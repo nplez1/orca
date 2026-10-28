@@ -13,7 +13,9 @@ function makeRefreshState(overrides: Partial<AgentInventoryRefreshState> = {}): 
   refreshRemote: ReturnType<typeof vi.fn>
   refreshRuntime: ReturnType<typeof vi.fn>
 } {
-  const refreshLocal = vi.fn<() => Promise<TuiAgent[]>>().mockResolvedValue([])
+  const refreshLocal = vi
+    .fn<(worktreeId?: string | null, isolated?: boolean) => Promise<TuiAgent[]>>()
+    .mockResolvedValue([])
   const refreshRemote = vi.fn<(connectionId: string) => Promise<TuiAgent[]>>().mockResolvedValue([])
   const refreshRuntime = vi
     .fn<(environmentId: string, worktreeId?: string | null) => Promise<TuiAgent[]>>()
@@ -82,15 +84,15 @@ describe('refreshDetectedAgentInventories', () => {
     expect(refreshLocal.mock.calls).toEqual([[]])
   })
 
-  it('reaches a workspace whose own runtime is a different local context', () => {
+  it('re-reads each workspace isolated, then this machine for the focused context', () => {
     const { state, refreshLocal } = makeRefreshState({
       worktreesByRepo: { repo: [{ id: 'wt-in-wsl' }] },
-      folderWorkspaces: [{ id: 'folder:c:/repo' }]
+      folderWorkspaces: [{ id: 'c:/repo' }]
     })
 
     refreshDetectedAgentInventories(state)
 
-    expect(refreshLocal.mock.calls).toEqual([['wt-in-wsl'], ['folder:c:/repo'], []])
+    expect(refreshLocal.mock.calls).toEqual([['wt-in-wsl', true], ['folder:c:/repo', true], []])
   })
 
   it('re-probes each remote host someone has already read, and skips the rest', () => {
@@ -135,7 +137,6 @@ describe('refreshDetectedAgentInventories', () => {
     expect(refreshRemote.mock.calls).toEqual([['ssh-2']])
     expect(refreshRuntime.mock.calls).toEqual([['env-1', undefined]])
   })
-
   it('narrows to one paired host, covering its default list and each workspace', () => {
     const otherHost = getRuntimeAgentInventoryKey('env-2', 'wt-2')
     const { state, refreshLocal, refreshRemote, refreshRuntime } = makeRefreshState({
@@ -165,14 +166,16 @@ describe('refreshDetectedAgentInventories', () => {
     ])
   })
 
-  it('does not fail the write when a probe cannot even be scheduled', () => {
-    const { state } = makeRefreshState()
+  it('does not stop scheduling the batch when one host cannot even start a probe', () => {
+    const { state, refreshRemote } = makeRefreshState({ remoteDetectedAgentIds: { 'ssh-1': [] } })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     state.refreshDetectedAgents = () => {
       throw new Error('no preflight context')
     }
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
     expect(() => refreshDetectedAgentInventories(state)).not.toThrow()
+    expect(consoleError).toHaveBeenCalled()
+    expect(refreshRemote.mock.calls).toEqual([['ssh-1']])
 
     consoleError.mockRestore()
   })

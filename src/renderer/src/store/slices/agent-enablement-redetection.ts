@@ -1,5 +1,6 @@
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selection'
+import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import {
   getRuntimeAgentInventoryEnvironmentId,
   getRuntimeAgentInventoryWorktreeId,
@@ -10,7 +11,7 @@ import {
 export type AgentInventoryRefreshState = {
   worktreesByRepo: Readonly<Record<string, readonly { id: string }[]>>
   folderWorkspaces: readonly { id: string }[]
-  refreshDetectedAgents: (worktreeId?: string | null) => Promise<TuiAgent[]>
+  refreshDetectedAgents: (worktreeId?: string | null, isolated?: boolean) => Promise<TuiAgent[]>
   remoteDetectedAgentIds: Readonly<Record<string, TuiAgent[] | null>>
   refreshRemoteDetectedAgents: (connectionId: string) => Promise<TuiAgent[]>
   runtimeDetectedAgentIds: Readonly<Record<string, TuiAgent[] | null>>
@@ -38,12 +39,22 @@ export function enablesNewTuiAgents(
   return false
 }
 
-/** Every local workspace id, which is how a local runtime context (a WSL distro) is named. */
+/** Every local workspace, named the way a runtime context resolves it. */
 function localWorkspaceIds(state: AgentInventoryRefreshState): string[] {
   return [
     ...Object.values(state.worktreesByRepo).flatMap((worktrees) => worktrees.map((w) => w.id)),
-    ...state.folderWorkspaces.map((folder) => folder.id)
+    // Why the key: a folder workspace answers to `folder:<id>`, and a bare id resolves as none.
+    ...state.folderWorkspaces.map((folder) => folderWorkspaceKey(folder.id))
   ]
+}
+
+/** Schedules one host's re-read; a probe that cannot even start must not fail the write. */
+function scheduleReRead(run: () => Promise<TuiAgent[]>): void {
+  try {
+    void run().catch(() => [])
+  } catch (error) {
+    console.error('Failed to re-detect agents after an enable:', error)
+  }
 }
 
 /**
@@ -60,44 +71,40 @@ export function refreshDetectedAgentInventories(
   options: { runtimeEnvironmentId?: string } = {}
 ): void {
   const { runtimeEnvironmentId } = options
-  try {
-    if (!runtimeEnvironmentId) {
-      // Why per workspace rather than once: a Windows project's own runtime (native or a WSL
-      // distro) names its own context, and only the focused one is reachable without an id.
-      // They collapse to one probe each, so the host these surfaces share is read once.
-      for (const worktreeId of localWorkspaceIds(state)) {
-        void state.refreshDetectedAgents(worktreeId).catch(() => [])
-      }
-      // Why last: the focused context is the one the shared `detectedAgentIds` field mirrors.
-      void state.refreshDetectedAgents().catch(() => [])
-      for (const [connectionId, cached] of Object.entries(state.remoteDetectedAgentIds)) {
-        // Why skip null: a list nobody has read yet is already being probed by its surface.
-        if (cached !== null) {
-          void state.refreshRemoteDetectedAgents(connectionId).catch(() => [])
-        }
+  if (!runtimeEnvironmentId) {
+    // Why per workspace rather than once: a Windows project's own runtime (native or a WSL
+    // distro) names its own context, and only the focused one is reachable without an id.
+    // Isolated, because a background context must not blank the shared field; and they
+    // collapse to one probe each, so the host these surfaces share is read once.
+    for (const worktreeId of localWorkspaceIds(state)) {
+      scheduleReRead(() => state.refreshDetectedAgents(worktreeId, true))
+    }
+    // Why last: the focused context is the one the shared `detectedAgentIds` field mirrors.
+    scheduleReRead(() => state.refreshDetectedAgents())
+    for (const [connectionId, cached] of Object.entries(state.remoteDetectedAgentIds)) {
+      // Why skip null: a list nobody has read yet is already being probed by its surface.
+      if (cached !== null) {
+        scheduleReRead(() => state.refreshRemoteDetectedAgents(connectionId))
       }
     }
-    // A paired host's default list and each of its workspaces are separate caches.
-    const inventories = new Set<string>(
-      runtimeEnvironmentId ? [getRuntimeAgentInventoryKey(runtimeEnvironmentId)] : []
+  }
+  // A paired host's default list and each of its workspaces are separate caches.
+  const inventories = new Set<string>(
+    runtimeEnvironmentId ? [getRuntimeAgentInventoryKey(runtimeEnvironmentId)] : []
+  )
+  for (const [key, cached] of Object.entries(state.runtimeDetectedAgentIds)) {
+    const sameHost =
+      !runtimeEnvironmentId || getRuntimeAgentInventoryEnvironmentId(key) === runtimeEnvironmentId
+    if (cached !== null && sameHost) {
+      inventories.add(key)
+    }
+  }
+  for (const key of inventories) {
+    scheduleReRead(() =>
+      state.refreshRuntimeDetectedAgents(
+        getRuntimeAgentInventoryEnvironmentId(key),
+        getRuntimeAgentInventoryWorktreeId(key)
+      )
     )
-    for (const [key, cached] of Object.entries(state.runtimeDetectedAgentIds)) {
-      const sameHost =
-        !runtimeEnvironmentId || getRuntimeAgentInventoryEnvironmentId(key) === runtimeEnvironmentId
-      if (cached !== null && sameHost) {
-        inventories.add(key)
-      }
-    }
-    for (const key of inventories) {
-      void state
-        .refreshRuntimeDetectedAgents(
-          getRuntimeAgentInventoryEnvironmentId(key),
-          getRuntimeAgentInventoryWorktreeId(key)
-        )
-        .catch(() => [])
-    }
-  } catch (error) {
-    // Why: the enabling write already landed; failing to schedule a probe is not a failed save.
-    console.error('Failed to re-detect agents after an enable:', error)
   }
 }
