@@ -100,8 +100,16 @@ describe('resolvePRCommentCodeSurface', () => {
 
   it('does not treat a compare against another base as the review diff', () => {
     const branchCompare = compare({ baseRef: 'origin/feature-x' })
-    expect(resolvePrCommentCodeSurfaceOutcome(branchCompare)).toBe('changes')
-    // Why the working-tree route still wins: its hunks are real, unlike a foreign base's.
+    expect(
+      resolvePRCommentCodeSurface({
+        relativePath: 'src/a.ts',
+        reviewBaseRefName: 'main',
+        branchCompare,
+        branchChanges: [branchEntry('src/a.ts')],
+        statusEntries: []
+      })
+    ).toEqual({ kind: 'changes' })
+    // Why Changes mode still wins for a dirty file: its hunks are real, unlike a foreign base's.
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/a.ts',
@@ -122,16 +130,22 @@ describe('resolvePRCommentCodeSurface', () => {
       }).kind
     ).toBe('branch-diff')
   })
-})
 
-function resolvePrCommentCodeSurfaceOutcome(
-  branchCompare: GitBranchCompareSummary
-): ReturnType<typeof resolvePRCommentCodeSurface>['kind'] {
-  return resolvePRCommentCodeSurface({
-    relativePath: 'src/a.ts',
-    reviewBaseRefName: 'main',
-    branchCompare,
-    branchChanges: [branchEntry('src/a.ts')],
-    statusEntries: []
-  }).kind
-}
+  it('accepts a base branch whose own name contains a slash', () => {
+    for (const baseRef of [
+      'release/2.0',
+      'origin/release/2.0',
+      'refs/remotes/origin/release/2.0'
+    ]) {
+      expect(
+        resolvePRCommentCodeSurface({
+          relativePath: 'src/a.ts',
+          reviewBaseRefName: 'release/2.0',
+          branchCompare: compare({ baseRef }),
+          branchChanges: [branchEntry('src/a.ts')],
+          statusEntries: []
+        }).kind
+      ).toBe('branch-diff')
+    }
+  })
+})

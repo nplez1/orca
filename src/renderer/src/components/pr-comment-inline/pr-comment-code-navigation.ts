@@ -76,6 +76,12 @@ export function resolvePRCommentCodeSurface({
   statusEntries: readonly GitStatusEntry[] | null | undefined
 }): PRCommentCodeSurface {
   const reviewBase = reviewBaseRefName?.trim() || null
+  // Why also the exact ref: a local base named `release/2.0` reads as `2.0` to the branch helper, and
+  // that mismatch would cost the jump the surface it came for.
+  const compareIsReviewBase = (baseRef: string): boolean =>
+    reviewBase === null ||
+    baseRef.trim() === reviewBase ||
+    getCompareBaseCandidateBranchName(baseRef) === reviewBase
   // Why the OIDs too: a diff tab with no compare OIDs silently renders an unstaged diff instead.
   const reviewDiffCompare =
     branchCompare?.status === 'ready' &&
@@ -83,7 +89,7 @@ export function resolvePRCommentCodeSurface({
     branchCompare.headOid &&
     branchCompare.mergeBase &&
     // Why: a compare against another base is some other diff, and its hunks would not be the review's.
-    (reviewBase === null || getCompareBaseCandidateBranchName(branchCompare.baseRef) === reviewBase)
+    compareIsReviewBase(branchCompare.baseRef)
       ? branchCompare
       : null
   const entry = reviewDiffCompare

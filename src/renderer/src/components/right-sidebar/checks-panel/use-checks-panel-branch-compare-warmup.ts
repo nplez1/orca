@@ -90,7 +90,6 @@ export function useChecksPanelBranchCompareWarmup({
     if (!ownerTarget) {
       return
     }
-    lastAskedRef.current = askKey
     const requestKey = `${askKey}:${Date.now()}`
     state.beginGitBranchCompareRequest(activeWorktreeId, requestKey, baseRef, {
       preserveExistingSummary: true
@@ -108,9 +107,11 @@ export function useChecksPanelBranchCompareWarmup({
       // Why still claim it: the result is keyed to this request, so applying it after the panel
       // hides is safe — and dropping it would strand the compare for the tab that needs it.
       .then((result) => {
+        lastAskedRef.current = askKey
         useAppStore.getState().setGitBranchCompareResult(activeWorktreeId, requestKey, result)
       })
-      // Why: a warm compare is advisory; a failed one leaves the jump on its existing fallbacks.
+      // Why: a warm compare is advisory, and a failed ask must not memoize — a reconnecting host
+      // would otherwise never be asked again for this base and head.
       .catch(() => {})
   }, [
     activeWorktreeId,

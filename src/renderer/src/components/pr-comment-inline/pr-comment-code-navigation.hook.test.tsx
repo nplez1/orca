@@ -53,6 +53,20 @@ function Probe({ reviewBaseRefName = 'main' }: { reviewBaseRefName?: string | nu
   return null
 }
 
+async function settleRevealFrames(): Promise<void> {
+  // Why poll rather than wait a fixed 40ms: the reveal is stamped two animation frames after the
+  // open, and a fixed wait is exactly the thing that turns flaky on a loaded worker.
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const state = useAppStore.getState()
+    if (state.pendingEditorReveal || state.scrollToDiffCommentId) {
+      return
+    }
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+  }
+}
+
 async function openComment(overrides: Partial<PRComment> = {}): Promise<void> {
   let opened = false
   await act(async () => {
@@ -60,10 +74,7 @@ async function openComment(overrides: Partial<PRComment> = {}): Promise<void> {
   })
   expect(opened).toBe(true)
   await flush()
-  // Why: the reveal is stamped two animation frames after the open, so the tab can mount first.
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 40))
-  })
+  await settleRevealFrames()
 }
 
 beforeEach(() => {

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { act } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -86,6 +87,24 @@ describe('useChecksPanelBranchCompareWarmup', () => {
     await flush()
 
     expect(mocks.getRuntimeGitBranchCompare).not.toHaveBeenCalled()
+    unmountProbes()
+  })
+
+  it('asks again after a failed compare, so a reconnecting host is not frozen out', async () => {
+    mocks.getRuntimeGitBranchCompare.mockRejectedValueOnce(new Error('host not connected'))
+    const root = await mountProbe(<Probe isPanelVisible activeReview={DEFAULT_REVIEW} />)
+    await flush()
+    expect(mocks.getRuntimeGitBranchCompare).toHaveBeenCalledOnce()
+
+    await act(async () => {
+      root.render(<Probe isPanelVisible={false} activeReview={DEFAULT_REVIEW} />)
+    })
+    await act(async () => {
+      root.render(<Probe isPanelVisible activeReview={DEFAULT_REVIEW} />)
+    })
+    await flush()
+
+    expect(mocks.getRuntimeGitBranchCompare).toHaveBeenCalledTimes(2)
     unmountProbes()
   })
 
