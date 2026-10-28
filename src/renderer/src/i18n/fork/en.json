@@ -65,26 +65,19 @@
         "preload": {
           "api": {
             "test": {
-              "harness": {
-                "225db77b97": "WebSocket"
-              }
+              "harness": {}
             }
           }
         }
       },
-      "pairingSecurity": {
-        "storedCodeInsecureOrigin": "This browser keeps a reusable pairing code, because this page is plain http on another machine. Anyone who can read this browser’s storage could use it. For a safer pairing, open Orca over https, at localhost on this computer, or through an SSH tunnel, and pair again.",
-        "sessionInsecureOrigin": "This pairing lasts only while this tab is open, because this page is plain http on another machine. For a pairing this browser remembers, open Orca over https, at localhost on this computer, or through an SSH tunnel."
-      }
+      "pairingSecurity": {}
     },
     "store": {
       "slices": {
         "github": {
           "slice": {
             "test": {
-              "harness": {
-                "28fd2d1802": "Test PR"
-              }
+              "harness": {}
             }
           }
         },
@@ -102,9 +95,7 @@
           },
           "slice": {
             "test": {
-              "fixtures": {
-                "e851268bd6": "Terminal"
-              }
+              "fixtures": {}
             }
           }
         },
@@ -123,18 +114,14 @@
         "background": {
           "session": {
             "test": {
-              "state": {
-                "d9fa6e0979": "Terminal 1"
-              }
+              "state": {}
             }
           }
         },
         "hibernation": {
           "coordinator": {
             "test": {
-              "fixture": {
-                "4499e360c7": "Agent"
-              }
+              "fixture": {}
             }
           }
         }
@@ -150,24 +137,15 @@
       }
     },
     "hooks": {
-      "useComposerState": {
-        "7eb3f44ff7": "Selected agent is disabled. Choose an enabled agent before creating."
-      },
-      "useIpcEvents": {
-        "291c8ed902": "Browser tabs are unavailable while a remote runtime is active",
-        "f45fa2b03c": "Browser profiles are unavailable while a remote runtime is active"
-      },
-      "useSettingsNavigationMetadata": {
-        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, and Fireworks.ai."
-      },
+      "useComposerState": {},
+      "useIpcEvents": {},
+      "useSettingsNavigationMetadata": {},
       "ipc": {
         "events": {
           "terminal": {
             "create": {
               "test": {
-                "harness": {
-                  "94ec7b52f7": "The workspace is not connected to a remote Orca host."
-                }
+                "harness": {}
               }
             }
           }
@@ -190,10 +168,7 @@
       },
       "NewWorkspaceComposerCard": {
         "test": {
-          "fixture": {
-            "95a5e6b3bb": "Devbox",
-            "2e2c474573": "Local Mac"
-          }
+          "fixture": {}
         },
         "pickAnotherHost": "This workspace already lives on that host. Pick another one to copy this branch there."
       },
@@ -214,7 +189,6 @@
         "jiraLoadMoreBacklog": "Load more backlog issues",
         "jiraBoardRequiresNewRuntime": "This Jira runtime does not support board views. Showing the issue list instead.",
         "jiraIssueMoved": "{{value0}} moved to {{value1}}",
-        "jiraNoStatusTransition": "Jira has no available transition to {{value0}} for {{value1}}.",
         "jiraCurrentSprint": "Current sprint",
         "jiraSprintEmpty": "No issues match this filter in the active sprint.",
         "jiraLoadMoreSprint": "Load more sprint issues",
@@ -239,9 +213,6 @@
         "jiraUnassignedFilter": "Unassigned",
         "jiraTransitionFieldsTitle": "Update fields to move {{value0}}",
         "jiraTransitionFieldsDescription": "Jira requires these fields before it will apply the {{value0}} transition.",
-        "jiraTransitionFieldsUnsupported": "Orca cannot set {{value0}}. If Jira requires it and the issue has no value, the move will be refused and Jira will name the field.",
-        "jiraTransitionFieldsApplying": "Moving…",
-        "jiraTransitionFieldsApply": "Apply and move",
         "jiraChooseOtherStatusTransition": "{{value0}} does not sit in a board column. Choose the status change to apply.",
         "jiraBoardIssueMoving": "{{value0}} is still moving.",
         "jiraBoardAlreadyInColumn": "{{value0}} is already in {{value1}}.",
@@ -268,10 +239,7 @@
       },
       "workspace": {
         "cleanup": {
-          "WorkspaceCleanupDialog": {
-            "4cc5b73efe": "Finding workspaces...",
-            "7b7bde5181": "Checked workspaces so far: {{value0}}"
-          }
+          "WorkspaceCleanupDialog": {}
         }
       },
       "terminal": {
@@ -281,9 +249,7 @@
               "pty": {
                 "transport": {
                   "test": {
-                    "harness": {
-                      "34e5ecd501": "Terminal"
-                    }
+                    "harness": {}
                   }
                 }
               }
@@ -293,15 +259,9 @@
       },
       "tab": {
         "bar": {
-          "BrowserTab": {
-            "9dd880bd56": "Close All Tabs To The Right"
-          },
-          "EditorFileTabContextMenu": {
-            "e5ff31ccaf": "Close All Tabs To The Right"
-          },
-          "SortableTabContextMenu": {
-            "c1ee099c7e": "Close All Tabs To The Right"
-          },
+          "BrowserTab": {},
+          "EditorFileTabContextMenu": {},
+          "SortableTabContextMenu": {},
           "TabBarDefaultAgentButton": {
             "2a0cbdc8a1": "Open {{value0}} in a new tab"
           },
@@ -316,18 +276,11 @@
       },
       "status": {
         "bar": {
-          "StatusBar": {
-            "8295903d17": "Restart live Claude terminals before continuing old conversations after switching."
-          },
+          "StatusBar": {},
           "tooltip": {
             "df60b41813": "Balance cannot fund further calls"
           },
-          "NativeChatResumeStatusSegment": {
-            "resumingLabelOne": "Resuming 1 chat",
-            "resumingLabel": "Resuming {{value0}} chats",
-            "resumingAriaOne": "Resuming 1 chat. Click to open details.",
-            "resumingAria": "Resuming {{value0}} chats. Click to open details."
-          },
+          "NativeChatResumeStatusSegment": {},
           "providerCredits": {
             "period": {
               "currentMonth": "this month",
@@ -352,9 +305,7 @@
         }
       },
       "sidebar": {
-        "SidebarWorkspaceOptionsMenu": {
-          "mergeSameBranch": "Group by branch"
-        },
+        "SidebarWorkspaceOptionsMenu": {},
         "WorktreeCard": {
           "ephemeralLeaseExpired": "Expired",
           "ephemeralLeaseRemaining": "Exp {{value0}}",
@@ -377,10 +328,7 @@
           "repo": {
             "local": {
               "start": {
-                "actions": {
-                  "serverSshDescription": "Open a project folder from an SSH host this server connects to",
-                  "serverSshUpdate": "Update this server to add projects on its SSH hosts"
-                }
+                "actions": {}
               }
             }
           }
@@ -402,28 +350,15 @@
         "worktree": {
           "card": {
             "meta": {
-              "row": {
-                "5c970dfb3b": "sidebar"
-              }
+              "row": {}
             }
           }
         },
         "AddRemoteHostDialog": {
-          "sshRelayGraceInvalid": "Terminal timeout must be between 60 and {{value0}} seconds.",
           "sshAlreadyHidden": "That SSH host is hidden in Settings → SSH hosts. Unhide it there rather than adding a second copy."
         },
-        "WorktreeIssueLinkField": {
-          "f047887705": "Paste an issue URL or key, or enter an issue number. Leave blank to remove the link.",
-          "662ae142f8": "Issue #, key, or an issue URL",
-          "3d7a1e90b4": "Jira",
-          "7b2c48d0a6": "Not a Jira issue key or Jira issue URL.",
-          "e91f5b2c73": "Couldn't open that issue. Check the identifier and your Jira connection."
-        },
-        "worktreeIssueDisplacement": {
-          "b7f1d0c4a9": "Jira {{value}}",
-          "c3a9f2b1d7": "This workspace is linked to a GitLab issue, which this field cannot replace.",
-          "6d0e8a45b2": "This workspace was created from a linked change request. This field only links issues."
-        },
+        "WorktreeIssueLinkField": {},
+        "worktreeIssueDisplacement": {},
         "WorktreeBranchHostSelect": {
           "label": "Select host"
         },
@@ -450,45 +385,19 @@
           "040f28a2a6": "Status",
           "66ae0c2967": "Show all"
         },
-        "useWorktreeMetaJiraLink": {
-          "4c1f7a2b90": "That Jira URL belongs to a site that is not connected.",
-          "8d2e0b6f31": "Connect Jira in Settings, then link the issue.",
-          "1a9c45e7d3": "Paste the full Jira issue URL so Orca knows which site holds it.",
-          "6f3b8c0a52": "Could not prepare this Jira link.",
-          "b5d9e17c48": "Couldn't find {{key}} on {{site}}. Check the key and your Jira access.",
-          "27e6a3d1f5": "Couldn't read {{key}} from Jira. Check your Jira connection and try again.",
-          "9b7f1d38a4": "More than one connected Jira account uses that site, so Orca cannot tell which one to read.",
-          "2e5a90c47b": "The Jira site this workspace is linked to is not connected."
-        }
+        "useWorktreeMetaJiraLink": {}
       },
       "settings": {
         "AccountsPane": {
-          "remoteScopeAccounts": "Showing accounts managed by {{value0}}. Add or re-authenticate accounts on that server.",
-          "854ebbcc45": "Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.",
-          "79e484c3b2": "Optional account switcher for the shared Claude auth files.",
-          "b15ce90870": "{{value0}} -> {{value1}}. Restart live Claude terminals before continuing old sessions.",
           "aa4de4475b": "Gemini CLI (legacy)"
         },
         "AdvancedPane": {
           "c22adcc7c5": "Debug Options",
           "9b1f52e764": "Extra logging for troubleshooting Orca itself."
         },
-        "BrowserDefaultZoomSetting": {
-          "2622126877": "Zoom level applied to newly opened browser tabs.",
-          "bbeec087d3": "Applied to newly opened browser tabs."
-        },
+        "BrowserDefaultZoomSetting": {},
         "ExperimentalPane": {
-          "nativeChat": {
-            "defaultTitle": "Default view",
-            "defaultCopy": "Choose how new supported agent terminal tabs open.",
-            "defaultViewLabel": "Default Chat UI view",
-            "defaultViewTerminal": "Terminal chat",
-            "defaultViewNative": "Chat UI",
-            "structuredTitle": "Use updated structured native chat",
-            "structuredCopy": "Open new agents as structured chats where supported. Off opens them in the terminal-backed chat. Chats that already exist stay as they are.",
-            "structuredScope": "Runs on this machine and on paired Orca servers running a version that supports it; older servers keep terminal chat. WSL and SSH hosts continue to use terminal chat.",
-            "structuredToggleLabel": "Toggle updated structured native chat"
-          },
+          "nativeChat": {},
           "agentDashboard": {
             "description": "Kanban board for monitoring agents across worktrees as a full view in the main area.",
             "clickLabel": "Clicking a card",
@@ -523,45 +432,15 @@
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
         "SshPane": {
-          "2c4ee7332b": "Failed to reset remote relay",
-          "db2e48975e": "Remote relay reset",
-          "025e107643": "Failed to end remote terminals",
-          "90e308c98b": "Remote terminals ended",
-          "3879cbaa52": "Terminal timeout must be between 60 and {{value0}} seconds, or keep terminals alive until reset.",
-          "terminateUnverifiable": "{{terminals}} remote terminal(s) could not be reached. Reconnect to end them.",
           "hostHidden": "{{value0}} is hidden from host lists",
           "hostUnhidden": "{{value0}} is available again",
           "hostVisibilityFailed": "Failed to update host visibility"
         },
         "SshTargetCard": {
-          "a883f5a00f": "terminal timeout: {{value0}}",
-          "8ce71262f4": "terminals until reset",
-          "762a48c662": "Reset remote relay",
-          "97dea4e8cf": "Resetting remote relay",
-          "da16e108e6": "End remote terminals",
-          "c77f1abfe3": "Ending remote terminals",
-          "hiddenBadge": "Hidden",
-          "hostNodeFallback": "Unsupported configuration: Orca-managed Node isn’t available for this connection, so Orca runs on this host’s Node.js with terminal support installed by npm on the host.",
-          "hostNodeUnsupported": "Unsupported configuration: Orca runs on this host’s Node.js with terminal support installed by npm on the host. Set Runtime to Auto in this host’s SSH settings to use Orca-managed Node."
+          "hiddenBadge": "Hidden"
         },
-        "SshTargetDestructiveActions": {
-          "7e66942808": "This will stop active terminal sessions on this SSH target. Reconnecting will not restore them.",
-          "accf177a03": "End Remote Terminals?",
-          "26be00392d": "This force-stops the remote relay for this SSH target. Active remote terminals and port forwards for this target will end.",
-          "570a7a0574": "Reset Remote Relay?"
-        },
-        "SshTargetForm": {
-          "1b19b00e93": "Bounded timeouts must be between 60 seconds and 7 days.",
-          "7c13f58c91": "Until reset",
-          "55c56cf2c7": "Timeout after disconnect (seconds)",
-          "b574994adc": "Use End Remote Terminals or Reset Relay when you want to stop them.",
-          "71fc546097": "Keep terminals alive until reset",
-          "remoteRuntime": "Runtime",
-          "remoteRuntimeHelp": "Which Node.js runs Orca on this host. Orca-managed Node uploads its own and needs no npm; Host Node uses the Node.js already installed there.",
-          "remoteRuntimeAuto": "Auto",
-          "remoteRuntimePinnedNode": "Orca-managed Node",
-          "remoteRuntimeHostNode": "Host Node"
-        },
+        "SshTargetDestructiveActions": {},
+        "SshTargetForm": {},
         "WorktreeSymlinksSection": {
           "sharedDirectoriesModeLabel": "orca.yaml sharedDirectories behavior",
           "sharedDirectoriesModeDescription": "APFS clones and copies are independent per worktree. Symlinks share changes with the primary checkout. Copy fallback has no size or entry-count cap and can be slow or use substantial disk space. SSH worktrees do not materialize sharedDirectories yet.",
@@ -646,11 +525,9 @@
                 "70efb28dee": "GitHub token is required."
               },
               "section": {
-                "5a193f1da9": "The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
                 "d7c06dead5": "your-enterprise",
                 "467c761749": "Enterprise slug",
                 "fa8def1ab4": "Optional. Required only when using an enterprise billing token override.",
-                "d0f786b0e5": "The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month.",
                 "4cf256a883": "Forget token",
                 "b03cd42103": "Save",
                 "ef36dc11a9": "Replace",
@@ -673,8 +550,7 @@
                 "ae9c8d3fd2": "Optional override",
                 "022c7c89d5": "Orca reads your Copilot AI-credit entitlement through your GitHub CLI sign-in, which needs the user scope. Paste a token only for an enterprise billing override. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits available to you each month.",
                 "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
-                "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
-                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it."
+                "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well."
               }
             }
           }
@@ -693,14 +569,7 @@
           }
         },
         "appearance": {
-          "search": {
-            "2fbe0c981b": "Langue",
-            "3a0e3a9fdc": "Idioma",
-            "5f4779d525": "言語",
-            "0b03f507c2": "언어",
-            "ab96f8a4b9": "語言",
-            "b6035a3def": "语言"
-          }
+          "search": {}
         },
         "experimental": {
           "search": {
@@ -720,18 +589,12 @@
         "terminal": {
           "advanced": {
             "platform": {
-              "search": {
-                "7d383cc610": "ghostty",
-                "77faf8be39": "Ghostty"
-              }
+              "search": {}
             }
           },
           "pane": {
             "appearance": {
-              "search": {
-                "1f4decdd74": "ghostty",
-                "e0cc1b7b47": "Ghostty"
-              }
+              "search": {}
             }
           }
         },
@@ -747,30 +610,10 @@
           "leaseExtended": "Lease extended.",
           "leaseExtendedUntil": "Lease extended to {{value0}}."
         },
-        "MobilePairingConnectionOptions": {
-          "signInRequired": "Relay only — LAN does not need an account."
-        },
-        "BrowserTerminalLinkActionsSetting": {
-          "description": "Show available actions when you click a link in the terminal or a chat transcript. Turn this off to require {{modifier}}-click in the terminal."
-        },
-        "sshHostServer": {
-          "unavailable": "Runs the relay: a managed Orca server can’t run on this host ({{reason}}).",
-          "tunnelUnavailable": "Runs the relay: this host’s SSH server doesn’t allow port forwarding, and Orca couldn’t reach a managed server through the SSH session either.",
-          "terminalsLive": "Runs the relay until its {{count}} open terminals are closed, then moves to a managed server.",
-          "terminalsLive_one": "Runs the relay until its {{count}} open terminal is closed, then moves to a managed server.",
-          "terminalsLive_other": "Runs the relay until its {{count}} open terminals are closed, then moves to a managed server.",
-          "terminalsUnverifiable": "Runs the relay: Orca couldn’t confirm its terminals are closed. It moves on a later connect.",
-          "retry": "Runs the relay this session; it moves to a managed server on a later connect.",
-          "unavailableUnknown": "Runs the relay: a managed Orca server can’t run on this host.",
-          "terminalsLiveUncounted": "Runs the relay until its open terminals are closed, then moves to a managed server.",
-          "terminalsElsewhere": "Runs the relay while {{count}} terminals another Orca desktop or session opened on this host are running.",
-          "terminalsElsewhere_one": "Runs the relay while {{count}} terminal another Orca desktop or session opened on this host is running.",
-          "terminalsElsewhere_other": "Runs the relay while {{count}} terminals another Orca desktop or session opened on this host are running.",
-          "terminalsElsewhereUncounted": "Runs the relay while terminals another Orca desktop or session opened on this host are running."
-        },
-        "NativeChatSupportedAgents": {
-          "label": "Supported agents:"
-        },
+        "MobilePairingConnectionOptions": {},
+        "BrowserTerminalLinkActionsSetting": {},
+        "sshHostServer": {},
+        "NativeChatSupportedAgents": {},
         "AgentSessionSearchSection": {
           "contentTitle": "Index conversation content",
           "contentDescription": "Indexes session titles, working directories, branches, and message text from transcripts on this machine. When off, search covers titles and paths but not conversation contents.",
@@ -814,7 +657,6 @@
           "defaultBoard": "Default board",
           "chooseBoard": "Choose a board",
           "useListView": "No default board (use issue list)",
-          "defaultBoardHelp": "The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter.",
           "retry": "Retry",
           "unnamedBoard": "Board {{value0}}",
           "searchBoards": "Search boards by name...",
@@ -843,14 +685,10 @@
             "filterScannedPartialWorkspace": "Only part of this workspace was searched — add more of the name to narrow it down",
             "filterShowingFirstMatches": "Showing the first {{value0}} of {{value1}} matches — add more of the name to narrow it down"
           },
-          "SourceControlAgentActionDialogForm": {
-            "1bc0bdbb5e": "Launch:"
-          },
+          "SourceControlAgentActionDialogForm": {},
           "checks": {
             "panel": {
-              "content": {
-                "b8c4e2a1f7": "View full logs"
-              },
+              "content": {},
               "review": {
                 "verdicts": {
                   "0bf5a253a984": "Changes requested",
@@ -893,7 +731,6 @@
             "hiddenSubagentSessions": "{{value0}} subagent sessions hidden (parent not loaded)"
           },
           "AiVaultSessionRow": {
-            "resumeInNewChat": "Resume in New Chat",
             "subagentSession_one": "{{count}} subagent session",
             "subagentSession_other": "{{count}} subagent sessions"
           },
@@ -906,11 +743,7 @@
             "searching": "Searching files…",
             "liveScanComplete": "Complete results from a full scan — the file index is still building"
           },
-          "AiVaultScanProgressStrip": {
-            "stoppedAfter": "Stopped after {{value0}}",
-            "stoppedAt": "stopped at {{value0}}",
-            "refresh": "Refresh"
-          },
+          "AiVaultScanProgressStrip": {},
           "IssuePane": {
             "providerGithub": "GitHub",
             "providerLinear": "Linear",
@@ -963,9 +796,7 @@
             "terminal": {
               "panel": {
                 "test": {
-                  "fixtures": {
-                    "00cde6717e": "Mobile Emulator"
-                  }
+                  "fixtures": {}
                 }
               }
             }
@@ -974,10 +805,7 @@
       },
       "browser": {
         "pane": {
-          "BrowserPane": {
-            "f796c774a4": "Type a URL above to start browsing.",
-            "8f87e6c2e5": "Intent"
-          },
+          "BrowserPane": {},
           "stream": {
             "remote": {
               "remote": {
@@ -985,9 +813,7 @@
                   "stream": {
                     "lifecycle": {
                       "test": {
-                        "harness": {
-                          "471387f8f8": "Example"
-                        }
+                        "harness": {}
                       }
                     }
                   }
@@ -1000,14 +826,9 @@
       "automations": {
         "automations": {
           "page": {
-            "fixtures": {
-              "104f70edd9": "Hermes",
-              "c1e6f01a35": "Nightly #1"
-            },
+            "fixtures": {},
             "test": {
-              "harness": {
-                "90edd9c380": "Refresh automations"
-              }
+              "harness": {}
             }
           }
         }
@@ -1015,19 +836,13 @@
       "activity": {
         "ActivityPrototypePage": {
           "test": {
-            "fixtures": {
-              "43a827f6a7": "Claude"
-            }
+            "fixtures": {}
           }
         }
       },
       "native": {
         "chat": {
-          "NativeChatStructuredSession": {
-            "1f772bb5d0": "Message delivery is unconfirmed.",
-            "93ef441197": "Message was not sent.",
-            "a5e7f14068": "Retry"
-          }
+          "NativeChatStructuredSession": {}
         }
       },
       "JiraIssueStoryPointsControl": {
@@ -1112,9 +927,7 @@
         "session": {
           "mirror": {
             "frame": {
-              "fixtures": {
-                "17e758e12c": "Codex"
-              }
+              "fixtures": {}
             }
           }
         }
@@ -1126,9 +939,7 @@
               "orphan": {
                 "recovery": {
                   "regression": {
-                    "fixtures": {
-                      "f1eb7ee8e3": "Terminal"
-                    }
+                    "fixtures": {}
                   }
                 }
               }
@@ -1138,57 +949,21 @@
       }
     },
     "ssh": {
-      "managedServerMove": {
-        "offer": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminals will restart.",
-        "offer_one": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminal will restart.",
-        "offer_other": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminals will restart.",
-        "moved": "{{host}} now runs a managed Orca server.",
-        "refusedLive": "Not moved: {{count}} terminals on {{host}} are still running.",
-        "refusedLive_one": "Not moved: {{count}} terminal on {{host}} is still running.",
-        "refusedLive_other": "Not moved: {{count}} terminals on {{host}} are still running.",
-        "refusedUnverifiable": "Not moved: Orca couldn’t confirm that {{count}} terminals on {{host}} stopped.",
-        "refusedUnverifiable_one": "Not moved: Orca couldn’t confirm that {{count}} terminal on {{host}} stopped.",
-        "refusedUnverifiable_other": "Not moved: Orca couldn’t confirm that {{count}} terminals on {{host}} stopped.",
-        "stayed": "{{host}} still runs the relay. SSH Hosts in Settings shows why.",
-        "failed": "Could not move {{host}}: {{reason}}",
-        "running": "Moving {{host}} to a managed Orca server…",
-        "title": "Move to managed server",
-        "confirm": "Move",
-        "notNow": "Not now",
-        "close": "Close",
-        "offerUncounted": "Move {{host}} to a managed Orca server for more reliable connections. Its open terminals will restart.",
-        "refusedUnverifiableUncounted": "Not moved: Orca couldn’t confirm that the terminals on {{host}} stopped.",
-        "retry": "Try again"
-      }
+      "managedServerMove": {}
     }
   },
   "components": {
     "native-chat": {
-      "queuedMessages": {
-        "awaitingAnswerHold": "Waiting for your answer",
-        "editAlreadySent": "Already sent — your text is still in the composer.",
-        "pausedKept": "Not sent yet — press Send to send it.",
-        "from": "From {{names}}"
-      },
-      "visualOpenInSidebar": "Open in sidebar",
-      "visualClose": "Close visualization"
+      "queuedMessages": {}
     },
     "tab": {
       "bar": {
-        "SortableTabContextMenu": {
-          "closeTabsToLeft": "Close All Tabs To The Left"
-        },
-        "BrowserTab": {
-          "closeTabsToLeft": "Close All Tabs To The Left"
-        },
-        "EditorFileTabContextMenu": {
-          "closeTabsToLeft": "Close All Tabs To The Left"
-        }
+        "SortableTabContextMenu": {},
+        "BrowserTab": {},
+        "EditorFileTabContextMenu": {}
       }
     },
-    "agentSessionContinuation": {
-      "continueInNewSession": "Continue in New Session…"
-    },
+    "agentSessionContinuation": {},
     "jiraOptionMultiSelect": {
       "search": "Search options...",
       "noMatch": "No options match your search."
@@ -1207,12 +982,7 @@
     }
   },
   "terminal": {
-    "codexSharedServerBanner": {
-      "openNewTerminal": "Open new terminal",
-      "dontShowAgain": "Don't show again",
-      "dismiss": "Dismiss",
-      "learnMore": "Learn more"
-    }
+    "codexSharedServerBanner": {}
   },
   "workspace": {
     "exactBranch": {

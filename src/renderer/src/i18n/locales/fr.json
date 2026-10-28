@@ -595,7 +595,6 @@
     "minimizeNotice": {
       "body": "Orca continue de tourner dans la zone de notification"
     },
-    "activityWaiting": "Orca - activité en attente",
     "activityWaitingSuffix": "activité en attente"
   },
   "worktreeJumpPalette": {
@@ -677,7 +676,6 @@
       "df1d56bf87": "Le shell de l'espace de travail a rencontré une erreur.",
       "9e0b441a91": "Basculer la barre latérale droite",
       "e81217c1b7": "Masquer le nom de l'app",
-      "5096cbbc86": "Orca",
       "8b0b8eb54f": "Menu de l'application",
       "caea5b51b9": "Redémarrer maintenant",
       "0a9e810705": "Les modifications ne seront enregistrées qu'après redémarrage. Vos onglets précédents sont en sécurité sur le disque.",
@@ -810,7 +808,6 @@
           }
         },
         "worktrees": {
-          "e50495aae6": "Forcer la suppression de la branche",
           "14bc053a47": "Le {{value0}} local n'a pas été actualisé",
           "localBaseRefRefreshFailedForWorktree": "Le {{value0}} local n'a pas été actualisé pour « {{value1}} »",
           "903b51c2ed": "Espace de travail créé à partir de {{value0}}, mais Orca n'a pas pu avancer le {{value1}} local en fast-forward. {{value2}}",
@@ -821,11 +818,6 @@
           "localBaseRefRefreshFailedDetailError": "Git a renvoyé une erreur lors de la mise à jour du {{value0}} local. Vérifiez que le dépôt n'a pas de refs verrouillées ni d'état de worktree inhabituel, puis mettez à jour le {{value0}} local manuellement.",
           "0216895fb5": "Échec de la suppression de la branche",
           "c6cf133786": "Cet espace de travail n'est plus disponible.",
-          "5366d13eec": "Espace de travail supprimé, branche conservée",
-          "2e17f825d4": "Worktree supprimé, branche conservée",
-          "78e08cd877": "Git n'a pas pu supprimer la branche « {{value0}} » sans risque, Orca l'a donc conservée pour éviter de perdre des commits locaux.",
-          "3b57982bf6": "Git n'a pas pu supprimer la branche « {{value0}} » sans risque après la suppression de l'espace de travail « {{value1}} », Orca l'a donc conservée pour éviter de perdre des commits locaux.",
-          "81f13f48d2": "Git n'a pas pu supprimer la branche « {{value0}} » sans risque après la suppression du worktree « {{value1}} », Orca l'a donc conservée pour éviter de perdre des commits locaux.",
           "runtimeScopeForbiddenTitle": "Cette connexion a un accès limité (mobile)",
           "runtimeScopeForbiddenDescription": "Les espaces de travail sont indisponibles sur un appairage à périmètre mobile. Reconnectez-vous via le lien d'accès navigateur depuis Paramètres → Environnements d'exécution → Partager ce serveur Orca.",
           "a17f4d2e93": "Impossible de mettre à jour cet espace de travail.",
@@ -1559,7 +1551,6 @@
         "cd50cec5d7": "Coordonnez plusieurs agents de codage via Orca.",
         "58a868e8e4": "Orchestration",
         "7c79d3b7bf": "Facultatif",
-        "b1c2f8b0ac": "Configuration facultative de changement de compte et d'utilisation pour Claude, Codex, Gemini, OpenCode Go, MiniMax et Grok.",
         "f70ac54d38": "Comptes de fournisseurs d'IA",
         "4121f7a0a2": "Gérez les agents IA, définissez-en un par défaut et personnalisez les commandes.",
         "b49abbd2f7": "Agents",
@@ -1720,8 +1711,6 @@
         "28986b3747": "Un agent IA a été démarré pour les vérifications cassées.",
         "1690fd7f4a": "Aucune vérification cassée à corriger.",
         "9e7c221b8d": "Échec de la relance des vérifications",
-        "e463ec935f": "Relances des vérifications demandées",
-        "ddafe851e1": "Relance de la vérification demandée",
         "0bbdc673c1": "Échec de l'actualisation des vérifications",
         "e7007aa1d8": "Impossible d'actualiser les vérifications sans chemin de dépôt.",
         "675bc0d638": "Annuler",
@@ -2199,8 +2188,6 @@
         "98583589c6": "Échec du démarrage d'un agent IA pour les vérifications cassées : {{value0}}",
         "51c65c0265": "Aucune vérification cassée à corriger.",
         "788a782bb0": "Échec de la relance des vérifications",
-        "18f2af42ac": "Relances des vérifications demandées",
-        "5963a6a852": "Relance de la vérification demandée",
         "246b2c6456": "Échec de l'actualisation des vérifications",
         "c057f2fcb0": "Impossible d'actualiser les vérifications sans chemin de dépôt.",
         "6591b1fa82": "Annuler",
@@ -3894,7 +3881,6 @@
             "bbcd9b7b85": "Réduire l'espace de travail",
             "c4a8968bdd": "Développer l'espace de travail",
             "b10695d6ce": "Tuer la session",
-            "288a4dd177": "Orca",
             "53dd5560ae": "Réduire Orca",
             "e419d27083": "Développer Orca",
             "41ae4fa725": "Arrêt forcé…",
@@ -4533,7 +4519,6 @@
         "share": {
           "card": {
             "utils": {
-              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "sortie",
               "5d66fdd7c2": "entrée",
               "7080aeaebb": "Raisonnement",
@@ -6581,7 +6566,6 @@
           "d676c41fc6": "Extrait les identifiants OAuth de votre installation locale de Gemini CLI pour vous authentifier auprès de Google. Utilise les identifiants émis pour l'app Gemini CLI, pas pour Orca. Peut cesser de fonctionner si Google met à jour la CLI. À utiliser à vos risques et périls.",
           "0c7f915b01": "Utiliser les identifiants Gemini CLI",
           "973741a871": "Conserver les sessions Gemini CLI existantes disponibles. Les identifiants Gemini ne vous connectent pas à Antigravity.",
-          "0c64dc2a64": "Gemini CLI (hérité)",
           "db209ee572": "Supprimer",
           "8a0f870153": "Réauthentifier",
           "3d245ef7d9": "Codex signale que cette connexion est périmée",
@@ -7159,12 +7143,7 @@
             "title": "Tableau de bord des agents",
             "description": "Tableau Kanban pour surveiller les agents de tous les worktrees, dans la fenêtre ou en fenêtre indépendante.",
             "copy": "Ajoute une entrée Tableau de bord des agents à la barre latérale gauche. Surveillez les agents qui ont besoin de vous, qui travaillent ou qui ont terminé, avec en option les agents inactifs.",
-            "toggleLabel": "Activer le tableau de bord des agents",
-            "modeLabel": "Mode d'affichage",
-            "modeCopy": "Affiche le tableau de bord dans la fenêtre, à côté de la barre latérale, ou dans une fenêtre indépendante.",
-            "modeAriaLabel": "Mode d'ouverture du tableau de bord des agents",
-            "modeInWindow": "Dans la fenêtre",
-            "modePopout": "Fenêtre indépendante"
+            "toggleLabel": "Activer le tableau de bord des agents"
           },
           "browserExtensions": {
             "copy": "Ajoute Paramètres › Navigateur › Extensions pour les profils de navigateur locaux.",
@@ -9380,7 +9359,6 @@
               "dashboard": "tableau de bord",
               "agent": "agent",
               "kanban": "Kanban",
-              "popout": "pop-out",
               "board": "conseil",
               "inWindow": "dans la fenêtre",
               "worktrees": "arbres de travail"
@@ -13890,7 +13868,6 @@
           "1b5e182e9f": "Bienvenue dans Orca",
           "4db04f2f57": "sur",
           "adaa0aa627": "Aller à l'étape {{value0}} de la prise en main : {{value1}}",
-          "a249f81538": "Orca",
           "277ba45540": "Prise en main d'Orca",
           "97c42cda00": "Installez le CLI GitHub pour :",
           "ae3b00ca82": "Configurer les tâches GitHub",
@@ -14193,8 +14170,7 @@
             "4a40af029b": "Temps agent",
             "00a6903322": "Agents lancés",
             "c0e2e9dcd9": "Bon retour",
-            "af761a0c0d": "Paramètres",
-            "5d94e8ddcc": "Orca"
+            "af761a0c0d": "Paramètres"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "Envoyer",
@@ -15690,7 +15666,6 @@
             "88fea8e84e": "Ne pas envoyer",
             "50b00dc327": "Copier les détails",
             "6d3ebe216a": "Texte de diagnostic",
-            "835037edc9": "Orca",
             "8e24fe4f75": "Rapport de plantage envoyé.",
             "8b8473c544": "Rapport de plantage copié.",
             "765591798d": "Recherche de rapports de plantage...",
@@ -18912,9 +18887,7 @@
       "agentOptional": "Agent (facultatif)",
       "createDescription": "Choisissez le projet et le nom de l'espace de travail. Sélectionnez un agent si vous souhaitez en démarrer un."
     },
-    "JiraIssueWorkspace": {
-      "pendingChange": "Une autre modification d'issue est en cours."
-    },
+    "JiraIssueWorkspace": {},
     "jiraProjectPicker": {
       "search": "Rechercher des projets Jira",
       "empty": "Aucun projet trouvé.",
@@ -18987,10 +18960,7 @@
     }
   },
   "dashboardPopout": {
-    "recoverableError": {
-      "title": "Le tableau de bord Orca a rencontré une erreur.",
-      "description": "Le tableau de bord n'a pas pu terminer son rendu. Réessayez pour le recharger, ou rouvrez-le."
-    },
+    "recoverableError": {},
     "bucket": {
       "attention": "Vous concerne",
       "working": "En activité",
@@ -20058,7 +20028,6 @@
       "count": "{{count}} espaces de travail liés à {{key}}",
       "startAnother": "Démarrer un nouvel espace de travail",
       "empty": "Liez une issue Jira à un espace de travail, ou choisissez une autre vue.",
-      "openFailed": "Impossible d'ouvrir l'espace de travail lié à cette issue Jira.",
       "mode": "Avec espace de travail",
       "search": "Rechercher les issues liées",
       "single": "1 espace de travail lié à {{key}}"
@@ -20085,8 +20054,6 @@
       "loadError": "Impossible de charger les changements de statut.",
       "retry": "Réessayer",
       "loading": "Chargement des changements de statut…",
-      "completeInJira": "Terminez « {{name}} » dans Jira",
-      "unsupported": "Jira exige des champs qu'Orca ne peut pas encore collecter : {{fields}}.",
       "chooseResolution": "Choisissez une résolution",
       "comment": "Commentaire",
       "back": "Retour",

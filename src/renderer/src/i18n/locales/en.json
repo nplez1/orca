@@ -683,7 +683,6 @@
     "minimizeNotice": {
       "body": "Orca is still running in the system tray"
     },
-    "activityWaiting": "Orca - activity waiting",
     "activityWaitingSuffix": "activity waiting"
   },
   "worktreeJumpPalette": {
@@ -765,7 +764,6 @@
       "df1d56bf87": "The workspace shell hit an error.",
       "9e0b441a91": "Toggle right sidebar",
       "e81217c1b7": "Hide App Name",
-      "5096cbbc86": "Orca",
       "8b0b8eb54f": "Application menu",
       "caea5b51b9": "Restart now",
       "0a9e810705": "Changes won't be saved until restart. Your previous tabs are safe on disk.",
@@ -898,7 +896,7 @@
           }
         },
         "worktrees": {
-          "e50495aae6": "Force Delete Branch",
+          "e50495aae6": "Force Delete Local Branch",
           "14bc053a47": "Local {{value0}} was not refreshed",
           "localBaseRefRefreshFailedForWorktree": "Local {{value0}} was not refreshed for \"{{value1}}\"",
           "903b51c2ed": "Workspace created from {{value0}}, but Orca could not fast-forward local {{value1}}. {{value2}}",
@@ -921,11 +919,11 @@
           "localBaseRefRefreshTurnOffFailed": "Could not turn off {{value0}}",
           "0216895fb5": "Failed to delete branch",
           "c6cf133786": "This workspace is no longer available.",
-          "5366d13eec": "Workspace deleted, branch kept",
-          "2e17f825d4": "Worktree deleted, branch kept",
-          "78e08cd877": "Git could not safely delete branch \"{{value0}}\", so Orca kept it to avoid losing local commits.",
-          "3b57982bf6": "Git could not safely delete branch \"{{value0}}\" after deleting workspace \"{{value1}}\", so Orca kept it to avoid losing local commits.",
-          "81f13f48d2": "Git could not safely delete branch \"{{value0}}\" after deleting worktree \"{{value1}}\", so Orca kept it to avoid losing local commits.",
+          "5366d13eec": "Workspace deleted, local branch kept",
+          "2e17f825d4": "Worktree deleted, local branch kept",
+          "78e08cd877": "Git could not safely delete local branch \"{{value0}}\", so Orca kept it to avoid losing local commits.",
+          "3b57982bf6": "Git could not safely delete local branch \"{{value0}}\" after deleting workspace \"{{value1}}\", so Orca kept it to avoid losing local commits.",
+          "81f13f48d2": "Git could not safely delete local branch \"{{value0}}\" after deleting worktree \"{{value1}}\", so Orca kept it to avoid losing local commits.",
           "runtimeScopeForbiddenTitle": "This connection has limited (mobile) access",
           "runtimeScopeForbiddenDescription": "Workspaces are unavailable on a mobile-scope pairing. Reconnect using the browser access link from Settings → Runtime Environments → Share this Orca server.",
           "a17f4d2e93": "Could not update this workspace.",
@@ -1638,7 +1636,7 @@
         "cd50cec5d7": "Coordinate multiple coding agents through Orca.",
         "58a868e8e4": "Orchestration",
         "7c79d3b7bf": "Optional",
-        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, and Grok.",
+        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, Fireworks.ai, and GitHub Copilot.",
         "f70ac54d38": "AI Provider Accounts",
         "4121f7a0a2": "Manage AI agents, set a default, and customize commands.",
         "b49abbd2f7": "Agents",
@@ -1784,8 +1782,6 @@
         "28986b3747": "Started an AI agent for the broken checks.",
         "1690fd7f4a": "No broken checks to fix.",
         "9e7c221b8d": "Failed to rerun checks",
-        "e463ec935f": "Check reruns requested",
-        "ddafe851e1": "Check rerun requested",
         "0bbdc673c1": "Failed to refresh checks",
         "e7007aa1d8": "Unable to refresh checks without a repository path.",
         "675bc0d638": "Cancel",
@@ -2262,8 +2258,6 @@
         "98583589c6": "Failed to start an AI agent for the broken checks: {{value0}}",
         "51c65c0265": "No broken checks to fix.",
         "788a782bb0": "Failed to rerun checks",
-        "18f2af42ac": "Check reruns requested",
-        "5963a6a852": "Check rerun requested",
         "246b2c6456": "Failed to refresh checks",
         "c057f2fcb0": "Unable to refresh checks without a repository path.",
         "6591b1fa82": "Cancel",
@@ -4007,7 +4001,6 @@
             "bbcd9b7b85": "Collapse workspace",
             "c4a8968bdd": "Expand workspace",
             "b10695d6ce": "Kill session",
-            "288a4dd177": "Orca",
             "53dd5560ae": "Collapse Orca",
             "e419d27083": "Expand Orca",
             "41ae4fa725": "Killing…",
@@ -4655,7 +4648,6 @@
         "share": {
           "card": {
             "utils": {
-              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "output",
               "5d66fdd7c2": "input",
               "7080aeaebb": "Reasoning",
@@ -6706,7 +6698,7 @@
           "d676c41fc6": "Extracts OAuth credentials from your local Gemini CLI installation to authenticate with Google. This uses credentials issued to the Gemini CLI app, not Orca. May break if Google updates the CLI. Use at your own risk.",
           "0c7f915b01": "Use Gemini CLI credentials",
           "973741a871": "Keep existing Gemini CLI sessions available. Gemini credentials do not sign you into Antigravity.",
-          "0c64dc2a64": "Gemini CLI (legacy)",
+          "0c64dc2a64": "Gemini",
           "db209ee572": "Remove",
           "8a0f870153": "Re-authenticate",
           "3d245ef7d9": "Codex reported this sign-in is out of date",
@@ -7280,12 +7272,7 @@
             "title": "Agent Dashboard",
             "description": "Kanban board for monitoring agents across worktrees, in-window or as a pop-out.",
             "copy": "Adds an Agent Dashboard entry to the left sidebar. Monitor agents that need you, are working, or are done, with optional idle agents.",
-            "toggleLabel": "Toggle Agent Dashboard",
-            "modeLabel": "Open as",
-            "modeCopy": "Show the dashboard as an in-window board beside the sidebar or a separate pop-out window.",
-            "modeAriaLabel": "Agent Dashboard open mode",
-            "modeInWindow": "In-window",
-            "modePopout": "Pop-out"
+            "toggleLabel": "Toggle Agent Dashboard"
           },
           "browserExtensions": {
             "copy": "Adds Settings › Browser › Extensions for local browser profiles.",
@@ -9502,7 +9489,6 @@
               "dashboard": "dashboard",
               "agent": "agent",
               "kanban": "kanban",
-              "popout": "pop-out",
               "board": "board",
               "inWindow": "in-window",
               "worktrees": "worktrees"
@@ -12437,6 +12423,9 @@
               "windowsFailureDescription": "Enable notifications for Orca in Windows Settings."
             }
           }
+        },
+        "JiraBoardSettings": {
+          "defaultBoardHelp": "The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter. Search to find a board on a Jira site with many."
         }
       },
       "right": {
@@ -12492,7 +12481,6 @@
               "branch": "Sync Branch"
             },
             "7e4b2a19c0": "Could not resolve the GitHub PR to reply on.",
-            "430f1a62d4": "Could not resolve the selected thread on the host.",
             "updateReactionFailed": "Failed to update reaction.",
             "gitlabMoreActions": "More MR actions",
             "gitlabLinkAnother": "Link another MR"
@@ -14010,7 +13998,6 @@
           "1b5e182e9f": "Welcome to Orca",
           "4db04f2f57": "of",
           "adaa0aa627": "Go to onboarding step {{value0}}: {{value1}}",
-          "a249f81538": "Orca",
           "277ba45540": "Orca onboarding",
           "97c42cda00": "Install the GitHub CLI to:",
           "ae3b00ca82": "Set up GitHub tasks",
@@ -14313,8 +14300,7 @@
             "4a40af029b": "Agent time",
             "00a6903322": "Agents spawned",
             "c0e2e9dcd9": "Welcome back",
-            "af761a0c0d": "Settings",
-            "5d94e8ddcc": "Orca"
+            "af761a0c0d": "Settings"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "Send",
@@ -15810,7 +15796,6 @@
             "88fea8e84e": "Don't Send",
             "50b00dc327": "Copy Details",
             "6d3ebe216a": "Diagnostic text",
-            "835037edc9": "Orca",
             "8e24fe4f75": "Crash report sent.",
             "8b8473c544": "Crash report copied.",
             "765591798d": "Checking for crash reports...",
@@ -19001,9 +18986,7 @@
       "agentOptional": "Agent [Optional]",
       "createDescription": "Choose the project and workspace name. Select an agent if you want to start one."
     },
-    "JiraIssueWorkspace": {
-      "pendingChange": "Another issue change is in progress."
-    },
+    "JiraIssueWorkspace": {},
     "jiraProjectPicker": {
       "search": "Search Jira projects",
       "empty": "No projects found.",
@@ -19076,10 +19059,7 @@
     }
   },
   "dashboardPopout": {
-    "recoverableError": {
-      "title": "Orca dashboard hit an error.",
-      "description": "The dashboard could not finish rendering. Retry to remount it, or reopen it."
-    },
+    "recoverableError": {},
     "bucket": {
       "attention": "Needs You",
       "working": "Working",
@@ -20022,7 +20002,6 @@
       "count": "{{count}} workspaces linked to {{key}}",
       "startAnother": "Start new workspace",
       "empty": "Link a Jira issue to a workspace, or choose another view.",
-      "openFailed": "Unable to open the workspace linked to this Jira issue.",
       "mode": "Has Workspace",
       "search": "Search linked issues",
       "single": "1 workspace linked to {{key}}"
@@ -20066,8 +20045,6 @@
       "loadError": "Could not load status changes.",
       "retry": "Retry",
       "loading": "Loading status changes…",
-      "completeInJira": "Complete “{{name}}” in Jira",
-      "unsupported": "Jira requires fields Orca cannot collect yet: {{fields}}.",
       "chooseResolution": "Choose a resolution",
       "comment": "Comment",
       "back": "Back",

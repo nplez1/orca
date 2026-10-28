@@ -173,7 +173,6 @@
     "minimizeNotice": {
       "body": "O Orca continua em execução na bandeja do sistema"
     },
-    "activityWaiting": "Orca - atividade em espera",
     "activityWaitingSuffix": "atividade em espera"
   },
   "dashboard": {
@@ -472,10 +471,7 @@
     "taskSearchRetry": "Tentar novamente"
   },
   "dashboardPopout": {
-    "recoverableError": {
-      "title": "O painel do Orca encontrou um erro.",
-      "description": "O painel não conseguiu concluir a renderização. Tente novamente para remontá-lo, ou reabra-o."
-    },
+    "recoverableError": {},
     "bucket": {
       "attention": "Precisa de Você",
       "working": "Em Andamento",
@@ -1097,7 +1093,6 @@
       "df1d56bf87": "A visualização do espaço de trabalho encontrou um erro.",
       "9e0b441a91": "Alternar barra lateral direita",
       "e81217c1b7": "Ocultar Nome do Aplicativo",
-      "5096cbbc86": "Orca",
       "8b0b8eb54f": "Menu do aplicativo",
       "caea5b51b9": "Reiniciar agora",
       "0a9e810705": "As alterações não serão salvas até reiniciar. Suas abas anteriores estão salvas no disco.",
@@ -1335,7 +1330,6 @@
           }
         },
         "worktrees": {
-          "e50495aae6": "Forçar Exclusão da Branch",
           "14bc053a47": "A {{value0}} local não foi atualizada",
           "localBaseRefRefreshFailedForWorktree": "A {{value0}} local não foi atualizada para \"{{value1}}\"",
           "903b51c2ed": "Espaço de trabalho criado a partir de {{value0}}, mas o Orca não conseguiu fazer fast-forward da {{value1}} local. {{value2}}",
@@ -1346,11 +1340,6 @@
           "localBaseRefRefreshFailedDetailError": "O Git retornou um erro ao atualizar a {{value0}} local. Verifique se há refs bloqueadas ou um estado incomum de worktree no repositório e depois atualize a {{value0}} local manualmente.",
           "0216895fb5": "Falha ao excluir a branch",
           "c6cf133786": "Este espaço de trabalho não está mais disponível.",
-          "5366d13eec": "Espaço de trabalho excluído, branch mantida",
-          "2e17f825d4": "Worktree excluída, branch mantida",
-          "78e08cd877": "O Git não conseguiu excluir com segurança a branch \"{{value0}}\", então o Orca a manteve para evitar a perda de commits locais.",
-          "3b57982bf6": "O Git não conseguiu excluir com segurança a branch \"{{value0}}\" após excluir o espaço de trabalho \"{{value1}}\", então o Orca a manteve para evitar a perda de commits locais.",
-          "81f13f48d2": "O Git não conseguiu excluir com segurança a branch \"{{value0}}\" após excluir a worktree \"{{value1}}\", então o Orca a manteve para evitar a perda de commits locais.",
           "runtimeScopeForbiddenTitle": "Esta conexão tem acesso limitado (mobile)",
           "runtimeScopeForbiddenDescription": "Espaços de trabalho não estão disponíveis em um pareamento com escopo mobile. Reconecte usando o link de acesso do navegador em Configurações → Ambientes de Execução → Compartilhar este servidor Orca.",
           "a17f4d2e93": "Não foi possível atualizar este espaço de trabalho.",
@@ -1564,7 +1553,6 @@
         "cd50cec5d7": "Coordene vários agentes de código através do Orca.",
         "58a868e8e4": "Orquestração",
         "7c79d3b7bf": "Opcional",
-        "b1c2f8b0ac": "Alternância de conta opcional e configuração de uso para Claude, Codex, Gemini, OpenCode Go, MiniMax e Grok.",
         "f70ac54d38": "Contas de Provedores de IA",
         "4121f7a0a2": "Gerencie agentes de IA, defina um padrão e personalize comandos.",
         "b49abbd2f7": "Agentes",
@@ -2190,7 +2178,6 @@
           "1b5e182e9f": "Bem-vindo ao Orca",
           "4db04f2f57": "de",
           "adaa0aa627": "Ir para a etapa {{value0}} da introdução: {{value1}}",
-          "a249f81538": "Orca",
           "277ba45540": "Introdução do Orca",
           "97c42cda00": "Instale a CLI do GitHub para:",
           "ae3b00ca82": "Configurar tarefas do GitHub",
@@ -2342,7 +2329,6 @@
             "bbcd9b7b85": "Recolher espaço de trabalho",
             "c4a8968bdd": "Expandir espaço de trabalho",
             "b10695d6ce": "Encerrar sessão",
-            "288a4dd177": "Orca",
             "53dd5560ae": "Recolher Orca",
             "e419d27083": "Expandir Orca",
             "41ae4fa725": "Encerrando…",
@@ -3264,7 +3250,6 @@
           "d676c41fc6": "Extrai as credenciais OAuth da sua instalação local da Gemini CLI para autenticar com o Google. Isso usa credenciais emitidas para o app Gemini CLI, não para o Orca. Pode deixar de funcionar se o Google atualizar a CLI. Use por sua conta e risco.",
           "0c7f915b01": "Usar credenciais da Gemini CLI",
           "973741a871": "Configure as opções do provedor Gemini.",
-          "0c64dc2a64": "Gemini",
           "db209ee572": "Remover",
           "8a0f870153": "Reautenticar",
           "3d245ef7d9": "O Codex informou que este login está desatualizado",
@@ -4399,7 +4384,6 @@
               "dashboard": "painel",
               "agent": "agente",
               "kanban": "kanban",
-              "popout": "janela separada",
               "board": "quadro",
               "inWindow": "na própria janela",
               "worktrees": "worktrees"
@@ -4901,12 +4885,7 @@
             "title": "Painel de Agentes",
             "description": "Quadro kanban para monitorar agentes entre worktrees, na própria janela ou em uma janela separada.",
             "copy": "Adiciona uma entrada Painel de Agentes à barra lateral esquerda. Monitore agentes que precisam de você, estão trabalhando ou concluíram, com agentes ociosos opcionais.",
-            "toggleLabel": "Alternar Painel de Agentes",
-            "modeLabel": "Abrir como",
-            "modeCopy": "Mostre o painel como um quadro na própria janela ao lado da barra lateral ou em uma janela separada.",
-            "modeAriaLabel": "Modo de abertura do Painel de Agentes",
-            "modeInWindow": "Na própria janela",
-            "modePopout": "Janela separada"
+            "toggleLabel": "Alternar Painel de Agentes"
           },
           "browserExtensions": {
             "copy": "Adiciona Configurações › Navegador › Extensões para perfis de navegador locais.",
@@ -14033,7 +14012,6 @@
         "share": {
           "card": {
             "utils": {
-              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "saída",
               "5d66fdd7c2": "entrada",
               "7080aeaebb": "Raciocínio",
@@ -14433,8 +14411,6 @@
         "28986b3747": "Foi iniciado um agente de IA para as verificações com falha.",
         "1690fd7f4a": "Nenhuma verificação com falha para corrigir.",
         "9e7c221b8d": "Falha ao executar as verificações novamente",
-        "e463ec935f": "Novas execuções de verificação solicitadas",
-        "ddafe851e1": "Nova execução de verificação solicitada",
         "0bbdc673c1": "Falha ao atualizar as verificações",
         "e7007aa1d8": "Não é possível atualizar as verificações sem um caminho de repositório.",
         "675bc0d638": "Cancelar",
@@ -14944,8 +14920,7 @@
             "4a40af029b": "Tempo de agente",
             "00a6903322": "Agentes iniciados",
             "c0e2e9dcd9": "Bem-vindo de volta",
-            "af761a0c0d": "Configurações",
-            "5d94e8ddcc": "Orca"
+            "af761a0c0d": "Configurações"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "Enviar",
@@ -15201,8 +15176,6 @@
         "98583589c6": "Falha ao iniciar um agente de IA para as verificações com falha: {{value0}}",
         "51c65c0265": "Nenhuma verificação com falha para corrigir.",
         "788a782bb0": "Falha ao executar as verificações novamente",
-        "18f2af42ac": "Novas execuções de verificação solicitadas",
-        "5963a6a852": "Nova execução de verificação solicitada",
         "246b2c6456": "Falha ao atualizar as verificações",
         "c057f2fcb0": "Não é possível atualizar as verificações sem um caminho de repositório.",
         "6591b1fa82": "Cancelar",
@@ -17085,7 +17058,6 @@
             "88fea8e84e": "Não Enviar",
             "50b00dc327": "Copiar Detalhes",
             "6d3ebe216a": "Texto de diagnóstico",
-            "835037edc9": "Orca",
             "8e24fe4f75": "Relatório de falha enviado.",
             "8b8473c544": "Relatório de falha copiado.",
             "765591798d": "Verificando relatórios de falha...",
@@ -19326,9 +19298,7 @@
       "agentOptional": "Agente [Opcional]",
       "createDescription": "Escolha o projeto e o nome do espaço de trabalho. Selecione um agente se quiser iniciar um."
     },
-    "JiraIssueWorkspace": {
-      "pendingChange": "Outra alteração de issue está em andamento."
-    },
+    "JiraIssueWorkspace": {},
     "jiraProjectPicker": {
       "search": "Buscar projetos do Jira",
       "empty": "Nenhum projeto encontrado.",
@@ -19996,7 +19966,6 @@
       "count": "{{count}} espaços de trabalho vinculados a {{key}}",
       "startAnother": "Iniciar novo espaço de trabalho",
       "empty": "Vincule uma issue do Jira a um espaço de trabalho ou escolha outra visualização.",
-      "openFailed": "Não foi possível abrir o espaço de trabalho vinculado a esta issue do Jira.",
       "mode": "Tem espaço de trabalho",
       "search": "Buscar issues vinculadas",
       "single": "1 espaço de trabalho vinculado a {{key}}"
@@ -20040,8 +20009,6 @@
       "loadError": "Não foi possível carregar as alterações de status.",
       "retry": "Tentar novamente",
       "loading": "Carregando alterações de status…",
-      "completeInJira": "Concluir “{{name}}” no Jira",
-      "unsupported": "O Jira exige campos que o Orca ainda não consegue coletar: {{fields}}.",
       "chooseResolution": "Escolha uma resolução",
       "comment": "Comentário",
       "back": "Voltar",

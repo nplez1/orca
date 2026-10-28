@@ -664,7 +664,6 @@
     "minimizeNotice": {
       "body": "Orca 仍在系統匣中執行"
     },
-    "activityWaiting": "Orca - 活動等待中",
     "activityWaitingSuffix": "活動等待中"
   },
   "worktreeJumpPalette": {
@@ -746,7 +745,6 @@
       "df1d56bf87": "工作區介面遇到錯誤。",
       "9e0b441a91": "切換右側邊欄",
       "e81217c1b7": "隱藏應用程式名稱",
-      "5096cbbc86": "Orca",
       "8b0b8eb54f": "應用程式選單",
       "caea5b51b9": "立即重新啟動",
       "0a9e810705": "重新啟動前不會儲存變更。先前的分頁已安全儲存在磁碟上。",
@@ -879,7 +877,6 @@
           }
         },
         "worktrees": {
-          "e50495aae6": "強制刪除分支",
           "14bc053a47": "本機 {{value0}} 未重新整理",
           "localBaseRefRefreshFailedForWorktree": "「{{value1}}」的本機 {{value0}} 未重新整理",
           "903b51c2ed": "從 {{value0}} 建立工作區，但 Orca 無法快轉本機 {{value1}}。{{value2}}",
@@ -902,11 +899,6 @@
           "localBaseRefRefreshTurnOffFailed": "無法關閉 {{value0}}",
           "0216895fb5": "刪除分支失敗",
           "c6cf133786": "該工作區不再可用。",
-          "5366d13eec": "工作區已刪除，分支已保留",
-          "2e17f825d4": "工作樹已刪除，分支已保留",
-          "78e08cd877": "Git 無法安全刪除分支\"{{value0}}\"，因此 Orca 將其保留以避免丟失本機提交。",
-          "3b57982bf6": "刪除工作區\"{{value1}}\"後，Git 無法安全刪除分支\"{{value0}}\"，因此 Orca 將其保留以避免丟失本機提交。",
-          "81f13f48d2": "刪除工作樹\"{{value1}}\"後，Git 無法安全刪除分支\"{{value0}}\"，因此 Orca 將其保留以避免丟失本機提交。",
           "runtimeScopeForbiddenTitle": "此連線具有受限（行動版）存取權限",
           "runtimeScopeForbiddenDescription": "行動版範圍的配對無法使用工作區。請透過設定 → 執行環境 → 分享此 Orca 伺服器中的瀏覽器存取連結重新連線。",
           "a17f4d2e93": "無法更新此工作區。",
@@ -1619,7 +1611,6 @@
         "cd50cec5d7": "透過 Orca 協調多個程式開發代理程式。",
         "58a868e8e4": "編排",
         "7c79d3b7bf": "可選",
-        "b1c2f8b0ac": "Claude、Codex、Gemini、OpenCode Go、MiniMax 和 Grok 的可選帳戶切換與用量設定。",
         "f70ac54d38": "AI 供應商帳戶",
         "4121f7a0a2": "管理 AI 代理程式、設定預設值並自訂命令。",
         "b49abbd2f7": "代理程式",
@@ -1765,8 +1756,6 @@
         "28986b3747": "已啟動 AI 代理程式處理失敗的檢查。",
         "1690fd7f4a": "沒有需要修復的失敗檢查。",
         "9e7c221b8d": "無法重新執行檢查",
-        "e463ec935f": "已要求重新執行檢查",
-        "ddafe851e1": "已要求重新執行檢查",
         "0bbdc673c1": "重新整理檢查失敗",
         "e7007aa1d8": "如果沒有存放庫路徑，則無法重新整理檢查。",
         "675bc0d638": "取消",
@@ -2243,8 +2232,6 @@
         "98583589c6": "無法為失敗的檢查啟動 AI 代理程式：{{value0}}",
         "51c65c0265": "沒有需要修復的失敗檢查。",
         "788a782bb0": "無法重新執行檢查",
-        "18f2af42ac": "已請求重新執行檢查",
-        "5963a6a852": "已請求重新執行檢查",
         "246b2c6456": "重新整理檢查失敗",
         "c057f2fcb0": "如果沒有存放庫路徑，則無法重新整理檢查。",
         "6591b1fa82": "取消",
@@ -3988,7 +3975,6 @@
             "bbcd9b7b85": "摺疊工作區",
             "c4a8968bdd": "展開工作區",
             "b10695d6ce": "終止工作階段",
-            "288a4dd177": "Orca",
             "53dd5560ae": "摺疊 Orca",
             "e419d27083": "展開 Orca",
             "41ae4fa725": "正在結束…",
@@ -4625,7 +4611,6 @@
         "share": {
           "card": {
             "utils": {
-              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "輸出",
               "5d66fdd7c2": "輸入",
               "7080aeaebb": "推理",
@@ -6674,7 +6659,6 @@
           "d676c41fc6": "從本機 Gemini CLI 安裝中擷取 OAuth 憑證以透過 Google 認證。這將使用頒發給 Gemini CLI 應用程式的憑證，而非 Orca。若 Google 更新 CLI，可能會失效。請自行承擔風險。",
           "0c7f915b01": "使用 Gemini CLI 憑證",
           "973741a871": "讓現有的 Gemini CLI 工作階段保持可用。Gemini 憑證不會讓您登入 Antigravity。",
-          "0c64dc2a64": "Gemini CLI（舊版）",
           "db209ee572": "移除",
           "8a0f870153": "重新驗證",
           "3d245ef7d9": "Codex 報告此登入已過時",
@@ -7248,12 +7232,7 @@
             "title": "代理程式儀表板",
             "description": "用於監控跨工作樹的代理程式的看板，支援視窗內或彈出視窗顯示。",
             "copy": "在左側邊欄新增代理程式儀表板入口。監控需要你處理、正在工作或已完成的代理程式，並可選擇顯示閒置代理程式。",
-            "toggleLabel": "切換代理程式儀表板",
-            "modeLabel": "開啟方式",
-            "modeCopy": "將儀表板顯示為側邊欄旁的視窗內看板，或單獨的彈出視窗。",
-            "modeAriaLabel": "代理程式儀表板開啟模式",
-            "modeInWindow": "視窗內",
-            "modePopout": "彈出視窗"
+            "toggleLabel": "切換代理程式儀表板"
           },
           "browserExtensions": {
             "copy": "為本機瀏覽器設定檔新增「設定 › 瀏覽器 › 擴充功能」。",
@@ -9470,7 +9449,6 @@
               "dashboard": "儀錶板",
               "agent": "代理程式",
               "kanban": "看板",
-              "popout": "彈出",
               "board": "看板",
               "inWindow": "視窗內",
               "worktrees": "工作樹"
@@ -12458,7 +12436,6 @@
               "branch": "同步分支"
             },
             "7e4b2a19c0": "無法確定要回覆的 GitHub PR。",
-            "430f1a62d4": "無法在主機上解決選取的討論串。",
             "updateReactionFailed": "無法更新反應。",
             "gitlabMoreActions": "更多 MR 動作",
             "gitlabLinkAnother": "連結另一個 MR"
@@ -13976,7 +13953,6 @@
           "1b5e182e9f": "歡迎使用 Orca",
           "4db04f2f57": "/",
           "adaa0aa627": "前往入門步驟 {{value0}}：{{value1}}",
-          "a249f81538": "Orca",
           "277ba45540": "Orca 入門引導",
           "97c42cda00": "安裝 GitHub CLI 以：",
           "ae3b00ca82": "設定 GitHub 任務",
@@ -14279,8 +14255,7 @@
             "4a40af029b": "代理程式時間",
             "00a6903322": "已建立的代理程式",
             "c0e2e9dcd9": "歡迎回來",
-            "af761a0c0d": "設定",
-            "5d94e8ddcc": "Orca"
+            "af761a0c0d": "設定"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "傳送",
@@ -15776,7 +15751,6 @@
             "88fea8e84e": "不傳送",
             "50b00dc327": "複製詳情",
             "6d3ebe216a": "診斷文字",
-            "835037edc9": "Orca",
             "8e24fe4f75": "已傳送當機報告。",
             "8b8473c544": "已複製當機報告。",
             "765591798d": "正在檢查當機報告...",
@@ -18964,9 +18938,7 @@
       "agentOptional": "代理程式 [選填]",
       "createDescription": "選擇專案和工作區名稱。如果想啟動代理程式，請選擇一個。"
     },
-    "JiraIssueWorkspace": {
-      "pendingChange": "另一個議題更改正在進行中。"
-    },
+    "JiraIssueWorkspace": {},
     "jiraProjectPicker": {
       "search": "搜尋 Jira 專案",
       "empty": "未找到專案。",
@@ -19039,10 +19011,7 @@
     }
   },
   "dashboardPopout": {
-    "recoverableError": {
-      "title": "Orca 看板遇到錯誤。",
-      "description": "看板未能完成繪製。請重試以重新掛載，或重新開啟。"
-    },
+    "recoverableError": {},
     "bucket": {
       "attention": "需要你處理",
       "working": "工作中",
@@ -19985,7 +19954,6 @@
       "count": "{{count}} 個關聯到 {{key}} 的工作區",
       "startAnother": "啟動新工作區",
       "empty": "將 Jira 議題關聯到工作區，或選擇其他檢視。",
-      "openFailed": "無法開啟關聯到此 Jira 議題的工作區。",
       "mode": "有工作區",
       "search": "搜尋關聯的議題",
       "single": "1 個關聯到 {{key}} 的工作區"
@@ -20029,8 +19997,6 @@
       "loadError": "無法載入狀態更改。",
       "retry": "重試",
       "loading": "正在載入狀態更改…",
-      "completeInJira": "在 Jira 中完成「{{name}}」",
-      "unsupported": "Jira 需要 Orca 目前無法收集的欄位：{{fields}}。",
       "chooseResolution": "選擇解決結果",
       "comment": "留言",
       "back": "返回",

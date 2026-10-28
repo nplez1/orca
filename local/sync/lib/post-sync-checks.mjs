@@ -525,10 +525,13 @@ export function deletedForkModules(tip, source) {
       details: []
     }
   }
-  const upstreamChanged = changedNames([oldBase, base])
-  // Renames off, deliberately: git pairs a deletion with a similar addition and reports the pair as
-  // `R`, which removes the deleted path from `--diff-filter=D` — the one entry this scan exists to
-  // list. `filesystem-text-search-handler.ts` disappeared from the list exactly that way.
+  // Renames off on both sides, deliberately: git pairs a deletion with a similar addition and reports
+  // the pair as `R`, which drops the deleted path from the set this classifier reads. Two paths were
+  // lost that way — `filesystem-text-search-handler.ts` from our side, and
+  // `terminal-file-link-detection-ranges.ts` from upstream's, which then read as a fork-only deletion
+  // with a lost export when upstream had simply renamed the file.
+  const upstreamChanged = changedNames(['--no-renames', oldBase, base])
+  // Renames off here too: see the note above.
   const deleted = changedNames(['--no-renames', '--diff-filter=D', tip, 'HEAD'])
   if (upstreamChanged === null || deleted === null) {
     return {
