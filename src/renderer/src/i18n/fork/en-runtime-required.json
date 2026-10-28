@@ -4,6 +4,10 @@
       "5096cbbc86": "Orca"
     },
     "components": {
+      "GitHubItemDialog": {
+        "ddafe851e1": "Check rerun requested",
+        "e463ec935f": "Check reruns requested"
+      },
       "NewWorkspaceComposerCard": {
         "test": {
           "fixture": {
@@ -11,6 +15,10 @@
             "95a5e6b3bb": "Devbox"
           }
         }
+      },
+      "PullRequestPage": {
+        "18f2af42ac": "Check reruns requested",
+        "5963a6a852": "Check rerun requested"
       },
       "TaskPage": {
         "jiraNoStatusTransition": "Jira has no available transition to {{value0}} for {{value1}}.",
