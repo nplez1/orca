@@ -2,7 +2,14 @@ import { useCallback, useRef } from 'react'
 import { detectLanguage } from '@/lib/language-detect'
 import { joinPath } from '@/lib/path'
 import { useAppStore } from '@/store'
+import { getOpenedEditFileIdAfterOpen } from '@/store/slices/editor/file-ids/editor-file-ids'
+import type {
+  GitBranchChangeEntry,
+  GitBranchCompareSummary
+} from '../../../../shared/git-diff-compare-types'
+import type { GitStatusEntry } from '../../../../shared/git-status-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
+import { canUseChangesModeForFile } from '../editor/editor-panel-file-mode'
 import { getPRCommentInlineId } from './pr-comment-inline-threads'
 import {
   cancelSourceControlEditorRevealFrames,
@@ -40,6 +47,49 @@ export function resolvePRCommentCodeTarget(
 }
 
 /**
+ * The editor surface a comment should land on, ranked by how many of the lines it was written about
+ * that surface can show.
+ *
+ * A thread is only readable against the code it reviews, so the branch diff — merge base to head,
+ * which is the review's own diff — comes first; Changes mode carries the uncommitted hunks; and a
+ * plain tab is the honest answer when the worktree holds neither, because then there are no hunks
+ * for this file anywhere.
+ */
+export type PRCommentCodeSurface =
+  | { kind: 'branch-diff'; entry: GitBranchChangeEntry; compare: GitBranchCompareSummary }
+  | { kind: 'changes' }
+  | { kind: 'edit' }
+
+export function resolvePRCommentCodeSurface({
+  relativePath,
+  branchCompare,
+  branchChanges,
+  statusEntries
+}: {
+  relativePath: string
+  branchCompare: GitBranchCompareSummary | null | undefined
+  branchChanges: readonly GitBranchChangeEntry[] | null | undefined
+  statusEntries: readonly GitStatusEntry[] | null | undefined
+}): PRCommentCodeSurface {
+  // Why the OIDs too: a diff tab with no compare OIDs silently renders an unstaged diff instead.
+  if (
+    branchCompare?.status === 'ready' &&
+    branchCompare.baseOid &&
+    branchCompare.headOid &&
+    branchCompare.mergeBase
+  ) {
+    const entry = branchChanges?.find((candidate) => candidate.path === relativePath)
+    if (entry) {
+      return { kind: 'branch-diff', entry, compare: branchCompare }
+    }
+  }
+  if (statusEntries?.some((entry) => entry.path === relativePath)) {
+    return { kind: 'changes' }
+  }
+  return { kind: 'edit' }
+}
+
+/**
  * Opens a review comment in the code and asks the inline decorator to reveal its thread.
  *
  * The reveal is stamped rather than passed as a prop because opening the file can remount Monaco,
@@ -57,6 +107,7 @@ export function usePRCommentCodeNavigation({
   placementAllowed: boolean
 }): (comment: PRComment) => boolean {
   const openFile = useAppStore((s) => s.openFile)
+  const openBranchDiff = useAppStore((s) => s.openBranchDiff)
   const setEditorViewMode = useAppStore((s) => s.setEditorViewMode)
   const setPendingEditorReveal = useAppStore((s) => s.setPendingEditorReveal)
   const setScrollToDiffCommentId = useAppStore((s) => s.setScrollToDiffCommentId)
@@ -73,29 +124,56 @@ export function usePRCommentCodeNavigation({
       // would try to reveal a thread it does not have.
       setScrollToDiffCommentId(null)
       const absolutePath = joinPath(worktreePath, target.relativePath)
-      openFile({
-        filePath: absolutePath,
+      const language = detectLanguage(target.relativePath)
+      const beforeOpen = useAppStore.getState()
+      const surface = resolvePRCommentCodeSurface({
         relativePath: target.relativePath,
-        worktreeId,
-        language: detectLanguage(target.relativePath),
-        mode: 'edit'
+        branchCompare: beforeOpen.gitBranchCompareSummaryByWorktree[worktreeId],
+        branchChanges: beforeOpen.gitBranchChangesByWorktree[worktreeId],
+        statusEntries: beforeOpen.gitStatusByWorktree[worktreeId]
       })
-      setEditorViewMode(absolutePath, 'edit')
+      let editFileId: string | null = null
+      if (surface.kind === 'branch-diff') {
+        openBranchDiff(worktreeId, worktreePath, surface.entry, surface.compare, language)
+      } else {
+        openFile({
+          filePath: absolutePath,
+          relativePath: target.relativePath,
+          worktreeId,
+          language,
+          mode: 'edit'
+        })
+        const afterOpen = useAppStore.getState()
+        const fileId = getOpenedEditFileIdAfterOpen(afterOpen, absolutePath, worktreeId)
+        const opened = afterOpen.openFiles.find((file) => file.id === fileId)
+        // Why: Changes mode is keyed by file id, and that id is not the path for a remote owner (or
+        // an occupied path) — a path-keyed write would leave the tab in plain Edit mode.
+        const changesMode =
+          surface.kind === 'changes' && !!opened && canUseChangesModeForFile(opened)
+        setEditorViewMode(fileId, changesMode ? 'changes' : 'edit')
+        editFileId = fileId
+      }
       setPendingEditorReveal(null)
+      const revealFileId = editFileId
       requestSourceControlEditorRevealFrame(pendingRevealFramesRef, () => {
         requestSourceControlEditorRevealFrame(pendingRevealFramesRef, () => {
-          setPendingEditorReveal({
-            filePath: absolutePath,
-            line: target.line,
-            column: 1,
-            matchLength: 0
-          })
+          // Why: a diff surface scrolls to the thread by id; only a Monaco tab uses the line reveal.
+          if (revealFileId !== null) {
+            setPendingEditorReveal({
+              fileId: revealFileId,
+              filePath: absolutePath,
+              line: target.line,
+              column: 1,
+              matchLength: 0
+            })
+          }
           setScrollToDiffCommentId(getPRCommentInlineId(comment.id))
         })
       })
       return true
     },
     [
+      openBranchDiff,
       openFile,
       placementAllowed,
       setEditorViewMode,

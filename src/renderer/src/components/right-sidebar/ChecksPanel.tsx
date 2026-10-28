@@ -6,6 +6,7 @@ import { useChecksPanelGeneration } from './checks-panel/use-checks-panel-genera
 import { useChecksPanelComposerState } from './checks-panel/use-checks-panel-composer-state'
 import { useChecksPanelForegroundEffects } from './checks-panel/use-checks-panel-foreground-effects'
 import { useChecksPanelGitStatusEffects } from './checks-panel/use-checks-panel-git-status-effects'
+import { useChecksPanelBranchCompareWarmup } from './checks-panel/use-checks-panel-branch-compare-warmup'
 import { useChecksPanelConflictRefresh } from './checks-panel/use-checks-panel-conflict-refresh'
 import { useChecksPanelPolling } from './checks-panel/use-checks-panel-polling'
 import { useChecksPanelReviewData } from './checks-panel/use-checks-panel-review-data'
@@ -28,6 +29,8 @@ export default function ChecksPanel(): React.JSX.Element {
   const composerModel = Object.assign(generationModel, useChecksPanelComposerState(generationModel))
   useChecksPanelForegroundEffects(composerModel)
   useChecksPanelGitStatusEffects(composerModel)
+  // Why: the comment jump needs the review's own diff, and this pane is what replaces the tab that normally loads it.
+  useChecksPanelBranchCompareWarmup(composerModel)
   useChecksPanelConflictRefresh(composerModel)
   const pollingModel = Object.assign(composerModel, useChecksPanelPolling(composerModel))
   const dataModel = Object.assign(pollingModel, useChecksPanelReviewData(pollingModel))
