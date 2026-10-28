@@ -519,6 +519,139 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
       expect(entry?.interactivePrompt).toBe('Allow Bash(rm -rf)?')
     })
 
+    // Pi reports its dialog as `waiting` (ui_prompt_start) and Copilot's screen lane repaints a
+    // working row to `waiting`; neither names an ask tool, so only the state can carry the wait.
+    it('lets a host question wait pierce the fence (hook-HTTP-only on the host)', () => {
+      const store = seedPairedClientStore()
+      replayClientOscWorking(store, T0 + 500)
+
+      const askedAt = T0 + 1_000
+      applyHostSnapshot(
+        store,
+        makeHostSnapshot({
+          snapshotVersion: 2,
+          hostNow: askedAt,
+          includeAgentStatus: true,
+          agentStatusOverrides: {
+            state: 'waiting',
+            prompt: 'Does a pending ask show as Needs You?',
+            agentType: 'pi'
+          }
+        }),
+        askedAt
+      )
+
+      const entry = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
+      expect(entry?.state).toBe('waiting')
+      expect(entry?.prompt).toBe('Does a pending ask show as Needs You?')
+    })
+
+    // Why: the fence must not outlive the wait it admitted. A row the host mirrored here IS the
+    // host's statement, so the host's own release has to land without waiting for the client's
+    // next byte write (a dialog answered with no further PTY activity emits none).
+    it('follows the host when it releases the wait it opened', () => {
+      const store = seedPairedClientStore()
+      replayClientOscWorking(store, T0 + 500)
+      applyHostSnapshot(
+        store,
+        makeHostSnapshot({
+          snapshotVersion: 2,
+          hostNow: T0 + 1_000,
+          includeAgentStatus: true,
+          agentStatusOverrides: { state: 'waiting', prompt: 'Answer me', agentType: 'pi' }
+        }),
+        T0 + 1_000
+      )
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
+
+      // Answered: the host resumes the turn. No client byte write in between.
+      applyHostSnapshot(
+        store,
+        makeHostSnapshot({
+          snapshotVersion: 3,
+          hostNow: T0 + 2_000,
+          includeAgentStatus: true,
+          agentStatusOverrides: { state: 'working', prompt: 'Answer me', agentType: 'pi' }
+        }),
+        T0 + 2_000
+      )
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+
+      // And the turn then finishes.
+      applyHostSnapshot(
+        store,
+        makeHostSnapshot({
+          snapshotVersion: 4,
+          hostNow: T0 + 3_000,
+          includeAgentStatus: true,
+          agentStatusOverrides: { state: 'done', prompt: 'Answer me', agentType: 'pi' }
+        }),
+        T0 + 3_000
+      )
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('done')
+    })
+
+    // Why: the two clocks are not comparable, so a client running ahead must not be able to keep
+    // its own `working` over a dialog only the host can see.
+    it('takes the host wait even when the client clock runs ahead', () => {
+      const store = seedPairedClientStore()
+      replayClientOscWorking(store, T0 + 60_000)
+
+      applyHostSnapshot(
+        store,
+        makeHostSnapshot({
+          snapshotVersion: 2,
+          hostNow: T0 + 1_000,
+          includeAgentStatus: true,
+          agentStatusOverrides: { state: 'waiting', prompt: 'Answer me', agentType: 'pi' }
+        }),
+        T0 + 60_500
+      )
+
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
+    })
+
+    // Why: pi re-posts `ui_prompt_active` on every tool event while the dialog is open, so both
+    // writers keep publishing for the whole wait. Every round must settle on the host's dialog
+    // state, whatever order the two land in — the oscillation the fence was built to stop.
+    it('keeps the host wait through interleaved client byte writes', () => {
+      const store = seedPairedClientStore()
+      // The client's clock runs ahead of the host's, so its own byte writes always out-rank the
+      // host rows by `updatedAt` — the hardest order for the host's dialog to survive.
+      let clientNow = T0 + 10_000
+      replayClientOscWorking(store, clientNow)
+      const rounds: (string | null)[] = []
+      for (let cycle = 0; cycle < CYCLES; cycle += 1) {
+        clientNow += 5_000
+        vi.setSystemTime(clientNow)
+        markRendererOwnedAgentStatusWrite(MIRROR_PANE_KEY)
+        store
+          .getState()
+          .setAgentStatus(
+            MIRROR_PANE_KEY,
+            { state: 'working', prompt: CLIENT_PROMPT, agentType: 'pi' },
+            'pi',
+            undefined,
+            { tabId: MIRROR_TAB_ID, worktreeId: WT }
+          )
+        expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+
+        const hostNow = T0 + 1_000 + cycle * 1_000
+        applyHostSnapshot(
+          store,
+          makeHostSnapshot({
+            snapshotVersion: 2 + cycle,
+            hostNow,
+            includeAgentStatus: true,
+            agentStatusOverrides: { state: 'waiting', prompt: 'Answer me', agentType: 'pi' }
+          }),
+          hostNow
+        )
+        rounds.push(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state ?? null)
+      }
+      expect(rounds).toEqual(Array.from({ length: CYCLES }, () => 'waiting'))
+    })
+
     it('keeps live client status over a restored, unconfirmed host block', () => {
       const store = seedPairedClientStore()
       replayClientOscWorking(store, T0 + 500)

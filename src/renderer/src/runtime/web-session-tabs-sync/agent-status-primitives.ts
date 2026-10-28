@@ -64,14 +64,22 @@ export function isMirroredAgentPaneKeyForTabs(
   return parsed !== null && tabIds.has(parsed.tabId)
 }
 
-/** Host states the client's byte pipeline cannot observe: permission blocks and
- *  interactive question cards reach the host over its HTTP agent hook, never
- *  through PTY bytes, so they must pierce the client-authority fence. */
+/** Host states the client's byte pipeline cannot observe: a dialog holding the host's pane.
+ *
+ *  The hook that names the ask tool reports it as `blocked` (Claude's AskUserQuestion, OMP's `ask`).
+ *  Pi and Copilot report the same wait as `waiting` instead: Pi posts `ui_prompt_start`, and
+ *  Copilot's screen lane repaints a `working` row to `waiting`. Neither names an ask tool, so for
+ *  them the state IS the wait — and a fence that admits only `blocked` leaves a paired client
+ *  rendering the pane as Working for the whole dialog while the host row, the host's own screen
+ *  evidence and every local surface say it is asking.
+ *
+ *  Pi's title extension does paint a `!` marker into the PTY while a dialog is open, but that is
+ *  the pane title, not the OSC status this row carries: the client derives no agent status from it. */
 export function hostAgentStatusPiercesClientAuthority(entry: AgentStatusEntry): boolean {
   // Why: a row restored across a host restart is unverifiable, so it never outranks live bytes.
   return (
     entry.restoredUnconfirmed !== true &&
-    (entry.state === 'blocked' || entry.interactivePrompt != null)
+    (entry.state === 'blocked' || entry.state === 'waiting' || entry.interactivePrompt != null)
   )
 }
 

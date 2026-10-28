@@ -101,11 +101,26 @@ export function buildMirroredAgentStatusPatch(
     // outrank live client status forever; a proven client writer keeps its own
     // state (still adopting the host's identity fields below) unless the host
     // carries a state class the client's bytes can never see.
+    const hostPiercesFence = hostAgentStatusPiercesClientAuthority(entry)
+    // Why: a row the host mirrored here IS the host's statement, so the fence has nothing left to
+    // protect — the host's next frame, including the release of a wait it opened, must land. Without
+    // this the fenced branch re-spread the host's own `waiting` over the host's `working`/`done`,
+    // and only the client's next byte write (or the 30-minute stale boundary) released a dialog that
+    // had already been answered.
+    const existingIsHostRow = existing?.mirroredEvidenceReceivedAt !== undefined
+    // Why outright rather than on a clock comparison: pi re-posts `ui_prompt_active` on every tool
+    // event while the dialog is open, so a wait that loses once and wins once more IS the
+    // working/waiting oscillation this fence exists to stop — and `updatedAt` is the client's clock
+    // against the host's, which skew alone can invert.
+    const hostDialogOutranksClient = hostPiercesFence && !existingIsHostRow
     const clientOwnsEntry =
-      isFencedClientAgentStatus(entry.paneKey, existing, now) &&
-      !hostAgentStatusPiercesClientAuthority(entry)
+      !existingIsHostRow &&
+      !hostPiercesFence &&
+      isFencedClientAgentStatus(entry.paneKey, existing, now)
     const nextEntry =
-      existing && (clientOwnsEntry || existing.updatedAt > entry.updatedAt)
+      existing &&
+      !hostDialogOutranksClient &&
+      (clientOwnsEntry || existing.updatedAt > entry.updatedAt)
         ? {
             ...normalizeCompatibleAgentStatusEntryForOwner(existing, entry.agentType),
             ...(clientOwnsEntry && existing.state === 'working' && entry.state === 'working'
