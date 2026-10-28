@@ -10,6 +10,7 @@ import {
 import { getGitHubRuntimeRepoId, type GitHubRuntimeHost } from '@/lib/github-source-runtime-context'
 import { startFixChecksAgent } from '@/lib/fix-checks-agent-launch'
 import { buildFixBrokenChecksPrompt } from '@/components/pr-checks-fix-prompt'
+import { rerunChecksAcrossProviders } from '@/components/pr-checks-rerun'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import type { GitHubOwnerRepo } from '../../../../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
@@ -126,7 +127,9 @@ export async function refreshGitHubChecksTab(
 export async function rerunGitHubChecksTab(
   ctx: ChecksTabActionContext,
   failedOnly: boolean,
-  rerunning: boolean
+  rerunning: boolean,
+  /** The list being rerun, so the Jenkins half of a mixed failure list is not silently skipped. */
+  checks: PRCheckDetail[]
 ): Promise<void> {
   if (!ctx.canUseChecksRepoContext || rerunning) {
     return
@@ -134,43 +137,48 @@ export async function rerunGitHubChecksTab(
   const rerunContextOwner = ctx.committedChecksContextOwnerRef.current
   ctx.setRerunningOwner(rerunContextOwner)
   try {
-    const result = ctx.runtimeHost
-      ? await callRuntimeRpc<Awaited<ReturnType<typeof window.api.gh.rerunPRChecks>>>(
-          { kind: 'environment', environmentId: ctx.runtimeHost.environmentId },
-          'github.rerunPRChecks',
-          {
-            repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.itemRepoId),
-            prNumber: ctx.itemNumber,
-            headSha: ctx.headSha,
-            failedOnly,
-            prRepo: ctx.prRepo
-          },
-          { timeoutMs: 30_000 }
-        )
-      : await window.api.gh.rerunPRChecks({
-          repoPath: ctx.repoPath ?? '',
-          repoId: ctx.repoId ?? undefined,
-          sourceContext: ctx.sourceContext,
-          prNumber: ctx.itemNumber,
-          headSha: ctx.headSha,
-          failedOnly,
-          prRepo: ctx.prRepo
-        })
+    const outcome = await rerunChecksAcrossProviders({
+      checks,
+      failedOnly,
+      rerunGitHub: () =>
+        ctx.runtimeHost
+          ? callRuntimeRpc<Awaited<ReturnType<typeof window.api.gh.rerunPRChecks>>>(
+              { kind: 'environment', environmentId: ctx.runtimeHost.environmentId },
+              'github.rerunPRChecks',
+              {
+                repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.itemRepoId),
+                prNumber: ctx.itemNumber,
+                headSha: ctx.headSha,
+                failedOnly,
+                prRepo: ctx.prRepo
+              },
+              { timeoutMs: 30_000 }
+            )
+          : window.api.gh.rerunPRChecks({
+              repoPath: ctx.repoPath ?? '',
+              repoId: ctx.repoId ?? undefined,
+              sourceContext: ctx.sourceContext,
+              prNumber: ctx.itemNumber,
+              headSha: ctx.headSha,
+              failedOnly,
+              prRepo: ctx.prRepo
+            })
+    })
     if (
       !ctx.mountedRef.current ||
       ctx.committedChecksContextOwnerRef.current !== rerunContextOwner
     ) {
       return
     }
-    if (!result.ok) {
-      toast.error(result.error)
+    if (!outcome.ok) {
+      toast.error(outcome.message)
+      // Why still refresh: a partial success means builds did start, and the list is now stale.
+      if (outcome.started > 0) {
+        await refreshGitHubChecksTab(ctx, rerunContextOwner)
+      }
       return
     }
-    toast.success(
-      result.count === 1
-        ? translate('auto.components.GitHubItemDialog.ddafe851e1', 'Check rerun requested')
-        : translate('auto.components.GitHubItemDialog.e463ec935f', 'Check reruns requested')
-    )
+    toast.success(outcome.message)
     await refreshGitHubChecksTab(ctx, rerunContextOwner)
   } catch (err) {
     if (

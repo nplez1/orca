@@ -35,6 +35,14 @@ export type JenkinsBuildLocation = {
   buildNumber: number | null
   /** Build alias the URL resolved to; `lastBuild` when it pointed at the job rather than a build. */
   permalink: string | null
+  /**
+   * Whether the link named a build at all.
+   *
+   * Why it has to be a field: `permalink` is synthesized as `lastBuild` for a job-level link, so it
+   * cannot answer this. The Checks surface needs the distinction to tell a Jenkins build URL from a
+   * GitHub Actions one — `…/actions/runs/123/job/456` parses as a job named `456` with no build.
+   */
+  namesBuild: boolean
 }
 
 function parseUrl(input: string | null | undefined): URL | null {
@@ -148,28 +156,30 @@ function toLocation(
   url: URL,
   pathPrefix: string,
   rawJobNames: string[],
-  buildRef: string
+  /** The build segment the link actually carried, or null when it named none. */
+  buildRef: string | null
 ): JenkinsBuildLocation | null {
   if (rawJobNames.length === 0) {
     return null
   }
-  const numeric = /^\d+$/.test(buildRef)
+  const numeric = buildRef !== null && /^\d+$/.test(buildRef)
   const buildNumber = numeric ? Number(buildRef) : null
   const permalink = numeric
     ? null
-    : CLASSIC_PERMALINKS.has(buildRef)
+    : buildRef !== null && CLASSIC_PERMALINKS.has(buildRef)
       ? buildRef
       : // Why: a job-level link names no build, so read the newest one rather than nothing.
         'lastBuild'
-  const resolvedRef = buildNumber === null ? permalink! : buildRef
   const jobUrl = `${url.origin}${pathPrefix}/${rawJobNames.map((name) => `job/${name}`).join('/')}/`
+  const resolvedRef = numeric && buildRef !== null ? buildRef : (permalink ?? 'lastBuild')
   return {
     serverUrl: `${url.origin}${pathPrefix}`,
     jobUrl,
     buildUrl: `${jobUrl}${encodeURIComponent(resolvedRef)}/`,
     jobPath: rawJobNames.map(decodeSegment),
     buildNumber,
-    permalink
+    permalink,
+    namesBuild: buildRef !== null
   }
 }
 
@@ -196,7 +206,7 @@ function parseClassicLocation(url: URL): JenkinsBuildLocation | null {
     return null
   }
   // Everything past the build reference is a page (console/artifact/changes/…) we do not need.
-  return toLocation(url, pathPrefix, rawJobNames, segments[index] ?? 'lastBuild')
+  return toLocation(url, pathPrefix, rawJobNames, segments[index] ?? null)
 }
 
 /**
@@ -241,7 +251,7 @@ function parseBlueOceanLocation(url: URL): JenkinsBuildLocation | null {
     url,
     pathPrefix,
     names.map((name) => encodeURIComponent(name)),
-    runId ?? 'lastBuild'
+    runId
   )
 }
 

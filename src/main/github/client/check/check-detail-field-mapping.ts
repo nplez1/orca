@@ -1,4 +1,5 @@
 import type { PRCheckRunDetails } from '../../../../shared/github/check-types'
+import { parseActionsRunId as parseActionsRunIdFromUrl } from '../../../../shared/actions-run-url'
 export function nullableString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
@@ -71,13 +72,5 @@ export function getWorkflowRunIdFromCheckRun(
 }
 
 export function parseActionsRunId(url: string | null | undefined): number | undefined {
-  if (!url) {
-    return undefined
-  }
-  const match = /\/actions\/runs\/(\d+)(?:[/?#]|$)/.exec(url)
-  if (!match) {
-    return undefined
-  }
-  const id = Number(match[1])
-  return Number.isSafeInteger(id) ? id : undefined
+  return parseActionsRunIdFromUrl(url)
 }

@@ -18,6 +18,7 @@ import { CheckRunAnnotations } from './CheckRunAnnotations'
 import { CheckFailureSummary } from './CheckFailureSummary'
 import { CheckRunJobs } from './CheckRunJobs'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
+import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 import { CheckRunCopyButton } from './CheckRunCopyButton'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useCheckDetailsReadingPosition } from './use-check-details-reading-position'
@@ -176,6 +177,12 @@ export function CheckRunDetailsPanel({
             {check.name}
           </h1>
           <div className="flex shrink-0 items-center gap-2">
+            <JenkinsRebuildButton
+              check={check}
+              size="sm"
+              className="shrink-0"
+              {...(onRefresh ? { onStarted: onRefresh } : {})}
+            />
             {canFixWithAI && (
               <SourceControlFixSplitButton
                 label={translate(

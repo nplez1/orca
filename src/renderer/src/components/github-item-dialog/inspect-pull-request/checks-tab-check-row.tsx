@@ -14,7 +14,8 @@ export function renderCheckRow({
   expandedCheckKey,
   detailsByCheckKey,
   onToggle,
-  requestCheckDetails
+  requestCheckDetails,
+  onCheckRebuildStarted
 }: {
   check: PRCheckDetail
   variant: 'compact' | 'page'
@@ -22,6 +23,7 @@ export function renderCheckRow({
   detailsByCheckKey: Record<string, CheckDetailsLoadState | undefined>
   onToggle: (check: PRCheckDetail) => void
   requestCheckDetails: (check: PRCheckDetail, key: string) => void
+  onCheckRebuildStarted?: () => void
 }): React.JSX.Element {
   const key = getCheckDetailsKey(check)
   return (
@@ -33,6 +35,7 @@ export function renderCheckRow({
       detailsState={detailsByCheckKey[key]}
       onToggle={onToggle}
       onRetry={requestCheckDetails}
+      {...(onCheckRebuildStarted ? { onCheckRebuildStarted } : {})}
     />
   )
 }
@@ -43,7 +46,8 @@ export function ChecksTabCheckRow({
   expanded,
   detailsState,
   onToggle,
-  onRetry
+  onRetry,
+  onCheckRebuildStarted
 }: {
   check: PRCheckDetail
   variant: 'compact' | 'page'
@@ -51,6 +55,7 @@ export function ChecksTabCheckRow({
   detailsState: CheckDetailsLoadState | undefined
   onToggle: (check: PRCheckDetail) => void
   onRetry: (check: PRCheckDetail, key: string) => void
+  onCheckRebuildStarted?: () => void
 }): React.JSX.Element {
   const conclusion = getCheckConclusion(check)
   const Icon = CHECK_ICON[conclusion] ?? CircleDashed
@@ -80,7 +85,12 @@ export function ChecksTabCheckRow({
         <span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel}</span>
       </button>
       {expanded ? (
-        <ChecksTabCheckDetails check={check} state={detailsState} onRetry={onRetry} />
+        <ChecksTabCheckDetails
+          check={check}
+          state={detailsState}
+          onRetry={onRetry}
+          {...(onCheckRebuildStarted ? { onRebuildStarted: onCheckRebuildStarted } : {})}
+        />
       ) : null}
     </div>
   )

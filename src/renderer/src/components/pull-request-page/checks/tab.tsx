@@ -235,6 +235,7 @@ export function ChecksTab({
         item,
         headSha,
         prRepo,
+        checks: list,
         failedOnly,
         mountedRef,
         handleRefresh
@@ -244,6 +245,7 @@ export function ChecksTab({
       handleRefresh,
       headSha,
       item,
+      list,
       mountedRef,
       prRepo,
       runtimeHost,
@@ -363,6 +365,11 @@ export function ChecksTab({
         detailsState={detailsByCheckKey[key]}
         onToggle={handleToggleCheckDetails}
         onRetryDetails={requestCheckDetails}
+        onCheckRebuildStarted={() => {
+          // Why the list and not just the details: a rebuild is a new build with a new URL, so the
+          // row itself is stale, not only the expanded pane below it.
+          void handleRefresh()
+        }}
       />
     )
   }

@@ -1283,6 +1283,35 @@
       "timeout": "{{value0}} did not respond in time.",
       "failed": "Jenkins could not return this build.",
       "timedOut": "Timed out loading this Jenkins build."
+    },
+    "rebuild": {
+      "action": "Rerun build",
+      "rerunning": "Rerunning…",
+      "noBuild": "This check does not link to a numbered Jenkins build, so there is nothing to rerun. Open it in Jenkins instead.",
+      "notConfigured": "Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to rerun this build.",
+      "unauthorized": "Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.",
+      "forbidden": "The saved Jenkins account cannot start builds on {{value0}}.",
+      "notFound": "This Jenkins job or build is no longer available, so nothing was started.",
+      "unreachable": "Could not reach {{value0}}, so nothing was started. Builds are triggered from this machine, so a Jenkins on another network stays out of reach.",
+      "timeout": "{{value0}} did not respond in time. Check Jenkins before retrying, in case a build did start.",
+      "failed": "Jenkins could not start a new build.",
+      "timedOut": "Timed out waiting for Jenkins to start the build.",
+      "notJenkins": "This check does not link to a Jenkins build, so it cannot be rerun here.",
+      "unavailable": "Rerunning Jenkins builds is not available in this client.",
+      "replayStarted": "Jenkins is rebuilding build #{{value0}}",
+      "parametersStarted": "Jenkins started a new build with the same parameters",
+      "buildStarted": "Jenkins started a new build"
+    }
+  },
+  "prChecks": {
+    "rerun": {
+      "nothingFailed": "No failed checks to rerun.",
+      "nothingRerunnable": "No rerunnable checks found.",
+      "partialFailure": "{{value0}} rerun(s) already started. {{value1}}",
+      "mixedStarted": "Reruns requested: {{value0}} GitHub check(s), {{value1}} Jenkins build(s)",
+      "jenkinsStarted": "Reruns requested for {{value0}} Jenkins builds",
+      "githubStarted": "Check rerun requested",
+      "githubStartedPlural": "Check reruns requested"
     }
   },
   "checkDetails": {

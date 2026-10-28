@@ -1,14 +1,26 @@
 import { getMainHttpClient } from '../network/http-client'
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
 import type { JenkinsBuildDetailsFailureReason } from '../../shared/jenkins-check-details'
-import { isJenkinsUrlUnderBase } from '../../shared/jenkins-urls'
+import {
+  classifyJenkinsHttpStatus,
+  isKnownJenkins,
+  isResponseBeyondCredentialScope,
+  type JenkinsIdentityEvidence
+} from './jenkins-response-verdict'
+
+export {
+  classifyJenkinsHttpStatus,
+  isResponseBeyondCredentialScope,
+  type JenkinsIdentityEvidence
+} from './jenkins-response-verdict'
 
 /**
- * Authenticated GETs against a Jenkins server.
+ * The transport every Jenkins request goes through: authenticated, proxied, bounded.
  *
  * Jenkins answers its REST API over plain HTTP with basic auth, so this sits on the shared
  * main-process HTTP port (Chromium's stack on the desktop, which is what follows proxy and VPN
- * state) rather than the `gh`/`glab` CLI delegation the git providers use.
+ * state) rather than the `gh`/`glab` CLI delegation the git providers use. `jenkinsGetJson` reads
+ * with it; `jenkins-write.ts` posts with it.
  */
 
 /** Jenkins answers quickly or not at all; a hung server must not hold the Checks pane open. */
@@ -24,52 +36,6 @@ export type JenkinsRequestFailure = {
   identifiedAsJenkins: boolean
   /** `X-Jenkins` header value, e.g. `2.452.1`, when the server sent one. */
   jenkinsVersion: string | null
-}
-
-/**
- * What the response says about whether this host really is Jenkins.
- *
- * `configured` is the user having added this URL as a Jenkins server, which makes its answers
- * authoritative: a 404 then means the build is gone, not that the URL was never Jenkins.
- */
-export type JenkinsIdentityEvidence = {
-  identifiedAsJenkins: boolean
-  configured: boolean
-}
-
-function isKnownJenkins(evidence: JenkinsIdentityEvidence): boolean {
-  return evidence.identifiedAsJenkins || evidence.configured
-}
-
-/**
- * Whether the response arrived from somewhere our credentials were not meant for.
- *
- * Why refuse it rather than read it: a Jenkins that redirects away from its own URL is an SSO
- * interstitial or a proxy, and that response is no longer evidence about this Jenkins. The Fetch
- * standard strips `Authorization` on a *cross-origin* hop, but a same-origin hop keeps it, so the
- * configured path prefix — not just the origin — is the boundary that matters here: a server
- * configured at `https://host/jenkins` redirecting to `https://host/other-service` is still the
- * same origin and would otherwise take the token with it.
- *
- * An unconfigured host has no prefix to compare against, so its own origin is the boundary.
- */
-export function isResponseBeyondCredentialScope(args: {
-  requestUrl: string
-  responseUrl: string
-  serverBaseUrl: string | null
-}): boolean {
-  if (args.responseUrl.length === 0) {
-    // A synthetic or unpopulated `response.url` tells us nothing; do not invent a refusal.
-    return false
-  }
-  if (args.serverBaseUrl !== null) {
-    return !isJenkinsUrlUnderBase(args.serverBaseUrl, args.responseUrl)
-  }
-  try {
-    return new URL(args.requestUrl).origin !== new URL(args.responseUrl).origin
-  } catch {
-    return false
-  }
 }
 
 /**
@@ -143,7 +109,7 @@ function failure(
 }
 
 /** A response body nobody reads still has to be released; undici can crash the host otherwise. */
-async function releaseBody(response: Response): Promise<void> {
+export async function releaseBody(response: Response): Promise<void> {
   try {
     await response.body?.cancel()
   } catch {
@@ -168,26 +134,8 @@ export function classifyJenkinsTransportError(error: unknown): JenkinsRequestFai
   return { reason: 'unreachable', message, identifiedAsJenkins: false, jenkinsVersion: null }
 }
 
-export function classifyJenkinsHttpStatus(
-  status: number,
-  evidence: JenkinsIdentityEvidence
-): JenkinsBuildDetailsFailureReason {
-  if (status === 401) {
-    return 'unauthorized'
-  }
-  if (status === 403) {
-    return 'forbidden'
-  }
-  if (status === 404) {
-    // Why: without either signal we cannot tell "no such build" from "not Jenkins at all", and
-    // claiming a build is missing when the URL was never Jenkins would hide that distinction.
-    return isKnownJenkins(evidence) ? 'not-found' : 'not-jenkins'
-  }
-  return isKnownJenkins(evidence) ? 'error' : 'not-jenkins'
-}
-
-export async function jenkinsGetJson(args: {
-  url: string
+/** The credentials half of every Jenkins request; null `apiToken` means an anonymous read. */
+export type JenkinsCredentialArgs = {
   /** Empty when the server profile has no username; the token is then sent as a bearer token. */
   username: string
   /** Null for an unconfigured host, where only anonymous reads can succeed. */
@@ -197,29 +145,46 @@ export async function jenkinsGetJson(args: {
   /** The matched server's configured prefix, which bounds where credentials may travel. */
   serverBaseUrl?: string | null
   signal?: AbortSignal
-}): Promise<JenkinsRequestResult> {
-  const httpClient = getMainHttpClient()
-  const proxySession = httpClient.proxySession()
-  // Why: a Jenkins behind a corporate proxy is the normal case for self-hosted instances, and the
-  // shared transport only follows proxy state once it has been applied to the session.
+}
+
+/**
+ * Points the shared transport at the proxy the environment describes.
+ *
+ * Why: a Jenkins behind a corporate proxy is the normal case for self-hosted instances, and the
+ * shared transport only follows proxy state once it has been applied to the session.
+ */
+export async function applyJenkinsProxy(url: string): Promise<void> {
+  const proxySession = getMainHttpClient().proxySession()
   await ensureElectronProxyFromEnvironment({
     ...(proxySession ? { proxySession } : {}),
-    probeUrl: args.url
+    probeUrl: url
   }).catch(() => undefined)
+}
 
+export function jenkinsAuthHeaders(args: JenkinsCredentialArgs): Record<string, string> {
+  return args.apiToken
+    ? { Authorization: jenkinsAuthorizationHeader(args.username, args.apiToken) }
+    : {}
+}
+
+export function jenkinsSignal(signal: AbortSignal | undefined): AbortSignal {
   const timeout = AbortSignal.timeout(JENKINS_REQUEST_TIMEOUT_MS)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
+}
+
+export async function jenkinsGetJson(
+  args: JenkinsCredentialArgs & { url: string }
+): Promise<JenkinsRequestResult> {
+  const httpClient = getMainHttpClient()
+  await applyJenkinsProxy(args.url)
+
   let response: Response
   try {
     response = await httpClient.fetch(args.url, {
       method: 'GET',
       redirect: 'follow',
-      headers: {
-        Accept: 'application/json',
-        ...(args.apiToken
-          ? { Authorization: jenkinsAuthorizationHeader(args.username, args.apiToken) }
-          : {})
-      },
-      signal: args.signal ? AbortSignal.any([args.signal, timeout]) : timeout
+      headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
+      signal: jenkinsSignal(args.signal)
     })
   } catch (error) {
     return { ok: false, failure: classifyJenkinsTransportError(error) }
