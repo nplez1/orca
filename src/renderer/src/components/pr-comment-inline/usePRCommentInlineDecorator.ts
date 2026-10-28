@@ -20,6 +20,17 @@ const THREAD_TRIGGER_PX = 28
 /** A no-op, stable identity so the decorator's required delete handler does not churn the zones. */
 const ignoreCommentDelete = (): void => {}
 
+/** Which lines a surface must leave alone because a collapsed thread's bubble owns the gutter slot. */
+export type PRCommentInlineDecoratorHandle = {
+  /**
+   * Lines drawn as a collapsed-thread bubble. Empty when every thread is open.
+   *
+   * A surface that mounts both this decorator and the add-note "+" hands these to the latter: the
+   * two affordances want the same gutter slot for the same line, and the conversation wins.
+   */
+  gutterOccupiedLines: readonly number[]
+}
+
 type PRCommentInlineDecoratorArgs = {
   editor: monacoEditor.ICodeEditor | null
   monacoModelIdentity?: string
@@ -56,7 +67,7 @@ export function usePRCommentInlineDecorator({
   onResolveThread,
   pendingRevealCommentId,
   onPendingRevealConsumed
-}: PRCommentInlineDecoratorArgs): void {
+}: PRCommentInlineDecoratorArgs): PRCommentInlineDecoratorHandle {
   const displayOverrides = useAppStore((s) => s.prCommentInlineDisplayById)
   const setPRCommentInlineDisplay = useAppStore((s) => s.setPRCommentInlineDisplay)
 
@@ -100,6 +111,7 @@ export function usePRCommentInlineDecorator({
     marks: gutterMarks,
     onActivate: (commentId) => setPRCommentInlineDisplay(commentId, 'expanded')
   })
+  const gutterOccupiedLines = useMemo(() => gutterMarks.map((mark) => mark.line), [gutterMarks])
 
   const inlineComments = useMemo<DecoratedDiffComment[]>(
     () => (scope ? toInlinePRComments({ threads: expandedThreads, scope, filePath }) : []),
@@ -149,6 +161,8 @@ export function usePRCommentInlineDecorator({
     pendingScrollCommentId: pendingRevealCommentId ?? null,
     onPendingScrollConsumed: onPendingRevealConsumed
   })
+
+  return { gutterOccupiedLines }
 }
 
 const NO_COMMENTABLE_LINES: readonly number[] = []

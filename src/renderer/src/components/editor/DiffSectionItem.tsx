@@ -128,6 +128,23 @@ export function DiffSectionItem({
     [addDiffComment, onAddLineComment, section, worktreeId]
   )
 
+  // Why: review threads run their own decorator instance rather than joining the local-note list, so
+  // the note flow's add-note overlay and draft zone stay out of a comment a user only wants to reply to.
+  // Mounted before the local-note decorator because a collapsed thread's line is one the "+" must skip.
+  const prCommentSurface = usePRCommentInlineSurface(prCommentReview ?? null, section.path)
+  const prCommentGutter = usePRCommentInlineDecorator({
+    editor: modifiedEditor,
+    monacoModelIdentity: `${modelPathBase}:modified`,
+    filePath: section.path,
+    threads: prCommentSurface?.threads ?? null,
+    scope: prCommentSurface?.scope ?? null,
+    enabled: prCommentSurface?.enabled ?? false,
+    onReply: prCommentSurface?.onReply,
+    onResolveThread: prCommentSurface?.onResolveThread,
+    pendingRevealCommentId: prCommentSurface?.pendingRevealCommentId ?? null,
+    onPendingRevealConsumed: prCommentSurface?.onPendingRevealConsumed
+  })
+
   useDiffCommentDecorator({
     editor: hasLineCommentAction ? modifiedEditor : null,
     monacoModelIdentity: `${modelPathBase}:modified`,
@@ -135,6 +152,7 @@ export function DiffSectionItem({
     worktreeId: worktreeId ?? '',
     comments: inlineComments ?? (worktreeId ? diffComments : []),
     commentableLineNumbers: getCommentableLineNumbers?.(section),
+    gutterOccupiedLineNumbers: prCommentGutter.gutterOccupiedLines,
     addButtonLabel: addLineCommentLabel,
     addNoteShortcutEnabled: hasLineCommentAction,
     onCreateComment: handleCreateComment,
@@ -149,22 +167,6 @@ export function DiffSectionItem({
     onUpdateComment: worktreeId ? (id, body) => updateDiffComment(worktreeId, id, body) : undefined,
     pendingScrollCommentId: pendingScrollForThisSection,
     onPendingScrollConsumed: () => setScrollToDiffCommentId(null)
-  })
-
-  // Why: review threads run their own decorator instance rather than joining the local-note list, so
-  // the note flow's add-note overlay and draft zone stay out of a comment a user only wants to reply to.
-  const prCommentSurface = usePRCommentInlineSurface(prCommentReview ?? null, section.path)
-  usePRCommentInlineDecorator({
-    editor: modifiedEditor,
-    monacoModelIdentity: `${modelPathBase}:modified`,
-    filePath: section.path,
-    threads: prCommentSurface?.threads ?? null,
-    scope: prCommentSurface?.scope ?? null,
-    enabled: prCommentSurface?.enabled ?? false,
-    onReply: prCommentSurface?.onReply,
-    onResolveThread: prCommentSurface?.onResolveThread,
-    pendingRevealCommentId: prCommentSurface?.pendingRevealCommentId ?? null,
-    onPendingRevealConsumed: prCommentSurface?.onPendingRevealConsumed
   })
 
   useEffect(() => {

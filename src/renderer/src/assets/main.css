@@ -2997,7 +2997,10 @@ html.native-shell .app-layout {
 /* Why: the "+" button is appended into Monaco's editor DOM node by
    useDiffCommentDecorator. Keep it visually subtle until hovered so it does
    not distract from the diff itself. Left position overlaps the glyph margin
-   so the affordance reads as "add comment on this line". */
+   so the affordance reads as "add comment on this line" — safe only because
+   the overlay skips every line whose gutter slot already carries a collapsed
+   review thread's bubble, so the two never share a slot and a click there can
+   only mean "open the thread". */
 .orca-diff-comment-add-btn {
   position: absolute;
   left: 4px;

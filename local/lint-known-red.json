@@ -23,5 +23,20 @@
     "reproducing is reported stale; `node local/gate-lint.mjs --prune` drops it."
   ],
   "recordedAt": "2026-10-22",
-  "entries": []
+  "entries": [
+    {
+      "step": "check:flaky-test-pattern-ratchet",
+      "match": "^test-no-wall-clock:src/renderer/src/components/github/check-details-cache\\.test\\.ts:",
+      "class": "foreign-red",
+      "owner": "941acb70e0 fix(checks): keep cached check details on screen instead of re-spinning (#198)",
+      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198"
+    },
+    {
+      "step": "check:flaky-test-pattern-ratchet",
+      "match": "^test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details\\.test\\.tsx:",
+      "class": "foreign-red",
+      "owner": "941acb70e0 fix(checks): keep cached check details on screen instead of re-spinning (#198)",
+      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198"
+    }
+  ]
 }

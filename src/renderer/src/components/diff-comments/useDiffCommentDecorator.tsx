@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { createRoot, type Root } from 'react-dom/client'
 import { getCommentBodyLayoutLineCount } from '@/lib/comment-body-line-count'
 import { useAppStore } from '@/store'
 import {
-  installDiffCommentAddButtonOverlay,
+  useDiffCommentAddButtonOverlay,
   type DiffCommentAddButtonOverlayHandle
 } from './diff-comment-add-button-overlay'
 import { installDiffCommentAddNoteShortcut } from './diff-comment-add-note-shortcut'
+import { useDiffCommentLineSets } from './use-diff-comment-line-sets'
 import { installDiffCommentZoneMouseDownStopper } from './diff-comment-zone-mouse-events'
 import { getRenderSignature, renderDiffCommentZoneCard } from './diff-comment-zone-card'
 import type { DecoratedDiffComment } from './decorated-diff-comment'
@@ -32,6 +33,12 @@ type DecoratorArgs = {
   worktreeId: string
   comments: readonly DecoratedDiffComment[]
   commentableLineNumbers?: readonly number[]
+  /**
+   * Lines whose gutter slot is already occupied by another control — a collapsed review thread's
+   * bubble. The add-note "+" is not drawn there, so hovering a commented line can only offer the
+   * conversation. The Add Review Note chord still opens a note on such a line.
+   */
+  gutterOccupiedLineNumbers?: readonly number[]
   addButtonLabel?: string
   pendingCommentTarget?: DiffCommentLineTarget | null
   // Bind the Add Review Note chord to this editor. Off for the markdown editor, which already
@@ -73,6 +80,7 @@ export function useDiffCommentDecorator({
   worktreeId,
   comments,
   commentableLineNumbers,
+  gutterOccupiedLineNumbers,
   addButtonLabel = 'Add note for the AI',
   pendingCommentTarget = null,
   addNoteShortcutEnabled = false,
@@ -148,47 +156,24 @@ export function useDiffCommentDecorator({
     scrollToZoneFrameRef.current = null
   }, [])
 
-  // Key on the values, not the array identity: review surfaces re-fetch PR/MR file data on every
-  // refresh and hand us a fresh-but-equal number[], which would otherwise churn every consumer.
-  // Memoized on the array identity: the join walks every commentable line of the patch (thousands
-  // on a large file) and every mounted diff row runs this hook on every render.
-  const commentableLineKey = useMemo(
-    () => commentableLineNumbers?.join(','),
-    [commentableLineNumbers]
-  )
-  const commentableLineSet = useMemo(
-    () => (commentableLineNumbers ? new Set(commentableLineNumbers) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [commentableLineKey]
+  // The line filters this decorator's "+" obeys; the hook owns how each is keyed.
+  const { commentableLineSet, gutterOccupiedLineSet } = useDiffCommentLineSets(
+    commentableLineNumbers,
+    gutterOccupiedLineNumbers
   )
 
-  // Add-button overlay only: it captures commentableLineSet/addButtonLabel, so it must be rebuilt when
-  // either changes. Kept apart from the zone teardown below, whose deps must mirror the zone-creating effect.
-  useEffect(() => {
-    if (!editor) {
-      return
-    }
-
-    const editorDomNode = editor.getDomNode()
-    if (!editorDomNode) {
-      return
-    }
-
-    const overlay = installDiffCommentAddButtonOverlay({
-      editor,
-      editorDomNode,
-      addButtonLabel,
-      commentableLineSet,
-      hoverLineRef,
-      onAddCommentClickRef
-    })
-    overlayRef.current = overlay
-    overlay.setPendingRange(pendingCommentRangeRef.current)
-    return () => {
-      overlayRef.current = null
-      overlay.dispose()
-    }
-  }, [addButtonLabel, commentableLineSet, editor, monacoModelIdentity, onAddCommentClickRef])
+  // Kept apart from the zone teardown below, whose deps must mirror the zone-creating effect.
+  useDiffCommentAddButtonOverlay({
+    editor,
+    monacoModelIdentity,
+    addButtonLabel,
+    commentableLineSet,
+    gutterOccupiedLines: gutterOccupiedLineSet,
+    hoverLineRef,
+    onAddCommentClickRef,
+    pendingRangeRef: pendingCommentRangeRef,
+    overlayRef
+  })
 
   const pendingLineNumber = pendingCommentTarget?.lineNumber ?? null
   const pendingStartLine = pendingCommentTarget?.startLine ?? null

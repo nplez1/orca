@@ -52,6 +52,11 @@ export function useMonacoMarkdownAnnotations(params: {
   language: string
   worktreeId: string | undefined
   markdownAnnotationsEnabled: boolean
+  /**
+   * Lines a collapsed review thread already draws a bubble on. The add-note "+" stands down there,
+   * because both controls want the same gutter slot and a click there can only mean the thread.
+   */
+  gutterOccupiedLineNumbers: readonly number[]
 }): MonacoMarkdownAnnotations {
   const {
     mountedEditor,
@@ -60,7 +65,8 @@ export function useMonacoMarkdownAnnotations(params: {
     content,
     language,
     worktreeId,
-    markdownAnnotationsEnabled
+    markdownAnnotationsEnabled,
+    gutterOccupiedLineNumbers
   } = params
 
   const addDiffComment = useAppStore((s) => s.addDiffComment)
@@ -113,6 +119,7 @@ export function useMonacoMarkdownAnnotations(params: {
     filePath: relativePath,
     worktreeId: worktreeId ?? '',
     comments: shouldShowMarkdownAnnotations ? markdownComments : [],
+    gutterOccupiedLineNumbers,
     pendingCommentTarget: commentPopover,
     onAddCommentClick: ({ lineNumber, startLine, top }) => {
       setSelectionAnnotationTarget(null)

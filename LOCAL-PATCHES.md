@@ -1614,6 +1614,28 @@ today, and all 17 are `host-toolchain` (8) and `sqlite-binding` (9) — a differ
 and SQLite, which is not something this fork can fix in a test. The `host-toolchain` entries that were
 bash 3.2 rather than bun or SQLite are gone with the bash install recorded above.
 
+### `local(lint)`: two flaky-test-pattern reds inherited from #198
+
+`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` fails
+`check:flaky-test-pattern-ratchet` on two files that commit merged, and on nothing else:
+
+```
+test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details.test.tsx: 1 flaky-test finding(s), baseline allows 0.
+test-no-wall-clock:src/renderer/src/components/github/check-details-cache.test.ts: 4 flaky-test finding(s), baseline allows 0.
+```
+
+Both are static ast-grep findings, so they are deterministic, not flaky-that-time: neither file was
+touched by the branch that ran the gate, and both arrive through the base commit. Recording them is
+the `local(lint)` mechanism's reason for existing — the alternative was a branch either fixing another
+branch's fresh tests or quietly not running the gate.
+
+`local/lint-known-red.json` carries one narrow entry per file (the `match` names the rule and the
+path, so a _new_ finding in either file still fails the gate). The fix belongs to whoever owns the
+checks-panel work: a wall-clock read and a real-time wait in a test are what
+`config/scripts/check-flaky-test-pattern-ratchet.mjs` exists to catch, and both want fake timers or a
+fixed timestamp, not a suppression. **Pruning wins**: when that lands, delete both entries and this
+section in the same commit.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream

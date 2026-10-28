@@ -13,6 +13,7 @@ export type FakeDecoration = {
   endLine: number
   className?: string | null
   marginClassName?: string | null
+  glyphMarginClassName?: string | null
 }
 
 export type FakeDiffCommentEditor = {
@@ -70,6 +71,9 @@ export function createFakeDiffCommentEditor(
   let nextZoneId = 0
   let scrollTop = 0
   let decorations: FakeDecoration[] = []
+  // Each createDecorationsCollection gets its own record, the way Monaco keeps the range-drag band
+  // and the gutter marks apart: clearing one must not erase the other.
+  const decorationCollections = new Set<{ current: FakeDecoration[] }>()
   let decorationWrites = 0
   let focusCount = 0
   const mouseMoveListeners: ((e: { target: { position: { lineNumber: number } } }) => void)[] = []
@@ -95,6 +99,8 @@ export function createFakeDiffCommentEditor(
     getContainerDomNode: () => domNode,
     getModel: () => model,
     getOption: () => FAKE_LINE_HEIGHT_PX,
+    // The gutter-mark hook writes the glyphMargin option through this, and the overlay reads lineHeight.
+    updateOptions: () => {},
     getTopForLineNumber: (lineNumber: number) => (lineNumber - 1) * FAKE_LINE_HEIGHT_PX,
     getScrollTop: () => scrollTop,
     setScrollTop: (next: number) => {
@@ -107,21 +113,36 @@ export function createFakeDiffCommentEditor(
       focusCount += 1
     },
     deltaDecorations: () => [],
-    createDecorationsCollection: () => ({
-      set: (next: MonacoEditor.IModelDeltaDecoration[]) => {
+    createDecorationsCollection: (initial?: MonacoEditor.IModelDeltaDecoration[]) => {
+      const record: { current: FakeDecoration[] } = { current: [] }
+      decorationCollections.add(record)
+      const sync = (): void => {
+        decorations = [...decorationCollections].flatMap((entry) => entry.current)
+      }
+      const apply = (next: MonacoEditor.IModelDeltaDecoration[]): void => {
         decorationWrites += 1
-        decorations = next.map((decoration) => ({
+        record.current = next.map((decoration) => ({
           startLine: decoration.range.startLineNumber,
           endLine: decoration.range.endLineNumber,
           className: decoration.options.className,
-          marginClassName: decoration.options.marginClassName
+          marginClassName: decoration.options.marginClassName,
+          glyphMarginClassName: decoration.options.glyphMarginClassName
         }))
-      },
-      clear: () => {
-        decorationWrites += 1
-        decorations = []
+        sync()
       }
-    }),
+      // Monaco takes initial decorations as the argument, not through set() — both styles write here.
+      if (initial) {
+        apply(initial)
+      }
+      return {
+        set: apply,
+        clear: () => {
+          decorationWrites += 1
+          record.current = []
+          sync()
+        }
+      }
+    },
     getTargetAtClientPoint: (clientX: number, clientY: number) => {
       const dead = options.deadColumn
       if (dead && clientX >= dead.fromX && clientX <= dead.toX) {
@@ -140,6 +161,12 @@ export function createFakeDiffCommentEditor(
       return noopDisposable
     },
     onMouseLeave: () => noopDisposable,
+    // The gutter-mark hook subscribes to gutter presses through this; the press itself is that
+    // hook's own unit suite's subject.
+    onMouseDown: () => noopDisposable,
+    // Subscriptions the markdown-annotation path takes; nothing here fires them.
+    onDidChangeCursorSelection: () => noopDisposable,
+    onDidLayoutChange: () => noopDisposable,
     onDidScrollChange: () => noopDisposable,
     onDidDispose: (listener: () => void) => {
       disposeListeners.push(listener)

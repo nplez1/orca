@@ -20,6 +20,8 @@ Annotate AI Diff is Orca's inline review loop for agent-generated code. You leav
 
 Comments pin to the exact line; Orca tracks them across edits so they follow the line if the diff shifts.
 
+On a line that already carries a collapsed review thread, hovering offers the thread bubble instead: the **+** steps aside so a click there can only mean "open the conversation". Press `c` with the cursor on that line to leave a note on it anyway, or drag down the line-number column to pick a range that starts there.
+
 ## Send the batch
 
 When your review is done, click **Send to agent** at the top of the diff. Orca composes a single prompt with all your comments, line-anchored, then opens a **Send notes to** menu for the worktree's available agents. Pick the agent that should revise the change, or start a new agent from the same menu.
