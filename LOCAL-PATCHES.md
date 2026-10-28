@@ -1664,6 +1664,13 @@ anywhere in the repo. The changed-lines gate (`pnpm run check:code-quality:chang
 on every PR) still fails a new finding on a changed line, so the masking is bounded to pre-existing
 files. **Pruning wins**: when both commits repair their lines, delete the entry and this section.
 
+The same rebase onto `5793b0a125` turned up one **typecheck** red, which is not something `local/lint`
+can record: #205 added a required `onBoardUnavailable` prop to the Jira board and updated most of its
+call sites, but not `src/renderer/src/components/task-page/jira/Board.silentRefresh.test.tsx`, so
+`pnpm tc` failed on two of its renders. Repaired here — two lines in that test — rather than left as a
+red no gate can classify, the same shape as the two base reds repaired in #177. It is a two-line
+hunk on an upstream file, so it will conflict benignly when upstream makes the same change.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream
