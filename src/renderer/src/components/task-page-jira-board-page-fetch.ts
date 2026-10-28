@@ -79,9 +79,9 @@ export async function loadMoreJiraBoardPage(args: {
       }
     }
   } finally {
-    if (!stale()) {
-      args.setLoadingMore(false)
-    }
+    // Why outside the staleness guard: the read that owns this flag is the one that set it,
+    // and a reload starting meanwhile must not leave it set forever.
+    args.setLoadingMore(false)
   }
 }
 

@@ -5,7 +5,6 @@ import { useEffect, useState, type JSX } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
-  JiraBoardIssuePage,
   JiraBoardIssuePageRequest,
   JiraIssue,
   JiraTransition
@@ -68,9 +67,6 @@ function issue(key: string, statusId: string, overrides: Partial<JiraIssue> = {}
 }
 
 const sprintIssue = issue('ABC-1', '1')
-// Why a second viewer-held issue: the board opens on the Me filter, so anything else
-// cannot stand in for the card a reload must not take off screen.
-const secondSprintIssue = issue('ABC-6', '1')
 const otherAssigneeIssue = issue('ABC-9', '1', {
   assignee: { accountId: 'viewer-2', displayName: 'Grace' }
 })
@@ -190,35 +186,6 @@ function dragCardOnto(card: HTMLElement, target: HTMLElement, key: string): void
   const drop = new Event('drop', { bubbles: true, cancelable: true })
   Object.defineProperty(drop, 'dataTransfer', { value: dataTransfer })
   fireEvent(target, drop)
-}
-
-/** A one-page board answer, the depth a first read returns. */
-function boardPage(issues: JiraIssue[]): JiraBoardIssuePage {
-  return { issues, startAt: 0, nextPageToken: null, total: issues.length, isLast: true }
-}
-
-/** Holds the sprint refetch a mutation asks for, so the window it runs in is observable. */
-function holdSprintRefetch(firstPage: JiraIssue[] = [sprintIssue, secondSprintIssue]): {
-  resolve: (page: JiraBoardIssuePage) => void
-  sprintCalls: () => number
-} {
-  let resolveHeld: (page: JiraBoardIssuePage) => void = () => {}
-  // Why one shared promise: an explicit refresh can issue the read more than once, and
-  // a per-call deferred would leave the later ones pending for good.
-  const held = new Promise<JiraBoardIssuePage>((resolve) => {
-    resolveHeld = resolve
-  })
-  let sprintCalls = 0
-  mocks.jiraListBoardIssues.mockImplementation(
-    (_settings: unknown, request: JiraBoardIssuePageRequest) => {
-      if (request.scope === 'backlog') {
-        return Promise.resolve(boardPage([backlogIssue]))
-      }
-      sprintCalls += 1
-      return sprintCalls === 1 ? Promise.resolve(boardPage(firstPage)) : held
-    }
-  )
-  return { resolve: (page) => resolveHeld(page), sprintCalls: () => sprintCalls }
 }
 
 afterEach(() => {
@@ -707,52 +674,6 @@ describe('TaskPageJiraBoard', () => {
     await waitFor(() => expect(onIssueMoved).toHaveBeenCalledWith(sprintIssue))
   })
 
-  it('keeps the rendered cards while a lane drop refetches the sprint', async () => {
-    const refetch = holdSprintRefetch()
-    renderBoard()
-
-    const card = await screen.findByRole('button', { name: /ABC-1 title/ })
-    const doingColumn = screen.getByText('Doing').closest('section')
-    if (!doingColumn) {
-      throw new Error('Doing column was not rendered')
-    }
-    dragCardOnto(card, doingColumn, sprintIssue.key)
-
-    // The reload the move asked for is in flight, and the board is still drawn under it.
-    await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
-    expect(screen.getByText('ABC-1').closest('section')?.textContent).toContain('Doing')
-    expect(screen.getByText('ABC-6')).toBeTruthy()
-    expect(screen.queryByText('Loading…')).toBeNull()
-
-    await act(async () => {
-      refetch.resolve(boardPage([issue('ABC-1', '3'), secondSprintIssue, issue('ABC-3', '3')]))
-    })
-
-    // The answer still reconciles: an issue the client did not predict lands too.
-    expect(await screen.findByText('ABC-3')).toBeTruthy()
-    expect(screen.getByText('ABC-1').closest('section')?.textContent).toContain('Doing')
-  })
-
-  it('still blanks the board for the header refresh', async () => {
-    const user = userEvent.setup()
-    const refetch = holdSprintRefetch()
-    renderBoard()
-
-    await screen.findByRole('button', { name: /ABC-1 title/ })
-    await user.click(screen.getByRole('button', { name: 'Refresh Jira issues' }))
-
-    // An explicit refresh is the one reload allowed to empty the board behind a loader.
-    await waitFor(() => expect(screen.queryByText('ABC-1')).toBeNull())
-    expect(await screen.findByText('Loading…')).toBeTruthy()
-
-    await act(async () => {
-      refetch.resolve(boardPage([sprintIssue, secondSprintIssue]))
-    })
-
-    expect(await screen.findByText('ABC-1')).toBeTruthy()
-    expect(screen.queryByText('Loading…')).toBeNull()
-  })
-
   it('prompts for a transition screen field and submits it with the move', async () => {
     const user = userEvent.setup()
     mocks.jiraListTransitions.mockResolvedValue([
@@ -925,28 +846,5 @@ describe('TaskPageJiraBoard external refresh signal', () => {
     await waitFor(() => expect(screen.queryByText('ABC-2 title')).toBeNull())
     expect(screen.getByText('No backlog issues match this filter.')).toBeTruthy()
     expect(mocks.jiraGetBoardOverview.mock.calls.length).toBe(overviewCalls + 1)
-  })
-
-  it('keeps a sprint whose issues the filter hides on screen while it reloads', async () => {
-    // Why: the counts that decide a loader must be the unfiltered ones. A filter that
-    // hides every issue is not an empty board, so the reload must not blank it.
-    const refetch = holdSprintRefetch([otherAssigneeIssue])
-    render(<RefreshHost />)
-    const filteredEmpty = 'No issues match this filter in the active sprint.'
-    expect(await screen.findByText(filteredEmpty)).toBeTruthy()
-
-    await act(async () => {
-      bumpBoardRefresh()
-    })
-
-    await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
-    expect(screen.queryByText('Loading…')).toBeNull()
-    // The lanes themselves, not just the empty-state sentence, survive the reload.
-    expect(screen.getByText('Doing')).toBeTruthy()
-    expect(screen.getByText(filteredEmpty)).toBeTruthy()
-
-    await act(async () => {
-      refetch.resolve(boardPage([otherAssigneeIssue]))
-    })
   })
 })

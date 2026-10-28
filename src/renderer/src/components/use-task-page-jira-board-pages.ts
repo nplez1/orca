@@ -47,12 +47,16 @@ export function useTaskPageJiraBoardPages(args: {
     () => initialCache?.sprint ?? emptyJiraBoardPage()
   )
   const [sprintLoading, setSprintLoading] = useState(false)
+  // Why a flag of its own: an empty sprint that is loaded and one that was just cleared
+  // both have no issues, and only the second may show a loader over them.
+  const [sprintBlanked, setSprintBlanked] = useState(false)
   const [sprintLoadingMore, setSprintLoadingMore] = useState(false)
   const [sprintError, setSprintError] = useState<string | null>(null)
   const [backlogPage, setBacklogPage] = useState<TaskPageJiraBoardCachedPage>(
     () => initialCache?.backlog ?? emptyJiraBoardPage()
   )
   const [backlogLoading, setBacklogLoading] = useState(false)
+  const [backlogBlanked, setBacklogBlanked] = useState(false)
   const [backlogLoadingMore, setBacklogLoadingMore] = useState(false)
   const [backlogError, setBacklogError] = useState<string | null>(null)
   const sprintPageRef = useRef(sprintPage)
@@ -100,6 +104,7 @@ export function useTaskPageJiraBoardPages(args: {
       setSprintPageLocal(emptyJiraBoardPage())
       sprintLoadedRef.current = false
       setSprintLoading(false)
+      setSprintBlanked(false)
       setSprintError(null)
       return
     }
@@ -117,9 +122,10 @@ export function useTaskPageJiraBoardPages(args: {
     if (!silent) {
       setSprintPageLocal(emptyJiraBoardPage())
     }
-    // Why outside the blanking branch: the read is in flight either way, and a board with
-    // issues to draw shows it — the loader is what an empty page gets.
+    // Why not inside the blanking branch: the read is in flight either way, and that is all
+    // the header's indicator needs; the loader belongs to a page that was actually cleared.
     setSprintLoading(true)
+    setSprintBlanked(!silent)
     setSprintError(null)
     void (async () => {
       try {
@@ -144,6 +150,7 @@ export function useTaskPageJiraBoardPages(args: {
       } finally {
         if (generation === sprintGeneration.current) {
           setSprintLoading(false)
+          setSprintBlanked(false)
         }
       }
     })()
@@ -173,6 +180,7 @@ export function useTaskPageJiraBoardPages(args: {
       setBacklogPageLocal(emptyJiraBoardPage())
     }
     setBacklogLoading(true)
+    setBacklogBlanked(!silent)
     setBacklogError(null)
     void (async () => {
       try {
@@ -197,6 +205,7 @@ export function useTaskPageJiraBoardPages(args: {
       } finally {
         if (generation === backlogGeneration.current) {
           setBacklogLoading(false)
+          setBacklogBlanked(false)
         }
       }
     })()
@@ -278,6 +287,7 @@ export function useTaskPageJiraBoardPages(args: {
     sprintStartAt: sprintPage.startAt,
     sprintIsLast: sprintPage.isLast,
     sprintLoading,
+    sprintBlanked,
     sprintLoadingMore,
     sprintError,
     loadMoreSprint,
@@ -287,6 +297,7 @@ export function useTaskPageJiraBoardPages(args: {
     backlogTotal: backlogPage.total,
     backlogIsLast: backlogPage.isLast,
     backlogLoading,
+    backlogBlanked,
     backlogLoadingMore,
     backlogError,
     loadMoreBacklog,

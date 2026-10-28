@@ -80,7 +80,7 @@ export function TaskPageJiraBacklogView({
           {board.backlogError}
         </div>
       ) : null}
-      {board.backlogLoading && board.backlogLoadedCount === 0 ? (
+      {board.backlogBlanked ? (
         <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           <LoaderCircle className="mx-auto size-4 animate-spin" />
           <span className="mt-2 block">
@@ -88,9 +88,7 @@ export function TaskPageJiraBacklogView({
           </span>
         </div>
       ) : null}
-      {board.backlogIssues.length === 0 &&
-      !board.backlogError &&
-      (!board.backlogLoading || board.backlogLoadedCount > 0) ? (
+      {board.backlogIssues.length === 0 && !board.backlogError && !board.backlogBlanked ? (
         <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           {board.backlogIsLast
             ? translate(
