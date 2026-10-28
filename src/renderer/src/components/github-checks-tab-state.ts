@@ -1,10 +1,18 @@
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../shared/github/check-types'
+import type {
+  CheckDetailsCacheEntry,
+  CheckDetailsRowState
+} from '@/components/github/check-details-cache'
 
 export type CheckDetailsLoadState = {
   requestId?: number
   loading: boolean
+  /** Held while a refresh runs: the surface keeps rendering it instead of a spinner. */
   details: PRCheckRunDetails | null
   error: string | null
+  /** Clock and row state of the read behind `details` — staleness inputs, never rendered. */
+  readAt?: number
+  readFor?: CheckDetailsRowState
 }
 
 declare const checksContextOwnerBrand: unique symbol
@@ -60,7 +68,11 @@ export function resetGitHubChecksTabForSource(
     sourceChecks,
     localChecks: null,
     expandedCheckKey: null,
-    detailsByCheckKey: {}
+    // Why: a list refresh replaces every row object, and clearing here re-read each open detail on
+    // the next render — the spinner came back on its own after every poll. Keys are the build's
+    // identity, so a payload (or a read in flight) outlives the refresh; a context change, which a
+    // push causes by moving the head SHA, is what drops them.
+    detailsByCheckKey: state.detailsByCheckKey
   }
 }
 
@@ -106,13 +118,20 @@ export function updateGitHubChecksTabDetails(
 export function beginGitHubChecksTabDetails(
   state: GitHubChecksTabState,
   key: string,
-  requestId: number
+  requestId: number,
+  cached?: CheckDetailsCacheEntry
 ): GitHubChecksTabState {
   const current = state.detailsByCheckKey[key]
+  // Why: a refresh must not blank rows it already has — the spinner belongs to the first read.
+  const carried: Pick<CheckDetailsLoadState, 'details' | 'readAt' | 'readFor'> = current?.details
+    ? { details: current.details, readAt: current.readAt, readFor: current.readFor }
+    : cached?.data
+      ? { details: cached.data, readAt: cached.fetchedAt, readFor: cached.readFor }
+      : { details: null }
   return updateGitHubChecksTabDetails(state, key, {
     requestId,
     loading: true,
-    details: null,
+    ...carried,
     error: current?.error ?? null
   })
 }
@@ -132,4 +151,22 @@ export function settleGitHubChecksTabDetails(
     return state
   }
   return updateGitHubChecksTabDetails(state, key, { ...details, requestId })
+}
+
+/**
+ * Settle a refresh without blanking the payload it already had.
+ *
+ * Why: a failed refresh reports itself beside the rows on screen; only a first read has none.
+ */
+export function settleGitHubChecksTabDetailsKeepingShown(
+  state: GitHubChecksTabState,
+  key: string,
+  requestId: number,
+  details: Omit<CheckDetailsLoadState, 'requestId'>
+): GitHubChecksTabState {
+  const current = state.detailsByCheckKey[key]
+  return settleGitHubChecksTabDetails(state, key, requestId, {
+    ...details,
+    details: details.details ?? current?.details ?? null
+  })
 }

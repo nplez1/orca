@@ -5,6 +5,7 @@ import {
   createGitHubChecksTabState,
   resolveGitHubChecksTabState,
   settleGitHubChecksTabDetails,
+  settleGitHubChecksTabDetailsKeepingShown,
   toggleGitHubChecksTabExpandedKey,
   updateGitHubChecksTabDetails,
   updateGitHubChecksTabLocalChecks
@@ -43,7 +44,7 @@ describe('github checks tab state', () => {
     expect(resolveGitHubChecksTabState(state, sourceChecks, 'repo-a')).toBe(state)
   })
 
-  it('resets local checks and expanded details when source checks change', () => {
+  it('keeps the payloads it has while a source refresh replaces the rows', () => {
     const oldSource = [check('old')]
     const nextSource = [check('next')]
     const stateWithDetails = updateGitHubChecksTabDetails(
@@ -54,7 +55,13 @@ describe('github checks tab state', () => {
         'unit'
       ),
       'unit',
-      { loading: true, details: null, error: null }
+      {
+        loading: false,
+        details: checkRunDetails,
+        error: null,
+        readAt: 7,
+        readFor: { status: 'completed', conclusion: 'failure' }
+      }
     )
 
     expect(resolveGitHubChecksTabState(stateWithDetails, nextSource, 'repo-a')).toEqual({
@@ -63,7 +70,7 @@ describe('github checks tab state', () => {
       sourceChecks: nextSource,
       localChecks: null,
       expandedCheckKey: null,
-      detailsByCheckKey: {}
+      detailsByCheckKey: stateWithDetails.detailsByCheckKey
     })
   })
 
@@ -160,25 +167,91 @@ describe('github checks tab state', () => {
     })
   })
 
-  it('clears loaded details when a retry starts after a successful load', () => {
+  it('keeps the loaded rows while a retry runs', () => {
     const sourceChecks = [check('unit')]
     const loaded = settleGitHubChecksTabDetails(
       beginGitHubChecksTabDetails(createGitHubChecksTabState(sourceChecks, 'repo-a'), 'unit', 1),
       'unit',
       1,
-      { loading: false, details: checkRunDetails, error: null }
+      {
+        loading: false,
+        details: checkRunDetails,
+        error: null,
+        readAt: 7,
+        readFor: { status: 'completed', conclusion: 'failure' }
+      }
     )
 
     expect(loaded.detailsByCheckKey.unit.details).toBe(checkRunDetails)
     expect(beginGitHubChecksTabDetails(loaded, 'unit', 2).detailsByCheckKey.unit).toEqual({
       requestId: 2,
       loading: true,
-      details: null,
-      error: null
+      details: checkRunDetails,
+      error: null,
+      readAt: 7,
+      readFor: { status: 'completed', conclusion: 'failure' }
     })
   })
 
-  it('drops settlement after a source refresh clears request ownership', () => {
+  it('keeps the rows on screen when a refresh fails', () => {
+    const loaded = settleGitHubChecksTabDetails(
+      beginGitHubChecksTabDetails(createGitHubChecksTabState([check('unit')], 'repo-a'), 'unit', 1),
+      'unit',
+      1,
+      {
+        loading: false,
+        details: checkRunDetails,
+        error: null,
+        readAt: 7,
+        readFor: { status: 'completed', conclusion: 'failure' }
+      }
+    )
+    const failed = settleGitHubChecksTabDetailsKeepingShown(
+      beginGitHubChecksTabDetails(loaded, 'unit', 2),
+      'unit',
+      2,
+      {
+        loading: false,
+        details: null,
+        error: 'Timed out loading this Jenkins build.',
+        readAt: 20,
+        readFor: { status: 'completed', conclusion: 'failure' }
+      }
+    )
+
+    expect(failed.detailsByCheckKey.unit).toEqual({
+      requestId: 2,
+      loading: false,
+      details: checkRunDetails,
+      error: 'Timed out loading this Jenkins build.',
+      readAt: 20,
+      readFor: { status: 'completed', conclusion: 'failure' }
+    })
+  })
+
+  it('starts a read showing the payload the shared cache already holds', () => {
+    const state = beginGitHubChecksTabDetails(
+      createGitHubChecksTabState([check('unit')], 'repo-a'),
+      'unit',
+      3,
+      {
+        data: checkRunDetails,
+        fetchedAt: 11,
+        readFor: { status: 'completed', conclusion: 'failure' }
+      }
+    )
+
+    expect(state.detailsByCheckKey.unit).toEqual({
+      requestId: 3,
+      loading: true,
+      details: checkRunDetails,
+      error: null,
+      readAt: 11,
+      readFor: { status: 'completed', conclusion: 'failure' }
+    })
+  })
+
+  it('keeps an in-flight read alive across a source refresh', () => {
     const oldSource = [check('old')]
     const loading = updateGitHubChecksTabDetails(
       createGitHubChecksTabState(oldSource, 'repo-a'),
@@ -193,14 +266,14 @@ describe('github checks tab state', () => {
     const refreshed = resolveGitHubChecksTabState(loading, [check('new')], 'repo-a')
 
     expect(refreshed.contextOwner).toBe(loading.contextOwner)
-
+    expect(refreshed.detailsByCheckKey).toBe(loading.detailsByCheckKey)
     expect(
       settleGitHubChecksTabDetails(refreshed, 'unit', 1, {
         loading: false,
-        details: null,
-        error: 'stale'
-      })
-    ).toBe(refreshed)
+        details: checkRunDetails,
+        error: null
+      }).detailsByCheckKey.unit.details
+    ).toBe(checkRunDetails)
   })
 
   it('resets request ownership when the context changes with the same checks array', () => {

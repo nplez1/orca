@@ -1,4 +1,5 @@
 import { getCheckConclusion } from '@/components/pr-check-counts'
+import { checkDetailsBuildIdentity } from '@/components/github/check-details-cache'
 import type {
   PRCheckAnnotation,
   PRCheckDetail,
@@ -38,7 +39,7 @@ export function getCheckStatusLabel(check: PRCheckDetail): string {
 }
 
 export function getCheckDetailsKey(check: PRCheckDetail): string {
-  return String(check.checkRunId ?? check.workflowRunId ?? check.url ?? check.name)
+  return checkDetailsBuildIdentity(check)
 }
 
 // Why: check annotations carry no id, so identify them by the fields that make one distinct.

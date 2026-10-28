@@ -10,8 +10,14 @@ import {
 import {
   beginGitHubChecksTabDetails,
   settleGitHubChecksTabDetails,
+  settleGitHubChecksTabDetailsKeepingShown,
   type CheckDetailsLoadState
 } from '@/components/github-checks-tab-state'
+import {
+  checkDetailsRowState,
+  readCachedCheckDetails,
+  rememberCheckDetails
+} from '@/components/github/check-details-cache'
 import { getGitHubRuntimeRepoId } from '@/lib/github-source-runtime-context'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { translate } from '@/i18n/i18n'
@@ -26,13 +32,24 @@ export function requestGitHubCheckDetails(
     return
   }
   const requestId = ++ctx.nextCheckDetailsRequestIdRef.current
+  const readFor = checkDetailsRowState(check)
   const commit = (next: Omit<CheckDetailsLoadState, 'requestId'>): void => {
     if (!ctx.mountedRef.current) {
       return
     }
     ctx.setChecksState((current) => settleGitHubChecksTabDetails(current, key, requestId, next))
   }
-  ctx.setChecksState((current) => beginGitHubChecksTabDetails(current, key, requestId))
+  const commitFailure = (next: Omit<CheckDetailsLoadState, 'requestId'>): void => {
+    if (!ctx.mountedRef.current) {
+      return
+    }
+    ctx.setChecksState((current) =>
+      settleGitHubChecksTabDetailsKeepingShown(current, key, requestId, next)
+    )
+  }
+  ctx.setChecksState((current) =>
+    beginGitHubChecksTabDetails(current, key, requestId, readCachedCheckDetails(check))
+  )
   const detailsRequest = loadCheckDetailsWithProviderFallback(check, () =>
     withGitHubCheckDetailsTimeout((signal) =>
       ctx.runtimeHost
@@ -64,6 +81,10 @@ export function requestGitHubCheckDetails(
   void detailsRequest
     .then((rawDetails) => {
       const details = normalizeCheckRunDetailsLogTails(rawDetails)
+      const readAt = Date.now()
+      if (details) {
+        rememberCheckDetails(check, { data: details, fetchedAt: readAt, readFor })
+      }
       commit({
         loading: false,
         details,
@@ -72,7 +93,9 @@ export function requestGitHubCheckDetails(
           : translate(
               'auto.components.GitHubItemDialog.e15a8b77ef',
               'No inline details are available for this check.'
-            )
+            ),
+        readAt,
+        readFor
       })
     })
     .catch((err) => {
@@ -82,7 +105,7 @@ export function requestGitHubCheckDetails(
       )
       const isTimeout =
         isGitHubCheckDetailsTimeout(err) || (err instanceof Error && err.message === timeoutMessage)
-      commit({
+      commitFailure({
         loading: false,
         details: null,
         error: isTimeout
@@ -92,7 +115,9 @@ export function requestGitHubCheckDetails(
             : translate(
                 'auto.components.GitHubItemDialog.e45324fbed',
                 'Failed to load check details.'
-              )
+              ),
+        readAt: Date.now(),
+        readFor
       })
     })
 }

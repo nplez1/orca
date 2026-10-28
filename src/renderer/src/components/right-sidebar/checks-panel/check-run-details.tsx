@@ -13,6 +13,7 @@ import { CheckJobLogTail } from '../check-job-log-tail'
 import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
 import { resolveStepOutcome } from '@/components/editor/check-job-step-status'
 import { translate } from '@/i18n/i18n'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { checkJobIdentities } from '@/components/editor/check-details-reading-cache'
 import {
   type CheckDetailsLoadState,
@@ -113,6 +114,7 @@ export function CheckRunDetails({
   const hasOutput = Boolean(details?.title || details?.summary || details?.text)
   const hasAnnotations = (details?.annotations.length ?? 0) > 0
   const hasJobs = jobs.length > 0
+  const refreshing = useDelayedFlag(Boolean(state?.loading && details))
   const fullDetailsLabel = translate(
     'auto.components.right.sidebar.checks.panel.content.e4e3af15ee',
     'View full details'
@@ -155,7 +157,7 @@ export function CheckRunDetails({
           <ViewFullCheckDetailsButton label={fullDetailsLabel} onClick={handleOpenFullDetails} />
         </div>
       )}
-      {state?.loading && !state.error ? (
+      {state?.loading && !details && !state.error ? (
         <div role="status" aria-live="polite" className="flex min-w-0 flex-col gap-2 py-1.5">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <LoaderCircle className="size-3.5 animate-spin" />
@@ -214,6 +216,12 @@ export function CheckRunDetails({
                   'workflow #'
                 )}
                 {check.workflowRunId}
+              </span>
+            )}
+            {refreshing && (
+              <span role="status" aria-live="polite" className="flex items-center gap-1">
+                <LoaderCircle className="size-3 animate-spin" />
+                {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
               </span>
             )}
           </div>

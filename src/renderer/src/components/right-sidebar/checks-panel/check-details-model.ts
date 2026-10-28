@@ -1,33 +1,21 @@
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../../shared/github/check-types'
 import type { CheckDetailsErrorAction } from '@/lib/check-details-error-action'
+import {
+  checkDetailsRowKey,
+  type CheckDetailsRowState
+} from '@/components/github/check-details-cache'
 
 export type CheckDetailsLoadState = {
   requestId?: number
   loading: boolean
+  /** Held while a refresh runs: the pane keeps rendering it instead of a spinner. */
   details: PRCheckRunDetails | null
   error: string | null
   /** Settings affordance for the error, when the failure is one the user can fix. */
   errorAction?: CheckDetailsErrorAction | null
-  /** Check state when the load failed or returned nothing, so a later state change can retry it. */
-  errorAt?: { status: PRCheckDetail['status']; conclusion: PRCheckDetail['conclusion'] }
-}
-
-function getCheckIdentityKey(check: PRCheckDetail, index: number): string {
-  if (check.checkRunId) {
-    return `check-run:${check.checkRunId}`
-  }
-  if (check.workflowRunId) {
-    return `workflow-run:${check.workflowRunId}`
-  }
-  // Why: manual/created GitLab jobs have no web_url, so they would otherwise key on
-  // the list index and lose their cached log whenever the pipeline re-sorts.
-  if (check.gitlabJobId) {
-    return `gitlab-job:${check.gitlabJobId}`
-  }
-  if (check.url) {
-    return `url:${check.url}`
-  }
-  return `fallback:${check.name}:${index}`
+  /** Clock and row state of the read behind `details` — staleness inputs, never rendered. */
+  readAt?: number
+  readFor?: CheckDetailsRowState
 }
 
 export function getCheckDetailsKey(
@@ -35,7 +23,9 @@ export function getCheckDetailsKey(
   check: PRCheckDetail,
   index: number
 ): string {
-  return `${contextKey}::${getCheckIdentityKey(check, index)}`
+  // Why: manual/created GitLab jobs may have neither id nor web_url, so they would otherwise key on
+  // the list index and lose their cached log whenever the pipeline re-sorts.
+  return `${contextKey}::${checkDetailsRowKey(check, index)}`
 }
 
 export function getCheckConclusion(check: PRCheckDetail): NonNullable<PRCheckDetail['conclusion']> {

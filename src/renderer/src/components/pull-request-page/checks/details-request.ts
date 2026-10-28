@@ -10,9 +10,15 @@ import {
 import {
   beginGitHubChecksTabDetails,
   settleGitHubChecksTabDetails,
+  settleGitHubChecksTabDetailsKeepingShown,
   type CheckDetailsLoadState,
   type GitHubChecksTabState
 } from '@/components/github-checks-tab-state'
+import {
+  checkDetailsRowState,
+  readCachedCheckDetails,
+  rememberCheckDetails
+} from '@/components/github/check-details-cache'
 import { getGitHubRuntimeRepoId, type GitHubRuntimeHost } from '@/lib/github-source-runtime-context'
 import { translate } from '@/i18n/i18n'
 import type { GitHubOwnerRepo } from '../../../../../shared/github/pull-request-types'
@@ -41,6 +47,7 @@ export function requestPullRequestCheckDetails(args: {
     return
   }
   const requestId = ++args.nextCheckDetailsRequestIdRef.current
+  const readFor = checkDetailsRowState(args.check)
   const commit = (next: Omit<CheckDetailsLoadState, 'requestId'>): void => {
     if (!args.mountedRef.current) {
       return
@@ -49,7 +56,17 @@ export function requestPullRequestCheckDetails(args: {
       settleGitHubChecksTabDetails(current, args.key, requestId, next)
     )
   }
-  args.setChecksState((current) => beginGitHubChecksTabDetails(current, args.key, requestId))
+  const commitFailure = (next: Omit<CheckDetailsLoadState, 'requestId'>): void => {
+    if (!args.mountedRef.current) {
+      return
+    }
+    args.setChecksState((current) =>
+      settleGitHubChecksTabDetailsKeepingShown(current, args.key, requestId, next)
+    )
+  }
+  args.setChecksState((current) =>
+    beginGitHubChecksTabDetails(current, args.key, requestId, readCachedCheckDetails(args.check))
+  )
   const detailsRequest = loadCheckDetailsWithProviderFallback(args.check, () =>
     withGitHubCheckDetailsTimeout((signal) =>
       args.runtimeHost
@@ -81,6 +98,10 @@ export function requestPullRequestCheckDetails(args: {
   void detailsRequest
     .then((rawDetails) => {
       const details = normalizeCheckRunDetailsLogTails(rawDetails)
+      const readAt = Date.now()
+      if (details) {
+        rememberCheckDetails(args.check, { data: details, fetchedAt: readAt, readFor })
+      }
       commit({
         loading: false,
         details,
@@ -89,7 +110,9 @@ export function requestPullRequestCheckDetails(args: {
           : translate(
               'auto.components.PullRequestPage.6b1d5ee3e4',
               'No inline details are available for this check.'
-            )
+            ),
+        readAt,
+        readFor
       })
     })
     .catch((err) => {
@@ -99,7 +122,7 @@ export function requestPullRequestCheckDetails(args: {
       )
       const isTimeout =
         isGitHubCheckDetailsTimeout(err) || (err instanceof Error && err.message === timeoutMessage)
-      commit({
+      commitFailure({
         loading: false,
         details: null,
         error: isTimeout
@@ -109,7 +132,9 @@ export function requestPullRequestCheckDetails(args: {
             : translate(
                 'auto.components.PullRequestPage.e04c027d98',
                 'Failed to load check details.'
-              )
+              ),
+        readAt: Date.now(),
+        readFor
       })
     })
 }

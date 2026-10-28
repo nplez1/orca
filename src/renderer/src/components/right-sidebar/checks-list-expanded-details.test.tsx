@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
 import { ChecksList } from './checks-panel/checks-list'
+import { clearCheckDetailsCache } from '@/components/github/check-details-cache'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -68,6 +69,7 @@ const checkDetails: PRCheckRunDetails = {
 
 beforeEach(() => {
   activeWorktreeState.current = null
+  clearCheckDetailsCache()
   openCheckRunDetails.mockReset()
   patchOpenCheckRunDetails.mockReset()
   container = document.createElement('div')
@@ -558,6 +560,101 @@ describe('ChecksList expanded check details', () => {
     expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
     expect(container.textContent).not.toContain('No inline details are available')
     expect(container.textContent).toContain('ERROR: Job failed: exit code 1')
+  })
+
+  // The bug this pane had: a poll that landed while a detail was open deleted its entry before
+  // refetching, so the rows came back as a spinner on their own.
+  it('keeps its rows on screen while a moved check refreshes behind them', async () => {
+    const runningCheck: PRCheckDetail = {
+      name: 'test: unit',
+      status: 'in_progress',
+      conclusion: 'failure',
+      url: null,
+      gitlabJobId: 611
+    }
+    const runningDetails: PRCheckRunDetails = {
+      ...checkDetails,
+      name: runningCheck.name,
+      status: 'in_progress',
+      completedAt: null
+    }
+    let resolveRefresh: (details: PRCheckRunDetails) => void = () => {}
+    const refresh = new Promise<PRCheckRunDetails>((resolve) => {
+      resolveRefresh = resolve
+    })
+    const onLoadCheckDetails = vi
+      .fn<(check: PRCheckDetail) => Promise<PRCheckRunDetails | null>>()
+      .mockResolvedValueOnce(runningDetails)
+      .mockReturnValueOnce(refresh)
+
+    renderChecksList({ checks: [runningCheck], onLoadCheckDetails })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('Verify failed')
+
+    renderChecksList({
+      checks: [{ ...runningCheck, status: 'completed', conclusion: 'failure' }],
+      onLoadCheckDetails
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toContain('Verify failed')
+    expect(container.textContent).not.toContain('Loading check details…')
+    // Why the wait: the refreshing label is deferred, so a fast read never flashes it.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+    })
+    expect(container.textContent).toContain('Refreshing check details…')
+
+    await act(async () => {
+      resolveRefresh({ ...checkDetails, title: 'Verify failed again' })
+      await refresh
+    })
+
+    expect(container.textContent).toContain('Verify failed again')
+    expect(container.textContent).not.toContain('Refreshing check details…')
+    expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps its rows when the refresh behind them fails', async () => {
+    const runningCheck: PRCheckDetail = {
+      name: 'test: unit',
+      status: 'in_progress',
+      conclusion: 'failure',
+      url: null,
+      gitlabJobId: 612
+    }
+    const onLoadCheckDetails = vi
+      .fn<(check: PRCheckDetail) => Promise<PRCheckRunDetails | null>>()
+      .mockResolvedValueOnce({
+        ...checkDetails,
+        name: runningCheck.name,
+        status: 'in_progress',
+        completedAt: null
+      })
+      .mockRejectedValueOnce(new Error('401 Unauthorized'))
+
+    renderChecksList({ checks: [runningCheck], onLoadCheckDetails })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    renderChecksList({
+      checks: [{ ...runningCheck, status: 'completed' }],
+      onLoadCheckDetails
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toContain('Verify failed')
+    expect(container.textContent).toContain('401 Unauthorized')
+    expect(container.textContent).not.toContain('Loading check details…')
   })
 
   it('keeps a failed detail load pinned while the check state is unchanged', async () => {

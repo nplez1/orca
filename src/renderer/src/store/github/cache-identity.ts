@@ -244,6 +244,9 @@ export function prCommentsCacheSuffix(prNumber: number, prRepo?: GitHubOwnerRepo
     : `pr-comments::${prNumber}`
 }
 
+/** How long a checks read counts as fresh; the details panes re-read on the same cadence. */
+export const PR_CHECKS_CACHE_TTL_MS = 60_000
+
 export function getPRChecksCacheTtl(entry: CacheEntry<PRCheckDetail[]> | undefined): number {
-  return entry?.data?.length === 0 ? 10_000 : 60_000
+  return entry?.data?.length === 0 ? 10_000 : PR_CHECKS_CACHE_TTL_MS
 }

@@ -16,6 +16,12 @@ import {
   getCheckDetailsKey,
   isFailedCheck
 } from './check-details-model'
+import {
+  checkDetailsNeedRefresh,
+  checkDetailsRowState,
+  readCachedCheckDetails,
+  rememberCheckDetails
+} from '@/components/github/check-details-cache'
 
 export type ChecksListProps = {
   checks: PRCheckDetail[]
@@ -98,39 +104,12 @@ export function useChecksListState({
     })
   }, [checkDetailsContextKey, rows])
 
-  useEffect(() => {
-    setDetailsByCheckKey((current) => {
-      let changed = false
-      const next: Record<string, CheckDetailsLoadState> = { ...current }
-      for (const row of rows) {
-        const cached = next[row.key]
-        if (!cached || cached.loading) {
-          continue
-        }
-        // Why: a failed load (GitLab auth blip, 404, offline) otherwise pins its error
-        // forever — there is no retry affordance — so re-arm it once the job moves on.
-        const stale = cached.details
-          ? cached.details.status !== row.check.status ||
-            cached.details.conclusion !== row.check.conclusion
-          : Boolean(
-              cached.errorAt &&
-              (cached.errorAt.status !== row.check.status ||
-                cached.errorAt.conclusion !== row.check.conclusion)
-            )
-        if (stale) {
-          delete next[row.key]
-          changed = true
-        }
-      }
-      return changed ? next : current
-    })
-  }, [rows])
-
   const requestCheckDetails = useCallback(
     (row: { check: PRCheckDetail; key: string }) => {
-      if (detailsByCheckKey[row.key]?.loading || detailsByCheckKey[row.key]?.details) {
+      if (detailsByCheckKey[row.key]?.loading) {
         return
       }
+      const readFor = checkDetailsRowState(row.check)
       if (
         !row.check.checkRunId &&
         !row.check.workflowRunId &&
@@ -146,7 +125,9 @@ export function useChecksListState({
               'auto.components.right.sidebar.checks.panel.content.e15a8b77ef',
               'No inline details are available for this check.'
             ),
-            errorAction: null
+            errorAction: null,
+            readAt: Date.now(),
+            readFor
           }
         }))
         return
@@ -161,7 +142,9 @@ export function useChecksListState({
               'auto.components.right.sidebar.checks.panel.content.e15a8b77ef',
               'No inline details are available for this check.'
             ),
-            errorAction: null
+            errorAction: null,
+            readAt: Date.now(),
+            readFor
           }
         }))
         return
@@ -170,12 +153,21 @@ export function useChecksListState({
       const requestId = createCheckRunDetailsRequestId()
       const retryError = detailsByCheckKey[row.key]?.error ?? null
       const retryErrorAction = detailsByCheckKey[row.key]?.errorAction ?? null
+      // Why: a refresh keeps the rows already on screen — the spinner belongs to the first read —
+      // and a payload another mount read for this same build is as good as one of our own.
+      const cached = readCachedCheckDetails(row.check)
+      const previous = detailsByCheckKey[row.key]
+      const carried = previous?.details
+        ? { details: previous.details, readAt: previous.readAt, readFor: previous.readFor }
+        : cached?.data
+          ? { details: cached.data, readAt: cached.fetchedAt, readFor: cached.readFor }
+          : { details: null }
       setDetailsByCheckKey((current) => ({
         ...current,
         [row.key]: {
           requestId,
           loading: true,
-          details: null,
+          ...carried,
           error: retryError,
           errorAction: retryErrorAction
         }
@@ -183,7 +175,7 @@ export function useChecksListState({
       if (resolvedWorktreeId) {
         patchOpenCheckRunDetails(resolvedWorktreeId, requestContextKey, row.check, {
           requestId,
-          details: null,
+          details: carried.details ?? null,
           loading: true,
           error: retryError,
           errorAction: retryErrorAction,
@@ -194,6 +186,10 @@ export function useChecksListState({
       const request = Promise.resolve().then(() => onLoadCheckDetails(row.check))
       void request
         .then((details) => {
+          const readAt = Date.now()
+          if (details) {
+            rememberCheckDetails(row.check, { data: details, fetchedAt: readAt, readFor })
+          }
           if (resolvedWorktreeId) {
             patchOpenCheckRunDetails(resolvedWorktreeId, requestContextKey, row.check, {
               requestId,
@@ -230,10 +226,8 @@ export function useChecksListState({
                       'No inline details are available for this check.'
                     ),
                 errorAction: null,
-                // Why: a detail-less result is only final for this status — re-arm the retry once the job moves on.
-                errorAt: details
-                  ? undefined
-                  : { status: row.check.status, conclusion: row.check.conclusion }
+                readAt,
+                readFor
               }
             }
           })
@@ -250,7 +244,7 @@ export function useChecksListState({
           if (resolvedWorktreeId) {
             patchOpenCheckRunDetails(resolvedWorktreeId, requestContextKey, row.check, {
               requestId,
-              details: null,
+              details: carried.details ?? null,
               loading: false,
               error,
               errorAction,
@@ -270,10 +264,12 @@ export function useChecksListState({
               [row.key]: {
                 requestId,
                 loading: false,
-                details: null,
+                // Why: a failed refresh reports itself beside the rows it has; a first read has none.
+                details: current[row.key]?.details ?? null,
                 error,
                 errorAction,
-                errorAt: { status: row.check.status, conclusion: row.check.conclusion }
+                readAt: Date.now(),
+                readFor
               }
             }
           })
@@ -295,7 +291,10 @@ export function useChecksListState({
       return
     }
     for (const row of rows) {
-      if (expandedCheckKeys.has(row.key) && !detailsByCheckKey[row.key]) {
+      if (
+        expandedCheckKeys.has(row.key) &&
+        checkDetailsNeedRefresh(detailsByCheckKey[row.key], row.check)
+      ) {
         requestCheckDetails(row)
       }
     }
@@ -342,11 +341,11 @@ export function useChecksListState({
         }
         return next
       })
-      if (willExpand) {
+      if (willExpand && checkDetailsNeedRefresh(detailsByCheckKey[row.key], row.check)) {
         requestCheckDetails(row)
       }
     },
-    [expandedCheckKeys, requestCheckDetails]
+    [detailsByCheckKey, expandedCheckKeys, requestCheckDetails]
   )
   return {
     resolvedWorktreeId,

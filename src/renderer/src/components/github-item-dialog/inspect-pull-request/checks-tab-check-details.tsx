@@ -6,6 +6,7 @@ import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import type { CheckDetailsLoadState } from '@/components/github-checks-tab-state'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { translate } from '@/i18n/i18n'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import { getCheckConclusion } from '@/components/pr-check-counts'
 import {
@@ -37,10 +38,11 @@ export function ChecksTabCheckDetails({
   const hasOutput = Boolean(details?.title || details?.summary || details?.text)
   const hasAnnotations = (details?.annotations.length ?? 0) > 0
   const hasJobs = (details?.jobs.length ?? 0) > 0
+  const refreshing = useDelayedFlag(Boolean(state?.loading && details))
 
   return (
     <div className="mx-2 mb-2 mt-1 min-w-0 rounded-md border border-border/50 bg-muted/20 px-3 py-2">
-      {state?.loading && !state.error ? (
+      {state?.loading && !details && !state.error ? (
         <div className="flex items-center gap-2 py-2 text-[12px] text-muted-foreground">
           <LoaderCircle className="size-3.5 animate-spin" />
           {translate('auto.components.GitHubItemDialog.934d87ab96', 'Loading check details…')}
@@ -67,6 +69,12 @@ export function ChecksTabCheckDetails({
               <span className="font-mono">
                 {translate('auto.components.GitHubItemDialog.485609c4f2', 'check #')}
                 {check.checkRunId}
+              </span>
+            )}
+            {refreshing && (
+              <span role="status" aria-live="polite" className="flex items-center gap-1">
+                <LoaderCircle className="size-3 animate-spin" />
+                {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
               </span>
             )}
           </div>
