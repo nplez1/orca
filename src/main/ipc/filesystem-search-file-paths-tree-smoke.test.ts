@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { realpath } from 'node:fs/promises'
 import type { Store } from '../persistence'
-import { collectQuickOpenPaths } from './filesystem-search-file-paths'
+import { collectQuickOpenPaths } from './filesystem/filesystem-search-file-paths'
 import {
   createFilesystemPathTreeFixture,
   type FilesystemPathTreeFixture

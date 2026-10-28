@@ -5,7 +5,7 @@ import type {
 } from '../../../shared/workspace-path-search-instrumentation'
 import { summarizeWorkspacePathSearchDiagnostics } from '../workspace-path-search-diagnostics-summary'
 import { exportQuickOpenPathSearchInstrumentation } from '../quick-open-path-inventory'
-import { resolveAuthorizedPath } from '../filesystem-auth'
+import { resolveAuthorizedPath } from './filesystem-auth'
 import {
   createLocalWorkspacePathIndexService,
   WORKSPACE_PATH_INDEX_LISTING_POLICY_VERSION

@@ -131,19 +131,14 @@ export function createWorkspaceTerminalReconnectActions(
       const deferredSshSessionIdsByTabId: Record<string, string> = {}
       for (const worktreeId of ids) {
         const worktree = worktreeById.get(worktreeId)
-        // Why: SSH worktrees aren't in worktreesByRepo at cold start; fall back to the repo id in the composite worktree id so sessions still reach the deferred map.
+        // Cold-start SSH listings are absent; derive repo ID from the composite worktree ID to retain deferred sessions.
         const repoId = worktree?.repoId ?? getRepoIdFromWorktreeId(worktreeId)
         const repo = repoId ? (repoById.get(repoId) ?? null) : null
         const connectionId = repo?.connectionId
         if (!connectionId) {
           continue
         }
-        // Why: a repo can outlive its SSH target when the target was removed out of
-        // band (a crash between removal and cleanup, or edited out of the config).
-        // Once the authoritative target list has loaded, don't re-defer sessions for
-        // a target it no longer lists — a stranded deferred id reads as liveness and
-        // the orphan sweep could never remove the dead tab. Defer while the list is
-        // still unknown so a normal cold-start reconnect isn't dropped (#9911).
+        // Only a hydrated target catalog proves removal; re-deferring absent targets creates permanent orphan-sweep liveness (#9911).
         if (get().sshTargetsHydrated && !get().sshTargetLabels.has(connectionId)) {
           continue
         }

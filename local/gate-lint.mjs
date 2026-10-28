@@ -110,6 +110,39 @@ export function resolveLintSteps(scripts) {
 }
 
 /**
+ * Upstream replaced package.json's inline lint chain with one `run-lint.mjs` step that runs `LINT_STEPS`
+ * itself. Resolved literally that is one gate step, which loses per-step attribution and `--only`, so
+ * the gate expands it back into the steps it runs. Fails closed: a reworded runner must not silently
+ * collapse the gate.
+ */
+function expandConsolidatedRunner(steps, root) {
+  return steps.flatMap((step) => {
+    const script = /^node (config\/scripts\/[\w.-]+\.mjs)$/.exec(step.command)
+    if (!script || basename(script[1]) !== 'run-lint.mjs') {
+      return [step]
+    }
+    const declared = /export const LINT_STEPS = \[([\s\S]*?)\n\]/.exec(
+      readFileSync(join(root, script[1]), 'utf8')
+    )
+    if (!declared) {
+      throw new Error(
+        `${script[1]} declares no LINT_STEPS, so the lint gate cannot attribute steps`
+      )
+    }
+    const names = [...declared[1].matchAll(/'([\w:.-]+)'/g)].map((match) => match[1])
+    if (names.length === 0) {
+      throw new Error(`${script[1]}: LINT_STEPS parsed empty`)
+    }
+    // `oxlint` has no package script of its own — upstream resolves the binary directly.
+    return names.map((name) => ({
+      id: name,
+      command: name === 'oxlint' ? 'oxlint' : `pnpm run ${name}`,
+      argv: name === 'oxlint' ? ['pnpm', 'exec', 'oxlint'] : ['pnpm', 'run', name]
+    }))
+  })
+}
+
+/**
  * Fork-only lint steps, run beside the chain. Why not in `package.json`'s `lint`: that is one line
  * upstream edits ~100 times a month, so a step prepended to it conflicts on every sync. This file is
  * fork-owned, so a sync cannot drop a step from here.
@@ -119,16 +152,46 @@ export const FORK_LINT_STEPS = [
     id: 'check-upstream-identity-literals',
     command: 'node config/scripts/check-upstream-identity-literals.mjs',
     argv: ['node', 'config/scripts/check-upstream-identity-literals.mjs']
+  },
+  // Why these three are fork-only additions rather than chain steps: upstream's run-lint.mjs replaced
+  // package.json's inline `lint` chain in the 2026-10-28 sync and does not know them, so taking that
+  // refactor silently stopped running them.
+  {
+    id: 'check:process-host-imports',
+    command: 'pnpm run check:process-host-imports',
+    argv: ['pnpm', 'run', 'check:process-host-imports']
+  },
+  {
+    id: 'check:workspace-path-sync-fs-ratchet',
+    command: 'pnpm run check:workspace-path-sync-fs-ratchet',
+    argv: ['pnpm', 'run', 'check:workspace-path-sync-fs-ratchet']
+  },
+  {
+    id: 'check:compat-boundary-imports',
+    command: 'pnpm run check:compat-boundary-imports',
+    argv: ['pnpm', 'run', 'check:compat-boundary-imports']
   }
 ]
 
 /**
  * The chain plus the fork steps. A fork step whose script is gone throws rather than being skipped,
  * and one a sync has put back into the chain runs once.
+ *
+ * A `pnpm`-shaped fork step is validated against the manifest at `root`, not against `scripts`: a
+ * caller may pass a synthetic `scripts` to read the chain, while the fork's own steps are facts
+ * about this repository.
  */
 export function resolveGateSteps(scripts, forkSteps = FORK_LINT_STEPS, root = ROOT) {
-  const chain = resolveLintSteps(scripts)
+  const chain = expandConsolidatedRunner(resolveLintSteps(scripts), root)
+  let manifest = null
   for (const step of forkSteps) {
+    if (step.argv[0] === 'pnpm') {
+      manifest ??= JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts ?? {}
+      if (!manifest[step.id]) {
+        throw new Error(`fork lint step "${step.id}" has no package.json script`)
+      }
+      continue
+    }
     if (!existsSync(join(root, step.argv[1]))) {
       throw new Error(`fork lint step "${step.id}" runs ${step.argv[1]}, which does not exist`)
     }

@@ -30,7 +30,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const disabled = this.disabledUsageProviderIds()
     this.resetDisabledProviderCredentialFlags(disabled)
     const claudeTarget = this.claudeFetchTarget
-    // Why: capture before the resolver await so an account switch during it invalidates both the snapshot and the state apply.
+    // Capture before await so a switch invalidates both attribution and result application.
     const claudeGeneration = this.claudeFetchGeneration
     const claudeAuthPreparation = disabled.has('claude')
       ? undefined
@@ -41,13 +41,13 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     this.rememberClaudeAuthSnapshot(claudeAuthPreparation, claudeGeneration, claudeTarget)
     const claudeProvenance = claudeAuthPreparation?.provenance ?? 'system'
     const codexTarget = this.codexFetchTarget
-    // Why: capture before the resolver await; a reset during it bumps the generation and this cycle's result is stale.
+    // Capture before await so a reset invalidates this cycle.
     const codexGeneration = this.codexFetchGeneration
-    const previousState = this.state
-    // Why: a skipped Codex poll must not stop the other providers' cycle, so gate
-    // only the Codex slot instead of returning early (#STA-4422).
+    // Gate only Codex, never siblings, when its runtime is skipped (#STA-4422).
     // Why: resolveCodexHome probes credential homes, so a disabled Codex skips it entirely.
     const codexHome = disabled.has('codex') ? null : await this.resolveCodexHome(codexTarget)
+    const previousState = this.state
+    const antigravityGeneration = this.antigravityFetchGeneration
     const codexFetchGated = disabled.has('codex') || codexHome?.skip === true
     const codexHomePath = codexHome?.homePath ?? null
     const codexStateBeforeFetch =
@@ -89,12 +89,11 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const geminiCliOAuthEnabled = disabled.has('gemini')
       ? false
       : (this.geminiCliOAuthEnabledResolver?.() ?? false)
-    // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
+    // Probe auth during fetch, not hot renderer/mobile getState calls.
     const grokAuthReadResult = disabled.has('grok') ? null : readGrokAuthSession()
     this.grokAuthConfigured = disabled.has('grok') ? false : grokAuthReadResult?.status === 'ok'
 
-    // Discard stale data on config change — it belongs to a different session/workspace.
-    // Digest, not the key: this string only has to change when the account does.
+    // Config changes discard old-account usage; hash credentials because only identity changes matter.
     const apiKeyFingerprint = openCodeGoApiKey
       ? createHash('sha256').update(openCodeGoApiKey).digest('hex')
       : ''
@@ -112,7 +111,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
 
     const zcodePlanConfigResult = this.resolveZcodePlanConfig()
     const zcodePlanApiKey = zcodePlanConfigResult.config.apiKey
-    // Why digest, not the key: this string only has to change when the credential does.
+    // Hash credentials because only changes matter, never retain the raw key here.
     const currentZcodeConfigHash = zcodePlanApiKey
       ? `${zcodePlanConfigResult.config.site}|${createHash('sha256').update(zcodePlanApiKey).digest('hex')}`
       : (zcodePlanConfigResult.error ?? '')
@@ -140,8 +139,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       }
     })
 
-    // Why its own promise: the keychain read and the desktop state.vscdb read
-    // (on its worker thread) are both async and must not delay other providers.
+    // Async Keychain/worker DB reads must not delay other providers.
     const cursorResultPromise = disabled.has('cursor')
       ? trackSettledProviderResult(Promise.resolve(this.disabledUsageProviderSnapshot('cursor')))
       : trackSettledProviderResult(
@@ -173,7 +171,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         )
       : trackSettledProviderResult(Promise.resolve(this.disabledUsageProviderSnapshot('grok')))
 
-    // Why: automated checks must honor the endpoint's Retry-After even when live display is available.
+    // Live display does not waive automated Retry-After gates.
     const claudeFetchGated =
       disabled.has('claude') ||
       (!options?.force && this.shouldSkipAutomatedFetch('claude', previousState.claude))
@@ -202,10 +200,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           ? Promise.resolve(this.disabledUsageProviderSnapshot('opencode-go'))
           : fetchOpenCodeGoUsage({
               settingsApiKey: openCodeGoApiKey,
-              // Why here: the key can also come from the environment or OpenCode's
-              // own store, so presence is only known once the fetch resolves it.
+              // Store/env keys become known only when the fetch resolves them.
               onApiKeyResolved: (resolution) => {
-                // Why: a credential change mid-fetch bumps the generation; its stale presence must not win.
+                // A credential change invalidates stale in-flight presence results.
                 if (opencodeGeneration !== this.opencodeFetchGeneration) {
                   return
                 }
@@ -235,7 +232,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     if (signal.aborted) {
       return null
     }
-    // Why: the decrypt error only replaces a result with no usage and no diagnosis of its own; a real cookie error stays visible.
+    // Decryption diagnosis fills only an otherwise undiagnosed empty result; preserve actual cookie failures.
     if (
       openCodeGoApiKeyError &&
       opencodeGoResult.status === 'fulfilled' &&
@@ -265,6 +262,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       zcodeConfigChanged,
       zcodeGeneration,
       forkProviderCycle,
+      antigravityGeneration,
       claudeFetchGated,
       results: [
         claudeResult,

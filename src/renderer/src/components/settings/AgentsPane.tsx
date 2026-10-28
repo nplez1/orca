@@ -1,3 +1,7 @@
+import {
+  getClaudeSubagentNavigationTitle,
+  getClaudeSubagentNavigationDescription
+} from './claude-subagent-navigation-copy'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { getLocalExecutionHostLabel } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
@@ -83,6 +87,17 @@ export function AgentsPane({
           wslCapabilitiesLoading={wslCapabilitiesLoading}
         />
         <AgentStatusHooksSetting settings={settings} updateSettings={updateSettings} />
+        <SettingsSwitchRow
+          label={getClaudeSubagentNavigationTitle()}
+          description={getClaudeSubagentNavigationDescription()}
+          checked={settings.claudeSubagentNavigationEnabled !== false}
+          onChange={() =>
+            updateSettings({
+              claudeSubagentNavigationEnabled: settings.claudeSubagentNavigationEnabled === false
+            })
+          }
+          ariaLabel={getClaudeSubagentNavigationTitle()}
+        />
         {!isPairedWebClientWindow() ? (
           <>
             <AgentWorkspaceTrustSetting settings={settings} updateSettings={updateSettings} />

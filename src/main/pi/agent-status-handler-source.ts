@@ -21,8 +21,6 @@ import {
   getPiLateBusyPostCompletionSourceLines
 } from './agent-status-session-boundary-source'
 
-// Why: keep the generated handler registrations separate from hook transport;
-// both are independently sizeable and the installed extension concatenates them.
 export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] {
   const sessionStartHandler =
     kind !== 'omp'
@@ -31,15 +29,14 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
           '    updateSessionMetadata(ctx)',
           ...getPiAgentStatusAsyncSubagentSessionNoteLines(kind),
           ...(kind === 'pi' ? ['    piUiPromptDepth = 0'] : []),
-          '    // Why: /reload re-registers the active session, but it is not a',
-          '    // turn boundary and must not clear the visible status or unread state.',
+          '    // Reload replaces registration without ending the turn; preserve status and unread state.',
           "    if (event.reason === 'reload') return",
           "    post('session_start')",
           ...(kind === 'pi'
             ? [
                 '    replyFinishedAt = undefined',
                 '    restoreParkedSubagents()',
-                // Why: the host reads session_start as an idle session; children still hold this one.
+                // session_start reports idle; restore busy status while children still own the run.
                 "    if (lifecycleState.waiting) post('agent_start')"
               ]
             : []),
@@ -48,7 +45,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
         ]
       : []
 
-  // Why: OMP can switch sessions in-process, so each latest-only post needs fresh identity.
+  // OMP switches in-process, so every post needs current session identity.
   const ctxParam = ', ctx'
   const bareCtxParams = '_event, ctx'
   const captureSessionMetadata = [
@@ -58,15 +55,13 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
   const primeDaemonWorkerGuard =
     kind === 'prime-agent'
       ? [
-          '  // Why: Prime loads extensions in both its frontend and event-emitting daemon worker.',
+          '  // Prime loads this in frontend and daemon; only the event-emitting daemon reports.',
           '  if (!process.env.PRIME_AGENT_INTERNAL_DAEMON_WORKER) return'
         ]
       : []
   const ownerEnv = kind === 'prime-agent' ? 'ORCA_PRIME_AGENT_STATUS_OWNED' : 'ORCA_PI_STATUS_OWNED'
 
-  // Why: OMP suppresses its approval lifecycle unless an extension listens for it,
-  // and it is the only signal that the run is parked on a permission prompt rather
-  // than still working. Prime has no OMP runtime, so the handlers would be dead there.
+  // OMP emits permission-wait lifecycle only with listeners; Prime has no such runtime.
   const approvalHandlers =
     kind === 'prime-agent'
       ? []
@@ -92,8 +87,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
           ''
         ]
 
-  // Why: OMP does not fire model_select today, but Pi does and OMP wraps Pi's
-  // runtime; when it arrives it is the one event that reports a switch between turns.
+  // OMP wraps Pi, so future Pi model_select events can report between-turn switches.
   const modelSelectHandler =
     kind === 'prime-agent'
       ? []
@@ -117,6 +111,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '// a live foreign owner still cannot double-report. Mirrors the tri-state in',
     '// main/agent-hooks/managed-hook-owner-identity.ts, which this runtime cannot',
     '// import (the extension loads inside pi/omp with no Orca deps).',
+    '// Reclaim inherited dead owner PIDs only on ESRCH; all other probe results must suppress duplicate reporting.',
     'function isStatusOwnerAlive(pid: string): boolean {',
     '  const parsed = Number(pid)',
     '  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 0x7fffffff) return false',
@@ -129,8 +124,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '  }',
     '}',
     '',
-    "// Why: child agents inherit the lead's pane env; only its process may",
-    '// register status hooks. PID identity keeps in-process reloads reporting.',
+    '// Inherited pane identity permits only the lead process; PID equality retains in-process reloads.',
     'export default function (pi): void {',
     ...primeDaemonWorkerGuard,
     `  const ownerPid = process.env.${ownerEnv}`,
@@ -154,8 +148,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '    clearPendingAgentEndCheck()',
     '    lifecycleState.waiting = false',
     '    lifecycleState.runGeneration += 1',
-    // Why: a turn cannot begin under a dialog holding input focus, so this is the one
-    // boundary that can recover a modal whose close never arrived.
+    // Turn start proves no input-holding modal remains; recover missing dialog-close events.
     ...(kind === 'pi'
       ? ['    piUiPromptDepth = 0', '    piTurnInFlight = true', '    replyFinishedAt = undefined']
       : []),
@@ -192,10 +185,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     ...getPiAgentStatusUiPromptHandlerSourceLines(kind),
     ...getPiAgentStatusCompactionHandlerSourceLines(kind),
     ...modelSelectHandler,
-    "  // Why: capture the assistant's final text on each completed message",
-    '  // so the dashboard preview reflects the most recent reply even before',
-    '  // agent_end fires. message_end is the right hook because pi guarantees',
-    '  // it fires after the message is finalized (post-streaming).',
+    '  // message_end finalizes preview text before agent_end, so dashboards see the latest reply sooner.',
     `  onStatus('message_end', (event${ctxParam}) => {`,
     ...captureSessionMetadata,
     "    if (event.message?.role !== 'assistant') return",
@@ -205,10 +195,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     ...(kind === 'pi' ? ['    republishLateBusyPostCompletion()'] : []),
     '  })',
     '',
-    '  // Why: modern Pi stays non-idle across retry/compaction/follow-up work,',
-    '  // while legacy Pi becomes idle after its final agent_end handlers.',
-    '  // OMP instead marks non-terminal agent_end events with willContinue, so it',
-    '  // returns before the recheck timer is ever armed.',
+    '  // Modern Pi stays busy through retry/compaction; OMP willContinue bypasses this legacy-idle recheck.',
     '  const AGENT_END_IDLE_RECHECK_MS = 25',
     '  const AGENT_END_IDLE_RECHECK_MAX_MS = 250',
     // Why: a settle is a fact about ONE run. A settle seen for an earlier run must not silence a
@@ -224,7 +211,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '    pendingAgentEndContext = null',
     '  }',
     ...getPiSubagentRosterEventSourceLines(),
-    // The one answer to "do children still hold this pane"; an exited runner holds through its grace.
+    // Exited child runners retain ownership through their grace period.
     '  function isHeldByChildren(): boolean {',
     '    return lifecycleState.active.size > 0',
     '  }',
@@ -242,10 +229,9 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '    lifecycleState.waiting = false',
     '    if (lifecycleState.completionPostedGeneration === lifecycleState.endedRunGeneration) return false',
     '    lifecycleState.completionPostedGeneration = lifecycleState.endedRunGeneration',
-    // Why: distinct from the completion guard, which holds the generation of the posted run
-    // and so starts clean on a pane that has not run a turn yet — that pane is idle, not busy.
+    // Separate from completion generation: a fresh pane without a turn is idle.
     ...(kind === 'pi' ? ['    piTurnInFlight = false'] : []),
-    // Why: a run that ends because its session did has not completed; the host records it quietly.
+    // Session boundary is not successful completion; record it quietly.
     ...(kind === 'pi'
       ? [
           '    const replyFields = takeCompletedReplyFields()',
@@ -295,7 +281,8 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '    lifecycleState.endedRunGeneration = lifecycleState.runGeneration',
     ...(kind === 'pi' ? ['    recordReplyFinish(event)'] : []),
     '    if (isOmpRuntime()) {',
-    '      postAgentEndOnce()',
+    '      const prunedVisible = forgetFinishedOmpSubagents(ctx)',
+    '      if (!postAgentEndOnce() && prunedVisible) postSubagentsUpdate()',
     '      return',
     '    }',
     // Why: this run already settled, so nothing is left to recheck. A settle from an EARLIER run

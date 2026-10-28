@@ -22,7 +22,6 @@ const ROW_STAGGER_MS = 90
 
 function noop(): void {}
 
-// The real panel header, inert, with everything but the query held still.
 const DEMO_HEADER_PROPS = {
   hasScanResult: true,
   activeWorktreePath: '/demo',
@@ -69,7 +68,6 @@ function DemoActivityTab({
   )
 }
 
-// Mirrors the right sidebar's tab row so the tip shows where the panel lives.
 function DemoActivityStrip(): JSX.Element {
   return (
     <div className="flex h-10 items-center gap-1 border-b border-sidebar-border px-2">
@@ -93,7 +91,6 @@ function DemoActivityStrip(): JSX.Element {
   )
 }
 
-/** The right sidebar's Agent Session History panel, inert, for a feature tip visual. */
 export function DemoSessionPanel({
   query = '',
   searching = false,
@@ -140,7 +137,6 @@ export function DemoSessionRow({
   isHit: boolean
   focused: boolean
   index: number
-  /** Overlays anchored to the row, such as its actions menu. */
   children?: ReactNode
 }): JSX.Element {
   return (

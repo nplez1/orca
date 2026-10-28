@@ -12,7 +12,7 @@ import {
 import { getCheckDetailsKey } from '@/components/github/pr-check-presentation'
 import { checkDetailsNeedRefresh } from '@/components/github/check-details-cache'
 import { getCheckCounts, getChecksSummaryLabel } from '@/components/pr-check-counts'
-import { getBrokenChecks } from '@/components/pr-checks-fix-prompt'
+import { getBrokenChecks } from '../../../../../shared/pr-checks-fix-prompt'
 import { sortChecksBySeverity } from '../../../../../shared/pr-check-severity-order'
 import { githubRepoIdentityKey } from '../../../../../shared/github/repository-identity-key'
 import { getTaskSourceCacheScope } from '../../../../../shared/task-source-context'
@@ -63,7 +63,7 @@ export function ChecksTab({
 }): React.JSX.Element {
   const targetRepoId = repoId ?? item.repoId
   const settings = useAppStore((s) => s.settings)
-  const updateSettings = useAppStore((s) => s.updateSettings)
+  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
   const updateRepo = useAppStore((s) => s.updateRepo)
   const repo = useAppStore((s) =>
     targetRepoId ? (s.repos.find((candidate) => candidate.id === targetRepoId) ?? null) : null
@@ -163,8 +163,7 @@ export function ChecksTab({
   const failedChecks = getBrokenChecks(list)
   const counts = getCheckCounts(list)
   const summaryLabel = getChecksSummaryLabel(list)
-  // Why: keying the green tick off `list.length` painted an all-neutral PR green above the words
-  // "0 of N checks passing"; nothing passed, so it reads unresolved like the checks pill does.
+  // All-neutral checks remain unresolved; list length alone cannot justify a green tick.
   const SummaryIcon =
     counts.failing > 0
       ? CHECK_ICON.failure
@@ -349,7 +348,7 @@ export function ChecksTab({
       repoConnectionId={repo?.connectionId ?? null}
       targetRepoId={targetRepoId}
       item={item}
-      updateSettings={updateSettings}
+      updateSettings={updateSettingsOrThrow}
       updateRepo={updateRepo}
     />
   )

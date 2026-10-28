@@ -13,7 +13,7 @@ import {
 } from '../../shared/workspace-path-catalog-overlay'
 import type { WorkspacePathCatalog } from '../../shared/workspace-path-catalog'
 import { parseWslPath } from '../wsl'
-import { resolveAuthorizedPath } from './filesystem-auth'
+import { resolveAuthorizedPath } from './filesystem/filesystem-auth'
 import { getLocalGitOptionsForRegisteredWorktree } from './local-worktree-runtime-options'
 import { scanRipgrepPaths } from './quick-open-rg-path-scan'
 import { RipgrepUnavailableError } from '../../shared/ripgrep-process-availability'

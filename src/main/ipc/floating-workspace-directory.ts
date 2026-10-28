@@ -6,7 +6,7 @@ import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { FloatingTerminalCwdRequest } from '../../shared/ui-chrome-types'
 import type { Store } from '../persistence'
 import { ensureFloatingWorkspaceLaunchDirectory } from '../floating-workspace-launch-directory'
-import { authorizeExternalPath } from './filesystem-auth'
+import { authorizeExternalPath } from './filesystem/filesystem-auth'
 
 type FloatingTerminalSettings = Pick<GlobalSettings, 'floatingTerminalTrustedCwds'>
 

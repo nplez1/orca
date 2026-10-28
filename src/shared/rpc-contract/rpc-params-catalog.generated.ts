@@ -71,6 +71,7 @@ import { CurrentRequestsParams } from './agent-session-current-requests-params'
 import { CreateAgentSessionParams, EnsureAgentSessionParams } from './agent-session-params'
 import { ReadVisualParams } from './agent-session-visual-params'
 import {
+  AiVaultDeleteSessionParams,
   AiVaultListSessionsParams,
   AiVaultPrepareSessionResumeParams,
   AiVaultSessionTitlesParams
@@ -181,6 +182,7 @@ import {
   ConnectorAnswer,
   ConnectorCancel,
   ConnectorPendingPrompt,
+  ConnectorReply,
   ConnectorSend,
   ConnectorStart,
   ConnectorWatch
@@ -489,7 +491,8 @@ import {
   PreflightAgentDetection,
   PreflightCheck,
   PreflightDetectRemoteAgents,
-  PreflightDetectRemoteWindowsTerminalCapabilities
+  PreflightDetectRemoteWindowsTerminalCapabilities,
+  PreflightProjectAgentDetection
 } from './preflight-params'
 import {
   ProjectHostSetupClone,
@@ -531,6 +534,7 @@ import {
   CloseLifecycleTab,
   CloseTab,
   CreateTerminalTab,
+  MovePaneToNewTab,
   MoveTab,
   SaveMarkdownTab,
   SessionTabsUnsubscribe,
@@ -538,6 +542,7 @@ import {
   UpdatePaneLayout,
   WorktreeTabSelector
 } from './session-tabs-schemas-params'
+import { SessionReadTerminalScrollbackParams } from './session-terminal-scrollback-params'
 import { SidebarSessionBeginParams } from './sidebar-session-params'
 import {
   SkillsCancelInstallParams,
@@ -561,6 +566,7 @@ import {
   SshTargetUpdate
 } from './ssh-params'
 import { ContinueInterruptedParams } from './structured-agent-session-continue-params'
+import { ContinuationContextParams } from './structured-agent-session-identifiers'
 import {
   AcknowledgeAttentionParams,
   AgentsParams,
@@ -593,8 +599,10 @@ import {
 } from './structured-agent-session-params'
 import {
   QueuedMessageEditHoldParams,
+  QueuedMessageMoveParams,
   QueuedMessageUpdateParams
 } from './structured-agent-session-queued-edit-params'
+import { RenameParams } from './structured-agent-session-rename-params'
 import { TerminalDaemonRestartSeveredParams } from './terminal-daemon-params'
 import { TerminalAdoptOrphans } from './terminal-orphan-params'
 import { TerminalQuickCommandsUpdate } from './terminal-quick-command-params'
@@ -624,6 +632,7 @@ import {
   TerminalSetViewerColors,
   TerminalSplit,
   TerminalStopExact,
+  TerminalViewClaudeAgent,
   TerminalWait
 } from './terminal-unary-params'
 import { TerminalGetAutoRestoreFitParams } from './terminal-viewport-methods-params'
@@ -736,6 +745,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'agentSession.cancel': CancelParams,
   'agentSession.close': OptionsParams,
   'agentSession.commands': OptionsParams,
+  'agentSession.continuationContext': ContinuationContextParams,
   'agentSession.continueInterrupted': ContinueInterruptedParams,
   'agentSession.conversationCommand': ConversationCommandParams,
   'agentSession.conversationOutline': OptionsParams,
@@ -751,12 +761,14 @@ export const RPC_PARAMS_BY_METHOD = {
   'agentSession.options': OptionsParams,
   'agentSession.queuedMessageDelete': QueuedMessageActionParams,
   'agentSession.queuedMessageEditHold': QueuedMessageEditHoldParams,
+  'agentSession.queuedMessageMove': QueuedMessageMoveParams,
   'agentSession.queuedMessageSend': QueuedMessageActionParams,
   'agentSession.queuedMessageUpdate': QueuedMessageUpdateParams,
   'agentSession.queuedMessagesResume': QueuedMessagesResumeParams,
   'agentSession.readVisual': ReadVisualParams,
   'agentSession.regenerateName': OptionsParams,
   'agentSession.release': HoldParams,
+  'agentSession.rename': RenameParams,
   'agentSession.respondToApproval': RespondParams,
   'agentSession.respondToQuestion': RespondToQuestionParams,
   'agentSession.restartContinue': RestartResumeParams,
@@ -781,6 +793,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'agentSessionAttachment.uploadStart': AttachmentUploadStartParams,
   'agentTeams.prepareLaunch': AgentTeamsPrepareLaunch,
   'agentTeams.tmuxCompat': AgentTeamsTmuxCompat,
+  'aiVault.deleteSession': AiVaultDeleteSessionParams,
   'aiVault.listSessions': AiVaultListSessionsParams,
   'aiVault.prepareSessionResume': AiVaultPrepareSessionResumeParams,
   'aiVault.resolveSessionTitles': AiVaultSessionTitlesParams,
@@ -915,6 +928,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'connector.answer': ConnectorAnswer,
   'connector.cancel': ConnectorCancel,
   'connector.pendingPrompt': ConnectorPendingPrompt,
+  'connector.reply': ConnectorReply,
   'connector.send': ConnectorSend,
   'connector.start': ConnectorStart,
   'connector.watch': ConnectorWatch,
@@ -1270,7 +1284,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'plugins.readPanelEntry': PluginReadPanelEntryParams,
   'plugins.setEnabled': PluginSetEnabledParams,
   'preflight.check': PreflightCheck,
-  'preflight.detectAgents': PreflightAgentDetection,
+  'preflight.detectAgents': PreflightProjectAgentDetection,
   'preflight.detectRemoteAgents': PreflightDetectRemoteAgents,
   'preflight.detectRemoteWindowsTerminalCapabilities':
     PreflightDetectRemoteWindowsTerminalCapabilities,
@@ -1318,6 +1332,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'runtime.clientCapabilities.update': ClientCapabilitiesUpdate,
   'runtime.clientEvents.subscribe': null,
   'runtime.clientEvents.unsubscribe': ClientEventsUnsubscribeParams,
+  'session.readTerminalScrollback': SessionReadTerminalScrollbackParams,
   'session.tabs.activate': ActivateTab,
   'session.tabs.close': CloseTab,
   'session.tabs.closeLifecycle': CloseLifecycleTab,
@@ -1325,6 +1340,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'session.tabs.list': WorktreeTabSelector,
   'session.tabs.listAll': null,
   'session.tabs.move': MoveTab,
+  'session.tabs.movePaneToNewTab': MovePaneToNewTab,
   'session.tabs.setTabProps': SetTabProps,
   'session.tabs.subscribe': WorktreeTabSelector,
   'session.tabs.subscribeAll': null,
@@ -1431,8 +1447,10 @@ export const RPC_PARAMS_BY_METHOD = {
   'terminal.stop': TerminalCloseAll,
   'terminal.stopExact': TerminalStopExact,
   'terminal.subscribe': TerminalSubscribe,
+  'terminal.subscribeClaudeAgentViews': null,
   'terminal.unsubscribe': TerminalUnsubscribe,
   'terminal.updateViewport': TerminalUpdateViewport,
+  'terminal.viewClaudeAgent': TerminalViewClaudeAgent,
   'terminal.wait': TerminalWait,
   'terminalDaemon.restartSevered': TerminalDaemonRestartSeveredParams,
   'terminalDaemon.severedStatus': null,

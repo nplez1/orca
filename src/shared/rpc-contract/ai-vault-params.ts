@@ -5,9 +5,7 @@ import { aiVaultHostListQuery } from '../ai-vault-session-filters'
 import { OptionalBoolean } from './rpc-param-primitives'
 import { AI_VAULT_SESSION_TITLE_REQUEST_MAX_COUNT } from '../ai-vault-session-title'
 
-// Why: bound limit + scopePaths so a client cannot force an unbounded scan.
-// Each scopePath is a host-local match prefix (validated/capped, never used for
-// traversal); the count/length caps mirror the worktree-schemas bounding style.
+// Bound discovery input; scopePaths are host-local match prefixes, never traversal paths.
 export const AI_VAULT_SCOPE_PATH_MAX_LENGTH = 4096
 
 export const AI_VAULT_LIMIT_MAX = 2000
@@ -47,9 +45,7 @@ export const AiVaultListSessionsParams = z
       .optional(),
     scopePaths: z
       .array(z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH))
-      // Why: clamp instead of reject — scope paths only ever widen discovery, and
-      // rejecting would hard-break older/uncapped producers (web client, pre-cap
-      // desktop parents) that send more than the bound.
+      // Clamp to preserve older uncapped clients; scopes only widen discovery.
       .transform((paths) => paths.slice(0, AI_VAULT_SCOPE_PATHS_MAX_COUNT))
       .optional(),
     // Why a transform and not a rejection, like scopePaths: the client and the
@@ -119,4 +115,11 @@ export const AiVaultSessionTitlesParams = z.object({
       })
     )
     .max(AI_VAULT_SESSION_TITLE_REQUEST_MAX_COUNT)
+})
+
+// The host revalidates the path against its own roots; no host id travels because the host deletes only its own files.
+export const AiVaultDeleteSessionParams = z.object({
+  agent: z.enum(AI_VAULT_AGENTS),
+  sessionId: z.string().min(1).max(512).optional(),
+  filePath: z.string().min(1).max(AI_VAULT_SCOPE_PATH_MAX_LENGTH)
 })

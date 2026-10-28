@@ -99,8 +99,7 @@ describe('canPostPRReviewThreadReply', () => {
     expect(canPostPRReviewThreadReply(comment({ id: 0, threadId: 'T1' }))).toBe(false)
   })
 
-  // Why: CodeRabbit review summaries can still carry path/threadId metadata; the
-  // pullrequestreview anchor must win or the replies endpoint 404s.
+  // Review-summary anchors override thread metadata; their IDs would 404 on the nested replies endpoint.
   it('rejects review summaries even when thread metadata is present', () => {
     expect(
       canPostPRReviewThreadReply(

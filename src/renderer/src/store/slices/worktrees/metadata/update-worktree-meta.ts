@@ -243,7 +243,7 @@ export function createUpdateWorktreeMeta(
       return { ok: true }
     }
     if (hasHostedReviewLinkUpdates(enriched)) {
-      bumpHostedReviewLinkMutationGeneration(worktreeId)
+      bumpHostedReviewLinkMutationGeneration(worktreeId, worktreeForUpdate)
     }
 
     const writePrimary = (): Promise<void> =>
@@ -290,8 +290,7 @@ export function createUpdateWorktreeMeta(
       }
       console.error('Failed to update worktree meta:', err)
       void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
-      // Why: the refetch above reverts the optimistic write, so a caller that
-      // closes its surface on this path shows the user a save that undid itself.
+      // Refetch reverted the optimistic write; report failure so callers do not close on an undone save.
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
     if (rename?.failure) {

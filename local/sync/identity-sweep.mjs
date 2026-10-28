@@ -47,6 +47,11 @@ const ALLOWLIST = [
     'the native launcher is built as `orca.exe`; extraResources maps it to bin/orca-np.exe.',
     NATIVE_OR_BUILD
   ],
+  [
+    /orca\.exe/,
+    'the base builder config is byte-identical to upstream\u2019s; `bin/orca.exe` is the destination KEY the Orca NP overlay (electron-builder.np.config.cjs) matches on to rename the packaged copy to bin/orca-np.exe.',
+    /config\/electron-builder(?:\.np)?\.config\.cjs$/
+  ],
   [/^orca(?:\.cmd)?$/, RELAY_WHY, null, /relay|\.orca-relay|ORCA_CLI_COMMAND/i],
   [/^(?:bin[\\/])?orca(?:\.cmd|\.exe)?$/, RELAY_WHY, RELAY_PATHS],
   [/orca-ide/, LINUX_WHY, /linux|appimage|docker/i],

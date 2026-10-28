@@ -72,17 +72,22 @@ export type FilesystemApi = {
       access?: LocalFileAccess
       offset: number
       length: number
+      wakeWslDistro?: boolean
     }) => Promise<RuntimeFileReadChunkResult>
     readDir: (args: {
       dirPath: string
       connectionId?: string
       followSymlinks?: boolean
+      /** A user act (open or Retry); may start a stopped WSL distro. */
+      wakeWslDistro?: boolean
     }) => Promise<DirEntry[]>
     readFile: (args: {
       filePath: string
       connectionId?: string
       includeLocalLogMetadata?: boolean
       access?: LocalFileAccess
+      /** A user act (open, expand, Retry); may start a stopped WSL distro. */
+      wakeWslDistro?: boolean
     }) => Promise<{
       content: string
       isBinary: boolean
@@ -167,12 +172,14 @@ export type FilesystemApi = {
         targetPath: string
         connectionId?: string
         recursive?: boolean
+        permanent?: boolean
       } & SshMutationExpectation
     ) => Promise<void>
     stat: (args: {
       filePath: string
       connectionId?: string
       access?: LocalFileAccess
+      wakeWslDistro?: boolean
     }) => Promise<{ size: number; isDirectory: boolean; mtime: number }>
     pathsExist?: (args: {
       filePaths: string[]

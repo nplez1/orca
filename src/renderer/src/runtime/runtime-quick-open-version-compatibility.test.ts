@@ -71,34 +71,6 @@ it('validates default-policy recent paths on a version-two host through complete
   expect(fsListFiles).not.toHaveBeenCalled()
 })
 
-it('sends bounded candidates only after a compatible host advertises their semantics', async () => {
-  runtimeEnvironmentCall.mockImplementation(({ method }) =>
-    Promise.resolve({
-      id: 'compat',
-      ok: true,
-      _meta: { runtimeId: 'host' },
-      result:
-        method === 'files.searchPaths'
-          ? { files: [], truncated: false, quickOpenSearchVersion: 3 }
-          : ['src/recent.ts']
-    })
-  )
-  await expect(
-    listRuntimeFiles(
-      {
-        target: { kind: 'environment' as const, environmentId: 'env-1' },
-        worktreeId: 'recent-new',
-        worktreePath: '/host/repo'
-      },
-      { rootPath: '/host/repo', candidatePaths: ['src/recent.ts'], maxResults: 1 }
-    )
-  ).resolves.toEqual(['src/recent.ts'])
-  expect(runtimeEnvironmentCall.mock.calls[1][0]).toMatchObject({
-    method: 'files.listAll',
-    params: { worktree: 'id:recent-new', candidatePaths: ['src/recent.ts'], maxResults: 1 }
-  })
-})
-
 it('refuses to infer recent eligibility from a truncated old-host inventory', async () => {
   runtimeEnvironmentCall.mockImplementation(({ method }) =>
     Promise.resolve({

@@ -308,6 +308,9 @@
           "TabBarNewTabButton": {
             "729bccd8bd": "More options",
             "6417e68a08": "Hold for all new tab options"
+          },
+          "TabBar": {
+            "ab589350e5": "Could not build launch command for {{value0}}."
           }
         }
       },
@@ -463,7 +466,8 @@
           "remoteScopeAccounts": "Showing accounts managed by {{value0}}. Add or re-authenticate accounts on that server.",
           "854ebbcc45": "Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.",
           "79e484c3b2": "Optional account switcher for the shared Claude auth files.",
-          "b15ce90870": "{{value0}} -> {{value1}}. Restart live Claude terminals before continuing old sessions."
+          "b15ce90870": "{{value0}} -> {{value1}}. Restart live Claude terminals before continuing old sessions.",
+          "aa4de4475b": "Gemini CLI (legacy)"
         },
         "AdvancedPane": {
           "c22adcc7c5": "Debug Options",

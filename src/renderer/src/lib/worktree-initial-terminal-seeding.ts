@@ -27,6 +27,7 @@ import {
 import { applyDefaultTerminalTabs } from '@/lib/worktree-default-terminal-tabs'
 import { openDefaultAgentChatInEmptyWorkspace } from '@/lib/empty-workspace-default-agent-chat'
 import { isEmptyWorkspaceDefaultSurfacePending } from '@/lib/empty-workspace-default-surface-claims'
+import { findPendingWorktreeCreationId } from './pending-worktree-creation'
 
 function getSetupRunnerCommandPlatformForLaunch(setup: WorktreeSetupLaunch): 'windows' | 'posix' {
   return getSetupRunnerCommandPlatformForPath(
@@ -103,7 +104,7 @@ export function ensureWorktreeHasInitialTerminal(
   opts?: InitialTerminalOptions
 ): string | null {
   const { renderableTabCount } = store.reconcileWorktreeTabModel(worktreeId)
-  // Why: creating a terminal just because the legacy terminal slice is empty gives editor/browser-only worktrees an unexpected extra tab.
+  // Editor/browser-only workspaces need no extra terminal merely because the legacy terminal slice is empty.
   const ownerState =
     store.settings !== undefined || store.repos !== undefined || store.worktreesByRepo !== undefined
       ? store
@@ -133,7 +134,7 @@ export function ensureWorktreeHasInitialTerminal(
     worktreeId,
     opts?.executionHostId
   )
-  // Why: explicit spawn evidence survives the new-worktree ownership race; a host that owns terminal creation provides the same authority for later activations.
+  // Explicit spawn evidence survives new-worktree ownership races; later activations also defer to host-owned terminal creation.
   if (backendStartupTerminalSpawned || hostAuthority === 'live') {
     const existingTerminalTabId = store.tabsByWorktree[worktreeId]?.[0]?.id
     if (existingTerminalTabId && (setup || issueCommand)) {
@@ -152,7 +153,7 @@ export function ensureWorktreeHasInitialTerminal(
       return existingTerminalTabId
     }
     if (setup || issueCommand) {
-      // Why: runtime-owned worktrees mirror session tabs async, so hold commands for the first mirrored tab instead of dropping them.
+      // Runtime tabs mirror asynchronously; retain commands until the first tab arrives.
       queueHookCommandsForFirstWorktreeTab({
         worktreeId,
         deliver: (state, firstTerminalTabId) =>
@@ -171,6 +172,18 @@ export function ensureWorktreeHasInitialTerminal(
   }
 
   const hasExplicitLaunchWork = Boolean(sequencedStartup || setup || issueCommand)
+  const pendingCreationId = findPendingWorktreeCreationId(
+    ownerState.pendingWorktreeCreations,
+    worktreeId
+  )
+  // Why: a checkout can become selectable before creation has handed off its chosen surface.
+  if (
+    pendingCreationId &&
+    opts?.worktreeCreationId !== pendingCreationId &&
+    !hasExplicitLaunchWork
+  ) {
+    return null
+  }
   if (
     renderableTabCount === 0 &&
     !shouldSeedWorktreePrimaryTerminal({
@@ -214,7 +227,7 @@ export function ensureWorktreeHasInitialTerminal(
   if (!shouldAutoCreate && !shouldCreateForExplicitWork && !shouldCreateNewStartupTerminal) {
     const existingTerminalTabId = store.tabsByWorktree[worktreeId]?.[0]?.id
     if (existingTerminalTabId && (setup || issueCommand)) {
-      // Why: main may have adopted the startup tab but failed to spawn setup; renderer must still launch the returned fallback setup.
+      // Main can adopt the startup tab yet fail setup spawn; renderer still runs returned fallback setup.
       queueSetupAndIssueCommands(
         store,
         worktreeId,
@@ -247,7 +260,6 @@ export function ensureWorktreeHasInitialTerminal(
     !hasExplicitLaunchWork &&
     opts.activateCreatedTabs !== false
   ) {
-    // A host's "no" to the chat seeds what this same call would have without the default chat.
     const defaultChat = openDefaultAgentChatInEmptyWorkspace(
       worktreeId,
       () =>
@@ -266,8 +278,8 @@ export function ensureWorktreeHasInitialTerminal(
     }
   }
 
-  // Why: tag this activation-created tab so its PTY spawn doesn't count as activity and reshuffle the Recent sort.
-  // Why: stamp the seeded agent before hooks arrive so native chat and provider chrome can resolve it immediately.
+  // Activation-created PTY spawns must not count as activity and reshuffle Recent.
+  // Stamp before hooks so chat/provider chrome can resolve agent identity immediately.
   const launchAgent =
     sequencedStartup?.launchAgent ??
     (sequencedStartup?.telemetry
@@ -277,7 +289,6 @@ export function ensureWorktreeHasInitialTerminal(
     pendingActivationSpawn: true,
     ...(launchAgent ? { launchAgent } : {}),
     ...(opts?.activateCreatedTabs === false ? { activate: false } : {}),
-    // Why: the initial pane begins in the requested agent session instead of an idle shell.
     ...(sequencedStartup ? { pendingStartup: sequencedStartup } : {})
   })
   if (opts?.activateCreatedTabs !== false) {

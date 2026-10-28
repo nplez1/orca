@@ -37,8 +37,7 @@ export function CopyButton({
 }): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   const copiedResetTimerRef = useRef<number | null>(null)
-  // Why: clipboard IPC can resolve after this row action unmounts; avoid
-  // starting a reset timer that will outlive the component.
+  // Clipboard IPC may settle after unmount; do not start a reset timer then.
   const isMountedRef = useRef(false)
 
   const clearCopiedResetTimer = useCallback((): void => {
@@ -147,7 +146,6 @@ export function ResolveButton({
   )
 }
 
-/** Format a line range string like "L12" or "L5-L12". */
 export function formatLineRange(comment: PRComment): string | null {
   if (!comment.line) {
     return null
@@ -198,17 +196,6 @@ export function CommentLocationLabel({
   )
 }
 
-/** True for top-level PR conversation comments the viewer can edit or delete. */
-export function isMutablePRConversationComment(comment: PRComment): boolean {
-  if (comment.threadId || comment.path) {
-    return false
-  }
-  if (comment.url && comment.url.includes('pullrequestreview')) {
-    return false
-  }
-  return Number.isSafeInteger(comment.id) && comment.id > 0
-}
-
 export function CommentMoreMenu({
   comment,
   botAuthorOverrides,
@@ -229,8 +216,7 @@ export function CommentMoreMenu({
 }): React.JSX.Element | null {
   const authorLogin = normalizePRCommentAuthorLogin(comment.author)
   const isOverriddenBot = authorLogin.length > 0 && botAuthorOverrides.has(authorLogin)
-  // Why: the override is an escape hatch for bots the heuristics miss, so hide
-  // the action when the author is already detected as a bot without it.
+  // Offer the bot override only for authors heuristics miss or users already overrode.
   const hasMarkAsBot = authorLogin.length > 0 && (isOverriddenBot || !isBotPRComment(comment))
   const hasGoToComment = Boolean(comment.url)
   const hasOpenInCode = Boolean(canOpenInCode && onOpenInCode)
@@ -333,7 +319,6 @@ export function CommentMoreMenu({
   )
 }
 
-/** Build copy text that includes file location context for review comments. */
 export function buildCopyText(comment: PRComment): string {
   if (!comment.path) {
     return comment.body
@@ -354,7 +339,6 @@ export function QueueForAgentButton({
     'auto.components.right.sidebar.checks.panel.content.f8a2c91d04',
     'Queue for agent'
   )
-  // Why: always-visible row action, but ghost styling keeps it from reading as a card-level CTA.
   return (
     <button
       type="button"

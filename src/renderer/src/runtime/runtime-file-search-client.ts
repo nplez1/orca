@@ -61,9 +61,7 @@ export async function listRuntimeFiles(
     followSymlinks?: boolean
     excludePaths?: string[]
     requestToken?: string
-    // Why: naming the cap is what makes a full page readable as "there is more". The host returns
-    // the whole listing when no limit is named, so a caller that never states one cannot tell a
-    // bound from a total.
+    // State a limit so a full page proves more may exist; uncapped host listings cannot distinguish a bound from a total.
     maxResults?: number
     /** Local hosts only; SSH and runtime hosts list unfiltered. */
     nameFilter?: string

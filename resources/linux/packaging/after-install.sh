@@ -1,16 +1,7 @@
 #!/bin/bash
-# Why: register the bundled CLI on PATH at package-install time, so `orca-np serve`
-# works on a headless host. The in-app "Install CLI" action (CliInstaller) can never
-# run on a server, so without this symlink the CLI is unreachable from the shell on
-# exactly the hosts that need it most. deb/rpm both run this after unpacking.
-#
-# The shim resolves the real app by walking up from its own location, so a symlink
-# works. We discover the install dir instead of hardcoding it because electron-builder
-# names it after the product name, which carries a space in this build ("Orca NP"),
-# and an older layout used the executable name.
-#
-# Why (fork): the PATH command is `orca-np`, not upstream's `orca-ide` — an official
-# Orca install owns that name. See LOCAL-PATCHES.md § local(identity).
+# deb/rpm must register `orca-np` on PATH for headless hosts where the in-app installer cannot
+# run; the install dir is discovered because electron-builder names it after the product. Fork:
+# the command is `orca-np` — an official install owns `orca-ide`. LOCAL-PATCHES.md § local(identity).
 set -e
 
 link="/usr/bin/orca-np"

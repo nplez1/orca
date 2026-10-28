@@ -19,9 +19,7 @@ export function lastEnteredDoneAt(
     return agent.childRow?.settledAt ?? null
   }
   const entry = agent.entry
-  // Why: same primitive Smart Sort ranks on, so the displayed age and Done eligibility share a clock.
-  // (Session-boundary `done` means the session connected idle — STA-3386 — so it resolves to the real
-  // completion it displaced, if any.)
+  // Share Smart Sort’s completion clock; session-boundary idle must use the real completion it displaced.
   const completedAt = agentEntryCompletionAt(entry)
   if (completedAt !== null) {
     return completedAt

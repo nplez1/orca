@@ -54,8 +54,7 @@ export function useChecksListState({
   )
   const detailsContextRef = useRef(checkDetailsContextKey)
   const autoExpandedContextRef = useRef<string | null>(null)
-  // Why: expanded check details already sit inside the sidebar scroller; keeping
-  // the list scroller too creates nested scrollbars around CI annotations.
+  // Expanded details use the sidebar scroller; constraining the list too would create nested scrollbars.
   const shouldConstrainCheckList = checksExpanded && expandedCheckKeys.size === 0
   const { detailsHeight, handleResizeStart } = useCheckDetailsResize(
     shouldConstrainCheckList && checks.length > 0
@@ -70,9 +69,7 @@ export function useChecksListState({
       })),
     [checkDetailsContextKey, sorted]
   )
-  // Why: every header count comes from the same classifier the checks pill uses — counting only
-  // `success` made a 2-success/3-skipped PR say "2 passing" next to "5/5 passed", and treating a
-  // null conclusion as pending kept a completed-but-unresolved check spinning forever.
+  // Share the pill's classifier for skipped passes and completed-without-verdict unresolved checks.
   const {
     passed: passingCount,
     failed: failingCount,
@@ -91,14 +88,16 @@ export function useChecksListState({
       }
       return next
     })
+    // Close the one-shot latch outside the updater; React may run an updater twice.
+    let autoExpandKey: string | undefined
+    if (autoExpandedContextRef.current !== checkDetailsContextKey) {
+      autoExpandKey = rows.find((row) => isFailedCheck(row.check))?.key
+      autoExpandedContextRef.current = checkDetailsContextKey
+    }
     setExpandedCheckKeys((current) => {
       const next = new Set([...current].filter((key) => validKeys.has(key)))
-      if (autoExpandedContextRef.current !== checkDetailsContextKey) {
-        const firstFailed = rows.find((row) => isFailedCheck(row.check))
-        if (firstFailed) {
-          next.add(firstFailed.key)
-        }
-        autoExpandedContextRef.current = checkDetailsContextKey
+      if (autoExpandKey !== undefined) {
+        next.add(autoExpandKey)
       }
       return next
     })

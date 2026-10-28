@@ -12,11 +12,7 @@ type PreviewRightClickTerminal = Pick<
   'element' | 'options' | 'getSelection' | 'clearSelection' | 'focus'
 > & { modes: Pick<Terminal['modes'], 'mouseTrackingMode'> }
 
-/**
- * Terminal-style right-click for the preview terminal, mirroring the pane's
- * useTerminalContextMenuTrigger: a selection copies and clears, no selection
- * pastes, and Ctrl+right-click keeps the native menu reachable.
- */
+/** Match pane right-click behavior: copy selection or paste; Ctrl+right-click retains native menu access. */
 export function installPreviewTerminalRightClickPaste({
   container,
   getTerminal,

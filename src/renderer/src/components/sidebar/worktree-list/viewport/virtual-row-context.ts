@@ -19,7 +19,6 @@ import type { WorktreeVirtualRowContext } from '../rows/virtual-row-dispatch'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../../store/worktree-visibility-defaults-by-host'
 
 import type { ProjectHeaderHostContext } from '../rows/project-header-host-context'
-import type { RepoSshGateResolver } from '@/hooks/use-repo-ssh-gate-resolver'
 
 type BuildArgs = {
   props: VirtualizedWorktreeViewportProps
@@ -30,7 +29,6 @@ type BuildArgs = {
   measureVirtualRowElement: (element: HTMLDivElement | null) => void
   settings: AppState['settings']
   worktreeVisibilityDefaultsByHost: AppState['worktreeVisibilityDefaultsByHost']
-  getRepoSshGate: RepoSshGateResolver
   newCardStyle: boolean
   folderBackedProjectGroupIds: ReadonlySet<string>
   session: WorktreeDragSession
@@ -54,8 +52,6 @@ type BuildArgs = {
   onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
 }
 
-// Assembles the per-render context the row dispatcher reads. Plain data — everything in it
-// is either a prop, a memoised hook result, or a stable callback.
 export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtualRowContext {
   const { props, runtime, session, statusDrag, headerDrag, primaryActive, reveal } = args
   return {
@@ -85,7 +81,6 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       collapsedGroups: props.collapsedGroups,
       workspaceStatuses: props.workspaceStatuses,
       projectGroups: args.projectGroups,
-      getRepoSshGate: args.getRepoSshGate,
       highlightedRevealRowKey: reveal.highlightedRevealRowKey,
       dragOverStatus: runtime.dragOverStatus,
       pinDragOver: runtime.pinDragOver,

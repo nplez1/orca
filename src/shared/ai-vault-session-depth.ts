@@ -16,8 +16,7 @@ export function requestedAiVaultSessionDepth(
     : DEFAULT_AI_VAULT_SCAN_LIMIT
 }
 
-// Scanners bound with slice/comparisons, so 'unlimited' resolves to no bound.
-// Single owner of the normalization every scan limit goes through.
+// Normalize unlimited to no bound for scanner slices/comparisons; keep one owner for all scan limits.
 export function aiVaultScanLimit(args?: Pick<AiVaultListArgs, 'limit' | 'unlimited'>): number {
   const depth = requestedAiVaultSessionDepth(args)
   return depth === 'unlimited' ? Number.POSITIVE_INFINITY : depth
@@ -60,9 +59,7 @@ export function aiVaultCachedDepthServes(
   return scopePaths.length > 0 ? cached === requested : aiVaultSessionDepthCovers(cached, requested)
 }
 
-// Depth bounds only out-of-scope rows: the scan already budgets in-scope rows per source,
-// and its out-of-scope rows are its capped newest set, so a scan result passes through
-// unchanged and a cache hit can never show less than the scan it came from.
+// Depth caps only out-of-scope rows; scoped sources have their own budgets. Preserve scan results so cache hits cannot display fewer rows.
 export function truncateAiVaultListResult(
   result: AiVaultListResult,
   depth: AiVaultSessionDepth,

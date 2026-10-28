@@ -1,4 +1,4 @@
-import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
+import type { TaskPageComposerActionsModel } from './use-task-page-composer-actions'
 import { TaskPageGitHubFilters } from './github/Filters'
 import { TaskPageLinearFilters } from './linear/Filters'
 import { TaskPageJiraFilters } from './jira/Filters'
@@ -11,8 +11,7 @@ export function TaskPageProviderFilters({
   const { linearConnected, jiraConnected, taskSource, githubMode, settings, jiraBoardViewMode } =
     model
   return taskSource === 'github' && githubMode === 'items' ? (
-    // Why: top of the joined GitHub list card — pairs with the
-    // table shell below (rounded-t-none border-t-0) as one surface.
+    // Join the filter chrome to the table shell below.
     <TaskPageGitHubFilters model={model} />
   ) : taskSource === 'linear' && linearConnected ? (
     <TaskPageLinearFilters model={model} />

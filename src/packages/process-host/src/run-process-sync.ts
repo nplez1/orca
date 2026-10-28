@@ -1,21 +1,13 @@
 import { spawnSync as nodeSpawnSync } from 'node:child_process'
 import { resolveSpawn, type ResolvedSpawn } from './spawn-resolution'
 import { hasSpawnObserver, notifySpawnObserver } from './spawn-observer'
-import type { ProcessSpec, ProcessResult } from './process-spec'
 import { DEFAULT_PROCESS_TIMEOUT_MS, DEFAULT_MAX_OUTPUT_BYTES } from './process-spec'
+import type { ProcessSpec, ProcessResult } from './process-spec'
 
-/**
- * Synchronous variant, for the call sites that genuinely cannot await — CLI
- * entry points and teardown paths that run while the event loop is stopping.
- *
- * Prefer `runProcess`. This exists so those callers still get the Windows
- * invariants (hidden console, correct `.cmd` argv) instead of reaching for
- * `execFileSync` and re-deciding them.
- */
-export function runResolvedProcessSyncEntry(spec: ProcessSpec): ProcessResult {
+/** Prefer runProcess; reserve blocking execution for synchronous entry points and teardown. */
+export function runProcessSync(spec: ProcessSpec): ProcessResult {
   const resolved = resolveSpawn(spec, process.platform)
-  // Diagnostics only: spawnSync holds the calling thread until the child exits,
-  // so the whole call is the block, reported even when it throws.
+  // spawnSync blocks until exit; report that duration even if it throws.
   const spawnStartedAt = hasSpawnObserver() ? performance.now() : null
   try {
     return runResolvedProcessSync(spec, resolved)
@@ -48,13 +40,9 @@ function runResolvedProcessSync(spec: ProcessSpec, resolved: ResolvedSpawn): Pro
     ...(spec.captureStdoutAsBytes ? { stdoutBytes: result.stdout ?? Buffer.alloc(0) } : {}),
     stderr: spec.captureStderrAsBytes ? '' : (result.stderr?.toString('utf8') ?? ''),
     ...(spec.captureStderrAsBytes ? { stderrBytes: result.stderr ?? Buffer.alloc(0) } : {}),
-    // Why always false: spawnSync reports an overrun as an ENOBUFS error, and
-    // the guard above rethrows it, so no truncated result reaches this point.
+    // ENOBUFS is rethrown above, so truncated output never reaches this result.
     outputTruncated: false,
-    // Why ETIMEDOUT and not the signal: a timeout kills with SIGTERM, but so
-    // does anything else that terminates the child, and only a timeout also
-    // sets this error. Reading the signal alone reports a deliberately
-    // stopped process as having timed out, which callers retry.
+    // SIGTERM can be deliberate; only ETIMEDOUT proves a timeout.
     timedOut
   }
 }

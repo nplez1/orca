@@ -106,10 +106,7 @@ describe('Claude background task status', () => {
     }
   })
 
-  // The inventory shares one kind table with the SDK stream, so the stream's `local_*` agent names
-  // classify as agents here too rather than failing active as untyped watch work.
-  // A teammate row still never gates the pane: it reports running permanently, so only its
-  // lifecycle events may (the #8825 idle-squat rule), which is why its pane state differs.
+  // SDK local_* names share inventory classification; teammate tasks stay running permanently, so lifecycle events own their pane state (#8825).
   it.each([
     ['local_agent', 'working'],
     ['local_subagent', 'working'],
@@ -204,8 +201,7 @@ describe('Claude background task status', () => {
       background_tasks: [{ id: 'child-1', type: 'subagent', status: 'running' }]
     })
 
-    // Why: real agent work keeps the spinner (no workingMode) but the lead turn still ended,
-    // so the stamp must be present. The two predicates are deliberately not the same.
+    // Child work keeps the spinner, but the ended lead still needs a notification stamp.
     expect(childWorking).toMatchObject({ state: 'working', workingMode: undefined })
     expect(typeof childWorking?.turnCompletedAt).toBe('number')
   })
@@ -233,9 +229,7 @@ describe('Claude background task status', () => {
       background_tasks: [RUNNING_SHELL]
     })
 
-    // Why: the cancel is the main agent's verdict, the shell is the inventory's fact, and the two never
-    // trade: the row shows the shell, the verdict rides `mainAgent.outcome`. A cancelled turn is not a
-    // completion, so nothing is stamped for the notification path to announce.
+    // Shell inventory owns row liveness; the cancelled lead verdict stays on mainAgent.outcome and must not announce completion.
     expect(interrupted).toMatchObject({
       state: 'working',
       // LOCAL(nplez1): a shell is not watch work, so the row keeps working without the monitoring mode.
@@ -256,8 +250,7 @@ describe('Claude background task status', () => {
       session_crons: []
     })
 
-    // Why: the stamp exists to announce a turn whose pane STAYS working. A plain done
-    // needs no stamp — the ordinary done path already notifies.
+    // Ordinary done already notifies; the stamp covers panes that remain working.
     expect(finished?.state).toBe('done')
     expect(finished?.turnCompletedAt).toBeUndefined()
   })
@@ -399,8 +392,7 @@ describe('Claude background task status', () => {
     ).toBe('working')
     expect(state.claudeActiveSessionCronPaneKeys.has(SOURCE_PANE)).toBe(false)
 
-    // Why: the mid-turn drain must survive to the next boundary — a Stop that reports
-    // nothing is the case where a stale cron flag would pin the pane 'working'.
+    // A mid-turn drain must survive the boundary or a missing next inventory leaves stale cron work pinned.
     expect(claudeEvent(state, SOURCE_PANE, { hook_event_name: 'Stop' })?.state).toBe('done')
   })
 
@@ -736,8 +728,7 @@ describe('Claude background task status', () => {
     })
     claudeEvent(state, SOURCE_PANE, { hook_event_name: 'UserPromptSubmit', prompt: 'now this' })
 
-    // Why: Ctrl+C ends the main agent's turn, not the shell or cron the inventory reported; the row the
-    // server synthesizes for the cancel is the same fold every Stop goes through.
+    // Ctrl+C ends the lead turn while reported shell/cron work survives; synthesized cancel uses the Stop fold.
     expect(markClaudeLeadTurnInterrupted(state, SOURCE_PANE)).toEqual({
       state: 'working',
       mainAgent: { state: 'done', outcome: 'cancellation', stateStartedAt: expect.any(Number) }
@@ -748,8 +739,7 @@ describe('Claude background task status', () => {
 
   it('keeps a live shell as a confirmed done-gate for child lifecycle events after a cancel', () => {
     const state = createHookListenerState()
-    // A child restored from disk, then a truncated inventory that registers a shell without
-    // retiring the restored seed.
+    // A truncated inventory adds a shell without retiring the restored child seed.
     seedClaudeSubagentRosterFromSnapshots(state, SOURCE_PANE, [
       { id: 'restored-1', state: 'working', startedAt: 1 }
     ])
@@ -761,8 +751,7 @@ describe('Claude background task status', () => {
     expect(state.claudeRunningNonAgentTaskPaneKeys.has(SOURCE_PANE)).toBe(true)
     markClaudeLeadTurnInterrupted(state, SOURCE_PANE)
 
-    // Why: the shell the inventory reported is live evidence whatever verdict ended the turn, so
-    // a child ending beside it is not a restored-only boundary and the row stays confirmed.
+    // A live shell confirms inventory regardless of lead verdict; a sibling’s end cannot make it restored-only.
     const ended = normalizeHookPayload(
       state,
       'claude',

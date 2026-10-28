@@ -8,6 +8,7 @@ export type LocalWatcherInstallToken = {
   abortController: AbortController
 }
 
+// 'capacity': retry scheduled, not unwatchable (watcher capacity, or a stopped WSL distro).
 export type LocalWatcherInstallResult = 'installed' | 'unavailable' | 'capacity' | 'cancelled'
 
 export type LocalWatcherCapacityRetry = {

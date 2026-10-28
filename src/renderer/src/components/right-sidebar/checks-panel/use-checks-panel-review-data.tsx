@@ -48,7 +48,6 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
     setCommentsError,
     setCommentsLoading
   } = model
-  // Fetch comments once when PR changes (no polling — comments change infrequently).
   const fetchComments = useCallback(
     async ({
       force = false,
@@ -153,7 +152,7 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
     [fetchPRCheckDetails, pr?.prRepo, repo, activeWorktree, gitLabProjectRefRef]
   )
 
-  // Why: read at call time — the ref is filled by an async MR fetch, so a value prop would be stale.
+  // Read the ref at call time because async MR fetches can fill it after render.
   const getGitLabProjectRef = useCallback(() => gitLabProjectRefRef.current, [gitLabProjectRefRef])
   // Why: `fetchPRComments` serves a five-minute renderer cache, so re-reading the payload after the
   // PR's review state moved has to ask for fresh data — otherwise an approval that lands while the

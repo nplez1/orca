@@ -1,4 +1,5 @@
 import type { RuntimeStatus } from '../../../shared/runtime-types'
+import type { RuntimeCapability } from '../../../shared/protocol-version'
 import { isRuntimeStatusCompatible } from './runtime-protocol-compat'
 
 const RUNTIME_COMPATIBILITY_CACHE_MAX = 32
@@ -13,12 +14,31 @@ export type RuntimeCompatibilityCacheEntry = {
   provenCompatible: boolean
   status: RuntimeStatus | null
   statusCheckedAt: number | null
+  // Why: statusCheckedAt is cleared after a negative verdict to force async re-probes; the sync
+  // peek keeps answering from this so many mounts on an old host do not each fire status.get.
+  statusObservedAt: number | null
 }
 
 export const runtimeCompatibilityChecks = new Map<string, RuntimeCompatibilityCacheEntry>()
 const workspacePathSearchCapabilityInvalidationListeners = new Set<
   (environmentId: string | null) => void
 >()
+
+/** A pending probe by default; an observed status is proof of itself. */
+export function compatibilityEntry(
+  status: RuntimeStatus | null = null,
+  provenCompatible = status !== null
+): RuntimeCompatibilityCacheEntry {
+  const statusCheckedAt = status ? Date.now() : null
+  return {
+    check: Promise.resolve(),
+    failedAt: null,
+    provenCompatible,
+    status,
+    statusCheckedAt,
+    statusObservedAt: statusCheckedAt
+  }
+}
 
 export function getCachedRuntimeCompatibilityCheck(
   environmentId: string,
@@ -109,13 +129,7 @@ export function clearRecentRuntimeCompatibilityFailure(
     // probe never records it; the published answer is the proof synchronous readers need.
     const answersPendingProbe = cached.failedAt === null && !cached.provenCompatible
     if (observedStatus && answersPendingProbe && isRuntimeStatusCompatible(observedStatus)) {
-      rememberRuntimeEnvironmentCompatibility(trimmed, {
-        check: Promise.resolve(),
-        failedAt: null,
-        provenCompatible: true,
-        status: observedStatus,
-        statusCheckedAt: Date.now()
-      })
+      rememberRuntimeEnvironmentCompatibility(trimmed, compatibilityEntry(observedStatus))
     }
   }
 }
@@ -137,13 +151,28 @@ export function markRuntimeEnvironmentCompatible(environmentId: string): void {
     return
   }
   notifyWorkspacePathSearchCapabilityInvalidation(trimmed)
-  rememberRuntimeEnvironmentCompatibility(trimmed, {
-    check: Promise.resolve(),
-    failedAt: null,
-    provenCompatible: true,
-    status: null,
-    statusCheckedAt: null
-  })
+  rememberRuntimeEnvironmentCompatibility(trimmed, compatibilityEntry(null, true))
+}
+
+/**
+ * Synchronous capability verdict from an already-cached status, positive or negative, within the
+ * capability TTL; `undefined` when no fresh status is cached. Never issues a request.
+ */
+export function peekRuntimeEnvironmentCapability(
+  environmentId: string,
+  capability: RuntimeCapability
+): boolean | undefined {
+  const cached = runtimeCompatibilityChecks.get(environmentId.trim())
+  if (
+    !cached ||
+    cached.failedAt !== null ||
+    !cached.status ||
+    cached.statusObservedAt === null ||
+    Date.now() - cached.statusObservedAt >= RUNTIME_CAPABILITY_STATUS_TTL_MS
+  ) {
+    return undefined
+  }
+  return cached.status.capabilities?.includes(capability) === true
 }
 
 export function getCachedRuntimeEnvironmentStatus(environmentId: string): RuntimeStatus | null {

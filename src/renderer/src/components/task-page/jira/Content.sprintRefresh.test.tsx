@@ -11,7 +11,7 @@ import type { JiraBoardIssuePageRequest, JiraIssue } from '../../../../../shared
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
-import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
+import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import { clearTaskPageJiraBoardCache } from '../../task-page-jira-board-cache'
 import { TaskPageJiraContent } from './Content'
 

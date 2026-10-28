@@ -146,7 +146,7 @@ export function renderTabBarSurface({
           </TooltipContent>
         </Tooltip>
       ) : null}
-      {/* Why: no strategy stops dnd-kit animating siblings, so tabs stay anchored during drag; only the insertion bar moves. */}
+      {/* Keep drag siblings anchored; only the insertion bar moves. */}
       <SortableContext items={sortableIds}>
         {/* Why: no-drag lets tab interactions work inside the titlebar's drag region (outer container stays window-draggable). */}
         <div

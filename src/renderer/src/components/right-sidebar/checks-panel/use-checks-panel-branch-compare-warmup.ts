@@ -6,7 +6,7 @@ import { getWorktreeGitOwnerTarget } from '../worktree-git-owner-target'
 import {
   resolveSourceControlBaseRef,
   resolveSourceControlCompareBaseRef
-} from '../source-control/sync/base-ref-resolution'
+} from '../../../../../shared/source-control-base-ref-resolution'
 
 /**
  * Keeps the worktree's branch compare warm while the Checks pane is showing.

@@ -5,7 +5,7 @@ import { splitJiraFieldDraft, joinJiraFieldDraft } from '../../../shared/jira-fi
 import {
   findJiraCreateAllowedValue,
   getJiraCreateAllowedValueLabel
-} from '@/components/task-page-jira-create-fields'
+} from '@/components/task-page/jira/task-page-jira-create-fields'
 import { Button } from '@/components/ui/button'
 import {
   Command,

@@ -254,8 +254,7 @@ describe('computeVisibleWorktreeIds', () => {
   })
 
   it('keeps workspaces without CLI provenance visible when the CLI filter is enabled', () => {
-    // Why: workspaces persisted before cliProvenance existed have no marker and
-    // must never be filtered as CLI-created.
+    // Legacy rows without provenance must remain visible.
     const legacy = makeWorktree('legacy')
 
     const result = computeVisibleWorktreeIds(
@@ -294,8 +293,7 @@ describe('computeVisibleWorktreeIds', () => {
   })
 
   it('keeps headless workspaces visible when the detached filter is enabled', () => {
-    // Why: folder workspaces and SSH-synthesized rows carry an empty branch AND
-    // an empty head. Only a real head means a genuine detached checkout.
+    // Folder and SSH-synthesized rows have neither branch nor head; only a head proves detachment.
     const folder = { ...makeWorktree('folder'), branch: '', head: '', isMainWorktree: true }
 
     const result = computeVisibleWorktreeIds(
@@ -359,7 +357,6 @@ describe('computeVisibleWorktreeIds', () => {
       [wt.id],
       visibleOptions({
         showSleepingWorkspaces: false,
-        // No live PTY for the tab, but the agent session is live.
         tabsByWorktree: { [wt.id]: [makeTab('tab-agent', wt.id, null)] },
         ptyIdsByTabId: { 'tab-agent': [] },
         worktreeIdsWithLiveAgent: new Set([wt.id])
@@ -588,9 +585,6 @@ describe('computeVisibleWorktreeIds', () => {
     main.isMainWorktree = true
     const feature = makeWorktree('feature')
 
-    // Why: verifies filter ordering — the default-branch hide runs before
-    // sleeping visibility, so the hidden main does not slip back in while the
-    // feature survives because it has a live PTY.
     const result = computeVisibleWorktreeIds(
       { repo1: [main, feature] },
       [main.id, feature.id],
@@ -613,11 +607,6 @@ describe('computeVisibleWorktreeIds', () => {
     main2.isMainWorktree = true
     const feature2 = makeWorktree('feature2', 'repo2')
 
-    // Why: the filterRepoIds=['repo1'] already drops everything in repo2, so
-    // to actually prove the hide filter is scoped to the selected repos we
-    // need to flip the situation — select repo2 instead. Only main2 should be
-    // dropped by hide; main1 survives because the repo filter has already
-    // removed it from consideration.
     const result = computeVisibleWorktreeIds(
       { repo1: [main1, feature1], repo2: [main2, feature2] },
       [main1.id, feature1.id, main2.id, feature2.id],
@@ -650,8 +639,6 @@ describe('computeVisibleWorktreeIds', () => {
   })
 
   it('gives a sleeping-exempt main its cached-sort slot, not a position at the end', () => {
-    // #8873: the exempted main enters `all` and is sorted with everyone else,
-    // so Cmd+1-9 numbers it where the sidebar actually renders it.
     const awakeA = makeWorktree('awake-a')
     const main = { ...makeWorktree('main'), isMainWorktree: true }
     const awakeB = makeWorktree('awake-b')
@@ -685,8 +672,6 @@ describe('computeVisibleWorktreeIds', () => {
   })
 
   it('leaves lineage ordering untouched when the exempted main is also a parent', () => {
-    // The parent used to arrive via addVisibleLineageAncestors and now arrives
-    // on its own; either way it must render immediately above its child.
     const parent = { ...makeWorktree('parent'), isMainWorktree: true }
     const child = makeWorktree('child')
     const sibling = makeWorktree('sibling')

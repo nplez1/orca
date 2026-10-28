@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -67,6 +68,30 @@ describe('fork-only steps run from the gate, not from package.json', () => {
     expect(() =>
       resolveGateSteps({ lint: 'oxlint' }, [forkStep], join(REPO_ROOT, 'no-such-root'))
     ).toThrow(/check-thing/)
+  })
+})
+
+describe('the consolidated run-lint runner is expanded, not collapsed', () => {
+  it('runs the steps run-lint.mjs runs, not one opaque step', () => {
+    const { scripts } = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
+    const ids = resolveGateSteps(scripts).map((step) => step.id)
+    expect(ids).not.toContain('run-lint')
+    expect(ids).toEqual(expect.arrayContaining(['oxlint', 'check:import-boundaries']))
+  })
+
+  // Why: collapsing to one step is the failure this guards — it passes green while attributing
+  // nothing, so a reworded runner has to throw rather than quietly merge 36 steps into one.
+  it('refuses a runner it cannot read steps out of', () => {
+    const root = mkdtempSync(join(tmpdir(), 'lint-gate-runner-'))
+    mkdirSync(join(root, 'config', 'scripts'), { recursive: true })
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ scripts: { lint: 'node config/scripts/run-lint.mjs' } })
+    )
+    writeFileSync(join(root, 'config', 'scripts', 'run-lint.mjs'), 'export const OTHER = []\n')
+    expect(() => resolveGateSteps({ lint: 'node config/scripts/run-lint.mjs' }, [], root)).toThrow(
+      /LINT_STEPS/
+    )
   })
 })
 

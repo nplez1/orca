@@ -106,7 +106,7 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
     const refreshOnResume = (): void => {
       void this.refreshIfWindowActive()
     }
-    // Why: attach() can replace windows; remove the previous closed listener too, not only the focus listeners.
+    // Replacing windows must also detach the old closed listener.
     const detachWindowListeners = (): void => {
       mainWindow.removeListener('focus', refreshOnResume)
       mainWindow.removeListener('show', refreshOnResume)

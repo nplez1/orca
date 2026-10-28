@@ -19,8 +19,6 @@ export function worktreeCreateRepoSelector(
   return hostQualifiedRepoSelector(params.repo, params.repoHostId)
 }
 
-/** Wire params → runtime create args. Kept out of the method table so the mapping can grow with
- *  the schema without the table becoming unreadable. */
 export function buildManagedWorktreeCreateArgs(
   params: WorktreeCreateParams,
   provenance: CreateProvenance,
@@ -39,6 +37,7 @@ export function buildManagedWorktreeCreateArgs(
     compareBaseRef: params.compareBaseRef,
     branchNameOverride: params.branchNameOverride,
     ...(params.exactBranchName === true ? { exactBranchName: true } : {}),
+    ...(params.branchIntent ? { branchIntent: params.branchIntent } : {}),
     linkedIssue: params.linkedIssue,
     linkedPR: params.linkedPR,
     linkedLinearIssue: params.linkedLinearIssue,
@@ -89,8 +88,7 @@ export function buildManagedWorktreeCreateArgs(
     ...(params.setupOnly !== undefined ? { setupOnly: params.setupOnly } : {}),
     createdWithAgent: params.createdWithAgent ?? params.startupAgent,
     ...provenance,
-    // Why: a person initiated this create (the phone, CLI text and agent.launch don't surface the
-    // fallback yet); an automation run has no one watching, so it keeps the network error.
+    // Only user-visible creates offer offline fallback; automation retains the network error.
     ...(provenance.automationProvenance ? {} : { allowLocalBaseFallback: true }),
     startup: params.startupCommand
       ? {

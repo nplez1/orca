@@ -5,7 +5,7 @@ import { formatBuildDuration } from '@/components/check-build-metadata'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { PRCheckJob, PRCheckStep } from '../../../../shared/github/check-types'
-import { resolveStepOutcome } from './check-job-step-status'
+import { resolveStepOutcome } from '../../../../shared/pr-check-step-status'
 
 /** Elapsed time for a settled step, or null while it is still running. */
 function stepDurationMs(step: PRCheckStep): number | null {

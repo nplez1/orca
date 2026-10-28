@@ -48,7 +48,6 @@ function createCoordinator() {
   return { coordinator, dispatchCompletion, dispatchHookLifecycle }
 }
 
-/** Meta the coordinator hands the notification dispatcher. */
 function completionMeta(dispatchCompletion: ReturnType<typeof vi.fn>) {
   return dispatchCompletion.mock.calls[0]?.[1] as
     | { source?: string; agentStatus?: { state?: string; workingMode?: string } }
@@ -79,8 +78,7 @@ describe('completion notification when a lead turn ends into background work', (
     expect(dispatchCompletion).toHaveBeenCalledTimes(1)
     const meta = completionMeta(dispatchCompletion)
     expect(meta?.source).toBe('hook')
-    // Why: the announcement is a synthesized `done` while the reported row stays `working` —
-    // the notification follows the TURN boundary, not the rendered state.
+    // Announce the turn boundary as done while the stored row remains working.
     expect(meta?.agentStatus?.state).toBe('done')
     // Why: announce only. Running pane lifecycle here would settle a pane that is still working.
     expect(dispatchHookLifecycle).not.toHaveBeenCalledWith(

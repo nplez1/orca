@@ -228,6 +228,7 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   nativeChatInlineVisuals: 'replicated',
   nativeChatSessionOptions: 'replicated',
   nativeChatPermissionMode: 'replicated',
+  claudeSubagentNavigationEnabled: 'replicated',
   rightSidebarOpenByDefault: 'replicated',
   followSymlinkedDirectories: 'replicated',
   showGitIgnoredFiles: 'replicated',
@@ -242,6 +243,8 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   agentSkillSharingEnabled: 'replicated',
   nestedWorkerMaxDepth: 'replicated',
   orchestrationChatErrorEscalationEnabled: 'replicated',
+  orchestrationHeartbeatsEnabled: 'replicated',
+  orchestrationHeartbeatIntervalMinutes: 'replicated',
   showArtifactsButton: 'replicated',
   showSkillsButton: 'replicated',
   showMobileButton: 'replicated',
@@ -329,6 +332,7 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   experimentalAgentDashboardPopout: 'replicated',
   // Why replicated: a feature flag the user turned on, like the other experimental keys.
   experimentalConnectors: 'replicated',
+  experimentalBrowserExtensions: 'replicated',
   experimentalAgentDashboardShowIdle: 'replicated',
   experimentalAgentDashboardCardClickAction: 'replicated',
   experimentalTerminalAttention: 'replicated',
@@ -359,8 +363,6 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   // Why hostLocal: a `…MigrationApplied` marker — copying it would suppress the host's own run.
   uiLanguagePortugueseMigrationApplied: 'hostLocal',
   claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal',
-  // Why replicated, like `nativeChatPermissionMode`: a per-agent chat preference the user chose.
-  agentNativeChatPermissionModes: 'replicated',
   // Why hostLocal, like `httpProxyUrl`: which mirror of nodejs.org this network can reach.
   nodeDistMirrorUrl: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>

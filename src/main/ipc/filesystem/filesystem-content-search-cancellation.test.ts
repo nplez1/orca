@@ -44,7 +44,7 @@ vi.mock('../../wsl', () => ({
   toWindowsWslPath: toWindowsWslPathMock
 }))
 
-vi.mock('../filesystem-auth', () => ({
+vi.mock('./filesystem-auth', () => ({
   authorizeExternalPath: vi.fn(async (value: string) => value),
   resolveAuthorizedPath: resolveAuthorizedPathMock
 }))
@@ -54,7 +54,7 @@ vi.mock('../local-file-access-resolution', () => ({
   resolveLocalFileRequestPath: resolveAuthorizedPathMock
 }))
 
-vi.mock('../filesystem-path-containment', () => ({
+vi.mock('./filesystem-path-containment', () => ({
   isENOENT: vi.fn(() => false),
   validateGitRelativeFilePath: vi.fn((value: string) => value)
 }))
@@ -63,7 +63,7 @@ vi.mock('../registered-worktree-roots-cache', () => ({
   resolveRegisteredWorktreePath: vi.fn(async (value: string) => value)
 }))
 
-vi.mock('../filesystem-list-files', () => ({
+vi.mock('./filesystem-list-files', () => ({
   listQuickOpenFiles: vi.fn()
 }))
 
@@ -126,16 +126,36 @@ describe('content search cancellation', () => {
         authorize = resolve
       })
     )
+    const child = createMockProcess()
+    wslAwareSpawnMock.mockReturnValueOnce(child)
+    const untouched = handlers.get('fs:search')!(
+      { sender },
+      { rootPath: '/repo', query: 'needle', requestToken: 'owned' }
+    )
+    const success = expect(untouched).resolves.toMatchObject({ totalMatches: 0 })
+    handlers.get('fs:cancelSearch')!({ sender: otherSender }, { requestToken: 'owned' })
+    authorize?.('/repo')
+    await flushMicrotasks()
+    expect(wslAwareSpawnMock).toHaveBeenCalledOnce()
+    child.emit('close', 1, null)
+    await success
+    expect(child.kill).not.toHaveBeenCalled()
+    expect(sender.eventNames()).toHaveLength(0)
+
+    resolveAuthorizedPathMock.mockReturnValue(
+      new Promise<string>((resolve) => {
+        authorize = resolve
+      })
+    )
     const pending = handlers.get('fs:search')!(
       { sender },
       { rootPath: '/repo', query: 'needle', requestToken: 'owned' }
     )
     const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
-    handlers.get('fs:cancelSearch')!({ sender: otherSender }, { requestToken: 'owned' })
     handlers.get('fs:cancelSearch')!({ sender }, { requestToken: 'owned' })
     authorize?.('/repo')
     await rejection
-    expect(wslAwareSpawnMock).not.toHaveBeenCalled()
+    expect(wslAwareSpawnMock).toHaveBeenCalledOnce()
     expect(sender.eventNames()).toHaveLength(0)
   })
 
@@ -265,20 +285,12 @@ describe('content search cancellation', () => {
     const live = () =>
       children.filter((child) => child.exitCode === null && child.signalCode === null).length
     const before = live()
-    const started = performance.now()
     try {
       for (let index = 0; index < 6; index++) {
         handlers.get('fs:cancelSearch')?.({ sender }, { requestToken: `real-${index}` })
       }
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await Promise.all(exits)
       const after = live()
-      console.info(
-        JSON.stringify({
-          processCountBeforeClear: before,
-          processCountAfterClear: after,
-          observedAfterMs: Math.round(performance.now() - started)
-        })
-      )
       expect(before).toBe(6)
       expect(after).toBe(0)
     } finally {

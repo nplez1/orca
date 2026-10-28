@@ -69,7 +69,7 @@ function GHEditSectionItem({
     useShallow((s) => getGitHubRepoRoutingTarget(s, item.repoId ?? null, sourceContext))
   )
   const { isPending, run } = useImmediateMutation()
-  // Why: from a Project view, keep projectViewCache in sync too — patchWorkItem only walks workItemsCache, so the table would render stale without this. See docs/design/github-project-view-tasks.md §Dialog editing from Project rows.
+  // Patch Project rows too; patchWorkItem updates only workItemsCache, leaving projectViewCache stale.
   const patchProjectRowIfNeeded = useCallback(
     (patch: Parameters<typeof patchProjectRowContent>[2]) => {
       if (!projectOrigin) {
@@ -85,7 +85,6 @@ function GHEditSectionItem({
     () => ({ target: ownerTarget, ownerRepo: issueRepo }),
     [ownerTarget, issueRepo]
   )
-  // Project metadata comes from the row repository.
   const slugOwner = projectOrigin?.owner ?? null
   const slugRepo = projectOrigin?.repo ?? null
   const repoLabelsByPath = useRepoLabels(
@@ -151,7 +150,7 @@ function GHEditSectionItem({
     onUse(item)
   }, [item, onOpenOrUse, onUse])
 
-  // Why: sync local assignees on item change / detail resolve, but skip if the user made an optimistic edit so we don't clobber in-flight changes.
+  // Sync resolved assignees unless an optimistic edit for this item is still in flight.
   useEffect(() => {
     if (editedAssigneesItemKeyRef.current === assigneesItemKey) {
       return

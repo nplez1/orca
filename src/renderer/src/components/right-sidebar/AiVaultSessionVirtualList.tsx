@@ -165,8 +165,7 @@ export function AiVaultSessionVirtualList({
     overscan: VAULT_ROW_OVERSCAN,
     // Why: the pinned group header covers the list's top, so a row scrolled into view stops below it.
     scrollPaddingStart: stickyHeaderIndexes.length > 0 ? VAULT_GROUP_HEADER_ROW_HEIGHT : 0,
-    // Why: keep the active group header mounted so CSS sticky can pin it while
-    // its sessions scroll underneath in the virtual list.
+    // Keep the active group header mounted so CSS sticky survives row virtualization.
     rangeExtractor: useCallback(
       (range) => {
         stickyRangeStartIndexRef.current = range.startIndex

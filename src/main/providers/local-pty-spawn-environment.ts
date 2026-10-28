@@ -30,11 +30,11 @@ export function buildLocalPtySpawnEnvironment(args: {
   const { id, spawn, getOptions, plan } = args
   const spawnEnv = buildInheritedLocalPtyEnvironment(spawn.env, spawn.envToDelete)
 
-  // Why: on Windows LANG doesn't set the console code page; PYTHONUTF8=1 forces Python UTF-8 stdio to avoid garbled CJK.
+  // Windows LANG cannot set Python console encoding; PYTHONUTF8 prevents garbled CJK stdio.
   if (process.platform === 'win32') {
     spawnEnv.PYTHONUTF8 ??= '1'
     if (isWindowsGitBashShellPath(plan.shellPath)) {
-      // Why: Git for Windows login files otherwise cd to $HOME, ignoring node-pty's cwd for repo-scoped terminals.
+      // Git login files otherwise cd to HOME instead of the requested terminal cwd.
       spawnEnv.CHERE_INVOKING ??= '1'
     }
   }
@@ -54,7 +54,6 @@ export function buildLocalPtySpawnEnvironment(args: {
   })
 }
 
-/** What any local PTY inherits from Orca: its terminal identity, minus build and pane leftovers. */
 export function buildInheritedLocalPtyEnvironment(
   explicitEnv: Record<string, string> | undefined,
   envToDelete: readonly string[] = []
@@ -66,9 +65,9 @@ export function buildInheritedLocalPtyEnvironment(
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
     TERM_PROGRAM: 'Orca',
-    // Why: TUIs feature-gate on TERM_PROGRAM_VERSION; the fallback keeps tests and non-Electron runs working.
+    // TUIs gate features on version; plain-node/test launches lack the app version.
     TERM_PROGRAM_VERSION: process.env.ORCA_APP_VERSION ?? '0.0.0-dev',
-    // Why: supports-hyperlinks rejects TERM_PROGRAM=Orca, so tools drop OSC 8 links; force it since xterm.js parses them.
+    // supports-hyperlinks rejects Orca by name despite xterm supporting OSC 8; force support.
     FORCE_HYPERLINK: '1',
     // Why: pi needs this to copy over OSC 52 for a paired client (see pi-clipboard-osc52-env).
     [PI_CLIPBOARD_OSC52_ENV]: PI_CLIPBOARD_OSC52_VALUE,
@@ -85,7 +84,7 @@ export function buildInheritedLocalPtyEnvironment(
   if (explicitEnv?.TERM) {
     spawnEnv.TERM = explicitEnv.TERM
   }
-  // Why after the strips and deletes: an alias must never outlive the value it mirrors.
+  // Create aliases after stripping/deletion so none outlives its source value.
   applyScrubSafeAgentEnvAliases(spawnEnv)
 
   spawnEnv.LANG ??= 'en_US.UTF-8'

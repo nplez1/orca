@@ -27,7 +27,6 @@ import {
   type JiraIssueFieldOutcome
 } from './jira-issue-edit-fields-dialog'
 
-/** Header row for an open Jira issue: key, summary, and workspace actions. */
 export function JiraIssueWorkspaceHeader({
   attachedWorkspaceLabel,
   displayed,
@@ -94,7 +93,6 @@ export function JiraIssueWorkspaceHeader({
   )
 }
 
-/** Status, assignee, and priority controls shown above an open Jira issue. */
 export function JiraIssueMetadataBar({
   displayed,
   pendingField,

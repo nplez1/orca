@@ -9,7 +9,7 @@ import {
   type HostedReviewMergeMarker,
   type HostedReviewMergeReadinessInput
 } from '@/components/hosted-review-merge-readiness'
-import { getChecksPillTone, getChecksLabel } from '@/components/task-page-checks-pill'
+import { getChecksPillTone, getChecksLabel } from '../task-page-checks-pill'
 
 // Why the marker's tone is not the pill's tone: the pill's colour reports CI, so painting
 // "merge blocked" in it would put two meanings back into one signal. Same reason the reason

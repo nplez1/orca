@@ -11,6 +11,7 @@ import { getAutomationRunContent } from './automation-run-content'
 import type { AutomationRunViewState } from './automation-run-view-state'
 import type { AutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
 import {
+  AutomationRunErrorNotice,
   formatAutomationDateTimeWithRelative,
   getAutomationRunStatusLabel,
   getAutomationRunStatusVariant
@@ -39,6 +40,7 @@ export function AutomationRunDetailsPage({
   onOpenWorkspace: () => void
   onBack: () => void
 }): React.JSX.Element {
+  const content = getAutomationRunContent(run)
   return (
     <section className="flex min-h-0 flex-1 p-5">
       <AutomationRunPageFrame
@@ -84,9 +86,17 @@ export function AutomationRunDetailsPage({
         }
         onBack={onBack}
       >
+        {/* Why: saved terminal output otherwise hides why the run failed. */}
+        {run.status === 'dispatch_failed' && run.error && content !== run.error ? (
+          <AutomationRunErrorNotice
+            className="mb-4"
+            label={translate('auto.components.automations.AutomationsPage.runError', 'Error:')}
+            error={run.error}
+          />
+        ) : null}
         <CommentMarkdown
           variant="document"
-          content={getAutomationRunContent(run)}
+          content={content}
           className="text-sm leading-relaxed text-foreground"
         />
       </AutomationRunPageFrame>

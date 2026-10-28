@@ -13,7 +13,6 @@ export type HarnessStoreState = {
   [key: string]: unknown
 }
 
-/** Store surface useIpcEvents touches at mount plus the terminal-reveal path. */
 export function createHarnessStoreState(
   overrides: Partial<HarnessStoreState> & Pick<HarnessStoreState, 'tabsByWorktree'>
 ): HarnessStoreState {
@@ -39,6 +38,7 @@ export function createHarnessStoreState(
     setUpdateStatus: vi.fn(),
     fetchRepos: vi.fn(),
     fetchWorktrees: vi.fn(),
+    fetchHostWorkspaceStatuses: vi.fn(),
     closeModal: vi.fn(),
     openModal: vi.fn(),
     setActiveRepo: vi.fn(),

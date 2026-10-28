@@ -8,7 +8,7 @@ import { getFocusedAgentPaneKeyForWorktree } from '@/components/sidebar/focused-
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { SleepingAgentSessionRecord } from '../../../../shared/agent-session-resume'
-import type { RetainedAgentEntry } from '@/store/slices/agent-status-contract'
+import type { RetainedAgentEntry } from '@/store/slices/agent-status/agent-status-contract'
 
 /** Exactly what resolving the pane's subject reads, so tests can build a partial state. */
 export type SessionSummarySubjectState = Pick<

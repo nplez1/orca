@@ -1,4 +1,4 @@
-import type { TaskPageComposerActionsModel } from './use-task-page-composer-actions'
+import type { TaskPageComposerActionsModel } from './task-page/use-task-page-composer-actions'
 
 export type TaskPageJiraBoardModel = Pick<
   TaskPageComposerActionsModel,

@@ -13,6 +13,8 @@ import {
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
 import { isRuntimeHostContactRevoked } from '../shared/runtime-host-status'
 import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm/runtime-environment-release'
+import { clearRuntimeEnvironmentCapabilityEvidence } from './ipc/runtime-environments/runtime-environment-capability-evidence'
+import { clearRuntimeEnvironmentManualDisconnect } from './ipc/runtime-environments/runtime-environment-manual-disconnect'
 import { withEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
 import { removeRuntimeOwnedSshTarget } from './ephemeral-vm/runtime-ssh'
 import { removeEphemeralVmRuntimeSshTarget } from './ephemeral-vm/runtime-ssh-cleanup'
@@ -203,7 +205,17 @@ export class EphemeralVmRuntimeReclaimer {
 
   private async releaseHostRegistrations(runtime: EphemeralVmRuntimeRecord): Promise<void> {
     try {
-      await releaseEphemeralVmRuntimeEnvironments(this.context.userDataPath, runtime)
+      await releaseEphemeralVmRuntimeEnvironments(
+        this.context.userDataPath,
+        runtime,
+        // Why partial: this sweep holds no settings store, so the partition/listing retirement of a
+        // Settings removal is out of reach here; the capability evidence and the stale manual
+        // disconnect are the parts that would otherwise advertise a host the provider destroyed.
+        (environmentId) => {
+          clearRuntimeEnvironmentCapabilityEvidence(environmentId)
+          clearRuntimeEnvironmentManualDisconnect(environmentId)
+        }
+      )
     } catch (error) {
       console.warn(
         `[ephemeral-vm] Could not release the reclaimed host's servers: ${errorMessage(error)}`

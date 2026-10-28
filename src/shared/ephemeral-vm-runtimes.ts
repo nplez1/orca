@@ -68,8 +68,7 @@ export type EphemeralVmContextMenuItem = z.infer<typeof EphemeralVmContextMenuIt
 export const EphemeralVmRuntimeRecordSchema = z.object({
   id: z.string().min(1),
   recipeId: z.string().min(1),
-  /** Immutable lifecycle commands used for this runtime even if its source
-   * pack is updated, disabled, or removed later. */
+  /** Snapshot lifecycle commands so later pack updates/disabling/removal cannot change an existing runtime’s cleanup. */
   recipe: EphemeralVmRuntimeRecipeSchema.optional(),
   /**
    * The provider's lease-extension verb, snapshotted with the lifecycle commands so that a later

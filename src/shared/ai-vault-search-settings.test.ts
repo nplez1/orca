@@ -59,8 +59,7 @@ it('normalizes a history bound and drops anything that is not one', () => {
   ).toEqual({ contentEnabled: true, historyDays: 3_650 })
 })
 
-// There is no `paused`: the indexer is immutable, so a pause would be a second
-// lifetime for one object's store, queue and sweep flag.
+// No paused lifecycle: immutable indexers would otherwise need a second store/queue/sweep lifetime.
 it('keeps only the two fields the indexer is constructed from', () => {
   expect(
     resolveAiVaultSearchSettings({

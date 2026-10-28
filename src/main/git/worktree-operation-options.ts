@@ -47,7 +47,7 @@ export type RemoveWorktreeOptions = GitWorktreeExecOptions & {
   forceBranchDelete?: boolean
   /** Opt-in `git push --delete` for the branch's upstream. Off unless the user asked for it. */
   deleteRemoteBranch?: boolean
-  knownRemovedWorktree?: Pick<GitWorktreeInfo, 'branch' | 'head' | 'locked' | 'lockReason'>
+  knownRemovedWorktree?: Pick<GitWorktreeInfo, 'branch' | 'head' | 'locked' | 'lockReason'> | null
   /** Stops only `git worktree remove`; a killed branch cleanup could strand a ref lock. */
   checkoutDeleteSignal?: AbortSignal
 }

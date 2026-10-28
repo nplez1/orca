@@ -10,7 +10,7 @@ import type { Worktree } from '../../../../../shared/worktree/types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
-import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
+import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 
 // Why: this pins the seam the helper tests cannot see — which handler Content wires
 // the list and the sheet to. A revert to the composer-opening handler would keep every

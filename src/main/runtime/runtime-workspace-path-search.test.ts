@@ -4,12 +4,12 @@ const { searchQuickOpenFilePathsMock } = vi.hoisted(() => ({
   searchQuickOpenFilePathsMock: vi.fn()
 }))
 
-vi.mock('../ipc/filesystem-search-file-paths', async (importOriginal) => ({
+vi.mock('../ipc/filesystem/filesystem-search-file-paths', async (importOriginal) => ({
   ...(await importOriginal<typeof FilesystemPathSearchModule>()),
   searchQuickOpenFilePaths: searchQuickOpenFilePathsMock
 }))
 import type { WorkspacePathSearchScopeDescriptor } from '../../shared/workspace-path-search-contract'
-import type * as FilesystemPathSearchModule from '../ipc/filesystem-search-file-paths'
+import type * as FilesystemPathSearchModule from '../ipc/filesystem/filesystem-search-file-paths'
 import {
   createRuntimeFileCommands,
   useRuntimeFileCommandsLifecycle

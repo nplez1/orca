@@ -4,6 +4,7 @@ import {
   checkDetailsRowKey,
   type CheckDetailsRowState
 } from '@/components/github/check-details-cache'
+import { getCheckConclusion } from '../../../../../shared/pr-check-status-label'
 
 export type CheckDetailsLoadState = {
   requestId?: number
@@ -28,49 +29,11 @@ export function getCheckDetailsKey(
   return `${contextKey}::${checkDetailsRowKey(check, index)}`
 }
 
-export function getCheckConclusion(check: PRCheckDetail): NonNullable<PRCheckDetail['conclusion']> {
-  return check.conclusion ?? 'pending'
-}
-
 export function isFailedCheck(check: PRCheckDetail): boolean {
-  // Why: action_required blocks merge just like a failure, so it must count as
-  // not-passing — otherwise the summary reads "all checks passing" while
-  // auto-merge stays blocked.
+  // action_required blocks merge; counting it as passing would contradict auto-merge readiness.
   return ['failure', 'cancelled', 'timed_out', 'action_required'].includes(
     getCheckConclusion(check)
   )
-}
-
-export function getCheckStatusLabel(check: PRCheckDetail): string {
-  const conclusion = getCheckConclusion(check)
-  if (conclusion === 'success') {
-    return 'Successful'
-  }
-  if (conclusion === 'failure') {
-    return 'Failed'
-  }
-  if (conclusion === 'cancelled') {
-    return 'Cancelled'
-  }
-  if (conclusion === 'timed_out') {
-    return 'Timed out'
-  }
-  if (conclusion === 'action_required') {
-    return 'Action required'
-  }
-  if (conclusion === 'neutral') {
-    return 'Neutral'
-  }
-  if (conclusion === 'skipped') {
-    return 'Skipped'
-  }
-  if (check.status === 'queued') {
-    return 'Queued'
-  }
-  if (check.status === 'in_progress') {
-    return 'In progress'
-  }
-  return 'Pending'
 }
 
 export function formatCheckTimestamp(input: string | null | undefined): string | null {

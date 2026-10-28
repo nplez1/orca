@@ -1,8 +1,6 @@
 export function getPiAgentStatusWslCurlSourceLines(): string[] {
   return [
-    '// Why: WSL-ness and curl.exe presence cannot change within a process',
-    '// lifetime; re-probing /proc and /mnt/c on every failed event would add',
-    '// filesystem work to the per-event path.',
+    '// WSL identity and host curl availability are process-constant; avoid repeated filesystem probes on failed delivery.',
     'let cachedIsWslRuntime: boolean | null = null',
     'let cachedWindowsCurlPath: string | null | undefined',
     '',
@@ -21,7 +19,6 @@ export function getPiAgentStatusWslCurlSourceLines(): string[] {
     "        const contents = String(fs.readFileSync(path, 'utf8'))",
     '        if (/microsoft|wsl/i.test(contents)) return true',
     '      } catch {',
-    '        // Why: probe the next runtime hint when a proc file is absent or unreadable.',
     '      }',
     '    }',
     '  } catch {',
@@ -42,7 +39,7 @@ export function getPiAgentStatusWslCurlSourceLines(): string[] {
     '  return cachedWindowsCurlPath',
     '}',
     '',
-    '// Why: WSL loopback is not the Windows loopback, so use curl.exe on the host.',
+    '// Guest loopback may not reach Windows Orca; retry through host curl.exe.',
     'let lastDeliveredWindowsCurl = null',
     '',
     'async function postViaWindowsCurl(body: string, ompRuntime: boolean, coords): Promise<void> {',

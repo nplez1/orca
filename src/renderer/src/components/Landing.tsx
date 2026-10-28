@@ -38,16 +38,13 @@ function PreflightBanner({
   issues: PreflightIssue[]
   repos: readonly Repo[]
 }): React.JSX.Element | null {
-  // Why: keying the seed on the current GitHub project set means adding a new
-  // GitHub project (which changes the key) re-evaluates dismissals, so a lapsed
-  // dismissal re-surfaces the nudge without a manual reset.
+  // Recheck dismissals when the GitHub project set changes so expired nudges can reappear.
   const githubKey = githubProjectKeys(repos).join('|')
   const [dismissed, setDismissed] = useState<Set<string>>(() =>
     dismissedPreflightIssueIds(issues, repos)
   )
 
-  // Why an event: re-seed only when the GitHub project set changes; issues identity is
-  // stable per render and would otherwise reset transient dismiss state.
+  // Reseed only when GitHub projects change; issues identity is stable and would reset transient dismissals each render.
   const reseedDismissed = useEffectEvent(() =>
     setDismissed(dismissedPreflightIssueIds(issues, repos))
   )
@@ -66,10 +63,7 @@ function PreflightBanner({
   }
 
   return (
-    // Why: cap width below the max-w-lg column so the card reads as part of the
-    // centered content stack instead of stretching edge-to-edge. The styleguide
-    // reserves color for true error state — these are soft setup nudges, so use
-    // the quiet muted/border surface, not an amber frame.
+    // Keep setup nudges narrow and muted; the styleguide reserves warning/error framing for actual problems.
     <div className="w-full max-w-sm space-y-1.5 rounded-lg border border-border bg-muted/40 p-3">
       {visibleIssues.map((issue) => (
         <div
@@ -113,7 +107,7 @@ export default function Landing(): React.JSX.Element {
   const hasGitHubProject = useMemo(() => hasGitHubBackedProject(repos), [repos])
   const showGitHubSupportFooter = repos.length === 0 || hasGitHubProject
 
-  // Why: the runtime-aware slice probes the active remote host instead of the renderer host.
+  // Probe the active execution host, including remote runtimes.
   const { preflightIssues } = useLandingPreflightRuntime()
   const [starState, setStarState] = useOrcaStarState()
 

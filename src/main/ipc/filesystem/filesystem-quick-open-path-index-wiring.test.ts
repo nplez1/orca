@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { handlers, resetFilesystemIpcMocks, store } from './filesystem-test-harness'
-import type * as FilesystemAuth from '../filesystem-auth'
+import type * as FilesystemAuth from './filesystem-auth'
 import type * as WorkspacePathIndexRuntime from '../../workspace-path-index/workspace-path-index-runtime'
 import { createCompleteWorkspacePathSearchResponse } from '../../../shared/workspace-path-search-response'
 import type { WorkspacePathIndexEnsureArgs } from '../../workspace-path-index/workspace-path-index-ensure'
@@ -44,8 +44,8 @@ const pathIndexMock = vi.hoisted(() => {
 
 vi.mock('electron', async () => (await import('./filesystem-test-harness')).electronMock)
 vi.mock('../filesystem-list-files', () => listFilesMock)
-vi.mock('../filesystem-search-file-paths', () => pathSearchMock)
-vi.mock('../filesystem-auth', async (importOriginal) => ({
+vi.mock('./filesystem-search-file-paths', () => pathSearchMock)
+vi.mock('./filesystem-auth', async (importOriginal) => ({
   ...(await importOriginal<typeof FilesystemAuth>()),
   resolveAuthorizedPath: authMock.resolveAuthorizedPath
 }))

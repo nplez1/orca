@@ -34,7 +34,7 @@ export async function markQoderWorkspaceTrusted(
     // Why async: realpath probes the workspace's volume, and a stalled one would freeze the app.
     canonicalPath = await realpath(workspacePath)
   } catch {
-    /* Keep the supplied path when absent. */
+    // Missing paths retain their supplied spelling.
   }
   const configPath = join(home, configDirName, 'settings.json')
   const config = readHooksJson(configPath)

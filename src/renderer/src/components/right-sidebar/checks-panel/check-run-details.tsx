@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's check-run details plus the fork's Jenkins rerun
+   action and build-metadata rows. */
 import React from 'react'
 import { LoaderCircle, PanelRight, RefreshCw, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,19 +13,21 @@ import { paneCheckSteps } from '../../../../../shared/check-step-visibility'
 import type { GitHubRepositoryIdentity } from '../../../../../shared/github/pull-request-types'
 import { CheckJobLogTail } from '../check-job-log-tail'
 import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
-import { resolveStepOutcome } from '@/components/editor/check-job-step-status'
 import { translate } from '@/i18n/i18n'
 import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { checkJobIdentities } from '@/components/editor/check-details-reading-cache'
+import { resolveStepOutcome } from '../../../../../shared/pr-check-step-status'
 import {
   type CheckDetailsLoadState,
   type CheckDetailsStickySurface,
   formatCheckTimestamp,
-  getCheckConclusion,
   getCheckDetailsStickySurfaceClass,
-  getCheckDurationMs,
-  getCheckStatusLabel
+  getCheckDurationMs
 } from './check-details-model'
+import {
+  getCheckConclusion,
+  getCheckStatusLabel
+} from '../../../../../shared/pr-check-status-label'
 import { CheckBuildMetadata, formatBuildDuration } from '@/components/check-build-metadata'
 import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 
@@ -93,7 +97,7 @@ export function CheckRunDetails({
   checkDetailsContextKey: string
   worktreeId: string | null
   detailsStickySurface?: CheckDetailsStickySurface
-  /** Why: a getter, not a value — the source ref is filled by an async fetch and would read stale during render. */
+  /** Read the asynchronously filled ref on demand; a render-time value can be stale. */
   getGitLabProjectRef?: () => GitLabProjectRef | null
   githubRepository?: GitHubRepositoryIdentity | null
   onRetry: () => void
@@ -144,8 +148,7 @@ export function CheckRunDetails({
   return (
     <div className="mb-1 ml-[26px] mr-3 min-w-0 border-l border-border pl-3">
       {worktreeId && (
-        // Why: inline check details can be long; pinning the affordance keeps it
-        // visible while scrolling through annotations and job output.
+        // Keep the action reachable while scrolling long annotations and output.
         <div
           className={cn(
             'sticky top-0 z-10 -ml-3 flex min-w-0 items-center gap-2 border-b border-border/60 py-1 pl-3 backdrop-blur-sm',

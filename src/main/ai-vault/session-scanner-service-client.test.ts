@@ -397,7 +397,7 @@ describe('AiVaultScannerServiceClient', () => {
     client.dispose()
   })
 
-  it('faults the child on malformed output without affecting later processes', async () => {
+  it('rejects the active request and kills the child on malformed output', async () => {
     const { child, client } = setup()
     const request = client.request({ type: 'request', operation: 'titles', requests: [] })
     readyAiVaultServiceChild(child)
@@ -446,6 +446,7 @@ describe('AiVaultScannerServiceClient', () => {
   })
 
   it('re-reads the init frame on every spawn so a respawn sees current consent', async () => {
+    vi.useFakeTimers()
     const children: AiVaultServiceTestChild[] = []
     let contentEnabled = false
     const client = new AiVaultScannerServiceClient({
@@ -475,7 +476,10 @@ describe('AiVaultScannerServiceClient', () => {
     children[0]!.emit('error', new Error('crashed'))
     await expect(first).rejects.toThrow('crashed')
     void client.request({ type: 'request', operation: 'titles', requests: [] }).catch(() => {})
-    await vi.waitFor(() => expect(children.length).toBeGreaterThan(1))
+    await vi.advanceTimersByTimeAsync(249)
+    expect(children).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(children).toHaveLength(2)
     for (const respawned of children.slice(1)) {
       expect(respawned.sent[0]).toMatchObject({
         sessionSearch: { settings: { contentEnabled: true } }

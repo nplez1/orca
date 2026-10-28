@@ -23,21 +23,13 @@ export function dashboardCardDotState(state: AgentRowState): DashboardCardDotSta
   return state === 'unverifiable' ? 'idle' : state
 }
 
-/** The store slices the agent-row unread rule reads. */
 export type AgentRowUnreadState = {
   agentStatusByPaneKey: AgentAttentionTurnRecords['liveTurns']
   retainedAgentsByPaneKey: AgentAttentionTurnRecords['retainedTurns']
   acknowledgedAgentsByPaneKey: AgentAttentionTurnRecords['acknowledgedTurnStartedAt']
 }
 
-/**
- * The records behind the one unread (bold) rule for an agent row, on every surface that draws one:
- * `isAgentSubjectUnread(records, row.paneKey)`.
- *
- * Why the store's turn records, not the row: auto-acknowledgement clears exactly these, so a row
- * is bold only while viewing or clicking it can clear it. Rows built from a terminal title, a
- * subagent or a migration block have no record and are never unread.
- */
+/** Unread reads live/retained turn records that acknowledgment can clear; synthetic title/subagent/migration rows have no record and stay read. */
 export function readAgentRowTurnRecords(state: AgentRowUnreadState): AgentAttentionTurnRecords {
   return {
     liveTurns: state.agentStatusByPaneKey,
@@ -54,7 +46,6 @@ export type DashboardRowBucketProjection = {
   bucket: DashboardBucket
 }
 
-/** Derive the shared dashboard presentation state for one agent row. */
 export function dashboardRowBucketProjection(
   row: Pick<DashboardAgentRow, 'paneKey' | 'entry' | 'state' | 'startedAt'>,
   turnRecords: AgentAttentionTurnRecords

@@ -9,6 +9,8 @@ import { BrowserWindow, ipcMain, webContents, type WebContents } from 'electron'
 import type { Store } from '../persistence'
 import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
 import { isFeatureInteractionId } from '../../shared/feature-interactions'
+import { isWslMoveWindowWriteHeld } from '../persistence/moving-wsl-projects/wsl-move-window-write-hold'
+import { isTrustedMainRendererSender } from './main-renderer-sender-trust'
 
 let trustedUIRendererWebContentsId: number | null = null
 
@@ -57,7 +59,7 @@ export function registerUIHandlers(store: Store): void {
   // another window) updates it — bi-directional sync, mirroring settings:changed.
   store.onUIChanged((ui) => {
     for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
+      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
         window.webContents.send('ui:stateChanged', ui)
       }
     }
@@ -85,7 +87,10 @@ export function registerUIHandlers(store: Store): void {
   })
 
   ipcMain.handle('ui:set', (_event, args: Partial<PersistedUIState>) => {
-    store.updateUI(args)
+    // A window a WSL move rewrote under is stale until main reloads it.
+    if (!isWslMoveWindowWriteHeld()) {
+      store.updateUI(args)
+    }
   })
 
   ipcMain.handle('ui:recordFeatureInteraction', (_event, id: unknown) => {
@@ -124,22 +129,5 @@ export function registerUIHandlers(store: Store): void {
 }
 
 export function isTrustedUIRenderer(sender: WebContents): boolean {
-  if (sender.isDestroyed() || sender.getType() !== 'window') {
-    return false
-  }
-  if (trustedUIRendererWebContentsId != null) {
-    return sender.id === trustedUIRendererWebContentsId
-  }
-
-  const senderUrl = sender.getURL()
-  if (process.env.ELECTRON_RENDERER_URL) {
-    try {
-      return new URL(senderUrl).origin === new URL(process.env.ELECTRON_RENDERER_URL).origin
-    } catch {
-      return false
-    }
-  }
-
-  // Packaged fallback requires the registered main-window ID, not arbitrary file documents.
-  return false
+  return isTrustedMainRendererSender(sender, trustedUIRendererWebContentsId)
 }

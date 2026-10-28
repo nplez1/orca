@@ -91,7 +91,6 @@ function seedWorkspaces(): void {
   useAppStore.setState(workspaces)
 }
 
-/** Drain the request/settle microtask chain well past any intermediate render. */
 async function settle(): Promise<void> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     await act(async () => {

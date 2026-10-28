@@ -281,8 +281,7 @@ describe('FloatingTerminalPanel close behavior', () => {
 
     element = await renderPanel(true)
     expect(getPanelStyleBounds(element)).toEqual(getMaximizedFloatingTerminalBounds())
-    // Why key-scoped rather than "no writes": maximize now persists panel view state under
-    // its own key. The invariant here is that the saved NORMAL bounds are never clobbered.
+    // Maximize may persist view state but must preserve the normal restore bounds.
     expect(getMockedLocalStorage().setItem).not.toHaveBeenCalledWith(
       FLOATING_TERMINAL_PANEL_BOUNDS_STORAGE_KEY,
       expect.anything()
@@ -293,8 +292,7 @@ describe('FloatingTerminalPanel close behavior', () => {
     element = await renderPanel(true)
 
     expect(getPanelStyleBounds(element)).toEqual(savedBounds)
-    // Why key-scoped rather than "no writes": maximize now persists panel view state under
-    // its own key. The invariant here is that the saved NORMAL bounds are never clobbered.
+    // Maximize may persist view state but must preserve the normal restore bounds.
     expect(getMockedLocalStorage().setItem).not.toHaveBeenCalledWith(
       FLOATING_TERMINAL_PANEL_BOUNDS_STORAGE_KEY,
       expect.anything()
@@ -354,8 +352,7 @@ describe('FloatingTerminalPanel close behavior', () => {
       width: 920,
       height: 560
     })
-    // Why key-scoped rather than "no writes": maximize now persists panel view state under
-    // its own key. The invariant here is that the saved NORMAL bounds are never clobbered.
+    // Maximize may persist view state but must preserve the normal restore bounds.
     expect(getMockedLocalStorage().setItem).not.toHaveBeenCalledWith(
       FLOATING_TERMINAL_PANEL_BOUNDS_STORAGE_KEY,
       expect.anything()
@@ -375,7 +372,6 @@ describe('FloatingTerminalPanel close behavior', () => {
     expect(getPanelStyleBounds(await renderPanel(true))).toEqual(
       getMaximizedFloatingTerminalBounds()
     )
-    // Why: the intent is one-shot and must be consumed by the open transition.
     expect(consumeFloatingTerminalOpenMaximizedIntent()).toBe(false)
   })
 
@@ -634,8 +630,7 @@ describe('FloatingTerminalPanel markdown editor', () => {
     setFloatingEditorTabs([makeFile({ id: 'notes' })])
 
     const element = await renderPanel(true)
-    // The editor renders inside the shared group tree; the panel's contract is the policy
-    // it passes down (scratch markdown exposes no agent annotations).
+    // Assert the shared tree’s policy: floating scratch Markdown must not expose review annotations.
     const tree = findByTypeName(element, 'TabGroupSplitNodeTree')
 
     expect(tree.props.markdownAnnotationsEnabled).toBe(false)

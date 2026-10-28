@@ -4,7 +4,7 @@ import { joinJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { JiraOptionMultiSelect, jiraOptionToken } from '@/components/jira-option-multi-select'
 import { JiraUserMultiPicker, jiraHeldUsers } from '@/components/jira-user-multi-picker'
 import { JiraUserPicker, type JiraUserPickerFixedOption } from '@/components/jira-user-picker'
-import { getJiraCreateAllowedValueLabel } from '@/components/task-page-jira-create-fields'
+import { getJiraCreateAllowedValueLabel } from '@/components/task-page/jira/task-page-jira-create-fields'
 import { Input } from '@/components/ui/input'
 import {
   Select,

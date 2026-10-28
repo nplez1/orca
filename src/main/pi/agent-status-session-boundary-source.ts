@@ -1,9 +1,8 @@
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 
-// What the generated extension does when a session ends or is replaced. A run belongs to one
-// session: once that session is gone its children never report here again, so the run ends with it.
+// Runs belong to sessions; after replacement their children can no longer report to this registration.
 
-// Pi replaces the registration for /new, resume and fork, and again for /reload, which keeps the session.
+// Pi replaces registrations for session switches and reloads.
 function getPiSessionShutdownHandlerSourceLines(): string[] {
   return [
     // Why: a registration's own cleanup cannot sit behind the ownership fence — a child
@@ -43,11 +42,11 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '      if (ownsPaneRoster) resetEndpointWatch()',
     '      return',
     '    }',
-    // Why: pi tears an open dialog down without resolving its promise, so no ui_prompt_end follows.
+    // Pi can tear down dialogs without resolving their promises or sending close events.
     '    piUiPromptDepth = 0',
     '    const reason = (event as { reason?: unknown } | null)?.reason',
     '    const target = (event as { targetSessionFile?: unknown } | null)?.targetSessionFile',
-    // Why: /reload and a resume of the file already open keep the session, and its children still report to it.
+    // Reload/current-file resume retains session ownership and future child reports.
     "    const keepsSession = reason === 'reload' || (reason === 'resume' && typeof target === 'string' && target === sessionMetadata.session_file)",
     '    if (!keepsSession) clearRunnerExitCheck()',
     // LOCAL(nplez1): Pi hands the factory it re-runs after this a FRESH `pi.events` for every
@@ -58,14 +57,14 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '    subagentRunnerExitBound = false',
     // Why: on quit the PTY's exit clears the pane, and a done here would notify on every quit.
     "    if (keepsSession || reason === 'quit') {",
-    // Why: this registration's queue outlives it and would deliver stale posts after the next one's.
+    // This queue outlives registration and could otherwise deliver stale status after its replacement.
     '      resetPostQueue()',
     // Why: a session that keeps running (/reload, same-file resume) keeps watching; a quit does not,
     // and only the registration that owns the pane's roster speaks for the pane.
     "      if (reason === 'quit' && ownsPaneRoster) resetEndpointWatch()",
     '      return',
     '    }',
-    // Also a Pi too old to give a reason: its children would otherwise hold the pane for good.
+    // Older Pi lacks reasons; settle so orphaned children cannot hold the pane forever.
     '    closeOutRun(sessionMetadata.session_file)',
     '    // Why this post is not optional: `closeOutRun` only posts when the turn was unsettled, and a',
     '    // session ending from idle has nothing pending — so without this, the emptied live set would',
@@ -79,7 +78,6 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
   ]
 }
 
-// Registered after onStatus exists; expects the roster and closeOutRun() from the handler scope.
 export function getAgentStatusSessionBoundaryHandlerSourceLines(kind: PiAgentKind): string[] {
   return [
     ...(kind !== 'pi'
@@ -91,13 +89,11 @@ export function getAgentStatusSessionBoundaryHandlerSourceLines(kind: PiAgentKin
       : []),
     ...(kind !== 'prime-agent'
       ? [
-          // Why: OMP keeps this registration and bus across a switch. /new and a branch cancel the
-          // session's own jobs; fork and resume (which is also how it reloads) leave them running
-          // and reporting here.
+          // OMP preserves registration/bus: new/branch cancel jobs, fork/resume retain their reports.
           '  const onOmpSessionChange = (event, ctx) => {',
           '    if (!isOmpRuntime()) return',
           "    if (event?.reason === 'fork' || event?.reason === 'resume') {",
-          // Why: a resume cuts a running turn off without an agent_end.
+          // Resume can interrupt a turn without agent_end.
           '      if (isTurnInFlight()) {',
           '        lifecycleState.endedRunGeneration = lifecycleState.runGeneration',
           '        postAgentEndOnce()',
@@ -117,7 +113,7 @@ export function getAgentStatusSessionBoundaryHandlerSourceLines(kind: PiAgentKin
 
 export function getAgentStatusRunCloseOutSourceLines(): string[] {
   return [
-    // Why: pi-subagents re-attaches a resumed session's runs and reports their completion to it.
+    // pi-subagents reattaches parked runs and repeats their completion after resume.
     '  function restoreParkedSubagents(): void {',
     '    const file = sessionMetadata.session_file',
     "    if (typeof file !== 'string') return",
@@ -133,8 +129,7 @@ export function getAgentStatusRunCloseOutSourceLines(): string[] {
     '    lifecycleState.completionPostedGeneration = -1',
     '  }',
     '',
-    // `parkUnder` keeps the children for a resume into that session file, where pi-subagents
-    // announces each one's completion again.
+    // Park children under their session file for resumed completion delivery.
     '  function closeOutRun(parkUnder?: unknown): void {',
     '    const unsettled = lifecycleState.waiting || isTurnInFlight()',
     "    if (typeof parkUnder === 'string' && isHeldByChildren()) {",

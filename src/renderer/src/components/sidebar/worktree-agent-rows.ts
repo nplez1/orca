@@ -1,7 +1,7 @@
 import type { DashboardAgentRow } from '@/components/dashboard/useDashboardData'
 import { isExplicitAgentStatusFresh } from '@/lib/agent-status'
 import { unplacedWorkingAgentTypes } from '@/lib/unplaced-working-agent-types'
-import type { RetainedAgentEntry } from '@/store/slices/agent-status'
+import type { RetainedAgentEntry } from '@/store/slices/agent-status/agent-status-contract'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
   type AgentStatusEntry,
@@ -73,9 +73,7 @@ function isRetainedLegacyAliasOfSeenStablePane(args: {
     return args.seenPaneKeys.has(makePaneKey(legacy.tabId, leafId))
   }
 
-  // Why: old PaneManager ids can advance across remounts/updates even for a
-  // single physical pane. Once the tab has exactly one current stable pane,
-  // retained numeric rows under that tab are stale aliases of it.
+  // A single stable pane supersedes retained numeric aliases left by old PaneManager remounts.
   return countTerminalLayoutLeaves(layout?.root) === 1 && stablePaneKeys.length === 1
 }
 
@@ -123,8 +121,7 @@ function markCompletedWorkerParentPaneKeysSeen(args: {
     if (rowEntry.state !== 'done') {
       return
     }
-    // Why: completed worker rows can be attributed to a child pane while the
-    // visible parent pane still has a stale spinner title.
+    // Completed workers may own a visible parent pane’s stale spinner title.
     markSeenPaneKeyForCurrentTab({
       paneKey: rowEntry.orchestration?.parentPaneKey,
       currentTabsById: args.currentTabsById,
@@ -243,9 +240,7 @@ export function buildWorktreeAgentRows(args: {
     })
   )
 
-  // Why: orchestration workers can be attributed to a worktree by main before
-  // their tab is present in this renderer. Keep those live rows visible in the
-  // worktree card instead of waiting for tab membership that may never arrive.
+  // Main can attribute workers before tabs hydrate; keep them visible without waiting for local membership.
   for (const entry of args.entries) {
     if (seenPaneKeys.has(entry.paneKey)) {
       continue
@@ -266,8 +261,7 @@ export function buildWorktreeAgentRows(args: {
       tab,
       agentType: resolveRowAgentType(rowEntry, tab),
       rowSource: 'live',
-      // Why: this row's tab is synthesized because no tab for it exists in this renderer,
-      // so there is no live-PTY evidence to hold — the decay destination is always `idle`.
+      // Even synthesized tabs use available PTY evidence to distinguish idle from unverifiable decay.
       state: shouldDecay
         ? resolveDecayedAgentRowState(rowEntry, tabHasLivePty(ptyIdsByTabId, tab.id))
         : rowEntry.state,
@@ -306,8 +300,7 @@ export function buildWorktreeAgentRows(args: {
     })
   }
 
-  // Why: hook pings can rebuild the live entry list in a different iteration
-  // order. Equal-start agents still need a deterministic sidebar order.
+  // Status pings can reorder entries; sort equal-start agents deterministically.
   rows.sort(compareWorktreeAgentRows)
   return rows
 }

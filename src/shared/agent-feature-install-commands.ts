@@ -4,8 +4,7 @@
 // Pointed at upstream the pair is incoherent — a nplez1/orca commit that stablyai/orca never had.
 export const ORCA_SKILLS_REPOSITORY_URL = 'https://github.com/nplez1/orca'
 
-// Why: one skills CLI for every install rail. 1.5.x cannot fetch a commit, and a bare
-// `npx skills` can reuse a stale cached copy or another binary (#18687).
+// Pin one CLI across install rails: 1.5.x lacks commit fetch and bare npx may reuse stale/wrong binaries (#18687).
 export const SKILLS_CLI_VERSION = '1.7.2'
 
 export type AgentFeatureSkillCommandOptions = {
@@ -22,14 +21,12 @@ export function buildAgentFeatureSkillInstallArgs(
     throw new Error('At least one skill name is required.')
   }
   const global = options.global ?? true
-  // Why: one flag per name remains compatible with both single-value and variadic parsers.
+  // One flag per skill works with both single-value and variadic parsers.
   const skillArgs = skillNames.flatMap((name) => ['--skill', name])
   return [
     `skills@${SKILLS_CLI_VERSION}`,
     'add',
-    // Why: pinned to the build's own commit so the installed bytes are the ones its bundled
-    // manifest judges freshness against, on every channel (hourly builds have no tag in
-    // this repo). `add` always re-copies, so the same command is install and update.
+    // Use the build commit for manifest freshness on every channel, including untagged hourly builds; add re-copies for updates.
     `${ORCA_SKILLS_REPOSITORY_URL}/tree/${options.sourceCommit}`,
     ...skillArgs,
     ...(global ? ['--global'] : [])

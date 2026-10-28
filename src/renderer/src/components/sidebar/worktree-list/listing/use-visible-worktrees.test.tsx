@@ -168,7 +168,6 @@ describe('useVisibleSidebarWorktrees', () => {
     expect(computeVisibleWorktreesCalls.count).toBe(callsAfterFirstRender)
     expect(result.current.visibleWorktrees).toBe(initialVisible)
 
-    // A write that does move it still recomputes.
     rerender(Object.assign({}, withSettings(nextSettings), { defaultHostId: 'runtime:other' }))
     expect(computeVisibleWorktreesCalls.count).toBe(callsAfterFirstRender + 1)
   })

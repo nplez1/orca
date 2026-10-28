@@ -148,7 +148,9 @@ export async function computeWorkspaceRootAsync(
 export async function computeWorkspaceRootWithin(
   repoPath: string,
   settings: WorkspaceRootSettings,
-  deadlineMs: number
+  deadlineMs: number,
+  // Injected by main so this shared module stays free of main-only gate imports.
+  readHome: (distro: string) => Promise<string | null> = getWslHomeAsync
 ): Promise<string> {
   const distro = mirrorDistroForWorkspaceRoot(repoPath, settings)
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -156,7 +158,7 @@ export async function computeWorkspaceRootWithin(
     timer = setTimeout(() => resolve(null), deadlineMs)
   })
   try {
-    const home = distro ? await Promise.race([getWslHomeAsync(distro), deadline]) : null
+    const home = distro ? await Promise.race([readHome(distro), deadline]) : null
     return projectContainerRoot(
       workspaceRootForMirrorHome(repoPath, settings.workspaceDir, home),
       repoPath,

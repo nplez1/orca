@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraCreateFieldAllowedValue } from '../../../shared/jira/jira-types'
-import { buildJiraCreateFieldValue } from './task-page-jira-create-fields'
+import { buildJiraCreateFieldValue } from './task-page/jira/task-page-jira-create-fields'
 import {
   JiraOptionMultiSelect,
   jiraOptionLabels,

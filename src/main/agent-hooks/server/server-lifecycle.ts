@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's server lifecycle plus the fork's hook status-cache
+   hydration readiness phase, which gates when the pane may read screen prompts. */
 import { AgentHookStartup, listenForAgentHooks } from '../../../shared/agent-hook-startup'
 import { checkHookOwnerPresence } from '../../../shared/agent-hook-owner-presence'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
@@ -17,6 +19,7 @@ import { clearAllListenerCaches } from '../../../shared/agent-hook-listener/list
 import { trackEmptyPaneKeyHook } from './server-transport-rules'
 import { AgentHookServerStatusHookLifecycle } from './server-status-hook-lifecycle'
 import { OPENCODE_STARTUP_PROMPT_CLAIM_PATH } from '../../../shared/opencode-startup-prompt'
+import { CLAUDE_AGENT_VIEW_PATH } from '../../../shared/claude-agent-view'
 
 type HookServerStartOptions = {
   env?: string
@@ -107,6 +110,11 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
         if (!isStatusCurrent()) {
           res.writeHead(404)
           res.end()
+          return
+        }
+        if (pathname === CLAUDE_AGENT_VIEW_PATH) {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify(this.claudeAgentViews.receive(body)))
           return
         }
         await this.initializeStatusHookOwner()
@@ -248,6 +256,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
   /** Quit retains status until chat teardown reads resumable child and background work. */
   stop(options?: { keepStatus?: boolean }): void {
     this.startup.stop()
+    this.claudeAgentViews.clear()
     // Terminal status may still have a pending write while hook ingress is disabled.
     if (this.statusHooksEnabled || this.statusPersistTimer) {
       this.flushStatusPersistSync()

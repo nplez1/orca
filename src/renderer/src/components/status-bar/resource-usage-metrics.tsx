@@ -12,8 +12,6 @@ export const MEM_COLUMN_CLS = 'w-16 text-right'
 // Why: every row and the header reserve this trailing gutter so CPU/Memory columns align whether or not the row has a kill-X.
 export const ROW_TRAILING_GUTTER_CLS = 'w-5 shrink-0 flex items-center justify-end'
 
-// ─── Formatters ─────────────────────────────────────────────────────
-
 export function formatMemory(bytes: number): string {
   if (bytes < 1024 * 1024) {
     return `${Math.round(bytes / 1024)} KB`
@@ -35,8 +33,6 @@ function formatMetricCpu(value: Metric): string {
 function formatMetricMemory(value: Metric): string {
   return value === null ? '—' : formatMemory(value)
 }
-
-// ─── Sparkline ──────────────────────────────────────────────────────
 
 type SparklineProps = {
   samples: number[]
@@ -113,8 +109,6 @@ export const Sparkline = memo(SparklineImpl, (a, b) => {
   }
   return true
 })
-
-// ─── Leaf UI: metric row ────────────────────────────────────────────
 
 export function MetricPair({
   cpu,

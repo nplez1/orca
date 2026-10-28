@@ -45,8 +45,7 @@ function groupByBucket(cards: DashboardCard[]): Record<DashboardBucket, Dashboar
   for (const card of cards) {
     grouped[card.bucket].push(card)
   }
-  // Most-recently-moved first: a card entering a column lands at the top,
-  // matching the view-transition motion the user just watched.
+  // Newly moved cards lead their column, matching the view-transition motion.
   for (const bucket of DASHBOARD_BUCKET_ORDER) {
     grouped[bucket].sort((a, b) => b.stateChangedAt - a.stateChangedAt)
   }
@@ -69,8 +68,7 @@ function KanbanColumn({
   const label = bucketLabel(bucket)
 
   return (
-    // Why: attention no longer tints the whole column — the cards inside carry
-    // their own state color, so a column border would double-signal it.
+    // Cards carry attention color; keep the column neutral to avoid duplicate signaling.
     <section
       aria-label={label}
       className="flex min-w-[264px] flex-1 flex-col rounded-xl border border-border/60 bg-muted/30"
@@ -223,8 +221,7 @@ export function AgentKanbanBoard({
     },
     [cardClickAction, onAckAgent, onRevealAgent]
   )
-  // Watching the open dialog counts as seeing state changes as they happen —
-  // without this, an agent finishing while you watch would re-flag its card.
+  // Acknowledge state changes while watched so open-dialog cards do not become unseen again.
   useEffect(() => {
     if (dialogCard?.unseen) {
       onAckAgent(dialogCard.paneKey)
@@ -232,9 +229,7 @@ export function AgentKanbanBoard({
   }, [dialogCard?.paneKey, dialogCard?.unseen, onAckAgent])
 
   return (
-    // Why: the pop-out is its own React root with no app-level provider, and the
-    // card's repo tooltip needs one in both hosts. Nesting inside the main
-    // window's provider is harmless.
+    // Pop-outs have no app provider; supply the card tooltip provider in either host.
     <TooltipProvider delayDuration={300}>
       <div
         className={cn('relative flex flex-col bg-background text-foreground', containerClassName)}

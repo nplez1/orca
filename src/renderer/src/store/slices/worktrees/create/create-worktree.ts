@@ -18,13 +18,18 @@ import {
   getGeneratedWorktreeCreateRetryCandidate,
   isRetryableWorktreeCreateConflict
 } from '../../../../../../shared/new-workspace/worktree-create-retry-policy'
-import { assertRuntimeEnvironmentCapability } from '../../../../runtime/runtime-rpc-client'
+import {
+  assertRuntimeEnvironmentCapability,
+  runtimeEnvironmentSupportsCapability
+} from '../../../../runtime/runtime-rpc-client'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { runtimeTargetForRepoOwner } from '@/lib/repo-runtime-owner'
 import {
   WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
   WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY
 } from '../../../../../../shared/protocol-version'
+import { WORKTREE_OPEN_EXISTING_BRANCH_RUNTIME_CAPABILITY } from '../../../../../../shared/worktree-runtime-capabilities'
+import { ensureLocalRuntimeCapabilities } from '../../../../runtime/local-runtime-capabilities'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/local-base-ref-suggestion-toast'
 import { requestWorktreeBaseFallbackNotice } from '@/components/worktree-base-fallback-notice'
 import { showLocalBaseRefRefreshToast } from './local-base-ref-refresh-toast'
@@ -193,6 +198,20 @@ export function createCreateWorktree(
         requestedHostId: options?.executionHostId,
         resolveOwnHostId: () => repoHostId(get(), repoId)
       })
+      if (options?.branchIntent === 'open-existing') {
+        const supported =
+          target.kind === 'environment'
+            ? await runtimeEnvironmentSupportsCapability(
+                target.environmentId,
+                WORKTREE_OPEN_EXISTING_BRANCH_RUNTIME_CAPABILITY
+              ).catch(() => false)
+            : (await ensureLocalRuntimeCapabilities())?.includes(
+                WORKTREE_OPEN_EXISTING_BRANCH_RUNTIME_CAPABILITY
+              ) === true
+        if (supported) {
+          request.branchIntent = 'open-existing'
+        }
+      }
       // Why outside the retry loop: a branch-name conflict retry must not re-warn about the same dropped pick.
       const parent = resolveWorktreeCreateParent(get(), options?.parentWorktreeId, creationHostId)
       let warnedParentDropped = false
@@ -278,7 +297,9 @@ export function createCreateWorktree(
           // Why: an exact-branch create is a copy of a workspace, so a renamed branch is the wrong
           // result — it must surface the host's refusal instead of retrying into `feature/x-2`.
           const shouldRetry =
-            !options?.exactBranchName && isRetryableWorktreeCreateConflict(message)
+            !options?.exactBranchName &&
+            request.branchIntent !== 'open-existing' &&
+            isRetryableWorktreeCreateConflict(message)
           if (!shouldRetry || attempt === CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS - 1) {
             throw error
           }

@@ -10,8 +10,7 @@ import type { RuntimeClientTarget } from '../../../../shared/runtime-client-targ
 
 type GitHubPRRepo = PRInfo['prRepo']
 
-// Why: runtime-host projects mirror server paths into the desktop store, but
-// desktop gh IPC only trusts local/SSH repo registrations.
+// Runtime paths mirrored into desktop state are not trusted local/SSH registrations; route through the runtime owner.
 function getGitHubActionTarget(repo: Repo): RuntimeClientTarget {
   const host = parseExecutionHostId(getRepoExecutionHostId(repo))
   return host?.kind === 'runtime'
@@ -39,7 +38,7 @@ export async function mergeGitHubHostedReview(args: {
         ...(args.bypassBranchProtection ? { bypassBranchProtection: true } : {}),
         prRepo: args.prRepo ?? null
       },
-      // Why: GitHub stack merges can run asynchronously for several minutes.
+      // GitHub stack merges can take several asynchronous minutes.
       { timeoutMs: 4 * 60_000 }
     )
   }

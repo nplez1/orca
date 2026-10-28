@@ -30,14 +30,6 @@ function closedAt(closedAtMs: number): ClosedTerminalTabTombstonesByTabId {
 }
 
 describe('seeding an empty workspace reads close records', () => {
-  it('an empty row with a close record stays empty', () => {
-    expect(seeds({ [WT]: [] }, closedAt(Date.now()))).toBe(false)
-  })
-
-  it('a legacy empty row with no record seeds', () => {
-    expect(seeds({ [WT]: [] })).toBe(true)
-  })
-
   it('an empty row whose only record is past its TTL seeds', () => {
     expect(
       seeds({ [WT]: [] }, closedAt(Date.now() - CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS - 1))

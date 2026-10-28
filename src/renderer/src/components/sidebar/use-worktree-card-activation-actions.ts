@@ -49,7 +49,6 @@ export function useWorktreeCardActivationActions({
   useLayoutEffect(() => {
     worktreeRef.current = worktree
   }, [worktree])
-  // Stable click handler – ignore clicks that are really text selections.
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       if (!isEventTargetInsideCurrentTarget(event.currentTarget, event.target)) {
@@ -86,7 +85,7 @@ export function useWorktreeCardActivationActions({
         return
       }
       onWorktreeCardClick?.()
-      // Why: route sidebar clicks through the shared activation path so the back/forward stack stays complete.
+      // Use shared activation so sidebar navigation participates in back/forward history.
       recordRendererCrashBreadcrumb('sidebar_worktree_activate', {
         worktreeId: worktree.id,
         repoId: worktree.repoId,

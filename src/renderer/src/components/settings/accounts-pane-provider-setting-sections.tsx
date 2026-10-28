@@ -16,7 +16,7 @@ export function renderGeminiAccountsSection(model: AccountsPaneSectionModel): Re
       <div className="space-y-1">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <GeminiIcon size={16} />
-          {translate('auto.components.settings.AccountsPane.0c64dc2a64', 'Gemini CLI (legacy)')}
+          {translate('auto.components.settings.AccountsPane.aa4de4475b', 'Gemini CLI (legacy)')}
         </h3>
         <p className="text-xs text-muted-foreground">
           {translate(

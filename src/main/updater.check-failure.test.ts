@@ -179,10 +179,18 @@ describe('updater check failure handling', () => {
     killAllPtyMock.mockReset()
     vi.unstubAllGlobals()
     vi.useRealTimers()
-    netFetchMock.mockReset().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () => Promise.resolve('<feed></feed>')
+    netFetchMock.mockReset().mockImplementation(async (url: string) => {
+      if (url.endsWith('/releases/latest')) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://github.com/nplez1/orca/releases/tag/v1.0.51' }
+        })
+      }
+      return new Response(
+        url.endsWith('.atom')
+          ? '<feed></feed>'
+          : 'version: 1.0.51\nfiles:\n  - url: orca-windows-setup.exe\n'
+      )
     })
     netRequestMock.mockReset()
     installNetRequestFetchAdapter(netRequestMock, netFetchMock)
@@ -392,5 +400,28 @@ describe('updater check failure handling', () => {
     expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(6)
     await vi.advanceTimersByTimeAsync(ONE_HOUR_MS)
     expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(7)
+  })
+
+  it('records check failures without touching a destroyed main window', async () => {
+    makeBenignCheckFailure('Unable to find latest version on GitHub')
+    // Electron throws from a destroyed BrowserWindow's webContents getter.
+    const mainWindow = {
+      isDestroyed: () => true,
+      get webContents(): never {
+        throw new TypeError('Object has been destroyed')
+      }
+    }
+
+    const { setupAutoUpdater, checkForUpdatesFromMenu, getUpdateStatus } = await loadUpdaterModule()
+
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the guard only reads isDestroyed/webContents, which this partial BrowserWindow covers.
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    checkForUpdatesFromMenu()
+
+    await vi.waitFor(() => {
+      expect(getUpdateStatus()).toEqual(
+        expect.objectContaining({ state: 'error', userInitiated: true })
+      )
+    })
   })
 })

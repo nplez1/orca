@@ -1,3 +1,6 @@
+import type { PluginSources, MaterializePiResult } from './plugin-sources'
+export type { PluginSources, MaterializePiResult } from './plugin-sources'
+import { RelayClaudeAgentViewPlugin } from './claude-agent-view-plugin'
 import { mirrorOpenCodeConfig } from './opencode-overlay-mirror'
 import {
   writeOpenCodeStartupPromptPlugin,
@@ -5,23 +8,8 @@ import {
 } from '../shared/opencode-startup-prompt-install'
 import { resolveOpenCodeConfigDirectory } from '../shared/opencode-config-directory'
 import { materializeOmpFreshConfig } from '../shared/omp-fresh-config'
-// Why: relay-side equivalent of Orca's local agent integration installers.
-// OpenCode still needs a config overlay, while Pi/OMP now get Orca-managed
-// extension files installed into the remote agent homes. Host paths from the
-// renderer are meaningless on SSH targets, so the relay performs the remote
-// filesystem work itself.
-//
-// Plugin source strings ship over the JSON-RPC channel at session-ready —
-// they are NOT bundled with the relay binary because the relay is versioned
-// independently from Orca and the plugin source changes frequently as new
-// agent events get added; bundling would make every such change a relay
-// redeploy, and an old relay would silently serve stale plugin code.
-//
-// We deliberately do not reuse OpenCodeHookService / PiTitlebarExtensionService
-// directly: those modules import `electron` and ride on Orca's userData
-// path. The relay's electron-free constraint forces a thin parallel
-// implementation rooted at $HOME/.orca-relay/ for OpenCode and at the remote
-// Pi/OMP homes for those agents.
+// Install remotely because host paths and Electron services are unavailable to the relay.
+// Receive plugin source at session-ready: relay and desktop update independently, so bundled copies could stay stale.
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync } from 'node:fs'
 import {
@@ -76,36 +64,13 @@ const PI_AGENT_HOME_DIR_NAME: Record<PiAgentKind, string> = {
   'prime-agent': '.prime'
 }
 function safeDirName(input: string): string {
-  // Why: paneKey embeds tabId:paneId where tabId may itself contain
-  // filesystem-unsafe characters in some Orca builds. Hash to a fixed-width
-  // hex name so any input produces a portable directory name.
+  // Hash pane keys into portable directory names because embedded tab ids can contain unsafe characters.
   return createHash('sha256').update(input).digest('hex').slice(0, 32)
 }
 function isUsableId(id: string): boolean {
   return typeof id === 'string' && id.length > 0 && id.length <= 1024
 }
-export type PluginSources = {
-  opencodeStartupPromptSource?: string
-  /** Empty string revokes future installs; omission preserves the cached source. */
-  opencodePluginSource?: string
-  /** Source body of OpenCode 2's status plugin. */
-  opencode2PluginSource?: string
-  /** Source body of Pi's `orca-agent-status.ts` to drop into <overlay>/extensions/. */
-  piExtensionSource?: string
-  /** Source body of OMP's `orca-agent-status.ts` to drop into <overlay>/extensions/. */
-  ompExtensionSource?: string
-  /** Source body of Prime Agent's `orca-agent-status.ts` to install in its real agent dir. */
-  primeAgentExtensionSource?: string
-}
-/** Result of installing Pi-compatible status into a real agent home or OMP fallback path. */
-export type MaterializePiResult = {
-  /** Real agent dir when extensions were installed there. Absent for OMP status-only fallback. */
-  sourceAgentDir?: string
-  /** Absolute path to orca-agent-status.ts (real home or relay-managed fallback). */
-  statusExtensionPath?: string
-}
-/** Presence of this file is what makes an overlay usable — a rebuild that failed
- *  after the wipe leaves the dir itself present but the plugin missing. */
+// Check the plugin file, not its directory: a failed rebuild can leave an unusable empty overlay.
 export function getRelayOpenCodePluginPath(
   overlayDir: string,
   agent: 'opencode' | 'opencode2' = 'opencode'
@@ -117,6 +82,7 @@ export function getRelayOpenCodePluginPath(
   )
 }
 export class PluginOverlayManager {
+  readonly claudeAgentView: RelayClaudeAgentViewPlugin
   private opencodeStartupPromptSource: string | null = null
   private opencodePluginSource: string | null = null
   private opencode2PluginSource: string | null = null
@@ -132,6 +98,7 @@ export class PluginOverlayManager {
   constructor(opts?: { homeDir?: string }) {
     const home = opts?.homeDir ?? homedir()
     this.homeDir = home
+    this.claudeAgentView = new RelayClaudeAgentViewPlugin(home)
     this.opencodeRoot = join(home, RELAY_HOOKS_DIR, OPENCODE_OVERLAY_SUBDIR)
     this.opencode2Root = join(home, RELAY_HOOKS_DIR, OPENCODE2_OVERLAY_SUBDIR)
     this.piRoots = {
@@ -139,14 +106,9 @@ export class PluginOverlayManager {
       omp: join(home, RELAY_HOOKS_DIR, PI_OVERLAY_SUBDIR_BY_KIND.omp)
     }
   }
-  /** Replace the cached source bodies. Called from relay.ts when Orca sends
-   *  `agent_hook.installPlugins`. The first install enables the augmenter
-   *  output; subsequent installs (e.g. Orca version upgrade in flight) refresh
-   *  the cached source so future spawns see the new strings.
-   *  Note: existing running agents keep whatever source they loaded at
-   *  process start. Future PTYs pick up the refreshed source when the relay
-   *  writes plugin/extension files before spawn. */
+  // Refresh cached source for future PTYs; running agents retain the source they loaded at startup.
   setSources(sources: PluginSources): void {
+    this.claudeAgentView.setSource(sources.claudeAgentViewSource)
     if (typeof sources.opencodeStartupPromptSource === 'string') {
       this.opencodeStartupPromptSource = sources.opencodeStartupPromptSource
     }
@@ -189,12 +151,7 @@ export class PluginOverlayManager {
     writeOverlayOpenCodePluginAtomically(pluginPath, source)
   }
 
-  /** Materialize the OpenCode plugin overlay for `id` (typically the
-   *  renderer-supplied paneKey or, fallback, the relay-internal pty-id) and
-   *  return the directory path. Returns null when no source is cached or
-   *  the overlay write fails — caller falls back to no plugin (the agent
-   *  CLI runs without status reporting), which is the existing fail-open
-   *  behavior on the local side. */
+  // Materialize the pane’s overlay; missing source/write failure returns null so the CLI can run without status reporting.
   materializeOpenCode(
     id: string,
     existingConfigDir?: string,
@@ -214,9 +171,7 @@ export class PluginOverlayManager {
         if (!existsSync(existingConfigDir)) {
           return null
         }
-        // Why: OPENCODE_CONFIG_DIR is a single config root. Mirror the user's
-        // remote root into the overlay before adding Orca's plugin so status
-        // reporting does not hide their auth, models, keybinds, or plugins.
+        // Mirror the remote user config before adding Orca: replacing OpenCode’s single config root must not hide auth/models/keybinds/plugins.
         mirrorOpenCodeConfig(existingConfigDir, dir, ORCA_OPENCODE_PLUGIN_ENTRIES)
       }
       if (source) {

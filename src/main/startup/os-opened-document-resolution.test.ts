@@ -11,7 +11,7 @@ vi.mock('../ipc/floating-workspace-directory', () => ({
   ensureFloatingWorkspaceDirectory: vi.fn()
 }))
 
-const { authorizeExternalPath } = await import('../ipc/filesystem-auth')
+const { authorizeExternalPath } = await import('../ipc/filesystem/filesystem-auth')
 const { ensureFloatingWorkspaceDirectory } = await import('../ipc/floating-workspace-directory')
 
 describe('resolveOsOpenedDocuments', () => {

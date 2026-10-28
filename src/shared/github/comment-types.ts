@@ -52,8 +52,7 @@ export type PRComment = {
   reactionSubjectId?: string
   /** File path for inline review comments (absent for top-level conversation comments). */
   path?: string
-  /** GraphQL node ID of the review thread — present only for inline review comments.
-   *  Used to resolve/unresolve the thread via GitHub's GraphQL API. */
+  /** Inline review thread’s GraphQL ID, used to resolve/unresolve it; absent for conversation comments. */
   threadId?: string
   /** Whether the review thread has been resolved. Only meaningful when threadId is set. */
   isResolved?: boolean

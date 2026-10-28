@@ -12,7 +12,7 @@ import {
   resolveJiraObjectListFieldKind
 } from '../../../shared/jira-field-rendering'
 import { splitJiraFieldDraft } from '../../../shared/jira-field-draft'
-import { buildJiraCreateFieldValue } from '@/components/task-page-jira-create-fields'
+import { buildJiraCreateFieldValue } from '@/components/task-page/jira/task-page-jira-create-fields'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
 import { Button } from '@/components/ui/button'
 import {

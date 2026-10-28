@@ -1,9 +1,4 @@
-/**
- * Seal integration credentials an older orcad wrote in plaintext, once its key is loaded.
- *
- * Why every store and not only Linear: each wrote plaintext under the same unsealable store.
- * GitHub and GitLab are not here because Orca never stores their tokens; `gh`/`glab` own them.
- */
+// Seal legacy integration credentials after key loading; gh/glab own their tokens separately.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -27,9 +22,8 @@ import { openCodeGoApiKeyEnvelopeFile } from '../opencode/opencode-go-api-key-st
 
 type PlaintextCredentialTarget = {
   path: string
-  /** `<prefix>plaintext:<base64>` becomes `<prefix>encrypted:<base64>`. */
   envelopePrefix?: string
-  /** The file may hold the bare value (no envelope), which is sealed as raw bytes. */
+  /** Legacy files can contain bare credentials without an envelope. */
   raw?: boolean
 }
 
@@ -45,7 +39,7 @@ function encFilesIn(dir: string): string[] {
   }
 }
 
-/** Where every integration store keeps its files, whatever ORCA_USER_DATA says. */
+/** Keep credentials outside disposable ORCA_USER_DATA roots. */
 export function orcadCredentialRoot(): string {
   // Why this name: every store below resolves through HOME_DIRECTORY_NAME, so hardcoding the upstream
   // home would root the headless server's secret store in the other app's directory — enumerating and
@@ -69,7 +63,7 @@ function listPlaintextCredentialTargets(): PlaintextCredentialTarget[] {
 
 function sealTarget(store: SecretStore, target: PlaintextCredentialTarget): boolean {
   const original = readFileSync(target.path)
-  // Why first: a file this pass cannot seal still should not stay group- or world-readable.
+  // Restrict permissions even when sealing fails.
   hardenExistingSecureFile(target.path)
   const unchanged = (): boolean => readFileSync(target.path).equals(original)
   const text = original.toString('utf8')
@@ -89,7 +83,7 @@ function sealTarget(store: SecretStore, target: PlaintextCredentialTarget): bool
     const envelope = `${target.envelopePrefix}encrypted:${sealed.toString('base64')}`
     return writeSecureFile(target.path, envelope, { durable: true, shouldPublish: unchanged })
   }
-  // Why the JSON skip: the speech store's oldest format is JSON wrapping an already-sealed key.
+  // Old speech JSON may already wrap a sealed key.
   if (
     !target.raw ||
     original.length === 0 ||
@@ -110,7 +104,7 @@ function sealTarget(store: SecretStore, target: PlaintextCredentialTarget): bool
   return published
 }
 
-/** Never logs credential contents; a failed file is left exactly as it was. */
+/** Never log credential contents or replace bytes when sealing fails. */
 export function migratePlaintextCredentials(
   store: SecretStore,
   targets: readonly PlaintextCredentialTarget[] = listPlaintextCredentialTargets(),

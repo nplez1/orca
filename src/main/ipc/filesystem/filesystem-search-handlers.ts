@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { listQuickOpenFiles } from '../filesystem-list-files'
+import { listQuickOpenFiles } from './filesystem-list-files'
 import {
   isFileNameFilterQueryTooLarge,
   pathMatchesFileNameFilterTokens,
@@ -11,7 +11,7 @@ import { registerFilesystemPathSearchHandler } from './filesystem-path-search-ha
 import { createFilesystemIndexRequestFences } from './filesystem-index-request-fences'
 import { registerWorkspacePathIndexIpc } from './workspace-path-index-ipc'
 import { isWorkspacePathIndexEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
-import { resolveAuthorizedPath } from '../filesystem-auth'
+import { resolveAuthorizedPath } from './filesystem-auth'
 import { prewarmQuickOpenPathInventory } from '../quick-open-path-inventory'
 
 export function registerFilesystemSearchHandlers(context: FilesystemHandlerContext): void {

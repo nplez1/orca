@@ -1,9 +1,6 @@
 #!/bin/bash
-# Why: remove the PATH symlink that after-install.sh created, but only if it
-# still points into an Orca NP install dir — never delete an unrelated
-# /usr/bin/orca-np a user or another package may own.
-# Why (fork): the link is `orca-np`; /usr/bin/orca-ide belongs to an official
-# Orca install and is none of this package's business.
+# Remove only the install-owned symlink we created (`orca-np`); /usr/bin/orca-ide belongs to an
+# official Orca install and is none of this package's business.
 set -e
 
 # RPM passes an instance count; dpkg passes the package lifecycle action.

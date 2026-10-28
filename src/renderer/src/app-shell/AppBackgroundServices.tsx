@@ -18,16 +18,15 @@ export function AppBackgroundServices(): React.JSX.Element {
   return (
     <>
       <WorkspacePortScanner enabled={workspaceSessionReady} />
-      {/* Why: plugin language-pack discovery must not re-render the App shell. */}
+      {/* Keep permission notices available across app surfaces. */}
       <MacosTccPromptNoticeHost />
-      {/* Why: leaf-mounted retention sync keeps agent-status subscriptions out of the App render tree. */}
+      {/* Keep agent-status retention subscriptions out of the App render tree. */}
       <RetainedAgentsSyncGate />
       <AiVaultTabTitleSyncGate />
       <SavedHostScopeWidenGate />
       <AgentHibernationGate />
       <StructuredAgentSessionStatusBridge />
-      {/* Why here and not in the chat pane: a backgrounded chat has no mounted pane, and that is
-          exactly the completion the user needs the dot for. */}
+      {/* Background chats have no mounted pane but still need completion attention. */}
       <StructuredAgentSessionAttentionBridge />
     </>
   )

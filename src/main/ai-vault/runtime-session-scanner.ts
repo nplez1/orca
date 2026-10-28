@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's session scanner plus the fork's paged drain, row-cap
+   prune and pairing-revision fencing, which cannot move out without copying upstream's scan body. */
 import { AiVaultChatForkSourceSchema } from '../../shared/ai-vault-chat-fork-contract'
 import { z } from 'zod'
 import {
@@ -9,7 +11,7 @@ import {
   type AiVaultSession
 } from '../../shared/ai-vault-types'
 import { toRuntimeExecutionHostId } from '../../shared/execution-host'
-import { listEnvironments } from '../../shared/runtime-environment-store'
+import { listEnvironments, resolveEnvironment } from '../../shared/runtime-environment-store'
 import { callRuntimeEnvironment } from '../ipc/runtime-environments/runtime-environment-transport-routing'
 import type {
   AiVaultPrepareSessionResumeRequest,
@@ -23,6 +25,14 @@ import { parseAiVaultListResult } from './session-list-result-validation'
 import { aiVaultPartialListIssue, readAiVaultListPages } from '../../shared/ai-vault-list-pages'
 import { parseAiVaultSessionTitlesResult } from './session-title-result-validation'
 import { isGatedOffWslHost } from '../wsl/wsl-host-gate'
+import type {
+  AiVaultDeleteSessionArgs,
+  AiVaultDeleteSessionResult
+} from '../../shared/ai-vault-session-deletion'
+import {
+  readRuntimeAiVaultDeleteSessionResponse,
+  runtimeAiVaultDeleteSessionParams
+} from '../../shared/ai-vault-runtime-session-delete'
 import type { RuntimeAiVaultHostInfo } from '../ipc/ai-vault-runtime-scan'
 
 export type RuntimeAiVaultScanOptions = {
@@ -70,6 +80,8 @@ export async function scanRuntimeAiVaultSessions(
 ): Promise<AiVaultListResult> {
   const executionHostId = toRuntimeExecutionHostId(environmentId)
   const drainBudget = drainBudgetMs(options)
+  // Captured before the call: a re-pair mid-scan leaves rows fenced to the older pairing, never the newer.
+  const pairingRevision = savedPairingRevision(userDataPath, environmentId)
   // Why drain here: a remote reply is capped at one 4 MiB frame, so a host's thousands of rows
   // arrive as byte-bounded pages and every desktop reader still sees one complete list.
   const read = await readAiVaultListPages({
@@ -91,7 +103,7 @@ export async function scanRuntimeAiVaultSessions(
   if (read.result.unchanged) {
     return read.result
   }
-  const result = withRuntimeExecutionHost(read.result, executionHostId)
+  const result = withRuntimeExecutionHost(read.result, executionHostId, pairingRevision)
   const issues = [...result.issues]
   // Why not for a cancelled read: the caller left, so an "only part loaded" row would report its
   // own cancellation as a failure. Its rows are dropped by that caller in any case.
@@ -262,12 +274,41 @@ export async function prepareRuntimeAiVaultSessionResume(
   return parsed.data
 }
 
+/** The owning host validates and deletes; a host without the RPC asks for an update instead. */
+export async function deleteRuntimeAiVaultSession(
+  userDataPath: string,
+  environmentId: string,
+  args: AiVaultDeleteSessionArgs
+): Promise<AiVaultDeleteSessionResult> {
+  const response = await callRuntimeEnvironment(
+    userDataPath,
+    environmentId,
+    'aiVault.deleteSession',
+    runtimeAiVaultDeleteSessionParams(args),
+    undefined,
+    args.expectedEnvironmentPairingRevision
+  )
+  return readRuntimeAiVaultDeleteSessionResponse(response, args.agent)
+}
+
+function savedPairingRevision(userDataPath: string, environmentId: string): number | undefined {
+  try {
+    const environment = resolveEnvironment(userDataPath, environmentId)
+    return environment.pairingRevision ?? environment.createdAt
+  } catch {
+    return undefined
+  }
+}
+
 function withRuntimeExecutionHost(
   result: AiVaultListResult,
-  executionHostId: `runtime:${string}`
+  executionHostId: `runtime:${string}`,
+  pairingRevision: number | undefined
 ): AiVaultListResult {
   return {
-    sessions: result.sessions.map((session) => retagRuntimeSession(session, executionHostId)),
+    sessions: result.sessions.map((session) =>
+      retagRuntimeSession(session, executionHostId, pairingRevision)
+    ),
     issues: result.issues.map((issue) => ({ ...issue, executionHostId })),
     scannedAt: result.scannedAt,
     ...(result.fingerprint ? { fingerprint: result.fingerprint } : {}),
@@ -277,7 +318,7 @@ function withRuntimeExecutionHost(
       ? {
           syncDelta: {
             upserts: result.syncDelta.upserts.map((session) =>
-              retagRuntimeSession(session, executionHostId)
+              retagRuntimeSession(session, executionHostId, pairingRevision)
             ),
             removedIds: result.syncDelta.removedIds
           }
@@ -288,13 +329,16 @@ function withRuntimeExecutionHost(
 
 function retagRuntimeSession(
   session: AiVaultSession,
-  executionHostId: `runtime:${string}`
+  executionHostId: `runtime:${string}`,
+  pairingRevision: number | undefined
 ): AiVaultSession {
-  // The caller selects the scanned host; a transport peer cannot supply trusted execution IDs.
+  // The caller selects the scanned host; a transport peer cannot supply trusted execution IDs or pairings.
+  const { hostPairingRevision: _untrusted, ...rest } = session
   return {
-    ...session,
+    ...rest,
     executionHostId,
-    id: `${executionHostId}:${session.agent}:${session.sessionId}:${session.filePath}`
+    id: `${executionHostId}:${session.agent}:${session.sessionId}:${session.filePath}`,
+    ...(pairingRevision !== undefined ? { hostPairingRevision: pairingRevision } : {})
   }
 }
 

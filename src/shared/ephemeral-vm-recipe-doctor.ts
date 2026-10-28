@@ -156,8 +156,7 @@ function checkCommandPath(
       remediation: 'Create the script or update the recipe command path.'
     }
   }
-  // Why: a non-executable script fails create with a confusing EACCES. The exec
-  // bit is a POSIX concept — skip on Windows, where it does not apply.
+  // Catch confusing create-time EACCES early; executable bits apply only on POSIX.
   if (process.platform !== 'win32') {
     try {
       accessSync(scriptPath, fsConstants.X_OK)

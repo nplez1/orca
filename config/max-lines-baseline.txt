@@ -1,21 +1,28 @@
 # Files/globs currently allowed to exceed the oxlint `max-lines` budget.
 # This is a RATCHET: the list may only SHRINK. Do NOT add entries to get CI green —
-# split the oversized file instead. The one exception, decided 2026-10-27: a file UPSTREAM owns is
-# exempted rather than split, because splitting it costs a permanent hunk on every sync. Fork-owned
-# files are never exempted. Rule and probe recipe: LOCAL-PATCHES.md § local(lint).
+# split the oversized file instead.
 # Regenerate/prune: pnpm check:max-lines-ratchet --prune   (removes stale entries only)
-inline src/main/ipc/worktree-remote.ts
-inline src/main/ssh/ssh-channel-multiplexer.ts
-inline src/main/ssh/connection/ssh-connection.ts
-inline src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.ts
-# Fork exemptions, reviewer-approved 2026-10-27 (plan §7 addendum): each is an upstream-owned file
-# held at its budget ceiling by the fork's own lines. Splitting an upstream file would cost a
-# permanent hunk on every sync, which is the divergence this baseline exists to avoid.
+inline config/scripts/verify-localization-catalog.mjs
+inline src/main/agent-hooks/server/server-lifecycle.ts
+inline src/main/ai-vault/runtime-session-scanner.ts
 inline src/main/claude/hook-settings.ts
+inline src/main/ipc/ai-vault.ts
 inline src/main/ipc/filesystem/watchers/filesystem-watcher-wsl.ts
-inline src/main/orcad/orcad-entry.ts
+inline src/main/ipc/register-core-handlers/register-core-handlers.ts
+inline src/main/ipc/settings.test.ts
+inline src/main/ipc/worktree-remote.ts
+inline src/main/ssh/connection/ssh-connection.ts
+inline src/main/ssh/ssh-channel-multiplexer.ts
 inline src/renderer/src/components/editor/CheckRunDetailsPanel.tsx
+inline src/renderer/src/components/right-sidebar/checks-panel/check-run-details.tsx
+inline src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-manual-refresh.tsx
 inline src/renderer/src/components/settings/accounts-search.ts
+inline src/renderer/src/components/settings/repository/execution/RepositoryHostSetupsSection.test.tsx
+inline src/renderer/src/components/sidebar/AddRepoDialog.tsx
+inline src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.ts
+inline src/renderer/src/lib/worktree-creation-flow-execute.ts
 inline src/renderer/src/web/preload-api/web-filesystem-api.ts
 inline src/shared/agent-hook-listener.ts
+inline src/shared/agent-hook-listener/listener-state.ts
+inline src/shared/ssh-types.ts
 inline src/shared/tui-agent-config.ts

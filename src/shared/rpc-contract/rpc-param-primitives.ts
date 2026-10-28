@@ -1,10 +1,7 @@
 import { z } from 'zod'
 
-// Why: the original handlers treated non-numeric/NaN limit values as "no
-// limit" rather than as errors. Preserve that forgiving behavior so CLI
-// callers passing stringified numbers or Infinity still reach the runtime.
-// The outer optional() is required for omitted keys in Zod v4; an optional
-// schema hidden behind pipe() still makes z.object require the property.
+// Preserve legacy nonnumeric/nonfinite limits as absent. Zod v4 needs outer optional(): one hidden by pipe
+// still makes object keys required.
 export const OptionalFiniteNumber = z
   .unknown()
   .transform((value) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined))
@@ -37,9 +34,7 @@ export const OptionalBoolean = z
   .pipe(z.union([z.boolean(), z.undefined()]))
   .optional()
 
-// Why: runtime handlers accept `linkedIssue: number | null | undefined` with
-// distinct meanings — undefined means "no update", null means "clear", number
-// means "set". The ambient JSON decode produces all three shapes as-is.
+// Preserve three update meanings: undefined leaves unchanged, null clears, number sets.
 export const TriStateLinkedIssue = z
   .unknown()
   .transform((value) => {

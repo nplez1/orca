@@ -1,4 +1,4 @@
-import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
+import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import {
   Dialog,
   DialogContent,
@@ -31,7 +31,7 @@ import {
   SelectItem
 } from '@/components/ui/select'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
-import { isJiraScalarUserCreateField } from '@/components/task-page-jira-create-fields'
+import { isJiraScalarUserCreateField } from '@/components/task-page/jira/task-page-jira-create-fields'
 import { TaskPageJiraIssueAssigneeField } from './IssueAssigneeField'
 import { TaskPageJiraIssueUserField } from './IssueUserField'
 export function TaskPageJiraIssueDialog({

@@ -9,7 +9,7 @@ import {
   buildSetupHostOptions,
   type SetupHostOption
 } from '@/components/settings/repository/execution/repository-host-setup-options'
-import { getRepositoryHostSetupsSectionId } from '@/components/settings/repository-settings-targets'
+import { getRepositoryHostSetupsSectionId } from '@/components/settings/repository/repository-settings-targets'
 import { useConfiguredExecutionHostOptions } from '@/hooks/use-configured-execution-host-options'
 
 export type ProjectAddToHostActions = {

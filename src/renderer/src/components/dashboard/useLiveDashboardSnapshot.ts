@@ -1,6 +1,7 @@
 import { createDashboardChatProgramHolds } from './dashboard-chat-program-acquisition'
 import { useEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store'
+import { useStructuredChatTabNames } from '@/runtime/structured-chat-name-observation'
 import type { DashboardSnapshot } from '../../../../shared/dashboard-snapshot'
 import { buildDashboardSnapshot } from './build-dashboard-snapshot'
 import { useChatProgramFactsVersion } from '@/lib/host-chat-program-acquisition'
@@ -46,8 +47,7 @@ export function useLiveDashboardSnapshot(): DashboardSnapshot {
   // (each writer bails out when nothing changed) next to agentStatusByPaneKey,
   // which already rebuilds this memo on every status ping.
   const detectedWorktreesByRepo = useAppStore((s) => selectDetectedWorktreesByRepo(s))
-  // Why: a folder workspace is not a git worktree — its host resolves through
-  // these two instead of worktreesByRepo.
+  // Folder workspace host resolution uses these slices instead of git-worktree rows.
   const folderWorkspaces = useAppStore((s) => selectFolderWorkspaces(s))
   const projectGroups = useAppStore((s) => s.projectGroups)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
@@ -64,9 +64,9 @@ export function useLiveDashboardSnapshot(): DashboardSnapshot {
   const detectedAgentIds = useAppStore((s) => s.detectedAgentIds)
   const remoteDetectedAgentIds = useAppStore((s) => s.remoteDetectedAgentIds)
   const runtimeDetectedAgentIds = useAppStore((s) => s.runtimeDetectedAgentIds)
-  // Why: freshness can flip a bucket without any backing map changing; the epoch
-  // ticks on the freshness boundary so the memo re-derives stale-decayed cards.
+  // Freshness can change buckets without map writes; the epoch invalidates stale-decay memos.
   const agentStatusEpoch = useAppStore((s) => s.agentStatusEpoch)
+  const chatNames = useStructuredChatTabNames()
   // Why: launch options read only this view, so any route input change rebuilds them.
   const launchRouteStore = useAppStore(selectAgentLaunchRouteView)
   const holdsRef = useRef<ReturnType<typeof createDashboardChatProgramHolds> | null>(null)
@@ -86,6 +86,7 @@ export function useLiveDashboardSnapshot(): DashboardSnapshot {
     () =>
       buildDashboardSnapshot(
         {
+          chatNames,
           repos,
           worktreesByRepo,
           tabsByWorktree,
@@ -117,14 +118,11 @@ export function useLiveDashboardSnapshot(): DashboardSnapshot {
           detectedAgentIds,
           remoteDetectedAgentIds,
           runtimeDetectedAgentIds,
-          // Why: read non-reactively — resolveWindowsShiftEnterEncoding takes
-          // launch identity but never routes on it, so subscribing would only
-          // rebuild the board. Matches the bridge's republish gate.
+          // Read launch identity non-reactively because Shift+Enter routing does not depend on it; match the bridge gate.
           agentLaunchConfigByPaneKey: useAppStore.getState().agentLaunchConfigByPaneKey
         },
         Date.now(),
-        // Why: unchanged worktrees reuse their row pipeline; card assembly still runs
-        // fresh against the review/host/status slices this memo subscribes to.
+        // Reuse unchanged worktree rows while assembling cards fresh from current review/host/status slices.
         { rowsCache: rowsCacheRef.current, rowsGeneration: agentStatusEpoch, launchRouteStore }
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,6 +158,7 @@ export function useLiveDashboardSnapshot(): DashboardSnapshot {
       detectedAgentIds,
       remoteDetectedAgentIds,
       runtimeDetectedAgentIds,
+      chatNames,
       chatProgramFactsVersion,
       launchRouteStore,
       agentStatusEpoch

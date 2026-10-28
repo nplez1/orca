@@ -4,8 +4,8 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraSite } from '../../../../shared/jira/jira-types'
-import type { SourceOption } from '../task-page-localized-options'
-import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
+import type { SourceOption } from './task-page-localized-options'
+import type { TaskPageComposerActionsModel } from './use-task-page-composer-actions'
 import { TaskPageSourceBar } from './SourceBar'
 
 const openSettingsPage = vi.fn()

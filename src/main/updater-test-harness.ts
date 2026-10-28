@@ -60,6 +60,7 @@ type UpdaterModuleFactories = {
   }
   updaterPrereleaseFeed: () => {
     fetchNewerReleaseTagsWithReadiness: (...args: unknown[]) => Promise<unknown>
+    fetchLatestStableReleaseTag: () => Promise<string | null>
     getReleaseDownloadUrl: (tag: string) => string
   }
   localBuildSwitch: () => { chooseLocalBuild: UpdaterSpy }
@@ -83,6 +84,7 @@ export type UpdaterMocks = {
   armExitWatchdogMock: UpdaterSpy
   disarmExitWatchdogMock: UpdaterSpy
   fetchNewerReleaseTagsMock: UpdaterSpy
+  fetchLatestStableReleaseTagMock: Mock<() => Promise<string | null>>
   chooseLocalBuildMock: UpdaterSpy
   startLocalBuildFeedMock: UpdaterSpy
   closeLocalBuildFeedMock: UpdaterSpy
@@ -205,6 +207,7 @@ export function createUpdaterMocks(): UpdaterMocks {
   const armExitWatchdogMock = vi.fn()
   const disarmExitWatchdogMock = vi.fn()
   const fetchNewerReleaseTagsMock = vi.fn()
+  const fetchLatestStableReleaseTagMock = vi.fn<() => Promise<string | null>>()
   const chooseLocalBuildMock = vi.fn()
   const startLocalBuildFeedMock = vi.fn()
   const closeLocalBuildFeedMock = vi.fn()
@@ -235,6 +238,7 @@ export function createUpdaterMocks(): UpdaterMocks {
       disarmUpdateInstallExitWatchdog: disarmExitWatchdogMock
     }),
     updaterPrereleaseFeed: () => ({
+      fetchLatestStableReleaseTag: fetchLatestStableReleaseTagMock,
       fetchNewerReleaseTagsWithReadiness: async (...args: unknown[]) => {
         const result = await fetchNewerReleaseTagsMock(...args)
         return Array.isArray(result)
@@ -276,6 +280,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     shouldApplyNudgeMock.mockReset().mockReturnValue(false)
     fetchChangelogMock.mockReset().mockResolvedValue(null)
     fetchNewerReleaseTagsMock.mockReset().mockResolvedValue([])
+    fetchLatestStableReleaseTagMock.mockReset().mockResolvedValue('v1.0.51')
     chooseLocalBuildMock.mockReset()
     closeLocalBuildFeedMock.mockReset()
     startLocalBuildFeedMock.mockReset().mockResolvedValue({
@@ -309,6 +314,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     armExitWatchdogMock,
     disarmExitWatchdogMock,
     fetchNewerReleaseTagsMock,
+    fetchLatestStableReleaseTagMock,
     chooseLocalBuildMock,
     startLocalBuildFeedMock,
     closeLocalBuildFeedMock,

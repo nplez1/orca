@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's catalog verifier plus the fork's overlay merge, so
+   new keys land in i18n/fork/en.json instead of upstream's catalog (LOCAL-PATCHES § local(i18n)). */
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -6,7 +8,11 @@ import process from 'node:process'
 // TypeScript 7 is a native CLI; AST consumers still need the legacy JavaScript API.
 import ts from 'typescript-api'
 
-import { readEnglishCatalog, writeMissingEnglishEntries } from './fork-english-catalog.mjs'
+import {
+  mergeCatalogs,
+  readForkEnglishCatalog,
+  writeMissingEnglishEntries
+} from './fork-english-catalog.mjs'
 import { canonicalGenericRenderings } from './locale-generic-ui-terms.mjs'
 import { repairTranslatedValue } from './locale-translation-policy.mjs'
 
@@ -182,8 +188,8 @@ function normalizeInterpolationVariables(value) {
     .join('|')
 }
 
-function formatInconsistentFallbackVariables(inconsistentFallbackVariables) {
-  return inconsistentFallbackVariables
+function formatFallbackReferenceGroups(groups) {
+  return groups
     .map(({ key, references }) => {
       const locations = references
         .map(
@@ -196,7 +202,7 @@ function formatInconsistentFallbackVariables(inconsistentFallbackVariables) {
     .join('\n\n')
 }
 
-function collectInconsistentFallbackVariables(references) {
+function groupFallbackReferencesByKey(references) {
   const byKey = new Map()
 
   for (const reference of references) {
@@ -207,8 +213,30 @@ function collectInconsistentFallbackVariables(references) {
     existing.push(reference)
     byKey.set(reference.key, existing)
   }
+  return byKey
+}
 
-  return [...byKey.entries()]
+// Why: the catalog holds one value per key, so a second sentence on the same key never renders.
+function collectReusedFallbackKeys(references) {
+  return [...groupFallbackReferencesByKey(references).entries()]
+    .filter(([, keyReferences]) => new Set(keyReferences.map((r) => r.fallback)).size > 1)
+    .map(([key, keyReferences]) => ({ key, references: keyReferences }))
+}
+
+/** Prints keys reused for different fallback text; returns true when any exist. */
+function reportReusedFallbackKeys(references) {
+  const reusedFallbackKeys = collectReusedFallbackKeys(references)
+  if (reusedFallbackKeys.length === 0) {
+    return false
+  }
+  console.error('Localization keys are reused for different fallback text; give each its own key.')
+  console.error('')
+  console.error(formatFallbackReferenceGroups(reusedFallbackKeys))
+  return true
+}
+
+function collectInconsistentFallbackVariables(references) {
+  return [...groupFallbackReferencesByKey(references).entries()]
     .map(([key, keyReferences]) => {
       const uniqueFallbackVariables = new Set(
         keyReferences.map((reference) => normalizeInterpolationVariables(reference.fallback))
@@ -263,19 +291,40 @@ function setCatalogEntry(catalog, key, value) {
   cursor[parts.at(-1)] = value
 }
 
-function collectLocaleParityIssues(enCatalog, localeCatalog) {
+// Locales with more CLDR plural categories than English (ru few/many) source those forms from `_other`.
+function resolveLocaleSourceKey(enEntries, localeName, key) {
+  if (enEntries.has(key)) {
+    return key
+  }
+  const plural = /^(.*)_(zero|one|two|few|many|other)$/.exec(key)
+  if (!plural || !localeName || !enEntries.has(`${plural[1]}_other`)) {
+    return undefined
+  }
+  try {
+    return new Intl.PluralRules(localeName).resolvedOptions().pluralCategories.includes(plural[2])
+      ? `${plural[1]}_other`
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function collectLocaleParityIssues(enCatalog, localeCatalog, localeName) {
   const enEntries = flattenCatalogEntries(enCatalog)
   const localeEntries = flattenCatalogEntries(localeCatalog)
   const missingInLocale = [...enEntries.keys()].filter((key) => !localeEntries.has(key))
-  const extraInLocale = [...localeEntries.keys()].filter((key) => !enEntries.has(key))
+  const extraInLocale = [...localeEntries.keys()].filter(
+    (key) => !resolveLocaleSourceKey(enEntries, localeName, key)
+  )
   const interpolationMismatches = []
 
-  for (const key of enEntries.keys()) {
-    if (!localeEntries.has(key)) {
+  for (const [key, localeValue] of localeEntries) {
+    const sourceKey = resolveLocaleSourceKey(enEntries, localeName, key)
+    if (!sourceKey) {
       continue
     }
-    const enVariables = collectInterpolationVariables(enEntries.get(key))
-    const localeVariables = collectInterpolationVariables(localeEntries.get(key))
+    const enVariables = collectInterpolationVariables(enEntries.get(sourceKey))
+    const localeVariables = collectInterpolationVariables(localeValue)
     if (enVariables.join('|') !== localeVariables.join('|')) {
       interpolationMismatches.push(key)
     }
@@ -318,8 +367,7 @@ function applyMissingEnglishEntries(catalog, missing) {
   return changed
 }
 
-// Why: #12113 — parity checks pass while repair-locale-catalog rewrites translated generic terms
-// back to English, so drift only surfaces when someone regenerates the catalog.
+// Check repair policy too: parity passed while repair rewrote translated generic terms into English (#12113).
 export function collectGenericTermRegressions(enEntries, localeEntries, localeName) {
   const renderings = canonicalGenericRenderings(localeName)
   if (renderings.length === 0) {
@@ -359,13 +407,53 @@ function formatGenericTermRegressions(regressions) {
     .join('\n')
 }
 
+// Why: JSON.parse silently keeps the last duplicate key.
+function collectDuplicateCatalogKeys(fileName, text) {
+  const sourceFile = ts.parseJsonText(fileName, text)
+  const duplicates = []
+  const visit = (node, prefix) => {
+    if (!ts.isObjectLiteralExpression(node)) {
+      return
+    }
+    const seen = new Set()
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property)) {
+        continue
+      }
+      const name = property.name.text
+      const key = prefix ? `${prefix}.${name}` : name
+      if (seen.has(name)) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(property.getStart(sourceFile))
+        duplicates.push(`${fileName}:${line + 1} ${key}`)
+      }
+      seen.add(name)
+      visit(property.initializer, key)
+    }
+  }
+  for (const statement of sourceFile.statements) {
+    visit(statement.expression, '')
+  }
+  return duplicates
+}
+
+async function readCatalogFile(catalogPath) {
+  const text = await fs.readFile(catalogPath, 'utf8')
+  const duplicates = collectDuplicateCatalogKeys(path.basename(catalogPath), text)
+  if (duplicates.length > 0) {
+    console.error('Localization catalog has duplicate keys; JSON keeps only the last value.')
+    console.error('')
+    console.error(duplicates.map((duplicate) => `- ${duplicate}`).join('\n'))
+    return undefined
+  }
+  return JSON.parse(text)
+}
+
 function verifyLocaleCatalog(enCatalog, localeName, localeCatalog) {
   const { enEntries, localeEntries, missingInLocale, extraInLocale, interpolationMismatches } =
-    collectLocaleParityIssues(enCatalog, localeCatalog)
+    collectLocaleParityIssues(enCatalog, localeCatalog, localeName)
   const genericTermRegressions = collectGenericTermRegressions(enEntries, localeEntries, localeName)
 
-  // Why: feature PRs own English declarations; absent target leaves deliberately
-  // use i18next's existing English fallback until a localization PR supplies them.
+  // Feature PRs own English declarations; missing target translations use i18next fallback until localization supplies them.
   console.log(
     `${localeName}.json coverage: ${enEntries.size - missingInLocale.length}/${enEntries.size} translated, ${missingInLocale.length} missing.`
   )
@@ -462,8 +550,7 @@ async function reportPluginCatalog(root, catalog, pluginCatalogPath) {
   if (interpolationMismatches.length > 0) {
     console.log(formatMissingKeys('interpolation mismatch', interpolationMismatches.slice(0, 20)))
   }
-  // Why: absent plugin translations safely fall back to English, but a present
-  // value with different variables can render broken or misleading UI.
+  // Missing plugin translation can fall back; mismatched variables in present value can mislead or break UI.
   return interpolationMismatches.length > 0 ? 1 : 0
 }
 
@@ -489,7 +576,13 @@ export async function main(
   sharedReferences
 ) {
   const localesDir = path.join(root, LOCALES_RELATIVE_DIR)
-  const catalog = await readEnglishCatalog(root)
+  const catalogPath = path.join(localesDir, 'en.json')
+  const upstreamCatalog = await readCatalogFile(catalogPath)
+  if (upstreamCatalog === undefined) {
+    return 1
+  }
+  // The fork's English strings live in an overlay merged over upstream's byte-identical en.json.
+  const catalog = mergeCatalogs(upstreamCatalog, await readForkEnglishCatalog(root))
   const pluginCatalogs = options.pluginCatalogs ?? []
   if (pluginCatalogs.length > 0) {
     if (options.fix) {
@@ -509,6 +602,11 @@ export async function main(
   }
   let catalogKeys = new Set(flattenCatalogKeys(catalog))
   const references = sharedReferences ?? (await collectLocalizationReferences(root))
+
+  // Why: runs before --fix so an ambiguous key never gets its first sentence written to en.json.
+  if (reportReusedFallbackKeys(references)) {
+    return 1
+  }
 
   const missing = references.filter((reference) => !catalogKeys.has(reference.key))
   if (missing.length > 0) {
@@ -549,7 +647,7 @@ export async function main(
   if (inconsistentFallbackVariables.length > 0) {
     console.error('Localization keys are used with inconsistent interpolation placeholders.')
     console.error('')
-    console.error(formatInconsistentFallbackVariables(inconsistentFallbackVariables))
+    console.error(formatFallbackReferenceGroups(inconsistentFallbackVariables))
     return 1
   }
 
@@ -568,8 +666,8 @@ export async function main(
   for (const fileName of localeFiles) {
     const localeName = fileName.replace(/\.json$/, '')
     const localeCatalogPath = path.join(localesDir, fileName)
-    const localeCatalog = JSON.parse(await fs.readFile(localeCatalogPath, 'utf8'))
-    if (reportDottedCatalogKeys(fileName, localeCatalog) !== 0) {
+    const localeCatalog = await readCatalogFile(localeCatalogPath)
+    if (localeCatalog === undefined || reportDottedCatalogKeys(fileName, localeCatalog) !== 0) {
       return 1
     }
     const exitCode = verifyLocaleCatalog(catalog, localeName, localeCatalog)

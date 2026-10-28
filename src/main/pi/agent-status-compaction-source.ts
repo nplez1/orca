@@ -1,7 +1,6 @@
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 
-/** Pi compacts between a finished reply's agent_end and its settle; stamping that compaction
- *  with the reply's finish lets the host announce it before the compaction ends. */
+/** Attribute between-turn compaction to the finished reply so the host can announce completion before compaction ends. */
 export function getPiAgentStatusCompactionHandlerSourceLines(kind: PiAgentKind): string[] {
   if (kind !== 'pi') {
     return []

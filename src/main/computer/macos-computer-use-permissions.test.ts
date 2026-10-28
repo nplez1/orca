@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCA_APP_ID } from '../../shared/local-build-compatibility'
+import { fakeSpawnDispatch } from '../../shared/__fixtures__/fake-spawned-child'
 import {
   openComputerUsePermissions,
   resetComputerUsePermissions
@@ -14,56 +15,11 @@ const permissionStatusTempDir = '/tmp/orca-computer-use-permissions-test'
 const helperAppPath = '/Applications/Orca Computer Use.app'
 const helperInfoPlistPath = join(helperAppPath, 'Contents', 'Info.plist')
 
-// runProcess settles after stdout and close; fake children must emit both.
 const plistBuddyStdout = vi.hoisted(() => ({ value: 'com.example.orca.computer-use\n' }))
-
-function fakeChild(stdout: string): Record<string, unknown> {
-  const stdoutData: ((chunk: Buffer) => void)[] = []
-  const finish = (callback: (status: number, signal: null) => void): void => {
-    queueMicrotask(() => {
-      for (const onData of stdoutData) {
-        onData(Buffer.from(stdout))
-      }
-      callback(0, null)
-    })
-  }
-  const child: Record<string, unknown> = {
-    pid: 4242,
-    stdin: { end: vi.fn(), on: vi.fn() },
-    stdout: {
-      on: vi.fn((event: string, callback: (chunk: Buffer) => void) => {
-        if (event === 'data') {
-          stdoutData.push(callback)
-        }
-      }),
-      off: vi.fn(),
-      setEncoding: vi.fn()
-    },
-    stderr: { on: vi.fn(), off: vi.fn(), setEncoding: vi.fn() },
-    on: vi.fn((event: string, callback: (status: number, signal: null) => void) => {
-      if (event === 'close') {
-        finish(callback)
-      }
-      return child
-    }),
-    once: vi.fn((event: string, callback: (status: number, signal: null) => void) => {
-      if (event === 'close') {
-        finish(callback)
-      }
-      return child
-    }),
-    off: vi.fn(() => child),
-    kill: vi.fn(),
-    unref: vi.fn()
-  }
-  return child
-}
 
 vi.mock('child_process', () => ({
   execFileSync: vi.fn(),
-  spawn: vi.fn((file: string) =>
-    fakeChild(file === '/usr/libexec/PlistBuddy' ? plistBuddyStdout.value : '')
-  ),
+  spawn: vi.fn(),
   spawnSync: vi.fn()
 }))
 
@@ -83,7 +39,13 @@ describe('openComputerUsePermissions', () => {
   const originalPlatform = process.platform
 
   beforeEach(() => {
-    vi.mocked(spawn).mockClear()
+    vi.mocked(spawn)
+      .mockReset()
+      .mockImplementation(
+        fakeSpawnDispatch((program) => ({
+          stdout: program === '/usr/libexec/PlistBuddy' ? plistBuddyStdout.value : ''
+        }))
+      )
     vi.mocked(spawnSync).mockClear()
     vi.mocked(execFileSync).mockReset()
     vi.mocked(mkdtemp).mockReset()

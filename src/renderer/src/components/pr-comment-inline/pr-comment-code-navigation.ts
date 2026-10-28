@@ -10,7 +10,7 @@ import type {
 import type { GitStatusEntry } from '../../../../shared/git-status-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { canUseChangesModeForFile } from '../editor/editor-panel-file-mode'
-import { getCompareBaseCandidateBranchName } from '../right-sidebar/source-control/sync/base-ref-resolution'
+import { getCompareBaseCandidateBranchName } from '../../../../shared/source-control-base-ref-resolution'
 import { getPRCommentInlineId } from './pr-comment-inline-threads'
 import {
   cancelSourceControlEditorRevealFrames,

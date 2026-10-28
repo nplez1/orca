@@ -111,7 +111,6 @@ export function renderLinearItemDrawerSheet({
 
         {displayed && (
           <div className="flex h-full min-h-0 flex-col">
-            {/* Header */}
             <div className="flex-none border-b border-border/60 px-4 py-3">
               <div className="flex items-start gap-2">
                 <LinearIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
@@ -177,7 +176,6 @@ export function renderLinearItemDrawerSheet({
               </div>
             </div>
 
-            {/* Edit section */}
             {editState && (
               <LinearIssueEditSection
                 issue={displayed}
@@ -188,7 +186,6 @@ export function renderLinearItemDrawerSheet({
               />
             )}
 
-            {/* Body + comments */}
             <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
               <div className="px-4 py-4">
                 <LinearIssueTextEditor
@@ -253,7 +250,6 @@ export function renderLinearItemDrawerSheet({
               </div>
             </div>
 
-            {/* Comment footer + Start/Open workspace */}
             <LinearIssueCommentFooter
               issueId={displayed.id}
               workspaceId={displayed.workspaceId}

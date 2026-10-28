@@ -2,7 +2,7 @@ import type { WorkspacePathSearchCorrelationId } from './workspace-path-search-i
 import { measureUtf8ByteLength } from './utf8-byte-limits'
 import { MAX_MESSAGE_SIZE } from './relay-frame-decoder'
 import { REMOTE_RPC_MAX_CONTENT_BYTES } from './remote-rpc-content-budget'
-import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from './remote-runtime-memory-limits'
+import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from './remote-runtime/remote-runtime-memory-limits'
 import {
   QUICK_OPEN_QUERY_MAX_BYTES,
   QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS,

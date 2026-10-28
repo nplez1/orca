@@ -133,6 +133,7 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
       incoming: terminalOwnedPayload.payload.agentType,
       // Relay presence is the execution host's owner verdict, not the sender's identity.
       incomingProcess: payload.connectionId ? undefined : incoming.agentPresence?.process,
+      incomingSession: terminalOwnedPayload.providerSession?.id,
       now
     })
     if (
@@ -144,8 +145,8 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
       this.commitStatusRowMutation(rowBefore, previous)
       return previous
     }
-    if (payload.hookEventName === 'UserPromptSubmit') {
-      // Repeated prompt text still opens a new turn; OSC must not inherit the old completion stamp.
+    // Any submitted prompt (incl. a replayed Codex start) opens a new turn; OSC must not inherit the old stamp.
+    if (payload.hookEventName === 'UserPromptSubmit' || payload.hasExplicitPrompt === true) {
       this.activeHookTurnCompletedAtByPaneKey.delete(payload.paneKey)
     }
     if (terminalOwnedPayload.connectionId) {

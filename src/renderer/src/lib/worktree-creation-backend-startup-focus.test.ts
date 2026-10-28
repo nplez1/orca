@@ -61,6 +61,7 @@ beforeEach(() => {
           revealTerminal = listener
           return () => {}
         },
+        onLaunchRecipe: () => () => {},
         onRequestTerminalTabMount: () => () => {},
         replyTerminalCreate: vi.fn()
       }

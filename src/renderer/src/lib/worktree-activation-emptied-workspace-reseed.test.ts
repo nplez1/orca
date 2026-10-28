@@ -231,9 +231,7 @@ describe('activating a workspace whose last terminal was closed', () => {
     }
   })
 
-  // Why: terminal file links and check annotations activate only to route history before they
-  // open an editor tab. Seeding there hands the user a shell they never asked for and erases the
-  // tombstone permanently. See terminal-file-open-routing.ts and check-annotation-open.ts.
+  // File links/check annotations provide editors; shell seeding would add an unrequested terminal and erase the empty tombstone.
   it('leaves the row empty when the caller opens its own surface', () => {
     const worktree = makeWorktree()
     seedEmptyActivatableWorktree(worktree)
@@ -260,8 +258,7 @@ describe('activating a workspace whose last terminal was closed', () => {
     expect(useAppStore.getState().tabsByWorktree[worktree.id]).toEqual([])
   })
 
-  // Why: this passes ahead of the tombstone check — a renderable browser tab short-circuits
-  // `shouldAutoCreateInitialTerminal` — so it guards `renderableTabCount`, not the re-seed flag.
+  // Renderable browser tabs short-circuit initial-terminal creation; this covers renderableTabCount, not reseed flags.
   it('does not add a terminal to a workspace that still renders a browser tab', () => {
     const worktree = makeWorktree()
     seedEmptyActivatableWorktree(worktree)
@@ -478,8 +475,7 @@ describe('activating a folder workspace whose last terminal was closed', () => {
     expect(useAppStore.getState().tabsByWorktree[FOLDER_KEY] ?? []).toEqual([])
   })
 
-  // Why: the opt-out must mean the same thing on both workspace shapes, or routing a
-  // file link through a folder workspace would silently regress to seeding a shell.
+  // Own-surface opt-out must also cover folders or file-link routing there reseeds shells.
   it('leaves the row empty when the caller opens its own surface', async () => {
     seedEmptiedFolderWorkspaceOnTwoHosts()
     useAppStore.setState({

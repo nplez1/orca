@@ -18,53 +18,36 @@ export type PRCommentAiLaunchAckCounts = {
 export type PRCommentAiLaunchAckDeps = {
   /** Provider supports posting a reply (GitHub in the Checks panel today). */
   canReply: boolean
-  /**
-   * Nested review-thread reply (pulls/.../comments/{id}/replies).
-   * Only call when canPostPRReviewThreadReply(comment) is true.
-   */
+  /** Nested review reply API; call only when canPostPRReviewThreadReply allows it. */
   replyInThread: (comment: PRComment, body: string) => Promise<boolean>
-  /**
-   * One top-level PR conversation comment (issues/.../comments) covering every selected
-   * comment with no nested-reply endpoint (review summaries, CodeRabbit, plain comments).
-   */
+  /** One conversation post for selected summaries/plain comments without nested-reply endpoints. */
   replyAsConversation: (body: string) => Promise<boolean>
 }
 
-/**
- * True when GitHub can nest a reply under this comment (inline review-thread comment).
- * Conversation comments and PR review summaries (CodeRabbit, etc.) cannot use that API.
- */
+/** Only inline review-thread comments support nested replies; conversation comments and review summaries do not. */
 export function canPostPRReviewThreadReply(
   comment: Pick<PRComment, 'id' | 'threadId' | 'path' | 'url'>
 ): boolean {
   if (!Number.isSafeInteger(comment.id) || comment.id <= 0) {
     return false
   }
-  // Why: review-summary anchors use #pullrequestreview-N; that id is not a review
-  // comment id and will 404 on the replies endpoint.
+  // Review-summary anchors name review IDs, not comment IDs; nested replies would 404.
   if (typeof comment.url === 'string' && comment.url.includes('pullrequestreview')) {
     return false
   }
-  // Why: threadId is the GraphQL thread key; path marks review comments even when
-  // thread metadata is missing; #discussion_r is the REST anchor for review comments.
+  // threadId/path identify review comments even without complete metadata; discussion_r is their REST anchor.
   if (Boolean(comment.threadId) || Boolean(comment.path)) {
     return true
   }
   return typeof comment.url === 'string' && comment.url.includes('discussion_r')
 }
 
-/**
- * Reply to the thread root: GitHub's replies endpoint keys off the top-level review
- * comment id, and a later reply's id can 404 there.
- */
+/** Reply using the thread root ID; later reply IDs can 404 on GitHub's endpoint. */
 export function getPRCommentGroupReplyTarget(group: PRCommentGroup): PRComment {
   return getPRCommentGroupRoot(group)
 }
 
-/**
- * Attach parent review-thread metadata so the sidebar groups the reply under the
- * original comment immediately (GitHub REST replies often omit threadId/path).
- */
+/** Restore parent metadata omitted by REST so the sidebar immediately groups replies under their thread. */
 export function attachPRReviewReplyParent(
   reply: PRComment,
   parent: Pick<PRComment, 'threadId' | 'path' | 'line' | 'isResolved' | 'isOutdated' | 'startLine'>
@@ -80,10 +63,7 @@ export function attachPRReviewReplyParent(
   }
 }
 
-/**
- * Resolve a threadId for a reply target from the live comment list when the
- * target itself is missing one (path-only review comments).
- */
+/** Recover missing thread IDs for path-only reply targets from the live comment list. */
 export function resolvePRReviewReplyThreadId(args: {
   parent: Pick<PRComment, 'id' | 'threadId' | 'path' | 'line'>
   existingComments: readonly PRComment[]
@@ -113,11 +93,7 @@ export function resolvePRReviewReplyThreadId(args: {
   return siblingThreadIds.size === 1 ? [...siblingThreadIds][0] : undefined
 }
 
-/**
- * Drop the trailing headSha segment from a checks-panel async key.
- * Agent launch (submit-after-ready) can take long enough for PR head to move;
- * ack must not abort just because headSha churned.
- */
+/** Ignore trailing headSha churn so slow agent launches do not abort acknowledgements after head changes. */
 export function checksPanelReviewStableKey(asyncResultKey: string): string {
   const parts = asyncResultKey.split('::')
   if (parts.length <= 1) {
@@ -126,10 +102,7 @@ export function checksPanelReviewStableKey(asyncResultKey: string): string {
   return parts.slice(0, -1).join('::')
 }
 
-/**
- * Bulk ack fans out over the host API (`gh`), which is slow on SSH; the shared
- * client already caps itself at 4 in-flight requests, so match that ceiling.
- */
+/** Match the shared host client's four-request cap; bulk gh calls are slow over SSH. */
 export const PR_COMMENT_ACK_MAX_CONCURRENCY = 4
 
 const EMPTY_ACK_COUNTS: PRCommentAiLaunchAckCounts = {
@@ -138,7 +111,6 @@ const EMPTY_ACK_COUNTS: PRCommentAiLaunchAckCounts = {
   failed: 0
 }
 
-/** Fixed-size worker pool; results stay in input order. */
 async function mapWithBoundedConcurrency<T, R>(
   items: readonly T[],
   limit: number,
@@ -174,7 +146,6 @@ export function getPRCommentGroupsNeedingReply(
   return groups.filter((group) => !isResolvablePRCommentGroup(group))
 }
 
-/** Emptiness test for the above without materializing the filtered list. */
 export function hasPRCommentGroupNeedingReply(groups: readonly PRCommentGroup[]): boolean {
   return groups.some((group) => !isResolvablePRCommentGroup(group))
 }
@@ -198,8 +169,7 @@ export async function acknowledgePRCommentsAfterAiLaunch(args: {
   groups: readonly PRCommentGroup[]
   deps: PRCommentAiLaunchAckDeps
 }): Promise<PRCommentAiLaunchAckCounts> {
-  // Why: conversation comments have no replies endpoint, so one post per selected item
-  // would spam the PR timeline with near-identical "Fixing." comments.
+  // Conversation comments lack nested replies; batch them to avoid repeated Fixing timeline posts.
   const conversationGroups = args.deps.canReply
     ? getPRCommentGroupsNeedingReply(args.groups).filter(
         (group) => !canPostPRReviewThreadReply(getPRCommentGroupReplyTarget(group))
@@ -234,7 +204,7 @@ async function postBatchedConversationReply(
     buildPRCommentBatchConversationReplyBody(groups.map(getPRCommentGroupReplyTarget))
   )
   return {
-    // Why: one host POST covers the whole set, so the toast must count it once.
+    // Count the combined host POST once for the toast.
     counts: { ...EMPTY_ACK_COUNTS, replied: replyOk ? 1 : 0, failed: replyOk ? 0 : 1 },
     handled: new Set(groups)
   }
@@ -266,7 +236,6 @@ async function acknowledgePRCommentGroup(
   return counts
 }
 
-/** Mutates counts in place. */
 async function postInThreadFixingReply(
   group: PRCommentGroup,
   deps: PRCommentAiLaunchAckDeps,
@@ -306,11 +275,7 @@ export type PendingPRCommentAiAck = {
 /** Durable pending ack payload so dialog close / re-renders cannot drop it before launch. */
 let pendingAiCommentAck: PendingPRCommentAiAck | null = null
 
-/**
- * The slot only ever holds an *unclaimed* queue: an accepted launch takes ownership via
- * takePendingPRCommentAiAck and parks the payload itself. Replacing an unclaimed payload is
- * how a re-opened composer re-queues, so log it — a clobbered accepted launch would be a bug.
- */
+/** This slot holds unclaimed queues only; accepted launches take ownership, while reopened composers may replace and log queued payloads. */
 export function setPendingPRCommentAiAck(payload: PendingPRCommentAiAck): void {
   if (pendingAiCommentAck && pendingAiCommentAck !== payload) {
     console.warn(
@@ -323,12 +288,19 @@ export function setPendingPRCommentAiAck(payload: PendingPRCommentAiAck): void {
   pendingAiCommentAck = payload
 }
 
-export function takePendingPRCommentAiAck(): PendingPRCommentAiAck | null {
+export function takePendingPRCommentAiAck(
+  expected?: PendingPRCommentAiAck
+): PendingPRCommentAiAck | null {
+  if (expected && pendingAiCommentAck !== expected) {
+    return null
+  }
   const payload = pendingAiCommentAck
   pendingAiCommentAck = null
   return payload
 }
 
-export function clearPendingPRCommentAiAck(): void {
-  pendingAiCommentAck = null
+export function clearPendingPRCommentAiAck(expected?: PendingPRCommentAiAck): void {
+  if (!expected || pendingAiCommentAck === expected) {
+    pendingAiCommentAck = null
+  }
 }

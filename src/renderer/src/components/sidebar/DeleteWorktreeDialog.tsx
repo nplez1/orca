@@ -118,9 +118,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
     [allWorktrees, isBatchDelete, worktree, worktreeLineageById]
   )
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
-  // Why: the main worktree is the repo's original clone directory — `git worktree remove`
-  // always rejects it. We block the delete button upfront so the user doesn't have to
-  // discover this limitation via a confusing force-delete dead-end.
+  // Git cannot remove the original clone with worktree remove; block it before the force-delete dead end.
   const isMainWorktree = !isBatchDelete && (worktree?.isMainWorktree ?? false)
   const childWorkspaceCount = lineageDelete.descendants.length
   const canDeleteAllLineage =
@@ -188,8 +186,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
   ])
 
   if (!isOpen && dontAskAgain) {
-    // Why: this checkbox is a one-shot dialog intent; reset it as soon as the
-    // dialog is closed so a later delete never inherits a cancelled choice.
+    // Do not carry a canceled one-shot checkbox into later deletions.
     setDontAskAgain(false)
   }
 
@@ -280,7 +277,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
         surface="security"
         className="max-w-md"
         onOpenAutoFocus={(event) => {
-          // Why: with unsaved edits listed, Enter must not discard them; keep Radix's default focus.
+          // Unsaved edits must not be discarded by Enter; retain Radix’s default focus.
           if (
             isMainWorktree ||
             collectRemovalUnsavedFiles(useAppStore.getState, unsavedTargets).length > 0
@@ -288,11 +285,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
             return
           }
           event.preventDefault()
-          // Why: this confirmation dialog exists specifically to guard a
-          // destructive action the user already chose from the context menu.
-          // Radix otherwise picks the first tabbable control, which can be the
-          // cancel/close affordance and breaks the expected "Delete, Enter"
-          // flow for quick keyboard confirmation.
+          // Focus confirmation for the chosen destructive action so Delete, Enter works without landing on Cancel.
           confirmButtonRef.current?.focus()
         }}
       >

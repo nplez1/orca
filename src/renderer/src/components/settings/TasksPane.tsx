@@ -110,10 +110,7 @@ export function TasksPane({
 
   // Warn only about started-then-stalled setup; untouched providers are the default.
   const stalledVisible = getStalledVisibleTaskProviders(TASK_PROVIDERS, readinessByProvider)
-  // Sticky across rechecks so expanded Linear install terminals are not unmounted.
-  // Claim during render (not an effect): a layout effect elsewhere can force a
-  // sync re-render before passive effects flush and collapse the open card.
-  // useState (not a ref write) keeps render pure for React Doctor.
+  // Claim sticky expansion through render state before passive effects; rechecks must preserve open install terminals without impure ref writes.
   const [previousAutoExpanded, setPreviousAutoExpanded] = useState<TaskProvider | null>(null)
   const autoExpandedProvider = resolveStickyAutoExpandedTaskProvider({
     providers: TASK_PROVIDERS,
@@ -171,8 +168,6 @@ export function TasksPane({
                 'Some visible providers still need setup'
               )}
             </p>
-            {/* Linear is the only multi-step provider today; the generic body
-                covers any future provider that can stall the same way. */}
             <p className="mt-1">
               {stalledVisible.includes('linear')
                 ? translate(

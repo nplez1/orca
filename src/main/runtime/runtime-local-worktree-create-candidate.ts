@@ -1,3 +1,4 @@
+import { selectWorktreeCreateBranchSeed } from '../worktree-create-branch-seed'
 import type { Repo } from '../../shared/repo-types'
 import type { WorktreeLayoutMode } from '../../shared/orca-workspace-layout'
 import { WorktreeCreateCollisionError } from '../../shared/new-workspace/worktree-create-collision'
@@ -58,6 +59,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     worktreeLayoutMode?: WorktreeLayoutMode
     branchPrefix: string
     branchPrefixCustom?: string
+    autoRenameBranchFromWork?: boolean
   }
   worktreePathSettings: ReturnType<typeof getWorktreePathSettings>
   workspaceRoot: string
@@ -72,6 +74,10 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     // invent one from the worktree name.
     throw new Error('An exact-branch create needs the branch it must keep.')
   }
+  const branchSeed = selectWorktreeCreateBranchSeed(
+    args.request,
+    args.settings.autoRenameBranchFromWork
+  )
   const sanitizedName = sanitizeWorktreeName(args.request.name)
   // Why: the branch→PR probes are gh calls; run them as the repo's pinned account, not the
   // ambient login the caller may not have threaded through.
@@ -85,6 +91,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
   let branchName = ''
   let checkoutExistingBranch = false
   let selectedExistingLocalBranchName: string | null = null
+  let selectedRemoteBranchName: string | null = null
   let branchConflictKind: 'local' | 'remote' | null = null
   let worktreePath = ''
   let worktreePathResolved = false
@@ -103,6 +110,41 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
         )
       : null
   const isRetiredName = retiredNameRegistry ? createRetiredNameLookup(retiredNameRegistry) : null
+  if (
+    args.request.branchIntent === 'open-existing' &&
+    args.request.branchNameOverride &&
+    !args.request.pushTarget &&
+    getSelectedReviewBranch(args.request) === null
+  ) {
+    branchName = await resolveCreateBranchName(
+      args.repo.path,
+      args.request.branchNameOverride,
+      sanitizedName,
+      args.settings,
+      args.username,
+      args.localWorktreeGitOptions
+    )
+    const conflict = await getBranchConflictKind(
+      args.repo.path,
+      branchName,
+      args.baseBranch,
+      args.localWorktreeGitOptions
+    )
+    if (conflict === null) {
+      selectedRemoteBranchName = branchName
+    }
+  }
+  const pathIsAvailable = async (): Promise<boolean> => {
+    worktreePath = ensurePathWithinWorkspace(
+      computeWorktreePath(effectiveSanitizedName, args.repo.path, args.worktreePathSettings),
+      args.workspaceRoot
+    )
+    // Orca owns the path until background removal settles.
+    return (
+      !findPendingWorktreeRemovalConflict(args.repo.path, { worktreePath }) &&
+      !(await runtimePathExists(worktreePath))
+    )
+  }
   for (let suffix = 1, attempts = 0; attempts < WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS; suffix += 1) {
     effectiveSanitizedName = shouldRetireGeneratedName
       ? getGeneratedWorktreeCreateCandidate(
@@ -120,6 +162,13 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
       continue
     }
     attempts += 1
+    if (selectedRemoteBranchName) {
+      if (await pathIsAvailable()) {
+        worktreePathResolved = true
+        break
+      }
+      continue
+    }
     branchName = await resolveCreateBranchName(
       args.repo.path,
       selectedExistingLocalBranchName ??
@@ -128,7 +177,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
           // Why: an exact branch keeps its name; only the worktree directory may take the suffix.
           args.request.exactBranchName ? 1 : suffix
         ),
-      effectiveSanitizedName,
+      branchSeed ? getWorktreeCreateCandidate(branchSeed, suffix) : effectiveSanitizedName,
       args.settings,
       args.username,
       args.localWorktreeGitOptions
@@ -215,15 +264,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
         continue
       }
     }
-    worktreePath = ensurePathWithinWorkspace(
-      computeWorktreePath(effectiveSanitizedName, args.repo.path, args.worktreePathSettings),
-      args.workspaceRoot
-    )
-    // Why the pending check: Orca still owns this path until its background removal settles.
-    if (
-      !findPendingWorktreeRemovalConflict(args.repo.path, { worktreePath }) &&
-      !(await runtimePathExists(worktreePath))
-    ) {
+    if (await pathIsAvailable()) {
       worktreePathResolved = true
       break
     }

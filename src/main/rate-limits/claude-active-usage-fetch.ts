@@ -5,8 +5,8 @@ import {
 } from '../claude-accounts/claude-oauth-token-refresh'
 import {
   readClaudeOAuthCredentials,
-  resolveClaudeOAuthCredentialReadOptions,
-  type ClaudeOAuthCredentialReadResult
+  type ClaudeOAuthCredentialReadResult,
+  resolveClaudeOAuthCredentialReadOptions
 } from './claude-oauth-credentials'
 import { fetchClaudeOAuthUsage } from './claude-oauth-usage-request'
 import { classifyClaudeOAuthUsageError } from './claude-usage-error-classification'
@@ -44,7 +44,7 @@ export async function fetchActiveClaudeRateLimits(
     credentialSource: credentials.source,
     authProvenance: options?.authPreparation?.provenance ?? 'system'
   }
-  // Why: System Default with no Claude login is an API-key or non-Claude user, not a signed-out account.
+  // System Default without login may be an API-key/non-Claude user, not a signed-out account.
   if (
     !credentials.token &&
     !credentials.unavailable &&
@@ -146,25 +146,16 @@ function refreshFailureResult(
   outcome: Exclude<ClaudeOAuthRefreshOutcome, { status: 'refreshed' }>,
   metadata: UsageRateLimitMetadata
 ): ProviderRateLimits {
-  // Why: the endpoint refused the stored grant, so no retry can recover this login.
-  if (outcome.status === 'rejected') {
+  // Why: a refused grant or an absent one is dead — only a fresh sign-in can renew the login.
+  if (outcome.status === 'rejected' || outcome.status === 'no-refresh-token') {
     return signInRequiredResult(metadata)
   }
   // Why: a throttle or outage leaves the same login worth retrying on the next poll.
-  if (outcome.status === 'unavailable') {
-    return makeClaudeUsageResult('error', 'Claude usage is waiting for its sign-in to refresh.', {
-      ...metadata,
-      failureKind: 'refreshable-credentials-without-token',
-      attemptedSources: ['oauth']
-    })
-  }
-  return makeClaudeUsageResult(
-    'error',
-    metadata.authProvenance === 'system'
-      ? 'Claude usage updates the next time Claude runs.'
-      : 'Claude usage has expired. Start Claude in this account to refresh it.',
-    { ...metadata, failureKind: 'stale-token', attemptedSources: ['oauth'] }
-  )
+  return makeClaudeUsageResult('error', 'Claude usage is waiting for its sign-in to refresh.', {
+    ...metadata,
+    failureKind: 'refreshable-credentials-without-token',
+    attemptedSources: ['oauth']
+  })
 }
 
 function usageFailureResult(

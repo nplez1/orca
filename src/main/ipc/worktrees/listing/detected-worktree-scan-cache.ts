@@ -26,6 +26,7 @@ import {
 } from '../../../local-worktree-metadata-prune-gate'
 import { pruneMetadataMissingFromAuthoritativeLocalScan } from './authoritative-local-worktree-metadata-pruning'
 import { persistWorktreeScanCacheEntry } from './persisted-worktree-scan-cache'
+import { assertWslUncPathRunning, wslDistroForPath } from '../../../wsl/wsl-unc-access-gate'
 
 // Coalesce renderer polls while bounding external-change lag.
 export const DETECTED_WORKTREE_SCAN_CACHE_TTL_MS = 5_000
@@ -112,6 +113,20 @@ export function __getDetectedWorktreeScanCacheStatsForTests(): {
   }
 }
 
+// A stopped distro fails the scan as unavailable (rows are retained) instead of booting it (E9).
+// Not async: a host scan must start and settle on the same ticks as before.
+function listUnlessWslDistroStopped(
+  repo: Repo,
+  options: ReturnType<typeof getLocalProjectWorktreeGitOptions>
+): ReturnType<typeof listRepoWorktreesForDetectedScan> {
+  if (!wslDistroForPath(repo.path, options.wslDistro)) {
+    return listRepoWorktreesForDetectedScan(repo, options)
+  }
+  return assertWslUncPathRunning(repo.path, options.wslDistro).then(() =>
+    listRepoWorktreesForDetectedScan(repo, options)
+  )
+}
+
 export async function listDetectedGitWorktrees(
   store: Store,
   repo: Repo
@@ -165,7 +180,7 @@ export async function listDetectedGitWorktrees(
       : undefined
   const scan: DetectedWorktreeScan = {
     invalidated: false,
-    promise: listRepoWorktreesForDetectedScan(repo, localWorktreeGitOptions),
+    promise: listUnlessWslDistroStopped(repo, localWorktreeGitOptions),
     sideEffectToken: { generation, authorizedRootsRevision, ...localWorktreeGitOptions },
     hygieneDue,
     ...(metadataPruneExpectation

@@ -88,15 +88,13 @@ export function installOrcaRuntimeOwnedControllers(
   runtime.repositoryClones = new RuntimeRepositoryCloneController(repositoryCatalogDeps)
 
   runtime.repositorySettings = new RuntimeRepositorySettingsController({
-    getStore: () => runtime.store,
+    ...repositoryCatalogDeps,
     resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
     forgetTerminalTopology: (repoId) => runtime.terminalTopologyRevisionByRepoId.delete(repoId),
     // Why the whole options object: the controller decides whether a removal also closes the
     // project's native chats, and forwarding only the deadline silently skipped that close.
     stopProjectTerminals: (repo, options) => runtime.stopTerminalsForProject(repo, options),
-    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
-    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
-    notifyReposChanged: () => runtime.notifyReposChanged()
+    notifyWorktreesChanged: (repoId, options) => runtime.notifyWorktreesChanged(repoId, options)
   })
 
   runtime.repositorySparsePresets = new RuntimeRepositorySparsePresets({

@@ -25,6 +25,9 @@ import type { MarkdownRenderState } from './markdown-render-mode'
 import { useWorktreePRCommentInline } from '../pr-comment-inline/worktree-pr-comment-inline'
 import { usePRCommentInlineSurface } from '../pr-comment-inline/usePRCommentInlineSurface'
 
+// Retry is a user act: it may start a stopped WSL distro.
+const USER_RETRY = { wakeWslDistro: true }
+
 const noopEditorContentChange = (_content: string): void => {}
 const noopEditorSave = async (_content: string): Promise<boolean> => false
 
@@ -93,7 +96,7 @@ export function EditorEditFileSurface({
   handleContentChange: (content: string) => void
   handleDirtyStateHint: (dirty: boolean) => void
   handleSave: (content: string) => Promise<boolean>
-  reloadContent: (file: OpenFile) => void
+  reloadContent: (file: OpenFile, options?: { wakeWslDistro?: boolean }) => void
 }): React.JSX.Element {
   // Why: resolved at the surface that owns the retained Monaco instance, so switching tabs hands the
   // editor the new file's own thread set instead of reusing the previous one's zones.
@@ -125,7 +128,7 @@ export function EditorEditFileSurface({
       <EditorFileLoadErrorView
         message={fileContent.loadError}
         code={fileContent.loadErrorCode}
-        onRetry={() => reloadContent(activeFile)}
+        onRetry={() => reloadContent(activeFile, USER_RETRY)}
       />
     )
   }
@@ -203,11 +206,10 @@ export function EditorEditFileSurface({
     )
   }
 
-  // Why: without a key React reuses the instance and skips cleanup (scroll snapshot); key forces a remount per pane+path.
+  // Remount per pane/path so cleanup snapshots scroll instead of reusing an instance across files.
   const monacoRemountKey = `${viewStateScopeId}\u0000${activeFile.filePath}`
   const monacoEditor = (
-    // Why: Monaco's own create effect throws on a broken language/editor init, which would otherwise
-    // unmount the whole workbench; contain it to this pane and let the retry remount the editor.
+    // Contain Monaco initialization errors to this pane; retry remounts the editor.
     <RecoverableRenderErrorBoundary
       boundaryId="editor.monaco"
       surface="code-editor"
@@ -222,7 +224,6 @@ export function EditorEditFileSurface({
         relativePath={activeFile.relativePath}
         content={currentContent}
         language={monacoLanguage}
-        // Why: read-only tabs no-op the change/save callbacks so no draft, dirty state, or write can occur.
         readOnly={activeFile.readOnly === true}
         liveTail={activeFile.liveTail === true}
         onContentChange={

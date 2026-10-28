@@ -124,7 +124,6 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
     | HostBindings['getAgentProviderSessionRowsForPane']
     | null
 
-  /** See run-terminal-client-use.ts. */
   readTerminalClientUse(ptyId: string): 'used' | 'unused' | 'unknown' {
     return readRunTerminalClientUse(this, ptyId)
   }
@@ -133,17 +132,15 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
     return confirmRunTerminalShellAlone(this.ptyController, ptyId)
   }
 
-  /** The PTY a terminal handle drives now; a restarted pane answers with its new PTY. */
   getTerminalPtyIdForHandle(handle: string): string | null {
     return this.getLivePtyForHandle(handle)?.pty.ptyId ?? null
   }
 
-  /** Every provider-session row this host holds, resume-identity-only rows included. */
+  /** Includes resume-identity-only provider rows. */
   getAgentProviderSessionRows(): AgentStatusIpcPayload[] {
     return this.getAgentProviderSessionSnapshotFn?.() ?? []
   }
 
-  /** Agent status rows this host holds for a pane, from hooks, OSC and titles alike. */
   getAgentStatusRowsForPane(paneKey: string): AgentStatusIpcPayload[] {
     return this.getAgentProviderSessionRowsForPaneFn?.(paneKey) ?? []
   }

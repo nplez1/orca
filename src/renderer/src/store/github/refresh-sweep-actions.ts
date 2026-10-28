@@ -26,8 +26,7 @@ export const createRefreshSweepActions = (
         projectViewCache: evictStaleEntries(s.projectViewCache),
         prRefreshStates: pruneExpiredPRRefreshStates(s.prRefreshStates)
       }
-      // Why: each eviction helper returns its input untouched when nothing changed, so an
-      // unchanged sweep can return `s` and avoid waking every subscriber on window resume.
+      // Unchanged eviction returns input maps; return s too so window-resume sweeps do not wake every subscriber.
       return next.commentsCache === s.commentsCache &&
         next.prCache === s.prCache &&
         next.issueCache === s.issueCache &&
@@ -102,7 +101,6 @@ export const createRefreshSweepActions = (
       return
     }
 
-    // Invalidate this worktree's cache entries
     const branch = worktree.branch.replace(/^refs\/heads\//, '')
     const ownerSettings = settingsForGitHubRepoOwner(state.settings, repo)
     const prKey = prCacheKey(
@@ -146,7 +144,6 @@ export const createRefreshSweepActions = (
       return updates
     })
 
-    // Re-fetch (skip when branch is empty — detached HEAD during rebase)
     if (!worktree.isBare && branch) {
       get().enqueueGitHubPRRefresh(worktreeId, 'post-push', 100)
     }

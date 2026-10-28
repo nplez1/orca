@@ -75,6 +75,13 @@
           }
         }
       },
+      "crash": {
+        "report": {
+          "CrashReportDialog": {
+            "835037edc9": "Orca"
+          }
+        }
+      },
       "floating": {
         "terminal": {
           "floating": {
@@ -586,6 +593,14 @@
     },
     "workspace": {
       "openFailed": "Unable to open the workspace linked to this Jira issue."
+    }
+  },
+  "notifications": {
+    "startupRegistration": {
+      "title": "Orca is ready to notify you"
+    },
+    "test": {
+      "title": "Orca notifications are on"
     }
   },
   "terminal": {

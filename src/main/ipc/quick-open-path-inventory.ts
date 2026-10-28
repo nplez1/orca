@@ -9,7 +9,7 @@ import type {
   WorkspacePathSearchCorrelationId,
   WorkspacePathSearchQueryMetrics
 } from '../../shared/workspace-path-search-instrumentation'
-import type { QuickOpenFilePathSearchResult } from './filesystem-search-file-paths'
+import type { QuickOpenFilePathSearchResult } from './filesystem/filesystem-search-file-paths'
 import {
   clearLocalWorkspacePathIndex,
   createLocalWorkspacePathIndexService,

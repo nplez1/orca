@@ -13,8 +13,7 @@ import type { RepoIcon } from '../../../../shared/repo-icon'
 import { i18n } from '@/i18n/i18n'
 import { AgentKanbanBoard } from './AgentKanbanBoard'
 
-// Stub the card and dialog so the board test stays free of xterm / Radix
-// machinery while still exercising the board-owned dialog wiring.
+// Stub card/dialog internals while retaining the board’s dialog wiring.
 vi.mock('./AgentKanbanCard', () => ({
   AgentKanbanCard: ({
     card,
@@ -226,7 +225,6 @@ describe('AgentKanbanBoard', () => {
 
   it('shows "None" for empty columns', () => {
     renderBoard([card({ bucket: 'working' })])
-    // attention and done are empty → two "None" placeholders.
     expect(screen.getAllByText('None')).toHaveLength(2)
   })
 
@@ -377,8 +375,7 @@ describe('AgentKanbanBoard', () => {
     fireEvent.click(screen.getByTestId('card'))
     expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('true')
 
-    // Sending a message flips the agent done → working; the dialog must
-    // follow the card to its new bucket instead of closing.
+    // Replying moves done agents to working; the dialog must survive the bucket change.
     const moved = { ...agent, bucket: 'working' as const, dotState: 'working' as const }
     rerender(
       <AgentKanbanBoard
@@ -436,8 +433,7 @@ describe('AgentKanbanBoard', () => {
     expect(screen.getByTestId('card').dataset.bucket).toBe('idle')
     expect(ackAgent).not.toHaveBeenCalled()
 
-    // A state change while the dialog is open re-acks (watching counts as
-    // seeing), so the card never flips bold under an open dialog.
+    // Watching new state counts as seeing it; keep open-dialog cards acknowledged.
     rerender(
       <AgentKanbanBoard
         snapshot={{

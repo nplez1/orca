@@ -40,8 +40,7 @@ export function normalizeAiVaultSearchHistoryDays(value: unknown): number | null
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
     return null
   }
-  // A fractional day floors to 0, which reads as "all history" on one side and
-  // "now" on the other; make the two agree.
+  // Normalize fractional days consistently: floor-to-zero cannot mean all history on one side and now on another.
   const days = Math.floor(value)
   return days <= 0 ? null : Math.min(HISTORY_DAYS_MAX, days)
 }
@@ -82,12 +81,7 @@ export function sameAiVaultSearchSettings(
   return a.contentEnabled === b.contentEnabled && a.historyDays === b.historyDays
 }
 
-/**
- * The policy a settings write moves to, or null when nothing about it changed.
- *
- * Every host that owns an index closes and reconstructs on apply, so an unchanged
- * value has to be filtered here rather than at the indexer.
- */
+/** Filter unchanged policies here; every owning host otherwise closes/reconstructs its index on apply. */
 export function changedAiVaultSearchSettings(
   before: { aiVaultSearch?: unknown } | null | undefined,
   after: { aiVaultSearch?: unknown } | null | undefined

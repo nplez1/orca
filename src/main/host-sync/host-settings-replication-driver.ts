@@ -3,7 +3,7 @@ import {
   HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY,
   type HostSettingsReplicationApplyResult
 } from '../../shared/host-settings-replication'
-import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime-client'
+import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime/remote-runtime-client'
 import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 import { resolveEnvironmentPairingOffer } from '../../shared/runtime-environment-store'
 import { HOST_SETTINGS_CREDENTIAL_PORTS } from './host-settings-credential-ports'

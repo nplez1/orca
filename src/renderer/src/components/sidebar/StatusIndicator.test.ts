@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import StatusIndicator, { type Status } from './StatusIndicator'
 
+// Why this file survives upstream retiring its StatusIndicator suite (#34156): the `setup` state is
+// the fork's, so upstream's removal took the only coverage of it with it.
 vi.mock('@/components/StateIndicatorTooltip', async () => {
   const { createElement } = await import('react')
   return {
@@ -32,58 +34,7 @@ function renderDotClassNames(status: Status): string[] {
   return dotClassName!.split(/\s+/)
 }
 
-describe('StatusIndicator', () => {
-  it('renders working as a yellow spinner ring', () => {
-    const markup = renderMarkup('working')
-
-    // The spinner's own classes and animation contract belong to AgentWorkingSpinner.test.tsx;
-    // this pins only that 'working' reaches for it.
-    expect(markup).toContain('data-agent-spinner')
-  })
-
-  it('renders monitoring as a static heartbeat glyph', () => {
-    const markup = renderMarkup('monitoring')
-
-    expect(markup).toContain('data-state-indicator-tooltip="Monitoring background tasks"')
-    expect(markup).not.toContain(' title=')
-    expect(markup).toContain('lucide-activity')
-    expect(markup).toContain('text-agent-working')
-    expect(markup).not.toContain('data-agent-spinner')
-  })
-
-  it('renders permission as the shared question glyph', () => {
-    const markup = renderMarkup('permission')
-
-    expect(markup).toContain('lucide-message-circle-question-mark')
-    expect(markup).toContain('text-agent-question')
-    expect(markup).not.toContain('text-amber-500')
-    expect(markup).not.toContain('data-agent-spinner')
-  })
-
-  it('renders active as full emerald dot', () => {
-    const classNames = renderDotClassNames('active')
-
-    expect(classNames).toContain('bg-emerald-500')
-  })
-
-  it('renders done as an emerald dot', () => {
-    const classNames = renderDotClassNames('done')
-
-    expect(classNames).toContain('bg-emerald-500')
-  })
-
-  it("renders a user's Stop muted, distinct from done and from a failure", () => {
-    const classNames = renderDotClassNames('interrupted')
-
-    expect(classNames).toContain('bg-muted-foreground')
-    expect(classNames).not.toContain('bg-emerald-500')
-    expect(classNames).not.toContain('bg-red-500')
-  })
-
-  it('renders failed as a red dot', () => {
-    expect(renderDotClassNames('failed')).toContain('bg-red-500')
-  })
-
+describe('StatusIndicator setup state', () => {
   it('renders setup as a pulsing amber dot, not a working spinner', () => {
     const classNames = renderDotClassNames('setup')
     const markup = renderMarkup('setup')
@@ -101,37 +52,5 @@ describe('StatusIndicator', () => {
 
     expect(markup).toContain('data-state-indicator-tooltip="Setting up…"')
     expect(markup).not.toContain(' title=')
-  })
-
-  it.each([
-    ['working', 'Working'],
-    ['monitoring', 'Monitoring background tasks'],
-    ['permission', 'Needs permission'],
-    ['interrupted', 'Interrupted'],
-    ['done', 'Done']
-  ] as const)('labels the agent-derived %s workspace state', (status, label) => {
-    const markup = renderMarkup(status)
-
-    expect(markup).toContain(`data-state-indicator-tooltip="${label}"`)
-    expect(markup).not.toContain(' title=')
-  })
-
-  it.each(['active', 'inactive'] as const)(
-    'does not label the passive %s workspace state',
-    (status) => {
-      const markup = renderMarkup(status)
-
-      expect(markup).not.toContain('data-state-indicator-tooltip')
-      expect(markup).not.toContain(' title=')
-    }
-  )
-
-  it('lets an enclosing action own the tooltip', () => {
-    const markup = renderToStaticMarkup(
-      React.createElement(StatusIndicator, { status: 'working', showTooltip: false })
-    )
-
-    expect(markup).not.toContain('data-state-indicator-tooltip')
-    expect(markup).toContain('data-agent-spinner')
   })
 })

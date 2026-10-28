@@ -19,13 +19,13 @@ import { TaskPageJiraBoard, jiraBoardIssueRefKey } from './task-page-jira-board'
 import type { TaskPageJiraBoardSection } from './task-page-jira-board-sections'
 import { JiraBoardMoveDialog, type JiraBoardMovePrompt } from './task-page-jira-board-move-dialog'
 import { applyJiraBoardMove, getJiraBoardMoveTransitions } from './task-page-jira-board-move'
-import { formatRelativeTime } from './task-page-source-context'
 import {
   JiraMutationFailure,
   enqueueJiraIssueMutation,
   jiraIssueRequestScope
 } from './jira-issue-mutation-queue'
 import type { JiraTransitionSubmitOutcome } from './jira-transition-fields-form'
+import { formatRelativeTime } from './task-page/task-page-source-context'
 
 type Props = {
   issues: JiraIssue[]

@@ -72,10 +72,7 @@ vi.mock('../pty-descendant-termination', () => ({
   killWithDescendantSweep: killWithDescendantSweepMock
 }))
 
-// Resolve PowerShell family names to deterministic absolute paths (the fs mock
-// above otherwise makes every probe miss). The real resolver — which skips the
-// Store App Execution Alias stub — is covered in
-// windows-powershell-executable.test.ts.
+// The fs mock misses executable probes; pin paths here and leave Store-alias coverage to the resolver tests.
 const WINDOWS_POWERSHELL_ABS = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
 const PWSH7_ABS = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
 const CMD_ABS = 'C:\\Windows\\System32\\cmd.exe'
@@ -115,8 +112,7 @@ vi.mock('../wsl', () => ({
     `\\\\wsl.localhost\\${distro}${path.replace(/\//g, '\\')}`,
   getDefaultWslDistro: () => 'Ubuntu',
   isWslAvailableAsync: () => isWslAvailableAsyncMock(),
-  // Why: WSL worktree validation now asks the distro; these tests use WSL UNC
-  // cwds that are meant to exist, so report them present without spawning wsl.exe.
+  // Fixture WSL UNC directories exist; avoid launching wsl.exe to validate them.
   wslUncDirectoryExistsAsync: (...args: unknown[]) => wslUncDirectoryExistsAsyncMock(...args)
 }))
 
@@ -237,15 +233,14 @@ describe('LocalPtyProvider', () => {
     })
 
     it.each([
-      // fish EXPORTS fish_history, so an Orca launched from a fish pane hands every
-      // pane the LAUNCHING worktree's session — even with isolation off (STA-4682).
+      // Exported fish_history can leak the launching workspace session even when isolation is off (STA-4682).
       ['an inherited Orca session', 'orca_abc123', undefined],
       ['a user value', 'mine', 'mine']
     ])('history isolation off: %s', async (_kind, inherited, expected) => {
       const previous = process.env.fish_history
       process.env.fish_history = inherited
       try {
-        // No worktreeId: the history-disabled branch of spawn.
+        // Missing workspace id exercises history-off cleanup.
         await provider.spawn({ cols: 80, rows: 24 })
       } finally {
         if (previous === undefined) {
@@ -259,8 +254,7 @@ describe('LocalPtyProvider', () => {
     })
 
     it.each([
-      // HISTFILE is exported, so an Orca launched from a pane in another worktree
-      // hands every pane that worktree's history file — isolation off included.
+      // Exported HISTFILE can leak the launching workspace history even with isolation off.
       [
         'an inherited Orca path',
         '/fake/userData/terminal-history/aabbccddeeff0011/zsh_history',
@@ -271,7 +265,7 @@ describe('LocalPtyProvider', () => {
       const previous = process.env.HISTFILE
       process.env.HISTFILE = inherited
       try {
-        // No worktreeId: the history-disabled branch of spawn.
+        // Missing workspace id exercises history-off cleanup.
         await provider.spawn({ cols: 80, rows: 24 })
       } finally {
         if (previous === undefined) {
@@ -285,8 +279,7 @@ describe('LocalPtyProvider', () => {
     })
 
     it('does not inherit NODE_ENV from the Orca process env', async () => {
-      // Why: NODE_ENV in Orca's process is Orca's build mode (electron-vite sets
-      // `development` in dev runs); leaking it breaks `next build` and Vitest.
+      // Ambient NODE_ENV belongs to the Orca build and can break terminal next build/Vitest.
       const previous = process.env.NODE_ENV
       process.env.NODE_ENV = 'development'
       try {
@@ -307,7 +300,6 @@ describe('LocalPtyProvider', () => {
     })
 
     it('keeps an explicitly requested NODE_ENV for spawned terminals', async () => {
-      // Why: only the ambient value is stripped; a caller-supplied NODE_ENV still wins.
       const previous = process.env.NODE_ENV
       process.env.NODE_ENV = 'development'
       try {
@@ -482,8 +474,7 @@ describe('LocalPtyProvider', () => {
     })
 
     it('does not forward a half-activated conda env into the shell', async () => {
-      // Why: CONDA_SHLVL asserts CONDA_PREFIX exists; forwarding the sentinel
-      // alone makes the user's rc-file conda hook raise a TypeError (#14195).
+      // CONDA_SHLVL without CONDA_PREFIX breaks user conda hooks (#14195).
       const saved = {
         CONDA_SHLVL: process.env.CONDA_SHLVL,
         CONDA_PREFIX: process.env.CONDA_PREFIX,
@@ -517,8 +508,7 @@ describe('LocalPtyProvider', () => {
     })
 
     it('drops the conda sentinel when the client asks to delete CONDA_PREFIX', async () => {
-      // Why: envToDelete runs after the inherited-env scrub, so the coherence
-      // pass must run last or it re-creates the exact broken pair it prevents.
+      // envToDelete runs after the scrub, so coherence repair must run last.
       const saved = {
         CONDA_SHLVL: process.env.CONDA_SHLVL,
         CONDA_PREFIX: process.env.CONDA_PREFIX,
@@ -549,8 +539,8 @@ describe('LocalPtyProvider', () => {
     it('uses shell wrapper when MiMo home must survive shell startup', async () => {
       provider.configure({
         buildSpawnEnv: (_id, env) => {
-          env.MIMOCODE_HOME = '/tmp/orca-mimocode-overlay'
-          env.ORCA_MIMOCODE_HOME = '/tmp/orca-mimocode-overlay'
+          env.MIMOCODE_CONFIG_DIR = '/tmp/orca-mimocode-overlay'
+          env.ORCA_MIMOCODE_CONFIG_DIR = '/tmp/orca-mimocode-overlay'
           return env
         }
       })

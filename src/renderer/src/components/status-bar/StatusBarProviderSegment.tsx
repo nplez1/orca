@@ -34,6 +34,9 @@ import { getStatusBarUsageSections } from './status-bar-usage-sections'
 import { GroupedPoolUsage } from './usage-grouped-pools'
 import { formatStatusBarSectionLabel, isGroupedUsagePool } from './usage-pool-label'
 import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
+import { useNow } from '@/hooks/use-now'
+
+const CALM_STALE_USAGE_MAX_AGE_MS = 30 * 60_000
 
 function MiniBar({
   usedPct,
@@ -77,9 +80,7 @@ function WindowLabel({
   )
 }
 
-// Single-letter provider badge for the icon-only (narrow) status bar. Shared by
-// the roster trigger and ProviderDetailsMenu so the dot's has-data condition
-// and markup can't drift between the two.
+// Share badge markup and data detection between the roster trigger and provider details.
 export function ProviderLetterBadge({ p }: { p: ProviderRateLimits }): React.JSX.Element {
   const hasData = hasUsageData(p)
   return (
@@ -125,10 +126,7 @@ export function getUsageTone(p: ProviderRateLimits): UsageTone {
       : 'normal'
 }
 
-/**
- * Stands in for usage chips a narrow bar can't fit. Always rendered at the collapsing
- * density so its width is known before anything collapses; out of the row while empty.
- */
+/** Remain measurable at collapsing densities before hidden chips need the overflow count. */
 export function UsageOverflowChip({
   hidden,
   providerCount,
@@ -219,15 +217,9 @@ function CreditsSummary({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Provider segment
-// ---------------------------------------------------------------------------
-
-// A plan spends into its overage balance only once an included window is
-// exhausted. Treat ~100% as capped to tolerate provider rounding.
+// Treat 99.5% as capped to tolerate rounding before revealing spendable overage.
 const CAP_THRESHOLD_PERCENT = 99.5
 
-// Why: only reveal the compact balance once a capped window can spend it.
 function isExtraUsageActive(p: ProviderRateLimits): boolean {
   if (
     !p.extraUsage ||
@@ -275,6 +267,7 @@ export function ProviderSegment({
   const statusLabel = p ? getProviderUsageStatusLabel(p) : ''
   // Why: not a problem; Claude updates its own login the next time it runs.
   const calm = p ? isClaudeUsageWaitingForClaude(p) : false
+  const calmClock = useNow(60_000, calm && p?.status === 'error')
   const tightest = p
     ? mode === 'compact'
       ? getUsageHeadlineSection(p)
@@ -291,12 +284,13 @@ export function ProviderSegment({
       : []
   )
 
-  // Idle / initial load
-  if (!p || p.status === 'idle') {
+  // Why static: unfocused windows never poll, so a pending chip's pulse would redraw the compositor indefinitely.
+  // A fetching provider with kept credits skips the dots; its summary renders instead.
+  if (!p || p.status === 'idle' || (p.status === 'fetching' && !tightest && p.credits == null)) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
         <ProviderIcon provider={provider} />
-        <span className="animate-pulse">···</span>
+        <span>···</span>
       </span>
     )
   }
@@ -304,17 +298,6 @@ export function ProviderSegment({
   const credits = p.credits ?? null
   const hasCredits = credits !== null
 
-  // Fetching with no prior data
-  if (p.status === 'fetching' && !tightest && !hasCredits) {
-    return (
-      <span className="inline-flex items-center gap-1 text-muted-foreground">
-        <ProviderIcon provider={provider} />
-        <span className="animate-pulse">···</span>
-      </span>
-    )
-  }
-
-  // Unavailable (CLI not installed)
   if (p.status === 'unavailable') {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground/50">
@@ -323,7 +306,6 @@ export function ProviderSegment({
     )
   }
 
-  // Set up on this device but not on the owning host: labelled like a failure, minus the alarm
   if (p.usageMetadata?.ownerNotSetUp) {
     return (
       <span
@@ -337,7 +319,6 @@ export function ProviderSegment({
     )
   }
 
-  // Error with no data
   if (p.status === 'error' && !tightest && !hasCredits) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -348,8 +329,9 @@ export function ProviderSegment({
     )
   }
 
-  // Has data (ok, fetching with stale data, or error with stale data)
-  const isStale = p.status === 'error' && !calm
+  // Why: calm is honest only while the kept bars are recent; old ones still deserve the warning.
+  const isStale =
+    p.status === 'error' && (!calm || calmClock - p.updatedAt > CALM_STALE_USAGE_MAX_AGE_MS)
   const showBalance = isExtraUsageActive(p)
   const showGroupedPools =
     mode === 'verbose' && groupedBuckets.length > 0 && groupedBuckets.length === sections.length

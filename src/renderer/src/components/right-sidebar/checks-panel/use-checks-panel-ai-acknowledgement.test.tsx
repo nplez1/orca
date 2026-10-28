@@ -154,10 +154,11 @@ afterEach(() => {
 describe('useChecksPanelAiAcknowledgement', () => {
   it('writes nothing when the agent tab opens', () => {
     const model = hookInput()
-    model.pendingCommentResolutionRef.current = mixedPayload()
+    const payload = mixedPayload()
+    model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
-    act(() => result.current.handleLaunchAccepted())
+    act(() => result.current.commentLaunchCallbacks(payload).onLaunchAccepted())
 
     expect(model.input.addPRReviewCommentReply).not.toHaveBeenCalled()
     expect(model.input.addPRConversationComment).not.toHaveBeenCalled()
@@ -169,11 +170,13 @@ describe('useChecksPanelAiAcknowledgement', () => {
   // selected comment with no resolution endpoint already got.
   it('leaves the selected thread unresolved on delivery and only replies where it must', async () => {
     const model = hookInput()
-    model.pendingCommentResolutionRef.current = mixedPayload()
+    const payload = mixedPayload()
+    model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
-    act(() => result.current.handleLaunchAccepted())
-    act(() => result.current.consumeClaimedCommentResolutionAfterDeliveryRef.current())
+    const callbacks = result.current.commentLaunchCallbacks(payload)
+    act(() => callbacks.onLaunchAccepted())
+    act(() => callbacks.onLaunched())
     await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledTimes(1))
 
     expect(model.input.addPRConversationComment).toHaveBeenCalledWith(
@@ -199,8 +202,9 @@ describe('useChecksPanelAiAcknowledgement', () => {
     model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
-    act(() => result.current.handleLaunchAccepted())
-    act(() => result.current.handleLaunchAborted())
+    const callbacks = result.current.commentLaunchCallbacks(payload)
+    act(() => callbacks.onLaunchAccepted())
+    act(() => callbacks.onLaunchAborted())
 
     expect(model.input.addPRReviewCommentReply).not.toHaveBeenCalled()
     expect(model.input.addPRConversationComment).not.toHaveBeenCalled()
@@ -212,15 +216,17 @@ describe('useChecksPanelAiAcknowledgement', () => {
   // at all — the toast counts tell the user the threads are theirs to close.
   it('writes nothing on a provider without a reply endpoint', async () => {
     const model = hookInput()
-    model.pendingCommentResolutionRef.current = {
+    const payload = {
       ...mixedPayload(),
       provider: 'gitlab',
       githubTarget: undefined
-    }
+    } as NonNullable<typeof model.pendingCommentResolutionRef.current>
+    model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
-    act(() => result.current.handleLaunchAccepted())
-    act(() => result.current.consumeClaimedCommentResolutionAfterDeliveryRef.current())
+    const callbacks = result.current.commentLaunchCallbacks(payload)
+    act(() => callbacks.onLaunchAccepted())
+    act(() => callbacks.onLaunched())
     await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledTimes(1))
 
     expect(model.input.addPRReviewCommentReply).not.toHaveBeenCalled()
@@ -234,17 +240,19 @@ describe('useChecksPanelAiAcknowledgement', () => {
   // the launch itself succeeded — that is a success toast, not an error.
   it('reports a thread-only selection with no reply target as a success', async () => {
     const model = hookInput()
-    model.pendingCommentResolutionRef.current = {
+    const payload = {
       ...mixedPayload(),
       selectedGroups: [
         { kind: 'thread', threadId: 'T1', root: reviewThreadComment(), replies: [] }
       ],
       githubTarget: undefined
-    }
+    } as NonNullable<typeof model.pendingCommentResolutionRef.current>
+    model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
-    act(() => result.current.handleLaunchAccepted())
-    act(() => result.current.consumeClaimedCommentResolutionAfterDeliveryRef.current())
+    const callbacks = result.current.commentLaunchCallbacks(payload)
+    act(() => callbacks.onLaunchAccepted())
+    act(() => callbacks.onLaunched())
     await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledTimes(1))
 
     expect(mocks.toastError).not.toHaveBeenCalled()
@@ -255,14 +263,16 @@ describe('useChecksPanelAiAcknowledgement', () => {
 
   it('reports a missing GitHub reply target instead of claiming success', async () => {
     const model = hookInput()
-    model.pendingCommentResolutionRef.current = {
+    const payload = {
       ...mixedPayload(),
       githubTarget: undefined
-    }
+    } as NonNullable<typeof model.pendingCommentResolutionRef.current>
+    model.pendingCommentResolutionRef.current = payload
     const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
 
-    act(() => result.current.handleLaunchAccepted())
-    act(() => result.current.consumeClaimedCommentResolutionAfterDeliveryRef.current())
+    const callbacks = result.current.commentLaunchCallbacks(payload)
+    act(() => callbacks.onLaunchAccepted())
+    act(() => callbacks.onLaunched())
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1))
 
     expect(model.input.addPRReviewCommentReply).not.toHaveBeenCalled()
