@@ -1806,7 +1806,10 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   unit-known-red.json; 0 flaky re-run passed; 0 unexpected; 1616 s`; `lint gate @029137ad95+dirty:
   PASS — 39 green, 1 failing: 2 known red, 0 new; 40 steps; 96.0 s` (the `+dirty` part is this
   record); `pnpm tc` clean on node, cli and web. The tagged revision is past the gated one: the
-  follow-up changes are this record, the lint baselines and two test-file comments.
+  follow-up changes are this record, the lint baselines and two test-file comments. **The nightly is
+  green again**: run `40701735011` on `1776dcc575` passed all five shards, the first green night since
+  2026-10-08 — the 10-27/10-28 reds were `main`'s own drift plus one Linux-only assertion this sync
+  repaired (a refused Claude 401 is retryable on every platform, not just darwin).
 
 - **2026-10-25 — merge of upstream `0571e45107` (556 commits) into the release line, from
   `095cf32705`** (merge base `57b5082404`, rollback tag `archive/pre-sync-095cf32705`, merge commit

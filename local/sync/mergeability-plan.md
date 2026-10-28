@@ -91,14 +91,14 @@ dropped item.
 
 ### Baselines that moved
 
-| Metric                                             | § 1 said      | Now                                                                                 |
-| -------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------- |
-| Known-red entries                                  | 40 / 18 files | **17 / 10**, `macos-path-semantics` empty                                           |
-| Nightly runs per week                              | 0             | 1, firing on its own since 10-27 (red: 3 branch-gap files + 1 upstream Linux flake) |
-| Silent-breakage files found after the merge        | 19 pending    | 2 found and fixed, plus a runbook check for the class                               |
-| Deletions asserted rather than re-decided          | 0             | 26                                                                                  |
-| Conflicted paths with a settled, executable answer | 0             | 15 (14 `delete`, 1 `take-theirs`; the rest are `manual`, which is the honest count) |
-| Last passing nightly                               | 2026-10-08    | **still 2026-10-08** — 450 h, because the fix is unpushed                           |
+| Metric                                             | § 1 said      | Now                                                                                               |
+| -------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------- |
+| Known-red entries                                  | 40 / 18 files | **17 / 10**, `macos-path-semantics` empty                                                         |
+| Nightly runs per week                              | 0             | 1, firing on its own since 10-27 (green from 10-28; the 10-27/10-28 reds were `main`'s own drift) |
+| Silent-breakage files found after the merge        | 19 pending    | 2 found and fixed, plus a runbook check for the class                                             |
+| Deletions asserted rather than re-decided          | 0             | 26                                                                                                |
+| Conflicted paths with a settled, executable answer | 0             | 15 (14 `delete`, 1 `take-theirs`; the rest are `manual`, which is the honest count)               |
+| Last passing nightly                               | 2026-10-08    | **2026-10-28** — run `40701735011` on `1776dcc575`, all five shards green after the sync          |
 
 ---
 
