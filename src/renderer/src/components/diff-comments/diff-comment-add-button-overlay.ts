@@ -1,7 +1,8 @@
 import * as monaco from 'monaco-editor'
 import type { editor as monacoEditor } from 'monaco-editor'
-import type { RefObject } from 'react'
+import { useEffect, type RefObject } from 'react'
 import { getDiffCommentPopoverTop } from './diff-comment-popover-position'
+import type { DiffCommentLineRange } from './diff-comment-line-range'
 import { toDiffCommentLineTarget } from './diff-comment-line-range'
 import {
   getGutterPressLine,
@@ -16,6 +17,13 @@ type AddButtonOverlayArgs = {
   editorDomNode: HTMLElement
   addButtonLabel: string
   commentableLineSet: Set<number> | null
+  /**
+   * Lines whose gutter slot already carries another affordance — a collapsed review thread's
+   * bubble. The "+" stands down there: two controls sharing one slot leaves a click with two
+   * possible meanings, and the conversation is the one the reader came for. The Add Review Note
+   * chord still reaches these lines, so the capability is displaced rather than dropped.
+   */
+  gutterOccupiedLineSet: ReadonlySet<number> | null
   // The hovered line survives model-swap rebuilds so a press on the parked button still has an anchor.
   hoverLineRef: RefObject<number | null>
   onAddCommentClickRef: RefObject<
@@ -29,11 +37,79 @@ export type DiffCommentAddButtonOverlayHandle = {
   isDragging: DiffCommentRangeDragHandle['isDragging']
 }
 
+/**
+ * Keeps the "+" overlay installed for as long as the editor lives here.
+ *
+ * Its own module because the overlay owns its install/teardown: a filter change rebuilds the button
+ * and the range-drag controller it parks on, and a model swap must drop the parked hover line.
+ */
+export function useDiffCommentAddButtonOverlay({
+  editor,
+  monacoModelIdentity,
+  addButtonLabel,
+  commentableLineSet,
+  gutterOccupiedLineSet,
+  hoverLineRef,
+  onAddCommentClickRef,
+  pendingRangeRef,
+  overlayRef
+}: {
+  editor: monacoEditor.ICodeEditor | null
+  /** Not read here — a model swap rebuilds the overlay so no hover line survives onto the new model. */
+  monacoModelIdentity?: string
+  addButtonLabel: string
+  commentableLineSet: Set<number> | null
+  gutterOccupiedLineSet: ReadonlySet<number>
+  hoverLineRef: RefObject<number | null>
+  onAddCommentClickRef: RefObject<
+    (args: { lineNumber: number; startLine?: number; top: number }) => void
+  >
+  /** Read at install time, never a dependency: an open composer must not reinstall the overlay. */
+  pendingRangeRef: RefObject<DiffCommentLineRange | null>
+  overlayRef: RefObject<DiffCommentAddButtonOverlayHandle | null>
+}): void {
+  useEffect(() => {
+    if (!editor) {
+      return
+    }
+    const editorDomNode = editor.getDomNode()
+    if (!editorDomNode) {
+      return
+    }
+    const overlay = installDiffCommentAddButtonOverlay({
+      editor,
+      editorDomNode,
+      addButtonLabel,
+      commentableLineSet,
+      gutterOccupiedLineSet,
+      hoverLineRef,
+      onAddCommentClickRef
+    })
+    overlayRef.current = overlay
+    overlay.setPendingRange(pendingRangeRef.current)
+    return () => {
+      overlayRef.current = null
+      overlay.dispose()
+    }
+  }, [
+    addButtonLabel,
+    commentableLineSet,
+    editor,
+    gutterOccupiedLineSet,
+    hoverLineRef,
+    monacoModelIdentity,
+    onAddCommentClickRef,
+    overlayRef,
+    pendingRangeRef
+  ])
+}
+
 export function installDiffCommentAddButtonOverlay({
   editor,
   editorDomNode,
   addButtonLabel,
   commentableLineSet,
+  gutterOccupiedLineSet,
   hoverLineRef,
   onAddCommentClickRef
 }: AddButtonOverlayArgs): DiffCommentAddButtonOverlayHandle {
@@ -69,6 +145,9 @@ export function installDiffCommentAddButtonOverlay({
   const BUTTON_SIZE = 18
 
   const canCommentOnLine = (lineNumber: number): boolean => {
+    if (gutterOccupiedLineSet?.has(lineNumber) === true) {
+      return false
+    }
     return commentableLineSet === null || commentableLineSet.has(lineNumber)
   }
 

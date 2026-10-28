@@ -95,6 +95,8 @@ export function createFakeDiffCommentEditor(
     getContainerDomNode: () => domNode,
     getModel: () => model,
     getOption: () => FAKE_LINE_HEIGHT_PX,
+    // The gutter-mark hook writes the glyphMargin option through this, and the overlay reads lineHeight.
+    updateOptions: () => {},
     getTopForLineNumber: (lineNumber: number) => (lineNumber - 1) * FAKE_LINE_HEIGHT_PX,
     getScrollTop: () => scrollTop,
     setScrollTop: (next: number) => {
@@ -140,6 +142,9 @@ export function createFakeDiffCommentEditor(
       return noopDisposable
     },
     onMouseLeave: () => noopDisposable,
+    // The gutter-mark hook subscribes to gutter presses through this; the press itself is that
+    // hook's own unit suite's subject.
+    onMouseDown: () => noopDisposable,
     onDidScrollChange: () => noopDisposable,
     onDidDispose: (listener: () => void) => {
       disposeListeners.push(listener)

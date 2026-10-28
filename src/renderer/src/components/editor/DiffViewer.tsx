@@ -158,6 +158,23 @@ export default function DiffViewer({
     [addDiffComment, onAddLineComment, relativePath, worktreeId]
   )
 
+  // Why: the worktree diff shows the same file the PR reviews, so it draws the same review threads —
+  // through its own decorator instance so the local-note add-note flow is untouched, and ahead of the
+  // local-note decorator so the lines a collapsed thread marks are lines the "+" skips. Also ahead of
+  // the first-change auto-scroll below, which defers to a thread reveal.
+  const prCommentGutter = usePRCommentInlineDecorator({
+    editor: modifiedEditor,
+    monacoModelIdentity: modifiedModelKey ?? modelKey,
+    filePath: relativePath,
+    threads: prCommentSurface?.threads ?? null,
+    scope: prCommentSurface?.scope ?? null,
+    enabled: prCommentSurface?.enabled ?? false,
+    onReply: prCommentSurface?.onReply,
+    onResolveThread: prCommentSurface?.onResolveThread,
+    pendingRevealCommentId: prCommentSurface?.pendingRevealCommentId ?? null,
+    onPendingRevealConsumed: prCommentSurface?.onPendingRevealConsumed
+  })
+
   // Why: gate the decorator on a comment target; updateDiffComment is only wired for local diffs (worktreeId present).
   useDiffCommentDecorator({
     editor: hasLineCommentAction ? modifiedEditor : null,
@@ -166,6 +183,7 @@ export default function DiffViewer({
     worktreeId: worktreeId ?? '',
     comments: worktreeId ? diffComments : [],
     commentableLineNumbers,
+    gutterOccupiedLineNumbers: prCommentGutter.gutterOccupiedLines,
     addButtonLabel: addLineCommentLabel,
     addNoteShortcutEnabled: hasLineCommentAction,
     onCreateComment: handleCreateComment,
@@ -180,21 +198,6 @@ export default function DiffViewer({
     onUpdateComment: worktreeId ? (id, body) => updateDiffComment(worktreeId, id, body) : undefined,
     pendingScrollCommentId: pendingScrollForThisViewer,
     onPendingScrollConsumed: () => setScrollToDiffCommentId(null)
-  })
-
-  // Why: the worktree diff shows the same file the PR reviews, so it draws the same review threads,
-  // resolved above so the first-change auto-scroll can defer to a thread reveal.
-  usePRCommentInlineDecorator({
-    editor: modifiedEditor,
-    monacoModelIdentity: modifiedModelKey ?? modelKey,
-    filePath: relativePath,
-    threads: prCommentSurface?.threads ?? null,
-    scope: prCommentSurface?.scope ?? null,
-    enabled: prCommentSurface?.enabled ?? false,
-    onReply: prCommentSurface?.onReply,
-    onResolveThread: prCommentSurface?.onResolveThread,
-    pendingRevealCommentId: prCommentSurface?.pendingRevealCommentId ?? null,
-    onPendingRevealConsumed: prCommentSurface?.onPendingRevealConsumed
   })
 
   useDiffViewerFirstChangeAutoScroll({
