@@ -127,9 +127,6 @@ describe('the shared check details cache', () => {
 
   it('keys a payload by the build the check describes', () => {
     expect(checkDetailsBuildIdentity(check())).toBe('check-run:42')
-    expect(checkDetailsBuildIdentity(check({ checkRunId: undefined, workflowRunId: 7 }))).toBe(
-      'workflow-run:7'
-    )
     expect(checkDetailsBuildIdentity(check({ checkRunId: undefined, gitlabJobId: 9 }))).toBe(
       'gitlab-job:9'
     )
@@ -139,6 +136,20 @@ describe('the shared check details cache', () => {
       )
     ).toBe('url:https://ci.example.com/j/12/')
     expect(checkDetailsBuildIdentity(check({ checkRunId: undefined }))).toBe('name:unit')
+  })
+
+  // Why: a `gh pr checks` fallback row carries only a workflow-run id, shared by every job in the run,
+  // while its payload is filtered to one job by name.
+  it('keeps two jobs of one workflow run apart', () => {
+    const job = (name: string, url: string | null): PRCheckDetail =>
+      check({ name, checkRunId: undefined, workflowRunId: 7, url })
+
+    expect(checkDetailsBuildIdentity(job('lint', 'https://github.com/o/r/actions/job/1'))).not.toBe(
+      checkDetailsBuildIdentity(job('test', 'https://github.com/o/r/actions/job/2'))
+    )
+    expect(checkDetailsBuildIdentity(job('lint', null))).not.toBe(
+      checkDetailsBuildIdentity(job('test', null))
+    )
   })
 
   it('hands a payload one surface read to the other', () => {

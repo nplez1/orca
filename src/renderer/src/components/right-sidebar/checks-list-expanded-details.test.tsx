@@ -620,6 +620,43 @@ describe('ChecksList expanded check details', () => {
     expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps its rows when the refresh behind them fails', async () => {
+    const runningCheck: PRCheckDetail = {
+      name: 'test: unit',
+      status: 'in_progress',
+      conclusion: 'failure',
+      url: null,
+      gitlabJobId: 612
+    }
+    const onLoadCheckDetails = vi
+      .fn<(check: PRCheckDetail) => Promise<PRCheckRunDetails | null>>()
+      .mockResolvedValueOnce({
+        ...checkDetails,
+        name: runningCheck.name,
+        status: 'in_progress',
+        completedAt: null
+      })
+      .mockRejectedValueOnce(new Error('401 Unauthorized'))
+
+    renderChecksList({ checks: [runningCheck], onLoadCheckDetails })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    renderChecksList({
+      checks: [{ ...runningCheck, status: 'completed' }],
+      onLoadCheckDetails
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toContain('Verify failed')
+    expect(container.textContent).toContain('401 Unauthorized')
+    expect(container.textContent).not.toContain('Loading check details…')
+  })
+
   it('keeps a failed detail load pinned while the check state is unchanged', async () => {
     const onLoadCheckDetails = vi
       .fn<(check: PRCheckDetail) => Promise<PRCheckRunDetails | null>>()

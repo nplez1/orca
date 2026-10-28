@@ -10,6 +10,7 @@ import {
 import {
   beginGitHubChecksTabDetails,
   settleGitHubChecksTabDetails,
+  settleGitHubChecksTabDetailsKeepingShown,
   type CheckDetailsLoadState
 } from '@/components/github-checks-tab-state'
 import {
@@ -32,18 +33,18 @@ export function requestGitHubCheckDetails(
   }
   const requestId = ++ctx.nextCheckDetailsRequestIdRef.current
   const readFor = checkDetailsRowState(check)
-  // Why: a refresh renders the payload it already has, so a failed one must not blank it.
-  const commit = (next: Omit<CheckDetailsLoadState, 'requestId'>, keepShown: boolean): void => {
+  const commit = (next: Omit<CheckDetailsLoadState, 'requestId'>): void => {
+    if (!ctx.mountedRef.current) {
+      return
+    }
+    ctx.setChecksState((current) => settleGitHubChecksTabDetails(current, key, requestId, next))
+  }
+  const commitFailure = (next: Omit<CheckDetailsLoadState, 'requestId'>): void => {
     if (!ctx.mountedRef.current) {
       return
     }
     ctx.setChecksState((current) =>
-      settleGitHubChecksTabDetails(current, key, requestId, {
-        ...next,
-        details: keepShown
-          ? (next.details ?? current.detailsByCheckKey[key]?.details ?? null)
-          : next.details
-      })
+      settleGitHubChecksTabDetailsKeepingShown(current, key, requestId, next)
     )
   }
   ctx.setChecksState((current) =>
@@ -84,21 +85,18 @@ export function requestGitHubCheckDetails(
       if (details) {
         rememberCheckDetails(check, { data: details, fetchedAt: readAt, readFor })
       }
-      commit(
-        {
-          loading: false,
-          details,
-          error: details
-            ? null
-            : translate(
-                'auto.components.GitHubItemDialog.e15a8b77ef',
-                'No inline details are available for this check.'
-              ),
-          readAt,
-          readFor
-        },
-        false
-      )
+      commit({
+        loading: false,
+        details,
+        error: details
+          ? null
+          : translate(
+              'auto.components.GitHubItemDialog.e15a8b77ef',
+              'No inline details are available for this check.'
+            ),
+        readAt,
+        readFor
+      })
     })
     .catch((err) => {
       const timeoutMessage = translate(
@@ -107,22 +105,19 @@ export function requestGitHubCheckDetails(
       )
       const isTimeout =
         isGitHubCheckDetailsTimeout(err) || (err instanceof Error && err.message === timeoutMessage)
-      commit(
-        {
-          loading: false,
-          details: null,
-          error: isTimeout
-            ? timeoutMessage
-            : err instanceof Error && err.name === 'AbortError'
-              ? createRuntimeRpcAbortError().message
-              : translate(
-                  'auto.components.GitHubItemDialog.e45324fbed',
-                  'Failed to load check details.'
-                ),
-          readAt: Date.now(),
-          readFor
-        },
-        true
-      )
+      commitFailure({
+        loading: false,
+        details: null,
+        error: isTimeout
+          ? timeoutMessage
+          : err instanceof Error && err.name === 'AbortError'
+            ? createRuntimeRpcAbortError().message
+            : translate(
+                'auto.components.GitHubItemDialog.e45324fbed',
+                'Failed to load check details.'
+              ),
+        readAt: Date.now(),
+        readFor
+      })
     })
 }

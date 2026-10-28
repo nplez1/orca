@@ -152,3 +152,21 @@ export function settleGitHubChecksTabDetails(
   }
   return updateGitHubChecksTabDetails(state, key, { ...details, requestId })
 }
+
+/**
+ * Settle a refresh without blanking the payload it already had.
+ *
+ * Why: a failed refresh reports itself beside the rows on screen; only a first read has none.
+ */
+export function settleGitHubChecksTabDetailsKeepingShown(
+  state: GitHubChecksTabState,
+  key: string,
+  requestId: number,
+  details: Omit<CheckDetailsLoadState, 'requestId'>
+): GitHubChecksTabState {
+  const current = state.detailsByCheckKey[key]
+  return settleGitHubChecksTabDetails(state, key, requestId, {
+    ...details,
+    details: details.details ?? current?.details ?? null
+  })
+}

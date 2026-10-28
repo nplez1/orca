@@ -3,21 +3,33 @@ import type { CacheEntry } from '@/store/github/cache-model'
 import { isFresh, evictStaleEntries } from '@/store/github/cache-policy'
 import { PR_CHECKS_CACHE_TTL_MS } from '@/store/github/cache-identity'
 
-/** The build behind a check, independent of the key a surface files it under. */
+/**
+ * The build behind a check, independent of the key a surface files it under.
+ *
+ * Why the url first: a `gh pr checks` fallback row carries only a workflow-run id, which every job in
+ * that run shares, while the payload is filtered to one job by name. The url is per job — and it
+ * carries the host and repo, so two forges that number a build the same cannot share a payload.
+ */
 export function checkDetailsBuildIdentity(check: PRCheckDetail): string {
+  if (check.url) {
+    return `url:${check.url}`
+  }
   if (check.checkRunId) {
     return `check-run:${check.checkRunId}`
-  }
-  if (check.workflowRunId) {
-    return `workflow-run:${check.workflowRunId}`
   }
   if (check.gitlabJobId) {
     return `gitlab-job:${check.gitlabJobId}`
   }
-  if (check.url) {
-    return `url:${check.url}`
+  if (check.workflowRunId) {
+    return `workflow-run:${check.workflowRunId}:${check.name}`
   }
   return `name:${check.name}`
+}
+
+/** A surface's own key for a row: unique even when two checks carry no id and share a name. */
+export function checkDetailsRowKey(check: PRCheckDetail, index: number): string {
+  const identity = checkDetailsBuildIdentity(check)
+  return identity.startsWith('name:') ? `${identity}:${index}` : identity
 }
 
 /** The row state a payload was read under; a row that has moved since is what re-arms a read. */
@@ -39,8 +51,10 @@ export type CheckDetailsReadState = {
 }
 
 // Why: expanding and collapsing a row remounts nothing, but switching panels remounts the surface
-// that owned the map — and a Jenkins build costs three main-process GETs. A payload either surface
-// read is therefore available to the other, keyed by build rather than by its own row key.
+// that owned the map, and a Jenkins build costs three main-process GETs. A payload either surface
+// read is therefore available to the other, keyed by build rather than by its own row key — so a
+// remount renders it instead of a spinner. (The read still runs: the local entry is what short-
+// circuits the request, and a fresh mount has none.)
 const MAX_CACHED_CHECKS = 50
 let cachedDetails: Record<string, CheckDetailsCacheEntry> = {}
 

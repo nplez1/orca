@@ -5,6 +5,7 @@ import {
   createGitHubChecksTabState,
   resolveGitHubChecksTabState,
   settleGitHubChecksTabDetails,
+  settleGitHubChecksTabDetailsKeepingShown,
   toggleGitHubChecksTabExpandedKey,
   updateGitHubChecksTabDetails,
   updateGitHubChecksTabLocalChecks
@@ -188,6 +189,42 @@ describe('github checks tab state', () => {
       details: checkRunDetails,
       error: null,
       readAt: 7,
+      readFor: { status: 'completed', conclusion: 'failure' }
+    })
+  })
+
+  it('keeps the rows on screen when a refresh fails', () => {
+    const loaded = settleGitHubChecksTabDetails(
+      beginGitHubChecksTabDetails(createGitHubChecksTabState([check('unit')], 'repo-a'), 'unit', 1),
+      'unit',
+      1,
+      {
+        loading: false,
+        details: checkRunDetails,
+        error: null,
+        readAt: 7,
+        readFor: { status: 'completed', conclusion: 'failure' }
+      }
+    )
+    const failed = settleGitHubChecksTabDetailsKeepingShown(
+      beginGitHubChecksTabDetails(loaded, 'unit', 2),
+      'unit',
+      2,
+      {
+        loading: false,
+        details: null,
+        error: 'Timed out loading this Jenkins build.',
+        readAt: 20,
+        readFor: { status: 'completed', conclusion: 'failure' }
+      }
+    )
+
+    expect(failed.detailsByCheckKey.unit).toEqual({
+      requestId: 2,
+      loading: false,
+      details: checkRunDetails,
+      error: 'Timed out loading this Jenkins build.',
+      readAt: 20,
       readFor: { status: 'completed', conclusion: 'failure' }
     })
   })
