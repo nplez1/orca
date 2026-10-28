@@ -1,9 +1,12 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { getConnectionId } from '@/lib/connection-context'
 import { getRuntimeGitBranchCompare } from '@/runtime/runtime-git-diff-client'
 import { useAppStore } from '@/store'
 import { getWorktreeGitOwnerTarget } from '../worktree-git-owner-target'
-import { resolveSourceControlBaseRef } from '../source-control/sync/base-ref-resolution'
+import {
+  resolveSourceControlBaseRef,
+  resolveSourceControlCompareBaseRef
+} from '../source-control/sync/base-ref-resolution'
 
 /**
  * Keeps the worktree's branch compare warm while the Checks pane is showing.
@@ -20,7 +23,9 @@ export function useChecksPanelBranchCompareWarmup({
   activeWorktreePath,
   isFolder,
   isPanelVisible,
-  repo
+  remoteStatus,
+  repo,
+  settings
 }: {
   activeReview: { baseRefName?: string } | null
   activeWorktree: { baseRef?: string; head: string } | null
@@ -28,18 +33,33 @@ export function useChecksPanelBranchCompareWarmup({
   activeWorktreePath: string | null
   isFolder: boolean
   isPanelVisible: boolean
+  remoteStatus: { upstreamName?: string } | null | undefined
   repo: { worktreeBaseRef?: string } | null
+  settings: { sourceControlCompareAgainstUpstream?: boolean } | null
 }): void {
   const hasActiveReview = activeReview !== null
-  const baseRef = resolveSourceControlBaseRef({
-    worktreeBaseRef: activeWorktree?.baseRef,
-    reviewBaseRefName: activeReview?.baseRefName,
-    repoBaseRef: repo?.worktreeBaseRef,
-    // Why no default-base probe: a worktree with neither a pin nor a review base has no review to
-    // compare against, and the jump falls back on the surfaces the checkout already proves.
-    defaultBaseRef: null
+  const worktreeBaseRef = activeWorktree?.baseRef
+  const repoBaseRef = repo?.worktreeBaseRef
+  // Why the same two steps as the Source Control tab: both writers share one compare slot, so a
+  // different base here would have each tab replacing the other's result on every switch.
+  const baseRef = resolveSourceControlCompareBaseRef({
+    enabled: settings?.sourceControlCompareAgainstUpstream ?? false,
+    worktreeBaseRef,
+    repoBaseRef,
+    upstreamName: remoteStatus?.upstreamName ?? null,
+    fallbackBaseRef: resolveSourceControlBaseRef({
+      worktreeBaseRef,
+      reviewBaseRefName: activeReview?.baseRefName,
+      repoBaseRef,
+      // Why no default-base probe: a worktree with neither a pin nor a review base has no review to
+      // compare against, and the jump falls back on the surfaces the checkout already proves.
+      defaultBaseRef: null
+    })
   })
   const headOid = activeWorktree?.head ?? null
+  // Why: a compare that answered is not re-asked, and neither is one that already failed for this
+  // exact base and head — hiding and reshowing the panel must not re-diff the tree.
+  const lastAskedRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (
@@ -52,25 +72,29 @@ export function useChecksPanelBranchCompareWarmup({
     ) {
       return
     }
+    const askKey = `${activeWorktreeId}:${baseRef}:${headOid ?? ''}`
+    if (lastAskedRef.current === askKey) {
+      return
+    }
     const state = useAppStore.getState()
     const existing = state.gitBranchCompareSummaryByWorktree[activeWorktreeId]
-    // Why: reuse a compare that already answers for this base and head instead of re-diffing the tree.
     if (
       existing?.status === 'ready' &&
       existing.baseRef === baseRef &&
       (headOid === null || existing.headOid === headOid)
     ) {
+      lastAskedRef.current = askKey
       return
     }
     const ownerTarget = getWorktreeGitOwnerTarget(activeWorktreeId)
     if (!ownerTarget) {
       return
     }
-    const requestKey = `${activeWorktreeId}:${baseRef}:${headOid ?? ''}:${Date.now()}`
+    lastAskedRef.current = askKey
+    const requestKey = `${askKey}:${Date.now()}`
     state.beginGitBranchCompareRequest(activeWorktreeId, requestKey, baseRef, {
       preserveExistingSummary: true
     })
-    let cancelled = false
     void getRuntimeGitBranchCompare(
       {
         target: ownerTarget,
@@ -81,16 +105,13 @@ export function useChecksPanelBranchCompareWarmup({
       baseRef,
       'background'
     )
+      // Why still claim it: the result is keyed to this request, so applying it after the panel
+      // hides is safe — and dropping it would strand the compare for the tab that needs it.
       .then((result) => {
-        if (!cancelled) {
-          useAppStore.getState().setGitBranchCompareResult(activeWorktreeId, requestKey, result)
-        }
+        useAppStore.getState().setGitBranchCompareResult(activeWorktreeId, requestKey, result)
       })
       // Why: a warm compare is advisory; a failed one leaves the jump on its existing fallbacks.
       .catch(() => {})
-    return () => {
-      cancelled = true
-    }
   }, [
     activeWorktreeId,
     activeWorktreePath,

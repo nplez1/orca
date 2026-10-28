@@ -52,7 +52,9 @@ function Probe({
     activeWorktreePath: '/repo/worktree',
     isFolder: false,
     isPanelVisible,
-    repo: { worktreeBaseRef: undefined }
+    remoteStatus: undefined,
+    repo: { worktreeBaseRef: undefined },
+    settings: { sourceControlCompareAgainstUpstream: false }
   })
   return null
 }
@@ -87,7 +89,7 @@ describe('useChecksPanelBranchCompareWarmup', () => {
     unmountProbes()
   })
 
-  it('works when the panel is off screen or the worktree carries no review', async () => {
+  it('skips while the panel is off screen or the worktree carries no review', async () => {
     await mountProbe(<Probe isPanelVisible={false} activeReview={DEFAULT_REVIEW} />)
     await flush()
     unmountProbes()

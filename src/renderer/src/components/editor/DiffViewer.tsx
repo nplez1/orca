@@ -92,6 +92,11 @@ export default function DiffViewer({
   )
   const hasLineCommentAction = Boolean(worktreeId || onAddLineComment)
 
+  // Why: the worktree diff shows the same file the PR reviews, so it draws the same review threads —
+  // through its own decorator instance so the local-note add-note flow is untouched.
+  const worktreePRComments = useWorktreePRCommentInline(worktreeId)
+  const prCommentSurface = usePRCommentInlineSurface(worktreePRComments, relativePath)
+
   // Why: only forward the pending scroll id when this viewer owns the comment, else unrelated viewers race to ack it.
   const pendingScrollForThisViewer = useMemo(() => {
     if (!worktreeId || !scrollToDiffCommentId) {
@@ -99,6 +104,20 @@ export default function DiffViewer({
     }
     return diffComments.some((c) => c.id === scrollToDiffCommentId) ? scrollToDiffCommentId : null
   }, [scrollToDiffCommentId, diffComments, worktreeId])
+
+  // Why: a review thread reveal owns the scroll the same way a local note does — otherwise the
+  // first-change auto-scroll below undoes it in a diff tab that has no stored view state yet.
+  const pendingScrollForSurface = useMemo(() => {
+    if (pendingScrollForThisViewer) {
+      return pendingScrollForThisViewer
+    }
+    if (!scrollToDiffCommentId || !prCommentSurface?.threads) {
+      return null
+    }
+    return prCommentSurface.threads.some((thread) => thread.id === scrollToDiffCommentId)
+      ? scrollToDiffCommentId
+      : null
+  }, [pendingScrollForThisViewer, prCommentSurface?.threads, scrollToDiffCommentId])
 
   const handleCreateComment = useCallback(
     async ({
@@ -163,10 +182,8 @@ export default function DiffViewer({
     onPendingScrollConsumed: () => setScrollToDiffCommentId(null)
   })
 
-  // Why: the worktree diff shows the same file the PR reviews, so it draws the same review threads —
-  // through its own decorator instance so the local-note add-note flow is untouched.
-  const worktreePRComments = useWorktreePRCommentInline(worktreeId)
-  const prCommentSurface = usePRCommentInlineSurface(worktreePRComments, relativePath)
+  // Why: the worktree diff shows the same file the PR reviews, so it draws the same review threads,
+  // resolved above so the first-change auto-scroll can defer to a thread reveal.
   usePRCommentInlineDecorator({
     editor: modifiedEditor,
     monacoModelIdentity: modifiedModelKey ?? modelKey,
@@ -184,7 +201,7 @@ export default function DiffViewer({
     diffEditorRef,
     modifiedEditor,
     modelKey,
-    pendingScrollCommentId: pendingScrollForThisViewer
+    pendingScrollCommentId: pendingScrollForSurface
   })
 
   const handleEnterLargeDiffFallback = useCallback(() => {

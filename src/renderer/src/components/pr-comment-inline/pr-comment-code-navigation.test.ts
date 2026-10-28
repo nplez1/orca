@@ -10,7 +10,7 @@ const OID = 'a'.repeat(40)
 
 function compare(overrides: Partial<GitBranchCompareSummary> = {}): GitBranchCompareSummary {
   return {
-    baseRef: 'main',
+    baseRef: 'origin/main',
     baseOid: OID,
     compareRef: 'HEAD',
     headOid: OID,
@@ -35,6 +35,7 @@ describe('resolvePRCommentCodeSurface', () => {
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/a.ts',
+        reviewBaseRefName: 'main',
         branchCompare: compare(),
         branchChanges: [entry],
         statusEntries: []
@@ -43,12 +44,12 @@ describe('resolvePRCommentCodeSurface', () => {
   })
 
   it('prefers the review diff even when the file also has uncommitted edits', () => {
-    const entry = branchEntry('src/a.ts')
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/a.ts',
+        reviewBaseRefName: 'main',
         branchCompare: compare(),
-        branchChanges: [entry],
+        branchChanges: [branchEntry('src/a.ts')],
         statusEntries: [statusEntry('src/a.ts')]
       }).kind
     ).toBe('branch-diff')
@@ -58,6 +59,7 @@ describe('resolvePRCommentCodeSurface', () => {
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/b.ts',
+        reviewBaseRefName: 'main',
         branchCompare: compare(),
         branchChanges: [branchEntry('src/a.ts')],
         statusEntries: [statusEntry('src/b.ts')]
@@ -65,10 +67,11 @@ describe('resolvePRCommentCodeSurface', () => {
     ).toEqual({ kind: 'changes' })
   })
 
-  it('lands in a plain tab when no surface holds a hunk for the file', () => {
+  it('lands in a plain tab only once the review diff proves the file is outside it', () => {
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/c.ts',
+        reviewBaseRefName: 'main',
         branchCompare: compare(),
         branchChanges: [branchEntry('src/a.ts')],
         statusEntries: [statusEntry('src/b.ts')]
@@ -76,7 +79,7 @@ describe('resolvePRCommentCodeSurface', () => {
     ).toEqual({ kind: 'edit' })
   })
 
-  it('does not trust a compare that has not finished, or one without compare OIDs', () => {
+  it('keeps the explaining surface when no review diff is known for the file', () => {
     for (const branchCompare of [
       compare({ status: 'loading' }),
       compare({ mergeBase: null }),
@@ -86,11 +89,49 @@ describe('resolvePRCommentCodeSurface', () => {
       expect(
         resolvePRCommentCodeSurface({
           relativePath: 'src/a.ts',
+          reviewBaseRefName: 'main',
           branchCompare,
           branchChanges: [branchEntry('src/a.ts')],
           statusEntries: []
         })
-      ).toEqual({ kind: 'edit' })
+      ).toEqual({ kind: 'changes' })
     }
   })
+
+  it('does not treat a compare against another base as the review diff', () => {
+    const branchCompare = compare({ baseRef: 'origin/feature-x' })
+    expect(resolvePrCommentCodeSurfaceOutcome(branchCompare)).toBe('changes')
+    // Why the working-tree route still wins: its hunks are real, unlike a foreign base's.
+    expect(
+      resolvePRCommentCodeSurface({
+        relativePath: 'src/a.ts',
+        reviewBaseRefName: 'main',
+        branchCompare,
+        branchChanges: [branchEntry('src/a.ts')],
+        statusEntries: [statusEntry('src/a.ts')]
+      }).kind
+    ).toBe('changes')
+    // A base the provider did not name leaves the compare's own base as the only claim available.
+    expect(
+      resolvePRCommentCodeSurface({
+        relativePath: 'src/a.ts',
+        reviewBaseRefName: null,
+        branchCompare,
+        branchChanges: [branchEntry('src/a.ts')],
+        statusEntries: []
+      }).kind
+    ).toBe('branch-diff')
+  })
 })
+
+function resolvePrCommentCodeSurfaceOutcome(
+  branchCompare: GitBranchCompareSummary
+): ReturnType<typeof resolvePRCommentCodeSurface>['kind'] {
+  return resolvePRCommentCodeSurface({
+    relativePath: 'src/a.ts',
+    reviewBaseRefName: 'main',
+    branchCompare,
+    branchChanges: [branchEntry('src/a.ts')],
+    statusEntries: []
+  }).kind
+}

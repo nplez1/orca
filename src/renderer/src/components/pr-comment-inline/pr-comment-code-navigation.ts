@@ -10,6 +10,7 @@ import type {
 import type { GitStatusEntry } from '../../../../shared/git-status-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { canUseChangesModeForFile } from '../editor/editor-panel-file-mode'
+import { getCompareBaseCandidateBranchName } from '../right-sidebar/source-control/sync/base-ref-resolution'
 import { getPRCommentInlineId } from './pr-comment-inline-threads'
 import {
   cancelSourceControlEditorRevealFrames,
@@ -52,8 +53,8 @@ export function resolvePRCommentCodeTarget(
  *
  * A thread is only readable against the code it reviews, so the branch diff — merge base to head,
  * which is the review's own diff — comes first; Changes mode carries the uncommitted hunks; and a
- * plain tab is the honest answer when the worktree holds neither, because then there are no hunks
- * for this file anywhere.
+ * plain tab is the answer only once a compare against the review's own base proves the file is
+ * outside the review, because then this worktree holds no hunks for it at all.
  */
 export type PRCommentCodeSurface =
   | { kind: 'branch-diff'; entry: GitBranchChangeEntry; compare: GitBranchCompareSummary }
@@ -62,31 +63,41 @@ export type PRCommentCodeSurface =
 
 export function resolvePRCommentCodeSurface({
   relativePath,
+  reviewBaseRefName,
   branchCompare,
   branchChanges,
   statusEntries
 }: {
   relativePath: string
+  /** The review's base branch, or null when the provider did not name one. */
+  reviewBaseRefName: string | null | undefined
   branchCompare: GitBranchCompareSummary | null | undefined
   branchChanges: readonly GitBranchChangeEntry[] | null | undefined
   statusEntries: readonly GitStatusEntry[] | null | undefined
 }): PRCommentCodeSurface {
+  const reviewBase = reviewBaseRefName?.trim() || null
   // Why the OIDs too: a diff tab with no compare OIDs silently renders an unstaged diff instead.
-  if (
+  const reviewDiffCompare =
     branchCompare?.status === 'ready' &&
     branchCompare.baseOid &&
     branchCompare.headOid &&
-    branchCompare.mergeBase
-  ) {
-    const entry = branchChanges?.find((candidate) => candidate.path === relativePath)
-    if (entry) {
-      return { kind: 'branch-diff', entry, compare: branchCompare }
-    }
+    branchCompare.mergeBase &&
+    // Why: a compare against another base is some other diff, and its hunks would not be the review's.
+    (reviewBase === null || getCompareBaseCandidateBranchName(branchCompare.baseRef) === reviewBase)
+      ? branchCompare
+      : null
+  const entry = reviewDiffCompare
+    ? branchChanges?.find((candidate) => candidate.path === relativePath)
+    : undefined
+  if (reviewDiffCompare && entry) {
+    return { kind: 'branch-diff', entry, compare: reviewDiffCompare }
   }
-  if (statusEntries?.some((entry) => entry.path === relativePath)) {
+  if (statusEntries?.some((statusEntry) => statusEntry.path === relativePath)) {
     return { kind: 'changes' }
   }
-  return { kind: 'edit' }
+  // Why: Changes mode explains itself with its own "no uncommitted changes" banner, which is the
+  // honest landing whenever the review's own diff is not known to be empty for this file.
+  return reviewDiffCompare ? { kind: 'edit' } : { kind: 'changes' }
 }
 
 /**
@@ -99,12 +110,15 @@ export function resolvePRCommentCodeSurface({
 export function usePRCommentCodeNavigation({
   worktreeId,
   worktreePath,
-  placementAllowed
+  placementAllowed,
+  reviewBaseRefName
 }: {
   worktreeId: string | null | undefined
   worktreePath: string | null | undefined
   /** False when the head rule forbids placing comments, which makes the jump fall back to GitHub. */
   placementAllowed: boolean
+  /** The review's base branch; a compare against any other base is not the review's diff. */
+  reviewBaseRefName: string | null | undefined
 }): (comment: PRComment) => boolean {
   const openFile = useAppStore((s) => s.openFile)
   const openBranchDiff = useAppStore((s) => s.openBranchDiff)
@@ -128,11 +142,14 @@ export function usePRCommentCodeNavigation({
       const beforeOpen = useAppStore.getState()
       const surface = resolvePRCommentCodeSurface({
         relativePath: target.relativePath,
+        reviewBaseRefName,
         branchCompare: beforeOpen.gitBranchCompareSummaryByWorktree[worktreeId],
         branchChanges: beforeOpen.gitBranchChangesByWorktree[worktreeId],
         statusEntries: beforeOpen.gitStatusByWorktree[worktreeId]
       })
-      let editFileId: string | null = null
+      // Why only an Edit tab consumes a line reveal; a diff surface scrolls to the thread by id, and
+      // a stale line reveal would fire later if the user switched that tab to Edit.
+      let lineRevealFileId: string | null = null
       if (surface.kind === 'branch-diff') {
         openBranchDiff(worktreeId, worktreePath, surface.entry, surface.compare, language)
       } else {
@@ -151,10 +168,12 @@ export function usePRCommentCodeNavigation({
         const changesMode =
           surface.kind === 'changes' && !!opened && canUseChangesModeForFile(opened)
         setEditorViewMode(fileId, changesMode ? 'changes' : 'edit')
-        editFileId = fileId
+        if (!changesMode) {
+          lineRevealFileId = fileId
+        }
       }
       setPendingEditorReveal(null)
-      const revealFileId = editFileId
+      const revealFileId = lineRevealFileId
       requestSourceControlEditorRevealFrame(pendingRevealFramesRef, () => {
         requestSourceControlEditorRevealFrame(pendingRevealFramesRef, () => {
           // Why: a diff surface scrolls to the thread by id; only a Monaco tab uses the line reveal.
@@ -176,6 +195,7 @@ export function usePRCommentCodeNavigation({
       openBranchDiff,
       openFile,
       placementAllowed,
+      reviewBaseRefName,
       setEditorViewMode,
       setPendingEditorReveal,
       setScrollToDiffCommentId,
