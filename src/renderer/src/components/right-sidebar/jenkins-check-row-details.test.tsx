@@ -8,6 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
 import { JenkinsCheckDetailsError } from '@/lib/check-details-error-action'
 import { ChecksList } from './checks-panel/checks-list'
+import { clearCheckDetailsCache } from '@/components/github/check-details-cache'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -135,6 +136,7 @@ function renderJenkinsDetails(details: PRCheckRunDetails): void {
 }
 
 beforeEach(() => {
+  clearCheckDetailsCache()
   openSettingsTarget.mockReset()
 })
 
@@ -146,6 +148,31 @@ afterEach(() => {
 })
 
 describe('a Jenkins check inside the Checks pane', () => {
+  // The reported repro: expand, let it load, collapse, expand again.
+  it('reopens on the build it already read instead of spinning again', async () => {
+    const load = vi.fn(async () => jenkinsDetails)
+    renderChecksList(load)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('Unit tests')
+    expect(load).toHaveBeenCalledTimes(1)
+
+    const toggle = container.querySelector('.group\\/check-row')
+    if (!toggle) {
+      throw new Error('Missing check row')
+    }
+    fireEvent.click(toggle)
+    expect(container.textContent).not.toContain('Unit tests')
+
+    fireEvent.click(toggle)
+
+    expect(container.textContent).toContain('Unit tests')
+    expect(container.textContent).not.toContain('Loading check details…')
+    // A finished build is final, so reopening it is a cache read, not another three GETs.
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
   it('reduces the stage list to the failing and still-running stages', async () => {
     renderJenkinsDetails(jenkinsDetails)
     await act(async () => {

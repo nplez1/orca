@@ -12,6 +12,11 @@ import {
   settleGitHubChecksTabDetails,
   type CheckDetailsLoadState
 } from '@/components/github-checks-tab-state'
+import {
+  checkDetailsRowState,
+  readCachedCheckDetails,
+  rememberCheckDetails
+} from '@/components/github/check-details-cache'
 import { getGitHubRuntimeRepoId } from '@/lib/github-source-runtime-context'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { translate } from '@/i18n/i18n'
@@ -26,13 +31,24 @@ export function requestGitHubCheckDetails(
     return
   }
   const requestId = ++ctx.nextCheckDetailsRequestIdRef.current
-  const commit = (next: Omit<CheckDetailsLoadState, 'requestId'>): void => {
+  const readFor = checkDetailsRowState(check)
+  // Why: a refresh renders the payload it already has, so a failed one must not blank it.
+  const commit = (next: Omit<CheckDetailsLoadState, 'requestId'>, keepShown: boolean): void => {
     if (!ctx.mountedRef.current) {
       return
     }
-    ctx.setChecksState((current) => settleGitHubChecksTabDetails(current, key, requestId, next))
+    ctx.setChecksState((current) =>
+      settleGitHubChecksTabDetails(current, key, requestId, {
+        ...next,
+        details: keepShown
+          ? (next.details ?? current.detailsByCheckKey[key]?.details ?? null)
+          : next.details
+      })
+    )
   }
-  ctx.setChecksState((current) => beginGitHubChecksTabDetails(current, key, requestId))
+  ctx.setChecksState((current) =>
+    beginGitHubChecksTabDetails(current, key, requestId, readCachedCheckDetails(check))
+  )
   const detailsRequest = loadCheckDetailsWithProviderFallback(check, () =>
     withGitHubCheckDetailsTimeout((signal) =>
       ctx.runtimeHost
@@ -64,16 +80,25 @@ export function requestGitHubCheckDetails(
   void detailsRequest
     .then((rawDetails) => {
       const details = normalizeCheckRunDetailsLogTails(rawDetails)
-      commit({
-        loading: false,
-        details,
-        error: details
-          ? null
-          : translate(
-              'auto.components.GitHubItemDialog.e15a8b77ef',
-              'No inline details are available for this check.'
-            )
-      })
+      const readAt = Date.now()
+      if (details) {
+        rememberCheckDetails(check, { data: details, fetchedAt: readAt, readFor })
+      }
+      commit(
+        {
+          loading: false,
+          details,
+          error: details
+            ? null
+            : translate(
+                'auto.components.GitHubItemDialog.e15a8b77ef',
+                'No inline details are available for this check.'
+              ),
+          readAt,
+          readFor
+        },
+        false
+      )
     })
     .catch((err) => {
       const timeoutMessage = translate(
@@ -82,17 +107,22 @@ export function requestGitHubCheckDetails(
       )
       const isTimeout =
         isGitHubCheckDetailsTimeout(err) || (err instanceof Error && err.message === timeoutMessage)
-      commit({
-        loading: false,
-        details: null,
-        error: isTimeout
-          ? timeoutMessage
-          : err instanceof Error && err.name === 'AbortError'
-            ? createRuntimeRpcAbortError().message
-            : translate(
-                'auto.components.GitHubItemDialog.e45324fbed',
-                'Failed to load check details.'
-              )
-      })
+      commit(
+        {
+          loading: false,
+          details: null,
+          error: isTimeout
+            ? timeoutMessage
+            : err instanceof Error && err.name === 'AbortError'
+              ? createRuntimeRpcAbortError().message
+              : translate(
+                  'auto.components.GitHubItemDialog.e45324fbed',
+                  'Failed to load check details.'
+                ),
+          readAt: Date.now(),
+          readFor
+        },
+        true
+      )
     })
 }

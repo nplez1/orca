@@ -1,15 +1,18 @@
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../../shared/github/check-types'
 import type { CheckDetailsErrorAction } from '@/lib/check-details-error-action'
+import type { CheckDetailsRowState } from '@/components/github/check-details-cache'
 
 export type CheckDetailsLoadState = {
   requestId?: number
   loading: boolean
+  /** Held while a refresh runs: the pane keeps rendering it instead of a spinner. */
   details: PRCheckRunDetails | null
   error: string | null
   /** Settings affordance for the error, when the failure is one the user can fix. */
   errorAction?: CheckDetailsErrorAction | null
-  /** Check state when the load failed or returned nothing, so a later state change can retry it. */
-  errorAt?: { status: PRCheckDetail['status']; conclusion: PRCheckDetail['conclusion'] }
+  /** Clock and row state of the read behind `details` — staleness inputs, never rendered. */
+  readAt?: number
+  readFor?: CheckDetailsRowState
 }
 
 function getCheckIdentityKey(check: PRCheckDetail, index: number): string {

@@ -30,6 +30,7 @@ import {
 } from '@/components/pr-check-counts'
 import { resolvePullRequestRepo } from '@/components/github/github-work-item-identity'
 import { getCheckDetailsKey } from '@/components/github/pr-check-presentation'
+import { checkDetailsNeedRefresh } from '@/components/github/check-details-cache'
 import { getChecksTabSummaryPresentation } from './checks-tab-summary'
 import { renderCheckRow } from './checks-tab-check-row'
 import {
@@ -251,13 +252,15 @@ export function ChecksTab({
   const handleToggleCheckDetails = useCallback(
     (check: PRCheckDetail): void => {
       const key = getCheckDetailsKey(check)
+      const expanding = expandedCheckKey !== key
       setChecksState((current) => toggleGitHubChecksTabExpandedKey(current, key))
-      if (detailsByCheckKey[key]) {
-        return
+      // Why: a payload that is still good renders from the cache; only a row that moved, or a run
+      // still going past the TTL, is read again — behind the rows already on screen.
+      if (expanding && checkDetailsNeedRefresh(detailsByCheckKey[key], check)) {
+        requestCheckDetails(check, key)
       }
-      requestCheckDetails(check, key)
     },
-    [detailsByCheckKey, requestCheckDetails]
+    [detailsByCheckKey, expandedCheckKey, requestCheckDetails]
   )
 
   const { refreshAction, rerunAction, secondaryActions, actions } = ChecksTabActions({
