@@ -32,20 +32,20 @@ export function useJiraBoardDrop({
   sprintIssues,
   columns,
   applyIssuePatch,
-  refreshBoard,
+  revalidateBoard,
   onIssueMoved
 }: {
   providerSettings: RuntimeJiraSettings
   sprintIssues: JiraIssue[]
   columns: TaskPageJiraBoardColumn[]
   applyIssuePatch: (key: string, patch: Partial<JiraIssue>, siteId?: string | null) => void
-  refreshBoard: () => void
+  revalidateBoard: () => void
   onIssueMoved: (issue: JiraIssue) => void
 }) {
   const move = useJiraBoardTransitionMove({
     providerSettings,
     applyIssuePatch,
-    refreshBoard,
+    revalidateBoard,
     onIssueMoved
   })
   const [draggingIssueKey, setDraggingIssueKey] = useState<string | null>(null)

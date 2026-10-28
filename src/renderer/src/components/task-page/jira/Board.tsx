@@ -78,7 +78,7 @@ export function TaskPageJiraBoard({
     sprintIssues: board.sprintIssues,
     columns: filteredColumns.columns,
     applyIssuePatch: board.applyIssuePatch,
-    refreshBoard: board.refresh,
+    revalidateBoard: board.refreshSilently,
     onIssueMoved
   })
 
@@ -87,7 +87,8 @@ export function TaskPageJiraBoard({
     backlogSprints.find((sprint) => sprint.id === sprintId)?.name ?? sprintId
 
   // Moving an issue into a sprint takes it out of the backlog, so the reload — not a
-  // local removal — is what settles both views.
+  // local removal — is what settles both views. It reconciles behind the rendered rows,
+  // so the board a slow host is still drawing does not blank under the user.
   const assignSprint = async (issue: JiraIssue, sprintId: string): Promise<void> => {
     // One row move at a time: the key disables every row's control while it runs.
     if (assigningSprintIssueKey) {
@@ -106,7 +107,7 @@ export function TaskPageJiraBoard({
         })
       )
       onIssueMoved(issue)
-      board.refresh()
+      board.refreshSilently()
     } catch (error) {
       toast.error(jiraBoardErrorText(error))
     } finally {
@@ -221,7 +222,8 @@ export function TaskPageJiraBoard({
                   {translate('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
                 </div>
               ) : null}
-              {board.overview?.activeSprints.length && !board.sprintLoading ? (
+              {board.overview?.activeSprints.length &&
+              (!board.sprintLoading || board.sprintIssues.length > 0) ? (
                 <TaskPageJiraBoardColumns
                   columns={filteredColumns.columns}
                   otherIssues={filteredColumns.otherIssues}
