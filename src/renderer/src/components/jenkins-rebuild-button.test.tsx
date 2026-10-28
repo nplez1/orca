@@ -96,6 +96,14 @@ describe('JenkinsRebuildButton', () => {
     expect(container.textContent).toBe('')
   })
 
+  it('renders nothing for a Jenkins check that publishes a check run', () => {
+    // Why: that check is rerun by rerequesting its check run, which needs no Jenkins credentials
+    // here — offering this button would contradict the toolbar about the same build.
+    render({ ...jenkinsCheck, checkRunId: 42 })
+
+    expect(container.textContent).toBe('')
+  })
+
   it('renders nothing in a client with no Jenkins surface', () => {
     hasJenkinsApi.mockReturnValue(false)
 

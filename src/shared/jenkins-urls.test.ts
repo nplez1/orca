@@ -27,9 +27,13 @@ describe('parseJenkinsBuildLocation classic URLs', () => {
     expect(
       parseJenkinsBuildLocation('https://github.com/o/r/actions/runs/1/job/456')?.namesBuild
     ).toBe(false)
+    // A permalink is not a numbered build: it names whichever build is newest when it is read.
     expect(
       parseJenkinsBuildLocation('https://ci.example.com/job/pipeline/lastBuild/')?.namesBuild
-    ).toBe(true)
+    ).toBe(false)
+    expect(parseJenkinsBuildLocation('https://ci.example.com/job/pipeline/7/')?.namesBuild).toBe(
+      true
+    )
   })
 
   it('ignores the page the status link happens to point at', () => {

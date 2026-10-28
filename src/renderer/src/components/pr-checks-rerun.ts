@@ -105,7 +105,7 @@ export async function rerunChecksAcrossProviders({
       started,
       message: translate(
         'prChecks.rerun.mixedStarted',
-        'Reruns requested: {{value0}} GitHub check(s), {{value1}} Jenkins build(s)',
+        'Reruns requested: {{value0}} GitHub rerun(s), {{value1}} Jenkins build(s)',
         { value0: githubStarted, value1: jenkinsStarted }
       )
     }

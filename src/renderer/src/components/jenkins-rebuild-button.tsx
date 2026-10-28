@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { LoaderCircle, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,9 @@ import { cn } from '@/lib/utils'
 import { rerunJenkinsCheck, hasJenkinsApi } from '@/runtime/jenkins-rebuild-client'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
+
+/** How long a started rerun keeps its own button quiet, until Jenkins reports the new build. */
+const RERUN_SETTLE_MS = 15_000
 
 /**
  * "Rerun build" for one Jenkins check, next to the build it belongs to.
@@ -36,6 +39,19 @@ export function JenkinsRebuildButton({
   iconOnly?: boolean
 }): React.JSX.Element | null {
   const [rebuilding, setRebuilding] = useState(false)
+  const [justQueued, setJustQueued] = useState(false)
+  // Why this window lives here rather than in the rerun client: the check keeps reading `completed`
+  // until Jenkins posts a pending status (the quiet period, then a free executor), and a second
+  // click in that gap is accepted by Jenkins as a second build. The button that was clicked is what
+  // has to stay quiet, and its own state is the cheapest honest place to hold that.
+  useEffect(() => {
+    if (!justQueued) {
+      return
+    }
+    const timer = setTimeout(() => setJustQueued(false), RERUN_SETTLE_MS)
+    return () => clearTimeout(timer)
+  }, [justQueued])
+  const busy = rebuilding || justQueued
   const run = useCallback(async (): Promise<void> => {
     setRebuilding(true)
     try {
@@ -45,6 +61,7 @@ export function JenkinsRebuildButton({
         return
       }
       toast.success(outcome.message)
+      setJustQueued(true)
       onStarted?.()
     } catch (err) {
       toast.error(
@@ -59,7 +76,15 @@ export function JenkinsRebuildButton({
 
   // Why also the status: a queued or running build is not something to rerun — Jenkins would run
   // the second build concurrently in the same workspace, and the useful action there is to abort.
-  if (!isJenkinsCheck(check) || check.status !== 'completed' || !hasJenkinsApi()) {
+  // Why not a check run: a Jenkins that publishes GitHub check runs is rerun by rerequesting that
+  // check run, which needs no Jenkins credentials here; offering this button for it would send the
+  // same build through a path that needs a server the toolbar does not.
+  if (
+    !isJenkinsCheck(check) ||
+    check.status !== 'completed' ||
+    typeof check.checkRunId === 'number' ||
+    !hasJenkinsApi()
+  ) {
     return null
   }
   const label = rebuilding
@@ -74,8 +99,8 @@ export function JenkinsRebuildButton({
             variant="ghost"
             size="icon-xs"
             className={cn('size-6', className)}
-            disabled={rebuilding}
-            aria-busy={rebuilding}
+            disabled={busy}
+            aria-busy={busy}
             aria-label={translate('jenkins.rerun.action', 'Rerun build')}
             onClick={(event) => {
               // Why: the row underneath toggles the details, and rerunning is not a request to open them.
@@ -83,7 +108,7 @@ export function JenkinsRebuildButton({
               void run()
             }}
           >
-            {rebuilding ? (
+            {busy ? (
               <LoaderCircle className="size-3 animate-spin" />
             ) : (
               <RotateCw className="size-3" />
@@ -102,15 +127,11 @@ export function JenkinsRebuildButton({
       variant="outline"
       size={size}
       className={className}
-      disabled={rebuilding}
-      aria-busy={rebuilding}
+      disabled={busy}
+      aria-busy={busy}
       onClick={() => void run()}
     >
-      {rebuilding ? (
-        <LoaderCircle className="size-3 animate-spin" />
-      ) : (
-        <RotateCw className="size-3" />
-      )}
+      {busy ? <LoaderCircle className="size-3 animate-spin" /> : <RotateCw className="size-3" />}
       {label}
     </Button>
   )

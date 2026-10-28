@@ -130,11 +130,17 @@ describe('rerunJenkinsBuild', () => {
     })
   })
 
-  it('reports a build with no replay action as not replayable', async () => {
+  it('reports a freestyle build as not replayable', async () => {
     const { connection, rebuild } = await loadModules()
     configureServer(connection)
-    route = (_url, init) =>
-      init.method === 'POST' ? new Response(null, { status: 404 }) : json({})
+    route = (url, init) => {
+      if (init.method === 'POST') {
+        return new Response(null, { status: 404 })
+      }
+      // Why the probe: a freestyle build has no `ReplayAction`, so the endpoint 404s; reading the
+      // build's class is what separates that from a pruned build or a missing permission.
+      return url.includes('api/json') ? json({ _class: 'hudson.model.FreeStyleBuild' }) : json({})
+    }
 
     const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
 
@@ -142,10 +148,41 @@ describe('rerunJenkinsBuild', () => {
     if (result.ok) {
       return
     }
-    // Why its own reason: a freestyle job has no `ReplayAction`, and "no longer available" would
-    // send the user looking for a build that is right there.
     expect(result.reason).toBe('not-replayable')
     expect(posts()).toHaveLength(1)
+  })
+
+  it('blames the account when a pipeline run exists but offers no rerun', async () => {
+    const { connection, rebuild } = await loadModules()
+    configureServer(connection)
+    route = (_url, init) =>
+      init.method === 'POST'
+        ? new Response(null, { status: 404 })
+        : json({ _class: 'org.jenkinsci.plugins.workflow.job.WorkflowRun' })
+
+    const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) {
+      return
+    }
+    // Why: `ReplayAction` hides itself rather than answering 403, so a missing Build permission looks
+    // exactly like a missing endpoint. The readable pipeline run is what proves it is not missing.
+    expect(result.reason).toBe('forbidden')
+  })
+
+  it('reports a pruned build as missing', async () => {
+    const { connection, rebuild } = await loadModules()
+    configureServer(connection)
+    route = () => new Response(null, { status: 404 })
+
+    const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) {
+      return
+    }
+    expect(result.reason).toBe('not-found')
   })
 
   it('does not retry when Jenkins refuses the rerun', async () => {

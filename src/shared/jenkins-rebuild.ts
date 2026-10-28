@@ -91,6 +91,12 @@ function isJenkinsRebuildTarget(check: PRCheckDetail): boolean {
   return isJenkinsCheck(check) && typeof check.checkRunId !== 'number'
 }
 
+/** The build a Jenkins link names, which is how one build is recognised behind two checks. */
+function jenkinsBuildUrl(check: PRCheckDetail): string | null {
+  const location = parseJenkinsBuildLocation(check.url)
+  return location !== null && location.namesBuild ? location.buildUrl : null
+}
+
 /**
  * A mixed failure list, split by the provider that owns each check.
  *
@@ -110,13 +116,25 @@ export function selectRerunTargets({
   failedOnly: boolean
 }): { jenkins: PRCheckDetail[]; github: PRCheckDetail[] } {
   const candidates = failedOnly ? checks.filter(isRerunnableFailure) : checks
+  // Why the check runs are claimed first: a Jenkins that publishes GitHub check runs (the Checks
+  // plugin) emits a legacy status *and* a check run for one build, and rerequesting that check run
+  // starts the build on the Jenkins side. Claiming its build URL here is what keeps the status copy
+  // off the Jenkins leg — otherwise one click replays build 12 and rerequests it, two builds.
   const seenBuildUrls = new Set<string>()
+  for (const check of candidates) {
+    if (isJenkinsCheck(check) && typeof check.checkRunId === 'number') {
+      const buildUrl = jenkinsBuildUrl(check)
+      if (buildUrl !== null) {
+        seenBuildUrls.add(buildUrl)
+      }
+    }
+  }
   const jenkins = candidates.filter((check) => {
     if (!isJenkinsRebuildTarget(check) || check.status !== 'completed') {
       return false
     }
-    const buildUrl = parseJenkinsBuildLocation(check.url)?.buildUrl
-    if (buildUrl === undefined || seenBuildUrls.has(buildUrl)) {
+    const buildUrl = jenkinsBuildUrl(check)
+    if (buildUrl === null || seenBuildUrls.has(buildUrl)) {
       return false
     }
     seenBuildUrls.add(buildUrl)

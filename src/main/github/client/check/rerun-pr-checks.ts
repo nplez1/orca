@@ -37,11 +37,11 @@ export async function rerunPRChecks(
     connectionId,
     localGitOptions
   )
-  // Why the Jenkins filter: a Jenkins that publishes GitHub check runs (the Checks plugin) gives
-  // its checks a `checkRunId`, and rerequesting that check run starts a build on the Jenkins side.
-  // The Jenkins rerun path starts that build itself, so leaving these in would start two. The
-  // exception is a Jenkins link that carries a check run: that one *is* ours to rerequest, because
-  // the plugin starts the build without Orca holding this server's credentials.
+  // Why the Jenkins filter: a Jenkins link with no check run contributes nothing to either set — it
+  // has no Actions run id and no check run to rerequest — so this only keeps it out of the loop that
+  // builds those ids. A Jenkins link that *does* carry a check run stays: rerequesting it is the
+  // GitHub path for that build, and the renderer keeps the Jenkins half off the same build (see
+  // `selectRerunTargets`), which is what makes "exactly one path per build" true.
   const candidates = (
     options.failedOnly
       ? checks.filter((check) =>

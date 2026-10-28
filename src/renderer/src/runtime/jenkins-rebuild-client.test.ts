@@ -28,15 +28,25 @@ afterEach(() => {
 })
 
 describe('rerunJenkinsCheck', () => {
-  it('does not call Jenkins for a check another provider owns', async () => {
+  it('does not call Jenkins for a link that is not a Jenkins build', async () => {
+    await expect(rerunJenkinsCheck(check({ url: null }))).resolves.toEqual({
+      ok: false,
+      error: expect.stringContaining('does not link to a Jenkins build')
+    })
+    expect(rerunBuild).not.toHaveBeenCalled()
+  })
+
+  it('refuses a link that names no numbered build', async () => {
     for (const url of [
-      null,
+      // A GitHub Actions link parses as a job called `456` with no build of its own.
       'https://github.com/stablyai/orca/actions/runs/123/job/456',
-      'https://gitlab.com/group/project/-/jobs/99'
+      'https://gitlab.com/group/project/-/jobs/99',
+      // A permalink names whatever build is newest when it is read, which may be another PR's.
+      'https://ci.example.com/job/team/job/repo/lastBuild/'
     ]) {
       await expect(rerunJenkinsCheck(check({ url }))).resolves.toEqual({
         ok: false,
-        error: expect.stringContaining('does not link to a Jenkins build')
+        error: expect.stringMatching(/does not link to (a|a numbered) Jenkins build/)
       })
     }
     expect(rerunBuild).not.toHaveBeenCalled()

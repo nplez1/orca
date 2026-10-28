@@ -68,7 +68,7 @@ a warning on the host rather than failing the recipe result**: `readEphemeralVmL
 through `orca vm recipe doctor --provision`. Why not a hard failure: at that point `create` has
 already run, so refusing the result would throw away the only record of a machine the provider is
 already billing for. The host provisions, shows no countdown, and is never reclaimed
-automatically — a bad deadline reads as *no* deadline to every reader, so it can never cause a
+automatically — a bad deadline reads as _no_ deadline to every reader, so it can never cause a
 reclaim. **An `extend` or `resume` that would lose a deadline the host already had is refused
 outright**, because there the record survives and the action is retryable. The message for the common
 case is `userData.releaseAt must be an RFC 3339 timestamp with an offset, such as
@@ -189,7 +189,7 @@ it.
 **The reconnect ladder is left alone, and that is deliberate.** An earlier revision suppressed it
 past the deadline and reported `Ephemeral host lease expired at <ISO>` without making a single
 attempt. That was removed: the ladder is already bounded — nine attempts, about a hundred seconds —
-so it stops on its own, while suppressing it *manufactured* the very `reconnection-failed` verdict
+so it stops on its own, while suppressing it _manufactured_ the very `reconnection-failed` verdict
 the reclaim decision reads as evidence the machine is gone. An out-of-band extension followed by a
 brief network blip would have reclaimed a demonstrably alive host. Nothing is gained by shortening
 a bounded ladder, and the reclaim now rests only on a verdict Orca actually earned. Relays past
@@ -381,7 +381,7 @@ Three notes worth carrying into a real hook:
 
 - **`releaseAt` must come back with an offset.** `Z` and `+02:00` both pass. A local time with no
   offset is unusable, so format from the provider's own UTC value rather than from localtime. Only
-  the *extension* is refused for it: the host keeps the deadline it already had, and the refusal is
+  the _extension_ is refused for it: the host keeps the deadline it already had, and the refusal is
   retryable. (At create time an unreadable deadline is a warning rather than a failure, for the
   reason above.)
 - **`lifetimeSeconds` is optional, and stale is worse than absent.** Set it from the provider's

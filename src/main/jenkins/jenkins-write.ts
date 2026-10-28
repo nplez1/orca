@@ -101,7 +101,10 @@ export async function jenkinsPost(
     configured: args.configured === true
   }
   // Why the scope check first: a redirect out of the configured prefix (an SSO interstitial, or a
-  // proxy) is the one case where our credentials went somewhere they were not meant for.
+  // proxy) is the one case where our credentials went somewhere they were not meant for. But a
+  // write has already been sent by then, and Jenkins itself answers with `X-Jenkins` — so a landing
+  // that identifies as Jenkins means the build was probably queued, and telling the user their
+  // credentials were rejected would invite a retry that starts a second one.
   if (
     isResponseBeyondCredentialScope({
       requestUrl: args.url,
@@ -110,6 +113,13 @@ export async function jenkinsPost(
     })
   ) {
     await releaseBody(response)
+    if (jenkinsVersion !== null) {
+      return {
+        ok: false,
+        reason: 'unconfirmed',
+        message: `Jenkins redirected the answer outside its configured URL to ${response.url}`
+      }
+    }
     return {
       ok: false,
       reason: 'failure',

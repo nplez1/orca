@@ -36,11 +36,12 @@ export type JenkinsBuildLocation = {
   /** Build alias the URL resolved to; `lastBuild` when it pointed at the job rather than a build. */
   permalink: string | null
   /**
-   * Whether the link named a build at all.
+   * Whether the link names a build by number.
    *
    * Why it has to be a field: `permalink` is synthesized as `lastBuild` for a job-level link, so it
-   * cannot answer this. The Checks surface needs the distinction to tell a Jenkins build URL from a
-   * GitHub Actions one — `…/actions/runs/123/job/456` parses as a job named `456` with no build.
+   * cannot answer this. Surfaces that act on the build need the distinction: a permalink names
+   * whatever build is newest when it is read, and a GitHub Actions link — `…/actions/runs/123/job/456`
+   * — parses as a job named `456` with no build at all.
    */
   namesBuild: boolean
 }
@@ -180,10 +181,11 @@ function toLocation(
     jobPath: rawJobNames.map(decodeSegment),
     buildNumber,
     permalink,
-    // Why only a number or a permalink: the segment after the job names is a page as often as it
-    // is a build (`…/job/x/configure`, `…/job/x/display/redirect`), and treating a page as a build
-    // reference would point the rerun at whichever build happens to be newest.
-    namesBuild: numeric || namedPermalink
+    // Why a number only: the segment after the job names is a page as often as it is a build
+    // (`…/job/x/configure`), and a permalink (`…/lastBuild`) names whatever build is newest when it
+    // is read — on a job serving several pull requests, that is someone else's build. Anything that
+    // acts on the build behind this link has to be able to name which one.
+    namesBuild: numeric
   }
 }
 

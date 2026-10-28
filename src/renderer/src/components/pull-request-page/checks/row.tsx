@@ -58,8 +58,10 @@ export function CheckRow({
             className={cn('size-3.5 shrink-0', color, conclusion === 'pending' && 'animate-spin')}
           />
           <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{check.name}</span>
+          {/* Why inside the toggle: the whole row reads as one target, so the status in it has to
+              open the details too rather than doing nothing. */}
+          <span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel}</span>
         </button>
-        <span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel}</span>
         <JenkinsRebuildButton
           check={check}
           iconOnly

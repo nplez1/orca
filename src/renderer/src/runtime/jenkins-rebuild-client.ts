@@ -50,7 +50,7 @@ function failureMessage(reason: JenkinsRebuildFailureReason, serverUrl: string |
     case 'not-replayable':
       return translate(
         'jenkins.rerun.notReplayable',
-        'Jenkins has no rerun for this build. It is a freestyle job rather than a pipeline, or the job is no longer built.'
+        'Jenkins has no rerun for this build: the job is a freestyle job rather than a pipeline, or it is disabled.'
       )
     case 'not-configured':
       return translate(
@@ -67,13 +67,13 @@ function failureMessage(reason: JenkinsRebuildFailureReason, serverUrl: string |
     case 'forbidden':
       return translate(
         'jenkins.rerun.forbidden',
-        'The saved Jenkins account cannot rerun builds on {{value0}}. It needs the Build permission on the job.',
+        'Jenkins did not offer a rerun for this build on {{value0}}. The saved account needs the Build permission on the job.',
         { value0: server }
       )
     case 'not-found':
       return translate(
         'jenkins.rerun.notFound',
-        'This Jenkins build is no longer available, so nothing was started.'
+        'This Jenkins build is no longer available — build retention may have pruned it. Nothing was started.'
       )
     case 'unreachable':
       // Why hedged: a connection reset after the request was sent is classified the same way, and
@@ -134,7 +134,8 @@ async function callWithTimeout(
 /** Rerun the build this check links to, or explain why Orca cannot. */
 export async function rerunJenkinsCheck(check: PRCheckDetail): Promise<JenkinsRerunOutcome> {
   const url = check.url
-  if (!url || !isJenkinsCheck(check)) {
+  const location = parseJenkinsBuildLocation(url)
+  if (!url || location === null) {
     return {
       ok: false,
       error: translate(
@@ -142,6 +143,11 @@ export async function rerunJenkinsCheck(check: PRCheckDetail): Promise<JenkinsRe
         'This check does not link to a Jenkins build, so it cannot be rerun here.'
       )
     }
+  }
+  // Why its own answer: a link to `lastBuild` or to the job is Jenkins, but it names whichever build
+  // is newest when it is read, so there is no specific build to rerun.
+  if (!isJenkinsCheck(check)) {
+    return { ok: false, error: failureMessage('no-build', location.serverUrl) }
   }
   // Why the namespace check: a web client has no Jenkins namespace, and a partial `window.api`
   // (an embedder, or a test harness stubbing only what it exercises) has no proxy at all.
@@ -157,7 +163,7 @@ export async function rerunJenkinsCheck(check: PRCheckDetail): Promise<JenkinsRe
   // Why the build URL and not the check's: one build reaches this surface twice (a legacy status
   // linking `…/42/display/redirect` and a Checks-plugin run linking `…/42/`), and keying on the raw
   // link would let each affordance rerun the same build.
-  const buildUrl = parseJenkinsBuildLocation(url)?.buildUrl ?? url
+  const buildUrl = location.buildUrl
   if (inFlightBuilds.has(buildUrl)) {
     return {
       ok: false,

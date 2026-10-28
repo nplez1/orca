@@ -260,7 +260,7 @@ Bumping `@xterm/xterm` is:
 4. `node config/scripts/regenerate-xterm-patches.mjs --write`.
 5. `pnpm install`, then `--check`. On a bump the lockfile has no entry under the
    new key yet, so `--write` reports the gap and leaves the hash to `pnpm
-install`; `--check` is what proves the two agree afterwards.
+   install`; `--check` is what proves the two agree afterwards.
 
 Step 4 is where a real upstream conflict shows up: `git apply` of the source
 patch fails against the new tree. Resolve it in the checkout, re-diff, and

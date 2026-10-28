@@ -27,16 +27,18 @@ const actionsCheck = (overrides: Partial<PRCheckDetail> = {}): PRCheckDetail =>
   })
 
 describe('isJenkinsCheck', () => {
-  it('needs a link that names a build, not just a `/job/` segment', () => {
+  it('needs a link that names a numbered build, not just a `/job/` segment', () => {
     expect(isJenkinsCheck(jenkinsCheck())).toBe(true)
-    expect(
-      isJenkinsCheck(jenkinsCheck({ url: 'https://ci.example.com/job/repo/lastBuild/' }))
-    ).toBe(true)
     expect(isJenkinsCheck(actionsCheck())).toBe(false)
     expect(isJenkinsCheck(jenkinsCheck({ url: 'https://ci.example.com/job/repo/' }))).toBe(false)
     expect(isJenkinsCheck(jenkinsCheck({ url: 'https://ci.example.com/job/repo/configure' }))).toBe(
       false
     )
+    // Why not a permalink: `lastFailedBuild` names whichever build is newest when it is read, which
+    // on a job serving several pull requests can be someone else's.
+    expect(
+      isJenkinsCheck(jenkinsCheck({ url: 'https://ci.example.com/job/repo/lastFailedBuild/' }))
+    ).toBe(false)
     expect(isJenkinsCheck(check({ url: null }))).toBe(false)
   })
 })
@@ -117,7 +119,9 @@ describe('selectRerunTargets', () => {
       failedOnly: true
     })
 
-    expect(targets.jenkins).toHaveLength(1)
+    // Why the legacy status must be dropped: the check run owns this build's rerun (it needs no
+    // Jenkins credentials), so replaying the status as well would start the same build twice.
+    expect(targets.jenkins).toHaveLength(0)
     expect(targets.github).toHaveLength(1)
   })
 })

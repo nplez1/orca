@@ -55,7 +55,7 @@ describe('rerunChecksAcrossProviders', () => {
 
     expect(outcome.ok).toBe(true)
     expect(outcome.started).toBe(2)
-    expect(outcome.message).toMatch(/1 GitHub check/)
+    expect(outcome.message).toMatch(/1 GitHub rerun/)
     expect(outcome.message).toMatch(/1 Jenkins build/)
   })
 
