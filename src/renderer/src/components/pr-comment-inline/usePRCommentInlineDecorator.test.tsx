@@ -200,4 +200,17 @@ describe('usePRCommentInlineDecorator gutter ownership', () => {
     fake.emitMouseMove(40)
     expect(visibleAddButtonCount(fake.domNode)).toBe(1)
   })
+
+  it('takes the parked "+" away when its line gains a collapsed thread', () => {
+    const fake = createFakeDiffCommentEditor()
+    const threads = [reviewThread(40)]
+    const { rerender } = render(<GutterSurface fake={fake} threads={threads} enabled />)
+
+    fake.emitMouseMove(40)
+    expect(visibleAddButtonCount(fake.domNode)).toBe(1)
+
+    // Collapsing under a stationary pointer must not wait for the next mousemove to clear the slot.
+    rerender(<GutterSurface fake={fake} threads={threads} enabled={false} />)
+    expect(visibleAddButtonCount(fake.domNode)).toBe(0)
+  })
 })

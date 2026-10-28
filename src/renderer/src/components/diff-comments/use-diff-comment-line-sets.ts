@@ -24,11 +24,16 @@ export function useDiffCommentLineSets(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [commentableLineKey]
   )
-  // Identity-keyed, unlike the set above: the occupied lines are derived from the thread list, so a
-  // new array means a thread changed how it is drawn — exactly when the overlay must be rebuilt.
+  // Value-keyed for the same reason: a thread toggled anywhere hands every mounted surface a fresh
+  // display map, and a new-but-equal array must not cost the overlay a push it does not need.
+  const gutterOccupiedLineKey = useMemo(
+    () => gutterOccupiedLineNumbers?.join(','),
+    [gutterOccupiedLineNumbers]
+  )
   const gutterOccupiedLineSet = useMemo(
     () => new Set(gutterOccupiedLineNumbers ?? []),
-    [gutterOccupiedLineNumbers]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gutterOccupiedLineKey]
   )
   return { commentableLineSet, gutterOccupiedLineSet }
 }

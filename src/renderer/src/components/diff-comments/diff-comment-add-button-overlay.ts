@@ -237,12 +237,22 @@ export function installDiffCommentAddButtonOverlay({
     }
   })
   const onScroll = editor.onDidScrollChange(() => {
-    // Why the availability check: the parked line can stop being ours while it is parked (its thread
-    // collapsed, or the commentable set narrowed), and scrolling must not draw the "+" back over it.
-    const parked = hoverLineRef.current
-    if (!dragging && parked != null && canCommentOnLine(parked)) {
-      positionAtLine(parked)
+    if (dragging) {
+      return
     }
+    const parked = hoverLineRef.current
+    if (parked == null) {
+      return
+    }
+    // Why hide rather than skip: the parked line can stop being ours (its thread collapsed, or the
+    // commentable set narrowed). Leaving the button at its old pixels would park a "+" for a line it
+    // no longer belongs to, and a press on it would target that stale line.
+    if (!canCommentOnLine(parked)) {
+      hoverLineRef.current = null
+      setDisplay('none')
+      return
+    }
+    positionAtLine(parked)
   })
 
   const disposables = [onMouseMove, onMouseLeave, onScroll]
@@ -261,12 +271,13 @@ export function installDiffCommentAddButtonOverlay({
     setGutterOccupiedLines: (lines) => {
       occupiedLines = lines
       // A thread collapsed under a stationary pointer: the "+" must go rather than sit on the bubble
-      // until the next mousemove.
+      // until the next mousemove. Not while dragging: there the "+" is what shows the gesture is live.
       const parked = hoverLineRef.current
-      if (parked != null && !canCommentOnLine(parked)) {
-        hoverLineRef.current = null
-        setDisplay('none')
+      if (dragging || parked == null || canCommentOnLine(parked)) {
+        return
       }
+      hoverLineRef.current = null
+      setDisplay('none')
     }
   }
 }

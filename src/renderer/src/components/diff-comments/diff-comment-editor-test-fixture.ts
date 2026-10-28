@@ -71,6 +71,9 @@ export function createFakeDiffCommentEditor(
   let nextZoneId = 0
   let scrollTop = 0
   let decorations: FakeDecoration[] = []
+  // Each createDecorationsCollection gets its own record, the way Monaco keeps the range-drag band
+  // and the gutter marks apart: clearing one must not erase the other.
+  const decorationCollections = new Set<{ current: FakeDecoration[] }>()
   let decorationWrites = 0
   let focusCount = 0
   const mouseMoveListeners: ((e: { target: { position: { lineNumber: number } } }) => void)[] = []
@@ -111,15 +114,21 @@ export function createFakeDiffCommentEditor(
     },
     deltaDecorations: () => [],
     createDecorationsCollection: (initial?: MonacoEditor.IModelDeltaDecoration[]) => {
+      const record: { current: FakeDecoration[] } = { current: [] }
+      decorationCollections.add(record)
+      const sync = (): void => {
+        decorations = [...decorationCollections].flatMap((entry) => entry.current)
+      }
       const apply = (next: MonacoEditor.IModelDeltaDecoration[]): void => {
         decorationWrites += 1
-        decorations = next.map((decoration) => ({
+        record.current = next.map((decoration) => ({
           startLine: decoration.range.startLineNumber,
           endLine: decoration.range.endLineNumber,
           className: decoration.options.className,
           marginClassName: decoration.options.marginClassName,
           glyphMarginClassName: decoration.options.glyphMarginClassName
         }))
+        sync()
       }
       // Monaco takes initial decorations as the argument, not through set() — both styles write here.
       if (initial) {
@@ -129,7 +138,8 @@ export function createFakeDiffCommentEditor(
         set: apply,
         clear: () => {
           decorationWrites += 1
-          decorations = []
+          record.current = []
+          sync()
         }
       }
     },
@@ -154,6 +164,9 @@ export function createFakeDiffCommentEditor(
     // The gutter-mark hook subscribes to gutter presses through this; the press itself is that
     // hook's own unit suite's subject.
     onMouseDown: () => noopDisposable,
+    // Subscriptions the markdown-annotation path takes; nothing here fires them.
+    onDidChangeCursorSelection: () => noopDisposable,
+    onDidLayoutChange: () => noopDisposable,
     onDidScrollChange: () => noopDisposable,
     onDidDispose: (listener: () => void) => {
       disposeListeners.push(listener)
