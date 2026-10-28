@@ -193,8 +193,12 @@ function LedgerFacts({ facts }: { facts: LedgerWindow['facts'] }): React.JSX.Ele
 }
 
 /**
- * The brief: a title, the ledger, then the written summary — with everything defaulting to
- * what happened since the reader last spoke to the agent, and one switch for the whole session.
+ * The brief: a title, then the written summary, then the ledger and the timeline — with
+ * everything defaulting to what happened since the reader last spoke to the agent, and one
+ * switch for the whole session.
+ *
+ * Why the prose leads: the summary is what the reader came for; the disclosures are the
+ * evidence behind it, so opening them is a deliberate step rather than the first thing seen.
  *
  * Why both windows are pre-built: the toggle must not cost a fold, so the whole-session report
  * is written by the fold alongside the windowed one, and the facts carry the index that places
@@ -246,16 +250,6 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
   return (
     <div className="space-y-3">
       {title ? <p className="text-sm font-medium leading-snug text-foreground">{title}</p> : null}
-      {factsAvailable ? (
-        <Disclosure
-          label={translate('activity.sessionSummary.ledger', 'Ledger')}
-          detail={factDetail(facts, showFullSession)}
-          open={ledgerOpen}
-          onToggle={() => setLedgerOpen((open) => !open)}
-        >
-          <LedgerFacts facts={facts} />
-        </Disclosure>
-      ) : null}
       {report ? (
         <div>
           {report.through < ledger.foldedThrough ? (
@@ -277,6 +271,16 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
             'Nothing has happened since your last message.'
           )}
         </p>
+      ) : null}
+      {factsAvailable ? (
+        <Disclosure
+          label={translate('activity.sessionSummary.ledger', 'Ledger')}
+          detail={factDetail(facts, showFullSession)}
+          open={ledgerOpen}
+          onToggle={() => setLedgerOpen((open) => !open)}
+        >
+          <LedgerFacts facts={facts} />
+        </Disclosure>
       ) : null}
       {timeline.length > 0 ? (
         <Disclosure

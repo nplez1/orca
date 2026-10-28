@@ -78,6 +78,49 @@ describe('SessionSummaryLedgerView', () => {
     ).toBeNull()
   })
 
+  // The pane is a brief: the prose sits directly under the title, and the disclosures are the
+  // evidence behind it rather than the first thing the reader sees.
+  it('renders the written summary above both disclosures', () => {
+    const { container } = render(<SessionSummaryLedgerView snapshot={snapshotOf(ledger())} />)
+    const text = container.textContent ?? ''
+    const title = text.indexOf('Add a --since flag to the export CLI')
+    const report = text.indexOf('The flag works now')
+    const ledgerRow = text.indexOf('Ledger')
+    const timelineRow = text.indexOf('Timeline')
+
+    expect([title, report, ledgerRow, timelineRow].every((index) => index >= 0)).toBe(true)
+    expect(title).toBeLessThan(report)
+    expect(report).toBeLessThan(ledgerRow)
+    expect(ledgerRow).toBeLessThan(timelineRow)
+    expect(timelineRow).toBeLessThan(text.indexOf('Show the full session'))
+  })
+
+  // An empty section drops out instead of leaving a row behind, and the fallback keeps the
+  // summary's slot rather than closing the gap under the title.
+  it('drops empty sections and still ends on the session switch', () => {
+    const { container } = render(
+      <SessionSummaryLedgerView
+        snapshot={snapshotOf(
+          ledger({
+            reportSince: null,
+            inProgress: null,
+            done: [{ text: 'old work', sourceIndex: 5 }],
+            timeline: [{ id: 'a', kind: 'milestone', text: 'old milestone', sourceIndex: 5 }],
+            lastUserMessageIndex: 40
+          })
+        )}
+      />
+    )
+    const text = container.textContent ?? ''
+    const title = text.indexOf('Add a --since flag to the export CLI')
+    const fallback = text.indexOf('Nothing has happened since your last message.')
+
+    expect(title).toBeLessThan(fallback)
+    expect(fallback).toBeLessThan(text.indexOf('Show the full session'))
+    expect(text).not.toContain('Ledger')
+    expect(text).not.toContain('Timeline')
+  })
+
   // Both sections start collapsed: the pane opens as a brief, not as a play-by-play.
   it('keeps the ledger and the timeline collapsed until asked', () => {
     render(<SessionSummaryLedgerView snapshot={snapshotOf(ledger())} />)
