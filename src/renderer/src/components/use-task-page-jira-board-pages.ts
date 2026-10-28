@@ -121,6 +121,9 @@ export function useTaskPageJiraBoardPages(args: {
     const silent = !(refreshChanged && !refreshSilent) && !sprintChanged && sprintLoadedRef.current
     if (!silent) {
       setSprintPageLocal(emptyJiraBoardPage())
+      // Why: a cleared page has nothing to keep, so a reload arriving over it must blank
+      // again rather than render the cleared page as a confidently-empty sprint.
+      sprintLoadedRef.current = false
     }
     // Why not inside the blanking branch: the read is in flight either way, and that is all
     // the header's indicator needs; the loader belongs to a page that was actually cleared.
@@ -178,6 +181,7 @@ export function useTaskPageJiraBoardPages(args: {
     const silent = !(refreshChanged && !refreshSilent) && backlogLoadedRef.current
     if (!silent) {
       setBacklogPageLocal(emptyJiraBoardPage())
+      backlogLoadedRef.current = false
     }
     setBacklogLoading(true)
     setBacklogBlanked(!silent)

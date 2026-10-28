@@ -296,9 +296,8 @@ describe('TaskPageJiraBoard silent reloads', () => {
     // loader cannot be inferred from the count — only from having blanked the page.
     const refetch = holdSprintRefetch(boardPage([]))
     render(<RefreshHost />)
-    expect(
-      await screen.findByText('No issues match this filter in the active sprint.')
-    ).toBeTruthy()
+    const emptySprint = 'No issues match this filter in the active sprint.'
+    expect(await screen.findByText(emptySprint)).toBeTruthy()
 
     await act(async () => {
       bumpBoardRefresh()
@@ -306,13 +305,39 @@ describe('TaskPageJiraBoard silent reloads', () => {
 
     await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
     expect(screen.queryByText('Loading…')).toBeNull()
+    expect(screen.getByText(emptySprint)).toBeTruthy()
 
     await act(async () => {
       refetch.resolve(boardPage([]))
     })
   })
 
-  it('holds Load more while a scope read is in flight', async () => {
+  it('keeps the loader up when a silent reload supersedes a blanking one', async () => {
+    // Why: a blanking refresh leaves a page that is cleared but still counts as loaded,
+    // so a silent reload landing over it must blank again — not render the cleared page
+    // as an empty sprint while its own read is still out.
+    const refetch = holdSprintRefetch(boardPage([sprintIssue, secondSprintIssue]))
+    render(<RefreshHost />)
+    await screen.findByText('ABC-1')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh Jira issues' }))
+    })
+    expect(await screen.findByText('Loading…')).toBeTruthy()
+
+    await act(async () => {
+      bumpBoardRefresh()
+    })
+    expect(screen.getByText('Loading…')).toBeTruthy()
+    expect(screen.queryByText('No issues match this filter in the active sprint.')).toBeNull()
+
+    await act(async () => {
+      refetch.resolve(boardPage([sprintIssue, secondSprintIssue]))
+    })
+    expect(await screen.findByText('ABC-1')).toBeTruthy()
+  })
+
+  it('disables Load more while a scope read is in flight', async () => {
     const refetch = holdSprintRefetch(
       boardPage([sprintIssue, secondSprintIssue], {
         isLast: false,
@@ -330,10 +355,10 @@ describe('TaskPageJiraBoard silent reloads', () => {
 
     // Why: a page appended over the reload's answer would write a pre-reload snapshot
     // back over the server's, cache included, so the button must not offer that read.
+    // The hook's own guard is belt-and-braces behind the disabled attribute, which is
+    // what a click can observe.
     const loadMore = screen.getByRole('button', { name: 'Load more sprint issues' })
     expect(loadMore).toBeDisabled()
-    fireEvent.click(loadMore)
-    expect(refetch.sprintCalls()).toBe(2)
 
     await act(async () => {
       refetch.resolve(
