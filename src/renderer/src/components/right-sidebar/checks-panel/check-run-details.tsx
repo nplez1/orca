@@ -25,6 +25,7 @@ import {
   getCheckStatusLabel
 } from './check-details-model'
 import { CheckBuildMetadata, formatBuildDuration } from '@/components/check-build-metadata'
+import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 
 function ViewFullCheckDetailsButton({
   onClick,
@@ -224,6 +225,8 @@ export function CheckRunDetails({
                 {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
               </span>
             )}
+            {/* Why no onStarted: this panel polls, so the row picks the new build up on its own. */}
+            <JenkinsRebuildButton check={check} className="ml-auto" />
           </div>
 
           {state?.error && (

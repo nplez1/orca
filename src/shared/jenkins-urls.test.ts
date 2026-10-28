@@ -13,8 +13,27 @@ describe('parseJenkinsBuildLocation classic URLs', () => {
       buildUrl: 'https://ni.example.com/job/merge/1/',
       jobPath: ['merge'],
       buildNumber: 1,
-      permalink: null
+      permalink: null,
+      namesBuild: true
     })
+  })
+
+  it('reports a link that names no build', () => {
+    // Why it matters: the Checks surface uses this to tell a Jenkins build from a GitHub Actions
+    // check, whose URL also contains a `/job/<id>` segment.
+    expect(parseJenkinsBuildLocation('https://ci.example.com/job/pipeline/')?.namesBuild).toBe(
+      false
+    )
+    expect(
+      parseJenkinsBuildLocation('https://github.com/o/r/actions/runs/1/job/456')?.namesBuild
+    ).toBe(false)
+    // A permalink is not a numbered build: it names whichever build is newest when it is read.
+    expect(
+      parseJenkinsBuildLocation('https://ci.example.com/job/pipeline/lastBuild/')?.namesBuild
+    ).toBe(false)
+    expect(parseJenkinsBuildLocation('https://ci.example.com/job/pipeline/7/')?.namesBuild).toBe(
+      true
+    )
   })
 
   it('ignores the page the status link happens to point at', () => {

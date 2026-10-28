@@ -15,6 +15,7 @@ import { translate } from '@/i18n/i18n'
 import { CHECK_COLOR, CHECK_ICON } from './check-presentation'
 import { CheckRunDetails } from './check-run-details'
 import { getCheckStatusLabel } from './check-details-model'
+import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 import { type ChecksListProps, useChecksListState } from './use-checks-list-state'
 
 export function ChecksList(props: ChecksListProps): React.JSX.Element {
@@ -162,6 +163,7 @@ export function ChecksList(props: ChecksListProps): React.JSX.Element {
                       <span className="text-[11px] text-muted-foreground">
                         {getCheckStatusLabel(check)}
                       </span>
+                      <JenkinsRebuildButton check={check} iconOnly />
                       {openUrl && (
                         <Tooltip>
                           <TooltipTrigger asChild>

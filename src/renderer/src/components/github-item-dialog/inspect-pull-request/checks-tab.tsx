@@ -178,13 +178,15 @@ export function ChecksTab({
           onChecksUpdated
         },
         failedOnly,
-        rerunning
+        rerunning,
+        list
       ),
     [
       canUseChecksRepoContext,
       headSha,
       item.number,
       item.repoId,
+      list,
       mountedRef,
       onChecksUpdated,
       prRepo,
@@ -378,7 +380,8 @@ export function ChecksTab({
                 expandedCheckKey,
                 detailsByCheckKey,
                 onToggle: handleToggleCheckDetails,
-                requestCheckDetails
+                requestCheckDetails,
+                onCheckRebuildStarted: () => void handleRefresh()
               })}
             </div>
           ))}
@@ -397,7 +400,8 @@ export function ChecksTab({
             expandedCheckKey,
             detailsByCheckKey,
             onToggle: handleToggleCheckDetails,
-            requestCheckDetails
+            requestCheckDetails,
+            onCheckRebuildStarted: () => void handleRefresh()
           })
         )}
       </div>

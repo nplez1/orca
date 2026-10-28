@@ -58,15 +58,15 @@ This is an extension of machinery already in the tree, not a new subsystem:
 
 Add `onHostSync` to the disposition table, with three values. In the tree it is a **sibling** table for
 the session fields — `WORKSPACE_SESSION_HOST_SYNC_DISPOSITION` beside `WORKSPACE_SESSION_FIELD_DISPOSITION`,
-held to the same key set at compile time — because the two existing axes are per-field *profile*
+held to the same key set at compile time — because the two existing axes are per-field _profile_
 operations and every entry's comment explains them as a pair. `GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION`
 carries the same three values for all 245 persisted settings.
 
-| Value                 | Meaning                                                                            | Examples                                                                                                                   |
-| --------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `replicated`          | The main's value wins; the host applies it.                                        | settings, agent defaults, task-source connections, provider credentials, card properties                                    |
-| `hostLocal`           | Never leaves or arrives; it describes _this_ machine.                              | repo registrations and roots, paths, terminal shell and PTY config, VM/GPU/emulator settings, port forwards, SSH keys, `activeWorkspaceExecutionHostId` |
-| `replicatedOnlyIfEmpty` | Fills a host that has nothing, never overwrites a deliberate local value.        | anything a user may have set locally on purpose                                                                             |
+| Value                   | Meaning                                                                   | Examples                                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replicated`            | The main's value wins; the host applies it.                               | settings, agent defaults, task-source connections, provider credentials, card properties                                                                |
+| `hostLocal`             | Never leaves or arrives; it describes _this_ machine.                     | repo registrations and roots, paths, terminal shell and PTY config, VM/GPU/emulator settings, port forwards, SSH keys, `activeWorkspaceExecutionHostId` |
+| `replicatedOnlyIfEmpty` | Fills a host that has nothing, never overwrites a deliberate local value. | anything a user may have set locally on purpose                                                                                                         |
 
 The table is the contract. A field with no entry is a bug, not a default, so the test that walks it
 should fail on an unknown key.

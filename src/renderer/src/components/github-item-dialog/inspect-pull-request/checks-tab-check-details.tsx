@@ -8,6 +8,7 @@ import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { translate } from '@/i18n/i18n'
 import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
+import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 import { getCheckConclusion } from '@/components/pr-check-counts'
 import {
   formatCheckTimestamp,
@@ -20,11 +21,14 @@ import {
 export function ChecksTabCheckDetails({
   check,
   state,
-  onRetry
+  onRetry,
+  onRebuildStarted
 }: {
   check: PRCheckDetail
   state: CheckDetailsLoadState | undefined
   onRetry: (check: PRCheckDetail, key: string) => void
+  /** A Jenkins rebuild started from this row; the check list, not just the details, is now stale. */
+  onRebuildStarted?: () => void
 }): React.JSX.Element {
   const details = state?.details
   const openUrl = details?.detailsUrl ?? details?.url ?? check.url
@@ -77,6 +81,11 @@ export function ChecksTabCheckDetails({
                 {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
               </span>
             )}
+            <JenkinsRebuildButton
+              check={check}
+              className="ml-auto"
+              {...(onRebuildStarted ? { onStarted: onRebuildStarted } : {})}
+            />
           </div>
 
           {state?.error && (

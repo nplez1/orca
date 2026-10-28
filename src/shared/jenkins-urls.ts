@@ -35,6 +35,15 @@ export type JenkinsBuildLocation = {
   buildNumber: number | null
   /** Build alias the URL resolved to; `lastBuild` when it pointed at the job rather than a build. */
   permalink: string | null
+  /**
+   * Whether the link names a build by number.
+   *
+   * Why it has to be a field: `permalink` is synthesized as `lastBuild` for a job-level link, so it
+   * cannot answer this. Surfaces that act on the build need the distinction: a permalink names
+   * whatever build is newest when it is read, and a GitHub Actions link — `…/actions/runs/123/job/456`
+   * — parses as a job named `456` with no build at all.
+   */
+  namesBuild: boolean
 }
 
 function parseUrl(input: string | null | undefined): URL | null {
@@ -148,28 +157,35 @@ function toLocation(
   url: URL,
   pathPrefix: string,
   rawJobNames: string[],
-  buildRef: string
+  /** The build segment the link actually carried, or null when it named none. */
+  buildRef: string | null
 ): JenkinsBuildLocation | null {
   if (rawJobNames.length === 0) {
     return null
   }
-  const numeric = /^\d+$/.test(buildRef)
+  const numeric = buildRef !== null && /^\d+$/.test(buildRef)
   const buildNumber = numeric ? Number(buildRef) : null
+  const namedPermalink = buildRef !== null && CLASSIC_PERMALINKS.has(buildRef)
   const permalink = numeric
     ? null
-    : CLASSIC_PERMALINKS.has(buildRef)
+    : namedPermalink
       ? buildRef
       : // Why: a job-level link names no build, so read the newest one rather than nothing.
         'lastBuild'
-  const resolvedRef = buildNumber === null ? permalink! : buildRef
   const jobUrl = `${url.origin}${pathPrefix}/${rawJobNames.map((name) => `job/${name}`).join('/')}/`
+  const resolvedRef = numeric && buildRef !== null ? buildRef : (permalink ?? 'lastBuild')
   return {
     serverUrl: `${url.origin}${pathPrefix}`,
     jobUrl,
     buildUrl: `${jobUrl}${encodeURIComponent(resolvedRef)}/`,
     jobPath: rawJobNames.map(decodeSegment),
     buildNumber,
-    permalink
+    permalink,
+    // Why a number only: the segment after the job names is a page as often as it is a build
+    // (`…/job/x/configure`), and a permalink (`…/lastBuild`) names whatever build is newest when it
+    // is read — on a job serving several pull requests, that is someone else's build. Anything that
+    // acts on the build behind this link has to be able to name which one.
+    namesBuild: numeric
   }
 }
 
@@ -196,7 +212,7 @@ function parseClassicLocation(url: URL): JenkinsBuildLocation | null {
     return null
   }
   // Everything past the build reference is a page (console/artifact/changes/…) we do not need.
-  return toLocation(url, pathPrefix, rawJobNames, segments[index] ?? 'lastBuild')
+  return toLocation(url, pathPrefix, rawJobNames, segments[index] ?? null)
 }
 
 /**
@@ -241,7 +257,7 @@ function parseBlueOceanLocation(url: URL): JenkinsBuildLocation | null {
     url,
     pathPrefix,
     names.map((name) => encodeURIComponent(name)),
-    runId ?? 'lastBuild'
+    runId
   )
 }
 

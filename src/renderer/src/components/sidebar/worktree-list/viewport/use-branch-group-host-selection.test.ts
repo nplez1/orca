@@ -4,7 +4,10 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host'
-import type { BranchGroupMember, WorktreeRow } from '../../../../../../shared/sidebar-list/row-types'
+import type {
+  BranchGroupMember,
+  WorktreeRow
+} from '../../../../../../shared/sidebar-list/row-types'
 import {
   remoteRepo,
   remoteWorktree,

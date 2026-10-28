@@ -1283,6 +1283,37 @@
       "timeout": "{{value0}} did not respond in time.",
       "failed": "Jenkins could not return this build.",
       "timedOut": "Timed out loading this Jenkins build."
+    },
+    "rerun": {
+      "action": "Rerun build",
+      "rerunning": "Rerunning…",
+      "inFlight": "A rerun of this Jenkins build is already starting.",
+      "noBuild": "This check does not link to a numbered Jenkins build, so there is nothing to rerun. Open it in Jenkins instead.",
+      "notReplayable": "Jenkins has no rerun for this build: the job is a freestyle job rather than a pipeline, or it is disabled.",
+      "notConfigured": "Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to rerun this build.",
+      "unauthorized": "Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.",
+      "forbidden": "Jenkins did not offer a rerun for this build on {{value0}}. The saved account needs the Build permission on the job.",
+      "notFound": "This Jenkins build is no longer available — build retention may have pruned it. Nothing was started.",
+      "unreachable": "Could not reach {{value0}}. Check Jenkins before retrying, in case a build did start. Builds are triggered from this machine, so a Jenkins on another network stays out of reach.",
+      "timeout": "{{value0}} did not respond in time. Check Jenkins before retrying, in case a build did start.",
+      "unconfirmed": "Jenkins did not confirm the rerun. Check Jenkins before retrying, in case a build did start.",
+      "failed": "Jenkins could not rerun this build.",
+      "timedOut": "Timed out waiting for Jenkins to rerun the build. Check Jenkins before retrying, in case a build did start.",
+      "notJenkins": "This check does not link to a Jenkins build, so it cannot be rerun here.",
+      "unavailable": "Rerunning Jenkins builds is not available in this client.",
+      "started": "Jenkins is rerunning this build",
+      "startedBuild": "Jenkins is rerunning build #{{value0}}"
+    }
+  },
+  "prChecks": {
+    "rerun": {
+      "nothingFailed": "No failed checks to rerun.",
+      "nothingRerunnable": "No rerunnable checks found.",
+      "partialFailure": "{{value0}} rerun(s) already started. {{value1}}",
+      "mixedStarted": "Reruns requested: {{value0}} GitHub rerun(s), {{value1}} Jenkins build(s)",
+      "jenkinsStarted": "Reruns requested for {{value0}} Jenkins builds",
+      "githubStarted": "Check rerun requested",
+      "githubStartedPlural": "Check reruns requested"
     }
   },
   "checkDetails": {

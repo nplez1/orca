@@ -16,7 +16,11 @@ import {
   getProjectGroupingForRepo,
   type ProjectGroupingIndex
 } from '../../../../../../shared/project-section-grouping'
-import type { BranchGroupMember, Row, WorktreeRow } from '../../../../../../shared/sidebar-list/row-types'
+import type {
+  BranchGroupMember,
+  Row,
+  WorktreeRow
+} from '../../../../../../shared/sidebar-list/row-types'
 
 // `|` is legal inside a branch, so the section and branch need a separator that
 // cannot appear in either.

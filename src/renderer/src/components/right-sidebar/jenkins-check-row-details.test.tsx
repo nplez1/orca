@@ -13,6 +13,14 @@ import { clearCheckDetailsCache } from '@/components/github/check-details-cache'
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const openSettingsTarget = vi.hoisted(() => vi.fn())
+const rerunJenkinsCheck = vi.hoisted(() =>
+  vi.fn(async () => ({ ok: true as const, message: 'Jenkins is rerunning build #12' }))
+)
+
+vi.mock('@/runtime/jenkins-rebuild-client', () => ({
+  hasJenkinsApi: () => true,
+  rerunJenkinsCheck
+}))
 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
@@ -138,6 +146,7 @@ function renderJenkinsDetails(details: PRCheckRunDetails): void {
 beforeEach(() => {
   clearCheckDetailsCache()
   openSettingsTarget.mockReset()
+  rerunJenkinsCheck.mockClear()
 })
 
 afterEach(() => {
@@ -148,6 +157,31 @@ afterEach(() => {
 })
 
 describe('a Jenkins check inside the Checks pane', () => {
+  it('offers the rerun in the row itself, and does not toggle the row', async () => {
+    const load = vi.fn(async () => jenkinsDetails)
+    renderChecksList(load)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const toggle = container.querySelector('.group\\/check-row')
+    if (!toggle) {
+      throw new Error('Missing check row')
+    }
+    fireEvent.click(toggle)
+    expect(container.textContent).not.toContain('Unit tests')
+
+    // Why this matters: the action is meant to be one click from the list, so it has to be there
+    // with the details collapsed.
+    fireEvent.click(screen.getByRole('button', { name: 'Rerun build' }))
+
+    expect(rerunJenkinsCheck).toHaveBeenCalledWith(
+      expect.objectContaining({ name: jenkinsCheck.name })
+    )
+    // The click must not also expand the row.
+    expect(container.textContent).not.toContain('Unit tests')
+  })
+
   // The reported repro: expand, let it load, collapse, expand again.
   it('reopens on the build it already read instead of spinning again', async () => {
     const load = vi.fn(async () => jenkinsDetails)

@@ -3,6 +3,7 @@ import { ghExecFileAsync, acquire, release, type LocalGitExecOptions } from '../
 // Keep real error parsing available when tests mock gh-utils.
 import { extractExecError } from '../../../git/exec-error'
 import { classifyRerunChecksError } from '../../gh-error-classification'
+import { isJenkinsCheck } from '../../../../shared/jenkins-rebuild'
 import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
 import { getPRChecks } from './get-pr-checks'
 import { parseActionsRunId } from './check-detail-field-mapping'
@@ -36,11 +37,18 @@ export async function rerunPRChecks(
     connectionId,
     localGitOptions
   )
-  const candidates = options.failedOnly
-    ? checks.filter((check) =>
-        ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? '')
-      )
-    : checks
+  // Why the Jenkins filter: a Jenkins link with no check run contributes nothing to either set — it
+  // has no Actions run id and no check run to rerequest — so this only keeps it out of the loop that
+  // builds those ids. A Jenkins link that *does* carry a check run stays: rerequesting it is the
+  // GitHub path for that build, and the renderer keeps the Jenkins half off the same build (see
+  // `selectRerunTargets`), which is what makes "exactly one path per build" true.
+  const candidates = (
+    options.failedOnly
+      ? checks.filter((check) =>
+          ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? '')
+        )
+      : checks
+  ).filter((check) => !isJenkinsCheck(check) || typeof check.checkRunId === 'number')
   const workflowRunIds = new Set(
     candidates
       .map((check) => check.workflowRunId ?? parseActionsRunId(check.url))

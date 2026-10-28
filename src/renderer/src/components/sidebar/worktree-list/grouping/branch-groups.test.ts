@@ -6,7 +6,11 @@ import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { mergeSameBranchRows, resolveBranchGroupSelection } from './branch-groups'
 import { buildProjectGroupingIndex } from '../../../../../../shared/project-section-grouping'
 import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/group-keys'
-import type { BranchGroupMember, Row, WorktreeRow } from '../../../../../../shared/sidebar-list/row-types'
+import type {
+  BranchGroupMember,
+  Row,
+  WorktreeRow
+} from '../../../../../../shared/sidebar-list/row-types'
 import {
   project,
   projectHostSetups,
