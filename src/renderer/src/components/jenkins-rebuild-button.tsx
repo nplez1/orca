@@ -2,7 +2,9 @@ import React, { useCallback, useState } from 'react'
 import { LoaderCircle, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 import { rerunJenkinsCheck, hasJenkinsApi } from '@/runtime/jenkins-rebuild-client'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
@@ -22,13 +24,16 @@ export function JenkinsRebuildButton({
   check,
   onStarted,
   className,
-  size = 'xs'
+  size = 'xs',
+  iconOnly = false
 }: {
   check: PRCheckDetail
   /** Called once a build actually started, so the surface can refresh the check. */
   onStarted?: () => void
   className?: string
   size?: 'xs' | 'sm'
+  /** Icon with a tooltip, for a check row — the label would push the row's name out of the way. */
+  iconOnly?: boolean
 }): React.JSX.Element | null {
   const [rebuilding, setRebuilding] = useState(false)
   const run = useCallback(async (): Promise<void> => {
@@ -57,6 +62,40 @@ export function JenkinsRebuildButton({
   if (!isJenkinsCheck(check) || check.status !== 'completed' || !hasJenkinsApi()) {
     return null
   }
+  const label = rebuilding
+    ? translate('jenkins.rerun.rerunning', 'Rerunning…')
+    : translate('jenkins.rerun.action', 'Rerun build')
+  if (iconOnly) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className={cn('size-6', className)}
+            disabled={rebuilding}
+            aria-busy={rebuilding}
+            aria-label={translate('jenkins.rerun.action', 'Rerun build')}
+            onClick={(event) => {
+              // Why: the row underneath toggles the details, and rerunning is not a request to open them.
+              event.stopPropagation()
+              void run()
+            }}
+          >
+            {rebuilding ? (
+              <LoaderCircle className="size-3 animate-spin" />
+            ) : (
+              <RotateCw className="size-3" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="left" sideOffset={4}>
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
   return (
     <Button
       type="button"
@@ -72,9 +111,7 @@ export function JenkinsRebuildButton({
       ) : (
         <RotateCw className="size-3" />
       )}
-      {rebuilding
-        ? translate('jenkins.rerun.rerunning', 'Rerunning…')
-        : translate('jenkins.rerun.action', 'Rerun build')}
+      {label}
     </Button>
   )
 }

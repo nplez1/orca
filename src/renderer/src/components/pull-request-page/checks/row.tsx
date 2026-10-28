@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { CHECK_COLOR, CHECK_ICON } from '@/components/right-sidebar/checks-panel/check-presentation'
 import { getCheckConclusion } from '@/components/pr-check-counts'
 import { getCheckDetailsKey, getCheckStatusLabel } from '@/components/github/pr-check-presentation'
+import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 import type { CheckDetailsLoadState } from '@/components/github-checks-tab-state'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { CheckDetailsPanel } from './details'
@@ -32,27 +33,39 @@ export function CheckRow({
   const key = getCheckDetailsKey(check)
   return (
     <div key={key} className="min-w-0">
-      <button
-        type="button"
-        onClick={() => onToggle(check)}
-        aria-expanded={expanded}
+      <div
         className={cn(
-          'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition',
-          variant === 'page' ? 'px-3 py-2.5 hover:bg-accent/60' : 'px-2 py-1.5 hover:bg-muted/40'
+          'flex w-full min-w-0 items-center gap-2 rounded-md transition',
+          variant === 'page' ? 'px-3 py-1 hover:bg-accent/60' : 'px-2 py-0.5 hover:bg-muted/40'
         )}
       >
-        <ChevronDown
+        <button
+          type="button"
+          onClick={() => onToggle(check)}
+          aria-expanded={expanded}
           className={cn(
-            'size-3 shrink-0 text-muted-foreground transition-transform',
-            !expanded && '-rotate-90'
+            'flex min-w-0 flex-1 items-center gap-2 text-left',
+            variant === 'page' ? 'py-1.5' : 'py-1'
           )}
-        />
-        <Icon
-          className={cn('size-3.5 shrink-0', color, conclusion === 'pending' && 'animate-spin')}
-        />
-        <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{check.name}</span>
+        >
+          <ChevronDown
+            className={cn(
+              'size-3 shrink-0 text-muted-foreground transition-transform',
+              !expanded && '-rotate-90'
+            )}
+          />
+          <Icon
+            className={cn('size-3.5 shrink-0', color, conclusion === 'pending' && 'animate-spin')}
+          />
+          <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{check.name}</span>
+        </button>
         <span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel}</span>
-      </button>
+        <JenkinsRebuildButton
+          check={check}
+          iconOnly
+          {...(onCheckRebuildStarted ? { onStarted: onCheckRebuildStarted } : {})}
+        />
+      </div>
       {expanded && (
         <CheckDetailsPanel
           check={check}
