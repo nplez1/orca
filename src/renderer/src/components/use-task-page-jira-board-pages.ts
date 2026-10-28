@@ -216,7 +216,9 @@ export function useTaskPageJiraBoardPages(args: {
 
   const loadMoreSprint = useCallback(async (): Promise<void> => {
     const current = sprintPageRef.current
-    if (sprintLoadingMore || current.isLast || !activeSprintId) {
+    // Why the loading guards: a read in flight owns the page, so a page appended over it
+    // would write a pre-reload snapshot back — the reload's own answer would be lost.
+    if (sprintLoadingMore || sprintLoading || current.isLast || !activeSprintId) {
       return
     }
     await loadMoreJiraBoardPage({
@@ -239,12 +241,13 @@ export function useTaskPageJiraBoardPages(args: {
     onRuntimeBoardUnavailable,
     providerSettings,
     siteId,
+    sprintLoading,
     sprintLoadingMore
   ])
 
   const loadMoreBacklog = useCallback(async (): Promise<void> => {
     const current = backlogPageRef.current
-    if (backlogLoadingMore || current.isLast) {
+    if (backlogLoadingMore || backlogLoading || current.isLast) {
       return
     }
     await loadMoreJiraBoardPage({
@@ -261,6 +264,7 @@ export function useTaskPageJiraBoardPages(args: {
       onRuntimeBoardUnavailable
     })
   }, [
+    backlogLoading,
     backlogLoadingMore,
     boardId,
     commitBacklogPage,

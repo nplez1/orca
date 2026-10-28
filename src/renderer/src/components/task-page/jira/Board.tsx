@@ -216,14 +216,14 @@ export function TaskPageJiraBoard({
                   {board.sprintError}
                 </div>
               ) : null}
-              {board.sprintLoading && board.sprintIssues.length === 0 ? (
+              {board.sprintLoading && board.sprintTotal === 0 ? (
                 <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
                   <LoaderCircle className="size-4 animate-spin" />
                   {translate('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
                 </div>
               ) : null}
               {board.overview?.activeSprints.length &&
-              (!board.sprintLoading || board.sprintIssues.length > 0) ? (
+              (!board.sprintLoading || board.sprintTotal > 0) ? (
                 <TaskPageJiraBoardColumns
                   columns={filteredColumns.columns}
                   otherIssues={filteredColumns.otherIssues}
@@ -246,7 +246,7 @@ export function TaskPageJiraBoard({
               ) : null}
               {board.sprintIssues.length === 0 &&
               board.sprintIsLast &&
-              !board.sprintLoading &&
+              (!board.sprintLoading || board.sprintTotal > 0) &&
               board.overview?.activeSprints.length ? (
                 <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                   {translate(
@@ -261,7 +261,7 @@ export function TaskPageJiraBoard({
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={board.sprintLoadingMore}
+                    disabled={board.sprintLoadingMore || board.sprintLoading}
                     onClick={() => void board.loadMoreSprint()}
                   >
                     {loadMoreLabel(

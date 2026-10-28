@@ -198,7 +198,7 @@ function boardPage(issues: JiraIssue[]): JiraBoardIssuePage {
 }
 
 /** Holds the sprint refetch a mutation asks for, so the window it runs in is observable. */
-function holdSprintRefetch(): {
+function holdSprintRefetch(firstPage: JiraIssue[] = [sprintIssue, secondSprintIssue]): {
   resolve: (page: JiraBoardIssuePage) => void
   sprintCalls: () => number
 } {
@@ -215,7 +215,7 @@ function holdSprintRefetch(): {
         return Promise.resolve(boardPage([backlogIssue]))
       }
       sprintCalls += 1
-      return sprintCalls === 1 ? Promise.resolve(boardPage([sprintIssue, secondSprintIssue])) : held
+      return sprintCalls === 1 ? Promise.resolve(boardPage(firstPage)) : held
     }
   )
   return { resolve: (page) => resolveHeld(page), sprintCalls: () => sprintCalls }
@@ -925,5 +925,28 @@ describe('TaskPageJiraBoard external refresh signal', () => {
     await waitFor(() => expect(screen.queryByText('ABC-2 title')).toBeNull())
     expect(screen.getByText('No backlog issues match this filter.')).toBeTruthy()
     expect(mocks.jiraGetBoardOverview.mock.calls.length).toBe(overviewCalls + 1)
+  })
+
+  it('keeps a sprint whose issues the filter hides on screen while it reloads', async () => {
+    // Why: the counts that decide a loader must be the unfiltered ones. A filter that
+    // hides every issue is not an empty board, so the reload must not blank it.
+    const refetch = holdSprintRefetch([otherAssigneeIssue])
+    render(<RefreshHost />)
+    const filteredEmpty = 'No issues match this filter in the active sprint.'
+    expect(await screen.findByText(filteredEmpty)).toBeTruthy()
+
+    await act(async () => {
+      bumpBoardRefresh()
+    })
+
+    await waitFor(() => expect(refetch.sprintCalls()).toBe(2))
+    expect(screen.queryByText('Loading…')).toBeNull()
+    // The lanes themselves, not just the empty-state sentence, survive the reload.
+    expect(screen.getByText('Doing')).toBeTruthy()
+    expect(screen.getByText(filteredEmpty)).toBeTruthy()
+
+    await act(async () => {
+      refetch.resolve(boardPage([otherAssigneeIssue]))
+    })
   })
 })

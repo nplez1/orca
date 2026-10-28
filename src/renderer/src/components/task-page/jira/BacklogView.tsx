@@ -80,7 +80,7 @@ export function TaskPageJiraBacklogView({
           {board.backlogError}
         </div>
       ) : null}
-      {board.backlogLoading && board.backlogIssues.length === 0 ? (
+      {board.backlogLoading && board.backlogLoadedCount === 0 ? (
         <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           <LoaderCircle className="mx-auto size-4 animate-spin" />
           <span className="mt-2 block">
@@ -88,7 +88,9 @@ export function TaskPageJiraBacklogView({
           </span>
         </div>
       ) : null}
-      {!board.backlogLoading && board.backlogIssues.length === 0 && !board.backlogError ? (
+      {board.backlogIssues.length === 0 &&
+      !board.backlogError &&
+      (!board.backlogLoading || board.backlogLoadedCount > 0) ? (
         <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           {board.backlogIsLast
             ? translate(
@@ -126,7 +128,7 @@ export function TaskPageJiraBacklogView({
             type="button"
             variant="outline"
             size="sm"
-            disabled={board.backlogLoadingMore}
+            disabled={board.backlogLoadingMore || board.backlogLoading}
             onClick={() => void board.loadMoreBacklog()}
           >
             {board.backlogLoadingMore
