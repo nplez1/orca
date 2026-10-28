@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { mergePRCommentIntoList } from '@/store/github/pr-comment-cache'
 import {
@@ -63,6 +63,12 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
   const refreshCommentsAfterReplies = useCallback(async (): Promise<void> => {
     await fetchComments({ force: true })
   }, [fetchComments])
+  // Why a ref: launchContext captures these callbacks at queue time; a head-churn re-render must
+  // not aim the refresh at the review the panel has left — always call the latest consumer.
+  const refreshCommentsRef = useRef(refreshCommentsAfterReplies)
+  useLayoutEffect(() => {
+    refreshCommentsRef.current = refreshCommentsAfterReplies
+  })
 
   const replyToSelectedCommentsAfterLaunch = useCallback(
     async (resolution: NonNullable<ChecksAgentComposerState['commentResolution']>) => {
@@ -172,7 +178,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       })
 
       if (canReplyOnHost && isPanelStillOnLaunchReview()) {
-        await refreshCommentsAfterReplies()
+        await refreshCommentsRef.current()
       }
 
       // Why: surface the underlying API error when replies were possible but none landed.

@@ -134,6 +134,7 @@ describe('installLocalWatcher on a stopped WSL distro', () => {
     const root = {
       listeners: new Map(),
       batch: { cancelled: false },
+      indexReconciliationController: new AbortController(),
       subscription: { unsubscribe: async () => {} }
     }
     createWslWatcherMock.mockImplementation(async (_key, _path, deps) => {

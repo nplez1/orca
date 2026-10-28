@@ -175,6 +175,7 @@ describe('launchAgentInNewTab execution host resolution', () => {
 
     await launchOnLinux()
 
-    expect(queuedCommand()).toBe("orca-np claude-teams '--dangerously-skip-permissions'")
+    // A paired Orca server publishes plain `orca` on PATH, like the relay shim — not the desktop's `orca-np`.
+    expect(queuedCommand()).toBe("orca claude-teams '--dangerously-skip-permissions'")
   })
 })

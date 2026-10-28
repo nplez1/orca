@@ -28,6 +28,11 @@ import {
   markForcedRescanSpent
 } from './ai-vault-forced-rescan-throttle'
 
+// Why re-exported: upstream defines this test hook in this module and its suites import it here; the
+// fork keeps the throttle in its own module, so the name stays reachable from where upstream's tests
+// look for it.
+export { resetAiVaultForcedRescanThrottleForTest } from './ai-vault-forced-rescan-throttle'
+
 type ConditionalSnapshot = AiVaultConditionalSnapshot & { scopeKey: string }
 
 type AiVaultRefreshArgs = { force?: boolean; background?: boolean; reuseLoadedDepth?: boolean }

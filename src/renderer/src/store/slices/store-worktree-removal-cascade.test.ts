@@ -168,7 +168,7 @@ describe('removeWorktree cascade', () => {
       ok: true,
       preservedBranch: { branchName: 'feature/test', head: 'def456', hostId: 'local' }
     })
-    expect(toast.warning).toHaveBeenCalledWith('Worktree deleted, branch kept', {
+    expect(toast.warning).toHaveBeenCalledWith('Worktree deleted, local branch kept', {
       id: 'preserved-branch:feature/test:def456',
       description: expect.anything(),
       dismissible: true,

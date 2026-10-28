@@ -203,7 +203,8 @@ describe('reclaiming a lapsed ephemeral host', () => {
     expect(record.connectionMode).toBeUndefined()
     expect(mocks.releaseEphemeralVmRuntimeEnvironments).toHaveBeenCalledWith(
       fixture.userDataPath,
-      expect.objectContaining({ id: 'runtime-1' })
+      expect.objectContaining({ id: 'runtime-1' }),
+      expect.any(Function)
     )
     expect(mocks.removeRuntimeOwnedSshTarget).toHaveBeenCalledWith('runtime-ssh-1')
     expect(fixture.sent).toEqual([

@@ -237,9 +237,9 @@ describe('AccountsPane', () => {
     for (const provider of [
       'Claude',
       'Codex',
-      // Upstream renamed this surface in the 2026-10-05 sync; the switch and the section
-      // header share one catalog key, so the switch label follows the rename.
-      'Gemini CLI (legacy)',
+      // The switch label key follows the source copy ("Gemini"); the fork's
+      // "Gemini CLI (legacy)" heading lives on its own key (aa4de4475b).
+      'Gemini',
       'OpenCode Go',
       'MiniMax',
       'DeepSeek',
@@ -259,7 +259,7 @@ describe('AccountsPane', () => {
     })
 
     expect(markup).toContain('Cursor is off.')
-    expect(markup).toContain('Gemini CLI (legacy) is off.')
+    expect(markup).toContain('Gemini is off.')
     // The provider's own controls are gone while it is switched off.
     expect(markup).not.toContain('No Cursor sign-in found on this computer')
     expect(markup).not.toContain('Use Gemini CLI credentials')

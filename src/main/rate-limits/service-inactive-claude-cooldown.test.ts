@@ -426,19 +426,23 @@ it.each([401, 503])(
   }
 )
 
-it('keeps an idle account last-good usage when its access token expires overnight', async () => {
+it('reports a retryable login refresh when an idle account’s access token expires overnight', async () => {
   await service.fetchInactiveClaudeAccountsOnOpen()
-  const originalAt = cached('A')?.updatedAt
-  // Why: Orca never refreshes a Claude login, so an idle account's usage 401s until Claude runs in it.
+  // Why: the fork refreshes a refused Claude login (#134) instead of waiting for Claude to run.
+  // A refresh the Keychain cannot complete reads as a login worth retrying, not a dead one — and
+  // that retryable kind rides the 30-minute stale window, so an overnight snapshot is dropped.
   fixture.now += 2 * 60 * 60 * 1000
   fixture.status = 401
   await service.fetchInactiveClaudeAccountsOnOpen()
   expect(cached('A')).toMatchObject({
     status: 'error',
-    updatedAt: originalAt,
-    session: { usedPercent: 21 },
-    weekly: { usedPercent: 11 },
-    usageMetadata: { failureKind: 'stale-token', authProvenance: 'profile:A' }
+    updatedAt: fixture.now,
+    session: null,
+    weekly: null,
+    usageMetadata: {
+      failureKind: 'refreshable-credentials-without-token',
+      authProvenance: 'profile:A'
+    }
   })
 })
 

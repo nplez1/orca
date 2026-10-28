@@ -61,7 +61,16 @@ describe('fork-only steps run from the gate, not from package.json', () => {
     const steps = resolveGateSteps({
       lint: 'oxlint && node config/scripts/check-upstream-identity-literals.mjs'
     })
-    expect(steps.map((step) => step.id)).toEqual(['oxlint', 'check-upstream-identity-literals'])
+    const ids = steps.map((step) => step.id)
+    expect(ids.filter((id) => id === 'check-upstream-identity-literals')).toHaveLength(1)
+    // The pnpm-shaped fork steps have no chain entry to duplicate, so they ride along once each.
+    expect(ids).toEqual([
+      'oxlint',
+      'check-upstream-identity-literals',
+      'check:process-host-imports',
+      'check:workspace-path-sync-fs-ratchet',
+      'check:compat-boundary-imports'
+    ])
   })
 
   it('refuses a fork step whose script is gone instead of skipping it', () => {

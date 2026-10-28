@@ -1,5 +1,5 @@
 import type { CommandSpec } from '../args'
-import { GLOBAL_FLAGS, LOCAL_COMMAND_FLAGS } from '../args'
+import { LOCAL_COMMAND_FLAGS } from '../args'
 
 export const VM_COMMAND_SPECS: CommandSpec[] = [
   {
@@ -7,7 +7,7 @@ export const VM_COMMAND_SPECS: CommandSpec[] = [
     summary: 'Run a per-workspace environment recipe extend hook against a stored recipe result',
     usage:
       'orca vm recipe extend <recipe-id> --recipe-result <file> --lifetime <duration> [--repo-path <path>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'recipe-id', 'repo-path', 'recipe-result', 'lifetime'],
+    allowedFlags: [...LOCAL_COMMAND_FLAGS, 'recipe-id', 'repo-path', 'recipe-result', 'lifetime'],
     positionalArgs: ['recipe-id'],
     notes: [
       'Runs the recipe extend hook from the command line, without the desktop app, so a provider author can exercise it before relying on it.',

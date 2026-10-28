@@ -19,7 +19,7 @@ const { authorizeExternalPathMock } = vi.hoisted(() => ({
   authorizeExternalPathMock: vi.fn()
 }))
 
-vi.mock('./filesystem-auth', () => ({
+vi.mock('./filesystem/filesystem-auth', () => ({
   authorizeExternalPath: authorizeExternalPathMock
 }))
 

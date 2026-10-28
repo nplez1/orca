@@ -80,11 +80,15 @@ function expectFailure(loader: Loader, surface: Surface, message: string, origin
     expect(result.error.stack).not.toContain('SYNTHETIC_SECRET')
     expect(JSON.stringify(loader.store.getState())).not.toContain('SYNTHETIC_SECRET')
   } else {
+    // Why `details` survives and the read stamps are present: #198 settles a failed refresh by
+    // keeping the payload already on screen, unlike upstream's blank-the-pane contract.
     expect(loader.state().detailsByCheckKey.check).toEqual({
       requestId: loader.ctx.nextCheckDetailsRequestIdRef.current,
       loading: false,
-      details: null,
-      error: message
+      details,
+      error: message,
+      readAt: expect.any(Number),
+      readFor: { status: 'completed', conclusion: 'failure' }
     })
     expect(JSON.stringify(loader.state())).not.toContain('SYNTHETIC_SECRET')
   }
@@ -444,6 +448,8 @@ for (const surface of ['dialog', 'page'] as const) {
           }
           await vi.advanceTimersByTimeAsync(0)
           const current = loader.state()
+          // Why `readAt`/`readFor` are stamped on success too: #198 records the read behind
+          // `details` (clock + row state) as staleness inputs for every settlement.
           expect(current.detailsByCheckKey.check).toEqual({
             requestId: 2,
             loading: false,
@@ -451,7 +457,9 @@ for (const surface of ['dialog', 'page'] as const) {
               ...newerDetails,
               jobs: [{ ...newerDetails.jobs[0], logTail: expectedLegacyControls }]
             },
-            error: null
+            error: null,
+            readAt: expect.any(Number),
+            readFor: { status: 'completed', conclusion: 'failure' }
           })
           if (oldOutcome === 'success') {
             older.resolve(details)

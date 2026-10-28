@@ -441,6 +441,7 @@ describe.skipIf(process.platform !== 'darwin')('a worktree delete Git fails part
 
   it('never deletes a worktree Git registers at the path since, even on the same branch', async () => {
     await failStartupFinish()
+    const [originalRecord] = await readWorktreeRemovalRecords(recordsDir)
     await setImmutable(false)
     await rm(worktreePath, { recursive: true })
     // The failed delete already deleted the merged branch; the user makes it again.
@@ -458,7 +459,17 @@ describe.skipIf(process.platform !== 'darwin')('a worktree delete Git fails part
     expect(await isRegistered(worktreePath)).toBe(true)
     expect(await git(['branch', '--list', 'feature'])).not.toBe('')
     expect(purged).toEqual([])
-    expect(await readWorktreeRemovalRecords(recordsDir)).toEqual([])
+    // The refusal keeps the record: the registered checkout is live, so only a fresh delete's
+    // checks may remove it (worktree-failed-removal.test.ts pins the same retention).
+    expect(await readWorktreeRemovalRecords(recordsDir)).toEqual([
+      {
+        ...originalRecord,
+        failure: {
+          message: `A different checkout is now at ${worktreePath}; Orca left it in place. Delete it again to remove it.`,
+          failedAt: expect.any(Number)
+        }
+      }
+    ])
   })
 
   it('never deletes a worktree Git registers inside the leftover', async () => {

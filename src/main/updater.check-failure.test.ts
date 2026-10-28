@@ -407,6 +407,8 @@ describe('updater check failure handling', () => {
     // Electron throws from a destroyed BrowserWindow's webContents getter.
     const mainWindow = {
       isDestroyed: () => true,
+      // The fork's binding subscribes to close-release; a real BrowserWindow always has `once`.
+      once: () => mainWindow,
       get webContents(): never {
         throw new TypeError('Object has been destroyed')
       }
@@ -414,7 +416,7 @@ describe('updater check failure handling', () => {
 
     const { setupAutoUpdater, checkForUpdatesFromMenu, getUpdateStatus } = await loadUpdaterModule()
 
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the guard only reads isDestroyed/webContents, which this partial BrowserWindow covers.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the guard reads isDestroyed/webContents and binds once, all of which this partial BrowserWindow covers.
     setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
     checkForUpdatesFromMenu()
 

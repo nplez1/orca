@@ -24,6 +24,7 @@ vi.mock('../git/runner', () => ({ gitExecFileAsync: mocks.git }))
 vi.mock('../project-runtime-git-options', () => ({
   getLocalProjectGitExecOptions: () => ({ cwd: '/repo', ...mocks.routing() }),
   getLocalProjectWorktreeGitOptions: mocks.routing,
+  getLocalProjectGhExecOptions: () => mocks.routing(),
   getWorktreeMirrorDistro: () => undefined
 }))
 vi.mock('../git/repo', () => ({

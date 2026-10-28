@@ -17,13 +17,16 @@ import {
   runtimeEnvironmentTransportCall
 } from '../slices/github-slice-test-harness'
 import {
+  check,
   createLoader,
+  details,
   surfaces,
   transports,
   successResponse,
   expectRequestCounts,
   type Surface
 } from './check-details-loader-test-fixture'
+import { checkDetailsRowState, rememberCheckDetails } from '@/components/github/check-details-cache'
 
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
 
@@ -180,6 +183,13 @@ for (const surface of surfaces) {
 
 for (const surface of surfaces) {
   describe(`${surface} paired RPC failure boundary`, () => {
+    beforeEach(() => {
+      rememberCheckDetails(check, {
+        data: details,
+        fetchedAt: Date.now(),
+        readFor: checkDetailsRowState(check)
+      })
+    })
     it.each([
       'envelope failure',
       'disconnect',
@@ -225,9 +235,11 @@ for (const surface of surfaces) {
           }
           expect(settledStore.error.message).toBe('Failed to load check details.')
         } else {
+          // Why `details` survives: #198 keeps the payload already on screen when a refresh fails
+          // instead of re-spinning to an empty pane.
           expect(settledState.detailsByCheckKey.check).toMatchObject({
             loading: false,
-            details: null,
+            details,
             error: 'Failed to load check details.'
           })
         }

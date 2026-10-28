@@ -7,6 +7,7 @@ import { getRuntimeAgentInventoryKey } from '@/store/slices/runtime-agent-invent
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
 import { getDefaultSettings } from '../../../../../shared/constants'
@@ -304,29 +305,28 @@ it('owns detection single-flight, returns failed delivery to the editor, then co
   editor?.launchContext?.onLaunchAccepted?.()
   editor?.launchContext?.onLaunched?.()
   editor?.launchContext?.onLaunched?.()
-  await waitFor(() => expect(f.resolveThread).toHaveBeenCalledOnce())
-  expect(f.resolveThread).toHaveBeenCalledWith(
-    '/repo',
-    42,
-    'thread-42',
-    true,
-    expect.objectContaining({ repoId: 'repo-1' })
-  )
+  await waitFor(() => expect(f.busy.current).toBe(false))
+  // Reply-only ack (#169): a launch never writes review state, so the open thread stays open.
+  expect(f.resolveThread).not.toHaveBeenCalled()
+  // The duplicate onLaunched is deduped — the acknowledgement runs exactly once.
+  expect(toast.success).toHaveBeenCalledTimes(1)
   expect(takePendingPRCommentAiAck()).toBeNull()
 })
 
 it('starts conflict resolution while the original comments acknowledgement is pending', async () => {
-  const provider = deferred<boolean>()
+  // The reply-only ack holds its busy flag on the post-launch refresh; pin that step in flight.
+  const refresh = deferred<unknown[]>()
   launch.mockReturnValue({
     surface: { kind: 'local-terminal', tabId: 'tab-1' },
     promptDeliveryResult: Promise.resolve({ delivered: true, failureNotified: false })
   })
   const f = fixture()
-  f.resolveThread.mockReturnValueOnce(provider.promise)
+  f.fetchPRComments.mockImplementation((_path, _number, options) =>
+    options?.force ? refresh.promise : Promise.resolve([])
+  )
   act(() => f.result.current.handleResolveCommentsWithAI(f.groups))
   await act(async () => f.inventory.resolve(['codex']))
-  await waitFor(() => expect(f.resolveThread).toHaveBeenCalledOnce())
-  expect(f.busy.current).toBe(true)
+  await waitFor(() => expect(f.busy.current).toBe(true))
   act(() => {
     f.result.current.handleResolveCommentsWithAI(f.groups)
     void f.result.current.handleResolveConflictsWithAI()
@@ -335,16 +335,10 @@ it('starts conflict resolution while the original comments acknowledgement is pe
   await waitFor(() => expect(launch).toHaveBeenCalledTimes(2))
   expect(launch.mock.calls[1]?.[0]).toMatchObject({ launchSource: 'conflict_resolution' })
   expect(f.busy.current).toBe(true)
-  await act(async () => provider.resolve(true))
+  await act(async () => refresh.resolve([]))
   await waitFor(() => expect(f.busy.current).toBe(false))
-  expect(f.resolveThread).toHaveBeenCalledOnce()
-  expect(f.resolveThread).toHaveBeenCalledWith(
-    '/repo',
-    42,
-    'thread-42',
-    true,
-    expect.objectContaining({ repoId: 'repo-1' })
-  )
+  // Reply-only ack: the launch never resolves the thread — it stays open for the user to close.
+  expect(f.resolveThread).not.toHaveBeenCalled()
 })
 
 it.each([false, true])(
@@ -365,35 +359,33 @@ it.each(['before-delivery', 'during-ack'])(
   'refreshes the current head after original-target acknowledgement (%s)',
   async (churn) => {
     const delivery = deferred<{ delivered: boolean; failureNotified: boolean }>()
-    const provider = deferred<boolean>()
+    // The reply-only ack's post-launch refresh is its in-flight step; pin it with a deferred.
+    const refresh = deferred<unknown[]>()
     launch.mockReturnValue({
       surface: { kind: 'local-terminal', tabId: 'tab-1' },
       promptDeliveryResult: delivery.promise
     })
     const f = fixture()
-    f.resolveThread.mockReturnValueOnce(provider.promise)
+    f.fetchPRComments.mockImplementation((_path, _number, options) =>
+      options?.force ? refresh.promise : Promise.resolve([])
+    )
     act(() => f.result.current.handleResolveCommentsWithAI(f.groups))
     await act(async () => f.inventory.resolve(['codex']))
     if (churn === 'before-delivery') {
       await act(async () => f.rerender({ head: 'head-B' }))
     }
     await act(async () => delivery.resolve({ delivered: true, failureNotified: false }))
-    expect(f.resolveThread).toHaveBeenCalledOnce()
+    // The acknowledgement claimed the launch and is refreshing the snapshotted original target.
+    expect(f.busy.current).toBe(true)
     if (churn === 'during-ack') {
       await act(async () => f.rerender({ head: 'head-B' }))
     }
-    expect(f.loading.current).toBe(false)
-    await act(async () => provider.resolve(true))
+    await act(async () => refresh.resolve([]))
     await waitFor(() => expect(f.busy.current).toBe(false))
     expect(f.fetchPRComments.mock.calls.filter((call) => call[2]?.force)).toHaveLength(1)
     expect(f.loading.current).toBe(false)
-    expect(f.resolveThread).toHaveBeenCalledWith(
-      '/repo',
-      42,
-      'thread-42',
-      true,
-      expect.objectContaining({ repoId: 'repo-1' })
-    )
+    // Reply-only ack: the post-launch flow refreshes the current head and never resolves a thread.
+    expect(f.resolveThread).not.toHaveBeenCalled()
     act(() => f.result.current.handleResolveCommentsWithAI(f.groups))
     await waitFor(() => expect(launch).toHaveBeenCalledTimes(2))
   }

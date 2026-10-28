@@ -364,8 +364,10 @@ describe('one pane title update: fanout at live-capture scale', () => {
     applyOnePaneTitleUpdate('next title')
 
     // Match the captured listener scale; Zustand visits every listener on each notification.
+    // The capture band (5,462–7,478) predates upstream's per-row hasAwakeStructuredChat
+    // subscription (~1 more per sidebar row, ~870 at this scale).
     expect(listeners).toBeGreaterThan(5_000)
-    expect(listeners).toBeLessThan(8_000)
+    expect(listeners).toBeLessThan(9_000)
     expect(notifications).toBe(1)
 
     // Shared-store notification still invokes every mounted selector.

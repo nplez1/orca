@@ -9,10 +9,12 @@ const { netFetchMock, netRequestMock } = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({ net: { fetch: netFetchMock, request: netRequestMock } }))
 
-const latestUrl = 'https://github.com/stablyai/orca/releases/latest'
-const releaseUrl = 'https://github.com/stablyai/orca/releases/download/v1.4.241'
+// LOCAL(nplez1): the fork re-points the whole stable-fallback probe at its own repo (see
+// local(updater)); upstream's file said stablyai/orca for every URL here.
+const latestUrl = 'https://github.com/nplez1/orca/releases/latest'
+const releaseUrl = 'https://github.com/nplez1/orca/releases/download/v1.4.241'
 
-function serveLatestRelease(location = '/stablyai/orca/releases/tag/v1.4.241'): void {
+function serveLatestRelease(location = '/nplez1/orca/releases/tag/v1.4.241'): void {
   netFetchMock.mockImplementation(async (url: string) => {
     if (url === latestUrl) {
       return new Response(null, { status: 302, headers: { location } })
@@ -65,12 +67,12 @@ describe('latest stable release fallback', () => {
   )
 
   it.each([
-    'https://other.example/stablyai/orca/releases/tag/v1.4.241',
+    'https://other.example/nplez1/orca/releases/tag/v1.4.241',
     '/other/repo/releases/tag/v1.4.241',
-    '/stablyai/orca/releases/tag/v1.4.242-rc.1',
-    '/stablyai/orca/releases/tag/mobile-android-v0.0.59',
-    '/stablyai/orca/releases/tag/%',
-    '/stablyai/orca/releases/latest'
+    '/nplez1/orca/releases/tag/v1.4.242-rc.1',
+    '/nplez1/orca/releases/tag/mobile-android-v0.0.59',
+    '/nplez1/orca/releases/tag/%',
+    '/nplez1/orca/releases/latest'
   ])('rejects an invalid fallback redirect %s before probing assets', async (location) => {
     serveLatestRelease(location)
     const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
@@ -99,7 +101,7 @@ describe('latest stable release fallback', () => {
     const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
     await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
 
-    serveLatestRelease('https://github.com/stablyai/orca/releases/tag/v1.4.241')
+    serveLatestRelease('https://github.com/nplez1/orca/releases/tag/v1.4.241')
     await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.241')
   })
 })

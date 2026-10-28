@@ -43,7 +43,7 @@ const pathIndexMock = vi.hoisted(() => {
 })
 
 vi.mock('electron', async () => (await import('./filesystem-test-harness')).electronMock)
-vi.mock('../filesystem-list-files', () => listFilesMock)
+vi.mock('./filesystem-list-files', () => listFilesMock)
 vi.mock('./filesystem-search-file-paths', () => pathSearchMock)
 vi.mock('./filesystem-auth', async (importOriginal) => ({
   ...(await importOriginal<typeof FilesystemAuth>()),
