@@ -7,6 +7,7 @@ import type {
 } from '../../../shared/jenkins-rebuild'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
 import { asRecord } from '../../../shared/jenkins-payload'
+import { parseJenkinsBuildLocation } from '../../../shared/jenkins-urls'
 
 /**
  * Starting a Jenkins build again, from the renderer's side.
@@ -100,23 +101,33 @@ function failureMessage(reason: JenkinsRebuildFailureReason, serverUrl: string |
   }
 }
 
-function successMessage(mode: JenkinsRebuildMode, omittedParameters: number): string {
-  const started =
-    mode === 'parameters'
-      ? translate(
-          'jenkins.rebuild.parametersStarted',
-          'Jenkins started a new build with this build’s parameters'
-        )
-      : translate('jenkins.rebuild.buildStarted', 'Jenkins started a new build')
-  // Why say it: a value Jenkins does not export cannot be replayed, and the new build runs with the
-  // job's default instead — which is worth knowing when that default is not what failed.
-  return omittedParameters > 0
-    ? `${started}. ${translate(
-        'jenkins.rebuild.omittedParameters',
-        '{{value0}} parameter(s) stayed at the job’s default because Jenkins did not report their value.',
-        { value0: omittedParameters }
-      )}`
-    : started
+function successMessage(
+  mode: JenkinsRebuildMode,
+  sentParameters: number,
+  omittedParameters: number
+): string {
+  // Why the sent count decides the wording: a build whose only parameters are ones Jenkins does not
+  // export has nothing to replay, and "with this build's parameters" would be a claim about a form
+  // that was sent empty.
+  if (sentParameters > 0 && omittedParameters === 0) {
+    return translate(
+      'jenkins.rebuild.parametersStarted',
+      'Jenkins started a new build with this build’s parameters'
+    )
+  }
+  if (omittedParameters > 0) {
+    return translate(
+      'jenkins.rebuild.defaultsStarted',
+      'Jenkins started a new build, with {{value0}} parameter(s) left at the job’s default because Jenkins did not report their value.',
+      { value0: omittedParameters }
+    )
+  }
+  return mode === 'parameters'
+    ? translate(
+        'jenkins.rebuild.parametersStarted',
+        'Jenkins started a new build with this build’s parameters'
+      )
+    : translate('jenkins.rebuild.buildStarted', 'Jenkins started a new build')
 }
 
 async function callWithTimeout(
@@ -165,9 +176,11 @@ export async function rebuildJenkinsCheck(check: PRCheckDetail): Promise<Jenkins
       )
     }
   }
-  // Why here and not in each surface: the toolbar's menu and the per-check button are separate
-  // affordances over the same build, and one click each would otherwise start it twice.
-  if (inFlightBuilds.has(url)) {
+  // Why the build URL and not the check's: one build reaches this surface twice (a legacy status
+  // linking `…/42/display/redirect` and a Checks-plugin run linking `…/42/`), and keying on the raw
+  // link would let each affordance start the same build.
+  const buildUrl = parseJenkinsBuildLocation(url)?.buildUrl ?? url
+  if (inFlightBuilds.has(buildUrl)) {
     return {
       ok: false,
       error: translate(
@@ -176,7 +189,7 @@ export async function rebuildJenkinsCheck(check: PRCheckDetail): Promise<Jenkins
       )
     }
   }
-  inFlightBuilds.add(url)
+  inFlightBuilds.add(buildUrl)
   try {
     const result = await callWithTimeout(window.api.jenkins.rebuild({ url }))
     if (!result) {
@@ -188,9 +201,9 @@ export async function rebuildJenkinsCheck(check: PRCheckDetail): Promise<Jenkins
     return {
       ok: true,
       mode: result.mode,
-      message: successMessage(result.mode, result.omittedParameters)
+      message: successMessage(result.mode, result.sentParameters, result.omittedParameters)
     }
   } finally {
-    inFlightBuilds.delete(url)
+    inFlightBuilds.delete(buildUrl)
   }
 }

@@ -119,6 +119,7 @@ describe('rebuildJenkinsBuild', () => {
       ok: true,
       mode: 'parameters',
       buildNumber: 12,
+      sentParameters: 2,
       omittedParameters: 1
     })
     expect(posts().map((request) => request.url)).toEqual([`${JOB_URL}buildWithParameters`])
@@ -130,7 +131,7 @@ describe('rebuildJenkinsBuild', () => {
     expect(body).not.toContain('DEPLOY_TOKEN')
   })
 
-  it('sends the crumb and the saved credentials, and never follows a redirect', async () => {
+  it('sends the crumb and the saved credentials', async () => {
     const { connection, rebuild } = await loadModules()
     configureServer(connection)
     route = (url, init) => {
@@ -149,9 +150,7 @@ describe('rebuildJenkinsBuild', () => {
     expect(headers.get('Authorization')).toBe(
       `Basic ${Buffer.from('ada:s3cret').toString('base64')}`
     )
-    // Why assert the mode: following a redirect would re-issue the write as a GET and judge it by
-    // whatever page it landed on.
-    expect(posts()[0].init.redirect).toBe('manual')
+    expect(posts()[0].init.method).toBe('POST')
   })
 
   it('uses the parameterless endpoint for a job that takes none', async () => {
@@ -166,6 +165,7 @@ describe('rebuildJenkinsBuild', () => {
       ok: true,
       mode: 'build',
       buildNumber: 12,
+      sentParameters: 0,
       omittedParameters: 0
     })
     expect(posts().map((request) => request.url)).toEqual([`${JOB_URL}build`])
@@ -175,21 +175,57 @@ describe('rebuildJenkinsBuild', () => {
   it('reports a redirect as unconfirmed rather than as a failure or a success', async () => {
     const { connection, rebuild } = await loadModules()
     configureServer(connection)
-    route = (_url, init) =>
-      init.method === 'POST'
-        ? new Response(null, { status: 302, headers: { location: `${JOB_URL}12/` } })
-        : json(buildBody([parameterAction]))
+    route = (_url, init) => {
+      if (init.method !== 'POST') {
+        return json(buildBody([parameterAction]))
+      }
+      // Why the url: the desktop transport follows redirects, so a write that landed elsewhere is
+      // recognised by where it landed, not by a 3xx status we would never see.
+      const response = new Response(null, { status: 201 })
+      Object.defineProperty(response, 'url', { value: `${JOB_URL}12/` })
+      return response
+    }
 
     const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
 
-    // Why: a 302 may mean the build was queued, so calling it a failure would invite a retry that
-    // starts a second one, and calling it a success would claim a build that never started.
+    // Why: a redirect may mean the build was queued, so calling it a failure would invite a retry
+    // that starts a second one, and calling it a success would claim a build nobody saw.
     expect(result.ok).toBe(false)
     if (result.ok) {
       return
     }
     expect(result.reason).toBe('unconfirmed')
     expect(posts()).toHaveLength(1)
+  })
+
+  it('starts a build whose parameters were all unreadable instead of refusing', async () => {
+    const { connection, rebuild } = await loadModules()
+    configureServer(connection)
+    route = (_url, init) =>
+      init.method === 'POST'
+        ? new Response(null, { status: 201 })
+        : json(
+            buildBody([
+              {
+                _class: 'hudson.model.ParametersAction',
+                parameters: [{ _class: 'hudson.model.PasswordParameterValue', name: 'TOKEN' }]
+              }
+            ])
+          )
+
+    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
+
+    // Why the parameters endpoint with an empty form: `/build` is refused on a parameterized job,
+    // and only `buildWithParameters` lets every value fall back to its definition default.
+    expect(result).toEqual({
+      ok: true,
+      mode: 'build',
+      buildNumber: 12,
+      sentParameters: 0,
+      omittedParameters: 1
+    })
+    expect(posts().map((request) => request.url)).toEqual([`${JOB_URL}buildWithParameters`])
+    expect(posts()[0].init.body).toBeUndefined()
   })
 
   it('does not retry on another endpoint when Jenkins refuses the write', async () => {

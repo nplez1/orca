@@ -21,8 +21,8 @@ import { getMainHttpClient } from '../network/http-client'
  * Writes against a Jenkins server.
  *
  * Kept apart from the read transport because a write's success is the status line, not a document:
- * `build`, `buildWithParameters` and the rebuild plugin all answer a POST whose body nobody reads,
- * and a 201 with no `Location` is the normal case rather than an empty result.
+ * `build` and `buildWithParameters` answer a POST whose body nobody reads, and a 201 with no
+ * `Location` is the normal case rather than an empty result.
  */
 
 export type JenkinsPostResult =
@@ -72,10 +72,11 @@ export async function jenkinsPost(
   try {
     response = await getMainHttpClient().fetch(args.url, {
       method: 'POST',
-      // Why not follow: a write's verdict is the status line of the POST, and following a redirect
-      // re-issues it as a GET whose result says nothing about whether a build started. A 3xx is
-      // reported as unconfirmed instead, which is what the caller can honestly tell the user.
-      redirect: 'manual',
+      // Why follow rather than manual: the desktop transport is Electron's `net.fetch`, which
+      // rejects a manual-redirect request outright. Following the redirect and comparing the
+      // landing URL to the one we posted at is what both hosts can do, and the landing page is
+      // never read as a verdict on the write (see the check below).
+      redirect: 'follow',
       headers: {
         Accept: 'application/json',
         ...(args.body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
@@ -94,8 +95,8 @@ export async function jenkinsPost(
     identifiedAsJenkins: jenkinsVersion !== null,
     configured: args.configured === true
   }
-  // Why for both: an opaqueredirect carries no status and no URL (`redirect: 'manual'` follows the
-  // spec), so a chromeless 0 and a visible 3xx are the same answer — look, do not assume.
+  // Why for both: an opaqueredirect carries no status and no URL, so a chromeless 0 and a visible
+  // 3xx are the same answer — look, do not assume.
   if (
     response.type === 'opaqueredirect' ||
     response.status === 0 ||
@@ -106,6 +107,18 @@ export async function jenkinsPost(
       ok: false,
       reason: 'unconfirmed',
       message: 'Jenkins redirected the build request instead of accepting it'
+    }
+  }
+  // Why the URL rather than a redirect flag: a followed redirect re-issues the write as a GET, so
+  // the status below describes the page it landed on, not the POST. Jenkins answers a queued build
+  // with 201 and no redirect, so a landing URL that differs means the status is no longer evidence
+  // about the write — possibly after starting something, which is what `unconfirmed` says.
+  if (response.url.length > 0 && response.url !== args.url) {
+    await releaseBody(response)
+    return {
+      ok: false,
+      reason: 'unconfirmed',
+      message: `Jenkins redirected the build request to ${response.url}`
     }
   }
   if (

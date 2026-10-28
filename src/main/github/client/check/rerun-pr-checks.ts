@@ -39,14 +39,16 @@ export async function rerunPRChecks(
   )
   // Why the Jenkins filter: a Jenkins that publishes GitHub check runs (the Checks plugin) gives
   // its checks a `checkRunId`, and rerequesting that check run starts a build on the Jenkins side.
-  // The Jenkins rerun path starts that build itself, so leaving these in would start two.
+  // The Jenkins rerun path starts that build itself, so leaving these in would start two. The
+  // exception is a Jenkins link that carries a check run: that one *is* ours to rerequest, because
+  // the plugin starts the build without Orca holding this server's credentials.
   const candidates = (
     options.failedOnly
       ? checks.filter((check) =>
           ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? '')
         )
       : checks
-  ).filter((check) => !isJenkinsCheck(check))
+  ).filter((check) => !isJenkinsCheck(check) || typeof check.checkRunId === 'number')
   const workflowRunIds = new Set(
     candidates
       .map((check) => check.workflowRunId ?? parseActionsRunId(check.url))

@@ -49,11 +49,14 @@ describe('isGitHubRerunCandidate', () => {
     expect(isGitHubRerunCandidate(check({ url: null }))).toBe(false)
   })
 
-  it('never counts a Jenkins check, however little else it carries', () => {
+  it('never counts a legacy Jenkins check, which carries no check run', () => {
     expect(isGitHubRerunCandidate(jenkinsCheck())).toBe(false)
-    // A Jenkins that publishes GitHub check runs carries an id, and rerequesting it starts a build
-    // on the Jenkins side — so it belongs to the Jenkins half only.
-    expect(isGitHubRerunCandidate(jenkinsCheck({ checkRunId: 42 }))).toBe(false)
+  })
+
+  it('counts a Jenkins check that is also a GitHub check run, so no Jenkins credentials are needed', () => {
+    // Rerequesting the check run is how the Jenkins Checks plugin starts a build, and the Jenkins
+    // leg must stay out of it — sending the check to both halves is what started two builds.
+    expect(isGitHubRerunCandidate(jenkinsCheck({ checkRunId: 42 }))).toBe(true)
   })
 })
 
@@ -103,7 +106,8 @@ describe('selectRerunTargets', () => {
     const targets = selectRerunTargets({
       checks: [
         jenkinsCheck(),
-        // The same build through a Jenkins that also publishes a GitHub check run.
+        // The same build through a Jenkins that also publishes a GitHub check run: only one of the
+        // two paths may start it, and it is the check run, which needs no Jenkins credentials.
         jenkinsCheck({
           name: 'continuous-integration/jenkins/pr-merge (check run)',
           url: 'https://ci.example.com/job/team/job/repo/12/',
@@ -114,6 +118,6 @@ describe('selectRerunTargets', () => {
     })
 
     expect(targets.jenkins).toHaveLength(1)
-    expect(targets.github).toHaveLength(0)
+    expect(targets.github).toHaveLength(1)
   })
 })

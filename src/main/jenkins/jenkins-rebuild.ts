@@ -160,7 +160,10 @@ export async function rebuildJenkinsBuild(args: {
   const triggered = await jenkinsPost({
     ...request,
     crumb,
-    url: `${location.jobUrl}${plan.parameters.length > 0 ? 'buildWithParameters' : 'build'}`,
+    // Why `buildWithParameters` also when every value was omitted: the job declares parameters, and
+    // `/build` on a parameterized job is refused rather than defaulted. An empty form here leaves
+    // each of them at its definition default.
+    url: `${location.jobUrl}${plan.parameters.length > 0 || plan.omittedParameters > 0 ? 'buildWithParameters' : 'build'}`,
     ...(plan.parameters.length > 0
       ? {
           body: new URLSearchParams(
@@ -178,6 +181,7 @@ export async function rebuildJenkinsBuild(args: {
     ok: true,
     mode: plan.parameters.length > 0 ? 'parameters' : 'build',
     buildNumber: plan.buildNumber,
+    sentParameters: plan.parameters.length,
     omittedParameters: plan.omittedParameters
   }
 }

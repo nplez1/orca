@@ -32,6 +32,8 @@ export type JenkinsRebuildResult =
       ok: true
       mode: JenkinsRebuildMode
       buildNumber: number
+      /** Parameters sent from the previous build. */
+      sentParameters: number
       /** Parameters left at the job's default because Jenkins did not export a value for them. */
       omittedParameters: number
     }
@@ -72,16 +74,30 @@ export function isRerunnableFailure(check: Pick<PRCheckDetail, 'conclusion'>): b
  * Mirrors the candidate rule in the main process (`rerun-pr-checks.ts`), because a mixed list has
  * to be split before either provider is called: asking GitHub about a Jenkins-only list is what
  * produced "No failed GitHub Actions checks to rerun."
+ *
+ * A Jenkins check that is *also* a GitHub check run belongs here, not to the Jenkins leg: the
+ * Checks plugin starts a build when its check run is rerequested, and that path needs no Jenkins
+ * credentials in Orca. Routing it to both halves is how one click started two builds.
  */
 export function isGitHubRerunCandidate(check: PRCheckDetail): boolean {
   if (isJenkinsCheck(check)) {
-    return false
+    return typeof check.checkRunId === 'number'
   }
   return (
     typeof check.workflowRunId === 'number' ||
     typeof check.checkRunId === 'number' ||
     parseActionsRunId(check.url) !== undefined
   )
+}
+
+/**
+ * Whether the Jenkins leg may start this build, which needs the link Jenkins actually POSTs at.
+ *
+ * Why not when there is a check run: rerequesting that check run and POSTing at the job would start
+ * the same build twice, and the check run is the path that works without Jenkins credentials here.
+ */
+function isJenkinsRebuildTarget(check: PRCheckDetail): boolean {
+  return isJenkinsCheck(check) && typeof check.checkRunId !== 'number'
 }
 
 /**
@@ -105,7 +121,7 @@ export function selectRerunTargets({
   const candidates = failedOnly ? checks.filter(isRerunnableFailure) : checks
   const seenBuildUrls = new Set<string>()
   const jenkins = candidates.filter((check) => {
-    if (!isJenkinsCheck(check) || check.status !== 'completed') {
+    if (!isJenkinsRebuildTarget(check) || check.status !== 'completed') {
       return false
     }
     const buildUrl = parseJenkinsBuildLocation(check.url)?.buildUrl

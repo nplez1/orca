@@ -47,6 +47,7 @@ describe('rebuildJenkinsCheck', () => {
       ok: true,
       mode: 'parameters',
       buildNumber: 12,
+      sentParameters: 2,
       omittedParameters: 0
     })
 
@@ -60,11 +61,12 @@ describe('rebuildJenkinsCheck', () => {
     })
   })
 
-  it('says which parameters were left at the job default', async () => {
+  it('says how many parameters were left at the job default', async () => {
     rebuild.mockResolvedValue({
       ok: true,
       mode: 'parameters',
       buildNumber: 12,
+      sentParameters: 1,
       omittedParameters: 2
     })
 
@@ -74,7 +76,9 @@ describe('rebuildJenkinsCheck', () => {
     if (!outcome.ok) {
       return
     }
-    expect(outcome.message).toMatch(/2 parameter\(s\) stayed at the job’s default/)
+    expect(outcome.message).toMatch(/2 parameter\(s\) left at the job’s default/)
+    // Why not also "with this build's parameters": some of them were not sent at all.
+    expect(outcome.message).not.toMatch(/with this build’s parameters/)
   })
 
   it('does not claim a build was started when Jenkins only redirected', async () => {
@@ -148,12 +152,35 @@ describe('rebuildJenkinsCheck', () => {
       error: expect.stringMatching(/already starting/)
     })
 
-    settle({ ok: true, mode: 'build', buildNumber: 12, omittedParameters: 0 })
+    settle({ ok: true, mode: 'build', buildNumber: 12, sentParameters: 0, omittedParameters: 0 })
     await expect(first).resolves.toEqual({
       ok: true,
       mode: 'build',
       message: 'Jenkins started a new build'
     })
+    expect(rebuild).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a second rerun of the same build reached through a different link', async () => {
+    let settle: (value: unknown) => void = () => undefined
+    rebuild.mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve
+      })
+    )
+
+    const first = rebuildJenkinsCheck(check())
+    // Why: a legacy status links `…/12/display/redirect` while a Checks-plugin run links `…/12/`,
+    // and both name one build.
+    await expect(
+      rebuildJenkinsCheck(check({ url: 'https://ci.example.com/job/team/job/repo/12/' }))
+    ).resolves.toEqual({
+      ok: false,
+      error: expect.stringMatching(/already starting/)
+    })
+
+    settle({ ok: true, mode: 'build', buildNumber: 12, sentParameters: 0, omittedParameters: 0 })
+    await first
     expect(rebuild).toHaveBeenCalledTimes(1)
   })
 

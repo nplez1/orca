@@ -1301,7 +1301,7 @@
       "notJenkins": "This check does not link to a Jenkins build, so it cannot be rerun here.",
       "unavailable": "Rerunning Jenkins builds is not available in this client.",
       "parametersStarted": "Jenkins started a new build with this build’s parameters",
-      "omittedParameters": "{{value0}} parameter(s) stayed at the job’s default because Jenkins did not report their value.",
+      "defaultsStarted": "Jenkins started a new build, with {{value0}} parameter(s) left at the job’s default because Jenkins did not report their value.",
       "buildStarted": "Jenkins started a new build"
     }
   },
