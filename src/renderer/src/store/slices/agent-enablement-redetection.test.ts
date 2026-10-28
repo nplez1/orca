@@ -6,6 +6,8 @@ import {
   type AgentInventoryRefreshState
 } from './agent-enablement-redetection'
 import { getRuntimeAgentInventoryKey } from './runtime-agent-inventory-key'
+import { makeWorktree } from './worktrees-slice-test-fixtures'
+import { makeFolderWorkspace } from '@/components/sidebar/folder-workspace-composer-submit-fixtures'
 
 function makeRefreshState(overrides: Partial<AgentInventoryRefreshState> = {}): {
   state: AgentInventoryRefreshState
@@ -86,8 +88,8 @@ describe('refreshDetectedAgentInventories', () => {
 
   it('re-reads each workspace isolated, then this machine for the focused context', () => {
     const { state, refreshLocal } = makeRefreshState({
-      worktreesByRepo: { repo: [{ id: 'wt-in-wsl' }] },
-      folderWorkspaces: [{ id: 'c:/repo' }]
+      worktreesByRepo: { repo: [makeWorktree({ id: 'wt-in-wsl', repoId: 'repo' })] },
+      folderWorkspaces: [makeFolderWorkspace({ id: 'c:/repo' })]
     })
 
     refreshDetectedAgentInventories(state)
@@ -122,7 +124,7 @@ describe('refreshDetectedAgentInventories', () => {
 
   it('keeps re-reading the other hosts when one refresh rejects', async () => {
     const { state, refreshLocal, refreshRemote, refreshRuntime } = makeRefreshState({
-      worktreesByRepo: { repo: [{ id: 'wt-1' }] },
+      worktreesByRepo: { repo: [makeWorktree({ id: 'wt-1', repoId: 'repo' })] },
       remoteDetectedAgentIds: { 'ssh-1': null, 'ssh-2': ['claude'] },
       runtimeDetectedAgentIds: { 'env-1': ['claude'] }
     })
@@ -140,7 +142,7 @@ describe('refreshDetectedAgentInventories', () => {
   it('narrows to one paired host, covering its default list and each workspace', () => {
     const otherHost = getRuntimeAgentInventoryKey('env-2', 'wt-2')
     const { state, refreshLocal, refreshRemote, refreshRuntime } = makeRefreshState({
-      worktreesByRepo: { repo: [{ id: 'wt-1' }] },
+      worktreesByRepo: { repo: [makeWorktree({ id: 'wt-1', repoId: 'repo' })] },
       remoteDetectedAgentIds: { 'ssh-1': ['claude'] },
       runtimeDetectedAgentIds: { [otherHost]: ['claude'] }
     })

@@ -2,15 +2,18 @@ import type { TuiAgent } from '../../../../shared/tui-agent'
 import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selection'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import {
+  selectFolderWorkspaces,
+  selectWorktreesByRepo,
+  type WorkspaceRecordState
+} from '../workspace-record-selectors'
+import {
   getRuntimeAgentInventoryEnvironmentId,
   getRuntimeAgentInventoryWorktreeId,
   getRuntimeAgentInventoryKey
 } from './runtime-agent-inventory-key'
 
 /** The cached per-host inventories an enable re-reads, plus the local workspaces that name them. */
-export type AgentInventoryRefreshState = {
-  worktreesByRepo: Readonly<Record<string, readonly { id: string }[]>>
-  folderWorkspaces: readonly { id: string }[]
+export type AgentInventoryRefreshState = WorkspaceRecordState & {
   refreshDetectedAgents: (worktreeId?: string | null, isolated?: boolean) => Promise<TuiAgent[]>
   remoteDetectedAgentIds: Readonly<Record<string, TuiAgent[] | null>>
   refreshRemoteDetectedAgents: (connectionId: string) => Promise<TuiAgent[]>
@@ -40,11 +43,12 @@ export function enablesNewTuiAgents(
 }
 
 /** Every local workspace, named the way a runtime context resolves it. */
-function localWorkspaceIds(state: AgentInventoryRefreshState): string[] {
+function localWorkspaceIds(state: WorkspaceRecordState): string[] {
+  const worktrees = Object.values(selectWorktreesByRepo(state)).flatMap((perRepo) => perRepo)
   return [
-    ...Object.values(state.worktreesByRepo).flatMap((worktrees) => worktrees.map((w) => w.id)),
+    ...worktrees.map((worktree) => worktree.id),
     // Why the key: a folder workspace answers to `folder:<id>`, and a bare id resolves as none.
-    ...state.folderWorkspaces.map((folder) => folderWorkspaceKey(folder.id))
+    ...selectFolderWorkspaces(state).map((folder) => folderWorkspaceKey(folder.id))
   ]
 }
 
