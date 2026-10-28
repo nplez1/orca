@@ -1,6 +1,9 @@
-import type { AiVaultListArgs } from '../../shared/ai-vault-types'
-import { aiVaultAppliedScopePaths } from '../../shared/ai-vault-session-depth'
-import type { AiVaultHostLegSyncBasis } from './ai-vault-host-leg-cache'
+import type { AiVaultListArgs, AiVaultListResult } from '../../shared/ai-vault-types'
+import {
+  aiVaultAppliedScopePaths,
+  type AiVaultSessionDepth
+} from '../../shared/ai-vault-session-depth'
+import { hostLegSyncScan, type AiVaultHostLegSyncBasis } from './ai-vault-host-leg-sync'
 
 /**
  * What one host's listing for this scope is called, whichever view asked for it. Why not the
@@ -29,4 +32,20 @@ export function legListArgs(
   return args
     ? { ...args, afterFingerprint: undefined, syncFromFingerprint: syncFrom?.fingerprint }
     : undefined
+}
+
+/** The host-leg cache's `scan` for one host, syncing from the list this host's leg holds. */
+export function aiVaultLegSyncScan(
+  args: AiVaultListArgs | undefined,
+  hostId: string,
+  depth: AiVaultSessionDepth,
+  scan: (syncFrom: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>
+): () => Promise<AiVaultListResult> {
+  // The same key whichever view asks, so the single-host and all-hosts views share a basis.
+  return hostLegSyncScan({
+    syncBasisKey: aiVaultLegScopeKey(args, hostId),
+    depth,
+    hostLabel: hostId,
+    scan
+  })
 }

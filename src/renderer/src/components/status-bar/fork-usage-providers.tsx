@@ -143,6 +143,8 @@ export const FORK_USAGE_PROVIDERS: Record<ForkUsageProviderId, ForkUsageProvider
     settingsFlag: 'copilotTokenConfigured',
     // Why: Copilot reports a monthly allowance rather than a quota window.
     pendingReadout: { monthly: null, allowance: null },
+    // Why not `hasUsageData`: that module imports this one, so reusing it would cycle. The allowance is
+    // Copilot's own readout, so it is the field that has to be present before the row counts as data.
     hasData: (provider) => provider.allowance != null
   }
 }

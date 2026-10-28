@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
 import * as monaco from 'monaco-editor'
 import type { editor as monacoEditor } from 'monaco-editor'
+// Why direct: the gutter marks are the thread card's styling reached through four modules of imports,
+// and a mark rendered on a code path that skips that chain would come out unstyled.
+import './pr-comment-thread.css'
 
 /** One collapsed review thread reduced to a marker. */
 export type PRCommentGutterMark = {

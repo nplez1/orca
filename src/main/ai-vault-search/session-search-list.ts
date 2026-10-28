@@ -3,6 +3,7 @@ import type { ExecutionHostId } from '../../shared/execution-host'
 import type SyncDatabase from '../sqlite/sync-database'
 import { parseVaultQuery } from '../../shared/ai-vault-session-filters'
 import { sessionRowFilter } from './session-search-row-filter'
+import { SESSION_LIST_FROM } from './session-search-list-schema'
 
 /**
  * Agent Session History's list, answered from the metadata tier.
@@ -24,7 +25,7 @@ import { sessionRowFilter } from './session-search-row-filter'
  * caller rather than waited for.
  */
 
-/** A `sessions` row as the list reads it. */
+/** A `sessions` row and its list facts, as the list reads them. */
 type IndexedSessionRow = {
   id: number
   agent: AiVaultAgent
@@ -74,10 +75,16 @@ export type IndexedSessionList = {
   truncated: boolean
 }
 
-const COLUMNS = `id, agent, session_id, file_path, codex_home, title, cwd, branch, model,
-  created_at, updated_at, modified_at, message_count, total_tokens, queued_message_count,
-  subagent_transcript_count, subagent_parent_session_id, subagent_agent_type,
-  subagent_parent_agent, resume_command`
+// The facts columns are qualified so a same-named column upstream adds to `sessions` is not ambiguous.
+const COLUMNS = `id, agent, session_id, file_path, codex_home, title, cwd, branch,
+  session_list_facts.model AS model, created_at, updated_at,
+  session_list_facts.modified_at AS modified_at, message_count,
+  COALESCE(session_list_facts.total_tokens, 0) AS total_tokens,
+  COALESCE(session_list_facts.queued_message_count, 0) AS queued_message_count,
+  COALESCE(session_list_facts.subagent_transcript_count, 0) AS subagent_transcript_count,
+  session_list_facts.subagent_parent_session_id AS subagent_parent_session_id,
+  session_list_facts.subagent_agent_type AS subagent_agent_type,
+  session_list_facts.subagent_parent_agent AS subagent_parent_agent, resume_command`
 
 /**
  * The columns the panel's own filter searches, minus preview text.
@@ -86,7 +93,7 @@ const COLUMNS = `id, agent, session_id, file_path, codex_home, title, cwd, branc
  * `_`, `.`, `-` and `/` inside a token, so a cwd is one token `/repo/app` and a
  * user typing `app` or `repo/app` would find nothing — while the panel's
  * client-side filter, and the search box this replaced, both match it. Same
- * columns, same all-terms rule, same answer. `sessions_fts` stays for the ranked
+ * columns, same all-terms rule, same answer. `session_metadata_fts` stays for the ranked
  * search surface, where token semantics are what a hit is ranked on.
  */
 const QUERY_COLUMNS = [
@@ -94,7 +101,7 @@ const QUERY_COLUMNS = [
   'session_id',
   'agent',
   'branch',
-  'model',
+  'session_list_facts.model',
   'cwd',
   'file_path'
 ] as const
@@ -145,10 +152,10 @@ export function listIndexedSessions(
   // counting them, which on a large profile is the difference between a range
   // scan and a full one.
   const bound = unlimited ? -1 : Math.max(1, Math.floor(args.limit)) + 1
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the sessions schema defines IndexedSessionRow, and the SELECT lists its columns by name.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the sessions and session_list_facts schemas define IndexedSessionRow, and the SELECT lists its columns by name.
   const rows = db
     .prepare(
-      `SELECT ${COLUMNS} FROM sessions WHERE ${conditions.join(' AND ')}
+      `SELECT ${COLUMNS} FROM ${SESSION_LIST_FROM} WHERE ${conditions.join(' AND ')}
        ORDER BY updated_at DESC, id DESC LIMIT ?`
     )
     .all(...values, bound) as IndexedSessionRow[]

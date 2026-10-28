@@ -21,20 +21,7 @@ const RECENT_SCAN_FACTOR = 20
 const FULL_WEIGHTS = '3.0, 2.0, 1.0, 1.0'
 const CONVERSATION_WEIGHTS = '3.0, 2.0, 0.0, 0.0'
 
-/** Sessions columns the schema declares but upstream's `SessionRow` does not. */
-type SessionColumnOutsideRow =
-  | 'cwd_key'
-  | 'created_at'
-  | 'model'
-  | 'total_tokens'
-  | 'queued_message_count'
-  | 'subagent_transcript_count'
-  | 'subagent_parent_session_id'
-  | 'subagent_agent_type'
-  | 'subagent_parent_agent'
-  | 'modified_at'
-
-// Explicit columns let the existing statement cache reuse these reads; tests pin every schema field.
+// Keep SQL text stable for statement-cache reuse; tests pin the projected schema.
 const SESSION_COLUMN_LIST = (
   [
     'id',
@@ -51,16 +38,8 @@ const SESSION_COLUMN_LIST = (
     'message_count',
     'resume_command',
     'content_hash',
-    'content_hash_count',
-    'model',
-    'total_tokens',
-    'queued_message_count',
-    'subagent_transcript_count',
-    'subagent_parent_session_id',
-    'subagent_agent_type',
-    'subagent_parent_agent',
-    'modified_at'
-  ] as const satisfies readonly (keyof SessionRow | SessionColumnOutsideRow)[]
+    'content_hash_count'
+  ] as const satisfies readonly (keyof SessionRow | 'cwd_key' | 'created_at')[]
 ).join(', ')
 
 export type RetrievalScope = {

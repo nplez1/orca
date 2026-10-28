@@ -70,8 +70,6 @@ function args(
     cacheKey: 'leg',
     depth,
     force,
-    hostLabel: 'runtime:env-1',
-    syncBasisKey: 'leg|runtime:env-1',
     scopePaths,
     scan
   }
@@ -183,17 +181,13 @@ describe('host session result cache lifetime', () => {
     expect(lookup.sessions.map((session) => session.id)).toEqual(
       [0, 1, 2, 3].map((index) => `local:codex:full-${index}`)
     )
-    // A delete drops the TTL cache but keeps the held list: it is the basis every refresh diffs
-    // against, and re-downloading each host's whole history after one delete is the cost this
-    // exists to remove. The body behind an `unchanged` reply is still the host's list at that
-    // fingerprint, so restoring it stays correct.
     invalidateAiVaultHostLegCache()
     await scanHostLegWithCache({
       ...args(scan),
       afterFingerprint: fingerprint
     })
     await scanHostLegWithCache(args(scan))
-    expect(scan).toHaveBeenCalledTimes(3)
+    expect(scan).toHaveBeenCalledTimes(4)
   })
 
   it('keeps the refreshed deadline and cached covering depth when the old timer fires', async () => {

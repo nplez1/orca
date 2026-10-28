@@ -16,6 +16,7 @@ import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import './comment-composer.css'
 
 export type CommentComposerProps = {
   value: string

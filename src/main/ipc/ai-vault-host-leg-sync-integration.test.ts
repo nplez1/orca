@@ -3,11 +3,12 @@ import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-ty
 import { aiVaultPagedListReply } from '../ai-vault/ai-vault-paged-list-reply'
 import { resetAiVaultListSyncStoreForTests } from '../ai-vault/ai-vault-list-sync-store'
 import { parseAiVaultListResult } from '../ai-vault/session-list-result-validation'
+import { resetAiVaultHostLegCacheForTests, scanHostLegWithCache } from './ai-vault-host-leg-cache'
 import {
-  resetAiVaultHostLegCacheForTests,
-  scanHostLegWithCache,
+  hostLegSyncScan,
+  resetAiVaultHostLegSyncForTests,
   type AiVaultHostLegSyncBasis
-} from './ai-vault-host-leg-cache'
+} from './ai-vault-host-leg-sync'
 
 const SCANNED_AT = '2026-10-02T00:00:00.000Z'
 
@@ -58,9 +59,12 @@ function legArgs(
     cacheKey: 'leg',
     depth: 'unlimited' as const,
     force: false,
-    hostLabel: 'env-1',
-    syncBasisKey: 'leg|runtime:env-1',
-    scan
+    scan: hostLegSyncScan({
+      syncBasisKey: 'leg|runtime:env-1',
+      depth: 'unlimited',
+      hostLabel: 'env-1',
+      scan
+    })
   }
 }
 
@@ -72,8 +76,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  // Why the full reset: the held lists survive invalidation now, so they would leak between tests.
+  // Why the full reset: the held lists survive invalidation, so they would leak between tests.
   resetAiVaultHostLegCacheForTests()
+  resetAiVaultHostLegSyncForTests()
   resetAiVaultListSyncStoreForTests()
   vi.useRealTimers()
 })

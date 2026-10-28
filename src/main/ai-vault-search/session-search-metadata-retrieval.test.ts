@@ -5,7 +5,6 @@ import {
   openSessionSearchHarness,
   type SessionSearchHarness
 } from './session-search-engine-test-fixture'
-import { SessionSearchFileRecords } from './session-search-file-records'
 import { SessionSearchCursorError } from './session-search-page-cursor'
 
 let harness: SessionSearchHarness | null = null
@@ -37,9 +36,9 @@ type MetadataSession = {
 }
 
 /**
- * A session the metadata tier can answer for. Written through the writer's own
- * mirror so the test proves the reader agrees with what the indexer stores,
- * rather than with a copy of its SQL pasted into a test.
+ * A session the metadata tier can answer for. Its FTS row comes from the
+ * schema's own trigger on the UPDATE below, so the test proves the reader agrees
+ * with what the index stores, rather than with a copy of its SQL pasted here.
  */
 function addMetadataSession(db: SyncDatabase, session: MetadataSession): void {
   addSyntheticSession(db, {
@@ -51,13 +50,12 @@ function addMetadataSession(db: SyncDatabase, session: MetadataSession): void {
     filePath: session.filePath
   })
   // `addSyntheticSession` writes a fixed title and no branch; both are metadata
-  // the tier under test reads, so they are set before the FTS row is mirrored.
+  // the tier under test reads; setting them is what mirrors the FTS row.
   db.prepare('UPDATE sessions SET title = ?, branch = ? WHERE id = ?').run(
     session.title ?? 'fixture',
     session.branch ?? null,
     session.id
   )
-  new SessionSearchFileRecords(db).refreshSessionFts(session.id)
 }
 
 function ids(result: { hits: { sessionId: string }[] }): string[] {

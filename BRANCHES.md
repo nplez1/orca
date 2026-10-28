@@ -137,6 +137,76 @@ The three-deep chain is real, not cosmetic: `startup-worktree-hydration` needs t
 that `terminal-session-reconnect` adds. Splitting it further would mean duplicating code to hide the
 dependency, so the three want to land in that order.
 
+## Retired — archived and deleted, 2026-10-27
+
+**The policy, and why it replaced the old one.** Branches were once kept near-upstream-ready so a fix
+could be offered to `stablyai/orca` on demand. That cost every sync: a branch 2,800 commits behind is
+not "ready", it is a snapshot, and the ready state decays faster than anyone maintains it. The fork's
+rule is now the opposite — **no branch is kept upstream-ready.** If upstream work is wanted, it is cut
+**fresh from `nplez1/main`**, because the code that lands there is the only version worth offering; an
+old branch is a source of ideas, never a base.
+
+So a branch with a merged PR is deleted once the PR merges, and a branch with no open PR and no plan to
+open one is deleted. **Nothing was deleted without an archive tag first**, pushed to `origin`, so
+"retired" here means "unreferenced by a branch", never "gone":
+
+```bash
+git tag -l 'archive/2026-10-27/*'                                                            # 28 tags
+git push origin refs/tags/archive/2026-10-27/nplez1-beachball:refs/heads/nplez1/beachball   # restore
+git branch nplez1/beachball refs/tags/archive/2026-10-27/nplez1-beachball                    # restore, local
+```
+
+Where the tag sits: the branch tip, except `nplez1/AI-Prompts`, where the local tip carried a commit the
+PR never got (`5cd608f2f0`), so the tag points at that superset.
+
+**Zero-loss deletions** — the PR merged and the branch tip equals the PR head (`headRefOid`), so the
+content is in `nplez1/main`:
+
+| Branch                                                    | Why it was safe                                             |
+| --------------------------------------------------------- | ----------------------------------------------------------- |
+| `nplez1/Session-Summary`                                  | PR #180 merged 2026-10-25, tip `85d16aaaa1` = PR head       |
+| `nplez1/pi-osc52-clipboard-over-paired-client`            | PR #131 merged 2026-10-18                                   |
+| `nplez1/docs/fork-differences`                            | PR #142 merged 2026-10-19                                   |
+| `nplez1/ci-nightly-unblock`                               | PR #186 merged 2026-10-27                                   |
+| `nplez1/feature-empty-tabs-state-closing-all-tabs-should` | PR #185 merged 2026-10-25; the remote ref was already gone  |
+| `nplez1/fix-tag-mirror-token`                             | its single patch is already in `main` (empty residual diff) |
+| `nplez1/hunt-vitest-nonexit`                              | zero own commits — it pointed at an upstream commit         |
+| `docs/actions-enablement-check`                           | PR #174 merged 2026-10-24                                   |
+
+**Archived with unlanded content** — recoverable, and the tag is the record. None of these is a base for
+anything; re-cut from `nplez1/main` if the idea is wanted again.
+
+| Branch                              | Own work                                   | Note                                                                                                                                                                                   |
+| ----------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nplez1/AI-Prompts`                 | 3 commits, 26 files, +517/−283             | PR #184 **closed** unmerged: "one place for every model-facing prompt". It creates `src/shared/ai-prompts/**`, which `main` does not have — the one retirement with real unlanded code |
+| `nplez1/Agent-Dash-Improvements`    | 150 commits, 1,630 files, +102,957/−12,663 | 4,421 behind; the dashboard it built ships in `main` (§ 5.4)                                                                                                                           |
+| `nplez1/Agent-Dashboard`            | 58 commits, 550 files, +25,987/−2,169      | 5,632 behind, same subsystem                                                                                                                                                           |
+| `nplez1/History-Filter-Agents`      | 91 commits, 814 files, +34,135/−3,183      | 5,193 behind                                                                                                                                                                           |
+| `nplez1/Show-in-Finder`             | 73 commits, 633 files, +27,538/−2,774      | 5,417 behind                                                                                                                                                                           |
+| `nplez1/beachball`                  | 50 commits, 547 files, +25,839/−2,408      | 5,632 behind; never adopted                                                                                                                                                            |
+| `nplez1/automations-create-by-desc` | 1 commit, 66 files, +3,467/−526            | PR #110, never opened against `main`; 2,531 behind                                                                                                                                     |
+| `nplez1/automations-project-scope`  | 1 commit, 10 files, +591/−8                | PR #109, same                                                                                                                                                                          |
+| `nplez1/host-routed-github-panels`  | 4 commits, 17 files, +425/−29              | upstream's own `fix/host-routed-github-panels` still mirrors in the fork, which is the better base                                                                                     |
+
+The twelve **upstream-bound** branches are gone too — `fix/cli-symlink-world-readable`,
+`fix/copilot-background-work`, `fix/repo-catalog-connection-fence`,
+`fix/claude-codex-enterprise-accounts`, `fix/terminal-session-reconnect`,
+`fix/agent-status-routing-readiness`, `feat/copilot-usage`, `feat/deepseek-usage`,
+`feat/fireworks-usage`, `feat/worktree-scan-cache-persistence`, `feat/startup-worktree-hydration` and
+`feat/startup-service-ordering`. All twelve sat on `560c42e1d1`/`615b1370fb`, ~2,800 commits behind, and
+none was ever opened. Two things to know if one is ever resurrected: the three `feat/*-usage` branches
+(70–80 files, ~3k insertions each) are the **predecessors** of the provider work § 5.3 re-architected into
+`main`, so re-cutting from `main` is strictly better; and `fix/claude-codex-enterprise-accounts` (12
+residual files, +1,220/−5,833) predates § 6.4's adoption of upstream's Claude spend cap, so it is a
+history of the code that item deletes, not a source for it.
+
+**Deliberately kept:** `nplez1/main`, `nplez1/Fork-Opt` (PR #187), and the three `backup/*` refs
+(`backup/nplez1-main-pre-sync`, `backup/BUG-Remote-Host-History-r19`,
+`backup/jira-sprint-assignment-pre-rebase`). The backups are pre-sync and pre-rebase snapshots — deleting
+a safety ref to tidy a branch list is the worst trade available, so they stay.
+
+Every `### <branch>` section below is now historical unless the table above says otherwise.
+
 ## Base drift — recorded, not fixed
 
 **2026-10-25:** after the `0571e45107` merge, **no local branch contains it** — every one needs a

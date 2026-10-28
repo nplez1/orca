@@ -110,7 +110,7 @@ export type ProviderRateLimits = {
   weekly: RateLimitWindow | null
   /** Claude Fable 7-day weekly window, null if not available. */
   fableWeekly?: RateLimitWindow | null
-  /** 30-day monthly window (OpenCode Go, Grok unified billing, Cursor plan pools), null if not available. */
+  /** 30-day monthly window (OpenCode Go, Grok unified billing, Cursor plan pools, Claude enterprise spend caps), null if not available. */
   monthly?: RateLimitWindow | null
   /** Overage / pay-as-you-go balance the plan spends into once its windows cap. */
   extraUsage?: ExtraUsageBalance | null
@@ -121,7 +121,9 @@ export type ProviderRateLimits = {
   credits?: ProviderCredits | null
   /**
    * Consumed-against-ceiling readout for enterprise and usage-billed plans that report
-   * no percentage quota window: Claude's monthly spend cap, Codex's spend control.
+   * no percentage quota window: Codex's spend control, Copilot's credit budget. Claude's
+   * spend cap arrives as `monthly` instead, from the same payload the Credits section
+   * renders.
    */
   allowance?: ProviderAllowance | null
   /** Named per-model buckets (Gemini models, Cursor plan pools). */

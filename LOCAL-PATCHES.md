@@ -155,6 +155,36 @@ Anchor: `config/electron-builder.config.cjs`, `ORCA_MAC_TEAM_ID`.
 `config/scripts/rebuild-and-relaunch-installed-macos-arm64.sh`: build locally and install over the
 running app. Convenience only — not for upstream.
 
+### `local(usage)`: Claude's spend cap is upstream's, Codex's stays ours
+
+Anchor: `src/main/rate-limits/claude-oauth-usage-request.ts`,
+`src/main/rate-limits/claude-usage-credits.ts`,
+`src/renderer/src/components/status-bar/InlineProviderUsage.tsx`,
+`src/main/rate-limits/codex-backend-usage-client.ts`.
+
+A Claude seat with no 5h/7d window reports a monthly spend cap. The fork implemented that half of
+upstream's `dd1248998f` itself, with its own parser and a separate `allowance` readout line; upstream later
+shipped the same feature as `cffb527b82` (#33655), so the fork's half is retired and upstream's is taken
+**byte-for-byte** in all three of its files (verified by `git hash-object` against the commit). Three
+things upstream does that the fork did not: the legacy `extra_usage` percentage is computed from the
+amounts first (the fork read a 0–1 fraction `0.0958` as 0.0958%, not 9.58%); `monthly` requires a real
+cap (a currency, a percentage and a limit above 0) rather than a bare percentage; and the window comes
+from the same `ExtraUsageBalance` the "Usage credits" section already renders, so the bar and that section
+cannot disagree. The duplicate `allowance` line went with it — the Credits section already shows the same
+bar and amounts. Net +163/−443 across 5 files, 231 of those deletions in a fork-only test file.
+
+**What remains fork-only, deliberately:** the Codex half. `spend_control.individual_limit` maps to
+`monthly` plus a `count`-unit `ProviderAllowance` in `codex-backend-usage-client.ts`; upstream has no
+equivalent, and its tests are unchanged. And **#134**, the Claude OAuth token refresh in
+`claude-accounts/claude-oauth-token-refresh.ts` — upstream deliberately never refreshes (`1bd308bd84`),
+and refreshing is this fork's product decision. That is the one permanent divergence in this area, and
+it is isolated in its own module rather than mixed into the spend-cap path.
+
+Two shared docs named Claude as an `allowance` producer, which stopped being true here:
+`src/shared/rate-limit-types.ts`, `src/shared/provider-allowance.ts` (Copilot and Codex are the
+remaining producers) and `docs/site/content/docs/agents/usage-tracking.mdx`. They now say so, including
+that Claude's percentage is one of the two computed ones.
+
 ### `local(agents)`: one binding per pi subagent channel
 
 Upstream's `#21882` tracks pi's async children _inside_ the generated extension source — its own
@@ -985,6 +1015,89 @@ its retry delay and its test reset — moved to `ai-vault-forced-rescan-throttle
 `markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as the new edges the hook and the tab-bar
 switch call. `tab-session-history-switch.ts` and three test files import from the new module.
 
+### `local(renderer)`: the fork's styling and transient state are not upstream's files
+
+Both of the fork's renderer stylesheets are **byte-identical to upstream's** — `assets/main.css` and
+`assets/rich-markdown-editor.css`. Take upstream's side on any conflict in either; the fork has no lines
+there. The 157 fork lines that used to live in them moved to two colocated files, verbatim except one
+comment that pointed "further down this file":
+
+- `components/pr-comment-inline/pr-comment-thread.css` — the `.orca-pr-comment-*` block, imported by
+  `PRCommentThreadCard.tsx`, the way upstream imports `AgentKanbanBoard.tsx`'s own stylesheet.
+- `components/comment-composer.css` — the composer rules that were in `rich-markdown-editor.css`,
+  imported by `comment-composer.tsx`. Not folded into the PR block: `CommentComposer` is rendered by the
+  Jira issue workspace too, and it is the only caller that passes `compact` or `disabled`.
+
+Why the load order cannot change the result: no moved selector ties on specificity with a remaining rule
+that touches the same element and property. The only overlap is
+`.orca-diff-comment-inline > .orca-diff-comment-card` (0,2,0), which outranks `.orca-pr-comment-thread`
+(0,1,0) either way; `.monaco-editor .glyph-margin-widgets .cgmr` (0,3,0) likewise; the composer's
+`.rich-markdown-editor.comment-composer-editor` (0,2,0) and its `p/ul/ol/blockquote` (0,2,1) outrank every
+base `.rich-markdown-editor` rule, and the rules that would tie are scoped to
+`.linear-issue-markdown-editor`/`.rich-markdown-editor-shell`, which the composer is never inside. The
+block was unlayered in `main.css` and stays unlayered, so it still beats Tailwind's layered utilities.
+
+Transient fork UI state lives in `store/slices/fork-ui.ts` — `settingsProjectAddHostRequest`,
+`prCommentInlineDisplayById`, their actions and the `ProjectHostAddRequest` type — registered beside
+`worktree-setup-runner` in `store/index.ts` and `store/types.ts`, one line each. `ui.ts`,
+`ui-slice-contract.ts`, `ui-slice-contract-contextual.ts` and `ui-slice-surface-actions.ts` now carry no
+fork lines for it; the only one left in `ui-slice-settings-actions.ts` is the request clear inside
+`closeSettingsPage`. **`store-test-helpers.ts` composes the slice too** — a hand-built `AppState` there
+fails `tc:web` without it, which is the check that catches a future slice registered in one place only.
+The persisted `hiddenWorkspaceStatusIds` and `mergeSameBranchWorkspaces` stay in upstream's UI slice
+because they ride its hydration.
+
+`task-page/jira/Content.tsx` is upstream's nested-ternary shape plus one hook
+(`task-page/jira/use-jira-board-mode.ts`) and one early return that mounts the configured board, so its
+fork delta is 63 changed lines where it was 384. A conflict there resolves by taking upstream and
+re-adding those hunks.
+
+### `local(vault)`: the list tier's schema is the fork's own
+
+The fork's 8 list columns (`model`, `total_tokens`, `queued_message_count`, `subagent_transcript_count`,
+`modified_at`, `subagent_parent_session_id`, `subagent_agent_type`, `subagent_parent_agent`) and its
+metadata FTS live in `session_list_facts` / `session_metadata_fts`, versioned by
+`meta.session_list_schema_version` (`SESSION_LIST_SCHEMA_VERSION`), both created in
+`ai-vault-search/session-search-list-schema.ts`. **Never merge them back into upstream's `sessions` or
+`SCHEMA_SQL`, and never bump `SESSION_SEARCH_SCHEMA_VERSION` for a fork change** — take upstream's value
+verbatim on every sync and bump the fork's key instead. That is the whole point: the two constants used
+to collide (fork 6→9, upstream 6→8, merged 10) and the same shape had already hit the parse cache.
+
+Triggers on `sessions` maintain both fork tables — `AFTER UPDATE` and `AFTER INSERT` refreshing the
+metadata row, `AFTER DELETE` reclaiming both — so upstream's writer, retention purge and replacement
+delete carry no fork hunks, and `session-search-retrieval.ts` / `session-search-retention-delete.ts` are
+byte-identical to upstream. **The INSERT trigger is load-bearing, not redundant:** without it metadata
+search depends on upstream's `createSessionRow` staying "insert blank, then UPDATE", and the day it
+inserts a full row in one statement every session would silently drop out of metadata search. The only
+fork lines left are two hook calls in `openSessionSearchDatabase` (`session-search-schema.ts`), one
+`writeSessionListFacts` call in `session-search-file-records.ts`, and the list read's `LEFT JOIN` in
+`session-search-list.ts` — with every fact column written as `session_list_facts.<name> AS <name>`, so
+upstream adding a `model` column to `sessions` cannot make the list query ambiguous.
+
+**A wrong or missing key on a file that already holds sessions rebuilds, it does not stamp.** When the
+pre-open check cannot judge the file (a lock timeout, a transient error), `ensureSessionListSchema` throws
+`SessionListTierMismatchError` carrying `code = 'SQLITE_CORRUPT'` instead of writing the current fork
+version over whatever is on disk — upstream's `openVersionedCacheDatabase` already treats that code as
+"delete and rebuild once", so this needs no new lines in upstream's opener. **If upstream changes that
+rebuild rule, the schema test fails rather than the index quietly degrading**, which is the coupling to
+watch. The stamp itself is a plain `INSERT` and only fires when the key is absent and `sessions` is empty.
+
+**The merged-10 migration.** `migrateMergedLegacyLayout` runs before upstream's opener — it has to,
+because upstream deletes a file whose version it does not recognise — and fires only for a version `'10'`
+file that has `sessions_fts`, the legacy columns and no fork key. It renames the FTS table, copies the 8
+columns into the facts table, drops them from `sessions`, sets the version to the literal `'8'` (the
+upstream content the merged 10 carried) and writes the fork key, in one locked transaction. **That
+migration is dead the moment upstream's constant passes 8** — delete it then, and the file will be
+rebuilt by upstream's own rule like any other stale index.
+
+The host-leg sync delta lives in `ipc/ai-vault-host-leg-sync.ts` and wraps `scan` at the `ai-vault.ts`
+call sites, so `scanHostLegWithCache`'s `scan: () => Promise<AiVaultListResult>` stays upstream's
+signature. Two hunks stay in `ai-vault-host-leg-cache.ts` deliberately and are not the delta: the
+unbounded key/bypass, and the row-capped prune, because every paged reply now carries a fingerprint and
+upstream's count-only cap of 8 would no longer bound memory. One behaviour difference to expect: after a
+delete, upstream's cache cannot expand an `unchanged` reply, so the next plain refresh rescans (4 where
+the fork had 3) — a small diff request, not a full re-download.
+
 ### `local(jira)`: a required transition field the issue already fills is not the user's to fill
 
 After the 2026-10-15 sync, two of the three status-change surfaces refused a transition outright with
@@ -1292,6 +1405,23 @@ Three changes:
 - **`node local/check-nightly-liveness.mjs`**, because the first two only make a failure faster. See
   below.
 
+**A shard now greens for a known red, and reds for anything else.** `unit-tests.yml`'s shard job leaves
+Vitest's exit code in charge upstream and hands it to `local/check-unit-shard-verdict.mjs` here, so that
+script is what reds a nightly shard. It ignored `local/nightly-linux-known-red.json`, which meant every
+recurrence of the already-triaged daemon disconnect race failed the workflow and emailed an alarm — at
+07:19 on 2026-10-27 for shard 4/5, a failure whose evidence was already written down. It now reads the
+manifest on Linux: a matching red is a tolerated warning and the shard passes, an unmatched one still
+fails by name. Four inputs are never absorbed — a file-level error (including one beside an absorbed
+row), a report declaring more failures than it lists, an unhandled error other than the tolerated
+teardown race, and a shard that failed with nothing to explain it. It cannot see a describe-level hook
+failure that Vitest attributes to a suite rather than to the file's `message`, because
+`numFailedTestSuites` counts failing describes as well as files (2 for one failing file, measured) and
+would red every night.
+
+The night's verdict is still the cross-shard checker's, not the shard's: `--failures` insists on one
+report per declared shard and fails a red that no entry accounts for. What the shard-level change buys
+is that a known red no longer sends mail; a new one still does, once, with its name.
+
 **What the first real runs measured.** The 2026-10-26 scheduled run (id `40308443374`) is unusable as a
 red set: its cancel rewrote the run-level conclusion, so a reader saw four red shards and no verdict.
 The cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `nplez1/main` plus this
@@ -1344,6 +1474,24 @@ skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at 
 `fork-main-tests.yml` and again at the release gate, and the failure window that choice accepts is a
 cross-cutting break sitting on the release line until one of those two runs.
 
+**The Linux red set, and why the Mac one does not substitute for it.** The Mac allowlist names _this
+machine's_ environment; the nightly runs `ubuntu-24.04-arm`, which has its own. `local/nightly-linux-known-red.json`
+is that set — an entry needs a `file`, a `test` name, a `class`, and **`evidence`; an entry without
+evidence is a hard problem, not a warning**, because that is the difference between a verdict and a mute
+button. `node local/check-nightly-linux-parity.mjs <artifacts> --failures` judges every failing assertion
+in the shards against it: no entry → the run fails; a listed test that _passed_ is reported as prunable
+(reported, never enforced, so an upstream fix does not turn the night red in the other direction); and a
+file-level failure (a `beforeAll` or import error with no assertion rows) can never be absorbed by a
+name-matching entry.
+
+Its first entry is `daemon-pty-adapter-history-recovery.test.ts › serializes concurrent keepHistory and
+disconnectOnly checkpoints`, which failed on Linux in **both** runs — the 04:53Z schedule
+(`40485647652`) and this dispatch — with `DaemonConnectionLostError: Disconnected` out of
+`disconnectOnly()`, while passing 3/3 on this Mac. Every file in that stack is upstream-owned with zero
+fork hunks, so it is upstream's race under Linux runner timing, and the entry records its exit condition
+rather than hiding it. Verified in both directions: `--failures` exits 0 on this run's artifacts and
+exits **1** on the earlier one, naming the three branch-gap reds that the merge has since fixed.
+
 **The first scheduled run after the unblock, read (2026-10-27, run id `40485647652`, `main` @
 `7c53c12a17`).** The schedule fires again — that is the part `#186` fixed, and this run proves it on a
 real slot rather than by dispatch. It is red: `plan` succeeded, all five shards ran, `relay integration`
@@ -1356,7 +1504,7 @@ skipped as intended, and **four files failed across four shards** (shard 3 green
   `DaemonConnectionLostError: Disconnected` out of `disconnectOnly()` at its own line 292. **All five
   files in that chain are upstream-owned with zero fork hunks**, so it is upstream's own race under
   Linux runner timing, not a regression here — and it passes 3/3 on this Mac, so it is not a Mac
-  allowlist entry either. It is the first case that needs a *Linux* flake set, which § 6.2's parity
+  allowlist entry either. It is the first case that needs a _Linux_ flake set, which § 6.2's parity
   checker does not carry; until one exists, read it as an ownerless red and do not "fix" it inside the
   fork.
 

@@ -6,6 +6,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
+import { parseExpectedDeletions } from './expected-deletions.mjs'
 import {
   STATUS,
   changedNames,
@@ -471,20 +472,28 @@ function readExpectedDeletions() {
   if (!existsSync(file)) {
     return { acknowledged: {}, stale: [], failure: null }
   }
+  let text
   try {
-    const parsed = JSON.parse(readFileSync(file, 'utf8'))
-    const acknowledged = parsed?.acknowledged
-    if (acknowledged === null || typeof acknowledged !== 'object') {
-      return { acknowledged: {}, stale: [], failure: `${file} has no \`acknowledged\` object` }
-    }
-    return { acknowledged, stale: [], failure: null }
+    text = readFileSync(file, 'utf8')
   } catch (error) {
     return {
       acknowledged: {},
       stale: [],
-      failure: `${file} could not be parsed: ${error instanceof Error ? error.message : String(error)}`
+      failure: `${file} could not be read: ${error instanceof Error ? error.message : String(error)}`
     }
   }
+  // Why the shared parser: the manifest's shape is `deletions[]` with a per-entry status, and a second
+  // reader with its own idea of it is how this check read the retired `acknowledged` key for a week and
+  // reported FAILED on every run.
+  const { entries, note } = parseExpectedDeletions(text)
+  const acknowledged = {}
+  for (const entry of entries) {
+    // `pending-decision` means nobody has judged it yet, so it acknowledges nothing.
+    if (entry.status === 'expected-deletion') {
+      acknowledged[entry.path] = { reason: entry.reason }
+    }
+  }
+  return { acknowledged, stale: [], failure: note }
 }
 
 export function deletedForkModules(tip, source) {
@@ -565,8 +574,12 @@ export function deletedForkModules(tip, source) {
     scanFailures.push(expectations.failure)
   }
   const acknowledgedPaths = Object.keys(expectations.acknowledged)
-  const deletedSet = new Set(deleted)
-  const staleAcknowledgements = acknowledgedPaths.filter((file) => !deletedSet.has(file))
+  // Why presence rather than this sync's deleted set: the manifest settles deletions from every past
+  // sync, so asking which of them this one range deleted reads all 22 settled entries as stale on
+  // every run. A deletion that is *back* is the thing worth reporting.
+  const staleAcknowledgements = acknowledgedPaths.filter((file) =>
+    existsSync(path.join(repoRoot(), file))
+  )
   const modules = forkOnly.filter(isDeletedCodeModule)
   for (const file of modules) {
     const content = gitText(['show', `${tip}:${file}`])
@@ -607,7 +620,7 @@ export function deletedForkModules(tip, source) {
         if (ack) {
           acknowledgedUnreferenced.push(`${file}: ${name}`)
           details.push(
-            `      ~ ${name} (${kind}) — no reference left, acknowledged as superseded by ${ack.supersededBy ?? 'an unnamed replacement'}`
+            `      ~ ${name} (${kind}) — no reference left, acknowledged: ${ack.reason || 'no reason recorded'}`
           )
         } else {
           unreferenced.push(`${file}: ${name}`)
@@ -624,7 +637,7 @@ export function deletedForkModules(tip, source) {
   }
   if (staleAcknowledgements.length > 0) {
     details.push(
-      `acknowledged deletions no longer deleted (stale entries in local/sync/expected-deletions.json): ${staleAcknowledgements.length}`
+      `acknowledged deletions that are present again (stale entries in local/sync/expected-deletions.json): ${staleAcknowledgements.length}`
     )
     for (const file of staleAcknowledgements) {
       details.push(`  ? ${file}`)

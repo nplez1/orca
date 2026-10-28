@@ -7,6 +7,7 @@ import {
   EXPECTED_DELETION_STATUSES,
   deletionFor,
   parseExpectedDeletions,
+  parseExpectedSymbols,
   pendingDeletionPaths,
   staleDeletions
 } from './expected-deletions.mjs'
@@ -66,4 +67,40 @@ test('a manifest that calls a present file deleted is stale', () => {
     staleDeletions(entries, new Set(['src/restored.ts', 'src/restored-on-purpose.ts'])),
     ['src/restored.ts']
   )
+})
+
+test('the symbols half reads path + symbol pairs and defaults to pending, never to settled', () => {
+  const { entries, note } = parseExpectedSymbols(
+    JSON.stringify({
+      deletions: [{ path: 'src/file-entry.ts' }],
+      symbols: [
+        {
+          path: 'src/a.ts',
+          symbol: 'S.fork',
+          status: 'expected-deletion',
+          supersededBy: 'src/b.ts'
+        },
+        { path: 'src/a.ts', symbol: 'later' },
+        { path: 'src/a.ts', symbol: 'later' },
+        { path: 'src/a.ts' },
+        { path: 'src/a.ts', symbol: 'odd', status: 'maybe' }
+      ]
+    })
+  )
+  assert.deepEqual(
+    entries.map((entry) => [entry.symbol, entry.status]),
+    [
+      ['S.fork', 'expected-deletion'],
+      ['later', 'pending-decision'],
+      ['later', 'pending-decision'],
+      ['odd', 'maybe']
+    ]
+  )
+  assert.match(note, /listed twice/)
+  assert.match(note, /needs both path and symbol/)
+  assert.match(note, /unknown status "maybe"/)
+  assert.deepEqual(parseExpectedSymbols(JSON.stringify({ deletions: [] })), {
+    entries: [],
+    note: null
+  })
 })

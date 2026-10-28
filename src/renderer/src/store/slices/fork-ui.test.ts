@@ -1,6 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toSshExecutionHostId } from '../../../../shared/execution-host'
-import { createUIStore } from './ui-slice-test-harness'
+import { useAppStore } from '../index'
+
+beforeEach(() => {
+  useAppStore.setState({ settingsProjectAddHostRequest: null })
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -10,7 +14,7 @@ describe('project host add request', () => {
   it('carries the project and host into Settings without persisting them', () => {
     const setUI = vi.fn(() => Promise.resolve())
     vi.stubGlobal('window', { api: { ui: { set: setUI } } })
-    const store = createUIStore()
+    const store = useAppStore
 
     store.getState().requestProjectHostAdd({
       projectId: 'git:acme/app',
@@ -31,7 +35,7 @@ describe('project host add request', () => {
   })
 
   it('gives the same request a fresh identity so the flow re-opens', () => {
-    const store = createUIStore()
+    const store = useAppStore
     const request = {
       projectId: 'git:acme/app',
       repoId: 'remote-repo',

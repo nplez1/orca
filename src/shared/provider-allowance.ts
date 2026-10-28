@@ -4,9 +4,10 @@
  *
  * Why this is not `ProviderCredits`: that type is money-only and expresses a running
  * balance or spend. Enterprise and usage-billed plans instead report "consumed N of a
- * ceiling of M", where the unit is not always money — Claude's monthly spend cap is
- * dollars, while Codex's group-based spend control is denominated in its own `credit`
- * unit. A currency code cannot represent the latter.
+ * ceiling of M", where the unit is not always money — Copilot reports AI credits when it
+ * knows the per-credit price and dollars when it does not, while Codex's group-based
+ * spend control is denominated in its own `credit` unit. A currency code cannot represent
+ * the latter.
  */
 export type ProviderAllowanceUnit =
   | { kind: 'money'; currencyCode: string }

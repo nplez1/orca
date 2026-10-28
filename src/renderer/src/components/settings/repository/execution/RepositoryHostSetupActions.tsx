@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import type { ProjectHostAddRequest } from '@/store/slices/ui'
+import type { ProjectHostAddRequest } from '@/store/slices/fork-ui'
 import type {
   ProjectHostSetup,
   ProjectHostSetupCreateResult,

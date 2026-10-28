@@ -613,7 +613,37 @@ rather than literals. Be honest about the trade: converting a literal to an impo
 cost but **not** sync cost — the import line is still a fork hunk. Only an upstream seam removes
 that.
 
-### 5.9 Tooling: resolve what can be proven
+### 5.9 Tooling: resolve what can be proven — **done 2026-10-27**
+
+Built, all five proof tiers, each judged on the syntax tree of both sides rebuilt as a whole file (so a
+hunk inside a template literal, or one whose edge splits a token, is never proven): `--propose` attaches a
+proof per hunk, `--apply-proven` writes only fully proven files, refuses one edited since the proposal,
+re-proves from disk and stages nothing, and a ledger/manifest deletion is printed as a `git rm` command
+rather than run. Plus `--rename-forecast` (32 real targets on the `281cccf5a4` sync in 2 s, 23 today) and
+`fork-symbols.mjs` (names, not behaviour; an `expected-deletions.json` `symbols` entry acknowledges one).
+43 `node --test` cases across the four new libs; every guard broken on a copy outside git's view and every
+one of the 32 breaks fails a test.
+
+**Measured:** 245 of 421 hunks proven on HEAD vs `upstream/main` `8d72873b78`, 159 of 267 files fully
+proven; 187 of 347 and 113 of 216 on the `281cccf5a4` sync. Survival reported 0 lost and 3 relocated on
+that sync in 2.5 s, and 851 lost when upstream's own tree is fed in as the "merged" result, so it does
+detect losses.
+
+**Two claims below that the work corrected.** The 133-hunk note is at `LOCAL-PATCHES.md:1552`, not
+`:1207`, and its "50 identity-only hunks" does not reproduce: only 1–2 qualify on either range measured,
+and only 7 unproven hunks in the `281cccf5a4` merge contain an identity literal at all. And `typescript`
+in `package.json` is 7.0.2, the native compiler with no JavaScript scanner — the tools use the
+`typescript-api` alias (`npm:typescript@6.0.3`) that `config/scripts/ci-unit-dependency-graph.mjs` already
+uses.
+
+**Two pre-existing defects found on the way, both fixed.** `deletedForkModules` read an `acknowledged`
+object that `6357e7baa9` had replaced with the `deletions[]` manifest, so it reported FAILED on every run;
+it now reads the manifest through the shared parser and asks whether an asserted deletion is _present
+again_, rather than whether this one sync deleted it (which reads all 22 settled entries as stale every
+time). And `conflicts.mjs` ended with `process.exit(main())`, which can truncate a large `--json` piped
+into another command — the new command uses `process.exitCode`.
+
+Original requirement, kept for the record:
 
 `LOCAL-PATCHES.md:1207-1213` records that the 10-25 sync resolved 133 hunks by hand under a proof
 rule — _upstream never touched the region_ — with a script that was never committed. Commit it,
@@ -717,14 +747,57 @@ and must not be opened without an explicit ask**:
    supports.
 8. An identity/brand seam: home directory, app-data name, display name.
 
-### 6.4 Adopt upstream's Claude spend cap
+### 6.4 Adopt upstream's Claude spend cap — **done 2026-10-27**
+
+Taken **byte-for-byte** in all three of upstream's files (`git hash-object` against `cffb527b82`, not a
+read-through), so a conflict there resolves by taking upstream. The fork's own Claude half of
+`dd1248998f` is retired: +163/−443 across 5 files, 231 of the deletions a fork-only test file. Three
+things upstream does that the fork did not, and two of them were the fork being _wrong_: the legacy
+`extra_usage` percentage is computed from the amounts first, so a 0–1 fraction `0.0958` reads as 9.58%
+rather than 0.0958%; `monthly` needs a real cap (currency, percentage, limit above 0) rather than a bare
+percentage; and the window comes from the same `ExtraUsageBalance` the Credits section renders, so the two
+cannot disagree. The Codex `spend_control` half stays fork-only and its 23 cases pass unchanged; #134's
+OAuth refresh was already isolated in `claude-accounts/claude-oauth-token-refresh.ts` and was not touched.
+The 2,800-commits-behind branch `fix/claude-codex-enterprise-accounts`, now archived, turned out to be
+the _history_ of the code this deletes rather than a source for it.
 
 `cffb527b82` (pending) covers the Claude half of `dd1248998f`; take it and keep only the Codex
 `spend_control` half (~350 lines removed). Keep #134 (Claude OAuth refresh) as the one permanent
 divergence here — upstream deliberately does not refresh (`1bd308bd84`), and the fork's choice is a
 product decision. Isolate it in `claude-accounts/claude-oauth-*`.
 
-### 6.5 AI Vault: give the fork its own schema
+### 6.5 AI Vault: give the fork its own schema — **done 2026-10-27**
+
+`SESSION_SEARCH_SCHEMA_VERSION` is upstream's **8** again. The fork's list state lives in
+`session_list_facts` (`session_row_id` plus the 8 columns) and `session_metadata_fts`, versioned under
+`meta.session_list_schema_version` (`SESSION_LIST_SCHEMA_VERSION = 1`), and **triggers on `sessions` keep
+them in step** — which is what removed the fork hunks from upstream's writer, retention purge and
+replacement delete: `session-search-retrieval.ts`, `session-search-retention-delete.ts` and
+`ai-vault-host-leg-cache-retention.test.ts` are byte-identical to upstream again. What remains in
+upstream's files is 3 lines in `session-search-schema.ts`, 2 in `session-search-file-records.ts`, and 5
+hunks in `ai-vault-host-leg-cache.ts` for two things that are _not_ the sync delta (the unbounded key,
+and the row-capped prune a paged reply needs).
+
+**A v10 database is migrated, not dropped.** Upstream deletes a file whose version it does not know, so
+the migration runs _before_ its opener, which rules out an ordinary step after it: it renames
+`sessions_fts`, copies the 8 columns into the facts table, drops them from `sessions`, sets the version
+to the literal `'8'` (the upstream content the merged 10 carried) and writes the fork key. Once
+upstream's constant moves past 8, the migrated file is simply rebuilt by upstream's own rule and the
+migration can be deleted with it. The host-leg delta moved to `ipc/ai-vault-host-leg-sync.ts`, wrapping
+`scan` at the `ai-vault.ts` call sites so the cache's signature is upstream's again.
+
+Two claims the plan made that the work corrected: "move 8 columns" understates it — the readers and the
+test seeds had to change too — and "upstream's cache keeps its original signature" is true of `scan` but
+not of the file, which keeps those two unrelated hunks. One behaviour difference is recorded rather than
+hidden: after a delete, upstream's cache cannot expand an `unchanged` reply, so the next plain refresh
+rescans (4 where the fork had 3); the held list makes it a small diff request rather than a full
+re-download, and a new sync test asserts that.
+
+The change also had to move two cross-cutting inventories the agent's scope could not see — the WSL
+mover's table list and its SQL-owning file map — which is the class of miss `wsl-move-dispositions`
+exists to catch. That test failing is why they moved here rather than in gate 1.
+
+Original requirement, kept for the record:
 
 Fork 6→9 plus upstream 6→8 forced a merged value of 10 (`ledger:1682-1692`), and the same shape
 previously hit the parse cache (`:291`). Move the fork's 8 `sessions` columns and `sessions_fts`
@@ -733,7 +806,23 @@ alone. Separately, the host-leg sync delta belongs in `ai-vault-host-leg-sync.ts
 lists, wrapping `args.scan` at the `ai-vault.ts` call site, so upstream's cache keeps its original
 signature — that is the 8-hunk file. This item is also the strongest upstream candidate (§6.3).
 
-### 6.6 Renderer tidying
+### 6.6 Renderer tidying — **done 2026-10-27**
+
+Both stylesheets are now **byte-identical to the merge base** (`main.css`,
+`rich-markdown-editor.css`), so a conflict there resolves by taking upstream outright. 157 fork lines
+moved out: the `.orca-pr-comment-*` block to `pr-comment-inline/pr-comment-thread.css` (imported by
+`PRCommentThreadCard.tsx`, following `AgentKanbanBoard.tsx:22`), and the 31 composer lines to
+`components/comment-composer.css` rather than into the PR block, because `CommentComposer` is also
+rendered by the Jira issue workspace and is the only caller passing `compact`/`disabled`. Every moved
+line is verbatim except one comment that said "further down this file", which is no longer true. The
+cascade argument is static but checkable: no moved selector ties on specificity with any remaining rule
+that touches the same element and property, and the block stays unlayered so it still beats Tailwind's
+layered utilities. Five transient-state fields moved into `store/slices/fork-ui.ts` (`ui.ts` and three
+`ui-slice-*.ts` now carry no fork lines), and `Content.tsx` was rebuilt on upstream's nested-ternary shape
+so its fork delta fell from 384 changed lines to 63. `tc:web` caught the one thing the agent could not:
+the hand-built `AppState` in `store-test-helpers.ts` did not compose the new slice.
+
+Original requirement, kept for the record:
 
 - `main.css`'s entire fork delta is one 145-line `.orca-pr-comment-*` block (+31 lines in
   `rich-markdown-editor.css`), and it introduces no tokens, so the styleguide is untouched. Move it
@@ -747,7 +836,28 @@ signature — that is the 8-hunk file. This item is also the strongest upstream 
 - `jira/Content.tsx` board-mode state into `use-jira-board-mode.ts`, mounted through one conditional;
   consistent with the ledger's "upstream's shape, the fork's extra capabilities" (`:813`).
 
-### 6.7 Branch base drift
+### 6.7 Branch base drift — **decided and executed 2026-10-27**
+
+The measurement stands — after 10-25 no branch contained the release tip, the oldest 2,529 commits
+behind — but the policy question underneath it is answered by the product owner: **branches are no
+longer kept upstream-ready.** That idea cost every sync (a branch 2,800 commits behind is a snapshot,
+not a ready state) and its premise is gone. If upstream work is wanted, it is cut **fresh from
+`nplez1/main`**; the code that lands there is the only version worth offering.
+
+Executed: **28 branches retired**, each with a pushed `archive/2026-10-27/<branch>` tag first, so nothing
+is unrecoverable — 8 zero-loss (merged PR whose tip equals the PR head, or a patch already in `main`),
+and 20 archived-with-unlanded-content (the old `nplez1/*` ideas and all twelve upstream-bound
+`fix/*`/`feat/*` branches). The one with real unlanded code is `nplez1/AI-Prompts` (PR #184 closed
+unmerged; it creates `src/shared/ai-prompts/**`, absent from `main`). `nplez1/main`, `nplez1/Fork-Opt`
+and the three `backup/*` snapshots are kept deliberately. The table, the restore commands and the
+per-branch reasoning live in `BRANCHES.md` § "Retired".
+
+What this closes: the "land or delete" bullet, the "catch up on a schedule" bullet (nothing is left to
+catch up), and the "branch age cap" bullet (there is no set to age). The mobile half was measured rather
+than assumed: `mobile/` is upstream's (3,980 files on `main`), and exactly one archived branch carried
+real mobile work — `nplez1/Agent-Dash-Improvements`, 10 files including a PR-sidebar actions feature —
+and every one of those files exists on `main` already, so nothing was lost with it. The standing
+position is upstream's own: mobile parity is upstream's, and the fork ships no mobile app.
 
 After 10-25 **no branch contains the release tip**; the oldest sit 2,529 commits behind, and
 `local/open-pr.mjs` refuses a head that does not descend from its base. With 0 open PRs and ~13

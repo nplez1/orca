@@ -50,7 +50,7 @@ function transcriptPath(sessionId: string): string {
 }
 
 /** Row counts read from the index itself: what the tier is allowed to have kept. */
-function tableRowCount(table: 'messages' | 'sessions_fts'): number {
+function tableRowCount(table: 'messages' | 'session_metadata_fts'): number {
   const db = new SyncDatabase(harness.databasePath)
   try {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: COUNT(*) always returns one row with one numeric column.
@@ -66,7 +66,7 @@ function messageRowCount(): number {
 }
 
 function sessionFtsRowCount(): number {
-  return tableRowCount('sessions_fts')
+  return tableRowCount('session_metadata_fts')
 }
 
 async function searchFor(query: string): Promise<string[]> {

@@ -1,6 +1,3 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { JiraIssue } from '../../../../../shared/jira/jira-types'
-import { accountBackedDetailSource } from '@/lib/account-backed-detail-source'
 import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
 import { LoaderCircle } from 'lucide-react'
 import { JiraIcon } from '@/components/icons/JiraIcon'
@@ -14,7 +11,6 @@ import { TaskPageJiraTextFallbackNotice } from '../../task-page-jira-text-fallba
 import { TaskPageJiraIssueList } from '@/components/task-page-jira-issue-list'
 import { TaskPageJiraBoardView } from '@/components/task-page-jira-board-view'
 import { TaskPageJiraViewControls } from '@/components/task-page-jira-view-controls'
-import { TaskPageJiraBoard } from './Board'
 import { formatRelativeTime } from '../../task-page-source-context'
 import { getJiraStatusTone } from '@/components/task-page-jira-status-tone'
 import JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
@@ -25,6 +21,8 @@ import {
 } from '@/runtime/runtime-client-target'
 import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
+import { TaskPageJiraBoard } from './Board'
+import { useJiraBoardMode } from './use-jira-board-mode'
 
 export function TaskPageJiraContent({
   model
@@ -34,6 +32,7 @@ export function TaskPageJiraContent({
   const {
     jiraStatus,
     jiraHasWorkspace,
+    getJiraIssueWorkspaces,
     jiraStatusReady,
     jiraConnected,
     selectedJiraSiteId,
@@ -41,7 +40,6 @@ export function TaskPageJiraContent({
     taskSource,
     closeTaskDetailPage,
     selectedJiraIssue,
-    jiraDetailSourceContext,
     openJiraDetailPage,
     jiraIssues,
     jiraLoading,
@@ -69,53 +67,10 @@ export function TaskPageJiraContent({
     jiraTaskSourceScopeKey,
     accountBackedTaskSourceHostId,
     setJiraRefreshNonce,
-    jiraBoardViewMode,
-    setJiraBoardViewMode,
     jiraIssueAttachmentIndex,
-    handleOpenOrUseJiraItem,
-    getJiraIssueWorkspaces
+    handleOpenOrUseJiraItem
   } = model
-  const defaultJiraBoard = model.settings?.defaultJiraBoard ?? null
-  const [jiraDetailRefreshSignal, setJiraDetailRefreshSignal] = useState(0)
-  const [jiraBoardRefreshSignal, setJiraBoardRefreshSignal] = useState(0)
-  const boardSelectionRef = useRef<string | null>(null)
-  const jiraBoardSelectionKey = defaultJiraBoard
-    ? `${defaultJiraBoard.siteId}:${defaultJiraBoard.boardId}`
-    : null
-  const notifyJiraIssueMoved = (issue: JiraIssue): void => {
-    if (
-      selectedJiraIssue?.key === issue.key &&
-      (!selectedJiraIssue.siteId || !issue.siteId || selectedJiraIssue.siteId === issue.siteId)
-    ) {
-      setJiraDetailRefreshSignal((signal) => signal + 1)
-    }
-  }
-  // Why both: a sprint move changes which list an item is in, and the surface holding that
-  // list differs by view — the board's own pages in board mode, the searched list otherwise.
-  const notifyJiraSprintChange = (): void => {
-    setJiraRefreshNonce((value) => value + 1)
-    setJiraBoardRefreshSignal((value) => value + 1)
-  }
-
-  useEffect(() => {
-    // Why: only a genuine board change forces the board view; the first resolved
-    // selection must not clobber a restored issue-list preference.
-    const previousSelectionKey = boardSelectionRef.current
-    boardSelectionRef.current = jiraBoardSelectionKey
-    if (previousSelectionKey !== null && previousSelectionKey !== jiraBoardSelectionKey) {
-      setJiraBoardViewMode('board')
-    }
-  }, [jiraBoardSelectionKey, setJiraBoardViewMode])
-
-  // Why memoised: the workspace refetches on its source's identity, and a fresh object per render
-  // would re-run every detail read.
-  const jiraDetailOwnerSource = useMemo(
-    () =>
-      jiraDetailSourceContext ??
-      jiraTaskSourceContext ??
-      accountBackedDetailSource('jira', accountBackedTaskSourceHostId),
-    [accountBackedTaskSourceHostId, jiraDetailSourceContext, jiraTaskSourceContext]
-  )
+  const boardMode = useJiraBoardMode(model)
   const boardTarget = ipcOrRuntimeTargetForHostId(
     jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId
   )
@@ -123,19 +78,36 @@ export function TaskPageJiraContent({
     jiraTaskSourceScopeKey,
     boardTarget ? getEnvironmentRuntimeContextKey(runtimeTargetEnvironmentId(boardTarget)) : null
   ])
-
-  if (taskSource !== 'jira') {
-    return <TaskPageLinearContent model={model} />
-  }
-  if (!jiraStatusReady) {
+  // Why two board surfaces: the configured agile board (its own columns, and drops
+  // that transition) is what `jiraBoardViewMode` picks, while `jiraViewMode` picks
+  // the ad-hoc status board over the current result set. Both are kept deliberately;
+  // unifying them is a named follow-up in local/sync/convergence-ledger.md.
+  if (taskSource === 'jira' && jiraStatusReady && jiraConnected && boardMode.activeBoard) {
+    const board = boardMode.activeBoard
     return (
+      <>
+        <TaskPageJiraBoard
+          key={`${board.siteId}:${board.boardId}`}
+          model={model}
+          selection={board}
+          onUseIssueList={boardMode.showIssueList}
+          onIssueMoved={boardMode.notifyIssueMoved}
+          refreshSignal={boardMode.boardRefreshSignal}
+        />
+        <JiraIssueWorkspace
+          issue={selectedJiraIssue}
+          onClose={closeTaskDetailPage}
+          {...boardMode.workspaceProps}
+        />
+      </>
+    )
+  }
+  return taskSource === 'jira' ? (
+    !jiraStatusReady ? (
       <div className="mt-4 flex items-center justify-center py-14">
         <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
       </div>
-    )
-  }
-  if (!jiraConnected) {
-    return (
+    ) : !jiraConnected ? (
       <div className="mt-4 flex flex-col items-center justify-center rounded-md border border-border/50 bg-muted/50 px-6 py-14 text-center shadow-sm">
         <JiraIcon className="mb-4 size-8 text-muted-foreground/60" />
         <p className="text-base font-medium text-foreground">
@@ -156,189 +128,155 @@ export function TaskPageJiraContent({
           </Button>
         </div>
       </div>
-    )
-  }
-
-  // Why two board surfaces: the configured agile board (its own columns, and drops
-  // that transition) is what `jiraBoardViewMode` picks, while `jiraViewMode` picks
-  // the ad-hoc status board over the current result set. Both are kept deliberately;
-  // unifying them is a named follow-up in local/sync/convergence-ledger.md.
-  return defaultJiraBoard && jiraBoardViewMode === 'board' ? (
-    <>
-      <TaskPageJiraBoard
-        key={`${defaultJiraBoard.siteId}:${defaultJiraBoard.boardId}`}
-        model={model}
-        selection={defaultJiraBoard}
-        onUseIssueList={() => setJiraBoardViewMode('list')}
-        onIssueMoved={notifyJiraIssueMoved}
-        refreshSignal={jiraBoardRefreshSignal}
-      />
-      <JiraIssueWorkspace
-        issue={selectedJiraIssue}
-        issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
-        onUse={handleOpenOrUseJiraItem}
-        onClose={closeTaskDetailPage}
-        sourceContext={jiraDetailOwnerSource}
-        sprintBoard={defaultJiraBoard}
-        refreshSignal={jiraDetailRefreshSignal}
-        onSprintChange={notifyJiraSprintChange}
-      />
-    </>
-  ) : (
-    <div
-      style={jiraListGridStyle(jiraColumns)}
-      className="@container flex min-h-0 max-h-full flex-col overflow-hidden rounded-md rounded-t-none border border-t-0 border-border/50 bg-background shadow-sm"
-    >
-      <div className="flex min-h-10 flex-none flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3 py-1">
-        <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          {translate('auto.components.TaskPage.63b2abd3aa', 'Jira issues')}
-        </div>
-        <TaskPageJiraViewControls
-          mode={jiraViewMode}
-          onModeChange={setJiraViewMode}
-          currentSprint={jiraCurrentSprint}
-          onCurrentSprintChange={setJiraCurrentSprint}
-          sprintDisabled={jiraHasWorkspace}
-        />
-        <div className="flex shrink-0 items-center gap-2 text-2xs text-muted-foreground">
-          <span>
-            {displayedJiraIssues.length} {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
-          </span>
-          {jiraViewMode === 'list' ? (
-            <JiraListColumnsMenu ids={jiraColumnIds} onToggle={toggleJiraColumn} />
-          ) : null}
-        </div>
-      </div>
-
-      {defaultJiraBoard ? (
-        <div className="flex justify-end border-b border-border/50 px-3 py-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onClick={() => setJiraBoardViewMode('board')}
-          >
-            {translate('auto.components.TaskPage.jiraReturnToBoard', 'Return to board')}
-          </Button>
-        </div>
-      ) : null}
-
+    ) : (
       <div
-        className="min-h-0 flex-1 overflow-auto scrollbar-sleek"
-        style={{
-          scrollbarGutter: 'stable'
-        }}
+        style={jiraListGridStyle(jiraColumns)}
+        className="@container flex min-h-0 max-h-full flex-col overflow-hidden rounded-md rounded-t-none border border-t-0 border-border/50 bg-background shadow-sm"
       >
-        {jiraViewMode === 'list' ? (
-          <TaskPageJiraSortControls
-            columns={jiraColumns}
-            direction={jiraOrderDirection}
-            onSort={handleJiraSort}
-            orderBy={jiraOrderBy}
-          />
-        ) : null}
-
-        {jiraStatus.credentialError ? (
-          <div className="border-b border-border px-4 py-4 text-sm text-destructive">
-            {jiraStatus.credentialError}
+        <div className="flex min-h-10 flex-none flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3 py-1">
+          <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            {translate('auto.components.TaskPage.63b2abd3aa', 'Jira issues')}
           </div>
-        ) : null}
-        {!jiraStatus.credentialError && jiraError ? (
-          <TaskPageJiraErrorBanner
-            error={jiraError}
-            open={jiraErrorDetailsOpen}
-            onOpenChange={setJiraErrorDetailsOpen}
+          <TaskPageJiraViewControls
+            mode={jiraViewMode}
+            onModeChange={setJiraViewMode}
+            currentSprint={jiraCurrentSprint}
+            onCurrentSprintChange={setJiraCurrentSprint}
+            sprintDisabled={jiraHasWorkspace}
           />
-        ) : null}
-        <TaskPageJiraTextFallbackNotice
-          rejection={jiraStatus.credentialError ? null : jiraJqlRejection}
-        />
+          <div className="flex shrink-0 items-center gap-2 text-2xs text-muted-foreground">
+            <span>
+              {displayedJiraIssues.length}{' '}
+              {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+            </span>
+            {jiraViewMode === 'list' ? (
+              <JiraListColumnsMenu ids={jiraColumnIds} onToggle={toggleJiraColumn} />
+            ) : null}
+          </div>
+        </div>
 
-        {jiraLoading && jiraIssues.length === 0 ? (
-          <div className="divide-y divide-border/50">
-            {Array.from({
-              length: 6
-            }).map((_, i) => (
-              <div key={i} className="px-3 py-3">
-                <div className="h-4 w-4/5 animate-pulse rounded bg-muted/70" />
-                <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-muted/60" />
-              </div>
-            ))}
+        {boardMode.configuredBoard ? (
+          <div className="flex justify-end border-b border-border/50 px-3 py-1.5">
+            <Button type="button" variant="ghost" size="xs" onClick={boardMode.showBoard}>
+              {translate('auto.components.TaskPage.jiraReturnToBoard', 'Return to board')}
+            </Button>
           </div>
         ) : null}
 
-        {!jiraLoading &&
-        displayedJiraIssues.length === 0 &&
-        !jiraError &&
-        !jiraStatus.credentialError ? (
-          <div className="px-4 py-10 text-center">
-            <p className="text-sm font-medium text-foreground">
-              {translate('auto.components.TaskPage.eba87f2edb', 'No Jira issues found')}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {jiraHasWorkspace
-                ? translate(
-                    'jira.workspace.empty',
-                    'Link a Jira issue to a workspace, or choose another view.'
-                  )
-                : jiraSearchInput
+        <div
+          className="min-h-0 flex-1 overflow-auto scrollbar-sleek"
+          style={{
+            scrollbarGutter: 'stable'
+          }}
+        >
+          {jiraViewMode === 'list' ? (
+            <TaskPageJiraSortControls
+              columns={jiraColumns}
+              direction={jiraOrderDirection}
+              onSort={handleJiraSort}
+              orderBy={jiraOrderBy}
+            />
+          ) : null}
+
+          {jiraStatus.credentialError ? (
+            <div className="border-b border-border px-4 py-4 text-sm text-destructive">
+              {jiraStatus.credentialError}
+            </div>
+          ) : null}
+          {!jiraStatus.credentialError && jiraError ? (
+            <TaskPageJiraErrorBanner
+              error={jiraError}
+              open={jiraErrorDetailsOpen}
+              onOpenChange={setJiraErrorDetailsOpen}
+            />
+          ) : null}
+          <TaskPageJiraTextFallbackNotice
+            rejection={jiraStatus.credentialError ? null : jiraJqlRejection}
+          />
+
+          {jiraLoading && jiraIssues.length === 0 ? (
+            <div className="divide-y divide-border/50">
+              {Array.from({
+                length: 6
+              }).map((_, i) => (
+                <div key={i} className="px-3 py-3">
+                  <div className="h-4 w-4/5 animate-pulse rounded bg-muted/70" />
+                  <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-muted/60" />
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {!jiraLoading &&
+          displayedJiraIssues.length === 0 &&
+          !jiraError &&
+          !jiraStatus.credentialError ? (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm font-medium text-foreground">
+                {translate('auto.components.TaskPage.eba87f2edb', 'No Jira issues found')}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {jiraHasWorkspace
                   ? translate(
-                      'auto.components.TaskPage.f51e254d35',
-                      'Try different search terms or JQL.'
+                      'jira.workspace.empty',
+                      'Link a Jira issue to a workspace, or choose another view.'
                     )
-                  : translate(
-                      'auto.components.TaskPage.94d900518d',
-                      'No issues match the selected preset.'
-                    )}
-            </p>
-          </div>
-        ) : null}
+                  : jiraSearchInput
+                    ? translate(
+                        'auto.components.TaskPage.f51e254d35',
+                        'Try different search terms or JQL.'
+                      )
+                    : translate(
+                        'auto.components.TaskPage.94d900518d',
+                        'No issues match the selected preset.'
+                      )}
+              </p>
+            </div>
+          ) : null}
 
-        {jiraViewMode === 'board' ? (
-          <TaskPageJiraBoardView
-            key={`${boardScopeKey}:${selectedJiraSiteId}`}
-            issues={sortedJiraIssues}
-            statusOrder={displayedJiraStatusOrder}
-            selectedIssue={selectedJiraIssue}
-            sourceContext={jiraTaskSourceContext}
-            target={boardTarget}
-            scopeKey={boardScopeKey}
-            onOpenIssue={openJiraDetailPage}
-            onStartWorkspace={handleUseJiraItem}
-            showSiteContext={selectedJiraSiteId === 'all'}
-            loading={jiraLoading}
-            onRefresh={() => setJiraRefreshNonce((value) => value + 1)}
-          />
-        ) : (
-          <TaskPageJiraIssueList
-            columns={jiraColumns}
-            formatUpdatedAt={formatRelativeTime}
-            getIssueWorkspaces={getJiraIssueWorkspaces}
-            getStatusTone={getJiraStatusTone}
-            issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
-            issues={sortedJiraIssues}
-            onOpenIssue={openJiraDetailPage}
-            onOpenWorkspace={openJiraIssueWorkspace}
-            onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
-            onStartWorkspace={handleUseJiraItem}
-            selectedIssue={selectedJiraIssue}
-            showSiteContext={selectedJiraSiteId === 'all'}
-            sourceContext={jiraTaskSourceContext}
-            statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
-            statusOrder={displayedJiraStatusOrder}
-          />
-        )}
+          {jiraViewMode === 'board' ? (
+            <TaskPageJiraBoardView
+              key={`${boardScopeKey}:${selectedJiraSiteId}`}
+              issues={sortedJiraIssues}
+              statusOrder={displayedJiraStatusOrder}
+              selectedIssue={selectedJiraIssue}
+              sourceContext={jiraTaskSourceContext}
+              target={boardTarget}
+              scopeKey={boardScopeKey}
+              onOpenIssue={openJiraDetailPage}
+              onStartWorkspace={handleUseJiraItem}
+              showSiteContext={selectedJiraSiteId === 'all'}
+              loading={jiraLoading}
+              onRefresh={() => setJiraRefreshNonce((value) => value + 1)}
+            />
+          ) : (
+            <TaskPageJiraIssueList
+              getIssueWorkspaces={getJiraIssueWorkspaces}
+              onOpenWorkspace={openJiraIssueWorkspace}
+              columns={jiraColumns}
+              formatUpdatedAt={formatRelativeTime}
+              getStatusTone={getJiraStatusTone}
+              issues={sortedJiraIssues}
+              onOpenIssue={openJiraDetailPage}
+              onStartWorkspace={handleUseJiraItem}
+              selectedIssue={selectedJiraIssue}
+              showSiteContext={selectedJiraSiteId === 'all'}
+              statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
+              statusOrder={displayedJiraStatusOrder}
+              issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
+              onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
+              sourceContext={jiraTaskSourceContext}
+            />
+          )}
+        </div>
+        <JiraIssueWorkspace
+          issue={selectedJiraIssue}
+          onClose={closeTaskDetailPage}
+          {...boardMode.workspaceProps}
+        />
       </div>
-      <JiraIssueWorkspace
-        issue={selectedJiraIssue}
-        issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
-        onUse={handleOpenOrUseJiraItem}
-        onClose={closeTaskDetailPage}
-        sourceContext={jiraDetailOwnerSource}
-        sprintBoard={defaultJiraBoard}
-        refreshSignal={jiraDetailRefreshSignal}
-        onSprintChange={notifyJiraSprintChange}
-      />
-    </div>
+    )
+  ) : (
+    <TaskPageLinearContent model={model} />
   )
 }

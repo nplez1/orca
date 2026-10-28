@@ -34,10 +34,6 @@ export function createUiSettingsActions(set: UISliceSet, get: UISliceGet): Parti
     clearSettingsTarget: () => set({ settingsNavigationTarget: null }),
     settingsProjectHostSelection: {},
     settingsProjectSetupSelection: {},
-    settingsProjectAddHostRequest: null,
-    // Why: a fresh object per request, so asking for the same host twice re-opens the flow.
-    requestProjectHostAdd: (request) => set({ settingsProjectAddHostRequest: { ...request } }),
-    clearProjectHostAddRequest: () => set({ settingsProjectAddHostRequest: null }),
     // Why: renderer-only, never persisted — no window.api.ui.set, and absent from the debounced UI writer in App.tsx.
     setSettingsProjectHostSelection: (selectionKey, hostId, setupId) =>
       set((s) => {

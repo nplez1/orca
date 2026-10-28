@@ -54,11 +54,9 @@ type SeededSession = {
 function seed(db: SyncDatabase, row: SeededSession): void {
   const cwd = row.cwd ?? null
   db.prepare(
-    `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,model,
-       created_at,updated_at,modified_at,message_count,total_tokens,queued_message_count,
-       subagent_transcript_count,subagent_parent_session_id,subagent_agent_type,
-       subagent_parent_agent,resume_command)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,
+       created_at,updated_at,message_count,resume_command)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).run(
     row.id,
     row.agent ?? 'claude',
@@ -69,18 +67,26 @@ function seed(db: SyncDatabase, row: SeededSession): void {
     cwd,
     cwdKey(cwd),
     row.branch ?? null,
-    row.model ?? null,
     row.createdAt ?? null,
     row.updatedAt === undefined ? '2026-09-01T00:00:00.000Z' : row.updatedAt,
-    row.modifiedAt ?? null,
     row.messageCount ?? 0,
+    row.resumeCommand ?? ''
+  )
+  db.prepare(
+    `INSERT INTO session_list_facts(session_row_id,model,modified_at,total_tokens,
+       queued_message_count,subagent_transcript_count,subagent_parent_session_id,
+       subagent_agent_type,subagent_parent_agent)
+     VALUES (?,?,?,?,?,?,?,?,?)`
+  ).run(
+    row.id,
+    row.model ?? null,
+    row.modifiedAt ?? null,
     row.totalTokens ?? 0,
     row.queuedMessageCount ?? 0,
     row.subagentTranscriptCount ?? 0,
     row.subagent?.parentSessionId ?? null,
     row.subagent?.agentType ?? null,
-    row.subagent?.parentAgent ?? null,
-    row.resumeCommand ?? ''
+    row.subagent?.parentAgent ?? null
   )
 }
 
@@ -447,5 +453,34 @@ describe('the mapped row', () => {
     })
 
     expect(list(db).sessions[0]?.modifiedAt).toBe('2026-09-02T00:00:00.000Z')
+  })
+})
+
+describe('beside upstream’s columns', () => {
+  it('reads and filters the facts even when `sessions` grows a column of the same name', async () => {
+    const db = await openIndex()
+    for (const column of [
+      'model TEXT',
+      'modified_at TEXT',
+      'total_tokens INTEGER',
+      'queued_message_count INTEGER',
+      'subagent_transcript_count INTEGER',
+      'subagent_parent_session_id TEXT',
+      'subagent_agent_type TEXT',
+      'subagent_parent_agent TEXT'
+    ]) {
+      db.exec(`ALTER TABLE sessions ADD COLUMN ${column}`)
+    }
+    seed(db, {
+      id: 1,
+      model: 'claude-fable-5',
+      totalTokens: 900,
+      subagent: { parentSessionId: 'root', agentType: 'Explore', status: null, parentAgent: 'pi' }
+    })
+
+    const listed = list(db, { query: 'fable' }).sessions
+    expect(listed).toHaveLength(1)
+    expect(listed[0]).toMatchObject({ model: 'claude-fable-5', totalTokens: 900 })
+    expect(listed[0]?.subagent).toMatchObject({ parentSessionId: 'root', parentAgent: 'pi' })
   })
 })

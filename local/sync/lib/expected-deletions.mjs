@@ -76,3 +76,43 @@ export function staleDeletions(entries, presentAtHead) {
     .filter((entry) => entry.status !== 'restore' && presentAtHead.has(entry.path))
     .map((entry) => entry.path)
 }
+
+/**
+ * The `symbols` half of the manifest: fork-added names a merge removed on purpose. Same statuses as a
+ * file entry; only `expected-deletion` silences the survival check, and `restore` says it must return.
+ */
+export function parseExpectedSymbols(text) {
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch (error) {
+    return { entries: [], note: `expected-deletions.json is not valid JSON: ${error.message}` }
+  }
+  const problems = []
+  const entries = []
+  const seen = new Set()
+  for (const item of Array.isArray(parsed?.symbols) ? parsed.symbols : []) {
+    const path = typeof item?.path === 'string' ? item.path.trim() : ''
+    const symbol = typeof item?.symbol === 'string' ? item.symbol.trim() : ''
+    if (path === '' || symbol === '') {
+      problems.push('a symbols entry needs both path and symbol')
+      continue
+    }
+    const status = item.status ?? 'pending-decision'
+    if (!EXPECTED_DELETION_STATUSES.includes(status)) {
+      problems.push(`${path}#${symbol}: unknown status "${status}"`)
+    }
+    if (seen.has(`${path}#${symbol}`)) {
+      problems.push(`${path}#${symbol} is listed twice`)
+    }
+    seen.add(`${path}#${symbol}`)
+    entries.push({
+      path,
+      symbol,
+      status,
+      supersededBy: item.supersededBy ?? null,
+      reason: item.reason ?? ''
+    })
+  }
+  return { entries, note: problems.length === 0 ? null : problems.join(' | ') }
+}

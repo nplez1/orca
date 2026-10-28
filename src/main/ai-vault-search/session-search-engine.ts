@@ -57,7 +57,7 @@ export type SessionSearchEngineOptions = {
   retentionCutoffMs?: number | null
   /**
    * Whether transcript content is consented to. False means `messages_fts` was
-   * never filled, so a text query is answered from `sessions_fts` instead.
+   * never filled, so a text query is answered from `session_metadata_fts` instead.
    */
   contentEnabled?: boolean
 }
