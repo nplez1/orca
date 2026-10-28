@@ -77,16 +77,18 @@ function reviewThread(line: number): PRCommentInlineThread {
 }
 
 /**
- * How many add-note "+" buttons the editor is currently offering.
+ * The add-note "+" buttons this editor holds, in DOM order.
  *
- * More than one exists in the DOM on a surface that mounts both decorators: the review-thread
- * decorator installs its own overlay with an empty commentable set, which never shows. Counting the
- * visible ones is what "one affordance per line" actually means.
+ * More than one exists on a surface that mounts both decorators: the review-thread decorator
+ * installs its own overlay with an empty commentable set, which never shows. Counting the visible
+ * ones is what "one affordance per line" actually means.
  */
+function addedButtons(domNode: HTMLElement): HTMLElement[] {
+  return [...domNode.querySelectorAll<HTMLElement>('.orca-diff-comment-add-btn')]
+}
+
 function visibleAddButtonCount(domNode: HTMLElement): number {
-  return [...domNode.querySelectorAll<HTMLElement>('.orca-diff-comment-add-btn')].filter(
-    (button) => button.style.display !== 'none'
-  ).length
+  return addedButtons(domNode).filter((button) => button.style.display !== 'none').length
 }
 
 /**
@@ -161,7 +163,16 @@ describe('usePRCommentInlineDecorator gutter ownership', () => {
   it('offers exactly one affordance on a commented line, and the "+" again on the lines around it', () => {
     const fake = createFakeDiffCommentEditor()
     const threads = [reviewThread(40)]
-    const { rerender } = render(<GutterSurface fake={fake} threads={threads} enabled={false} />)
+    render(<GutterSurface fake={fake} threads={threads} enabled={false} />)
+
+    // The bubble is really there — "no "+" on this line" is only meaningful next to it.
+    expect(fake.decorations()).toContainEqual({
+      startLine: 40,
+      endLine: 40,
+      className: undefined,
+      marginClassName: undefined,
+      glyphMarginClassName: 'orca-pr-comment-gutter-mark'
+    })
 
     // The defect this pins: hovering a line with a collapsed thread used to offer "add a note" and
     // hide "there is a conversation here", and the "+" swallowed the click meant for the bubble.
@@ -170,9 +181,22 @@ describe('usePRCommentInlineDecorator gutter ownership', () => {
 
     fake.emitMouseMove(41)
     expect(visibleAddButtonCount(fake.domNode)).toBe(1)
+  })
 
-    // Opening the thread frees the slot: no bubble left to collide with, so the "+" is back.
+  it('keeps the running "+" instead of rebuilding it when a thread opens', () => {
+    const fake = createFakeDiffCommentEditor()
+    const threads = [reviewThread(40)]
+    const { rerender } = render(<GutterSurface fake={fake} threads={threads} enabled={false} />)
+    const parked = addedButtons(fake.domNode)[1]
+    expect(parked).toBeDefined()
+
+    // Why: the occupied-line set is derived from the thread list, so it changes whenever any thread
+    // is toggled or comments are refetched. Reinstalling the overlay for that would re-park the
+    // button under a stationary pointer and drop a gutter drag in flight.
     rerender(<GutterSurface fake={fake} threads={threads} enabled />)
+    expect(addedButtons(fake.domNode)[1]).toBe(parked)
+
+    // Nothing left to collide with, so the "+" is back on the line the thread used to own.
     fake.emitMouseMove(40)
     expect(visibleAddButtonCount(fake.domNode)).toBe(1)
   })

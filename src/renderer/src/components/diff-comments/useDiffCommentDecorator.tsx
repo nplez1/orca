@@ -156,23 +156,19 @@ export function useDiffCommentDecorator({
     scrollToZoneFrameRef.current = null
   }, [])
 
-  // Key on the values, not the array identity: review surfaces re-fetch PR/MR file data on every
-  // refresh and hand us a fresh-but-equal number[], which would otherwise churn every consumer.
-  // Memoized on the array identity: the join walks every commentable line of the patch (thousands
-  // on a large file) and every mounted diff row runs this hook on every render.
+  // The line filters this decorator's "+" obeys; the hook owns how each is keyed.
   const { commentableLineSet, gutterOccupiedLineSet } = useDiffCommentLineSets(
     commentableLineNumbers,
     gutterOccupiedLineNumbers
   )
 
-  // Add-button overlay only: it captures the line filters and the label, so it is rebuilt when any
-  // of them changes. Kept apart from the zone teardown below, whose deps must mirror the zone-creating effect.
+  // Kept apart from the zone teardown below, whose deps must mirror the zone-creating effect.
   useDiffCommentAddButtonOverlay({
     editor,
     monacoModelIdentity,
     addButtonLabel,
     commentableLineSet,
-    gutterOccupiedLineSet,
+    gutterOccupiedLines: gutterOccupiedLineSet,
     hoverLineRef,
     onAddCommentClickRef,
     pendingRangeRef: pendingCommentRangeRef,

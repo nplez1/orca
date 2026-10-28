@@ -150,17 +150,9 @@ export default function MonacoEditor({
     fileId,
     onContentChange
   })
-  const annotations = useMonacoMarkdownAnnotations({
-    mountedEditor,
-    editorContainerRef,
-    relativePath,
-    content,
-    language,
-    worktreeId,
-    markdownAnnotationsEnabled
-  })
-
-  usePRCommentInlineDecorator({
+  // Why before the markdown annotations: that hook mounts the add-note "+", which must skip the
+  // lines a collapsed review thread already draws its bubble on.
+  const prCommentGutter = usePRCommentInlineDecorator({
     editor: mountedEditor,
     // Why: Monaco drops model-scoped view zones and decorations on a model swap, and a retained
     // editor keeps the same object across tabs — the model URI is what actually changed.
@@ -173,6 +165,17 @@ export default function MonacoEditor({
     onResolveThread: prCommentInline?.onResolveThread,
     pendingRevealCommentId: prCommentInline?.pendingRevealCommentId ?? null,
     onPendingRevealConsumed: prCommentInline?.onPendingRevealConsumed
+  })
+
+  const annotations = useMonacoMarkdownAnnotations({
+    mountedEditor,
+    editorContainerRef,
+    relativePath,
+    content,
+    language,
+    worktreeId,
+    markdownAnnotationsEnabled,
+    gutterOccupiedLineNumbers: prCommentGutter.gutterOccupiedLines
   })
 
   // Why useLayoutEffect: cleanup runs before @monaco-editor/react disposes the editor, so getScrollTop() still reads valid state on unmount.

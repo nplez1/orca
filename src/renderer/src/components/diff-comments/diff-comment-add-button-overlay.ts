@@ -1,6 +1,6 @@
 import * as monaco from 'monaco-editor'
 import type { editor as monacoEditor } from 'monaco-editor'
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { getDiffCommentPopoverTop } from './diff-comment-popover-position'
 import type { DiffCommentLineRange } from './diff-comment-line-range'
 import { toDiffCommentLineTarget } from './diff-comment-line-range'
@@ -23,7 +23,7 @@ type AddButtonOverlayArgs = {
    * possible meanings, and the conversation is the one the reader came for. The Add Review Note
    * chord still reaches these lines, so the capability is displaced rather than dropped.
    */
-  gutterOccupiedLineSet: ReadonlySet<number> | null
+  gutterOccupiedLines: ReadonlySet<number>
   // The hovered line survives model-swap rebuilds so a press on the parked button still has an anchor.
   hoverLineRef: RefObject<number | null>
   onAddCommentClickRef: RefObject<
@@ -35,20 +35,30 @@ export type DiffCommentAddButtonOverlayHandle = {
   dispose: () => void
   setPendingRange: DiffCommentRangeDragHandle['setPendingRange']
   isDragging: DiffCommentRangeDragHandle['isDragging']
+  /**
+   * Hands the running overlay a new set of lines another control owns, instead of reinstalling it.
+   *
+   * Why: the set is derived from the review thread list, so it changes whenever any thread anywhere
+   * is expanded or collapsed and whenever PR comments are refetched. Reinstalling would drop a
+   * gutter drag in flight and re-park the button, so the overlay is told and re-checks the hover.
+   */
+  setGutterOccupiedLines: (lines: ReadonlySet<number>) => void
 }
 
 /**
  * Keeps the "+" overlay installed for as long as the editor lives here.
  *
- * Its own module because the overlay owns its install/teardown: a filter change rebuilds the button
- * and the range-drag controller it parks on, and a model swap must drop the parked hover line.
+ * Its own module because the overlay owns its install/teardown: a commentable-line change rebuilds
+ * the button and the range-drag controller it parks on, and a model swap rebuilds it hidden on the
+ * new model. The occupied-line set is pushed in through the handle instead, so churn in the review
+ * thread list never tears the overlay down.
  */
 export function useDiffCommentAddButtonOverlay({
   editor,
   monacoModelIdentity,
   addButtonLabel,
   commentableLineSet,
-  gutterOccupiedLineSet,
+  gutterOccupiedLines,
   hoverLineRef,
   onAddCommentClickRef,
   pendingRangeRef,
@@ -59,7 +69,7 @@ export function useDiffCommentAddButtonOverlay({
   monacoModelIdentity?: string
   addButtonLabel: string
   commentableLineSet: Set<number> | null
-  gutterOccupiedLineSet: ReadonlySet<number>
+  gutterOccupiedLines: ReadonlySet<number>
   hoverLineRef: RefObject<number | null>
   onAddCommentClickRef: RefObject<
     (args: { lineNumber: number; startLine?: number; top: number }) => void
@@ -68,6 +78,14 @@ export function useDiffCommentAddButtonOverlay({
   pendingRangeRef: RefObject<DiffCommentLineRange | null>
   overlayRef: RefObject<DiffCommentAddButtonOverlayHandle | null>
 }): void {
+  // Why a ref rather than a dependency: the set changes identity on every review refresh and every
+  // thread toggle anywhere, and reinstalling for that would drop a gutter drag in flight.
+  const occupiedLinesRef = useRef(gutterOccupiedLines)
+  useEffect(() => {
+    occupiedLinesRef.current = gutterOccupiedLines
+    overlayRef.current?.setGutterOccupiedLines(gutterOccupiedLines)
+  }, [gutterOccupiedLines, overlayRef])
+
   useEffect(() => {
     if (!editor) {
       return
@@ -81,7 +99,7 @@ export function useDiffCommentAddButtonOverlay({
       editorDomNode,
       addButtonLabel,
       commentableLineSet,
-      gutterOccupiedLineSet,
+      gutterOccupiedLines: occupiedLinesRef.current,
       hoverLineRef,
       onAddCommentClickRef
     })
@@ -95,7 +113,6 @@ export function useDiffCommentAddButtonOverlay({
     addButtonLabel,
     commentableLineSet,
     editor,
-    gutterOccupiedLineSet,
     hoverLineRef,
     monacoModelIdentity,
     onAddCommentClickRef,
@@ -109,7 +126,7 @@ export function installDiffCommentAddButtonOverlay({
   editorDomNode,
   addButtonLabel,
   commentableLineSet,
-  gutterOccupiedLineSet,
+  gutterOccupiedLines,
   hoverLineRef,
   onAddCommentClickRef
 }: AddButtonOverlayArgs): DiffCommentAddButtonOverlayHandle {
@@ -144,8 +161,11 @@ export function installDiffCommentAddButtonOverlay({
   // Fixed 18px square centered in the line box — tracking line-height made a rectangle on taller line-heights.
   const BUTTON_SIZE = 18
 
+  // Mutable so a thread expanding or collapsing never rebuilds the overlay; see `setGutterOccupiedLines`.
+  let occupiedLines = gutterOccupiedLines
+
   const canCommentOnLine = (lineNumber: number): boolean => {
-    if (gutterOccupiedLineSet?.has(lineNumber) === true) {
+    if (occupiedLines.has(lineNumber)) {
       return false
     }
     return commentableLineSet === null || commentableLineSet.has(lineNumber)
@@ -217,8 +237,11 @@ export function installDiffCommentAddButtonOverlay({
     }
   })
   const onScroll = editor.onDidScrollChange(() => {
-    if (!dragging && hoverLineRef.current != null) {
-      positionAtLine(hoverLineRef.current)
+    // Why the availability check: the parked line can stop being ours while it is parked (its thread
+    // collapsed, or the commentable set narrowed), and scrolling must not draw the "+" back over it.
+    const parked = hoverLineRef.current
+    if (!dragging && parked != null && canCommentOnLine(parked)) {
+      positionAtLine(parked)
     }
   })
 
@@ -234,6 +257,16 @@ export function installDiffCommentAddButtonOverlay({
       plus.remove()
     },
     setPendingRange: rangeDrag.setPendingRange,
-    isDragging: rangeDrag.isDragging
+    isDragging: rangeDrag.isDragging,
+    setGutterOccupiedLines: (lines) => {
+      occupiedLines = lines
+      // A thread collapsed under a stationary pointer: the "+" must go rather than sit on the bubble
+      // until the next mousemove.
+      const parked = hoverLineRef.current
+      if (parked != null && !canCommentOnLine(parked)) {
+        hoverLineRef.current = null
+        setDisplay('none')
+      }
+    }
   }
 }
