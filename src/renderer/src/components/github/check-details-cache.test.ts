@@ -152,6 +152,15 @@ describe('the shared check details cache', () => {
     )
   })
 
+  // Why: a third-party app (the Jenkins Checks plugin, for one) can point several check runs at the
+  // same build url, so the run's own id has to lead.
+  it('keeps two check runs that share one details url apart', () => {
+    const shared = 'https://ci.example.com/job/team/job/repo/12/'
+
+    expect(checkDetailsBuildIdentity(check({ checkRunId: 1, url: shared }))).toBe('check-run:1')
+    expect(checkDetailsBuildIdentity(check({ checkRunId: 2, url: shared }))).toBe('check-run:2')
+  })
+
   it('hands a payload one surface read to the other', () => {
     rememberCheckDetails(check(), entry('in_progress', null, 12))
 

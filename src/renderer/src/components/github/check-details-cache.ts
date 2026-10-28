@@ -6,19 +6,20 @@ import { PR_CHECKS_CACHE_TTL_MS } from '@/store/github/cache-identity'
 /**
  * The build behind a check, independent of the key a surface files it under.
  *
- * Why the url first: a `gh pr checks` fallback row carries only a workflow-run id, which every job in
- * that run shares, while the payload is filtered to one job by name. The url is per job — and it
- * carries the host and repo, so two forges that number a build the same cannot share a payload.
+ * Why the id first: a check run's url is its `details_url`, which a third-party app can share across
+ * several runs (the Jenkins Checks plugin points each at one build), so a url-keyed run would collide.
+ * Why the run id carries the name: a `gh pr checks` fallback row has no check-run id, only the run's,
+ * which every job in that run shares, while its payload is filtered to one job by name.
  */
 export function checkDetailsBuildIdentity(check: PRCheckDetail): string {
-  if (check.url) {
-    return `url:${check.url}`
-  }
   if (check.checkRunId) {
     return `check-run:${check.checkRunId}`
   }
   if (check.gitlabJobId) {
     return `gitlab-job:${check.gitlabJobId}`
+  }
+  if (check.url) {
+    return `url:${check.url}`
   }
   if (check.workflowRunId) {
     return `workflow-run:${check.workflowRunId}:${check.name}`
