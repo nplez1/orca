@@ -27,9 +27,16 @@ const actionsCheck = (overrides: Partial<PRCheckDetail> = {}): PRCheckDetail =>
   })
 
 describe('isJenkinsCheck', () => {
-  it('decides on the link alone', () => {
+  it('needs a link that names a build, not just a `/job/` segment', () => {
     expect(isJenkinsCheck(jenkinsCheck())).toBe(true)
+    expect(
+      isJenkinsCheck(jenkinsCheck({ url: 'https://ci.example.com/job/repo/lastBuild/' }))
+    ).toBe(true)
     expect(isJenkinsCheck(actionsCheck())).toBe(false)
+    expect(isJenkinsCheck(jenkinsCheck({ url: 'https://ci.example.com/job/repo/' }))).toBe(false)
+    expect(isJenkinsCheck(jenkinsCheck({ url: 'https://ci.example.com/job/repo/configure' }))).toBe(
+      false
+    )
     expect(isJenkinsCheck(check({ url: null }))).toBe(false)
   })
 })
@@ -44,6 +51,9 @@ describe('isGitHubRerunCandidate', () => {
 
   it('never counts a Jenkins check, however little else it carries', () => {
     expect(isGitHubRerunCandidate(jenkinsCheck())).toBe(false)
+    // A Jenkins that publishes GitHub check runs carries an id, and rerequesting it starts a build
+    // on the Jenkins side — so it belongs to the Jenkins half only.
+    expect(isGitHubRerunCandidate(jenkinsCheck({ checkRunId: 42 }))).toBe(false)
   })
 })
 
@@ -66,7 +76,10 @@ describe('selectRerunTargets', () => {
     const targets = selectRerunTargets({
       checks: [
         jenkinsCheck(),
-        jenkinsCheck({ url: 'https://ci.example.com/job/team/job/repo/11/' })
+        jenkinsCheck({
+          status: 'completed',
+          url: 'https://ci.example.com/job/team/job/repo/11/'
+        })
       ],
       failedOnly: false
     })
@@ -75,12 +88,32 @@ describe('selectRerunTargets', () => {
     expect(targets.github).toHaveLength(0)
   })
 
-  it('drops a Jenkins build that is still running when only failures are wanted', () => {
+  it('drops a Jenkins build that is still running, in either mode', () => {
+    for (const failedOnly of [true, false]) {
+      const targets = selectRerunTargets({
+        checks: [jenkinsCheck({ status: 'in_progress', conclusion: null })],
+        failedOnly
+      })
+
+      expect(targets.jenkins).toHaveLength(0)
+    }
+  })
+
+  it('counts one build once when two checks name it', () => {
     const targets = selectRerunTargets({
-      checks: [jenkinsCheck({ status: 'in_progress', conclusion: null })],
+      checks: [
+        jenkinsCheck(),
+        // The same build through a Jenkins that also publishes a GitHub check run.
+        jenkinsCheck({
+          name: 'continuous-integration/jenkins/pr-merge (check run)',
+          url: 'https://ci.example.com/job/team/job/repo/12/',
+          checkRunId: 42
+        })
+      ],
       failedOnly: true
     })
 
-    expect(targets.jenkins).toHaveLength(0)
+    expect(targets.jenkins).toHaveLength(1)
+    expect(targets.github).toHaveLength(0)
   })
 })

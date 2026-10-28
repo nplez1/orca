@@ -164,9 +164,10 @@ function toLocation(
   }
   const numeric = buildRef !== null && /^\d+$/.test(buildRef)
   const buildNumber = numeric ? Number(buildRef) : null
+  const namedPermalink = buildRef !== null && CLASSIC_PERMALINKS.has(buildRef)
   const permalink = numeric
     ? null
-    : buildRef !== null && CLASSIC_PERMALINKS.has(buildRef)
+    : namedPermalink
       ? buildRef
       : // Why: a job-level link names no build, so read the newest one rather than nothing.
         'lastBuild'
@@ -179,7 +180,10 @@ function toLocation(
     jobPath: rawJobNames.map(decodeSegment),
     buildNumber,
     permalink,
-    namesBuild: buildRef !== null
+    // Why only a number or a permalink: the segment after the job names is a page as often as it
+    // is a build (`…/job/x/configure`, `…/job/x/display/redirect`), and treating a page as a build
+    // reference would point the rerun at whichever build happens to be newest.
+    namesBuild: numeric || namedPermalink
   }
 }
 

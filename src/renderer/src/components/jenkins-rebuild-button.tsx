@@ -3,7 +3,7 @@ import { LoaderCircle, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { rebuildJenkinsCheck } from '@/runtime/jenkins-rebuild-client'
+import { rebuildJenkinsCheck, hasJenkinsApi } from '@/runtime/jenkins-rebuild-client'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
 
@@ -52,7 +52,9 @@ export function JenkinsRebuildButton({
     }
   }, [check, onStarted])
 
-  if (!isJenkinsCheck(check)) {
+  // Why also the status: a queued or running build is not something to rerun — Jenkins would run
+  // the second build concurrently in the same workspace, and the useful action there is to abort.
+  if (!isJenkinsCheck(check) || check.status !== 'completed' || !hasJenkinsApi()) {
     return null
   }
   return (

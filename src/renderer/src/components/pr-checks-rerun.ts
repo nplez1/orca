@@ -47,11 +47,18 @@ export async function rerunChecksAcrossProviders({
   const errors: string[] = []
   let githubStarted = 0
   if (targets.github.length > 0) {
-    const result = await rerunGitHub()
-    if (result.ok) {
-      githubStarted = result.count
-    } else {
-      errors.push(result.error)
+    // Why try/catch per leg: a runtime RPC that times out throws, and letting that escape would
+    // skip the Jenkins builds entirely and drop the count of what already started — which is the
+    // one thing a retry must not be given by accident.
+    try {
+      const result = await rerunGitHub()
+      if (result.ok) {
+        githubStarted = result.count
+      } else {
+        errors.push(result.error)
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -60,12 +67,16 @@ export async function rerunChecksAcrossProviders({
   let jenkinsStarted = 0
   const jenkinsMessages: string[] = []
   for (const check of targets.jenkins) {
-    const outcome = await rebuildJenkinsCheck(check)
-    if (outcome.ok) {
-      jenkinsStarted += 1
-      jenkinsMessages.push(outcome.message)
-    } else {
-      errors.push(`${check.name}: ${outcome.error}`)
+    try {
+      const outcome = await rebuildJenkinsCheck(check)
+      if (outcome.ok) {
+        jenkinsStarted += 1
+        jenkinsMessages.push(outcome.message)
+      } else {
+        errors.push(`${check.name}: ${outcome.error}`)
+      }
+    } catch (error) {
+      errors.push(`${check.name}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 

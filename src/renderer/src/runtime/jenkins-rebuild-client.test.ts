@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
-import { rebuildJenkinsCheck } from './jenkins-rebuild-client'
+import { hasJenkinsApi, rebuildJenkinsCheck } from './jenkins-rebuild-client'
 
 const rebuild = vi.fn()
 
@@ -31,7 +31,7 @@ describe('rebuildJenkinsCheck', () => {
   it('does not call Jenkins for a check another provider owns', async () => {
     for (const url of [
       null,
-      'https://github.com/stablyai/orca/actions/runs/123',
+      'https://github.com/stablyai/orca/actions/runs/123/job/456',
       'https://gitlab.com/group/project/-/jobs/99'
     ]) {
       await expect(rebuildJenkinsCheck(check({ url }))).resolves.toEqual({
@@ -43,20 +43,30 @@ describe('rebuildJenkinsCheck', () => {
   })
 
   it('sends only the link, so no masked parameter can travel back to Jenkins', async () => {
-    rebuild.mockResolvedValue({ ok: true, mode: 'rebuild', buildNumber: 12 })
+    rebuild.mockResolvedValue({
+      ok: true,
+      mode: 'parameters',
+      buildNumber: 12,
+      omittedParameters: 0
+    })
 
     const outcome = await rebuildJenkinsCheck(check())
 
     expect(rebuild).toHaveBeenCalledWith({ url: JENKINS_URL })
     expect(outcome).toEqual({
       ok: true,
-      mode: 'rebuild',
-      message: expect.stringContaining('#12')
+      mode: 'parameters',
+      message: expect.stringMatching(/this build’s parameters/)
     })
   })
 
-  it('says a new build was started when the build could not be replayed', async () => {
-    rebuild.mockResolvedValue({ ok: true, mode: 'parameters', buildNumber: 12 })
+  it('says which parameters were left at the job default', async () => {
+    rebuild.mockResolvedValue({
+      ok: true,
+      mode: 'parameters',
+      buildNumber: 12,
+      omittedParameters: 2
+    })
 
     const outcome = await rebuildJenkinsCheck(check())
 
@@ -64,7 +74,23 @@ describe('rebuildJenkinsCheck', () => {
     if (!outcome.ok) {
       return
     }
-    expect(outcome.message).toMatch(/same parameters/)
+    expect(outcome.message).toMatch(/2 parameter\(s\) stayed at the job’s default/)
+  })
+
+  it('does not claim a build was started when Jenkins only redirected', async () => {
+    rebuild.mockResolvedValue({
+      ok: false,
+      reason: 'unconfirmed',
+      serverUrl: 'https://ci.example.com',
+      message: null
+    })
+
+    const outcome = await rebuildJenkinsCheck(check())
+
+    expect(outcome).toEqual({
+      ok: false,
+      error: expect.stringMatching(/did not confirm the new build/)
+    })
   })
 
   it('names the server to configure when there is none', async () => {
@@ -107,6 +133,30 @@ describe('rebuildJenkinsCheck', () => {
     })
   })
 
+  it('refuses a second rerun of the same build while the first is in flight', async () => {
+    let settle: (value: unknown) => void = () => undefined
+    rebuild.mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve
+      })
+    )
+
+    const first = rebuildJenkinsCheck(check())
+    // Why: the toolbar's menu and the per-check button are separate affordances over one build.
+    await expect(rebuildJenkinsCheck(check())).resolves.toEqual({
+      ok: false,
+      error: expect.stringMatching(/already starting/)
+    })
+
+    settle({ ok: true, mode: 'build', buildNumber: 12, omittedParameters: 0 })
+    await expect(first).resolves.toEqual({
+      ok: true,
+      mode: 'build',
+      message: 'Jenkins started a new build'
+    })
+    expect(rebuild).toHaveBeenCalledTimes(1)
+  })
+
   it('reports a client without Jenkins support instead of throwing', async () => {
     // The web client's fallback proxy resolves every call to undefined rather than throwing.
     rebuild.mockResolvedValue(undefined)
@@ -115,5 +165,9 @@ describe('rebuildJenkinsCheck', () => {
       ok: false,
       error: expect.any(String)
     })
+  })
+
+  it('tells callers whether this client has a Jenkins surface at all', () => {
+    expect(hasJenkinsApi()).toBe(true)
   })
 })

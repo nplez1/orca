@@ -7,28 +7,34 @@ import { parseActionsRunId } from './actions-run-url'
  * Starting a Jenkins build again from the Checks surface.
  *
  * A Jenkins check arrives as a GitHub legacy commit status — a name, a state and a `target_url`
- * with no run identifier — so the link is the only handle there is. Everything provider-specific
- * (the build number, its parameters, whether the rebuild plugin is installed) is resolved in the
- * main process from that link, and never round-tripped through the renderer: a secret parameter
- * value is masked before it reaches the renderer, so replaying the masked copy would start a build
- * with the literal mask.
+ * with no run identifier — so the link is the only handle there is. A Jenkins that publishes
+ * GitHub check runs instead (the Checks plugin) carries a `checkRunId` too, which is why the
+ * GitHub rerun path has to leave these checks alone: rerequesting such a check run starts a build
+ * on the Jenkins side, and this module would start a second one.
+ *
+ * Everything provider-specific — the build number, its parameters — is resolved in the main
+ * process from that link and never round-tripped through the renderer: a secret parameter value is
+ * masked before it reaches the renderer, so replaying the masked copy would POST `••••` at Jenkins.
  */
 
-/**
- * How the new build was started, which is what the confirmation copy says.
- *
- * `rebuild` replays the exact build; the other two start a *new* build, so the copy must not claim
- * they are the same run.
- */
-export type JenkinsRebuildMode = 'rebuild' | 'parameters' | 'build'
+/** How the new build was started, which is what the confirmation copy says. */
+export type JenkinsRebuildMode = 'parameters' | 'build'
 
 export type JenkinsRebuildFailureReason =
   | JenkinsBuildDetailsFailureReason
   /** The link names a job or a permalink rather than a build that can be read back. */
   | 'no-build'
+  /** Jenkins answered with a redirect, so whether a build started cannot be read from it. */
+  | 'unconfirmed'
 
 export type JenkinsRebuildResult =
-  | { ok: true; mode: JenkinsRebuildMode; buildNumber: number }
+  | {
+      ok: true
+      mode: JenkinsRebuildMode
+      buildNumber: number
+      /** Parameters left at the job's default because Jenkins did not export a value for them. */
+      omittedParameters: number
+    }
   | {
       ok: false
       reason: JenkinsRebuildFailureReason
@@ -39,11 +45,11 @@ export type JenkinsRebuildResult =
     }
 
 /**
- * Whether a check is a Jenkins build Orca can act on, decided by the only handle Jenkins gives us.
+ * Whether a check is a Jenkins build Orca can rerun, decided by the only handle Jenkins gives us.
  *
- * Why `namesBuild`: `parseJenkinsBuildLocation` is deliberately permissive — it answers "could this be
- * a Jenkins build", which the details path then confirms with a request. A GitHub Actions check URL
- * (`…/actions/runs/123/job/456`) parses as a job named `456` with no build, so treating that as
+ * Why `namesBuild`: `parseJenkinsBuildLocation` is deliberately permissive — it answers "could this
+ * be a Jenkins build", which the details path then confirms with a request. A GitHub Actions check
+ * URL (`…/actions/runs/123/job/456`) parses as a job named `456` with no build, so treating that as
  * Jenkins here would send a GitHub check to a Jenkins server.
  */
 export function isJenkinsCheck(check: Pick<PRCheckDetail, 'url'>): boolean {
@@ -78,7 +84,17 @@ export function isGitHubRerunCandidate(check: PRCheckDetail): boolean {
   )
 }
 
-/** A mixed failure list, split by the provider that owns each check. */
+/**
+ * A mixed failure list, split by the provider that owns each check.
+ *
+ * Two exclusions that only apply to Jenkins:
+ *
+ * - A build that is still queued or running is never rerun: starting a second build of a job that
+ *   is already building is not what anyone means by "rerun", and Jenkins would run them
+ *   concurrently in one workspace.
+ * - Two checks can name the same build (a legacy status and a check run from one Jenkins), so the
+ *   list is deduplicated on the build URL — one build must not be started twice by one click.
+ */
 export function selectRerunTargets({
   checks,
   failedOnly
@@ -87,8 +103,17 @@ export function selectRerunTargets({
   failedOnly: boolean
 }): { jenkins: PRCheckDetail[]; github: PRCheckDetail[] } {
   const candidates = failedOnly ? checks.filter(isRerunnableFailure) : checks
-  return {
-    jenkins: candidates.filter(isJenkinsCheck),
-    github: candidates.filter(isGitHubRerunCandidate)
-  }
+  const seenBuildUrls = new Set<string>()
+  const jenkins = candidates.filter((check) => {
+    if (!isJenkinsCheck(check) || check.status !== 'completed') {
+      return false
+    }
+    const buildUrl = parseJenkinsBuildLocation(check.url)?.buildUrl
+    if (buildUrl === undefined || seenBuildUrls.has(buildUrl)) {
+      return false
+    }
+    seenBuildUrls.add(buildUrl)
+    return true
+  })
+  return { jenkins, github: candidates.filter(isGitHubRerunCandidate) }
 }

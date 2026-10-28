@@ -3,6 +3,7 @@ import { ghExecFileAsync, acquire, release, type LocalGitExecOptions } from '../
 // Keep real error parsing available when tests mock gh-utils.
 import { extractExecError } from '../../../git/exec-error'
 import { classifyRerunChecksError } from '../../gh-error-classification'
+import { isJenkinsCheck } from '../../../../shared/jenkins-rebuild'
 import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
 import { getPRChecks } from './get-pr-checks'
 import { parseActionsRunId } from './check-detail-field-mapping'
@@ -36,11 +37,16 @@ export async function rerunPRChecks(
     connectionId,
     localGitOptions
   )
-  const candidates = options.failedOnly
-    ? checks.filter((check) =>
-        ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? '')
-      )
-    : checks
+  // Why the Jenkins filter: a Jenkins that publishes GitHub check runs (the Checks plugin) gives
+  // its checks a `checkRunId`, and rerequesting that check run starts a build on the Jenkins side.
+  // The Jenkins rerun path starts that build itself, so leaving these in would start two.
+  const candidates = (
+    options.failedOnly
+      ? checks.filter((check) =>
+          ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? '')
+        )
+      : checks
+  ).filter((check) => !isJenkinsCheck(check))
   const workflowRunIds = new Set(
     candidates
       .map((check) => check.workflowRunId ?? parseActionsRunId(check.url))

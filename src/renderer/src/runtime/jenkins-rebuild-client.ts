@@ -6,22 +6,43 @@ import type {
   JenkinsRebuildResult
 } from '../../../shared/jenkins-rebuild'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
+import { asRecord } from '../../../shared/jenkins-payload'
 
 /**
  * Starting a Jenkins build again, from the renderer's side.
  *
- * The IPC call carries the check's link and nothing else: the build number, its parameters and
- * whether the build can be replayed are resolved in the main process. A secret parameter value is
- * masked before it reaches here, so anything this module knew about the parameters would be the
- * mask, and a rebuild that echoed it back would start a build with `••••` as its secret.
+ * The IPC call carries the check's link and nothing else: the build number and its parameters are
+ * resolved in the main process. A secret parameter value is masked before it reaches here, so
+ * anything this module knew about the parameters would be the mask, and a rebuild that echoed it
+ * back would POST `••••` at Jenkins.
  */
 
-/** Bounds the wait on the renderer side; the IPC call itself has no abort channel. */
-const JENKINS_REBUILD_TIMEOUT_MS = 20_000
+/**
+ * Bounds the wait on the renderer side; the IPC call itself has no abort channel.
+ *
+ * Why sized to the main process's worst case rather than a round trip: the main side makes up to
+ * three requests (build probe, crumb, POST) at 10s each, so a tighter bound would report a timeout
+ * for a build that then starts.
+ */
+const JENKINS_REBUILD_TIMEOUT_MS = 45_000
+
+/** Builds this client has a request in flight for, so two surfaces cannot start one build twice. */
+const inFlightBuilds = new Set<string>()
 
 export type JenkinsRebuildOutcome =
   | { ok: true; mode: JenkinsRebuildMode; message: string }
   | { ok: false; error: string }
+
+/** Whether this client has a Jenkins surface at all; a web client has no `jenkins` namespace. */
+export function hasJenkinsApi(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+  // Why the record view: a harness or embedder can have no `window.api` at all, and `in` on
+  // undefined throws — which reached React as a render error rather than as "not available".
+  const api = asRecord(window.api)
+  return api !== null && 'jenkins' in api
+}
 
 function failureMessage(reason: JenkinsRebuildFailureReason, serverUrl: string | null): string {
   const server = serverUrl ?? translate('jenkins.buildDetails.unknownServer', 'this Jenkins server')
@@ -55,9 +76,11 @@ function failureMessage(reason: JenkinsRebuildFailureReason, serverUrl: string |
         'This Jenkins job or build is no longer available, so nothing was started.'
       )
     case 'unreachable':
+      // Why hedged: a connection reset after the request was sent is classified the same way, and
+      // that request may have started a build.
       return translate(
         'jenkins.rebuild.unreachable',
-        'Could not reach {{value0}}, so nothing was started. Builds are triggered from this machine, so a Jenkins on another network stays out of reach.',
+        'Could not reach {{value0}}. Check Jenkins before retrying, in case a build did start. Builds are triggered from this machine, so a Jenkins on another network stays out of reach.',
         { value0: server }
       )
     case 'timeout':
@@ -66,26 +89,34 @@ function failureMessage(reason: JenkinsRebuildFailureReason, serverUrl: string |
         '{{value0}} did not respond in time. Check Jenkins before retrying, in case a build did start.',
         { value0: server }
       )
+    case 'unconfirmed':
+      return translate(
+        'jenkins.rebuild.unconfirmed',
+        'Jenkins did not confirm the new build. Check Jenkins before retrying, in case a build did start.'
+      )
     case 'not-jenkins':
     case 'error':
       return translate('jenkins.rebuild.failed', 'Jenkins could not start a new build.')
   }
 }
 
-function successMessage(mode: JenkinsRebuildMode, buildNumber: number): string {
-  switch (mode) {
-    case 'rebuild':
-      return translate('jenkins.rebuild.replayStarted', 'Jenkins is rebuilding build #{{value0}}', {
-        value0: buildNumber
-      })
-    case 'parameters':
-      return translate(
-        'jenkins.rebuild.parametersStarted',
-        'Jenkins started a new build with the same parameters'
-      )
-    case 'build':
-      return translate('jenkins.rebuild.buildStarted', 'Jenkins started a new build')
-  }
+function successMessage(mode: JenkinsRebuildMode, omittedParameters: number): string {
+  const started =
+    mode === 'parameters'
+      ? translate(
+          'jenkins.rebuild.parametersStarted',
+          'Jenkins started a new build with this build’s parameters'
+        )
+      : translate('jenkins.rebuild.buildStarted', 'Jenkins started a new build')
+  // Why say it: a value Jenkins does not export cannot be replayed, and the new build runs with the
+  // job's default instead — which is worth knowing when that default is not what failed.
+  return omittedParameters > 0
+    ? `${started}. ${translate(
+        'jenkins.rebuild.omittedParameters',
+        '{{value0}} parameter(s) stayed at the job’s default because Jenkins did not report their value.',
+        { value0: omittedParameters }
+      )}`
+    : started
 }
 
 async function callWithTimeout(
@@ -96,7 +127,10 @@ async function callWithTimeout(
     timer = setTimeout(() => {
       reject(
         new Error(
-          translate('jenkins.rebuild.timedOut', 'Timed out waiting for Jenkins to start the build.')
+          translate(
+            'jenkins.rebuild.timedOut',
+            'Timed out waiting for Jenkins to start the build. Check Jenkins before retrying, in case a build did start.'
+          )
         )
       )
     }, JENKINS_REBUILD_TIMEOUT_MS)
@@ -122,7 +156,7 @@ export async function rebuildJenkinsCheck(check: PRCheckDetail): Promise<Jenkins
   }
   // Why the namespace check: a web client has no Jenkins namespace, and a partial `window.api`
   // (an embedder, or a test harness stubbing only what it exercises) has no proxy at all.
-  if (!('jenkins' in window.api)) {
+  if (!hasJenkinsApi()) {
     return {
       ok: false,
       error: translate(
@@ -131,12 +165,32 @@ export async function rebuildJenkinsCheck(check: PRCheckDetail): Promise<Jenkins
       )
     }
   }
-  const result = await callWithTimeout(window.api.jenkins.rebuild({ url }))
-  if (!result) {
-    return { ok: false, error: failureMessage('error', null) }
+  // Why here and not in each surface: the toolbar's menu and the per-check button are separate
+  // affordances over the same build, and one click each would otherwise start it twice.
+  if (inFlightBuilds.has(url)) {
+    return {
+      ok: false,
+      error: translate(
+        'jenkins.rebuild.inFlight',
+        'A rerun of this Jenkins build is already starting.'
+      )
+    }
   }
-  if (!result.ok) {
-    return { ok: false, error: failureMessage(result.reason, result.serverUrl) }
+  inFlightBuilds.add(url)
+  try {
+    const result = await callWithTimeout(window.api.jenkins.rebuild({ url }))
+    if (!result) {
+      return { ok: false, error: failureMessage('error', null) }
+    }
+    if (!result.ok) {
+      return { ok: false, error: failureMessage(result.reason, result.serverUrl) }
+    }
+    return {
+      ok: true,
+      mode: result.mode,
+      message: successMessage(result.mode, result.omittedParameters)
+    }
+  } finally {
+    inFlightBuilds.delete(url)
   }
-  return { ok: true, mode: result.mode, message: successMessage(result.mode, result.buildNumber) }
 }

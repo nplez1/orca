@@ -27,7 +27,12 @@ import { getMainHttpClient } from '../network/http-client'
 
 export type JenkinsPostResult =
   | { ok: true; status: number }
-  | { ok: false; failure: JenkinsRequestFailure }
+  /**
+   * `unconfirmed` is its own outcome: a redirect may mean the build was queued, and reporting it as
+   * a failure would invite a retry that starts a second one.
+   */
+  | { ok: false; reason: 'unconfirmed'; message: string }
+  | { ok: false; reason: 'failure'; failure: JenkinsRequestFailure }
 
 /**
  * The CSRF field Jenkins requires on a write.
@@ -67,10 +72,10 @@ export async function jenkinsPost(
   try {
     response = await getMainHttpClient().fetch(args.url, {
       method: 'POST',
-      // Why follow: Jenkins answers a successful trigger with 201 + Location, and the rebuild
-      // plugin with a 302 to the new build. Neither is ours to read; what matters is that the
-      // write was accepted rather than refused.
-      redirect: 'follow',
+      // Why not follow: a write's verdict is the status line of the POST, and following a redirect
+      // re-issues it as a GET whose result says nothing about whether a build started. A 3xx is
+      // reported as unconfirmed instead, which is what the caller can honestly tell the user.
+      redirect: 'manual',
       headers: {
         Accept: 'application/json',
         ...(args.body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
@@ -81,13 +86,27 @@ export async function jenkinsPost(
       signal: jenkinsSignal(args.signal)
     })
   } catch (error) {
-    return { ok: false, failure: classifyJenkinsTransportError(error) }
+    return { ok: false, reason: 'failure', failure: classifyJenkinsTransportError(error) }
   }
 
   const jenkinsVersion = response.headers.get('x-jenkins')
   const evidence: JenkinsIdentityEvidence = {
     identifiedAsJenkins: jenkinsVersion !== null,
     configured: args.configured === true
+  }
+  // Why for both: an opaqueredirect carries no status and no URL (`redirect: 'manual'` follows the
+  // spec), so a chromeless 0 and a visible 3xx are the same answer — look, do not assume.
+  if (
+    response.type === 'opaqueredirect' ||
+    response.status === 0 ||
+    (response.status >= 300 && response.status < 400)
+  ) {
+    await releaseBody(response)
+    return {
+      ok: false,
+      reason: 'unconfirmed',
+      message: 'Jenkins redirected the build request instead of accepting it'
+    }
   }
   if (
     isResponseBeyondCredentialScope({
@@ -99,6 +118,7 @@ export async function jenkinsPost(
     await releaseBody(response)
     return {
       ok: false,
+      reason: 'failure',
       failure: {
         reason: isKnownJenkins(evidence) ? 'unauthorized' : 'not-jenkins',
         message: `Jenkins redirected outside its configured URL to ${response.url}`,
@@ -112,6 +132,7 @@ export async function jenkinsPost(
     await releaseBody(response)
     return {
       ok: false,
+      reason: 'failure',
       failure: {
         reason: classifyJenkinsHttpStatus(status, evidence),
         message: `Jenkins responded ${status}${response.statusText ? ` ${response.statusText}` : ''}`,
