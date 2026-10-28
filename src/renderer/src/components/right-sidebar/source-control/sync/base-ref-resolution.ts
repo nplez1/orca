@@ -89,7 +89,8 @@ function resolveHostedReviewCompareBaseRef(
   return null
 }
 
-function getCompareBaseCandidateBranchName(candidate: string): string {
+/** The branch a compare base ref names, so `origin/main`, `refs/heads/main` and `main` compare equal. */
+export function getCompareBaseCandidateBranchName(candidate: string): string {
   const remoteRefPrefix = 'refs/remotes/'
   if (candidate.startsWith(remoteRefPrefix)) {
     const remoteAndBranch = candidate.slice(remoteRefPrefix.length)

@@ -4,7 +4,10 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import type { PRInfo } from '../../../../shared/github/pull-request-types'
 import { createGlobalSettingsFixture } from '../../../../shared/global-settings-test-fixture'
-import { getGitHubPRCacheKey, getGitHubRepoCacheKey } from '../../../../shared/github/github-cache-key'
+import {
+  getGitHubPRCacheKey,
+  getGitHubRepoCacheKey
+} from '../../../../shared/github/github-cache-key'
 import { prCommentsCacheSuffix } from '@/store/github/cache-identity'
 import type { AppState } from '@/store/types'
 import {

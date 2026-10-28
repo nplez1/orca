@@ -112,7 +112,8 @@ export function ChecksPanelActiveContent({
   const openCommentInCode = usePRCommentCodeNavigation({
     worktreeId: activeWorktreeId,
     worktreePath: activeWorktreePath,
-    placementAllowed: commentsInlinePlacementAllowed
+    placementAllowed: commentsInlinePlacementAllowed,
+    reviewBaseRefName: activeReview?.baseRefName ?? null
   })
   const handleToggleCommentsInline = useCallback((): void => {
     void updateSettings({ prCommentsInlineEnabled: !isPRCommentsInlineEnabled(settings) })
