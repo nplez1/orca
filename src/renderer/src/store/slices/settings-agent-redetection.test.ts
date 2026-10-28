@@ -15,38 +15,38 @@ function makeStore(disabledTuiAgents: string[]) {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the slice reads only disabledTuiAgents, and a real GlobalSettings needs every field.
     settings: { disabledTuiAgents, notifications: {} } as AppState['settings']
   })
-  const refreshDetectedAgents = vi.fn().mockResolvedValue([])
-  store.setState({ refreshDetectedAgents })
-  return { store, refreshDetectedAgents }
+  const refreshLocal = vi.fn().mockResolvedValue([])
+  store.setState({ refreshDetectedAgents: refreshLocal })
+  return { store, refreshLocal }
 }
 
 describe('createSettingsSlice agent enablement re-detection', () => {
-  it('re-probes the host agent lists when a write enables an agent', async () => {
-    const { store, refreshDetectedAgents } = makeStore(['pi'])
+  it('re-reads the host agent inventories when a write enables an agent', async () => {
+    const { store, refreshLocal } = makeStore(['pi'])
     settingsSet.mockResolvedValueOnce({ disabledTuiAgents: [], notifications: {} })
 
     await store.getState().updateSettingsOrThrow({ disabledTuiAgents: [] })
 
-    expect(refreshDetectedAgents).toHaveBeenCalledTimes(1)
+    expect(refreshLocal).toHaveBeenCalled()
   })
 
   it('leaves agent detection alone when a write changes nothing about enablement', async () => {
-    const { store, refreshDetectedAgents } = makeStore([])
+    const { store, refreshLocal } = makeStore([])
     settingsSet.mockResolvedValueOnce({ disabledTuiAgents: ['pi'], notifications: {} })
 
     await store.getState().updateSettingsOrThrow({ disabledTuiAgents: ['pi'] })
 
-    expect(refreshDetectedAgents).not.toHaveBeenCalled()
+    expect(refreshLocal).not.toHaveBeenCalled()
   })
 
-  it('does not re-probe agent detection when the write fails', async () => {
-    const { store, refreshDetectedAgents } = makeStore(['pi'])
+  it('does not re-read agent detection when the write fails', async () => {
+    const { store, refreshLocal } = makeStore(['pi'])
     settingsSet.mockRejectedValueOnce(new Error('settings IPC failed'))
 
     await expect(store.getState().updateSettingsOrThrow({ disabledTuiAgents: [] })).rejects.toThrow(
       'settings IPC failed'
     )
 
-    expect(refreshDetectedAgents).not.toHaveBeenCalled()
+    expect(refreshLocal).not.toHaveBeenCalled()
   })
 })

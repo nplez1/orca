@@ -20,6 +20,8 @@ function makeRefreshState(overrides: Partial<AgentInventoryRefreshState> = {}): 
     .mockResolvedValue([])
   return {
     state: {
+      worktreesByRepo: {},
+      folderWorkspaces: [],
       refreshDetectedAgents: refreshLocal,
       remoteDetectedAgentIds: {},
       refreshRemoteDetectedAgents: refreshRemote,
@@ -72,12 +74,23 @@ describe('enablesNewTuiAgents', () => {
 })
 
 describe('refreshDetectedAgentInventories', () => {
-  it('re-probes the local host', () => {
+  it('re-reads this machine, last for the focused context', () => {
     const { state, refreshLocal } = makeRefreshState()
 
     refreshDetectedAgentInventories(state)
 
-    expect(refreshLocal).toHaveBeenCalledTimes(1)
+    expect(refreshLocal.mock.calls).toEqual([[]])
+  })
+
+  it('reaches a workspace whose own runtime is a different local context', () => {
+    const { state, refreshLocal } = makeRefreshState({
+      worktreesByRepo: { repo: [{ id: 'wt-in-wsl' }] },
+      folderWorkspaces: [{ id: 'folder:c:/repo' }]
+    })
+
+    refreshDetectedAgentInventories(state)
+
+    expect(refreshLocal.mock.calls).toEqual([['wt-in-wsl'], ['folder:c:/repo'], []])
   })
 
   it('re-probes each remote host someone has already read, and skips the rest', () => {
@@ -105,19 +118,62 @@ describe('refreshDetectedAgentInventories', () => {
     ])
   })
 
-  it('keeps re-probing the other hosts when one refresh rejects', async () => {
+  it('keeps re-reading the other hosts when one refresh rejects', async () => {
     const { state, refreshLocal, refreshRemote, refreshRuntime } = makeRefreshState({
+      worktreesByRepo: { repo: [{ id: 'wt-1' }] },
       remoteDetectedAgentIds: { 'ssh-1': null, 'ssh-2': ['claude'] },
       runtimeDetectedAgentIds: { 'env-1': ['claude'] }
     })
+    refreshLocal.mockRejectedValue(new Error('probe failed'))
     refreshRemote.mockRejectedValue(new Error('relay gone'))
     refreshRuntime.mockRejectedValue(new Error('needs server update'))
 
     refreshDetectedAgentInventories(state)
     await Promise.resolve()
 
-    expect(refreshLocal).toHaveBeenCalledTimes(1)
+    expect(refreshLocal).toHaveBeenCalledTimes(2)
     expect(refreshRemote.mock.calls).toEqual([['ssh-2']])
     expect(refreshRuntime.mock.calls).toEqual([['env-1', undefined]])
+  })
+
+  it('narrows to one paired host, covering its default list and each workspace', () => {
+    const otherHost = getRuntimeAgentInventoryKey('env-2', 'wt-2')
+    const { state, refreshLocal, refreshRemote, refreshRuntime } = makeRefreshState({
+      worktreesByRepo: { repo: [{ id: 'wt-1' }] },
+      remoteDetectedAgentIds: { 'ssh-1': ['claude'] },
+      runtimeDetectedAgentIds: { [otherHost]: ['claude'] }
+    })
+
+    refreshDetectedAgentInventories(state, { runtimeEnvironmentId: 'env-1' })
+
+    expect(refreshLocal).not.toHaveBeenCalled()
+    expect(refreshRemote).not.toHaveBeenCalled()
+    expect(refreshRuntime.mock.calls).toEqual([['env-1', undefined]])
+  })
+
+  it('re-reads a narrowed host a surface has already read, workspace lists included', () => {
+    const workspace = getRuntimeAgentInventoryKey('env-1', 'wt-1')
+    const { state, refreshRuntime } = makeRefreshState({
+      runtimeDetectedAgentIds: { [workspace]: ['claude'] }
+    })
+
+    refreshDetectedAgentInventories(state, { runtimeEnvironmentId: 'env-1' })
+
+    expect(refreshRuntime.mock.calls).toEqual([
+      ['env-1', undefined],
+      ['env-1', 'wt-1']
+    ])
+  })
+
+  it('does not fail the write when a probe cannot even be scheduled', () => {
+    const { state } = makeRefreshState()
+    state.refreshDetectedAgents = () => {
+      throw new Error('no preflight context')
+    }
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    expect(() => refreshDetectedAgentInventories(state)).not.toThrow()
+
+    consoleError.mockRestore()
   })
 })

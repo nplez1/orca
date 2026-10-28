@@ -51,6 +51,7 @@ import { buildCodexSessionSourceHomeControl } from './codex-session-source-home-
 import { buildDefaultAgentOpensAs } from './native-chat-provider-choice'
 import { useHostStructuredAgentsVersion } from '@/lib/chat-provider-agents'
 import { readNativeDetectedAgents } from '@/store/slices/local-detected-agent-store-state'
+import { refreshDetectedAgentInventories } from '@/store/slices/agent-enablement-redetection'
 import { translate } from '@/i18n/i18n'
 
 export type AgentPermissionsRenderer = (props: AgentPermissionsSettingProps) => React.ReactNode
@@ -214,9 +215,18 @@ export function AgentLaunchSettingsCatalog({
       // Why: an agent is normally enabled because it is already installed, and this host's
       // list is a cache — re-read it so the menu and the default pills offer the agent.
       void save({ type: 'availability', agent: agent.id, enabled }).then(() => {
-        if (enabled) {
-          void refresh()
+        if (!enabled) {
+          return
         }
+        if (detectionTarget.kind === 'runtime') {
+          // Why: a host page's enable is an RPC write, so no settings-write fan-out sees it, and
+          // each of that host's workspaces keeps a list of its own beside the default one.
+          refreshDetectedAgentInventories(useAppStore.getState(), {
+            runtimeEnvironmentId: detectionTarget.environmentId
+          })
+          return
+        }
+        void refresh()
       })
     },
     onSaveOverride: (value) => mutate({ type: 'command', agent: agent.id, value }),

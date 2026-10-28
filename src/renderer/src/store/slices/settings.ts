@@ -154,11 +154,13 @@ async function applySettingsUpdates(
     get().worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId,
     shouldPublish
   )
-  if ('worktreeVisibilityDefaults' in updates) {
-    await get().fetchAllWorktrees({ visibilityOwnerHostId })
-  }
+  // Why before the follow-up: the enable is about the write that just landed, and a follow-up
+  // read that rejects must not swallow the re-detection it owes.
   if (enablesNewTuiAgents(previousSettings, get().settings)) {
     refreshDetectedAgentInventories(get())
+  }
+  if ('worktreeVisibilityDefaults' in updates) {
+    await get().fetchAllWorktrees({ visibilityOwnerHostId })
   }
 }
 
