@@ -24,6 +24,12 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Unable to load this Jira board.'
 }
 
+/**
+ * A board reload and whether it may blank what is on screen first. A user's refresh
+ * blanks; the reload after a mutation that already landed a patch does not.
+ */
+type JiraBoardRefreshRequest = { nonce: number; silent: boolean }
+
 export function useTaskPageJiraBoard(
   model: TaskPageJiraBoardModel,
   selection: JiraBoardSelection,
@@ -47,16 +53,21 @@ export function useTaskPageJiraBoard(
   const cacheKey = taskPageJiraBoardCacheKey(selection)
   const [cacheSnapshot] = useState(() => readTaskPageJiraBoardCache(cacheKey))
   const overviewLoadedRef = useRef(cacheSnapshot?.overview != null)
-  const [refreshNonce, setRefreshNonce] = useState(0)
-  // Why a nonce rather than a dependency: the parent's signal must reload exactly the
-  // way the board's own refresh does, loaders and page resets included.
+  const [refreshRequest, setRefreshRequest] = useState<JiraBoardRefreshRequest>({
+    nonce: 0,
+    silent: false
+  })
+  const { nonce: refreshNonce, silent: refreshSilent } = refreshRequest
+  // Why a nonce rather than a dependency: the parent's signal must reload every scope.
+  // Why silent: the sprint it announces is already applied in the sheet that sent it,
+  // so blanking the board under the user would be the same defect as a blanking drop.
   const lastRefreshSignalRef = useRef(refreshSignal)
   useEffect(() => {
     if (lastRefreshSignalRef.current === refreshSignal) {
       return
     }
     lastRefreshSignalRef.current = refreshSignal
-    setRefreshNonce((nonce) => nonce + 1)
+    setRefreshRequest((current) => ({ nonce: current.nonce + 1, silent: true }))
   }, [refreshSignal])
   const [overview, setOverview] = useState<JiraBoardOverview | null>(
     cacheSnapshot?.overview ?? null
@@ -97,9 +108,9 @@ export function useTaskPageJiraBoard(
     const generation = ++overviewGeneration.current
     const refreshChanged = refreshNonce !== lastOverviewRefreshRef.current
     lastOverviewRefreshRef.current = refreshNonce
-    // Why: a cached overview revalidates behind the rendered board; only an explicit
+    // Why: a cached overview revalidates behind the rendered board; only a user's own
     // refresh may blank it and show a loader.
-    const silent = !refreshChanged && overviewLoadedRef.current
+    const silent = !(refreshChanged && !refreshSilent) && overviewLoadedRef.current
     if (!silent) {
       setOverview(null)
       setOverviewLoading(true)
@@ -144,7 +155,7 @@ export function useTaskPageJiraBoard(
     return () => {
       overviewGeneration.current += 1
     }
-  }, [cacheKey, providerSettings, refreshNonce, selection.boardId, selection.siteId])
+  }, [cacheKey, providerSettings, refreshNonce, refreshSilent, selection.boardId, selection.siteId])
 
   const activeSprintAvailable = Boolean(
     overview?.activeSprints.some((sprint) => sprint.id === activeSprintId)
@@ -156,6 +167,7 @@ export function useTaskPageJiraBoard(
     activeSprintId,
     activeSprintAvailable,
     refreshNonce,
+    refreshSilent,
     initialCache: cacheSnapshot,
     onRuntimeBoardUnavailable: markRuntimeBoardUnavailable
   })
@@ -192,6 +204,7 @@ export function useTaskPageJiraBoard(
     sprintIssues: displayedSprintIssues,
     sprintTotal: pages.sprintIssues.length,
     sprintLoading: pages.sprintLoading,
+    sprintBlanked: pages.sprintBlanked,
     sprintLoadingMore: pages.sprintLoadingMore,
     sprintIsLast: pages.sprintIsLast,
     sprintError: pages.sprintError,
@@ -200,6 +213,7 @@ export function useTaskPageJiraBoard(
     backlogLoadedCount: pages.backlogIssues.length,
     backlogTotal: pages.backlogTotal,
     backlogLoading: pages.backlogLoading,
+    backlogBlanked: pages.backlogBlanked,
     backlogLoadingMore: pages.backlogLoadingMore,
     backlogIsLast: pages.backlogIsLast,
     backlogError: pages.backlogError,
@@ -211,6 +225,10 @@ export function useTaskPageJiraBoard(
     meFilterReady: Boolean(viewerAccountId),
     /** Local-only patch so an optimistic move renders before Jira confirms it. */
     applyIssuePatch: pages.patchBoardIssue,
-    refresh: () => setRefreshNonce((nonce) => nonce + 1)
+    /** A user's own refresh: the board blanks and reloads behind a loader. */
+    refresh: () => setRefreshRequest((current) => ({ nonce: current.nonce + 1, silent: false })),
+    /** A mutation's reload: what is on screen stays until the answer lands. */
+    refreshSilently: () =>
+      setRefreshRequest((current) => ({ nonce: current.nonce + 1, silent: true }))
   }
 }

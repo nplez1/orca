@@ -1,5 +1,7 @@
+import type { MutableRefObject } from 'react'
 import type { JiraBoardIssuePage } from '../../../shared/jira/jira-types'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-client'
 import { jiraListBoardIssues } from '@/runtime/runtime-jira-client'
 import type { TaskPageJiraBoardCachedPage } from './task-page-jira-board-cache'
 
@@ -28,6 +30,58 @@ export function appendJiraBoardIssuePage(
     pageToken: next.nextPageToken,
     isLast: next.isLast,
     total: next.total ?? current.total
+  }
+}
+
+/** Reads the page after `current`, so "load more" continues the depth the scope holds. */
+export async function loadMoreJiraBoardPage(args: {
+  providerSettings: RuntimeJiraSettings
+  boardId: string
+  siteId: string
+  issueScope: JiraBoardIssueScope
+  current: TaskPageJiraBoardCachedPage
+  generation: number
+  generationRef: MutableRefObject<number>
+  commit: (page: TaskPageJiraBoardCachedPage) => void
+  setError: (message: string | null) => void
+  setLoadingMore: (loading: boolean) => void
+  onRuntimeBoardUnavailable: () => void
+}): Promise<void> {
+  // Why guarded on every branch: a reload that started meanwhile owns the scope's state.
+  const stale = (): boolean => args.generation !== args.generationRef.current
+  const pageArgs = {
+    ...(args.current.pageToken ? { pageToken: args.current.pageToken } : {}),
+    startAt: args.current.startAt,
+    maxResults: JIRA_BOARD_ISSUE_PAGE_SIZE
+  }
+  const request =
+    args.issueScope.scope === 'sprint'
+      ? {
+          boardId: args.boardId,
+          siteId: args.siteId,
+          scope: 'sprint' as const,
+          sprintId: args.issueScope.sprintId,
+          ...pageArgs
+        }
+      : { boardId: args.boardId, siteId: args.siteId, scope: 'backlog' as const, ...pageArgs }
+  args.setLoadingMore(true)
+  args.setError(null)
+  try {
+    const page = await jiraListBoardIssues(args.providerSettings, request)
+    if (!stale()) {
+      args.commit(appendJiraBoardIssuePage(args.current, page))
+    }
+  } catch (error) {
+    if (!stale()) {
+      args.setError(describeJiraBoardPageError(error))
+      if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
+        args.onRuntimeBoardUnavailable()
+      }
+    }
+  } finally {
+    // Why outside the staleness guard: the read that owns this flag is the one that set it,
+    // and a reload starting meanwhile must not leave it set forever.
+    args.setLoadingMore(false)
   }
 }
 

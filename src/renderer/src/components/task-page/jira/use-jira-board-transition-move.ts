@@ -28,17 +28,18 @@ export type JiraPendingTransitionFields = {
 /**
  * Applies a status transition and owns the fields form for one that needs input.
  * The card is patched into the target lane before Jira answers and rolled back on
- * rejection, so the visible failure is the old lane plus Jira's reason.
+ * rejection, so the visible failure is the old lane plus Jira's reason. The reload
+ * afterwards reconciles behind the rendered board rather than blanking it.
  */
 export function useJiraBoardTransitionMove({
   providerSettings,
   applyIssuePatch,
-  refreshBoard,
+  revalidateBoard,
   onIssueMoved
 }: {
   providerSettings: RuntimeJiraSettings
   applyIssuePatch: (key: string, patch: Partial<JiraIssue>, siteId?: string | null) => void
-  refreshBoard: () => void
+  revalidateBoard: () => void
   onIssueMoved: (issue: JiraIssue) => void
 }) {
   const [movingIssueKeys, setMovingIssueKeys] = useState<string[]>([])
@@ -90,7 +91,7 @@ export function useJiraBoardTransitionMove({
         })
       )
       onIssueMoved(issue)
-      refreshBoard()
+      revalidateBoard()
       return { ok: true }
     } catch (error) {
       return { ok: false, error: jiraBoardErrorText(error) }

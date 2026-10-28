@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-client'
-import { jiraListBoardIssues } from '@/runtime/runtime-jira-client'
 import {
   patchTaskPageJiraBoardCache,
   taskPageJiraBoardCacheKey,
@@ -9,10 +8,9 @@ import {
   type TaskPageJiraBoardCachedPage
 } from './task-page-jira-board-cache'
 import {
-  appendJiraBoardIssuePage,
   describeJiraBoardPageError,
   emptyJiraBoardPage,
-  JIRA_BOARD_ISSUE_PAGE_SIZE,
+  loadMoreJiraBoardPage,
   readJiraBoardScopePages
 } from './task-page-jira-board-page-fetch'
 import { useJiraBoardIssuePatch } from './use-jira-board-issue-patch'
@@ -24,6 +22,8 @@ export function useTaskPageJiraBoardPages(args: {
   activeSprintId: string
   activeSprintAvailable: boolean
   refreshNonce: number
+  /** Whether the refresh behind `refreshNonce` may blank the rendered page. */
+  refreshSilent: boolean
   initialCache: TaskPageJiraBoardCacheEntry | null
   onRuntimeBoardUnavailable: () => void
 }) {
@@ -34,6 +34,7 @@ export function useTaskPageJiraBoardPages(args: {
     activeSprintId,
     activeSprintAvailable,
     refreshNonce,
+    refreshSilent,
     initialCache,
     onRuntimeBoardUnavailable
   } = args
@@ -46,12 +47,16 @@ export function useTaskPageJiraBoardPages(args: {
     () => initialCache?.sprint ?? emptyJiraBoardPage()
   )
   const [sprintLoading, setSprintLoading] = useState(false)
+  // Why a flag of its own: an empty sprint that is loaded and one that was just cleared
+  // both have no issues, and only the second may show a loader over them.
+  const [sprintBlanked, setSprintBlanked] = useState(false)
   const [sprintLoadingMore, setSprintLoadingMore] = useState(false)
   const [sprintError, setSprintError] = useState<string | null>(null)
   const [backlogPage, setBacklogPage] = useState<TaskPageJiraBoardCachedPage>(
     () => initialCache?.backlog ?? emptyJiraBoardPage()
   )
   const [backlogLoading, setBacklogLoading] = useState(false)
+  const [backlogBlanked, setBacklogBlanked] = useState(false)
   const [backlogLoadingMore, setBacklogLoadingMore] = useState(false)
   const [backlogError, setBacklogError] = useState<string | null>(null)
   const sprintPageRef = useRef(sprintPage)
@@ -99,6 +104,7 @@ export function useTaskPageJiraBoardPages(args: {
       setSprintPageLocal(emptyJiraBoardPage())
       sprintLoadedRef.current = false
       setSprintLoading(false)
+      setSprintBlanked(false)
       setSprintError(null)
       return
     }
@@ -112,11 +118,17 @@ export function useTaskPageJiraBoardPages(args: {
     }
     // Why: a sprint that already has data revalidates behind the rendered board; only
     // an explicit refresh or a different sprint may blank it and show a loader.
-    const silent = !refreshChanged && !sprintChanged && sprintLoadedRef.current
+    const silent = !(refreshChanged && !refreshSilent) && !sprintChanged && sprintLoadedRef.current
     if (!silent) {
       setSprintPageLocal(emptyJiraBoardPage())
-      setSprintLoading(true)
+      // Why: a cleared page has nothing to keep, so a reload arriving over it must blank
+      // again rather than render the cleared page as a confidently-empty sprint.
+      sprintLoadedRef.current = false
     }
+    // Why not inside the blanking branch: the read is in flight either way, and that is all
+    // the header's indicator needs; the loader belongs to a page that was actually cleared.
+    setSprintLoading(true)
+    setSprintBlanked(!silent)
     setSprintError(null)
     void (async () => {
       try {
@@ -141,6 +153,7 @@ export function useTaskPageJiraBoardPages(args: {
       } finally {
         if (generation === sprintGeneration.current) {
           setSprintLoading(false)
+          setSprintBlanked(false)
         }
       }
     })()
@@ -155,6 +168,7 @@ export function useTaskPageJiraBoardPages(args: {
     onRuntimeBoardUnavailable,
     providerSettings,
     refreshNonce,
+    refreshSilent,
     setSprintPageLocal,
     siteId
   ])
@@ -164,11 +178,13 @@ export function useTaskPageJiraBoardPages(args: {
     const previous = backlogRunRef.current
     const refreshChanged = refreshNonce !== previous.refreshNonce
     backlogRunRef.current = { refreshNonce }
-    const silent = !refreshChanged && backlogLoadedRef.current
+    const silent = !(refreshChanged && !refreshSilent) && backlogLoadedRef.current
     if (!silent) {
       setBacklogPageLocal(emptyJiraBoardPage())
-      setBacklogLoading(true)
+      backlogLoadedRef.current = false
     }
+    setBacklogLoading(true)
+    setBacklogBlanked(!silent)
     setBacklogError(null)
     void (async () => {
       try {
@@ -193,6 +209,7 @@ export function useTaskPageJiraBoardPages(args: {
       } finally {
         if (generation === backlogGeneration.current) {
           setBacklogLoading(false)
+          setBacklogBlanked(false)
         }
       }
     })()
@@ -205,43 +222,31 @@ export function useTaskPageJiraBoardPages(args: {
     onRuntimeBoardUnavailable,
     providerSettings,
     refreshNonce,
+    refreshSilent,
     setBacklogPageLocal,
     siteId
   ])
 
   const loadMoreSprint = useCallback(async (): Promise<void> => {
     const current = sprintPageRef.current
-    if (sprintLoadingMore || current.isLast || !activeSprintId) {
+    // Why the loading guards: a read in flight owns the page, so a page appended over it
+    // would write a pre-reload snapshot back — the reload's own answer would be lost.
+    if (sprintLoadingMore || sprintLoading || current.isLast || !activeSprintId) {
       return
     }
-    const generation = sprintGeneration.current
-    setSprintLoadingMore(true)
-    setSprintError(null)
-    try {
-      const page = await jiraListBoardIssues(providerSettings, {
-        boardId,
-        siteId,
-        scope: 'sprint',
-        sprintId: activeSprintId,
-        ...(current.pageToken ? { pageToken: current.pageToken } : {}),
-        startAt: current.startAt,
-        maxResults: JIRA_BOARD_ISSUE_PAGE_SIZE
-      })
-      if (generation === sprintGeneration.current) {
-        commitSprintPage(appendJiraBoardIssuePage(current, page))
-      }
-    } catch (error) {
-      if (generation === sprintGeneration.current) {
-        setSprintError(describeJiraBoardPageError(error))
-        if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
-          onRuntimeBoardUnavailable()
-        }
-      }
-    } finally {
-      if (generation === sprintGeneration.current) {
-        setSprintLoadingMore(false)
-      }
-    }
+    await loadMoreJiraBoardPage({
+      providerSettings,
+      boardId,
+      siteId,
+      issueScope: { scope: 'sprint', sprintId: activeSprintId },
+      current,
+      generation: sprintGeneration.current,
+      generationRef: sprintGeneration,
+      commit: commitSprintPage,
+      setError: setSprintError,
+      setLoadingMore: setSprintLoadingMore,
+      onRuntimeBoardUnavailable
+    })
   }, [
     activeSprintId,
     boardId,
@@ -249,42 +254,30 @@ export function useTaskPageJiraBoardPages(args: {
     onRuntimeBoardUnavailable,
     providerSettings,
     siteId,
+    sprintLoading,
     sprintLoadingMore
   ])
 
   const loadMoreBacklog = useCallback(async (): Promise<void> => {
     const current = backlogPageRef.current
-    if (backlogLoadingMore || current.isLast) {
+    if (backlogLoadingMore || backlogLoading || current.isLast) {
       return
     }
-    const generation = backlogGeneration.current
-    setBacklogLoadingMore(true)
-    setBacklogError(null)
-    try {
-      const page = await jiraListBoardIssues(providerSettings, {
-        boardId,
-        siteId,
-        scope: 'backlog',
-        ...(current.pageToken ? { pageToken: current.pageToken } : {}),
-        startAt: current.startAt,
-        maxResults: JIRA_BOARD_ISSUE_PAGE_SIZE
-      })
-      if (generation === backlogGeneration.current) {
-        commitBacklogPage(appendJiraBoardIssuePage(current, page))
-      }
-    } catch (error) {
-      if (generation === backlogGeneration.current) {
-        setBacklogError(describeJiraBoardPageError(error))
-        if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
-          onRuntimeBoardUnavailable()
-        }
-      }
-    } finally {
-      if (generation === backlogGeneration.current) {
-        setBacklogLoadingMore(false)
-      }
-    }
+    await loadMoreJiraBoardPage({
+      providerSettings,
+      boardId,
+      siteId,
+      issueScope: { scope: 'backlog' },
+      current,
+      generation: backlogGeneration.current,
+      generationRef: backlogGeneration,
+      commit: commitBacklogPage,
+      setError: setBacklogError,
+      setLoadingMore: setBacklogLoadingMore,
+      onRuntimeBoardUnavailable
+    })
   }, [
+    backlogLoading,
     backlogLoadingMore,
     boardId,
     commitBacklogPage,
@@ -298,6 +291,7 @@ export function useTaskPageJiraBoardPages(args: {
     sprintStartAt: sprintPage.startAt,
     sprintIsLast: sprintPage.isLast,
     sprintLoading,
+    sprintBlanked,
     sprintLoadingMore,
     sprintError,
     loadMoreSprint,
@@ -307,6 +301,7 @@ export function useTaskPageJiraBoardPages(args: {
     backlogTotal: backlogPage.total,
     backlogIsLast: backlogPage.isLast,
     backlogLoading,
+    backlogBlanked,
     backlogLoadingMore,
     backlogError,
     loadMoreBacklog,
