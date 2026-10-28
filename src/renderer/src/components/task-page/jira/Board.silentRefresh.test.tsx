@@ -313,9 +313,9 @@ describe('TaskPageJiraBoard silent reloads', () => {
   })
 
   it('keeps the loader up when a silent reload supersedes a blanking one', async () => {
-    // Why: a blanking refresh leaves a page that is cleared but still counts as loaded,
-    // so a silent reload landing over it must blank again — not render the cleared page
-    // as an empty sprint while its own read is still out.
+    // Why: a cleared page must not count as loaded, or the silent reload landing over it
+    // takes the keep-what-is-rendered branch and shows the cleared page as an empty sprint
+    // while its own read is still out.
     const refetch = holdSprintRefetch(boardPage([sprintIssue, secondSprintIssue]))
     render(<RefreshHost />)
     await screen.findByText('ABC-1')
