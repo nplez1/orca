@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { act } from 'react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAppStore } from '@/store'
 import type { GitBranchCompareSummary } from '../../../../shared/git-diff-compare-types'
@@ -54,17 +54,11 @@ function Probe({ reviewBaseRefName = 'main' }: { reviewBaseRefName?: string | nu
 }
 
 async function settleRevealFrames(): Promise<void> {
-  // Why poll rather than wait a fixed 40ms: the reveal is stamped two animation frames after the
-  // open, and a fixed wait is exactly the thing that turns flaky on a loaded worker.
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const state = useAppStore.getState()
-    if (state.pendingEditorReveal || state.scrollToDiffCommentId) {
-      return
-    }
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    })
-  }
+  // Why fake timers rather than a real wait: the reveal is stamped two animation frames after the
+  // open, and a wall-clock wait for them is exactly what turns flaky on a loaded worker.
+  await act(async () => {
+    vi.advanceTimersByTime(64)
+  })
 }
 
 async function openComment(overrides: Partial<PRComment> = {}): Promise<void> {
@@ -78,8 +72,13 @@ async function openComment(overrides: Partial<PRComment> = {}): Promise<void> {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers()
   useAppStore.setState(useAppStore.getInitialState(), true)
   navigate = null
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('usePRCommentCodeNavigation', () => {
