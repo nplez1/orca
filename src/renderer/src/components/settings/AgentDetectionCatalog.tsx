@@ -110,6 +110,10 @@ export function AgentDetectionCatalog({
                 </SettingsBadge>
               </span>
             }
+            description={translate(
+              'settings.agents.undetectedDefaultHint',
+              'Install one, then Refresh: an agent needs to be detected on this host before a new tab can launch it as your default.'
+            )}
           />
           <div className="divide-y divide-border/40">
             {undetectedAgents.map((agent) => (

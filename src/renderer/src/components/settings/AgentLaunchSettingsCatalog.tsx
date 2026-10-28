@@ -3,7 +3,7 @@ import {
   savedChatPermissionMode
 } from '../../../../shared/agent-chat-permission-mode'
 import { useChatProgramFacts } from '@/lib/host-chat-program-acquisition'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import type {
   AgentLaunchSettings,
@@ -86,6 +86,12 @@ export function AgentLaunchSettingsCatalog({
     isRefreshing,
     refresh
   } = useDetectedAgents(detectionTarget)
+  // Why: this pane is where a user goes to see whether an install was noticed, and a
+  // cache read would answer with the list from before it. `refresh` changes identity
+  // only when the host does, so switching hosts re-reads the new one.
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
   const detectedIds = useMemo(() => (detected ? new Set(detected) : null), [detected])
   useHostStructuredAgentsVersion()
   const installedHere = useAppStore(readNativeDetectedAgents)
@@ -107,12 +113,12 @@ export function AgentLaunchSettingsCatalog({
   const undetectedAgents = catalog.filter(
     (agent) => detectedIds !== null && !detectedIds.has(agent.id)
   )
-  const save = (mutation: AgentLaunchSettingsMutation): void => {
+  const save = (mutation: AgentLaunchSettingsMutation): Promise<void> => {
     const scopedMutation =
       mutation.type === 'permissions' && nativeChatPermissionsSupported
         ? { ...mutation, syncNativeChat: true as const }
         : mutation
-    void mutate(scopedMutation).catch(() => {})
+    return mutate(scopedMutation).catch(() => {})
   }
   const typed = settings.agentPermission
   const permissionSettings: AgentPermissionSettings | null = typed
@@ -204,7 +210,15 @@ export function AgentLaunchSettingsCatalog({
         type: 'default',
         agent: settings.defaultTuiAgent === agent.id ? 'blank' : agent.id
       }),
-    onSetEnabled: (enabled) => save({ type: 'availability', agent: agent.id, enabled }),
+    onSetEnabled: (enabled) => {
+      // Why: an agent is normally enabled because it is already installed, and this host's
+      // list is a cache — re-read it so the menu and the default pills offer the agent.
+      void save({ type: 'availability', agent: agent.id, enabled }).then(() => {
+        if (enabled) {
+          void refresh()
+        }
+      })
+    },
     onSaveOverride: (value) => mutate({ type: 'command', agent: agent.id, value }),
     onSaveArgs: (value) =>
       typed

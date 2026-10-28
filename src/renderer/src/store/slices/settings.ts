@@ -18,6 +18,10 @@ import { normalizeOpenInApplications } from '../../../../shared/open-in-applicat
 import { createSettingsSearchState, type SettingsSearchState } from './settings-search-state'
 import { isRuntimeCatalogListingStale } from './runtime-status-hydration'
 import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selection'
+import {
+  enablesNewTuiAgents,
+  refreshDetectedAgentInventories
+} from './agent-enablement-redetection'
 import { normalizeDisabledUsageProviders } from '../../../../shared/usage-provider-enablement'
 import { sanitizeAgentLaunchProfileUpdates } from '../../../../shared/tui-agent-launch-defaults'
 import { bumpProviderRuntimeSessionGeneration } from '@/lib/provider-runtime-context'
@@ -131,6 +135,33 @@ function normalizeSettingsUpdates(
   return sanitizedUpdates
 }
 
+async function applySettingsUpdates(
+  set: ownerHydration.SettingsStateSetter,
+  get: () => AppState,
+  updates: Partial<GlobalSettings>
+): Promise<void> {
+  const shouldPublish = ownerHydration.createSettingsPublicationFence(
+    'activeRuntimeEnvironmentId' in updates || 'worktreeVisibilityDefaults' in updates
+  )
+  const visibilityOwnerHostId = getSettingsFocusedExecutionHostId(get().settings)
+  // Why capture: enabling an agent must re-probe its host, and the write is what says so.
+  const previousSettings = get().settings
+  await persistSettingsUpdates(
+    set,
+    updates,
+    previousSettings,
+    get().worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId,
+    get().worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId,
+    shouldPublish
+  )
+  if ('worktreeVisibilityDefaults' in updates) {
+    await get().fetchAllWorktrees({ visibilityOwnerHostId })
+  }
+  if (enablesNewTuiAgents(previousSettings, get().settings)) {
+    refreshDetectedAgentInventories(get())
+  }
+}
+
 async function persistSettingsUpdates(
   set: ownerHydration.SettingsStateSetter,
   updates: Partial<GlobalSettings>,
@@ -203,44 +234,14 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
     ownerHydration.awaitOwnerWorktreeVisibilityDefaultsHydration(get),
 
   updateSettings: async (updates) => {
-    const shouldPublish = ownerHydration.createSettingsPublicationFence(
-      'activeRuntimeEnvironmentId' in updates || 'worktreeVisibilityDefaults' in updates
-    )
-    const visibilityOwnerHostId = getSettingsFocusedExecutionHostId(get().settings)
     try {
-      await persistSettingsUpdates(
-        set,
-        updates,
-        get().settings,
-        get().worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId,
-        get().worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId,
-        shouldPublish
-      )
-      if ('worktreeVisibilityDefaults' in updates) {
-        await get().fetchAllWorktrees({ visibilityOwnerHostId })
-      }
+      await applySettingsUpdates(set, get, updates)
     } catch (err) {
       console.error('Failed to update settings:', err)
     }
   },
 
-  updateSettingsOrThrow: async (updates) => {
-    const shouldPublish = ownerHydration.createSettingsPublicationFence(
-      'activeRuntimeEnvironmentId' in updates || 'worktreeVisibilityDefaults' in updates
-    )
-    const visibilityOwnerHostId = getSettingsFocusedExecutionHostId(get().settings)
-    await persistSettingsUpdates(
-      set,
-      updates,
-      get().settings,
-      get().worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId,
-      get().worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId,
-      shouldPublish
-    )
-    if ('worktreeVisibilityDefaults' in updates) {
-      await get().fetchAllWorktrees({ visibilityOwnerHostId })
-    }
-  },
+  updateSettingsOrThrow: (updates) => applySettingsUpdates(set, get, updates),
 
   setActiveRuntimeEnvironmentPreference: async (environmentId) => {
     const nextId = normalizeRuntimeEnvironmentId(environmentId)

@@ -54,6 +54,9 @@
       "discovering": "Discovering models…",
       "modelsUnavailable": "Couldn't list this agent's models — using its built-in list.",
       "refreshModels": "Refresh models"
+    },
+    "agents": {
+      "undetectedDefaultHint": "Install one, then Refresh: an agent needs to be detected on this host before a new tab can launch it as your default."
     }
   },
   "auto": {
