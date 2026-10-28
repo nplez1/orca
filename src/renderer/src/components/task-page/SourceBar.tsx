@@ -67,6 +67,10 @@ export function TaskPageSourceBar({
           hostLabelById
         })
       : taskSourceContextSummary
+  // Why: the Jira board is configured globally, so its settings stay reachable from every source.
+  const jiraSettingsVisible =
+    taskSource === 'jira' ||
+    (jiraConnected && visibleSourceOptions.some((source) => source.id === 'jira'))
   return (
     <div className="flex items-center justify-between gap-2">
       <div
@@ -152,105 +156,111 @@ export function TaskPageSourceBar({
           <span className="truncate">{sourceSummary.label}</span>
         </div>
       </div>
-      {taskSource === 'linear' && linearConnected ? (
-        <div className="flex items-center gap-2">
-          <LinearScopeSelector
-            workspaces={linearWorkspaces}
-            selectedWorkspaceId={selectedLinearWorkspaceId}
-            teams={linearTeamOptions}
-            selectedTeamIds={linearTeamSelection}
-            teamSelectionIsStickyAll={defaultLinearTeamSelection == null}
-            onWorkspaceChange={handleLinearWorkspaceChange}
-            onTeamSelectionChange={handleLinearTeamSelectionChange}
-            onAddTeamAccess={() => setLinearConnectOpen(true)}
-            onOpen={handleLinearScopeOpen}
-          />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => {
-                  if (!selectedLinearTeamForExternalLink?.url) {
-                    return
+      <div className="flex items-center gap-2">
+        {taskSource === 'linear' && linearConnected ? (
+          <div className="flex items-center gap-2">
+            <LinearScopeSelector
+              workspaces={linearWorkspaces}
+              selectedWorkspaceId={selectedLinearWorkspaceId}
+              teams={linearTeamOptions}
+              selectedTeamIds={linearTeamSelection}
+              teamSelectionIsStickyAll={defaultLinearTeamSelection == null}
+              onWorkspaceChange={handleLinearWorkspaceChange}
+              onTeamSelectionChange={handleLinearTeamSelectionChange}
+              onAddTeamAccess={() => setLinearConnectOpen(true)}
+              onOpen={handleLinearScopeOpen}
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => {
+                    if (!selectedLinearTeamForExternalLink?.url) {
+                      return
+                    }
+                    void window.api.shell.openUrl(selectedLinearTeamForExternalLink.url)
+                  }}
+                  disabled={!selectedLinearTeamForExternalLink}
+                  aria-label={
+                    selectedLinearTeamForExternalLink
+                      ? translate(
+                          'auto.components.TaskPage.246bd64aed',
+                          'Open {{value0}} in Linear',
+                          {
+                            value0: selectedLinearTeamForExternalLink.name
+                          }
+                        )
+                      : translate(
+                          'auto.components.TaskPage.8029e2bd4d',
+                          'Select one Linear team to open in Linear'
+                        )
                   }
-                  void window.api.shell.openUrl(selectedLinearTeamForExternalLink.url)
-                }}
-                disabled={!selectedLinearTeamForExternalLink}
-                aria-label={
-                  selectedLinearTeamForExternalLink
-                    ? translate(
-                        'auto.components.TaskPage.246bd64aed',
-                        'Open {{value0}} in Linear',
-                        {
-                          value0: selectedLinearTeamForExternalLink.name
-                        }
+                  className="h-8 w-8 rounded-md border-border/50 bg-muted/50 text-foreground shadow-sm transition hover:bg-muted/50"
+                >
+                  <ExternalLink className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {selectedLinearTeamForExternalLink
+                  ? translate('auto.components.TaskPage.246bd64aed', 'Open {{value0}} in Linear', {
+                      value0: selectedLinearTeamForExternalLink.name
+                    })
+                  : translate(
+                      'auto.components.TaskPage.2af3ab5c58',
+                      'Select one team to open in Linear'
+                    )}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ) : null}
+        {jiraSettingsVisible ? (
+          <div className="flex items-center gap-2">
+            {taskSource === 'jira' &&
+            shouldShowJiraSiteSelector(
+              jiraConnected,
+              Boolean(settings?.defaultJiraBoard),
+              jiraBoardViewMode,
+              jiraSites.length
+            ) ? (
+              <Select
+                value={selectedJiraSiteId ?? undefined}
+                onValueChange={(value) => {
+                  setSelectedJiraIssueKey(null)
+                  setSelectedJiraIssueFallback(null)
+                  setJiraIssues([])
+                  setJiraError(null)
+                  setJiraLoading(true)
+                  void selectJiraSite(value).catch(() => {
+                    toast.error(
+                      translate(
+                        'auto.components.TaskPage.d09b7631b7',
+                        'Failed to switch Jira site.'
                       )
-                    : translate(
-                        'auto.components.TaskPage.8029e2bd4d',
-                        'Select one Linear team to open in Linear'
-                      )
-                }
-                className="h-8 w-8 rounded-md border-border/50 bg-muted/50 text-foreground shadow-sm transition hover:bg-muted/50"
-              >
-                <ExternalLink className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {selectedLinearTeamForExternalLink
-                ? translate('auto.components.TaskPage.246bd64aed', 'Open {{value0}} in Linear', {
-                    value0: selectedLinearTeamForExternalLink.name
+                    )
                   })
-                : translate(
-                    'auto.components.TaskPage.2af3ab5c58',
-                    'Select one team to open in Linear'
-                  )}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      ) : null}
-      {taskSource === 'jira' ? (
-        <div className="flex items-center gap-2">
-          {shouldShowJiraSiteSelector(
-            jiraConnected,
-            Boolean(settings?.defaultJiraBoard),
-            jiraBoardViewMode,
-            jiraSites.length
-          ) ? (
-            <Select
-              value={selectedJiraSiteId ?? undefined}
-              onValueChange={(value) => {
-                setSelectedJiraIssueKey(null)
-                setSelectedJiraIssueFallback(null)
-                setJiraIssues([])
-                setJiraError(null)
-                setJiraLoading(true)
-                void selectJiraSite(value).catch(() => {
-                  toast.error(
-                    translate('auto.components.TaskPage.d09b7631b7', 'Failed to switch Jira site.')
-                  )
-                })
-              }}
-            >
-              <SelectTrigger className="h-8 w-[220px] rounded-md border-border/50 bg-muted/50 text-xs font-medium shadow-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  {translate('auto.components.TaskPage.e592d99051', 'All Jira sites')}
-                </SelectItem>
-                {jiraSites.map((site) => (
-                  <SelectItem key={site.id} value={site.id}>
-                    {site.displayName}
+                }}
+              >
+                <SelectTrigger className="h-8 w-[220px] rounded-md border-border/50 bg-muted/50 text-xs font-medium shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {translate('auto.components.TaskPage.e592d99051', 'All Jira sites')}
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-          <TaskPageJiraSettingsLink />
-        </div>
-      ) : null}
+                  {jiraSites.map((site) => (
+                    <SelectItem key={site.id} value={site.id}>
+                      {site.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <TaskPageJiraSettingsLink />
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }
