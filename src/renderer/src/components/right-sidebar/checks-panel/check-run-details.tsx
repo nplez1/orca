@@ -13,6 +13,7 @@ import { CheckJobLogTail } from '../check-job-log-tail'
 import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
 import { resolveStepOutcome } from '@/components/editor/check-job-step-status'
 import { translate } from '@/i18n/i18n'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { checkJobIdentities } from '@/components/editor/check-details-reading-cache'
 import {
   type CheckDetailsLoadState,
@@ -113,7 +114,7 @@ export function CheckRunDetails({
   const hasOutput = Boolean(details?.title || details?.summary || details?.text)
   const hasAnnotations = (details?.annotations.length ?? 0) > 0
   const hasJobs = jobs.length > 0
-  const refreshing = Boolean(state?.loading && details)
+  const refreshing = useDelayedFlag(Boolean(state?.loading && details))
   const fullDetailsLabel = translate(
     'auto.components.right.sidebar.checks.panel.content.e4e3af15ee',
     'View full details'

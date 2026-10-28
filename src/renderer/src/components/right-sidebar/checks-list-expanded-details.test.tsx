@@ -603,8 +603,12 @@ describe('ChecksList expanded check details', () => {
 
     expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
     expect(container.textContent).toContain('Verify failed')
-    expect(container.textContent).toContain('Refreshing check details…')
     expect(container.textContent).not.toContain('Loading check details…')
+    // Why the wait: the refreshing label is deferred, so a fast read never flashes it.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+    })
+    expect(container.textContent).toContain('Refreshing check details…')
 
     await act(async () => {
       resolveRefresh({ ...checkDetails, title: 'Verify failed again' })

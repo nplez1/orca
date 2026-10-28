@@ -14,6 +14,7 @@ import { translate } from '@/i18n/i18n'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { assignUniqueListKeys } from './details-list-keys'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 
 export function CheckDetailsPanel({
   check,
@@ -49,7 +50,7 @@ export function CheckDetailsPanel({
   )
   const hasAnnotations = annotationRows.length > 0
   const hasJobs = jobRows.length > 0
-  const refreshing = Boolean(state?.loading && details)
+  const refreshing = useDelayedFlag(Boolean(state?.loading && details))
 
   return (
     <div className="mx-2 mb-2 mt-1 min-w-0 rounded-md border border-border/50 bg-muted/20 px-3 py-2">

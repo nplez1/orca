@@ -6,6 +6,7 @@ import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import type { CheckDetailsLoadState } from '@/components/github-checks-tab-state'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { translate } from '@/i18n/i18n'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import { getCheckConclusion } from '@/components/pr-check-counts'
 import {
@@ -37,7 +38,7 @@ export function ChecksTabCheckDetails({
   const hasOutput = Boolean(details?.title || details?.summary || details?.text)
   const hasAnnotations = (details?.annotations.length ?? 0) > 0
   const hasJobs = (details?.jobs.length ?? 0) > 0
-  const refreshing = Boolean(state?.loading && details)
+  const refreshing = useDelayedFlag(Boolean(state?.loading && details))
 
   return (
     <div className="mx-2 mb-2 mt-1 min-w-0 rounded-md border border-border/50 bg-muted/20 px-3 py-2">
