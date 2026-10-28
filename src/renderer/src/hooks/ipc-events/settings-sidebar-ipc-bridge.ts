@@ -5,6 +5,10 @@ import { subscribeToUnpairedDeviceAuthNotification } from '../unpaired-device-au
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 import { useAppStore } from '../../store'
+import {
+  enablesNewTuiAgents,
+  refreshDetectedAgentInventories
+} from '../../store/slices/agent-enablement-redetection'
 
 function getShortcutPlatform(): NodeJS.Platform {
   if (navigator.userAgent.includes('Mac')) {
@@ -124,6 +128,11 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
       })
       if ('worktreeVisibilityDefaults' in updates) {
         void store.fetchAllWorktrees({ visibilityOwnerHostId: 'local' })
+      }
+      // Why: another window or client enabled an agent, and this window's host list is a cache.
+      const next = useAppStore.getState()
+      if (enablesNewTuiAgents(store.settings, next.settings)) {
+        refreshDetectedAgentInventories(next)
       }
     })
   )

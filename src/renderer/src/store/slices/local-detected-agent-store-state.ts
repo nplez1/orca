@@ -20,7 +20,7 @@ export type LocalDetectedAgentState = {
   pathFailureReason: ShellHydrationFailureReason | null
   ensureNativeDetectedAgents: () => Promise<TuiAgent[]>
   ensureDetectedAgents: (worktreeId?: string | null) => Promise<TuiAgent[]>
-  refreshDetectedAgents: (worktreeId?: string | null) => Promise<TuiAgent[]>
+  refreshDetectedAgents: (worktreeId?: string | null, isolated?: boolean) => Promise<TuiAgent[]>
   clearLocalDetectedAgentContextsForProjects: (projectIds: readonly string[]) => void
   clearLocalDetectedAgents: () => void
 }

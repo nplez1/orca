@@ -149,8 +149,9 @@ export const createLocalDetectedAgentState: LocalDetectedAgentStateCreator = (se
       return pending
     },
 
-    refreshDetectedAgents: (worktreeId?: string | null) => {
-      const isFloating = worktreeId === FLOATING_TERMINAL_WORKTREE_ID
+    // `isolated` re-reads a background context without mirroring it into `detectedAgentIds`.
+    refreshDetectedAgents: (worktreeId?: string | null, isolated = false) => {
+      const isFloating = isolated || worktreeId === FLOATING_TERMINAL_WORKTREE_ID
       const context = getLocalAgentPreflightContext(get(), undefined, undefined, worktreeId)
       const contextKey = localAgentInventoryContextKey(context)
       const cached = get().localDetectedAgentIdsByContext[contextKey]

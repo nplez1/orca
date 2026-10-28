@@ -156,6 +156,7 @@ function renderBoard(): void {
         model={model}
         selection={{ boardId: '42', siteId: 'site-1' }}
         onUseIssueList={vi.fn()}
+        onBoardUnavailable={vi.fn()}
         onIssueMoved={vi.fn()}
       />
     </TooltipProvider>
@@ -192,6 +193,7 @@ function RefreshHost(): JSX.Element {
         model={model}
         selection={{ boardId: '42', siteId: 'site-1' }}
         onUseIssueList={vi.fn()}
+        onBoardUnavailable={vi.fn()}
         onIssueMoved={vi.fn()}
         refreshSignal={signal}
       />

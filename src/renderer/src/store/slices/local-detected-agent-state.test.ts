@@ -249,6 +249,22 @@ describe('local detected agent context lifecycle', () => {
     expect(store.getState().localDetectedAgentIdsByContext.host).toEqual(['codex'])
   })
 
+  it('re-reads an isolated context without blanking the shared detected list', async () => {
+    const store = createTestStore([])
+    await store.getState().ensureDetectedAgents()
+    expect(store.getState().detectedAgentIds).toEqual(['claude'])
+
+    await store.getState().refreshDetectedAgents(undefined, true)
+
+    expect(store.getState().localDetectedAgentIdsByContext.host).toEqual(['codex'])
+    expect(store.getState().detectedAgentIds).toEqual(['claude'])
+    expect(store.getState().isRefreshingAgents).toBe(false)
+
+    await store.getState().refreshDetectedAgents()
+
+    expect(store.getState().detectedAgentIds).toEqual(['codex'])
+  })
+
   it('retries after an authoritative refresh fails without a usable cache', async () => {
     let resolveDetection: (agents: string[]) => void = () => {}
     detectAgents.mockReturnValueOnce(

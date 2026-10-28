@@ -1636,6 +1636,41 @@ checks-panel work: a wall-clock read and a real-time wait in a test are what
 fixed timestamp, not a suppression. **Pruning wins**: when that lands, delete both entries and this
 section in the same commit.
 
+### `local(lint)`: the bare `oxlint` step is red on the base branch
+
+`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `0f65cb537e` fails the
+bare `oxlint` step on six lines, none of them on a file the branch touched:
+
+```
+src/renderer/src/components/right-sidebar/checks-panel/check-run-details.tsx:423:2: error eslint(max-lines): File has too many lines (402). help: Maximum allowed is 400.
+docs/site/src/lib/docs-og-image.tsx:102:12: warning next(no-img-element): Using `<img>` …
+docs/site/src/components/docs/SearchDialog.tsx:225:9: warning jsx-a11y(prefer-tag-over-role): …
+docs/site/src/components/docs/prose.tsx:51:12: warning next(no-img-element): …
+docs/site/src/components/AutoplayClip.tsx:70:10: warning next(no-img-element): …
+docs/site/src/components/AutoplayClip.tsx:85:8: warning next(no-img-element): …
+```
+
+The `max-lines` error arrives with `c7c216aae8` (#203), which grew a checks-panel component past 400
+lines; the five `docs/site` warnings arrive with `6aba202d5e` (the OSS docs site, which is not even
+inside `pnpm lint`'s upstream scope on the machines that only build the app). Both are the base
+branch's, and the fix belongs to whoever owns each surface — shrinking #203's component, and either
+`next/image` or a suppression in the docs site.
+
+**This is the one entry that has to be whole-step.** `pnpm lint` runs `oxlint` directly, and its
+output is `file:line:col: warning rule(…): …`, which `extractFailureLines` does not recognise — so
+the step yields no failure line and `classifyRun` falls back to its last output line, which no
+`match` can narrow. The consequence, stated plainly: this entry also allows a _new_ oxlint failure
+anywhere in the repo. The changed-lines gate (`pnpm run check:code-quality:changed`, which runs in CI
+on every PR) still fails a new finding on a changed line, so the masking is bounded to pre-existing
+files. **Pruning wins**: when both commits repair their lines, delete the entry and this section.
+
+The same rebase onto `5793b0a125` turned up one **typecheck** red, which is not something `local/lint`
+can record: #205 added a required `onBoardUnavailable` prop to the Jira board and updated most of its
+call sites, but not `src/renderer/src/components/task-page/jira/Board.silentRefresh.test.tsx`, so
+`pnpm tc` failed on two of its renders. Repaired here — two lines in that test — rather than left as a
+red no gate can classify, the same shape as the two base reds repaired in #177. It is a two-line
+hunk on an upstream file, so it will conflict benignly when upstream makes the same change.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream

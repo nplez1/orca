@@ -57,3 +57,4 @@
 21 src/renderer/src/store/slices/linear/linear-slice-connection-actions.ts # fork has 21 where upstream allows 33; lowered by a fork prune
 4 src/renderer/src/store/slices/linear/linear-slice-status-actions.ts # fork has 4 where upstream allows 9; lowered by a fork prune
 5 src/renderer/src/store/slices/linear/linear-team-actions.ts # fork has 5 where upstream allows 6; lowered by a fork prune
+4 src/renderer/src/store/slices/settings.ts # fork has 4 where upstream allows 5; lowered by a fork prune

@@ -37,6 +37,12 @@
       "class": "foreign-red",
       "owner": "941acb70e0 fix(checks): keep cached check details on screen instead of re-spinning (#198)",
       "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198"
+    },
+    {
+      "step": "oxlint",
+      "class": "foreign-red",
+      "owner": "c7c216aae8 feat(checks): rerun Jenkins builds from the Checks surface (#203) + 6aba202d5e feat(docs): publish OSS docs with stable releases",
+      "evidence": "LOCAL-PATCHES.md § local(lint): the bare `oxlint` step is red on the base branch"
     }
   ]
 }
