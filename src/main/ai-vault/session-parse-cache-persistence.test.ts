@@ -452,6 +452,38 @@ describe('session parse cache persistence', () => {
     expect(databaseRows(cacheFile)).toHaveLength(1)
   })
 
+  // Why: this build's older parser output would be trusted by the newer build on the next upgrade, since
+  // the stamp it reads would still be its own, and a finished transcript never re-derives.
+  it('reads, but does not extend, a cache a newer parser wrote', async () => {
+    const root = await makeTempDir()
+    const cacheFile = join(root, 'session-parse-cache.json')
+    const transcript = await writeTranscript(root)
+    initSessionParseCachePersistence({ filePath: cacheFile, appVersion: APP_VERSION })
+    expect((await parse(transcript)).fullParses).toBe(1)
+    await flushSessionParseCachePersist()
+
+    const databasePath = join(root, 'session-parse-cache.sqlite')
+    const newerStamp = String(SESSION_PARSE_PARSER_VERSION + 1)
+    const db = new SyncDatabase(databasePath)
+    db.prepare("UPDATE meta SET value = ? WHERE key = 'parser_version'").run(newerStamp)
+    db.close()
+
+    simulateRestart(cacheFile)
+    await parse(await writeTranscript(root, 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'))
+    await flushSessionParseCachePersist()
+
+    const after = new SyncDatabase(databasePath)
+    try {
+      // Only the newer build's row: this build read it and added nothing of its own.
+      expect(after.prepare('SELECT count(*) AS n FROM rows').get()?.n).toBe(1)
+      expect(
+        after.prepare("SELECT value FROM meta WHERE key = 'parser_version'").get()?.value
+      ).toBe(newerStamp)
+    } finally {
+      after.close()
+    }
+  })
+
   it('rebuilds a corrupt database instead of failing the scan', async () => {
     const root = await makeTempDir()
     const cacheFile = join(root, 'session-parse-cache.json')

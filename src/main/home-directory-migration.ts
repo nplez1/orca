@@ -115,7 +115,7 @@ export function resolveLegacyHomeStoreIn(
     // Why a recorded decision can still report: the marker distinguishes "nothing to import" from "a copy
     // exists that this build chose not to import", and only the second stays worth telling the user —
     // while still being a decision, so signing out cannot resurrect the pre-rename copy.
-    return { path: current, adoption: recorded }
+    return { path: current, adoption: stillWorthReporting(recorded, current) }
   }
   const legacy = resolveLegacyHomeStorePathIn(home, segment, ...segments)
   const legacyExists = existsSync(legacy)
@@ -230,8 +230,12 @@ function readAdoptionRecord(marker: string): LegacyHomeStoreAdoption | null {
   let text: string
   try {
     text = readFileSync(marker, 'utf8')
-  } catch {
-    return null
+  } catch (error) {
+    // Why only a missing marker is undecided: a marker that exists but cannot be read still records a
+    // decision, and adopting anyway would take an official install's copy. ENOTDIR is "missing" too —
+    // the fork's home itself is a file, so no marker can exist under it.
+    const code = errorCode(error)
+    return code === 'ENOENT' || code === 'ENOTDIR' ? null : { kind: 'decided' }
   }
   if (text === ADOPTION_DECIDED) {
     return { kind: 'decided' }
@@ -260,6 +264,32 @@ function readAdoptionRecord(marker: string): LegacyHomeStoreAdoption | null {
 
 function errorCode(error: unknown): unknown {
   return typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
+}
+
+/**
+ * A recorded un-imported copy is worth reporting only while there is still a copy to import.
+ *
+ * Why re-derive the reason: the record was written when both copies existed, so its text stops being true
+ * once one of them is deleted — and a settings pane that keeps showing a false reason forever is worse
+ * than silence.
+ */
+function stillWorthReporting(
+  recorded: LegacyHomeStoreAdoption,
+  current: string
+): LegacyHomeStoreAdoption {
+  if (recorded.kind !== 'failed') {
+    return recorded
+  }
+  if (!existsSync(recorded.legacyPath)) {
+    return { kind: 'decided' }
+  }
+  return {
+    kind: 'failed',
+    legacyPath: recorded.legacyPath,
+    reason: existsSync(current)
+      ? `${current} already exists, so the copy in ${LEGACY_HOME_DIRECTORY_NAME} was not imported`
+      : `${current} is missing, so the copy in ${LEGACY_HOME_DIRECTORY_NAME} was left where it is`
+  }
 }
 
 /** {@link adoptLegacyHomeStoreIn} for the real home directory. */

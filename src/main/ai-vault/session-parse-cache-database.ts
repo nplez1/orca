@@ -58,9 +58,12 @@ const PAGE_SIZE = 8192
 export class SessionParseCacheDatabase {
   private db: SyncDatabase | null
   private recovered = false
+  /** True when a newer build's parser stamped this file: its rows are read, never extended. */
+  private readonly rowsFromNewerParser: boolean
 
   constructor(private readonly path: string) {
     this.db = openDatabase(path)
+    this.rowsFromNewerParser = this.run(rowsBelongToNewerParser, false)
   }
 
   read(path: string): PersistedSessionParseCacheEntry | undefined {
@@ -106,6 +109,12 @@ export class SessionParseCacheDatabase {
     seenAt: number,
     keepExisting = false
   ): void {
+    // Why nothing is written over a newer build's rows: this build's parser output would be trusted by
+    // that build on the next upgrade, because the stamp it reads would still be its own — and a row is
+    // only re-derived when the transcript changes, which for a finished one is never.
+    if (this.rowsFromNewerParser) {
+      return
+    }
     this.run((db) => {
       const insert = db.prepare(
         `INSERT OR ${keepExisting ? 'IGNORE' : 'REPLACE'} INTO rows(path, mtime_ms, size_bytes, platform, sidecar, session, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -238,10 +247,9 @@ function dropRowsFromAnotherParser(db: SyncDatabase): void {
   if (stored === current) {
     return
   }
-  // Why only an older stamp drops the rows: a newer one means a newer build's parser wrote them, and
-  // discarding it would empty the cache on every downgrade-and-return, the way an older cache file is
-  // discarded. Its rows are left alone and its stamp is kept, so this build reads them as they are.
-  if (typeof stored === 'string' && Number(stored) > SESSION_PARSE_PARSER_VERSION) {
+  // Why only an older stamp drops the rows: see `rowsBelongToNewerParser`, which keeps a newer build's
+  // rows and stops this build from adding to them.
+  if (rowsBelongToNewerParser(db)) {
     return
   }
   db.exec('DELETE FROM rows')
@@ -249,6 +257,12 @@ function dropRowsFromAnotherParser(db: SyncDatabase): void {
     PARSER_VERSION_KEY,
     current
   )
+}
+
+/** Whether the stamp in this file came from a parser newer than this build's. */
+function rowsBelongToNewerParser(db: SyncDatabase): boolean {
+  const stored = db.prepare('SELECT value FROM meta WHERE key = ?').get(PARSER_VERSION_KEY)?.value
+  return typeof stored === 'string' && Number(stored) > SESSION_PARSE_PARSER_VERSION
 }
 
 export function parsePersistedSessionParseCacheRow(

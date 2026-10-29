@@ -16,6 +16,7 @@ import {
   type AutomationListResult
 } from '../../../../shared/automation-list-scope'
 import { OrchestrationDb } from '../../orchestration/db'
+import { OrchestrationSchemaNewerThanBuildError } from '../../orchestration/db/schema/migrate'
 import { orchestrationDbFile } from '../../orchestration/db/orchestration-db-file'
 import {
   committedHandBackTypes,
@@ -159,7 +160,12 @@ export abstract class OrcaRuntimeWithAutomationOperations extends OrcaRuntimeWit
       try {
         this._orchestrationDb = new OrchestrationDb(this.orchestrationDbPath())
       } catch (error) {
-        this._orchestrationDbRefusal = error
+        // Why only the schema refusal is remembered: a transient failure (a busy file, a permission that
+        // clears) should be retried by the next caller, while a schema this build is too old for never
+        // stops being one.
+        if (error instanceof OrchestrationSchemaNewerThanBuildError) {
+          this._orchestrationDbRefusal = error
+        }
         throw error
       }
       this.bindMailHandBack(this._orchestrationDb)

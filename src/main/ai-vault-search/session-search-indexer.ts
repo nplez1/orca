@@ -63,6 +63,8 @@ export class SessionSearchIndexer {
   private closed = false
   /** The last believable clock reading; a jumped reading never replaces it. */
   private clockBaselineMs: number | null = null
+  /** The cutoff that reading produced, which is what a jumped reading falls back to. */
+  private lastGoodCutoffMs: number | null = null
 
   constructor(private readonly options: SessionSearchIndexerOptions) {
     this.roots = options.roots
@@ -285,14 +287,18 @@ export class SessionSearchIndexer {
 
   private cutoffMs(): number | null {
     const now = this.clock.now()
+    // Why a jump holds the last good cutoff instead of clearing it: `null` means "no bound", which would
+    // also lift the limit on what this pass indexes — every transcript on the machine. Holding it keeps
+    // both the purge and the index window where they were.
+    if (isWallClockJump(this.clockBaselineMs, now)) {
+      return this.lastGoodCutoffMs
+    }
     // Why the baseline only moves on a believable reading: adopting the jumped reading would leave the
     // next pass free to purge an index the jump had made look expired, and nothing re-indexes those
     // rows until the clock is right again. Holding it keeps the guard in force until the clock returns.
-    if (isWallClockJump(this.clockBaselineMs, now)) {
-      return null
-    }
     this.clockBaselineMs = now
-    return sessionSearchHistoryCutoffMs(this.options.historyDays, now)
+    this.lastGoodCutoffMs = sessionSearchHistoryCutoffMs(this.options.historyDays, now)
+    return this.lastGoodCutoffMs
   }
 }
 import { resolve } from 'node:path'
