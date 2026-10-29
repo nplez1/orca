@@ -148,7 +148,6 @@ export type RgArgsOptions = {
   excludePathPrefixes: readonly string[]
   /** On Windows rg emits `\\`-separated paths; pass true to force `/` output. */
   forceSlashSeparator: boolean
-  /** A folder project has no repo of its own, so an enclosing checkout's ignore files do not apply. */
   isFolderProject?: boolean
 }
 

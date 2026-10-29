@@ -73,6 +73,14 @@ async function flushMicrotasks(): Promise<void> {
   }
 }
 
+function quickOpenStore(scope: {
+  getFolderWorkspaces?: () => { folderPath: string }[]
+  getRepos?: () => { path: string; kind: 'git' }[]
+}): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the listing touches only getFolderWorkspaces and getRepos on this stub. fork-comment-ok: AGENTS.md mandates a SAFETY note on every assertion
+  return scope as unknown as Store
+}
+
 function isIgnoredRgPass(args: string[]): boolean {
   return args.includes('--no-ignore-vcs')
 }
@@ -203,10 +211,9 @@ describe('filesystem-list-files', () => {
     spawnMock.mockImplementation((_command, args: string[]) =>
       isIgnoredRgPass(args) ? broad : source
     )
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the folder-scope decision reads only getFolderWorkspaces off this store.
-    const folderStore = {
+    const folderStore = quickOpenStore({
       getFolderWorkspaces: () => [{ folderPath: '/mock/root' }]
-    } as unknown as Store
+    })
 
     const listing = listQuickOpenFiles('/mock/root', folderStore)
     source.stdout?.emit('data', 'notes.md\0debug.log\0')
@@ -226,10 +233,7 @@ describe('filesystem-list-files', () => {
     spawnMock.mockImplementation((_command, args: string[]) =>
       isIgnoredRgPass(args) ? broad : source
     )
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the folder-scope decision reads only getRepos off this store.
-    const gitStore = {
-      getRepos: () => [{ path: '/mock/root', kind: 'git' }]
-    } as unknown as Store
+    const gitStore = quickOpenStore({ getRepos: () => [{ path: '/mock/root', kind: 'git' }] })
 
     const listing = listQuickOpenFiles('/mock/root', gitStore)
     source.stdout?.emit('data', 'notes.md\0')
