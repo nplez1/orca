@@ -243,15 +243,19 @@ export function collectedQuarantinedFiles(report, quarantined) {
  * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which fails a shard that
  * failed without the tolerated teardown race.
  *
- * Why only unexpected failures and blocking unhandled errors: an allowlisted red explains nothing, and
- * this machine always carries some, so counting it here made the check unreachable — a worker crash
- * that printed no failure of its own read as "a known red explains the exit".
+ * Why `unexpected` and not the failure count: the count includes the allowlisted reds this machine
+ * always carries, so `failedCount > 0` made the check unreachable — a worker crash that printed no
+ * failure of its own read as "a known red explains the exit".
+ *
+ * Why any unhandled headline still counts: a headline is a claim about the run rather than about one
+ * test, and the allowlist covers them on evidence — the tolerated Vitest teardown race and the
+ * recorded `node-runtime` pool crash are exactly the non-zero exits with no failure behind them.
  */
-export function unexplainedSuiteExit({ outcome, status, unexpectedCount, blockingUnhandledCount }) {
+export function unexplainedSuiteExit({ outcome, status, unexpectedCount, unhandledCount }) {
   if (outcome !== 'complete') {
     return `the suite did not run to completion: ${outcome}`
   }
-  if (status === 0 || unexpectedCount > 0 || blockingUnhandledCount > 0) {
+  if (status === 0 || unexpectedCount > 0 || unhandledCount > 0) {
     return null
   }
   return `the suite exited ${status === null ? 'without a status' : status} and neither the report nor the log explains it; failing closed`

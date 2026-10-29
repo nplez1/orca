@@ -28,13 +28,13 @@
  *
  * Exit: 0 pass, 1 fail, 2 usage or environment problem.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
 import { flakeWaiver, packageJsonChangedForTests } from './gate-flake-coupling.mjs'
-import { forkTestFiles, quarantinedFiles, runnableFiles } from './unit-lane-files.mjs'
+import { quarantinedFiles, runnableFiles } from './unit-lane-files.mjs'
 import { rerunIsolation, runSuite } from './unit-suite-run.mjs'
 import {
   GATE_INPUT_PATHS,
@@ -66,6 +66,18 @@ const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000
 const MAX_SUMMARY_LIST = 12
+/** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
+const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
+
+function normalise(name) {
+  return String(name ?? '').replaceAll('\\', '/')
+}
+
+export function forkTestFiles(root = ROOT) {
+  return globSync(FORK_TEST_INCLUDE, { cwd: root, exclude: ['**/node_modules/**'] })
+    .map(normalise)
+    .sort()
+}
 
 function usage() {
   return 'usage: node local/gate-unit.mjs [--allowlist PATH] [--no-cache] [--allow-dirty] [--timeout-ms N] [-- <vitest args>]'
@@ -387,10 +399,11 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   const exitProblem = unexplainedSuiteExit({
     outcome: run.outcome,
     status: run.status,
-    // Why after judging: an allowlisted red explains nothing about the exit, and this machine always
-    // carries some, so passing the failure count in made this check unreachable.
     unexpectedCount: unexpected.length,
-    blockingUnhandledCount: judgedUnhandled.blocking.length
+    // Why every headline and not just the blocking ones: a headline is a claim about the run, and the
+    // allowlist covers the tolerated teardown race and the recorded pool crash on evidence — both are
+    // a non-zero exit with no failing test behind it, which is the shape this check exists for.
+    unhandledCount: unhandled.headlines.length
   })
   if (exitProblem) {
     problems.push(exitProblem)

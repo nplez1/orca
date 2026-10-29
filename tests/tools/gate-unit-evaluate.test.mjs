@@ -171,4 +171,27 @@ describe('the exit a verdict composes', () => {
     expect(result.problems.join('\n')).toContain('no Vitest JSON report was written')
     expect(result.exitCode).toBe(1)
   })
+
+  it('lets the tolerated Vitest teardown race explain a non-zero exit', () => {
+    // The one non-zero exit with no failing test behind it that the fork deliberately tolerates: the
+    // check has to keep accepting it, or every run that hits the race reds the release gate.
+    const { result } = gateRun({
+      report: passingReport(),
+      run: { status: 1 },
+      log: 'Unhandled Rejection\nEnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending\n'
+    })
+    expect(result.unhandled.tolerated).toBe(1)
+    expect(result.problems).toEqual([])
+    expect(result.exitCode).toBe(0)
+  })
+
+  it('fails a non-zero exit an unfiled headline does not explain away', () => {
+    const { result } = gateRun({
+      report: passingReport(),
+      run: { status: 1 },
+      log: 'Unhandled Rejection\nError: something nobody recorded\n'
+    })
+    expect(result.unhandled.blocking).toHaveLength(1)
+    expect(result.exitCode).toBe(1)
+  })
 })

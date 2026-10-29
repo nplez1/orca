@@ -7,9 +7,6 @@ import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 
-/** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
-export const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
-
 function normalise(name) {
   return String(name ?? '').replaceAll('\\', '/')
 }
@@ -29,11 +26,5 @@ export function quarantinedFiles(root = ROOT) {
   return globSync(UNIT_INCLUDE, { cwd: root })
     .map(normalise)
     .filter((file) => !runnable.has(file))
-    .sort()
-}
-
-export function forkTestFiles(root = ROOT) {
-  return globSync(FORK_TEST_INCLUDE, { cwd: root, exclude: ['**/node_modules/**'] })
-    .map(normalise)
     .sort()
 }

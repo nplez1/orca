@@ -35,17 +35,17 @@ describe('a run the report cannot explain fails closed', () => {
         outcome: 'complete',
         status: 0,
         unexpectedCount: 0,
-        blockingUnhandledCount: 0
+        unhandledCount: 0
       })
     ).toBeNull()
   })
 
-  it('passes a non-zero exit that an unexpected failure or a blocking error accounts for', () => {
-    const base = { outcome: 'complete', status: 1, unexpectedCount: 39, blockingUnhandledCount: 0 }
+  it('passes a non-zero exit that an unexpected failure or an unhandled error accounts for', () => {
+    const base = { outcome: 'complete', status: 1, unexpectedCount: 39, unhandledCount: 0 }
     expect(unexplainedSuiteExit(base)).toBeNull()
-    expect(
-      unexplainedSuiteExit({ ...base, unexpectedCount: 0, blockingUnhandledCount: 1 })
-    ).toBeNull()
+    // A headline is a claim about the run: the tolerated teardown race and the recorded pool crash are
+    // allowlisted, and both are a non-zero exit with no failing test behind it.
+    expect(unexplainedSuiteExit({ ...base, unexpectedCount: 0, unhandledCount: 1 })).toBeNull()
   })
 
   it('fails a non-zero exit whose only failures were allowlisted', () => {
@@ -56,7 +56,7 @@ describe('a run the report cannot explain fails closed', () => {
         outcome: 'complete',
         status: 1,
         unexpectedCount: 0,
-        blockingUnhandledCount: 0
+        unhandledCount: 0
       })
     ).toMatch(/exited 1 .*failing closed/)
   })
@@ -67,7 +67,7 @@ describe('a run the report cannot explain fails closed', () => {
         outcome: 'complete',
         status: null,
         unexpectedCount: 0,
-        blockingUnhandledCount: 0
+        unhandledCount: 0
       })
     ).toMatch(/without a status/)
   })
@@ -78,7 +78,7 @@ describe('a run the report cannot explain fails closed', () => {
         outcome: 'timed-out',
         status: null,
         unexpectedCount: 0,
-        blockingUnhandledCount: 0
+        unhandledCount: 0
       })
     ).toMatch(/did not run to completion/)
   })
