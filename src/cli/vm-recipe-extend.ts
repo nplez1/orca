@@ -132,7 +132,7 @@ export async function extendEphemeralVmRecipeFromFile(args: {
       // Why its own message: the hook was killed, not refused, so the transcript alone would read as an
       // unexplained empty exit and the caller would not know the provider may have acted already.
       error: extend.aborted
-        ? `Extend did not finish within ${timeout.timeoutMs} ms and was stopped. The provider may already have granted the extension, so re-run extend to confirm the deadline.`
+        ? `Extend did not finish within ${timeout.timeoutMs} ms and was stopped. The provider may already have granted the extension, so check its own deadline before extending again.`
         : extend.error,
       transcript: {
         exitCode: extend.exitCode,

@@ -376,6 +376,102 @@ describe('orca cli worktree awareness', () => {
     }
   })
 
+  it('says the machine may still be running when the destroy after a mismatch failed', async () => {
+    // Why: R11 asked for the output to state whether a machine is left behind. Saying it was released
+    // when destroy failed would read as the opposite of the transcript printed below it.
+    const repoPath = mkdtempSync(path.join(tmpdir(), 'orca-vm-doctor-mismatch-fail-'))
+    const pairingCode = encodePairingOffer({
+      v: PAIRING_OFFER_VERSION,
+      endpoint: 'ws://sandbox.example.com:6767',
+      deviceToken: 'token',
+      publicKeyB64: 'public-key'
+    })
+    try {
+      writeFileSync(
+        path.join(repoPath, 'orca.yaml'),
+        [
+          'environmentRecipes:',
+          '  - id: cloud-sandbox',
+          '    name: Cloud Sandbox',
+          `    create: ${JSON.stringify(`${process.execPath} ./start.js`)}`,
+          `    destroy: ${JSON.stringify(`${process.execPath} ./cleanup.js`)}`
+        ].join('\n')
+      )
+      writeFileSync(path.join(repoPath, 'start.js'), '')
+      writeFileSync(path.join(repoPath, 'cleanup.js'), '')
+      const { EventEmitter } = await import('node:events')
+      const startChild = Object.assign(new EventEmitter(), {
+        stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+        stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+        stdin: Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() }),
+        kill: vi.fn()
+      })
+      const cleanupChild = Object.assign(new EventEmitter(), {
+        stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+        stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+        stdin: Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() }),
+        kill: vi.fn()
+      })
+      spawnMock
+        .mockImplementationOnce(() => {
+          process.nextTick(() => {
+            startChild.stdout.emit(
+              'data',
+              Buffer.from(
+                JSON.stringify({
+                  schemaVersion: 2,
+                  checkoutMode: 'provisioned-root',
+                  pairingCode,
+                  projectRoot: '/workspace/repo'
+                })
+              )
+            )
+            startChild.emit('exit', 0, null)
+            startChild.emit('close', 0, null)
+          })
+          return startChild
+        })
+        .mockImplementationOnce(() => {
+          process.nextTick(() => {
+            cleanupChild.emit('exit', 1, null)
+            cleanupChild.emit('close', 1, null)
+          })
+          return cleanupChild
+        })
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const priorExitCode = process.exitCode
+
+      await main([
+        'vm',
+        'recipe',
+        'doctor',
+        'cloud-sandbox',
+        '--repo-path',
+        repoPath,
+        '--provision',
+        '--json'
+      ])
+
+      const output = JSON.parse(String(logSpy.mock.calls[0][0])) as {
+        ok: boolean
+        checks: { id: string; status: string; remediation?: string }[]
+      }
+      expect(output.ok).toBe(false)
+      expect(output.checks).toContainEqual(
+        expect.objectContaining({
+          id: 'recipe.provision',
+          remediation: expect.stringContaining('did not release it')
+        })
+      )
+      expect(output.checks).toContainEqual(
+        expect.objectContaining({ id: 'recipe.destroy.run', status: 'fail' })
+      )
+      process.exitCode = priorExitCode
+    } finally {
+      rmSync(repoPath, { recursive: true, force: true })
+    }
+  })
+
   it('returns the full create transcript when provision fails so the agent can self-diagnose', async () => {
     const repoPath = mkdtempSync(path.join(tmpdir(), 'orca-vm-doctor-provision-fail-'))
     try {

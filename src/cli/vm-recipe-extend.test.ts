@@ -219,7 +219,7 @@ describe('orca vm recipe extend', () => {
 })
 
 describe('orca vm recipe extend deadline', () => {
-  it('bounds the hook by default, so a stuck provider CLI cannot hang the caller', async () => {
+  it('stops the hook at the deadline it is given', async () => {
     const repoPath = makeRepo()
     const hangPath = join(repoPath, 'hang.sh')
     writeFileSync(hangPath, '#!/bin/sh\nexec sleep 30\n')
@@ -238,7 +238,8 @@ describe('orca vm recipe extend deadline', () => {
     // Why the message and not the exit code: the hook was killed, so a bare "exit unknown" would leave
     // the caller unable to tell a refusal from a deadline — and the provider may already have acted.
     expect(result.error).toContain('did not finish within 200 ms')
-    expect(result.error).toContain('re-run extend')
+    // Why this wording: extend is paid and not idempotent, so the advice must not be "extend again".
+    expect(result.error).toContain('before extending again')
     expect(result.transcript).toBeDefined()
     expect(Date.now() - startedAt).toBeLessThan(10_000)
   })
