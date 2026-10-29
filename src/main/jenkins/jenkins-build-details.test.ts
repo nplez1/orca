@@ -493,15 +493,13 @@ describe('getJenkinsBuildDetails', () => {
     expect(requests).toEqual([])
   })
 
-  it('does not follow a redirect from an unconfigured host into the network', async () => {
+  it('does not follow a redirect from an unconfigured host', async () => {
     const { details } = await loadModules()
-    route = (url) =>
-      url.startsWith('https://ci.example-builds.net/')
-        ? new Response(null, {
-            status: 302,
-            headers: { location: 'http://10.0.0.5:8080/job/team/job/repo/12/api/json' }
-          })
-        : json(buildBody())
+    route = () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: 'http://10.0.0.5:8080/job/team/job/repo/12/api/json' }
+      })
 
     const result = await details.getJenkinsBuildDetails({
       url: 'https://ci.example-builds.net/job/team/job/repo/12/',
@@ -509,32 +507,60 @@ describe('getJenkinsBuildDetails', () => {
     })
 
     expect(result).toMatchObject({ ok: false, reason: 'not-configured' })
-    expect(requests.map((entry) => entry.url)).toEqual([
-      `https://ci.example-builds.net/job/team/job/repo/12/api/json?tree=${JENKINS_BUILD_TREE_QUERY}`
-    ])
+    // One request left this machine; the redirect target was never contacted.
+    expect(requests).toHaveLength(1)
+    expect(requests[0].init.redirect).toBe('manual')
   })
 
-  it('follows a redirect that stays publicly routable', async () => {
+  it('refuses a redirect that stays on the same public host too', async () => {
     const { details } = await loadModules()
-    route = (url) =>
-      url.includes('/moved/')
-        ? json(buildBody())
-        : new Response(null, {
-            status: 302,
-            headers: {
-              location: 'https://ci.example-builds.net/moved/job/team/job/repo/12/api/json'
-            }
-          })
+    route = () =>
+      new Response(null, {
+        status: 301,
+        headers: { location: 'https://ci.example-builds.net/moved/job/team/job/repo/12/' }
+      })
 
-    // A hop inside the same public host is what a Jenkins behind a path alias answers.
-    await details.getJenkinsBuildDetails({
+    // Following one hop means vetting every hop through `net.request`, which an unconfigured host is
+    // not worth: it is read only when it answers directly, and configuring it is how to follow it.
+    await expect(
+      details.getJenkinsBuildDetails({
+        url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+        check
+      })
+    ).resolves.toMatchObject({ ok: false, reason: 'not-configured' })
+    expect(requests).toHaveLength(1)
+  })
+
+  it('reads the desktop transport cancelling a manual redirect as the same refusal', async () => {
+    const { details } = await loadModules()
+    // `net.fetch` rejects `redirect: 'manual'` with this error instead of handing back the 3xx.
+    route = () => {
+      throw new Error('Redirect was cancelled')
+    }
+
+    await expect(
+      details.getJenkinsBuildDetails({
+        url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+        check
+      })
+    ).resolves.toMatchObject({ ok: false, reason: 'not-configured' })
+  })
+
+  it('leaves redirects to the transport for a configured server', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection, 'https://ci.example-builds.net')
+    route = (url) =>
+      url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
+
+    const result = await details.getJenkinsBuildDetails({
       url: 'https://ci.example-builds.net/job/team/job/repo/12/',
       check
     })
 
-    expect(requests.map((entry) => entry.url)).toContain(
-      'https://ci.example-builds.net/moved/job/team/job/repo/12/api/json'
-    )
+    // The mocked transport cannot follow a hop itself, so the contract under test is the option: a
+    // configured server's build permalink redirects inside its own prefix and must still resolve.
+    expect(result.ok).toBe(true)
+    expect(requests[0].init.redirect).toBe('follow')
   })
 
   it('still reads a private host once its server is configured', async () => {

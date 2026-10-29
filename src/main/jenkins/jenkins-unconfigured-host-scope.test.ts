@@ -94,10 +94,12 @@ describe('isPubliclyRoutableUrl', () => {
     ).toBe(false)
   })
 
-  it('allows a name this machine cannot resolve, because then the fetch cannot reach anything', async () => {
+  it('refuses a name it cannot resolve, because the transport resolves it again', async () => {
+    // An attacker's own DNS can answer SERVFAIL/NXDOMAIN to this lookup and a private address to
+    // Chromium's, so "unknown" is a refusal.
     expect(
       await isPubliclyRoutableUrl('https://ci.acme-cicd.io/job/team/job/repo/12/', async () => null)
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('does not resolve a literal address', async () => {

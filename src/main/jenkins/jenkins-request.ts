@@ -145,13 +145,15 @@ export type JenkinsCredentialArgs = {
   /** The matched server's configured prefix, which bounds where credentials may travel. */
   serverBaseUrl?: string | null
   /**
-   * Vets every redirect hop before the next request is sent.
+   * Refuse a redirect instead of following it.
    *
-   * Why hand-followed: a public host answering `302 Location: http://10.0.0.5/…` reaches this
-   * machine's intranet under `redirect: 'follow'`, which is the request an unconfigured host is not
-   * allowed to make. Passing a guard here switches the transport to manual redirects.
+   * Why: `follow` sends the next request wherever the status points, and a public host answering
+   * `302 Location: http://10.0.0.5/…` is the intranet probe an unconfigured host may not make.
+   * Every hop can be vetted only through `net.request` (see `electron-repo-icon-fetch.ts`), and a
+   * redirect from a host nobody configured is not worth that transport — so an unconfigured host is
+   * read only when it answers directly.
    */
-  redirectGuard?: (url: string) => Promise<boolean>
+  refuseRedirects?: boolean
   signal?: AbortSignal
 }
 
@@ -180,39 +182,25 @@ export function jenkinsSignal(signal: AbortSignal | undefined): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout
 }
 
-/** A redirect the transport follows only after the guard vets its destination. */
+/** A redirect status; the value only matters to the refusal below. */
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
-const MAX_REDIRECT_HOPS = 4
 
-function redirectFailure(message: string): JenkinsRequestFailure {
-  return { reason: 'not-configured', message, identifiedAsJenkins: false, jenkinsVersion: null }
+function redirectFailure(): JenkinsRequestFailure {
+  return {
+    reason: 'not-configured',
+    message: 'Jenkins redirected, and an unconfigured host is only read when it answers directly',
+    identifiedAsJenkins: false,
+    jenkinsVersion: null
+  }
 }
 
-/** The URL to follow, null to use the response as-is, or the failure that stops the chain. */
-async function nextRedirectHop(
-  response: Response,
-  requestUrl: string,
-  hop: number,
-  args: JenkinsCredentialArgs
-): Promise<string | JenkinsRequestFailure | null> {
-  if (!REDIRECT_STATUSES.has(response.status)) {
-    return null
-  }
-  const location = response.headers.get('location')
-  await releaseBody(response)
-  if (hop >= MAX_REDIRECT_HOPS) {
-    return redirectFailure(`Jenkins redirected more than ${MAX_REDIRECT_HOPS} times`)
-  }
-  let nextUrl: string
-  try {
-    nextUrl = new URL(location ?? '', requestUrl).toString()
-  } catch {
-    return redirectFailure('Jenkins redirected without a usable target')
-  }
-  if (!location || !(await args.redirectGuard?.(nextUrl))) {
-    return redirectFailure(`Jenkins redirected to a host that is not publicly routable: ${nextUrl}`)
-  }
-  return nextUrl
+/**
+ * Electron's transport rejects a manual redirect instead of handing back the 3xx response
+ * (`net-client-request.ts`): the request is already cancelled when it reaches us, which is a
+ * refusal, not an unreachable server.
+ */
+function isCancelledRedirect(error: unknown): boolean {
+  return error instanceof Error && /redirect/i.test(error.message)
 }
 
 export async function jenkinsGetJson(
@@ -222,29 +210,22 @@ export async function jenkinsGetJson(
   await applyJenkinsProxy(args.url)
 
   let response: Response
-  let requestUrl = args.url
-  for (let hop = 0; ; hop += 1) {
-    try {
-      response = await httpClient.fetch(requestUrl, {
-        method: 'GET',
-        redirect: args.redirectGuard ? 'manual' : 'follow',
-        headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
-        signal: jenkinsSignal(args.signal)
-      })
-    } catch (error) {
-      return { ok: false, failure: classifyJenkinsTransportError(error) }
+  try {
+    response = await httpClient.fetch(args.url, {
+      method: 'GET',
+      redirect: args.refuseRedirects ? 'manual' : 'follow',
+      headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
+      signal: jenkinsSignal(args.signal)
+    })
+  } catch (error) {
+    if (args.refuseRedirects && isCancelledRedirect(error)) {
+      return { ok: false, failure: redirectFailure() }
     }
-    const hopResult = args.redirectGuard
-      ? await nextRedirectHop(response, requestUrl, hop, args)
-      : null
-    if (typeof hopResult === 'string') {
-      requestUrl = hopResult
-      continue
-    }
-    if (hopResult) {
-      return { ok: false, failure: hopResult }
-    }
-    break
+    return { ok: false, failure: classifyJenkinsTransportError(error) }
+  }
+  if (args.refuseRedirects && REDIRECT_STATUSES.has(response.status)) {
+    await releaseBody(response)
+    return { ok: false, failure: redirectFailure() }
   }
 
   const jenkinsVersion = response.headers.get('x-jenkins')

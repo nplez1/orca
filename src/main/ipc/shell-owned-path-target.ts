@@ -57,7 +57,10 @@ function statLocalTarget(
  */
 const EXECUTABLE_LAUNCH_EXTENSIONS = new Set([
   '.app',
+  '.application',
+  '.appref-ms',
   '.bat',
+  '.chm',
   '.cmd',
   '.cpl',
   '.com',
@@ -66,19 +69,25 @@ const EXECUTABLE_LAUNCH_EXTENSIONS = new Set([
   '.exe',
   '.fileloc',
   '.hta',
+  '.inetloc',
   '.jar',
   '.lnk',
   '.msc',
   '.msi',
+  '.msp',
   '.pif',
+  '.prefpane',
   '.ps1',
   '.reg',
+  '.scf',
   '.scr',
   '.terminal',
   '.tool',
   '.url',
   '.vbs',
+  '.webloc',
   '.workflow',
+  '.wsh',
   '.wsf'
 ])
 /** Kinds Windows alone runs through a script host; refusing them elsewhere would only break editors. */

@@ -9,9 +9,15 @@ import { lookup } from 'node:dns/promises'
  * probe this machine's intranet from outside. No credentials travel on such a request, so the risk
  * is the probe itself rather than exfiltration — which is why the answer is "do not send it".
  *
- * Three checks, because a host name is not one input: the literal address, the addresses it
- * resolves to here (a split-horizon name is the ordinary intranet setup), and — through
- * `isPubliclyRoutableUrl`, which every redirect hop is put through — wherever a redirect leads.
+ * Two checks: the literal address, and the addresses the name resolves to here — a split-horizon
+ * name is the ordinary intranet setup, and no literal test can see it. A name this machine cannot
+ * resolve is refused rather than allowed, because the transport resolves it again and an attacker's
+ * own DNS can fail the first answer (TTL 0) and hand the second one a private address.
+ *
+ * Known residual, and why it is stated rather than closed: the name is resolved twice, so a
+ * rebinding name that answers public first and private second gets through. Pinning the vetted
+ * address into the request is not possible through `net.fetch`, and refusing every unconfigured
+ * host outright is the other half of the issue's advice — not what this fork chose.
  */
 
 /** Suffixes that are private by construction (RFC 6762 `.local`, RFC 8375 `.home.arpa`). */
@@ -33,14 +39,22 @@ const PRIVATE_HOST_SUFFIXES = [
 /** Resolved addresses for a host name, or null when this machine cannot resolve it. */
 export type HostAddressLookup = (hostname: string) => Promise<readonly string[] | null>
 
+/** A resolver that hangs must not hold the Checks pane open past the request timeout. */
+const LOOKUP_TIMEOUT_MS = 2_000
+
 async function lookupHostAddresses(hostname: string): Promise<readonly string[] | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), LOOKUP_TIMEOUT_MS)
+  })
   try {
-    const addresses = await lookup(hostname, { all: true, verbatim: true })
-    return addresses.map((entry) => entry.address)
+    // `dns.lookup` cannot be cancelled, so the abandoned promise is raced rather than aborted.
+    const answers = await Promise.race([lookup(hostname, { all: true, verbatim: true }), timeout])
+    return answers?.map((entry) => entry.address) ?? null
   } catch {
-    // Why allow an unresolvable name: the fetch cannot reach anything either, and refusing here
-    // would report a name that does not exist as if it were a network policy failure.
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -187,7 +201,7 @@ export async function isPubliclyRoutableUrl(
   }
   const addresses = await lookupAddresses(stripAddressBrackets(hostname))
   if (addresses === null) {
-    return true
+    return false
   }
   return addresses.every((address) => !isPrivateJenkinsHost(address))
 }

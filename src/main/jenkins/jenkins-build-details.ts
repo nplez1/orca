@@ -234,9 +234,9 @@ export async function getJenkinsBuildDetails(args: {
     apiToken,
     configured: server !== null,
     serverBaseUrl: server?.baseUrl ?? null,
-    // Only an unconfigured host needs its redirects vetted: a configured one is already bounded by
+    // Only an unconfigured host needs its redirects refused: a configured one is already bounded by
     // its own prefix, and its builds legitimately hop inside it.
-    ...(server === null ? { redirectGuard: isPubliclyRoutableUrl } : {}),
+    ...(server === null ? { refuseRedirects: true } : {}),
     ...(args.signal ? { signal: args.signal } : {})
   }
   const buildResponse = await jenkinsGetJson({
