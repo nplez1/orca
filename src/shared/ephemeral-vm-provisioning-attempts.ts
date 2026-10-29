@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeSecureJsonFileWithinLimit } from './bounded-secure-json-file'
 import { readNodeFileSyncWithinLimit } from './node-bounded-file-reader'
@@ -53,7 +53,8 @@ export function listEphemeralVmProvisioningAttempts(
   }
   // Why swallow a read failure here and nowhere else in this file: every caller of this list is
   // either reconciling a possible leak or about to write, and neither can do anything with a corrupt
-  // file except complain — while throwing would stop the startup reconcile dead.
+  // file except complain — while throwing would stop the startup reconcile dead. The contents are
+  // what the write path has to worry about, and it sets an unreadable file aside before replacing it.
   try {
     hardenExistingSecureFile(path)
     const parsed: unknown = JSON.parse(
@@ -115,6 +116,7 @@ export function removeEphemeralVmProvisioningAttempt(
 
 function writeAttempts(userDataPath: string, attempts: EphemeralVmProvisioningAttempt[]): void {
   const path = getEphemeralVmProvisioningAttemptsPath(userDataPath)
+  preserveUnreadableStore(path)
   // Why absent rather than empty: no attempt in flight is the normal state, and a file that only
   // exists to hold an empty array would make "is anything pending?" a question about two shapes.
   if (attempts.length === 0) {
@@ -130,6 +132,32 @@ function writeAttempts(userDataPath: string, attempts: EphemeralVmProvisioningAt
     MAX_EPHEMERAL_VM_PROVISIONING_ATTEMPTS_FILE_BYTES,
     { durable: true }
   )
+}
+
+/**
+ * Keep an unreadable store instead of overwriting it.
+ *
+ * Why: this file's whole purpose is to hold the only record of a create that never reported, so a
+ * write that replaced a damaged one would destroy the evidence it was written for. Renaming is also how
+ * an operator gets to see what a killed process left behind.
+ */
+function preserveUnreadableStore(path: string): void {
+  if (!existsSync(path)) {
+    return
+  }
+  try {
+    hardenExistingSecureFile(path)
+    JSON.parse(
+      readNodeFileSyncWithinLimit(
+        path,
+        MAX_EPHEMERAL_VM_PROVISIONING_ATTEMPTS_FILE_BYTES
+      ).buffer.toString('utf8')
+    )
+  } catch {
+    const aside = `${path}.unreadable`
+    renameSync(path, aside)
+    console.warn(`[ephemeral-vm] Moved an unreadable provisioning-attempt store to ${aside}.`)
+  }
 }
 
 /**

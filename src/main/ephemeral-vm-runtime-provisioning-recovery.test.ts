@@ -9,9 +9,16 @@ import {
   upsertEphemeralVmProvisioningAttempt,
   type EphemeralVmProvisioningAttempt
 } from '../shared/ephemeral-vm-provisioning-attempts'
-import { upsertEphemeralVmRuntime } from '../shared/ephemeral-vm-runtime-store'
+import {
+  getEphemeralVmRuntimeStorePath,
+  upsertEphemeralVmRuntime
+} from '../shared/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
-import { flagInterruptedEphemeralVmProvisioning } from './ephemeral-vm-runtime-provisioning-recovery'
+import { holdEphemeralVmProvisioningInFlightForTest } from './ephemeral-vm/runtime-provisioning'
+import {
+  MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS,
+  flagInterruptedEphemeralVmProvisioning
+} from './ephemeral-vm-runtime-provisioning-recovery'
 
 const NOW_MS = Date.parse('2026-10-29T12:00:00.000Z')
 
@@ -126,12 +133,69 @@ describe('flagging a create that never reported', () => {
     const userDataPath = makeDir('orca-vm-recovery-corrupt-')
     // A truncated write is the shape a killed process leaves behind.
     const path = getEphemeralVmProvisioningAttemptsPath(userDataPath)
-    rmSync(path, { force: true })
     writeFileSync(path, '{"version":1,"attempts":[{"instanceId":')
 
     expect(flagInterruptedEphemeralVmProvisioning({ userDataPath, now: NOW_MS })).toEqual([])
-    // The unreadable file is left alone rather than rewritten: it is the only trace of that create.
+    // The unreadable file is left alone by the read path rather than rewritten: it is the only trace
+    // of whatever that create bought.
     expect(readFileSync(path, 'utf8')).toBe('{"version":1,"attempts":[{"instanceId":')
+  })
+
+  it('does not let a corrupt runtime store break the startup pass', () => {
+    // Why: this runs while IPC handlers are being registered, so a throw here would leave every channel
+    // registered after it unregistered — a far larger outage than the warning it was emitting.
+    const userDataPath = makeDir('orca-vm-recovery-corrupt-store-')
+    upsertEphemeralVmProvisioningAttempt(userDataPath, attempt())
+    writeFileSync(getEphemeralVmRuntimeStorePath(userDataPath), 'not json')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    expect(flagInterruptedEphemeralVmProvisioning({ userDataPath, now: NOW_MS })).toEqual([])
+
+    expect(warn.mock.calls[0]?.[0]).toContain('never reported')
+  })
+
+  it('leaves a create that is still running in this process alone', () => {
+    // Why: registration re-runs on macOS re-activation, so a create started from the previous window is
+    // still in flight — flagging it would tell the user to delete a machine about to be recorded.
+    const userDataPath = makeDir('orca-vm-recovery-in-flight-')
+    const inFlight = attempt({ instanceId: 'orca-in-flight' })
+    upsertEphemeralVmProvisioningAttempt(userDataPath, inFlight)
+    const release = holdEphemeralVmProvisioningInFlightForTest(inFlight.instanceId)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      expect(flagInterruptedEphemeralVmProvisioning({ userDataPath, now: NOW_MS })).toEqual([])
+    } finally {
+      release()
+    }
+
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toEqual([inFlight])
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('keeps the newest interrupted records and says what it dropped', () => {
+    const userDataPath = makeDir('orca-vm-recovery-prune-')
+    const total = MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS + 2
+    for (let index = 0; index < total; index += 1) {
+      upsertEphemeralVmProvisioningAttempt(
+        userDataPath,
+        attempt({ instanceId: `orca-instance-${index}`, startedAt: NOW_MS - index * 1_000 })
+      )
+    }
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    const interrupted = flagInterruptedEphemeralVmProvisioning({ userDataPath, now: NOW_MS })
+
+    // Unbounded growth is what would eventually make the store unreadable — the one failure that would
+    // lose the record silently, so the newest rows win.
+    expect(interrupted).toHaveLength(MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS)
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toHaveLength(
+      MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS
+    )
+    const dropped = warn.mock.calls
+      .map((call) => String(call[0]))
+      .filter((line) => line.includes('Dropped'))
+    expect(dropped).toHaveLength(2)
   })
 })
 
@@ -162,5 +226,19 @@ describe('the attempt store', () => {
     removeEphemeralVmProvisioningAttempt(userDataPath, 'orca-instance-2')
     // No attempt in flight is the normal state, so the file does not linger to say so.
     expect(existsSync(getEphemeralVmProvisioningAttemptsPath(userDataPath))).toBe(false)
+  })
+
+  it('keeps an unreadable store beside the file instead of overwriting it', () => {
+    // Why: the next write replaces the file, and a damaged one is the only record a lost create has.
+    const userDataPath = makeDir('orca-vm-recovery-store-corrupt-')
+    const path = getEphemeralVmProvisioningAttemptsPath(userDataPath)
+    writeFileSync(path, '{"version":1,"attempts":')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    upsertEphemeralVmProvisioningAttempt(userDataPath, attempt())
+
+    expect(readFileSync(`${path}.unreadable`, 'utf8')).toBe('{"version":1,"attempts":')
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toHaveLength(1)
+    expect(warn.mock.calls[0]?.[0]).toContain('.unreadable')
   })
 })
