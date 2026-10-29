@@ -23,7 +23,7 @@ function getFireworksCredentialsStatus(): FireworksCredentialsStatus {
   } catch (error) {
     // Why: an undecryptable file must not break the whole Accounts pane; the
     // status call only exists to seed the form's draft fields.
-    recordSwallowedFailure('fireworks', error, 'failed to read stored credentials')
+    recordSwallowedFailure('fireworks', error, 'failed to read stored credentials', 'error')
   }
   return { configured: apiKeyConfigured, apiKeyConfigured, accountIdOverride }
 }
@@ -39,7 +39,8 @@ function refreshAfterFireworksCredentialChange(
     recordSwallowedFailure(
       'fireworks',
       error,
-      `failed to trigger rate-limit refresh after ${action}`
+      `failed to trigger rate-limit refresh after ${action}`,
+      'error'
     )
   })
 }

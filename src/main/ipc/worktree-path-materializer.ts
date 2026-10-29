@@ -118,7 +118,8 @@ export async function materializeWorktreePaths(
         recordSwallowedFailure(
           'worktree-symlinks',
           error,
-          `failed to prepare "${safePath.rel}" (${source})`
+          `failed to prepare "${safePath.rel}" (${source})`,
+          'error'
         )
         return { failedPath: safePath.rel }
       }
@@ -157,7 +158,8 @@ export async function materializeWorktreePaths(
       recordSwallowedFailure(
         'worktree-symlinks',
         error,
-        `failed to materialize "${safePath.rel}" (${source} -> ${target})`
+        `failed to materialize "${safePath.rel}" (${source} -> ${target})`,
+        'error'
       )
       return { failedPath: safePath.rel }
     }

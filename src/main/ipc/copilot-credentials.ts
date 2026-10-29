@@ -37,7 +37,7 @@ function readStoredEnterpriseSlug(): string | null {
     return readCopilotCredentials()?.enterpriseSlug ?? null
   } catch (error) {
     // Why: an undecryptable file must not break the pane; the form only needs a draft.
-    recordSwallowedFailure('copilot', error, 'failed to read stored credentials')
+    recordSwallowedFailure('copilot', error, 'failed to read stored credentials', 'error')
     return null
   }
 }
@@ -73,7 +73,12 @@ function refreshAfterCopilotCredentialChange(
 ): void {
   rateLimits?.invalidateCopilotCredentialState()
   void rateLimits?.refresh().catch((error: unknown) => {
-    recordSwallowedFailure('copilot', error, `failed to trigger rate-limit refresh after ${action}`)
+    recordSwallowedFailure(
+      'copilot',
+      error,
+      `failed to trigger rate-limit refresh after ${action}`,
+      'error'
+    )
   })
 }
 

@@ -29,7 +29,8 @@ function refreshAfterDeepSeekCredentialChange(
     recordSwallowedFailure(
       'deepseek',
       error,
-      `failed to trigger rate-limit refresh after ${action}`
+      `failed to trigger rate-limit refresh after ${action}`,
+      'error'
     )
   })
 }

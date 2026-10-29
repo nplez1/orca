@@ -133,8 +133,10 @@ export async function fetchFireworksBalance(args: {
       encodeGetBalanceRequest(`accounts/${args.accountId}`)
     )
     if (response.grpcStatus !== GRPC_STATUS_OK) {
-      console.warn(
-        `[fireworks] GetBalance returned grpc-status=${response.grpcStatus ?? 'none'} ${response.grpcMessage ?? ''}`.trim()
+      recordSwallowedFailure(
+        'fireworks',
+        `grpc-status=${response.grpcStatus ?? 'none'} ${response.grpcMessage ?? ''}`.trim(),
+        'GetBalance answered an error status; falling back to spend only'
       )
       return null
     }

@@ -153,7 +153,8 @@ export async function materializeWorktreePathThroughStaging(
     recordSwallowedFailure(
       'worktree-symlinks',
       error,
-      `${materialized ? 'materialized' : 'failed to materialize'} "${target}" but could not clean staging directory "${stagingDirectory}"`
+      `${materialized ? 'materialized' : 'failed to materialize'} "${target}" but could not clean staging directory "${stagingDirectory}"`,
+      'error'
     )
   })
   if (materializationFailed) {
@@ -215,7 +216,8 @@ export async function removeStaleWorktreeMaterializationStagingDirectories(
         recordSwallowedFailure(
           'worktree-symlinks',
           error,
-          `failed to remove stale staging directory "${stagingDirectory}"`
+          `failed to remove stale staging directory "${stagingDirectory}"`,
+          'error'
         )
       }
     }

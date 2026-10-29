@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraClientForSite } from './authenticated-request'
 import type { JiraCreateField } from '../../shared/jira/jira-types'
 import { _resetTracerForTests, setActiveSink, type TracerSink } from '../observability/tracer'
@@ -13,6 +13,11 @@ function captureSpans(): unknown[] {
   setActiveSink(sink)
   return records
 }
+
+// Why afterEach: a failing assertion must not leave this suite's capturing sink installed.
+afterEach(() => {
+  _resetTracerForTests()
+})
 
 const { clearTokenMock, isAuthErrorMock, jiraRequestMock } = vi.hoisted(() => ({
   clearTokenMock: vi.fn(),
@@ -109,7 +114,6 @@ describe('readIssueProjectKey', () => {
       })
     ])
     warn.mockRestore()
-    _resetTracerForTests()
   })
 
   it('returns an empty key when the response carries no project', async () => {

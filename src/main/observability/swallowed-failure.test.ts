@@ -65,6 +65,16 @@ describe('recordSwallowedFailure', () => {
     expect(console.warn).toHaveBeenCalledWith('[worktree-symlinks] materialize:', expect.any(Error))
   })
 
+  it('keeps the console severity a call site already relied on', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    recordSwallowedFailure('worktree-symlinks', new Error('EPERM'), 'materialize', 'error')
+
+    expect(errorSpy).toHaveBeenCalledWith('[worktree-symlinks] materialize:', expect.any(Error))
+    expect(console.warn).not.toHaveBeenCalled()
+    expect(sink.records).toHaveLength(1)
+  })
+
   it('writes the record into the file the diagnostic bundle collects', () => {
     const directory = mkdtempSync(join(tmpdir(), 'orca-swallowed-failure-'))
     const traceFilePath = join(directory, 'main.trace.ndjson')
