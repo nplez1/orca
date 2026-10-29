@@ -166,4 +166,44 @@ describe('TrustDialogStatusObserver', () => {
     await vi.advanceTimersByTimeAsync(1_000)
     expect(published).toEqual(['waiting', 'done'])
   })
+
+  // Pi shows this before its session starts, so no hook can report it and no agent row exists yet:
+  // an orchestrator's `wait --for tui-idle` -> `send --enter` used to press Enter on `→ Trust` (#230).
+  describe("Pi's project-trust prompt", () => {
+    const PI_TRUST_GRID = [
+      ' Trust project folder?',
+      ' This allows Pi-Bolt to load .pi settings and resources, install missing project packages, and execute project extensions.',
+      ' \u2192 Trust',
+      '   Trust parent folder (\u2026)',
+      '   Trust (this session only)',
+      '   Do not trust',
+      '   Do not trust (this session only)',
+      ' \u2191\u2193 navigate  enter select  escape/ctrl+c cancel'
+    ].join('\r\n')
+
+    it('publishes the wait its hooks cannot, and settles on a session boundary', async () => {
+      const { published, write } = await pane('codex-0-158-0-trustprompt', 'pi')
+      await write(`\x1b[2J\x1b[H${PI_TRUST_GRID}\r\n`)
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(published).toEqual(['waiting'])
+
+      // Answered: the shell keeps the pane, so the row ends as a session boundary, not a finished turn.
+      await write(SHELL_PROMPT)
+      await vi.advanceTimersByTimeAsync(1_000)
+      expect(published).toEqual(['waiting', 'done'])
+    })
+
+    it('ignores the same wording quoted in ordinary output', async () => {
+      const { published, write } = await pane('codex-0-158-0-trustprompt', 'pi')
+      const reply = [
+        '\u2022 Pi asked "Trust project folder?" and offered \u2192 Trust,',
+        '  then continued with the turn.',
+        '',
+        '\u203a ask pi anything'
+      ]
+      await write(`\x1b[2J\x1b[H${reply.join('\r\n')}\r\n`)
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(published).toEqual([])
+    })
+  })
 })
