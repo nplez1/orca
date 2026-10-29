@@ -1,0 +1,7 @@
+{
+  "platform": "darwin",
+  "command": ["copilot", "-C", "<temporary directory>"],
+  "cols": 60,
+  "rows": 20,
+  "note": "Copilot CLI 1.0.105; selected manual approval for this session, then requested a harmless shell write. Recording ends while the approval dialog is open. Temporary directory identifiers replaced with same-length placeholders."
+}

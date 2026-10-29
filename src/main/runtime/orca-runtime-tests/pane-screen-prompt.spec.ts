@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { AgentHookServer } from '../../agent-hooks/server'
+import { buildBody, postHookEvent } from '../../agent-hooks/server.test-fixtures'
+import { wireScreenPromptReader } from '../../agent-hooks/server/server-screen-prompt-wiring'
 import { OrcaRuntimeService } from '../orca-runtime-test-mocks.spec'
+import { readRuntimeFixture } from '../agent-transcript-replay-test-harness'
 import {
   TEST_WORKTREE_PATH,
   expectStablePaneKeyEnv,
@@ -25,6 +32,7 @@ async function terminalRuntime(
     spawn,
     write: () => true,
     kill: () => true,
+    getSize: () => ({ cols: 120, rows: 40 }),
     getForegroundProcess: async () => null
   })
   await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
@@ -32,19 +40,93 @@ async function terminalRuntime(
     title: 'worker'
   })
   const paneKey = expectStablePaneKeyEnv(spawnedPtyEnv(spawn.mock.calls[0]?.[0]))
-  return { runtime, paneKey }
+  const flush = async (): Promise<void> => {
+    await runtime['headlessTerminals'].get('pty-screen')?.writeChain
+  }
+  return { runtime, paneKey, flush }
 }
 
 describe('the screen prompt a pane is holding', () => {
-  it('reads the approval dialog out of the pane it belongs to', async () => {
-    const { runtime, paneKey } = await terminalRuntime()
+  it('detects the captured Copilot dialog after the tail loses it', async () => {
+    const gained: string[] = []
+    const { runtime, paneKey, flush } = await terminalRuntime({
+      onPaneScreenPromptGained: (key) => gained.push(key)
+    })
+    const transcript = readRuntimeFixture('copilot-1-0-105-manual-approval')
+    for (let offset = 0; offset < transcript.length; offset += 64) {
+      runtime.onPtyData('pty-screen', transcript.slice(offset, offset + 64), Date.now())
+    }
+    await flush()
+    await new Promise((resolve) => setImmediate(resolve))
+    // Why two: the byte path and the tail scan each report the same appearance, and the store's
+    // noteDialogGained tolerates a repeat. Pinned so neither reporter can silently stop firing.
+    expect(gained).toEqual([paneKey, paneKey])
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toMatchObject({
+      reason: 'agent-approval-prompt'
+    })
+  })
+
+  it('publishes the captured dialog through the hook store and clears it after dismissal', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-copilot-screen-'))
+    const server = new AgentHookServer()
+    await server.start({ env: 'production', userDataPath })
+    try {
+      const { runtime, paneKey, flush } = await terminalRuntime({
+        onPaneScreenPromptGained: (key) => server.noteScreenPromptGained(key)
+      })
+      wireScreenPromptReader(server, runtime)
+      const tabId = paneKey.split(':')[0]
+      await postHookEvent(
+        server,
+        buildBody(
+          { hook_event_name: 'UserPromptSubmit', prompt: 'run a command' },
+          { paneKey, tabId }
+        ),
+        '/hook/copilot'
+      )
+      await postHookEvent(
+        server,
+        buildBody({ hookName: 'permissionRequest', tool_name: 'bash' }, { paneKey, tabId }),
+        '/hook/copilot'
+      )
+      const transcript = readRuntimeFixture('copilot-1-0-105-manual-approval')
+      for (let offset = 0; offset < transcript.length; offset += 64) {
+        runtime.onPtyData('pty-screen', transcript.slice(offset, offset + 64), Date.now())
+      }
+      await flush()
+      await vi.waitFor(
+        () => expect(server.getStatusSnapshotForPane(paneKey)[0]?.state).toBe('waiting'),
+        { timeout: 4_000 }
+      )
+      runtime.onPtyData('pty-screen', '\u001b[2J\u001b[Hcommand running\r\n', Date.now())
+      await flush()
+      await vi.waitFor(
+        () => expect(server.getStatusSnapshotForPane(paneKey)[0]?.state).toBe('working'),
+        { timeout: 4_000 }
+      )
+    } finally {
+      server.stop()
+      rmSync(userDataPath, { recursive: true, force: true })
+    }
+  })
+
+  it('stamps the dialog once, and restamps it after the wait is dropped', async () => {
+    const { runtime, paneKey, flush } = await terminalRuntime()
     runtime.onPtyData('pty-screen', APPROVAL_DIALOG, 1_000)
+    await flush()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(2_000)
     expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toMatchObject({
       reason: 'agent-approval-prompt',
-      // Why the stamp: a dialog gained before the turn opened is discarded by the store's reader, so
-      // the scan's own clock has to reach it — a null one would silently disable that check.
-      since: 1_000
+      since: 2_000
     })
+    // Why the same stamp: the store judges the row's turn clock against it, so a re-read of a dialog
+    // that never left must not advance it.
+    clock.mockReturnValue(9_000)
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')?.since).toBe(2_000)
+    // Why a new stamp: the wait is over, so a second dialog must not inherit one that predates it.
+    runtime.forgetPaneScreenPrompt(paneKey)
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')?.since).toBe(9_000)
+    clock.mockRestore()
   })
 
   it('reports the moment a dialog appears, through the host dep the store binds', async () => {
@@ -58,15 +140,31 @@ describe('the screen prompt a pane is holding', () => {
     // Why a tick: the report is deferred out of the byte path, so the scan can record the state it
     // compared before the store repaints a row.
     await new Promise((resolve) => setImmediate(resolve))
-    expect(gained).toEqual([paneKey])
+    expect(gained).toEqual([paneKey, paneKey])
+  })
+
+  it('reports once per run of candidate wording, not once per chunk', async () => {
+    const gained: string[] = []
+    const { runtime, paneKey } = await terminalRuntime({
+      onPaneScreenPromptGained: (key) => gained.push(key)
+    })
+    // Why 12: it separates the dialog's two candidate phrases, so the latch clears between them and
+    // arms a second report -- where a report per chunk would arm one for every chunk instead.
+    for (let offset = 0; offset < APPROVAL_DIALOG.length; offset += 12) {
+      runtime.onPtyData('pty-screen', APPROVAL_DIALOG.slice(offset, offset + 12), 1_000)
+    }
+    await new Promise((resolve) => setImmediate(resolve))
+    // One report per run of candidate wording; the tail scan's own report is still on its timer.
+    expect(gained).toEqual([paneKey, paneKey])
   })
 
   it('stops reading a dialog its later output has pushed out of the window', async () => {
     // Why: the copilot fixtures' own note says an answered dialog is protected by the CLI erasing it
     // rather than by the matcher, so enough later output pushes it out of the window the layer reads.
     // That, and not a hook, is what ends the wait in practice.
-    const { runtime, paneKey } = await terminalRuntime()
+    const { runtime, paneKey, flush } = await terminalRuntime()
     runtime.onPtyData('pty-screen', APPROVAL_DIALOG, 1_000)
+    await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')?.reason).toBe('agent-approval-prompt')
     runtime.onPtyData(
       'pty-screen',
@@ -75,12 +173,25 @@ describe('the screen prompt a pane is holding', () => {
       ),
       1_100
     )
+    await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toBeNull()
   })
 
+  it('treats a grid painted for another size as unreadable', async () => {
+    const { runtime, paneKey, flush } = await terminalRuntime()
+    runtime.onPtyData('pty-screen', APPROVAL_DIALOG, 1_000)
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')?.reason).toBe('agent-approval-prompt')
+    const size = vi.spyOn(runtime, 'getTerminalSize').mockReturnValue({ cols: 80, rows: 24 })
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toBeUndefined()
+    size.mockRestore()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')?.reason).toBe('agent-approval-prompt')
+  })
+
   it('answers null for a pane showing ordinary output', async () => {
-    const { runtime, paneKey } = await terminalRuntime()
+    const { runtime, paneKey, flush } = await terminalRuntime()
     runtime.onPtyData('pty-screen', '  ✓ 12 tests passed\r\n  compiling…\r\n', 1_000)
+    await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toBeNull()
   })
 

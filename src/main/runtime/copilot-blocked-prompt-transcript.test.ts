@@ -3,11 +3,7 @@
  * fixtures are the visible lines of those captures: `copilot-permission-prompt.txt` (URL access),
  * `copilot-command-prompt.txt` (shell command), `copilot-question-prompt.txt`.
  *
- * Known gap: AGENTS.md asks for raw recordings with escapes intact plus a `.meta.json`, and these
- * are extracted text, so the redraw pipeline is not exercised here. What protects an ANSWERED dialog
- * is the CLI erasing it, not `withinLastLines` - a dialog left in the tail still reads until about six
- * (approval) to ten (question) lines follow it. The raw before/after pair is what would rule out a
- * renderer that commits it to scrollback, or a dialog taller than the viewport.
+ * The 1.0.105 fixture retains raw PTY redraws; the older fixtures contain extracted visible lines.
  *
  * The screen is the only witness. Copilot's hooks carry no "a prompt is up" event: a
  * `permission_prompt` also fires for the requests the CLI approves itself (measured: 3,611
@@ -16,10 +12,77 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { readRuntimeFixture, replayTranscript } from './agent-transcript-replay-test-harness'
+import {
+  finalReplayFrame,
+  readRuntimeFixture,
+  replayTranscript
+} from './agent-transcript-replay-test-harness'
 import { detectTerminalWaitBlockedReason } from './terminal-wait-detection'
+import { CopilotScreenPromptGained } from './copilot-screen-prompt'
 
 describe("Copilot's blocking prompts, from captured transcripts", () => {
+  it('reads a live CLI 1.0.105 approval through the actual terminal redraw', async () => {
+    const { ruledScreenLines, waitText } = await finalReplayFrame(
+      'copilot-1-0-105-manual-approval',
+      120,
+      40
+    )
+    expect(detectTerminalWaitBlockedReason(ruledScreenLines.join('\n'))).toBe(
+      'agent-approval-prompt'
+    )
+    expect(detectTerminalWaitBlockedReason(waitText)).toBeNull()
+  })
+
+  it('reads the captured approval in a narrow 60x20 terminal', async () => {
+    const { ruledScreenLines } = await finalReplayFrame('copilot-1-0-105-narrow-approval', 60, 20)
+    const detector = new CopilotScreenPromptGained()
+    expect(detector.observe('pty', ruledScreenLines)?.reason).toBe('agent-approval-prompt')
+  })
+
+  it('keeps the first observation clock until the dialog disappears', async () => {
+    const { ruledScreenLines } = await finalReplayFrame('copilot-1-0-105-manual-approval', 120, 40)
+    const detector = new CopilotScreenPromptGained()
+    expect(detector.observe('pty', ruledScreenLines, 100)?.since).toBe(100)
+    expect(detector.observe('pty', ruledScreenLines, 200)?.since).toBe(100)
+    expect(detector.observe('pty', ['command running'], 300)).toBeNull()
+    expect(detector.observe('pty', ruledScreenLines, 400)?.since).toBe(400)
+  })
+
+  it('stamps a forgotten pane from its next sighting', async () => {
+    const { ruledScreenLines } = await finalReplayFrame('copilot-1-0-105-manual-approval', 120, 40)
+    const detector = new CopilotScreenPromptGained()
+    expect(detector.observe('pty', ruledScreenLines, 100)?.since).toBe(100)
+    detector.forget('pty')
+    expect(detector.observe('pty', ruledScreenLines, 400)?.since).toBe(400)
+  })
+
+  it('observes a real approval until the user accepts it', async () => {
+    const detector = new CopilotScreenPromptGained()
+    let sawPrompt = false
+    let last: ReturnType<CopilotScreenPromptGained['observe']> = null
+    for await (const frame of replayTranscript(
+      readRuntimeFixture('copilot-1-0-105-approved'),
+      120,
+      40
+    )) {
+      last = detector.observe('pty', frame.ruledScreenLines)
+      sawPrompt ||= last?.reason === 'agent-approval-prompt'
+    }
+    expect(sawPrompt).toBe(true)
+    expect(last).toBeNull()
+  })
+
+  it('never reports a dialog during a real assisted approval', async () => {
+    const detector = new CopilotScreenPromptGained()
+    for await (const frame of replayTranscript(
+      readRuntimeFixture('copilot-1-0-105-assisted'),
+      120,
+      40
+    )) {
+      expect(detector.observe('pty', frame.ruledScreenLines)).toBeNull()
+    }
+  })
+
   it('reads the approval dialog as an approval prompt', () => {
     expect(detectTerminalWaitBlockedReason(readRuntimeFixture('copilot-permission-prompt'))).toBe(
       'agent-approval-prompt'

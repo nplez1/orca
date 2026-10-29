@@ -228,6 +228,27 @@ describe('a Copilot approval that only the screen reports', () => {
     await vi.waitFor(() => expect(states()).toEqual(['working']), { timeout: 4_000 })
   })
 
+  it('holds a wait when the wired reader cannot see the pane', async () => {
+    let reading: 'prompt' | 'unreadable' | 'clear' = 'prompt'
+    let reads = 0
+    server.setScreenPromptReader(() => {
+      reads += 1
+      if (reading === 'unreadable') {
+        return undefined
+      }
+      return reading === 'prompt' ? { reason: 'agent-approval-prompt', since: Date.now() } : null
+    })
+    await post({ hook_event_name: 'UserPromptSubmit', prompt: 'run a command' })
+    await post({ hook_event_name: 'PermissionRequest', tool_name: 'bash' })
+    await vi.waitFor(() => expect(states()).toEqual(['waiting']), { timeout: 4_000 })
+    reading = 'unreadable'
+    const before = reads
+    await vi.waitFor(() => expect(reads).toBeGreaterThan(before), { timeout: 4_000 })
+    expect(states()).toEqual(['waiting'])
+    reading = 'clear'
+    await vi.waitFor(() => expect(states()).toEqual(['working']), { timeout: 4_000 })
+  })
+
   it('keeps working when no dialog is on screen (a request the CLI approved itself)', async () => {
     let reads = 0
     server.setScreenPromptReader(() => {
@@ -321,13 +342,14 @@ describe('the corroboration loop', () => {
     vi.useRealTimers()
   })
 
-  function corroboration() {
+  function corroboration(forgotten: string[] = []) {
     const loop = new ScreenPromptCorroboration({
       readsScreen: () => true,
       readScreenPrompt: () => {
         reads += 1
         return screen
       },
+      forgetScreenPrompt: (paneKey) => forgotten.push(paneKey),
       currentRow: () => current,
       publishScreenPromptRow: (next) => {
         current = { ...next, receivedAt: current.receivedAt + 1, stateStartedAt: 1 }
@@ -340,13 +362,139 @@ describe('the corroboration loop', () => {
     return loop
   }
 
-  it('never reads a row another host owns', () => {
-    current = row('working', { connectionId: 'conn-1' })
+  it('retries a permission request whose dialog paints after the first read', () => {
+    current = row('working', { hookEventName: 'PermissionRequest' })
+    screen = null
     const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(reads).toBe(1)
+    expect(published).toHaveLength(0)
+    screen = { reason: 'agent-approval-prompt', since: 1_200 }
+    vi.advanceTimersByTime(250)
+    expect(published.at(-1)?.payload.state).toBe('waiting')
+  })
+
+  it('stops retrying an automatically approved request', () => {
+    current = row('working', { hookEventName: 'permissionRequest' })
+    screen = null
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(30_000)
+    expect(reads).toBe(6)
+    expect(published).toHaveLength(0)
+    vi.advanceTimersByTime(30_000)
+    expect(reads).toBe(6)
+  })
+
+  it('stops retrying once a newer row replaces the one it armed', () => {
+    current = row('working', { hookEventName: 'PermissionRequest' })
+    screen = null
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(500)
+    expect(reads).toBe(2)
+    // Not re-armed: the ladder itself must notice the row it was armed for is gone.
+    current = row('working', { receivedAt: 2_000 })
+    vi.advanceTimersByTime(30_000)
+    // One read sees the newer row and stops there; without the guard the ladder runs to six.
+    expect(reads).toBe(3)
+    expect(published).toHaveLength(0)
+  })
+
+  it('stops holding a wait on a pane that never becomes readable', () => {
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(published.at(-1)?.payload.state).toBe('waiting')
+    screen = undefined
+    vi.advanceTimersByTime(200_000)
+    expect(published.at(-1)?.payload.state).toBe('working')
+    const settled = reads
+    vi.advanceTimersByTime(200_000)
+    expect(reads).toBe(settled)
+  })
+
+  it('keeps a wait when unreadable reads are interrupted by a readable one', () => {
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(published.at(-1)?.payload.state).toBe('waiting')
+    screen = undefined
+    vi.advanceTimersByTime(15_000)
+    // The dialog is still up; one readable screen restarts the count of consecutive misses.
+    screen = { reason: 'agent-approval-prompt', since: 1_200 }
+    vi.advanceTimersByTime(6_000)
+    screen = undefined
+    vi.advanceTimersByTime(60_000)
+    expect(published.some((row) => row.payload.state === 'working')).toBe(false)
+  })
+
+  it('defers the gained read so the dialog can paint first', () => {
+    const loop = corroboration()
+    loop.noteDialogGained(PANE)
+    expect(reads).toBe(0)
+    vi.advanceTimersByTime(249)
+    expect(reads).toBe(0)
+    vi.advanceTimersByTime(1)
+    expect(reads).toBe(1)
+  })
+
+  it('drops the pane screen clock once a newer row ends the wait', () => {
+    const forgotten: string[] = []
+    const loop = corroboration(forgotten)
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(published.at(-1)?.payload.state).toBe('waiting')
+    expect(forgotten).toEqual([])
+    current = row('done', { receivedAt: 2_000 })
+    loop.arm(current)
+    expect(forgotten).toEqual([PANE])
+  })
+
+  it('drops the stamp when a non-copilot row ends a live wait', () => {
+    const forgotten: string[] = []
+    const loop = corroboration(forgotten)
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(published.at(-1)?.payload.state).toBe('waiting')
+    // Why: clearing the loop also cancels the recheck, so nothing else can drop the stamp the wait
+    // was justified by -- whoever ends the wait has to drop it, whatever agent their row names.
+    loop.arm(
+      row('done', {
+        receivedAt: 2_000,
+        payload: { state: 'done', prompt: 'review the diff', agentType: 'claude' }
+      })
+    )
+    expect(forgotten).toEqual([PANE])
+  })
+
+  it('drops a pane stamp only for the agent that keeps one', () => {
+    const forgotten: string[] = []
+    const loop = corroboration(forgotten)
+    // Why done rows: they are not corroboratable, so they take the branch that runs for every stored
+    // row -- the one that must not pay a handle lookup for an agent that keeps no stamp.
+    loop.arm(
+      row('done', {
+        receivedAt: 2_000,
+        payload: { state: 'done', prompt: 'review the diff', agentType: 'claude' }
+      })
+    )
+    expect(forgotten).toEqual([])
+    loop.arm(row('done', { receivedAt: 3_000 }))
+    expect(forgotten).toEqual([PANE])
+  })
+
+  it('never reads a row another host owns', () => {
+    const forgotten: string[] = []
+    current = row('working', { connectionId: 'conn-1' })
+    const loop = corroboration(forgotten)
     loop.arm(current)
     vi.advanceTimersByTime(10_000)
     expect(reads).toBe(0)
     expect(published).toHaveLength(0)
+    // A remote pane owns no local stamp, so ending its row costs no lookup either.
+    expect(forgotten).toEqual([])
   })
 
   it('reads once after the delay, then keeps watching while its wait stands', () => {

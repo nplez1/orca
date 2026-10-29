@@ -25,6 +25,9 @@ import type { OrcaRuntimeWithRecordAgentPromptLifecycleState } from '../output/t
 import type { OrcaRuntimeWithEmitDaemonPtyTransientFact } from '../output/terminal-transient-facts'
 import type { OrcaRuntimeWithGetUnpersistedTrackedTitleForPty } from '../output/terminal-title-tracker'
 
+const COPILOT_DIALOG_CANDIDATE =
+  /do you want to run this command|do you want to allow this access|tell copilot what to do|copilot needs information|ctrl\+d decline/
+
 export abstract class OrcaRuntimeWithScheduleWaitBlockedCheck extends OrcaRuntimeWithOnPtyData {
   protected abstract recordAgentPromptPermissionObservation(
     ...args: Parameters<
@@ -55,6 +58,24 @@ export abstract class OrcaRuntimeWithScheduleWaitBlockedCheck extends OrcaRuntim
     // Fold carry and chunk once; per-chunk lowercasing would add another full copy.
     const keywordWindow = `${state.keywordCarry}${appendedText}`.toLowerCase()
     const keywordHit = WAIT_BLOCKED_KEYWORD_PATTERN.test(keywordWindow)
+    // Why a latch: each report arms a read ladder, so re-reporting on every chunk that still carries
+    // the phrase would arm a new ladder each time the last one ends. It reports once per run of
+    // candidate wording in the window, not once per dialog. Why not gated on `keywordHit`: Copilot's
+    // phrases are deliberately absent from WAIT_BLOCKED_KEYWORD_PATTERN, so that gate would drop the
+    // report entirely.
+    const copilotCandidate = COPILOT_DIALOG_CANDIDATE.test(keywordWindow)
+    if (copilotCandidate !== state.copilotCandidate) {
+      const pty = copilotCandidate ? this.ptysById.get(ptyId) : undefined
+      const paneKey = pty && this.paneOfPty(pty).paneKey
+      if (!copilotCandidate) {
+        state.copilotCandidate = false
+      } else if (paneKey) {
+        // Why the latch only once reported: a pane that cannot be resolved yet must not swallow the
+        // report for the rest of this dialog's wording.
+        state.copilotCandidate = true
+        queueMicrotask(() => this.notePaneScreenPromptGained(paneKey))
+      }
+    }
     // Own the tiny retained carry so it cannot pin the full lowercased output window.
     state.keywordCarry = ownRetainedString(keywordWindow.slice(-WAIT_BLOCKED_KEYWORD_CARRY_CHARS))
     appendWaitBlockedCarry(state.appended, appendedText)

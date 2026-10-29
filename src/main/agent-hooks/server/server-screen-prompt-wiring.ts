@@ -8,15 +8,26 @@ type ScreenPromptReader = (
   agentType: string | undefined
 ) => ScreenPromptObservation | null | undefined
 
+type ScreenPromptForgetter = (paneKey: string) => void
+
 /** Switch point for both pane-owning hosts (main and orcad): the screen is the only witness of a
  *  dialog some agents' hooks cannot report, and only the host can read a pane's terminal. */
 export function wireScreenPromptReader(
-  server: Pick<AgentHookServerScreenPromptWiring, 'setScreenPromptReader'>,
-  runtime: { readPaneScreenPrompt: ScreenPromptReader }
+  server: Pick<
+    AgentHookServerScreenPromptWiring,
+    'setScreenPromptReader' | 'setScreenPromptForgetter'
+  >,
+  runtime: {
+    readPaneScreenPrompt: ScreenPromptReader
+    forgetPaneScreenPrompt: ScreenPromptForgetter
+  }
 ): void {
   server.setScreenPromptReader((paneKey, agentType) =>
     runtime.readPaneScreenPrompt(paneKey, agentType)
   )
+  // Why required: a reader that keeps a per-pane stamp with no forgetter reverts to the stale-clock
+  // bug this binding exists to fix, and nothing would report it.
+  server.setScreenPromptForgetter((paneKey) => runtime.forgetPaneScreenPrompt(paneKey))
 }
 
 /**
@@ -29,10 +40,12 @@ export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerS
   /** Bound by the host that owns panes (main, or the runtime behind `orca serve`); absent in the
    *  relay's parser, which has no screen to read. */
   private screenPromptReader: ScreenPromptReader | null = null
+  private screenPromptForgetter: ScreenPromptForgetter | null = null
 
   private readonly screenPromptCorroboration = new ScreenPromptCorroboration({
     readsScreen: () => this.screenPromptReader !== null,
-    readScreenPrompt: (paneKey, agentType) => this.screenPromptReader?.(paneKey, agentType) ?? null,
+    readScreenPrompt: (paneKey, agentType) => this.screenPromptReader?.(paneKey, agentType),
+    forgetScreenPrompt: (paneKey) => this.screenPromptForgetter?.(paneKey),
     currentRow: (paneKey) =>
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: main stores enriched rows; this shared view only declares their base event type.
       this.state.lastStatusByPaneKey.get(paneKey) as EnrichedAgentHookEventPayload | undefined,
@@ -47,6 +60,11 @@ export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerS
     // Why here: a headless host starts the store before it has a runtime to read panes with, so the
     // rows hydrated in between would otherwise never be adopted.
     this.adoptHydratedScreenPromptRows()
+  }
+
+  /** Binds the pane-side stamp withdrawal; null leaves every stamp to the screen's own read. */
+  setScreenPromptForgetter(forgetter: ScreenPromptForgetter | null): void {
+    this.screenPromptForgetter = forgetter
   }
 
   /** The pane's screen gained a dialog: earlier and surer evidence than any deferred read. */

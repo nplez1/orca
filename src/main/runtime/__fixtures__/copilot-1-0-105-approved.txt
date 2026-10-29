@@ -1,0 +1,209 @@
+[>4;2m[?u[?2026$p[?1049h[?2004h[?1004h[?1003h[?1006h[?25l[?12$p[?1007$p[H[2J[>q]10;?\]11;?\]4;0;?\]4;1;?\]4;2;?\]4;3;?\]4;4;?\]4;5;?\]4;6;?\]4;7;?\]4;8;?\]4;9;?\]4;10;?\]4;11;?\]4;12;?\]4;13;?\]4;14;?\]4;15;?\[?25l[22;0t]0;GitHub Copilot[H[2J[?996n[2;90m╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[116C│
+│[m [34m ╭─╮╭─╮[3;39H[2;90m│[m  [1;34mGetting started[61C[0;2;90m│
+│[m [34m ╰─╯╰─╯[m  Copilot v1.0.105 uses AI.  [2;90m│[m  /init — Initialize Copilot instructions for this repository[17C[2;90m│
+│[m [35m █ [96m▘▝[35m █[m  Check for mistakes.[5;39H[2;90m│[m  /model — Switch models across providers, or use Auto[24C[2;90m│
+│[m [35m  ▔▔▔▔ [m  [33m/experimental[6;39H[2;90m│[78C│
+│[116C│
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m[15B[90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[m [1mConfirm folder trust[97C[0;90m│
+│[m [90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[m [90m│
+│[m [90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮[m [90m│
+│[m [90m│[m /private/var/folders/ml/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/T/xxxxxxxxxxxxxxxxxxxxxxxxxxx[29C[90m│[m [90m│
+│[m [90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m [90m│
+│[118C│
+│[m Copilot can read files in this folder and, with your permission, edit them or run code and shell commands. It will   [90m│
+│[m remember your permissions for the rest of this session.[62C[90m│
+│[118C│
+│[m Do you trust the files in this folder?[79C[90m│
+│[118C│
+│[m [97;44m❯ 1. Yes[39m                                                                                                            [m [90m│
+│[m   2. Yes, and remember this folder for future sessions[63C[90m│
+│[m   3. No (Esc)[104C[90m│
+│[118C│
+│[m [1m↑/↓[m to navigate · [1menter[m to select · [1mesc[m to cancel[68C[90m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[?7l╯[?7h[m[10;2H[34m●[m Tip: /autopilot
+   └ Toggle autopilot mode, or set an autopilot objective with an optional AI-credit limit (--max-ai-credits)[5;90HCopilot Fusion[8B [34m●[m An administrator-managed setting replaced model "claude-sonnet-5.5" with "gpt-6.1-sol" for this session. Contact
+   your administrator if this is unexpected.[5;6H[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[18B[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+ /private/var/folders/ml/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx[36;73HRun on: This computer [1mctrl+e[m change environment 
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m❯[K
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m [94m●[m [94mL[34moading: 6 skills, 1 MCP server[m                                                          GPT-6.1 Sol · Medium · (0%)[?7l [?7h[38;3H[?25h[?25l[40;13H[34m13 hooks, 6 skills, 1 MCP server[m[38;3H[?25h[?25l[9;14r[14;1H
+
+
+[1;40r[10;15r[10;1HMMM[1;40r[10;2H[34m●[m An administrator-managed setting replaced model "claude-sonnet-5.5" with "gpt-6.1-sol" for this session. Contact
+   your administrator if this is unexpected.
+
+[3CTip: /autopilot[K
+   └ Toggle autopilot mode, or set an autopilot objective with an optional AI-credit limit (--max-ai-credits)[40;2HInteractive · Assisted Permissions · [1m/[m commands · [1m?[m help[38;3H[?25h[?25l[7A❯ /permissions [4mmanual[m  Require approval for each request[5B[K
+
+❯ /permissions manual[40;39H[1m@[m files · [1m#[m issues [38;22H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[38;22H[?25h[?25l[7A[K[5B /private/var/folders/ml/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx[36;73HRun on: This computer [1mctrl+e[m change environment
+
+❯ [K[40;39H[1m/[m commands · [1m?[m help[38;3H[?25h[?25l[40;16HManual Approval · [1m/[m commands · [1m?[m help     [38;3H[?25h[?25l[22A[34m●[m Permission policy: Manual Approval for this session. All permissions have been disabled. Tool, path, and URL
+   requests will require approval. Execution mode: Interactive. Defaults for future sessions: unchanged.[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[38;3H[?25h[?25lUse the shell tool to run exactly this command: printf orca-test > approval-test.txt. Then report success.[40;34H[1m@[m files · [1m#[m issues [38;109H[?25h[?25l[5;6H[96m╴╶[35m [m[38;109H[?25h]0;Use the shell tool to run exactly this command: printf orca-test > approval-test.txt. Then report success. - GitHub Copilot[?25l[5;6H[96m  [35m [19;2H[m❯ Use the shell tool to run exactly this command: printf orca-test > approval-test.txt. Then report success.    14:30[36;95H[K
+
+❯ [K
+
+ [94m●[m [94mW[34morking[m [1mesc esc[m edit prompt                     [38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[36;26Hxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/T/xxxxxxxxxxxxxxxxxxxxxxxxxxx        [7CSession: 0 AIC used
+
+❯ [?25h[?25l[5;6H[96m▘▝[35m [40;2H[94m◉[m [34mWo[94mrk[109C[m7[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [94m●[m [2A[?25h[?25l
+
+ [94m◉[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[m[38;3H[?25h]0;Run Shell Command for Approval - GitHub Copilot[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m●[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [94m○[m [2A[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [94m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m○[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l
+
+ [34m●[m [94mW[34mo[m[38;3H[?25h[?25l[40;12H· 25 B [1mesc esc[m interrupt[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l[40;14H52 [38;3H[?25h[?25l[40;14H88 [38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m · 95[38;3H[?25h[?25l
+
+ [94m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l[36;98HSession: 1.73[4B [94m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l[17A[33m$[m [1mShell [mWrite approval test file
+   printf orca-test > approval-test.txt[38;3H[?25h[?25l[12A[90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[m [1mWrite approval test file[93C[0;90m│
+│[m [90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[m [90m│
+│[m [90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮[m [90m│
+│[m [90m│[m printf orca-test > approval-test.txt[77C[90m│[m [90m│
+│[m [90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m [90m│
+│[118C│
+│[m Do you want to run this command?[85C[90m│
+│[118C│
+│[m [97;44m❯[39m [97m1. Yes[39m                                                                                                            [m [90m│
+│[m   2. Yes, and don't ask again for `printf` in this directory (/private/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx)              [90m│
+│[m   3. No, and tell Copilot what to do differently (Esc to stop)                                                       [90m│
+│[118C│
+│[m [1m↑/↓[m to navigate · [1menter[m to select · [1mesc[m to cancel                                                                    [90m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[?7l╯[?7h[m[24;2H[34m●[m MCP Servers reloaded: 1 server connected[21;117H5s[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[21;117H6s[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[21;117H7s8s9s10s1s2s[5;6H[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[21;117H3s4s5s6s7s8s[5B[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+ /private/var/folders/ml/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/T/xxxxxxxxxxxxxxxxxxxxxxxxxxx            Session: 1.73 AIC used 
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m❯[K
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m [94m●[m [94mW[34morking[m · 95 B [1mesc esc[m interrupt                                                         GPT-6.1 Sol · Medium · (7%)[?7l [?7h[38;3H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[38;3H[?25h[?25l[21;35HNo Content[38;3H[?25h[?25l
+
+ [34m◎[6C[94mng[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [94m●[m [2A[?25h[?25l
+
+ [94m◉[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m●[m [34mWorki[94mng[m[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [94m○[m [2A[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l[40;14H103 B [1mesc esc[m interrupt[38;3H[?25h[?25l[12A[34m●[m Succe[38;3H[?25h[?25l[26;9Hs[40;2H[34m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l[26;10Hs[38;3H[?25h[?25l[26;11H.[36;109H93
+
+❯ [?25h[?25l
+
+ Interactive · Manual Approval · [1m/[m commands · [1m?[m help[38;3H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[38;3H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h

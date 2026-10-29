@@ -1,0 +1,301 @@
+[>4;2m[?u[?2026$p[?1049h[?2004h[?1004h[?1003h[?1006h[?25l[?12$p[?1007$p[H[2J[>q]10;?\]11;?\]4;0;?\]4;1;?\]4;2;?\]4;3;?\]4;4;?\]4;5;?\]4;6;?\]4;7;?\]4;8;?\]4;9;?\]4;10;?\]4;11;?\]4;12;?\]4;13;?\]4;14;?\]4;15;?\[?25l[22;0t]0;GitHub Copilot[H[2J[?996n[2;90m╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[116C│
+│[m [34m ╭─╮╭─╮[3;39H[2;90m│[m  [1;34mGetting started[61C[0;2;90m│
+│[m [34m ╰─╯╰─╯[m  Copilot v1.0.105 uses AI.  [2;90m│[m  /init — Initialize Copilot instructions for this repository[17C[2;90m│
+│[m [35m █ [96m▘▝[35m █[m  Check for mistakes.[5;39H[2;90m│[m  /model — Switch models across providers, or use Auto[24C[2;90m│
+│[m [35m  ▔▔▔▔ [m  [33m/experimental[6;39H[2;90m│[78C│
+│[116C│
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m[15B[90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[m [1mConfirm folder trust[97C[0;90m│
+│[m [90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[m [90m│
+│[m [90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮[m [90m│
+│[m [90m│[m /private/var/folders/ml/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/T/xxxxxxxxxxxxxxxxxxxxxxxxxxx[29C[90m│[m [90m│
+│[m [90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m [90m│
+│[118C│
+│[m Copilot can read files in this folder and, with your permission, edit them or run code and shell commands. It will   [90m│
+│[m remember your permissions for the rest of this session.[62C[90m│
+│[118C│
+│[m Do you trust the files in this folder?[79C[90m│
+│[118C│
+│[m [97;44m❯ 1. Yes[39m                                                                                                            [m [90m│
+│[m   2. Yes, and remember this folder for future sessions[63C[90m│
+│[m   3. No (Esc)[104C[90m│
+│[118C│
+│[m [1m↑/↓[m to navigate · [1menter[m to select · [1mesc[m to cancel[68C[90m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[?7l╯[?7h[m[10;2H[34m●[m Tip: /context
+   └ Show context window token usage and visualization[5;90HCopilot Fusion[8B [34m●[m An administrator-managed setting replaced model "claude-sonnet-5.5" with "gpt-6.1-sol" for this session. Contact
+   your administrator if this is unexpected.[5;6H[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[18B[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+ /private/var/folders/ml/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx[36;73HRun on: This computer [1mctrl+e[m change environment 
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m❯[K
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m [94m●[m [94mL[34moading: 6 skills, 1 MCP server[m                                                          GPT-6.1 Sol · Medium · (0%)[?7l [?7h[38;3H[?25h[?25l[9;14r[14;1H
+
+
+[1;40r[10;15r[10;1HMMM[1;40r[10;2H[34m●[m An administrator-managed setting replaced model "claude-sonnet-5.5" with "gpt-6.1-sol" for this session. Contact
+   your administrator if this is unexpected.
+
+[3CTip: /context[K
+   └ Show context window token usage and visualization[40;13H[34m13 hooks, 6 skills, 1 MCP server[m[38;3H[?25h[?25l[36;95H[K[40;4H[94mW[34morking[m [1mesc esc[m interrupt                [38;3H[?25h]0;Run exactly the shell command curl -s https://example.com and report the first line. Use the shell tool. - GitHub Copilot[?25l[22A❯ Run exactly the shell command curl -s [4;36m]8;id=md-v03177;https://example.comhttps://example.com[m]8;; and report the first line. Use the shell tool.[6C14:22[38;3H[?25h[?25l[36;26Hxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/T/xxxxxxxxxxxxxxxxxxxxxxxxxxx        [7CSession: 0 AIC used[4B [94m◉[m [34mWo[94mrk[109C[m7[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [94m●[m [2A[?25h]0;Run Shell Command with curl - GitHub Copilot[?25l
+
+ [94m◉[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m●[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [94m○[m [2A[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [94m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m○[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l[40;12H· 6 B [1mesc esc[m interrupt[38;3H[?25h[?25l[40;14H22 B [1mesc esc[m interrupt[38;3H[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l[40;14H79 [38;3H[?25h[?25l
+
+ [34m●[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l[36;98HSession: 4.58[4B [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l[20A[33m$[m [1mShell [mFetch example.com
+   curl -s [4;36m]8;id=md-v03177;https://example.comhttps://example.com]8;;[m[38;3H[?25h[?25l
+
+ [94m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [94m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m[38;3H[?25h[?25l
+
+ [34m●[m [2A[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [94m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [94m●[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [34m◎[m [2A[?25h[?25l
+
+ [34m○[m [2A[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [94m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m○[6Cng[m[38;3H[?25h[?25l
+
+ [34m◎[m [2A[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l
+
+ [94m●[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [94m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[18A [1mApproval check 
+[5C[m└ [32m✓ Auto-approved[m URL ([4;36m]8;id=md-1qfat2s;https://example.com/https://example.com/[m]8;;)
+[7CExplicitly requested, bounded fetch of example.com; no mandatory exclusion applies.[38;3H[?25h[?25l[5;6H[96m▘▝[35m [40;2H[34m◉[6Cng[m[38;3H[?25h[?25l[21;11H[32mssisted Permissions approved[m URL ([4;36m]8;id=md-1qfat2s;https://example.com/https://example.com/[m]8;;)[38;3H[?25h[?25l
+
+ [34m●[m [2A[?25h[?25l
+
+ [94m◉[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [94m○[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m●[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [94m○[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m○[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [94m◉[m [2A[?25h[?25l
+
+ [34m●[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [94m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m●[m [2A[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[m[38;3H[?25h[?25l[18;117H5s[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [94m●[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m[38;3H[?25h[?25l
+
+ [34m◎[m [2A[?25h[?25l
+
+ [34m○[m [2A[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l[20;18H[1ms (2) 
+[5C[m│ 
+[5C│ 
+[5C└ [32m✓ Auto-approved[m shell command (curl)
+[7CExplicitly authorized bounded fetch of example.com; no mandatory exclusion applies.[38;3H[?25h[?25l[23;11H[32mssisted Permissions approved[m shell command (curl)[40;2H[94m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWork[m[38;3H[?25h[?25l[18;28H1 line…[82C6[38;3H[?25h[?25l
+
+ [34m◎[m [2A[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l
+
+ [34m●[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [94m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [94m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [34m●[m [2A[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [94m○[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [94m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[40;2H[34m●[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [34m◎[m [2A[?25h[?25l
+
+ [94m○[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l[40;14H82 [38;3H[?25h[?25l[12A[34m●[40;14H[m107 B [1mesc esc[m interrupt[38;3H[?25h[?25l[12A [36m<![40;2H[34m◉[m [34mWo[94mrk[34ming[m · 12[38;3H[?25h[?25l[12A [31m<!docty[40;15H[m56 [38;3H[?25h[?25l[26;11H[31mpe html>[32m<html [33mlang[40;15H[m80 [38;3H[?25h[?25l[26;29H[32m=[34men[32m>[36m<head[40;2H[34m◎[m [34mWorki[94mng[m · 196[38;3H[?25h[?25l[26;33H[32m<head><meta [33mcharset[32m=[34mutf-8[32m>[36m<l[40;14H[m232 [38;3H[?25h[?25l[26;59H[32m<link [33mrel[32m=[34micon[32m [40;2H[34m○[6Cng[m · 248[38;3H[?25h[?25l[26;74H[33mhref[32m=[34mdata:,[32m>[40;15H[m69 [38;3H[?25h[?25l[26;86H[32m<meta [33mname[32m=[34mviewport[32m [33mcontent[32m=[34m"[40;14H[m310 [38;3H[?25h[?25l[26;106H[K
+   [33mcontent[32m=[34m"width=device-w[40;2H[94m◎[m [2A[?25h[?25l[27;27H[34midth,initial-[40;15H[m42 [38;3H[?25h[?25l[27;40H[34mscale=1"[32m><title>[36mExample Domai[40;16H[m9 [38;3H[?25h[?25l[27;69H[36mn[32m</title>[36m<st[40;2H[94m◉[40;15H[m57[38;3H[?25h[?25l[27;78H[32m<style>html[36m{colo[40;14H[m406 [38;3H[?25h[?25l[27;90H[33mcolor-scheme[36m:light 
+[3Cdark;[33mbackground[40;2H[94m●[m [94mW[40;16H[m7[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[28;19H[36m:[31mlight-dark[36m(#[40;15H[m13 [38;3H[?25h[?25l[28;31H[94m#eee[36m,[94m#222[36m)}bo[40;16H[m5 [38;3H[?25h[?25l[28;42H[32mbody[36m{[33mfont[36m:[94m16px[36m/[94m1.6[36m sys[40;2H[34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l[28;64H[36mtem-ui,sans[40;15H[m60 [38;3H[?25h[?25l[28;75H[36m-serif;max-w[40;15H[m73 [38;3H[?25h[?25l[28;82H[33mmax-width[36m:[94m26em[36m;[33mmargin[36m:auto;[32mp[40;2H[34m◎[m [94mW[34morki[94mng[5C[m6[38;3H[?25h[?25l[28;61H[K
+   [36msystem-ui,sans-serif;[33mmax-width[36m:[94m26em[36m;[33mmargin[36m:auto;[33mpadding[36m:[94m25vh[36m [94m2[36me[40;14H[m538 [38;3H[?25h[?25l[29;66H[94mem[36m [94m2em[36m;[33mtext-align[40;2H[34m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l[29;83H[36m:center}[32m</style></head><body>[36m<[40;15H[m75 [38;3H[?25h[?25l[29;112H[32m<p>[36mThis
+[3Cdomain is for[40;14H[m620 [38;3H[?25h[?25l[30;17H[36m use in documentat[40;2H[34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l[30;35H[36mion examples without needing per[40;15H[m42 [38;3H[?25h[?25l[30;67H[36mmission. This is n[40;2H[94m◉[6C[34mng[m · 667[38;3H[?25h[?25l[30;85H[36mot a service; a[m[38;3H[?25h[?25l[30;100H[36mvoid relying on it
+[3Cfor te[m[38;3H[?25h[?25l[31;10H[36msting and [40;2H[94m●[m [2A[?25h[?25l[31;20H[36mmonitorin[36;109H[m98
+
+❯ [?25h[?25l
+
+ Interactive · Assisted Permissions · [1m/[m commands · [1m?[m help[38;3H[?25h[?25l[31;29H[36mg purposes.[32m</p><script [33msrc[32m=[34m/s.js[32m></script></body></html>[m[38;3H[?25h[?25l[5A[34m●[m MCP Servers reloaded: 1 server connected[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[38;3H[?25h
