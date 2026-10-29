@@ -59,7 +59,7 @@ export class SessionParseCacheDatabase {
   private db: SyncDatabase | null
   private recovered = false
   /** True when a newer build's parser stamped this file: its rows are read, never extended. */
-  private readonly rowsFromNewerParser: boolean
+  private rowsFromNewerParser: boolean
 
   constructor(private readonly path: string) {
     this.db = openDatabase(path)
@@ -215,6 +215,8 @@ export class SessionParseCacheDatabase {
           try {
             removeVersionedCacheDatabase(this.path)
             this.db = openDatabase(this.path)
+            // The rebuilt file carries this build's stamp, so the rows are this build's own again.
+            this.rowsFromNewerParser = false
           } catch (reopenError) {
             console.debug('[ai-vault] session parse cache database stays off', reopenError)
           }

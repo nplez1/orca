@@ -190,5 +190,9 @@ describe('home directory migration', () => {
     expect(after.adoption).toMatchObject({ kind: 'failed' })
     // Nothing was copied in: the pre-rename copy may belong to an official install.
     expect(existsSync(join(currentDir(), 'sites.json'))).toBe(false)
+
+    // Once there is no copy left to import, the report stops rather than naming a copy that is gone.
+    rmSync(join(legacyDir(), 'sites.json'))
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption).toEqual({ kind: 'decided' })
   })
 })

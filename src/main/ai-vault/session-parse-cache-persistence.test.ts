@@ -469,6 +469,8 @@ describe('session parse cache persistence', () => {
     db.close()
 
     simulateRestart(cacheFile)
+    // The newer build's row is still served, so this build does not re-parse what it can read.
+    expect(await parse(transcript)).toMatchObject({ fullParses: 0, reused: 1 })
     await parse(await writeTranscript(root, 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'))
     await flushSessionParseCachePersist()
 
