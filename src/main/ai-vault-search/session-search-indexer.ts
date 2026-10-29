@@ -9,10 +9,7 @@ import {
 import { SessionSearchDirectoryListings } from './session-search-directory-listings'
 import { registerSessionSearchIndexConsumer } from './session-search-index-consumer'
 import { runSessionSearchPass } from './session-search-pass'
-import {
-  sessionSearchHistoryCutoffMs,
-  sessionSearchRetentionWindowMs
-} from './session-search-retention-policy'
+import { isWallClockJump, sessionSearchHistoryCutoffMs } from './session-search-retention-policy'
 import { SessionSearchStore, type SessionSearchStateCounts } from './session-search-store'
 import type { SessionSearchDegradedRoot } from './session-search-degraded-roots'
 import { SessionSearchWorkLoop } from './session-search-work-loop'
@@ -64,6 +61,8 @@ export class SessionSearchIndexer {
   private sweepNext = false
   private started = false
   private closed = false
+  /** The last believable clock reading; a jumped reading never replaces it. */
+  private clockBaselineMs: number | null = null
 
   constructor(private readonly options: SessionSearchIndexerOptions) {
     this.roots = options.roots
@@ -103,7 +102,7 @@ export class SessionSearchIndexer {
       options.contentEnabled !== false
     )
     liveIndexerPaths.add(this.ownershipPath)
-    this.store.setRetentionCutoffMs(this.cutoffMs(), this.retentionWindowMs())
+    this.store.setRetentionCutoffMs(this.cutoffMs())
     this.unregister = registerSessionSearchIndexConsumer(this.store)
   }
 
@@ -231,7 +230,7 @@ export class SessionSearchIndexer {
 
   private async pass(signal: AbortSignal): Promise<void> {
     // Refresh the cutoff each pass so purged transcripts cannot immediately be re-indexed.
-    this.store.setRetentionCutoffMs(this.cutoffMs(), this.retentionWindowMs())
+    this.store.setRetentionCutoffMs(this.cutoffMs())
     const startedAt = this.clock.now()
     const full = this.sweepNext
     // Consume the flag before awaiting so requests arriving during this pass survive.
@@ -285,11 +284,15 @@ export class SessionSearchIndexer {
   }
 
   private cutoffMs(): number | null {
-    return sessionSearchHistoryCutoffMs(this.options.historyDays, this.clock.now())
-  }
-
-  private retentionWindowMs(): number | null {
-    return sessionSearchRetentionWindowMs(this.options.historyDays)
+    const now = this.clock.now()
+    // Why the baseline only moves on a believable reading: adopting the jumped reading would leave the
+    // next pass free to purge an index the jump had made look expired, and nothing re-indexes those
+    // rows until the clock is right again. Holding it keeps the guard in force until the clock returns.
+    if (isWallClockJump(this.clockBaselineMs, now)) {
+      return null
+    }
+    this.clockBaselineMs = now
+    return sessionSearchHistoryCutoffMs(this.options.historyDays, now)
   }
 }
 import { resolve } from 'node:path'

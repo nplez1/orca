@@ -360,6 +360,31 @@ it('covers the whole machine over the passes that follow a truncated sweep', asy
   expect(indexer?.status().phase).toBe('current')
 })
 
+it('refuses to purge the index when the clock jumps mid-session', async () => {
+  const path = transcriptPath()
+  await writeClaudeTranscript(path, ['an entry before the clock moved'], SESSION_ID)
+  const now = new Date(clock.now())
+  await utimes(path, now, now)
+  await newIndexer({ historyDays: 1 }).start()
+  expect(sessionsMatching('before the clock')).toEqual([SESSION_ID])
+
+  // A resumed VM or a wrong RTC: every indexed row now looks expired, and a purge would delete the
+  // whole index. Nothing re-indexes those rows until the clock is right again.
+  clock.advance(400 * 86_400_000)
+  await indexer?.reconcile({ full: true })
+  expect(sessionsMatching('before the clock')).toEqual([SESSION_ID])
+
+  // The jumped reading is not adopted as the baseline, so the guard stays in force.
+  await nextCycle()
+  expect(sessionsMatching('before the clock')).toEqual([SESSION_ID])
+
+  // Once the clock is right again, retention applies again and the aged-out row leaves.
+  clock.advance(-400 * 86_400_000)
+  clock.advance(2 * 86_400_000)
+  await indexer?.reconcile({ full: true })
+  expect(sessionsMatching('before the clock')).toEqual([])
+})
+
 it('moves the retention window with the clock instead of freezing it at construction', async () => {
   const path = transcriptPath()
   await writeClaudeTranscript(path, ['an entry that ages out'], SESSION_ID)
@@ -369,14 +394,9 @@ it('moves the retention window with the clock instead of freezing it at construc
   expect(sessionsMatching('ages')).toEqual([SESSION_ID])
 
   clock.advance(3 * 86_400_000)
-  // Why a newer transcript: a purge whose cutoff sits past every indexed row is refused as a clock
-  // jump, so the window advancing past a whole index is only provable once something inside it
-  // exists. That case is covered in session-search-retention-delete.test.ts.
-  await writeClaudeTranscript(transcriptPath(OTHER_SESSION_ID), ['still inside'], OTHER_SESSION_ID)
   await indexer?.reconcile({ full: true })
 
   expect(sessionsMatching('ages')).toEqual([])
-  expect(sessionsMatching('still')).toEqual([OTHER_SESSION_ID])
   await nextCycle()
   expect(sessionsMatching('ages')).toEqual([])
 })

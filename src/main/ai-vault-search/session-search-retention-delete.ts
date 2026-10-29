@@ -1,8 +1,6 @@
 import { setImmediate as yieldToEventLoop } from 'node:timers/promises'
-import { asRecord } from '../ai-vault/session-scanner-record-value'
 import type SyncDatabase from '../sqlite/sync-database'
 import { deleteSearchMessages } from './session-search-message-rows'
-import { usableRetentionCutoffMs } from './session-search-retention-policy'
 
 export const RETENTION_DELETE_ROWS_PER_STEP = 256
 // Reclaim freed pages incrementally to avoid a long vacuum after the purge.
@@ -13,32 +11,24 @@ export async function deleteExpiredSearchFiles(
   db: SyncDatabase,
   cutoffMs: number | null,
   closed: () => boolean,
-  yieldStep: () => Promise<void> = yieldToEventLoop,
-  /** Retention window the cutoff implements, so a jumped clock cannot empty the index. */
-  windowMs: number | null = null
+  yieldStep: () => Promise<void> = yieldToEventLoop
 ): Promise<void> {
-  const newestRow = asRecord(db.prepare('SELECT max(mtime_ms) AS mtime_ms FROM files').get())
-  const newestIndexedMtimeMs = typeof newestRow?.mtime_ms === 'number' ? newestRow.mtime_ms : null
-  const cutoff = usableRetentionCutoffMs(cutoffMs, newestIndexedMtimeMs, windowMs)
-  if (cutoff !== null) {
+  if (cutoffMs !== null) {
     const expired = db
       .prepare('SELECT path FROM files WHERE mtime_ms < ? ORDER BY mtime_ms')
-      .all(cutoff)
-      .flatMap((row) => (typeof row.path === 'string' ? [row.path] : []))
-    for (const path of expired) {
+      .all(cutoffMs) as { path: string }[]
+    for (const { path } of expired) {
       if (closed()) {
         return
       }
       db.exec('BEGIN IMMEDIATE')
       try {
         // Recheck expiry under the write lock in case a read refreshed this file after the initial scan.
-        const stillExpired = db
-          .prepare('SELECT 1 AS expired FROM files WHERE path = ? AND mtime_ms < ?')
-          .get(path, cutoff)
-        if (stillExpired !== undefined) {
-          db.prepare(
-            'DELETE FROM sessions WHERE id = (SELECT session_row_id FROM files WHERE path = ? AND mtime_ms < ?)'
-          ).run(path, cutoff)
+        const file = db
+          .prepare('SELECT session_row_id FROM files WHERE path = ? AND mtime_ms < ?')
+          .get(path, cutoffMs) as { session_row_id: number | null } | undefined
+        if (file) {
+          db.prepare('DELETE FROM sessions WHERE id = ?').run(file.session_row_id)
           db.prepare('DELETE FROM files WHERE path = ?').run(path)
         }
         db.exec('COMMIT')

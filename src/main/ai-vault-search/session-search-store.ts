@@ -42,7 +42,6 @@ export class SessionSearchStore {
   private readonly writer: SessionSearchIndexWriter
   private closed = false
   private retentionCutoffMs: number | null = null
-  private retentionWindowMs: number | null = null
   // Coalesce replacements into one drain, rerunning if more rows become orphaned.
   private draining = false
   private drainRequested = false
@@ -102,10 +101,8 @@ export class SessionSearchStore {
     return this.db
   }
 
-  /** Records the window beside the cutoff it produced, which is what a clock jump is measured against. */
-  setRetentionCutoffMs(cutoffMs: number | null, windowMs: number | null = null): void {
+  setRetentionCutoffMs(cutoffMs: number | null): void {
     this.retentionCutoffMs = cutoffMs
-    this.retentionWindowMs = windowMs
   }
 
   get retentionCutoff(): number | null {
@@ -346,9 +343,7 @@ export class SessionSearchStore {
       await deleteExpiredSearchFiles(
         this.db,
         cutoffMs,
-        () => this.closed || signal?.aborted === true,
-        undefined,
-        this.retentionWindowMs
+        () => this.closed || signal?.aborted === true
       )
     } catch (error) {
       if (!this.closed) {

@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest'
 import {
-  sessionSearchHistoryCutoffMs,
-  sessionSearchRetentionWindowMs,
-  usableRetentionCutoffMs
+  CLOCK_JUMP_TOLERANCE_MS,
+  isWallClockJump,
+  sessionSearchHistoryCutoffMs
 } from './session-search-retention-policy'
 
 const NOW = 1_740_000_000_000
@@ -23,29 +23,15 @@ it('moves the cutoff with the clock', () => {
   )
 })
 
-it('reports the window the cutoff implements, and none when unbounded', () => {
-  expect(sessionSearchRetentionWindowMs(30)).toBe(30 * DAY)
-  expect(sessionSearchRetentionWindowMs(0)).toBeNull()
-  expect(sessionSearchRetentionWindowMs(null)).toBeNull()
+it('calls a clock reading more than a week ahead of the previous one a jump', () => {
+  expect(isWallClockJump(NOW, NOW + DAY)).toBe(false)
+  expect(isWallClockJump(NOW, NOW + CLOCK_JUMP_TOLERANCE_MS)).toBe(false)
+  expect(isWallClockJump(NOW, NOW + CLOCK_JUMP_TOLERANCE_MS + 1)).toBe(true)
+  // A resumed VM or a wrong RTC lands decades away.
+  expect(isWallClockJump(NOW, NOW + 400 * DAY)).toBe(true)
 })
 
-it('keeps a cutoff at most a window past the newest indexed file', () => {
-  const cutoff = sessionSearchHistoryCutoffMs(30, NOW) ?? 0
-  const window = sessionSearchRetentionWindowMs(30)
-  // One expired file and nothing else is a real state, so an ordinary purge has to survive it.
-  expect(usableRetentionCutoffMs(cutoff, cutoff - 100, window)).toBe(cutoff)
-  expect(usableRetentionCutoffMs(cutoff, cutoff, window)).toBe(cutoff)
-  expect(usableRetentionCutoffMs(cutoff, cutoff - 30 * DAY, window)).toBe(cutoff)
-})
-
-it('ignores a cutoff that a clock jump pushed past the whole index', () => {
-  const cutoff = sessionSearchHistoryCutoffMs(30, NOW + 400 * DAY) ?? 0
-  expect(usableRetentionCutoffMs(cutoff, NOW, sessionSearchRetentionWindowMs(30))).toBeNull()
-})
-
-it('never clamps without a window or an index', () => {
-  expect(usableRetentionCutoffMs(NOW, NOW - 100 * DAY, null)).toBe(NOW)
-  expect(usableRetentionCutoffMs(NOW, NOW - 100 * DAY, 0)).toBe(NOW)
-  expect(usableRetentionCutoffMs(null, NOW, 30 * DAY)).toBeNull()
-  expect(usableRetentionCutoffMs(NOW, null, 30 * DAY)).toBe(NOW)
+it('treats a first reading, and a clock that moved backwards, as believable', () => {
+  expect(isWallClockJump(null, NOW)).toBe(false)
+  expect(isWallClockJump(NOW, NOW - 400 * DAY)).toBe(false)
 })

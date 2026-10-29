@@ -11,29 +11,22 @@ export function sessionSearchHistoryCutoffMs(
   return days === null ? null : nowMs - days * DAY_MS
 }
 
-/** The retention window length the cutoff implements; null when the setting means "unbounded". */
-export function sessionSearchRetentionWindowMs(historyDays: number | null): number | null {
-  const days = normalizeAiVaultSearchHistoryDays(historyDays)
-  return days === null ? null : days * DAY_MS
-}
+/**
+ * How far a wall clock may move within one process before the reading is not a clock.
+ *
+ * Why a week of slack: a suspended laptop legitimately wakes with a week of elapsed time, while a
+ * wrong RTC or a resumed VM lands decades away. Nothing below the threshold is treated as a jump.
+ */
+export const CLOCK_JUMP_TOLERANCE_MS = 7 * DAY_MS
 
 /**
- * A cutoff that a jumped clock pushed more than a window past the newest indexed file would purge the
- * whole index, and nothing re-indexes those rows until the clock is right again.
+ * Whether this reading is a clock jump rather than elapsed time.
  *
- * Why a window of slack rather than any overshoot: files are indexed while they are inside the
- * window, so an ordinary purge sits at most about one window above the newest row — one expired file
- * and nothing else is a real state, and it must still be deleted. A wrong RTC or a resumed VM moves
- * `now` by days or years, which is what the extra window distinguishes. A null window means no bound,
- * so nothing is clamped.
+ * Why the reading itself and not the index: a jumped clock writes *new* rows at the jumped time, so any
+ * test of "the cutoff is past the newest indexed file" stops applying the moment the user does
+ * anything. Comparing two readings of the same clock is not defeated by activity, and needs no stored
+ * state: `lastNowMs` is the previous pass's reading in this process.
  */
-export function usableRetentionCutoffMs(
-  cutoffMs: number | null,
-  newestIndexedMtimeMs: number | null,
-  windowMs: number | null
-): number | null {
-  if (cutoffMs === null || newestIndexedMtimeMs === null || windowMs === null || windowMs <= 0) {
-    return cutoffMs
-  }
-  return cutoffMs - newestIndexedMtimeMs > windowMs ? null : cutoffMs
+export function isWallClockJump(lastNowMs: number | null, nowMs: number): boolean {
+  return lastNowMs !== null && nowMs - lastNowMs > CLOCK_JUMP_TOLERANCE_MS
 }
