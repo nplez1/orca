@@ -234,6 +234,11 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcMobileDevices {
         connectionId,
         clientId: principal.clientId,
         pairedDeviceId: device.deviceId,
+        // Why a live-registry probe: host settings are pinned to the pairing that configured them, and
+        // removing that pairing on this host is how a user hands the host to another machine.
+        pairedDeviceRegistry: this.deviceRegistry
+          ? { has: (deviceId) => this.deviceRegistry?.getDevice(deviceId) !== null }
+          : undefined,
         pairedDeviceParentId: device.parentDeviceId,
         // Diet only mobile payloads; retain full web/desktop replies.
         clientKind: device.scope,

@@ -145,6 +145,13 @@ if (preflightReady) {
         openMainWindow,
         handleMacAppActivation
       })
+      // A rotation the credential store refused is on disk, and the old refresh token is already spent: a
+      // `claude` run that starts before Orca's next usage refresh would otherwise spend that dead token and
+      // lose the login. Why here and not earlier: `safeStorage` cannot decrypt before the app is ready on
+      // Windows and Linux, and the serve-path keychain guard has to have run first.
+      void import('./claude-accounts/claude-oauth-pending-rotations')
+        .then((rotations) => rotations.flushPendingClaudeOAuthRotations())
+        .catch(() => {})
     } catch (error) {
       const message =
         formatProfileStateStartupFailure(error) ??

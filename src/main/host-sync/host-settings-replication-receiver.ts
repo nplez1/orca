@@ -49,8 +49,18 @@ export function applyHostSettingsPayload(input: {
   payload: HostSettingsReplicationPayload
   registry: HostSettingsCredentialRegistry
   now: number
+  /**
+   * Credential ids this host holds *because replication put them here*.
+   *
+   * Why the receiver needs it: a value the host holds that replication never wrote is the user's own,
+   * entered on this machine — and overwriting it with the main's value makes the id a replicated
+   * holding, so the main's later revocation deletes a credential the host's owner supplied. Only the
+   * host knows which of its own values came from a push, so `onlyIfEmpty` cannot express this.
+   */
+  replicatedIds?: readonly string[]
 }): { report: HostSettingsApplyReport; state: HostSettingsSyncState } {
   const { payload, registry, now } = input
+  const replicated = new Set(input.replicatedIds ?? [])
   const outcomes: Record<string, HostSettingsApplyOutcome> = {}
 
   for (const credential of payload.upserts) {
@@ -59,7 +69,18 @@ export function applyHostSettingsPayload(input: {
       outcomes[credential.id] = 'refusedUnknownKind'
       continue
     }
-    if (credential.onlyIfEmpty && port.protectionOf(credential.id) !== null) {
+    const heldHere = port.protectionOf(credential.id) !== null
+    if (credential.onlyIfEmpty && heldHere) {
+      outcomes[credential.id] = 'keptHostValue'
+      continue
+    }
+    // Why kept rather than replaced: this is the host's own value, and taking it over would both
+    // switch the account this machine uses and hand the main the right to delete it.
+    //
+    // Known limit: a value the user re-enters here for an id replication already owns is still replaced,
+    // because the local save paths do not clear the replicated claim. Fixing that needs the stores to
+    // report their own writes, which is why this guard is the record and not the value.
+    if (heldHere && !replicated.has(credential.id)) {
       outcomes[credential.id] = 'keptHostValue'
       continue
     }

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 import { createHostSettingsApiKeyPort } from './host-settings-api-key-port'
 import type { HostSettingsApiKeyStore } from './host-settings-api-key-port'
+import { createHostSettingsCredentialRegistry } from './host-settings-credential-port'
+import { applyHostSettingsPayload } from './host-settings-replication-receiver'
 
 const ID = 'api-key:deepseek'
 const LABEL = 'DeepSeek API key'
@@ -113,5 +116,63 @@ describe('the provider-key credential port', () => {
 
     expect(port.protectionOf(ID)).toBe('plaintext')
     expect(port.list()).toEqual([])
+  })
+})
+
+function incoming(payload: string): ReplicatedHostCredential {
+  return {
+    id: ID,
+    kind: ID,
+    label: LABEL,
+    protection: 'sealed',
+    onlyIfEmpty: false,
+    payload
+  }
+}
+
+describe('a provider key the user entered on the host', () => {
+  it('keeps the host key when replication has never written this id', () => {
+    const store = fakeStore({ payload: 'sk-mine', protection: 'sealed' })
+    const port = createPort(store)
+
+    const { report, state } = applyHostSettingsPayload({
+      payload: {
+        version: 1,
+        baseRevision: null,
+        revision: 3,
+        upserts: [incoming('sk-laptop')],
+        removals: []
+      },
+      registry: createHostSettingsCredentialRegistry([port]),
+      replicatedIds: [],
+      now: 1
+    })
+
+    expect(store.currentPayload()).toBe('sk-mine')
+    expect(report.outcomes).toEqual({ [ID]: 'keptHostValue' })
+    expect(state).toMatchObject({ kind: 'partial' })
+  })
+
+  // Why the other half: a value replication did put here is the main's to update, so the guard must
+  // not turn into "a host key is never replaced" — that would strand a rotated key forever.
+  it('replaces the host copy once replication owns that id', () => {
+    const store = fakeStore({ payload: 'sk-old', protection: 'sealed' })
+    const port = createPort(store)
+
+    const { report } = applyHostSettingsPayload({
+      payload: {
+        version: 1,
+        baseRevision: null,
+        revision: 4,
+        upserts: [incoming('sk-rotated')],
+        removals: []
+      },
+      registry: createHostSettingsCredentialRegistry([port]),
+      replicatedIds: [ID],
+      now: 1
+    })
+
+    expect(store.currentPayload()).toBe('sk-rotated')
+    expect(report.outcomes).toEqual({ [ID]: 'applied' })
   })
 })

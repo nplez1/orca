@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import type * as Os from 'node:os'
 import { join } from 'node:path'
@@ -116,4 +124,24 @@ describe('OpenAI speech API key store', () => {
     expect(existsSync(join(tempHome, '.orca-np'))).toBe(false)
     expect(safeStorageMock.decryptString).not.toHaveBeenCalled()
   })
+
+  // Why: `writeFileSync`'s `mode` applies at creation only, so a rewrite of an existing 0644 file kept
+  // 0644 while the file holds the key. The atomic writer publishes a new inode at 0600 instead.
+  it.skipIf(process.platform === 'win32')(
+    'keeps the stored key owner-only across a rewrite, in a private home directory',
+    async () => {
+      const store = await loadStoreModule()
+      const orcaDir = join(tempHome, '.orca-np')
+      const keyPath = join(orcaDir, 'openai-speech-token.enc')
+
+      store.saveOpenAiSpeechApiKey('first-key')
+      chmodSync(keyPath, 0o644)
+      chmodSync(orcaDir, 0o755)
+      store.saveOpenAiSpeechApiKey('second-key')
+
+      expect(statSync(keyPath).mode & 0o777).toBe(0o600)
+      expect(statSync(orcaDir).mode & 0o777).toBe(0o700)
+      expect(readFileSync(keyPath, 'utf8')).toBe('second-key')
+    }
+  )
 })
