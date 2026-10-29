@@ -1724,29 +1724,37 @@ today, and all 17 are `host-toolchain` (8) and `sqlite-binding` (9) — a differ
 and SQLite, which is not something this fork can fix in a test. The `host-toolchain` entries that were
 bash 3.2 rather than bun or SQLite are gone with the bash install recorded above.
 
-### `local(lint)`: two flaky-test-pattern reds inherited from #198
+### `local(lint)`: the two #198 flaky-test-pattern reds, fixed in the tree and pruned
 
-`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` fails
+`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` failed
 `lint:ast-grep-gates` on two files that commit merged, and on nothing else. That step is where these
 live now: the 2026-10-28 sync folded upstream's `check:flaky-test-pattern-ratchet` into
-`lint:ast-grep-gates`, and `local/lint-known-red.json` follows the rename. The red itself did not change.
+`lint:ast-grep-gates`, and `local/lint-known-red.json` followed the rename. The red itself did not
+change.
 
 ```
 test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details.test.tsx: 1 flaky-test finding(s), baseline allows 0.
 test-no-wall-clock:src/renderer/src/components/github/check-details-cache.test.ts: 4 flaky-test finding(s), baseline allows 0.
 ```
 
-Both are static ast-grep findings, so they are deterministic, not flaky-that-time: neither file was
-touched by the branch that ran the gate, and both arrive through the base commit. Recording them is
-the `local(lint)` mechanism's reason for existing — the alternative was a branch either fixing another
-branch's fresh tests or quietly not running the gate.
+Both are static ast-grep findings, so they are deterministic rather than flaky-that-time, and both
+arrive through `941acb70e0` — the fork's own work, not a foreign red. They were allowlisted for one
+release line and are now fixed where the ratchet asked for them, so both entries are gone:
 
-`local/lint-known-red.json` carries one narrow entry per file (the `match` names the rule and the
-path, so a _new_ finding in either file still fails the gate). The fix belongs to whoever owns the
-checks-panel work: a wall-clock read and a real-time wait in a test are what
-`config/scripts/check-flaky-test-pattern-ratchet.mjs` exists to catch (now reached through
-`lint:ast-grep-gates`), and both want fake timers or a fixed timestamp, not a suppression. **Pruning
-wins**: when that lands, delete both entries and this section in the same commit.
+- `check-details-cache.test.ts` pins the clock with `vi.useFakeTimers()` + `vi.setSystemTime()`. That
+  is what the four `Date.now()` reads needed: `checkDetailsNeedRefresh` compares a payload's `readAt`
+  against the wall clock, so the TTL cases were really asking how fast the machine ran them.
+- `checks-list-expanded-details.test.tsx` drives `useDelayedFlag`'s 200 ms deferral with
+  `vi.advanceTimersByTimeAsync(250)` instead of sleeping 250 real milliseconds to catch a label a fast
+  machine never shows. The case went from a real quarter-second wait to milliseconds.
+
+**The claim that stood here was false, which is the argument for fixing rather than allowlisting.** It
+said the entries' `match` named the rule and the path, "so a _new_ finding in either file still fails
+the gate". It does not. The ratchet prints one line per rule and file — `<rule>:<path>: N flaky-test
+finding(s), baseline allows M.` — and the regex is anchored on the rule and the path alone, so a fifth
+`Date.now()` in `check-details-cache.test.ts` would have printed the same line and been masked. A
+`match` narrows an entry to one file; it does not pin the count, so it cannot notice new findings in
+an allowlisted file.
 
 ### `local(lint)`: a base-branch typecheck red, repaired rather than recorded
 
