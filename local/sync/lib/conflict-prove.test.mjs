@@ -520,3 +520,68 @@ test('a --merge-tree decision has no worktree to write', () => {
     /live/
   )
 })
+
+// A directive comment is code. These are the shapes that used to prove as "upstream changed only
+// comments", silently dropping the directive and keeping the fork's side.
+const directiveHunk = (directive, path = 'src/a.ts') =>
+  only(
+    file(
+      hunk({
+        ours: ['const x = compute(1, fork)'],
+        base: ['const x = compute(1)'],
+        theirs: [directive, 'const x = compute(1)']
+      })
+    ),
+    path
+  )
+
+test('a vitest-environment directive upstream added is not "only comments"', () => {
+  const proof = directiveHunk('// @vitest-environment happy-dom')
+  assert.equal(proof.tier, null)
+  assert.match(proof.reason, /directive comment/)
+})
+
+test('a ts-expect-error and a ts-nocheck are directives too', () => {
+  for (const directive of ['// @ts-expect-error the mock is partial', '// @ts-nocheck']) {
+    const proof = directiveHunk(directive)
+    assert.equal(proof.tier, null, directive)
+  }
+})
+
+test('a lint-disable and a triple-slash reference are directives too', () => {
+  for (const directive of [
+    '// eslint-disable-next-line no-console',
+    '// oxlint-disable',
+    '/// <reference types="vitest" />'
+  ]) {
+    const proof = directiveHunk(directive)
+    assert.equal(proof.tier, null, directive)
+  }
+})
+
+test('a JSDoc type is a directive in a JS file and plain prose in a TS file', () => {
+  const directive = '/** @type {import("./types").Opts} */'
+  const js = directiveHunk(directive, 'src/a.mjs')
+  assert.equal(js.tier, null)
+  // tsc reads JSDoc types only in JS, so the same comment in a .ts file still proves.
+  assert.equal(directiveHunk(directive, 'src/a.ts').tier, 'upstream-unchanged')
+})
+
+test('an upstream reward of a non-directive comment still proves ours', () => {
+  const proof = directiveHunk('// tidy-up by upstream')
+  assert.equal(proof.tier, 'upstream-unchanged')
+  assert.deepEqual(proof.resolution, ['const x = compute(1, fork)'])
+})
+
+test('a directive both sides already carry identically does not refuse the hunk', () => {
+  const proof = only(
+    file(
+      hunk({
+        ours: ['// @ts-expect-error the shim is partial', 'const x = compute(1, fork)'],
+        base: ['// @ts-expect-error the shim is partial', 'const x = compute(1)'],
+        theirs: ['// @ts-expect-error the shim is partial', 'const x = compute(1)']
+      })
+    )
+  )
+  assert.equal(proof.tier, 'upstream-unchanged')
+})
