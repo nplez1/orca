@@ -54,14 +54,16 @@ describe('session timeline bounds', () => {
     expect(state.updatedAt).toBe('+010000-01-01T00:00:00.000Z')
   })
 
-  it('ignores invalid timestamps and retains the existing out-of-range error', () => {
+  it('ignores invalid timestamps and drops one that cannot be a Date', () => {
     const state = accumulator()
     for (const timestamp of [null, undefined, '', 'bad-date', 0, -1, Number.NaN, Infinity]) {
       updateTimeline(state, timestamp)
     }
     expect(state.createdAt).toBeNull()
     expect(state.updatedAt).toBeNull()
-    expect(() => updateTimeline(state, 8_640_000_000_000_001)).toThrow(RangeError)
+    // Past the Date range `toISOString` throws RangeError, which used to lose the whole session;
+    // the value is now dropped instead.
+    expect(() => updateTimeline(state, 8_640_000_000_000_001)).not.toThrow()
     expect(state.createdAt).toBeNull()
     expect(state.updatedAt).toBeNull()
   })

@@ -144,6 +144,16 @@ export type JenkinsCredentialArgs = {
   configured?: boolean
   /** The matched server's configured prefix, which bounds where credentials may travel. */
   serverBaseUrl?: string | null
+  /**
+   * Refuse a redirect instead of following it.
+   *
+   * Why: `follow` sends the next request wherever the status points, and a public host answering
+   * `302 Location: http://10.0.0.5/…` is the intranet probe an unconfigured host may not make.
+   * Every hop can be vetted only through `net.request` (see `electron-repo-icon-fetch.ts`), and a
+   * redirect from a host nobody configured is not worth that transport — so an unconfigured host is
+   * read only when it answers directly.
+   */
+  refuseRedirects?: boolean
   signal?: AbortSignal
 }
 
@@ -172,6 +182,28 @@ export function jenkinsSignal(signal: AbortSignal | undefined): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout
 }
 
+/** A redirect status; only the class matters, and only to the refusal below. */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
+
+function redirectFailure(): JenkinsRequestFailure {
+  return {
+    reason: 'not-configured',
+    message: 'Jenkins redirected, and an unconfigured host is only read when it answers directly',
+    identifiedAsJenkins: false,
+    jenkinsVersion: null
+  }
+}
+
+/**
+ * Electron's transport rejects a manual redirect instead of handing back the 3xx response
+ * (`net-client-request.ts`): the request is already cancelled when it reaches us, which is a
+ * refusal, not an unreachable server. The message is Electron's own, matched verbatim — in `manual`
+ * mode Chromium cancels on the first hop, so no `ERR_TOO_MANY_REDIRECTS` reaches this branch.
+ */
+function isCancelledRedirect(error: unknown): boolean {
+  return error instanceof Error && /redirect was cancelled/i.test(error.message)
+}
+
 export async function jenkinsGetJson(
   args: JenkinsCredentialArgs & { url: string }
 ): Promise<JenkinsRequestResult> {
@@ -182,12 +214,19 @@ export async function jenkinsGetJson(
   try {
     response = await httpClient.fetch(args.url, {
       method: 'GET',
-      redirect: 'follow',
+      redirect: args.refuseRedirects ? 'manual' : 'follow',
       headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
       signal: jenkinsSignal(args.signal)
     })
   } catch (error) {
+    if (args.refuseRedirects && isCancelledRedirect(error)) {
+      return { ok: false, failure: redirectFailure() }
+    }
     return { ok: false, failure: classifyJenkinsTransportError(error) }
+  }
+  if (args.refuseRedirects && REDIRECT_STATUSES.has(response.status)) {
+    await releaseBody(response)
+    return { ok: false, failure: redirectFailure() }
   }
 
   const jenkinsVersion = response.headers.get('x-jenkins')

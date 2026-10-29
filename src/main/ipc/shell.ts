@@ -25,8 +25,8 @@ import {
 import {
   isLocallyOwned,
   pathExists,
-  resolveOwnedPathTarget,
-  validateLocalPathTarget
+  resolveDefaultAppOpenTarget,
+  resolveOwnedPathTarget
 } from './shell-owned-path-target'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
@@ -102,7 +102,9 @@ async function openWithSystemDefault(pathValue: string, ownerHostId: unknown): P
   if (!isLocallyOwned(ownerHostId)) {
     return false
   }
-  const target = await validateLocalPathTarget(pathValue)
+  // Why not `validateLocalPathTarget`: this handler is reachable from a markdown link, so the file
+  // type decides whether the OS may execute it.
+  const target = await resolveDefaultAppOpenTarget(pathValue)
   if (!target.ok) {
     return false
   }
@@ -185,12 +187,9 @@ export function registerShellHandlers(
       return
     }
 
-    const target = await validateLocalPathTarget(filePath)
-    if (!target.ok) {
-      return
-    }
-
-    await openWithSystemDefault(target.path, ownerHostId)
+    // Owner and file type are both decided inside; this handler is the markdown-link route, so
+    // nothing it forwards may be executable.
+    await openWithSystemDefault(filePath, ownerHostId)
   })
 
   ipcMain.handle('shell:pathsExist', async (_event, paths: string[]): Promise<boolean[]> => {

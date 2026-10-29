@@ -30,7 +30,7 @@ export const SESSION_PARSE_CACHE_SCHEMA_VERSION = 8
  * a finished transcript never looks stale again — so without this, a fix reaches only transcripts that
  * change afterwards, and only if someone remembered to bump the schema by hand.
  */
-export const SESSION_PARSE_PARSER_VERSION = 2
+export const SESSION_PARSE_PARSER_VERSION = 3
 const PARSER_VERSION_KEY = 'parser_version'
 
 const SCHEMA_SQL = `
