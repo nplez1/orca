@@ -7,7 +7,6 @@ import type {
   GitBranchChangeEntry,
   GitBranchCompareSummary
 } from '../../../../shared/git-diff-compare-types'
-import type { GitStatusEntry } from '../../../../shared/git-status-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { canUseChangesModeForFile } from '../editor/editor-panel-file-mode'
 import { getCompareBaseCandidateBranchName } from '../../../../shared/source-control-base-ref-resolution'
@@ -17,34 +16,50 @@ import {
   requestSourceControlEditorRevealFrame
 } from '../right-sidebar/source-control/notes/editor-reveal-frames'
 
-/** Where a Checks-pane comment can be shown in the code. */
+/** Where a comment can be shown in the code. */
 export type PRCommentCodeTarget = {
   /** Repo-relative path, exactly as GitHub reports it. */
   relativePath: string
   line: number
+  /**
+   * Whether the tab should scroll to that line.
+   *
+   * False for an outdated thread: its line belongs to a revision the provider no longer maps, so the
+   * file still opens — only the scroll to a line nobody vouches for is withheld.
+   */
+  reveal: boolean
 }
 
 /**
- * The line a comment can be opened at, or null when opening it in code would be a lie.
+ * A changed row as the review names it, including the old side of a rename.
  *
- * Outdated threads keep their original line number, and a worktree whose head is not the PR's head
- * cannot say where the line moved to. Both cases return null so the caller falls back to opening the
- * comment on the provider instead of scrolling to unrelated code.
+ * GitHub keeps reporting the pre-rename path for a thread that started before the rename, so
+ * matching only the new path would silently lose the file it belongs to.
+ */
+function matchesCommentPath(
+  entry: { path: string; oldPath?: string },
+  relativePath: string
+): boolean {
+  return entry.path === relativePath || entry.oldPath === relativePath
+}
+
+/**
+ * Where a comment can be opened, or null when the workspace cannot hold the file at all.
+ *
+ * A comment with no path, no line number, or no worktree has nothing to open — that is the only case
+ * the caller may fall back to the provider for. An outdated thread still opens its file, without the
+ * scroll.
  */
 export function resolvePRCommentCodeTarget(
   comment: PRComment,
-  worktreePath: string | null | undefined,
-  placementAllowed: boolean
+  worktreePath: string | null | undefined
 ): PRCommentCodeTarget | null {
-  if (!placementAllowed || comment.isOutdated) {
-    return null
-  }
   const relativePath = comment.path
   const line = comment.line
   if (!relativePath || typeof line !== 'number' || !worktreePath?.trim()) {
     return null
   }
-  return { relativePath, line }
+  return { relativePath, line, reveal: comment.isOutdated !== true }
 }
 
 /**
@@ -52,36 +67,43 @@ export function resolvePRCommentCodeTarget(
  * that surface can show.
  *
  * A thread is only readable against the code it reviews, so the branch diff — merge base to head,
- * which is the review's own diff — comes first; Changes mode carries the uncommitted hunks; and a
- * plain tab is the answer only once a compare against the review's own base proves the file is
- * outside the review, because then this worktree holds no hunks for it at all.
+ * which is the review's own diff — comes first, and Changes mode carries everything else. There is
+ * no plain-tab outcome: Changes mode explains an empty result itself, while a plain tab would hide
+ * the workspace's changes instead of showing that there are none.
  */
 export type PRCommentCodeSurface =
   | { kind: 'branch-diff'; entry: GitBranchChangeEntry; compare: GitBranchCompareSummary }
   | { kind: 'changes' }
-  | { kind: 'edit' }
 
 export function resolvePRCommentCodeSurface({
   relativePath,
   reviewBaseRefName,
   branchCompare,
-  branchChanges,
-  statusEntries
+  branchChanges
 }: {
   relativePath: string
   /** The review's base branch, or null when the provider did not name one. */
   reviewBaseRefName: string | null | undefined
   branchCompare: GitBranchCompareSummary | null | undefined
   branchChanges: readonly GitBranchChangeEntry[] | null | undefined
-  statusEntries: readonly GitStatusEntry[] | null | undefined
 }): PRCommentCodeSurface {
   const reviewBase = reviewBaseRefName?.trim() || null
   // Why also the exact ref: a local base named `release/2.0` reads as `2.0` to the branch helper, and
   // that mismatch would cost the jump the surface it came for.
-  const compareIsReviewBase = (baseRef: string): boolean =>
-    reviewBase === null ||
-    baseRef.trim() === reviewBase ||
-    getCompareBaseCandidateBranchName(baseRef) === reviewBase
+  // Why the namespace prefix too: a provider names a base branch without an owner, while the local
+  // remote ref carries one — this fork's reviews target `main` on GitHub and `origin/nplez1/main` here,
+  // and requiring the two names to be equal is what sent every such jump to the wrong view.
+  const compareIsReviewBase = (baseRef: string): boolean => {
+    if (reviewBase === null) {
+      return true
+    }
+    const trimmed = baseRef.trim()
+    if (trimmed === reviewBase) {
+      return true
+    }
+    const candidate = getCompareBaseCandidateBranchName(trimmed)
+    return candidate === reviewBase || candidate.endsWith(`/${reviewBase}`)
+  }
   // Why the OIDs too: a diff tab with no compare OIDs silently renders an unstaged diff instead.
   const reviewDiffCompare =
     branchCompare?.status === 'ready' &&
@@ -93,17 +115,15 @@ export function resolvePRCommentCodeSurface({
       ? branchCompare
       : null
   const entry = reviewDiffCompare
-    ? branchChanges?.find((candidate) => candidate.path === relativePath)
+    ? (branchChanges?.find((candidate) => candidate.path === relativePath) ??
+      branchChanges?.find((candidate) => matchesCommentPath(candidate, relativePath)))
     : undefined
   if (reviewDiffCompare && entry) {
     return { kind: 'branch-diff', entry, compare: reviewDiffCompare }
   }
-  if (statusEntries?.some((statusEntry) => statusEntry.path === relativePath)) {
-    return { kind: 'changes' }
-  }
-  // Why: Changes mode explains itself with its own "no uncommitted changes" banner, which is the
-  // honest landing whenever the review's own diff is not known to be empty for this file.
-  return reviewDiffCompare ? { kind: 'edit' } : { kind: 'changes' }
+  // Why: Changes mode is the one diff surface every worktree file has, and it explains an empty
+  // result with its own banner. A plain tab would hide the workspace's changes rather than show none.
+  return { kind: 'changes' }
 }
 
 /**
@@ -116,13 +136,10 @@ export function resolvePRCommentCodeSurface({
 export function usePRCommentCodeNavigation({
   worktreeId,
   worktreePath,
-  placementAllowed,
   reviewBaseRefName
 }: {
   worktreeId: string | null | undefined
   worktreePath: string | null | undefined
-  /** False when the head rule forbids placing comments, which makes the jump fall back to GitHub. */
-  placementAllowed: boolean
   /** The review's base branch; a compare against any other base is not the review's diff. */
   reviewBaseRefName: string | null | undefined
 }): (comment: PRComment) => boolean {
@@ -135,7 +152,7 @@ export function usePRCommentCodeNavigation({
 
   return useCallback(
     (comment: PRComment): boolean => {
-      const target = resolvePRCommentCodeTarget(comment, worktreePath, placementAllowed)
+      const target = resolvePRCommentCodeTarget(comment, worktreePath)
       if (!target || !worktreeId || !worktreePath) {
         return false
       }
@@ -150,8 +167,7 @@ export function usePRCommentCodeNavigation({
         relativePath: target.relativePath,
         reviewBaseRefName,
         branchCompare: beforeOpen.gitBranchCompareSummaryByWorktree[worktreeId],
-        branchChanges: beforeOpen.gitBranchChangesByWorktree[worktreeId],
-        statusEntries: beforeOpen.gitStatusByWorktree[worktreeId]
+        branchChanges: beforeOpen.gitBranchChangesByWorktree[worktreeId]
       })
       // Why only an Edit tab consumes a line reveal; a diff surface scrolls to the thread by id, and
       // a stale line reveal would fire later if the user switched that tab to Edit.
@@ -171,10 +187,9 @@ export function usePRCommentCodeNavigation({
         const opened = afterOpen.openFiles.find((file) => file.id === fileId)
         // Why: Changes mode is keyed by file id, and that id is not the path for a remote owner (or
         // an occupied path) — a path-keyed write would leave the tab in plain Edit mode.
-        const changesMode =
-          surface.kind === 'changes' && !!opened && canUseChangesModeForFile(opened)
+        const changesMode = !!opened && canUseChangesModeForFile(opened)
         setEditorViewMode(fileId, changesMode ? 'changes' : 'edit')
-        if (!changesMode) {
+        if (!changesMode && target.reveal) {
           lineRevealFileId = fileId
         }
       }
@@ -192,7 +207,10 @@ export function usePRCommentCodeNavigation({
               matchLength: 0
             })
           }
-          setScrollToDiffCommentId(getPRCommentInlineId(comment.id))
+          // An outdated thread has no line the provider still maps, so the file opens without a scroll.
+          if (target.reveal) {
+            setScrollToDiffCommentId(getPRCommentInlineId(comment.id))
+          }
         })
       })
       return true
@@ -200,7 +218,6 @@ export function usePRCommentCodeNavigation({
     [
       openBranchDiff,
       openFile,
-      placementAllowed,
       reviewBaseRefName,
       setEditorViewMode,
       setPendingEditorReveal,

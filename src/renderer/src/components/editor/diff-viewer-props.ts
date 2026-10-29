@@ -9,6 +9,8 @@ export type DiffViewerProps = {
   language: string
   filePath: string
   relativePath: string
+  /** The pre-rename name a provider still files an old review thread under. */
+  oldPath?: string
   sideBySide: boolean
   editable?: boolean
   // Hosted review dialogs may have no workspace for local comments.
@@ -26,4 +28,6 @@ export type DiffViewerProps = {
   largeDiffRenderLimit?: LargeDiffRenderLimit
   // Render-limited IPC bodies are blank placeholders, never saveable drafts.
   largeDiffSaveContentAvailable?: boolean
+  /** False on a historical revision, where review-head line numbers would land on other code. */
+  showReviewThreads?: boolean
 }

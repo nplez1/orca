@@ -4,11 +4,15 @@ import { act } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  getRuntimeGitBranchCompare: vi.fn()
+  getRuntimeGitBranchCompare: vi.fn(),
+  getRuntimeRepoBaseRefDefault: vi.fn()
 }))
 
 vi.mock('@/runtime/runtime-git-diff-client', () => ({
   getRuntimeGitBranchCompare: mocks.getRuntimeGitBranchCompare
+}))
+vi.mock('@/runtime/runtime-repo-client', () => ({
+  getRuntimeRepoBaseRefDefault: mocks.getRuntimeRepoBaseRefDefault
 }))
 vi.mock('@/lib/connection-context', () => ({ getConnectionId: () => null }))
 vi.mock('../worktree-git-owner-target', () => ({
@@ -22,6 +26,7 @@ import { useChecksPanelBranchCompareWarmup } from './use-checks-panel-branch-com
 import { flush, mountProbe, unmountProbes } from '../source-control-hook-test-harness'
 
 const WORKTREE_ID = 'worktree-A'
+const REPO_ID = 'repo-A'
 const HEAD = 'b'.repeat(40)
 
 function summary(overrides: Partial<GitBranchCompareSummary> = {}): GitBranchCompareSummary {
@@ -41,20 +46,22 @@ const DEFAULT_REVIEW = { baseRefName: 'main' }
 
 function Probe({
   isPanelVisible,
-  activeReview
+  activeReview,
+  worktreeBaseRef = 'main'
 }: {
   isPanelVisible: boolean
   activeReview: { baseRefName?: string } | null
+  worktreeBaseRef?: string | null
 }): null {
   useChecksPanelBranchCompareWarmup({
     activeReview,
-    activeWorktree: { baseRef: 'main', head: HEAD },
+    activeWorktree: { baseRef: worktreeBaseRef ?? undefined, head: HEAD },
     activeWorktreeId: WORKTREE_ID,
     activeWorktreePath: '/repo/worktree',
     isFolder: false,
     isPanelVisible,
     remoteStatus: undefined,
-    repo: { worktreeBaseRef: undefined },
+    repo: { id: REPO_ID, executionHostId: 'local', worktreeBaseRef: undefined },
     settings: { sourceControlCompareAgainstUpstream: false }
   })
   return null
@@ -64,6 +71,8 @@ beforeEach(() => {
   useAppStore.setState(useAppStore.getInitialState(), true)
   mocks.getRuntimeGitBranchCompare.mockReset()
   mocks.getRuntimeGitBranchCompare.mockResolvedValue({ summary: summary(), entries: [] })
+  mocks.getRuntimeRepoBaseRefDefault.mockReset()
+  mocks.getRuntimeRepoBaseRefDefault.mockResolvedValue({ defaultBaseRef: 'origin/main' })
 })
 
 describe('useChecksPanelBranchCompareWarmup', () => {
@@ -76,6 +85,31 @@ describe('useChecksPanelBranchCompareWarmup', () => {
     expect(useAppStore.getState().gitBranchCompareSummaryByWorktree[WORKTREE_ID]?.status).toBe(
       'ready'
     )
+    unmountProbes()
+  })
+
+  it('asks for the review diff when nothing is pinned, resolving its base through the repo default', async () => {
+    await mountProbe(<Probe isPanelVisible activeReview={DEFAULT_REVIEW} worktreeBaseRef={null} />)
+    await flush()
+    await flush()
+
+    expect(mocks.getRuntimeGitBranchCompare).toHaveBeenCalledOnce()
+    expect(mocks.getRuntimeGitBranchCompare.mock.calls[0][1]).toBe('origin/main')
+    unmountProbes()
+  })
+
+  it('maps the review base onto the repo default when the worktree pins a commit', async () => {
+    await mountProbe(
+      <Probe
+        isPanelVisible
+        activeReview={{ baseRefName: 'release/2.0' }}
+        worktreeBaseRef={'a'.repeat(40)}
+      />
+    )
+    await flush()
+    await flush()
+
+    expect(mocks.getRuntimeGitBranchCompare.mock.calls[0][1]).toBe('origin/release/2.0')
     unmountProbes()
   })
 

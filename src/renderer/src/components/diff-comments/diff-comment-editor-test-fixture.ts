@@ -23,6 +23,7 @@ export type FakeDiffCommentEditor = {
   scrollTop: () => number
   focusCount: () => number
   emitMouseMove: (lineNumber: number) => void
+  emitContentChange: () => void
   emitDispose: () => void
   /** Viewport-relative Y used by the hit-test. */
   clientYForLine: (lineNumber: number) => number
@@ -70,9 +71,16 @@ export function createFakeDiffCommentEditor(
   let focusCount = 0
   const mouseMoveListeners: ((e: { target: { position: { lineNumber: number } } }) => void)[] = []
   const disposeListeners: (() => void)[] = []
+  const contentChangeListeners: (() => void)[] = []
   const noopDisposable: IDisposable = { dispose: () => {} }
   // Monaco hands back the same model reference until the model is replaced.
-  const model = { getLineCount: () => lineCount }
+  const model = {
+    getLineCount: () => lineCount,
+    onDidChangeContent: (listener: () => void) => {
+      contentChangeListeners.push(listener)
+      return noopDisposable
+    }
+  }
 
   const clientYForLine = (lineNumber: number): number =>
     FAKE_EDITOR_TOP_PX + (lineNumber - 1) * FAKE_LINE_HEIGHT_PX - scrollTop + 1
@@ -194,6 +202,11 @@ export function createFakeDiffCommentEditor(
     emitMouseMove: (lineNumber) => {
       for (const listener of mouseMoveListeners) {
         listener({ target: { position: { lineNumber } } })
+      }
+    },
+    emitContentChange: () => {
+      for (const listener of contentChangeListeners) {
+        listener()
       }
     },
     emitDispose: () => {

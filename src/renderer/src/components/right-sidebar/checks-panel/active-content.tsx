@@ -102,13 +102,11 @@ export function ChecksPanelActiveContent({
   // the same derivation the editor uses rather than the panel's own review lookup.
   const prCommentInline = useWorktreePRCommentInline(activeWorktreeId)
   const commentsInlineEnabled = prCommentInline.enabled
-  const commentsInlinePlacementAllowed = prCommentInline.inlineThreadsByPath !== null
   const inlineMismatch =
     prCommentInline.blocker?.kind === 'head-mismatch' ? prCommentInline.blocker : null
   const openCommentInCode = usePRCommentCodeNavigation({
     worktreeId: activeWorktreeId,
     worktreePath: activeWorktreePath,
-    placementAllowed: commentsInlinePlacementAllowed,
     reviewBaseRefName: activeReview?.baseRefName ?? null
   })
   const handleToggleCommentsInline = useCallback((): void => {
@@ -116,8 +114,8 @@ export function ChecksPanelActiveContent({
   }, [settings, updateSettings])
   const handleOpenCommentInCode = useCallback(
     (comment: PRComment): void => {
-      // Why: when the recorded line cannot be trusted, GitHub is the only place the comment is
-      // certainly anchored to the right code, so the jump degrades instead of scrolling somewhere wrong.
+      // Why: only an unopenable comment falls back to the provider — an outdated thread still opens
+      // its file, just without the scroll.
       if (!openCommentInCode(comment) && comment.url) {
         void window.api.shell.openUrl(comment.url)
       }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { useAppStore } from '@/store'
 import { resolvePRCommentInlineDisplay } from '@/lib/pr-comment-inline-display'
@@ -71,6 +71,25 @@ export function usePRCommentInlineDecorator({
   const displayOverrides = useAppStore((s) => s.prCommentInlineDisplayById)
   const setPRCommentInlineDisplay = useAppStore((s) => s.setPRCommentInlineDisplay)
 
+  // Why the model's own line count: a thread is drawn for whatever revision the workspace is
+  // reviewing, so one past the last line has nowhere honest to go. Read the model itself so the first
+  // paint is already right — a null count would draw it once and then pull it back.
+  const editorModel = editor?.getModel() ?? null
+  const modelLineCount = useSyncExternalStore(
+    useCallback(
+      (onChange: () => void) => {
+        if (!editorModel) {
+          return () => {}
+        }
+        // Keyed on the model, not the editor: a swap under the same editor must move the subscription.
+        const subscription = editorModel.onDidChangeContent(onChange)
+        return () => subscription.dispose()
+      },
+      [editorModel]
+    ),
+    () => editorModel?.getLineCount() ?? null
+  )
+
   const displayOf = useCallback(
     (thread: PRCommentInlineThread) =>
       resolvePRCommentInlineDisplay({
@@ -93,16 +112,28 @@ export function usePRCommentInlineDecorator({
     }
   }, [displayOf, pendingRevealCommentId, setPRCommentInlineDisplay, threads])
 
+  // Why: threads are drawn for whatever revision the workspace is reviewing, so a comment whose line
+  // the file no longer has cannot be placed at all — drawing it would invent a fact.
+  const placeableThreads = useMemo(() => {
+    if (!threads) {
+      return null
+    }
+    if (modelLineCount === null) {
+      return threads
+    }
+    return threads.filter((thread) => thread.line >= 1 && thread.line <= modelLineCount)
+  }, [modelLineCount, threads])
+
   const expandedThreads = useMemo(
-    () => (threads ?? []).filter((thread) => displayOf(thread) === 'expanded'),
-    [displayOf, threads]
+    () => (placeableThreads ?? []).filter((thread) => displayOf(thread) === 'expanded'),
+    [displayOf, placeableThreads]
   )
   const gutterMarks = useMemo<PRCommentGutterMark[]>(
     () =>
-      (threads ?? [])
+      (placeableThreads ?? [])
         .filter((thread) => displayOf(thread) !== 'expanded')
         .map((thread) => ({ id: thread.id, line: thread.line })),
-    [displayOf, threads]
+    [displayOf, placeableThreads]
   )
 
   usePRCommentGutterMarks({
