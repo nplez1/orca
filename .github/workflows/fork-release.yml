@@ -14,6 +14,12 @@ name: Fork release
 # build you intend to hand to someone; run `pnpm test` yourself when it matters. What is gated is the
 # dispatch itself: the `release-ref` job refuses any ref but `refs/heads/nplez1/main`, and any tag
 # that already points at another commit.
+#
+# Why every `uses:` is pinned to a commit SHA with its tag in a trailing comment: these jobs hold
+# `contents: write` and, on macOS, the Apple certificate and notarisation secrets. The repository
+# allows `allowed_actions: all` with `sha_pinning_required: false`, so a moved tag would run new code
+# inside the signing job. `oven-sh/setup-bun` in `unit-tests.yml` is already pinned, so the standard
+# is the repository's own. Refresh a pin by re-reading the tag's commit and updating both halves.
 
 on:
   workflow_dispatch:
@@ -41,12 +47,12 @@ jobs:
   release-ref:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
 
@@ -68,23 +74,23 @@ jobs:
       # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
       # and the default clone carries one commit and no tags. Deepening to the tag would not be
       # enough either — this fork rebases onto upstream, so the previous tag is not on HEAD's line.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
         with:
           install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
           cache: pnpm
 
       - name: Cache electron-builder downloads
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ~/Library/Caches/electron
@@ -277,21 +283,21 @@ jobs:
     needs: macos
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
         with:
           install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
           cache: pnpm
 
       - name: Cache electron-builder downloads
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ~\AppData\Local\electron\Cache
@@ -381,21 +387,21 @@ jobs:
     needs: windows
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
         with:
           install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
           cache: pnpm
 
       - name: Cache electron-builder downloads
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ~/.cache/electron

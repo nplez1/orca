@@ -46,6 +46,15 @@ export function needsOf(workflow, job) {
   return Array.isArray(needs) ? needs : [needs]
 }
 
+/** `uses:` values as written, comments included — a YAML parse drops the pin's tag comment. */
+export function usesLines(path) {
+  const text = readFileSync(new URL(path, new URL('../../', import.meta.url)), 'utf8')
+  return text
+    .split('\n')
+    .map((line) => /^\s*(?:- )?uses:\s*(.+?)\s*$/.exec(line)?.[1])
+    .filter((uses) => uses && !uses.startsWith('./'))
+}
+
 /** Every `run:` script in the workflow, joined, for asserting that a step does something. */
 export function runScripts(workflow) {
   return Object.values(workflow.jobs ?? {})
