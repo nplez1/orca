@@ -118,7 +118,9 @@ describe('SessionSummaryService', () => {
     const ready = updates.find((u) => u.status === 'ready')
     expect(ready?.ledger?.foldedThrough).toBe(5)
     expect(ready?.facts?.messageCount).toBe(5)
-    // Persisted: a fresh store over the same file resumes at foldedThrough.
+    // Persisted: a fresh store over the same file resumes at foldedThrough. `set` is debounced, so a
+    // reopen inside the window sees it only after the queued write is flushed.
+    store.flush()
     const reloaded = new SessionSummaryStore(path)
     expect(reloaded.get('tab:leaf')?.ledger.foldedThrough).toBe(5)
   })

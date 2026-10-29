@@ -160,4 +160,17 @@ describe('Jenkins integration card', () => {
 
     expect(container.textContent).toContain('no token saved')
   })
+
+  // An unreadable profiles file, or a pre-rename copy this build could not import, otherwise reads as
+  // "not configured" and the user's next move is to add a server, which hides the problem for good.
+  it('shows why the server list could not be read', async () => {
+    mocks.listServers.mockRejectedValue(
+      new Error(
+        'Could not import the Jenkins servers saved in /home/ada/.orca/jenkins-servers.json: the copy failed'
+      )
+    )
+    await renderCard()
+
+    expect(container.textContent).toContain('Could not import the Jenkins servers saved in')
+  })
 })

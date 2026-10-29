@@ -16,6 +16,20 @@ export type VersionedCacheDatabaseSchema = {
   pageSize?: number
 }
 
+/** A cache written by a build newer than this one: refuse it instead of destroying the newer build's index. */
+export class CacheDatabaseNewerThanBuildError extends Error {
+  constructor(
+    readonly path: string,
+    readonly storedVersion: string,
+    readonly buildVersion: string
+  ) {
+    super(
+      `Cache ${path} has schema ${storedVersion}, newer than this build's ${buildVersion}; leaving it untouched`
+    )
+    this.name = 'CacheDatabaseNewerThanBuildError'
+  }
+}
+
 /** Rebuild unreadable/stale cache schemas: source files remain authoritative, so replacement costs only a rescan instead of stranding the feature. */
 export function openVersionedCacheDatabase(
   path: string,
@@ -41,9 +55,16 @@ function openExisting(path: string, schema: VersionedCacheDatabaseSchema): SyncD
   // Null closed handles so cleanup cannot mask the real failure with ERR_INVALID_STATE.
   let db: SyncDatabase | null = openWithPragmas(path, schema.pageSize)
   try {
-    if (isStaleSchema(db, schema.version)) {
+    const storedVersion = storedSchemaVersion(db)
+    // Why refuse rather than unlink: a downgrade would otherwise delete an index a newer build built,
+    // and the next upgrade would rebuild it again — a full rescan per downgrade-and-return. An older
+    // or unparseable version is rebuilt as before: this build's schema is what the rows are read as.
+    if (storedVersion !== null && Number(storedVersion) > schema.version) {
+      throw new CacheDatabaseNewerThanBuildError(path, storedVersion, String(schema.version))
+    }
+    if (storedVersion !== null && storedVersion !== String(schema.version)) {
       // Unlink stale caches; dropping multi-GB tables can exceed scanner readiness deadlines.
-      db.close()
+      releaseForRemoval(db)
       db = null
       removeVersionedCacheDatabase(path)
       db = openWithPragmas(path, schema.pageSize)
@@ -107,13 +128,25 @@ export function removeVersionedCacheDatabase(path: string): void {
 }
 
 /** No meta table is a fresh database; missing/unparseable version rows in existing meta indicate stale data and must rebuild rather than seed over it. */
-function isStaleSchema(db: SyncDatabase, version: number): boolean {
+function storedSchemaVersion(db: SyncDatabase): string | null {
   const table = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'meta'")
     .get()
   if (!table) {
-    return false
+    return null
   }
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get()
-  return (typeof row?.value === 'string' ? Number(row.value) : Number.NaN) !== version
+  const value = row?.value
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : 'NaN'
+}
+
+/**
+ * Close the handle before the files are removed.
+ *
+ * Why not an exclusive lock: `BEGIN EXCLUSIVE` is released by the close that precedes the unlink, and in
+ * WAL mode it does not block readers anyway. A second process that opens this file after this point
+ * holds a handle to an unlinked inode until it notices, which SQLite gives no way to prevent from here.
+ */
+function releaseForRemoval(db: SyncDatabase): void {
+  db.close()
 }

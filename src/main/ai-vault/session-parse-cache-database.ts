@@ -22,6 +22,17 @@ import { parsePersistedSidecar } from './session-sidecar-stat'
 // Bump for row-layout or cached-semantic changes; mismatched databases are discarded.
 export const SESSION_PARSE_CACHE_SCHEMA_VERSION = 8
 
+/**
+ * Bump when a parser fix has to reach transcripts that are already cached.
+ *
+ * Why a second constant: the schema version discards the whole database, which is the right size for a
+ * row-layout change and far too much for a parser fix. Because a row is matched on path + mtime + size,
+ * a finished transcript never looks stale again — so without this, a fix reaches only transcripts that
+ * change afterwards, and only if someone remembered to bump the schema by hand.
+ */
+export const SESSION_PARSE_PARSER_VERSION = 2
+const PARSER_VERSION_KEY = 'parser_version'
+
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS rows(
@@ -47,9 +58,12 @@ const PAGE_SIZE = 8192
 export class SessionParseCacheDatabase {
   private db: SyncDatabase | null
   private recovered = false
+  /** True when a newer build's parser stamped this file: its rows are read, never extended. */
+  private rowsFromNewerParser: boolean
 
   constructor(private readonly path: string) {
     this.db = openDatabase(path)
+    this.rowsFromNewerParser = this.run(rowsBelongToNewerParser, false)
   }
 
   read(path: string): PersistedSessionParseCacheEntry | undefined {
@@ -95,6 +109,12 @@ export class SessionParseCacheDatabase {
     seenAt: number,
     keepExisting = false
   ): void {
+    // Why nothing is written over a newer build's rows: this build's parser output would be trusted by
+    // that build on the next upgrade, because the stamp it reads would still be its own — and a row is
+    // only re-derived when the transcript changes, which for a finished one is never.
+    if (this.rowsFromNewerParser) {
+      return
+    }
     this.run((db) => {
       const insert = db.prepare(
         `INSERT OR ${keepExisting ? 'IGNORE' : 'REPLACE'} INTO rows(path, mtime_ms, size_bytes, platform, sidecar, session, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -195,6 +215,8 @@ export class SessionParseCacheDatabase {
           try {
             removeVersionedCacheDatabase(this.path)
             this.db = openDatabase(this.path)
+            // The rebuilt file carries this build's stamp, so the rows are this build's own again.
+            this.rowsFromNewerParser = false
           } catch (reopenError) {
             console.debug('[ai-vault] session parse cache database stays off', reopenError)
           }
@@ -211,10 +233,38 @@ function openDatabase(path: string): SyncDatabase {
     sql: SCHEMA_SQL,
     directoryMode: PRIVATE_DIRECTORY_MODE,
     pageSize: PAGE_SIZE,
-    afterSchema: ensureScopeCwdsTable
+    afterSchema: (db) => {
+      ensureScopeCwdsTable(db)
+      dropRowsFromAnotherParser(db)
+    }
   })
   hardenSqliteDatabaseFiles(path)
   return db
+}
+
+// Scope cwds are kept: they carry their own version and are not a transcript parse.
+function dropRowsFromAnotherParser(db: SyncDatabase): void {
+  const stored = db.prepare('SELECT value FROM meta WHERE key = ?').get(PARSER_VERSION_KEY)?.value
+  const current = String(SESSION_PARSE_PARSER_VERSION)
+  if (stored === current) {
+    return
+  }
+  // Why only an older stamp drops the rows: see `rowsBelongToNewerParser`, which keeps a newer build's
+  // rows and stops this build from adding to them.
+  if (rowsBelongToNewerParser(db)) {
+    return
+  }
+  db.exec('DELETE FROM rows')
+  db.prepare('INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)').run(
+    PARSER_VERSION_KEY,
+    current
+  )
+}
+
+/** Whether the stamp in this file came from a parser newer than this build's. */
+function rowsBelongToNewerParser(db: SyncDatabase): boolean {
+  const stored = db.prepare('SELECT value FROM meta WHERE key = ?').get(PARSER_VERSION_KEY)?.value
+  return typeof stored === 'string' && Number(stored) > SESSION_PARSE_PARSER_VERSION
 }
 
 export function parsePersistedSessionParseCacheRow(

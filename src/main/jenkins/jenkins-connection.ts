@@ -10,6 +10,7 @@ import type {
 import { jenkinsGetJson, type JenkinsRequestFailure } from './jenkins-request'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import {
+  assertJenkinsServersReportable,
   createJenkinsServerId,
   hasJenkinsServerToken,
   listJenkinsServers,
@@ -27,6 +28,9 @@ function summarize(profile: JenkinsServerProfile): JenkinsServerSummary {
 }
 
 export function listJenkinsServerSummaries(): JenkinsServerSummary[] {
+  // Throws when the profiles file cannot be read or a pre-rename copy could not be imported: the
+  // settings card renders a failure instead of an empty list that means "nothing configured".
+  assertJenkinsServersReportable()
   return listJenkinsServers().map(summarize)
 }
 
@@ -65,7 +69,12 @@ export function saveJenkinsServerFromArgs(args: JenkinsSaveServerArgs): JenkinsS
   }
   // Why: an empty token on an edit means "leave the stored one alone"; a server may also be
   // readable anonymously, which is a legitimate configuration.
-  saveJenkinsServer(profile, apiToken.length > 0 ? apiToken : null)
+  try {
+    saveJenkinsServer(profile, apiToken.length > 0 ? apiToken : null)
+  } catch (error) {
+    // The dialog has a place to show this, and a refusal has to read as one rather than as a save.
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
   noteReplicatedCredentialChanged()
   return { ok: true, server: summarize(profile) }
 }

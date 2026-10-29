@@ -11,9 +11,11 @@ import { clearAttachmentImagesForSite } from './attachments/image-cache'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import { acquire, release } from './request-queue'
 import {
+  assertSiteFileWritable,
   getCredentialError,
   deleteToken,
   getSiteFile,
+  getSiteFileProblem,
   hasStoredToken,
   readToken,
   saveToken,
@@ -66,9 +68,13 @@ export function getStatus(): JiraConnectionStatus {
   const file = getSiteFile()
   const sites = file.sites.filter((site) => hasStoredToken(site.id))
   const activeSite = sites.find((site) => site.id === file.activeSiteId) ?? sites[0] ?? null
-  const credentialError = sites
-    .map((site) => getCredentialError(site.id))
-    .find((message) => message !== undefined)
+  // Why the site-file problem joins this field: an unreadable or un-imported
+  // `jira-sites.json` shows as configured-nothing, which is the same silent dead end a credential
+  // this build cannot decrypt produces, and this is the channel that already carries that.
+  const credentialError =
+    sites.map((site) => getCredentialError(site.id)).find((message) => message !== undefined) ??
+    getSiteFileProblem() ??
+    undefined
   // Protection is host-wide: inactive sites with plaintext credentials still matter.
   const credentialProtection = sites.some((site) => getSiteTokenProtection(site.id) === 'plaintext')
     ? 'plaintext'
@@ -113,6 +119,9 @@ export async function connect(
 
   await acquire()
   try {
+    // Before the network call and before saveToken: a file this build cannot read would otherwise
+    // collect an orphan token for a site that can never be written down.
+    assertSiteFileWritable()
     const { viewer, apiBaseUrl } = await verifyJiraCredentials(siteUrl, email, apiToken, authType)
     // PAT sites lack email; verified viewer identity prevents same-host account collisions.
     const id = getSiteId(siteUrl, email || viewer.accountId)
@@ -144,6 +153,9 @@ export async function connect(
 }
 
 export function disconnect(siteId?: string): void {
+  // Why before the tokens go: an unreadable sites file cannot record the removal, so deleting the tokens
+  // first would leave site rows pointing at credentials that no longer exist.
+  assertSiteFileWritable()
   const file = getSiteFile()
   const ids = siteId ? [siteId] : file.sites.map((site) => site.id)
   for (const id of ids) {
@@ -201,6 +213,8 @@ export async function testConnection(
 }
 
 export function clearToken(siteId: string): void {
+  // Why before the deletion: see `disconnect`.
+  assertSiteFileWritable()
   deleteToken(siteId)
   noteReplicatedCredentialChanged()
   // Why: auth failure removes the site; drop cached attachment data URLs too.

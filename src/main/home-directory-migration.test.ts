@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LEGACY_HOME_DIRECTORY_NAME, HOME_DIRECTORY_NAME } from '../shared/app-directory-names'
-import { adoptLegacyHomeStoreIn, resolveHomeStorePathIn } from './home-directory-migration'
+import {
+  adoptLegacyHomeStoreIn,
+  resolveHomeStorePathIn,
+  resolveLegacyHomeStoreIn
+} from './home-directory-migration'
 
 describe('home directory migration', () => {
   let home: string
@@ -114,5 +118,81 @@ describe('home directory migration', () => {
     adoptLegacyHomeStoreIn(home, 'sites.json')
 
     expect(readFileSync(adoptLegacyHomeStoreIn(home, 'tokens.enc'), 'utf-8')).toBe('tokens')
+  })
+
+  it('reports the pre-rename copy it adopted, and nothing once decided', () => {
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["kept"]}')
+
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json')).toEqual({
+      path: join(currentDir(), 'sites.json'),
+      adoption: { kind: 'adopted', legacyPath: join(legacyDir(), 'sites.json') }
+    })
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption).toEqual({ kind: 'decided' })
+  })
+
+  it('reports a failed adoption instead of an unconfigured store', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["only-copy"]}')
+    writeFileSync(currentDir(), 'not a directory')
+
+    const resolution = resolveLegacyHomeStoreIn(home, 'sites.json')
+
+    expect(resolution.path).toBe(join(currentDir(), 'sites.json'))
+    expect(resolution.adoption).toMatchObject({
+      kind: 'failed',
+      legacyPath: join(legacyDir(), 'sites.json')
+    })
+  })
+
+  // The trap J5 names: re-entering credentials creates the fork's copy, and the old code read that as
+  // "the decision was made", so the un-imported copy was never mentioned again.
+  it('keeps reporting an un-imported copy after the fork path appears', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["only-copy"]}')
+    writeFileSync(currentDir(), 'not a directory')
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption.kind).toBe('failed')
+
+    // The user re-enters the credential, which writes the fork's own copy.
+    rmSync(currentDir(), { force: true })
+    mkdirSync(currentDir(), { recursive: true })
+    writeFileSync(join(currentDir(), 'sites.json'), '{"sites":["re-entered"]}')
+
+    const again = resolveLegacyHomeStoreIn(home, 'sites.json')
+    expect(again.path).toBe(join(currentDir(), 'sites.json'))
+    expect(again.adoption).toMatchObject({ kind: 'failed' })
+    // And the pre-rename copy is still there to import when the user chooses to.
+    expect(readFileSync(join(legacyDir(), 'sites.json'), 'utf-8')).toBe('{"sites":["only-copy"]}')
+    // Nothing overwrote the copy the user has just written.
+    expect(readFileSync(join(currentDir(), 'sites.json'), 'utf-8')).toBe('{"sites":["re-entered"]}')
+  })
+
+  // Why this sequence: recording the decision is what stops a sign-out from adopting an official
+  // install's copy, and the report has to survive that decision.
+  it('does not adopt the pre-rename copy after the fork copy is deleted', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["only-copy"]}')
+    writeFileSync(currentDir(), 'not a directory')
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption.kind).toBe('failed')
+
+    rmSync(currentDir(), { force: true })
+    mkdirSync(currentDir(), { recursive: true })
+    writeFileSync(join(currentDir(), 'sites.json'), '{"sites":["re-entered"]}')
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption.kind).toBe('failed')
+
+    // The user signs out, which deletes this build's copy.
+    rmSync(join(currentDir(), 'sites.json'))
+
+    const after = resolveLegacyHomeStoreIn(home, 'sites.json')
+    expect(after.adoption).toMatchObject({ kind: 'failed' })
+    // Nothing was copied in: the pre-rename copy may belong to an official install.
+    expect(existsSync(join(currentDir(), 'sites.json'))).toBe(false)
+
+    // Once there is no copy left to import, the report stops rather than naming a copy that is gone.
+    rmSync(join(legacyDir(), 'sites.json'))
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption).toEqual({ kind: 'decided' })
   })
 })

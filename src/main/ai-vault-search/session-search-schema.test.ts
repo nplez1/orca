@@ -9,6 +9,7 @@ import {
   WINDOWS_RM_RETRY_DELAY_MS
 } from '../../shared/windows-transient-lock-removal'
 import SyncDatabase from '../sqlite/sync-database'
+import { CacheDatabaseNewerThanBuildError } from '../sqlite/versioned-cache-database'
 import {
   SESSION_SEARCH_SCHEMA_VERSION,
   openSessionSearchDatabase,
@@ -186,9 +187,11 @@ it('gives up rather than looping when a fresh file still cannot be opened', asyn
 it('surfaces the unlink failure itself when a stale index cannot be removed', async () => {
   const path = await tempDatabasePath()
   const stale = openSessionSearchDatabase(path)
+  // Why an older version: a newer one is refused untouched (see the newer-schema case), so only an
+  // older index is the one this build tries to unlink.
   stale
     .prepare("UPDATE meta SET value = ? WHERE key = 'schema_version'")
-    .run(String(SESSION_SEARCH_SCHEMA_VERSION + 1))
+    .run(String(SESSION_SEARCH_SCHEMA_VERSION - 1))
   stale.close()
   recordedRmSync.mockReset()
   recordedRmSync.mockImplementation(() => {
@@ -202,6 +205,24 @@ it('surfaces the unlink failure itself when a stale index cannot be removed', as
     expect(() => openSessionSearchDatabase(path)).not.toThrow(/not open/)
   } finally {
     recordedRmSync.mockReset()
+  }
+})
+
+it('refuses a newer index without unlinking it', async () => {
+  const path = await tempDatabasePath()
+  const newer = openSessionSearchDatabase(path)
+  newer
+    .prepare("UPDATE meta SET value = ? WHERE key = 'schema_version'")
+    .run(String(SESSION_SEARCH_SCHEMA_VERSION + 1))
+  newer.close()
+
+  expect(() => openSessionSearchDatabase(path)).toThrow(CacheDatabaseNewerThanBuildError)
+  const probe = new SyncDatabase(path)
+  try {
+    // The newer build's file, and its version stamp, are still there.
+    expect(schemaVersion(probe)).toBe(String(SESSION_SEARCH_SCHEMA_VERSION + 1))
+  } finally {
+    probe.close()
   }
 })
 
