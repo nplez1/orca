@@ -24,19 +24,41 @@ RELAY_GRACE_SECONDS=3600
 
 log() { printf '%s\n' "$*" >&2; }
 
+# jq reads the provisioner output and builds the result, so a missing jq must fail before allocating.
+if ! command -v jq >/dev/null 2>&1; then
+  log "create: jq is required"
+  exit 1
+fi
+
 name="orca-${ORCA_WORKSPACE_NAME}"
 log "allocating $name"
+
+released=0
+# Why this exists: a create that half-succeeds must not leave a machine nobody knows about.
+release() {
+  if [ "$released" -eq 1 ]; then
+    return 0
+  fi
+  released=1
+  log "releasing $resource_id"
+  $DESTROY_VERB "$resource_id" >&2 ||
+    log "WARNING: cleanup failed — $resource_id may still be running"
+}
+
+# Why a trap and not just the explicit exits: Orca cancels a create by killing the recipe's process
+# group, so every explicit `exit` below is skipped exactly when the machine is likeliest to leak.
+on_signal() {
+  log "cancelled — releasing $resource_id"
+  release
+  exit 130
+}
 
 created="$($PROVISION_VERB --name "$name")" || { log "provisioning failed"; exit 1; }
 resource_id="$(printf '%s' "$created" | jq -r '.id // empty')"
 host="$(printf '%s' "$created" | jq -r '.address // empty')"
 
-# Why this exists: a create that half-succeeds must not leave a machine nobody knows about.
-release() {
-  log "releasing $resource_id"
-  $DESTROY_VERB "$resource_id" >&2 ||
-    log "WARNING: cleanup failed — $resource_id may still be running"
-}
+# Armed only once the id is known: before that there is nothing to release.
+trap on_signal INT TERM HUP
 
 if [ -z "$resource_id" ] || [ -z "$host" ]; then
   log "could not read id/address from provisioner output: $created"
@@ -78,5 +100,20 @@ if ! ssh "${SSH_USER}@${host}" "test -d '${project_root}/.git'" >/dev/null 2>&1;
   fi
 fi
 
-printf '{"schemaVersion":1,"connection":{"type":"ssh","projectRoot":"%s","target":{"label":"%s","host":"%s","port":22,"username":"%s","relayGracePeriodSeconds":%s}},"userData":{"resourceId":"%s"}}\n' \
-  "$project_root" "$name" "$host" "$SSH_USER" "$RELAY_GRACE_SECONDS" "$resource_id"
+# Why jq and not printf: a provider address or workspace name carrying a quote or a backslash used to
+# exit 0 with unparseable JSON, so Orca got no recipeResult at all and the machine went unrecorded.
+jq -c -n \
+  --arg projectRoot "$project_root" \
+  --arg label "$name" \
+  --arg host "$host" \
+  --arg username "$SSH_USER" \
+  --argjson relayGrace "$RELAY_GRACE_SECONDS" \
+  --arg resourceId "$resource_id" \
+  '{schemaVersion:1,
+    connection:{type:"ssh",projectRoot:$projectRoot,
+      target:{label:$label,host:$host,port:22,username:$username,relayGracePeriodSeconds:$relayGrace}},
+    userData:{resourceId:$resourceId}}'
+
+# The machine is Orca's to track from here, so a signal that lands after the result is printed must not
+# release the host the app is about to persist.
+trap - INT TERM HUP
