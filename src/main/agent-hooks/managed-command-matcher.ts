@@ -36,11 +36,6 @@ export function createManagedCommandMatcher(
   )
   const legacyNativeHook = nativeHookNeedle(LEGACY_HOME_DIRECTORY_NAME, scriptFileName)
   const sweepsLegacyHome = options.sweepLegacyHomeDirectory ?? !hasOfficialOrcaProfile()
-  // Why: a resolved path under this user's own `~/.orca` is an official install's, while a remote
-  // host's or a frozen `${HOME}` template's `.orca` path is this build's own registration.
-  const localLegacyRoot = normalizeHookCommandPath(
-    join(homedir(), LEGACY_HOME_DIRECTORY_NAME)
-  ).toLowerCase()
   return (command) => {
     if (!command) {
       return false
@@ -51,9 +46,25 @@ export function createManagedCommandMatcher(
     }
     const legacyLines = sweepsLegacyHome
       ? lines
-      : lines.filter((line) => !line.toLowerCase().includes(localLegacyRoot))
+      : lines.filter((line) => !line.toLowerCase().includes(localLegacyHomePrefix()))
     return matchesManagedHook(legacyLines, legacyNeedles, legacyNativeHook)
   }
+}
+
+/**
+ * This user's own pre-rename home directory, or '' when the host cannot name one.
+ *
+ * Why: a resolved path under it belongs to an official install, while a remote host's or a frozen
+ * `${HOME}` template's `.orca` path is this build's own registration.
+ *
+ * Why resolved per call and not at construction: hook installs run during startup, and a host with no
+ * usable home must lose the exclusion rather than fail to install hooks at all.
+ */
+function localLegacyHomePrefix(): string {
+  const home = homedir()
+  return typeof home === 'string' && home.length > 0
+    ? `${normalizeHookCommandPath(join(home, LEGACY_HOME_DIRECTORY_NAME))}/`.toLowerCase()
+    : ''
 }
 
 function managedCommandNeedles(

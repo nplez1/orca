@@ -14,13 +14,22 @@ export function officialOrcaProfilePath(
   homeDirectory: string = homedir(),
   env: NodeJS.ProcessEnv = process.env
 ): string | null {
-  if (platform === 'darwin') {
-    return join(homeDirectory, 'Library', 'Application Support', OFFICIAL_DATA_DIRECTORY_NAME)
-  }
   if (platform === 'win32') {
     return env.APPDATA ? join(env.APPDATA, OFFICIAL_DATA_DIRECTORY_NAME) : null
   }
-  return join(env.XDG_CONFIG_HOME || join(homeDirectory, '.config'), OFFICIAL_DATA_DIRECTORY_NAME)
+  if (platform === 'darwin') {
+    return hasHomeDirectory(homeDirectory)
+      ? join(homeDirectory, 'Library', 'Application Support', OFFICIAL_DATA_DIRECTORY_NAME)
+      : null
+  }
+  const configHome =
+    env.XDG_CONFIG_HOME || (hasHomeDirectory(homeDirectory) ? join(homeDirectory, '.config') : null)
+  return configHome ? join(configHome, OFFICIAL_DATA_DIRECTORY_NAME) : null
+}
+
+/** Why: a host or a test harness may resolve no home at all, and an unanswerable probe is "absent". */
+function hasHomeDirectory(homeDirectory: unknown): homeDirectory is string {
+  return typeof homeDirectory === 'string' && homeDirectory.length > 0
 }
 
 /**
