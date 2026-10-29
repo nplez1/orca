@@ -220,9 +220,11 @@ const PI_NEEDS_INPUT_TITLE = '\x1b]0;\u03c0 ! worker\x07'
 const PI_WORKING_TITLE = '\x1b]0;\u03c0 : worker\x07'
 const PI_IDLE_TITLE = '\x1b]0;\u03c0 > worker\x07'
 
-async function piTerminalRuntime() {
+async function piTerminalRuntime(
+  deps: { onPaneScreenPromptGained?: (paneKey: string) => void } = {}
+) {
   const spawn = vi.fn().mockResolvedValue({ id: 'pty-screen' })
-  const runtime = new OrcaRuntimeService(store)
+  const runtime = new OrcaRuntimeService(store, undefined, deps)
   runtime.setPtyController({
     spawn,
     write: () => true,
@@ -290,6 +292,23 @@ describe('the ask card a pi pane is holding', () => {
     )
     await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
+  })
+
+  it('tells the store as soon as the pane claims a dialog', async () => {
+    // Why: pi paints most dialogs with no hook of its own, and the store's only other on-gain cue is
+    // the tail-text scan, which a card in the alternate screen never reaches. Without this the row
+    // waits for the next hook post, which an unanswered dialog may never send (#228).
+    const gained: string[] = []
+    const { runtime, paneKey, flush } = await piTerminalRuntime({
+      onPaneScreenPromptGained: (key) => gained.push(key)
+    })
+    runtime.onPtyData('pty-screen', PI_WORKING_TITLE + PI_ASK_CARD, 1_000)
+    await flush()
+    expect(gained).toEqual([])
+
+    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE, 2_000)
+    await flush()
+    expect(gained).toEqual([paneKey])
   })
 
   it('holds the wait rather than releasing it on a footer it cannot read', async () => {

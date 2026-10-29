@@ -6,6 +6,7 @@ import type { AgentHookSource } from '../../shared/agent-hook-relay'
 import { AgentHookServer, _internals } from './server'
 import {
   SCREEN_PROMPT_FAST_RECHECK_COUNT,
+  SCREEN_PROMPT_SLOW_RECHECK_MS,
   ScreenPromptCorroboration,
   screenPromptReleaseRow,
   screenPromptRow
@@ -547,6 +548,36 @@ describe('the corroboration loop', () => {
     screen = null
     vi.advanceTimersByTime(1_000)
     expect(published.at(-1)?.payload.state).toBe('working')
+  })
+
+  it('keeps rechecking a pane whose first read could not see the dialog', () => {
+    // Why: expanding a collapsed card, widening a narrow pane and a settled resize all make the
+    // card readable again, and one blind read used to forget the pane for the rest of the question
+    // — nothing re-reads a forgotten pane until the agent posts, which an unanswered card may
+    // never do (#228).
+    screen = undefined
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(reads).toBe(1)
+    expect(published).toHaveLength(0)
+
+    screen = { reason: 'agent-approval-prompt', since: 1_200 }
+    vi.advanceTimersByTime(SCREEN_PROMPT_SLOW_RECHECK_MS)
+    expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
+  })
+
+  it('forgets the pane once a hook row proves no dialog is holding it', () => {
+    screen = undefined
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    // A fresh row that needs no corroboration ends the loop: the blind read must not outlive it.
+    current = { ...row('done'), receivedAt: current.receivedAt + 5 }
+    loop.arm(current)
+    const after = reads
+    vi.advanceTimersByTime(SCREEN_PROMPT_SLOW_RECHECK_MS * 4)
+    expect(reads).toBe(after)
   })
 
   it('slows its re-reads instead of stopping them', () => {
