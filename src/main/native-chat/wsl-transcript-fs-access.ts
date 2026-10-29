@@ -1,5 +1,5 @@
 import { createReadStream, type Dirent, type Stats } from 'node:fs'
-import { access, lstat, open, readdir, stat, type FileHandle } from 'node:fs/promises'
+import { access, lstat, open, readFile, readdir, stat, type FileHandle } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
 import {
@@ -112,30 +112,31 @@ export function wslGatedReaddir(
  */
 export const TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES = 16 * 1024 * 1024
 
-export function wslGatedReadFile(
+export async function wslGatedReadFile(
   path: string,
   encoding: BufferEncoding,
   priority: WslTranscriptFsTaskPriority,
   signal?: AbortSignal,
   maxBytes: number = TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES
 ): Promise<string> {
-  if (!isWslUncPath(path)) {
-    return readNodeFileWithinLimit(path, maxBytes, { signal }).then((read) =>
-      read.buffer.toString(encoding)
-    )
+  if (!isWslUncPath(path) && !parseSshTranscriptPath(path)) {
+    const read = await readNodeFileWithinLimit(path, maxBytes, { signal })
+    return read.buffer.toString(encoding)
   }
-  // A remote path cannot be bounded by the reader, so its size is checked first — one gated call
-  // before the read, never nested inside it.
-  return wslGatedStat(path, priority, signal).then((stats) => {
-    if (stats.size > maxBytes) {
-      throw new NodeFileReadTooLargeError(stats.size, maxBytes)
-    }
-    return runReusableFsOperation({ operation: 'readfile', path, encoding }, priority, signal, () =>
-      readNodeFileWithinLimit(path, maxBytes, { signal }).then((read) =>
-        read.buffer.toString(encoding)
-      )
-    )
-  })
+  // Why the size check after the read on a remote path: the WSL and SSH readers materialize the
+  // text themselves, so this cannot bound their allocation — but it stops the parse, and an oversize
+  // file still reports itself as one issue instead of exhausting the scanner's heap.
+  const text = await runReusableFsOperation(
+    { operation: 'readfile', path, encoding },
+    priority,
+    signal,
+    () => readFile(path, encoding)
+  )
+  const bytes = Buffer.byteLength(text, 'utf-8')
+  if (bytes > maxBytes) {
+    throw new NodeFileReadTooLargeError(bytes, maxBytes)
+  }
+  return text
 }
 
 // Do not coalesce opens: joiners would share one handle and both close it.

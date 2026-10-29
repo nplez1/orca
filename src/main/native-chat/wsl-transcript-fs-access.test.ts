@@ -57,7 +57,11 @@ import {
 } from './wsl-transcript-fs-gate'
 
 function fakeHandle() {
-  return { read: vi.fn(), close: vi.fn(async () => {}) }
+  return {
+    read: vi.fn(),
+    close: vi.fn(async () => {}),
+    stat: vi.fn(async () => ({ size: 0, isFile: () => true }))
+  }
 }
 
 beforeEach(() => {
@@ -97,7 +101,9 @@ describe('transcript filesystem accessor off WSL UNC', () => {
     expect(mocks.runTask).not.toHaveBeenCalled()
     expect(mocks.stat).toHaveBeenCalledWith(path)
     expect(mocks.readdir).toHaveBeenCalledWith(path, { withFileTypes: true })
-    expect(mocks.readFile).toHaveBeenCalledWith(path, 'utf-8')
+    // A local whole-file read is bounded through the handle, so it never takes the remote reader.
+    expect(mocks.readFile).not.toHaveBeenCalledWith(path, 'utf-8')
+    expect(handle.read).toHaveBeenCalled()
     expect(mocks.open).toHaveBeenCalledWith(path, 'r')
     expect(stream).toBe('raw-stream')
     expect(mocks.createReadStream).toHaveBeenCalledWith(path, {
