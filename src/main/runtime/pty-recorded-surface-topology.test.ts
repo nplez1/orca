@@ -13,7 +13,11 @@ const LEAF = '11111111-1111-4111-8111-111111111111'
 type Recorded = RecordedPtySurface & { tabId: string | null; paneKey: string | null }
 
 /** The pane the record names, as the window-owned query reads it. */
-function ptyHoldsRecordedSurface(record: Recorded, graph: PtySurfaceTopology): boolean {
+function ptyHoldsRecordedSurface(
+  record: Recorded,
+  graph: PtySurfaceTopology,
+  ptyConnected = true
+): boolean {
   return holdsPane(
     record.ptyId,
     {
@@ -21,7 +25,8 @@ function ptyHoldsRecordedSurface(record: Recorded, graph: PtySurfaceTopology): b
       paneKey: record.paneKey,
       recordedAtGraphSequence: record.surfaceRecordedAtGraphSequence ?? 0
     },
-    graph
+    graph,
+    ptyConnected
   )
 }
 
@@ -56,6 +61,19 @@ describe('ptyHoldsRecordedSurface', () => {
 
   it('does not hold it when the graph rebound that pane to another PTY', () => {
     expect(ptyHoldsRecordedSurface(pty(), topology({ ptyIdHoldingPane: () => 'pty-2' }))).toBe(
+      false
+    )
+  })
+
+  it('keeps the claim when the graph publishes its pane without a PTY', () => {
+    // A leaf with no PTY is an unmounted (background, parked) pane or a restored binding the
+    // renderer has not re-learned - an absent statement, not a contradiction (#232).
+    expect(ptyHoldsRecordedSurface(pty(), topology({ ptyIdHoldingPane: () => null }))).toBe(true)
+  })
+
+  it('reports it lost when the record itself is disconnected', () => {
+    // Why the record decides: an unbound leaf only keeps a claim the process still backs.
+    expect(ptyHoldsRecordedSurface(pty(), topology({ ptyIdHoldingPane: () => null }), false)).toBe(
       false
     )
   })
