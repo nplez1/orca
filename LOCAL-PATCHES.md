@@ -1287,6 +1287,18 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   `-shm` behind, which hid it. Probe: writer in WAL mode, `close()`, `new DatabaseSync(p, { readOnly: true })`
   — Node 26.11.1 opens it, bun 1.4.3 opens it, bun 1.4.4 throws `unable to open database file`. The same
   HEAD passes all five files under bun 1.4.3. Product code runs on Electron's Node, not this path.
+  **All seven are closed (2026-10-29), and none of them by a test fix.** The three topology files were
+  already green: upstream #33533 (`a886dcd1fe9`, merged with the 10-28 sync) added
+  `terminal-topology-profile-fixture` to the harness list `config/scripts/vitest-sqlite-runtime-scan.mjs`
+  keys on, so `getNodeRuntimeInclude()` had been routing them to the Node project all along. The other
+  two — `tests/e2e/helpers/persisted-profile-state.unit.test.ts` and
+  `src/main/ai-vault-search/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
+  scan does not follow, so they really were running under Bun; both are now listed in
+  `NODE_RUNTIME_INCLUDE` with the reason, and both pass (42/42 and 3/3) where they failed 1/42 and 2/3.
+  `vitest-node-runtime-boundary.test.ts` pins the two entries, because nothing else would notice their
+  removal. The hazard the audit named is the real reason this mattered: the entries' `match`,
+  `Unable to read profile state database`, is exactly what a genuine profile-state open regression
+  throws, so the allowlist could not have seen one.
 - **`verify-cli-bin`, `macos-path-semantics`** — new upstream case; the child's `process.cwd()` reports
   `/private/var/…` against the unresolved `os.tmpdir()` the case compares.
 - **`reclaim-worktree-generated-files`, `host-toolchain`** — new upstream file. The script recovers from

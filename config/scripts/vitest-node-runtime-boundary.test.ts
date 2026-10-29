@@ -23,6 +23,15 @@ function isGlobalThis(expression: ts.Expression): boolean {
   return ts.isIdentifier(expression) && expression.text === 'globalThis'
 }
 
+it('routes the suites whose SQLite dependency the import scan cannot see', () => {
+  // Why pinned rather than derived: each reaches node:sqlite through a helper the scan does not
+  // follow, so nothing else would catch their removal from this list — and under Bun's node:sqlite
+  // both fail on the WAL reopen, which is why the known-red manifest used to carry them.
+  const nodeFiles = new Set(getNodeRuntimeInclude())
+  expect(nodeFiles).toContain('src/main/ai-vault-search/session-search-indexer.test.ts')
+  expect(nodeFiles).toContain('tests/e2e/helpers/persisted-profile-state.unit.test.ts')
+})
+
 it('keeps exposed-GC heap measurements in the Node runtime project', () => {
   const root = process.cwd()
   const nodeFiles = new Set(globSync(getNodeRuntimeInclude()).map((file) => resolve(root, file)))
