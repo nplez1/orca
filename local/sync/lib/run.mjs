@@ -7,7 +7,7 @@
 // Nothing here mutates the repository except writeSyncState(), which --prepare calls.
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -110,6 +110,9 @@ export function splitNul(text) {
   return text.split('\0').filter((entry) => entry.length > 0)
 }
 
+/** The abbreviated form every sync report prints for a commit. */
+export const shortCommit = (commit) => commit.slice(0, 10)
+
 export function changedNames(args) {
   const result = git(['diff', '--name-only', '-z', ...args])
   return result.ok ? splitNul(result.stdout) : null
@@ -188,11 +191,26 @@ export function writeSyncState(state) {
   return file
 }
 
+/**
+ * Drop the state file once a sync has passed its checks. It describes one merge, and a state file that
+ * outlives its merge is how the next post-sync run accepts a pre-sync tip that belongs to an earlier
+ * one. Returns the path it removed, or null when there was nothing to remove.
+ */
+export function clearSyncState() {
+  const file = stateFilePath()
+  if (!existsSync(file)) {
+    return null
+  }
+  rmSync(file, { force: true })
+  return file
+}
+
 export class Report {
   constructor(title, meta = {}) {
     this.title = title
     this.meta = meta
     this.checks = []
+    this.waived = new Map()
   }
 
   // Positional rather than an options object: both tools add eight checks, and the field names
@@ -201,6 +219,18 @@ export class Report {
     const entry = { id, status, title, summary, details: [], ...extra }
     this.checks.push(entry)
     return entry
+  }
+
+  /**
+   * Record a deliberate exception for a check that could not run. A check that did not run is not a
+   * pass, so it fails the run unless an operator said, in writing, which one and why.
+   */
+  waive(id, reason) {
+    if (!this.checks.some((check) => check.id === id)) {
+      throw new Error(`no check ${id} to waive`)
+    }
+    this.waived.set(id, reason)
+    return this
   }
 
   // Register the outcome of one gate (see lib/checks.mjs). `look` is what the operator has to
@@ -222,8 +252,20 @@ export class Report {
     )
   }
 
+  /** `unavailable` rows with no recorded waiver: what makes "N/A" stop reading as "fine". */
+  get unwaived() {
+    return this.checks.filter(
+      (check) => check.status === STATUS.unavailable && !this.waived.has(check.id)
+    )
+  }
+
+  /** The whole verdict: no hard failure, and every row that could not run accounted for. */
+  get ok() {
+    return this.failures.length === 0 && this.unwaived.length === 0
+  }
+
   result() {
-    return this.failures.length === 0 ? 'pass' : 'fail'
+    return this.ok ? 'pass' : 'fail'
   }
 
   render(summary) {
@@ -233,8 +275,9 @@ export class Report {
     }
     lines.push('')
     for (const check of this.checks) {
+      const waiver = this.waived.get(check.id)
       lines.push(
-        `[${LABEL[check.status]}] ${check.title}${check.summary ? ` — ${check.summary}` : ''}`
+        `[${LABEL[check.status]}] ${check.title}${check.summary ? ` — ${check.summary}` : ''}${waiver ? ` (waived: ${waiver})` : ''}`
       )
       for (const detail of check.details) {
         lines.push(`       ${detail}`)
@@ -254,10 +297,17 @@ export class Report {
           .join('; ')} — these are not passes, confirm them another way`
       )
     }
+    for (const [id, reason] of this.waived) {
+      lines.push(`WAIVED: ${id} — ${reason}`)
+    }
     const verdict =
-      this.failures.length === 0
-        ? `result: PASS — no hard gate failed`
-        : `result: FAIL — ${this.failures.length} of ${this.checks.length} check(s) failed`
+      this.failures.length > 0
+        ? `result: FAIL — ${this.failures.length} of ${this.checks.length} check(s) failed`
+        : this.unwaived.length > 0
+          ? `result: FAIL — ${this.unwaived.length} check(s) could not run: ${this.unwaived
+              .map((check) => check.id)
+              .join(', ')} (waive one with --waive <id>:<reason>)`
+          : `result: PASS — no hard gate failed${this.waived.size > 0 ? `, ${this.waived.size} waived` : ''}`
     lines.push(verdict)
     for (const failure of this.failures) {
       lines.push(`  fix: ${failure.look}`)
@@ -276,6 +326,8 @@ export class Report {
       result: this.result(),
       checks: this.checks,
       notRun: this.notRun.map((check) => ({ id: check.id, status: check.status })),
+      unwaived: this.unwaived.map((check) => check.id),
+      waived: [...this.waived].map(([id, reason]) => ({ id, reason })),
       ...extra
     }
   }

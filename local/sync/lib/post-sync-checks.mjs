@@ -6,7 +6,8 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { parseExpectedDeletions } from './expected-deletions.mjs'
+import { readDeletionManifest } from './expected-deletions.mjs'
+import { BACKUP_REF, UPSTREAM_REF, pinnedUpstreamBase } from './sync-range.mjs'
 import {
   STATUS,
   changedNames,
@@ -14,8 +15,6 @@ import {
   gitText,
   headText,
   pnpmCommand,
-  readSyncState,
-  refExists,
   repoRoot,
   run,
   splitNul,
@@ -31,8 +30,6 @@ import { isSweepCandidate, orphanForkFiles } from './orphan-sweep.mjs'
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/
 
 export const FORK_SLUG = 'nplez1/orca'
-export const UPSTREAM_REF = 'upstream/main'
-export const BACKUP_REF = 'backup/nplez1-main-pre-sync'
 export const BUILDER_CONFIG = './config/electron-builder.config.cjs'
 // The update feed must keep naming the fork: without it an update check resolves upstream
 // releases and a fork install "upgrades" to a build carrying none of the fork's patches.
@@ -223,55 +220,24 @@ export function identitySweep() {
   }
 }
 
-// The pre-sync tip is what "ours" means for the checks below. The state file is written by
-// `pre-sync.mjs --prepare`; the backup ref covers a sync prepared by hand from the runbook.
-export function resolvePreSyncTip() {
-  const { state, source, file } = readSyncState()
-  if (state?.oldTip && refExists(`${state.oldTip}^{commit}`)) {
-    return { tip: state.oldTip, source: `${source} (${file})` }
-  }
-  const backup = gitText(['rev-parse', '--verify', '--quiet', `refs/heads/${BACKUP_REF}`])
-  return backup ? { tip: backup, source: `ref ${BACKUP_REF}` } : { tip: null, source: null }
-}
-
-// The upstream base this sync recorded, i.e. `pre-sync.mjs --prepare`'s newBase. The red-flag scan
-// must not compare against the moving `upstream/main`: upstream keeps advancing after the sync, and
-// the set of files it "touched in this range" would change under the check.
-//
-// With no state file the only records left are the backup ref, which names the pre-sync TIP, and the
-// merged tree itself, so the base is derived from HEAD: `merge-base(HEAD, upstream/main)` is a commit
-// in HEAD's own history, so it does not move as upstream advances. Deriving it from the pre-sync tip
-// instead yields the PREVIOUS sync's base and collapses the upstream range to nothing.
-export function pinnedUpstreamBase(tip, source) {
-  const { state, source: stateSource, file } = readSyncState()
-  if (state?.newBase) {
-    const resolved = gitText(['rev-parse', '--verify', '--quiet', `${state.newBase}^{commit}`])
-    return resolved
-      ? { base: resolved, source: `${stateSource} (${file})` }
-      : {
-          base: null,
-          source: null,
-          problem: `the state file records new base ${state.newBase}, which does not resolve to a commit`
-        }
-  }
-  const derived = gitText(['merge-base', 'HEAD', UPSTREAM_REF])
-  return derived
-    ? {
-        base: derived,
-        source: `merge-base(HEAD, ${UPSTREAM_REF}) (no state file${source ? `; tip from ${source}` : ''})`
-      }
-    : {
-        base: null,
-        source: null,
-        problem: `no recorded base: no state file, and no merge base between HEAD and ${UPSTREAM_REF}`
-      }
-}
+// The pre-sync tip and the pinned upstream base live in lib/sync-range.mjs: they are the input every
+// check below shares, and the check that they belong to THIS merge is what makes them safe to use.
 
 // Runbook Step 3.1, the check that catches the dropped-merge-commit trap: a MODIFIED file that
 // upstream never touched in this sync's range means the replay moved content it did not own. A path
 // upstream does not have at all is fork-only by construction, and expected here. This is a red-flag
 // scan over modified files — it does not prove that no content was lost anywhere else.
-export function lostContent(tip, source) {
+export function lostContent(tip, source, problem = null) {
+  if (problem !== null) {
+    return {
+      status: STATUS.failed,
+      summary: `the pre-sync tip does not belong to this sync: ${problem}`,
+      details: [
+        'the scan would compare the wrong range and report clean, so it refuses instead',
+        're-run `node local/sync/pre-sync.mjs --prepare` before relying on this check'
+      ]
+    }
+  }
   if (!tip) {
     return {
       status: STATUS.unavailable,
@@ -466,37 +432,57 @@ export function exportInventory(source) {
  * A deleted module legitimately leaves no reference to its exports behind when its behaviour moved
  * into a live module under a different name, so the export scan needs a way to record that verdict
  * rather than failing forever on a supersession someone already checked.
+ *
+ * `base` is the pinned upstream base: an entry bound to a blob upstream no longer has is a question
+ * again, and an entry neither side has any more is prunable.
  */
-function readExpectedDeletions() {
+function readExpectedDeletions(base = null) {
   const file = path.join(repoRoot(), 'local/sync/expected-deletions.json')
-  if (!existsSync(file)) {
-    return { acknowledged: {}, stale: [], failure: null }
-  }
-  let text
+  let text = null
   try {
     text = readFileSync(file, 'utf8')
   } catch (error) {
-    return {
-      acknowledged: {},
-      stale: [],
-      failure: `${file} could not be read: ${error instanceof Error ? error.message : String(error)}`
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+      return {
+        acknowledged: {},
+        prunable: [],
+        failure: `${file} could not be read: ${error instanceof Error ? error.message : String(error)}`
+      }
     }
   }
-  // Why the shared parser: the manifest's shape is `deletions[]` with a per-entry status, and a second
+  const at = (ref) =>
+    ref === null ? null : new Set(splitNul(gitText(['ls-tree', '-r', '--name-only', '-z', ref])))
+  // Why the shared reader: the manifest's shape is `deletions[]` with a per-entry status, and a second
   // reader with its own idea of it is how this check read the retired `acknowledged` key for a week and
   // reported FAILED on every run.
-  const { entries, note } = parseExpectedDeletions(text)
+  const manifest = readDeletionManifest({
+    text,
+    presentAtHead: at('HEAD') ?? new Set(),
+    presentUpstream: at(base),
+    upstreamBlobOf: (entryPath) =>
+      base === null ? null : gitText(['rev-parse', '--verify', '--quiet', `${base}:${entryPath}`])
+  })
   const acknowledged = {}
-  for (const entry of entries) {
-    // `pending-decision` means nobody has judged it yet, so it acknowledges nothing.
+  for (const entry of manifest.entries) {
+    // `pending-decision` acknowledges nothing, and neither does one the binding reopened.
     if (entry.status === 'expected-deletion') {
       acknowledged[entry.path] = { reason: entry.reason }
     }
   }
-  return { acknowledged, stale: [], failure: note }
+  return { acknowledged, prunable: manifest.prunable, failure: manifest.failure }
 }
 
-export function deletedForkModules(tip, source) {
+export function deletedForkModules(tip, source, problem = null) {
+  if (problem !== null) {
+    return {
+      status: STATUS.failed,
+      summary: `the pre-sync tip does not belong to this sync: ${problem}`,
+      details: [
+        'the scan would read the wrong tip and report clean, so it refuses instead',
+        're-run `node local/sync/pre-sync.mjs --prepare` before relying on this check'
+      ]
+    }
+  }
   if (!tip) {
     return {
       status: STATUS.unavailable,
@@ -572,7 +558,7 @@ export function deletedForkModules(tip, source) {
   const scanFailures = []
   const unreferenced = []
   const acknowledgedUnreferenced = []
-  const expectations = readExpectedDeletions()
+  const expectations = readExpectedDeletions(base)
   if (expectations.failure !== null) {
     scanFailures.push(expectations.failure)
   }
@@ -645,6 +631,9 @@ export function deletedForkModules(tip, source) {
     for (const file of staleAcknowledgements) {
       details.push(`  ? ${file}`)
     }
+  }
+  for (const file of expectations.prunable) {
+    details.push(`  ? ${file} — in the manifest, but neither side has it any more: prune the entry`)
   }
   if (acknowledgedUnreferenced.length > 0) {
     details.push(

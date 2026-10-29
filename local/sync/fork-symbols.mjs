@@ -7,7 +7,7 @@
 
 import process from 'node:process'
 import { forkSymbolSurvival, scanForkSymbols } from './lib/fork-symbol-check.mjs'
-import { resolvePreSyncTip } from './lib/post-sync-checks.mjs'
+import { resolvePreSyncTip } from './lib/sync-range.mjs'
 import { gitText } from './lib/run.mjs'
 
 const HELP = `fork-symbol survival — which names the fork added are gone after a merge

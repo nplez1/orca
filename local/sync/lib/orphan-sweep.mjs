@@ -27,6 +27,10 @@ const EXTENSIONS = [
   '/index.mjs'
 ]
 
+// A `.js` specifier in a TypeScript file is the ESM spelling of the `.ts` module beside it, and the
+// bundler resolves it that way. Without this every `import './x.js'` in a TS file reads as dangling.
+const JS_TO_TS = { '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] }
+
 /** The repo path a specifier names, or null when it is a package or cannot be resolved. */
 export function resolveSpecifier(specifier, fromPath, known) {
   let base
@@ -39,10 +43,13 @@ export function resolveSpecifier(specifier, fromPath, known) {
     }
     base = alias[1] + specifier.slice(alias[0].length)
   }
-  for (const extension of EXTENSIONS) {
-    const candidate = base + extension
-    if (known.has(candidate)) {
-      return candidate
+  const extension = posix.extname(base)
+  const swapped = (JS_TO_TS[extension] ?? []).map((to) => base.slice(0, -extension.length) + to)
+  for (const candidate of [...swapped, base]) {
+    for (const suffix of EXTENSIONS) {
+      if (known.has(candidate + suffix)) {
+        return candidate + suffix
+      }
     }
   }
   return null
@@ -68,6 +75,39 @@ export function orphanForkFiles({ sources, forkOnly, allowlist = [] }) {
   }
   const allowed = new Set(allowlist)
   return [...forkOnly].filter((path) => !referenced.has(path) && !allowed.has(path)).sort()
+}
+
+/**
+ * Whether a specifier is one that names a repo path at all. A bare `electron` or `@scope/pkg` is a
+ * package: nothing in this tree resolves it, and calling that dangling would be a false finding.
+ */
+export function isRepoSpecifier(specifier) {
+  return (
+    specifier.startsWith('./') ||
+    specifier.startsWith('../') ||
+    ALIASES.some(([prefix]) => specifier.startsWith(prefix))
+  )
+}
+
+/**
+ * References that name a repo path nobody has. `known` is the tree the references must resolve in —
+ * HEAD after a merge, not the pre-merge tip — because the point is what the merged tree can still find.
+ *
+ * This is the check `rename-forecast` only ever ran *before* a merge: after it, an unresolved import was
+ * silently null and nothing looked at it again. `pnpm tc` catches the TypeScript imports; it cannot see
+ * `vi.mock('…')`, a path string, or a dynamic import in a `.mjs` file.
+ */
+export function danglingReferences({ references, known }) {
+  const dangling = []
+  for (const reference of references) {
+    if (!isRepoSpecifier(reference.spec)) {
+      continue
+    }
+    if (resolveSpecifier(reference.spec, reference.file, known) === null) {
+      dangling.push(reference)
+    }
+  }
+  return dangling
 }
 
 /** Fork-only means: present at HEAD under `src/`, absent from upstream's tree. Tests are not candidates. */

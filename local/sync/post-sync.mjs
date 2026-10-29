@@ -24,6 +24,8 @@ import {
   repoLint,
   typecheck
 } from './lib/checks.mjs'
+import { danglingForkReferences } from './lib/dangling-references.mjs'
+import { forkSymbolSurvival } from './lib/fork-symbol-check.mjs'
 import {
   BUILDER_CONFIG,
   FORK_SLUG,
@@ -32,20 +34,31 @@ import {
   identitySweep,
   localizationVerifiers,
   lostContent,
-  pinnedUpstreamBase,
-  resolvePreSyncTip,
   unreferencedForkModules,
   updaterFeed
 } from './lib/post-sync-checks.mjs'
-import { Report, STATUS, gitText, repoRoot } from './lib/run.mjs'
+import { Report, STATUS, clearSyncState, gitText, repoRoot } from './lib/run.mjs'
+import { pinnedUpstreamBase, resolvePreSyncTip } from './lib/sync-range.mjs'
 
 function parseArgs(argv) {
-  const options = { json: false, skipTypecheck: false, help: false }
-  for (const flag of argv) {
+  const options = { json: false, skipTypecheck: false, help: false, waivers: [] }
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index]
     if (flag === '--json') {
       options.json = true
     } else if (flag === '--skip-typecheck') {
       options.skipTypecheck = true
+    } else if (flag === '--waive') {
+      const value = argv[index + 1]
+      if (!value) {
+        throw new Error('--waive needs <check-id>:<reason>')
+      }
+      const split = value.indexOf(':')
+      if (split < 1 || value.slice(split + 1).trim() === '') {
+        throw new Error(`--waive needs <check-id>:<reason>, got "${value}"`)
+      }
+      options.waivers.push([value.slice(0, split), value.slice(split + 1).trim()])
+      index += 1
     } else if (flag === '--help' || flag === '-h') {
       options.help = true
     } else {
@@ -56,7 +69,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`Usage: node local/sync/post-sync.mjs [--json] [--skip-typecheck]
+  console.log(`Usage: node local/sync/post-sync.mjs [--json] [--skip-typecheck] [--waive <id>:<reason>]
 
 Integration checks, each reported separately: no conflict markers (delegating to
 local/sync/conflicts.mjs --verify when present), the derived localization catalog regenerates to
@@ -64,16 +77,21 @@ no diff, both localization verifiers, the fork builder config (${BUILDER_CONFIG}
 still loading, the update feed still naming ${FORK_SLUG}, the fork identity sweep (delegating to
 local/sync/identity-sweep.mjs when present), a red-flag scan of the files modified since the pre-sync
 tip compared against the upstream base pre-sync recorded, an inventory of the exported surface of
-every fork-only module this sync deleted (each name searched for a surviving reference), the
-repo-wide lint the changed-lines gate never runs (which is how the np.18 merge left six over-cap
-files for a later PR to inherit), and the merged tip typecheck (${TYPE_CHECK_COMMAND}).
+every fork-only module this sync deleted (each name searched for a surviving reference), the names the
+fork added to a surviving file that the merged file no longer declares, fork-added references that
+resolve to nothing at HEAD, the repo-wide lint the changed-lines gate never runs (which is how the
+np.18 merge left six over-cap files for a later PR to inherit), and the merged tip typecheck
+(${TYPE_CHECK_COMMAND}).
 
 Options:
-  --json            machine-readable report on stdout
-  --skip-typecheck  skip ${TYPE_CHECK_COMMAND}; reported as skipped, never as passed
-  -h, --help        this text
+  --json                     machine-readable report on stdout
+  --skip-typecheck           skip ${TYPE_CHECK_COMMAND}; reported as skipped, never as passed
+  --waive <id>:<reason>      record a deliberate exception for a check that could not run (repeatable).
+                             Without one, an N/A check fails the run: a check that did not run is not a pass
+  -h, --help                 this text
 
-Exit code is non-zero if any hard check fails.`)
+Exit code is non-zero if any hard check fails, or if a check could not run and was not waived.
+A clean run deletes the pre-sync state file: it describes one merge and must not outlive it.`)
 }
 
 function main() {
@@ -89,7 +107,7 @@ function main() {
     usage()
     return
   }
-  const { tip, source } = resolvePreSyncTip()
+  const { tip, source, problem } = resolvePreSyncTip()
   const base = pinnedUpstreamBase(tip, source)
   const report = new Report('post-sync integration checks', {
     repo: repoRoot(),
@@ -142,13 +160,25 @@ function main() {
       'lost-content',
       'red-flag scan of files modified since the pre-sync tip',
       "diff each flagged file against the pre-sync tip and take the old tip's content where the replay dropped it",
-      () => lostContent(tip, source)
+      () => lostContent(tip, source, problem)
     ],
     [
       'deleted-fork-modules',
       'deleted fork-only modules, with the exported surface each one carried',
       'for each name listed as unreferenced, find the caller the deletion dropped and re-home it; "upstream supersedes this" is not a review',
-      () => deletedForkModules(tip, source)
+      () => deletedForkModules(tip, source, problem)
+    ],
+    [
+      'fork-symbol-survival',
+      'fork-added names the merged file no longer declares',
+      "the file survived the merge and the fork's function, constant or settings field inside it did not: re-home it, or acknowledge it under `symbols` in local/sync/expected-deletions.json",
+      () => forkSymbolSurvival(tip, source, { problem })
+    ],
+    [
+      'dangling-references',
+      'fork-added references that name nothing at HEAD',
+      'a rename or extract left an import, a vi.mock target or a path string pointing at a file that no longer exists; pnpm tc sees the TypeScript imports and nothing else',
+      () => danglingForkReferences(tip, source, problem)
     ],
     [
       'unreferenced-fork-modules',
@@ -181,8 +211,24 @@ function main() {
       })
     }
   }
+  // A waiver a reader cannot find is not recorded: it lands in the rendered report, in --json and in the
+  // verdict line, and it only ever covers a check that could not run.
+  for (const [id, reason] of options.waivers) {
+    try {
+      report.waive(id, reason)
+    } catch (error) {
+      console.error(`post-sync: ${error.message}`)
+      process.exit(2)
+    }
+  }
   console.log(options.json ? JSON.stringify(report.toJSON(), null, 2) : report.render())
-  process.exit(report.failures.length === 0 ? 0 : 1)
+  if (report.ok) {
+    const removed = clearSyncState()
+    if (removed) {
+      console.log(`\ncleared the pre-sync state file (${removed}); this merge is done`)
+    }
+  }
+  process.exit(report.ok ? 0 : 1)
 }
 
 main()

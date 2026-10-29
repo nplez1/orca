@@ -7,7 +7,8 @@ import { parseExpectedSymbols } from './expected-deletions.mjs'
 import { forkAdded, forkSurface, manifestEntry, survivalVerdict } from './fork-symbols.mjs'
 import { blobs, upstreamMoves } from './fork-surface-git.mjs'
 import { addedLines } from './rename-forecast.mjs'
-import { BACKUP_REF, isDeletedCodeModule, pinnedUpstreamBase } from './post-sync-checks.mjs'
+import { isDeletedCodeModule } from './post-sync-checks.mjs'
+import { BACKUP_REF, pinnedUpstreamBase } from './sync-range.mjs'
 import { STATUS, git, gitText, repoRoot, splitNul, tailText } from './run.mjs'
 
 function readManifestSymbols() {
@@ -240,7 +241,17 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
   }
 }
 
-export function forkSymbolSurvival(tip, source, { merged = 'HEAD' } = {}) {
+export function forkSymbolSurvival(tip, source, { merged = 'HEAD', problem = null } = {}) {
+  if (problem !== null) {
+    return {
+      status: STATUS.failed,
+      summary: `the pre-sync tip does not belong to this sync: ${problem}`,
+      details: [
+        'the scan would read the wrong tip and report clean, so it refuses instead',
+        're-run `node local/sync/pre-sync.mjs --prepare` before relying on this check'
+      ]
+    }
+  }
   if (!tip) {
     return {
       status: STATUS.unavailable,
