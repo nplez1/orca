@@ -15,10 +15,11 @@ import {
 import {
   WORKSPACE_PATH_CATALOG_CHECKPOINT_HOST_DISK_BUDGET_BYTES,
   WORKSPACE_PATH_CATALOG_CHECKPOINT_ROOT_DISK_BUDGET_BYTES,
-  measureWorkspacePathCatalogCheckpointRootBytes as measureCheckpointRootBytes,
+  measureWorkspacePathCatalogCheckpointDirectoryBytes,
   pruneWorkspacePathCatalogCheckpointGenerations,
   publishWorkspacePathCatalogCheckpoint,
   reserveWorkspacePathCatalogCheckpointDiskBudget,
+  unpinWorkspacePathCatalogCheckpoint,
   workspacePathCatalogCheckpointPayloadPath
 } from './workspace-path-catalog-checkpoint-store'
 import { workspacePathCatalogResidentCheckpointEncodeEnabled } from './workspace-path-catalog-checkpoint-policy'
@@ -134,6 +135,8 @@ export async function writeWorkspacePathCatalogCheckpoint(args: {
   }
   await publishWorkspacePathCatalogCheckpoint(directory, manifest)
   await pruneWorkspacePathCatalogCheckpointGenerations(directory, payloadFile)
+  // A write supersedes whatever restored generation this identity was pinned for.
+  unpinWorkspacePathCatalogCheckpoint(directory)
   return {
     payloadBytes,
     writeMilliseconds: performance.now() - startedAt,
@@ -150,7 +153,9 @@ async function canEncodeResidentCatalogPayload(
   catalog: Exclude<WorkspacePathCatalogGeneration['catalog'], { storageKind: 'disk-spilled' }>,
   perRootBudgetBytes: number
 ): Promise<boolean> {
-  const retained = await measureCheckpointRootBytes(dirname(directory))
+  // Why this identity's own directory: the ceiling is per root, and measuring the whole host root
+  // against it refused every resident checkpoint once all of them together passed that number.
+  const retained = await measureWorkspacePathCatalogCheckpointDirectoryBytes(directory)
   // The resident form is a conservative upper bound for the encoded payload.
   return retained + catalog.retainedBytes <= perRootBudgetBytes
 }
