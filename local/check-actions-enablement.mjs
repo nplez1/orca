@@ -25,7 +25,8 @@ import { parse } from 'yaml'
 const REPO = 'nplez1/orca'
 const ROOT = resolve(import.meta.dirname, '..')
 
-// Must stay enabled: the release build, the daily v* tag mirror, and the nightly full unit suite.
+// Must stay enabled: the release build, the daily v* tag mirror, the nightly full unit suite, and
+// the daily health check that watches the other three.
 export const REQUIRED = [
   '.github/workflows/fork-release.yml',
   '.github/workflows/fork-upstream-tags.yml',
@@ -34,7 +35,10 @@ export const REQUIRED = [
   // between merges — a cross-cutting break sits on the release line until someone runs the release
   // gate by hand. Treating "disabled" as drift is the whole point: this is the backstop, and a
   // backstop nobody notices is off is not one. See LOCAL-PATCHES.md § local(ci) before changing it.
-  '.github/workflows/fork-main-tests.yml'
+  '.github/workflows/fork-main-tests.yml',
+  // Why: this is the check that watches the health checks. An unwatched watchdog is exactly the
+  // failure `LOCAL-PATCHES.md` § local(ci) records, so a disabled one is drift, not a preference.
+  '.github/workflows/fork-ci-health.yml'
 ]
 
 // Inert without a manual dispatch or a caller — active is fine, disabled is also fine.
