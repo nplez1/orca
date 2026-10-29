@@ -3,6 +3,8 @@ import {
   isCheckoutOutsideProjectFolder,
   planPrimaryCheckoutRelocation,
   relocatePrimaryCheckout,
+  RelocationRollbackFailedError,
+  RelocationVolumeUnreadableError,
   type RelocationDependencies,
   type RelocationPlan
 } from './project-folder-relocation'
@@ -161,7 +163,7 @@ const plan: RelocationPlan = {
 function makeDeps(overrides: Partial<RelocationDependencies> = {}): RelocationDependencies {
   return {
     pathExists: vi.fn().mockResolvedValue(false),
-    isSameVolume: vi.fn().mockResolvedValue(true),
+    volumeRelation: vi.fn().mockResolvedValue('same'),
     hasLiveSessions: vi.fn().mockResolvedValue(false),
     makeDirectory: vi.fn().mockResolvedValue(undefined),
     moveDirectory: vi.fn().mockResolvedValue(undefined),
@@ -201,7 +203,11 @@ describe('relocatePrimaryCheckout', () => {
   it.each([
     ['a live session', { hasLiveSessions: vi.fn().mockResolvedValue(true) }, 'live-sessions'],
     ['a taken target', { pathExists: vi.fn().mockResolvedValue(true) }, 'target-exists'],
-    ['a cross-volume target', { isSameVolume: vi.fn().mockResolvedValue(false) }, 'cross-volume']
+    [
+      'a cross-volume target',
+      { volumeRelation: vi.fn().mockResolvedValue('cross-volume') },
+      'cross-volume'
+    ]
   ])('refuses %s without touching the filesystem', async (_label, overrides, reason) => {
     const deps = makeDeps(overrides)
 
@@ -226,5 +232,39 @@ describe('relocatePrimaryCheckout', () => {
     expect(deps.setRepoPath).not.toHaveBeenCalled()
     expect(deps.migrateWorktreeIdentity).not.toHaveBeenCalled()
     expect(deps.notifyRepoRelocated).not.toHaveBeenCalled()
+  })
+
+  // Why a failure rather than `cross-volume`: the user cannot act on "different volume", and the
+  // volume question was not answered — the path could not be read.
+  it('names an unreadable path instead of claiming the destination is on another volume', async () => {
+    const deps = makeDeps({ volumeRelation: vi.fn().mockResolvedValue('unreadable') })
+
+    await expect(relocatePrimaryCheckout({ repo, plan, deps })).rejects.toThrow(
+      RelocationVolumeUnreadableError
+    )
+    expect(deps.makeDirectory).not.toHaveBeenCalled()
+    expect(deps.moveDirectory).not.toHaveBeenCalled()
+  })
+
+  // The trap this fixes: the caller reported the original failure as if the move had been undone, and
+  // the user then looked for the checkout at a path it had left.
+  it('reports where the folder actually is when moving it back fails', async () => {
+    const repairFailure = new Error('repair failed')
+    const rollbackFailure = new Error('rename back failed')
+    const deps = makeDeps({
+      repairWorktrees: vi.fn().mockRejectedValue(repairFailure),
+      moveDirectory: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(rollbackFailure)
+    })
+
+    const error = await relocatePrimaryCheckout({ repo, plan, deps }).catch(
+      (thrown: unknown) => thrown
+    )
+
+    expect(error).toBeInstanceOf(RelocationRollbackFailedError)
+    expect((error as InstanceType<typeof RelocationRollbackFailedError>).currentPath).toBe(
+      '/ws/homelab/main'
+    )
+    expect((error as Error).message).toContain('the folder is still at /ws/homelab/main')
+    expect(deps.setRepoPath).not.toHaveBeenCalled()
   })
 })

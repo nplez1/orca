@@ -15,9 +15,9 @@ import { gitExecFileAsync } from './git/runner'
 import { runProcessSync } from '@orca/process-host'
 import { getRepoMainWorktreeId } from '../shared/worktree/id'
 import {
-  isSameVolume,
   planPrimaryCheckoutRelocation,
   relocatePrimaryCheckout,
+  volumeRelationBetween,
   type RelocationDependencies
 } from './project-folder-relocation'
 
@@ -40,7 +40,7 @@ function realDeps(overrides: Partial<RelocationDependencies> = {}): RelocationDe
     pathExists: async (path) => existsSync(path),
     // The production rule, not a copy of it: a local reimplementation is how the original
     // fixtures came to hide a broken volume check.
-    isSameVolume: (from, to) => isSameVolume(from, to),
+    volumeRelation: (from, to) => volumeRelationBetween(from, to),
     hasLiveSessions: async () => false,
     makeDirectory: async (path) => {
       await mkdir(path, { recursive: true })

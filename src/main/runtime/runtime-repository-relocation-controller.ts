@@ -15,9 +15,9 @@ import { gitExecFileAsync } from '../git/runner'
 import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import {
   isCheckoutOutsideProjectFolder,
-  isSameVolume,
   planPrimaryCheckoutRelocation,
   relocatePrimaryCheckout,
+  volumeRelationBetween,
   type RelocationDecision,
   type RelocationOutcome
 } from '../project-folder-relocation'
@@ -138,7 +138,7 @@ export class RuntimeRepositoryRelocationController {
       plan: decision.plan,
       deps: {
         pathExists: (path) => pathExists(path),
-        isSameVolume: (from, to) => isSameVolume(from, to),
+        volumeRelation: (from, to) => volumeRelationBetween(from, to),
         hasLiveSessions: async () =>
           hasLiveWorktreeSessions(
             await this.deps.getWorktreePs(WORKTREE_LIVENESS_PROBE_LIMIT),

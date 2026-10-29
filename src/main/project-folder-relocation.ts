@@ -146,7 +146,7 @@ export function planPrimaryCheckoutRelocation(args: {
 }
 
 /**
- * Whether `rename` can move between these two paths at all.
+ * Whether `rename` can move between these two paths at all, or why that cannot be answered.
  *
  * Exported because the executor takes it as a dependency: a caller wiring the real move has to use
  * this rather than its own comparison, or the two drift and a refusal looks real when it is not.
@@ -154,17 +154,22 @@ export function planPrimaryCheckoutRelocation(args: {
  * Why the nearest existing ancestor rather than `dirname(to)`: the container is created by this
  * move, so it usually does not exist yet, and stat'ing a missing path is not a volume answer. The
  * ancestor that does exist is on the volume the container will be created on.
+ *
+ * Why three answers rather than a boolean: a `stat` failure is not a volume answer, and reporting it
+ * as `cross-volume` tells the user their disks are arranged differently when the truth is that this
+ * host cannot read the path at all.
  */
-export async function isSameVolume(from: string, to: string): Promise<boolean> {
+export type VolumeRelation = 'same' | 'cross-volume' | 'unreadable'
+
+export async function volumeRelationBetween(from: string, to: string): Promise<VolumeRelation> {
   try {
     const [fromStats, targetParentStats] = await Promise.all([
       stat(from),
       stat(await nearestExistingAncestor(dirname(to)))
     ])
-    return fromStats.dev === targetParentStats.dev
+    return fromStats.dev === targetParentStats.dev ? 'same' : 'cross-volume'
   } catch {
-    // An unreadable path is not a volume answer, so refuse the move rather than assume one.
-    return false
+    return 'unreadable'
   }
 }
 
@@ -186,8 +191,8 @@ async function nearestExistingAncestor(path: string): Promise<string> {
 
 export type RelocationDependencies = {
   pathExists: (path: string) => Promise<boolean>
-  /** False when a `rename` would cross volumes, where it fails outright. */
-  isSameVolume: (from: string, to: string) => Promise<boolean>
+  /** How a `rename` would treat these paths; `unreadable` means the question cannot be answered. */
+  volumeRelation: (from: string, to: string) => Promise<VolumeRelation>
   /** True when this repo has a live agent session on any of its worktrees. */
   hasLiveSessions: (repo: Pick<Repo, 'id' | 'path'>) => Promise<boolean>
   makeDirectory: (path: string) => Promise<void>
@@ -204,6 +209,38 @@ export type RelocationDependencies = {
 export type RelocationOutcome =
   | { kind: 'relocated'; from: string; to: string }
   | { kind: 'skipped'; reason: 'live-sessions' | 'target-exists' | 'cross-volume' }
+
+/**
+ * A rollback that failed: the checkout is at `currentPath` while the saved repo path still names
+ * `originalPath`.
+ *
+ * Why its own error: the caller's message said the move was undone, so the repo then read as missing
+ * at a path it had left — the one fact the user needs is where the folder actually is.
+ */
+export class RelocationRollbackFailedError extends Error {
+  constructor(
+    readonly currentPath: string,
+    readonly originalPath: string,
+    cause: unknown
+  ) {
+    super(
+      `Moving the checkout into its project folder failed and moving it back to ${originalPath} failed too, so the folder is still at ${currentPath}`,
+      { cause }
+    )
+    this.name = 'RelocationRollbackFailedError'
+  }
+}
+
+/** The volume question could not be answered, so no move was attempted. */
+export class RelocationVolumeUnreadableError extends Error {
+  constructor(
+    readonly from: string,
+    readonly to: string
+  ) {
+    super(`Could not read ${from} or the destination for ${to}, so the checkout was not moved`)
+    this.name = 'RelocationVolumeUnreadableError'
+  }
+}
 
 /**
  * Perform the move: directory, then `git worktree repair`, then the records that point at the old
@@ -232,7 +269,13 @@ export async function relocatePrimaryCheckout(args: {
   if (await deps.pathExists(to)) {
     return { kind: 'skipped', reason: 'target-exists' }
   }
-  if (!(await deps.isSameVolume(from, to))) {
+  const relation = await deps.volumeRelation(from, to)
+  if (relation === 'unreadable') {
+    // Why throw rather than skip: `cross-volume` was a claim about the user's disks, and this is a
+    // failure to read a path. Only one of the two is something the user can act on.
+    throw new RelocationVolumeUnreadableError(from, to)
+  }
+  if (relation === 'cross-volume') {
     // Why refuse instead of copy-and-delete: a copy that fails halfway leaves two checkouts and
     // no way to know which one the records should point at.
     return { kind: 'skipped', reason: 'cross-volume' }
@@ -244,10 +287,16 @@ export async function relocatePrimaryCheckout(args: {
     await deps.repairWorktrees(to)
     deps.setRepoPath(to)
   } catch (error) {
-    await deps.moveDirectory(to, from).catch(() => {})
+    try {
+      await deps.moveDirectory(to, from)
+    } catch (rollbackError) {
+      // Why a distinct error naming `to`: the caller otherwise reports the original failure as if the
+      // move had been undone, and the checkout is somewhere its records do not name.
+      throw new RelocationRollbackFailedError(to, from, rollbackError)
+    }
     // Why repair again: the repair above may already have pointed every linked worktree's gitdir at
     // the new path, so moving the directory back without this leaves them all broken — the failure
-    // would then be worse than not having moved at all.
+    // would then be worse than not having moved at all. A failure here does not hide the original.
     await deps.repairWorktrees(from).catch(() => {})
     throw error
   }
