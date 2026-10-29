@@ -463,6 +463,45 @@ describe('getJenkinsBuildDetails', () => {
     expect(result.ok).toBe(true)
     expect(new Headers(requests[0].init.headers).get('Authorization')).toBeNull()
   })
+
+  it('sends no request at all to an unconfigured host that is not publicly routable', async () => {
+    const { details } = await loadModules()
+    route = () => json(buildBody())
+
+    // Why: the check URL is a commit status anybody who can push may write, so an intranet host in
+    // it must not turn the desktop into a probe of this machine's network.
+    for (const url of [
+      'http://jenkins.internal/job/team/job/repo/12/',
+      'http://10.0.0.5:8080/job/team/job/repo/12/',
+      'http://localhost:8080/job/team/job/repo/12/'
+    ]) {
+      await expect(details.getJenkinsBuildDetails({ url, check })).resolves.toMatchObject({
+        ok: false,
+        reason: 'not-configured'
+      })
+    }
+    expect(requests).toEqual([])
+  })
+
+  it('still reads a private host once its server is configured', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection, 'http://jenkins.internal')
+    route = (url) =>
+      url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
+
+    const result = await details.getJenkinsBuildDetails({
+      url: 'http://jenkins.internal/job/team/job/repo/12/',
+      check
+    })
+
+    expect(result.ok).toBe(true)
+    expect(requests[0].url).toBe(
+      'http://jenkins.internal/job/team/job/repo/12/api/json?tree=' +
+        'number,building,result,displayName,fullDisplayName,description,url,timestamp,duration,' +
+        'estimatedDuration,actions[_class,causes[_class,shortDescription],parameters[_class,name,value]],' +
+        'changeSets[items[commitId,msg,comment,author[fullName]]]'
+    )
+  })
 })
 
 function buildBody(): Record<string, unknown> {
