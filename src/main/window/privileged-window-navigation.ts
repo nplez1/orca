@@ -13,12 +13,10 @@ function openExternalLink(contents: WebContents, url: string): void {
 
 /** Keep remote documents from inheriting an Orca window's privileged preload. */
 export function installPrivilegedWindowNavigationPolicy(contents: WebContents): void {
-  // A new document has to re-announce its router, and a dead renderer never will.
-  contents.on('did-start-navigation', (_event, _url, isSameDocument, isMainFrame) => {
-    if (isMainFrame && !isSameDocument) {
-      forgetContextualLinkRouter(contents)
-    }
-  })
+  // Why a committed navigation, not `did-start-navigation`: the latter precedes the throttle
+  // that emits `will-navigate`, so clearing there would disarm the relay for the very handler
+  // that cancels the navigation — the document survives and would never re-announce.
+  contents.on('did-navigate', () => forgetContextualLinkRouter(contents))
   contents.on('render-process-gone', () => forgetContextualLinkRouter(contents))
 
   contents.setWindowOpenHandler(({ url }) => {

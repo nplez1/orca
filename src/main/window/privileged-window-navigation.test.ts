@@ -46,6 +46,16 @@ describe('privileged window navigation policy', () => {
         }
         handler(event, url)
         return event
+      },
+      fire(event: string, ...args: unknown[]) {
+        const handler = handlers.get(event)
+        if (!handler) {
+          throw new Error(`no ${event} handler was registered`)
+        }
+        handler(...args)
+      },
+      subscribesTo(event: string): boolean {
+        return handlers.has(event)
       }
     }
   }
@@ -150,5 +160,52 @@ describe('privileged window navigation policy', () => {
     expect(fixture.windowOpen('https://example.com/')).toEqual({ action: 'deny' })
     expect(openExternal).toHaveBeenCalledWith('https://example.com/')
     expect(fixture.contents.send).not.toHaveBeenCalled()
+  })
+
+  // Chromium emits did-start-navigation before the throttle that emits will-navigate, so clearing
+  // readiness there would disarm the relay for the handler that cancels this very navigation.
+  it('clears readiness only once a navigation commits', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    expect(fixture.subscribesTo('did-start-navigation')).toBe(false)
+    expect(fixture.subscribesTo('did-navigate')).toBe(true)
+
+    const event = fixture.willNavigate('https://example.com/')
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(fixture.contents.send).toHaveBeenCalledWith(
+      'link:openContextual',
+      'https://example.com/'
+    )
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('forgets the router once a new document commits, and relays again until it re-announces', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    fixture.fire('did-navigate', {}, 'file:///next-document.html', 200, 'OK')
+    expect(fixture.windowOpen('https://example.com/')).toEqual({ action: 'deny' })
+
+    expect(fixture.contents.send).not.toHaveBeenCalled()
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/')
+  })
+
+  it('forgets the router when the renderer dies', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    fixture.fire('render-process-gone', {}, { reason: 'crashed' })
+    fixture.windowOpen('https://example.com/')
+
+    expect(fixture.contents.send).not.toHaveBeenCalled()
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/')
   })
 })
