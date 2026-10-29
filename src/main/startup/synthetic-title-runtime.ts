@@ -158,10 +158,15 @@ export function driveSyntheticTitleFromHook(
   }
   // Stop before the next tick can restore working; only permission frames ring BEL, completion owns its own notifications.
   stopSyntheticTitleSpinner(paneKey)
+  const needsUserInput = agentState === 'blocked' || agentState === 'waiting'
   if (paneTitleClaimsOwnState(ptyId, profile)) {
+    // Why the bell alone: that extra BEL is what fires the permission notification, and the label it
+    // would ride on is the write this guard exists to refuse.
+    if (needsUserInput) {
+      sendSyntheticTitle(ptyId, '\x07', { force: true })
+    }
     return
   }
-  const needsUserInput = agentState === 'blocked' || agentState === 'waiting'
   const label = needsUserInput ? profile.permissionLabel : profile.idleLabel
   sendSyntheticTitle(ptyId, `\x1b]0;${label}\x07${needsUserInput ? '\x07' : ''}`, { force: true })
 }

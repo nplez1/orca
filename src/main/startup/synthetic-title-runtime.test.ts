@@ -50,15 +50,26 @@ beforeEach(() => {
 })
 
 describe('synthetic titles over a pi state title', () => {
-  it('leaves the pane alone while pi itself claims a dialog', () => {
+  it('rings the permission bell without restating the title', () => {
+    // Why the bell alone: that extra BEL is what fires the permission notification, and the label it
+    // would ride on carries no marker — the write that erased `π !` in the first place.
     titles.set('pty-1', 'π ! main')
 
     driveSyntheticTitleFromHookStatus(status('waiting', 'pi'))
 
+    expect(hooks.ingest).toHaveBeenCalledTimes(1)
+    expect(hooks.ingest.mock.calls[0][1]).toBe('\x07')
+  })
+
+  it('rings nothing for a finished turn over a pi state title', () => {
+    titles.set('pty-1', 'π > main')
+
+    driveSyntheticTitleFromHookStatus(status('done', 'pi'))
+
     expect(hooks.ingest).not.toHaveBeenCalled()
   })
 
-  it('still labels a pi pane that is quiet at rest without a marker', () => {
+  it('still labels a pi pane that holds no state marker of its own', () => {
     titles.set('pty-1', '⠋ π - main')
 
     driveSyntheticTitleFromHookStatus(status('waiting', 'pi'))
@@ -66,14 +77,6 @@ describe('synthetic titles over a pi state title', () => {
     expect(hooks.ingest).toHaveBeenCalledTimes(1)
     expect(hooks.ingest.mock.calls[0][0]).toBe('pty-1')
     expect(hooks.ingest.mock.calls[0][1]).toContain('Pi - action required')
-  })
-
-  it('leaves an idle pi state title as the pane name', () => {
-    titles.set('pty-1', 'π > main')
-
-    driveSyntheticTitleFromHookStatus(status('done', 'pi'))
-
-    expect(hooks.ingest).not.toHaveBeenCalled()
   })
 
   // Why: the guard belongs to the `pi-compatible` identity group, so another agent's label over a
