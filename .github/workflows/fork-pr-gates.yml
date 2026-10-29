@@ -1,0 +1,69 @@
+name: Fork PR gates
+
+# Why this exists: `pr.yml` is `disabled_manually` on this fork, so a pull request has no status
+# checks at all while the ruleset requires one — and the reason recorded for disabling it (billed
+# minutes) does not hold. Standard runners bill nothing on a public repository: the Actions timing API
+# returns 0 ms for the nightly (7 jobs) and for a full three-platform release. See `LOCAL-PATCHES.md`
+# § local(ci), which also records the decision this file implements.
+#
+# Why these two gates and not `pr.yml`: upstream's file is the whole fleet — package, e2e, relay,
+# cross-version-wire, mobile web, Windows probes — it arrives with every sync, and it spends 40+
+# minutes per PR re-treading a branch that just ran the same suites locally. Typecheck and oxlint are
+# the two classes that reached this fork's release line unnoticed (the type breaks, and the four
+# `pnpm lint` drifts of #161), and they are the cheapest pair that would have caught them. The unit
+# suite is not here on purpose: `ci-unit-selection.mjs` turns one changed file into ~3,000 of 13,064
+# test files, which is a shard planner, not a PR lane. It runs nightly and now gates a release.
+#
+# Draft PRs run it too: the cost is a few free minutes, and a draft whose types do not compile is
+# worth knowing about before it is marked ready.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-pr-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # Why `native-runtime: node`: the same preparation `fork-main-gates.yml` uses before `pnpm tc`
+      # on this runner, so a green here means what a green there means.
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Typecheck
+        run: pnpm tc
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: none
+
+      # The repo-wide rule set, unchanged from `pnpm lint`, one step per family so a failure names
+      # itself rather than needing a log read.
+      - name: Repo-wide lint
+        run: pnpm exec oxlint --format github
+
+      - name: Max-lines ratchet
+        run: pnpm run check:max-lines-ratchet

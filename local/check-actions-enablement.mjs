@@ -25,8 +25,8 @@ import { parse } from 'yaml'
 const REPO = 'nplez1/orca'
 const ROOT = resolve(import.meta.dirname, '..')
 
-// Must stay enabled: the release build, the daily v* tag mirror, the nightly full unit suite, and
-// the daily health check that watches the other three.
+// Must stay enabled: the release build, the daily v* tag mirror, the nightly full unit suite, the
+// cheap PR lane, and the daily health check that watches the other four.
 export const REQUIRED = [
   '.github/workflows/fork-release.yml',
   '.github/workflows/fork-upstream-tags.yml',
@@ -36,6 +36,9 @@ export const REQUIRED = [
   // gate by hand. Treating "disabled" as drift is the whole point: this is the backstop, and a
   // backstop nobody notices is off is not one. See LOCAL-PATCHES.md § local(ci) before changing it.
   '.github/workflows/fork-main-tests.yml',
+  // Why: the cheap PR lane `LOCAL-PATCHES.md` § local(ci) decided on. A lane a ruleset can require is
+  // worthless disabled, and nothing else would say so.
+  '.github/workflows/fork-pr-gates.yml',
   // Why: this is the check that watches the health checks. An unwatched watchdog is exactly the
   // failure `LOCAL-PATCHES.md` § local(ci) records, so a disabled one is drift, not a preference.
   '.github/workflows/fork-ci-health.yml'

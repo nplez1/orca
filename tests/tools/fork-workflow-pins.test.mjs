@@ -10,7 +10,8 @@ const FORK_WORKFLOWS = [
   '.github/workflows/fork-release.yml',
   '.github/workflows/fork-main-tests.yml',
   '.github/workflows/fork-upstream-tags.yml',
-  '.github/workflows/fork-ci-health.yml'
+  '.github/workflows/fork-ci-health.yml',
+  '.github/workflows/fork-pr-gates.yml'
 ]
 
 const PINNED = /^[^@\s]+@[0-9a-f]{40} # v\d+(?:\.\d+){1,2}$/

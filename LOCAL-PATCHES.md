@@ -2223,7 +2223,7 @@ would leave the workflow listed and re-enabled at the first `workflow_dispatch` 
 file. A disabled workflow keeps receiving file updates from sync and stays off until someone turns
 it back on — which is what a fork wants, and why this is documented here instead of patched.
 
-**Live on purpose — these three must stay enabled:**
+**Live on purpose — these must stay enabled:**
 
 - `fork-release.yml` — `workflow_dispatch` only; the feed the patched updater points at.
 - `fork-upstream-tags.yml` — the daily `v*` tag mirror (see above).
@@ -2233,10 +2233,10 @@ it back on — which is what a fork wants, and why this is documented here inste
   at 10-24. This is the backstop the
   PR gates gave up (`AGENTS.md` § Verification tiers). It is in `local/check-actions-enablement.mjs`
   `REQUIRED`, not `ALLOWED_INERT`: it has a `schedule`, so "disabled" is drift and should be reported
-  as `MISSING`, not silently tolerated. Billing is ~50 min a night because five shards bill
-  concurrently — ~1,500 min/month against the account's ~10,000, which is the accepted cost. Check the
-  real figure with `gh api repos/nplez1/orca/actions/workflows` and the run history before adding any
-  further lane; the whole fleet being on is what burned nearly the full month in a few days.
+  as `MISSING`, not silently tolerated.
+- `fork-pr-gates.yml` — the cheap PR lane, new on 2026-10-29 (see the cost note below).
+- `fork-ci-health.yml` — the daily check that runs `local/ci-health-report.mjs`, which is what keeps a
+  silently disabled lane from staying silent. Also `REQUIRED`, for the same reason.
 
 **Also left enabled, and inert without a manual dispatch:** `zcode-account-contract.yml`,
 `unit-module-cache-benchmark.yml`, `windows-native-preparation-benchmark.yml`, and the three
@@ -2246,6 +2246,50 @@ so it runs only when `ci-cache-warmup.yml` does — and that one is disabled.
 Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
 `e2e.yml`, `mobile.yml` and `fork-main-gates.yml`. `fork-main-tests.yml` is the exception above: it is
 live, and the section below is why its being live was not the same as its running.
+
+#### The cost premise was wrong, and the PR lane that follows from it (audit #221 C2)
+
+This section said the fleet being fully on "burned nearly the full month in a few days", and put the
+nightly at "~50 minutes a night" against a monthly allowance. **Both claims were wrong, and the ledger
+they supported was wrong with them.** Standard runners bill **nothing** on a public repository, which
+this one is. Measured on 2026-10-29, per run, from
+`gh api repos/nplez1/orca/actions/runs/<id>/timing`:
+
+| run           | what it ran                                  | billable ms                     |
+| ------------- | -------------------------------------------- | ------------------------------- |
+| `40797794635` | nightly, 7 jobs, all five shards green       | `UBUNTU: 0`                     |
+| `40863045535` | nightly, 7 jobs, shard 5 red                 | `UBUNTU: 0`                     |
+| `40695040714` | a full release, macOS + Windows + Linux legs | `MACOS: 0 UBUNTU: 0 WINDOWS: 0` |
+
+So there is no minutes budget to spend and no `~10,000` to spend it from. Account billing totals could
+not be read (the token has no `user` scope), but the per-run timing API is the stronger measurement for
+this question: it is what the billable-minutes meter reads.
+
+**The decision, since the reason `pr.yml` was disabled does not hold:** `pr.yml` stays
+`disabled_manually`, but not for cost. It is upstream's whole fleet in one file — package, e2e,
+relay, cross-version-wire, mobile web, Windows probes — which arrives with every sync, spends 40+
+minutes per PR to re-tread a branch that just ran the same suites locally, and would put a dozen
+unfamiliar checks on every PR. The cheapest useful lane is the fork's own, and that is now
+`fork-pr-gates.yml`: `pull_request` plus `workflow_dispatch`, `pnpm tc` and `pnpm exec oxlint` — the two
+classes that would have caught the type breaks and the four `pnpm lint` drifts (#161) that reached this
+line unnoticed. It is deliberately not the unit selection: `ci-unit-selection.mjs` computes a
+reverse-import closure that one changed file turns into ~3,000 of 13,064 test files, which is a shard
+planner, not a PR lane. The unit suite stays on `fork-main-tests.yml` nightly and now also gates a
+release (`fork-release.yml`).
+
+**To make it a required check**, once it has run at least once on a PR (GitHub will not offer a check
+name that has never reported):
+
+```bash
+ruleset=$(mktemp -t orca-ruleset)          # unique per agent: /tmp is shared
+gh api repos/nplez1/orca/rulesets/23697698 >"$ruleset"
+# add {"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"typecheck"},{"context":"lint"}]}}
+# to .rules[], then PUT the whole object back with -X PUT
+```
+
+The ruleset is repository state a sync cannot carry, like the enablement itself, so this paragraph is
+the record of the intent rather than a patch. `fork-ci-health.yml` reports the lane going missing; it
+does not police the ruleset.
 
 **A sweep is never complete, and the first one wasn't.** Nine workflows survived it on 2026-10-19 —
 eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-switch-e2e`,
