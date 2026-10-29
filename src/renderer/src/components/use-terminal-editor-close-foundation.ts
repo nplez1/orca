@@ -5,7 +5,10 @@ import {
   type WindowCloseRunningWork
 } from './terminal/window-close-running-work'
 import type { TerminalWorkspaceProjectionController } from './use-terminal-workspace-projection'
-import { runWithWindowCloseCheckpointScope } from './window-close-request-coordinator'
+import {
+  runWithWindowCloseCheckpointScope,
+  reportQuitCancelled
+} from './window-close-request-coordinator'
 import { showShutdownCheckpointFailureToast } from '@/lib/shutdown-checkpoint-failure-toast'
 
 export function useTerminalEditorCloseFoundation(
@@ -43,9 +46,18 @@ export function useTerminalEditorCloseFoundation(
     if (!accepted) {
       // Report checkpoint-vetoed quits instead of silently trapping the window (#15352); dirty-file vetoes provide no reason.
       showShutdownCheckpointFailureToast()
+      // Why: main latched `isQuitting` before this veto and only `will-prevent-unload` used to clear it.
+      reportQuitCancelled()
       return
     }
     window.api.ui.confirmWindowClose()
+  }, [])
+
+  // Dismissing the running-work dialog is a veto for the close that opened it, quit or not; main
+  // ignores the report when it was not quitting.
+  const handleWindowCloseDialogCancel = useCallback(() => {
+    setWindowCloseDialogOpen(false)
+    reportQuitCancelled()
   }, [])
 
   const proceedToNativeWindowClose = useCallback(
@@ -82,6 +94,7 @@ export function useTerminalEditorCloseFoundation(
     windowCloseDialogKind,
     windowCloseAfterDirtyRef,
     confirmNativeWindowClose,
+    handleWindowCloseDialogCancel,
     proceedToNativeWindowClose
   }
 }

@@ -13,6 +13,7 @@ import {
 } from './editor/editor-save-disk-precondition'
 import { discardEditorFileChangesAndClose } from './editor/discard-editor-file-changes'
 import { translate } from '@/i18n/i18n'
+import { reportQuitCancelled } from './window-close-request-coordinator'
 import type { TerminalEditorCloseQueueController } from './use-terminal-editor-close-queue'
 
 export type TerminalEditorCloseDialogActionsInput = Pick<
@@ -152,6 +153,10 @@ export function useTerminalEditorCloseDialogActions(
     windowCloseAfterDirtyRef.current = null
     setSaveDialogFileId(null)
     releaseCloseDialogGuardAfterDebounce()
+    // Why unconditional: this dialog can outlive the close that opened it (a later Cmd+Q keeps the
+    // captured flag stale), so the renderer cannot tell whether a quit is waiting. Main ignores a
+    // report that arrives when it is not quitting.
+    reportQuitCancelled()
   }, [
     closedReactionsRef,
     isClosingRef,

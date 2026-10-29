@@ -51,6 +51,24 @@ async function runWindowCloseGuards(): Promise<boolean> {
   return true
 }
 
+/**
+ * Tell main a quit it already started was vetoed here.
+ *
+ * Why exported: `before-quit` latches `isQuitting` before the renderer gets a say, and every path that
+ * declines a close has to retract that latch or the app stays open in a quit-mode state — tray-hide
+ * disabled, later closes read as quits. Main ignores the report when it is not quitting, so a caller
+ * need not know which close this was.
+ */
+export function reportQuitCancelled(): void {
+  window.api.ui.cancelQuit()
+}
+
+function reportQuitCancelledIfQuitting(data: { isQuitting: boolean }): void {
+  if (data.isQuitting) {
+    reportQuitCancelled()
+  }
+}
+
 /** Run pre-close guards, then the mounted rich handler; with no workbench, confirm directly because no tabs need protection (#5144). */
 export async function dispatchWindowCloseRequest(data: { isQuitting: boolean }): Promise<void> {
   if (closeInFlight) {
@@ -59,6 +77,7 @@ export async function dispatchWindowCloseRequest(data: { isQuitting: boolean }):
   closeInFlight = true
   try {
     if (!(await runWindowCloseGuards())) {
+      reportQuitCancelledIfQuitting(data)
       return
     }
   } finally {
@@ -76,4 +95,5 @@ export async function dispatchWindowCloseRequest(data: { isQuitting: boolean }):
     return
   }
   showShutdownCheckpointFailureToast()
+  reportQuitCancelledIfQuitting(data)
 }

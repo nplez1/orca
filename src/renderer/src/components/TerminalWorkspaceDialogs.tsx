@@ -24,6 +24,7 @@ export function TerminalWorkspaceDialogs({
     saveDialogFile,
     saveDialogFileId,
     setWindowCloseDialogOpen,
+    handleWindowCloseDialogCancel,
     windowCloseDialogKind,
     windowCloseDialogOpen
   } = controller
@@ -73,7 +74,7 @@ export function TerminalWorkspaceDialogs({
         open={windowCloseDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setWindowCloseDialogOpen(false)
+            handleWindowCloseDialogCancel()
           }
         }}
       >
@@ -99,7 +100,7 @@ export function TerminalWorkspaceDialogs({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setWindowCloseDialogOpen(false)}
+              onClick={handleWindowCloseDialogCancel}
             >
               {translate('auto.components.Terminal.f82e9f02df', 'Cancel')}
             </Button>
