@@ -2197,10 +2197,13 @@ Three parts, of which only the third is in the tree:
    creating one is repository state, and the fork's `v*-np.*` updater tags are only ever created, so
    the rules would not block a release.
 3. **In the tree: the guarantee is checked, not inherited.** `actions/checkout` is SHA-pinned, and
-   `.github/scripts/fork-tag-mirror-guard.sh` reads both remotes and fails the job when a tag it would
-   send already exists at another commit. `git push --atomic origin --tags` carries no `--force` and no
-   `--mirror`, and `tests/tools/fork-tag-mirror-guard.test.mjs` fails if either appears in the script
-   that runs the push.
+   `.github/scripts/fork-tag-mirror-guard.sh` compares this checkout's `refs/tags/v*` — what the push
+   sends — against the fork's, fails the job when a name already exists at another commit, and prints
+   the refspecs for the tags that are genuinely new. The push is then
+   `git push --atomic origin $refspecs`: no `--force`, no `--mirror`, and no `--tags`, because `--tags`
+   would also send the fork's own `mobile-ios-v*` / `mobile-android-v*` tags, which start App Store and
+   Play builds. `tests/tools/fork-tag-mirror-guard.test.mjs` runs the guard against scratch
+   repositories and fails if any of those flags returns to the push.
 
 **Verified 2026-10-16:** with the secret set and the change merged (`077e5e06`), a dispatched run
 went green in 1m18s and mirrored `v1.4.223`, `v1.4.224` and `v1.4.227` — the first successful run
@@ -2279,11 +2282,12 @@ gates a release (`fork-release.yml`).
 
 **Why not repo-wide `pnpm lint`, measured on `nplez1/main` at 2026-10-29:** it reports "2 of 36 lint
 step(s) failed" — `oxlint` is red for `src/cli/handlers/vm.ts` (336 counted lines against a limit of
-300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. That is the debt
-`fork-main-gates.yml` exists to surface, and a required check that is red on its own base teaches
-everyone to ignore red — the PR #57 failure shape. So the lane judges the pull request's **changed
-lines** with the rule set the repository already enforces on a diff, and repo-wide `pnpm lint`
-becomes the third gate here once the release line is green.
+300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. That is exactly the debt
+`fork-main-gates.yml` was written to surface — and it too is `disabled_manually`, so nothing reports it
+today, which is the second half of audit #221 C4. A required check that is red on its own base teaches
+everyone to ignore red — the PR #57 failure shape — so the lane judges the pull request's **changed
+lines** with the rule set the repository already enforces on a diff, and repo-wide `pnpm lint` becomes
+the third gate here once the release line is green.
 
 **To make it a required check**, once it has run at least once on a PR (GitHub will not offer a check
 name that has never reported):

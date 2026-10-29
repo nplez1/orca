@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ALLOWED_INERT,
   INERT_TRIGGERS,
+  applyFixes,
   REQUIRED,
   cancellableRuns,
   judgeEnablement,
@@ -216,5 +217,82 @@ describe('the live list against this checkout', () => {
         expect(INERT_TRIGGERS.has(trigger), `${path} fires on ${trigger}`).toBe(true)
       }
     }
+  })
+})
+
+describe('applying --fix', () => {
+  const driftState = () => {
+    const state = healthy()
+    state.workflows.push({ ...active('.github/workflows/wsl-orcad-e2e.yml', 'WSL'), id: 7 })
+    return judgeEnablement(state)
+  }
+
+  const failingGh =
+    (calls, { failCancel = false } = {}) =>
+    (args) => {
+      calls.push(args)
+      if (args[0] === 'run' && args[1] === 'list') {
+        return JSON.stringify([
+          { databaseId: 41, status: 'in_progress' },
+          { databaseId: 42, status: 'completed' }
+        ])
+      }
+      if (args[0] === 'run' && args[1] === 'cancel' && (failCancel || args[2] === '42')) {
+        throw new Error('boom')
+      }
+      return ''
+    }
+
+  it('disables by workflow id and reads running runs by that id, not by path', () => {
+    const calls = []
+
+    const result = applyFixes(driftState(), true, failingGh(calls), () => {})
+
+    expect(result).toEqual({ disabled: ['.github/workflows/wsl-orcad-e2e.yml'], failed: [] })
+    expect(calls[0]).toEqual(['workflow', 'disable', '7', '--repo', 'nplez1/orca'])
+    expect(calls[1]).toEqual(expect.arrayContaining(['run', 'list', '--workflow', '7']))
+    expect(calls[1]).not.toContain('.github/workflows/wsl-orcad-e2e.yml')
+    // The completed run is not cancelled; the in-progress one is.
+    expect(calls.slice(2).map((args) => args[2])).toEqual(['41'])
+  })
+
+  it('does nothing without --fix', () => {
+    const calls = []
+
+    expect(applyFixes(driftState(), false, failingGh(calls), () => {})).toEqual({
+      disabled: [],
+      failed: []
+    })
+    expect(calls).toEqual([])
+  })
+
+  it('reports a disable that failed, and leaves it outstanding', () => {
+    const result = applyFixes(
+      driftState(),
+      true,
+      () => {
+        throw new Error('HTTP 403')
+      },
+      () => {}
+    )
+
+    expect(result).toEqual({ disabled: [], failed: ['.github/workflows/wsl-orcad-e2e.yml'] })
+  })
+
+  it('keeps a disabled workflow disabled and outstanding when the cancel step fails', () => {
+    const result = applyFixes(driftState(), true, failingGh([], { failCancel: true }), () => {})
+
+    // The workflow is off either way, so this is not "could not disable" — but a run may still be
+    // going, which has to leave the run non-zero rather than read as swept.
+    expect(result.disabled).toEqual(['.github/workflows/wsl-orcad-e2e.yml'])
+    expect(result.failed).toEqual(['.github/workflows/wsl-orcad-e2e.yml'])
+    expect(
+      residualProblems({
+        verdict: driftState(),
+        fix: true,
+        disabled: result.disabled,
+        failed: result.failed
+      })
+    ).toBe(1)
   })
 })

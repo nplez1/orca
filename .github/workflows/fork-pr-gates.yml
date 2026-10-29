@@ -57,6 +57,10 @@ jobs:
 
   changed-lines:
     name: 'fork-pr-gates: changed lines'
+    # Why pull_request only: the gate diffs the pull request's merge commit against its first parent,
+    # and on a dispatch HEAD is not a merge commit — it would fall back to merge-base against a base
+    # branch a shallow checkout does not have. A dispatch still runs the typecheck half.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

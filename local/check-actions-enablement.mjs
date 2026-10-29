@@ -181,8 +181,11 @@ export function judgeEnablement(
  * The problems left after a run: under `--fix`, a target that was disabled (and had its runs
  * cancelled) is resolved; one that failed to disable is not.
  */
-export function residualProblems({ verdict, fix = false, disabled = [] }) {
+export function residualProblems({ verdict, fix = false, disabled = [], failed = [] }) {
   const handled = new Set(fix ? disabled : [])
+  for (const path of failed) {
+    handled.delete(path)
+  }
   const outstanding = verdict.disableTargets.filter((target) => !handled.has(target.path)).length
   return outstanding + verdict.missing.length + verdict.stale.length + verdict.unreadable.length
 }
@@ -217,9 +220,12 @@ function firstLine(error) {
 
 /**
  * Print the verdict, disabling and cancelling under `--fix`, and return the paths it handled plus
- * the ones it could not. Kept out of `main` so the arithmetic is testable.
+ * the ones it could not.
+ *
+ * `runGh` is a parameter so the two failure modes a real `gh` hides — disabling succeeded but the run
+ * lookup failed, and the cancel itself failing — are covered by tests without a network.
  */
-function apply(verdict, fix) {
+export function applyFixes(verdict, fix, runGh = gh, log = console.log) {
   const disabled = []
   const failed = []
   for (const target of verdict.disableTargets) {
@@ -232,16 +238,26 @@ function apply(verdict, fix) {
       continue
     }
     try {
-      gh(['workflow', 'disable', String(target.id), '--repo', REPO])
+      runGh(['workflow', 'disable', String(target.id), '--repo', REPO])
+      disabled.push(target.path)
+      log(`  disabled ${target.path} (${target.why})`)
+    } catch (error) {
+      failed.push(target.path)
+      console.error(`  FAILED   could not disable ${target.path}: ${firstLine(error)}`)
+      continue
+    }
+    // Cancelling is a second step on purpose: disabling does not stop a run already going, and the
+    // run ids are read by workflow id (which works for a disabled workflow) rather than by path.
+    try {
       const runs = cancellableRuns(
         JSON.parse(
-          gh([
+          runGh([
             'run',
             'list',
             '--repo',
             REPO,
             '--workflow',
-            target.path,
+            String(target.id),
             '--limit',
             '50',
             '--json',
@@ -250,14 +266,17 @@ function apply(verdict, fix) {
         )
       )
       for (const runId of runs) {
-        gh(['run', 'cancel', String(runId), '--repo', REPO])
+        runGh(['run', 'cancel', String(runId), '--repo', REPO])
       }
-      disabled.push(target.path)
-      const cancelled = runs.length > 0 ? `, cancelled ${runs.length} run(s) already going` : ''
-      console.log(`  disabled ${target.path} (${target.why})${cancelled}`)
+      if (runs.length > 0) {
+        log(`  cancelled ${runs.length} run(s) of ${target.path} that were still going`)
+      }
     } catch (error) {
       failed.push(target.path)
-      console.error(`  FAILED   could not disable ${target.path}: ${firstLine(error)}`)
+      const reason = firstLine(error)
+      console.error(
+        `  FAILED   ${target.path} is disabled, but its running jobs could not be cancelled: ${reason}`
+      )
     }
   }
   return { disabled, failed }
@@ -287,8 +306,8 @@ function report(verdict, fix) {
     console.log(`  UNKNOWN  cannot read the triggers of ${u.path}: ${u.reason}`)
   }
 
-  const { disabled, failed } = apply(verdict, fix)
-  const residual = residualProblems({ verdict, fix, disabled })
+  const { disabled, failed } = applyFixes(verdict, fix)
+  const residual = residualProblems({ verdict, fix, disabled, failed })
   if (residual > 0) {
     if (verdict.disableTargets.length > 0 && !fix) {
       console.log('  fix: node local/check-actions-enablement.mjs --fix')

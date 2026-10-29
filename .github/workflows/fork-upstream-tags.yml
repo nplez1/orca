@@ -67,8 +67,18 @@ jobs:
           git remote add upstream https://github.com/stablyai/orca.git
           # Tag refspec only: the mirror must never fetch or touch a branch.
           git fetch --no-tags upstream '+refs/tags/v*:refs/tags/v*'
-          # Refuse before the push: a tag this fork already publishes must never be moved.
-          bash .github/scripts/fork-tag-mirror-guard.sh origin
+          # Refuse before the push: a tag this fork already publishes must never be moved. The guard
+          # prints the refspecs to send, so the push carries only tags it has read — not every local
+          # tag, which is what `--tags` would have sent and what could start a mobile release build.
+          if ! refspecs="$(bash .github/scripts/fork-tag-mirror-guard.sh origin)"; then
+            echo '::error::the tag mirror refused to run; see the guard output above'
+            exit 1
+          fi
+          if [ -z "$refspecs" ]; then
+            echo 'every v* tag upstream publishes is already here; nothing to mirror'
+            exit 0
+          fi
+          # Unquoted on purpose: one refspec per word, and git ref names cannot contain whitespace.
           # No --force (this only adds) and --atomic (a half-applied mirror is not a mirror).
-          git push --atomic origin --tags
+          git push --atomic origin $refspecs
           printf 'mirrored tags now include: %s\n' "$(git tag -l 'v*' | sort -V | tail -1)"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refuse a tag mirror that would move a tag this fork already publishes.
+# Refuse a tag mirror that would move a tag this fork already publishes, and name exactly what to push.
 #
 # Why: `.github/workflows/fork-upstream-tags.yml` pushes `refs/tags/v*` without `--force`, so today an
 # existing tag cannot be moved — but that was a property of the command line, not of the job, and
@@ -9,15 +9,16 @@
 # backstop either.
 #
 # This makes the guarantee explicit and testable: compare the tags this checkout is about to push
-# against the tags the fork already has, and refuse when one name exists at another commit. Tags that
-# exist only on the fork are left alone (the mirror only adds), and a tag identical on both is a no-op.
-# It reads local refs rather than upstream's, because local refs are exactly what the push sends.
+# against the tags the fork already has, refuse when one name exists at another commit, and print the
+# refspecs for the tags that are genuinely new — so the push is `git push --atomic origin <those>` and
+# cannot carry anything the guard did not read, including the fork's own non-`v*` tags.
 #
 # Written for bash 3.2, which is what macOS still ships: no associative arrays, and the comparison is
 # awk, so a workstation without Homebrew bash runs the same code the runner does.
 #
 # usage: fork-tag-mirror-guard.sh ORIGIN-REMOTE
-# exit: 0 only additions, 1 a tag would move, 2 environment problem
+# stdout: one `refs/tags/NAME:refs/tags/NAME` refspec per line, for the tags to add
+# exit: 0 nothing to move, 1 a tag would move, 2 environment problem
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -26,8 +27,11 @@ if [ "$#" -ne 1 ]; then
 fi
 
 origin="$1"
-remote_file="$(mktemp -t orca-mirror-remote)"
-local_file="$(mktemp -t orca-mirror-local)"
+# Why the template with Xs: GNU mktemp (the runner) rejects a bare prefix, BSD mktemp (this Mac)
+# accepts both. `${RUNNER_TEMP}` is what the sibling release guard uses.
+scratch="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+remote_file="$(mktemp "$scratch/orca-mirror-remote.XXXXXX")"
+local_file="$(mktemp "$scratch/orca-mirror-local.XXXXXX")"
 trap 'rm -f "$remote_file" "$local_file"' EXIT
 
 # `--refs` drops the `^{}` dereference lines, so an annotated tag compares as its tag object on both
@@ -50,18 +54,23 @@ if [ ! -s "$local_file" ]; then
   exit 2
 fi
 
-counts="$(awk -v origin="$origin" '
-  BEGIN { added = 0; moved = 0 }
-  NR == FNR { remote[$1] = $2; next }
-  {
-    if (!($1 in remote)) { added++; next }
-    if (remote[$1] != $2) {
-      printf "mirror guard: refusing to move %s — %s has it at %s, this checkout has it at %s\n", $1, origin, remote[$1], $2 > "/dev/stderr"
-      moved++
+# An empty remote file is the first-run case: the fork has no v* tags at all, so every local tag is
+# new. Skipping the join is what keeps `added` honest there.
+if [ -s "$remote_file" ]; then
+  counts="$(awk -v origin="$origin" '
+    NR == FNR { remote[$1] = $2; next }
+    {
+      if (!($1 in remote)) { added++; next }
+      if (remote[$1] != $2) {
+        printf "mirror guard: refusing to move %s — %s has it at %s, this checkout has it at %s\n", $1, origin, remote[$1], $2 > "/dev/stderr"
+        moved++
+      }
     }
-  }
-  END { printf "%d %d\n", added, moved }
-' "$remote_file" "$local_file")"
+    END { printf "%d %d\n", added, moved }
+  ' "$remote_file" "$local_file")"
+else
+  counts="$(awk 'END { printf "%d 0\n", NR }' "$local_file")"
+fi
 read -r added moved <<<"$counts"
 
 if [ "${moved:-0}" -gt 0 ]; then
@@ -73,4 +82,11 @@ if [ "${moved:-0}" -gt 0 ]; then
   exit 1
 fi
 
-printf 'mirror guard: %s tag(s) to add, 0 to move\n' "${added:-0}"
+if [ -s "$remote_file" ]; then
+  awk 'NR == FNR { remote[$1] = 1; next } !($1 in remote) { print "refs/tags/" $1 ":refs/tags/" $1 }' \
+    "$remote_file" "$local_file"
+else
+  awk '{ print "refs/tags/" $1 ":refs/tags/" $1 }' "$local_file"
+fi
+
+printf 'mirror guard: %s tag(s) to add, 0 to move\n' "${added:-0}" >&2
