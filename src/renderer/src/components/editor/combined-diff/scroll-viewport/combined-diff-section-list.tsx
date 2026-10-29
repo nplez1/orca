@@ -6,6 +6,7 @@ import type { OpenFile } from '@/store/slices/editor'
 import type { DiffComment } from '../../../../../../shared/diff-comment-types'
 import { DiffSectionItem } from '../../DiffSectionItem'
 import type { DiffSectionItemProps } from '../../diff-section-item-props'
+import type { WorktreePRCommentInline } from '../../../pr-comment-inline/worktree-pr-comment-inline'
 import { DiffNotesSendMenu } from '../../DiffNotesSendMenu'
 import { canOpenDiffSectionPreviewToSide } from '../../diff-section-preview'
 import type { DiffSection } from '../../diff-section-types'
@@ -28,6 +29,7 @@ export function CombinedDiffSectionList({
   onScrollbarPointerDown,
   openSection,
   openSectionPreview,
+  prCommentReview,
   retrySection,
   scrollThumb,
   sectionHeights,
@@ -57,6 +59,7 @@ export function CombinedDiffSectionList({
   onScrollbarPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void
   openSection: (index: number) => void
   openSectionPreview: (section: DiffSection) => void
+  prCommentReview: WorktreePRCommentInline | null
   retrySection: (index: number) => void
   scrollThumb: CombinedDiffScrollThumb
   sectionHeights: Record<number, number>
@@ -138,6 +141,7 @@ export function CombinedDiffSectionList({
                   setSections={setSections}
                   modifiedEditorsRef={modifiedEditorsRef}
                   handleSectionSaveRef={handleSectionSaveRef}
+                  prCommentReview={prCommentReview}
                   renderHeaderTrailingContent={(section) => {
                     const fileNoteCount = commentCountByFilePath.get(section.path) ?? 0
                     return fileNoteCount > 0 ? (

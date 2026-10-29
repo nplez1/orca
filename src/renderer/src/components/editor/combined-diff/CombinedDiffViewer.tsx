@@ -3,6 +3,7 @@ import { useAppStore } from '@/store'
 import { createProgrammaticScrollMarks } from '@/hooks/programmatic-scroll-marks'
 import { useWorkspaceFileBrowserActionPredicate } from '@/lib/file-preview'
 import { useVisibleWorktreeDiffComments } from '../../diff-comments/use-visible-worktree-diff-comments'
+import { useWorktreePRCommentInline } from '../../pr-comment-inline/worktree-pr-comment-inline'
 import type { OpenFile } from '@/store/slices/editor'
 import '@/lib/monaco-setup'
 import type { DiffSection } from '../diff-section-types'
@@ -67,6 +68,7 @@ export default function CombinedDiffViewer({
     useVisibleWorktreeDiffComments(file.worktreeId)
   const activeGroupId = useAppStore((s) => s.activeGroupIdByWorktree[file.worktreeId])
   const canOpenWorkspaceFileBrowserForPath = useWorkspaceFileBrowserActionPredicate(file.worktreeId)
+  const prCommentReview = useWorktreePRCommentInline(file.worktreeId)
   const isDark = useDocumentDarkTheme()
 
   const [sections, setSections] = useState<DiffSection[]>([])
@@ -385,6 +387,7 @@ export default function CombinedDiffViewer({
             onScrollbarPointerDown={handleScrollbarPointerDown}
             openSection={openSection}
             openSectionPreview={openSectionPreview}
+            prCommentReview={prCommentReview}
             retrySection={retrySection}
             scrollThumb={scrollThumb}
             sectionHeights={sectionHeights}

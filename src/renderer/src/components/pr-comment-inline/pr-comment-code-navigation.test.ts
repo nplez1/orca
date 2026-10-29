@@ -3,8 +3,11 @@ import type {
   GitBranchChangeEntry,
   GitBranchCompareSummary
 } from '../../../../shared/git-diff-compare-types'
-import type { GitStatusEntry } from '../../../../shared/git-status-types'
-import { resolvePRCommentCodeSurface } from './pr-comment-code-navigation'
+import type { PRComment } from '../../../../shared/github/comment-types'
+import {
+  resolvePRCommentCodeSurface,
+  resolvePRCommentCodeTarget
+} from './pr-comment-code-navigation'
 
 const OID = 'a'.repeat(40)
 
@@ -21,13 +24,42 @@ function compare(overrides: Partial<GitBranchCompareSummary> = {}): GitBranchCom
   }
 }
 
-function branchEntry(path: string): GitBranchChangeEntry {
-  return { path, status: 'modified', added: 3, removed: 1 }
+function branchEntry(path: string, oldPath?: string): GitBranchChangeEntry {
+  return { path, oldPath, status: 'modified', added: 3, removed: 1 }
 }
 
-function statusEntry(path: string): GitStatusEntry {
-  return { path, status: 'modified', area: 'unstaged' }
+function comment(overrides: Partial<PRComment>): PRComment {
+  return {
+    id: 1,
+    author: 'reviewer',
+    authorAvatarUrl: '',
+    body: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    url: 'https://example.test/comment',
+    ...overrides
+  }
 }
+
+describe('resolvePRCommentCodeTarget', () => {
+  it('opens the recorded line whenever the provider still maps it', () => {
+    expect(resolvePRCommentCodeTarget(comment({ path: 'src/a.ts', line: 42 }), '/repo')).toEqual({
+      relativePath: 'src/a.ts',
+      line: 42
+    })
+  })
+
+  it('refuses only an outdated thread, whose line the provider no longer maps', () => {
+    expect(
+      resolvePRCommentCodeTarget(comment({ path: 'src/a.ts', line: 42, isOutdated: true }), '/repo')
+    ).toBeNull()
+  })
+
+  it('refuses a comment no worktree can hold', () => {
+    expect(resolvePRCommentCodeTarget(comment({ path: 'src/a.ts', line: 1 }), null)).toBeNull()
+    expect(resolvePRCommentCodeTarget(comment({ line: 1 }), '/repo')).toBeNull()
+    expect(resolvePRCommentCodeTarget(comment({ path: 'src/a.ts' }), '/repo')).toBeNull()
+  })
+})
 
 describe('resolvePRCommentCodeSurface', () => {
   it('lands in the branch diff, which carries the review hunks', () => {
@@ -37,46 +69,32 @@ describe('resolvePRCommentCodeSurface', () => {
         relativePath: 'src/a.ts',
         reviewBaseRefName: 'main',
         branchCompare: compare(),
-        branchChanges: [entry],
-        statusEntries: []
+        branchChanges: [entry]
       })
     ).toEqual({ kind: 'branch-diff', entry, compare: compare() })
   })
 
-  it('prefers the review diff even when the file also has uncommitted edits', () => {
+  it('finds the file a thread still names by its pre-rename path', () => {
+    const entry = branchEntry('src/renamed.ts', 'src/a.ts')
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/a.ts',
         reviewBaseRefName: 'main',
         branchCompare: compare(),
-        branchChanges: [branchEntry('src/a.ts')],
-        statusEntries: [statusEntry('src/a.ts')]
-      }).kind
-    ).toBe('branch-diff')
-  })
-
-  it('falls back to Changes mode for a file only the working tree changed', () => {
-    expect(
-      resolvePRCommentCodeSurface({
-        relativePath: 'src/b.ts',
-        reviewBaseRefName: 'main',
-        branchCompare: compare(),
-        branchChanges: [branchEntry('src/a.ts')],
-        statusEntries: [statusEntry('src/b.ts')]
+        branchChanges: [entry]
       })
-    ).toEqual({ kind: 'changes' })
+    ).toEqual({ kind: 'branch-diff', entry, compare: compare() })
   })
 
-  it('lands in a plain tab only once the review diff proves the file is outside it', () => {
+  it('never lands in a plain tab: a file outside the review still gets the change surface', () => {
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/c.ts',
         reviewBaseRefName: 'main',
         branchCompare: compare(),
-        branchChanges: [branchEntry('src/a.ts')],
-        statusEntries: [statusEntry('src/b.ts')]
+        branchChanges: [branchEntry('src/a.ts')]
       })
-    ).toEqual({ kind: 'edit' })
+    ).toEqual({ kind: 'changes' })
   })
 
   it('keeps the explaining surface when no review diff is known for the file', () => {
@@ -91,8 +109,7 @@ describe('resolvePRCommentCodeSurface', () => {
           relativePath: 'src/a.ts',
           reviewBaseRefName: 'main',
           branchCompare,
-          branchChanges: [branchEntry('src/a.ts')],
-          statusEntries: []
+          branchChanges: [branchEntry('src/a.ts')]
         })
       ).toEqual({ kind: 'changes' })
     }
@@ -105,30 +122,47 @@ describe('resolvePRCommentCodeSurface', () => {
         relativePath: 'src/a.ts',
         reviewBaseRefName: 'main',
         branchCompare,
-        branchChanges: [branchEntry('src/a.ts')],
-        statusEntries: []
+        branchChanges: [branchEntry('src/a.ts')]
       })
     ).toEqual({ kind: 'changes' })
-    // Why Changes mode still wins for a dirty file: its hunks are real, unlike a foreign base's.
-    expect(
-      resolvePRCommentCodeSurface({
-        relativePath: 'src/a.ts',
-        reviewBaseRefName: 'main',
-        branchCompare,
-        branchChanges: [branchEntry('src/a.ts')],
-        statusEntries: [statusEntry('src/a.ts')]
-      }).kind
-    ).toBe('changes')
     // A base the provider did not name leaves the compare's own base as the only claim available.
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/a.ts',
         reviewBaseRefName: null,
         branchCompare,
-        branchChanges: [branchEntry('src/a.ts')],
-        statusEntries: []
+        branchChanges: [branchEntry('src/a.ts')]
       }).kind
     ).toBe('branch-diff')
+  })
+
+  it('accepts a base whose local remote ref carries a namespace the provider does not name', () => {
+    // The fork's reviews target `main` on the provider, while the worktree pins `origin/nplez1/main`.
+    for (const baseRef of [
+      'origin/nplez1/main',
+      'refs/remotes/origin/nplez1/main',
+      'refs/remotes/upstream/main'
+    ]) {
+      expect(
+        resolvePRCommentCodeSurface({
+          relativePath: 'src/a.ts',
+          reviewBaseRefName: 'main',
+          branchCompare: compare({ baseRef }),
+          branchChanges: [branchEntry('src/a.ts')]
+        }).kind
+      ).toBe('branch-diff')
+    }
+  })
+
+  it('still rejects a different branch that merely ends in the same characters', () => {
+    expect(
+      resolvePRCommentCodeSurface({
+        relativePath: 'src/a.ts',
+        reviewBaseRefName: 'main',
+        branchCompare: compare({ baseRef: 'origin/feature/not-main' }),
+        branchChanges: [branchEntry('src/a.ts')]
+      }).kind
+    ).toBe('changes')
   })
 
   it('accepts a base branch whose own name contains a slash', () => {
@@ -142,8 +176,7 @@ describe('resolvePRCommentCodeSurface', () => {
           relativePath: 'src/a.ts',
           reviewBaseRefName: 'release/2.0',
           branchCompare: compare({ baseRef }),
-          branchChanges: [branchEntry('src/a.ts')],
-          statusEntries: []
+          branchChanges: [branchEntry('src/a.ts')]
         }).kind
       ).toBe('branch-diff')
     }

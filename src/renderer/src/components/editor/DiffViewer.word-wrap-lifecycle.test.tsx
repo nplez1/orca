@@ -16,6 +16,7 @@ const fixture = vi.hoisted(() => {
       },
       // The PR-comment gutter hook subscribes and decorates through the modified editor.
       onMouseDown: vi.fn(() => ({ dispose: vi.fn() })),
+      getModel: () => ({ getLineCount: () => 1, onDidChangeContent: () => ({ dispose: vi.fn() }) }),
       updateOptions: vi.fn(),
       createDecorationsCollection: vi.fn(() => ({ set: vi.fn(), clear: vi.fn() }))
     }

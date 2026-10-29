@@ -12,6 +12,7 @@ import {
 import { prCommentsCacheSuffix } from '@/store/github/cache-identity'
 import { isGitHubPRSuppressed } from '../../../../shared/worktree/github-pr-suppression'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
+import { isStaleMergedGitHubReviewForHead } from '@/store/slices/hosted-review-cache-state'
 import { getPRCommentInlineScope } from './pr-comment-inline-comments'
 import {
   buildPRCommentInlineThreads,
@@ -26,11 +27,16 @@ export type WorktreePRCommentInline = {
   enabled: boolean
   /** Namespaces these threads away from the worktree's local notes; null with no review. */
   scope: string | null
-  /** Threads for inline drawing, or null when the head rule forbids placing them. */
+  /** Threads for inline drawing, or null only when the user turned inline comments off. */
   inlineThreadsByPath: Map<string, PRCommentInlineThread[]> | null
-  /** Every thread, regardless of the head rule, so a surface can still navigate to one. */
+  /** Every thread whether or not inline drawing is on, so a surface can still navigate to one. */
   threadsByPath: Map<string, PRCommentInlineThread[]> | null
-  /** Why inline placement is suppressed; null when it is safe or deliberately turned off. */
+  /**
+   * Whether the checkout is known to be the revision the comments were resolved against.
+   *
+   * Advisory only: an unknown or moved head is worth explaining, but it is not a reason to hide the
+   * review. The decorator drops the individual threads it cannot place honestly instead.
+   */
   blocker: PRCommentInlineBlocker | null
   /** Head the cached comments were fetched against, for the Checks-pane explanation. */
   commentsHeadSha: string | null
@@ -76,7 +82,9 @@ export function buildPRCommentInlineFromComments(
   return {
     enabled: input.enabled,
     scope: getPRCommentInlineScope(input.repoId, input.prNumber),
-    inlineThreadsByPath: input.blocker === null ? grouped : null,
+    // Why: the workspace's active review is always drawn. `blocker` still reports a moved head so
+    // the sidebar can explain it, and the decorator refuses any thread whose line is not on screen.
+    inlineThreadsByPath: input.enabled ? grouped : null,
     threadsByPath: grouped,
     blocker: input.blocker,
     commentsHeadSha: input.commentsHeadSha,
@@ -108,8 +116,9 @@ const NO_REVIEW: WorktreePRCommentInline = {
  * and the repo/PR-keyed comments cache — so the sidebar and the editor can never disagree about
  * which pull request a worktree is reviewing.
  *
- * Threads are returned even when `blocker` is set: placement is what the head rule governs. The
- * Checks pane still needs them to take the user from a comment to its code.
+ * The active review is whatever the Checks pane would show for this worktree — same PR cache, same
+ * staleness rule, same suppression list — so the editor and the sidebar can never disagree about
+ * which pull request is on screen.
  */
 export function deriveWorktreePRCommentInline(
   state: WorktreePRCommentInlineInput,
@@ -140,8 +149,14 @@ export function deriveWorktreePRCommentInline(
     repo.executionHostId,
     true
   )
-  const pr = state.prCache[prCacheKey]?.data ?? null
+  const prEntry = state.prCache[prCacheKey]
+  const pr = prEntry?.data ?? null
   if (!pr || isGitHubPRSuppressed(worktree, pr.number)) {
+    return { ...NO_REVIEW, enabled }
+  }
+  // Why: a merged review whose head the checkout has moved past is no longer what the worktree is
+  // reviewing, and the Checks pane already hides it — drawing its threads here would contradict it.
+  if (isStaleMergedGitHubReviewForHead(prEntry, worktree.head)) {
     return { ...NO_REVIEW, enabled }
   }
   const commentsCacheKey = getGitHubRepoCacheKey(
@@ -155,9 +170,8 @@ export function deriveWorktreePRCommentInline(
   )
   const entry = state.commentsCache[commentsCacheKey]
   const commentsHeadSha = entry?.headSha ?? null
-  // Why: a comment's `line` belongs to the PR's head commit, so it may only be drawn once the
-  // commit on screen is known to be that same commit. Unknown heads count as a mismatch — a
-  // comment shown against the wrong code reads as a fact about that code.
+  // Why: reported, never enforced — drawing is what the user asked for; the warning explains a
+  // checkout that may have moved, and the decorator withholds only threads with no line to sit on.
   const blocked = resolvePRCommentInlineBlocker({
     enabled,
     worktreeHeadOid: worktree.head,

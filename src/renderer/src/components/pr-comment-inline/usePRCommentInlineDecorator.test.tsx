@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, renderHook } from '@testing-library/react'
+import { act, cleanup, render, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as DiffCommentZoneCardModule from '../diff-comments/diff-comment-zone-card'
 import type { PRComment } from '../../../../shared/github/comment-types'
@@ -212,5 +212,37 @@ describe('usePRCommentInlineDecorator gutter ownership', () => {
     // Collapsing under a stationary pointer must not wait for the next mousemove to clear the slot.
     rerender(<GutterSurface fake={fake} threads={threads} enabled={false} />)
     expect(visibleAddButtonCount(fake.domNode)).toBe(0)
+  })
+})
+
+describe('usePRCommentInlineDecorator line placement', () => {
+  it('draws a thread on a line the file still has', () => {
+    const fake = createFakeDiffCommentEditor({ lineCount: 60 })
+    render(<GutterSurface fake={fake} threads={[reviewThread(40)]} enabled />)
+
+    expect(fake.zones.size).toBe(1)
+  })
+
+  it('refuses a thread whose line the file no longer has, rather than drawing it on the last line', () => {
+    // Why: threads are drawn for whatever revision the workspace is reviewing, so a stale line must
+    // not be re-anchored onto whatever code now sits at the end of the file.
+    const fake = createFakeDiffCommentEditor({ lineCount: 20 })
+    render(<GutterSurface fake={fake} threads={[reviewThread(40)]} enabled />)
+
+    expect(fake.zones.size).toBe(0)
+    expect(fake.decorations()).not.toContainEqual(
+      expect.objectContaining({ glyphMarginClassName: 'orca-pr-comment-gutter-mark' })
+    )
+  })
+
+  it('drops a thread once the file shrinks past its line', () => {
+    const fake = createFakeDiffCommentEditor({ lineCount: 60 })
+    render(<GutterSurface fake={fake} threads={[reviewThread(40)]} enabled />)
+    expect(fake.zones.size).toBe(1)
+
+    fake.setLineCount(10)
+    act(() => fake.emitContentChange())
+
+    expect(fake.zones.size).toBe(0)
   })
 })

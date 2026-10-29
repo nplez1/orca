@@ -3,6 +3,8 @@ import { getConnectionId } from '@/lib/connection-context'
 import { getRuntimeGitBranchCompare } from '@/runtime/runtime-git-diff-client'
 import { useAppStore } from '@/store'
 import { getWorktreeGitOwnerTarget } from '../worktree-git-owner-target'
+import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import { useSourceControlBaseRefDefault } from '../source-control/sync/use-base-ref-default'
 import {
   resolveSourceControlBaseRef,
   resolveSourceControlCompareBaseRef
@@ -34,12 +36,28 @@ export function useChecksPanelBranchCompareWarmup({
   isFolder: boolean
   isPanelVisible: boolean
   remoteStatus: { upstreamName?: string } | null | undefined
-  repo: { worktreeBaseRef?: string } | null
+  repo: {
+    id: string
+    connectionId?: string | null
+    executionHostId?: ExecutionHostId | null
+    worktreeBaseRef?: string
+  } | null
   settings: { sourceControlCompareAgainstUpstream?: boolean } | null
 }): void {
   const hasActiveReview = activeReview !== null
   const worktreeBaseRef = activeWorktree?.baseRef
   const repoBaseRef = repo?.worktreeBaseRef
+  // Why the same default-base probe the Source Control tab runs: `resolveSourceControlBaseRef` only
+  // honours the review's base branch by matching it against a candidate ref, so passing no default
+  // throws the review's base away and this files no compare at all — the jump then lands in Changes
+  // mode with nothing to show.
+  const defaultBaseRef = useSourceControlBaseRefDefault({
+    activeRepoConnectionId: repo?.connectionId ?? null,
+    activeRepoExecutionHostId: repo?.executionHostId ?? null,
+    activeRepoId: repo?.id ?? null,
+    isBranchVisible: isPanelVisible,
+    isFolder
+  })
   // Why the same two steps as the Source Control tab: both writers share one compare slot, so a
   // different base here would have each tab replacing the other's result on every switch.
   const baseRef = resolveSourceControlCompareBaseRef({
@@ -51,9 +69,7 @@ export function useChecksPanelBranchCompareWarmup({
       worktreeBaseRef,
       reviewBaseRefName: activeReview?.baseRefName,
       repoBaseRef,
-      // Why no default-base probe: a worktree with neither a pin nor a review base has no review to
-      // compare against, and the jump falls back on the surfaces the checkout already proves.
-      defaultBaseRef: null
+      defaultBaseRef
     })
   })
   const headOid = activeWorktree?.head ?? null

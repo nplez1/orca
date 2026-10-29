@@ -47,7 +47,6 @@ function Probe({ reviewBaseRefName = 'main' }: { reviewBaseRefName?: string | nu
   navigate = usePRCommentCodeNavigation({
     worktreeId: WORKTREE_ID,
     worktreePath: WORKTREE_PATH,
-    placementAllowed: true,
     reviewBaseRefName
   })
   return null
@@ -122,7 +121,7 @@ describe('usePRCommentCodeNavigation', () => {
     unmountProbes()
   })
 
-  it('opens a plain Edit tab with a line reveal when no surface holds a hunk', async () => {
+  it('never opens a plain tab: it keeps the change surface with no reveal to wait for', async () => {
     useAppStore.setState({
       gitBranchCompareSummaryByWorktree: { [WORKTREE_ID]: compare() },
       gitBranchChangesByWorktree: { [WORKTREE_ID]: [] },
@@ -135,12 +134,9 @@ describe('usePRCommentCodeNavigation', () => {
       .getState()
       .openFiles.find((file) => file.relativePath === 'src/a.ts' && file.mode === 'edit')
     expect(editTab).toBeDefined()
-    // Why absent: 'edit' is the default view mode, so the store stores no entry for it.
-    expect(useAppStore.getState().editorViewMode[editTab?.id ?? '']).toBeUndefined()
-    expect(useAppStore.getState().pendingEditorReveal).toMatchObject({
-      fileId: editTab?.id,
-      line: 42
-    })
+    // Changes mode explains its own empty result, which is why it beats a tab that shows no diff.
+    expect(useAppStore.getState().editorViewMode[editTab?.id ?? '']).toBe('changes')
+    expect(useAppStore.getState().pendingEditorReveal).toBeNull()
     unmountProbes()
   })
 
