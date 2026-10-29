@@ -125,7 +125,7 @@ describe('registerShellHandlers', () => {
       spawnArgs: args
     }))
     spawnMock.mockReturnValue(createSpawnedProcess())
-    statMock.mockResolvedValue({ isDirectory: () => true })
+    statMock.mockResolvedValue({ isDirectory: () => true, isFile: () => true, mode: 0o644 })
   })
 
   function getHandler(channel: string): (event: unknown, ...args: unknown[]) => Promise<unknown> {
