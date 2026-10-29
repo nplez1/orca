@@ -53,7 +53,10 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
     unreadableIds: () => {
       const unreadable: string[] = []
       for (const site of getSiteFile().sites) {
-        if (!hasStoredToken(site.id) || getSiteTokenProtection(site.id) === null) {
+        // Why presence comes from existence and not from the decoded protection: a read that fails
+        // (`EBUSY` under a Windows antivirus scan, `EACCES`, a locked keyring) answers null there, and
+        // reading that as "no token" puts a working credential in the removal list instead.
+        if (!hasStoredToken(site.id)) {
           continue
         }
         try {
@@ -68,7 +71,13 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
     },
     protectionOf: (id) => {
       const siteId = siteIdOf(id)
-      return siteId !== null && hasStoredToken(siteId) ? getSiteTokenProtection(siteId) : null
+      if (siteId === null || !hasStoredToken(siteId)) {
+        return null
+      }
+      // Why plaintext rather than null for a present token that cannot be classified: null means "this
+      // host holds nothing", which is how a failed read becomes a removal the receiver reports as
+      // verified. Undecodable bytes on disk are still bytes on disk.
+      return getSiteTokenProtection(siteId) ?? 'plaintext'
     },
     list: () => {
       const credentials: ReplicatedHostCredential[] = []

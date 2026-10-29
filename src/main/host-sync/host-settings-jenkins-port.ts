@@ -2,6 +2,7 @@ import type { ReplicatedHostCredential } from '../../shared/host-settings-replic
 import type { JenkinsServerProfile } from '../../shared/jenkins-servers'
 import {
   getJenkinsServerTokenProtection,
+  hasJenkinsServerToken,
   listJenkinsServers,
   normalizeStoredServer,
   readJenkinsServerToken,
@@ -49,7 +50,10 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
     unreadableIds: () => {
       const unreadable: string[] = []
       for (const server of listJenkinsServers()) {
-        if (getJenkinsServerTokenProtection(server.id) === null) {
+        // Why presence comes from existence, as the Jira adapter does: `getJenkinsServerTokenProtection`
+        // answers null for a file that is there but cannot be read, and treating that as absent puts a
+        // working token in the removal list.
+        if (!hasJenkinsServerToken(server.id)) {
           continue
         }
         try {
@@ -64,7 +68,12 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
     },
     protectionOf: (id) => {
       const serverId = serverIdOf(id)
-      return serverId === null ? null : getJenkinsServerTokenProtection(serverId)
+      if (serverId === null || !hasJenkinsServerToken(serverId)) {
+        return null
+      }
+      // Why plaintext rather than null: see the Jira adapter — null claims this host holds nothing, and
+      // that is what turns an unreadable token into a removal reported as verified.
+      return getJenkinsServerTokenProtection(serverId) ?? 'plaintext'
     },
     list: () => {
       const credentials: ReplicatedHostCredential[] = []
