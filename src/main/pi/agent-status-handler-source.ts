@@ -2,6 +2,7 @@ import { getOmpModelCommandSourceLines } from './omp-model-command-source'
 import { getPiPrefillHandlerSourceLines } from './prefill-extension-source'
 import { getAgentStatusInputRedactionSourceLines } from './agent-status-input-redaction-source'
 import { getAgentStatusAssistantTextSourceLines } from './agent-status-assistant-text-source'
+import { getPiOwnerLivenessSourceLines } from './agent-status-owner-liveness-source'
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 import { getOmpSessionOwnerHandlerSourceLines } from './omp-session-status-owner-source'
 import {
@@ -105,25 +106,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     ...getAgentStatusInputRedactionSourceLines(),
     ...getAgentStatusAssistantTextSourceLines(),
     '// Preserve ordinary preview data; credential references never leave the agent host.',
-    '// Why: a restarted agent inherits the previous owner PID through env, so a',
-    '// dead owner must be claimable or the pane goes silent for good. Only ESRCH',
-    '// proves the owner is gone -- every other probe result keeps suppression, so',
-    '// a live foreign owner still cannot double-report. Mirrors the tri-state in',
-    '// main/agent-hooks/managed-hook-owner-identity.ts, which this runtime cannot',
-    '// import (the extension loads inside pi/omp with no Orca deps).',
-    '// Reclaim inherited dead owner PIDs only on ESRCH; all other probe results must suppress duplicate reporting.',
-    'function isStatusOwnerAlive(pid: string): boolean {',
-    '  const parsed = Number(pid)',
-    '  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 0x7fffffff) return false',
-    "  if (typeof process.kill !== 'function') return true",
-    '  try {',
-    '    process.kill(parsed, 0)',
-    '    return true',
-    '  } catch (err: unknown) {',
-    "    return (err as { code?: string } | null)?.code !== 'ESRCH'",
-    '  }',
-    '}',
-    '',
+    ...getPiOwnerLivenessSourceLines(),
     '// Inherited pane identity permits only the lead process; PID equality retains in-process reloads.',
     'export default function (pi): void {',
     ...primeDaemonWorkerGuard,
