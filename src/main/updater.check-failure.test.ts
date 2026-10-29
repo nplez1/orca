@@ -126,15 +126,18 @@ function respondWithNotReadyRelease({
   manifestStatus = 200,
   manifestText
 }: NotReadyProbe): void {
-  const atom = `<feed>${publishingIncident.atomTags
-    .map(
-      (tag) =>
-        `<entry><link rel="alternate" type="text/html" href="https://github.com/nplez1/orca/releases/tag/${tag}"/><title>${tag}</title></entry>`
-    )
-    .join('')}</feed>`
+  // The resolver reads the REST release list first and only falls back to the atom feed when it
+  // cannot, so this answers the list: one request per check, exactly as the atom feed used to be.
+  const releases = JSON.stringify(
+    publishingIncident.atomTags.map((tag) => ({
+      tag_name: tag,
+      draft: false,
+      assets: [{ name: 'latest-mac.yml' }]
+    }))
+  )
   netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-    if (url === 'https://github.com/nplez1/orca/releases.atom') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(atom) })
+    if (url === 'https://api.github.com/repos/nplez1/orca/releases?per_page=100') {
+      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(releases) })
     }
     if (init?.method === 'HEAD' && assetStatus !== undefined) {
       return Promise.resolve({
