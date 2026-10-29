@@ -5,7 +5,7 @@ export const WORKTREE_SET_COMMAND_SPEC: CommandSpec = {
   path: ['worktree', 'set'],
   summary: 'Update Orca metadata for a worktree',
   usage:
-    'orca worktree set --worktree <selector> [--display-name <name>] [--issue <number|null>] [--pr <number|null>] [--linear-issue <identifier-or-url|null>] [--jira-issue <key-or-url|null>] [--gitlab-issue <number-or-url|null>] [--gitlab-mr <number-or-url|null>] [--comment <text>] [--workspace-status <id>] [--unread|--read] [--parent-worktree <selector>|--no-parent] [--json]',
+    'orca worktree set --worktree <selector> [--display-name <name>] [--issue <number|null>] [--pr <number|null>] [--linear-issue <identifier-or-url|null>] [--jira-issue <key-or-url|null>] [--replace-linked-item] [--gitlab-issue <number-or-url|null>] [--gitlab-mr <number-or-url|null>] [--comment <text>] [--workspace-status <id>] [--unread|--read] [--parent-worktree <selector>|--no-parent] [--json]',
   allowedFlags: [
     ...GLOBAL_FLAGS,
     'worktree',
@@ -14,6 +14,7 @@ export const WORKTREE_SET_COMMAND_SPEC: CommandSpec = {
     'pr',
     'linear-issue',
     'jira-issue',
+    'replace-linked-item',
     'gitlab-issue',
     'gitlab-mr',
     'comment',
@@ -27,6 +28,7 @@ export const WORKTREE_SET_COMMAND_SPEC: CommandSpec = {
     'Workspace status ids match the board columns (defaults: todo, in-progress, in-review, completed); custom statuses use their configured id.',
     'Pass --linear-issue null to clear the Linear issue link, or --jira-issue null to clear a Jira one.',
     'A Jira link is read from the host that owns the workspace, so the key must live on a site connected to that host; pass the issue URL when more than one site is connected.',
+    'A Jira link is the workspace link slot every task provider shares: --jira-issue null clears it only while it holds a Jira issue, and naming an issue refuses to replace a GitHub, GitLab or Linear one unless --replace-linked-item says so.',
     'Pass --pr null, --gitlab-issue null, or --gitlab-mr null to clear only the matching link.',
     'Each link flag updates its own field and leaves unrelated links unchanged. GitLab URLs must match the stored source project or remote; they cannot select a foreign project.'
   ],
@@ -35,6 +37,7 @@ export const WORKTREE_SET_COMMAND_SPEC: CommandSpec = {
     'orca worktree set --worktree active --linear-issue null --json',
     'orca worktree set --worktree active --jira-issue ABC-123 --json',
     'orca worktree set --worktree active --jira-issue https://acme.atlassian.net/browse/ABC-123 --json',
+    'orca worktree set --worktree active --jira-issue ABC-123 --replace-linked-item --json',
     'orca worktree set --worktree active --workspace-status in-review --unread --json'
   ]
 }

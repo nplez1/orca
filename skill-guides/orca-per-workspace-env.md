@@ -532,12 +532,15 @@ Once it passes, exercise `extend` while nothing is live: save the recipe result 
 to a file and run the hook through the CLI.
 
 ```text
-ORCA vm recipe extend <recipe-id> --recipe-result ./result.json --lifetime 4h --json
+ORCA vm recipe extend <recipe-id> --recipe-result ./result.json --lifetime 4h --write-result ./result.json --json
 ```
 
 The lifetime must be one the recipe's own `extendDurations` declares. It prints the updated result,
 so confirm `releaseAt` actually moved; extending a live lease from the app is what persists the new
-deadline, and this command only reports what the hook produced.
+deadline, and this command only reports what the hook produced. `--write-result` saves that updated
+result as JSON (all or nothing, mode 0600) — without it the file you passed to `--recipe-result` is
+untouched, so a second extend runs against the stale lease. Point it at `--recipe-result` to replace
+the stored result. A failure goes to stderr and exits 1, so stdout stays consumable.
 
 Run it as a loop: read the `provisionTranscript` in the failed result, fix the script, re-run, until
 `ok` is `true`. Do not wait for the user to paste errors. How to read the transcript is in

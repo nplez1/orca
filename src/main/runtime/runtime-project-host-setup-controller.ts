@@ -25,7 +25,10 @@ import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidators'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
-import { takeWorktreeLayoutMode } from './runtime-project-setup-layout-mode'
+import {
+  takeWorktreeLayoutMode,
+  applyAndReportWorktreeLayoutMode
+} from './runtime-project-setup-layout-mode'
 import { updateProjectHostSetupWithProvenKind } from '../folder-repo-git-conversion'
 import type { RuntimeStore } from './runtime-store-contract'
 import { readAllWorktreeMetaForRepo } from '../persistence/host-qualified-worktree-meta'
@@ -109,16 +112,15 @@ export class RuntimeProjectHostSetupController {
       throw new Error('runtime_unavailable')
     }
     assertWslMoveHostSetupWritable(store, args)
-    // Why before the setup write: the mode is a host setting rather than a setup field, so a
-    // rejected settings write should fail the command instead of leaving a created setup whose
-    // requested layout silently did not apply.
+    // Why split: the mode is host-wide, so it is checked here and applied only once the setup
+    // write succeeded — a rejected create must not leave every project's placement flipped.
     const setupArgs = takeWorktreeLayoutMode(this.deps, args)
     const result = store.createProjectHostSetup(setupArgs)
     if (!result) {
       throw new Error(`Project not found: ${args.projectId}`)
     }
     this.deps.notifyReposChanged()
-    return result
+    return applyAndReportWorktreeLayoutMode(this.deps, args.worktreeLayoutMode, result)
   }
 
   async setupExistingFolder(
@@ -201,7 +203,7 @@ export class RuntimeProjectHostSetupController {
     }
     this.deps.invalidateResolvedWorktrees()
     this.deps.notifyReposChanged()
-    return result
+    return applyAndReportWorktreeLayoutMode(this.deps, args.updates.worktreeLayoutMode, result)
   }
 
   deleteSetup(args: ProjectHostSetupDeleteArgs): ProjectHostSetupDeleteResult {

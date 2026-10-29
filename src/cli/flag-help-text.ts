@@ -40,7 +40,8 @@ export const FLAG_HELP_TEXT: Record<string, string> = {
     '--gitlab-mr <number|url|null> Linked GitLab merge request number or URL; null clears on set',
   'linear-issue':
     '--linear-issue <id|url|null> Linked Linear issue identifier or URL; null clears on set',
-  'jira-issue': '--jira-issue <key|url|null> Linked Jira issue key or URL; null clears on set',
+  'jira-issue':
+    '--jira-issue <key|url|null> Linked Jira issue key or URL; null clears a Jira link only',
   json: '--json                 Emit machine-readable JSON',
   key: '--key <key>            Key argument for this command',
   limit: '--limit <n>            Maximum number of rows to return',
@@ -62,6 +63,8 @@ export const FLAG_HELP_TEXT: Record<string, string> = {
   prompt: '--prompt <text>        Prompt text for agent-backed commands',
   query: '--query <text>        Search text for matching refs',
   ref: '--ref <ref>            Base ref to persist for the repo',
+  'replace-linked-item':
+    '--replace-linked-item   Replace a link held by another task provider with this one',
   repo: '--repo <selector>      Repo selector such as id:<id>, name:<name>, or path:<path>',
   'restore-window': '--restore-window     Bring the target app/window forward before the operation',
   session: '--session <id>        Snapshot namespace for a related computer-use workflow',
@@ -116,6 +119,7 @@ export const FLAG_HELP_TEXT: Record<string, string> = {
   'value-stdin': '--value-stdin         Read set-value payload from stdin',
   'window-id': '--window-id <id>      Target a window id from list-windows',
   'window-index': '--window-index <n>   Target a window index from list-windows',
+  'write-result': '--write-result <file>  Save the updated recipe result as JSON, mode 0600',
   element: '--element <ref>        Element ref from snapshot (e.g. e3)',
   url: '--url <url>            URL to navigate to',
   value: '--value <text>         Value to fill or select',

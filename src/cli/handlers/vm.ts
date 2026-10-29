@@ -19,8 +19,10 @@ import {
 } from '../../shared/ephemeral-vm-recipe-runner'
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import {
+  describeSensitiveExtendResult,
   extendEphemeralVmRecipeFromFile,
-  formatExtendEphemeralVmRecipeResult
+  formatExtendEphemeralVmRecipeResult,
+  writeEphemeralVmRecipeResultFile
 } from '../vm-recipe-extend'
 import {
   buildProvisionFailureRemediation,
@@ -54,28 +56,56 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
     }
     const timeoutMs =
       typeof timeoutFlag === 'string' && timeoutFlag.length > 0 ? Number(timeoutFlag) : undefined
-    const repoPath = getStringFlag(flags, 'repo-path') ?? cwd
-    const recipe = loadRecipe(repoPath, recipeId)
-    const result = recipe
-      ? await extendEphemeralVmRecipeFromFile({
-          repoPath,
-          recipe,
-          recipeResultPath: resolve(cwd, recipeResultPath),
-          requestedLifetime,
-          ...(timeoutMs === undefined ? {} : { timeoutMs })
-        })
-      : {
-          recipeId,
-          repoPath,
-          ok: false as const,
-          error: `Recipe "${recipeId}" was not found in environmentRecipes.`
-        }
-    if (json) {
-      console.log(JSON.stringify(result, null, 2))
-    } else {
-      console.log(formatExtendEphemeralVmRecipeResult(result))
+    // Why resolve against the invocation cwd: over the SSH bridge ORCA_CLI_CWD is the remote
+    // caller's directory, so a relative path has to mean what it means on that side. Resolving
+    // straight from `process.cwd()` put `--repo-path ./repo` and `--recipe-result ./r.json` in
+    // two different places for the same invocation.
+    const repoPath = resolve(cwd, getStringFlag(flags, 'repo-path') ?? '.')
+    const loaded = loadRecipe(repoPath, recipeId)
+    const result =
+      'recipe' in loaded
+        ? await extendEphemeralVmRecipeFromFile({
+            repoPath,
+            recipe: loaded.recipe,
+            recipeResultPath: resolve(cwd, recipeResultPath),
+            requestedLifetime,
+            ...(timeoutMs === undefined ? {} : { timeoutMs })
+          })
+        : { recipeId, repoPath, ok: false as const, error: loaded.error }
+    const writeResultPath = getStringFlag(flags, 'write-result')
+    const resultPath = writeResultPath ? resolve(cwd, writeResultPath) : null
+    const write =
+      resultPath && result.ok && result.recipeResult
+        ? writeEphemeralVmRecipeResultFile(resultPath, result.recipeResult)
+        : null
+    if (write && !write.written) {
+      // Why still report the result: the hook has already moved the lease, so this output is the
+      // only place the deadline that now exists can be read.
+      console.error(`warning: could not write ${resultPath}: ${write.error}`)
+    } else if (write && !write.restricted) {
+      console.error(
+        `warning: wrote ${resultPath}, but could not restrict its permissions to this user`
+      )
     }
-    if (!result.ok) {
+    if (json) {
+      const sensitive = describeSensitiveExtendResult(result)
+      if (sensitive) {
+        console.error(`warning: ${sensitive}`)
+      }
+      console.log(JSON.stringify(result, null, 2))
+    } else if (result.ok) {
+      console.log(
+        formatExtendEphemeralVmRecipeResult(
+          result,
+          write?.written ? { resultPath: write.path } : {}
+        )
+      )
+    } else {
+      // Why stderr: a failure is not this command's output, and `> result.json` must not
+      // capture an error a destroy hook would then try to parse.
+      console.error(formatExtendEphemeralVmRecipeResult(result))
+    }
+    if (!result.ok || (write && !write.written)) {
       process.exitCode = 1
     }
   },
@@ -84,7 +114,7 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
     if (!recipeId) {
       throw new RuntimeClientError('invalid_argument', 'Missing recipe id.')
     }
-    const repoPath = getStringFlag(flags, 'repo-path') ?? cwd
+    const repoPath = resolve(cwd, getStringFlag(flags, 'repo-path') ?? '.')
     const shouldProvision = flags.get('provision') === true || flags.get('connect') === true
     const result = shouldProvision
       ? await doctorRecipeWithProvision(repoPath, recipeId)
@@ -165,10 +195,11 @@ async function doctorRecipeWithProvision(
     }
   }
 
-  const recipe = loadRecipe(repoPath, recipeId)
-  if (!recipe) {
+  const loaded = loadRecipe(repoPath, recipeId)
+  if ('error' in loaded) {
     return baseline
   }
+  const recipe = loaded.recipe
 
   const start = await runEphemeralVmRecipeStart({ repoPath, recipe })
   if (!start.ok) {
@@ -260,9 +291,28 @@ async function doctorRecipeWithProvision(
   }
 }
 
-function loadRecipe(repoPath: string, recipeId: string): OrcaVmRecipe | null {
-  const hooks = parseOrcaYaml(readTextFile(join(repoPath, 'orca.yaml')))
-  return hooks?.environmentRecipes?.find((entry) => entry.id === recipeId) ?? null
+function loadRecipe(
+  repoPath: string,
+  recipeId: string
+): { recipe: OrcaVmRecipe } | { error: string } {
+  const yamlPath = join(repoPath, 'orca.yaml')
+  // Why structured rather than a raw throw: a missing orca.yaml is an answer the caller can act
+  // on, and ENOENT from a stack trace is not. `doctor` already reports it as a check.
+  if (!existsSync(yamlPath)) {
+    return { error: `No orca.yaml found at ${yamlPath}.` }
+  }
+  let hooks: ReturnType<typeof parseOrcaYaml>
+  try {
+    hooks = parseOrcaYaml(readTextFile(yamlPath))
+  } catch (error) {
+    return {
+      error: `orca.yaml at ${yamlPath} could not be read: ${error instanceof Error ? error.message : String(error)}`
+    }
+  }
+  const recipe = hooks?.environmentRecipes?.find((entry) => entry.id === recipeId)
+  return recipe
+    ? { recipe }
+    : { error: `Recipe "${recipeId}" was not found in environmentRecipes.` }
 }
 
 /**
