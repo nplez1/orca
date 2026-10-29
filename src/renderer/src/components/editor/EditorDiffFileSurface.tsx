@@ -156,6 +156,7 @@ export function EditorDiffFileSurface({
       filePath={activeFile.filePath}
       relativePath={activeFile.relativePath}
       oldPath={activeFile.branchOldPath}
+      showReviewThreads={activeFile.diffSource !== 'commit'}
       sideBySide={sideBySide}
       editable={isEditable}
       worktreeId={activeFile.worktreeId}

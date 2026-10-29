@@ -89,10 +89,19 @@ export function usePRCommentInlineSurface(
   const setScrollToDiffCommentId = useAppStore((s) => s.setScrollToDiffCommentId)
   const scope = review?.scope ?? null
   const enabled = review?.enabled ?? false
-  const threads =
-    review?.threadsByPath?.get(normalizePRCommentPath(filePath)) ??
-    (alternatePath ? review?.threadsByPath?.get(normalizePRCommentPath(alternatePath)) : null) ??
-    null
+  const threads = useMemo(() => {
+    const byPath = review?.threadsByPath ?? null
+    const direct = byPath?.get(normalizePRCommentPath(filePath)) ?? null
+    const alternate = alternatePath
+      ? (byPath?.get(normalizePRCommentPath(alternatePath)) ?? null)
+      : null
+    if (!direct || !alternate) {
+      return direct ?? alternate
+    }
+    // A rename can leave threads on both names; one id must not be drawn twice.
+    const merged = new Map([...direct, ...alternate].map((thread) => [thread.id, thread]))
+    return [...merged.values()].sort((a, b) => a.line - b.line || a.id.localeCompare(b.id))
+  }, [alternatePath, filePath, review?.threadsByPath])
 
   const onPendingRevealConsumed = useCallback((): void => {
     setScrollToDiffCommentId(null)

@@ -66,9 +66,9 @@ export type BuildPRCommentInlineInput = {
   comments: readonly PRComment[]
   enabled: boolean
   /**
-   * Why placement is unsafe, or null when the revision on screen is known to be the one the
-   * comments were fetched against.
+   * Why the revision on screen may not be the one the comments describe, or null when it is.
    *
+   * Advisory only — a surface draws the review regardless, and the decorator drops what it cannot place.
    * The caller supplies this rather than the derivation deciding it, because only the caller knows
    * what revision its surface shows: a worktree editor shows a checkout that may have moved, while
    * a pull-request diff shows the reviewed commit by construction.

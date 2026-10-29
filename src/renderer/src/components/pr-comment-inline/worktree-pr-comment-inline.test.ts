@@ -188,7 +188,6 @@ describe('deriveWorktreePRCommentInline', () => {
       prHeadSha: HEAD_SHA
     })
     expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
-    expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
   })
 
   it('still draws the review when the cached comments never recorded a head', () => {

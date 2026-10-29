@@ -74,19 +74,20 @@ export function usePRCommentInlineDecorator({
   // Why the model's own line count: a thread is drawn for whatever revision the workspace is
   // reviewing, so one past the last line has nowhere honest to go. Read the model itself so the first
   // paint is already right — a null count would draw it once and then pull it back.
+  const editorModel = editor?.getModel() ?? null
   const modelLineCount = useSyncExternalStore(
     useCallback(
       (onChange: () => void) => {
-        const model = editor?.getModel() ?? null
-        if (!model) {
+        if (!editorModel) {
           return () => {}
         }
-        const subscription = model.onDidChangeContent(onChange)
+        // Keyed on the model, not the editor: a swap under the same editor must move the subscription.
+        const subscription = editorModel.onDidChangeContent(onChange)
         return () => subscription.dispose()
       },
-      [editor]
+      [editorModel]
     ),
-    () => editor?.getModel()?.getLineCount() ?? null
+    () => editorModel?.getLineCount() ?? null
   )
 
   const displayOf = useCallback(
