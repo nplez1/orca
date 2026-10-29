@@ -12,9 +12,11 @@ SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 RESOURCES_DIR="$(cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 APP_DIR="$(cd "$RESOURCES_DIR/.." >/dev/null 2>&1 && pwd)"
 
-# orca-ide avoids the GNOME Orca name; -f excludes executable directories.
+# orca-ide avoids the GNOME Orca name; -f excludes executable directories. orca-np is this fork's
+# packaged executable name (linux.executableName in electron-builder.np.config.cjs), and the other
+# three keep an upstream-layout bundle launching.
 ELECTRON=""
-for candidate in orca-ide orca Orca; do
+for candidate in orca-np orca-ide orca Orca; do
 	if [ -f "$APP_DIR/$candidate" ] && [ -x "$APP_DIR/$candidate" ]; then
 		ELECTRON="$APP_DIR/$candidate"
 		break

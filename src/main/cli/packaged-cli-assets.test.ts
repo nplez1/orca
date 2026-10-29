@@ -41,6 +41,16 @@ const unixLauncherFixtures = [
     executable: ['orca-ide'],
     cli: ['resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
   },
+  // Why: electron-builder.np.config.cjs names this fork's Linux executable `orca-np`, so the bundled
+  // launcher has to find it there instead of only upstream's `orca-ide`.
+  {
+    name: 'Linux (Orca NP)',
+    asset: linuxLauncherAsset,
+    appDir: ['Orca NP'],
+    launcher: ['resources', 'bin', 'orca-ide'],
+    executable: ['orca-np'],
+    cli: ['resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
+  },
   {
     name: 'macOS',
     asset: darwinLauncherAsset,

@@ -2436,3 +2436,90 @@ Deliberately unchanged, and why each is not a copy to collapse:
   so their English is a catalog value rather than an inline literal. The non-dev attention tooltip now
   reuses the existing `tray.activityWaitingSuffix` key, which drops one `'Orca'` literal without
   touching a catalog; the remaining "Open Orca" menu label is left to the translations.
+
+#### The names one install owns below the bundle id (2026-10-29, fork issue #211)
+
+The rename above held at the bundle id and the userData path and failed at every level below it: a
+second install was still reachable through shared install directories, shared package payload paths,
+shared CLI profiles and shared supervisor and guest registrations. Each is independently reachable, so
+each now carries the identity, and each is pinned by a test rather than by a comment:
+
+| Piece                                                   | Value                                                                      | Pinned by                                                          |
+| ------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| package `name` (NSIS install dir, `*-updater` cache)    | `orca-np`                                                                  | `config/scripts/electron-builder-np-config.test.mjs`               |
+| `linux.executableName` (desktop entry, icons, mime xml) | `orca-np`                                                                  | same file                                                          |
+| Linux CLI profile                                       | `~/.config/orca-np`                                                        | `src/cli/runtime/metadata.test.ts`                                 |
+| agent-hook entry matcher                                | `.orca-np` only                                                            | `src/main/agent-hooks/managed-command-matcher-legacy-home.test.ts` |
+| launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `src/cli/runtime/serve-service-unit.test.ts`                       |
+| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl-cli-installer.test.ts`                           |
+| `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts`           |
+| dev profile fallback                                    | `orca-np-dev`                                                              | `src/cli/runtime/launch-user-data-path.test.ts`                    |
+| `serve service install` default command                 | `orca-np`                                                                  | `src/cli/handlers/serve-service.test.ts`                           |
+| serve park/ack coordination root                        | `Application Support/orca-np`                                              | `src/shared/serve-bundle-coordination.test.ts`                     |
+
+Three couplings that only show up in the built artifact:
+
+- **`extraMetadata` is spread, not replaced.** A dev-channel build stages its `version` there, so the
+  overlay writes `{ ...release.extraMetadata, name }`; overwriting the object ships the wrong version.
+- **`resources/linux/bin/orca-ide` now searches for `orca-np` first.** The in-bundle CLI launcher keeps
+  upstream's file name (pinned by `LINUX_CLI_COMMAND_NAME`), but the executable beside it is this
+  build's, and `src/main/cli/packaged-cli-assets.test.ts` runs the script against both layouts.
+- **`src/shared/appimage-cache-identity.ts` recognises both executable names.** An AppImage generation
+  cached by an earlier build still runs as `orca-ide`, so keying the cache layout on one name would
+  drop its lease and its update handoff.
+
+Two upgrade costs, both accepted deliberately rather than migrated:
+
+- **The `BROWSER` command did not change on macOS or Linux, and did not need to.** There the basename
+  of the resolved launcher is `orca` — this build's own bundled launcher and its own Linux shim
+  (created only so a bare `orca` reaches us instead of GNOME's screen reader), both ahead of anything
+  else on the pane's PATH. What changed is that the value is now derived from the launcher the pane
+  actually has; Windows (previously `orca`) and dev/WSL follow their own names.
+- **macOS Keychain and Linux libsecret identity move with the package name.** Electron fixes the
+  safeStorage service name before `ready` from the bundled `package.json`'s `name`, which is why
+  `main-process-preflight.ts` renames only dev builds pre-ready. Renaming the package therefore moves
+  the macOS Keychain item from `orca Safe Storage` to `orca-np Safe Storage`. That is also the bug being
+  fixed — with `name: orca`, this build and an official install shared one Keychain item — but the cost
+  is real: an install that predates this change cannot decrypt what it stored (provider credentials,
+  plugin secrets, browser cookies) and has to sign in again. No migration is attempted; copying the
+  other item would mean reading another install's key.
+
+What is deliberately left alone, because either side of the pair is indistinguishable:
+
+- **`~/.orca` agent-hook entries.** The matcher sweeps them when they cannot be an official install's:
+  an unresolved `${HOME}` template or another host's home (remote registrations, Codex's frozen
+  command form). Those remote forms are swept because a remote `.orca` path may be either install's
+  and the command alone cannot tell them apart. A resolved `.orca` path in this user's home is swept
+  only when `hasOfficialOrcaProfile()` finds no official profile directory — otherwise it is that
+  install's. Grok's owner directories are read from both installs; only this build's is pruned, and
+  only a live process in the other one holds the removal open.
+- **A Muse pointer to a pre-rename hooks file.** `managed_hooks_path` naming
+  `~/.orca/agent-hooks/muse-hooks.json` — on the local machine or an SSH host — is reported as "a
+  pre-rename or official Orca registration" and left alone, because an official install writes the
+  same pointer. Registration stays blocked until the user clears or repoints `managed_hooks_path`.
+- **A `~/Library/Application Support/orca` profile holding nothing but `bundle-coordination`.** That
+  tree is the only thing builds before the coordination-root move ever wrote there, so the probe treats
+  such a profile as absent and the legacy sweep still runs; anything else in the directory is the
+  official app's. Two residual risks, both recorded rather than guessed at:
+  - An official install that only ever ran a supervised serve with a pinned `ORCA_USER_DATA_PATH`
+    leaves exactly that same one-entry profile, so its local `~/.orca` hook entries would be swept.
+    Reading the park tree's `supervisors/*.json` to tell the two apart is the fix if it is ever
+    observed; the sweep only ever deletes entries that look like this build's own.
+  - A `.DS_Store` (or any other second entry) in that directory makes an Orca-NP-only Mac read as an
+    official install, so its `~/.orca` leftovers are not swept. That is the safe direction.
+- **A pre-rename `serve` unit and a pre-rename WSL registration.** Both were written under upstream's
+  names with upstream's marker, exactly like the official app's, so neither can be removed or adopted
+  safely. The launchd _label_ is still recognised, which is what lets an upgrade park the supervisor
+  an older build started; that supervisor keeps running until it is booted out by hand, because the
+  new unit is deliberately a different label. A `~/.local/bin/orca-ide` launcher is left in place too:
+  re-registering the WSL CLI creates `orca-np` beside it rather than replacing it.
+- **A pre-rename park/ack tree.** `Application Support/orca-np` is a new coordination root; a
+  supervisor started by an older build registered under `Application Support/orca` and will not be
+  parked by this one. Parking fails towards "the old supervisor keeps running", never towards a
+  half-installed bundle.
+- **Existing Windows installs do not migrate.** The NSIS installer reads `InstallLocation` from
+  `HKCU\Software\<appId GUID>`, and the appId is unchanged, so an install made before the package
+  rename keeps updating in place under `%LOCALAPPDATA%\Programs\orca` — beside the official app's
+  default directory, which is the collision this fix removes. Only a fresh install lands in
+  `Programs\orca-np`. Uninstalling the old copy (or clearing its `InstallLocation` value) is a manual
+  step, and the release notes for the first build carrying this say so.

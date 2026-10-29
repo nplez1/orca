@@ -3,6 +3,7 @@ import type { SFTPWrapper } from 'ssh2'
 
 // Muse allowlists hook environment variables; persist Orca coordinates to preserve attribution.
 import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import {
   buildWindowsAgentHookCurlPostCommand,
   writeHooksJson,
@@ -27,6 +28,8 @@ import {
   getMuseManagedCommandMatcher,
   getMuseManagedHooksPath,
   getMuseManagedScriptPath,
+  museForeignPointerDetail,
+  museRemoteForeignPointerDetail,
   getMuseRemoteConfigPath,
   getMuseRemoteManagedCommand,
   getMuseRemoteManagedHooksPath,
@@ -200,7 +203,7 @@ export class MuseHookService {
         state: 'not_installed',
         configPath,
         managedHooksPresent: false,
-        detail: `managed_hooks_path points at ${existingPointer}; leaving the user's managed hooks untouched`
+        detail: museForeignPointerDetail(existingPointer)
       }
     }
     const scriptPath = getMuseManagedScriptPath()
@@ -223,7 +226,7 @@ export class MuseHookService {
 
   async installRemote(sftp: SFTPWrapper, remoteHome: string): Promise<AgentHookInstallStatus> {
     const remoteConfigPath = getMuseRemoteConfigPath(remoteHome)
-    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/muse-hook.sh`
+    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/${HOME_DIRECTORY_NAME}/agent-hooks/muse-hook.sh`
     const remoteManagedHooksPath = getMuseRemoteManagedHooksPath(remoteHome)
     try {
       const body = await readTextFileRemote(sftp, remoteConfigPath)
@@ -245,7 +248,7 @@ export class MuseHookService {
           state: 'not_installed',
           configPath: remoteConfigPath,
           managedHooksPresent: false,
-          detail: `managed_hooks_path points at ${existingPointer}; leaving the user's managed hooks untouched`
+          detail: museRemoteForeignPointerDetail(existingPointer, remoteHome)
         }
       }
       const command = getMuseRemoteManagedCommand(remoteScriptPath)

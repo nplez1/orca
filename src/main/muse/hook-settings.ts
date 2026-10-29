@@ -9,6 +9,7 @@ import {
   type HookDefinition
 } from '../agent-hooks/installer-utils'
 import { readManagedHookEventsFromJson } from '../agent-hooks/managed-hooks-json-events'
+import { HOME_DIRECTORY_NAME, LEGACY_HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { wrapWindowsBatchHookCommand } from '../agent-hooks/windows-direct-cmd-hook-command'
 import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
 import { parseMuseSettingsText } from './hook-config-json'
@@ -54,13 +55,42 @@ export function getMuseManagedHooksPath(): string {
   return getSharedManagedScriptPath(MUSE_MANAGED_HOOKS_FILE_NAME)
 }
 
+/**
+ * The pointer an earlier build of this fork, or an official install, registered under `~/.orca`.
+ *
+ * Why it is a named case and not adoption: the pointer is identical on both, so a build that takes it
+ * over would be editing another install's remote hooks.
+ */
+export function getMusePreRenameManagedHooksPath(): string {
+  return join(homedir(), LEGACY_HOME_DIRECTORY_NAME, 'agent-hooks', MUSE_MANAGED_HOOKS_FILE_NAME)
+}
+
+export function getMuseRemotePreRenameManagedHooksPath(remoteHome: string): string {
+  return `${remoteHome.replace(/\/$/, '')}/${LEGACY_HOME_DIRECTORY_NAME}/agent-hooks/${MUSE_MANAGED_HOOKS_FILE_NAME}`
+}
+
+/** Name what a foreign pointer is, so a pre-rename or official registration is not read as the user's. */
+function musePointerDetail(pointer: string, preRenamePath: string): string {
+  return pointer === preRenamePath
+    ? `managed_hooks_path points at ${pointer}, a pre-rename or official Orca registration; leaving it untouched`
+    : `managed_hooks_path points at ${pointer}; leaving the user's managed hooks untouched`
+}
+
+export function museForeignPointerDetail(pointer: string): string {
+  return musePointerDetail(pointer, getMusePreRenameManagedHooksPath())
+}
+
+export function museRemoteForeignPointerDetail(pointer: string, remoteHome: string): string {
+  return musePointerDetail(pointer, getMuseRemotePreRenameManagedHooksPath(remoteHome))
+}
+
 export function getMuseRemoteConfigPath(remoteHome: string): string {
   // SFTP does not expose remote XDG_CONFIG_HOME; use Muse's default path.
   return `${remoteHome.replace(/\/$/, '')}/.config/muse/settings.json`
 }
 
 export function getMuseRemoteManagedHooksPath(remoteHome: string): string {
-  return `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/${MUSE_MANAGED_HOOKS_FILE_NAME}`
+  return `${remoteHome.replace(/\/$/, '')}/${HOME_DIRECTORY_NAME}/agent-hooks/${MUSE_MANAGED_HOOKS_FILE_NAME}`
 }
 
 export function getMuseManagedCommand(scriptPath: string): string {

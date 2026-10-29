@@ -240,17 +240,13 @@ describe('writeHooksJson', () => {
 describe('createManagedCommandMatcher', () => {
   const match = createManagedCommandMatcher('claude-hook.sh')
 
-  it('matches commands containing the agent-hooks/<scriptFileName> path', () => {
-    expect(
-      match('/bin/sh "/Users/alice/Library/Application Support/Orca/agent-hooks/claude-hook.sh"')
-    ).toBe(true)
-    expect(match('/bin/sh "/some/other/location/agent-hooks/claude-hook.sh"')).toBe(true)
+  it('matches this install’s own hook entries', () => {
+    expect(match('/bin/sh "/home/alice/.orca-np/agent-hooks/claude-hook.sh"')).toBe(true)
+    expect(match('if [ -f "$HOME/.orca-np/agent-hooks/claude-hook.sh" ]; then :; fi')).toBe(true)
   })
 
   it('normalizes Windows backslashes so cmd-style paths still match', () => {
-    expect(match('C:\\Users\\alice\\AppData\\Roaming\\Orca\\agent-hooks\\claude-hook.sh')).toBe(
-      true
-    )
+    expect(match('C:\\Users\\alice\\.orca-np\\agent-hooks\\claude-hook.sh')).toBe(true)
   })
 
   it('returns false for unrelated commands', () => {
@@ -259,16 +255,18 @@ describe('createManagedCommandMatcher', () => {
     expect(match('echo "user-authored hook"')).toBe(false)
     // A matching filename outside agent-hooks remains user-owned.
     expect(match('/bin/sh "/home/alice/scripts/claude-hook.sh"')).toBe(false)
+    // So does an agent-hooks directory that is not one of the two home directories.
+    expect(match('/bin/sh "/some/other/location/agent-hooks/claude-hook.sh"')).toBe(false)
   })
 
   it('does not match hooks for a different agent', () => {
-    expect(match('/bin/sh "/path/agent-hooks/gemini-hook.sh"')).toBe(false)
+    expect(match('/bin/sh "/path/.orca-np/agent-hooks/gemini-hook.sh"')).toBe(false)
   })
 
   it('matches the guarded launcher form so wrapped commands sweep correctly', () => {
     expect(
       match(
-        'if [ -x "/Users/alice/Library/Application Support/Orca/agent-hooks/claude-hook.sh" ]; then /bin/sh "/Users/alice/Library/Application Support/Orca/agent-hooks/claude-hook.sh"; fi'
+        'if [ -x "/home/alice/.orca-np/agent-hooks/claude-hook.sh" ]; then /bin/sh "/home/alice/.orca-np/agent-hooks/claude-hook.sh"; fi'
       )
     ).toBe(true)
   })
@@ -310,12 +308,12 @@ describe('removeManagedCommands', () => {
       [
         {
           type: 'command',
-          bash: '/bin/sh "/Users/alice/Orca/agent-hooks/copilot-hook.sh"',
+          bash: '/bin/sh "/Users/alice/.orca-np/agent-hooks/copilot-hook.sh"',
           timeoutSec: 5
         },
         {
           type: 'command',
-          powershell: "& 'C:\\Users\\alice\\Orca\\agent-hooks\\copilot-hook.sh'",
+          powershell: "& 'C:\\Users\\alice\\.orca-np\\agent-hooks\\copilot-hook.sh'",
           timeoutSec: 5
         },
         {
@@ -337,7 +335,7 @@ describe('removeManagedCommands', () => {
           hooks: [
             {
               type: 'command',
-              command: '/bin/sh "/path/agent-hooks/copilot-hook.sh"'
+              command: '/bin/sh "/home/alice/.orca-np/agent-hooks/copilot-hook.sh"'
             },
             { type: 'command', command: 'echo keep me' }
           ]
@@ -403,7 +401,7 @@ describe('hookDefinitionHasManagedCommand', () => {
 
     expect(
       hookDefinitionHasManagedCommand(
-        { bash: '/bin/sh "/Users/alice/Orca/agent-hooks/copilot-hook.sh"' },
+        { bash: '/bin/sh "/Users/alice/.orca-np/agent-hooks/copilot-hook.sh"' },
         match
       )
     ).toBe(true)
@@ -413,7 +411,7 @@ describe('hookDefinitionHasManagedCommand', () => {
           hooks: [
             {
               type: 'command',
-              command: '/bin/sh "/path/agent-hooks/copilot-hook.sh"'
+              command: '/bin/sh "/home/alice/.orca-np/agent-hooks/copilot-hook.sh"'
             }
           ]
         },

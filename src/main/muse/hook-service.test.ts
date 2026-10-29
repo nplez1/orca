@@ -194,14 +194,32 @@ describe('MuseHookService', () => {
     const remote = createAgentHookMemorySftp()
     const service = new MuseHookService()
     expect((await service.installRemote(remote.sftp, '/home/alice smith')).state).toBe('installed')
-    const remoteHooksPath = '/home/alice smith/.orca/agent-hooks/muse-hooks.json'
+    const remoteHooksPath = '/home/alice smith/.orca-np/agent-hooks/muse-hooks.json'
     const installed = remote.fs.files.get(remoteHooksPath)
-    expect(installed).toContain('/home/alice smith/.orca/agent-hooks/muse-hook.sh')
+    expect(installed).toContain('/home/alice smith/.orca-np/agent-hooks/muse-hook.sh')
     expect(installed).not.toMatch(/powershell|EncodedCommand|muse-hook.cmd/)
-    expect(remote.fs.files.get('/home/alice smith/.orca/agent-hooks/muse-hook.sh')).toContain(
+    expect(remote.fs.files.get('/home/alice smith/.orca-np/agent-hooks/muse-hook.sh')).toContain(
       '#!/bin/sh'
     )
     await service.installRemote(remote.sftp, '/home/alice smith')
     expect(remote.fs.files.get(remoteHooksPath)).toBe(installed)
+  })
+
+  // Why: an earlier build of this fork, and an official install, register the same `.orca` pointer on a
+  // remote host, so neither can be taken over — but the status has to say which file it found.
+  it('names a pre-rename or official pointer instead of claiming the user owns it', async () => {
+    const remote = createAgentHookMemorySftp()
+    const stalePointer = '/home/alice/.orca/agent-hooks/muse-hooks.json'
+    remote.fs.files.set(
+      '/home/alice/.config/muse/settings.json',
+      `${JSON.stringify({ managed_hooks_path: stalePointer }, null, 2)}\n`
+    )
+
+    const status = await new MuseHookService().installRemote(remote.sftp, '/home/alice')
+
+    expect(status.state).toBe('not_installed')
+    expect(status.detail).toContain(stalePointer)
+    expect(status.detail).toMatch(/pre-rename or official Orca registration/)
+    expect(remote.fs.files.get('/home/alice/.config/muse/settings.json')).toContain(stalePointer)
   })
 })
