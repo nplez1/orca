@@ -629,14 +629,15 @@ signature that identifies it. None imports a module this fork changed.
 - `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
   `src/main/persistence/profile-state/profile-state-streaming-validation.test.ts` ("cannot add
   rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
-  assume; neither file is imported by anything this fork touches. **Both diagnoses were wrong, and
-  both cases are gone (2026-10-29).** Neither was a bundled-binding difference: upstream #34661
-  (`e5f1eef466`) deleted the first, because Node 26.10 binds an explicit `undefined` as NULL so the
-  contract it asserted no longer existed, and rebuilt the second to shadow the rowid aliases through
-  `CREATE TABLE` instead of an `ALTER TABLE … ADD COLUMN` alias, which SQLite 3.54 refuses. Both were
-  Node runtime changes every machine took, not something "the bundled SQLite" did to this fork alone,
-  and the second now runs 16/16 green. That is what made the first one dangerous: a dead entry can
-  never be reported stale.
+  assume; neither file is imported by anything this fork touches. **Both are closed, and the second
+  diagnosis was wrong about the cause (2026-10-29).** The rowid case did fail on SQLite 3.54's refusal
+  to add a `rowid` alias by `ALTER TABLE … ADD COLUMN` — that part held — but the upgrade came in with a
+  Node release every machine took, so the fix was to update the test, not to allowlist it; upstream
+  #34661 (`e5f1eef466`) rebuilt it to shadow the aliases through `CREATE TABLE`. The undefined-bindings
+  case was the same story with a different ending: #34661 deleted it, because Node 26.10 binds an
+  explicit `undefined` as NULL, so the contract it asserted no longer existed. Neither was something
+  "the bundled SQLite" did to this fork alone, and that is what made the first one dangerous: a dead
+  entry can never be reported stale.
 - `src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
   output", the PTY/subprocess class recorded above.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
@@ -922,9 +923,10 @@ could not split.
 It is fork-local: upstream keeps `pnpm lint`'s exit code and CI is unchanged.
 `tests/tools/lint-gate.test.mjs` covers the chain reader, the per-step failure split and the
 classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: the whole chain is
-~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is **not**
-empty: it holds two entries, both under `lint:ast-grep-gates` (see `local(lint)` below). It is the place
-a future red on the base branch gets recorded with its evidence instead of being re-derived by hand.
+~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is now
+**empty**: its two entries were fixed in the tree on 2026-10-29 rather than allowlisted (see
+`local(lint)` below). It is the place a future red on the base branch gets recorded with its evidence
+instead of being re-derived by hand.
 This file stays the evidence and the JSON the assertion, as with the unit red set.
 
 ### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
@@ -1304,7 +1306,7 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   two — `tests/e2e/helpers/persisted-profile-state.unit.test.ts` and
   `src/main/ai-vault-search/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
   scan does not follow, so they really were running under Bun; both are now listed in
-  `NODE_RUNTIME_INCLUDE` with the reason, and both pass (42/42 and 3/3) where they failed 1/42 and 2/3.
+  `NODE_RUNTIME_INCLUDE` with the reason, and both pass (3/3 and 42/42) where they failed 2/3 and 1/42.
   `vitest-node-runtime-boundary.test.ts` pins the two entries, because nothing else would notice their
   removal. The hazard the audit named is the real reason this mattered: the entries' `match`,
   `Unable to read profile state database`, is exactly what a genuine profile-state open regression
@@ -1744,9 +1746,10 @@ test fix that will conflict once, benignly, when upstream makes the same change 
 upstream itself made in #33540. **The `sqlite-binding` class is now empty too**: 40 entries at the
 2026-10-26 baseline, 17 after that repair, and **8 today, all `host-toolchain`** — the dev-rebuild
 timeouts (6), the bun `fs.rm` on a read-only directory (1) and one facade case (1). The nine
-`sqlite-binding` entries went on 2026-10-29: six because the suites were re-seated or re-routed into
-the Node project (`a886dcd1fe9`, and `2ecae9a7470`), three because upstream #34661 (`e5f1eef466`)
-deleted or rebuilt the cases they named. The `host-toolchain` entries that were bash 3.2 rather than
+`sqlite-binding` entries went on 2026-10-29: seven because the suites were re-seated or re-routed into
+the Node project (`a886dcd1fe9` for the four topology cases, and `2ecae9a7470` for the three the
+import scan had never classified), two because upstream #34661 (`e5f1eef466`) deleted or rebuilt the
+cases they named. The `host-toolchain` entries that were bash 3.2 rather than
 bun or SQLite are gone with the bash install recorded above.
 
 **The manifest can now notice its own dead entries.** `local/gate-unit.mjs` derives staleness only
@@ -1804,9 +1807,9 @@ whole-step `lint-known-red.json` entry covering six lines (one `max-lines` error
 `docs/site` warnings from `6aba202d5e`). `d96a57ffc6` recorded it as stale on the 2026-10-28 sync and
 pruned it, and that commit's own note in `local/lint-known-red.json` says so — but the section describing
 it stayed behind, saying of itself "delete the entry and this section". Both are gone now.
-`local/lint-known-red.json` holds two entries, each narrowed by `match` to one rule and path, both under
-`lint:ast-grep-gates`. Nothing in the file covers a whole step any more, which is what the file's own note
-asks for.
+`local/lint-known-red.json` is empty as of 2026-10-29: both entries it held under `lint:ast-grep-gates`
+were fixed in the tree with fake timers rather than allowlisted, so nothing in the file covers a whole
+step — or any step at all. The file keeps its note and its mechanism for the next base-branch red.
 
 ## Syncing with upstream
 

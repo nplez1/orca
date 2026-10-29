@@ -604,9 +604,15 @@ describe('ChecksList expanded check details', () => {
     expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
     expect(container.textContent).toContain('Verify failed')
     expect(container.textContent).not.toContain('Loading check details…')
-    // Why the advance: the refreshing label is deferred, so a fast read never flashes it.
+    // Why both assertions: the label is *deferred*, so proving it appears says nothing unless it is
+    // also absent before the delay. With the clock faked, the pair is what pins `useDelayedFlag`.
+    expect(container.textContent).not.toContain('Refreshing check details…')
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(250)
+      await vi.advanceTimersByTimeAsync(199)
+    })
+    expect(container.textContent).not.toContain('Refreshing check details…')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(51)
     })
     expect(container.textContent).toContain('Refreshing check details…')
 

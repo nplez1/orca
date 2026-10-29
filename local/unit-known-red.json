@@ -877,14 +877,14 @@
       "test": "reads committed SQLite and changes stopped fixtures without rewriting retained JSON",
       "class": "sqlite-binding",
       "commit": "2ecae9a7470",
-      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4`s WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
+      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4's WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
     },
     {
       "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
       "test": "refuses a fixture write while a runtime is admitted and releases the refused owner",
       "class": "sqlite-binding",
       "commit": "2ecae9a7470",
-      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4`s WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
+      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4's WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
     },
     {
       "file": "src/main/runtime/editor-view-layout-apply.test.ts",
@@ -919,7 +919,7 @@
       "test": "stops everything on close, including work already queued",
       "class": "sqlite-binding",
       "commit": "2ecae9a7470",
-      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4`s WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
+      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4's WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
     }
   ]
 }

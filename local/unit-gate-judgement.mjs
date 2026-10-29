@@ -251,10 +251,29 @@ export function collectedQuarantinedFiles(report, quarantined) {
     .filter((file) => set.has(file))
 }
 
-// `%s`, `%d` … and `$name` are what Vitest substitutes into an `it.each` title.
-const SUBSTITUTION = /(%[sdifjoO#%]|\$\{[^}]*\})/
+// What Vitest substitutes into an `it.each` title: printf tokens, `$name` off a table row, and a
+// template literal's own interpolations.
+const SUBSTITUTION = /(%[$#sdifjoOp]|\$\{[^}]*\}|\$[A-Za-z_][\w.]*)/
 const MODIFIERS_WITH_ARGUMENTS = new Set(['each', 'for', 'runIf', 'skipIf'])
-const TITLE_CALLER = /\b(?:describe|it|test|suite)\b/g
+// Why the suffix: the repo also names its case tables `itRunsUnixShell.each(...)`, `testEach(...)`.
+const TITLE_CALLER = /\b(?:describe|it|test|suite)[\w$]*/g
+const NEVER_RUNS = new Set(['skip', 'todo'])
+const RELATIVE_SPECIFIER = /(['"`])((?:\.{1,2}\/)[^'"`\n]*)\1/g
+
+/**
+ * The relative modules a test file pulls its cases in from, so a title can be found where it is
+ * written rather than only in the file the entry names: `orca-runtime.test.ts` does `await
+ * import('./orca-runtime-tests/x.spec')`. Callers read those files; this function stays pure.
+ */
+export function importedCaseSpecifiers(source) {
+  return [
+    ...new Set(
+      [...source.matchAll(RELATIVE_SPECIFIER)]
+        .map((match) => match[2])
+        .filter((specifier) => specifier.includes('.spec'))
+    )
+  ]
+}
 
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -317,10 +336,15 @@ function collectTitles(source) {
   const tests = []
   for (const caller of source.matchAll(TITLE_CALLER)) {
     let index = skipSpace(source, caller.index + caller[0].length)
+    let runs = true
     while (source[index] === '.') {
       index = skipSpace(source, index + 1)
       const name = /^[\w$]+/.exec(source.slice(index))?.[0] ?? ''
       index = skipSpace(source, index + name.length)
+      // Why: a skipped or todo case never fails, so its title cannot be a known red.
+      if (NEVER_RUNS.has(name)) {
+        runs = false
+      }
       if (source[index] === '<') {
         const end = source.indexOf('>', index)
         index = skipSpace(source, end === -1 ? index : end + 1)
@@ -331,12 +355,12 @@ function collectTitles(source) {
         index = skipSpace(source, close === -1 ? index : close + 1)
       }
     }
-    if (source[index] !== '(') {
+    if (!runs || source[index] !== '(') {
       continue
     }
     const literal = readLiteral(source, skipSpace(source, index + 1))
     if (literal) {
-      ;(caller[0] === 'describe' ? describes : tests).push(literal.text)
+      ;(caller[0].startsWith('describe') ? describes : tests).push(literal.text)
     }
   }
   return { describes, tests }
@@ -349,6 +373,11 @@ function collectTitles(source) {
  * Why this exists: `gate-unit.mjs` derives staleness only from entries that matched a failure, so an
  * entry whose test was deleted is structurally invisible — it sits in the manifest for ever, and the
  * run that would disprove it costs 25 minutes. A static check catches the same rot at PR time.
+ *
+ * It over-approximates on purpose: the cost of a false "still there" is that rot hides until the next
+ * full run, while the cost of a false "dead" is a live entry deleted. `source` may therefore be the
+ * file plus the `.spec` modules it imports, and a title surviving only in a comment still counts as
+ * present — the one shape this check cannot tell apart without parsing.
  */
 export function titleExistsInSource(title, source) {
   const { describes, tests } = collectTitles(source)

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { forkTestFiles } from '../../local/gate-unit.mjs'
 import { quarantinedFiles } from '../../local/unit-lane-files.mjs'
@@ -7,6 +7,7 @@ import {
   allowlistEntries,
   collectCases,
   collectedQuarantinedFiles,
+  importedCaseSpecifiers,
   judge,
   judgeUnhandled,
   prunableEntries,
@@ -355,6 +356,24 @@ describe('a title the file can still produce', () => {
     expect(
       titleExistsInSource('SQLite runtime contract rejects a before changing rows', source)
     ).toBe(true)
+    // Why both forms: a `$name` from a table row is substituted the same way as a printf token.
+    const rows = `it.each([{ name: 'macos' }])('launches through the $name launcher', () => {})`
+    expect(titleExistsInSource('launches through the macos launcher', rows)).toBe(true)
+    expect(titleExistsInSource('launches through the $name launcher', rows)).toBe(true)
+  })
+
+  it('covers the shapes this repo writes titles in', () => {
+    const nested = `describe('outer', () => { describe('inner', () => { it('deep case', () => {}) }) })`
+    expect(titleExistsInSource('outer inner deep case', nested)).toBe(true)
+    // `src/main/cli/packaged-cli-assets.test.ts` names its table `itRunsUnixShell`.
+    const aliased = `itRunsUnixShell.each([['a']])('runs %s', () => {})`
+    expect(titleExistsInSource('runs a', aliased)).toBe(true)
+    const generic = `it.each<[string]>([['a']])('runs %s', () => {})`
+    expect(titleExistsInSource('runs a', generic)).toBe(true)
+    const quoted = `describe("main's store", () => { it('keeps a tab\\'s view', () => {}) })`
+    expect(titleExistsInSource("main's store keeps a tab's view", quoted)).toBe(true)
+    const template = 'it(`reads ${n} rows`, () => {})'
+    expect(titleExistsInSource('reads 3 rows', template)).toBe(true)
   })
 
   it('reports a title the file no longer names, which is the rot this catches', () => {
@@ -365,6 +384,46 @@ describe('a title the file can still produce', () => {
     expect(
       titleExistsInSource('Sync database contract admits the actual runtime driver', source)
     ).toBe(false)
+    // Why: a skipped or todo case never fails, so an entry naming one can never be a known red.
+    expect(titleExistsInSource('old case', `it.skip('old case', () => {})`)).toBe(false)
+    expect(titleExistsInSource('later case', `it.todo('later case')`)).toBe(false)
+    expect(titleExistsInSource('old case', `describe('outer', () => {})`)).toBe(false)
+  })
+})
+
+const SPEC_EXTENSIONS = ['', '.ts', '.tsx', '.mts', '.cts', '.mjs', '.js']
+
+/** A test file's own source plus the `.spec` modules it imports its cases from. */
+function sourceWithImportedCases(file) {
+  const absolute = join(ROOT, file)
+  if (!existsSync(absolute)) {
+    return ''
+  }
+  const source = readFileSync(absolute, 'utf8')
+  const parts = [source]
+  for (const specifier of importedCaseSpecifiers(source)) {
+    for (const extension of SPEC_EXTENSIONS) {
+      const candidate = join(dirname(absolute), `${specifier}${extension}`)
+      if (existsSync(candidate)) {
+        parts.push(readFileSync(candidate, 'utf8'))
+        break
+      }
+    }
+  }
+  return parts.join('\n')
+}
+
+describe('a title imported from a spec module', () => {
+  it('is found where the spec module writes it', () => {
+    // Why this shape: `src/main/runtime/orca-runtime.test.ts` pulls every case in through
+    // `await import('./orca-runtime-tests/x.spec')`, so the entry's own file names no title at all.
+    const file = 'src/main/runtime/orca-runtime.test.ts'
+    const title =
+      'OrcaRuntimeService keeps existing-folder imports split by runtime host on the same normalized path'
+    expect(importedCaseSpecifiers(sourceWithImportedCases(file)).length).toBeGreaterThan(0)
+    expect(titleExistsInSource(title, sourceWithImportedCases(file))).toBe(true)
+    // The same title in the file alone, to prove the follow is what found it.
+    expect(titleExistsInSource(title, readFileSync(join(ROOT, file), 'utf8'))).toBe(false)
   })
 })
 
@@ -373,10 +432,7 @@ describe('the known-red manifest', () => {
     // Why: the gate learns staleness only from an entry that matched a failure, so an entry for a
     // deleted test never surfaces — it sits in the manifest for as long as nobody re-reads the file.
     const dead = manifest.entries
-      .filter((entry) => {
-        const file = join(ROOT, entry.file)
-        return !titleExistsInSource(entry.test, existsSync(file) ? readFileSync(file, 'utf8') : '')
-      })
+      .filter((entry) => !titleExistsInSource(entry.test, sourceWithImportedCases(entry.file)))
       .map((entry) => `${entry.file} › ${entry.test}`)
     expect(dead).toEqual([])
   })
