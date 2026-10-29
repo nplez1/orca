@@ -28,10 +28,7 @@ export function TaskPageJiraIssueTitleField({
     !newJiraIssueBody.trim() || !newJiraIssueTargetProject?.siteId || newJiraIssueSubmitting
   return (
     <div className="flex flex-col gap-1">
-      <label
-        htmlFor="new-jira-issue-title"
-        className="text-[11px] font-medium text-muted-foreground"
-      >
+      <label htmlFor="new-jira-issue-title" className="text-2xs font-medium text-muted-foreground">
         {translate('auto.components.TaskPage.16cba35bee', 'Title')}
       </label>
       <div className="flex items-center gap-1">

@@ -59,14 +59,18 @@ function renderBar({
         transitionsError={null}
         reloadTransitions={vi.fn()}
         priorities={[]}
+        prioritiesError={null}
         users={[]}
         editFields={[]}
         editFieldsLoading={false}
+        editFieldsError={null}
+        reloadEditFields={vi.fn()}
         selfUser={null}
         providerSettings={defaultScopeHost(null)}
         owner={{ kind: 'local' }}
         runtimeContextKey="local#0"
         sprintAssignment={assignment}
+        sprintAssignmentError={null}
         mutateIssue={mutateIssue}
         submitIssueFields={async () => ({ ok: true })}
       />

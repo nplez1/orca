@@ -2,7 +2,7 @@ import { buildJiraCreateTextAdf } from '@/components/jira-create-adf'
 import { JIRA_TEXT_FIELDS_RUNTIME_CAPABILITY } from '../../../shared/jira-runtime-capabilities'
 import type { JiraIssueUpdate } from '../../../shared/jira/jira-types'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
-import { runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
+import { jiraCapabilityProbeForTarget, type JiraCapabilityProbe } from './jira-capability-probe'
 
 export type JiraTextFields = {
   values?: Record<string, unknown>
@@ -15,23 +15,17 @@ export type JiraTextFields = {
  * wants wiki text, v3 ADF); a host from before it would pass the plain value
  * straight to v3 and be rejected, so the renderer sends the ADF it used to.
  */
-export async function foldTextFieldsForTarget(
-  target: RuntimeClientTarget,
+export async function foldTextFieldsForCapabilities(
+  supports: JiraCapabilityProbe,
   values: Record<string, unknown> | undefined,
   textFieldKeys: readonly string[] | undefined
 ): Promise<JiraTextFields> {
   if (!values || !textFieldKeys || textFieldKeys.length === 0) {
     return { values, textFieldKeys: textFieldKeys ? [...textFieldKeys] : undefined }
   }
-  if (target.kind !== 'environment') {
-    return { values, textFieldKeys: [...textFieldKeys] }
-  }
-  const supported = await runtimeEnvironmentSupportsCapability(
-    target.environmentId,
-    JIRA_TEXT_FIELDS_RUNTIME_CAPABILITY,
-    30_000
-  ).catch(() => false)
-  if (supported) {
+  // Why the tolerant read: shaping must never fail a write, so an unanswerable
+  // capability question takes the conservative path and sends the ADF it used to.
+  if (await supports(JIRA_TEXT_FIELDS_RUNTIME_CAPABILITY).catch(() => false)) {
     return { values, textFieldKeys: [...textFieldKeys] }
   }
   const folded = { ...values }
@@ -44,17 +38,25 @@ export async function foldTextFieldsForTarget(
   return { values: folded, textFieldKeys: undefined }
 }
 
-/** Shapes both textarea payloads an update can carry for the host that will run it. */
-export async function foldIssueUpdateForTarget(
+export async function foldTextFieldsForTarget(
   target: RuntimeClientTarget,
+  values: Record<string, unknown> | undefined,
+  textFieldKeys: readonly string[] | undefined
+): Promise<JiraTextFields> {
+  return foldTextFieldsForCapabilities(jiraCapabilityProbeForTarget(target), values, textFieldKeys)
+}
+
+/** Shapes both textarea payloads an update can carry for the host that will run it. */
+export async function foldIssueUpdateForCapabilities(
+  supports: JiraCapabilityProbe,
   updates: JiraIssueUpdate
 ): Promise<JiraIssueUpdate> {
   const fields = updates.customFields
-    ? await foldTextFieldsForTarget(target, updates.customFields, updates.textFieldKeys)
+    ? await foldTextFieldsForCapabilities(supports, updates.customFields, updates.textFieldKeys)
     : null
   const transition = updates.transitionFields
-    ? await foldTextFieldsForTarget(
-        target,
+    ? await foldTextFieldsForCapabilities(
+        supports,
         updates.transitionFields,
         updates.transitionTextFieldKeys
       )
@@ -69,4 +71,11 @@ export async function foldIssueUpdateForTarget(
       ? { transitionFields: transition.values, transitionTextFieldKeys: transition.textFieldKeys }
       : {})
   }
+}
+
+export async function foldIssueUpdateForTarget(
+  target: RuntimeClientTarget,
+  updates: JiraIssueUpdate
+): Promise<JiraIssueUpdate> {
+  return foldIssueUpdateForCapabilities(jiraCapabilityProbeForTarget(target), updates)
 }

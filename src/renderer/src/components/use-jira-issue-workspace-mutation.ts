@@ -6,6 +6,8 @@ import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import type { JiraIssue, JiraMutationResult } from '../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { JiraWriteTimeoutError } from '@/runtime/jira-write-deadline'
 import { enqueueJiraIssueMutation, JiraMutationFailure } from './jira-issue-mutation-queue'
 import {
   editedJiraIssueFields,
@@ -123,12 +125,17 @@ export function useJiraIssueWorkspaceMutation({
           restoreSprintAssignment(previousSprintAssignment)
           await reloadSprintAssignment()
         }
+        // Why the timeout first: its message is the shared English constant, and the
+        // user needs the "check the value" wording rather than a raw transport string.
         const message =
-          error instanceof Error
-            ? error.message
-            : translate(
-                'auto.components.JiraIssueWorkspace.ea21952aa3',
-                'Failed to update Jira issue.'
+          error instanceof JiraWriteTimeoutError
+            ? translate('jira.issue.writeTimedOut', error.message)
+            : extractIpcErrorMessage(
+                error,
+                translate(
+                  'auto.components.JiraIssueWorkspace.ea21952aa3',
+                  'Failed to update Jira issue.'
+                )
               )
         // Why a flag rather than the field name: more than one surface mutates a
         // transition — the sheet's control reports the error inline, but the pane's

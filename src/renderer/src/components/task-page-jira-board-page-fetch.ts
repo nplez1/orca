@@ -3,6 +3,8 @@ import type { JiraBoardIssuePage } from '../../../shared/jira/jira-types'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-client'
 import { jiraListBoardIssues } from '@/runtime/runtime-jira-client'
+import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import type { TaskPageJiraBoardCachedPage } from './task-page-jira-board-cache'
 
 export const JIRA_BOARD_ISSUE_PAGE_SIZE = 100
@@ -13,7 +15,10 @@ const JIRA_BOARD_REVALIDATE_MAX_PAGES = 3
 export type JiraBoardIssueScope = { scope: 'sprint'; sprintId: string } | { scope: 'backlog' }
 
 export function describeJiraBoardPageError(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unable to load this Jira board.'
+  return extractIpcErrorMessage(
+    error,
+    translate('jira.board.loadFailed', 'Unable to load this Jira board.')
+  )
 }
 
 export function emptyJiraBoardPage(): TaskPageJiraBoardCachedPage {

@@ -144,3 +144,39 @@ describe('IssueAssigneeCombobox', () => {
     expect(onSelect).toHaveBeenCalledWith(ALICE)
   })
 })
+
+describe('IssueAssigneeCombobox roster read failure', () => {
+  it('reports the failure instead of claiming nobody is assignable', () => {
+    render(
+      <IssueAssigneeCombobox
+        label="Assignee"
+        roster={[]}
+        selected={[]}
+        rosterError="Failed to load the people assignable to this issue."
+        onSelect={() => {}}
+      />
+    )
+
+    openCombobox()
+
+    expect(screen.getByText('Failed to load the people assignable to this issue.')).toBeTruthy()
+    expect(screen.queryByText('No people found')).toBeNull()
+  })
+
+  it('leaves a typed query to the search it belongs to', () => {
+    render(
+      <IssueAssigneeCombobox
+        label="Assignee"
+        roster={[]}
+        selected={[]}
+        rosterError="Failed to load the people assignable to this issue."
+        onSelect={() => {}}
+      />
+    )
+
+    openCombobox()
+    fireEvent.change(screen.getByPlaceholderText('Search people'), { target: { value: 'ada' } })
+
+    expect(screen.queryByText('Failed to load the people assignable to this issue.')).toBeNull()
+  })
+})

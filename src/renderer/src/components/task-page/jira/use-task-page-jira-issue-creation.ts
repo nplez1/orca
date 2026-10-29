@@ -8,6 +8,7 @@ import { jiraCreateIssue } from '@/runtime/runtime-jira-user-fields-client'
 import { jiraGetIssue } from '@/runtime/runtime-jira-client'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { defaultCreationHost } from '@/lib/default-creation-host'
 export function useTaskPageJiraIssueCreation(model: TaskPageLinearIssueCreationModel) {
   const {
@@ -113,9 +114,10 @@ export function useTaskPageJiraIssueCreation(model: TaskPageLinearIssueCreationM
     } catch (error) {
       if (submitProviderRuntimeContextKey === providerRuntimeContextKeyRef.current) {
         toast.error(
-          error instanceof Error
-            ? error.message
-            : translate('auto.components.TaskPage.aec5feeb69', 'Failed to create Jira issue.')
+          extractIpcErrorMessage(
+            error,
+            translate('auto.components.TaskPage.aec5feeb69', 'Failed to create Jira issue.')
+          )
         )
       }
     } finally {

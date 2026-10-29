@@ -15,6 +15,7 @@ import {
   StoreBackedWorkspace
 } from './__mocks__/jira-issue-workspace-edit-fixture'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { JiraIssue, JiraMutationResult } from '../../../shared/jira/jira-types'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
@@ -159,8 +160,11 @@ describe('JiraIssueWorkspace optimistic edits', () => {
     runtimeMocks.jiraUpdateIssueForTarget.mockReturnValue(deferred<{ ok: true }>().promise)
     render(<StoreBackedWorkspace initial={initial} />)
     await flushPromises()
-    fireEvent.click(screen.getByRole('button', { name: 'High' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'No priority' }))
+    const user = userEvent.setup()
+    // The priority list is a DropdownMenu: it opens on a pointer press, and its rows are
+    // menuitems.
+    await user.click(screen.getByRole('button', { name: 'High' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'No priority' }))
     await act(async () => initialLoad.resolve(initial))
     await flushPromises()
     expect(screen.queryByRole('button', { name: 'High' })).toBeNull()

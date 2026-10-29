@@ -15,6 +15,7 @@ import {
   StoreBackedWorkspace
 } from './__mocks__/jira-issue-workspace-edit-fixture'
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
@@ -134,8 +135,10 @@ describe('JiraIssueWorkspace reopened issue edits', () => {
     await flushPromises()
     await act(async () => selectIssue(jiraIssue('First edit', { priority: high })))
     await flushPromises()
-    fireEvent.click(screen.getByRole('button', { name: 'High' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Low' }))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'High' }))
+    // The priority list is a DropdownMenu, so its rows are menuitems.
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Low' }))
     await flushPromises()
     await act(async () => oldSave.resolve({ ok: false, error: 'Title rejected' }))
     await flushPromises()

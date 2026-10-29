@@ -6,10 +6,13 @@ import type {
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { getJiraReadIdentity } from '@/store/slices/jira-read-coordination'
+import { JiraWriteTimeoutError } from '@/runtime/jira-write-deadline'
 import {
   editedJiraIssueFields,
+  jiraIssueFieldsLanded,
   jiraIssueRollbackPatch,
-  mergeJiraIssueHydration
+  mergeJiraIssueHydration,
+  type EditableJiraIssueField
 } from './jira-issue-workspace-hydration'
 
 type IssuePatchListener = (
@@ -131,27 +134,47 @@ export function enqueueJiraIssueMutation({
     await predecessor?.catch(() => undefined)
     let saved = false
     let refreshed = false
+    // Why deferred rather than thrown here: the publish below has to run first, so a
+    // rollback reaches the screen before the toast that explains it.
+    let failure: Error | null = null
+    // Fields a later queued edit already owns must survive the read that replaces this one.
+    const newerFields = (): Set<EditableJiraIssueField> =>
+      new Set(
+        write.pending
+          .filter((queued) => queued !== mutation)
+          .flatMap((queued) => editedJiraIssueFields(queued.patch))
+          .filter((field) => !(field in optimistic))
+      )
+    const revalidate = async (): Promise<JiraIssue | null> => {
+      const latest = await refresh().catch(() => null)
+      if (latest) {
+        write.confirmed = mergeJiraIssueHydration(latest, write.confirmed, newerFields())
+      }
+      return latest
+    }
     try {
       const result = await update()
       if (!result.ok) {
+        if (result.timedOut === true) {
+          throw new JiraWriteTimeoutError()
+        }
         throw new JiraMutationFailure(result.error, result.fieldErrors, result.errorMessages)
       }
       saved = true
       write.confirmed = { ...write.confirmed, ...optimistic }
-      try {
-        const latest = await refresh()
-        if (latest) {
-          const newerFields = new Set(
-            write.pending
-              .filter((queued) => queued !== mutation)
-              .flatMap((queued) => editedJiraIssueFields(queued.patch))
-              .filter((field) => !(field in optimistic))
-          )
-          write.confirmed = mergeJiraIssueHydration(latest, write.confirmed, newerFields)
-          refreshed = true
+      refreshed = (await revalidate()) !== null
+    } catch (error) {
+      if (error instanceof JiraWriteTimeoutError) {
+        // Why the read decides: the host may have committed a write nobody answered,
+        // and a blind rollback would show the old value for a saved one.
+        const latest = await revalidate()
+        refreshed = latest !== null
+        saved = latest !== null && jiraIssueFieldsLanded(latest, optimistic)
+        if (!saved) {
+          failure = error
         }
-      } catch {
-        // A failed refresh does not undo a successful save.
+      } else {
+        failure = error instanceof Error ? error : new Error(String(error))
       }
     } finally {
       write.pending.splice(write.pending.indexOf(mutation), 1)
@@ -175,6 +198,9 @@ export function enqueueJiraIssueMutation({
         'status' in optimistic && !write.pending.some((queued) => 'status' in queued.patch),
         saved && commentsChanged
       )
+    }
+    if (failure) {
+      throw failure
     }
   })()
   write.tail = request

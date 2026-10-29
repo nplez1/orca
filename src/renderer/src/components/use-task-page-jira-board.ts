@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TaskPageJiraBoardModel } from './task-page-jira-board-types'
 import type { JiraBoardOverview, JiraBoardSelection } from '../../../shared/jira/jira-types'
 import { jiraGetBoardOverview } from '@/runtime/runtime-jira-client'
+import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import {
   filterTaskPageJiraBoardIssues,
   getTaskPageJiraBoardViewerAccountId,
@@ -21,7 +23,10 @@ import {
 } from './jira-board-view-storage'
 
 function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unable to load this Jira board.'
+  return extractIpcErrorMessage(
+    error,
+    translate('jira.board.loadFailed', 'Unable to load this Jira board.')
+  )
 }
 
 /**

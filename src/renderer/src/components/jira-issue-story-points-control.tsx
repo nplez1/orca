@@ -14,7 +14,7 @@ import type {
 } from '../../../shared/jira/jira-types'
 
 const TRIGGER_CLASS =
-  'flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50'
+  'flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50'
 
 export type JiraStoryPointsMutation = (
   field: string,
@@ -241,7 +241,7 @@ export function JiraStoryPointsEditorForm({
         <p
           id={messageId}
           role={problem ? 'alert' : undefined}
-          className={problem ? 'text-[11px] text-destructive' : 'text-[11px] text-muted-foreground'}
+          className={problem ? 'text-2xs text-destructive' : 'text-2xs text-muted-foreground'}
         >
           {message}
         </p>
@@ -288,7 +288,7 @@ export function JiraIssueStoryPointsControl({
   if (!editor.pointsField) {
     return editor.points === undefined ? null : (
       <span
-        className="px-1.5 py-0.5 text-[11px] text-muted-foreground"
+        className="px-1.5 py-0.5 text-2xs text-muted-foreground"
         title={pointsTitle(editor.points)}
       >
         {jiraStoryPointsChipLabel(editor.points)}

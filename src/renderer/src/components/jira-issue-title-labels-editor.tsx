@@ -24,7 +24,7 @@ export function JiraIssueTitleLabelsEditor({
 }): React.JSX.Element {
   return (
     <div className="grid gap-2">
-      <label className="text-[11px] font-medium text-muted-foreground">
+      <label className="text-2xs font-medium text-muted-foreground">
         {translate('auto.components.JiraIssueWorkspace.444865b4a8', 'Title')}
       </label>
       <div className="flex gap-2">
@@ -52,7 +52,7 @@ export function JiraIssueTitleLabelsEditor({
           )}
         </Button>
       </div>
-      <label className="mt-2 text-[11px] font-medium text-muted-foreground">
+      <label className="mt-2 text-2xs font-medium text-muted-foreground">
         {translate('auto.components.JiraIssueWorkspace.aee97b6913', 'Labels')}
       </label>
       <div className="flex gap-2">

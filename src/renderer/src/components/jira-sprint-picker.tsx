@@ -56,7 +56,7 @@ function SprintOptionBody({
         {current ? <Check className="size-3.5" /> : null}
       </span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {state ? <span className="shrink-0 text-[10px] text-muted-foreground">{state}</span> : null}
+      {state ? <span className="shrink-0 text-3xs text-muted-foreground">{state}</span> : null}
     </>
   )
 }

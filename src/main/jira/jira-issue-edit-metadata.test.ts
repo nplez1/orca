@@ -351,4 +351,13 @@ describe('Jira issue edit metadata', () => {
     expect(await listEditFields('ALP-1')).toEqual([])
     expect(jiraRequestMock).not.toHaveBeenCalled()
   })
+
+  it('reports the failure to a caller that asked for it instead of an empty form', async () => {
+    jiraRequestMock.mockRejectedValue(new Error('Jira returned 502'))
+    const { listEditFields } = await import('./issues')
+
+    await expect(listEditFields('ALP-1', 'site-1', true)).rejects.toThrow('Jira returned 502')
+    // The default stays the resilient read the other surfaces rely on.
+    await expect(listEditFields('ALP-1', 'site-1')).resolves.toEqual([])
+  })
 })

@@ -11,7 +11,7 @@ import {
 } from './jira-list-columns'
 import { getJiraPriorityTone } from './task-page-jira-status-tone'
 
-const MUTED_CELL = 'block truncate text-[12px] text-muted-foreground'
+const MUTED_CELL = 'block truncate text-xs text-muted-foreground'
 
 export function noPriorityLabel(): string {
   return translate('auto.components.TaskPage.713179dfdc', 'No priority')
@@ -42,8 +42,8 @@ function ParentCell({ issue }: { issue: JiraIssue }): React.JSX.Element {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-muted-foreground">
-          <span className="shrink-0 rounded-sm border border-border bg-muted px-1 font-mono text-[10px] text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="shrink-0 rounded-sm border border-border bg-muted px-1 font-mono text-3xs text-muted-foreground">
             {issue.parent.key}
           </span>
           <span className="truncate">{issue.parent.title}</span>
@@ -59,7 +59,7 @@ function ParentCell({ issue }: { issue: JiraIssue }): React.JSX.Element {
 
 function AssigneeCell({ issue }: { issue: JiraIssue }): React.JSX.Element {
   return (
-    <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
       {issue.assignee?.avatarUrl ? (
         <img
           src={issue.assignee.avatarUrl}
@@ -67,7 +67,7 @@ function AssigneeCell({ issue }: { issue: JiraIssue }): React.JSX.Element {
           className="size-5 shrink-0 rounded-full"
         />
       ) : (
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-[10px]">
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-3xs">
           {issue.assignee?.displayName?.slice(0, 1) ?? '-'}
         </span>
       )}
@@ -94,7 +94,7 @@ export function JiraIssueCell({
         <div className="flex min-w-0">
           <span
             className={cn(
-              'inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+              'inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-2xs font-medium',
               getStatusTone(issue.status.categoryKey)
             )}
           >
@@ -103,7 +103,7 @@ export function JiraIssueCell({
         </div>
       )
     case 'priority':
-      return <JiraPriorityText issue={issue} className="block truncate text-[12px]" />
+      return <JiraPriorityText issue={issue} className="block truncate text-xs" />
     case 'assignee':
       return <AssigneeCell issue={issue} />
     case 'parent':
@@ -132,7 +132,7 @@ export function JiraIssueCell({
       return (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="block min-w-0 truncate text-[12px] text-muted-foreground">
+            <div className="block min-w-0 truncate text-xs text-muted-foreground">
               {formatUpdatedAt(issue.updatedAt)}
             </div>
           </TooltipTrigger>

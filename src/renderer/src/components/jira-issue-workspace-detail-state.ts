@@ -174,6 +174,7 @@ export function useJiraIssueWorkspaceDetail({
     displayed,
     providerSettings,
     sourceContext,
+    editedFieldsRef,
     reloadTransitions,
     refreshSignal,
     setFullIssue
@@ -248,10 +249,14 @@ export function useJiraIssueWorkspaceDetail({
     transitionsLoading: sideData.transitionsLoading,
     transitionsError: sideData.transitionsError,
     priorities: sideData.priorities,
+    prioritiesError: sideData.prioritiesError,
     users: sideData.users,
+    usersError: sideData.usersError,
     editFields: sideData.editFields,
     editFieldsLoading: sideData.editFieldsLoading,
+    editFieldsError: sideData.editFieldsError,
     sprintAssignment: sideData.sprintAssignment,
+    sprintAssignmentError: sideData.sprintAssignmentError,
     pendingField,
     titleDraft,
     setTitleDraft,
@@ -269,6 +274,7 @@ export function useJiraIssueWorkspaceDetail({
     refresh,
     reload,
     reloadTransitions,
+    reloadEditFields,
     mutateIssue,
     submitIssueFields
   }

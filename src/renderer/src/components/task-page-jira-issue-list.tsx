@@ -138,7 +138,7 @@ export function TaskPageJiraIssueList({
                 <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
                   {section.label}
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
+                <span className="shrink-0 text-2xs text-muted-foreground">
                   {section.issues.length}
                 </span>
               </Button>

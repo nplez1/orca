@@ -8,6 +8,12 @@ import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
 import { useAppStore } from '@/store'
 import type { JiraComment, JiraIssue, JiraUser } from '../../../../shared/jira/jira-types'
@@ -47,9 +53,6 @@ function jiraCommentView(comment: JiraComment): IssueCommentView {
     body: comment.body
   }
 }
-
-const MENU_ITEM_CLASS =
-  'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent'
 
 /** Jira issue detail for the pane: a compact vertical property list built for
  *  the narrow sidebar, reusing the Task view's Jira hydration hook. */
@@ -144,6 +147,7 @@ export function JiraLinkedIssuePane({
               <IssueAssigneeCombobox
                 label={translate('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
                 roster={detail.users.map(jiraUserOption)}
+                rosterError={detail.usersError}
                 selected={displayed.assignee ? [jiraUserOption(displayed.assignee)] : []}
                 isSelf={viewerAccountId ? (option) => option.id === viewerAccountId : undefined}
                 search={searchAssignees}
@@ -181,6 +185,8 @@ export function JiraLinkedIssuePane({
                 issue={displayed}
                 fields={detail.editFields}
                 loading={detail.editFieldsLoading}
+                error={detail.editFieldsError}
+                onRetry={detail.reloadEditFields}
                 pending={detail.pendingField === 'fields'}
                 providerSettings={providerSettings}
                 onSubmit={detail.submitIssueFields}
@@ -246,8 +252,8 @@ function JiraPriorityRow({
 }): React.JSX.Element {
   const pending = detail.pendingField === 'priority'
   return (
-    <Popover>
-      <PopoverTrigger asChild>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <IssuePanePropertyRow
           label={translate('auto.components.right.sidebar.IssuePane.priority', 'Priority')}
           pending={pending}
@@ -262,31 +268,31 @@ function JiraPriorityRow({
             )
           }
         />
-      </PopoverTrigger>
-      <PopoverContent className="w-48" align="start">
-        <button
-          type="button"
-          onClick={() =>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-48" align="start">
+        <DropdownMenuItem
+          onSelect={() =>
             void detail.mutateIssue('priority', { priorityId: null }, { priority: undefined })
           }
-          className={MENU_ITEM_CLASS}
         >
           {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
-        </button>
-        {detail.priorities.map((priority) => (
-          <button
-            key={priority.id}
-            type="button"
-            onClick={() =>
-              void detail.mutateIssue('priority', { priorityId: priority.id }, { priority })
-            }
-            className={MENU_ITEM_CLASS}
-          >
-            <TaskPageJiraPriorityBadge priority={priority} />
-          </button>
-        ))}
-      </PopoverContent>
-    </Popover>
+        </DropdownMenuItem>
+        {detail.prioritiesError ? (
+          <p className="px-2 py-1.5 text-2xs text-destructive">{detail.prioritiesError}</p>
+        ) : (
+          detail.priorities.map((priority) => (
+            <DropdownMenuItem
+              key={priority.id}
+              onSelect={() =>
+                void detail.mutateIssue('priority', { priorityId: priority.id }, { priority })
+              }
+            >
+              <TaskPageJiraPriorityBadge priority={priority} />
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

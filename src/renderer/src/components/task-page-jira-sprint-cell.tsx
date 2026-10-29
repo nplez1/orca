@@ -43,7 +43,7 @@ export function JiraSprintCell({
           // open the issue.
           onClick={(event) => event.stopPropagation()}
           className={cn(
-            'inline-flex max-w-full items-center gap-1 rounded-full border border-dashed border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground transition hover:border-border hover:text-foreground disabled:opacity-50',
+            'inline-flex max-w-full items-center gap-1 rounded-full border border-dashed border-border/60 px-2 py-0.5 text-2xs text-muted-foreground transition hover:border-border hover:text-foreground disabled:opacity-50',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
           )}
         >

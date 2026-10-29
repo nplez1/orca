@@ -131,7 +131,7 @@ export function JiraUserMultiPicker({
                 <Check className="size-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{user.displayName}</span>
                 {user.email ? (
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{user.email}</span>
+                  <span className="shrink-0 text-3xs text-muted-foreground">{user.email}</span>
                 ) : null}
               </CommandItem>
             ))}
@@ -146,7 +146,7 @@ export function JiraUserMultiPicker({
                 <Check className="size-3.5 shrink-0 opacity-0" />
                 <span className="min-w-0 flex-1 truncate">{user.displayName}</span>
                 {user.email ? (
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{user.email}</span>
+                  <span className="shrink-0 text-3xs text-muted-foreground">{user.email}</span>
                 ) : null}
               </CommandItem>
             ))}

@@ -153,4 +153,74 @@ describe('web Jira preload API', () => {
     await expect(api.jira.cancelGenerateIssueSummary(request)).resolves.toBeUndefined()
     expect(runtimeCalls).toEqual([])
   })
+
+  describe('issue writes on an older server', () => {
+    function mockHost(capabilities: string[]): RuntimeCall[] {
+      return mockRuntimeClient((method) =>
+        method === 'status.get' ? { capabilities } : { ok: true }
+      )
+    }
+
+    it('refuses transition fields the paired server would drop', async () => {
+      const runtimeCalls = mockHost(['jira.text-fields.v1'])
+      const {
+        window: { api }
+      } = await installApi()
+
+      await expect(
+        api.jira.updateIssue({
+          key: 'ORCA-1',
+          siteId: 'site-1',
+          updates: { transitionId: '31', transitionFields: { resolution: { id: '1' } } }
+        })
+      ).rejects.toThrow(
+        'Update the remote Orca server to submit required transition fields, or complete the transition in Jira.'
+      )
+      expect(runtimeCalls.map((call) => call.method)).toEqual(['status.get'])
+    })
+
+    it('shapes a plain-text field for a server that cannot convert it', async () => {
+      const runtimeCalls = mockHost([])
+      const {
+        window: { api }
+      } = await installApi()
+
+      await api.jira.updateIssue({
+        key: 'ORCA-1',
+        siteId: 'site-1',
+        updates: { customFields: { customfield_7: 'plain' }, textFieldKeys: ['customfield_7'] }
+      })
+
+      expect(runtimeCalls.at(-1)).toEqual({
+        method: 'jira.updateIssue',
+        params: {
+          key: 'ORCA-1',
+          siteId: 'site-1',
+          updates: {
+            customFields: { customfield_7: expect.objectContaining({ type: 'doc' }) },
+            textFieldKeys: undefined
+          }
+        }
+      })
+    })
+
+    it('leaves the payload alone when the server converts it itself', async () => {
+      const runtimeCalls = mockHost(['jira.text-fields.v1', 'jira.transition-fields.v1'])
+      const {
+        window: { api }
+      } = await installApi()
+      const updates = {
+        transitionId: '31',
+        transitionFields: { customfield_7: 'plain' },
+        transitionTextFieldKeys: ['customfield_7']
+      }
+
+      await api.jira.updateIssue({ key: 'ORCA-1', siteId: 'site-1', updates })
+
+      expect(runtimeCalls.at(-1)).toEqual({
+        method: 'jira.updateIssue',
+        params: { key: 'ORCA-1', siteId: 'site-1', updates }
+      })
+    })
+  })
 })

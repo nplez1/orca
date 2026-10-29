@@ -114,7 +114,7 @@ export function TaskPageJiraIssueDialog({
         <div className="flex flex-col gap-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-muted-foreground">
+              <label className="text-2xs font-medium text-muted-foreground">
                 {translate('auto.components.TaskPage.00022ec0ba', 'Project')}
               </label>
               <Popover
@@ -200,7 +200,7 @@ export function TaskPageJiraIssueDialog({
               </Popover>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-muted-foreground">
+              <label className="text-2xs font-medium text-muted-foreground">
                 {translate('auto.components.TaskPage.ae592fee62', 'Issue type')}
               </label>
               <Select
@@ -233,7 +233,7 @@ export function TaskPageJiraIssueDialog({
           </div>
           <TaskPageJiraIssueTitleField model={model} />
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">
+            <label className="text-2xs font-medium text-muted-foreground">
               {translate('auto.components.TaskPage.f161bf9ede', 'Description (optional)')}
             </label>
             <textarea
@@ -263,7 +263,7 @@ export function TaskPageJiraIssueDialog({
                 const fieldValue = newJiraIssueCustomFieldValues[field.key] ?? ''
                 return (
                   <div key={field.key} className="flex min-w-0 flex-col gap-1">
-                    <label className="text-[11px] font-medium text-muted-foreground">
+                    <label className="text-2xs font-medium text-muted-foreground">
                       {field.name}
                     </label>
                     {isJiraScalarUserCreateField(field) && !field.allowedValues?.length ? (
@@ -306,7 +306,7 @@ export function TaskPageJiraIssueDialog({
               })}
             </div>
           ) : null}
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-3xs text-muted-foreground">
             {submitShortcutLabel} {translate('auto.components.TaskPage.fc0d8a1fa4', 'to submit.')}
           </p>
         </div>
