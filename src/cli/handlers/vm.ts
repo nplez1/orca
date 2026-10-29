@@ -5,11 +5,9 @@ import { RuntimeClientError } from '../runtime-client'
 import { parseOrcaYaml } from '../../shared/orca-yaml'
 import {
   getEphemeralVmRecipeResultProjectRoot,
-  type EphemeralVmRecipeDoctorCheck,
-  type EphemeralVmRecipeResult
+  type EphemeralVmRecipeDoctorCheck
 } from '../../shared/ephemeral-vm-recipes'
 import { getEphemeralVmRecipeResultWarnings } from '../../shared/ephemeral-vm-recipe-diagnostics'
-import { writeDurableSecureJsonFile } from '../../shared/secure-file'
 // Why: import directly from the doctor module (not the barrel) — it uses Node
 // fs/path and must stay out of the browser bundle that imports the barrel.
 import { doctorEphemeralVmRecipe } from '../../shared/ephemeral-vm-recipe-doctor'
@@ -22,7 +20,8 @@ import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import {
   describeSensitiveExtendResult,
   extendEphemeralVmRecipeFromFile,
-  formatExtendEphemeralVmRecipeResult
+  formatExtendEphemeralVmRecipeResult,
+  writeEphemeralVmRecipeResultFile
 } from '../vm-recipe-extend'
 import {
   buildProvisionFailureRemediation,
@@ -73,10 +72,16 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
           })
         : { recipeId, repoPath, ok: false as const, error: loaded.error }
     const writeResultPath = getStringFlag(flags, 'write-result')
-    const writtenResultPath =
-      writeResultPath && result.ok && result.recipeResult
-        ? writeExtendResult(resolve(cwd, writeResultPath), result.recipeResult)
+    const resultPath = writeResultPath ? resolve(cwd, writeResultPath) : null
+    const writeFailure =
+      resultPath && result.ok && result.recipeResult
+        ? writeEphemeralVmRecipeResultFile(resultPath, result.recipeResult)
         : null
+    if (writeFailure) {
+      // Why still report the result: the hook has already moved the lease, so this output is the
+      // only place the deadline that now exists can be read.
+      console.error(`warning: could not write ${resultPath}: ${writeFailure}`)
+    }
     if (json) {
       const sensitive = describeSensitiveExtendResult(result)
       if (sensitive) {
@@ -87,7 +92,7 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
       console.log(
         formatExtendEphemeralVmRecipeResult(
           result,
-          writtenResultPath ? { resultPath: writtenResultPath } : {}
+          resultPath && !writeFailure ? { resultPath } : {}
         )
       )
     } else {
@@ -95,7 +100,7 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
       // capture an error a destroy hook would then try to parse.
       console.error(formatExtendEphemeralVmRecipeResult(result))
     }
-    if (!result.ok) {
+    if (!result.ok || writeFailure) {
       process.exitCode = 1
     }
   },
@@ -305,14 +310,7 @@ function loadRecipe(
     : { error: `Recipe "${recipeId}" was not found in environmentRecipes.` }
 }
 
-/** Writes the updated result so a destroy hook — or a second `extend` — can consume it.
- *  Returns the path once written, and reports a write whose permissions stayed open. */
-function writeExtendResult(path: string, recipeResult: EphemeralVmRecipeResult): string {
-  if (!writeDurableSecureJsonFile(path, recipeResult)) {
-    console.error(`warning: wrote ${path}, but could not restrict its permissions to this user.`)
-  }
-  return path
-}
+/** Writes the updated result so a destroy hook — or a second `extend` — can consume it. */
 
 /**
  * What to tell the reader after a create that reported a failure.

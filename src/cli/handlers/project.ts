@@ -32,7 +32,7 @@ import {
 } from '../execution-host-flag'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../flags'
 import {
-  assertWorktreeLayoutApplied,
+  confirmWorktreeLayoutApplied,
   getOptionalWorktreeLayoutMode
 } from '../project-worktree-layout-flag'
 import { findProjectSetups, resolveProjectIdSelector } from '../project-selector'
@@ -208,7 +208,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
       'projectHostSetup.create',
       args
     )
-    assertWorktreeLayoutApplied(layoutMode, result.result.result)
+    confirmWorktreeLayoutApplied(layoutMode, result.result.result)
     printResult(result, json, formatProjectHostSetupCreateResult)
   },
   'project setup-update': async ({ flags, client, cwd, json }) => {
@@ -236,7 +236,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
       'projectHostSetup.update',
       args
     )
-    assertWorktreeLayoutApplied(layoutMode, result.result.result)
+    confirmWorktreeLayoutApplied(layoutMode, result.result.result)
     printResult(result, json, formatProjectHostSetupUpdateResult)
   },
   'project setup-delete': async ({ flags, client, json }) => {

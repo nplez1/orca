@@ -20,10 +20,9 @@ export const VM_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'Runs the recipe extend hook from the command line, without the desktop app, so a provider author can exercise it before relying on it.',
       'The recipe result is the JSON object the create script printed, saved to a file.',
-      'The lifetime must be one the recipe declares in extendDurations; the updated result is printed on stdout for the destroy hook to consume.',
+      'The lifetime must be one the recipe declares in extendDurations. `--write-result <file>` saves the updated result as JSON (written whole or not at all, mode 0600), which is what a destroy hook parses and what makes a second extend or destroy consume the new deadline instead of the stale lease. Point it at --recipe-result to replace the stored result in place.',
       'The hook is stopped after 120000 ms unless --timeout-ms says otherwise, and the command then fails with the transcript so a stuck hook cannot hang a script.',
-      'Pass --write-result <file> to save the updated result as JSON (written whole or not at all, mode 0600), which is what makes a second extend or a destroy hook consume the new deadline instead of the stale lease. Point it at --recipe-result to replace the stored result in place.',
-      'A failure goes to stderr and exits 1, so stdout stays consumable; every relative path resolves against the invoking directory.',
+      'stdout carries a readable summary, not that JSON, and a failure goes to stderr with exit 1, so a redirect never captures an error. Every relative path resolves against the invoking directory.',
       'Extending a live lease from the app also updates the persisted runtime; this command only reports what the hook produced.'
     ],
     examples: [

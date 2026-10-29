@@ -23,25 +23,32 @@ export function getOptionalWorktreeLayoutMode(
   )
 }
 
-/** Confirms the host applied `--worktree-layout` by comparing it with the mode the host
- *  reports in effect.
+/** Confirms the host applied `--worktree-layout` by comparing it with the mode the host reports
+ *  in effect.
  *
- *  A host built before this field — upstream Orca included — validates the setup params with a
- *  closed schema, so the unknown key is stripped and the call succeeds having changed nothing.
- *  Its answer therefore carries no mode, and that absence is the failure: reporting success for
- *  a placement change that did not happen is what leaves every project on that host unchanged. */
-export function assertWorktreeLayoutApplied(
+ *  A host that reports a different mode refused the flag, and that is an error. A host that
+ *  reports no mode at all is a build from before the field: it may have applied the setting (the
+ *  fork has accepted it since before this field existed) or stripped it (upstream does), and
+ *  nothing here can tell which — so it says so on stderr instead of claiming either. */
+export function confirmWorktreeLayoutApplied(
   requested: WorktreeLayoutMode | undefined,
   result: { worktreeLayoutMode?: WorktreeLayoutMode }
 ): void {
-  if (!requested || result.worktreeLayoutMode === requested) {
+  if (!requested) {
     return
   }
   const reported = result.worktreeLayoutMode
+  if (reported === requested) {
+    return
+  }
+  if (reported === undefined) {
+    console.error(
+      `warning: this host did not confirm --worktree-layout ${requested}. It predates that report, so the mode may or may not have applied; check its settings, or update Orca there. Any other change in this call did apply.`
+    )
+    return
+  }
   throw new RuntimeClientError(
     'incompatible_runtime',
-    reported === undefined
-      ? `This host did not apply --worktree-layout ${requested}: it cannot report its placement mode, so it predates the flag and ignored it. Update Orca on that host and try again.`
-      : `This host did not apply --worktree-layout ${requested}: it reports ${reported} in effect. Update Orca on that host, or set the mode in its settings.`
+    `This host did not apply --worktree-layout ${requested}: it kept ${reported}. Update Orca on that host, or set the mode in its settings.`
   )
 }

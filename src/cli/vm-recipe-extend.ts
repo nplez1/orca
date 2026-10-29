@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import {
   getEphemeralVmLifetimeLossError,
   getEphemeralVmRecipeResultLifetime,
@@ -206,7 +206,7 @@ export function formatExtendEphemeralVmRecipeResult(
   if (options.resultPath) {
     // Why a path and not the JSON: the file is what the destroy hook reads, and printing it here
     // as well would put the connection back on stdout.
-    lines.push(`result: ${options.resultPath} (mode 0600)`)
+    lines.push(`result: ${options.resultPath}`)
     return lines.join('\n')
   }
   // Why the warning: this is what the recipe's own `destroy` hook consumes on stdin, and it carries
@@ -232,6 +232,32 @@ export function describeSensitiveExtendResult(
   return pairingCode
     ? 'this result carries the connection, including its pairing code — handle as sensitive.'
     : null
+}
+
+/** Publishes the updated result where a destroy hook — or a second `extend` — reads it.
+ *
+ *  Atomic and 0600, but the file only: the shared secure-write helpers also harden the *parent*
+ *  directory to 0700, which would silently lock down the repo directory the caller wrote into
+ *  (and throw on a parent they do not own). The failure is returned rather than thrown, because
+ *  the hook has already moved the lease and the caller still has to see what it produced.
+ *
+ *  Returns the failure message, or null when the file holds the result. */
+export function writeEphemeralVmRecipeResultFile(
+  path: string,
+  result: EphemeralVmRecipeResult
+): string | null {
+  const temporary = `${path}.${process.pid}.tmp`
+  try {
+    writeFileSync(temporary, JSON.stringify(result, null, 2), { mode: 0o600 })
+    // The umask can strip bits from `mode` but never add them; chmod sets exactly 0o600.
+    chmodSync(temporary, 0o600)
+    // The rename publishes the staged inode, so the mode above is the published file's.
+    renameSync(temporary, path)
+    return null
+  } catch (error) {
+    rmSync(temporary, { force: true })
+    return error instanceof Error ? error.message : String(error)
+  }
 }
 
 function redactAndCap(value: string): string {

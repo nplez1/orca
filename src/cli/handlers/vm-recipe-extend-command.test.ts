@@ -153,9 +153,10 @@ describe('orca vm recipe extend', () => {
     expect(process.exitCode).toBe(1)
   })
 
-  it('writes the updated result for the destroy hook, mode 0600', async () => {
+  it('writes the updated result for the destroy hook, mode 0600, and leaves the parent alone', async () => {
     const caller = makeDir()
     makeRepo(caller)
+    chmodSync(caller, 0o755)
 
     const { stdout } = await runExtend(caller, [
       ['recipe-id', 'cloud-sandbox'],
@@ -165,16 +166,37 @@ describe('orca vm recipe extend', () => {
     ])
 
     const extendedPath = join(caller, 'extended.json')
-    expect(stdout.join('\n')).toContain(`result: ${extendedPath} (mode 0600)`)
+    expect(stdout.join('\n')).toContain(`result: ${extendedPath}`)
     // Why not the JSON: the file is what the hook reads, and printing it would put the
     // connection back on stdout.
     expect(stdout.join('\n')).not.toContain('"connection"')
     if (process.platform !== 'win32') {
       expect(statSync(extendedPath).mode & 0o777).toBe(0o600)
+      // Why: the shared secure-write helpers also chmod the parent to 0700, which would
+      // silently lock down the directory the caller wrote into.
+      expect(statSync(caller).mode & 0o777).toBe(0o755)
     }
     const parsed = parseEphemeralVmRecipeResult(readFileSync(extendedPath, 'utf8'))
     expect(parsed.ok).toBe(true)
     expect(parsed.ok && parsed.result.schemaVersion).toBe(1)
+  })
+
+  it('still reports the new deadline when the result file cannot be written', async () => {
+    // The hook has already moved the lease, so losing the output would hide the only record of
+    // the deadline that now exists.
+    const caller = makeDir()
+    makeRepo(caller)
+
+    const { stdout, stderr } = await runExtend(caller, [
+      ['recipe-id', 'cloud-sandbox'],
+      ['recipe-result', './result.json'],
+      ['lifetime', '4h'],
+      ['write-result', './absent-dir/extended.json']
+    ])
+
+    expect(stderr.join('\n')).toContain('warning: could not write')
+    expect(stdout.join('\n')).toContain('releaseAt: 2026-10-13T07:00:00Z')
+    expect(process.exitCode).toBe(1)
   })
 
   it('replaces the stored result in place when asked to', async () => {

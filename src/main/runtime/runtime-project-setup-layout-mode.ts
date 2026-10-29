@@ -1,10 +1,6 @@
 import type { RuntimeStore } from './runtime-store-contract'
 import type { Repo } from '../../shared/repo-types'
 import {
-  findProjectHostSetup,
-  type ProjectHostSetupTarget
-} from '../../shared/project-host-setup-target'
-import {
   layoutModeNestsWorkspaces,
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
@@ -55,49 +51,32 @@ export function applyProjectSetupWorktreeLayoutMode(
   return true
 }
 
-/** Applies the host-level mode a setup payload carries, and drops it from the payload.
+/** Checks this host can write the mode at all, and drops it from a setup payload.
  *
- *  The mode is host-wide, so `target` — the record the caller is writing — must exist before it
- *  is applied: writing it for a missing project or setup flips every project's placement on this
- *  host and the command then fails, leaving the flip behind. */
+ *  Applying it is a separate step, `applyAndReportWorktreeLayoutMode`, run only once the setup
+ *  write succeeded: the mode is host-wide, so a rejected project or setup must not have flipped
+ *  every project's placement on this host first. */
 export function takeWorktreeLayoutMode<T extends { worktreeLayoutMode?: WorktreeLayoutMode }>(
   deps: ProjectSetupLayoutModeDeps,
-  payload: T,
-  target: { projectId?: string; setup?: ProjectHostSetupTarget } = {}
+  payload: T
 ): Omit<T, 'worktreeLayoutMode'> {
   if (payload.worktreeLayoutMode) {
-    assertLayoutModeTargetExists(deps, target)
+    const store = deps.getStore()
+    if (!store?.updateSettings || !store.getSettings) {
+      throw new Error('runtime_unavailable')
+    }
   }
-  applyProjectSetupWorktreeLayoutMode(deps, payload.worktreeLayoutMode)
   const { worktreeLayoutMode: _mode, ...rest } = payload
   void _mode
   return rest
 }
 
-function assertLayoutModeTargetExists(
-  deps: ProjectSetupLayoutModeDeps,
-  target: { projectId?: string; setup?: ProjectHostSetupTarget }
-): void {
-  const store = deps.getStore()
-  const { projectId, setup } = target
-  if (projectId !== undefined && store?.getProjects) {
-    if (!store.getProjects().some((entry) => entry.id === projectId)) {
-      throw new Error(`Project not found: ${projectId}`)
-    }
-  }
-  if (setup && store?.getProjectHostSetups) {
-    if (!findProjectHostSetup(store.getProjectHostSetups(), setup)) {
-      throw new Error(`Project host setup not found: ${setup.setupId}`)
-    }
-  }
-}
-
-/** Adds the mode this host has in effect to a setup result, so the caller can prove the write
- *  landed instead of taking a success exit code for one.
+/** Applies the host-level mode a setup write carried, and adds the mode now in effect to the
+ *  result, so the caller can prove the write landed instead of taking an exit code for one.
  *
- *  Only a call that carried a mode carries one back: an unrelated setup edit is not a
- *  placement read. */
-export function withEffectiveLayoutMode<T extends object>(
+ *  Only a call that carried a mode carries one back: an unrelated setup edit is not a placement
+ *  read. A host that cannot report the mode — a build from before the field — answers without it. */
+export function applyAndReportWorktreeLayoutMode<T extends object>(
   deps: ProjectSetupLayoutModeDeps,
   requested: WorktreeLayoutMode | undefined,
   result: T
@@ -105,9 +84,7 @@ export function withEffectiveLayoutMode<T extends object>(
   if (!requested) {
     return result
   }
+  applyProjectSetupWorktreeLayoutMode(deps, requested)
   const settings = deps.getStore()?.getSettings?.()
-  if (!settings) {
-    return result
-  }
-  return { ...result, worktreeLayoutMode: resolveWorktreeLayoutMode(settings) }
+  return settings ? { ...result, worktreeLayoutMode: resolveWorktreeLayoutMode(settings) } : result
 }

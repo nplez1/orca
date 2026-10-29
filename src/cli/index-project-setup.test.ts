@@ -48,34 +48,24 @@ import {
   hostTargetStatusFixture,
   legacyProjectSetup,
   ORCA_PROJECT,
-  PROJECT_LIST_FIXTURE
+  PROJECT_LIST_FIXTURE,
+  setupLayoutFixture
 } from './index-project-setup-test-fixtures'
 
 const SETUP_UPDATE_FLAGS = ['project', 'setup-update', '--setup', 'setup-gpu']
 
-const SETUP_ROW = {
-  id: 'setup-gpu',
-  projectId: 'github:stablyai/orca',
-  hostId: 'runtime:gpu',
-  repoId: '',
-  path: '/srv/orca',
-  displayName: 'Orca',
-  setupState: 'ready',
-  setupMethod: 'provisioned',
-  createdAt: 1,
-  updatedAt: 2
-}
+const SETUP_CREATE_FLAGS = [
+  'project',
+  'setup-create',
+  '--project',
+  'github:stablyai/orca',
+  '--host',
+  'runtime:gpu',
+  '--setup-id',
+  'setup-gpu'
+]
 
-/** A `projectHostSetup.update` answer carrying the host-wide mode it left in effect. */
-function setupUpdateLayoutFixture(id: string, worktreeLayoutMode: string | undefined) {
-  return okFixture(id, {
-    result: {
-      project: { ...ORCA_PROJECT, sourceRepoIds: [] },
-      setup: SETUP_ROW,
-      ...(worktreeLayoutMode ? { worktreeLayoutMode } : {})
-    }
-  })
-}
+const GPU_SETUP_ROW = { id: 'setup-gpu', hostId: 'runtime:gpu', displayName: 'Orca' }
 
 describe('orca cli worktree awareness', () => {
   const priorExitCode = process.exitCode
@@ -697,7 +687,10 @@ describe('orca cli worktree awareness', () => {
 
   it('carries --worktree-layout through setup-update so the CLI can set host placement', async () => {
     pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
-    queueFixtures(callMock, setupUpdateLayoutFixture('req_layout_applied', 'project-folder'))
+    queueFixtures(
+      callMock,
+      setupLayoutFixture('req_layout_applied', GPU_SETUP_ROW, 'project-folder')
+    )
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
@@ -718,25 +711,39 @@ describe('orca cli worktree awareness', () => {
   })
 
   it.each([
-    [
-      'an answer carrying no mode, as a host that stripped the flag',
-      undefined,
-      'its placement mode'
-    ],
-    ['an answer carrying a different mode', 'repo-nested', 'it reports repo-nested in effect']
-  ])('fails when the host answers setup-update with %s', async (_case, mode, expected) => {
+    // Fork hosts before this field applied the setting without echoing it; upstream strips the
+    // key. Neither is a mismatch, so the command says what it cannot confirm and exits 0.
+    ['no mode, as a host that cannot confirm', undefined, 'did not confirm', undefined],
+    ['another mode', 'repo-nested', 'it kept repo-nested', 1]
+  ])('reports an answer carrying %s', async (_case, mode, expected, exitCode) => {
     pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
-    queueFixtures(callMock, setupUpdateLayoutFixture('req_layout_unapplied', mode))
+    queueFixtures(callMock, setupLayoutFixture('req_layout_answer', GPU_SETUP_ROW, mode))
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main([...SETUP_UPDATE_FLAGS, '--worktree-layout', 'flat', '--json'], '/tmp/repo')
 
     const printed = [...errSpy.mock.calls, ...logSpy.mock.calls].flat().join('\n')
-    expect(JSON.parse(printed).error.code).toBe('incompatible_runtime')
-    expect(printed).toContain('did not apply --worktree-layout flat')
     expect(printed).toContain(expected)
-    expect(process.exitCode).toBe(1)
+    expect(process.exitCode).toBe(exitCode)
+  })
+
+  it('confirms --worktree-layout on setup-create too', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
+    queueFixtures(
+      callMock,
+      PROJECT_LIST_FIXTURE,
+      setupLayoutFixture('req_create_layout', GPU_SETUP_ROW, 'flat')
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main([...SETUP_CREATE_FLAGS, '--worktree-layout', 'flat', '--json'], '/tmp/repo')
+
+    expect(callMock).toHaveBeenCalledWith(
+      'projectHostSetup.create',
+      expect.objectContaining({ worktreeLayoutMode: 'flat' })
+    )
+    expect(process.exitCode).toBeUndefined()
   })
 
   it('rejects an unknown --worktree-layout before contacting any runtime', async () => {

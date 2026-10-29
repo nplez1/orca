@@ -75,6 +75,8 @@ function makeController(
     setups?: ProjectHostSetup[]
     /** A store whose settings write silently does nothing, as an older host looks from here. */
     ignoreSettingsWrites?: boolean
+    /** The setup write itself fails, as a kind conversion or a validation refusal does. */
+    cleanupWriteFails?: boolean
   } = {}
 ): {
   controller: RuntimeProjectHostSetupController
@@ -95,50 +97,64 @@ function makeController(
       Object.assign(settings, updates)
     }
   })
-  const createProjectHostSetup = vi.fn((args: { projectId: string; hostId: string }) => ({
-    project: {
-      id: args.projectId,
-      displayName: 'Orca',
-      badgeColor: '#000',
-      sourceRepoIds: [],
-      createdAt: 1,
-      updatedAt: 1
-    },
-    setup: {
-      id: 'setup-1',
-      projectId: args.projectId,
-      hostId: args.hostId,
-      repoId: '',
-      path: '',
-      displayName: 'Orca',
-      setupState: 'not-set-up',
-      setupMethod: 'provisioned',
-      createdAt: 1,
-      updatedAt: 1
+  const createProjectHostSetup = vi.fn((args: { projectId: string; hostId: string }) => {
+    if (options.cleanupWriteFails) {
+      throw new Error('This folder project cannot be converted.')
     }
-  }))
-  const updateProjectHostSetup = vi.fn(() => ({
-    project: {
-      id: 'github:stablyai/orca',
-      displayName: 'Orca',
-      badgeColor: '#000',
-      sourceRepoIds: [],
-      createdAt: 1,
-      updatedAt: 1
-    },
-    setup: {
-      id: 'setup-1',
-      projectId: 'github:stablyai/orca',
-      hostId: 'local',
-      repoId: '',
-      path: '',
-      displayName: 'Orca',
-      setupState: 'ready',
-      setupMethod: 'provisioned',
-      createdAt: 1,
-      updatedAt: 2
+    // Why null: that is what the store answers for a project this host does not have.
+    if (options.projects && !options.projects.some((entry) => entry.id === args.projectId)) {
+      return null
     }
-  }))
+    return {
+      project: {
+        id: args.projectId,
+        displayName: 'Orca',
+        badgeColor: '#000',
+        sourceRepoIds: [],
+        createdAt: 1,
+        updatedAt: 1
+      },
+      setup: {
+        id: 'setup-1',
+        projectId: args.projectId,
+        hostId: args.hostId,
+        repoId: '',
+        path: '',
+        displayName: 'Orca',
+        setupState: 'not-set-up',
+        setupMethod: 'provisioned',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    }
+  })
+  const updateProjectHostSetup = vi.fn((args: { setupId: string }) => {
+    if (options.setups && !options.setups.some((entry) => entry.id === args.setupId)) {
+      return null
+    }
+    return {
+      project: {
+        id: 'github:stablyai/orca',
+        displayName: 'Orca',
+        badgeColor: '#000',
+        sourceRepoIds: [],
+        createdAt: 1,
+        updatedAt: 1
+      },
+      setup: {
+        id: 'setup-1',
+        projectId: 'github:stablyai/orca',
+        hostId: 'local',
+        repoId: '',
+        path: '',
+        displayName: 'Orca',
+        setupState: 'ready',
+        setupMethod: 'provisioned',
+        createdAt: 1,
+        updatedAt: 2
+      }
+    }
+  })
   const store = {
     getProjects: () => options.projects ?? projectHostSetupProjectionFromRepos([repo]).projects,
     getProjectHostSetups: () => options.setups ?? [],
@@ -314,7 +330,19 @@ describe('RuntimeProjectHostSetupController layout mode', () => {
       })
     ).toThrow('Project not found: no-such-project')
     expect(updateSettings).not.toHaveBeenCalled()
-    expect(createProjectHostSetup).not.toHaveBeenCalled()
+    expect(createProjectHostSetup).toHaveBeenCalledOnce()
+  })
+
+  it('does not move the host-wide mode when the setup write itself fails', () => {
+    const { controller, updateSettings } = makeController({
+      ...layoutFixture(),
+      cleanupWriteFails: true
+    })
+
+    expect(() =>
+      controller.createSetup({ projectId: 'p1', hostId: 'local', worktreeLayoutMode: 'flat' })
+    ).toThrow('cannot be converted')
+    expect(updateSettings).not.toHaveBeenCalled()
   })
 
   it('applies the mode through setup-update without leaking it into the setup record', async () => {
@@ -339,8 +367,9 @@ describe('RuntimeProjectHostSetupController layout mode', () => {
     await expect(
       controller.updateSetup({ setupId: 'no-such-id', updates: { worktreeLayoutMode: 'flat' } })
     ).rejects.toThrow('Project host setup not found: no-such-id')
+    // The store write is what proves the setup exists, so it runs; the host-wide mode must not.
+    expect(updateProjectHostSetup).toHaveBeenCalledOnce()
     expect(updateSettings).not.toHaveBeenCalled()
-    expect(updateProjectHostSetup).not.toHaveBeenCalled()
   })
 
   it('reports no mode when the call carried none', () => {

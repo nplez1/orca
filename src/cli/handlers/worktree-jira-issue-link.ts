@@ -67,6 +67,12 @@ export async function getJiraIssueLinkFlagUpdates(args: {
     createHint: 'a Jira issue key or URL'
   })
   if (value === undefined) {
+    if (args.flags.get(REPLACE_LINKED_ITEM_FLAG) === true) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `--${REPLACE_LINKED_ITEM_FLAG} only applies with --jira-issue.`
+      )
+    }
     return undefined
   }
   // Why before the round trip: a mistyped key must fail on its own, not on whether a
@@ -86,7 +92,7 @@ export async function getJiraIssueLinkFlagUpdates(args: {
       // to do to *this* workspace's Jira link, and there is none. Deleting another
       // provider's item instead is the destructive answer this guard exists to stop.
       console.error(
-        `warning: --jira-issue null cleared nothing: this workspace is linked to ${describeLink(worktree, provider)}.`
+        `warning: --jira-issue null cleared nothing: this workspace's link is ${describeLink(worktree, provider)}, not a Jira issue.`
       )
       return undefined
     }
@@ -223,11 +229,15 @@ export async function resolveJiraIssueLinkUpdates(args: {
       })
     ).result
   } catch (error) {
-    // Why only not-found: a timeout, a dead credential or a sleeping host is not a bad
-    // key, and reporting it as one tells an agent to stop retrying when a retry is
-    // exactly what would work. Everything else keeps its own code and message.
+    // Why only not-found: a timeout, a dead credential or a sleeping host is not a bad key, and
+    // reporting it as one tells an agent to stop retrying when a retry is exactly what would work.
+    // Anything else keeps its own code and detail, named with what the CLI was trying to do.
     if (getJiraSummaryLookupErrorCode(error) !== 'not-found') {
-      throw error
+      throw new RuntimeClientError(
+        error instanceof RuntimeClientError ? error.code : 'jira_issue_lookup_failed',
+        `Couldn't read ${parsed.key} from ${site.displayName || site.siteUrl}, so the link was not changed: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof RuntimeClientError ? error.data : undefined
+      )
     }
     looked = null
   }

@@ -334,9 +334,43 @@ describe('getJiraIssueLinkFlagUpdates', () => {
       })
     ).toBeUndefined()
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('cleared nothing: this workspace is linked to GitHub PR #12')
+      expect.stringContaining("this workspace's link is GitHub PR #12")
     )
     warn.mockRestore()
+  })
+
+  it('reads the provider from the routing context when no item is selected', async () => {
+    // Why: an older record carries the context without the item, and clearing it would take the
+    // routing a GitHub link needs with it.
+    const rpc = client({
+      sites: [ACME],
+      linkedWorkItem: null,
+      linkedTaskSourceContext: { provider: 'github' }
+    })
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    expect(
+      await getJiraIssueLinkFlagUpdates({
+        flags: new Map([['jira-issue', 'null']]),
+        client: rpc,
+        worktree: 'active'
+      })
+    ).toBeUndefined()
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
+  })
+
+  it('rejects the override on its own, because it names no link to replace', async () => {
+    const rpc = client({ sites: [ACME] })
+
+    await expect(
+      getJiraIssueLinkFlagUpdates({
+        flags: new Map([['replace-linked-item', true]]),
+        client: rpc,
+        worktree: 'active'
+      })
+    ).rejects.toThrow(/only applies with --jira-issue/)
+    expect(rpc.calls).toEqual([])
   })
 
   it('refuses to replace another provider’s link without the override', async () => {

@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -7,9 +15,11 @@ import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
 import {
   DEFAULT_EXTEND_TIMEOUT_MS,
   MAX_EXTEND_TIMEOUT_MS,
+  describeSensitiveExtendResult,
   extendEphemeralVmRecipeFromFile,
   formatExtendEphemeralVmRecipeResult,
-  resolveExtendTimeoutMs
+  resolveExtendTimeoutMs,
+  writeEphemeralVmRecipeResultFile
 } from './vm-recipe-extend'
 
 const ownedDirs: string[] = []
@@ -269,5 +279,78 @@ describe('orca vm recipe extend deadline', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toContain('--timeout-ms')
     expect(existsSync(join(repoPath, 'extend-stdin.json'))).toBe(false)
+  })
+})
+
+describe('extend result sensitivity', () => {
+  const parsed = parseEphemeralVmRecipeResult(STORED_RESULT)
+  if (!parsed.ok) {
+    throw new Error('fixture must parse')
+  }
+
+  it('stays quiet about a result that carries no pairing code', () => {
+    expect(
+      describeSensitiveExtendResult({
+        recipeId: 'cloud-sandbox',
+        repoPath: '/repo',
+        ok: true,
+        recipeResult: parsed.result
+      })
+    ).toBeNull()
+  })
+
+  it('warns when the result carries a pairing code', () => {
+    // Why: --json prints the connection verbatim, and text mode's inline warning is not printed
+    // there, so the warning has to come from this check.
+    expect(
+      describeSensitiveExtendResult({
+        recipeId: 'cloud-sandbox',
+        repoPath: '/repo',
+        ok: true,
+        recipeResult: {
+          schemaVersion: 1,
+          connection: {
+            type: 'orca-server',
+            pairingCode: 'orca://pair?code=abc',
+            projectRoot: '/workspace/repo'
+          }
+        }
+      })
+    ).toContain('pairing code')
+  })
+})
+
+describe('writeEphemeralVmRecipeResultFile', () => {
+  it('publishes the result at mode 0600 without hardening the directory', () => {
+    const dir = makeRepo()
+    chmodSync(dir, 0o755)
+    const parsed = parseEphemeralVmRecipeResult(STORED_RESULT)
+    if (!parsed.ok) {
+      throw new Error('fixture must parse')
+    }
+    const target = join(dir, 'extended.json')
+
+    expect(writeEphemeralVmRecipeResultFile(target, parsed.result)).toBeNull()
+
+    expect(statSync(target).size).toBeGreaterThan(0)
+    if (process.platform !== 'win32') {
+      expect(statSync(target, { bigint: false }).mode & 0o777).toBe(0o600)
+      // The shared secure-write helpers chmod the parent to 0700; that would silently lock down
+      // the repo directory a caller writes into, so this write must leave it alone.
+      expect(statSync(dir).mode & 0o777).toBe(0o755)
+    }
+  })
+
+  it('reports an unwritable target instead of throwing, so the result can still be reported', () => {
+    const dir = makeRepo()
+    const parsed = parseEphemeralVmRecipeResult(STORED_RESULT)
+    if (!parsed.ok) {
+      throw new Error('fixture must parse')
+    }
+
+    const failure = writeEphemeralVmRecipeResultFile(join(dir, 'absent', 'x.json'), parsed.result)
+
+    expect(failure).toBeTruthy()
+    expect(existsSync(join(dir, 'absent'))).toBe(false)
   })
 })

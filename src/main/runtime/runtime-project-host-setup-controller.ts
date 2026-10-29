@@ -27,7 +27,7 @@ import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidato
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 import {
   takeWorktreeLayoutMode,
-  withEffectiveLayoutMode
+  applyAndReportWorktreeLayoutMode
 } from './runtime-project-setup-layout-mode'
 import { updateProjectHostSetupWithProvenKind } from '../folder-repo-git-conversion'
 import type { RuntimeStore } from './runtime-store-contract'
@@ -112,14 +112,15 @@ export class RuntimeProjectHostSetupController {
       throw new Error('runtime_unavailable')
     }
     assertWslMoveHostSetupWritable(store, args)
-    // Why the target: the mode is host-wide, so a rejected create must not have applied it.
-    const setupArgs = takeWorktreeLayoutMode(this.deps, args, args)
+    // Why split: the mode is host-wide, so it is checked here and applied only once the setup
+    // write succeeded — a rejected create must not leave every project's placement flipped.
+    const setupArgs = takeWorktreeLayoutMode(this.deps, args)
     const result = store.createProjectHostSetup(setupArgs)
     if (!result) {
       throw new Error(`Project not found: ${args.projectId}`)
     }
     this.deps.notifyReposChanged()
-    return withEffectiveLayoutMode(this.deps, args.worktreeLayoutMode, result)
+    return applyAndReportWorktreeLayoutMode(this.deps, args.worktreeLayoutMode, result)
   }
 
   async setupExistingFolder(
@@ -187,7 +188,7 @@ export class RuntimeProjectHostSetupController {
         assertWslMoveHostSetupIdWritable(store, setupArgs)
         return updateProjectHostSetup(setupArgs)
       },
-      { ...args, updates: takeWorktreeLayoutMode(this.deps, args.updates, { setup: args }) },
+      { ...args, updates: takeWorktreeLayoutMode(this.deps, args.updates) },
       true
     )
     if (!result) {
@@ -202,7 +203,7 @@ export class RuntimeProjectHostSetupController {
     }
     this.deps.invalidateResolvedWorktrees()
     this.deps.notifyReposChanged()
-    return withEffectiveLayoutMode(this.deps, args.updates.worktreeLayoutMode, result)
+    return applyAndReportWorktreeLayoutMode(this.deps, args.updates.worktreeLayoutMode, result)
   }
 
   deleteSetup(args: ProjectHostSetupDeleteArgs): ProjectHostSetupDeleteResult {
