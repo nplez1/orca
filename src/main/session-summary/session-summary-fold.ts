@@ -14,8 +14,14 @@ import {
   mergeSessionSummaryDeltas,
   normalizeSessionSummaryDelta
 } from './session-summary-ledger'
+import {
+  SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY,
+  acquireSessionSummaryFoldSlot,
+  releaseSessionSummaryFoldSlot
+} from './session-summary-fold-slots'
 import { extractSessionSummaryJson } from './session-summary-json'
 import { rewriteReports } from './session-summary-report'
+import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 
 export type SessionSummarySourceEvent = {
   role: 'user' | 'assistant' | 'tool'
@@ -159,74 +165,92 @@ export async function foldSessionSummaryEvents(args: {
   const progress = (): void =>
     args.onProgress?.({ ledger, completedChunks, totalChunks: ranges.length })
 
-  const deltas = await Promise.all(
-    ranges.map(async (range) => {
-      const cacheKey = `${baseIndex + range.from}-${baseIndex + range.to}`
-      const cached = cache?.get(cacheKey)
-      if (cached) {
+  // Why the fold owns its controller: a failing chunk must stop its siblings instead of letting
+  // them run to the generation timeout, and a pane close must reach every chunk's own process.
+  const foldController = new AbortController()
+  const abortFromCaller = (): void => foldController.abort(signal.reason)
+  signal.addEventListener('abort', abortFromCaller, { once: true })
+  await acquireSessionSummaryFoldSlot(foldController.signal)
+  try {
+    const foldSignal = foldController.signal
+    const deltas = await mapWithConcurrency(
+      ranges,
+      SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY,
+      async (range) => {
+        foldSignal.throwIfAborted()
+        const cacheKey = `${baseIndex + range.from}-${baseIndex + range.to}`
+        const cached = cache?.get(cacheKey)
+        if (cached) {
+          completedChunks += 1
+          progress()
+          return cached
+        }
+        const raw = await brain.complete({
+          prompt: buildSessionSummaryChunkPrompt(events, range, baseIndex),
+          signal: foldSignal
+        })
+        foldSignal.throwIfAborted()
+        // A fact the model did not index is placed at the slice's *last* message, not its first:
+        // a slice usually opens with the reader's own message, and placing facts on that boundary
+        // hid the whole slice from the "since your last message" window.
+        const delta = normalizeSessionSummaryDelta(extractSessionSummaryJson(raw), {
+          min: baseIndex + range.from,
+          max: baseIndex + Math.max(range.from, range.to - 1),
+          fallback: baseIndex + Math.max(range.from, range.to - 1)
+        })
+        if (!delta) {
+          throw new Error('fold extract returned no usable JSON')
+        }
+        cache?.set(cacheKey, delta)
         completedChunks += 1
         progress()
-        return cached
+        return delta
       }
-      const raw = await brain.complete({
-        prompt: buildSessionSummaryChunkPrompt(events, range, baseIndex),
-        signal
-      })
-      signal.throwIfAborted()
-      // A fact the model did not index is placed at the slice's *last* message, not its first:
-      // a slice usually opens with the reader's own message, and placing facts on that boundary
-      // hid the whole slice from the "since your last message" window.
-      const delta = normalizeSessionSummaryDelta(extractSessionSummaryJson(raw), {
-        min: baseIndex + range.from,
-        max: baseIndex + Math.max(range.from, range.to - 1),
-        fallback: baseIndex + Math.max(range.from, range.to - 1)
-      })
-      if (!delta) {
-        throw new Error('fold extract returned no usable JSON')
-      }
-      cache?.set(cacheKey, delta)
-      completedChunks += 1
-      progress()
-      return delta
+    ).catch((error: unknown) => {
+      foldController.abort(error)
+      throw error
     })
-  )
 
-  const merged = mergeSessionSummaryDeltas(deltas)
-  const readerMessages = readerMessagesAfter(ledger, events, baseIndex)
-  const folded = applySessionSummaryDelta(
-    ledger,
-    merged,
-    baseIndex + events.length,
-    args.readAt ?? Date.now(),
-    readerMessages.lastUserMessageIndex,
-    readerMessages.userMessageCount
-  )
-  // Why a second call and not a projection of the facts: a progress report is prose, and the
-  // whole point of it is to be shorter and better organised than the facts are. Its input is the
-  // previous reports plus this batch, and the prompt caps the timeline share of that, so it grows
-  // with the batch rather than with the session.
-  const reports = await rewriteReports({
-    brain,
-    signal,
-    ledger,
-    merged,
-    through: folded.foldedThrough,
-    windowRestarted: readerMessages.lastUserMessageIndex !== ledger.lastUserMessageIndex,
-    userMessageCount: readerMessages.userMessageCount,
-    lastUserMessageIndex: readerMessages.lastUserMessageIndex
-  })
-  // Why drop a carried-over "since" when the window moved: the previous one describes work the
-  // reader has now spoken over, and a failed rewrite must not relabel it "since your last message".
-  const reportSince = reports
-    ? reports.since
-    : readerMessages.lastUserMessageIndex === ledger.lastUserMessageIndex
-      ? ledger.reportSince
-      : null
-  return {
-    ledger: reports
-      ? { ...folded, reportSince, reportFull: reports.full }
-      : { ...folded, reportSince },
-    completedChunks: ranges.length,
-    totalChunks: ranges.length
+    const merged = mergeSessionSummaryDeltas(deltas)
+    const readerMessages = readerMessagesAfter(ledger, events, baseIndex)
+    const folded = applySessionSummaryDelta(
+      ledger,
+      merged,
+      baseIndex + events.length,
+      args.readAt ?? Date.now(),
+      readerMessages.lastUserMessageIndex,
+      readerMessages.userMessageCount
+    )
+    // Why a second call and not a projection of the facts: a progress report is prose, and the
+    // whole point of it is to be shorter and better organised than the facts are. Its input is the
+    // previous reports plus this batch, and the prompt caps the timeline share of that, so it grows
+    // with the batch rather than with the session.
+    const reports = await rewriteReports({
+      brain,
+      signal: foldSignal,
+      ledger,
+      merged,
+      through: folded.foldedThrough,
+      windowRestarted: readerMessages.lastUserMessageIndex !== ledger.lastUserMessageIndex,
+      userMessageCount: readerMessages.userMessageCount,
+      lastUserMessageIndex: readerMessages.lastUserMessageIndex
+    })
+    // Why drop a carried-over "since" when the window moved: the previous one describes work the
+    // reader has now spoken over, and a failed rewrite must not relabel it "since your last message".
+    const reportSince = reports
+      ? reports.since
+      : readerMessages.lastUserMessageIndex === ledger.lastUserMessageIndex
+        ? ledger.reportSince
+        : null
+    return {
+      ledger: reports
+        ? { ...folded, reportSince, reportFull: reports.full }
+        : { ...folded, reportSince },
+      completedChunks: ranges.length,
+      totalChunks: ranges.length
+    }
+  } finally {
+    signal.removeEventListener('abort', abortFromCaller)
+    releaseSessionSummaryFoldSlot()
   }
 }
