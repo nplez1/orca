@@ -44,6 +44,12 @@ export type TranscriptReadStart = {
   previousByteOffset: number
   /** Query during the read after decoding begins; absent for parsers without resumable state. */
   identity?: () => TranscriptSessionIdentity | null
+  /**
+   * Caller-minted tag for this read, when the caller needs to tell its own read from another one of
+   * the same file. A consumer that started a read must compare this, not the path: two folds of one
+   * session carry the same path, so a path match enlists the wrong consumer.
+   */
+  readToken?: string
 }
 
 export type TranscriptReadOutcome = {
