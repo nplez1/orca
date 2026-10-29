@@ -20,7 +20,13 @@ vi.mock('@/components/ui/tooltip', () => ({
 }))
 
 const overview: JiraBoardOverview = {
-  board: { id: '9', name: 'Payments board', type: 'scrum' },
+  board: {
+    id: '9',
+    name: 'Payments board',
+    type: 'scrum',
+    siteId: 'site-1',
+    siteName: 'Example'
+  },
   columns: [],
   activeSprints: [{ id: '7', name: 'Sprint 7', state: 'active' }],
   sprints: []
@@ -81,7 +87,7 @@ function renderBoard(): void {
   render(
     <TaskPageJiraBoard
       model={model}
-      selection={{ boardId: '9', siteId: 'site-1', boardName: 'Payments board' }}
+      selection={{ boardId: '9', siteId: 'site-1', name: 'Payments board' }}
       onUseIssueList={() => {}}
       onBoardUnavailable={() => {}}
       onIssueMoved={() => {}}

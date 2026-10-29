@@ -19,6 +19,7 @@ import {
 import { JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY } from '../../../shared/jira/jira-detail-capabilities'
 import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { readRuntimeJiraPayload } from './runtime-jira-payload-stream'
+import { withJiraWriteDeadline } from './jira-write-deadline'
 
 export type JiraCommentResult = { ok: true; id: string } | { ok: false; error: string }
 
@@ -87,9 +88,14 @@ export async function jiraUpdateIssueForTarget(
     )
   }
   const args = { key, updates, siteId: siteId ?? undefined }
-  return target.kind === 'environment'
-    ? callRuntimeRpc<JiraMutationResult>(target, 'jira.updateIssue', args, { timeoutMs: 30_000 })
-    : window.api.jira.updateIssue(args)
+  return withJiraWriteDeadline((signal) =>
+    target.kind === 'environment'
+      ? callRuntimeRpc<JiraMutationResult>(target, 'jira.updateIssue', args, {
+          timeoutMs: 30_000,
+          signal
+        })
+      : window.api.jira.updateIssue(args)
+  )
 }
 
 export async function jiraAddIssueCommentForTarget(

@@ -119,13 +119,13 @@ describe('Jira issue mutations', () => {
       expect(jiraRequestMock).toHaveBeenCalledWith(
         entry,
         `${entry.site.authType === 'server' ? '/rest/api/2' : '/rest/api/3'}/issue/ENG-1`,
-        {
+        expect.objectContaining({
           method: 'PUT',
           body: JSON.stringify({
             fields: {},
             update: { labels: [{ add: 'new' }, { remove: 'obsolete' }] }
           })
-        }
+        })
       )
       expect(jiraRequestMock).toHaveBeenCalledTimes(1)
     }
@@ -461,5 +461,30 @@ describe('Jira issue mutations', () => {
       '/rest/api/3/issue/ALP-1',
       '/rest/agile/1.0/sprint/87/issue'
     ])
+  })
+
+  it('bounds every write with the connect deadline', async () => {
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await updateIssue(
+      'ALP-1',
+      { title: 'Renamed', assigneeAccountId: 'account-9', transitionId: '31', sprintId: '87' },
+      'site-1'
+    )
+
+    for (const [, , init] of jiraRequestMock.mock.calls) {
+      expect((init as { signal?: AbortSignal }).signal).toBeInstanceOf(AbortSignal)
+    }
+  })
+
+  it('reports an aborted write as a timeout the caller must re-read', async () => {
+    jiraRequestMock.mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+    const { updateIssue } = await import('./issues')
+
+    const result = await updateIssue('ALP-1', { title: 'Renamed' }, 'site-1')
+
+    expect(result).toMatchObject({ ok: false, timedOut: true })
+    expect(releaseMock).toHaveBeenCalled()
   })
 })

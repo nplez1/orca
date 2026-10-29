@@ -45,3 +45,25 @@ export function jiraIssueRollbackPatch(
   }
   return rollback
 }
+
+/** Deep equality for an editable field: scalars by value, a label list element-wise,
+ *  and a status/priority/assignee by the id it points at. */
+function referenceId(value: unknown): unknown {
+  return typeof value === 'object' && value !== null && 'id' in value ? value.id : undefined
+}
+
+function sameFieldValue(left: unknown, right: unknown): boolean {
+  if (left === right) {
+    return true
+  }
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length && left.every((value, index) => value === right[index])
+  }
+  const leftId = referenceId(left)
+  return leftId !== undefined && leftId === referenceId(right)
+}
+
+/** Whether a re-read carries the optimistic patch, for a write whose answer was lost. */
+export function jiraIssueFieldsLanded(issue: JiraIssue, patch: Partial<JiraIssue>): boolean {
+  return editedJiraIssueFields(patch).every((field) => sameFieldValue(issue[field], patch[field]))
+}
