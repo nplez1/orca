@@ -92,10 +92,16 @@ export async function persistProvisionedEphemeralVmRuntime(
       // left behind, and the row exists only to say otherwise. A failed destroy keeps it, along with the
       // `cleanup_failed` record above it.
       if (cleaned) {
-        removeEphemeralVmProvisioningAttempt(
-          args.userDataPath,
-          start.context.instanceId ?? compatibility.instanceId
-        )
+        try {
+          removeEphemeralVmProvisioningAttempt(
+            args.userDataPath,
+            start.context.instanceId ?? compatibility.instanceId
+          )
+        } catch {
+          // Why swallowed: this whole path runs because a write just failed, often for the same disk
+          // reason, and replacing the persistence error with a bookkeeping one would report the wrong
+          // failure. The machine was destroyed, so a leftover row only costs a startup warning.
+        }
       }
     }
     throw error
