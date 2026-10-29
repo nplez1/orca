@@ -125,6 +125,21 @@ The version is stamped `<package.json version>-np.<run number>` by the workflow.
 twice: it keeps fork releases strictly newer than each other, and it makes a fork build identifiable
 if someone reports a bug — upstream has never shipped that version.
 
+Two things about it are enforced by the `release-ref` job before any artifact is built
+(`.github/scripts/fork-release-version-guard.mjs`):
+
+- **the suffix must match `^np\.[0-9]+$`.** Semver compares a pre-release label alphabetically, so
+  `rc.1` on the same base outranks every `np.<n>` of that base — installs move to it and nothing
+  published afterwards is ever offered again. `local` sorts below `np`, so a `-local.` build takes the
+  release on its own base too.
+- **the version must be above the newest published `v*-np.*` tag.** `github.run_number` restarts at 1
+  if this workflow file is renamed or re-created, after which every new release sorts below the newest
+  one and no installed build sees it. A re-dispatch of an existing tag is exempt, since that tag is
+  already published.
+
+A refusal names the newest tag; re-dispatch with `version_suffix` set above it
+(`gh workflow run fork-release.yml --ref nplez1/main -f version_suffix=np.42`).
+
 Once `MAC_CERTS` exists the workflow switches itself to the signed, hardened, notarized path. There
 is nothing else to change.
 
@@ -167,18 +182,37 @@ minutes on the runner), which is the price of a range that spans a rebase; do no
 in the macos job to speed it up. The generator detects a shallow checkout and refuses to guess, which
 would leave every future release without a summary.
 
-**The generator cannot fail the release.** No history, a tag that does not exist, or a shallow clone
-produces a warning, a body without a summary, and exit 0. The shell step in the workflow is the second
-layer, and it checks more than an empty file: a body with no `## What changed` heading, or one under
-400 bytes, is replaced by a minimal body rather than published as a truncated or summary-less release.
+**The generator cannot fail the release; the workflow does.** No history, a tag that does not exist,
+or a shallow clone produces a warning, a body without a summary, and exit 0 — the generator keeps no
+veto. `.github/scripts/fork-release-notes-guard.mjs` is the gate instead, and it runs twice: on the
+generated body in the macos job, and again on the draft's live body in the linux job immediately
+before `--draft=false`. It refuses a body with no `## What changed` heading, one carrying the
+generator's own "A change summary could not be generated" fallback, and one under 400 bytes. Until
+2026-10-29 the macos job published a minimal `Built from <sha>` body instead of failing, so a
+summary-less release went live whenever the generator could not produce one.
 
 **Read the body of the draft before publishing.** The release is created as a draft and only
-`gh release edit --draft=false` at the end of the windows job makes it public, which is the window for
-exactly this check. **A release does not go public without the change summary**: the body must carry
-`## What changed` for the range since the previous `-np.` tag. A minimal body means the generator did
-not run — publish nothing, read its warning in the run log, fix the cause, and re-run the workflow, or
-write the notes by hand with `gh release edit v<version> --notes-file notes.md`. An install-only body
-is the failure the generator replaced, not an acceptable fallback.
+`gh release edit --draft=false` at the end of the linux job makes it public, which is the window for
+exactly this check — and the guard above is what now refuses a body with no summary. **A release does
+not go public without the change summary**: the body must carry `## What changed` for the range since
+the previous `-np.` tag. When the guard refuses, nothing has gone public, and what to do next depends
+on which of its two sites refused:
+
+- **The generated notes (macos job).** It fails before a draft, a tag or an asset exists, so the
+  cause is the only thing to fix and a fresh dispatch is the recovery. The generator's warning is in
+  the same step's log; a shallow clone is the usual cause. (A _missing previous tag_ is not — the
+  generator warns and summarizes from the tip, and that body passes.)
+- **The draft's body (linux job).** The release stays a draft, which no installed build can see. The
+  body to fix is the draft's own: `gh release edit v<version> --notes-file notes.md`, or delete the
+  draft and start over. **A re-dispatch does not rewrite it** — an existing draft skips
+  `gh release create`, so a re-run re-checks the same body and refuses again.
+
+An install-only body is the failure the generator replaced, not an acceptable fallback.
+
+Reading the draft is still worth doing, because the guard proves a summary _exists_, not that it is
+right — a generator bug or a mis-resolved previous tag is exactly what a reader catches and no check
+can. A body that is present but wrong is an edit, not a refusal — `gh release edit v<version>
+--notes-file notes.md` — and the linux job's check runs on whatever the body then says.
 
 ```bash
 gh release view v<version> --repo nplez1/orca --json body --jq .body | less
@@ -288,6 +322,12 @@ gh run rerun <run-id> --repo nplez1/orca     # re-runs every job; failed legs re
 
 Delete the draft and start over (`gh release delete v<version> --yes --cleanup-tag`) only when the
 _draft body_ is wrong — a re-run keeps the body it created.
+
+**`--failed` is not a re-run of the whole workflow.** It re-runs only the jobs that failed, so a
+`gh run rerun <id> --failed` on a run whose `release-ref` job passed skips the version guard entirely
+and can republish below the newest `-np.` tag. Installs ignore a release that is not newer, but
+`releases/latest` can then point at it. Use a full `gh run rerun <id>`, or a fresh dispatch (which
+runs the guard again), whenever the version is in question.
 
 ## The Linux leg, first run (2026-10-21, `v1.4.214-np.38`)
 

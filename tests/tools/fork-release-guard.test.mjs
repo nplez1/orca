@@ -20,7 +20,7 @@ afterEach(() => {
  * workflow: the two things that went wrong here were both logic — a ref nobody compared, and a
  * `targetCommitish` resolved as a branch name, which always equals this run's commit.
  */
-function scenario({ target, tagCommit = null, tag = 'v1.2.3-np.7' }) {
+function scenario({ target, tagCommit = null, tag = 'v1.2.3-np.7', existingTags = [] }) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-release-guard-'))
   dirs.push(dir)
   const bin = join(dir, 'bin')
@@ -50,6 +50,9 @@ function scenario({ target, tagCommit = null, tag = 'v1.2.3-np.7' }) {
   git('add', '-A')
   git('commit', '-qm', 'base')
   const sha = git('rev-parse', 'HEAD')
+  for (const existing of existingTags) {
+    git('tag', existing, sha)
+  }
   let other = null
   if (tagCommit === 'other') {
     writeFileSync(join(dir, 'next.txt'), 'x\n')
@@ -145,6 +148,77 @@ describe('the release dispatch guard', () => {
   it('is a usage error to run it without a tag or repository', () => {
     const { run } = scenario({ target: 'missing' })
     expect(run(['refs/heads/nplez1/main']).status).toBe(2)
+  })
+
+  // Semver compares a pre-release label alphabetically, so `rc.1` on the same base outranks every
+  // `np.<n>` of that base: installs move to it and nothing published afterwards is ever offered.
+  it('refuses a suffix that is not np.<n>', () => {
+    const { run, sha } = scenario({ target: 'missing' })
+    const result = run(['refs/heads/nplez1/main', 'v1.2.3-rc.1', sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('is not a publishable release version')
+    expect(result.stderr).toContain('suffix must match')
+  })
+
+  // github.run_number restarts at 1 if this workflow is renamed or re-created, after which every new
+  // release sorts below the newest published one and no installed build sees it.
+  it('refuses a version that is not above the newest published release', () => {
+    const { run, sha, tag } = scenario({ target: 'missing', existingTags: ['v1.2.3-np.9'] })
+    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('not above the newest published release v1.2.3-np.9')
+  })
+
+  it('accepts the next run number after the newest published release', () => {
+    const { run, sha } = scenario({
+      target: 'missing',
+      tag: 'v1.2.3-np.10',
+      existingTags: ['v1.2.3-np.9', 'v1.2.3-np.8']
+    })
+    const result = run(['refs/heads/nplez1/main', 'v1.2.3-np.10', sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('does not exist yet')
+  })
+
+  // A stray tag sorts first under git's version sort — `np.41-hotfix` beats `np.9` — and the guard
+  // can only compare versions it can parse, so one of them would refuse every release from then on.
+  it('ignores a tag that is not an np.<n> release when it looks for the newest', () => {
+    const { run, sha } = scenario({
+      target: 'missing',
+      tag: 'v1.2.3-np.10',
+      existingTags: ['v1.2.3-np.9', 'v1.2.3-np.41-hotfix']
+    })
+    const result = run(['refs/heads/nplez1/main', 'v1.2.3-np.10', sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('above the newest published release v1.2.3-np.9')
+  })
+
+  it('refuses a bad suffix on a re-dispatch too', () => {
+    // A re-dispatch publishes into the same tag, so it has to fail for the same reason a new tag
+    // would — the shape check never depends on the tag being new.
+    const { run, sha } = scenario({ target: 'sha', tagCommit: 'here', tag: 'v1.2.3-rc.1' })
+    const result = run(['refs/heads/nplez1/main', 'v1.2.3-rc.1', sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('is not a publishable release version')
+  })
+
+  it('does not apply the newest-tag check to the tag it is re-dispatching', () => {
+    // That tag is already published, so it cannot be above itself; refusing here would block the
+    // retry the whole re-dispatch path exists for.
+    const { run, sha, tag } = scenario({
+      target: 'sha',
+      tagCommit: 'here',
+      existingTags: ['v9.9.9-np.99']
+    })
+    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('already exists')
   })
 
   it('is what the workflow runs, before any platform builds', async () => {

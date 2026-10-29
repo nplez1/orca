@@ -195,28 +195,34 @@ export function getReleaseNotesUrlForVersion(version: string | null): string {
 }
 
 /** Require each platform’s updater manifest: missing/in-progress platform legs must not offer picker entries whose downloads 404. */
-const PLATFORM_UPDATE_MANIFESTS: Partial<Record<NodeJS.Platform, readonly string[]>> = {
-  darwin: ['latest-mac.yml'],
-  win32: ['latest.yml'],
-  // Both, because one release carries x64 and arm64 and either makes it installable.
-  linux: ['latest-linux.yml', 'latest-linux-arm64.yml']
+const PLATFORM_UPDATE_MANIFESTS: Partial<Record<NodeJS.Platform, string>> = {
+  // One manifest per platform: macOS and Windows publish a single file that names both arches.
+  darwin: 'latest-mac.yml',
+  win32: 'latest.yml'
 }
 
-export function getUpdateManifestNamesForPlatform(platform: NodeJS.Platform): readonly string[] {
-  return PLATFORM_UPDATE_MANIFESTS[platform] ?? []
+/** The manifest electron-updater reads on this platform *and* architecture, or null when it reads none. */
+export function getPlatformUpdateManifestName(
+  platform: NodeJS.Platform,
+  arch: NodeJS.Architecture = process.arch
+): string | null {
+  if (platform === 'linux') {
+    // Match electron-updater getChannelFilePrefix(): only x64 keeps the un-suffixed Linux name.
+    // Both arches are not interchangeable — a release that ships one has no manifest for the other.
+    return arch === 'x64' ? 'latest-linux.yml' : `latest-linux-${arch}.yml`
+  }
+  return PLATFORM_UPDATE_MANIFESTS[platform] ?? null
 }
 
-/** True when the release carries an artifact this platform's updater can install. */
+/** True when the release carries the artifact this platform's updater would fetch. */
 export function hasInstallableArtifactForPlatform(
   platform: NodeJS.Platform,
-  assetNames: readonly string[]
+  assetNames: readonly string[],
+  arch: NodeJS.Architecture = process.arch
 ): boolean {
-  const manifests = getUpdateManifestNamesForPlatform(platform)
-  // Unknown platforms should fail with a download explanation rather than an empty picker.
-  if (manifests.length === 0) {
-    return true
-  }
-  return manifests.some((manifest) => assetNames.includes(manifest))
+  const manifest = getPlatformUpdateManifestName(platform, arch)
+  // Unknown platforms should fail with a download explanation rather than an unexplained empty picker.
+  return manifest === null || assetNames.includes(manifest)
 }
 
 /** Match electron-builder’s runnable installer names for manual bootstrap when in-app switching cannot work. */

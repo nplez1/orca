@@ -208,8 +208,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
 
       # Why generated: the notes must say what changed, and a hand-maintained list goes stale. The
-      # script derives the summary from git and never exits non-zero, so a release can still be cut
-      # when history is unusable (see "Release notes" in RELEASE-RUNBOOK.md).
+      # script derives the summary from git and never exits non-zero, so the guard below — not the
+      # generator — decides whether this release has a summary (see "Release notes" in
+      # RELEASE-RUNBOOK.md).
       - name: Generate the release notes
         shell: bash
         env:
@@ -222,18 +223,11 @@ jobs:
             --repo "$PUBLISH_OWNER/orca" \
             --signing "$SIGNING" \
             --out /tmp/notes.md || true
-          # Why the check: an empty file is not the only failure — a missing file, a partially
-          # written body, or the generator's last-resort stub all publish a release with no change
-          # summary. Require the heading the generator always emits and a body long enough to be the
-          # whole template rather than a fragment; anything else gets the minimal body instead.
-          size=0
-          if [ -f /tmp/notes.md ]; then
-            size="$(wc -c </tmp/notes.md | tr -d '[:space:]')"
-          fi
-          if ! grep -q '^## What changed' /tmp/notes.md 2>/dev/null || [ "$size" -lt 400 ]; then
-            echo "::warning title=Release notes::The notes body is empty or incomplete; publishing a minimal body instead."
-            printf '**Orca NP %s**\n\nBuilt from `%s`.\n' "$RELEASE_VERSION" "$GITHUB_SHA" >/tmp/notes.md
-          fi
+          # Why this fails instead of substituting a minimal body: the runbook promises no release
+          # goes public without its change summary, and a minimal body published anyway is exactly
+          # the install-instructions-only release the generator was introduced to remove. Nothing
+          # is created at this point, so failing here leaves no draft, no tag and no assets behind.
+          node .github/scripts/fork-release-notes-guard.mjs /tmp/notes.md --label "the generated notes"
 
       # Why create the release up front, as a draft: electron-builder's publisher would otherwise
       # have two artifact legs race to create it, and the loser aborts the whole job with
@@ -243,7 +237,8 @@ jobs:
       # Why a draft: until the manifest check below passes, the release has assets a user can
       # download but no `latest-mac.yml`, so no installed build can update from it. A draft is
       # hidden from the releases list, so a run that dies in that window leaves nothing visible.
-      # It goes live at the end of the windows job, once every platform's manifest is up.
+      # It goes live at the end of the linux job, once every platform's manifest is up and the body
+      # has been re-checked for its change summary.
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -548,11 +543,19 @@ jobs:
       # Why here and not in an earlier job: every platform uploads into one release, and a release
       # that goes live before the last platform's manifest exists offers downloads that no installed
       # build can update from. Flipping it last makes "published" mean "complete".
+      #
+      # Why the body is checked again here: this is the step that makes the release public, and the
+      # body can change between generation and now — a re-dispatch appends into an existing release,
+      # and the runbook tells whoever reads the draft to edit a wrong body before it goes live. A
+      # failure leaves the release a draft, which no installed build can see.
       - name: Publish the release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release edit "v$RELEASE_VERSION" --repo "$PUBLISH_OWNER/orca" --draft=false
-          echo "published v$RELEASE_VERSION"
+          tag="v$RELEASE_VERSION"
+          gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json body --jq .body \
+            | node .github/scripts/fork-release-notes-guard.mjs - --site draft --label "the draft body of $tag"
+          gh release edit "$tag" --repo "$PUBLISH_OWNER/orca" --draft=false
+          echo "published $tag"

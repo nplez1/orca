@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   compareAppVersions,
+  isForkReleaseAppVersion,
   isPerfPrereleaseAppVersion,
   isPrereleaseAppVersion,
   isValidAppVersion,
@@ -22,6 +23,18 @@ describe('app version comparison', () => {
     expect(isPrereleaseAppVersion('1.5.0')).toBe(false)
     expect(isPerfPrereleaseAppVersion('1.5.0-rc.1.perf')).toBe(true)
     expect(isPerfPrereleaseAppVersion('1.5.0-rc.1')).toBe(false)
+  })
+
+  // The fork's release line: `releases/latest` resolves to one of these, so a stable check has to
+  // accept it. Any other pre-release stays rejected — those are upstream's channels, not this fork's.
+  it('recognises this fork’s -np.<n> release line and nothing else', () => {
+    expect(isForkReleaseAppVersion('1.4.214-np.41')).toBe(true)
+    expect(isForkReleaseAppVersion('1.4.214-np.1')).toBe(true)
+    expect(isForkReleaseAppVersion('1.4.214-rc.41')).toBe(false)
+    expect(isForkReleaseAppVersion('1.4.214')).toBe(false)
+    expect(isForkReleaseAppVersion('1.4.214-np.')).toBe(false)
+    expect(isForkReleaseAppVersion('1.4.214-np.41-extra')).toBe(false)
+    expect(isForkReleaseAppVersion('1.4.214-local.1758974321.abc1234')).toBe(false)
   })
 })
 

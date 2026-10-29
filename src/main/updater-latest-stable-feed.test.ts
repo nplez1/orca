@@ -81,6 +81,18 @@ describe('latest stable release fallback', () => {
     expect(netFetchMock).toHaveBeenCalledTimes(1)
   })
 
+  // LOCAL(nplez1): every release this fork publishes carries the `-np.<n>` suffix and is published as
+  // a normal release, so `releases/latest` always resolves to one of them. Rejecting prereleases
+  // outright therefore rejected the only tag this fallback can ever find here — and with the atom
+  // feed crowded out by mirrored tags, that left every installed build with no feed at all.
+  it('accepts the fork’s own -np. release line, which releases/latest resolves to', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    serveLatestRelease('/nplez1/orca/releases/tag/v1.4.214-np.41')
+    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.214-np.41')
+  })
+
   it.each(['manifest', 'installer'])('rejects a release with a missing %s', async (missing) => {
     Object.defineProperty(process, 'platform', { value: 'darwin' })
     serveLatestRelease()

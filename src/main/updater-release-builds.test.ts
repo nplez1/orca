@@ -203,6 +203,24 @@ describe('listReleaseBuilds', () => {
     ).resolves.toEqual(['1.4.163-hourly.202607312054'])
   })
 
+  // The fork publishes Linux x64 only. Reading either Linux manifest as installable offered arm64
+  // users a row whose latest-linux-arm64.yml 404s, so the manifest has to be matched to the
+  // architecture electron-updater would read.
+  it('matches the Linux manifest to the running architecture', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        release('v1.4.214-np.41', {
+          assets: [{ name: 'latest-linux.yml' }, { name: 'orca-linux.AppImage' }]
+        })
+      ])
+    )
+
+    await expect(
+      listReleaseBuilds('rc', 'linux', 'x64').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.214-np.41'])
+    await expect(listReleaseBuilds('rc', 'linux', 'arm64')).resolves.toEqual([])
+  })
+
   // Signed Windows builds cannot switch to unsigned channels in-app; offer the direct installer.
   it('resolves the platform installer download url', async () => {
     fetchMock.mockResolvedValue(jsonResponse([release('v1.4.163-hourly.202607312054')]))

@@ -49,8 +49,11 @@ fork offers to replace itself with an official release — and because local bui
 
 Anchors to re-point (`stablyai/orca` → `nplez1/orca`):
 
-- `src/main/updater-prerelease-feed.ts` — `ATOM_FEED_URL`, `RELEASES_DOWNLOAD_BASE`, `TAG_HREF_RE`,
-  and the Windows absolute-asset regex.
+- `src/main/updater-prerelease-feed.ts` — `ATOM_FEED_URL`, `RELEASES_API_URL`, `TAG_HREF_RE`.
+- `src/main/updater-release-targets.ts` — `RELEASES_REPO` and the download base every manifest and
+  asset URL is built from.
+- `src/main/updater-release-readiness.ts` — the Windows absolute-asset regex, which decides when a
+  HEAD request has to go through `net.request` to see GitHub's redirect.
 - `src/main/updater/updater-setup.ts` — the `latest/download` fallback.
 - `src/shared/release-channel.ts` — `MAIN_RELEASE_REPO`.
 
@@ -104,37 +107,65 @@ Whether Orca NP publishes its own mobile app is a product decision; `config/scri
 records the APK update-source half as reported-not-policed, and the About, Settings and protocol-block
 links are not checked at all.
 
-### `local(updater)`: probe every newer release, not a fixed window
+### `local(updater)`: read this repo's releases, not the ten-entry tag feed
 
-Upstream's resolver probes only the six newest candidates at or above the installed version
-(`MAX_MANIFEST_PROBE_CANDIDATES`), which is sound upstream because every entry in upstream's atom feed
-is one of its own releases and therefore has a manifest. It is not sound here: `nplez1/orca`'s feed
-also carries the parent repo's release entries (`v1.4.196`–`v1.4.202` at fork time, plus a `pr-…` and a
-`mobile-android-…` tag), and those tags have no manifest in this repo — `releases/download/v1.4.202/latest-mac.yml`
-404s. All seven of them sort above `1.4.197-np.N`, so an installed fork build filled the whole window
-with manifest-less entries and never reached this repo's own tag.
+Upstream's resolver reads GitHub's atom feed and probes only the six newest candidates at or above the
+installed version (`MAX_MANIFEST_PROBE_CANDIDATES`). Both halves are sound upstream, where the feed is
+one repo's own releases and every one of them has a manifest. Neither holds here.
 
-The state that produces is not "no update" — it is `not-ready` with no `lastGoodTag`, which
-`pinDefaultReleaseFeed` turns into a `ReleaseFeedPreflightError`, so the check is re-armed on the
-silent 1h→6h retry cadence and no `available` status is ever sent. Automatic and menu checks both
-fail; the menu one shows "Couldn't reach the update server", which is a misleading cause. Net effect:
-nobody running a build published here ever sees an in-app update offer.
+**The feed lists tags, not releases, and caps them at ten.** `nplez1/orca/releases.atom` carries every
+tag the repo has — the sync mirrors upstream's `v*` tags and the fork's own `archive/*` branch tags —
+measured on 2026-10-29 as eight mirrored tags against two of this repo's releases
+(`v1.4.214-np.41`, `v1.4.214-np.40`), out of ten entries. Those tags have no release and no manifest
+here (`releases/download/v1.4.244/latest-mac.yml` 404s), and they sort above every `1.4.214-np.*`. A
+day with nine new mirrored tags pushes this repo's newest release out of the feed entirely — after
+which there is no candidate left to probe at all.
+
+**The state that produces is not "no update".** `pinDefaultReleaseFeed` gets `no-newer` from the feed
+and falls through to `fetchLatestStableReleaseTag`, whose `releases/latest` redirect resolves to this
+fork's newest release — a `-np.` version, which the pre-release filter rejected outright, so the
+fallback returned null and every check ended in
+`ReleaseFeedPreflightError('manifest-unavailable', …)`. Automatic and menu checks both fail, the menu
+shows "Couldn't reach the update server", and the check is re-armed on the silent 1h→6h cadence.
+Nobody running a build published here saw an in-app update offer.
 
 Anchors:
 
-- `src/main/updater-prerelease-feed.ts` — `probeCandidates`, widened from a fixed six-wide
-  `slice(newestNewerIndex, newestNewerIndex + MAX_MANIFEST_PROBE_CANDIDATES)` to
-  `Math.max(newerCandidateCount, MAX_MANIFEST_PROBE_CANDIDATES)` entries. Keeping six as a _floor_ is
-  deliberate: the tag after the primary is the fallback feed a missing manifest walks back to, and
-  widening only when more newer candidates exist leaves upstream-shaped feeds byte-identical.
-- `src/main/updater-prerelease-feed.test.ts` — `probes every newer candidate concurrently`.
-- `src/main/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case.
+- `src/main/updater-prerelease-feed.ts` — `fetchReleaseListTags` reads
+  `api.github.com/repos/nplez1/orca/releases?per_page=100` and keeps entries that are not drafts and
+  carry at least one asset, which a bare mirrored tag never does. `fetchReleaseAtomTags` is the same
+  atom reader as before, kept as the fallback: the REST call is unauthenticated and shares a 60/hour
+  per-IP quota, and a throttled client must still resolve updates. `fetchLatestStableReleaseTag`
+  accepts `-np.<n>` (via `isForkReleaseVersion`) alongside non-prerelease versions, because that is
+  the only thing `releases/latest` can resolve to here.
+- `probeCandidates` still widens to every newer candidate. It is no longer load-bearing against the
+  atom noise — the release list has none — but it costs one round trip and stays true for the fallback
+  feed, where the mirrored tags are.
+- `src/main/updater-prerelease-feed.test.ts` — `finds this repo's own release when mirrored tags have
+  crowded out the atom feed` (this incident), `takes its candidate tags from the release list`, the
+  draft/asset-less case, and both fallback cases.
+- `src/main/updater-latest-stable-feed.test.ts` — `accepts the fork's own -np. release line`.
+- `src/main/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case, which now
+  exercises the atom fallback.
 - `src/main/updater.publishing-window-feed.test.ts` — the last-good pin reaching `available`.
+- `src/main/updater-release-targets.ts` and `src/main/updater-release-readiness.ts` — the URL and
+  probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
+  restores the single file has to take these two with it.
 
-Still fork-only, and still incomplete: the resolver only ever sees the tags in a feed that GitHub caps
-at ten entries, so the manifest-less entries ahead of this repo's tag recede by one per release. A
-release published while it sits seventh is skipped by every build already installed; the next one
-lands inside the window. Upstream never needs any of this, so it is not proposed there.
+Two upstream-owned files also diverge here, and neither is a `local(...)` patch — they are fixes
+upstream would want, recorded so the next sync does not quietly undo them:
+
+- `src/shared/release-channel.ts` — `PLATFORM_UPDATE_MANIFESTS` holds one manifest per platform and
+  `getPlatformUpdateManifestName(platform, arch)` replaces `getUpdateManifestNamesForPlatform`, so a
+  Linux release's manifest is matched to the running architecture rather than "either arch counts".
+  Upstream's array-valued table accepts `latest-linux-arm64.yml` on an x64 build and vice versa.
+- `src/shared/app-version.ts` — `isForkReleaseAppVersion` (`-np.<n>`, and nothing else). It is what
+  lets `releases/latest` resolve this fork's own release line.
+
+The probe window above is history worth keeping: it is why every newer candidate is probed rather
+than a fixed six, and the fault it fixed — a manifest-less entry hiding this repo's release behind it
+— is the same one the release list now removes at the source. Upstream never needs any of this, so it
+is not proposed there.
 
 ### `local(build)`: do not bake an updater `publisherName` into Windows builds
 
