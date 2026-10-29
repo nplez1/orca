@@ -23,12 +23,8 @@ import {
   ledgerResolution,
   parseLedger
 } from './lib/conflict-classify.mjs'
-import {
-  deletionFor,
-  parseExpectedDeletions,
-  pendingDeletionPaths,
-  staleDeletions
-} from './lib/expected-deletions.mjs'
+import { deletionFor, pendingDeletionPaths } from './lib/expected-deletions.mjs'
+import { readDeletionManifestFromGit } from './lib/deletion-manifest-git.mjs'
 import { planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
 import { proveFile } from './lib/conflict-prove.mjs'
 import { proposeAll } from './lib/conflict-propose.mjs'
@@ -342,25 +338,17 @@ function attachExpectedDeletions(files, manifest) {
  * Checked against HEAD on read, because a manifest that still calls a restored file deleted would talk a
  * resolver into deleting it again — the stale paths are named in the note, and the note now reaches the
  * text report as well as `--json`, so a human sees them without asking for JSON. The note does not stop
- * `--apply`: a stale entry is a manifest to fix, not a resolution to trust.
+ * `--apply`: a stale entry is a manifest to fix, not a resolution to trust. An entry bound to an upstream
+ * blob that has since changed comes back as `pending-decision`, which `--apply` will not act on.
  */
 function loadExpectedDeletions() {
-  let text
+  let text = null
   try {
     text = readFileSync(DELETIONS_URL, 'utf8')
   } catch {
-    return { entries: [], note: `no deletion manifest at ${DELETIONS_URL.pathname}` }
+    // readDeletionManifest reports a missing manifest as a note; nothing here needs to know why.
   }
-  const { entries, note } = parseExpectedDeletions(text)
-  const atHead = new Set(
-    (gitText(['ls-tree', '-r', '--name-only', 'HEAD']) ?? '').split('\n').filter(Boolean)
-  )
-  const stale = staleDeletions(entries, atHead)
-  const problems = [note]
-  if (stale.length > 0) {
-    problems.push(`manifest calls deleted but HEAD still has: ${stale.join('; ')}`)
-  }
-  return { entries, note: problems.filter(Boolean).join(' | ') || null }
+  return readDeletionManifestFromGit({ text, manifestPath: DELETIONS_URL.pathname })
 }
 
 /** Runs each proposal's git steps. Never commits: resolving the index is the point, not finishing. */
