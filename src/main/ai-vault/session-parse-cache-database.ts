@@ -22,6 +22,17 @@ import { parsePersistedSidecar } from './session-sidecar-stat'
 // Bump for row-layout or cached-semantic changes; mismatched databases are discarded.
 export const SESSION_PARSE_CACHE_SCHEMA_VERSION = 8
 
+/**
+ * Bump when a parser fix has to reach transcripts that are already cached.
+ *
+ * Why a second constant: the schema version discards the whole database, which is the right size for a
+ * row-layout change and far too much for a parser fix. Because a row is matched on path + mtime + size,
+ * a finished transcript never looks stale again — so without this, a fix reaches only transcripts that
+ * change afterwards, and only if someone remembered to bump the schema by hand.
+ */
+export const SESSION_PARSE_PARSER_VERSION = 2
+const PARSER_VERSION_KEY = 'parser_version'
+
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS rows(
@@ -211,10 +222,29 @@ function openDatabase(path: string): SyncDatabase {
     sql: SCHEMA_SQL,
     directoryMode: PRIVATE_DIRECTORY_MODE,
     pageSize: PAGE_SIZE,
-    afterSchema: ensureScopeCwdsTable
+    afterSchema: (db) => {
+      ensureScopeCwdsTable(db)
+      dropRowsFromAnotherParser(db)
+    }
   })
   hardenSqliteDatabaseFiles(path)
   return db
+}
+
+// Scope cwds are kept: they carry their own version and are not a transcript parse.
+function dropRowsFromAnotherParser(db: SyncDatabase): void {
+  const stored = db.prepare('SELECT value FROM meta WHERE key = ?').get(PARSER_VERSION_KEY) as
+    | { value?: unknown }
+    | undefined
+  const current = String(SESSION_PARSE_PARSER_VERSION)
+  if (stored?.value === current) {
+    return
+  }
+  db.exec('DELETE FROM rows')
+  db.prepare('INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)').run(
+    PARSER_VERSION_KEY,
+    current
+  )
 }
 
 export function parsePersistedSessionParseCacheRow(
