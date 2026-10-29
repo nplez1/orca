@@ -278,8 +278,12 @@ export function normalizeHookPayload(
     eventName === 'session_start' &&
     providerSession !== null
   // A transcript session_start carries resume identity while idle; receivers discard the placeholder row.
+  // Why also a session-less pi: `pi --no-session` still owns the pane, and a pane with no row at all
+  // has nothing for a title wait to repaint, so an idle dialog it opens never reaches Needs You
+  // (#231). It is the same `done` row the first launch has.
   const sessionPlaceholder =
-    providerSessionOnly && !dispatched.payload
+    (providerSessionOnly || (source === 'pi' && eventName === 'session_start')) &&
+    !dispatched.payload
       ? normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: source })
       : null
   // Why: a session_start is this lane's descendant-scope reset, so it is also the one place the

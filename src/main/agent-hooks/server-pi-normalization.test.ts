@@ -346,6 +346,16 @@ describe('Pi-family child rows through the hook lane', () => {
     expect(server.getStatusSnapshot()[0]?.subagents).toBeUndefined()
   })
 
+  it('gives a session-less pi the row an idle dialog repaints', async () => {
+    // Why: `pi --no-session` carries no resume identity, so nothing provisioned a row and a title
+    // wait had nothing to repaint — a relaunched pi's confirm/select never reached Needs You (#231).
+    await post('pi', { hook_event_name: 'session_start' })
+    expect(server.getStatusSnapshot()[0]).toMatchObject({ state: 'done', agentType: 'pi' })
+
+    await post('pi', { hook_event_name: 'ui_prompt_start' })
+    expect(server.getStatusSnapshot()[0]).toMatchObject({ state: 'waiting', agentType: 'pi' })
+  })
+
   it('keeps an update from inventing a row or unhiding a resume placeholder', async () => {
     await post('pi', { hook_event_name: 'subagents_update', subagents: [SCOUT] })
     expect(server.getStatusSnapshot()).toEqual([])
