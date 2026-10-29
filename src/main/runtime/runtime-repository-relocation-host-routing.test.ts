@@ -97,4 +97,29 @@ describe('the host a relocation plan reads the default branch from', () => {
 
     expect(branchReads.calls).toEqual([['/code/example', 'peer']])
   })
+
+  it('refuses a folder project without reading a branch from any host', async () => {
+    await expect(
+      makeController(makeRepo({ id: 'repo-1', kind: 'folder' })).relocate('repo-1', {
+        dryRun: true
+      })
+    ).resolves.toEqual({ repoId: 'repo-1', decision: 'not-a-git-repo' })
+
+    expect(branchReads.calls).toEqual([])
+  })
+
+  it('refuses a checkout already in its folder without reading a branch', async () => {
+    await expect(
+      makeController(
+        makeRepo({
+          id: 'repo-1',
+          // The container is `<worktreeBasePath>/<displayName>`, so this checkout is already in it.
+          path: '/ws/example/Example/main',
+          worktreeBasePath: '/ws/example'
+        })
+      ).relocate('repo-1', { dryRun: true })
+    ).resolves.toEqual({ repoId: 'repo-1', decision: 'already-in-container' })
+
+    expect(branchReads.calls).toEqual([])
+  })
 })

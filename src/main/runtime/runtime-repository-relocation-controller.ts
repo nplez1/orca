@@ -49,8 +49,6 @@ export type RuntimeRepositoryRelocationDependencies = {
   notifyRepoRelocated: (repoId: string, oldWorktreeId: string, newWorktreeId: string) => void
   invalidateResolvedWorktrees: () => void
   notifyReposChanged: () => void
-  /** Injected only so a test can count the probes: the branch names the folder, nothing else. */
-  resolveDefaultBranchName?: (repo: Repo) => Promise<string | null>
 }
 
 export type WorktreePsSnapshot = {
@@ -139,10 +137,10 @@ export class RuntimeRepositoryRelocationController {
     // this refuses needs no subprocess — and inside a git checkout, git would answer with the parent
     // repo's branch, which is not this project's name to take.
     const target = resolveRelocationTarget(candidate)
-    const resolveBranch = this.deps.resolveDefaultBranchName ?? resolveDefaultBranchName
     const decision = planPrimaryCheckoutRelocation({
       ...candidate,
-      defaultBranchName: target && !target.alreadyInContainer ? await resolveBranch(repo) : null
+      defaultBranchName:
+        target && !target.alreadyInContainer ? await resolveDefaultBranchName(repo) : null
     })
     if (decision.kind !== 'ready' || options.dryRun) {
       return toWireResult(repo.id, decision)
