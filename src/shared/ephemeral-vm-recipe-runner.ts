@@ -64,6 +64,8 @@ export type EphemeralVmRecipeStartFailure = {
   stderr: string
   exitCode: number | null
   signal: NodeJS.Signals | null
+  /** Set when the caller's signal stopped the create (a cancel) before it answered. */
+  aborted?: true
   recipeResult?: EphemeralVmRecipeResult
 }
 

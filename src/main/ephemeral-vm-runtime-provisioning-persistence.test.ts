@@ -262,4 +262,35 @@ describe('a create that has not reported yet', () => {
     expect(listEphemeralVmProvisioningAttempts(userDataPath)).toEqual([])
     expect(existsSync(getEphemeralVmProvisioningAttemptsPath(userDataPath))).toBe(false)
   })
+
+  it('keeps the row when the create was killed, because nobody saw its transcript', async () => {
+    // Why: a cancelled create's release has only the five seconds before Orca force-kills the process
+    // group, so the destroy it started may never have finished — and the kill means the user never saw
+    // the failure either. This row is what a later startup has to go on.
+    const userDataPath = makeDir('orca-vm-attempt-abort-user-data-')
+    const repoPath = makeDir('orca-vm-attempt-abort-repo-')
+    const scriptPath = join(repoPath, 'create.js')
+    writeFileSync(scriptPath, 'setTimeout(() => undefined, 30_000)\n')
+
+    const provisioned = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe: { ...parsedRecipe(), create: nodeCommand(scriptPath) },
+      repoId: 'repo-1',
+      now: 1_000,
+      signal: AbortSignal.timeout(200)
+    })
+
+    expect(provisioned.ok).toBe(false)
+    if (provisioned.ok) {
+      throw new Error('expected the cancelled create to fail')
+    }
+    expect(provisioned.start.aborted).toBe(true)
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toHaveLength(1)
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)[0]).toMatchObject({
+      recipeId: 'cloud-sandbox',
+      repoId: 'repo-1',
+      startedAt: 1_000
+    })
+  })
 })
