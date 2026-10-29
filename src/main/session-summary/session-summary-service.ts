@@ -32,7 +32,7 @@ import {
   IDLE_FOLD,
   type SessionSummaryStatusEntry
 } from './session-summary-snapshot'
-import { isStoredBriefReusable } from './session-summary-brief-freshness'
+import { isStoredBriefReusable, attributableStoredLedger } from './session-summary-brief-freshness'
 import { recordSessionSummarySeenCursor } from './session-summary-seen-cursor'
 import {
   resolveSessionSummaryTranscriptHost,
@@ -107,13 +107,17 @@ export class SessionSummaryService {
       return runtime.hostSnapshot
     }
     const stored = this.deps.store.get(paneKey)
+    const entry = this.deps.getAgentStatusEntry(paneKey)
+    const ledger = attributableStoredLedger(stored, entry, runtime?.identity)
     return buildLocalSessionSummarySnapshot({
       paneKey,
-      entry: this.deps.getAgentStatusEntry(paneKey),
-      ledger: stored?.ledger ?? null,
+      entry,
+      ledger,
       messageCount: runtime?.messageCount ?? stored?.messageCount ?? 0,
       seenThrough: stored?.seenThrough ?? 0,
-      status: runtime?.status,
+      // Why undefined when withheld: the builder infers "unavailable" for a pane with no ledger, and a
+      // withheld brief reported as "ready" is the blank body that reads as up to date.
+      status: ledger === null && runtime?.status === 'ready' ? undefined : runtime?.status,
       fold: runtime?.fold ?? IDLE_FOLD,
       ...(runtime?.error ? { error: runtime.error } : {})
     })
@@ -121,9 +125,7 @@ export class SessionSummaryService {
 
   private emit(paneKey: string): void {
     const snapshot = this.snapshot(paneKey)
-    for (const listener of this.listeners) {
-      listener(snapshot)
-    }
+    this.listeners.forEach((listener) => listener(snapshot))
   }
 
   /** Returns the current snapshot immediately; fold work is async and pushed via onUpdate. */

@@ -69,5 +69,7 @@ export type UiWindowApi = {
   popupMenu: () => void
   onWindowCloseRequested: (callback: (data: { isQuitting: boolean }) => void) => () => void
   confirmWindowClose: () => void
+  /** Tell main a quit it already started was vetoed here, so it can stand down instead of quitting. */
+  cancelQuit: () => void
   notifyWindowRevealed: () => void
 }

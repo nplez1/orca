@@ -79,6 +79,12 @@ export function resetHostSettingsReplication(): void {
  * one could send a removal list and delete credentials the first configured. The pin is taken from the
  * first snapshot — the push that establishes the relationship — and an owner/local caller (no
  * fingerprint) is always allowed, because that is the user at this machine.
+ *
+ * Why the pin is NOT a trust boundary: a refused caller can send a snapshot instead of a delta, which is
+ * accepted while the pin is unverifiable and, in doing so, deletes every credential replication owns and
+ * re-pins the host to that caller. See docs/reference/host-settings-replication.md § "What the pin does
+ * not do". It refuses an accidental second writer, not a malicious paired desktop — pairing already
+ * implies command execution on this host, so nothing here can be the boundary.
  */
 export function applyHostSettingsReplication(
   payload: HostSettingsIncomingPayload,
@@ -125,6 +131,9 @@ export function applyHostSettingsReplication(
       )
       return { decision: 'refusedNotTheMain' }
     }
+    // Why this branch is the honest limit of the pin: an unverifiable pin admits the snapshot, which
+    // clears what replication owns and stamps this caller as the new main. It is deliberate — a host
+    // whose pairing row is gone has no other way to be adopted — and it is not a security boundary.
   }
 
   const decision = decideHostSettingsPayload(record.revision, payload)

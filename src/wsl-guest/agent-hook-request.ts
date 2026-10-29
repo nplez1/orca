@@ -2,6 +2,7 @@ import { checkHookOwnerPresence } from '../shared/agent-hook-owner-presence'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { HOOK_REQUEST_SLOWLORIS_MS } from '../shared/agent-hook-listener/listener-limits'
 import { mergeAgentHookRequestHeaders } from '../shared/agent-hook-listener/hook-envelope'
+import { hookTokenMatches } from '../shared/agent-hook-listener/hook-token'
 import { readRequestBody } from '../shared/agent-hook-listener/request-body'
 import { resolveHookSource } from '../shared/agent-hook-listener/source-routing'
 import type { createHookTransportInterferenceTracker } from '../shared/agent-hook-transport-interference'
@@ -44,7 +45,7 @@ export async function handleRelayHookRequest(
     res.end()
     return
   }
-  if (req.headers['x-orca-agent-hook-token'] !== options.token) {
+  if (!hookTokenMatches(req.headers['x-orca-agent-hook-token'], options.token)) {
     res.writeHead(403)
     res.end()
     return

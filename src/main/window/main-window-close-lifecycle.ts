@@ -141,6 +141,17 @@ export function installMainWindowCloseLifecycle(args: {
       mainWindow.close()
     }
   }
+  // Why: a close guard can veto after `before-quit` has latched `isQuitting`, and that path sends no
+  // other IPC — main never heard, so tray-hide stayed disabled and later closes read as quits.
+  const quitCancelledChannel = 'window:quit-cancelled'
+  const onQuitCancelled = (event: Electron.IpcMainEvent): void => {
+    if (event.sender.id !== rendererWebContentsId || opts?.getIsQuitting?.() !== true) {
+      return
+    }
+    clearQuitRendererAckTimer()
+    state.resumeBoundsPersistence()
+    opts?.onQuitAborted?.()
+  }
   const trafficLightChannel = 'ui:sync-traffic-lights'
   const onSyncTrafficLights = (_event: Electron.IpcMainEvent, zoomFactor: number): void => {
     syncTrafficLightPosition(mainWindow, zoomFactor)
@@ -195,6 +206,7 @@ export function installMainWindowCloseLifecycle(args: {
 
   ipcMain.on(confirmCloseChannel, onConfirmClose)
   ipcMain.on(closeRequestReceivedChannel, onCloseRequestReceived)
+  ipcMain.on(quitCancelledChannel, onQuitCancelled)
 
   const dispose = (): void => {
     clearQuitRendererAckTimer()
@@ -206,6 +218,7 @@ export function installMainWindowCloseLifecycle(args: {
     ipcMain.removeHandler(isMaximizedChannel)
     ipcMain.removeListener(confirmCloseChannel, onConfirmClose)
     ipcMain.removeListener(closeRequestReceivedChannel, onCloseRequestReceived)
+    ipcMain.removeListener(quitCancelledChannel, onQuitCancelled)
   }
   return { dispose }
 }

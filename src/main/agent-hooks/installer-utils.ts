@@ -89,6 +89,14 @@ export {
   wrapWindowsHookCommand
 } from './windows-hook-command'
 
+// The agent's own process identity on Windows, as the native hook reports it.
+//
+// Why the env var: batch has no `$PPID`, so the JSON has to come from the process that could read it
+// (the native `orca-agent-hook.exe`, or a launcher that captured it) and this is how it reaches curl.
+// An unset value sends an empty field, which the listener already reads as "no identity" — exactly
+// what a hook sending nothing looked like before, so the change cannot regress the outer guard.
+export const WINDOWS_HOOK_AGENT_PROCESS_VAR = 'ORCA_HOOK_AGENT_PROCESS'
+
 /** Extra form lines precede payload@- and must end with ` ^`. */
 export function buildWindowsAgentHookPostCommand(
   source: AgentHookSource,
@@ -106,6 +114,7 @@ export function buildWindowsAgentHookPostCommand(
     '  --data-urlencode "worktreeId=%ORCA_WORKTREE_ID%" ^',
     '  --data-urlencode "env=%ORCA_AGENT_HOOK_ENV%" ^',
     '  --data-urlencode "version=%ORCA_AGENT_HOOK_VERSION%" ^',
+    `  --data-urlencode "agentProcess=%${WINDOWS_HOOK_AGENT_PROCESS_VAR}%" ^`,
     ...extraFormLines,
     '  --data-urlencode "payload@-" >nul 2>nul'
   ].join('\r\n')
@@ -125,6 +134,7 @@ export function buildWindowsAgentHookCurlPostCommand(source: AgentHookSource): s
     '--data-urlencode "worktreeId=%ORCA_WORKTREE_ID%"',
     '--data-urlencode "env=%ORCA_AGENT_HOOK_ENV%"',
     '--data-urlencode "version=%ORCA_AGENT_HOOK_VERSION%"',
+    `--data-urlencode "agentProcess=%${WINDOWS_HOOK_AGENT_PROCESS_VAR}%"`,
     '--data-urlencode "payload@-"',
     '>nul 2>&1'
   ].join(' ')

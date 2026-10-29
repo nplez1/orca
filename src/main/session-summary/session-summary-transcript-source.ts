@@ -32,6 +32,10 @@ import type { SessionSummarySourceEvent } from './session-summary-fold'
  */
 export const LOCAL_TRANSCRIPT_MAX_RETAINED_BYTES = REMOTE_TRANSCRIPT_MAX_BYTES
 
+// Why a counter and not the path: two folds of one session carry the same path, and the consumer
+// registry is process-wide, so only a per-read tag can tell this fold's messages from a sibling's.
+let transcriptReadSequence = 0
+
 export type SessionSummaryEventRead = {
   /** Events from the transcript, starting at the index the caller asked for. */
   events: SessionSummarySourceEvent[]
@@ -154,8 +158,9 @@ export async function readSessionSummaryEventsFromFile(args: {
     codexHome: null
   }
 
-  // Collect decoded messages via the parser's fan-out; scoped to this path so a
-  // concurrent AI Vault scan of another file can't leak into the fold.
+  // Collect decoded messages via the parser's fan-out; the tag, not the path, scopes the fold to this
+  // read, so a concurrent fold of the same session cannot enlist this consumer.
+  const readToken = `summary-fold:${++transcriptReadSequence}`
   const collected: TranscriptMessage[] = []
   let received = 0
   let retainedBytes = 0
@@ -170,7 +175,7 @@ export async function readSessionSummaryEventsFromFile(args: {
   signal.addEventListener('abort', abortRead, { once: true })
   const unregister = registerTranscriptConsumer({
     beginRead(start) {
-      if (start.candidate.file.path !== filePath) {
+      if (start.readToken !== readToken) {
         return null
       }
       return {
@@ -207,7 +212,8 @@ export async function readSessionSummaryEventsFromFile(args: {
     await readWholeTranscript({
       candidate,
       platform: process.platform,
-      signal: readController.signal
+      signal: readController.signal,
+      readToken
     })
     if (retainedOverflow) {
       throw retainedOverflow

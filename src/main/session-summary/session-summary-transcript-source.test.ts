@@ -267,4 +267,32 @@ describe('readSessionSummaryTranscriptEvents', () => {
       })
     ).rejects.toThrow()
   })
+
+  // Why: the consumer registry is process-wide and consumers used to accept any read whose path
+  // matched, so a second fold of one session enlisted the first one's consumer — its collection then
+  // held both streams interleaved and the fold's indexes pointed at the wrong messages.
+  it('keeps two concurrent folds of one file apart', async () => {
+    const dir = await tempDir()
+    const transcriptPath = join(dir, '2026-01-01T00-00-00-000Z_pi-session-1.jsonl')
+    await writeFile(transcriptPath, piTranscript('Add a sticky-note icon', 'Icon replaced.'))
+    const { readSessionSummaryTranscriptEvents } = await loadSource()
+    const identity = {
+      agentType: 'pi' as const,
+      providerSession: { key: 'session_id' as const, id: 'pi-session-1', transcriptPath }
+    }
+
+    const [first, second] = await Promise.all([
+      readSessionSummaryTranscriptEvents({ identity, signal: signal() }),
+      readSessionSummaryTranscriptEvents({ identity, signal: signal() })
+    ])
+
+    expect(first?.events.map((event) => event.text)).toEqual([
+      'Add a sticky-note icon',
+      'Icon replaced.'
+    ])
+    expect(second?.events.map((event) => event.text)).toEqual([
+      'Add a sticky-note icon',
+      'Icon replaced.'
+    ])
+  })
 })

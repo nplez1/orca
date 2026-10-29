@@ -7,6 +7,7 @@ import { RelayAgentHookServer } from '../../wsl-guest/agent-hook-server'
 import type { drainAgentHookSpoolAsync } from '../../shared/agent-hook-spool'
 import type * as HookSpoolModule from '../../shared/agent-hook-spool'
 import { getEndpointFileName } from '../../shared/agent-hook-listener/endpoint-publication'
+import { STATUS_SPOOL_DRAIN_INTERVAL_MS } from './server/server-status-hook-lifecycle'
 
 const drain = vi.hoisted(() => vi.fn<typeof drainAgentHookSpoolAsync>())
 vi.mock('../../shared/agent-hook-spool', async (importOriginal) => ({
@@ -137,3 +138,24 @@ it.each(['main', 'relay'] as const)(
     expect(existsSync(server.endpoint)).toBe(false)
   }
 )
+
+// Why: a spooled Stop that lost a brief main-process stall used to wait for the next launch, because
+// the spool was read once, before the listener bound.
+it('replays the spool again while it runs, not only at startup', async () => {
+  vi.useFakeTimers()
+  try {
+    const server = fixture('main')
+    drain.mockResolvedValue(0)
+    await server.start()
+    expect(drain).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(STATUS_SPOOL_DRAIN_INTERVAL_MS)
+    expect(drain).toHaveBeenCalledTimes(2)
+
+    server.stop()
+    await vi.advanceTimersByTimeAsync(STATUS_SPOOL_DRAIN_INTERVAL_MS * 3)
+    expect(drain).toHaveBeenCalledTimes(2)
+  } finally {
+    vi.useRealTimers()
+  }
+})

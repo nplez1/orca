@@ -4,15 +4,15 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
   return [
     'type HookSnapshot = { hookEventName: string; extra: Record<string, unknown>; metadata: Record<string, unknown>; ompRuntime: boolean }',
     'type HookPost = HookSnapshot & { revision: number; attempts: number; delivered: boolean; final?: boolean }',
-    'type HookPostQueue = { activePost: HookPost | null; pendingPost: HookPost | null; latestPost: HookPost | null; finalPosts: HookPost[]; finalRetryTimer: ReturnType<typeof setTimeout> | null; postRevision: number; retryTimer: ReturnType<typeof setTimeout> | null; watchTimer: ReturnType<typeof setTimeout> | null; watchAttemptedKey: string | null; watchSnapshot: HookSnapshot | null; turnEnded: boolean; newestEnqueued: number }',
+    'type HookPostQueue = { activePost: HookPost | null; pendingPost: HookPost | null; latestPost: HookPost | null; finalPosts: HookPost[]; finalRetryTimer: ReturnType<typeof setTimeout> | null; postRevision: number; retryTimer: ReturnType<typeof setTimeout> | null; watchTimer: ReturnType<typeof setTimeout> | null; watchAttemptedKey: string | null; watchSnapshot: HookSnapshot | null; turnEnded: boolean; newestEnqueued: number; completionDelivered: boolean; completionWatchDeadline: number }',
     ...(kind === 'pi'
       ? [
           'declare global { var __orcaPiStatusPostQueue: HookPostQueue | undefined }',
           // Why: old delivery continuations and a reloaded registration must serialize through one queue.
-          'const postQueue: HookPostQueue = globalThis.__orcaPiStatusPostQueue ??= { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true, newestEnqueued: 0 }'
+          'const postQueue: HookPostQueue = globalThis.__orcaPiStatusPostQueue ??= { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true, newestEnqueued: 0, completionDelivered: true, completionWatchDeadline: 0 }'
         ]
       : [
-          'const postQueue: HookPostQueue = { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true, newestEnqueued: 0 }'
+          'const postQueue: HookPostQueue = { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true, newestEnqueued: 0, completionDelivered: true, completionWatchDeadline: 0 }'
         ]),
     '',
     'function cancelPostRetry(): void {',
@@ -35,6 +35,8 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '  for (const post of [postQueue.activePost, postQueue.pendingPost, postQueue.latestPost]) {',
     "    if (!post || post.hookEventName !== 'agent_end' || post.delivered || post.final) continue",
     '    post.final = true',
+    '    // Why the spent budget is kept: the retries a completion already used are retries of the same',
+    '    // post, so promotion cannot hand out a fresh three on top of them.',
     '    postQueue.finalPosts.push(post)',
     '  }',
     '  postQueue.pendingPost = null',
@@ -60,6 +62,9 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     // long tool call or a subagent. So while work is in flight the agent speaks first and republishes the
     // state Orca already had, at the endpoint Orca is serving now.
     'const ENDPOINT_WATCH_MS = 2000',
+    // Why bounded: the watch exists to re-announce a completion Orca never acknowledged, and a pane
+    // whose Orca is gone must not poll for it for the rest of the run.
+    'const COMPLETION_WATCH_MAX_MS = 60000',
     '',
     'function endpointKeyOf(coords: { port?: string; token?: string; env?: string; version?: string }): string {',
     "  return [coords.port, coords.token, coords.env, coords.version].join('|')",
@@ -100,7 +105,11 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '  // Why the snapshot outranks the flag here: a reset can drop a turn start that was enqueued and',
     '  // never attempted, leaving a completion in hand with the flag already cleared — reporting that',
     '  // completion would tell a restarted Orca a working pane had finished.',
-    "  if (snapshot.hookEventName === 'agent_end') return childWork",
+    "  if (snapshot.hookEventName === 'agent_end') {",
+    '    // Why: a completion that never reached Orca leaves the pane reading "working" until the next',
+    '    // prompt, so the watch stays armed to republish it — at the new endpoint if Orca restarted.',
+    '    return childWork || (!postQueue.completionDelivered && Date.now() <= postQueue.completionWatchDeadline)',
+    '  }',
     '  return !postQueue.turnEnded || childWork',
     '}',
     '',
@@ -131,6 +140,10 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '    // promoted to final by a queue reset is a reload or a sibling registration, not the end.',
     '    postQueue.watchSnapshot =',
     '      extra.session_boundary === true ? null : { hookEventName, extra, metadata, ompRuntime }',
+    "    if (hookEventName === 'agent_end') {",
+    '      postQueue.completionDelivered = false',
+    '      postQueue.completionWatchDeadline = Date.now() + COMPLETION_WATCH_MAX_MS',
+    '    }',
     '  }',
     '  if (watchHeldByWork()) startEndpointWatch()',
     '  else stopEndpointWatch()',
@@ -174,6 +187,14 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '  void postOnce(next.hookEventName, next.extra, next.metadata, next.ompRuntime, next.final === true, isNewestEnqueue(next))',
     '    .then(() => {',
     '      next.delivered = true',
+    "      if (next.hookEventName === 'agent_end') {",
+    '        postQueue.completionDelivered = true',
+    '        // Why the guard: children still running keep the roster snapshot the watch republishes.',
+    '        if (!watchHeldByWork()) {',
+    '          postQueue.watchSnapshot = null',
+    '          stopEndpointWatch()',
+    '        }',
+    '      }',
     '      if (next.final) postQueue.finalPosts.shift()',
     '    })',
     '    .catch(() => {',
@@ -190,7 +211,9 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     "        if (typeof postQueue.finalRetryTimer.unref === 'function') postQueue.finalRetryTimer.unref()",
     '        return',
     '      }',
-    '      if (!next.ompRuntime || next.revision !== postQueue.postRevision) return',
+    '      // Why a completion retries too: a plain-pi failure was dropped outright, and the pane stayed',
+    '      // working until the user typed again.',
+    "      if (!(next.ompRuntime || next.hookEventName === 'agent_end') || next.revision !== postQueue.postRevision) return",
     '      if (next.attempts >= 3) {',
     "        console.warn('[orca-pi-status] hook delivery failed after retries:', next.hookEventName)",
     '        return',

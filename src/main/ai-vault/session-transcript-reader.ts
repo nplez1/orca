@@ -14,6 +14,14 @@ import { throwIfAiVaultScanCancelled } from './ai-vault-scan-cancellation'
 type TranscriptSessionEnrichment = {
   /** Complete consumer metadata before committing; the returned fold stays unmodified. */
   sessionForConsumers?: (session: AiVaultSession | null) => Promise<AiVaultSession | null>
+  /**
+   * Tag this read, so a consumer accepts only a read it started.
+   *
+   * Why: consumers are registered process-wide and match on the file path, which two folds of one
+   * session satisfy at the same time — a second fold would enlist the first one's consumer and
+   * interleave both streams into one collection.
+   */
+  readToken?: string
 }
 
 const NEWLINE_BYTE = 0x0a
@@ -78,6 +86,7 @@ export async function readResumableTranscript(
     candidate: args.candidate,
     mode: canResume ? 'append' : 'replace',
     previousByteOffset: startOffset,
+    ...(args.readToken === undefined ? {} : { readToken: args.readToken }),
     identity: () => state.identity?.() ?? null
   })
   try {
@@ -155,7 +164,12 @@ export async function readWholeTranscript(
     args.stats.bytesRead += file.sizeBytes ?? 0
   }
   const channel = new TranscriptMessageChannel()
-  channel.beginRead({ candidate: args.candidate, mode: 'replace', previousByteOffset: 0 })
+  channel.beginRead({
+    candidate: args.candidate,
+    mode: 'replace',
+    previousByteOffset: 0,
+    ...(args.readToken === undefined ? {} : { readToken: args.readToken })
+  })
   try {
     const session = await parseAgentSessionFile(args.candidate, args.platform, channel, args.signal)
     const consumerSession = args.sessionForConsumers

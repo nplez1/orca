@@ -11,6 +11,7 @@ import {
   parseClaudeStatusLineBody
 } from '../../../shared/claude-statusline-rate-limits'
 import { mergeAgentHookRequestHeaders } from '../../../shared/agent-hook-listener/hook-envelope'
+import { hookTokenMatches } from '../../../shared/agent-hook-listener/hook-token'
 import { readRequestBody } from '../../../shared/agent-hook-listener/request-body'
 import { resolveHookSource } from '../../../shared/agent-hook-listener/source-routing'
 import { HOOK_REQUEST_SLOWLORIS_MS } from '../../../shared/agent-hook-listener/listener-limits'
@@ -74,7 +75,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
         res.end()
         return
       }
-      if (req.headers['x-orca-agent-hook-token'] !== this.token) {
+      if (!hookTokenMatches(req.headers['x-orca-agent-hook-token'], this.token)) {
         res.writeHead(403)
         res.end()
         return
@@ -241,6 +242,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     }
     if (isCurrent() && this.statusHooksEnabled) {
       this.startOpenCodeBinderLoop()
+      this.startStatusSpoolDrainLoop()
     }
     this.adoptHydratedScreenPromptRows()
   }
@@ -256,6 +258,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
   /** Quit retains status until chat teardown reads resumable child and background work. */
   stop(options?: { keepStatus?: boolean }): void {
     this.startup.stop()
+    this.stopStatusSpoolDrainLoop()
     this.claudeAgentViews.clear()
     // Terminal status may still have a pending write while hook ingress is disabled.
     if (this.statusHooksEnabled || this.statusPersistTimer) {
