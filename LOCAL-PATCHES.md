@@ -2496,10 +2496,17 @@ What is deliberately left alone, because either side of the pair is indistinguis
 - **A Muse pointer to a pre-rename hooks file.** `managed_hooks_path` naming
   `~/.orca/agent-hooks/muse-hooks.json` — on the local machine or an SSH host — is reported as "a
   pre-rename or official Orca registration" and left alone, because an official install writes the
-  same pointer. Re-registering Muse hooks writes the new file instead of adopting that one.
-- **A `{HOME}/.orca` profile holding nothing but `bundle-coordination`.** That tree is the only thing
-  builds before this one ever wrote there, so the probe treats such a profile as absent and the legacy
-  sweep still runs; anything else in the directory is the official app's.
+  same pointer. Registration stays blocked until the user clears or repoints `managed_hooks_path`.
+- **A `~/Library/Application Support/orca` profile holding nothing but `bundle-coordination`.** That
+  tree is the only thing builds before the coordination-root move ever wrote there, so the probe treats
+  such a profile as absent and the legacy sweep still runs; anything else in the directory is the
+  official app's. Two residual risks, both recorded rather than guessed at:
+  - An official install that only ever ran a supervised serve with a pinned `ORCA_USER_DATA_PATH`
+    leaves exactly that same one-entry profile, so its local `~/.orca` hook entries would be swept.
+    Reading the park tree's `supervisors/*.json` to tell the two apart is the fix if it is ever
+    observed; the sweep only ever deletes entries that look like this build's own.
+  - A `.DS_Store` (or any other second entry) in that directory makes an Orca-NP-only Mac read as an
+    official install, so its `~/.orca` leftovers are not swept. That is the safe direction.
 - **A pre-rename `serve` unit and a pre-rename WSL registration.** Both were written under upstream's
   names with upstream's marker, exactly like the official app's, so neither can be removed or adopted
   safely. The launchd _label_ is still recognised, which is what lets an upgrade park the supervisor
