@@ -119,8 +119,11 @@ export class WorkerThreadRequestQueue<
         cleanupAbort: () => signal?.removeEventListener('abort', abort)
       }
       const abort = (): void => {
+        const abortError = signal?.reason instanceof Error ? signal.reason : null
         if (this.active === call) {
           this.host.destroy()
+          // The worker is gone, so concurrent calls on it would otherwise wait out their own deadlines.
+          this.concurrentCalls.failAll(abortError ?? new Error('Worker request aborted'))
         } else {
           this.queue = this.queue.filter((queued) => queued !== call)
         }
