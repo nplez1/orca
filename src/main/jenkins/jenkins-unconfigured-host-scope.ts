@@ -48,7 +48,9 @@ async function lookupHostAddresses(hostname: string): Promise<readonly string[] 
     timer = setTimeout(() => resolve(null), LOOKUP_TIMEOUT_MS)
   })
   try {
-    // `dns.lookup` cannot be cancelled, so the abandoned promise is raced rather than aborted.
+    // `dns.lookup` cannot be cancelled, so a hung resolver keeps its threadpool slot after the race
+    // gives up; the abandoned promise is handled rather than aborted, and this timeout is what keeps
+    // the request itself bounded.
     const answers = await Promise.race([lookup(hostname, { all: true, verbatim: true }), timeout])
     return answers?.map((entry) => entry.address) ?? null
   } catch {

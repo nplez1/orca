@@ -182,7 +182,7 @@ export function jenkinsSignal(signal: AbortSignal | undefined): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout
 }
 
-/** A redirect status; the value only matters to the refusal below. */
+/** A redirect status; only the class matters, and only to the refusal below. */
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
 function redirectFailure(): JenkinsRequestFailure {
@@ -197,10 +197,11 @@ function redirectFailure(): JenkinsRequestFailure {
 /**
  * Electron's transport rejects a manual redirect instead of handing back the 3xx response
  * (`net-client-request.ts`): the request is already cancelled when it reaches us, which is a
- * refusal, not an unreachable server.
+ * refusal, not an unreachable server. The message is Electron's own, matched verbatim — in `manual`
+ * mode Chromium cancels on the first hop, so no `ERR_TOO_MANY_REDIRECTS` reaches this branch.
  */
 function isCancelledRedirect(error: unknown): boolean {
-  return error instanceof Error && /redirect/i.test(error.message)
+  return error instanceof Error && /redirect was cancelled/i.test(error.message)
 }
 
 export async function jenkinsGetJson(
