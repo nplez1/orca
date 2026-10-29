@@ -7,8 +7,8 @@ import {
 import { openSessionSearchIndexFile } from './session-search-index-test-fixture'
 import { SessionSearchStore } from './session-search-store'
 
-// Realistic mtimes: the cutoff is a wall-clock bound, and a purge whose cutoff sits past the newest
-// indexed file is refused as a clock jump.
+// Realistic mtimes: the cutoff is a wall-clock bound, and only a purge that measures itself against
+// the retention window is clamped against a jumped clock.
 const BASE = 1_700_000_000_000
 
 function seed(db: SyncDatabase, id: number, rows: number, mtime: number): void {

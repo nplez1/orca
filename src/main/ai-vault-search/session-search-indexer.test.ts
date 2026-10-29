@@ -369,9 +369,14 @@ it('moves the retention window with the clock instead of freezing it at construc
   expect(sessionsMatching('ages')).toEqual([SESSION_ID])
 
   clock.advance(3 * 86_400_000)
+  // Why a newer transcript: a purge whose cutoff sits past every indexed row is refused as a clock
+  // jump, so the window advancing past a whole index is only provable once something inside it
+  // exists. That case is covered in session-search-retention-delete.test.ts.
+  await writeClaudeTranscript(transcriptPath(OTHER_SESSION_ID), ['still inside'], OTHER_SESSION_ID)
   await indexer?.reconcile({ full: true })
 
   expect(sessionsMatching('ages')).toEqual([])
+  expect(sessionsMatching('still')).toEqual([OTHER_SESSION_ID])
   await nextCycle()
   expect(sessionsMatching('ages')).toEqual([])
 })

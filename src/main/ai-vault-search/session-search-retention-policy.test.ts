@@ -29,10 +29,10 @@ it('reports the window the cutoff implements, and none when unbounded', () => {
   expect(sessionSearchRetentionWindowMs(null)).toBeNull()
 })
 
-it('keeps a cutoff that is at most a window past the newest indexed file', () => {
+it('keeps a cutoff at most a window past the newest indexed file', () => {
   const cutoff = sessionSearchHistoryCutoffMs(30, NOW) ?? 0
   const window = sessionSearchRetentionWindowMs(30)
-  // One expired file and nothing else is a real state, so an ordinary purge must survive.
+  // One expired file and nothing else is a real state, so an ordinary purge has to survive it.
   expect(usableRetentionCutoffMs(cutoff, cutoff - 100, window)).toBe(cutoff)
   expect(usableRetentionCutoffMs(cutoff, cutoff, window)).toBe(cutoff)
   expect(usableRetentionCutoffMs(cutoff, cutoff - 30 * DAY, window)).toBe(cutoff)
