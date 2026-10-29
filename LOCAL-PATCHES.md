@@ -1525,16 +1525,17 @@ with no diff a reader could see. These four came in with upstream's `d9a7aa89c8`
   `new Set(['refs/heads/main'])`, and this fork's default branch is **`nplez1/main`**
   (`gh api repos/nplez1/orca --jq .default_branch`), so the release line was what it swept. Its only run,
   `40762364436` (2026-10-28T20:20Z), logged `Removed 28 idle branch caches (9.39 GB)` and all 28 were
-  `refs/heads/nplez1/main`: `node-cache-*`, `electron-builder-*`, `electron-package-Linux-ARM64-43.8.1`,
-  `native-modules-*` and `pnpm-lockfile-verified-*`. It ran every three hours. The damage is checkable
+  `refs/heads/nplez1/main`, including `node-cache-*`, `electron-builder-*`,
+  `electron-package-Linux-ARM64-43.8.1`, `native-modules-*`, `pnpm-lockfile-verified-*` and a `bun-`
+  key. It ran every three hours. The damage is checkable
   from the other side: the confirmation run below reports `Cache not found for input keys:` for
   `electron-package-Linux-ARM64-43.8.1`, `native-modules-…-4480ff7f…` and `pnpm-lockfile-verified-Linux-arm64-…`
-  — keys this sweep had deleted 4.5 h earlier, matching down to the lockfile-hash suffix. **Never
+  — keys this sweep had deleted about 4.7 h earlier, matching down to the lockfile-hash suffix. **Never
   re-enable it without moving the keep-set to this fork's default branch in a fork hunk**, and it does
   not belong in `ALLOWED_INERT` either: it has a `schedule`, which is the same reason that list already
   gives for `fork-main-tests.yml` not being inert-able.
 - **`unit-module-cache.yml`** — asks for `blacksmith-8vcpu-ubuntu-2404`, which nothing here answers, so
-  its run `40695036546` queued all five shards for 12 h before this session cancelled it. Two
+  its run `40695036546` queued all five shards for 12 h before it was cancelled here. Two
   corrections to the first reading of it, both worth having written down, because both make the wedge
   **less** costly than it looked. That run was a **push on `main`** — the upstream mirror, carrying
   upstream's own `f173998203` — not on `nplez1/main`, so `unit-module-cache-${{ github.ref }}` never put
@@ -1553,8 +1554,9 @@ After `--fix`: `76 workflows on nplez1/orca, 10 active (3 required + 7 allowed-i
 **Disabled is the end state for the cache producer, not a repoint.** The tempting fix — run it on
 `ubuntu-24.04-arm` so its key lines up with the nightly — fails in both halves. The nightly passes no
 `module_cache`, whose default in `unit-tests.yml` is `'off'`, so there is no restore step for a producer
-key to match; and a cache written by a run on `main` is visible only to runs on `main` or on the default
-branch, which is `nplez1/main`. Making it real costs three hunks in upstream-owned files — the caller's
+key to match; and a cache saved by a run on `main` is restorable only by runs on `main` and PRs based on
+it — what is shared across branches is the other direction, caches written on the default branch
+(`nplez1/main`). Making it real costs three hunks in upstream-owned files — the caller's
 runner, `unit_plan`'s `if:` guard, and `module_cache: warm` on the nightly — for a cache nothing here
 consumes, since `pr.yml` is off and there is no PR shard to warm. Disabled, and no fork hunk taken.
 
@@ -1571,15 +1573,16 @@ The Linux red set keeps its one entry. The daemon disconnect race failed in that
 since: `40695078222` (on `d96a57ffc6`, shard 3 green; that run failed only shard 1's cooldown
 assertion), `40701735011` (on `1776dcc575`, all five shards) and `40797794635` (below) — the last two
 carrying its own `did not fail here, so its known-red entry may be prunable` notice. It stays anyway:
-the passes are dispatches, and the entry's exit condition asks for two consecutive green **scheduled**
-nights, which has not happened since 2026-10-08. Three failures in seven observations is also too weak
-for a pass count to mean a fix — two passes in a row would happen by luck about a third of the time — so
-the entry now asks for the upstream fix, or five consecutive green scheduled nights.
+the passes are dispatches, and the entry's exit condition asked for two consecutive green **scheduled**
+nights, which no two scheduled runs on record have delivered — the only green scheduled run here is
+2026-10-08. The history is also what makes a short pass count weak as evidence of a fix: three failures
+in seven observations would produce two passes in a row by luck about a third of the time. So the entry
+now asks for the upstream fix, or five consecutive green scheduled nights.
 
 **Confirmed on the revision this record lands on:** run `40797794635` on `fdd5850d0f` (dispatch,
 2026-10-29T01:01Z) — `plan` green, all five test shards green, `relay integration` skipped as intended,
-and the daemon entry passing rather than absorbed. The `##[error]` lines a green run carries are all
-asserted test output, not reds: `src/entry.ts(1,14): error TS2322` is the broken fixture
+and the daemon entry passing rather than absorbed. The `##[error]` lines a green run carries are expected
+noise, not reds: `src/entry.ts(1,14): error TS2322` is the broken fixture
 `config/scripts/build-cli.test.mjs:171` writes and then asserts the compiler reports, and
 `cannot read report.json: ENOENT` is `tests/tools/unit-shard-verdict.test.mjs` (23 cases, green)
 exercising its own error paths. `Unable to download artifact(s): unit-selection-attempt-1` is the
