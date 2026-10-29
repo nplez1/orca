@@ -563,7 +563,7 @@ describe('the corroboration loop', () => {
     expect(published).toHaveLength(0)
 
     screen = { reason: 'agent-approval-prompt', since: 1_200 }
-    vi.advanceTimersByTime(SCREEN_PROMPT_SLOW_RECHECK_MS)
+    vi.advanceTimersByTime(1_000)
     expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
   })
 

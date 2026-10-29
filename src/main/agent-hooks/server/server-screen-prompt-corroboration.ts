@@ -258,9 +258,12 @@ export class ScreenPromptCorroboration {
     // Why hold: "cannot see it" is not "no dialog". A collapsed card, a narrow pane and a ruled
     // grid are all blind spots the reader answers `undefined` for, and forgetting the pane on one
     // of them loses the rescue for the rest of the question — nothing re-reads a forgotten pane
-    // until the agent posts again, which an unanswered dialog may never do (#228).
+    // until the agent posts again, which an unanswered dialog may never do (#228). The ordinary
+    // cadence, not the slow one: the first read after an on-gain trigger usually lands before the
+    // emulator has parsed the chunk that paints the dialog, and a 5 s first retry would report
+    // Needs You late rather than wrong.
     if (reading === undefined) {
-      this.scheduleRecheck(paneKey, true)
+      this.scheduleRecheck(paneKey)
       return
     }
     const next = screenPromptRow(pane.working, current, reading)
@@ -283,7 +286,7 @@ export class ScreenPromptCorroboration {
     this.scheduleRecheck(paneKey)
   }
 
-  private scheduleRecheck(paneKey: string, slow = false): void {
+  private scheduleRecheck(paneKey: string): void {
     const pane = this.panes.get(paneKey)
     if (!pane) {
       return
@@ -292,7 +295,7 @@ export class ScreenPromptCorroboration {
     // Why slow rather than stop: nothing else ends an unanswered dialog's wait, and its answer emits
     // no hook at all - the next one is the approved command's PostToolUse, minutes later.
     const delay =
-      slow || pane.rechecks > SCREEN_PROMPT_FAST_RECHECK_COUNT
+      pane.rechecks > SCREEN_PROMPT_FAST_RECHECK_COUNT
         ? SCREEN_PROMPT_SLOW_RECHECK_MS
         : SCREEN_PROMPT_RECHECK_MS
     this.reads.schedule(paneKey, paneKey, delay)

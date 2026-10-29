@@ -685,6 +685,20 @@ describe('getPiTitlebarExtensionSource', () => {
     expect(harness.lastTitle()).toBe(PROMPT_TITLE)
   })
 
+  it('leaves the marker to a foreign owner it can prove is running', async () => {
+    const harness = createHarness({
+      env: { ORCA_PI_TITLE_MARKER_OWNED: '111' },
+      killImpl: () => {}
+    })
+
+    await harness.callHook('agent_start')
+    await harness.callHook('ui_prompt_start')
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(harness.titles).not.toContain(PROMPT_TITLE)
+    expect(harness.lastTitle()).toMatch(BRAILLE_RE)
+  })
+
   it('keeps suppression for an owner it cannot prove dead', async () => {
     // EPERM and an unreadable probe cannot prove the owner exited, exactly as the status lane treats
     // them: claiming the pane here would double-report a live pi's dialog.
