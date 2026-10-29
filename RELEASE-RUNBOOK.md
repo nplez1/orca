@@ -195,18 +195,24 @@ summary-less release went live whenever the generator could not produce one.
 `gh release edit --draft=false` at the end of the linux job makes it public, which is the window for
 exactly this check — and the guard above is what now refuses a body with no summary. **A release does
 not go public without the change summary**: the body must carry `## What changed` for the range since
-the previous `-np.` tag. When the guard refuses, nothing has gone public: on the generated notes it
-stops before a draft or a tag exists, so there is nothing to edit afterwards, and on the draft it
-leaves the release a draft no installed build can see. The recovery is the cause, not the body — the
-generator's own warning is in the same step's log, and a shallow clone or a missing previous tag is
-the usual one. Fix it and dispatch again. An install-only body is the failure the generator replaced,
-not an acceptable fallback.
+the previous `-np.` tag. When the guard refuses, nothing has gone public, and what to do next depends
+on which of its two sites refused:
+
+- **The generated notes (macos job).** It fails before a draft, a tag or an asset exists, so the
+  cause is the only thing to fix and a fresh dispatch is the recovery. The generator's warning is in
+  the same step's log; a shallow clone is the usual cause. (A _missing previous tag_ is not — the
+  generator warns and summarizes from the tip, and that body passes.)
+- **The draft's body (linux job).** The release stays a draft, which no installed build can see. The
+  body to fix is the draft's own: `gh release edit v<version> --notes-file notes.md`, or delete the
+  draft and start over. **A re-dispatch does not rewrite it** — an existing draft skips
+  `gh release create`, so a re-run re-checks the same body and refuses again.
+
+An install-only body is the failure the generator replaced, not an acceptable fallback.
 
 Reading the draft is still worth doing, because the guard proves a summary _exists_, not that it is
 right — a generator bug or a mis-resolved previous tag is exactly what a reader catches and no check
-can. A body that is present but wrong is an edit, not a refusal: `gh release edit v<version>
---notes-file notes.md` before it goes live, and the linux job's check runs on whatever the body then
-says.
+can. A body that is present but wrong is an edit, not a refusal — `gh release edit v<version>
+--notes-file notes.md` — and the linux job's check runs on whatever the body then says.
 
 ```bash
 gh release view v<version> --repo nplez1/orca --json body --jq .body | less
@@ -316,6 +322,12 @@ gh run rerun <run-id> --repo nplez1/orca     # re-runs every job; failed legs re
 
 Delete the draft and start over (`gh release delete v<version> --yes --cleanup-tag`) only when the
 _draft body_ is wrong — a re-run keeps the body it created.
+
+**`--failed` is not a re-run of the whole workflow.** It re-runs only the jobs that failed, so a
+`gh run rerun <id> --failed` on a run whose `release-ref` job passed skips the version guard entirely
+and can republish below the newest `-np.` tag. Installs ignore a release that is not newer, but
+`releases/latest` can then point at it. Use a full `gh run rerun <id>`, or a fresh dispatch (which
+runs the guard again), whenever the version is in question.
 
 ## The Linux leg, first run (2026-10-21, `v1.4.214-np.38`)
 

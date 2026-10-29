@@ -8,7 +8,7 @@
 // remembered to read the draft. A stub is a silent install-instructions-only release, which is the
 // exact failure the generator was introduced to remove.
 //
-// usage: fork-release-notes-guard.mjs <path|-> [--label <what>]
+// usage: fork-release-notes-guard.mjs <path|-> [--site generated|draft] [--label <what>]
 // exit: 0 the body carries a change summary, 1 refuse, 2 usage
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -45,16 +45,40 @@ export function checkReleaseNotesBody(body) {
   return { ok: true, reason: `${bytes} bytes with a change summary` }
 }
 
+/** What to do next depends on which of the two sites refused: only one of them is recoverable by re-running. */
+const RECOVERY = {
+  generated:
+    'Nothing has gone public: this failed before a draft, a tag or an asset existed. Fix the cause ' +
+    "(the generator's warning is in the same step's log — a shallow clone is the usual one) and " +
+    'dispatch again.',
+  draft:
+    'Nothing has gone public: the release stays a draft, which no installed build can see. The body ' +
+    "to fix is the draft's own — `gh release edit <tag> --notes-file notes.md`, or delete the draft " +
+    'and start over. A re-dispatch will not rewrite it: an existing draft skips `gh release create`, ' +
+    'so a re-run re-checks the same body and refuses again.'
+}
+
 function main(argv) {
   const args = [...argv]
   let label = 'the release body'
-  const labelIndex = args.indexOf('--label')
-  if (labelIndex !== -1) {
-    label = args.splice(labelIndex, 2)[1] ?? label
+  const optionValue = (name) => {
+    const index = args.indexOf(name)
+    if (index === -1) {
+      return null
+    }
+    const value = args.splice(index, 2)[1] ?? null
+    return value
   }
+  const labelOption = optionValue('--label')
+  if (labelOption) {
+    label = labelOption
+  }
+  const site = optionValue('--site') ?? 'generated'
   const [path, ...rest] = args
-  if (!path || rest.length > 0) {
-    process.stderr.write('usage: fork-release-notes-guard.mjs <path|-> [--label <what>]\n')
+  if (!path || rest.length > 0 || !Object.hasOwn(RECOVERY, site)) {
+    process.stderr.write(
+      'usage: fork-release-notes-guard.mjs <path|-> [--site generated|draft] [--label <what>]\n'
+    )
     return 2
   }
   let body
@@ -68,10 +92,7 @@ function main(argv) {
   if (!result.ok) {
     process.stderr.write(
       `::error::refusing to publish: ${label} has no usable change summary — ${result.reason}. ` +
-        'Nothing has gone public. On the generated notes this stops before a draft or a tag exists, ' +
-        'so there is nothing to edit afterwards; on the draft it leaves the release a draft, which no ' +
-        "installed build can see. Fix the cause (the generator's warning is in the same step's log — a " +
-        'shallow clone or a missing previous tag is the usual one) and dispatch again.\n'
+        `${RECOVERY[site]}\n`
     )
     return 1
   }

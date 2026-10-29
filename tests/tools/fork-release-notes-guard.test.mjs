@@ -98,6 +98,36 @@ describe('the release notes guard', () => {
     expect(result.stderr).toContain('fallback')
   })
 
+  // The marker is anchored to a line start on purpose: a body that merely quotes the sentence — a
+  // commit subject, a doc change describing the guard — carries a real summary and must pass.
+  it('accepts a summary that quotes the fallback sentence', () => {
+    const notes = generatedNotes({
+      prose:
+        '12 commits changed since the last release. The notes guard now refuses a body containing ' +
+        '`**A change summary could not be generated` — that is the line this release documents.'
+    })
+    expect(checkReleaseNotesBody(notes).ok).toBe(true)
+    expect(run([withNotesFile(notes)]).status).toBe(0)
+  })
+
+  it('names the recovery each site can actually take', () => {
+    const installOnly = '**Orca NP 1.4.214-np.42**\n\nBuilt from `abc123`.\n'
+
+    // Before the draft exists there is nothing to edit: the only recovery is fixing the cause.
+    const generated = run([withNotesFile(installOnly), '--site', 'generated'])
+    expect(generated.stderr).toContain('before a draft, a tag or an asset existed')
+    expect(generated.stderr).not.toContain('gh release edit')
+
+    // At the draft site a re-dispatch re-checks the same body, so the body itself has to be edited.
+    const draft = run(['-', '--site', 'draft'], installOnly)
+    expect(draft.stderr).toContain('gh release edit')
+    expect(draft.stderr).toContain('will not rewrite it')
+  })
+
+  it('is a usage error to name a site it does not have', () => {
+    expect(run([withNotesFile(generatedNotes()), '--site', 'elsewhere']).status).toBe(2)
+  })
+
   it('refuses a fragment shorter than a real summary', () => {
     const result = run([withNotesFile('## What changed\n\nThree fixes.\n')])
     expect(result.status).toBe(1)

@@ -556,6 +556,6 @@ jobs:
           set -euo pipefail
           tag="v$RELEASE_VERSION"
           gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json body --jq .body \
-            | node .github/scripts/fork-release-notes-guard.mjs - --label "the draft body of $tag"
+            | node .github/scripts/fork-release-notes-guard.mjs - --site draft --label "the draft body of $tag"
           gh release edit "$tag" --repo "$PUBLISH_OWNER/orca" --draft=false
           echo "published $tag"
