@@ -108,6 +108,12 @@ notes — it covers the Linux runtime better than the local gate does, though th
 the only one that exercises the darwin-bound classes, so substituting it is a judgement call and not
 something to do silently.
 
+Since 2026-10-29 the dispatch carries the same coverage itself: `fork-release.yml` runs the unit suite
+on the dispatched commit (`unit-plan` → `unit-tests`, the same reusable workflow, shard plan and fork
+shard verdict as the nightly) and every artifact leg waits for it. So a dispatch can no longer publish
+with no test evidence, and there is no flag to skip it. If a shard is red there, the fix is the one
+above — fix it, or classify it in `local/nightly-linux-known-red.json` with evidence — not a retry.
+
 ## Step 2 — publish the first signed release
 
 ```bash

@@ -160,9 +160,11 @@ describe('the release dispatch guard', () => {
       return next === -1 ? rest : rest.slice(0, next)
     }
     // A guard any leg can start ahead of is not a guard: the legs build and upload the artifacts.
-    expect(jobBlock('macos')).toMatch(/\n {4}needs: release-ref\n/)
-    expect(jobBlock('windows')).toMatch(/\n {4}needs: macos\n/)
-    expect(jobBlock('linux')).toMatch(/\n {4}needs: windows\n/)
+    // `needs` is read by containment, because `macos` also waits for the unit suite.
+    const needs = (name) => /needs: (\[[^\]]*\]|[^\n]*)/.exec(jobBlock(name))?.[1] ?? ''
+    expect(needs('macos')).toContain('release-ref')
+    expect(needs('windows')).toContain('macos')
+    expect(needs('linux')).toContain('windows')
     expect(workflow.indexOf('release-ref:')).toBeLessThan(workflow.indexOf('macos:'))
   })
 })

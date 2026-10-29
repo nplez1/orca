@@ -10,10 +10,15 @@ name: Fork release
 # is why it needs no GitHub App token: the workflow's own GITHUB_TOKEN can create
 # releases in its own repository.
 #
-# Tests and lint are deliberately not run here. They are the gate for a PR, not for a
-# build you intend to hand to someone; run `pnpm test` yourself when it matters. What is gated is the
-# dispatch itself: the `release-ref` job refuses any ref but `refs/heads/nplez1/main`, and any tag
-# that already points at another commit.
+# Tests and lint are not run as a PR gate for this branch, but nothing publishes without the unit
+# suite: `unit-tests` below runs it on the dispatched commit, and the `macos` job waits for it. Before
+# 2026-10-29 the header here said the opposite — a dispatch from the Actions UI published to every
+# auto-updating install with no test evidence at all, because the local release gate's verdict lives in
+# `.git/orca-gate/` on one machine, which CI cannot see. To release without waiting for a full run
+# there is no flag: fix the red, or classify it in `local/nightly-linux-known-red.json` with evidence.
+#
+# What is also gated is the dispatch itself: the `release-ref` job refuses any ref but
+# `refs/heads/nplez1/main`, and any tag that already points at another commit.
 #
 # Why every `uses:` is pinned to a commit SHA with its tag in a trailing comment: these jobs hold
 # `contents: write` and, on macOS, the Apple certificate and notarisation secrets. The repository
@@ -67,8 +72,43 @@ jobs:
           bash .github/scripts/fork-release-ref-guard.sh \
             "$GITHUB_REF" "v${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}" "$GITHUB_SHA" "$PUBLISH_OWNER/orca"
 
+  # Why: the suite, on the exact commit being released, before a single artifact is built. It is the
+  # same reusable workflow, the same shard plan and the same fork shard verdict every other unit lane
+  # uses, so a red here means what it means on `fork-main-tests.yml` — and `local/nightly-linux-known-red.json`
+  # absorbs the Linux-only reds with evidence instead of being bypassed. ~12 min of wall clock on a
+  # public repository that bills nothing, once per release.
+  unit-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Shard plan
+        id: plan
+        run: node config/scripts/ci-unit-plan.mjs
+
+  unit-tests:
+    needs: [release-ref, unit-plan]
+    # Parity with `fork-main-tests.yml`: same Node major, same runner, same shard assignments, and
+    # the relay job dropped for the same reason — this fork provisions no `blacksmith-*` runner for
+    # it, and ships no cloud relay, so the job would queue forever rather than test anything.
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      node_versions: '["24"]'
+      runner: ubuntu-24.04-arm
+      shards: ${{ needs.unit-plan.outputs.shards }}
+      run_relay_integration: false
+
   macos:
-    needs: release-ref
+    needs: [release-ref, unit-tests]
     runs-on: macos-15
     steps:
       # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
