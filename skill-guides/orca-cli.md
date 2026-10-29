@@ -189,7 +189,10 @@ Card status uses `--workspace-status <id>`; defaults are `todo`, `in-progress`, 
 Issue/review links: `--pr` writes the GitHub pull request number; `--linear-issue` and
 `--jira-issue` write the Linear and Jira issue links the right-sidebar Issue panel reads.
 `--linear-issue` takes an identifier (`STA-335`), a linear.app issue URL, or `null` to clear.
-`--jira-issue` takes a key (`ABC-123`), a Jira issue URL, or `null` to clear. A Jira link is
+`--jira-issue` takes a key (`ABC-123`), a Jira issue URL, or `null` to clear a Jira link. That
+slot is shared by every task provider, so `null` clears nothing unless the workspace's link is a
+Jira one (it says so on stderr), and naming an issue refuses to replace a GitHub, GitLab or
+Linear link unless `--replace-linked-item` says otherwise. A Jira link is
 resolved through the host that owns the workspace, because the stored link carries the site
 its reads route to: a bare key uses that host's selected Jira site, or its only one, and is
 refused when several are connected — pass the issue URL then, or when the issue is on a site

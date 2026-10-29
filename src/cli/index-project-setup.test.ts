@@ -51,6 +51,32 @@ import {
   PROJECT_LIST_FIXTURE
 } from './index-project-setup-test-fixtures'
 
+const SETUP_UPDATE_FLAGS = ['project', 'setup-update', '--setup', 'setup-gpu']
+
+const SETUP_ROW = {
+  id: 'setup-gpu',
+  projectId: 'github:stablyai/orca',
+  hostId: 'runtime:gpu',
+  repoId: '',
+  path: '/srv/orca',
+  displayName: 'Orca',
+  setupState: 'ready',
+  setupMethod: 'provisioned',
+  createdAt: 1,
+  updatedAt: 2
+}
+
+/** A `projectHostSetup.update` answer carrying the host-wide mode it left in effect. */
+function setupUpdateLayoutFixture(id: string, worktreeLayoutMode: string | undefined) {
+  return okFixture(id, {
+    result: {
+      project: { ...ORCA_PROJECT, sourceRepoIds: [] },
+      setup: SETUP_ROW,
+      ...(worktreeLayoutMode ? { worktreeLayoutMode } : {})
+    }
+  })
+}
+
 describe('orca cli worktree awareness', () => {
   const priorExitCode = process.exitCode
   beforeEach(() => {
@@ -671,38 +697,11 @@ describe('orca cli worktree awareness', () => {
 
   it('carries --worktree-layout through setup-update so the CLI can set host placement', async () => {
     pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
-    queueFixtures(
-      callMock,
-      okFixture('req_project_setup_update_layout', {
-        result: {
-          project: { ...ORCA_PROJECT, sourceRepoIds: [] },
-          setup: {
-            id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
-            hostId: 'runtime:gpu',
-            repoId: '',
-            path: '/srv/orca',
-            displayName: 'Orca',
-            setupState: 'ready',
-            setupMethod: 'provisioned',
-            createdAt: 1,
-            updatedAt: 2
-          }
-        }
-      })
-    )
+    queueFixtures(callMock, setupUpdateLayoutFixture('req_layout_applied', 'project-folder'))
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
-      [
-        'project',
-        'setup-update',
-        '--setup',
-        'setup-gpu',
-        '--worktree-layout',
-        'project-folder',
-        '--json'
-      ],
+      [...SETUP_UPDATE_FLAGS, '--worktree-layout', 'project-folder', '--json'],
       '/tmp/repo'
     )
 
@@ -715,6 +714,29 @@ describe('orca cli worktree awareness', () => {
         updates: expect.objectContaining({ worktreeLayoutMode: 'project-folder' })
       })
     )
+    expect(process.exitCode).toBeUndefined()
+  })
+
+  it.each([
+    [
+      'an answer carrying no mode, as a host that stripped the flag',
+      undefined,
+      'its placement mode'
+    ],
+    ['an answer carrying a different mode', 'repo-nested', 'it reports repo-nested in effect']
+  ])('fails when the host answers setup-update with %s', async (_case, mode, expected) => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
+    queueFixtures(callMock, setupUpdateLayoutFixture('req_layout_unapplied', mode))
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main([...SETUP_UPDATE_FLAGS, '--worktree-layout', 'flat', '--json'], '/tmp/repo')
+
+    const printed = [...errSpy.mock.calls, ...logSpy.mock.calls].flat().join('\n')
+    expect(JSON.parse(printed).error.code).toBe('incompatible_runtime')
+    expect(printed).toContain('did not apply --worktree-layout flat')
+    expect(printed).toContain(expected)
+    expect(process.exitCode).toBe(1)
   })
 
   it('rejects an unknown --worktree-layout before contacting any runtime', async () => {

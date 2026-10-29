@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { JiraIssue, JiraSite } from '../shared/jira/jira-types'
 import { isWorkspaceLinkedItemSourceContextMatch } from '../shared/workspace-linked-item-source-context'
+import type { TaskProvider } from '../shared/task-providers'
+import type { WorkspaceLinkedItem } from '../shared/worktree/types'
+import { RuntimeClientError } from './runtime-client'
 import type { JiraLinkRpcClient } from './handlers/worktree-jira-issue-link'
 import {
   getJiraIssueLinkFlagUpdates,
@@ -43,13 +46,37 @@ function issue(key: string, siteId = 'site-1', siteUrl = ACME.siteUrl): JiraIssu
   }
 }
 
+/** A stored link pair, as `worktree.show` reports one. */
+function jiraLink(key = 'ABC-1'): WorkspaceLinkedItem {
+  return {
+    provider: 'jira',
+    type: 'issue',
+    number: 0,
+    title: 'Fix checkout',
+    url: `https://acme.atlassian.net/browse/${key}`,
+    jiraIdentifier: key
+  }
+}
+
+function reviewerLink(): WorkspaceLinkedItem {
+  return {
+    provider: 'github',
+    type: 'pr',
+    number: 12,
+    title: 'Add checkout',
+    url: 'https://github.com/acme/payments/pull/12'
+  }
+}
+
 /** A client that answers the reads this module makes, by method name. */
 function client(answers: {
   sites: JiraSite[]
   selectedSiteId?: string | null
   issue?: JiraIssue | null
   hostId?: string | null
-  lookupThrows?: boolean
+  lookupThrows?: unknown
+  linkedWorkItem?: WorkspaceLinkedItem | null
+  linkedTaskSourceContext?: { provider: TaskProvider } | null
 }): JiraLinkRpcClient & { calls: [string, unknown][] } {
   const calls: [string, unknown][] = []
   const respond = (method: string): unknown => {
@@ -63,12 +90,18 @@ function client(answers: {
     }
     if (method === 'jira.lookupIssueSummary') {
       if (answers.lookupThrows) {
-        throw new Error('jira is down')
+        throw answers.lookupThrows
       }
       return answers.issue ?? null
     }
     if (method === 'worktree.show') {
-      return { worktree: { hostId: answers.hostId ?? null } }
+      return {
+        worktree: {
+          hostId: answers.hostId ?? null,
+          linkedWorkItem: answers.linkedWorkItem ?? null,
+          linkedTaskSourceContext: answers.linkedTaskSourceContext ?? null
+        }
+      }
     }
     throw new Error(`unexpected method ${method}`)
   }
@@ -203,12 +236,45 @@ describe('resolveJiraIssueLinkUpdates', () => {
     ).rejects.toThrow(/Couldn't find ABC-404/)
   })
 
-  it('reports a read that threw as not found rather than a transport error', async () => {
-    const rpc = client({ sites: [ACME], lookupThrows: true })
+  it('maps a not-found read from the host to the not-found message', async () => {
+    const rpc = client({
+      sites: [ACME],
+      lookupThrows: new RuntimeClientError(
+        'runtime_error',
+        'jira_summary_lookup:not-found:{"status":404}'
+      )
+    })
+
+    await expect(
+      resolveJiraIssueLinkUpdates({ value: 'ABC-404', client: rpc, hostId: 'local' })
+    ).rejects.toThrow(/Couldn't find ABC-404/)
+  })
+
+  it('keeps a transport failure instead of reporting it as a missing issue', async () => {
+    // Why: a sleeping host or a dead credential is not a bad key, and "Couldn't find
+    // ABC-1" tells an agent to stop retrying when a retry is what would work.
+    const rpc = client({
+      sites: [ACME],
+      lookupThrows: new RuntimeClientError(
+        'runtime_error',
+        'jira_summary_lookup:read-failed:socket hang up'
+      )
+    })
 
     await expect(
       resolveJiraIssueLinkUpdates({ value: 'ABC-1', client: rpc, hostId: 'local' })
-    ).rejects.toThrow(/Couldn't find ABC-1/)
+    ).rejects.toThrow(/socket hang up/)
+  })
+
+  it('keeps an auth failure as an auth failure', async () => {
+    const rpc = client({
+      sites: [ACME],
+      lookupThrows: new RuntimeClientError('runtime_error', 'jira_summary_lookup:auth:401')
+    })
+
+    await expect(
+      resolveJiraIssueLinkUpdates({ value: 'ABC-1', client: rpc, hostId: 'local' })
+    ).rejects.toThrow(/jira_summary_lookup:auth/)
   })
 
   it('rejects an issue the lookup returned under another key', async () => {
@@ -243,8 +309,8 @@ describe('getJiraIssueLinkFlagUpdates', () => {
     expect(updates?.linkedTaskSourceContext?.hostId).toBe('ssh:build-box')
   })
 
-  it('clears on an explicit null without reading the workspace', async () => {
-    const rpc = client({ sites: [ACME] })
+  it('clears a Jira link on an explicit null', async () => {
+    const rpc = client({ sites: [ACME], linkedWorkItem: jiraLink() })
 
     expect(
       await getJiraIssueLinkFlagUpdates({
@@ -253,6 +319,77 @@ describe('getJiraIssueLinkFlagUpdates', () => {
         worktree: 'active'
       })
     ).toEqual({ linkedWorkItem: null, linkedTaskSourceContext: null })
+    expect(rpc.calls).toEqual([['worktree.show', { worktree: 'active' }]])
+  })
+
+  it('leaves another provider’s link alone on an explicit null, and says so', async () => {
+    const rpc = client({ sites: [ACME], linkedWorkItem: reviewerLink() })
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    expect(
+      await getJiraIssueLinkFlagUpdates({
+        flags: new Map([['jira-issue', 'null']]),
+        client: rpc,
+        worktree: 'active'
+      })
+    ).toBeUndefined()
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('cleared nothing: this workspace is linked to GitHub PR #12')
+    )
+    warn.mockRestore()
+  })
+
+  it('refuses to replace another provider’s link without the override', async () => {
+    const rpc = client({ sites: [ACME], linkedWorkItem: reviewerLink() })
+
+    await expect(
+      getJiraIssueLinkFlagUpdates({
+        flags: new Map([['jira-issue', 'ABC-1']]),
+        client: rpc,
+        worktree: 'active'
+      })
+    ).rejects.toThrow(/linked to GitHub PR #12.*--replace-linked-item/)
+    // Why: no lookup was attempted, so nothing was read from Jira for a refused write.
+    expect(rpc.calls).toEqual([['worktree.show', { worktree: 'active' }]])
+  })
+
+  it('replaces another provider’s link when the override is given', async () => {
+    const rpc = client({ sites: [ACME], issue: issue('ABC-1'), linkedWorkItem: reviewerLink() })
+
+    const updates = await getJiraIssueLinkFlagUpdates({
+      flags: new Map<string, string | boolean>([
+        ['jira-issue', 'ABC-1'],
+        ['replace-linked-item', true]
+      ]),
+      client: rpc,
+      worktree: 'active'
+    })
+
+    expect(updates?.linkedWorkItem?.provider).toBe('jira')
+  })
+
+  it('replaces an existing Jira link without the override', async () => {
+    const rpc = client({ sites: [ACME], issue: issue('ABC-2'), linkedWorkItem: jiraLink() })
+
+    const updates = await getJiraIssueLinkFlagUpdates({
+      flags: new Map([['jira-issue', 'ABC-2']]),
+      client: rpc,
+      worktree: 'active'
+    })
+
+    expect(updates?.linkedWorkItem?.jiraIdentifier).toBe('ABC-2')
+  })
+
+  it('rejects a malformed key before any runtime round trip', async () => {
+    const rpc = client({ sites: [ACME] })
+
+    await expect(
+      getJiraIssueLinkFlagUpdates({
+        flags: new Map([['jira-issue', 'not an issue']]),
+        client: rpc,
+        worktree: 'active'
+      })
+    ).rejects.toThrow(/Pass a Jira issue key/)
     expect(rpc.calls).toEqual([])
   })
 

@@ -6,12 +6,13 @@ export const VM_COMMAND_SPECS: CommandSpec[] = [
     path: ['vm', 'recipe', 'extend'],
     summary: 'Run a per-workspace environment recipe extend hook against a stored recipe result',
     usage:
-      'orca vm recipe extend <recipe-id> --recipe-result <file> --lifetime <duration> [--repo-path <path>] [--timeout-ms <ms>] [--json]',
+      'orca vm recipe extend <recipe-id> --recipe-result <file> --lifetime <duration> [--repo-path <path>] [--write-result <file>] [--timeout-ms <ms>] [--json]',
     allowedFlags: [
       ...LOCAL_COMMAND_FLAGS,
       'recipe-id',
       'repo-path',
       'recipe-result',
+      'write-result',
       'lifetime',
       'timeout-ms'
     ],
@@ -21,10 +22,12 @@ export const VM_COMMAND_SPECS: CommandSpec[] = [
       'The recipe result is the JSON object the create script printed, saved to a file.',
       'The lifetime must be one the recipe declares in extendDurations; the updated result is printed on stdout for the destroy hook to consume.',
       'The hook is stopped after 120000 ms unless --timeout-ms says otherwise, and the command then fails with the transcript so a stuck hook cannot hang a script.',
+      'Pass --write-result <file> to save the updated result as JSON (written whole or not at all, mode 0600), which is what makes a second extend or a destroy hook consume the new deadline instead of the stale lease. Point it at --recipe-result to replace the stored result in place.',
+      'A failure goes to stderr and exits 1, so stdout stays consumable; every relative path resolves against the invoking directory.',
       'Extending a live lease from the app also updates the persisted runtime; this command only reports what the hook produced.'
     ],
     examples: [
-      'orca vm recipe extend cloud-sandbox --recipe-result ./result.json --lifetime 4h',
+      'orca vm recipe extend cloud-sandbox --recipe-result ./result.json --lifetime 4h --write-result ./result.json',
       'orca vm recipe extend cloud-sandbox --recipe-result ./result.json --lifetime 4h --timeout-ms 30000 --json'
     ]
   },

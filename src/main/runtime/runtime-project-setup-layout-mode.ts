@@ -1,6 +1,10 @@
 import type { RuntimeStore } from './runtime-store-contract'
 import type { Repo } from '../../shared/repo-types'
 import {
+  findProjectHostSetup,
+  type ProjectHostSetupTarget
+} from '../../shared/project-host-setup-target'
+import {
   layoutModeNestsWorkspaces,
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
@@ -51,13 +55,59 @@ export function applyProjectSetupWorktreeLayoutMode(
   return true
 }
 
-/** Applies the host-level mode a setup payload carries, and drops it from the payload. */
+/** Applies the host-level mode a setup payload carries, and drops it from the payload.
+ *
+ *  The mode is host-wide, so `target` — the record the caller is writing — must exist before it
+ *  is applied: writing it for a missing project or setup flips every project's placement on this
+ *  host and the command then fails, leaving the flip behind. */
 export function takeWorktreeLayoutMode<T extends { worktreeLayoutMode?: WorktreeLayoutMode }>(
   deps: ProjectSetupLayoutModeDeps,
-  payload: T
+  payload: T,
+  target: { projectId?: string; setup?: ProjectHostSetupTarget } = {}
 ): Omit<T, 'worktreeLayoutMode'> {
+  if (payload.worktreeLayoutMode) {
+    assertLayoutModeTargetExists(deps, target)
+  }
   applyProjectSetupWorktreeLayoutMode(deps, payload.worktreeLayoutMode)
   const { worktreeLayoutMode: _mode, ...rest } = payload
   void _mode
   return rest
+}
+
+function assertLayoutModeTargetExists(
+  deps: ProjectSetupLayoutModeDeps,
+  target: { projectId?: string; setup?: ProjectHostSetupTarget }
+): void {
+  const store = deps.getStore()
+  const { projectId, setup } = target
+  if (projectId !== undefined && store?.getProjects) {
+    if (!store.getProjects().some((entry) => entry.id === projectId)) {
+      throw new Error(`Project not found: ${projectId}`)
+    }
+  }
+  if (setup && store?.getProjectHostSetups) {
+    if (!findProjectHostSetup(store.getProjectHostSetups(), setup)) {
+      throw new Error(`Project host setup not found: ${setup.setupId}`)
+    }
+  }
+}
+
+/** Adds the mode this host has in effect to a setup result, so the caller can prove the write
+ *  landed instead of taking a success exit code for one.
+ *
+ *  Only a call that carried a mode carries one back: an unrelated setup edit is not a
+ *  placement read. */
+export function withEffectiveLayoutMode<T extends object>(
+  deps: ProjectSetupLayoutModeDeps,
+  requested: WorktreeLayoutMode | undefined,
+  result: T
+): T & { worktreeLayoutMode?: WorktreeLayoutMode } {
+  if (!requested) {
+    return result
+  }
+  const settings = deps.getStore()?.getSettings?.()
+  if (!settings) {
+    return result
+  }
+  return { ...result, worktreeLayoutMode: resolveWorktreeLayoutMode(settings) }
 }

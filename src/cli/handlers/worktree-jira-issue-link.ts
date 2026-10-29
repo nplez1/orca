@@ -1,4 +1,5 @@
-import { parseIssueLinkInput } from '../../shared/issue-link-input'
+import { parseIssueLinkInput, type ParsedIssueLinkInput } from '../../shared/issue-link-input'
+import { getJiraSummaryLookupErrorCode } from '../../shared/jira/jira-summary-lookup'
 import { getJiraSiteIdentityKey, parseJiraIssueUrl } from '../../shared/jira/jira-issue-url'
 import { selectJiraLinkSite, type JiraLinkSiteFailure } from '../../shared/jira-link-site-selection'
 import { buildJiraWorkspaceSource } from '../../shared/new-workspace/workspace-source'
@@ -6,7 +7,9 @@ import {
   ACCOUNT_BACKED_TASK_SOURCE_PROJECT_ID,
   normalizeTaskSourceContext
 } from '../../shared/task-source-context'
+import { workspaceAttachmentReferenceLabel } from '../../shared/workspace-attachments'
 import type { JiraConnectionStatus, JiraIssue, JiraSite } from '../../shared/jira/jira-types'
+import type { TaskProvider } from '../../shared/task-providers'
 import type { TaskSourceContext } from '../../shared/task-source-context'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 import type { RuntimeWorktreeRecord } from '../../shared/runtime-types'
@@ -23,11 +26,37 @@ export type JiraIssueLinkUpdates =
   | { linkedWorkItem: WorkspaceLinkedItem; linkedTaskSourceContext: TaskSourceContext }
   | { linkedWorkItem: null; linkedTaskSourceContext: null }
 
+/** `--replace-linked-item` waives the guard that stops a Jira link replacing
+ *  another provider's item. */
+const REPLACE_LINKED_ITEM_FLAG = 'replace-linked-item'
+
+const PROVIDER_LABELS: Record<TaskProvider, string> = {
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  linear: 'Linear',
+  jira: 'Jira'
+}
+
+/** The provider whose item `worktree.set` would overwrite, if the workspace carries one.
+ *  `linkedWorkItem` and its routing context are the pair a Jira link writes, so those
+ *  are the fields the guard has to read — a legacy `--pr`-only link stays untouched. */
+function existingLinkProvider(worktree: RuntimeWorktreeRecord): TaskProvider | null {
+  return worktree.linkedWorkItem?.provider ?? worktree.linkedTaskSourceContext?.provider ?? null
+}
+
+function describeLink(worktree: RuntimeWorktreeRecord, provider: TaskProvider): string {
+  const item = worktree.linkedWorkItem
+  return item
+    ? `${PROVIDER_LABELS[provider]} ${workspaceAttachmentReferenceLabel(item)}`
+    : PROVIDER_LABELS[provider]
+}
+
 /** `--jira-issue <key|url|null>` for a named workspace: undefined when the flag is
- *  absent, and the stored pair otherwise. Reads the workspace first because the
- *  link's source context has to name the host that owns it — only the workspace
- *  record knows that, and without it the link's later reads would route to
- *  whichever runtime the local app has active. */
+ *  absent, and the stored pair otherwise.
+ *
+ *  Every branch reads the workspace first, because `linkedWorkItem` is shared by all
+ *  four task providers: an unguarded write replaces a GitHub, GitLab or Linear source
+ *  and its routing context, and an unguarded `null` deletes them. */
 export async function getJiraIssueLinkFlagUpdates(args: {
   flags: Map<string, string | boolean>
   client: JiraLinkRpcClient
@@ -40,18 +69,62 @@ export async function getJiraIssueLinkFlagUpdates(args: {
   if (value === undefined) {
     return undefined
   }
-  // Why: clearing needs no host and no lookup, so it makes no request.
-  if (value === null) {
-    return { linkedWorkItem: null, linkedTaskSourceContext: null }
+  // Why before the round trip: a mistyped key must fail on its own, not on whether a
+  // runtime happens to answer.
+  if (value !== null && !parseJiraIssueReference(value)) {
+    throw invalidJiraIssueReference()
   }
   const shown = await args.client.call<{ worktree: RuntimeWorktreeRecord }>('worktree.show', {
     worktree: args.worktree
   })
+  const worktree = shown.result.worktree
+  const provider = existingLinkProvider(worktree)
+
+  if (value === null) {
+    if (provider !== null && provider !== 'jira') {
+      // Why warn and skip rather than fail: the clear is already what the caller meant
+      // to do to *this* workspace's Jira link, and there is none. Deleting another
+      // provider's item instead is the destructive answer this guard exists to stop.
+      console.error(
+        `warning: --jira-issue null cleared nothing: this workspace is linked to ${describeLink(worktree, provider)}.`
+      )
+      return undefined
+    }
+    return { linkedWorkItem: null, linkedTaskSourceContext: null }
+  }
+
+  if (
+    provider !== null &&
+    provider !== 'jira' &&
+    args.flags.get(REPLACE_LINKED_ITEM_FLAG) !== true
+  ) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `This workspace is linked to ${describeLink(worktree, provider)}. Pass --${REPLACE_LINKED_ITEM_FLAG} to replace that link with a Jira issue, or clear it first.`
+    )
+  }
+
   return resolveJiraIssueLinkUpdates({
     value,
     client: args.client,
-    hostId: shown.result.worktree.hostId ?? null
+    hostId: worktree.hostId ?? null
   })
+}
+
+/** A mistyped-argument refusal, shared so the round-trip-free check in
+ *  `getJiraIssueLinkFlagUpdates` and the stored-pair builder cannot disagree. */
+function invalidJiraIssueReference(): RuntimeClientError {
+  return new RuntimeClientError(
+    'invalid_argument',
+    'Pass a Jira issue key like ABC-123, a Jira issue URL, or null to clear.'
+  )
+}
+
+function parseJiraIssueReference(
+  value: string
+): Extract<ParsedIssueLinkInput, { provider: 'jira' }> | null {
+  const parsed = parseIssueLinkInput(value.trim(), 'jira')
+  return parsed?.provider === 'jira' ? parsed : null
 }
 
 function siteFailure(reason: JiraLinkSiteFailure): RuntimeClientError {
@@ -124,12 +197,9 @@ export async function resolveJiraIssueLinkUpdates(args: {
     return { linkedWorkItem: null, linkedTaskSourceContext: null }
   }
 
-  const parsed = parseIssueLinkInput(value.trim(), 'jira')
-  if (!parsed || parsed.provider !== 'jira') {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      'Pass a Jira issue key like ABC-123, a Jira issue URL, or null to clear.'
-    )
+  const parsed = parseJiraIssueReference(value)
+  if (!parsed) {
+    throw invalidJiraIssueReference()
   }
 
   const status = (await client.call<JiraConnectionStatus>('jira.status')).result
@@ -152,9 +222,13 @@ export async function resolveJiraIssueLinkUpdates(args: {
         siteId: site.id
       })
     ).result
-  } catch {
-    // Why: the read fails for an unknown key, a dead credential and a sleeping
-    // host alike, and the CLI cannot tell them apart from here.
+  } catch (error) {
+    // Why only not-found: a timeout, a dead credential or a sleeping host is not a bad
+    // key, and reporting it as one tells an agent to stop retrying when a retry is
+    // exactly what would work. Everything else keeps its own code and message.
+    if (getJiraSummaryLookupErrorCode(error) !== 'not-found') {
+      throw error
+    }
     looked = null
   }
   const issue = assertReturnedIssue(looked, parsed.key, site)

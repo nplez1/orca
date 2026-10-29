@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import {
+  COMPATIBILITY_CLI_COMMANDS,
+  COMPATIBILITY_WINDOWS_COMMANDS
+} from '../orchestration-compatibility-cli-commands'
+import {
   OptionalBoolean,
   OptionalFiniteNumber,
   OptionalString,
@@ -42,9 +46,7 @@ export const CheckParams = z
     ack: OptionalString,
     compatibilityAck: OptionalString,
     compatibilityQuestionAck: OptionalString,
-    compatibilityCliCommand: z
-      .enum(['orca', 'orca-ide', 'orca-dev', 'orca-np', 'orca-np-dev'])
-      .optional(),
+    compatibilityCliCommand: z.enum(COMPATIBILITY_CLI_COMMANDS).optional(),
     run: OptionalString,
     wait: OptionalBoolean,
     timeoutMs: OptionalFiniteNumber
@@ -135,10 +137,8 @@ export const AskParams = z
     timeoutMs: OptionalFiniteNumber,
     from: OptionalString,
     run: OptionalString,
-    compatibilityCliCommand: z
-      .enum(['orca', 'orca-ide', 'orca-dev', 'orca-np', 'orca-np-dev'])
-      .optional(),
-    compatibilityWindowsCommand: z.enum(['orca', 'orca-ide', 'orca-np']).optional()
+    compatibilityCliCommand: z.enum(COMPATIBILITY_CLI_COMMANDS).optional(),
+    compatibilityWindowsCommand: z.enum(COMPATIBILITY_WINDOWS_COMMANDS).optional()
   })
   .superRefine((params, ctx) => {
     if ((params.question ? 1 : 0) + (params.resume ? 1 : 0) !== 1) {

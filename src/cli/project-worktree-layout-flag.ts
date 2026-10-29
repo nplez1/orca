@@ -22,3 +22,26 @@ export function getOptionalWorktreeLayoutMode(
     `--worktree-layout must be one of ${WORKTREE_LAYOUT_MODES.join(', ')}`
   )
 }
+
+/** Confirms the host applied `--worktree-layout` by comparing it with the mode the host
+ *  reports in effect.
+ *
+ *  A host built before this field — upstream Orca included — validates the setup params with a
+ *  closed schema, so the unknown key is stripped and the call succeeds having changed nothing.
+ *  Its answer therefore carries no mode, and that absence is the failure: reporting success for
+ *  a placement change that did not happen is what leaves every project on that host unchanged. */
+export function assertWorktreeLayoutApplied(
+  requested: WorktreeLayoutMode | undefined,
+  result: { worktreeLayoutMode?: WorktreeLayoutMode }
+): void {
+  if (!requested || result.worktreeLayoutMode === requested) {
+    return
+  }
+  const reported = result.worktreeLayoutMode
+  throw new RuntimeClientError(
+    'incompatible_runtime',
+    reported === undefined
+      ? `This host did not apply --worktree-layout ${requested}: it cannot report its placement mode, so it predates the flag and ignored it. Update Orca on that host and try again.`
+      : `This host did not apply --worktree-layout ${requested}: it reports ${reported} in effect. Update Orca on that host, or set the mode in its settings.`
+  )
+}

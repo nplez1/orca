@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RuntimeProjectHostSetupController } from './runtime-project-host-setup-controller'
 import { SERVER_SSH_PROJECT_ADD_UNAVAILABLE_MESSAGE } from '../../shared/project-host-setup-target'
+import type { Project, ProjectHostSetup } from '../../shared/project-types'
+import type { ExecutionHostId } from '../../shared/execution-host'
 import { getProjectHostSetupForRepo } from '../../shared/project-host-setup-lookup'
 import { projectHostSetupProjectionFromRepos } from '../../shared/project-host-setup-projection'
 import type { Repo } from '../../shared/repo-types'
@@ -33,10 +35,46 @@ const repo: Repo = {
   kind: 'git'
 }
 
+function makeProject(id: string): Project {
+  return {
+    id,
+    displayName: 'Orca',
+    badgeColor: '#000',
+    sourceRepoIds: [],
+    createdAt: 1,
+    updatedAt: 1
+  }
+}
+
+function makeSetup(
+  setupId: string,
+  projectId: string,
+  hostId: ExecutionHostId = 'local'
+): ProjectHostSetup {
+  return {
+    id: setupId,
+    projectId,
+    hostId,
+    repoId: '',
+    path: '',
+    displayName: 'Orca',
+    setupState: 'ready',
+    setupMethod: 'provisioned',
+    createdAt: 1,
+    updatedAt: 1
+  }
+}
+
 function makeController(
   options: {
     settings?: Record<string, unknown>
     canWriteSettings?: boolean
+    /** Projects this host knows; absent keeps the projected-from-repos default. */
+    projects?: Project[]
+    /** Setups this host knows; absent reports none. */
+    setups?: ProjectHostSetup[]
+    /** A store whose settings write silently does nothing, as an older host looks from here. */
+    ignoreSettingsWrites?: boolean
   } = {}
 ): {
   controller: RuntimeProjectHostSetupController
@@ -47,7 +85,16 @@ function makeController(
   createProjectHostSetup: ReturnType<typeof vi.fn>
   updateProjectHostSetup: ReturnType<typeof vi.fn>
 } {
-  const updateSettings = vi.fn()
+  const settings: Record<string, unknown> = {
+    workspaceDir: '/orca/workspaces',
+    nestWorkspaces: true,
+    ...options.settings
+  }
+  const updateSettings = vi.fn((updates: Record<string, unknown>) => {
+    if (!options.ignoreSettingsWrites) {
+      Object.assign(settings, updates)
+    }
+  })
   const createProjectHostSetup = vi.fn((args: { projectId: string; hostId: string }) => ({
     project: {
       id: args.projectId,
@@ -93,19 +140,15 @@ function makeController(
     }
   }))
   const store = {
-    getProjects: () => projectHostSetupProjectionFromRepos([repo]).projects,
-    getProjectHostSetups: () => [],
+    getProjects: () => options.projects ?? projectHostSetupProjectionFromRepos([repo]).projects,
+    getProjectHostSetups: () => options.setups ?? [],
     updateRepo: (_target: unknown, updates: Record<string, unknown>) => ({ ...repo, ...updates }),
     createProjectHostSetup,
     updateProjectHostSetup,
     ...(options.canWriteSettings === false
       ? {}
       : {
-          getSettings: () => ({
-            workspaceDir: '/orca/workspaces',
-            nestWorkspaces: true,
-            ...options.settings
-          }),
+          getSettings: () => settings,
           updateSettings
         })
   }
@@ -204,10 +247,15 @@ describe('RuntimeProjectHostSetupController host routing', () => {
 })
 
 describe('RuntimeProjectHostSetupController layout mode', () => {
-  it('writes the host-wide mode with the legacy boolean and refreshes derived placement', () => {
-    const { controller, updateSettings, createProjectHostSetup } = makeController()
+  const layoutFixture = () => ({
+    projects: [makeProject('p1')],
+    setups: [makeSetup('setup-1', 'p1')]
+  })
 
-    controller.createSetup({
+  it('writes the host-wide mode with the legacy boolean and refreshes derived placement', () => {
+    const { controller, updateSettings, createProjectHostSetup } = makeController(layoutFixture())
+
+    const result = controller.createSetup({
       projectId: 'p1',
       hostId: 'local',
       worktreeLayoutMode: 'project-folder'
@@ -222,10 +270,13 @@ describe('RuntimeProjectHostSetupController layout mode', () => {
     expect(syncWatcherMock).toHaveBeenCalledOnce()
     // The mode is not a setup field, so the setup write must not carry it.
     expect(createProjectHostSetup).toHaveBeenCalledWith({ projectId: 'p1', hostId: 'local' })
+    // Why echoed: the caller has to be able to prove the host applied what it was asked for.
+    expect(result.worktreeLayoutMode).toBe('project-folder')
   })
 
   it('leaves settings alone when the host already uses that mode', () => {
     const { controller, updateSettings } = makeController({
+      ...layoutFixture(),
       settings: { worktreeLayoutMode: 'project-folder' }
     })
 
@@ -239,7 +290,10 @@ describe('RuntimeProjectHostSetupController layout mode', () => {
   })
 
   it('fails the command when the host cannot write settings, before creating the setup', () => {
-    const { controller, createProjectHostSetup } = makeController({ canWriteSettings: false })
+    const { controller, createProjectHostSetup } = makeController({
+      ...layoutFixture(),
+      canWriteSettings: false
+    })
 
     expect(() =>
       controller.createSetup({ projectId: 'p1', hostId: 'local', worktreeLayoutMode: 'flat' })
@@ -247,15 +301,70 @@ describe('RuntimeProjectHostSetupController layout mode', () => {
     expect(createProjectHostSetup).not.toHaveBeenCalled()
   })
 
-  it('applies the mode through setup-update without leaking it into the setup record', () => {
-    const { controller, updateSettings, updateProjectHostSetup } = makeController()
+  it('refuses a create for an unknown project without touching the host-wide mode', () => {
+    // Why: the mode applies to every project on this host, so writing it for a project that
+    // does not exist flips all of them and then fails the command.
+    const { controller, updateSettings, createProjectHostSetup } = makeController(layoutFixture())
 
-    controller.updateSetup({ setupId: 'setup-1', updates: { worktreeLayoutMode: 'flat' } })
+    expect(() =>
+      controller.createSetup({
+        projectId: 'no-such-project',
+        hostId: 'local',
+        worktreeLayoutMode: 'flat'
+      })
+    ).toThrow('Project not found: no-such-project')
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(createProjectHostSetup).not.toHaveBeenCalled()
+  })
+
+  it('applies the mode through setup-update without leaking it into the setup record', async () => {
+    const { controller, updateSettings, updateProjectHostSetup } = makeController(layoutFixture())
+
+    const result = await controller.updateSetup({
+      setupId: 'setup-1',
+      updates: { worktreeLayoutMode: 'flat' }
+    })
 
     expect(updateSettings).toHaveBeenCalledWith(
       { worktreeLayoutMode: 'flat', nestWorkspaces: false },
       { notifyListeners: true }
     )
     expect(updateProjectHostSetup).toHaveBeenCalledWith({ setupId: 'setup-1', updates: {} })
+    expect(result.worktreeLayoutMode).toBe('flat')
+  })
+
+  it('refuses an update for an unknown setup without touching the host-wide mode', async () => {
+    const { controller, updateSettings, updateProjectHostSetup } = makeController(layoutFixture())
+
+    await expect(
+      controller.updateSetup({ setupId: 'no-such-id', updates: { worktreeLayoutMode: 'flat' } })
+    ).rejects.toThrow('Project host setup not found: no-such-id')
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(updateProjectHostSetup).not.toHaveBeenCalled()
+  })
+
+  it('reports no mode when the call carried none', () => {
+    const { controller } = makeController(layoutFixture())
+
+    const result = controller.createSetup({ projectId: 'p1', hostId: 'local' })
+
+    expect(result).not.toHaveProperty('worktreeLayoutMode')
+  })
+
+  it('reports the mode actually in effect, so a swallowed write cannot look applied', async () => {
+    // A store whose settings write silently does nothing is what an older host looks like
+    // from here; the result must not repeat the request back as if it had landed.
+    const { controller } = makeController({
+      ...layoutFixture(),
+      settings: { worktreeLayoutMode: 'repo-nested' },
+      ignoreSettingsWrites: true
+    })
+
+    const result = await controller.updateSetup({
+      setupId: 'setup-1',
+      updates: { worktreeLayoutMode: 'flat' }
+    })
+
+    expect(result.worktreeLayoutMode).toBe('repo-nested')
   })
 })

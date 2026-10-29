@@ -25,7 +25,10 @@ import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidators'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
-import { takeWorktreeLayoutMode } from './runtime-project-setup-layout-mode'
+import {
+  takeWorktreeLayoutMode,
+  withEffectiveLayoutMode
+} from './runtime-project-setup-layout-mode'
 import { updateProjectHostSetupWithProvenKind } from '../folder-repo-git-conversion'
 import type { RuntimeStore } from './runtime-store-contract'
 import { readAllWorktreeMetaForRepo } from '../persistence/host-qualified-worktree-meta'
@@ -109,16 +112,14 @@ export class RuntimeProjectHostSetupController {
       throw new Error('runtime_unavailable')
     }
     assertWslMoveHostSetupWritable(store, args)
-    // Why before the setup write: the mode is a host setting rather than a setup field, so a
-    // rejected settings write should fail the command instead of leaving a created setup whose
-    // requested layout silently did not apply.
-    const setupArgs = takeWorktreeLayoutMode(this.deps, args)
+    // Why the target: the mode is host-wide, so a rejected create must not have applied it.
+    const setupArgs = takeWorktreeLayoutMode(this.deps, args, args)
     const result = store.createProjectHostSetup(setupArgs)
     if (!result) {
       throw new Error(`Project not found: ${args.projectId}`)
     }
     this.deps.notifyReposChanged()
-    return result
+    return withEffectiveLayoutMode(this.deps, args.worktreeLayoutMode, result)
   }
 
   async setupExistingFolder(
@@ -186,7 +187,7 @@ export class RuntimeProjectHostSetupController {
         assertWslMoveHostSetupIdWritable(store, setupArgs)
         return updateProjectHostSetup(setupArgs)
       },
-      { ...args, updates: takeWorktreeLayoutMode(this.deps, args.updates) },
+      { ...args, updates: takeWorktreeLayoutMode(this.deps, args.updates, { setup: args }) },
       true
     )
     if (!result) {
@@ -201,7 +202,7 @@ export class RuntimeProjectHostSetupController {
     }
     this.deps.invalidateResolvedWorktrees()
     this.deps.notifyReposChanged()
-    return result
+    return withEffectiveLayoutMode(this.deps, args.updates.worktreeLayoutMode, result)
   }
 
   deleteSetup(args: ProjectHostSetupDeleteArgs): ProjectHostSetupDeleteResult {

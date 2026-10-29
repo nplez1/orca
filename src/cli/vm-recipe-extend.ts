@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import {
   getEphemeralVmLifetimeLossError,
   getEphemeralVmRecipeResultLifetime,
+  getEphemeralVmRecipeResultPairingCode,
   parseEphemeralVmRecipeResult,
   type EphemeralVmRecipeResult
 } from '../shared/ephemeral-vm-recipes'
@@ -174,7 +175,12 @@ export async function extendEphemeralVmRecipeFromFile(args: {
   }
 }
 
-export function formatExtendEphemeralVmRecipeResult(result: ExtendEphemeralVmRecipeResult): string {
+/** `resultPath` is where `--write-result` put the updated result, so the text form reports
+ *  the file instead of printing the connection it now holds. */
+export function formatExtendEphemeralVmRecipeResult(
+  result: ExtendEphemeralVmRecipeResult,
+  options: { resultPath?: string } = {}
+): string {
   const lines = [`recipe: ${result.recipeId}`, `repoPath: ${result.repoPath}`]
   if (!result.ok) {
     lines.push('ok: false', `error: ${result.error ?? 'Extend failed.'}`)
@@ -197,6 +203,12 @@ export function formatExtendEphemeralVmRecipeResult(result: ExtendEphemeralVmRec
   if (result.releaseAt) {
     lines.push(`releaseAt: ${result.releaseAt}`)
   }
+  if (options.resultPath) {
+    // Why a path and not the JSON: the file is what the destroy hook reads, and printing it here
+    // as well would put the connection back on stdout.
+    lines.push(`result: ${options.resultPath} (mode 0600)`)
+    return lines.join('\n')
+  }
   // Why the warning: this is what the recipe's own `destroy` hook consumes on stdin, and it carries
   // the connection verbatim — a pairing code included. Printing it is the point; treating it as
   // anything but sensitive is not.
@@ -206,6 +218,20 @@ export function formatExtendEphemeralVmRecipeResult(result: ExtendEphemeralVmRec
     JSON.stringify(result.recipeResult, null, 2)
   )
   return lines.join('\n')
+}
+
+/** Only a result that carries the connection verbatim needs the warning, and only the
+ *  `orca serve` shape carries a pairing code. */
+export function describeSensitiveExtendResult(
+  result: ExtendEphemeralVmRecipeResult
+): string | null {
+  const pairingCode =
+    result.ok && result.recipeResult
+      ? getEphemeralVmRecipeResultPairingCode(result.recipeResult)
+      : null
+  return pairingCode
+    ? 'this result carries the connection, including its pairing code — handle as sensitive.'
+    : null
 }
 
 function redactAndCap(value: string): string {

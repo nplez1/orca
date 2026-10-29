@@ -135,12 +135,18 @@ export type ProjectHostSetupResult = {
 export type ProjectHostSetupCreateResult = {
   project: Project
   setup: ProjectHostSetup
+  /** The host-wide placement mode the call left in effect, present only when the call carried
+   *  one. A host that predates the field strips it, which is how a caller tells that its
+   *  `worktreeLayoutMode` was ignored rather than applied. */
+  worktreeLayoutMode?: WorktreeLayoutMode
 }
 
 export type ProjectHostSetupUpdateResult = {
   project: Project
   setup: ProjectHostSetup
   repo?: Repo
+  /** See `ProjectHostSetupCreateResult`. */
+  worktreeLayoutMode?: WorktreeLayoutMode
 }
 
 export type ProjectHostSetupDeleteResult = {
