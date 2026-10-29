@@ -244,6 +244,32 @@ describe('applying a payload on the host', () => {
     ).toEqual({ decision: 'refusedNotTheMain' })
   })
 
+  it('keeps a value the user entered on this host, and never records it as a replica', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    const port = fakePort()
+    port.held.set(CREDENTIAL_ID, 'sk-host-own')
+
+    const result = applyHostSettingsReplication(snapshot(1), {
+      registry: registry(port),
+      holdings,
+      now: NOW,
+      callerFingerprint: 'main-a'
+    })
+
+    // Why the host's value wins: this machine's agents are billed to the account it was configured
+    // with, and taking the main's copy would also make the main's later revocation delete it.
+    expect(port.held.get(CREDENTIAL_ID)).toBe('sk-host-own')
+    expect(result).toMatchObject({
+      decision: 'applied',
+      report: { outcomes: { [CREDENTIAL_ID]: 'keptHostValue' } }
+    })
+    expect(holdings.read().ids).toEqual([])
+
+    // A snapshot that does not mention it must not delete it either — it was never a replica.
+    applyHostSettingsReplication(snapshot(2, []), { registry: registry(port), holdings, now: NOW })
+    expect(port.held.get(CREDENTIAL_ID)).toBe('sk-host-own')
+  })
+
   it('does not strand a credential the main holds but could not read', () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
     const port = fakePort()

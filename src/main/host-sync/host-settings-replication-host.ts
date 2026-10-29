@@ -150,6 +150,9 @@ export function applyHostSettingsReplication(
         ? contractPayload
         : { ...contractPayload, removals: [...contractPayload.removals, ...stranded] },
     registry,
+    // Why the record rather than the payload: it is the only list of what replication put here, and a
+    // value on the host that is not in it is the user's own — see `applyHostSettingsPayload`.
+    replicatedIds: record.ids,
     now: options.now ?? Date.now()
   })
 
