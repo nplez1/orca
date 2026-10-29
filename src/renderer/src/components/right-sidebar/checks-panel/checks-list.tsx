@@ -173,6 +173,7 @@ export function ChecksList(props: ChecksListProps): React.JSX.Element {
                                 'auto.components.right.sidebar.checks.panel.content.0dca6bfab5',
                                 'Open check details'
                               )}
+                              data-link-url={openUrl}
                               onClick={(event) => {
                                 event.stopPropagation()
                                 window.api.shell.openUrl(openUrl)

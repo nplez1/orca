@@ -156,6 +156,7 @@ export function DiffCommentCard({
                       'auto.components.diff.comments.DiffCommentCard.508ee678a5',
                       'Open in browser'
                     )}
+                    data-link-url={url}
                     onClick={(ev) => {
                       ev.preventDefault()
                       ev.stopPropagation()

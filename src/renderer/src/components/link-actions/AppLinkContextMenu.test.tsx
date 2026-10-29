@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -125,5 +125,101 @@ describe('AppLinkContextMenu', () => {
     fireEvent.contextMenu(screen.getByText('anchor text'))
 
     expect(screen.queryByTestId('link-context-menu')).toBeNull()
+  })
+})
+
+describe('AppLinkContextMenu link resolution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.storeState.activeWorktreeId = 'wt-1'
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ui: { writeClipboardText: mocks.writeClipboardText } }
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    Reflect.deleteProperty(window, 'api')
+  })
+
+  function rightClickOn(node: ReactElement, targetText?: string): void {
+    render(
+      <>
+        <AppLinkContextMenu />
+        {node}
+      </>
+    )
+    fireEvent.contextMenu(targetText ? screen.getByText(targetText) : screen.getByTestId('target'))
+  }
+
+  it.each([
+    [
+      'a mailto: link',
+      <a key="m" data-testid="target" href="mailto:dev@example.com">
+        mail
+      </a>
+    ],
+    [
+      'a file: link',
+      <a key="f" data-testid="target" href="file:///tmp/notes.md">
+        notes
+      </a>
+    ],
+    [
+      'a same-page fragment',
+      <a key="h" data-testid="target" href="#section">
+        section
+      </a>
+    ],
+    [
+      'a relative link',
+      <a key="r" data-testid="target" href="/docs">
+        docs
+      </a>
+    ]
+  ])('leaves %s to the browser default menu', (_label, node) => {
+    rightClickOn(node)
+
+    expect(screen.queryByTestId('link-context-menu')).toBeNull()
+  })
+
+  // A cancelled DOM contextmenu suppresses Electron's own menu, which the editor needs.
+  it('leaves links inside an editable surface to the editor', () => {
+    rightClickOn(
+      <div contentEditable suppressContentEditableWarning>
+        <a href="https://example.com/docs">docs</a>
+      </div>,
+      'docs'
+    )
+
+    expect(screen.queryByTestId('link-context-menu')).toBeNull()
+  })
+
+  // Control: the same anchor outside an editable surface does get the link menu.
+  it('offers the menu for the same link outside an editable surface', () => {
+    rightClickOn(
+      <div>
+        <a href="https://example.com/docs">docs</a>
+      </div>,
+      'docs'
+    )
+
+    expect(screen.getByTestId('link-context-menu')).toBeTruthy()
+  })
+
+  it('offers the menu for a button that declares data-link-url', () => {
+    rightClickOn(
+      <button type="button" data-testid="target" data-link-url="https://example.com/pr/7">
+        Open in browser
+      </button>
+    )
+
+    fireEvent.click(menuItem('Open in System Browser'))
+
+    expect(mocks.openContextualHttpLink).toHaveBeenCalledWith('https://example.com/pr/7', {
+      worktreeId: 'wt-1',
+      forceDestination: 'system'
+    })
   })
 })

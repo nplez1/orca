@@ -123,6 +123,7 @@ export function ConversationCommentCard({
                   variant="ghost"
                   size="icon-xs"
                   className="size-7"
+                  data-link-url={comment.url}
                   onClick={() => window.api.shell.openUrl(comment.url)}
                   aria-label={translate(
                     'auto.components.PullRequestPage.0ac19bb52e',

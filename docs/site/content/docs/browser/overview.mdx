@@ -34,14 +34,14 @@ For SSH workspaces, **Browse through SSH workspace hosts** controls whether brow
 
 ## Link routing
 
-Links stay in context: http(s) links anywhere in the app — sidebar and PR panels, checks, task boards, ports, artifacts, chat, markdown, the editor, settings, and the terminal — open in Orca's per-worktree browser. Right-click any link for **Open in Orca Browser**, **Open in System Browser**, and **Copy Link**.
+Links stay in context: http(s) links anywhere in the app — sidebar and PR panels, checks, task boards, ports, artifacts, chat, markdown, the editor, settings, and the terminal — open in Orca's per-worktree browser. Right-click any link — or the "open in browser" control on a card, PR, review or check row — for **Open in Orca Browser**, **Open in System Browser**, and **Copy Link**. Controls that only carry a URL today (some task-board and settings rows) still open on left-click but do not yet offer that menu.
 
 Under [Settings → Browser → Link Routing](/docs/settings), **Default link destination** chooses between **In-App Browser** and **System Browser** for plain clicks. New profiles start on **In-App Browser**; a profile with a stored preference keeps it. A nested **Hold Shift…** toggle inverts that default for one click with the platform modifier (`⇧⌘-click` on macOS, `Shift+Ctrl+click` on Windows / Linux):
 
 - When links open in **Orca**, the modifier sends one link to the system browser.
 - When links open in the **system browser**, turn the toggle on so the modifier opens one link in Orca's built-in browser instead (plain click stays system).
 
-Sign-in and installer links always use the system browser: OAuth providers reject embedded browsers, and installers belong to the OS.
+Sign-in and installer links always use the system browser: OAuth providers reject embedded browsers, and installer downloads belong to the OS rather than the in-app download shelf.
 
 Links opened in Orca first reuse an existing page for the exact destination in the same workspace, execution host, and browser profile. Otherwise, they open a new tab in a pane already showing a browser. When several browser panes are visible, the focused one wins, then the most recently used one. Browser tabs hidden behind other tabs do not attract new pages. With no browser visible, a new split opens beside the source pane, keeping its contents visible. Explicit **Open in this group** actions use the requested pane instead.
 

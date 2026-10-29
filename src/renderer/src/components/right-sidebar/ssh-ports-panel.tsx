@@ -96,7 +96,7 @@ export function SshPortsPanel({
           isMac: navigator.userAgent.includes('Mac')
         })
       ) {
-        void window.api.shell.openUrl(url)
+        void window.api.shell.openUrlInSystemBrowser(url)
         return
       }
       if (!activeWorktree?.id) {

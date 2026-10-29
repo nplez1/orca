@@ -4,6 +4,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useClipboardTextCopyFeedback } from '@/hooks/use-clipboard-text-copy-feedback'
 import { translate } from '@/i18n/i18n'
 import { openContextualHttpLink } from '@/lib/contextual-http-link'
+import { isEditableTarget } from '@/lib/editable-target'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 
@@ -24,14 +25,16 @@ function contextMenuLinkUrl(event: MouseEvent): { url: string; origin: HTMLEleme
   if (!(event.target instanceof Element)) {
     return null
   }
-  const anchor = event.target.closest('a[href]')
-  if (anchor instanceof HTMLAnchorElement) {
-    // A same-document fragment is not a link out of the app, whatever the dev-server origin is.
-    const rawHref = anchor.getAttribute('href')
-    if (!rawHref || rawHref.startsWith('#')) {
-      return null
-    }
-    return /^https?:\/\//i.test(anchor.href) ? { url: anchor.href, origin: anchor } : null
+  // Why: a cancelled DOM contextmenu suppresses Electron's 'context-menu' event, which is what
+  // supplies cut/copy/paste, spelling, and formatting inside the editor and composers.
+  if (isEditableTarget(event.target)) {
+    return null
+  }
+  const rawHref = event.target.closest('a[href]')?.getAttribute('href') ?? null
+  // Only authored absolute web URLs: a relative href resolves against the dev-server origin here.
+  if (rawHref && /^https?:\/\//i.test(rawHref)) {
+    const anchor = event.target.closest('a[href]')
+    return anchor instanceof HTMLAnchorElement ? { url: rawHref, origin: anchor } : null
   }
   // Non-anchor affordances opt in with data-link-url, so a button-styled link gets the same menu.
   const declared = event.target.closest<HTMLElement>('[data-link-url]')
@@ -129,8 +132,11 @@ export function AppLinkContextMenu(): React.JSX.Element {
           side="bottom"
           sideOffset={2}
           collisionPadding={8}
-          className="w-max min-w-52 max-w-[min(21rem,calc(100vw-1rem))]"
+          className="z-[160] w-max min-w-52 max-w-[min(21rem,calc(100vw-1rem))]"
           data-app-link-context-menu
+          // Why: the layer is portalled from App, so a modal dialog would read a row click as its
+          // own outside interaction and dismiss itself mid-action.
+          onPointerDown={(event) => event.stopPropagation()}
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
           onEscapeKeyDown={restoreFocus}

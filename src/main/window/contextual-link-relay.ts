@@ -20,6 +20,14 @@ export function isContextualLinkRouterReady(contents: ContextualLinkTarget): boo
 }
 
 /**
+ * Drops a window's announcement. A reload or a crash leaves the old document's listener gone, so a
+ * stale entry would send the next link into a renderer that cannot receive it.
+ */
+export function forgetContextualLinkRouter(contents: ContextualLinkTarget): void {
+  routersReadyForLinkOpens.delete(contents)
+}
+
+/**
  * Hands `url` to the window's router, which applies the user's link-routing preference.
  * Returns false when the caller must fall back to the system browser itself.
  */

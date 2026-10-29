@@ -205,7 +205,8 @@ export function UpdateErrorCardContent({
               variant="outline"
               size="sm"
               onClick={() => {
-                void window.api.shell.openUrl(releaseUrl).catch((error) => {
+                // Installer downloads belong to the OS browser, not the in-app download shelf.
+                void window.api.shell.openUrlInSystemBrowser(releaseUrl).catch((error) => {
                   console.error('[updates] failed to open the release page:', error)
                 })
               }}

@@ -937,6 +937,18 @@
           "copyLink": "Copy Link",
           "openInOrcaBrowser": "Open in Orca Browser",
           "openInSystemBrowser": "Open in System Browser"
+        },
+        "routing": {
+          "preference": {
+            "dialog": {
+              "badge": "Links",
+              "title": "Open links in Orca's browser?",
+              "keep": {
+                "title": "Keep links in Orca's browser?"
+              },
+              "description": "Use Orca's browser for links anywhere in the app, or keep your system browser."
+            }
+          }
         }
       }
     },

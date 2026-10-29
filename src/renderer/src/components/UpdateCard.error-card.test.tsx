@@ -75,7 +75,8 @@ beforeEach(() => {
     value: {
       app: { relaunch },
       settings: { set: setSettings },
-      shell: { openUrl },
+      // One mock for both: these cases assert the OS-browser handoff of an installer link.
+      shell: { openUrl, openUrlInSystemBrowser: openUrl },
       ui: { set: vi.fn().mockResolvedValue(undefined), writeClipboardText },
       updater: {
         check,

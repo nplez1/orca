@@ -57,7 +57,10 @@ describe('SSH forwards for a managed server workspace', () => {
 
   it("opens a forward's local address on this machine, where it listens", () => {
     const openUrl = vi.fn(async () => undefined)
-    Object.defineProperty(window, 'api', { value: { shell: { openUrl } }, configurable: true })
+    Object.defineProperty(window, 'api', {
+      value: { shell: { openUrl, openUrlInSystemBrowser: openUrl } },
+      configurable: true
+    })
     renderSection('connected', [remapped])
     fireEvent.click(screen.getByTitle(/Open in Browser/))
     expect(openUrl).toHaveBeenCalledWith('http://127.0.0.1:13000')
