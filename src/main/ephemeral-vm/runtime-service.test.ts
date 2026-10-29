@@ -8,15 +8,13 @@ import {
   listEphemeralVmRuntimes,
   upsertEphemeralVmRuntime
 } from '../../shared/ephemeral-vm-runtime-store'
+import { listEphemeralVmProvisioningAttempts } from '../../shared/ephemeral-vm-provisioning-attempts'
 import {
   getEphemeralVmRuntimeFeatureStorePath,
   MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
 } from '../../shared/ephemeral-vm-runtime-feature-store'
-import {
-  cleanupEphemeralVmRuntime,
-  provisionEphemeralVmRuntime,
-  resumeEphemeralVmRuntime
-} from './runtime-service'
+import { cleanupEphemeralVmRuntime, resumeEphemeralVmRuntime } from './runtime-service'
+import { provisionEphemeralVmRuntime } from './runtime-provisioning'
 import { stopEphemeralVmRuntimeCleanup } from './runtime-cleanup-control'
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 
@@ -333,6 +331,9 @@ describe('ephemeral VM runtime service', () => {
     ).rejects.toThrow('Could not preserve ephemeral VM runtime compatibility metadata')
     expect(readFileSync(cleanupMarkerPath, 'utf8')).toBe('yes')
     expect(listEphemeralVmRuntimes(userDataPath)).toEqual([])
+    // Why nothing is left: the machine was destroyed, so a provisioning row would only report a host
+    // that does not exist.
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toEqual([])
   })
 
   it('keeps rollback-readable cleanup recovery when post-create destroy also fails', async () => {
@@ -384,6 +385,9 @@ describe('ephemeral VM runtime service', () => {
         })
       })
     ])
+    // Why the row stays: the destroy hook failed, so the machine may still be running and this is the only
+    // record naming it.
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toHaveLength(1)
   })
 
   it('destroys a provisioned resource when its checkout handshake is incompatible', async () => {

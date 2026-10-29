@@ -20,6 +20,38 @@ import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
 
 const MAX_TRANSCRIPT_BYTES = 16_000
 
+/**
+ * How long a hook may run before the command gives up.
+ *
+ * Why bounded by default: a command scripts call has to terminate, and a hook waiting on a provider
+ * CLI for an authentication prompt would otherwise hang the caller with no output at all.
+ */
+export const DEFAULT_EXTEND_TIMEOUT_MS = 120_000
+/**
+ * The ceiling, not a suggestion: a hook that needs longer than this is stuck rather than slow, and an
+ * unbounded wait is the defect the deadline exists to remove.
+ */
+export const MAX_EXTEND_TIMEOUT_MS = 3_600_000
+
+export type ExtendTimeoutVerdict = { ok: true; timeoutMs: number } | { ok: false; error: string }
+
+/** Validates `--timeout-ms` so an out-of-range value is refused instead of quietly ignored. */
+export function resolveExtendTimeoutMs(requested: number | undefined): ExtendTimeoutVerdict {
+  if (requested === undefined) {
+    return { ok: true, timeoutMs: DEFAULT_EXTEND_TIMEOUT_MS }
+  }
+  if (!Number.isInteger(requested) || requested <= 0) {
+    return { ok: false, error: '--timeout-ms must be a positive whole number of milliseconds.' }
+  }
+  if (requested > MAX_EXTEND_TIMEOUT_MS) {
+    return {
+      ok: false,
+      error: `--timeout-ms must be at most ${MAX_EXTEND_TIMEOUT_MS} ms; a hook slower than that is stuck.`
+    }
+  }
+  return { ok: true, timeoutMs: requested }
+}
+
 export type ExtendEphemeralVmRecipeTranscript = {
   exitCode: number | null
   signal: NodeJS.Signals | null
@@ -45,8 +77,14 @@ export async function extendEphemeralVmRecipeFromFile(args: {
   recipe: OrcaVmRecipe
   recipeResultPath: string
   requestedLifetime: string
+  /** Defaults to {@link DEFAULT_EXTEND_TIMEOUT_MS}, so no caller can run the hook unbounded. */
+  timeoutMs?: number
 }): Promise<ExtendEphemeralVmRecipeResult> {
   const base = { recipeId: args.recipe.id, repoPath: args.repoPath }
+  const timeout = resolveExtendTimeoutMs(args.timeoutMs)
+  if (!timeout.ok) {
+    return { ...base, ok: false, error: timeout.error }
+  }
   const lifetime = normalizeEphemeralVmLifetimeDuration(args.requestedLifetime)
   if (!lifetime) {
     return {
@@ -75,19 +113,27 @@ export async function extendEphemeralVmRecipeFromFile(args: {
     return { ...base, ok: false, error: `Recipe result file is not valid. ${parsed.error}` }
   }
 
+  // Why the deadline even though this command is not interruptible: a hook blocked on the network or
+  // on a provider CLI's authentication prompt hangs the caller forever, and a script cannot recover.
+  const signal = AbortSignal.timeout(timeout.timeoutMs)
   const extend = await runEphemeralVmRecipeExtend({
     repoPath: args.repoPath,
     recipe: args.recipe,
     context: { recipeId: args.recipe.id, repoPath: args.repoPath },
     recipeResult: parsed.result,
-    lifetime
+    lifetime,
+    signal
   })
   if (!extend.ok) {
     return {
       ...base,
       ok: false,
       requestedLifetime: lifetime,
-      error: extend.error,
+      // Why its own message: the hook was killed, not refused, so the transcript alone would read as an
+      // unexplained empty exit and the caller would not know the provider may have acted already.
+      error: extend.aborted
+        ? `Extend did not finish within ${timeout.timeoutMs} ms and was stopped. The provider may already have granted the extension, so check its own deadline before extending again.`
+        : extend.error,
       transcript: {
         exitCode: extend.exitCode,
         signal: extend.signal,

@@ -5,8 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { parseEphemeralVmRecipeResult } from '../shared/ephemeral-vm-recipes'
 import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
 import {
+  DEFAULT_EXTEND_TIMEOUT_MS,
+  MAX_EXTEND_TIMEOUT_MS,
   extendEphemeralVmRecipeFromFile,
-  formatExtendEphemeralVmRecipeResult
+  formatExtendEphemeralVmRecipeResult,
+  resolveExtendTimeoutMs
 } from './vm-recipe-extend'
 
 const ownedDirs: string[] = []
@@ -212,5 +215,59 @@ describe('orca vm recipe extend', () => {
     expect(succeeded).toContain('releaseAt: 2026-10-13T07:00:00Z')
     // The result carries the connection, so it is never presented as safe to paste around.
     expect(succeeded).toContain('handle as sensitive')
+  })
+})
+
+describe('orca vm recipe extend deadline', () => {
+  it('stops the hook at the deadline it is given', async () => {
+    const repoPath = makeRepo()
+    const hangPath = join(repoPath, 'hang.sh')
+    writeFileSync(hangPath, '#!/bin/sh\nexec sleep 30\n')
+    chmodSync(hangPath, 0o755)
+
+    const startedAt = Date.now()
+    const result = await extendEphemeralVmRecipeFromFile({
+      repoPath,
+      recipe: recipe({ extend: './hang.sh', extendDurations: ['4h'] }),
+      recipeResultPath: writeResultFile(repoPath, STORED_RESULT),
+      requestedLifetime: '4h',
+      timeoutMs: 200
+    })
+
+    expect(result.ok).toBe(false)
+    // Why the message and not the exit code: the hook was killed, so a bare "exit unknown" would leave
+    // the caller unable to tell a refusal from a deadline — and the provider may already have acted.
+    expect(result.error).toContain('did not finish within 200 ms')
+    // Why this wording: extend is paid and not idempotent, so the advice must not be "extend again".
+    expect(result.error).toContain('before extending again')
+    expect(result.transcript).toBeDefined()
+    expect(Date.now() - startedAt).toBeLessThan(10_000)
+  })
+
+  it('refuses a timeout that cannot be a deadline rather than ignoring it', () => {
+    expect(resolveExtendTimeoutMs(undefined)).toEqual({
+      ok: true,
+      timeoutMs: DEFAULT_EXTEND_TIMEOUT_MS
+    })
+    expect(resolveExtendTimeoutMs(0)).toMatchObject({ ok: false })
+    expect(resolveExtendTimeoutMs(Number.NaN)).toMatchObject({ ok: false })
+    expect(resolveExtendTimeoutMs(1500.5)).toMatchObject({ ok: false })
+    expect(resolveExtendTimeoutMs(MAX_EXTEND_TIMEOUT_MS + 1)).toMatchObject({ ok: false })
+  })
+
+  it('reports an unbounded --timeout-ms without running the hook', async () => {
+    const repoPath = makeRepo()
+    const script = writeExtendScript(repoPath, STORED_RESULT)
+    const result = await extendEphemeralVmRecipeFromFile({
+      repoPath,
+      recipe: recipe({ extend: script, extendDurations: ['4h'] }),
+      recipeResultPath: writeResultFile(repoPath, STORED_RESULT),
+      requestedLifetime: '4h',
+      timeoutMs: -1
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('--timeout-ms')
+    expect(existsSync(join(repoPath, 'extend-stdin.json'))).toBe(false)
   })
 })

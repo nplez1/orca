@@ -119,6 +119,9 @@ describe('registerEphemeralVmHandlers', () => {
     disconnectRuntimeOwnedSshTargetMock.mockReset()
     removeRuntimeOwnedSshTargetMock.mockReset()
     invalidateRuntimeEnvironmentTransportMock.mockReset()
+    // Why a default: handler registration now reads the user data path to reconcile creates that never
+    // reported, so a test that never sets one would fail on the registration rather than on its subject.
+    getPathMock.mockReturnValue(makeDir('orca-ephemeral-vm-ipc-user-data-'))
     connectRuntimeOwnedSshTargetMock.mockResolvedValue({
       targetId: 'runtime-ssh-orca-instance-1',
       target: {

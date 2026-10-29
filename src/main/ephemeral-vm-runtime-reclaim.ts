@@ -15,7 +15,7 @@ import { isRuntimeHostContactRevoked } from '../shared/runtime-host-status'
 import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm/runtime-environment-release'
 import { clearRuntimeEnvironmentCapabilityEvidence } from './ipc/runtime-environments/runtime-environment-capability-evidence'
 import { clearRuntimeEnvironmentManualDisconnect } from './ipc/runtime-environments/runtime-environment-manual-disconnect'
-import { withEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
+import { tryWithEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
 import { removeRuntimeOwnedSshTarget } from './ephemeral-vm/runtime-ssh'
 import { removeEphemeralVmRuntimeSshTarget } from './ephemeral-vm/runtime-ssh-cleanup'
 import { getRuntimeEnvironmentStatusSnapshots } from './ipc/runtime-environments/runtime-environment-request-connections'
@@ -149,7 +149,18 @@ export class EphemeralVmRuntimeReclaimer {
   }
 
   private async reclaim(runtimeId: string, nowMs: number): Promise<boolean> {
-    return withEphemeralVmRuntimeLock(runtimeId, () => this.reclaimLocked(runtimeId, nowMs))
+    const held = tryWithEphemeralVmRuntimeLock(runtimeId, () =>
+      this.reclaimLocked(runtimeId, nowMs)
+    )
+    if (!held.ran) {
+      // Why skip and not queue: the holder may be an extend hook waiting on a network that never
+      // answers, and waiting for it here would leave `sweeping` true with no runtime reclaimed at all.
+      console.warn(
+        `[ephemeral-vm] Reclaim skipped ${runtimeId}: another lifecycle operation is in flight.`
+      )
+      return false
+    }
+    return held.promise
   }
 
   /**
