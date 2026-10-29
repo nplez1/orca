@@ -223,11 +223,18 @@ export class Report {
 
   /**
    * Record a deliberate exception for a check that could not run. A check that did not run is not a
-   * pass, so it fails the run unless an operator said, in writing, which one and why.
+   * pass, so it fails the run unless an operator said, in writing, which one and why. Only a row that
+   * could not run can be waived: a waiver on a row that produced a result would be a claim about nothing.
    */
   waive(id, reason) {
-    if (!this.checks.some((check) => check.id === id)) {
+    const check = this.checks.find((candidate) => candidate.id === id)
+    if (!check) {
       throw new Error(`no check ${id} to waive`)
+    }
+    if (check.status !== STATUS.unavailable && check.status !== STATUS.skipped) {
+      throw new Error(
+        `${id} reported ${check.status}; only a check that could not run can be waived`
+      )
     }
     this.waived.set(id, reason)
     return this

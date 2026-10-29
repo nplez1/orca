@@ -6,13 +6,17 @@
 // being found. `pnpm tc` catches the TypeScript imports; a `vi.mock('…')` target, a dynamic import in a
 // `.mjs` file and a path string are outside it.
 //
+// Resolution goes through `rename-forecast`'s `resolveRef`, not the orphan sweep's simpler resolver: that
+// one knows the bundler's rules this sweep needs — the `.js`-to-`.ts` swap, `?url`/`?raw` query suffixes,
+// repo-relative strings and directory `index` files.
+//
 // A module specifier (`import`, `require`, dynamic import, a mock call) that names nothing at HEAD fails
 // the check. A plain string that looks like a path is reported and does not fail: a fixture that creates
 // `./create.sh` at run time is indistinguishable from a broken reference, and a check nobody can make
 // green is a check that gets waived every sync.
 
-import { danglingReferences } from './orphan-sweep.mjs'
-import { addedLines, referencesIn } from './rename-forecast.mjs'
+import { upstreamMoves } from './fork-surface-git.mjs'
+import { addedLines, fileSet, namesRepoPath, referencesIn, resolveRef } from './rename-forecast.mjs'
 import { STATUS, changedNames, git, gitText, splitNul, tailText } from './run.mjs'
 import { BACKUP_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 
@@ -21,8 +25,23 @@ const SOURCE_FILE = /\.[cm]?[jt]sx?$/
 const PATHSPEC_BATCH = 200
 const MODULE_KINDS = new Set(['import', 'mock'])
 
-const unresolved = (tip, pinned) =>
-  `no merge base between ${tip.slice(0, 10)} and the pinned base ${pinned.slice(0, 10)}`
+/**
+ * References that name a repo path nobody has. `set` is a `fileSet` of the tree they must resolve in —
+ * HEAD after a merge, not the pre-merge tip — because the point is what the merged tree can still find.
+ */
+export function danglingReferences({ references, set }) {
+  const dangling = []
+  for (const reference of references) {
+    const { file, spec, kind } = reference
+    if (!namesRepoPath(file, spec, kind, set)) {
+      continue
+    }
+    if (resolveRef(file, spec, kind, set) === null) {
+      dangling.push(reference)
+    }
+  }
+  return dangling
+}
 
 export function danglingForkReferences(tip, source, problem = null) {
   if (problem !== null) {
@@ -48,10 +67,16 @@ export function danglingForkReferences(tip, source, problem = null) {
   }
   const oldBase = gitText(['merge-base', tip, pinned.base])
   if (!oldBase) {
-    return { status: STATUS.failed, summary: unresolved(tip, pinned.base), details: [] }
+    return {
+      status: STATUS.failed,
+      summary: `no merge base between ${tip.slice(0, 10)} and the pinned base ${pinned.base.slice(0, 10)}`,
+      details: []
+    }
   }
   // Only the files the FORK touched are scanned: upstream rewrites its own callers, so scanning its whole
-  // delta would read tens of thousands of files to answer a question about the fork.
+  // delta would read tens of thousands of files to answer a question about the fork. And a fork file
+  // upstream renamed is scanned at its NEW path — at the old one it looks deleted, and dropping it would
+  // skip exactly the file whose relative specifiers the rename broke.
   const forkTouched = changedNames(['--no-renames', '--diff-filter=AM', oldBase, tip])
   if (forkTouched === null) {
     return {
@@ -60,8 +85,12 @@ export function danglingForkReferences(tip, source, problem = null) {
       details: ['the fork-touched set is unknown, so the scan cannot report clean']
     }
   }
-  const known = new Set(splitNul(gitText(['ls-tree', '-r', '--name-only', '-z', 'HEAD'])))
-  const scanned = forkTouched.filter((file) => known.has(file) && SOURCE_FILE.test(file))
+  const { renames } = upstreamMoves(oldBase, pinned.base)
+  const headPaths = splitNul(gitText(['ls-tree', '-r', '--name-only', '-z', 'HEAD']))
+  const known = new Set(headPaths)
+  const scanned = forkTouched
+    .map((file) => renames.get(file) ?? file)
+    .filter((file) => known.has(file) && SOURCE_FILE.test(file))
   if (scanned.length === 0) {
     return {
       status: STATUS.passed,
@@ -105,10 +134,11 @@ export function danglingForkReferences(tip, source, problem = null) {
       references.push({ file, ...reference })
     }
   }
+  const set = fileSet(headPaths)
   const seen = new Set()
   const findings = []
   const reported = []
-  for (const reference of danglingReferences({ references, known })) {
+  for (const reference of danglingReferences({ references, set })) {
     const key = `${reference.file}\u0000${reference.spec}\u0000${reference.kind}`
     if (seen.has(key)) {
       continue
@@ -123,8 +153,8 @@ export function danglingForkReferences(tip, source, problem = null) {
   }
   const details = [
     `old base ${oldBase.slice(0, 10)}, pre-sync tip ${tip.slice(0, 10)}, scanned at HEAD`,
-    `${scanned.length} fork-touched source file(s); ${linesByFile.size} changed since the old base`,
-    `${references.length} fork-added reference(s) scanned; bare specifiers are packages and are not resolved`,
+    `${scanned.length} fork-touched source file(s), ${renames.size} upstream rename(s) followed`,
+    `${references.length} fork-added reference(s) scanned; a bare specifier is a package and is not resolved`,
     `module specifiers naming nothing at HEAD: ${findings.length}; path strings: ${reported.length} (reported, not failed)`,
     ...reported
   ]

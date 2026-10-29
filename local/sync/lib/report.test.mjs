@@ -55,3 +55,14 @@ test('a waiver naming no check is refused', () => {
   const built = report(['a', STATUS.passed])
   assert.throws(() => built.waive('typo', 'reason'), /no check typo to waive/)
 })
+
+test('a waiver on a row that produced a result is refused', () => {
+  const built = report(['a', STATUS.passed])
+  assert.throws(() => built.waive('a', 'reason'), /only a check that could not run can be waived/)
+  const failed = report(['b', STATUS.failed])
+  assert.throws(() => failed.waive('b', 'reason'), /reported failed/)
+  // A `skipped` row is an explicit operator choice, so recording why is allowed.
+  const skipped = report(['c', STATUS.skipped])
+  skipped.waive('c', 'asked for --skip-typecheck')
+  assert.equal(skipped.result(), 'pass')
+})

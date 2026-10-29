@@ -157,6 +157,14 @@ function basePath(importer, spec, kind, set) {
   return kind === 'string' && set.top.has(repoRelative.split('/')[0]) ? repoRelative : null
 }
 
+/**
+ * Whether `spec` names a path inside this repository at all, as opposed to a package. Split out so a
+ * caller can tell "this resolves to nothing" from "this was never a repo path".
+ */
+export function namesRepoPath(importer, spec, kind, set) {
+  return basePath(importer, spec, kind, set) !== null
+}
+
 /** What `spec` names from `importer` in `set`: a file, a directory, or null (a package, or nothing). */
 export function resolveRef(importer, spec, kind, set) {
   const target = basePath(importer, spec, kind, set)

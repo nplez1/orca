@@ -77,39 +77,6 @@ export function orphanForkFiles({ sources, forkOnly, allowlist = [] }) {
   return [...forkOnly].filter((path) => !referenced.has(path) && !allowed.has(path)).sort()
 }
 
-/**
- * Whether a specifier is one that names a repo path at all. A bare `electron` or `@scope/pkg` is a
- * package: nothing in this tree resolves it, and calling that dangling would be a false finding.
- */
-export function isRepoSpecifier(specifier) {
-  return (
-    specifier.startsWith('./') ||
-    specifier.startsWith('../') ||
-    ALIASES.some(([prefix]) => specifier.startsWith(prefix))
-  )
-}
-
-/**
- * References that name a repo path nobody has. `known` is the tree the references must resolve in —
- * HEAD after a merge, not the pre-merge tip — because the point is what the merged tree can still find.
- *
- * This is the check `rename-forecast` only ever ran *before* a merge: after it, an unresolved import was
- * silently null and nothing looked at it again. `pnpm tc` catches the TypeScript imports; it cannot see
- * `vi.mock('…')`, a path string, or a dynamic import in a `.mjs` file.
- */
-export function danglingReferences({ references, known }) {
-  const dangling = []
-  for (const reference of references) {
-    if (!isRepoSpecifier(reference.spec)) {
-      continue
-    }
-    if (resolveSpecifier(reference.spec, reference.file, known) === null) {
-      dangling.push(reference)
-    }
-  }
-  return dangling
-}
-
 /** Fork-only means: present at HEAD under `src/`, absent from upstream's tree. Tests are not candidates. */
 export function isSweepCandidate(path) {
   return (

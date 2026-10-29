@@ -185,10 +185,19 @@ test('forkHasOwnHunks and forkDeleted say what they cannot see', () => {
   assert.equal(forkHasOwnHunks({}), null)
   assert.equal(forkHasOwnHunks({ hunks: forkUntouched }), false)
   assert.equal(forkHasOwnHunks({ hunks: forkRewrote }), true)
+  // No `|||||||` section: an empty base would read any hunk as fork-owned, so the answer is unknown.
+  assert.equal(forkHasOwnHunks({ hunks: [{ ours: [], base: [], basePresent: false }] }), null)
   assert.equal(forkDeleted({}), null)
   assert.equal(forkDeleted({ sides: { base: true, ours: false, theirs: true } }), true)
-  assert.equal(forkDeleted({ status: 'DD' }), true)
+  assert.equal(forkDeleted({ status: 'DU' }), true)
   assert.equal(forkDeleted({ status: 'UD' }), false)
+  // A rebase swaps the sides: `UD` is the fork's deletion, `DU` is upstream's.
+  assert.equal(forkDeleted({ status: 'UD' }, { rebase: true }), true)
+  assert.equal(forkDeleted({ status: 'DU' }, { rebase: true }), false)
+  assert.equal(
+    forkDeleted({ sides: { base: true, ours: true, theirs: false } }, { rebase: true }),
+    true
+  )
 })
 
 test('manual, rerere and an unknown verb are not answers to apply', () => {

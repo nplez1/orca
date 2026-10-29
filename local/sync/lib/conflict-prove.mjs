@@ -29,9 +29,13 @@ const DIRECTIVE_COMMENT = [
   /@ts-nocheck\b/,
   /@ts-check\b/,
   /@jsx(?:ImportSource|Frag)?\b/,
-  /\b(?:eslint|oxlint)-disable(?:-next-line|-line)?\b/,
+  /@__PURE__\b/,
+  /\b(?:eslint|oxlint)-(?:disable|enable)(?:-next-line|-line)?\b/,
+  /\bast-grep-ignore\b/,
   /\bprettier-ignore\b/,
+  /\boxfmt-ignore\b/,
   /\bbiome-ignore\b/,
+  /\bv8 ignore\b/,
   /^\s*\/\/\/\s*<reference\b/
 ]
 // `@param {T}`, `@type {T}` and friends only typecheck in JS, so they are tokens only for a JS file.
@@ -39,12 +43,19 @@ const JSDOC_TYPE =
   /@(?:param|arg|argument|type|returns?|typedef|property|prop|template|callback|this)\b[^\n]*\{/
 const JS_EXTENSIONS = /\.(?:[cm]?js|jsx)$/
 
-/** Comments that carry a directive, as comparable tokens. `comments` is `commentRanges`' map. */
+/**
+ * Comments that carry a directive, as comparable tokens. `comments` is `commentRanges`' map.
+ *
+ * A comment that merely OVERLAPS the region counts: a hunk inside a `/** … *\/` block (or a multi-line
+ * `eslint-disable` block) starts after the comment does, and skipping those made the directive invisible
+ * exactly when the change was to the directive itself. A comment that crosses an edge rather than
+ * enclosing the region is refused earlier, so overlap here cannot smuggle one in.
+ */
 export function directiveTokens({ comments, text, range, jsDocTypes = false }) {
   const [start, end] = range
   const tokens = []
   for (const [from, to] of comments) {
-    if (from < start || to > end) {
+    if (to <= start || from >= end) {
       continue
     }
     const raw = text.slice(from, to)
@@ -188,6 +199,10 @@ export function commentRanges(sf) {
   const jsxTexts = []
   const visit = (node) => {
     if (isJsDoc(node)) {
+      // The parser attaches a JSDoc block as a NODE (often of the end-of-file token, for one that trails
+      // the last statement), so it is never reached as trivia and skipping it lost the directive it may
+      // carry. Its own range is the comment.
+      ranges.set(node.pos, node.end)
       return
     }
     const children = node.getChildren(sf)
@@ -424,14 +439,13 @@ export function proveHunk(hunk, trees, index) {
       resolution: hunk.theirs
     }
   }
+  // Any side whose directives differ from base's refuses the hunk, whichever side added or removed one.
   const directiveGap = ['base', 'ours', 'theirs'].find(
-    (name) =>
-      sides[name].directives.length > 0 &&
-      sides[name].directives.join('\n') !== sides.base.directives.join('\n')
+    (name) => sides[name].directives.join('\n') !== sides.base.directives.join('\n')
   )
   if (directiveGap) {
     return unproven(
-      `the ${directiveGap} side carries a directive comment the other sides do not (or a different one): a directive is code, so this hunk needs a reviewer`
+      `the ${directiveGap} side's directive comments differ from base's: a directive is code, so this hunk needs a reviewer`
     )
   }
   const map = identityMap(sides.base, sides.ours)

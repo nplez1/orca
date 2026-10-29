@@ -341,14 +341,14 @@ function attachExpectedDeletions(files, manifest) {
  * `--apply`: a stale entry is a manifest to fix, not a resolution to trust. An entry bound to an upstream
  * blob that has since changed comes back as `pending-decision`, which `--apply` will not act on.
  */
-function loadExpectedDeletions() {
+function loadExpectedDeletions(upstream = null) {
   let text = null
   try {
     text = readFileSync(DELETIONS_URL, 'utf8')
   } catch {
     // readDeletionManifest reports a missing manifest as a note; nothing here needs to know why.
   }
-  return readDeletionManifestFromGit({ text, manifestPath: DELETIONS_URL.pathname })
+  return readDeletionManifestFromGit({ text, manifestPath: DELETIONS_URL.pathname, upstream })
 }
 
 /** Runs each proposal's git steps. Never commits: resolving the index is the point, not finishing. */
@@ -581,7 +581,9 @@ function main() {
       options.source === 'merge-tree' ? readMergeTree(options.base, options.other) : readLive()
     const ledger = loadLedger()
     attachLedger(result.files, ledger)
-    const manifest = loadExpectedDeletions()
+    const manifest = loadExpectedDeletions(
+      result.state?.kind === 'merge-tree' ? result.state.other : null
+    )
     attachExpectedDeletions(result.files, manifest)
     // Why in result.notes and not only in the JSON payload: headRows renders result.notes, so a stale
     // manifest went unreported in the text and --summary reports — the two a human actually reads.
@@ -601,7 +603,9 @@ function main() {
       for (const file of result.files) {
         file.proposal = null
       }
-      for (const proposal of proposeAll(result.files)) {
+      // A rebase swaps the merge sides, so a modify/delete reads the fork's deletion from the other stage.
+      const rebase = result.state?.kind === 'rebase'
+      for (const proposal of proposeAll(result.files, { rebase })) {
         const file = result.files.find((candidate) => candidate.path === proposal.path)
         if (file) {
           file.proposal = proposal
@@ -625,6 +629,20 @@ function main() {
       result.notes.push(
         `${settled.length} of ${result.files.length} conflicted path(s) carry a settled resolution; the rest are manual`
       )
+      // A verb that is present but refused looks exactly like no verb at all, so say which ones and why:
+      // `take-theirs` needs a file the fork left alone, `delete` needs a modify/delete the fork made.
+      const refused = result.files.filter(
+        (file) =>
+          !file.proposal &&
+          (file.ledger ?? []).some((entry) =>
+            ['take-theirs', 'delete'].includes(entry.resolution?.action)
+          )
+      )
+      if (refused.length > 0) {
+        result.notes.push(
+          `${refused.length} ledger verb(s) were not applied because applying them would discard fork work: ${refused.map((file) => file.path).join('; ')}`
+        )
+      }
       if (options.apply) {
         const outcome = applyProposals(settled.map((file) => file.proposal))
         result.notes.push(

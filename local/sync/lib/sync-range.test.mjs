@@ -12,7 +12,7 @@ after(remove)
 process.chdir(repo)
 const { BACKUP_REF, mergePair, pinnedUpstreamBase, resolvePreSyncTip } =
   await import('./sync-range.mjs')
-const { writeSyncState } = await import('./run.mjs')
+const { clearSyncState, writeSyncState } = await import('./run.mjs')
 
 commit('base', { 'src/a.ts': 'export const a = 1\n' })
 git('checkout', '-q', '-b', 'fork')
@@ -79,4 +79,52 @@ test('with no state file at all the merge itself names the base', () => {
   const pinned = pinnedUpstreamBase(parents[0], `ref ${BACKUP_REF}`)
   assert.equal(pinned.base, parents[1])
   assert.match(pinned.source, /HEAD\^2/)
+})
+
+test('mid-merge, HEAD is the old tip and MERGE_HEAD is the new base', () => {
+  git('checkout', '-q', '-b', 'mid-merge', parents[0])
+  // `--no-commit` leaves MERGE_HEAD behind, which is the state post-sync itself runs in.
+  let conflicted = false
+  try {
+    git('merge', '--no-commit', '--no-ff', parents[1])
+  } catch {
+    conflicted = true
+  }
+  const pair = mergePair()
+  assert.notEqual(pair, null)
+  assert.equal(pair.midMerge, true)
+  assert.equal(pair.tip, git('rev-parse', 'HEAD'))
+  assert.equal(pair.base, git('rev-parse', 'MERGE_HEAD'))
+  // A state file describing this merge is accepted; one describing another is not.
+  writeSyncState({ tool: 'fixture', oldTip: pair.tip, newBase: pair.base })
+  assert.equal(resolvePreSyncTip().tip, pair.tip)
+  writeSyncState({ tool: 'fixture', oldTip: newBase, newBase: pair.base })
+  assert.match(resolvePreSyncTip().problem, /does not belong to this merge/)
+  if (conflicted) {
+    git('merge', '--abort')
+  }
+  git('checkout', '-q', 'fork')
+  git('branch', '-q', '-D', 'mid-merge')
+})
+
+test('a tip outside HEAD history is refused even when HEAD is not a merge', () => {
+  // A fixup commit on top of the merge: the parent comparison has nothing to compare against, and the
+  // ancestor check is what still catches a state file from another sync.
+  const root = git('rev-parse', `${parents[0]}~1`)
+  git('checkout', '-q', '-b', 'elsewhere', root)
+  const unrelated = commit('on another line', { 'src/other.ts': 'export const other = 1\n' })
+  git('checkout', '-q', '-b', 'with-fixup', parents[0])
+  writeSyncState({ tool: 'fixture', oldTip: unrelated, newBase: parents[1] })
+  assert.match(resolvePreSyncTip().problem, /not in HEAD's history/)
+  assert.match(pinnedUpstreamBase(null, null).problem, /not in HEAD's history/)
+  git('checkout', '-q', 'fork')
+  git('branch', '-q', '-D', 'with-fixup')
+  git('branch', '-q', '-D', 'elsewhere')
+})
+
+test('clearSyncState drops the file and reports what it removed', () => {
+  writeSyncState({ tool: 'fixture', oldTip: parents[0], newBase: parents[1] })
+  const removed = clearSyncState()
+  assert.match(removed, /orca-pre-sync-state\.json$/)
+  assert.equal(clearSyncState(), null)
 })

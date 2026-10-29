@@ -73,8 +73,8 @@ function main() {
       merged: options.merged
     })
   } else {
-    const { tip, source } = resolvePreSyncTip()
-    outcome = forkSymbolSurvival(tip, source, { merged: options.merged })
+    const { tip, source, problem } = resolvePreSyncTip()
+    outcome = forkSymbolSurvival(tip, source, { merged: options.merged, problem })
   }
   if (options.json) {
     console.log(JSON.stringify(outcome, null, 2))
@@ -84,7 +84,9 @@ function main() {
       console.log(`  ${line}`)
     }
   }
-  return outcome.status === 'failed' ? 1 : 0
+  // Only `passed` and `info` exit 0: a scan that could not run is not a pass, and neither is one whose
+  // pre-sync tip belongs to another sync. Before this the tool printed a false reason and exited 0.
+  return outcome.status === 'passed' || outcome.status === 'info' ? 0 : 1
 }
 
 // exitCode, not exit(): exit() truncates a large --json still draining into a pipe.

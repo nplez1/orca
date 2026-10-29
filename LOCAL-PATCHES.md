@@ -538,25 +538,23 @@ Generated from those sources, so never edited directly: `skills/*/SKILL.md` and
 `src/cli/bundled-skill-guides.ts` (`pnpm run generate:bundled-skill-guides`), and
 `resources/skills/current-manifest.json` (`pnpm run generate:skill-bundle-manifest`).
 
-Tests that go red if a sync restores upstream's names: `src/shared/agent-feature-install-commands.test.ts`
-(the literal fork URL and the pinned-commit pair), `src/shared/skill-freshness.test.ts` (both lock
-owners accepted, a lookalike owner rejected), `src/cli/skills.test.ts` and
-`src/main/skills/skill-update-run.test.ts` (the executed rail), and
-`src/main/ipc/pty-spawn-env-terminal-basics.test.ts` plus
-`src/main/ipc/pty-daemon-spawn-agent-home-env.test.ts` (packaged / dev / WSL `ORCA_CLI_COMMAND`).
+Tests that go red if a sync restores upstream's names:
+`src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts` and
+`src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts` (packaged / dev `ORCA_CLI_COMMAND`),
+`src/main/pty/wsl-orca-env.test.ts` (the WSL lane's bare registered name) and
+`src/main/skills/skill-lock-sources.test.ts` (the lock reader); `src/cli/skills.test.ts` covers the CLI's
+skill listing and not the install rail.
 `pnpm lint` gates the generated content through `verify:bundled-skill-guides` and
 `verify:skill-bundle-manifest`, so a hand-edited stub or a stale manifest fails there.
 
-What is actually pinned today, after that list drifted: the three `ORCA_CLI_COMMAND` tests above
-(`src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts`, `src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts`
-and `src/main/pty/wsl-orca-env.test.ts` for the WSL lane) plus
-`src/main/skills/skill-lock-sources.test.ts` for the lock reader. Five of the six paths the paragraph
-above names do not exist: `src/shared/agent-feature-install-commands.test.ts`,
-`src/shared/skill-freshness.test.ts` and `src/main/skills/skill-update-run.test.ts` were retired on
-2026-10-27, and the two PTY environment tests moved under `src/main/ipc/pty/`. No test asserts
-`ORCA_SKILLS_REPOSITORY_URL` at all — it appears in one source file and in no test — so the install
-rail's bytes rest on `verify:bundled-skill-guides` alone, and `src/cli/skills.test.ts` covers the CLI's
-skill listing rather than the rail.
+`ORCA_SKILLS_REPOSITORY_URL` has no test of its own: it appears in one source file and in no test, so the
+install rail's bytes rest on `verify:bundled-skill-guides`. Three paths this section named before
+2026-10-29 do not exist — `src/shared/agent-feature-install-commands.test.ts` and
+`src/shared/skill-freshness.test.ts` were retired on 2026-10-27 — and the `isOrcaSkillLockSource`
+predicate they covered is gone; see the lock paragraph above. The two PTY environment test paths this
+section also named moved into `src/main/ipc/pty/`, where the tests above now live.
+`src/main/skills/skill-update-run.test.ts` was retired on the same date; nothing replaced it, so the
+paths above are the whole of what a sync can turn red here.
 
 Not covered, deliberately: `~/.agents/.skill-lock.json` on an existing machine still records
 `stablyai/orca` until the next update rewrites it, and `src/renderer/src/i18n/locales/*.json` keep a
@@ -1032,7 +1030,8 @@ that the shim's `VITEST_MAX_WORKERS` cap did anything, grepping this repo finds 
 reader is Vitest's `resolveConfig`, which assigns `resolved.maxWorkers` from that variable), so the cap
 is real and the export stays. Two corrections to how that was first written down: the cap is **4**, not
 2 (`~/.local/bin/pnpm` and the shell profile both export it), and `orca-queue node local/gate-unit.mjs`
-**is** capped by it — `gate-unit.mjs:323` prints `gate-unit: VITEST_MAX_WORKERS=<n>`. The gate is
+**is** capped by it — `local/unit-suite-run.mjs:110-111` prints `gate-unit: VITEST_MAX_WORKERS=<n>`.
+The gate is
 serialised by the queue, not uncapped. One part of the original claim survives: the fork's custom
 `node-runtime` pool never reads `maxWorkers` itself.
 
@@ -1998,8 +1997,9 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   a reviewer will want first:
 
   - **The ephemeral-VM grouping is upstream's, and the fork's four modules stay flat.**
-    `src/shared/ephemeral-vm-recipe-runner.ts` (a three-line barrel over shared modules) is deleted as
-    upstream deleted it; the fork's extend/context-menu/lock/reclaim modules stay where they are
+    `src/main/ephemeral-vm-recipe-runner.ts` (a three-line barrel over shared modules) is deleted as
+    upstream deleted it; the live `src/shared/ephemeral-vm-recipe-runner.ts` is upstream's own module and
+    is not a fork file; the fork's extend/context-menu/lock/reclaim modules stay where they are
     because they are fork-only and never collide. Every fork importer followed the moves
     (`./ephemeral-vm-runtime-service` → `./ephemeral-vm/runtime-service`, and five more).
   - **Jira's register file is upstream's per-module split plus the fork's three additions.**

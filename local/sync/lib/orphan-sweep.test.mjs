@@ -3,13 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  danglingReferences,
-  isRepoSpecifier,
-  isSweepCandidate,
-  orphanForkFiles,
-  resolveSpecifier
-} from './orphan-sweep.mjs'
+import { isSweepCandidate, orphanForkFiles, resolveSpecifier } from './orphan-sweep.mjs'
 
 const sources = (entries) => new Map(Object.entries(entries))
 const known = (...paths) => new Set(paths)
@@ -117,48 +111,5 @@ test('a .js specifier in a TS file resolves to the .ts module beside it', () => 
   assert.equal(
     resolveSpecifier('./thing.mjs', 'src/a/b.mjs', known('src/a/thing.mts')),
     'src/a/thing.mts'
-  )
-})
-
-const reference = (file, spec, kind = 'import', line = 1) => ({ file, spec, kind, line })
-
-test('a module specifier is resolved, a package is not', () => {
-  assert.equal(isRepoSpecifier('./a'), true)
-  assert.equal(isRepoSpecifier('../a'), true)
-  assert.equal(isRepoSpecifier('@/lib/a'), true)
-  assert.equal(isRepoSpecifier('@renderer/lib/a'), true)
-  assert.equal(isRepoSpecifier('electron'), false)
-  assert.equal(isRepoSpecifier('@scope/pkg'), false)
-})
-
-test('danglingReferences reports only repo paths that resolve to nothing', () => {
-  const tree = known('src/a/used.ts')
-  const dangling = danglingReferences({
-    known: tree,
-    references: [
-      reference('src/a/b.ts', './used'),
-      reference('src/a/b.ts', './gone'),
-      reference('src/a/b.ts', 'electron'),
-      reference('src/a/b.ts', '../a/used', 'mock')
-    ]
-  })
-  assert.deepEqual(
-    dangling.map((item) => item.spec),
-    ['./gone']
-  )
-})
-
-test('danglingReferences resolves against the tree it is given, not the importer', () => {
-  // The point of the post-merge sweep: the importer moved, so a specifier that used to resolve does not.
-  const before = known('src/a/target.ts', 'src/a/importer.ts')
-  const after = known('src/a/target.ts', 'src/moved/importer.ts')
-  const references = [reference('src/a/importer.ts', './target')]
-  assert.deepEqual(danglingReferences({ references, known: before }), [])
-  assert.deepEqual(
-    danglingReferences({
-      references: [reference('src/moved/importer.ts', './target')],
-      known: after
-    }).length,
-    1
   )
 })

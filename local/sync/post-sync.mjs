@@ -7,36 +7,20 @@
 // had renamed, two settings surfaces controlling one consent. Those are not conflict markers, so
 // nothing but a repeatable command catches them. This is that command.
 //
-// Read-only, except that the localization generator rewrites the derived catalog: that rewriting
-// *is* the check, and it must produce no diff.
+// Read-only, except that the localization generator rewrites the derived catalog (that rewriting *is*
+// the check, and it must produce no diff) and that a clean run deletes the pre-sync state file.
 //
 //   node local/sync/post-sync.mjs
 //   node local/sync/post-sync.mjs --skip-typecheck --json
 //
-// The checks themselves live in lib/post-sync-checks.mjs and lib/checks.mjs; this file is the
-// operator-facing report: one row per check, with the title and the remediation text.
+// The checks themselves live in lib/post-sync-checks.mjs, lib/dangling-references.mjs and lib/checks.mjs;
+// their order and titles in lib/post-sync-rows.mjs. This file is the driver: the report, the waivers, the
+// exit code and the state-file cleanup.
 
 import process from 'node:process'
-import {
-  TYPE_CHECK_COMMAND,
-  conflictMarkers,
-  localizationCatalog,
-  repoLint,
-  typecheck
-} from './lib/checks.mjs'
-import { danglingForkReferences } from './lib/dangling-references.mjs'
-import { forkSymbolSurvival } from './lib/fork-symbol-check.mjs'
-import {
-  BUILDER_CONFIG,
-  FORK_SLUG,
-  builderConfig,
-  deletedForkModules,
-  identitySweep,
-  localizationVerifiers,
-  lostContent,
-  unreferencedForkModules,
-  updaterFeed
-} from './lib/post-sync-checks.mjs'
+import { TYPE_CHECK_COMMAND } from './lib/checks.mjs'
+import { BUILDER_CONFIG, FORK_SLUG } from './lib/post-sync-checks.mjs'
+import { postSyncRowIds, postSyncRows } from './lib/post-sync-rows.mjs'
 import { Report, STATUS, clearSyncState, gitText, repoRoot } from './lib/run.mjs'
 import { pinnedUpstreamBase, resolvePreSyncTip } from './lib/sync-range.mjs'
 
@@ -84,7 +68,7 @@ np.18 merge left six over-cap files for a later PR to inherit), and the merged t
 (${TYPE_CHECK_COMMAND}).
 
 Options:
-  --json                     machine-readable report on stdout
+  --json                     machine-readable report on stdout (the state-file notice goes to stderr)
   --skip-typecheck           skip ${TYPE_CHECK_COMMAND}; reported as skipped, never as passed
   --waive <id>:<reason>      record a deliberate exception for a check that could not run (repeatable).
                              Without one, an N/A check fails the run: a check that did not run is not a pass
@@ -107,6 +91,15 @@ function main() {
     usage()
     return
   }
+  // Before anything runs: a waiver naming no check is a typo, and finding it after a 20-minute typecheck
+  // is finding it too late.
+  const known = new Set(postSyncRowIds({ options }))
+  for (const [id] of options.waivers) {
+    if (!known.has(id)) {
+      console.error(`post-sync: no check ${String(id)} to waive — one of ${[...known].join(', ')}`)
+      process.exit(2)
+    }
+  }
   const { tip, source, problem } = resolvePreSyncTip()
   const base = pinnedUpstreamBase(tip, source)
   const report = new Report('post-sync integration checks', {
@@ -118,87 +111,9 @@ function main() {
       ? `${base.base.slice(0, 10)} (from ${base.source})`
       : `unresolved: ${base.problem}`
   })
-  // One row per check. A check that throws is a failed check, never a missing one.
-  const checks = [
-    [
-      'conflict-markers',
-      'no conflict markers',
-      'each named file still carries a conflict; resolve it before pushing',
-      () => conflictMarkers({ delegate: true })
-    ],
-    [
-      'localization-catalog',
-      'derived localization catalog regenerates to no diff',
-      'commit the regenerated catalog; hand-merging a derived file is the failure this checks for',
-      localizationCatalog
-    ],
-    [
-      'localization-verifiers',
-      'both localization verifiers pass',
-      'the source catalog lost entries the derived file still expects',
-      localizationVerifiers
-    ],
-    [
-      'builder-config',
-      'the fork builder config loads',
-      'the fork patches this file; a clean merge into it was wrong',
-      builderConfig
-    ],
-    [
-      'updater-feed',
-      `update feed still names ${FORK_SLUG}`,
-      'without this, an update check resolves upstream releases and the fork ships a downgrade',
-      updaterFeed
-    ],
-    [
-      'identity-sweep',
-      'fork identity sweep',
-      'the named paths carry upstream identity (bundle id, app name, data dir) that the fork must own',
-      identitySweep
-    ],
-    [
-      'lost-content',
-      'red-flag scan of files modified since the pre-sync tip',
-      "diff each flagged file against the pre-sync tip and take the old tip's content where the replay dropped it",
-      () => lostContent(tip, source, problem)
-    ],
-    [
-      'deleted-fork-modules',
-      'deleted fork-only modules, with the exported surface each one carried',
-      'for each name listed as unreferenced, find the caller the deletion dropped and re-home it; "upstream supersedes this" is not a review',
-      () => deletedForkModules(tip, source, problem)
-    ],
-    [
-      'fork-symbol-survival',
-      'fork-added names the merged file no longer declares',
-      "the file survived the merge and the fork's function, constant or settings field inside it did not: re-home it, or acknowledge it under `symbols` in local/sync/expected-deletions.json",
-      () => forkSymbolSurvival(tip, source, { problem })
-    ],
-    [
-      'dangling-references',
-      'fork-added references that name nothing at HEAD',
-      'a rename or extract left an import, a vi.mock target or a path string pointing at a file that no longer exists; pnpm tc sees the TypeScript imports and nothing else',
-      () => danglingForkReferences(tip, source, problem)
-    ],
-    [
-      'unreferenced-fork-modules',
-      'fork-only modules under src/ that nothing imports',
-      'a fork module whose last caller upstream removed simply stops being read: delete it, or wire it in. Report-only, because deleting product code is a judgement',
-      () => unreferencedForkModules()
-    ],
-    [
-      'repo-lint',
-      'repo-wide oxlint passes',
-      'a merge resolved into a file that now breaks a repo-wide rule (max-lines is the usual one); split the file rather than bumping the cap',
-      repoLint
-    ],
-    [
-      'typecheck',
-      `merged tip typechecks (${TYPE_CHECK_COMMAND})`,
-      'pnpm tc found both semantic breaks of the previous sync that no conflict marker showed',
-      () => typecheck(options)
-    ]
-  ]
+  // One row per check, from lib/post-sync-rows.mjs. A check that throws is a failed check, never a
+  // missing one.
+  const checks = postSyncRows({ tip, source, problem, options })
   for (const [id, title, look, run] of checks) {
     try {
       report.addOutcome(id, title, look, run())
@@ -214,21 +129,19 @@ function main() {
   // A waiver a reader cannot find is not recorded: it lands in the rendered report, in --json and in the
   // verdict line, and it only ever covers a check that could not run.
   for (const [id, reason] of options.waivers) {
-    try {
-      report.waive(id, reason)
-    } catch (error) {
-      console.error(`post-sync: ${error.message}`)
-      process.exit(2)
-    }
+    report.waive(id, reason)
   }
   console.log(options.json ? JSON.stringify(report.toJSON(), null, 2) : report.render())
   if (report.ok) {
     const removed = clearSyncState()
     if (removed) {
-      console.log(`\ncleared the pre-sync state file (${removed}); this merge is done`)
+      // stderr, because `--json` promises stdout is the report and nothing else.
+      process.stderr.write(`\ncleared the pre-sync state file (${removed}); this merge is done\n`)
     }
   }
-  process.exit(report.ok ? 0 : 1)
+  // exitCode, not exit(): exit() truncates a large --json still draining into a pipe. The report grew
+  // past the pipe buffer once the fork-symbol and dangling-reference rows landed.
+  process.exitCode = report.ok ? 0 : 1
 }
 
 main()

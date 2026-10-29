@@ -567,7 +567,7 @@ test('a JSDoc type is a directive in a JS file and plain prose in a TS file', ()
   assert.equal(directiveHunk(directive, 'src/a.ts').tier, 'upstream-unchanged')
 })
 
-test('an upstream reward of a non-directive comment still proves ours', () => {
+test('an upstream reword of a non-directive comment still proves ours', () => {
   const proof = directiveHunk('// tidy-up by upstream')
   assert.equal(proof.tier, 'upstream-unchanged')
   assert.deepEqual(proof.resolution, ['const x = compute(1, fork)'])
@@ -584,4 +584,62 @@ test('a directive both sides already carry identically does not refuse the hunk'
     )
   )
   assert.equal(proof.tier, 'upstream-unchanged')
+})
+
+test('a hunk inside a JSDoc block still sees the directive the hunk changes', () => {
+  // The region starts after `/**`, so a containment test missed the comment entirely and the JSDoc type
+  // change proved as "upstream changed only comments" — the S2 failure, inside a comment.
+  const merged = file(
+    'export const run = (options) => options',
+    '/**',
+    hunk({
+      ours: [' * @param {{ path: string, fork: true }} options'],
+      base: [' * @param {{ path: string }} options'],
+      theirs: [' * @param {{ path: string, mode: string }} options']
+    }),
+    ' */'
+  )
+  const proof = proveFile({ path: 'src/a.mjs', merged }).hunks[0]
+  assert.equal(proof.tier, null)
+
+  // A directive upstream adds in a block comment the fork left alone: the fork's side cannot win, so the
+  // directive survives rather than being dropped by an `upstream-unchanged` proof.
+  const directive = file(
+    'export const run = (options) => options',
+    '/*',
+    hunk({
+      ours: [' * keep me', ' * and the fork changed code below'],
+      base: [' * keep me'],
+      theirs: [' * keep me', ' * eslint-disable no-console']
+    }),
+    ' */'
+  )
+  const added = proveFile({ path: 'src/a.ts', merged: directive }).hunks[0]
+  assert.equal(added.tier, 'fork-unchanged')
+  assert.ok(added.resolution.join('\n').includes('eslint-disable no-console'))
+})
+
+test('a side that REMOVES a directive is refused, not proved identity-only', () => {
+  const merged = file(
+    hunk({
+      ours: ['const name = "Orca NP"'],
+      base: ['// @ts-expect-error the shim is partial', 'const name = "Orca"'],
+      theirs: ['const name = "Orca"']
+    })
+  )
+  const proof = only(merged)
+  assert.equal(proof.tier, null)
+  assert.match(proof.reason, /directive comments differ/)
+})
+
+test('the directives this repo actually uses are directives', () => {
+  for (const directive of [
+    '// ast-grep-ignore: no-raw-ipc-channel',
+    '// oxlint-enable no-console',
+    '// oxfmt-ignore',
+    '// v8 ignore next',
+    '// @__PURE__'
+  ]) {
+    assert.equal(directiveHunk(directive).tier, null, directive)
+  }
 })

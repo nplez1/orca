@@ -1,5 +1,5 @@
 {
-  "note": "Files this fork deletes that upstream still owns. Every one is a modify/delete conflict on the next sync, so each is asserted here rather than rediscovered: the resolver prints the entry and can apply it. LOCAL-PATCHES.md and local/sync/convergence-ledger.md stay the evidence; this file is the machine-readable claim. Generated from `git diff <base>..HEAD --diff-filter=D`, NOT from the log: a merge resolution can delete a file without a commit of its own, which is how agent-dashboard-open-mode.ts was missed the first time. A path listed as deleted must be absent at HEAD and present at upstream/main, and conflicts.mjs reports a stale entry on read. Statuses were settled on 2026-10-26: the fork ships the Agent Dashboard as a content-area view and rejects upstream’s drawer/pop-out delivery, so the renderer half is a recorded product deletion and only the mutually inert main-process pair is held. Each entry records `upstreamBlob`, the upstream version of the file the decision was judged against: when upstream's blob for that path changes, the entry reverts to `pending-decision` instead of keeping a `git rm -f` proposal written about a file that no longer exists in that form. An entry present on neither side is reported as prunable.",
+  "note": "Files this fork deletes that upstream still owns. Every one is a modify/delete conflict on the next sync, so each is asserted here rather than rediscovered: the resolver prints the entry and can apply it. LOCAL-PATCHES.md and local/sync/convergence-ledger.md stay the evidence; this file is the machine-readable claim. Generated from `git diff <base>..HEAD --diff-filter=D`, NOT from the log: a merge resolution can delete a file without a commit of its own, which is how agent-dashboard-open-mode.ts was missed the first time. A path listed as deleted must be absent at HEAD and present at upstream/main, and conflicts.mjs reports a stale entry on read. Statuses were settled on 2026-10-26: the fork ships the Agent Dashboard as a content-area view and rejects upstream’s drawer/pop-out delivery, so the renderer half is a recorded product deletion and only the mutually inert main-process pair is held. Each entry records `upstreamBlob`, the upstream version of the file the decision was judged against — read at the upstream base of the merge that settled it (`f173998203` for the 2026-10-28 sync), not at today's `upstream/main`: when upstream's blob for that path changes the entry reverts to `pending-decision` instead of keeping a `git rm -f` proposal written about a file that no longer exists in that form, and binding against a moved upstream would approve changes nobody reviewed. An entry present on neither side is reported as prunable, and an entry with no blob at all is reported as unbound.",
   "statuses": {
     "expected-deletion": "settled: the deletion is the fork's answer and a sync re-applies it",
     "pending-decision": "not settled: the deletion exists but nobody has chosen between restoring and keeping it",
@@ -73,7 +73,7 @@
     {
       "path": "src/main/window/dashboard-popout-window.ts",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "e5497c026891690327fc2e0c0dcdcfd877c22b1f",
+      "upstreamBlob": "2c327a3a003dc71c44dc3471f1f7f4b4e4ae6785",
       "class": "dashboard-delivery",
       "status": "restore",
       "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
@@ -81,7 +81,7 @@
     {
       "path": "src/main/window/dashboard-popout-window.test.ts",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "60b09d2089a9e5dbc13caf2b388b3c8919be1c93",
+      "upstreamBlob": "283a591e0db38229a28dfa53bb653530fd485b40",
       "class": "dashboard-delivery",
       "status": "restore",
       "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
@@ -121,7 +121,7 @@
     {
       "path": "src/renderer/src/popout.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "f7e6fa3e61c2e55de8dcfb28955636313f7fe230",
+      "upstreamBlob": "cb819c23a8ea181f2ce5f7b82c12e336dccb6db5",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
       "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
@@ -185,7 +185,7 @@
     {
       "path": "src/renderer/src/components/dashboard/useDashboardPopoutBridge.ts",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "7ed949123b0394c2bb9798a4d22408f3b728bf65",
+      "upstreamBlob": "70a0603be7a9528f554caefe6acd073f9c72a7ce",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
       "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
@@ -193,7 +193,7 @@
     {
       "path": "src/renderer/src/components/dashboard/useDashboardPopoutBridge.test.tsx",
       "commit": "ab57bb7bbb",
-      "upstreamBlob": "7198d25779a2deba2119601545377d5ffd31bd60",
+      "upstreamBlob": "7bf660a702acc67812ddd2a9971979207950743b",
       "class": "dashboard-delivery",
       "status": "expected-deletion",
       "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."

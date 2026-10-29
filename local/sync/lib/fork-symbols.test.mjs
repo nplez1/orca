@@ -158,19 +158,23 @@ test('a member reached through an arrow body, a call argument or a nested litera
   ])
 })
 
-test('a channel a top-level call registers is a name, and a nested one is not', () => {
+test('a channel any call in the module registers is a name, including inside a register function', () => {
   const text = [
     "ipcMain.handle('np:fork-channel', () => 1)",
     'ipcMain.on(`np:template-channel`, () => 2)',
-    'function register() {',
+    'export function register() {',
     "  ipcMain.handle('np:inside-a-function', () => 3)",
     '}',
-    'register()'
+    'const emitter = new EventEmitter()',
+    "emitter.on('np:emitter-channel', () => 4)"
   ].join('\n')
   const surface = forkSurface('src/main/ipc.ts', text)
   assert.deepEqual([...surface.keys()].sort(), [
+    'channel:np:emitter-channel',
     'channel:np:fork-channel',
+    'channel:np:inside-a-function',
     'channel:np:template-channel',
+    'emitter',
     'register'
   ])
   assert.equal(surface.get('channel:np:fork-channel').kind, 'channel')

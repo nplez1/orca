@@ -42,6 +42,11 @@ export function mergePair() {
   return parts.length >= 3 ? { tip: parts[1], base: parts[2], midMerge: false } : null
 }
 
+// A recorded tip or base that is not in HEAD's history cannot belong to this sync, however HEAD is shaped.
+// The merge-parent check catches the common case; this catches a fixup commit on top, where HEAD is no
+// longer a merge and the parent comparison has nothing to compare against.
+const inHistory = (commit) => gitText(['merge-base', '--is-ancestor', commit, 'HEAD']) !== null
+
 /**
  * The pre-sync tip, which is what "ours" means for every check that compares a range. The state file is
  * written by `pre-sync.mjs --prepare`; the backup ref covers a sync prepared by hand from the runbook.
@@ -59,6 +64,13 @@ export function resolvePreSyncTip() {
         problem: `${source} (${file}) names ${short(tip)} as the pre-sync tip, but this is a merge of ${short(pair.tip)} and ${short(pair.base)}: the state file does not belong to this merge`
       }
     }
+    if (pair === null && !inHistory(tip)) {
+      return {
+        tip: null,
+        source: null,
+        problem: `${source} (${file}) names ${short(tip)} as the pre-sync tip, which is not in HEAD's history: the state file belongs to another sync`
+      }
+    }
     return { tip, source: `${source} (${file})`, problem: null }
   }
   const backup = gitText(['rev-parse', '--verify', '--quiet', `refs/heads/${BACKUP_REF}`])
@@ -70,6 +82,13 @@ export function resolvePreSyncTip() {
       tip: null,
       source: null,
       problem: `ref ${BACKUP_REF} is at ${short(backup)}, not at HEAD's first parent ${short(pair.tip)}: it is not this merge's rollback target, so the range it defines is the wrong one`
+    }
+  }
+  if (pair === null && !inHistory(backup)) {
+    return {
+      tip: null,
+      source: null,
+      problem: `ref ${BACKUP_REF} is at ${short(backup)}, which is not in HEAD's history: it is another sync's rollback target`
     }
   }
   return { tip: backup, source: `ref ${BACKUP_REF}`, problem: null }
@@ -103,6 +122,13 @@ export function pinnedUpstreamBase(tip, source) {
         base: null,
         source: null,
         problem: `${stateSource} (${file}) records new base ${short(resolved)}, but this is a merge of ${short(pair.tip)} and ${short(pair.base)}: the state file does not belong to this merge`
+      }
+    }
+    if (pair === null && !inHistory(resolved)) {
+      return {
+        base: null,
+        source: null,
+        problem: `${stateSource} (${file}) records new base ${short(resolved)}, which is not in HEAD's history: the state file belongs to another sync`
       }
     }
     return { base: resolved, source: `${stateSource} (${file})` }

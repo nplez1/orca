@@ -129,6 +129,7 @@ export function readDeletionManifest({
       entries: [],
       prunable: [],
       rebind: 0,
+      rebound: [],
       failure: null,
       note: `no deletion manifest at ${manifestPath}`
     }
@@ -145,13 +146,22 @@ export function readDeletionManifest({
     problems.push(`both sides deleted it, so the entry can be pruned: ${prunable.join('; ')}`)
   }
   const rebound = []
+  const unbound = []
   const bound = entries.map((entry) => {
+    if (entry.status !== 'pending-decision' && !entry.upstreamBlob) {
+      unbound.push(entry.path)
+    }
     const result = boundDeletion(entry, upstreamBlobOf === null ? null : upstreamBlobOf(entry.path))
     if (result.rebound) {
       rebound.push(`${entry.path} (judged ${entry.upstreamBlob.slice(0, 10)})`)
     }
     return result.entry
   })
+  if (unbound.length > 0) {
+    problems.push(
+      `settled without an upstreamBlob, so nothing binds them to the version that was judged: ${unbound.join('; ')}`
+    )
+  }
   if (rebound.length > 0) {
     problems.push(
       `judged against an upstream blob that has changed, so these are questions again: ${rebound.join('; ')}`

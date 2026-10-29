@@ -154,7 +154,9 @@ patch as a reversion — that is where the ~300k-line PRs came from.
 ## Verify
 
 - Typecheck `pnpm tc` (`tc:node` / `tc:cli` / `tc:web`) · tests `pnpm test <path>`
-- Changed-lines gate CI enforces: `pnpm run check:code-quality:changed`
+- Changed-lines gate: `pnpm run check:code-quality:changed` — the fork's `pr.yml` runs it as step
+  `changed-code-quality`, but that workflow is `disabled_manually` here, so on this fork it runs only
+  when an agent runs it
 - Lint `pnpm exec oxlint` · format `pnpm format`
 - **Always pass an explicit `timeout`** for typecheck, test, or lint: the harness default is below
   their real cost and causes repeated timeouts and restarts. The unit is per-harness — pi's Bash tool

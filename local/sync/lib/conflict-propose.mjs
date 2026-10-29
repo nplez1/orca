@@ -23,32 +23,45 @@ const CHECKOUT = {
   'take-theirs': { side: 'theirs', action: 'take-theirs' }
 }
 
-// `DU` is deleted by us, `DD` both deleted: the fork is the side that removed the file.
-const DELETED_BY_FORK = new Set(['DU', 'DD'])
+// `DU` is deleted by us: on a merge the fork is the "ours" side, so it is the one that removed the file.
+// A REBASE inverts the sides — "ours" is the upstream commit being replayed onto and "theirs" is the
+// fork's — so the same code means the opposite there. `DD` is both-deleted, which classifies as
+// `both-deleted` and is refused before this is reached.
+const DELETED_BY_OURS = new Set(['DU'])
+const DELETED_BY_THEIRS = new Set(['UD'])
 
 const sameLines = (left, right) =>
   left.length === right.length && left.every((line, index) => line === right[index])
 
-/** Whether the fork has a hunk of its own in this file; `null` when the annotation carries no hunks. */
+/**
+ * Whether the fork has a hunk of its own in this file; `null` when that cannot be decided.
+ *
+ * A hunk with no base section cannot answer it — `classifyHunk` records an empty `base` rather than null
+ * when `|||||||` is missing, and comparing against an empty base reads any hunk as fork-owned — so the
+ * absence is reported as unknown and the caller refuses rather than guesses.
+ */
 export function forkHasOwnHunks(file) {
   if (!Array.isArray(file.hunks) || file.hunks.length === 0) {
     return null
   }
-  return file.hunks.some(
-    (hunk) =>
-      hunk.base !== null && hunk.base !== undefined && !sameLines(hunk.ours ?? [], hunk.base)
-  )
+  if (file.hunks.some((hunk) => hunk.basePresent === false || hunk.base === null)) {
+    return null
+  }
+  return file.hunks.some((hunk) => !sameLines(hunk.ours ?? [], hunk.base ?? []))
 }
 
 /** Whether the fork's side is the one that deleted the path; `null` when the status is not known. */
-export function forkDeleted(file) {
+export function forkDeleted(file, { rebase = false } = {}) {
   if (typeof file.status === 'string') {
-    return DELETED_BY_FORK.has(file.status)
+    return (rebase ? DELETED_BY_THEIRS : DELETED_BY_OURS).has(file.status)
   }
-  return file.sides ? file.sides.ours === false : null
+  if (file.sides) {
+    return rebase ? file.sides.theirs === false : file.sides.ours === false
+  }
+  return null
 }
 
-export function proposeResolution(file) {
+export function proposeResolution(file, { rebase = false } = {}) {
   const isModifyDelete = String(file.class ?? '').includes('modify/delete')
   const deletion = file.expectedDeletion ?? null
 
@@ -64,7 +77,7 @@ export function proposeResolution(file) {
     const restore = deletion.status === 'restore'
     // A manifest that calls a path deleted while the fork still has its file is a manifest to fix, not
     // an answer to apply: deleting it here would throw away a file the fork never removed.
-    if (!restore && forkDeleted(file) !== true) {
+    if (!restore && forkDeleted(file, { rebase }) !== true) {
       return null
     }
     return {
@@ -90,7 +103,7 @@ export function proposeResolution(file) {
   const { action, note } = decided.resolution
   const provenance = `convergence-ledger.md: ${decided.title}`
   if (action === 'delete') {
-    if (!isModifyDelete || forkDeleted(file) !== true) {
+    if (!isModifyDelete || forkDeleted(file, { rebase }) !== true) {
       return null
     }
     return {
@@ -120,8 +133,8 @@ export function proposeResolution(file) {
   return null
 }
 
-export function proposeAll(files) {
-  return files.map((file) => proposeResolution(file)).filter(Boolean)
+export function proposeAll(files, options = {}) {
+  return files.map((file) => proposeResolution(file, options)).filter(Boolean)
 }
 
 /** A proposal is only safe to apply when every step names an existing index stage or a tracked path. */

@@ -158,7 +158,9 @@ export function forkSurface(file, text) {
       }
     }
   }
-  // A channel a top-level call registers, as its own name so a merge that drops the line is caught.
+  // A channel any call in this module registers is a name. Not only a top-level one: `src/main` has no
+  // top-level `ipcMain.handle` calls and hundreds inside `register*Handlers()`, which is exactly where a
+  // merge drops one without a marker.
   const addChannels = (node) => {
     const visit = (child) => {
       if (ts.isCallExpression(child)) {
@@ -173,6 +175,7 @@ export function forkSurface(file, text) {
   }
   for (const statement of sf.statements) {
     const exported = hasExport(statement)
+    addChannels(statement)
     const name = statement.name?.text
     if (ts.isFunctionDeclaration(statement)) {
       add(name, 'function', exported, statement)
@@ -208,7 +211,6 @@ export function forkSurface(file, text) {
       for (const literal of exposedObjectLiterals(statement.expression)) {
         addLiteral('default', literal, true)
       }
-      addChannels(statement.expression)
     } else if (ts.isExpressionStatement(statement)) {
       addChannels(statement)
     } else if (
