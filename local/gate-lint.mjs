@@ -153,6 +153,11 @@ export const FORK_LINT_STEPS = [
     command: 'node config/scripts/check-upstream-identity-literals.mjs',
     argv: ['node', 'config/scripts/check-upstream-identity-literals.mjs']
   },
+  {
+    id: 'check-upstream-file-comments',
+    command: 'node local/check-upstream-file-comments.mjs',
+    argv: ['node', 'local/check-upstream-file-comments.mjs']
+  },
   // Why these three are fork-only additions rather than chain steps: upstream's run-lint.mjs replaced
   // package.json's inline `lint` chain in the 2026-10-28 sync and does not know them, so taking that
   // refactor silently stopped running them.

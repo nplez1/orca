@@ -18,7 +18,15 @@ They are never proposed upstream, and they must never reach an upstream-bound PR
   this sync's hunks have an upstream side that changed only comments. A rationale paragraph above
   upstream's code is conflict adjacency and nothing else. The rule covers the fork's own added blocks
   too: a fork hook should name an exported function in a fork file, not explain itself in prose above
-  upstream's code.
+  upstream's code. **Enforced** by `node local/check-upstream-file-comments.mjs`
+  (`check-upstream-file-comments` in `local/gate-lint.mjs`) against
+  `local/upstream-file-comments-baseline.json`: per-file maxima for the files carrying the most, plus a
+  frozen total, measured against the current upstream merge base so a sync moves the ruler with it.
+  The total may only move down, and a shrink is a red until `--prune` locks it in, so slack cannot be
+  spent elsewhere. Growth needs `--accept <reason>`, recorded in the baseline so it is a reviewed
+  edit — including after a sync, which is why the re-baseline step is in `UPSTREAM-SYNC-RUNBOOK.md`
+  § Step 3. A comment that has to stay above upstream's code carries `fork-comment-ok: <why>`. A file
+  that needs one is worth re-reading as a fork-owned module instead.
   The tree does not satisfy this yet, and the size of the gap is the point: **20 files under `src/` carry
   a `LOCAL(nplez1)` comment and 19 of them are files upstream owns**, some running to five lines (the
   monitoring-policy note in `claude-pane-hold-evidence.ts`, which § `local(agents)` relies on). The marker
