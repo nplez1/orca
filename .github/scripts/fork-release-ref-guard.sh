@@ -22,11 +22,29 @@ if [ "$ref" != "refs/heads/nplez1/main" ]; then
   exit 1
 fi
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Why the version here, before anything else: an unpublishable version has to fail whatever else this
+# dispatch is doing. The shape is the part that can strand every install; it is checked on a
+# re-dispatch too, because a re-dispatch into a bad tag publishes it just the same.
+if ! node "$script_dir/fork-release-version-guard.mjs" "$tag"; then
+  exit 1
+fi
+
+# Why the tag on the version check: electron-builder creates the tag when it publishes, so the tags
+# in this checkout are the releases this fork already published. `v:refname` is git's own version
+# sort, so no second opinion on ordering is coded here.
+newest_tag="$(git tag -l 'v*-np.*' --sort=-v:refname 2>/dev/null | head -1 || true)"
+
 errors="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/fork-release-guard.XXXXXX")"
 # Why the error file: "the release is missing" and "gh could not tell me" are different answers, and
 # reading every failure as "no release yet" is how a ref, auth or network problem created a tag.
 if ! target="$(gh release view "$tag" --repo "$repo" --json targetCommitish --jq '.targetCommitish' 2>"$errors")"; then
   if grep -qiE 'not found|HTTP 404' "$errors"; then
+    # Why the monotonicity check only here: a re-dispatch of an existing tag is already published,
+    # so it cannot be stepped above itself, and refusing it would block the retry it exists for.
+    if ! node "$script_dir/fork-release-version-guard.mjs" "$tag" "$newest_tag"; then
+      exit 1
+    fi
     echo "$tag does not exist yet; this run creates it at $sha"
     exit 0
   fi
