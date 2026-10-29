@@ -6,6 +6,7 @@ import {
   removeEphemeralVmRuntime,
   upsertEphemeralVmRuntime
 } from '../../shared/ephemeral-vm-runtime-store'
+import { removeEphemeralVmProvisioningAttempt } from '../../shared/ephemeral-vm-provisioning-attempts'
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
 import {
   toEphemeralVmRuntimeContextMenuFields,
@@ -86,6 +87,15 @@ export async function persistProvisionedEphemeralVmRuntime(
         )
       ) {
         removeEphemeralVmRuntime(args.userDataPath, compatibility.instanceId)
+      }
+      // Why the provisioning row goes with a successful destroy: that is the one case where nothing was
+      // left behind, and the row exists only to say otherwise. A failed destroy keeps it, along with the
+      // `cleanup_failed` record above it.
+      if (cleaned) {
+        removeEphemeralVmProvisioningAttempt(
+          args.userDataPath,
+          start.context.instanceId ?? compatibility.instanceId
+        )
       }
     }
     throw error

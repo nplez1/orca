@@ -15,7 +15,8 @@ import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtime
 import { cleanupFailedEphemeralVmStart } from './failed-start-cleanup'
 import {
   persistProvisionedEphemeralVmRuntime,
-  prepareEphemeralVmCompatibilityPersistence
+  prepareEphemeralVmCompatibilityPersistence,
+  type EphemeralVmCompatibilityPersistence
 } from './runtime-provisioning-persistence'
 
 /**
@@ -94,6 +95,20 @@ export async function provisionEphemeralVmRuntime(
   recordProvisioningAttempt(args, instanceId, compatibility?.createdAt)
 
   inFlightCreates.add(instanceId)
+  try {
+    return await startProvisionedRuntime(args, instanceId, compatibility)
+  } finally {
+    // Why the whole body and not just the spawn: the row stays on disk through the destroy hooks that
+    // follow, and a registration that re-ran while one of those ran would flag a live create.
+    inFlightCreates.delete(instanceId)
+  }
+}
+
+async function startProvisionedRuntime(
+  args: ProvisionEphemeralVmRuntimeArgs,
+  instanceId: string,
+  compatibility: EphemeralVmCompatibilityPersistence | null
+): Promise<ProvisionEphemeralVmRuntimeResult> {
   let start: EphemeralVmRecipeStartResult
   try {
     start = await runEphemeralVmRecipeStart({
@@ -115,31 +130,21 @@ export async function provisionEphemeralVmRuntime(
       onStderr: args.onStderr
     })
   } catch (error) {
-    inFlightCreates.delete(instanceId)
     // Why cleared on a rejection: the hook never reported, and a failure to spawn it means it never
     // ran either, so there is no machine for a later startup to look for.
     forgetProvisioningAttempt(args.userDataPath, instanceId)
     throw error
   }
-  inFlightCreates.delete(instanceId)
 
   if (!start.ok) {
     return finishFailedProvisioning(args, { instanceId, start })
   }
 
-  let runtime: EphemeralVmRuntimeRecord
-  try {
-    // Why the attempt outlives the persist: the persisted record is what replaces it, so clearing first
-    // would leave a window where a crash loses both.
-    runtime = await persistProvisionedEphemeralVmRuntime(args, start, compatibility)
-  } catch (error) {
-    // Why cleared for a compatibility recipe only: that persistence path destroys the machine before
-    // rethrowing, so nothing is left to find. Otherwise the machine exists and only this row names it.
-    if (compatibility) {
-      forgetProvisioningAttempt(args.userDataPath, instanceId)
-    }
-    throw error
-  }
+  // Why the attempt outlives the persist: the persisted record is what replaces it, so clearing first
+  // would leave a window where a crash loses both. Why nothing is caught here: persistence clears the
+  // row itself when it managed to destroy the machine, and otherwise the machine exists with nothing
+  // else naming it.
+  const runtime = await persistProvisionedEphemeralVmRuntime(args, start, compatibility)
   forgetProvisioningAttempt(args.userDataPath, instanceId)
 
   return { ok: true, start, runtime }

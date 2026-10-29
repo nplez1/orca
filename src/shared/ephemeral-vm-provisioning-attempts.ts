@@ -154,7 +154,7 @@ function preserveUnreadableStore(path: string): void {
       ).buffer.toString('utf8')
     )
   } catch {
-    const aside = `${path}.unreadable`
+    const aside = `${path}.unreadable.${Date.now()}`
     renameSync(path, aside)
     console.warn(`[ephemeral-vm] Moved an unreadable provisioning-attempt store to ${aside}.`)
   }

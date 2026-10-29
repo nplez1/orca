@@ -96,8 +96,13 @@ function pruneInterruptedProvisioning(
   if (interrupted.length <= MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS) {
     return interrupted
   }
+  // Why the tie-break: every row flagged in this pass shares one `interruptedAt`, so without it the
+  // stable sort would keep store order — which is creation order — and drop the newest rows instead.
   const retained = [...interrupted]
-    .sort((left, right) => (right.interruptedAt ?? 0) - (left.interruptedAt ?? 0))
+    .sort(
+      (left, right) =>
+        (right.interruptedAt ?? 0) - (left.interruptedAt ?? 0) || right.startedAt - left.startedAt
+    )
     .slice(0, MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS)
   const retainedIds = new Set(retained.map((attempt) => attempt.instanceId))
   for (const dropped of interrupted.filter((attempt) => !retainedIds.has(attempt.instanceId))) {

@@ -17,7 +17,7 @@ SHOW_VERB="team-machines show"
 # How many times to ask for the deadline when the extend verb's own answer does not carry it.
 SHOW_ATTEMPTS=3
 
-log() { printf '%s\n' "$*" >&2; }
+log() { printf '%s\n' "$*" >&2 || true; }
 
 if ! command -v jq >/dev/null 2>&1; then
   log "extend: jq is required"

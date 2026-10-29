@@ -35,8 +35,8 @@ function writeStub(binDir, name, source) {
  * The whole provider surface the script may touch, plus an `ssh` that answers however the case needs:
  * a real ssh would depend on a host, and the cancel case deliberately never reaches one.
  *
- * `ssh` also records that it was called, which is the only point at which the script's signal trap is
- * guaranteed to be armed — a wait on the provisioner's marker would race the arming itself.
+ * `ssh` also records that it was called, which is a point in the run where the signal trap is certainly
+ * armed and the SSH wait has certainly begun.
  */
 function makeBin({ created, sshExitCode }) {
   const binDir = makeDir('orca-vm-create-bin-')
@@ -107,8 +107,8 @@ it('releases the machine when the create is cancelled mid-flight', async () => {
   })
   const create = runCreate(binDir)
 
-  // Why the ssh marker: the trap is armed just before the first ssh call, so waiting for it is the
-  // first moment a SIGTERM is guaranteed to reach the handler rather than kill the shell outright.
+  // Why the ssh marker: it places the signal inside the SSH retry loop, where the run has certainly got
+  // past the trap being armed and the machine having been allocated.
   await waitForPath(sshMarker)
   create.child.kill('SIGTERM')
 

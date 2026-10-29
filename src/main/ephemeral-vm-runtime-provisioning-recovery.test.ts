@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getEphemeralVmProvisioningAttemptsPath,
@@ -189,8 +189,16 @@ describe('flagging a create that never reported', () => {
     // Unbounded growth is what would eventually make the store unreadable — the one failure that would
     // lose the record silently, so the newest rows win.
     expect(interrupted).toHaveLength(MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS)
-    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toHaveLength(
-      MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS
+    const kept = listEphemeralVmProvisioningAttempts(userDataPath)
+    expect(kept).toHaveLength(MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS)
+    // Why the ids, not just the count: every row is flagged in this one pass, so a sort that ignored
+    // `startedAt` would keep the oldest sixteen and drop the newest silently. The store is written in
+    // `startedAt` order, so compare the sets rather than the file's order.
+    expect(kept.map((entry) => entry.instanceId).sort()).toEqual(
+      Array.from(
+        { length: MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS },
+        (_unused, index) => `orca-instance-${index}`
+      ).sort()
     )
     const dropped = warn.mock.calls
       .map((call) => String(call[0]))
@@ -237,7 +245,12 @@ describe('the attempt store', () => {
 
     upsertEphemeralVmProvisioningAttempt(userDataPath, attempt())
 
-    expect(readFileSync(`${path}.unreadable`, 'utf8')).toBe('{"version":1,"attempts":')
+    const preserved = readdirSync(dirname(path))
+      .filter((entry) => entry.includes('unreadable'))
+      .map((entry) => join(dirname(path), entry))
+    // Why a suffix: a second corruption must not replace the first preserved copy.
+    expect(preserved).toEqual([expect.stringContaining('unreadable')])
+    expect(readFileSync(preserved[0] ?? path, 'utf8')).toBe('{"version":1,"attempts":')
     expect(listEphemeralVmProvisioningAttempts(userDataPath)).toHaveLength(1)
     expect(warn.mock.calls[0]?.[0]).toContain('.unreadable')
   })

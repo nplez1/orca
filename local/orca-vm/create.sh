@@ -22,7 +22,9 @@ SSH_USER="${SSH_USER:-$(id -un)}"
 RELAY_GRACE_SECONDS=3600
 # ------------------------------------------------------------------------------------------
 
-log() { printf '%s\n' "$*" >&2; }
+# Why `|| true`: the release path runs with stderr already closed when the app quits, and a printf that
+# fails on that closed pipe would end the handler under `set -e` before the machine was released.
+log() { printf '%s\n' "$*" >&2 || true; }
 
 # jq reads the provisioner output and builds the result, so a missing jq must fail before allocating.
 if ! command -v jq >/dev/null 2>&1; then
