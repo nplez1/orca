@@ -1,7 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
-import { adoptLegacyHomeStore } from '../home-directory-migration'
+import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
+import {
+  adoptLegacyHomeStore,
+  resolveLegacyHomeStore,
+  type LegacyHomeStoreAdoption
+} from '../home-directory-migration'
 import { asRecord } from '../../shared/jenkins-payload'
 import { isJenkinsUrlUnderBase, normalizeJenkinsBaseUrl } from '../../shared/jenkins-urls'
 import type { JenkinsServerProfile } from '../../shared/jenkins-servers'
@@ -28,6 +33,31 @@ type JenkinsServersFile = {
   servers: JenkinsServerProfile[]
 }
 
+/**
+ * The profiles file exists but cannot be read as one.
+ *
+ * Why it throws rather than degrading: the writer reads this list, mutates it and writes it back, so a
+ * read that silently answered "no servers" would persist that emptiness over every saved profile and
+ * orphan their tokens in `jenkins-tokens/`.
+ */
+export class JenkinsServerStoreUnreadableError extends Error {
+  constructor(
+    readonly path: string,
+    message: string
+  ) {
+    super(message)
+    this.name = 'JenkinsServerStoreUnreadableError'
+  }
+}
+
+type JenkinsServersRead = {
+  file: JenkinsServersFile
+  /** Set when the file exists but is not readable as a profiles file; writes must then refuse. */
+  unreadable: JenkinsServerStoreUnreadableError | null
+  /** A pre-rename copy this build could not import; reported even though reads still answer. */
+  adoptionFailure: Extract<LegacyHomeStoreAdoption, { kind: 'failed' }> | null
+}
+
 function getServersFilePath(): string {
   return adoptLegacyHomeStore('jenkins-servers.json')
 }
@@ -39,27 +69,49 @@ function getTokenPath(serverId: string): string {
   )
 }
 
-function readServersFile(): JenkinsServersFile {
-  const path = getServersFilePath()
+function readServersFile(): JenkinsServersRead {
+  const { path, adoption } = resolveLegacyHomeStore('jenkins-servers.json')
+  const adoptionFailure = adoption.kind === 'failed' ? adoption : null
   if (!existsSync(path)) {
-    return { version: 1, servers: [] }
+    return { file: { version: 1, servers: [] }, unreadable: null, adoptionFailure }
   }
   try {
     const parsed: Partial<JenkinsServersFile> = JSON.parse(
       readFileSync(path, { encoding: 'utf-8' })
     )
     return {
-      version: 1,
-      servers: Array.isArray(parsed.servers)
-        ? parsed.servers
-            .map(normalizeStoredServer)
-            .filter((server): server is JenkinsServerProfile => server !== null)
-        : []
+      file: {
+        version: 1,
+        servers: Array.isArray(parsed.servers)
+          ? parsed.servers
+              .map(normalizeStoredServer)
+              .filter((server): server is JenkinsServerProfile => server !== null)
+          : []
+      },
+      unreadable: null,
+      adoptionFailure
     }
   } catch {
-    // A corrupt file must not take the Checks panel down with it.
-    return { version: 1, servers: [] }
+    // Why empty rather than a throw here: the panel must still open. The error travels with the read so
+    // the writers refuse and the settings card can say what happened.
+    return {
+      file: { version: 1, servers: [] },
+      unreadable: new JenkinsServerStoreUnreadableError(
+        path,
+        `Could not read the Jenkins servers saved in ${path}, so they are not shown`
+      ),
+      adoptionFailure
+    }
   }
+}
+
+/** The saved profiles, refusing when the file is present but unreadable. */
+function writableServersFile(): JenkinsServersFile {
+  const read = readServersFile()
+  if (read.unreadable) {
+    throw read.unreadable
+  }
+  return read.file
 }
 
 export function normalizeStoredServer(input: unknown): JenkinsServerProfile | null {
@@ -80,17 +132,44 @@ export function normalizeStoredServer(input: unknown): JenkinsServerProfile | nu
 }
 
 function writeServersFile(file: JenkinsServersFile): void {
-  const dir = dirname(getServersFilePath())
+  const path = getServersFilePath()
+  const dir = dirname(path)
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true })
   }
-  const path = getServersFilePath()
-  writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`, { encoding: 'utf-8', mode: 0o600 })
+  // Why the durable helper: a crash mid-write used to leave truncated JSON, which the next launch read
+  // as "no servers" and the next save then persisted over every profile.
+  writeFileDurableSync(
+    durableWriteTempPath(path),
+    path,
+    `${JSON.stringify(file, null, 2)}\n`,
+    0o600
+  )
   restrictCredentialFileToOwner(path)
 }
 
 export function listJenkinsServers(): JenkinsServerProfile[] {
-  return readServersFile().servers
+  return readServersFile().file.servers
+}
+
+/**
+ * Refuse to show the settings pane an empty list that means something else.
+ *
+ * Why the empty-store condition on an adoption failure: a store with servers is not misleading, but an
+ * empty one says "nothing configured" when the truth is a copy in the pre-rename directory was never
+ * imported.
+ */
+export function assertJenkinsServersReportable(): void {
+  const read = readServersFile()
+  if (read.unreadable) {
+    throw read.unreadable
+  }
+  if (read.adoptionFailure && read.file.servers.length === 0) {
+    throw new JenkinsServerStoreUnreadableError(
+      read.adoptionFailure.legacyPath,
+      `Could not import the Jenkins servers saved in ${read.adoptionFailure.legacyPath}: ${read.adoptionFailure.reason}`
+    )
+  }
 }
 
 export function hasJenkinsServerToken(serverId: string): boolean {
@@ -121,7 +200,7 @@ export function readJenkinsServerToken(serverId: string): string | null {
 }
 
 export function saveJenkinsServer(profile: JenkinsServerProfile, apiToken: string | null): void {
-  const file = readServersFile()
+  const file = writableServersFile()
   const servers = file.servers.filter((server) => server.id !== profile.id)
   servers.push(profile)
   // Why: write the token first — a profile whose token write failed would look connected and then
@@ -137,7 +216,9 @@ export function saveJenkinsServer(profile: JenkinsServerProfile, apiToken: strin
 }
 
 export function removeJenkinsServer(serverId: string): boolean {
-  const file = readServersFile()
+  // Why before the token is unlinked: an unreadable file cannot prove this server is not in it, and a
+  // removal that deleted the token anyway would leave the profile pointing at nothing.
+  const file = writableServersFile()
   const servers = file.servers.filter((server) => server.id !== serverId)
   // Why the token is unlinked even when there is no profile to remove: a token left behind by an
   // earlier partial removal keeps `hasJenkinsServerToken` true, so replication reports the removal as

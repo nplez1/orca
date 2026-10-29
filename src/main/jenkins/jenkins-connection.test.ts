@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import type * as Os from 'node:os'
 import { join } from 'node:path'
@@ -22,7 +22,8 @@ async function loadModules() {
   })
   const connection = await import('./jenkins-connection')
   const store = await import('./jenkins-server-store')
-  return { connection, store }
+  const { JenkinsServerStoreUnreadableError } = store
+  return { connection, store, JenkinsServerStoreUnreadableError }
 }
 
 beforeEach(() => {
@@ -144,6 +145,60 @@ describe('Jenkins server profiles', () => {
     expect(connection.listJenkinsServerSummaries()).toEqual([])
     expect(existsSync(tokenPath)).toBe(false)
     expect(store.readJenkinsServerToken(saved.server.id)).toBeNull()
+  })
+
+  // The bug this names: a corrupt file read as "no servers", and the next save persisted that emptiness
+  // over every profile while their tokens stayed behind in jenkins-tokens/.
+  it('refuses to save or remove over a profiles file it cannot read', async () => {
+    const { connection, store, JenkinsServerStoreUnreadableError } = await loadModules()
+    const saved = connection.saveJenkinsServerFromArgs({
+      baseUrl: 'https://ci.example.com',
+      label: 'CI',
+      username: 'ada',
+      apiToken: 'token'
+    })
+    if (!saved.ok) {
+      throw new Error('save failed')
+    }
+    const profilesPath = join(tempHome, '.orca-np', 'jenkins-servers.json')
+    writeFileSync(profilesPath, '{"version":1,"servers":[')
+
+    const save = connection.saveJenkinsServerFromArgs({
+      baseUrl: 'https://other.example.com',
+      label: 'other',
+      username: 'ada',
+      apiToken: 'token'
+    })
+    expect(save.ok).toBe(false)
+    expect(save.ok ? '' : save.error).toContain('Could not read the Jenkins servers')
+    // Why the file is asserted: the refusal has to leave the bytes that still hold the profiles.
+    expect(readFileSync(profilesPath, 'utf-8')).toBe('{"version":1,"servers":[')
+    expect(() => store.removeJenkinsServer(saved.server.id)).toThrow(
+      JenkinsServerStoreUnreadableError
+    )
+    expect(store.listJenkinsServers()).toEqual([])
+  })
+
+  it('reports an unreadable profiles file to the settings pane instead of an empty list', async () => {
+    const { connection, JenkinsServerStoreUnreadableError } = await loadModules()
+    mkdirSync(join(tempHome, '.orca-np'), { recursive: true })
+    writeFileSync(join(tempHome, '.orca-np', 'jenkins-servers.json'), 'not json')
+
+    expect(() => connection.listJenkinsServerSummaries()).toThrow(JenkinsServerStoreUnreadableError)
+  })
+
+  // J5's shape at this store's boundary: an un-imported copy used to look like "nothing configured".
+  it('reports a pre-rename copy it could not import', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { connection } = await loadModules()
+    mkdirSync(join(tempHome, '.orca'), { recursive: true })
+    writeFileSync(join(tempHome, '.orca', 'jenkins-servers.json'), '{"version":1,"servers":[]}')
+    // Makes creating the fork's own home impossible, so the copy cannot be made.
+    writeFileSync(join(tempHome, '.orca-np'), 'not a directory')
+
+    expect(() => connection.listJenkinsServerSummaries()).toThrow(
+      /Could not import the Jenkins servers saved in/
+    )
   })
 })
 
