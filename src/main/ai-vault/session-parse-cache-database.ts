@@ -233,11 +233,9 @@ function openDatabase(path: string): SyncDatabase {
 
 // Scope cwds are kept: they carry their own version and are not a transcript parse.
 function dropRowsFromAnotherParser(db: SyncDatabase): void {
-  const stored = db.prepare('SELECT value FROM meta WHERE key = ?').get(PARSER_VERSION_KEY) as
-    | { value?: unknown }
-    | undefined
+  const stored = db.prepare('SELECT value FROM meta WHERE key = ?').get(PARSER_VERSION_KEY)?.value
   const current = String(SESSION_PARSE_PARSER_VERSION)
-  if (stored?.value === current) {
+  if (stored === current) {
     return
   }
   db.exec('DELETE FROM rows')

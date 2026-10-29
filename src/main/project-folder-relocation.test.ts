@@ -261,10 +261,11 @@ describe('relocatePrimaryCheckout', () => {
     )
 
     expect(error).toBeInstanceOf(RelocationRollbackFailedError)
-    expect((error as InstanceType<typeof RelocationRollbackFailedError>).currentPath).toBe(
-      '/ws/homelab/main'
-    )
-    expect((error as Error).message).toContain('the folder is still at /ws/homelab/main')
+    if (!(error instanceof RelocationRollbackFailedError)) {
+      throw new Error('expected a rollback failure')
+    }
+    expect(error.currentPath).toBe('/ws/homelab/main')
+    expect(error.message).toContain('the folder is still at /ws/homelab/main')
     expect(deps.setRepoPath).not.toHaveBeenCalled()
   })
 })

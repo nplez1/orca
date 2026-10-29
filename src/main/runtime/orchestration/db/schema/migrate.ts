@@ -37,7 +37,7 @@ export class OrchestrationSchemaNewerThanBuildError extends Error {
 }
 
 export function assertOrchestrationSchemaNotNewer(db: Database.Database): void {
-  const storedVersion = db.pragma('user_version', { simple: true }) as number
+  const storedVersion = Number(db.pragma('user_version', { simple: true }) ?? 0)
   if (storedVersion > SCHEMA_VERSION) {
     db.close()
     throw new OrchestrationSchemaNewerThanBuildError(storedVersion, SCHEMA_VERSION)

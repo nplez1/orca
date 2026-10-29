@@ -94,9 +94,12 @@ describe('versioned cache database', () => {
       expect.unreachable('a newer schema must not open')
     } catch (error) {
       expect(error).toBeInstanceOf(CacheDatabaseNewerThanBuildError)
-      expect((error as CacheDatabaseNewerThanBuildError).storedVersion).toBe('9')
-      expect((error as CacheDatabaseNewerThanBuildError).buildVersion).toBe('8')
-      expect((error as Error).message).toContain('newer than this build')
+      if (!(error instanceof CacheDatabaseNewerThanBuildError)) {
+        throw new Error('expected a newer-schema refusal')
+      }
+      expect(error.storedVersion).toBe('9')
+      expect(error.buildVersion).toBe('8')
+      expect(error.message).toContain('newer than this build')
     }
   })
 

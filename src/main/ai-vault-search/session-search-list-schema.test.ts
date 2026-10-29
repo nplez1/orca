@@ -238,7 +238,7 @@ it('refuses, rather than discards, an index whose list tier a newer build wrote'
 
   const unchanged = new SyncDatabase(path)
   try {
-    expect((unchanged.prepare('SELECT count(*) AS n FROM files').get() as { n: number }).n).toBe(1)
+    expect(unchanged.prepare('SELECT count(*) AS n FROM files').get()?.n).toBe(1)
     expect(meta(unchanged, 'session_list_schema_version')).toBe(
       String(SESSION_LIST_SCHEMA_VERSION + 1)
     )
