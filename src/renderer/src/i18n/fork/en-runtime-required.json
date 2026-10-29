@@ -11,6 +11,11 @@
       }
     }
   },
+  "jira": {
+    "issue": {
+      "writeTimedOut": "Jira did not answer in time, so this change may not have been saved. Reload the issue."
+    }
+  },
   "notifications": {
     "startupRegistration": {
       "title": "Orca is ready to notify you"

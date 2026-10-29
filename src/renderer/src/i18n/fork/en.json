@@ -161,7 +161,9 @@
         "editFieldsSaving": "Saving…",
         "editFields": "Edit fields",
         "noIssueSelected": "No Jira issue is selected.",
-        "anotherUpdatePending": "Another Jira update is still in progress."
+        "anotherUpdatePending": "Another Jira update is still in progress.",
+        "failedToLoadComments": "Failed to load comments.",
+        "retryEditFields": "Retry"
       },
       "LinearItemDrawer": {
         "e6cd6f6d3e": "Estimate"
@@ -193,6 +195,7 @@
         "jiraSprintEmpty": "No issues match this filter in the active sprint.",
         "jiraLoadMoreSprint": "Load more sprint issues",
         "jiraBoardView": "Jira board",
+        "jiraBoardUpdateFailed": "Jira board update failed.",
         "jiraBoardStatusColumns": "Status columns · active sprint only",
         "jiraBoardNoSprintDescription": "No active sprint · board-filter backlog",
         "jiraBoardSprintLoading": "Loading sprint details from the board",
@@ -971,6 +974,9 @@
     "jiraUserMultiPicker": {
       "noOtherMatch": "No other users match."
     },
+    "jiraUserPicker": {
+      "searchFailed": "Could not load people assignable to this issue."
+    },
     "jiraSchemaField": {
       "noUser": "None",
       "currentValue": "Current: {{value0}}"
@@ -992,7 +998,14 @@
   "jira": {
     "board": {
       "noTarget": "No Jira host is available for this move.",
-      "noTransitionSelected": "No status change is selected."
+      "noTransitionSelected": "No status change is selected.",
+      "loadFailed": "Unable to load this Jira board."
+    },
+    "issue": {
+      "writeTimedOut": "Jira did not answer in time, so this change may not have been saved. Reload the issue."
+    },
+    "settings": {
+      "boardLoadFailed": "Jira settings could not be loaded."
     }
   },
   "checkBuild": {
