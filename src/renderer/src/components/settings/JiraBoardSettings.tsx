@@ -11,6 +11,7 @@ import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { toast } from 'sonner'
 import { jiraListBoards, type RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { SearchableSetting } from './SearchableSetting'
@@ -32,7 +33,10 @@ type JiraBoardSettingsProps = {
 const BOARD_SEARCH_DEBOUNCE_MS = 300
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Jira settings could not be loaded.'
+  return extractIpcErrorMessage(
+    error,
+    translate('jira.settings.boardLoadFailed', 'Jira settings could not be loaded.')
+  )
 }
 
 export function JiraBoardSettings({
