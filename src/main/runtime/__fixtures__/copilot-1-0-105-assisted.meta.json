@@ -1,0 +1,7 @@
+{
+  "platform": "darwin",
+  "command": ["copilot", "-C", "<temporary directory>", "-i", "<request to fetch example.com>"],
+  "cols": 120,
+  "rows": 40,
+  "note": "Copilot CLI 1.0.105; assisted approval automatically approved a request to fetch example.com. Temporary directory identifiers replaced with same-length placeholders."
+}

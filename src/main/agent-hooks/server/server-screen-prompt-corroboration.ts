@@ -25,6 +25,10 @@ export const SCREEN_PROMPT_RECHECK_MS = 1_000
  *  without paying a read per second for the rest of the session. */
 export const SCREEN_PROMPT_SLOW_RECHECK_MS = 5_000
 export const SCREEN_PROMPT_FAST_RECHECK_COUNT = 10
+const SCREEN_PROMPT_PAINT_RETRIES_MS = [250, 750, 1_500, 3_000, 6_000]
+/** A pane that reconnects answers inside this; one that never binds again would otherwise hold a
+ *  Needs You row for the life of the process. */
+const SCREEN_PROMPT_UNREADABLE_RECHECK_LIMIT = 20
 
 /** Fields this server stamps per row; carrying them into a repaint would claim a fresh observation. */
 function withoutRowTiming(row: EnrichedAgentHookEventPayload): AgentHookEventPayload {
@@ -80,13 +84,17 @@ export function screenPromptReleaseRow(
 export type ScreenPromptCorroborationHost = {
   /** False where no pane screen is readable at all (the relay's parser, a headless peer). */
   readsScreen: () => boolean
-  /** `undefined` when the pane's screen cannot be read at all, which is not "no dialog". */
-  /** `agentType` picks the lane that can see the dialog: pi's card exists only on the rendered grid,
-   *  copilot's only in the tail text. */
+  /** `undefined` when the pane's screen cannot be read at all, which is not "no dialog".
+   *  `agentType` picks the screen evidence appropriate for the agent. */
   readScreenPrompt: (
     paneKey: string,
     agentType: string | undefined
   ) => ScreenPromptObservation | null | undefined
+  /** Drops the pane's own screen clock without another read: the wait it justified has ended, and
+   *  a stamp carried into the next dialog would predate that dialog's own turn. This trades the
+   *  inverse risk - an answered dialog left painted across a turn boundary is stamped fresh - for
+   *  never letting a stale stamp outlive the wait it was earned by. */
+  forgetScreenPrompt?: (paneKey: string) => void
   currentRow: (paneKey: string) => EnrichedAgentHookEventPayload | undefined
   /** Publishes the repaint and returns the `receivedAt` the stored row ended up with. */
   publishScreenPromptRow: (row: AgentHookEventPayload) => number | undefined
@@ -98,6 +106,9 @@ type PanePrompt = {
   /** Set once our waiting row is the pane's; until then the pane still shows the hook's row. */
   waitingReceivedAt?: number
   rechecks: number
+  retryPaint?: boolean
+  /** Consecutive reads that could not see the pane at all; bounded so a dead pane's wait ends. */
+  unreadableRechecks?: number
 }
 
 /**
@@ -147,11 +158,20 @@ export class ScreenPromptCorroboration {
       return
     }
     if (!this.host.readsScreen() || !isCorroboratableRow(row)) {
-      this.panes.delete(row.paneKey)
-      this.reads.clear(row.paneKey)
+      // Why gated: this branch runs for every stored row, and a stamp is only owed to a live loop or
+      // a copilot row -- a remote pane owns none, so it pays no lookup.
+      const ownsStamp =
+        row.connectionId === null && (pane !== undefined || row.payload.agentType === 'copilot')
+      this.forget(row.paneKey, ownsStamp)
       return
     }
-    this.panes.set(row.paneKey, { working: row, rechecks: 0 })
+    this.panes.set(row.paneKey, {
+      working: row,
+      rechecks: 0,
+      retryPaint:
+        row.payload.agentType === 'copilot' &&
+        (row.hookEventName === 'PermissionRequest' || row.hookEventName === 'permissionRequest')
+    })
     this.reads.schedule(row.paneKey, row.paneKey, SCREEN_PROMPT_CORROBORATION_DELAY_MS)
   }
 
@@ -164,12 +184,19 @@ export class ScreenPromptCorroboration {
     // Why an existing loop is left alone: it is already reading this pane, and restarting it here
     // would lose the release that ends the wait. A stored wait row never reaches this point -
     // `isCorroboratableRow` reads `working` - so this only guards a second report mid-read.
-    if (this.panes.has(paneKey)) {
+    const pending = this.panes.get(paneKey)
+    if (pending) {
+      if (current.payload.agentType === 'copilot') {
+        pending.retryPaint = true
+      }
       return
     }
-    this.panes.set(paneKey, { working: current, rechecks: 0 })
-    this.reads.clear(paneKey)
-    this.corroborate(paneKey)
+    this.panes.set(paneKey, {
+      working: current,
+      rechecks: 0,
+      retryPaint: current.payload.agentType === 'copilot'
+    })
+    this.reads.schedule(paneKey, paneKey, SCREEN_PROMPT_CORROBORATION_DELAY_MS)
   }
 
   clearAll(): void {
@@ -199,7 +226,18 @@ export class ScreenPromptCorroboration {
     const reading = this.host.readScreenPrompt(paneKey, current.payload.agentType)
     // Why wait: a pane whose terminal is not bound yet (a restored one still reconnecting) cannot
     // answer, and releasing on that would report a live Working over a dialog nobody looked at.
-    if (reading === undefined || isScreenPromptForRow(pane.working, reading)) {
+    if (reading === undefined) {
+      pane.unreadableRechecks = (pane.unreadableRechecks ?? 0) + 1
+      if (pane.unreadableRechecks <= SCREEN_PROMPT_UNREADABLE_RECHECK_LIMIT) {
+        this.scheduleRecheck(paneKey)
+        return
+      }
+      this.forget(paneKey)
+      this.host.publishScreenPromptRow(screenPromptReleaseRow(pane.working))
+      return
+    }
+    pane.unreadableRechecks = 0
+    if (isScreenPromptForRow(pane.working, reading)) {
       this.scheduleRecheck(paneKey)
       return
     }
@@ -219,7 +257,17 @@ export class ScreenPromptCorroboration {
     const reading = this.host.readScreenPrompt(paneKey, current.payload.agentType)
     const next = reading === undefined ? null : screenPromptRow(pane.working, current, reading)
     if (!next) {
-      this.forget(paneKey)
+      const delay = SCREEN_PROMPT_PAINT_RETRIES_MS[pane.rechecks]
+      if (
+        pane.retryPaint &&
+        current.receivedAt === pane.working.receivedAt &&
+        delay !== undefined
+      ) {
+        pane.rechecks += 1
+        this.reads.schedule(paneKey, paneKey, delay)
+      } else {
+        this.forget(paneKey)
+      }
       return
     }
     pane.waitingReceivedAt = this.host.publishScreenPromptRow(next) ?? 0
@@ -242,8 +290,11 @@ export class ScreenPromptCorroboration {
     this.reads.schedule(paneKey, paneKey, delay)
   }
 
-  private forget(paneKey: string): void {
+  private forget(paneKey: string, dropStamp = true): void {
     this.panes.delete(paneKey)
     this.reads.clear(paneKey)
+    if (dropStamp) {
+      this.host.forgetScreenPrompt?.(paneKey)
+    }
   }
 }

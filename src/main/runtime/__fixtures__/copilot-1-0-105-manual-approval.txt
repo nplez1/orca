@@ -1,0 +1,216 @@
+[>4;2m[?u[?2026$p[?1049h[?2004h[?1004h[?1003h[?1006h[?25l[?12$p[?1007$p[H[2J[>q]10;?\]11;?\]4;0;?\]4;1;?\]4;2;?\]4;3;?\]4;4;?\]4;5;?\]4;6;?\]4;7;?\]4;8;?\]4;9;?\]4;10;?\]4;11;?\]4;12;?\]4;13;?\]4;14;?\]4;15;?\[?25l[22;0t]0;GitHub Copilot[H[2J[?996n[2;90m╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[116C│
+│[m [34m ╭─╮╭─╮[3;39H[2;90m│[m  [1;34mGetting started[61C[0;2;90m│
+│[m [34m ╰─╯╰─╯[m  Copilot v1.0.105 uses AI.  [2;90m│[m  /init — Initialize Copilot instructions for this repository[17C[2;90m│
+│[m [35m █ [96m▘▝[35m █[m  Check for mistakes.[5;39H[2;90m│[m  /model — Switch models across providers, or use Auto[24C[2;90m│
+│[m [35m  ▔▔▔▔ [m  [33m/experimental[6;39H[2;90m│[78C│
+│[116C│
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m[15B[90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[m [1mConfirm folder trust[97C[0;90m│
+│[m [90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[m [90m│
+│[m [90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮[m [90m│
+│[m [90m│[m /private/var/folders/ml/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/T/xxxxxxxxxxxxxxxxxxxxxxxxxxx[29C[90m│[m [90m│
+│[m [90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m [90m│
+│[118C│
+│[m Copilot can read files in this folder and, with your permission, edit them or run code and shell commands. It will   [90m│
+│[m remember your permissions for the rest of this session.[62C[90m│
+│[118C│
+│[m Do you trust the files in this folder?[79C[90m│
+│[118C│
+│[m [97;44m❯ 1. Yes[39m                                                                                                            [m [90m│
+│[m   2. Yes, and remember this folder for future sessions[63C[90m│
+│[m   3. No (Esc)[104C[90m│
+│[118C│
+│[m [1m↑/↓[m to navigate · [1menter[m to select · [1mesc[m to cancel[68C[90m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[?7l╯[?7h[m[10;2H[34m●[m Tip: /model
+   └ Select the AI model for this session (use 'auto' to let Copilot pick automatically). Use /config model to set the
+[5Cuser default, '--repo'/'--local' to set the repo default, or 'plan'/'--plan' to set the plan-mode model.[5;90HCopilot Fusion[9B [34m●[m An administrator-managed setting replaced model "claude-sonnet-5.5" with "gpt-6.1-sol" for this session. Contact
+   your administrator if this is unexpected.[5;6H[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[96m╴╶[35m [m[96m  [35m [m[96m╴╶[35m [m[96m▘▝[35m [m[18B[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+ /private/var/folders/ml/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx[36;73HRun on: This computer [1mctrl+e[m change environment 
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m❯[K
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m [94m●[m [94mL[34moading: 6 skills, 1 MCP server[m                                                          GPT-6.1 Sol · Medium · (0%)[?7l [?7h[38;3H[?25h[?25l[9;16r[9;1HMMM[1;40r[10;2H[34m●[m An administrator-managed setting replaced model "claude-sonnet-5.5" with "gpt-6.1-sol" for this session. Contact
+   your administrator if this is unexpected.[40;13H[34m13 hooks, 6 skills, 1 MCP server[m[38;3H[?25h[?25l
+
+ Interactive · Assisted Permissions · [1m/[m commands · [1m?[m help[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m  [35m [m[38;3H[?25h[?25l[5;6H[96m╴╶[35m [m[38;3H[?25h[?25l[5;6H[96m▘▝[35m [m[38;3H[?25h[?25l[7A❯ /permissions
+[4C/permissions manual  Require approval for each request
+[4C/permissions assisted  LLM review, not a security boundary; may approve dangerous or unintended actions
+[4C/permissions allow-all  Auto-approve all tool, path, and URL requests
+[4C/permissions show  Show the current permission status
+[K
+
+❯ /permissions [manual|assisted|allow-all|show][40;39H[1m@[m files · [1m#[m issues [38;15H[?25h[?25l[7A[K
+[K
+[K
+[K
+[K
+ /private/var/folders/ml/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx[36;73HRun on: This computer [1mctrl+e[m change environment
+
+❯ [K[40;39H[1m/[m commands · [1m?[m help[38;3H[?25h[?25l[9A[1mSelect Permission Mode
+
+[2C[m1. Manual Approval[31;32H[90mRequire approval for each request
+[m❯ 2. Assisted Permissions[32m ✓[m    [90mApprove requests an LLM safety check deems safe; handle others according to the execution[33;32H mode
+[2C[m3. Allow All[34;32H[90mAuto-approve all tool, path, and URL requests
+
+[mAssisted Permissions use a probabilistic LLM review to reduce approval prompts. They are not a security boundary and may
+ approve dangerous or unintended actions. Use managed restrictions, sandboxing, least-privilege credentials, and egress 
+controls for enforceable protection.
+[K
+[1m1-3[m to select · [1m↑/↓[m to navigate · [1menter[m to confirm · [1mesc[m to cancel[K[11A[K
+
+[K
+[K
+[K
+[K
+
+ /private/var/folders/ml/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx                Run on: This computer [1mctrl+e[m change environment 
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m❯[K
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[m Interactive · Assisted Permissions · [1m/[m commands · [1m?[m help         [40;93HGPT-6.1 Sol · Medium · (0%)[38;3H[?25h[?25l[21A[34m●[m Permission policy: Manual Approval for this session. All permissions have been disabled. Tool, path, and URL
+   requests will require approval. Execution mode: Interactive. Defaults for future sessions: unchanged.[40;16HManual Approval · [1m/[m commands · [1m?[m help     [38;3H[?25h[?25l[3;6H[34m─╮╭╮
+[5C─╯╰╯
+[4C[35m█ [96m▘▝[35m▐
+[4C ▔[m[38;3H[?25h[?25l[3;6H[34m╮╭─╮
+[5C╯╰─╯
+[4C[35m [96m▘▝[35m █
+[4C▔▔[m[38;3H[?25h[?25lUse the shell tool to run exactly this command: printf orca-test > approval-test.txt. Then report success.[40;34H[1m@[m files · [1m#[m issues [38;109H[?25h[?25l[36;95H[K
+
+❯ [K
+
+ [94m●[m [94mW[34morking[m [1mesc esc[m edit prompt                     [38;3H[?25h]0;Use the shell tool to run exactly this command: printf orca-test > approval-test.txt. Then report success. - GitHub Copilot[?25l[18A❯ Use the shell tool to run exactly this command: printf orca-test > approval-test.txt. Then report success.    14:23[38;3H[?25h[?25l[36;26Hxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/T/xxxxxxxxxxxxxxxxxxxxxxxxxxx        [7CSession: 0 AIC used
+
+❯ [?25h[?25l
+
+ [94m◉[m [34mWo[94mrk[109C[m7[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[6Cng[m[38;3H[?25h[?25l
+
+ [94m●[m [2A[?25h[?25l
+
+ [94m◉[m [2A[?25h[?25l
+
+ [94m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m○[m [34mWo[94mrk[m[38;3H[?25h]0;Run Shell Command for Approval - GitHub Copilot[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [34m●[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [94m○[m [2A[?25h[?25l[16A[34m●[m MCP Servers reloaded: 1 server connected[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m●[m [94mW[34morki[94mng[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[34ming[m[38;3H[?25h[?25l
+
+ [94m◎[m [34mWorki[94mng[m[38;3H[?25h[?25l
+
+ [94m○[6C[34mng[m[38;3H[?25h[?25l
+
+ [94m◎[m [2A[?25h[?25l
+
+ [34m◉[m [2A[?25h[?25l
+
+ [34m●[m [94mW[34mo[m[38;3H[?25h[?25l
+
+ [34m◉[m [34mWo[94mrk[m[38;3H[?25h[?25l
+
+ [34m◎[m [94mW[34morki[94mng[m[38;3H[?25h[?25l[40;12H· 6 B [1mesc esc[m interrupt[38;3H[?25h[?25l
+
+ [94m○[m [34mWo[94mrk[34ming[m · 25 B [1mesc esc[m interrupt[38;3H[?25h[?25l[40;15H7 [38;3H[?25h[?25l
+
+ [94m◎[m [34mWorki[94mng[m · 83[38;3H[?25h[?25l[40;15H8 [38;3H[?25h[?25l
+
+ [94m◉[6C[34mng[m · 95[38;3H[?25h[?25l
+
+ [34m●[m [2A[?25h[?25l[36;98HSession: 1.73
+
+❯ [?25h[?25l[14A[33m$[m [1mShell [mWrite approval test file
+   printf orca-test > approval-test.txt[40;2H[34m◉[m [2A[?25h[?25l[H[2;90m│[m                                                                                                                    [2;90m│[m ┃
+[2C[34m ╭─╮╭─╮[2;39H[2;90m│[m  [1;34mGetting started[63C[0;37m┃
+[3C[34m╰─╯╰─╯[m  Copilot v1.0.105 uses AI.[5C/init — Initialize Copilot instructions for this repository[19C[37m┃
+[2C[35m █ [96m▘▝[35m █[m  Check for mistakes.      [6Cmodel — Switch models across providers, or use Copilot Fusion[16C[37m┃
+[3C[35m ▔▔▔▔ [m  [33m/experimental[m      [5;42H                                                              [16C[37m┃
+[2C[m                      [6;39H [80C[37m┃
+[2;90m╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m [37m┃
+[118C[m[1K [37m┃
+[C[34m●[m An administrator-managed setting replaced model "claude-sonnet-5.5" with "gpt-6.1-sol" for this session. Contact    [37m┃
+[C[m  your administrator if this is unexpected.                                                                           [37m┃
+[118C[m[1K [37m┃
+[C[34m●[m Tip: /model[105C[37m┃
+[C[m  └ Select the AI model for this session (use 'auto' to let Copilot pick automatically). Use /config model to set the [37m┃
+[3C[m  user default, '--repo'/'--local' to set the repo default, or 'plan'/'--plan' to set the plan-mode model.          [37m┃
+[118C[m[1K [37m┃
+[C[34m●[m Permission policy: Manual Approval for this session. All permissions have been disabled. Tool, path, and URL[8C[37m┃
+[C[m  requests will require approval. Execution mode: Interactive. Defaults for future sessions: unchanged.       [8C[37m┃
+[118C[m[1K [37m┃
+[C[m❯ Use the shell tool to run exactly this command: printf orca-test > approval-test.txt. Then report success.    14:23 [37m┃
+[118C[m[1K [37m┃
+[C[34m●[m MCP Servers reloaded: 1 server connected[76C[37m┃
+[118C[m[1K [37m┃
+[C[33m$[m [1mShell [mWrite approval test file[86C[37m┃
+[C[m  printf orca-test > approval-test.txt[80C[37m┃
+[118C[m[1K [37m┃
+[90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[m [1mWrite approval test file[93C[0;90m│
+│[m [90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[m [90m│
+│[m [90m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮[m [90m│
+│[m [90m│[m printf orca-test > approval-test.txt[77C[90m│[m [90m│
+│[m [90m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m [90m│
+│[118C│
+│[m Do you want to run this command?[85C[90m│
+│[118C│
+│[m [97;44m❯[39m [97m1. Yes[39m                                                                                                            [m [90m│
+│[m   2. Yes, and don't ask again for `printf` in this directory (/private/.../xxxxxxxxxxxxxxxxxxxxxxxxxxx)              [90m│
+│[m   3. No, and tell Copilot what to do differently (Esc to stop)                                                       [90m│
+│[118C│
+│[m [1m↑/↓[m to navigate · [1menter[m to select · [1mesc[m to cancel                                                                    [90m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[?7l╯[?7h[m[4;6H[96m╴╶[m[96m  [m[96m╴╶[m[96m▘▝[m[23;117H5s678[2;6H[34m─╮╭
+[5C─╯╰
+[4C[35m█ [96m▘▝[35m▐
+[4C [m[23;117H9[2;6H[34m╮╭─
+[5C╯╰─
+[4C[35m [96m▘▝[35m █
+[4C▔[m[23;116H10123456[4;6H[96m╴╶[m[96m  [m[96m╴╶[m[96m▘▝[m[23;117H78920123[4;6H[96m╴╶[m[96m  [m[96m╴╶[m[96m▘▝[m[23;117H456789301[4;6H[96m╴╶[m[96m  [m[96m╴╶[m[96m▘▝[m[23;117H23456[2;6H[34m─╮╭
+[5C─╯╰
+[4C[35m█ [96m▘▝[35m▐
+[4C [m[23;117H7[2;6H[34m╮╭─
+[5C╯╰─
+[4C[35m [96m▘▝[35m █
+[4C▔[m[23;117H8940123[2;6H[34m─╮╭
+[5C─╯╰
+[4C[35m█ [96m▘▝[35m▐
+[4C [m[23;117H4[2;6H[34m╮╭─
+[5C╯╰─
+[4C[35m [96m▘▝[35m █
+[4C▔[m[23;117H5678950

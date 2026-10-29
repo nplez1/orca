@@ -13,6 +13,8 @@ export type WaitBlockedCheckState = {
   appended: WaitBlockedAppendedCarry
   keywordCarry: string
   timer: ReturnType<typeof setTimeout> | null
+  /** Latched while the window carries a Copilot dialog phrase, so one dialog is reported once. */
+  copilotCandidate: boolean
 }
 
 export function createWaitBlockedAppendedCarry(): WaitBlockedAppendedCarry {
@@ -25,7 +27,8 @@ export function createWaitBlockedCheckState(): WaitBlockedCheckState {
     lastWaitState: null,
     appended: createWaitBlockedAppendedCarry(),
     keywordCarry: '',
-    timer: null
+    timer: null,
+    copilotCandidate: false
   }
 }
 

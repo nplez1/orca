@@ -6,6 +6,7 @@ import { OrcaRuntimeWithAgentPromptRequestCorrelation } from '../../orca-runtime
 import { detectTerminalWaitBlockedReason } from '../../terminal-wait-detection'
 import { getPiStateTitleStatus } from '../../../../shared/pi-state-title-marker'
 import { PiAskDialogScreenGained } from '../../pi-ask-dialog-screen'
+import { CopilotScreenPromptGained } from '../../copilot-screen-prompt'
 
 /** What a pane's screen says about a dialog holding it, for the hook store to corroborate a row
  *  whose agent cannot report one itself. Split out of the prompt-submission chain only to keep that
@@ -13,6 +14,7 @@ import { PiAskDialogScreenGained } from '../../pi-ask-dialog-screen'
 export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAgentPromptRequestCorrelation {
   /** The pane's own first-seen clock for a pi card; see PiAskDialogScreenGained. */
   private readonly piAskDialogs = new PiAskDialogScreenGained()
+  private readonly copilotDialogs = new CopilotScreenPromptGained()
 
   /** The interactive dialog the pane's screen is holding, `null` when it holds none the blocked-text
    *  layer reads as a person being asked something, and `undefined` when there is no terminal to ask:
@@ -27,6 +29,15 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
     }
     if (agentType === 'pi') {
       return this.readPiAskDialogPrompt(handle)
+    }
+    if (agentType === 'copilot') {
+      try {
+        const ptyId = this.getTerminalAgentStatusPtyId(handle)
+        const screen = this.readCaughtUpRuledScreen(ptyId)
+        return screen ? this.copilotDialogs.observe(ptyId, screen.lines) : undefined
+      } catch {
+        return undefined
+      }
     }
     try {
       const snapshot = this.getTerminalAgentStatusSnapshot(
@@ -44,6 +55,21 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
       // Why unverifiable rather than "no dialog": these readers throw once a terminal is gone or its
       // handle is stale, and answering "none" there would end a wait on evidence nobody read.
       return undefined
+    }
+  }
+
+  /** Drops the pane's screen-evidence clock; see CopilotScreenPromptGained.forget. Pi's own title
+   *  check withdraws its stamp on every read, so only the agent without one needs this. */
+  forgetPaneScreenPrompt(paneKey: string): void {
+    try {
+      const handle = this.getAgentStatusTerminalHandleForPaneKey(paneKey)
+      if (!handle) {
+        return
+      }
+      this.copilotDialogs.forget(this.getTerminalAgentStatusPtyId(handle))
+    } catch {
+      // Why swallowed: this runs inside the store's commit path for every stored row, so a stale
+      // handle here must not stop the row it arrived with from being committed.
     }
   }
 
