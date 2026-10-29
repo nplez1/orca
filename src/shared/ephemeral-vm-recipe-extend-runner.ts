@@ -81,22 +81,16 @@ export async function runEphemeralVmRecipeExtend(
     spawnCommand: args.spawnCommand
   })
 
-  if (processResult.aborted) {
-    // Why before the exit code: a killed hook reports no code, and "exited with code unknown" would
-    // hide the deadline that actually ended it from the caller that owns that deadline.
-    return {
-      ok: false,
-      context: args.context,
-      error: 'Extend was stopped before it reported a result.',
-      ...processResult
-    }
-  }
-
   if (processResult.exitCode !== 0) {
     return {
       ok: false,
       context: args.context,
-      error: `Extend exited with code ${processResult.exitCode ?? 'unknown'}.`,
+      // Why the abort case is folded in here rather than checked first: a hook that was killed reports no
+      // code, but one that finished and printed a result was not killed — even if the caller's deadline
+      // landed microseconds later, and throwing that answer away would discard a granted extension.
+      error: processResult.aborted
+        ? 'Extend was stopped before it reported a result.'
+        : `Extend exited with code ${processResult.exitCode ?? 'unknown'}.`,
       ...processResult
     }
   }

@@ -10,7 +10,10 @@ import {
   type EphemeralVmRecipeResult
 } from '../shared/ephemeral-vm-recipes'
 import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lifetime'
-import { updateEphemeralVmRuntimeStatus } from '../shared/ephemeral-vm-runtime-store'
+import {
+  listEphemeralVmRuntimes,
+  updateEphemeralVmRuntimeStatus
+} from '../shared/ephemeral-vm-runtime-store'
 import { updateEnvironmentFromPairingCode } from '../shared/runtime-environment-store'
 import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
 import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environments/runtime-environments'
@@ -108,7 +111,7 @@ async function extendLocked(
     // failure the user can immediately retry would only make the host look broken meanwhile.
     throw new Error(
       deadline.aborted
-        ? `Extending the lease did not finish within ${hookTimeoutMs} ms and was stopped. The provider may already have granted the extension, so retry and check the new deadline.`
+        ? `Extending the lease did not finish within ${hookTimeoutMs} ms and was stopped. The provider may already have granted the extension, so check its own deadline for this host before extending again.`
         : extend.error
     )
   }
@@ -117,8 +120,13 @@ async function extendLocked(
   // delete during it is deliberate and must not wait — so the record that was actionable when the
   // lease was requested may be tearing down by the time the answer arrives. Writing the new
   // recipeResult onto a `cleaned` record is what made a finished host report "cleanup failed".
-  const afterHook = getRuntimeRecipeContext(args.store, args.userDataPath, args.runtimeId).runtime
-  if (!isEphemeralVmHostActionable(afterHook)) {
+  //
+  // Why the record alone and not the recipe context: that call re-resolves the repo and the recipe, and
+  // a repo removed from Orca while the hook ran would discard a granted extension with "Repo not found".
+  const afterHook = listEphemeralVmRuntimes(args.userDataPath).find(
+    (entry) => entry.id === args.runtimeId
+  )
+  if (!afterHook || !isEphemeralVmHostActionable(afterHook)) {
     throw new Error(
       'This host was released while its lease was being extended, so the new deadline was not applied.'
     )
