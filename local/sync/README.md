@@ -79,13 +79,19 @@ The two mistakes it is designed to prevent, both made for real:
 identity sweep, the derived catalogs and both localization verifiers, the builder config, the
 update-feed references, the lost-content diff, the exported surface of every deleted fork-only
 module (each name searched for a surviving reference — a deleted module is invisible to a
-modified-files diff), and `pnpm tc`. "Skipped" and "unavailable" are reported as themselves, never
-as a pass.
+modified-files diff), the fork-added names a merged file no longer declares (`forkSymbolSurvival`, so
+`fork-symbols.mjs` below runs as one row of this command rather than as a step somebody has to remember),
+fork-added module specifiers that resolve to nothing at HEAD, and `pnpm tc`. "Skipped" and "unavailable"
+are reported as themselves; `unavailable` fails the run unless `--waive <id>:<reason>` records why, and
+the waiver is printed. A clean run deletes the pre-sync state file, and the tip and base every range
+check uses are checked against HEAD's own parents first (`lib/sync-range.mjs`).
 
 **`fork-symbols.mjs`** — the modified-file companion to post-sync's deleted-module row: names the
 fork added to a file since the old base (top-level declarations, and members of top-level classes,
-interfaces, type literals, enums and object-literal constants) that the merged file no longer declares.
-A `symbols` entry in `expected-deletions.json` with status `expected-deletion` acknowledges one.
+interfaces, type literals, enums and object-literal constants, arrow and call bodies, `export default`
+objects and nested literals) that the merged file no longer declares. It runs as post-sync's
+`fork-symbol-survival` row; run it alone to see why a row named a symbol. A `symbols` entry in
+`expected-deletions.json` with status `expected-deletion` acknowledges one.
 
 It exits **1 whenever any name is relocated or lost**, so a relocation needs an acknowledgement too; the
 summary reports both. The `merged` ref must contain the pre-sync tip and the new upstream base

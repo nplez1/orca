@@ -71,7 +71,8 @@ a conflict for you.
 node local/sync/pre-sync.mjs [--prepare] [--json] [--skip-typecheck]
 node local/sync/conflicts.mjs [--summary|--json|--verify]
 node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no working tree touched
-node local/sync/post-sync.mjs [--json] [--skip-typecheck]
+node local/sync/post-sync.mjs [--json] [--skip-typecheck] [--waive <id>:<reason>]
+node local/sync/fork-symbols.mjs [--json]               # also a post-sync row; run it alone to see why
 node local/sync/identity-sweep.mjs [--json|--fix]
 ```
 
@@ -238,7 +239,18 @@ node local/sync/post-sync.mjs
 
 That runs the integration checks in one pass: conflict markers, the fork identity sweep, the
 derived catalogs (regenerate + both localization verifiers), the builder config loading, the five
-update-feed references still naming `nplez1/orca`, the lost-content diff, and `pnpm tc`.
+update-feed references still naming `nplez1/orca`, the lost-content diff, the exported surface of every
+fork-only module the sync deleted, the names the fork added to a surviving file that the merged file no
+longer declares (the `fork-symbols.mjs` scan, run here as the `fork-symbol-survival` row), fork-added
+references that resolve to nothing at HEAD, and `pnpm tc`.
+
+It also refuses to measure the wrong sync. The pre-sync tip and the recorded new base are checked against
+HEAD — on a merge they have to be its first and second parents — so a state file or backup ref left by an
+earlier sync fails the run instead of scanning its range and reporting clean. A clean run deletes the
+state file; `--prepare` re-points a stale backup after archiving where it used to be.
+
+A row reported `N/A` is **not** a pass: the run exits non-zero unless `--waive <id>:<reason>` records the
+exception, and the waiver is printed in the report, in `--json` and in the verdict line.
 
 A merge can also re-enable workflows **at the repository**, which no tree diff shows: new upstream
 workflows arrive enabled and an edited file comes back on even though the fork had disabled it. Sweep
