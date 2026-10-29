@@ -1,9 +1,20 @@
 /** Keep bundle-keyed coordination outside the macOS app being replaced so desktop installs can park supervised serve processes. */
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
+import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from './local-build-compatibility-contract'
 
-/** launchd label prefix `orca serve service install` writes; only those supervisors register. */
-export const SERVE_LAUNCHD_LABEL_PREFIX = 'com.stablyai.orca.serve'
+/**
+ * launchd label prefix `orca serve service install` writes; only those supervisors register.
+ *
+ * Why derived from the appId: a fixed upstream prefix makes this build install, replace and delete
+ * the unit an official Orca owns — `com.stablyai.orca.serve.plist`, its supervisor, on every run.
+ */
+export const SERVE_LAUNCHD_LABEL_PREFIX = `${LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId}.serve`
+/**
+ * The prefix builds before this fork's own appId registered under. Recognised, never written: a
+ * supervisor started by one of those builds still has to be parkable across the upgrade.
+ */
+const PRE_RENAME_SERVE_LAUNCHD_LABEL_PREFIX = 'com.stablyai.orca.serve'
 export const SERVE_COORDINATION_PROTOCOL = 1
 /** orcad restarts its own browser helper; under the serve prefix so older installers park it too. */
 export const ORCAD_BROWSER_PARK_LABEL = `${SERVE_LAUNCHD_LABEL_PREFIX}.orcad-browser`
@@ -54,9 +65,11 @@ export const acksDir = (dir: string): string => join(dir, 'acks')
 export const ackFileName = (attemptId: string, pid: number): string => `${attemptId}.${pid}.json`
 
 export function isServeSupervisorLabel(label: string | undefined): label is string {
-  return (
-    typeof label === 'string' &&
-    (label === SERVE_LAUNCHD_LABEL_PREFIX || label.startsWith(`${SERVE_LAUNCHD_LABEL_PREFIX}.`))
+  if (typeof label !== 'string') {
+    return false
+  }
+  return [SERVE_LAUNCHD_LABEL_PREFIX, PRE_RENAME_SERVE_LAUNCHD_LABEL_PREFIX].some(
+    (prefix) => label === prefix || label.startsWith(`${prefix}.`)
   )
 }
 

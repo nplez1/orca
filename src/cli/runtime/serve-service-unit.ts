@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
+import { APP_DATA_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { SERVE_LAUNCHD_LABEL_PREFIX } from '../../shared/serve-bundle-coordination'
 
 export type ServeServiceManager = 'launchd' | 'systemd'
@@ -39,6 +40,12 @@ export function serveServiceArgs(
   ]
 }
 
+/**
+ * The unit name this build owns. Why not upstream's plain `orca-serve`: systemd and launchd units are
+ * per-user singletons, so installing or uninstalling either app replaced the other's supervisor.
+ */
+const SERVICE_UNIT_BASE_NAME = `${APP_DATA_DIRECTORY_NAME}-serve`
+
 function profileSuffix(input: ServeServiceInput): string {
   return input.userDataPath === input.defaultUserDataPath
     ? ''
@@ -60,7 +67,7 @@ export function renderServeService(input: ServeServiceInput): ServeServiceSpec {
   const argv = [input.command, ...serveServiceArgs(input)]
   if (manager === 'launchd') {
     const name = suffix ? `${SERVE_LAUNCHD_LABEL_PREFIX}.${suffix}` : SERVE_LAUNCHD_LABEL_PREFIX
-    const logPath = join(input.homeDir, 'Library', 'Logs', 'Orca', `${name}.log`)
+    const logPath = join(input.homeDir, 'Library', 'Logs', APP_DATA_DIRECTORY_NAME, `${name}.log`)
     return {
       manager,
       name,
@@ -69,7 +76,9 @@ export function renderServeService(input: ServeServiceInput): ServeServiceSpec {
       content: renderLaunchAgent(name, argv, env, logPath)
     }
   }
-  const name = suffix ? `orca-serve-${suffix}.service` : 'orca-serve.service'
+  const name = suffix
+    ? `${SERVICE_UNIT_BASE_NAME}-${suffix}.service`
+    : `${SERVICE_UNIT_BASE_NAME}.service`
   return {
     manager,
     name,
