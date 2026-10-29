@@ -43,6 +43,10 @@ import {
   startEphemeralVmRuntimeReclaim,
   stopEphemeralVmRuntimeReclaim
 } from './ephemeral-vm-runtime-reclaim'
+import {
+  resetEphemeralVmRuntimeLocks,
+  withEphemeralVmRuntimeLock
+} from './ephemeral-vm-runtime-lock'
 
 const NOW_MS = Date.parse('2026-06-01T12:00:00.000Z')
 /** An hour before NOW_MS, so the provider deadline and the reclaim grace have both passed. */
@@ -171,6 +175,7 @@ beforeEach(() => {
 
 afterEach(() => {
   stopEphemeralVmRuntimeReclaim()
+  resetEphemeralVmRuntimeLocks()
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -519,6 +524,37 @@ describe('reclaiming a lapsed ephemeral host', () => {
     ).toMatchObject({ status: 'running', sshTargetId: 'runtime-ssh-2' })
     expect(mocks.removeRuntimeOwnedSshTarget).not.toHaveBeenCalledWith('runtime-ssh-2')
     expect(fixture.sent.map((payload) => payload.runtimeId)).toEqual(['runtime-1'])
+  })
+
+  it('skips a runtime another lifecycle operation holds, and still reclaims the rest', async () => {
+    // Why: an extend hook holds this lock while it waits on the provider, so a sweep that queued behind
+    // it stopped reclaiming every other runtime until the app restarted.
+    const fixture = makeFixture()
+    mocks.getSshConnectionManager.mockReturnValue({
+      getState: () => ({ status: 'reconnection-failed' })
+    })
+    upsertEphemeralVmRuntime(fixture.userDataPath, runtime())
+    upsertEphemeralVmRuntime(
+      fixture.userDataPath,
+      runtime({ id: 'runtime-2', sshTargetId: 'runtime-ssh-2' })
+    )
+
+    let finishHolder: () => void = () => undefined
+    const holder = withEphemeralVmRuntimeLock(
+      'runtime-1',
+      () => new Promise<void>((resolve) => (finishHolder = resolve))
+    )
+
+    expect(await makeReclaimer(fixture).sweep()).toEqual(['runtime-2'])
+
+    const skipped = listEphemeralVmRuntimes(fixture.userDataPath).find(
+      (entry) => entry.id === 'runtime-1'
+    )
+    expect(skipped?.reclaimedAt).toBeUndefined()
+    expect(skipped?.sshTargetId).toBe('runtime-ssh-1')
+
+    finishHolder()
+    await holder
   })
 })
 

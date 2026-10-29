@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  getEphemeralVmRuntimeStorePath,
   listEphemeralVmRuntimes,
   upsertEphemeralVmRuntime
 } from '../shared/ephemeral-vm-runtime-store'
@@ -69,6 +70,10 @@ type ExtendBehaviour =
   | { kind: 'increment' }
   | { kind: 'drop-lifetime' }
   | { kind: 'exit'; code: number }
+  /** Hangs the way a provider CLI waiting on an authentication prompt does. */
+  | { kind: 'hang' }
+  /** Releases the host mid-hook, as a workspace delete during the extension would. */
+  | { kind: 'released-during-hook'; storePath: string }
 
 type ExtendScript = {
   command: string
@@ -142,6 +147,19 @@ function writeExtendScript(
   if (behaviour.kind === 'exit') {
     lines.push(`  process.exit(${behaviour.code})`)
   }
+  if (behaviour.kind === 'hang') {
+    // Never answers: stdin is consumed, so only the deadline can end this run.
+    lines.push('  setTimeout(() => undefined, 30_000)')
+  }
+  if (behaviour.kind === 'released-during-hook') {
+    lines.push(
+      `  const storePath = ${JSON.stringify(behaviour.storePath)}`,
+      "  const store = JSON.parse(fs.readFileSync(storePath, 'utf8'))",
+      "  store.runtimes = store.runtimes.map((entry) => entry.id === 'runtime-1' ? { ...entry, status: 'cleaned', cleanupStatus: 'succeeded' } : entry)",
+      '  fs.writeFileSync(storePath, JSON.stringify(store))',
+      `  console.log(JSON.stringify({ schemaVersion: 1, connection: ${connection}, userData: { releaseAt: ${JSON.stringify(SECOND_RELEASE_AT)} } }))`
+    )
+  }
   lines.push('})')
   writeFileSync(scriptPath, lines.join('\n'))
   return { command: nodeCommand(scriptPath), markerPath, seenPath }
@@ -210,6 +228,24 @@ function extend(fixture: Fixture, lifetime = '1h'): Promise<EphemeralVmRuntimeRe
     store: unusedStore,
     runtimeId: RUNTIME_ID,
     lifetime
+  })
+}
+
+/**
+ * Why injected: the production deadline is two minutes, and a test that waited for it would be slower
+ * than the suite's whole budget while proving exactly the same thing about the same code path.
+ */
+function extendWithDeadline(
+  fixture: Fixture,
+  hookTimeoutMs: number,
+  lifetime = '1h'
+): Promise<EphemeralVmRuntimeRecord> {
+  return extendEphemeralVmRuntimeLease({
+    userDataPath: fixture.userDataPath,
+    store: unusedStore,
+    runtimeId: RUNTIME_ID,
+    lifetime,
+    hookTimeoutMs
   })
 }
 
@@ -491,5 +527,43 @@ describe('extending an ephemeral VM lease', () => {
     expect(storedRuntime(fixture).recipeResult).toMatchObject({
       userData: { releaseAt: THIRD_RELEASE_AT }
     })
+  })
+
+  it('stops a hook that never answers instead of holding the runtime lock forever', async () => {
+    // Why this case exists: the hook holds the per-runtime lock, and the reclaim sweep works through
+    // runtimes one at a time — so a hung hook used to stop every later action on this host.
+    const fixture = makeFixture()
+    const script = writeExtendScript(fixture.repoPath, 'hanging-extend', { kind: 'hang' })
+    seedRuntime(fixture, { extend: script.command, extendDurations: ['1h'] })
+    const before = storedRuntime(fixture)
+
+    await expect(extendWithDeadline(fixture, 250)).rejects.toThrow(
+      'did not finish within 250 ms and was stopped'
+    )
+
+    expect(existsSync(script.markerPath)).toBe(true)
+    // Nothing about the lease moved, and the provider may still have granted it, so the record keeps
+    // the deadline Orca can prove rather than a guess.
+    expect(storedRuntime(fixture)).toEqual(before)
+  })
+
+  it('drops the new deadline when the host was released while the hook ran', async () => {
+    // Why this case exists: destroy deliberately does not take this lock, so a workspace delete during
+    // the hook is expected — and the old code wrote `recipeResult` onto the resulting `cleaned` record,
+    // which then showed as a failed cleanup for a host that had in fact finished.
+    const fixture = makeFixture()
+    const script = writeExtendScript(fixture.repoPath, 'released-mid-extend', {
+      kind: 'released-during-hook',
+      storePath: getEphemeralVmRuntimeStorePath(fixture.userDataPath)
+    })
+    seedRuntime(fixture, { extend: script.command, extendDurations: ['1h'] })
+
+    await expect(extend(fixture)).rejects.toThrow('was released while its lease was being extended')
+
+    expect(existsSync(script.markerPath)).toBe(true)
+    const after = storedRuntime(fixture)
+    expect(after).toMatchObject({ status: 'cleaned', cleanupStatus: 'succeeded' })
+    // The deadline the hook reported must not land on a record that is no longer a live host.
+    expect(after.recipeResult).toMatchObject({ userData: { releaseAt: INITIAL_RELEASE_AT } })
   })
 })
