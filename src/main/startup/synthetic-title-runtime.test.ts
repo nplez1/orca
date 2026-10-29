@@ -49,11 +49,16 @@ beforeEach(() => {
   } as unknown as typeof mainProcessState.runtime
 })
 
+// Why both brands: the renderer rebrands a pi title to its owner label (`Pi ! …`), and a pi build
+// can paint that form itself, so the glyph is not what may decide this.
+const PI_PERMISSION_TITLES = ['π ! main', 'Pi ! main'] as const
+const PI_IDLE_TITLES = ['π > main', 'Pi > main'] as const
+
 describe('synthetic titles over a pi state title', () => {
-  it('rings the permission bell without restating the title', () => {
+  it.each(PI_PERMISSION_TITLES)('rings the permission bell without restating %j', (title) => {
     // Why the bell alone: that extra BEL is what fires the permission notification, and the label it
-    // would ride on carries no marker — the write that erased `π !` in the first place.
-    titles.set('pty-1', 'π ! main')
+    // would ride on carries no marker — the write that erased the marker in the first place.
+    titles.set('pty-1', title)
 
     driveSyntheticTitleFromHookStatus(status('waiting', 'pi'))
 
@@ -61,8 +66,8 @@ describe('synthetic titles over a pi state title', () => {
     expect(hooks.ingest.mock.calls[0][1]).toBe('\x07')
   })
 
-  it('rings nothing for a finished turn over a pi state title', () => {
-    titles.set('pty-1', 'π > main')
+  it.each(PI_IDLE_TITLES)('rings nothing for a finished turn over %j', (title) => {
+    titles.set('pty-1', title)
 
     driveSyntheticTitleFromHookStatus(status('done', 'pi'))
 

@@ -360,4 +360,25 @@ describe('the ask card a pi pane is holding', () => {
     await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({ current: true })
   })
+
+  // Why both brands: the renderer rebrands a pi title to its owner label (`Pi ! …`), and a pi build
+  // can paint that form itself. The whole lane gates on this classification, so the glyph must not
+  // be what decides it.
+  it.each([
+    ['\u03c0', PI_NEEDS_INPUT_TITLE],
+    ['Pi', '\x1b]0;Pi ! worker\x07']
+  ])('reads the card under a %s-brand marker, and reports it', async (_brand, title) => {
+    const gained: string[] = []
+    const { runtime, paneKey, flush } = await piTerminalRuntime({
+      onPaneScreenPromptGained: (key) => gained.push(key)
+    })
+    runtime.onPtyData('pty-screen', title + PI_ASK_CARD, 1_000)
+    await flush()
+
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({
+      reason: 'agent-interactive-prompt',
+      current: true
+    })
+    expect(gained).toEqual([paneKey])
+  })
 })
