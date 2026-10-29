@@ -1,5 +1,6 @@
 import { getPiTitlebarLifetimeSourceLines } from './titlebar-extension-lifetime-source'
 import { getPiTitlebarMarkerSourceLines } from './titlebar-extension-marker-source'
+import { getPiOwnerLivenessSourceLines } from './agent-status-owner-liveness-source'
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 import { getPiOmpRuntimeDetectionSourceLines } from './agent-status-runtime-detection-source'
 
@@ -57,6 +58,9 @@ export function getPiTitlebarExtensionSource(kind: PiAgentKind = 'pi'): string {
 
   return [
     ...(kind === 'pi' ? [...getPiOmpRuntimeDetectionSourceLines(`/hook/${kind}`), ''] : []),
+    // Why the shared probe: a restarted pi inherits the previous owner's PID through env, and a
+    // marker that never paints also switches off the ask-card lane that gates on it (#229).
+    ...(kind === 'pi' ? [...getPiOwnerLivenessSourceLines()] : []),
     'const BRAILLE_FRAMES = [',
     "  '\\u280b',",
     "  '\\u2819',",
@@ -106,7 +110,8 @@ export function getPiTitlebarExtensionSource(kind: PiAgentKind = 'pi'): string {
       ? [
           "  // Child processes inherit pane identity; only the owner may report the pane's needs-input marker.",
           '  const markerOwnerPid = process.env.ORCA_PI_TITLE_MARKER_OWNED',
-          '  const ownsMarker = !markerOwnerPid || markerOwnerPid === String(process.pid)',
+          '  const ownsMarker =',
+          '    !markerOwnerPid || markerOwnerPid === String(process.pid) || !isStatusOwnerAlive(markerOwnerPid)',
           '  if (ownsMarker) process.env.ORCA_PI_TITLE_MARKER_OWNED = String(process.pid)'
         ]
       : []),

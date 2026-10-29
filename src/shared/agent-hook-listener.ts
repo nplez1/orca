@@ -278,18 +278,31 @@ export function normalizeHookPayload(
     eventName === 'session_start' &&
     providerSession !== null
   // A transcript session_start carries resume identity while idle; receivers discard the placeholder row.
+  // Why also a session-less pi: `pi --no-session` still owns the pane, and a pane with no row at all
+  // has nothing for a title wait to repaint, so an idle dialog it opens never reaches Needs You
+  // (#231).
   const sessionPlaceholder =
-    providerSessionOnly && !dispatched.payload
+    (providerSessionOnly || (source === 'pi' && eventName === 'session_start')) &&
+    !dispatched.payload
       ? normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: source })
       : null
   // Why: a session_start is this lane's descendant-scope reset, so it is also the one place the
   // pane's own verdict can be re-established — otherwise the next child event reads the absence of
   // a verdict as `working`. Gating the placeholder does that, and recomputes the hold from the live
   // child set this same post carried, which is what a resume republishes for a session still held.
-  const gatedPlaceholder =
+  const heldPlaceholder =
     sessionPlaceholder !== null
       ? gatePaneStateOnDescendants(state, paneKey, sessionPlaceholder)
       : null
+  // Why a session boundary, and only on a still-idle row: this reports a session start, not a turn
+  // that ended — without the flag a relaunch over a crashed `working` row reads as a finished turn,
+  // and an automation's "turn done since dispatchedAt" check can pass before the turn has started.
+  // A row the gate turned live IS a turn, and clients without the session-boundary capability drop
+  // a flagged tab's whole status, so the flag must not ride on it.
+  const gatedPlaceholder =
+    heldPlaceholder?.state === 'done'
+      ? { ...heldPlaceholder, sessionBoundary: true }
+      : heldPlaceholder
   const transportPayload = dispatched.payload ?? gatedPlaceholder
   // Why: an identity-only record is what discards a status row, so it is only right while there is
   // no state to publish. A resume whose children are still live does have one, and publishing it is

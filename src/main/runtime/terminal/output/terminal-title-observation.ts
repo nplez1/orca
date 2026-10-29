@@ -6,6 +6,7 @@ import type {
 import { OrcaRuntimeWithGetUnpersistedTrackedTitleForPty } from './terminal-title-tracker'
 import type { TerminalTitleFactMeta } from '../../../../shared/terminal-output-side-effects'
 import { detectAgentStatusFromTitle } from '../../../../shared/agent-detection'
+import { notePiDialogTitleGained } from './pi-dialog-title-gain'
 import { terminalTitleBlocksExplicitAgentStatus } from '../../runtime-worktree-status-projection'
 import type { ClaudeTerminalEvidence } from '../../../../shared/claude-terminal-interrupt'
 import type { OrchestrationMailboxLeaf } from '../../orchestration/mailbox-owner'
@@ -156,6 +157,10 @@ export abstract class OrcaRuntimeWithApplyTrackedPtyTitle extends OrcaRuntimeWit
       ) {
         pty.lastAgentStatusRichInvalidatedAtEpochMs = observedAtEpochMs ?? Date.now()
       }
+      // Why the marker's arrival: pi's dialogs paint no tail text and mostly emit no hook (#228).
+      const paneKeys = this.collectPaneKeysForPty(ptyId)
+      const notifyGained = (paneKey: string) => this.notePaneScreenPromptGained(paneKey)
+      notePiDialogTitleGained(rawTitle, prevStatus, agentStatus, paneKeys, notifyGained)
       if (!statusOnly && identityOnlyTitle) {
         pty.managementTitle = null
         pty.managementTitleAt = null

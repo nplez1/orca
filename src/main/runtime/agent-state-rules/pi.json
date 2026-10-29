@@ -5,8 +5,11 @@
   "anchors": [
     {
       "id": "idle_title",
-      "why": "Pi, and OMP after it, title the pane `π - <session>` at rest (`π ⠋ <session>` while working).",
-      "when": { "region": "title", "match": { "regex": "^π - " } },
+      "why": "Pi, and OMP after it, title the pane `π - <session>` at rest (`π : <session>` while working). A pi build that rebrands its own title paints `Pi - <session>`, Orca's renderer rebrands it the same way, and OMP's owner label does the same for its panes, so all three brands are the same claim; the synthetic `<brand> - action required` permission label is the one hyphenated form that is not idle.",
+      "when": {
+        "region": "title",
+        "match": { "regex": "^(?:\u03c0|Pi|OMP) - (?!action required)" }
+      },
       "answer": { "state": "idle" }
     }
   ],

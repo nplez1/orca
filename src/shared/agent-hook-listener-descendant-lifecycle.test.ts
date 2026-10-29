@@ -193,6 +193,9 @@ describe('descendant lifecycle never settles the pane', () => {
       // resume names the same session again, so the record is still published for resuming.
       expect(resumed?.providerSessionOnly).toBeUndefined()
       expect(resumed?.providerSession).toMatchObject({ id: 'A' })
+      // Why no boundary: the flag reads "a session start, not a turn end", but this row IS the live
+      // hold, and a client without the session-boundary capability drops a flagged tab's status.
+      expect(resumed?.payload.sessionBoundary).toBeUndefined()
 
       // No new turn follows: A's last child ending is the only event left, and it settles the pane
       // because the resume restored the verdict it is gated against.

@@ -218,10 +218,13 @@ const PI_ASK_CARD = [
 
 const PI_NEEDS_INPUT_TITLE = '\x1b]0;\u03c0 ! worker\x07'
 const PI_WORKING_TITLE = '\x1b]0;\u03c0 : worker\x07'
+const PI_IDLE_TITLE = '\x1b]0;\u03c0 > worker\x07'
 
-async function piTerminalRuntime() {
+async function piTerminalRuntime(
+  deps: { onPaneScreenPromptGained?: (paneKey: string) => void } = {}
+) {
   const spawn = vi.fn().mockResolvedValue({ id: 'pty-screen' })
-  const runtime = new OrcaRuntimeService(store)
+  const runtime = new OrcaRuntimeService(store, undefined, deps)
   runtime.setPtyController({
     spawn,
     write: () => true,
@@ -263,19 +266,55 @@ describe('the ask card a pi pane is holding', () => {
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
   })
 
-  it('stops reading the card once the grid no longer holds it', async () => {
+  it('holds the wait while the pane still claims a card the grid no longer shows', async () => {
     const { runtime, paneKey, flush } = await piTerminalRuntime()
     runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_ASK_CARD, 1_000)
     await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).not.toBeNull()
     runtime.onPtyData('pty-screen', '\x1b[2J\x1b[H  \u2713 12 tests passed\r\n', 2_000)
     await flush()
-    // Why null and not undefined: the grid was read and no longer holds the card, which is the
-    // evidence that ends the wait - unlike a grid or title it cannot read, which must hold.
+    // Why undefined and not null: the pane's own marker still claims a dialog, so an emptied grid
+    // is a card that was answered (the marker follows within the second), not evidence nobody is
+    // waiting. Releasing here is how a collapsed or clipped card became a Working tab (#227).
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeUndefined()
+  })
+
+  it('ends the wait once the pane withdraws its own claim', async () => {
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_ASK_CARD, 1_000)
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).not.toBeNull()
+    // Answered: the titlebar extension releases the marker, which is the positive evidence.
+    runtime.onPtyData(
+      'pty-screen',
+      `${PI_IDLE_TITLE}\x1b[2J\x1b[H  \u2713 12 tests passed\r\n`,
+      2_000
+    )
+    await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
   })
 
-  it('claims no wait for a dialog whose wording pi does not paint on a card', async () => {
+  it('tells the store as soon as the pane claims a dialog', async () => {
+    // Why: pi paints most dialogs with no hook of its own, and the store's only other on-gain cue is
+    // the tail-text scan, which a card in the alternate screen never reaches. Without this the row
+    // waits for the next hook post, which an unanswered dialog may never send (#228).
+    const gained: string[] = []
+    const { runtime, paneKey, flush } = await piTerminalRuntime({
+      onPaneScreenPromptGained: (key) => gained.push(key)
+    })
+    runtime.onPtyData('pty-screen', PI_WORKING_TITLE + PI_ASK_CARD, 1_000)
+    await flush()
+    expect(gained).toEqual([])
+
+    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE, 2_000)
+    await flush()
+    expect(gained).toEqual([paneKey])
+  })
+
+  it('holds the wait rather than releasing it on a footer it cannot read', async () => {
+    // Why undefined and not null: the pane still claims a dialog with `π !`, and a footer this
+    // reader has not learned is an unreadable grid - releasing there is a Working tab over a card
+    // a person still has to answer (#227).
     const { runtime, paneKey, flush } = await piTerminalRuntime()
     runtime.onPtyData(
       'pty-screen',
@@ -283,6 +322,81 @@ describe('the ask card a pi pane is holding', () => {
       1_000
     )
     await flush()
-    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeUndefined()
+  })
+
+  it("recognises pi's own selector footer, which a permission gate paints", async () => {
+    // Why: `ctx.ui.select` is what a pi approval gate, a plan review and the trust prompt use, and
+    // its footer matched none of the ask card's anchors (#227).
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData(
+      'pty-screen',
+      `${PI_NEEDS_INPUT_TITLE} PROBE gate: run echo PROBEGATE-1?\r\n \u2191\u2193 navigate  enter select  escape/ctrl+c cancel\r\n`,
+      1_000
+    )
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({
+      reason: 'agent-interactive-prompt',
+      current: true
+    })
+  })
+
+  it('keeps the card readable when it is collapsed and expanded again', async () => {
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData(
+      'pty-screen',
+      `${PI_NEEDS_INPUT_TITLE} Ask Colour\r\n  Colour\r\n \u276f 1. Blue\r\n Enter to select \u00b7 \u2191/\u2193 to navigate \u00b7 n to add notes \u00b7 Esc to cancel \u00b7 Ctrl+] to collapse\r\n`,
+      1_000
+    )
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({ current: true })
+
+    // Ctrl+]: the card keeps its cancel half and drops the accept half.
+    runtime.onPtyData(
+      'pty-screen',
+      '\x1b[2J\x1b[H Ask Colour\r\n  Collapsed\r\n Ctrl+] to expand \u00b7 Esc to cancel\r\n',
+      2_000
+    )
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({ current: true })
+  })
+
+  // Why both brands: the renderer rebrands a pi title to its owner label (`Pi ! …`), and a pi build
+  // can paint that form itself. The whole lane gates on this classification, so the glyph must not
+  // be what decides it.
+  it.each([
+    ['\u03c0', PI_NEEDS_INPUT_TITLE],
+    ['Pi', '\x1b]0;Pi ! worker\x07']
+  ])('reads the card under a %s-brand marker, and reports it', async (_brand, title) => {
+    const gained: string[] = []
+    const { runtime, paneKey, flush } = await piTerminalRuntime({
+      onPaneScreenPromptGained: (key) => gained.push(key)
+    })
+    runtime.onPtyData('pty-screen', title + PI_ASK_CARD, 1_000)
+    await flush()
+
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({
+      reason: 'agent-interactive-prompt',
+      current: true
+    })
+    expect(gained).toEqual([paneKey])
+  })
+
+  // Why this exists separately: the store needs to know whether a blind read is a pane it cannot see
+  // or a pane with nothing to see, and only the title can answer that.
+  it.each([
+    ['π', PI_NEEDS_INPUT_TITLE, true],
+    ['Pi', '\x1b]0;Pi ! worker\x07', true],
+    ['π', PI_WORKING_TITLE, false],
+    ['π', PI_IDLE_TITLE, false]
+  ])('answers claimsDialog=%s for a %s title', async (_label, title, expected) => {
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', title + PI_ASK_CARD, 1_000)
+    await flush()
+
+    expect(runtime.paneClaimsDialog(paneKey, 'pi')).toBe(expected)
+    // Why the other agents answer false: their dialogs have no title claim, so a blind read for them
+    // is still bounded.
+    expect(runtime.paneClaimsDialog(paneKey, 'copilot')).toBe(false)
   })
 })

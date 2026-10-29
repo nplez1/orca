@@ -97,9 +97,38 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
       }
       const lines = screen ? screen.lines : this.readLiveTerminalScreenLines(ptyId)
       const card = this.piAskDialogs.observe(ptyId, lines)
-      return card ? { ...card, current: true } : card
+      if (card) {
+        return { ...card, current: true }
+      }
+      // Why "cannot see it": the pane's own marker still claims a dialog, and a footer this reader
+      // has not learned (a collapsed card, one clipped by pane width) is an unreadable grid, not
+      // evidence the dialog is gone. Holding the wait is right; releasing it is a Working tab over
+      // a card a person still has to answer.
+      return undefined
     } catch {
       return undefined
+    }
+  }
+
+  /** Whether the pane's own title still claims a dialog is open. The one question that separates a
+   *  pane this reader is blind to from a pane that holds no dialog at all: pi's `π !` is its own
+   *  claim, painted for exactly as long as a dialog or a startup prompt holds the pane. */
+  paneClaimsDialog(paneKey: string, agentType: string | undefined): boolean {
+    if (agentType !== 'pi') {
+      return false
+    }
+    try {
+      const handle = this.getAgentStatusTerminalHandleForPaneKey(paneKey)
+      if (!handle) {
+        return false
+      }
+      const snapshot = this.getTerminalAgentStatusSnapshot(
+        handle,
+        this.getTerminalAgentStatusPtyId(handle)
+      )
+      return getPiStateTitleStatus(snapshot.title ?? '') === 'permission'
+    } catch {
+      return false
     }
   }
 

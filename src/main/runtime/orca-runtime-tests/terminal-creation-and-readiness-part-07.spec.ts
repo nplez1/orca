@@ -205,6 +205,41 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it("returns a blocked wait for Pi's project-trust prompt, which its hooks cannot report", async () => {
+    // Why: pi shows trust before its session starts, so there is no row and no `π !` marker — an
+    // orchestrator's `wait --for tui-idle` -> `send --enter` used to press Enter on `→ Trust` (#230).
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'pi'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-bg',
+      [
+        'Trust project folder?\n',
+        'This allows Pi-Bolt to load .pi settings and resources.\n',
+        '→ Trust\n',
+        '  Trust (this session only)\n',
+        '  Do not trust\n',
+        '↑↓ navigate  enter select  escape/ctrl+c cancel\n'
+      ].join(''),
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({
+      handle,
+      condition: 'tui-idle',
+      satisfied: false,
+      status: 'running',
+      blockedReason: 'agent-trust-workspace'
+    })
+  })
+
   it('resolves tui-idle for an idle Cursor lane past its dismissed trust dialog (#8210)', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
