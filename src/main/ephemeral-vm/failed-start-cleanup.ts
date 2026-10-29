@@ -12,7 +12,7 @@ import {
   upsertEphemeralVmRuntime,
   upsertEphemeralVmRuntimeRollbackRecovery
 } from '../../shared/ephemeral-vm-runtime-store'
-import type { ProvisionEphemeralVmRuntimeArgs } from './runtime-service'
+import type { ProvisionEphemeralVmRuntimeArgs } from './runtime-provisioning'
 import {
   runEphemeralVmRecipeCleanup,
   type EphemeralVmRecipeContext

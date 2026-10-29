@@ -15,7 +15,7 @@ import {
 import type {
   ProvisionEphemeralVmRuntimeArgs,
   ProvisionEphemeralVmRuntimeResult
-} from './runtime-service'
+} from './runtime-provisioning'
 import { cleanupFailedEphemeralVmStart } from './failed-start-cleanup'
 
 export type EphemeralVmCompatibilityPersistence = {

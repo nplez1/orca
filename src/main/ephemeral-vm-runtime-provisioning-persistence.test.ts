@@ -3,12 +3,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  getEphemeralVmProvisioningAttemptsPath,
+  listEphemeralVmProvisioningAttempts
+} from '../shared/ephemeral-vm-provisioning-attempts'
+import {
   getEphemeralVmRuntimeStorePath,
   listEphemeralVmRuntimes
 } from '../shared/ephemeral-vm-runtime-store'
 import { parseOrcaYaml } from '../shared/orca-yaml'
 import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
-import { provisionEphemeralVmRuntime } from './ephemeral-vm/runtime-service'
+import { provisionEphemeralVmRuntime } from './ephemeral-vm/runtime-provisioning'
 
 const RELEASE_AT = '2026-06-01T13:00:00.000Z'
 
@@ -158,5 +162,104 @@ describe('persisting a provisioned ephemeral VM runtime', () => {
     expect(hasOwnKey(raw, 'extend')).toBe(false)
     expect(hasOwnKey(raw, 'extendDurations')).toBe(false)
     expect(raw.recipe).toMatchObject({ id: 'cloud-sandbox' })
+  })
+})
+
+describe('a create that has not reported yet', () => {
+  /**
+   * A create that, mid-run, copies the attempt store and its own `ORCA_VM_INSTANCE_ID`. That is the
+   * only way to observe the ordering this fix is about: the record has to exist while the hook is
+   * still running, before any recipe result has come back.
+   */
+  function writeInspectingCreateScript(
+    repoPath: string,
+    userDataPath: string
+  ): {
+    command: string
+    seenPath: string
+    attemptsSnapshotPath: string
+  } {
+    const scriptPath = join(repoPath, 'create.js')
+    const seenPath = join(repoPath, 'seen-instance.txt')
+    const attemptsSnapshotPath = join(repoPath, 'attempts-at-create.json')
+    writeFileSync(
+      scriptPath,
+      [
+        "const fs = require('node:fs')",
+        `fs.writeFileSync(${JSON.stringify(seenPath)}, process.env.ORCA_VM_INSTANCE_ID)`,
+        `fs.copyFileSync(${JSON.stringify(getEphemeralVmProvisioningAttemptsPath(userDataPath))}, ${JSON.stringify(attemptsSnapshotPath)})`,
+        `console.log(${JSON.stringify(
+          JSON.stringify({
+            schemaVersion: 1,
+            connection: SSH_CONNECTION,
+            userData: { releaseAt: RELEASE_AT }
+          })
+        )})`
+      ].join('\n')
+    )
+    return { command: nodeCommand(scriptPath), seenPath, attemptsSnapshotPath }
+  }
+
+  it('is recorded before the hook runs, keyed by the id the hook is given', async () => {
+    const userDataPath = makeDir('orca-vm-attempt-user-data-')
+    const repoPath = makeDir('orca-vm-attempt-repo-')
+    const create = writeInspectingCreateScript(repoPath, userDataPath)
+
+    const provisioned = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe: { ...parsedRecipe(), create: create.command },
+      repoId: 'repo-1',
+      workspaceName: 'Fix Login Race',
+      now: 1_000
+    })
+
+    expect(provisioned.ok).toBe(true)
+    if (!provisioned.ok) {
+      throw new Error(provisioned.start.error)
+    }
+
+    const instanceId = readFileSync(create.seenPath, 'utf8')
+    // The hook was told which id its machine is filed under...
+    expect(instanceId).toMatch(/^orca-/)
+    // ...and that id was already on disk, with the workspace it was bought for, while it ran.
+    const duringCreate: unknown = JSON.parse(readFileSync(create.attemptsSnapshotPath, 'utf8'))
+    expect(duringCreate).toMatchObject({
+      version: 1,
+      attempts: [
+        {
+          instanceId,
+          recipeId: 'cloud-sandbox',
+          repoPath,
+          repoId: 'repo-1',
+          workspaceName: 'Fix Login Race',
+          startedAt: 1_000
+        }
+      ]
+    })
+    // The runtime takes that same id, so the attempt and the record it becomes cannot be confused.
+    expect(provisioned.runtime.id).toBe(instanceId)
+    // And the attempt is gone once the record exists: an interrupted create is the only thing this
+    // file is allowed to hold.
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toEqual([])
+  })
+
+  it('is dropped when the create reports a failure, because the user sees that failure', async () => {
+    const userDataPath = makeDir('orca-vm-attempt-fail-user-data-')
+    const repoPath = makeDir('orca-vm-attempt-fail-repo-')
+    const scriptPath = join(repoPath, 'create.js')
+    writeFileSync(scriptPath, 'process.exit(4)\n')
+
+    const provisioned = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe: { ...parsedRecipe(), create: nodeCommand(scriptPath) },
+      repoId: 'repo-1',
+      now: 1_000
+    })
+
+    expect(provisioned.ok).toBe(false)
+    expect(listEphemeralVmProvisioningAttempts(userDataPath)).toEqual([])
+    expect(existsSync(getEphemeralVmProvisioningAttemptsPath(userDataPath))).toBe(false)
   })
 })

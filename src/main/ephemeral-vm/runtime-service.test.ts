@@ -12,11 +12,8 @@ import {
   getEphemeralVmRuntimeFeatureStorePath,
   MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
 } from '../../shared/ephemeral-vm-runtime-feature-store'
-import {
-  cleanupEphemeralVmRuntime,
-  provisionEphemeralVmRuntime,
-  resumeEphemeralVmRuntime
-} from './runtime-service'
+import { cleanupEphemeralVmRuntime, resumeEphemeralVmRuntime } from './runtime-service'
+import { provisionEphemeralVmRuntime } from './runtime-provisioning'
 import { stopEphemeralVmRuntimeCleanup } from './runtime-cleanup-control'
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 

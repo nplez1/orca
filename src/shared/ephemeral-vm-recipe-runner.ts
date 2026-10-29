@@ -311,10 +311,20 @@ function buildRecipeContext(
 ): EphemeralVmRecipeContext {
   return {
     ...context,
-    instanceId: context.instanceId ?? `orca-${randomUUID()}`,
+    instanceId: context.instanceId ?? newEphemeralVmInstanceId(),
     recipeId: recipe.id,
     repoPath
   }
+}
+
+/**
+ * The id one create is keyed by, published to the hook as `ORCA_VM_INSTANCE_ID`.
+ *
+ * Exported because the caller has to know it *before* the create runs: a detached hook outlives an app
+ * that is killed mid-create, so the only record of that machine is whichever id was written first.
+ */
+export function newEphemeralVmInstanceId(): string {
+  return `orca-${randomUUID()}`
 }
 
 export function validateRepoPath(repoPath: string): void {
