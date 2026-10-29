@@ -24,7 +24,9 @@ const {
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: handleMock
+    handle: handleMock,
+    // The link-router handshake is a listener, not a handler.
+    on: vi.fn()
   },
   shell: {
     showItemInFolder: showItemInFolderMock,
