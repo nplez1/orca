@@ -280,11 +280,19 @@ export function normalizeHookPayload(
   // A transcript session_start carries resume identity while idle; receivers discard the placeholder row.
   // Why also a session-less pi: `pi --no-session` still owns the pane, and a pane with no row at all
   // has nothing for a title wait to repaint, so an idle dialog it opens never reaches Needs You
-  // (#231). It is the same `done` row the first launch has.
+  // (#231).
+  // Why a session boundary: this row reports a session start, not a turn that ended. Without the
+  // flag a relaunch over a crashed `working` row reads as a finished turn, and an automation's
+  // "turn done since dispatchedAt" check can pass before the turn has even started.
   const sessionPlaceholder =
     (providerSessionOnly || (source === 'pi' && eventName === 'session_start')) &&
     !dispatched.payload
-      ? normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: source })
+      ? normalizeAgentStatusPayload({
+          state: 'done',
+          prompt: '',
+          agentType: source,
+          sessionBoundary: true
+        })
       : null
   // Why: a session_start is this lane's descendant-scope reset, so it is also the one place the
   // pane's own verdict can be re-established — otherwise the next child event reads the absence of
