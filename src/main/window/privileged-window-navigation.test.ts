@@ -54,8 +54,10 @@ describe('privileged window navigation policy', () => {
         }
         handler(...args)
       },
-      subscribesTo(event: string): boolean {
-        return handlers.has(event)
+      subscribedEvents(): string[] {
+        return contents.on.mock.calls
+          .map((call: unknown[]) => String(call[0]))
+          .sort((left, right) => left.localeCompare(right))
       }
     }
   }
@@ -164,14 +166,18 @@ describe('privileged window navigation policy', () => {
 
   // Chromium emits did-start-navigation before the throttle that emits will-navigate, so clearing
   // readiness there would disarm the relay for the handler that cancels this very navigation.
+  // Pinning the exact listener set makes the next lifecycle listener argue its ordering.
   it('clears readiness only once a navigation commits', () => {
     const fixture = createFixture(
       'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
       { routesLinks: true }
     )
 
-    expect(fixture.subscribesTo('did-start-navigation')).toBe(false)
-    expect(fixture.subscribesTo('did-navigate')).toBe(true)
+    expect(fixture.subscribedEvents()).toEqual([
+      'did-navigate',
+      'render-process-gone',
+      'will-navigate'
+    ])
 
     const event = fixture.willNavigate('https://example.com/')
 
@@ -183,7 +189,7 @@ describe('privileged window navigation policy', () => {
     expect(openExternal).not.toHaveBeenCalled()
   })
 
-  it('forgets the router once a new document commits, and relays again until it re-announces', () => {
+  it('opens the OS browser after a committed navigation until the window re-announces', () => {
     const fixture = createFixture(
       'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
       { routesLinks: true }
@@ -194,6 +200,16 @@ describe('privileged window navigation policy', () => {
 
     expect(fixture.contents.send).not.toHaveBeenCalled()
     expect(openExternal).toHaveBeenCalledWith('https://example.com/')
+
+    // The new document announces itself from its mount effect; relaying resumes.
+    markContextualLinkRouterReady(fixture.contents)
+    fixture.windowOpen('https://example.com/two')
+
+    expect(fixture.contents.send).toHaveBeenLastCalledWith(
+      'link:openContextual',
+      'https://example.com/two'
+    )
+    expect(openExternal).toHaveBeenCalledTimes(1)
   })
 
   it('forgets the router when the renderer dies', () => {

@@ -177,6 +177,12 @@ describe('AppLinkContextMenu link resolution', () => {
       <a key="r" data-testid="target" href="/docs">
         docs
       </a>
+    ],
+    [
+      'an empty href',
+      <a key="e" data-testid="target" href="">
+        empty
+      </a>
     ]
   ])('leaves %s to the browser default menu', (_label, node) => {
     rightClickOn(node)

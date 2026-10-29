@@ -31,7 +31,7 @@ function contextMenuLinkUrl(event: MouseEvent): { url: string; origin: HTMLEleme
     return null
   }
   const rawHref = event.target.closest('a[href]')?.getAttribute('href') ?? null
-  if (rawHref) {
+  if (rawHref !== null) {
     // Only authored absolute web URLs: a relative href resolves against the dev-server origin,
     // and an anchor with any other scheme keeps the browser's own menu.
     if (!/^https?:\/\//i.test(rawHref)) {
