@@ -8,6 +8,23 @@ import { throwIfAiVaultScanCancelled } from './ai-vault-scan-cancellation'
 
 export { asRecord }
 
+/** ECMAScript Date range; `new Date(ms).toISOString()` throws beyond it. */
+const MAX_DATE_MS = 8_640_000_000_000_000
+/** Beyond this the value is a mis-scaled epoch or a broken clock, never a session time. */
+const FUTURE_TIMESTAMP_SKEW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * One timestamp from a transcript written by somebody else's agent.
+ *
+ * Why the bounds: a nanosecond epoch is ordinary format drift, and `new Date(1.7e18)` throws
+ * `RangeError` inside the parse loop, which loses the whole session rather than one line. A
+ * microsecond epoch is inside the Date range but lands in the year 55840, so it would pin its row
+ * above every real session forever.
+ *
+ * The far-future clamp is for numbers only, because only a number can be a unit mistake worth
+ * re-reading: an ISO string says which instant it means, and extended-year values like
+ * `+010000-01-01` are deliberately preserved.
+ */
 export function timestampMs(value: unknown): number {
   if (typeof value === 'string') {
     const parsed = Date.parse(value)
@@ -16,7 +33,12 @@ export function timestampMs(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
     return Number.NaN
   }
-  return value > 1_000_000_000_000 ? value : value * 1000
+  const parsed = value > 1_000_000_000_000 ? value : value * 1000
+  if (parsed > MAX_DATE_MS) {
+    return Number.NaN
+  }
+  const now = Date.now()
+  return parsed > now + FUTURE_TIMESTAMP_SKEW_MS ? now : parsed
 }
 
 /**
@@ -30,12 +52,26 @@ export function sessionIdFromFileName(filePath: string): string {
   return match?.[0] ?? fileName
 }
 
+/**
+ * Byte-order mark a Windows editor leaves at the start of a file (Notepad, PowerShell's utf8).
+ *
+ * Why it needs stripping rather than trimming: U+FEFF counts as whitespace for `trim()` but not for
+ * `JSON.parse`, so a BOM-prefixed first record both looks non-empty and fails to parse — that is
+ * how a session loses its header and its workspace.
+ */
+const BYTE_ORDER_MARK = '\uFEFF'
+
+export function stripLeadingByteOrderMark(line: string): string {
+  return line.startsWith(BYTE_ORDER_MARK) ? line.slice(BYTE_ORDER_MARK.length) : line
+}
+
 export function parseJsonObject(line: string): Record<string, unknown> | null {
-  if (!line.trim()) {
+  const trimmed = stripLeadingByteOrderMark(line).trim()
+  if (!trimmed) {
     return null
   }
   try {
-    const parsed = JSON.parse(line) as unknown
+    const parsed: unknown = JSON.parse(trimmed)
     return asRecord(parsed)
   } catch {
     return null

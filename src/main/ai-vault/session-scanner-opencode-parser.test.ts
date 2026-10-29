@@ -168,3 +168,44 @@ describe('parseOpenCodeSessionFile', () => {
     ])
   })
 })
+
+describe('parseOpenCodeSessionFile timestamp drift', () => {
+  it('keeps the session when a record carries a nanosecond epoch', async () => {
+    // Ordinary format drift from another host: `new Date(1.7e18).toISOString()` throws RangeError,
+    // which used to take the whole session with it rather than one unusable timestamp.
+    const storageRoot = await mkdtemp(join(tmpdir(), 'orca-opencode-nanoseconds-'))
+    tempDirs.push(storageRoot)
+    const sessionDir = join(storageRoot, 'session', 'project')
+    const messageDir = join(storageRoot, 'message', 'ses_nanos')
+    await mkdir(sessionDir, { recursive: true })
+    await mkdir(messageDir, { recursive: true })
+
+    const path = join(sessionDir, 'ses_nanos.json')
+    const mtimeMs = Date.now()
+    await writeFile(
+      path,
+      JSON.stringify({
+        id: 'ses_nanos',
+        directory: '/tmp/opencode',
+        time: { created: 1_700_000_000_000_000_000 }
+      })
+    )
+    await writeFile(
+      join(messageDir, 'msg_1.json'),
+      userMessage('Prompt with a broken clock', 1_700_000_000_000_000_000)
+    )
+
+    const session = await parseOpenCodeSessionFile({
+      path,
+      mtimeMs,
+      modifiedAt: new Date(mtimeMs).toISOString()
+    })
+
+    expect(session).not.toBeNull()
+    expect(session?.previewMessages.map((message) => message.text)).toEqual([
+      'Prompt with a broken clock'
+    ])
+    // The unusable timestamps are dropped, not fatal.
+    expect(session?.previewMessages[0]?.timestamp).toBeNull()
+  })
+})

@@ -384,3 +384,33 @@ it('stops inside an over-budget record that is being discarded', async () => {
   expect(onLine).not.toHaveBeenCalled()
   expect(source.closed).toBe(true)
 })
+
+it('strips a byte-order mark from the record at offset 0 only', async () => {
+  const bom = Buffer.from([0xef, 0xbb, 0xbf])
+  // A BOM-prefixed transcript otherwise loses exactly the record that carries the header.
+  source.chunks = [Buffer.concat([bom, Buffer.from('{"type":"session"}\n{"b":2}\n')])]
+  const lines: string[] = []
+  await consumeCompleteJsonlLines({ path: '/log', start: 0, onLine: (line) => lines.push(line) })
+  expect(lines).toEqual(['{"type":"session"}', '{"b":2}'])
+
+  // The byte callback parsers see the same stripped record.
+  const bytes: string[] = []
+  await consumeCompleteJsonlLines({
+    path: '/log',
+    start: 0,
+    onLine: () => {},
+    onLineBytes: (line) => bytes.push(line.toString())
+  })
+  expect(bytes).toEqual(['{"type":"session"}', '{"b":2}'])
+
+  // A BOM anywhere past offset 0 is data, not a file prefix.
+  const midFile = Buffer.concat([Buffer.from('{"a":1}\n'), bom, Buffer.from('{"b":2}\n')])
+  source.chunks = [midFile]
+  const resumed: string[] = []
+  await consumeCompleteJsonlLines({
+    path: '/log',
+    start: Buffer.byteLength('{"a":1}\n'),
+    onLine: (line) => resumed.push(line)
+  })
+  expect(resumed).toEqual(['{"a":1}', '\uFEFF{"b":2}'])
+})

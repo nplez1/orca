@@ -1,16 +1,69 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   extractFullFirstUserPromptText,
   extractPreviewContentText,
   normalizeAgentSessionsDir,
   normalizeFullFirstUserPromptText,
   normalizePrimeAgentSessionsDir,
+  parseJsonObject,
   primeAgentSessionsDirFromEnv,
   normalizePreviewText,
-  normalizeTitleText
+  normalizeTitleText,
+  timestampMs
 } from './session-scanner-values'
+
+describe('timestampMs on foreign transcript epochs', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('drops a nanosecond epoch instead of throwing inside the parse loop', () => {
+    // `new Date(1.7e18).toISOString()` throws RangeError, which used to lose the whole session.
+    expect(timestampMs(1_700_000_000_000_000_000)).toBeNaN()
+    expect(timestampMs(8_640_000_000_000_001)).toBeNaN()
+    expect(timestampMs(-1)).toBeNaN()
+    expect(timestampMs(Number.POSITIVE_INFINITY)).toBeNaN()
+  })
+
+  it('still reads the ordinary second and millisecond epochs', () => {
+    expect(timestampMs(1_700_000_000)).toBe(1_700_000_000_000)
+    expect(timestampMs(1_700_000_000_000)).toBe(1_700_000_000_000)
+    expect(timestampMs('2026-05-01T10:00:00.000Z')).toBe(Date.parse('2026-05-01T10:00:00.000Z'))
+  })
+
+  it('clamps a far-future number so a row cannot pin itself above every real session', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-29T12:00:00.000Z'))
+    // A microsecond epoch is inside the Date range but lands in the year 55840.
+    expect(timestampMs(1_700_000_000_000_000)).toBe(Date.parse('2026-10-29T12:00:00.000Z'))
+    // A transcript written a minute ahead by a skewed clock keeps its own timestamp.
+    expect(timestampMs(Date.parse('2026-10-29T12:01:00.000Z'))).toBe(
+      Date.parse('2026-10-29T12:01:00.000Z')
+    )
+    // An ISO string states its own instant, so it is read as written.
+    expect(timestampMs('9999-01-01')).toBe(Date.parse('9999-01-01'))
+  })
+})
+
+describe('parseJsonObject with a byte-order mark', () => {
+  it('reads the first record of a BOM-prefixed transcript', () => {
+    // Why it used to fail: U+FEFF is whitespace for trim() but not for JSON.parse, so the header
+    // record looked non-empty and still refused to parse.
+    expect(parseJsonObject('\uFEFF{"type":"session","id":"abc"}')).toEqual({
+      type: 'session',
+      id: 'abc'
+    })
+    expect(parseJsonObject('\uFEFF  {"a":1}\r')).toEqual({ a: 1 })
+  })
+
+  it('still rejects blank and malformed lines', () => {
+    expect(parseJsonObject('\uFEFF   ')).toBeNull()
+    expect(parseJsonObject('')).toBeNull()
+    expect(parseJsonObject('not json')).toBeNull()
+  })
+})
 
 describe('AI Vault session scanner text values', () => {
   it('normalizes compact title text without surfacing hidden context blocks', () => {
