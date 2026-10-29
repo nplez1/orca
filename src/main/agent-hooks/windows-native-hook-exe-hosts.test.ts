@@ -24,8 +24,30 @@ const PAYLOAD = JSON.stringify({
 })
 
 type Post = { path: string; token: string | undefined; type: string | undefined; form: string }
+type FormEntry = [string, string]
 type Listener = { server: Server; port: number; posts: Post[] }
 type HookRun = { code: number | null; stdout: string; stderr: string; ms: number }
+
+function formEntries(form: string | undefined): FormEntry[] {
+  if (form === undefined) {
+    return []
+  }
+  const parsed: unknown = JSON.parse(form)
+  return Array.isArray(parsed) ? parsed.filter(isFormEntry) : []
+}
+
+function isFormEntry(value: unknown): value is FormEntry {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    typeof value[0] === 'string' &&
+    typeof value[1] === 'string'
+  )
+}
+
+function formWithoutAgentProcess(form: string): FormEntry[] {
+  return formEntries(form).filter(([name]) => name !== 'agentProcess')
+}
 
 async function startListener(reply: 'now' | 'never' | number = 'now'): Promise<Listener> {
   const posts: Post[] = []
@@ -173,8 +195,21 @@ describe.skipIf(process.platform !== 'win32' || !tempIsCmdSafe)('native agent ho
       expect(result.code, name).toBe(0)
       expect(result.stdout.trim(), name).toBe('{}')
       expect(result.stderr, name).toBe('')
-      expect(listener.posts.slice(before), name).toEqual([reference])
+      expect(listener.posts.slice(before), name).toHaveLength(1)
+      // Why agentProcess is excluded from the parity comparison: only a process that can read the
+      // parent's identity reports one, which is exactly the difference the native hook exists for
+      // (#216 A5). Every other field must still match the .cmd form byte for byte.
+      const posted = listener.posts[before]
+      expect({ ...posted, form: formWithoutAgentProcess(posted.form) }, name).toEqual({
+        ...reference,
+        form: formWithoutAgentProcess(reference.form)
+      })
     }
+    // The field itself is the parity contract: both forms must carry it, and only a process that can
+    // find the agent's own image fills it in (#216 A5).
+    const nativeForm = formEntries(listener.posts.at(-1)?.form)
+    expect(nativeForm.some(([name]) => name === 'agentProcess')).toBe(true)
+    expect(formEntries(reference.form).some(([name]) => name === 'agentProcess')).toBe(true)
     expect(JSON.parse(reference.form)).toContainEqual(['payload', PAYLOAD])
     expect(reference.token).toBe('native-token')
     expect(reference.type).toBe('application/x-www-form-urlencoded')
