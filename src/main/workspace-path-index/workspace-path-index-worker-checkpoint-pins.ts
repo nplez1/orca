@@ -12,7 +12,7 @@ import {
  * re-encodes, so many roots never write again, and their stale pins would refuse every new
  * checkpoint once enough of them held the host budget.
  */
-const restored = new Map<string, { directory: string; generationId: string }>()
+const restored = new Map<string, string>()
 
 export function pinRestoredWorkspacePathCheckpoint(args: {
   rootKey: string
@@ -20,21 +20,18 @@ export function pinRestoredWorkspacePathCheckpoint(args: {
   generationId: string
 }): void {
   releaseRestoredWorkspacePathCheckpoint(args.rootKey)
-  restored.set(args.rootKey, {
-    directory: args.checkpointDirectory,
-    generationId: args.generationId
-  })
+  restored.set(args.rootKey, args.checkpointDirectory)
   pinWorkspacePathCatalogCheckpoint(args.checkpointDirectory)
 }
 
 /** Releases the pin unconditionally: the root is gone, or a different restore replaced it. */
 export function releaseRestoredWorkspacePathCheckpoint(rootKey: string): void {
   const pinned = restored.get(rootKey)
-  if (!pinned) {
+  if (pinned === undefined) {
     return
   }
   restored.delete(rootKey)
-  unpinWorkspacePathCatalogCheckpoint(pinned.directory)
+  unpinWorkspacePathCatalogCheckpoint(pinned)
 }
 
 /**
@@ -49,11 +46,11 @@ export function releaseRestoredWorkspacePathCheckpointIfUnused(
   spillDirectoriesInUse: Iterable<string>
 ): void {
   const pinned = restored.get(rootKey)
-  if (!pinned) {
+  if (pinned === undefined) {
     return
   }
   for (const directory of spillDirectoriesInUse) {
-    if (directory === pinned.directory) {
+    if (directory === pinned) {
       return
     }
   }
@@ -63,7 +60,7 @@ export function releaseRestoredWorkspacePathCheckpointIfUnused(
 /** Test-only: a pin must not outlive the suite that created it. */
 export function resetRestoredWorkspacePathCheckpointPinsForTests(): void {
   for (const pinned of restored.values()) {
-    unpinWorkspacePathCatalogCheckpoint(pinned.directory)
+    unpinWorkspacePathCatalogCheckpoint(pinned)
   }
   restored.clear()
 }

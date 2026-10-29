@@ -142,13 +142,14 @@ async function handleRequest(
       }
       case 'drop':
         if (request.generationId) {
+          // The generation module releases the checkpoint pin when that drop leaves nothing reading
+          // out of the restored directory.
           dropWorkspacePathIndexWorkerGeneration({
             generations,
             latestGenerationIds,
             rootKey: request.key,
             generationId: request.generationId
           })
-          releaseRestoredWorkspacePathCheckpoint(request.key)
         } else {
           dropWorkspacePathIndexWorkerRoot({
             generations,
