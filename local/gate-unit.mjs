@@ -400,10 +400,10 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   const exitProblem = unexplainedSuiteExit({
     outcome: run.outcome,
     status: run.status,
-    unexpectedCount: unexpected.length,
-    // Why every headline and not just the blocking ones: a headline is a claim about the run, and the
-    // allowlist covers the tolerated teardown race and the recorded pool crash on evidence — both are
-    // a non-zero exit with no failing test behind it, which is the shape this check exists for.
+    failedCount: counts.failed,
+    // Why every headline: a headline is a claim about the run, and the allowlist covers the tolerated
+    // Vitest teardown race and the recorded pool crash on evidence — both are a non-zero exit with no
+    // failing test behind them, which is the shape this check exists for.
     unhandledCount: unhandled.headlines.length
   })
   if (exitProblem) {

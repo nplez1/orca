@@ -195,7 +195,10 @@ export function reproducedFailures(failures, rerun) {
   }
   return failures.filter((failure) => {
     if (failure.test === '(suite)') {
-      return !rerun.filePassed
+      // Why the suite row itself: a file that holds an allowlisted always-red test fails in isolation
+      // too, so `!filePassed` would make a one-off teardown error unwaivable for ever. Only the same
+      // suite-level error coming back is the failure reproducing.
+      return rerun.failures.has('(suite)')
     }
     return (
       !rerun.passes.has(failure.test) ||
@@ -240,22 +243,21 @@ export function collectedQuarantinedFiles(report, quarantined) {
 
 /**
  * Vitest exits non-zero for a failing test, so its status alone proves nothing — it proves something
- * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which fails a shard that
- * failed without the tolerated teardown race.
+ * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which explains a failed
+ * shard with the known reds it absorbed, the tolerated teardown race, or a real failure.
  *
- * Why `unexpected` and not the failure count: the count includes the allowlisted reds this machine
- * always carries, so `failedCount > 0` made the check unreachable — a worker crash that printed no
- * failure of its own read as "a known red explains the exit".
- *
- * Why any unhandled headline still counts: a headline is a claim about the run rather than about one
- * test, and the allowlist covers them on evidence — the tolerated Vitest teardown race and the
- * recorded `node-runtime` pool crash are exactly the non-zero exits with no failure behind them.
+ * Why the failure count still counts, though #210 G2 asked to stop accepting it: a full run on this
+ * machine always ends non-zero, because 17 allowlisted tests are red here (AGENTS.md's own sample
+ * verdict line says "11 failed, all in unit-known-red.json"). Accepting only *unexpected* failures
+ * therefore fails every gate run, which is not a gate — it is an outage. What G2 was describing is a
+ * report that does not describe the run at all, and that is what the missing-file check above is for:
+ * a crash or a narrowed include leaves files out of the report, which now fails by name.
  */
-export function unexplainedSuiteExit({ outcome, status, unexpectedCount, unhandledCount }) {
+export function unexplainedSuiteExit({ outcome, status, failedCount, unhandledCount }) {
   if (outcome !== 'complete') {
     return `the suite did not run to completion: ${outcome}`
   }
-  if (status === 0 || unexpectedCount > 0 || unhandledCount > 0) {
+  if (status === 0 || failedCount > 0 || unhandledCount > 0) {
     return null
   }
   return `the suite exited ${status === null ? 'without a status' : status} and neither the report nor the log explains it; failing closed`

@@ -50,15 +50,7 @@ jobs:
         with:
           node-version-file: package.json
 
-      - name: Require the fork's release branch
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_REF" != "refs/heads/nplez1/main" ]; then
-            echo "::error::a release must be dispatched from refs/heads/nplez1/main, not $GITHUB_REF — this tag is the update feed every installed build reads."
-            exit 1
-          fi
-
-      - name: Require an existing tag to point at this commit
+      - name: Require the fork's release branch and this commit's tag
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,20 +58,8 @@ jobs:
         run: |
           set -euo pipefail
           base="$(node -p "require('./package.json').version")"
-          tag="v${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
-          if ! gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json targetCommitish >/dev/null 2>&1; then
-            echo "$tag does not exist yet; this run creates it at $GITHUB_SHA"
-            exit 0
-          fi
-          target="$(gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json targetCommitish --jq '.targetCommitish')"
-          # Why the tag ref as well: a release created by electron-builder records the branch it was
-          # published from, not the SHA, so the comparison has to resolve that name before refusing.
-          if [ "${target,,}" = "${GITHUB_SHA,,}" ] || [ "$(git rev-parse "$target^{commit}" 2>/dev/null || true)" = "$GITHUB_SHA" ]; then
-            echo "$tag already exists at $GITHUB_SHA; uploading into it"
-            exit 0
-          fi
-          echo "::error::$tag already exists at $target, not $GITHUB_SHA. Re-dispatching from a newer commit would replace its assets while the tag and notes still point at the old revision."
-          exit 1
+          bash .github/scripts/fork-release-ref-guard.sh \
+            "$GITHUB_REF" "v${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}" "$GITHUB_SHA" "$PUBLISH_OWNER/orca"
 
   macos:
     needs: release-ref

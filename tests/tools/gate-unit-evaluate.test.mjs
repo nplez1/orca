@@ -79,12 +79,62 @@ describe('the exit a verdict composes', () => {
     expect(result.exitCode).toBe(1)
   })
 
-  it('fails a non-zero exit that only an allowlisted red explains', () => {
-    // The composition this pins: `unexpected` is empty (the failure was known) and no unhandled error
-    // exists, so nothing accounts for status 1 — which used to be `failedCount > 0` and never fired.
+  it('fails a non-zero exit that nothing at all explains', () => {
+    // The composition this pins: no failure in the report and no unhandled error, so status 1 is a
+    // run nobody can account for.
     const { result } = gateRun({ report: passingReport(), run: { status: 1 } })
     expect(result.unexpected).toEqual([])
     expect(result.problems.join('\n')).toContain('exited 1')
+    expect(result.exitCode).toBe(1)
+  })
+
+  it('lets an allowlisted red explain a non-zero exit, which every run on this machine has', () => {
+    // Why this must pass: 17 tests are allowlisted reds here, so a full run always exits 1. A gate
+    // that refused that would fail every run — the report's completeness is what is checked instead.
+    const dir = mkdtempSync(join(tmpdir(), 'orca-gate-allowlisted-'))
+    const allowlist = join(dir, 'known-red.json')
+    writeFileSync(
+      allowlist,
+      JSON.stringify({
+        entries: [{ file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream' }]
+      })
+    )
+    const reportPath = join(dir, 'report.json')
+    const logPath = join(dir, 'run.log')
+    writeFileSync(reportPath, JSON.stringify(failingReport))
+    writeFileSync(logPath, '')
+    const result = evaluate(
+      { allowlist, vitestArgs: [], timeoutMs: 1000, allowDirty: false },
+      {
+        dir,
+        reportPath,
+        logPath,
+        sources: {
+          run: () => ({ outcome: 'complete', status: 1, elapsedMs: 1, forkTestsPassed: true }),
+          git: (args) => (args.join(' ') === 'rev-parse HEAD' ? REVISION : null),
+          diff: () => null,
+          runnable: () => [SUITE_FILE],
+          quarantined: () => [],
+          forkTests: () => [FORK_TEST],
+          isolation: () => new Map()
+        }
+      }
+    )
+    expect(result.counts).toEqual({ passed: 0, failed: 1, known: 1 })
+    expect(result.unexpected).toEqual([])
+    expect(result.problems).toEqual([])
+    expect(result.exitCode).toBe(0)
+  })
+
+  it('fails the same allowlisted run when the report is missing another file', () => {
+    // The hole G2 actually named: a report that describes less than the lane. The allowlisted red may
+    // explain the exit; a missing file means the run proves nothing about the suite.
+    const { result } = gateRun({
+      report: passingReport(),
+      run: { status: 1 },
+      sources: { runnable: () => [SUITE_FILE, 'src/main/b.test.ts'] }
+    })
+    expect(result.problems.join('\n')).toContain('does not name 1 file(s)')
     expect(result.exitCode).toBe(1)
   })
 

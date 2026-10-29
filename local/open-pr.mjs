@@ -35,6 +35,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { reviewClaim, waiverDisclosure } from './pr-body-claims.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
@@ -60,28 +61,10 @@ export const TARGETS = {
 export const REVIEW_CLAIM_EXAMPLE =
   'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2'
 
-/**
- * Gate 2's reviewer, as AGENTS.md names it: an Opus model at high reasoning. Why the token check:
- * without it the gate accepts a review by anyone, which is not the claim the gate exists to verify.
- */
-export const REVIEWER_CLAIM = /^(?:claude\/)?opus\b(?:\s+\d+(?:\.\d+)*)?(?=\s|,|$)[\s\S]*\bhigh\b/i
-
-/** Wording that names a finding without claiming it was closed. */
-export const OPEN_VERDICT_WORDS =
-  /\b(?:not\s+yet|not\s+(?:clean|fixed|addressed|resolved)|will\s+be|to\s+be\s+(?:fixed|addressed|resolved)|later|todo|tbd|unresolved|outstanding|pending|unfixed|still\s+open)\b/i
-
-/** One `R<n>` (or `round <n>`) naming the round a verdict belongs to. */
-const ROUND_REF = /\bR\d+\b|\bround\s*\d+\b/gi
-
-/**
- * A closed verdict, in the two shapes AGENTS.md allows: the round came back clean, or a counted set
- * of blocking findings was fixed. Why counted: "found 2 BLOCKERs" is a finding, not a resolution.
- */
-const CLOSED_VERDICT =
-  /\bclean\b|\b(?:\d+|no)\s+(?:blocking|blockers?)\b[^;]*?\b(?:fixed|resolved|addressed)\b/gi
-
 function run(command, args) {
-  return execFileSync(command, args, { encoding: 'utf8' }).trim()
+  // Why the buffer: the default is 1 MiB, and `ls-tree` over this repository's 41k upstream files
+  // aborts with ENOBUFS — which the derivation reads as "no fork line", silently dropping the check.
+  return execFileSync(command, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim()
 }
 
 // Why untrimmed: a fingerprint is over bytes, and `git show` output ends with the newline the file
@@ -176,97 +159,6 @@ export function parseGateWaivers(entries = []) {
     waivers.set(Number(match[1]), match[2].trim())
   }
   return waivers
-}
-
-/** Markdown emphasis, headings and bullets are noise around the claim, not a different claim. */
-function normaliseBodyLine(line) {
-  return String(line)
-    .replace(/^[\s>*_#-]+/, '')
-    .replace(/[*_]/g, '')
-    .trim()
-}
-
-export function reviewClaim(body) {
-  let fenced = false
-  for (const raw of String(body ?? '').split('\n')) {
-    if (raw.trimStart().startsWith('```')) {
-      fenced = !fenced
-      continue
-    }
-    if (fenced) {
-      continue
-    }
-    const line = normaliseBodyLine(raw)
-    const match = /^reviewed by\s+(.+)$/i.exec(line)
-    if (!match) {
-      continue
-    }
-    const claim = match[1].trim()
-    const colon = claim.indexOf(':')
-    const reviewer = (colon === -1 ? claim : claim.slice(0, colon)).trim()
-    const roundsText = colon === -1 ? '' : claim.slice(colon + 1).trim()
-    // Why the reviewer first: a claim nobody AGENTS.md names is not a review, whatever verdicts it
-    // lists, and checking this last let `Reviewed by nobody: R1 clean` through the whole gate.
-    if (!REVIEWER_CLAIM.test(reviewer)) {
-      return {
-        ok: false,
-        reason: `the review line names "${reviewer}" as the reviewer, and AGENTS.md § PR gate 2 requires an Opus reviewer at high reasoning (\`Opus 5.5, high\` or \`claude/opus, high\`)`
-      }
-    }
-    // Why the whole claim: "not yet fixed" does not contain "not fixed", and that one gap accepted
-    // `R1 (3 blocking, not yet fixed)`.
-    if (OPEN_VERDICT_WORDS.test(roundsText)) {
-      return {
-        ok: false,
-        reason: `the review line records an open finding: "${claim}"`
-      }
-    }
-    const rounds = [...roundsText.matchAll(ROUND_REF)].length
-    if (rounds === 0) {
-      return {
-        ok: false,
-        reason: `the review line names no review round (R1, round 1): "${claim}"`
-      }
-    }
-    const closed = [...roundsText.matchAll(CLOSED_VERDICT)].length
-    if (closed === 0) {
-      return {
-        ok: false,
-        reason: `the review line states no closed verdict (R1 clean, or R1 N blocking fixed): "${claim}"`
-      }
-    }
-    // Why a count per round rather than one verdict anywhere: `R1 found 2 BLOCKERs; nits fixed` has a
-    // verdict word in it and closes nothing, and a round nobody reported on is not a reviewed round.
-    if (closed < rounds) {
-      return {
-        ok: false,
-        reason: `the review line names ${rounds} review round(s) but only ${closed} closed verdict(s); every round needs its own: "${claim}"`
-      }
-    }
-    return { ok: true, line: `Reviewed by ${reviewer}: ${roundsText}` }
-  }
-  return { ok: false, reason: 'the body has no "Reviewed by" line' }
-}
-
-/**
- * The waiver, written into the body it belongs to: the script used to print it to a terminal nobody
- * reads later, so the one place a reader would look was the one place it was guaranteed absent.
- */
-export function waiverDisclosure(body, waivers = new Map()) {
-  const text = String(body ?? '')
-  const present = new Set(text.split('\n').map((line) => line.trim()))
-  const lines = []
-  for (const [gate, reason] of waivers) {
-    const line = `Gate ${gate} waived: ${reason}`
-    if (!present.has(line)) {
-      lines.push(line)
-    }
-  }
-  if (lines.length === 0) {
-    return { body: text, lines }
-  }
-  const trimmed = text.replace(/\s*$/, '')
-  return { body: trimmed ? `${trimmed}\n\n${lines.join('\n')}\n` : `${lines.join('\n')}\n`, lines }
 }
 
 /** Why a subject prefix and not a path: `.husky/commit-msg` enforces the same invariant locally. */
@@ -438,6 +330,10 @@ export function evaluateGates({
 
 export const FORK_OWNED_PATHS = [
   'local/',
+  '.agents/skills/',
+  '.github/workflows/fork-*.yml',
+  '.github/scripts/fork-release-notes.mjs',
+  '.github/scripts/fork-release-ref-guard.sh',
   'LOCAL-PATCHES.md',
   'BRANCHES.md',
   'UPSTREAM-SYNC-RUNBOOK.md',
@@ -452,16 +348,16 @@ export const FORK_LINE_REFS = [
 ]
 
 /**
- * The fork-owned set, derived instead of listed: every file the fork's own line adds relative to the
- * merge base it shares with the upstream base.
+ * The fork-owned set, derived instead of listed: the files the fork's own line adds to a top-level
+ * tree the upstream base does not carry at all.
  *
- * Why derived: the hand list could not keep up — `.agents/skills/**`, `.github/workflows/fork-*.yml`,
- * `.github/scripts/fork-release-notes.mjs` and `local/orca-vm/` were all fork-added and all absent
- * from it, so a normally-worded commit carrying one reached an upstream-bound PR.
- *
- * Why from the fork line and not from the branch: a legitimate upstream PR adds new source files, and
- * deriving from the branch would refuse every one of them. What this set answers is "is this path a
- * file the fork introduced", which `FORK_OWNED_PATHS` answers only for the paths someone remembered.
+ * Why top-level trees: the hand list could not keep up — `.agents/skills/**`,
+ * `.github/workflows/fork-*.yml`, `.github/scripts/fork-release-notes.mjs` and `local/orca-vm/` were
+ * all fork-added and all absent from it. Why not files, and not nested directories either:
+ * BRANCHES.md records that upstream work is cut from code that has already landed on `nplez1/main`,
+ * so every new `src/` file — including one in a directory the fork created, a provider for instance —
+ * is "added since upstream/main" and would be refused. That is the one path fork work has to reach
+ * upstream, so a tree upstream already owns stays reviewable; a whole tree it lacks does not.
  *
  * Returns `null` when no fork line is reachable, in which case only the literal list applies.
  */
@@ -484,12 +380,21 @@ export function derivedForkOwnedPaths(upstreamBase, gitRun = git, refs = FORK_LI
       '--no-renames',
       `${upstreamBase}...${ref}`
     ])
-    return added === null
-      ? null
-      : added
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean)
+    const upstreamTop = attempt(['ls-tree', '--name-only', upstreamBase])
+    if (added === null || upstreamTop === null) {
+      return null
+    }
+    const owned = new Set(
+      upstreamTop
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    )
+    return added
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((path) => !owned.has(path.split('/')[0]))
   }
   return null
 }
@@ -582,13 +487,21 @@ export function needsFullUnitGate(changedPaths) {
 }
 
 /**
+ * Why the glob magic on a wildcard entry: a pathspec is a prefix match, so `.github/workflows/fork-`
+ * would match a file literally named that, and `fork-*.yml` needs `:(glob)` to match a pattern.
+ */
+function forkOwnedPathspec(path) {
+  return path.includes('*') ? `:(top,glob)${path}` : `:(top)${path}`
+}
+
+/**
  * Why a path check on top of the subject check: the subject prefix is a convention, and a squash or
  * a differently-worded commit carries the same files upstream without one.
  */
 export function forkOnlyPathsIn(range, gitRun = git) {
   // Why `:(top)`: pathspecs are relative to the current directory, so a run from a subdirectory would
   // look under `<subdir>/local/` and find nothing.
-  return gitRun(['diff', '--name-only', range, '--', ...FORK_OWNED_PATHS.map((p) => `:(top)${p}`)])
+  return gitRun(['diff', '--name-only', range, '--', ...FORK_OWNED_PATHS.map(forkOwnedPathspec)])
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)

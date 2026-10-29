@@ -236,10 +236,16 @@ describe('the isolated re-run', () => {
     ).toEqual(['came back', 'went away'])
   })
 
-  it('waives a collect failure only when the file itself passed', () => {
-    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
-    expect(reproducedFailures(suite, rerun())).toHaveLength(1)
+  it('waives a one-off suite error only when the re-run raised none', () => {
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'teardown' }]
+    // Why not `filePassed`: a file that also holds an allowlisted always-red test can never pass in
+    // isolation, so requiring that would make a one-off teardown error unwaivable for ever.
+    expect(reproducedFailures(suite, rerun())).toHaveLength(0)
     expect(reproducedFailures(suite, rerun({ filePassed: true }))).toHaveLength(0)
+    expect(reproducedFailures(suite, rerun({ failures: new Set(['(suite)']) }))).toHaveLength(1)
+    expect(
+      reproducedFailures(suite, rerun({ failures: new Set(['(suite)']), filePassed: true }))
+    ).toHaveLength(1)
   })
 
   it('reads one file out of a report the selector over-matched', () => {

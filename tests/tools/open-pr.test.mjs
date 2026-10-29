@@ -27,10 +27,9 @@ import {
   needsFullUnitGate,
   parseArgs,
   parseGateWaivers,
-  reviewClaim,
-  unitGateVerdict,
-  waiverDisclosure
+  unitGateVerdict
 } from '../../local/open-pr.mjs'
+import { reviewClaim, waiverDisclosure } from '../../local/pr-body-claims.mjs'
 
 const SCRIPT = new URL('../../local/open-pr.mjs', import.meta.url).pathname
 const REVISION = 'a'.repeat(40)
@@ -487,7 +486,7 @@ it('names what a refused review claim is missing', () => {
   })
   expect(reviewClaim('Reviewed by Opus 5.5, high: R1 found 2 blockers')).toMatchObject({
     ok: false,
-    reason: expect.stringContaining('no closed verdict')
+    reason: expect.stringContaining('without saying they were fixed')
   })
   expect(reviewClaim('Reviewed by Opus 5.5, high: R1 (2 blocking fixed), R2')).toMatchObject({
     ok: false,
@@ -499,16 +498,43 @@ it('names what a refused review claim is missing', () => {
   })
 })
 
+it('refuses a claim whose blocker count is not closed by the same clause', () => {
+  for (const claim of [
+    // `clean` elsewhere in the line used to satisfy the round without closing these findings.
+    'Reviewed by Opus 5.5, high: R1 found 2 blockers, everything else clean',
+    // The closing verb is in the next clause, not this one.
+    'Reviewed by Opus 5.5, high: R1 (2 blocking, 1 fixed)',
+    // A count that says what is left open in another word.
+    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed, 1 deferred)',
+    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), follow-up filed for the rest'
+  ]) {
+    expect(reviewClaim(claim), claim).toMatchObject({ ok: false })
+  }
+})
+
 it('accepts the claim shapes a real review produces, including a delta round', () => {
   for (const claim of [
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2',
+    REVIEW_CLAIM_EXAMPLE,
     'Reviewed by Opus 5.5, high: R1 (0 blocking fixed), delta clean on R2',
     'Reviewed by claude/opus, high: R1 (1 blocker fixed), clean on R2',
     'Reviewed by Opus 5.5, high: round 2 delta clean',
     'Reviewed by Opus 5.5, high: R1, 2 blockers addressed',
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed); R2 (1 blocking fixed), R3 clean'
+    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed); R2 (1 blocking fixed), R3 clean',
+    // AGENTS.md's own wording for a delta range: one round named twice is one round.
+    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta R1..R2 clean'
   ]) {
     expect(reviewClaim(claim), claim).toMatchObject({ ok: true })
+  }
+})
+
+it('requires the reviewer AGENTS.md names, version and reasoning included', () => {
+  for (const claim of [
+    'Reviewed by Opus 4, high: R1 clean',
+    'Reviewed by Opus 5.5: R1 clean',
+    'Reviewed by a strong model, high: R1 clean',
+    'Reviewed by gpt-5, high: R1 clean'
+  ]) {
+    expect(reviewClaim(claim), claim).toMatchObject({ ok: false })
   }
 })
 
@@ -532,34 +558,45 @@ it('writes a waiver into the body, because that is the only place a reader looks
   expect(waiverDisclosure('Fixes #210\n', new Map())).toEqual({ body: 'Fixes #210\n', lines: [] })
 })
 
-it('derives the fork-owned set instead of relying on the list that missed four trees', () => {
-  const forkAdded = ['.agents/skills/electron/SKILL.md', '.github/workflows/fork-release.yml']
+it('derives the fork-owned set from top-level trees upstream does not carry', () => {
+  // Why top-level trees: a file-level derivation would refuse every new src/ file in an upstream PR
+  // cut from work that has already landed on nplez1/main (BRANCHES.md), which is the normal shape
+  // there. A whole tree upstream lacks is fork territory; a file inside src/ is not.
+  const forkAdded = [
+    '.agents/skills/electron/SKILL.md',
+    'local/orca-vm/run.sh',
+    'src/main/new-module.ts',
+    'src/main/deepseek/new-provider.ts'
+  ]
+  const upstreamTop = ['src', '.github', 'docs', 'README.md']
   const fakeGit = (args) => {
     if (args[0] === 'rev-parse') {
-      // The first ref a clone without a fetched origin lacks, the second one it has.
-      return args[3] === 'refs/remotes/origin/nplez1/main' ? '' : 'refs/heads/nplez1/main'
+      return args[3] === 'refs/remotes/origin/nplez1/main' ? null : 'refs/heads/nplez1/main'
     }
     if (args[0] === 'diff') {
-      return ['src/main/upstream-added.ts', ...forkAdded].join('\n')
+      return forkAdded.join('\n')
+    }
+    if (args[0] === 'ls-tree') {
+      return upstreamTop.join('\n')
     }
     return ''
   }
   expect(derivedForkOwnedPaths('base', fakeGit)).toEqual([
-    'src/main/upstream-added.ts',
-    ...forkAdded
+    '.agents/skills/electron/SKILL.md',
+    'local/orca-vm/run.sh'
   ])
   // No fork line to compare against: the literal list is all that is left, which is not an error.
   expect(derivedForkOwnedPaths('base', () => null)).toBeNull()
 })
 
-it('refuses a branch that carries a fork tree the list never named', () => {
-  const changed = ['src/main/x.ts', '.agents/skills/electron/SKILL.md']
+it('refuses a branch that carries a fork directory nobody listed', () => {
+  const changed = ['src/main/x.ts', 'tools/fork-only/thing.mjs']
   const fakeGit = (args) => {
     if (args[0] === 'rev-parse') {
       return args[3] === 'refs/remotes/origin/nplez1/main' ? 'refs/heads/nplez1/main' : null
     }
     if (args[0] === 'diff' && args.includes('--diff-filter=A')) {
-      return '.agents/skills/electron/SKILL.md'
+      return ['tools/fork-only/thing.mjs', 'src/main/upstream-adds-this.ts'].join('\n')
     }
     if (args[0] === 'diff' && args.includes('--')) {
       // The literal list's pathspec run names nothing, which is the hole being closed.
@@ -568,9 +605,21 @@ it('refuses a branch that carries a fork tree the list never named', () => {
     if (args[0] === 'diff') {
       return changed.join('\n')
     }
+    if (args[0] === 'ls-tree') {
+      return ['src', 'tests', 'README.md'].join('\n')
+    }
     return ''
   }
   const paths = forkOwnedPathsInRange('base...head', 'base', fakeGit)
-  expect(paths).toEqual(['.agents/skills/electron/SKILL.md'])
-  expect(FORK_OWNED_PATHS).not.toContain('.agents/skills/')
+  expect(paths).toEqual(['tools/fork-only/thing.mjs'])
+  // The trees the issue named are literal entries too, because a file inside a shared tree cannot be
+  // derived: `.github/workflows/` exists upstream, `fork-*.yml` does not.
+  for (const entry of [
+    '.agents/skills/',
+    '.github/workflows/fork-*.yml',
+    '.github/scripts/fork-release-notes.mjs',
+    'local/'
+  ]) {
+    expect(FORK_OWNED_PATHS).toContain(entry)
+  }
 })

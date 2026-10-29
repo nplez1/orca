@@ -241,8 +241,9 @@ export function extractFailureLines(output) {
 const UNACCOUNTED_EVIDENCE = [
   // ast-grep / rustc-style diagnostics, which is what the lint half of that step prints.
   /^(?:error|warning|note)\[[\w.:-]+\]\s*:/,
-  // A crash block: a `Name: message` header whose name ends in Error/Exception, or a bare fatal one.
-  /^[A-Za-z]*(?:Error|Exception)\b\s*:/i,
+  // A crash block: a `Name [CODE]: message` header whose name ends in Error/Exception (`Error
+  // [ERR_MODULE_NOT_FOUND]`, `AssertionError [ERR_ASSERTION]`), or a bare fatal one.
+  /^[A-Za-z]*(?:Error|Exception)\s*(?:\[[^\]]+\])?\s*:/i,
   /^(?:panic|fatal|error)\b\s*:/i
 ]
 
