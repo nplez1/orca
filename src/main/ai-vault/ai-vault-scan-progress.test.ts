@@ -6,6 +6,8 @@ import type { AiVaultScanWork } from '../../shared/ai-vault-scan-progress'
 import {
   AI_VAULT_SCAN_PROGRESS_INTERVAL_MS,
   noteAiVaultScanFileFound,
+  noteAiVaultScanReading,
+  noteAiVaultScanReadingFile,
   aiVaultScanWork,
   openAiVaultScanSource,
   noteAiVaultScanWorkChanged,
@@ -102,6 +104,26 @@ describe('scan progress reporting', () => {
     expect(result.sessions).toHaveLength(3)
     expect(reports.some((work) => work.stage === 'finding')).toBe(true)
     expect(reports.at(-1)).toMatchObject({ stage: 'reading', read: { done: 3, total: 3 } })
+  })
+
+  it('reports the transcript being parsed, so a child fault can name it', () => {
+    // Why: the scanner child is a separate process, and the file that exhausts its heap dies with
+    // it — the last reported progress is the only record of which one that was.
+    const signal = new AbortController().signal
+    const stop = trackAiVaultScanProgress(
+      signal,
+      () => {},
+      () => 0
+    )
+
+    noteAiVaultScanReading(signal)
+    noteAiVaultScanReadingFile(signal, 'claude', '/sessions/huge.jsonl')
+
+    expect(aiVaultScanWork(signal)?.readingFile).toEqual({
+      agent: 'claude',
+      path: '/sessions/huge.jsonl'
+    })
+    stop()
   })
 })
 

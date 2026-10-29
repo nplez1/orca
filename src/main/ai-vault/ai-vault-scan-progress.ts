@@ -98,6 +98,20 @@ export function noteAiVaultScanReading(signal: AbortSignal | undefined): void {
   reporter?.workChanged()
 }
 
+/** Records the transcript in flight, so a child fault can name the file that killed it. */
+export function noteAiVaultScanReadingFile(
+  signal: AbortSignal | undefined,
+  agent: AiVaultAgent,
+  path: string
+): void {
+  const reporter = signal ? reporters.get(signal) : undefined
+  if (!reporter) {
+    return
+  }
+  reporter.tally.noteReadingFile(agent, path)
+  reporter.workChanged()
+}
+
 export function aiVaultScanWorkload(signal: AbortSignal | undefined) {
   return tallyFor(signal)?.workload
 }

@@ -22,6 +22,14 @@ export type AiVaultScanWork = {
   agents: AiVaultScanAgentProgress[]
   /** Fixed candidate workload; settled work is done + skipped. */
   read: AiVaultScanReadingProgress
+  /**
+   * The transcript being parsed right now.
+   *
+   * Why the path travels with progress: the scanner is a separate child with a 384 MB heap, and a
+   * heap death leaves no handler able to say which file it was in. The parent's last snapshot is
+   * the only record that can name it when the child faults.
+   */
+  readingFile?: { agent: AiVaultAgent; path: string }
 }
 
 /** One local Session History scan entry, as main pushes it to windows. */

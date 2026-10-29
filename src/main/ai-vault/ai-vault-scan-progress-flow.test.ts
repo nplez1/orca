@@ -117,7 +117,7 @@ describe('Session History scanner totals and service-client progress state', () 
   it('counts distinct files while walking, then reads, and publishes the finished totals', async () => {
     const { reports, final } = await scanInChild()
     expect(reports.some((work) => work.stage === 'finding')).toBe(true)
-    expect(final).toEqual({
+    expect(final).toMatchObject({
       stage: 'reading',
       agents: [
         {
@@ -130,6 +130,9 @@ describe('Session History scanner totals and service-client progress state', () 
       ],
       read: { done: 4, total: 4, skipped: 0 }
     })
+    // The last transcript parsed, so a scanner fault can name the file it died on.
+    expect(final.readingFile?.agent).toBe('claude')
+    expect(final.readingFile?.path).toMatch(/\.jsonl$/)
 
     const { child, scan, published } = startScan()
     readyAiVaultServiceChild(child)
