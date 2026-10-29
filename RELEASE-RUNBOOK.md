@@ -81,7 +81,8 @@ run if any of the five is missing, before the build starts.
 ## Step 1.5 — the unit gate, on the revision being released
 
 This is where the full unit suite runs. It is deliberately **not** a PR gate any more, except for a diff
-carrying a global input (`AGENTS.md` § Verification tiers): requiring it per branch is what had agents
+carrying a global input (`~/Code/orca/AGENTS.md` § Verification tiers, the cross-worktree file; this
+repo's `AGENTS.md` has no such section): requiring it per branch is what had agents
 running it five times a session.
 
 ```bash

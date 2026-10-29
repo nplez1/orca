@@ -21,7 +21,9 @@ vi.mock('../worktree-root-preparation', () => ({
 vi.mock('../ipc/worktree-base-directory-watcher', () => ({
   scheduleCurrentWorktreeBaseDirectoryWatcherSync: syncWatcherMock
 }))
-vi.mock('../ipc/filesystem-auth', () => ({ invalidateAuthorizedRootsCache: invalidateRootsMock }))
+vi.mock('../ipc/filesystem/filesystem-auth', () => ({
+  invalidateAuthorizedRootsCache: invalidateRootsMock
+}))
 
 const TARGET_ID = 'target-1'
 const REPO_PATH = '/srv/app'

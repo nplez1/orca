@@ -13,6 +13,7 @@ import {
   refExists,
   repoRoot,
   run,
+  shortCommit as short,
   tailText,
   toolExists,
   toolPath,
@@ -260,9 +261,12 @@ function conflictDryRun(options) {
 }
 
 // The runbook's manual Step 0 mutations. Idempotent by construction: every ref is checked before it
-// is created and never moved, so a rerun cannot clobber the rollback target. A failure is returned in
-// `failures` — the driver exits non-zero on it and never reports a printed failure as a pass — and a
-// backup that has drifted off the pre-sync tip is reported rather than treated as a silent pass.
+// is created, and a rerun never moves a ref that already points at the old tip. A failure is returned
+// in `failures` — the driver exits non-zero on it and never reports a printed failure as a pass.
+//
+// A backup that has drifted off the pre-sync tip is the one ref that IS moved, because a stale rollback
+// target is worse than none: the old location is archived under its own name first, so nothing is lost
+// and the next `--prepare` has a usable target instead of a permanent failure.
 export function prepare(options, failedGates, rebase = false) {
   const messages = []
   const failures = []
@@ -311,14 +315,38 @@ export function prepare(options, failedGates, rebase = false) {
   for (const { ref, kind, label, stale } of wanted) {
     if (refExists(ref)) {
       const at = gitText(['rev-parse', `${ref}^{commit}`])
-      const atTip = at === oldTip
+      if (at === oldTip) {
+        messages.push(`${label} already exists at ${short(at)} — left exactly as it is`)
+        continue
+      }
       messages.push(
-        `${label} already exists at ${(at ?? '?').slice(0, 10)} — left exactly as it is${atTip ? '' : ` (${stale})`}`
+        `${label} is stale: ${short(at ?? '?')} is not the pre-sync tip ${short(oldTip)} (${stale})`
       )
-      if (!atTip) {
+      // Only a branch is re-pointed: a tag that has already been published must not move, and the
+      // archive is what makes the old location recoverable either way.
+      if (kind !== 'branch') {
         failures.push(
-          `${label} is stale: ${(at ?? '?').slice(0, 10)} is not the pre-sync tip ${oldTip.slice(0, 10)} — move it or pick a new name before relying on it as the rollback target`
+          `${label} is stale: ${short(at ?? '?')} is not the pre-sync tip ${short(oldTip)} — move it or pick a new name before relying on it as the rollback target`
         )
+        continue
+      }
+      const archived = `archive/pre-sync-backup-${(at ?? oldTip).slice(0, 10)}`
+      if (!refExists(`refs/tags/${archived}`)) {
+        const tag = git(['tag', archived, at ?? oldTip])
+        messages.push(
+          tag.ok
+            ? `archived the stale ${label} as tag ${archived}`
+            : `could not archive ${label} as tag ${archived}: ${tailText(tag.stderr, 2).join(' ')}`
+        )
+      }
+      const moved = git(['branch', '-f', BACKUP_REF, oldTip])
+      messages.push(
+        moved.ok
+          ? `re-pointed ${label} at the pre-sync tip ${short(oldTip)} (was ${short(at ?? '?')})`
+          : `FAILED to re-point ${label}: ${tailText(moved.stderr, 3).join(' ')}`
+      )
+      if (!moved.ok) {
+        failures.push(`could not re-point ${label} at ${short(oldTip)}`)
       }
       continue
     }

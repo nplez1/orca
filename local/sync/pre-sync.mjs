@@ -35,8 +35,16 @@ import { BACKUP_REF, FORK_BRANCH, prepare, preSyncGates } from './lib/pre-sync-c
 import { Report, STATUS, repoRoot, stateFilePath } from './lib/run.mjs'
 
 function parseArgs(argv) {
-  const options = { prepare: false, json: false, skipTypecheck: false, rebase: false, help: false }
-  for (const flag of argv) {
+  const options = {
+    prepare: false,
+    json: false,
+    skipTypecheck: false,
+    rebase: false,
+    help: false,
+    waivers: []
+  }
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index]
     if (flag === '--prepare') {
       options.prepare = true
     } else if (flag === '--json') {
@@ -45,6 +53,14 @@ function parseArgs(argv) {
       options.skipTypecheck = true
     } else if (flag === '--rebase') {
       options.rebase = true
+    } else if (flag === '--waive') {
+      const value = argv[index + 1]
+      const split = value ? value.indexOf(':') : -1
+      if (split < 1 || value.slice(split + 1).trim() === '') {
+        throw new Error(`--waive needs <gate-id>:<reason>, got "${value ?? 'nothing'}"`)
+      }
+      options.waivers.push([value.slice(0, split), value.slice(split + 1).trim()])
+      index += 1
     } else if (flag === '--help' || flag === '-h') {
       options.help = true
     } else {
@@ -55,7 +71,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`Usage: node local/sync/pre-sync.mjs [--prepare] [--json] [--skip-typecheck] [--rebase]
+  console.log(`Usage: node local/sync/pre-sync.mjs [--prepare] [--json] [--skip-typecheck] [--rebase] [--waive <id>:<reason>]
 
 Read-only gates except for the derived localization catalog, which the localization-catalog gate
 regenerates (that rewriting is the check). Each is reported separately: working tree clean (nothing
@@ -69,15 +85,20 @@ Options:
   --prepare         after the gates pass: set rerere/zdiff3, create ${BACKUP_REF} and tag
                     archive/pre-sync-<old-tip-short>, write the state file to
                     ${path.basename(stateFilePath())} under the git directory (untracked).
-                    Idempotent: an existing backup ref or tag is reported, never moved, and one
-                    that no longer points at the pre-sync tip fails the prepare.
+                    Idempotent: an existing backup ref or tag is reported, never moved, and a
+                    stale backup is archived under archive/pre-sync-backup-<sha> and re-pointed at
+                    the pre-sync tip rather than left as a permanent failure.
   --json            machine-readable report on stdout
   --skip-typecheck  skip ${TYPE_CHECK_COMMAND}; reported as skipped, never as passed
   --rebase          the branch being synced is a feature branch or a local(...) series, so print
                     the rebase procedure; the default is the release line's merge procedure
+  --waive <id>:<reason>
+                    record a deliberate exception for a gate that could not run (repeatable).
+                    Without one, an N/A gate fails the run
   -h, --help        this text
 
-Exit code is non-zero if any hard gate fails, or if --prepare could not complete every mutation.`)
+Exit code is non-zero if any hard gate fails, if a gate could not run and was not waived, or if
+--prepare could not complete every mutation.`)
 }
 
 function main() {
@@ -151,6 +172,17 @@ function main() {
       () => typecheck(options)
     ]
   ]
+  // A waiver naming no gate is a typo, and finding it after the typecheck gate has run is finding it too
+  // late: validate before a single gate executes.
+  const knownGates = new Set(gates.map(([id]) => id))
+  for (const [id] of options.waivers) {
+    if (!knownGates.has(id)) {
+      console.error(
+        `pre-sync: no gate ${String(id)} to waive — one of ${[...knownGates].join(', ')}`
+      )
+      process.exit(2)
+    }
+  }
   for (const [id, title, look, run] of gates) {
     try {
       report.addOutcome(id, title, look, run())
@@ -162,6 +194,11 @@ function main() {
           .slice(0, 6)
       })
     }
+  }
+  // A row that produced a result is reported as an ignored waiver rather than failing the run: a stale
+  // flag from a previous run must not lose this run's report.
+  for (const [id, reason] of options.waivers) {
+    report.waive(id, reason)
   }
   const prepared = options.prepare ? prepare(options, report.failures.length, options.rebase) : null
   const summary = prepared
@@ -177,11 +214,12 @@ function main() {
       : report.render(summary)
   )
   // A failed --prepare has to be non-zero even though its own gates passed, and a stale backup is a
-  // reported condition, not a pass.
+  // reported condition, not a pass. exitCode, not exit(): exit() truncates a large --json in a pipe.
   if (prepared && prepared.failures.length > 0) {
-    process.exit(1)
+    process.exitCode = 1
+    return
   }
-  process.exit(report.failures.length === 0 ? 0 : 1)
+  process.exitCode = report.ok ? 0 : 1
 }
 
 main()
