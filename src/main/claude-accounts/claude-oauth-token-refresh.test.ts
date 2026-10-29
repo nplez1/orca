@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -37,13 +45,34 @@ vi.mock('../codex-accounts/fs-utils', async (importOriginal) => {
   }
 })
 
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
 import { readClaudeOAuthCredential } from './claude-oauth-credential-store'
+import {
+  flushPendingClaudeOAuthRotations,
+  resetPendingRotationsForTests,
+  setPendingRotationFilePathForTests,
+  setPendingRotationRetryScheduler
+} from './claude-oauth-pending-rotations'
 import {
   mergeRefreshedClaudeOAuthToken,
   refreshClaudeOAuthCredentials
 } from './claude-oauth-token-refresh'
 
 setMainHttpClient({ fetch: fetchMock, proxySession: () => null })
+
+let pendingRotationPath = ''
+
+// Why a stub store: the pending-rotation file is sealed, and a case that wrote it in the clear would
+// be the very downgrade the file exists to avoid.
+const sealedStore = {
+  isEncryptionAvailable: () => true,
+  encryptString: (value: string) => Buffer.from(`sealed:${value}`),
+  decryptString: (value: Buffer) =>
+    Buffer.from(value)
+      .toString('utf8')
+      .replace(/^sealed:/, ''),
+  describeProtectionGap: () => null
+}
 
 const roots: string[] = []
 
@@ -57,10 +86,20 @@ beforeEach(() => {
   keychain.write.mockReset()
   keychain.write.mockResolvedValue(undefined)
   filesystem.refuseWrites = false
+  // Why every case: a pending rotation must never land in the developer's real app home, and the
+  // default scheduler would leave timers running past the test that armed them.
+  const pendingDir = mkdtempSync(join(tmpdir(), 'claude-oauth-pending-'))
+  roots.push(pendingDir)
+  pendingRotationPath = join(pendingDir, 'pending-rotations.json')
+  setPendingRotationFilePathForTests(pendingRotationPath)
+  resetPendingRotationsForTests()
+  setPendingRotationRetryScheduler(() => {})
+  setSecretStore(sealedStore)
 })
 
 afterEach(() => {
   roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }))
+  _resetSecretStoreForTests()
 })
 
 function login(oauth: Record<string, unknown>) {
@@ -555,4 +594,110 @@ it('tells a store it cannot read apart from one that was signed out of', async (
   expect(
     await readClaudeOAuthCredential({ kind: 'file', path: join(home, 'missing.json') })
   ).toEqual({ status: 'absent' })
+})
+
+it('keeps a refused rotation in a sealed file, and writes it back on quit', async () => {
+  const { path, target } = storedFile({ accessToken: 'expired', refreshToken: 'quit-1' })
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  filesystem.refuseWrites = true
+  tokenResponse({ access_token: 'kept', refresh_token: 'quit-2' })
+
+  expect(await refreshClaudeOAuthCredentials(target, 'expired')).toMatchObject({
+    status: 'refreshed'
+  })
+
+  // Why a file at all: the exchange already spent quit-1 server-side, so an in-memory-only rotation
+  // makes quitting Orca a sign-out that no later launch can recover from.
+  expect(existsSync(pendingRotationPath)).toBe(true)
+  if (process.platform !== 'win32') {
+    expect(statSync(pendingRotationPath).mode & 0o777).toBe(0o600)
+  }
+  expect(readFileSync(pendingRotationPath, 'utf8')).not.toContain('quit-2')
+
+  // The store takes writes again; the quit hook flushes what it refused.
+  filesystem.refuseWrites = false
+  await flushPendingClaudeOAuthRotations()
+
+  expect(readStored(path).claudeAiOauth).toMatchObject({
+    accessToken: 'kept',
+    refreshToken: 'quit-2'
+  })
+  expect(existsSync(pendingRotationPath)).toBe(false)
+  warn.mockRestore()
+})
+
+it('writes back a rotation a previous launch left behind', async () => {
+  const { path, target } = storedFile({ accessToken: 'expired', refreshToken: 'relaunch-1' })
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  filesystem.refuseWrites = true
+  tokenResponse({ access_token: 'kept', refresh_token: 'relaunch-2' })
+  await refreshClaudeOAuthCredentials(target, 'expired')
+  filesystem.refuseWrites = false
+
+  // A fresh process: nothing in memory, and the file is the only copy of the rotation.
+  resetPendingRotationsForTests()
+  await flushPendingClaudeOAuthRotations()
+
+  expect(readStored(path).claudeAiOauth).toMatchObject({
+    accessToken: 'kept',
+    refreshToken: 'relaunch-2'
+  })
+  warn.mockRestore()
+})
+
+it('retries a refused write-back on a short backoff, without another exchange', async () => {
+  const scheduled: { run: () => void; delayMs: number }[] = []
+  setPendingRotationRetryScheduler((run, delayMs) => {
+    scheduled.push({ run, delayMs })
+  })
+  const { path, target } = storedFile({ accessToken: 'expired', refreshToken: 'retry-1' })
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  filesystem.refuseWrites = true
+  tokenResponse({ access_token: 'kept', refresh_token: 'retry-2' })
+
+  await refreshClaudeOAuthCredentials(target, 'expired')
+
+  // Why scheduled at all: the store that refused is usually transient (a locked keychain), and the
+  // next 401 may be hours away — waiting for it is a sign-out in the meantime.
+  expect(scheduled.map((entry) => entry.delayMs)).toEqual([500])
+
+  filesystem.refuseWrites = false
+  scheduled[0].run()
+
+  await vi.waitFor(() => {
+    expect(readStored(path).claudeAiOauth).toMatchObject({
+      accessToken: 'kept',
+      refreshToken: 'retry-2'
+    })
+  })
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(existsSync(pendingRotationPath)).toBe(false)
+  warn.mockRestore()
+})
+
+it('never writes a refused rotation in the clear when nothing can seal it', async () => {
+  _resetSecretStoreForTests()
+  const { path, target } = storedFile({ accessToken: 'expired', refreshToken: 'unsealed-1' })
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  filesystem.refuseWrites = true
+  tokenResponse({ access_token: 'kept', refresh_token: 'unsealed-2' })
+
+  expect(await refreshClaudeOAuthCredentials(target, 'expired')).toMatchObject({
+    status: 'refreshed'
+  })
+
+  // Why nothing on disk: a refresh token the keychain refused is exactly the secret a plaintext file
+  // would leak, and the in-memory copy still recovers this session once the store accepts writes.
+  expect(existsSync(pendingRotationPath)).toBe(false)
+  expect(warn).toHaveBeenCalledWith(
+    '[claude-oauth-refresh] could not seal the pending rotation to disk'
+  )
+
+  filesystem.refuseWrites = false
+  await flushPendingClaudeOAuthRotations()
+  expect(readStored(path).claudeAiOauth).toMatchObject({
+    accessToken: 'kept',
+    refreshToken: 'unsealed-2'
+  })
+  warn.mockRestore()
 })

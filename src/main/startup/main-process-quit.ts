@@ -195,6 +195,13 @@ function installWillQuitHandler(): void {
     const localSshRouteShutdown = import('../browser/local-ssh-browser-route')
       .then((routes) => routes.closeAllLocalSshBrowserRoutes())
       .catch(() => {})
+    // A Claude OAuth exchange spends the old refresh token server-side, so a rotation the keychain
+    // refused is the only copy of a working login (#212). Why not awaited: the rotation is already
+    // sealed on disk before this runs, so this is the last attempt rather than the only one — quit
+    // must not wait on a keychain prompt, and a lost attempt is flushed by the next launch.
+    void import('../claude-accounts/claude-oauth-pending-rotations')
+      .then((rotations) => rotations.flushPendingClaudeOAuthRotations())
+      .catch(() => {})
     browserManager.setBrowserGuestStateChangedListener(null)
     const emulatorShutdown =
       state.runtime?.getEmulatorBridge()?.destroyAllSessions() ?? Promise.resolve()
