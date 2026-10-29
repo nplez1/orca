@@ -7,8 +7,8 @@ import { getBrowserSitePermissionsSearchEntry } from './browser-site-permissions
 import {
   getBrowserLinkRoutingDescription,
   getLinkRoutingBackgroundSearchEntry,
-  getLinkRoutingModifierDescription,
-  getLinkRoutingModifierTitle
+  getLinkRoutingDestinationKeywords,
+  getLinkRoutingModifierSearchEntry
 } from './browser-link-routing-copy'
 import {
   getBrowserClientHostedRemoteDescription,
@@ -156,40 +156,12 @@ export function getBrowserPaneSearchEntries(
         platform.isMac ? 'cmd' : 'ctrl',
         ...translateSearchKeyword('auto.components.settings.browser.search.68d1db8929', 'markdown'),
         ...translateSearchKeyword('auto.components.settings.browser.search.8dd4805991', 'file'),
-        ...translateSearchKeyword('auto.components.settings.browser.search.a7a07d5415', 'editor')
+        ...translateSearchKeyword('auto.components.settings.browser.search.a7a07d5415', 'editor'),
+        // Index the two destinations the setting offers, not just the setting's name.
+        ...getLinkRoutingDestinationKeywords()
       ]
     },
-    {
-      title: getLinkRoutingModifierTitle(false),
-      description: getLinkRoutingModifierDescription({
-        openLinksInApp: false,
-        isMac: platform.isMac
-      }),
-      keywords: [
-        ...translateSearchKeyword('auto.components.settings.browser.search.2d2d995c58', 'browser'),
-        ...translateSearchKeyword('auto.components.settings.browser.search.bea27bac4b', 'links'),
-        ...translateSearchKeyword('auto.components.settings.browser.search.90425d313c', 'shift'),
-        ...translateSearchKeyword(
-          'auto.components.settings.browser.search.linkRoutingModifier.routing',
-          'routing'
-        ),
-        ...translateSearchKeyword(
-          'auto.components.settings.browser.search.linkRoutingModifier.modifier',
-          'modifier'
-        ),
-        ...translateSearchKeyword(
-          'auto.components.settings.browser.search.linkRoutingModifier.invert',
-          'invert'
-        ),
-        ...translateSearchKeyword(
-          'auto.components.settings.browser.search.linkRoutingModifier.opposite',
-          'opposite'
-        ),
-        // Index the alternate live title because this entry is built with openLinksInApp false.
-        getLinkRoutingModifierTitle(true),
-        platform.isMac ? 'cmd' : 'ctrl'
-      ]
-    },
+    getLinkRoutingModifierSearchEntry(platform),
     {
       title: translate(
         'auto.components.settings.BrowserTerminalLinkActionsSetting.title',

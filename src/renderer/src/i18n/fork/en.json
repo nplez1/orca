@@ -672,7 +672,10 @@
         },
         "BrowserLinkRoutingSetting": {
           "descriptionBase": "Open http(s) links in Orca's built-in browser — from anywhere in the app.",
-          "description": "Open http(s) links in Orca's built-in browser — from anywhere in the app. {{shortcut}} always uses your system browser."
+          "description": "Open http(s) links in Orca's built-in browser — from anywhere in the app. {{shortcut}} always uses your system browser.",
+          "destinationAriaLabel": "Default link destination",
+          "inAppOption": "In-App Browser",
+          "systemOption": "System Browser"
         },
         "BrowserLinkRoutingBackgroundSetting": {
           "description": "Links join the browser without taking focus from where you clicked."

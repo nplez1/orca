@@ -36,7 +36,6 @@ export function normalizeLoadedGlobalSettings(
     migratedOptionAsAlt,
     migratedFloatingTerminalEnabled,
     migratedOsc52Clipboard,
-    migratedLinkRouting,
     migratedFloatingTerminalCwd,
     migratedFloatingTerminalTrustedCwds
   } = terminal
@@ -126,7 +125,6 @@ export function normalizeLoadedGlobalSettings(
     localAccountRuntime: migratedLocalAccountRuntime,
     localAccountRuntimeDefaultedToAutoForAllUsers: true,
     ...migratedOsc52Clipboard,
-    ...migratedLinkRouting,
     floatingTerminalEnabled: migratedFloatingTerminalEnabled,
     floatingTerminalDefaultedForAllUsers: true,
     floatingTerminalCwd: migratedFloatingTerminalCwd,

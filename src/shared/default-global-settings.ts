@@ -124,13 +124,11 @@ export function buildDefaultSettings(args: {
     nodeDistMirrorUrl: '',
     electronHttp1CompatibilityMode: false,
     uiHangDiagnosticsEnabled: false,
-    // Links stay in context: every http(s) link opens in the per-worktree browser unless the user
-    // turns this off in Settings → Browser → Link Routing.
+    // Links stay in context: a profile with no stored preference opens http(s) links in the
+    // per-worktree browser. Settings → Browser → Link Routing changes it at any time.
     openLinksInApp: true,
     localhostWorktreeLabelsEnabled: false,
-    // Defaulted in-app, so there is no unasked-for preference left to prompt about.
-    openLinksInAppPreferencePrompted: true,
-    openLinksInAppDefaultedOnForAllUsers: true,
+    openLinksInAppPreferencePrompted: false,
     openLinksInAppModifierInverts: false,
     openLinksInAppInBackground: false,
     terminalLinkActionPopoverEnabled: true,
