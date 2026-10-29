@@ -32,6 +32,9 @@ describe('Orca NP electron-builder overlay', () => {
         'appId',
         'deb.artifactName',
         'deb.packageName',
+        // `name` is the only field the overlay adds; a channel build's `version` is carried through.
+        release.extraMetadata ? 'extraMetadata.name' : 'extraMetadata',
+        'linux.executableName',
         'productName',
         'protocols[].name',
         'rpm.artifactName',
@@ -43,6 +46,14 @@ describe('Orca NP electron-builder overlay', () => {
         'win.verifyUpdateCodeSignature'
       ].sort()
     )
+  })
+
+  // Why: NSIS derives the install directory and electron-builder the updater cache from the package
+  // name, so leaving upstream's `orca` overwrites an official install's app.asar.
+  it('installs beside an official Orca instead of into its directory', () => {
+    expect(np.extraMetadata.name).toBe('orca-np')
+    // A dev-channel build stages its own version here; taking it away ships the wrong one.
+    expect(np.extraMetadata.version).toBe(release.extraMetadata?.version)
   })
 
   it('drives the packaged product name from the shared display name', () => {
@@ -89,6 +100,16 @@ describe('Orca NP electron-builder overlay', () => {
       packageName: 'orca-np',
       artifactName: 'orca-np-${version}.${arch}.${ext}'
     })
+  })
+
+  // Why: deb/rpm payload paths come from linux.executableName, so upstream's `orca-ide` there ships
+  // the desktop entry, icons and mime package an official `orca-ide` package already owns.
+  it('ships the Linux payload under file names no official package owns', () => {
+    expect(np.linux.executableName).toBe('orca-np')
+    // Everything else in the Linux leg stays upstream's.
+    expect({ ...np.linux, executableName: release.linux.executableName }).toEqual(release.linux)
+    // The in-bundle CLI launcher keeps its own name; it is a different file from the executable.
+    expect(np.linux.extraResources).toEqual(release.linux.extraResources)
   })
 
   // Why: a sync that takes upstream's side of a build line would silently ship Orca's identity.
