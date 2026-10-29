@@ -97,7 +97,14 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
       }
       const lines = screen ? screen.lines : this.readLiveTerminalScreenLines(ptyId)
       const card = this.piAskDialogs.observe(ptyId, lines)
-      return card ? { ...card, current: true } : card
+      if (card) {
+        return { ...card, current: true }
+      }
+      // Why "cannot see it": the pane's own marker still claims a dialog, and a footer this reader
+      // has not learned (a collapsed card, one clipped by pane width) is an unreadable grid, not
+      // evidence the dialog is gone. Holding the wait is right; releasing it is a Working tab over
+      // a card a person still has to answer.
+      return undefined
     } catch {
       return undefined
     }

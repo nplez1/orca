@@ -5,9 +5,26 @@ import type { ScreenPromptObservation } from '../../shared/agent-screen-prompt'
  *  Measured against Pi-Bolt 1.0.0 `ask_user_question` in a 100x30 PTY: the card repaints inside the
  *  alternate screen, so this wording reaches the rendered grid and never the accumulated tail — the
  *  reason the tail-text lane reads no dialog for pi at all. Both halves are required on the same
- *  line so a transcript line quoting pi's footer is not a card. */
-const PI_CARD_ACCEPT_ANCHORS = ['enter to select', 'space to toggle'] as const
-const PI_CARD_CANCEL_ANCHORS = ['esc to cancel', 'ctrl+c to cancel'] as const
+ *  line so a transcript line quoting pi's footer is not a card.
+ *
+ *  The `ctx.ui.*` half is pi-tui's own selector, which is what a permission gate, a plan review and
+ *  the project-trust prompt paint: `↑↓ navigate  enter select  escape/ctrl+c cancel`. */
+const PI_CARD_ACCEPT_ANCHORS = [
+  'enter to select',
+  'space to toggle',
+  'enter select',
+  'enter submit'
+] as const
+const PI_CARD_CANCEL_ANCHORS = [
+  'esc to cancel',
+  'ctrl+c to cancel',
+  'escape/ctrl+c cancel'
+] as const
+/** A collapsed card keeps its cancel half but drops the accept half; the expand affordance is itself
+ *  the witness that a card is holding the pane. */
+const PI_CARD_COLLAPSED_ANCHORS = ['ctrl+] to expand'] as const
+/** A footer clipped by pane width ends in an ellipsis: the cancel half was cut off, not omitted. */
+const PI_CARD_TRUNCATION_SUFFIX = '…'
 
 /** Bounds the panes a card can be remembered for; see the cap in `observe`. */
 const PI_CARD_STAMP_LIMIT = 512
@@ -15,10 +32,15 @@ const PI_CARD_STAMP_LIMIT = 512
 /** Whether a rendered grid line is pi's card footer. */
 function isPiCardFooterLine(line: string): boolean {
   const normalized = line.toLowerCase()
-  return (
-    PI_CARD_ACCEPT_ANCHORS.some((anchor) => normalized.includes(anchor)) &&
-    PI_CARD_CANCEL_ANCHORS.some((anchor) => normalized.includes(anchor))
-  )
+  const hasAccept = PI_CARD_ACCEPT_ANCHORS.some((anchor) => normalized.includes(anchor))
+  const hasCancel = PI_CARD_CANCEL_ANCHORS.some((anchor) => normalized.includes(anchor))
+  if (hasAccept && hasCancel) {
+    return true
+  }
+  if (PI_CARD_COLLAPSED_ANCHORS.some((anchor) => normalized.includes(anchor)) && hasCancel) {
+    return true
+  }
+  return hasAccept && normalized.trimEnd().endsWith(PI_CARD_TRUNCATION_SUFFIX)
 }
 
 /** Whether the pane's rendered grid is holding a pi card a person has to answer. */
