@@ -106,3 +106,14 @@ it('names the cheap PR lane it decided on, and why the unit suite is not it', ()
     "'.github/workflows/fork-pr-gates.yml'"
   )
 })
+
+it('pushes the upstream mirror through the enablement sweep, not as a bare git push', () => {
+  // A workflow file new to that push arrives active; sweeping afterwards in the same step is the only
+  // lever, because there is no workflow to disable until the file exists (issue #221 C5).
+  const step = section(read('UPSTREAM-SYNC-RUNBOOK.md'), '## Step 4 — push').join('\n')
+  const blocks = codeBlocks(step).join('\n')
+
+  expect(blocks).toContain('node local/sync/push-upstream-mirror.mjs')
+  expect(blocks).not.toMatch(/^git push origin upstream\/main:main/m)
+  expect(blocks).toContain('node local/check-actions-enablement.mjs')
+})

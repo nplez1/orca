@@ -301,9 +301,16 @@ Then the gates that no script can judge:
 
 ## Step 4 — push
 
+The upstream mirror goes first, and its sweep is part of the same command: a workflow file new to that
+push arrives active, so the sweep has to follow immediately (see `local/sync/push-upstream-mirror.mjs`
+for why this is one step and not two). The release line's own push is the third place new workflow
+files can land — this repository's default branch is `nplez1/main`, so a `schedule` there fires without
+any push at all.
+
 ```bash
-git push origin upstream/main:main          # the upstream mirror; only upstream-bound branches are cut from it
-git push origin nplez1/main                 # a merge line fast-forwards; no force needed
+node local/sync/push-upstream-mirror.mjs   # push origin upstream/main:main, then sweep the fleet
+git push origin nplez1/main                # the sync result; a merge line fast-forwards, no force needed
+node local/check-actions-enablement.mjs    # the release line can deliver new workflow files too
 ```
 
 A rebased patch series or feature branch still needs `--force-with-lease`. Keep
