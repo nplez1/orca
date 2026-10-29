@@ -1,0 +1,122 @@
+{
+  "auto": {
+    "App": {
+      "5096cbbc86": null
+    },
+    "components": {
+      "GitHubItemDialog": {
+        "ddafe851e1": null,
+        "e463ec935f": null
+      },
+      "PullRequestPage": {
+        "18f2af42ac": null,
+        "5963a6a852": null
+      },
+      "crash": {
+        "report": {
+          "CrashReportDialog": {
+            "835037edc9": null
+          }
+        }
+      },
+      "mobile": {
+        "slides": {
+          "HomeSlide": {
+            "5d94e8ddcc": null
+          }
+        }
+      },
+      "onboarding": {
+        "OnboardingFlow": {
+          "a249f81538": null
+        }
+      },
+      "right": {
+        "sidebar": {
+          "ChecksPanel": {
+            "430f1a62d4": null,
+            "aa95b81a3a": null,
+            "f273f2271c": null
+          }
+        }
+      },
+      "settings": {
+        "AccountsPane": {
+          "0c64dc2a64": null
+        },
+        "ExperimentalPane": {
+          "agentDashboard": {
+            "modeAriaLabel": null,
+            "modeCopy": null,
+            "modeInWindow": null,
+            "modeLabel": null,
+            "modePopout": null
+          }
+        },
+        "experimental": {
+          "search": {
+            "agentDashboard": {
+              "popout": null
+            }
+          }
+        }
+      },
+      "stats": {
+        "share": {
+          "card": {
+            "utils": {
+              "19f4b4dc75": null
+            }
+          }
+        }
+      },
+      "status": {
+        "bar": {
+          "ResourceUsageStatusSegment": {
+            "288a4dd177": null
+          }
+        }
+      }
+    },
+    "hooks": {
+      "useSettingsNavigationMetadata": {
+        "b1c2f8b0ac": null
+      }
+    },
+    "store": {
+      "slices": {
+        "worktrees": {
+          "2e17f825d4": null,
+          "3b57982bf6": null,
+          "5366d13eec": null,
+          "78e08cd877": null,
+          "81f13f48d2": null,
+          "e50495aae6": null
+        }
+      }
+    }
+  },
+  "components": {
+    "JiraIssueWorkspace": {
+      "pendingChange": null
+    }
+  },
+  "dashboardPopout": {
+    "recoverableError": {
+      "description": null,
+      "title": null
+    }
+  },
+  "jira": {
+    "transitions": {
+      "completeInJira": null,
+      "unsupported": null
+    },
+    "workspace": {
+      "openFailed": null
+    }
+  },
+  "tray": {
+    "activityWaiting": null
+  }
+}

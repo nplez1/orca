@@ -200,6 +200,41 @@ when `MAC_CERTS` is — and keeps upstream's value as the unsigned fallback.
 
 Anchor: `config/electron-builder.config.cjs`, `ORCA_MAC_TEAM_ID`.
 
+### `local(i18n)`: the fork's strings live in overlays, not in upstream's catalogs
+
+Upstream owns every file under `src/renderer/src/i18n/locales/` byte-for-byte. The fork's added
+strings, its rewording of upstream's copy, and — the awkward one — the keys a dropped feature
+orphans all live in `src/renderer/src/i18n/fork/`:
+
+- `fork/en.json` holds the added and reworded English strings. `locales/en.json` is upstream's.
+- `fork/<lang>.json` holds the same for es/fr/ja/ko/pt/ru/tr/zh/zh-Hant, merged over upstream's file
+  by `loadForkLocaleOverlay` at read time.
+- A **`null` leaf is a tombstone**: the fork dropped a feature, extraction then finds no source
+  reference for upstream's key, and `verify:localization-extraction` fails on any key no source
+  references — so before the overlay existed, deleting the feature _forced_ deleting upstream's
+  entries and rewriting ~21–25 hunks per catalog.
+- `mergeCatalogs` (`config/scripts/fork-english-catalog.mjs`) and `mergeLocaleOverlay`
+  (`src/renderer/src/i18n/fork-catalog-overlay.ts`) are the same rule on the Node and renderer sides;
+  `tests/tools/i18n-catalog-overlay-parity.test.mjs` fails if they drift.
+
+Two failure modes a sync can produce here, both loud by design: a tombstone whose key upstream has
+**deleted** makes `verify:localization-catalogs` fail until the tombstone is removed, and a fork
+string upstream has **added under the same key** has to move out of the overlay. Both are reported by
+name.
+
+Anchors: `src/renderer/src/i18n/{i18n.ts,fork-catalog-overlay.ts,fork/*.json}`,
+`config/scripts/fork-english-catalog.mjs`, `config/scripts/verify-localization-catalog*.mjs`,
+`config/scripts/verify-localization-extraction.mjs`.
+
+Not covered, deliberately: **the main process does not read the overlays.** `src/main/i18n/main-i18n.ts`
+imports `locales/*.json` directly, so a fork string used by a menu, tray or dialog would silently fall
+back to English. Nothing is lost today — every non-null overlay entry is renderer-only — but a fork
+string that needs main-process copy belongs in `src/main`'s own catalog, not in the overlay.
+
+Tests that pin the mechanism: `config/scripts/fork-english-catalog.test.mjs`,
+`src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the overlay-fetch-failure path),
+`tests/tools/i18n-catalog-overlay-parity.test.mjs`.
+
 ### `local(dev)`: rebuild-and-relaunch helper
 
 `package.json`'s `rebuild:mac:relaunch-installed` script plus

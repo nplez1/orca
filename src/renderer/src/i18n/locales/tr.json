@@ -664,6 +664,7 @@
     "minimizeNotice": {
       "body": "Orca sistem tepsisinde çalışmaya devam ediyor"
     },
+    "activityWaiting": "Orca - etkinlik bekleniyor",
     "activityWaitingSuffix": "etkinlik bekleniyor"
   },
   "worktreeJumpPalette": {
@@ -745,6 +746,7 @@
       "df1d56bf87": "Çalışma alanı kabuğu bir hatayla karşılaştı.",
       "9e0b441a91": "Sağ kenar çubuğunu aç/kapat",
       "e81217c1b7": "Uygulama Adını Gizle",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "Uygulama menüsü",
       "caea5b51b9": "Şimdi yeniden başlat",
       "0a9e810705": "Değişiklikler yeniden başlatana kadar kaydedilmeyecek. Önceki sekmeleriniz diskte güvende.",
@@ -877,6 +879,7 @@
           }
         },
         "worktrees": {
+          "e50495aae6": "Branch'i Zorla Sil",
           "14bc053a47": "Yerel {{value0}} yenilenmedi",
           "localBaseRefRefreshFailedForWorktree": "\"{{value1}}\" için yerel {{value0}} yenilenmedi",
           "903b51c2ed": "Çalışma alanı {{value0}} üzerinden oluşturuldu, ancak Orca yerel {{value1}} için fast-forward yapamadı. {{value2}}",
@@ -899,6 +902,11 @@
           "localBaseRefRefreshTurnOffFailed": "{{value0}} kapatılamadı",
           "0216895fb5": "Branch silinemedi",
           "c6cf133786": "Bu çalışma alanı artık kullanılamıyor.",
+          "5366d13eec": "Çalışma alanı silindi, branch korundu",
+          "2e17f825d4": "Worktree silindi, branch korundu",
+          "78e08cd877": "Git, \"{{value0}}\" branch'ini güvenli şekilde silemedi, bu yüzden Orca yerel commit'leri kaybetmemek için onu korudu.",
+          "3b57982bf6": "\"{{value1}}\" çalışma alanı silindikten sonra Git, \"{{value0}}\" branch'ini güvenli şekilde silemedi, bu yüzden Orca yerel commit'leri kaybetmemek için onu korudu.",
+          "81f13f48d2": "\"{{value1}}\" worktree'si silindikten sonra Git, \"{{value0}}\" branch'ini güvenli şekilde silemedi, bu yüzden Orca yerel commit'leri kaybetmemek için onu korudu.",
           "runtimeScopeForbiddenTitle": "Bu bağlantının sınırlı (mobil) erişimi var",
           "runtimeScopeForbiddenDescription": "Mobil kapsamlı bir eşleştirmede çalışma alanları kullanılamaz. Ayarlar → Çalışma Zamanı Ortamları → Bu Orca Sunucusunu Paylaş üzerinden tarayıcı erişim bağlantısını kullanarak yeniden bağlanın.",
           "a17f4d2e93": "Bu çalışma alanı güncellenemedi.",
@@ -1611,6 +1619,7 @@
         "cd50cec5d7": "Orca üzerinden birden fazla kodlama ajanını koordine edin.",
         "58a868e8e4": "Orkestrasyon",
         "7c79d3b7bf": "Opsiyonel",
+        "b1c2f8b0ac": "Claude, Codex, Gemini, OpenCode Go, MiniMax ve Grok için isteğe bağlı hesap değiştirme ve kullanım kurulumu.",
         "f70ac54d38": "AI Sağlayıcı Hesapları",
         "4121f7a0a2": "AI ajanlarını yönetin, bir varsayılan belirleyin ve komutları özelleştirin.",
         "b49abbd2f7": "Ajanlar",
@@ -1756,6 +1765,8 @@
         "28986b3747": "Bozuk kontroller için bir AI ajanı başlatıldı.",
         "1690fd7f4a": "Düzeltilecek bozuk kontrol yok.",
         "9e7c221b8d": "Kontroller yeniden çalıştırılamadı",
+        "e463ec935f": "Kontrollerin yeniden çalıştırılması istendi",
+        "ddafe851e1": "Kontrolün yeniden çalıştırılması istendi",
         "0bbdc673c1": "Kontroller yenilenemedi",
         "e7007aa1d8": "Repository yolu olmadan kontroller yenilenemiyor.",
         "675bc0d638": "İptal",
@@ -2232,6 +2243,8 @@
         "98583589c6": "Bozuk kontroller için AI ajanı başlatılamadı: {{value0}}",
         "51c65c0265": "Düzeltilecek bozuk kontrol yok.",
         "788a782bb0": "Kontroller yeniden çalıştırılamadı",
+        "18f2af42ac": "Kontrollerin yeniden çalıştırılması istendi",
+        "5963a6a852": "Kontrolün yeniden çalıştırılması istendi",
         "246b2c6456": "Kontroller yenilenemedi",
         "c057f2fcb0": "Repository yolu olmadan kontroller yenilenemiyor.",
         "6591b1fa82": "İptal",
@@ -3975,6 +3988,7 @@
             "bbcd9b7b85": "Çalışma alanını daralt",
             "c4a8968bdd": "Çalışma alanını genişlet",
             "b10695d6ce": "Oturumu sonlandır",
+            "288a4dd177": "Orca",
             "53dd5560ae": "Orca'yı daralt",
             "e419d27083": "Orca'yı genişlet",
             "41ae4fa725": "Sonlandırılıyor…",
@@ -4622,6 +4636,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "çıktı",
               "5d66fdd7c2": "girdi",
               "7080aeaebb": "Akıl yürütme",
@@ -6670,6 +6685,7 @@
           "d676c41fc6": "Google ile kimlik doğrulaması yapmak amacıyla yerel Gemini CLI kurulumunuzdan OAuth kimlik bilgilerini çıkarır. Bu, Orca'ya değil Gemini CLI uygulamasına verilen kimlik bilgilerini kullanır. Google, CLI'yi güncellerse bozulabilir. Kendi sorumluluğunuzda kullanın.",
           "0c7f915b01": "Gemini CLI kimlik bilgilerini kullan",
           "973741a871": "Mevcut Gemini CLI oturumlarını kullanılabilir tutun. Gemini kimlik bilgileri Antigravity'de oturum açmanızı sağlamaz.",
+          "0c64dc2a64": "Gemini CLI (eski)",
           "db209ee572": "Kaldır",
           "8a0f870153": "Yeniden kimlik doğrula",
           "3d245ef7d9": "Codex, bu girişin güncel olmadığını bildirdi",
@@ -7243,7 +7259,12 @@
             "title": "Ajan Panosu",
             "description": "Worktree'ler genelinde ajanları izlemek için pencere içinde veya ayrı pencere olarak kullanılabilen Kanban panosu.",
             "copy": "Sol kenar çubuğuna bir Ajan Panosu girişi ekler. Size ihtiyaç duyan, çalışan veya tamamlanan ajanları, isteğe bağlı olarak boştaki ajanlarla birlikte izleyin.",
-            "toggleLabel": "Ajan Panosunu aç/kapat"
+            "toggleLabel": "Ajan Panosunu aç/kapat",
+            "modeLabel": "Şu şekilde aç",
+            "modeCopy": "Panoyu kenar çubuğunun yanında pencere içi bir pano olarak ya da ayrı bir pop-out pencere olarak gösterin.",
+            "modeAriaLabel": "Ajan Panosu açılış modu",
+            "modeInWindow": "Pencere içi",
+            "modePopout": "Ayrı pencere"
           },
           "browserExtensions": {
             "copy": "Yerel tarayıcı profilleri için Ayarlar › Tarayıcı › Uzantılar bölümünü ekler.",
@@ -9460,6 +9481,7 @@
               "dashboard": "pano",
               "agent": "ajan",
               "kanban": "kanban",
+              "popout": "ayrı pencere",
               "board": "pano",
               "inWindow": "pencere içinde",
               "worktrees": "worktree'ler"
@@ -12436,6 +12458,8 @@
             "f316a8ca2b": "Çözülmemiş yorum seçilmedi.",
             "d00ebdc402": "{{value0}} Yorumu AI ile Çöz",
             "5eb2163b6b": "Bir ajan başlatmadan önce istemi gözden geçirin. İstem iletildikten sonra Orca, sunucudaki seçili yorum dizilerini çözüldü olarak işaretler ve çözemediği yorumlara yanıt verir.",
+            "f273f2271c": "Ajan başlatıldı. {{value0}} tanesi çözüldü olarak işaretlendi, {{value1}} tanesine yanıt verildi, {{value2}} tanesi atlandı, {{value3}} tanesi başarısız oldu.{{value4}}",
+            "aa95b81a3a": "Ajan başlatıldı. {{value0}} tanesi çözüldü olarak işaretlendi, {{value1}} tanesine yanıt verildi, {{value2}} tanesi atlandı, {{value3}} tanesi başarısız oldu.",
             "495b2f8c4b": "Ajan başlatıldı, ancak seçilen yorumlar çözülemedi veya yanıtlanamadı.",
             "review": {
               "auto_retry": "Orca {{time}} saatinde tekrar deneyecek.",
@@ -12447,6 +12471,7 @@
               "branch": "Branch'i Senkronize Et"
             },
             "7e4b2a19c0": "Yanıt verilecek GitHub PR'ı bulunamadı.",
+            "430f1a62d4": "Sunucudaki seçili yorum dizisi çözüldü olarak işaretlenemedi.",
             "updateReactionFailed": "Tepki güncellenemedi.",
             "gitlabMoreActions": "Diğer MR işlemleri",
             "gitlabLinkAnother": "Başka bir MR bağla"
@@ -13964,6 +13989,7 @@
           "1b5e182e9f": "Orca'ya Hoş Geldiniz",
           "4db04f2f57": "/",
           "adaa0aa627": "Onboarding adımı {{value0}}'a git: {{value1}}",
+          "a249f81538": "Orca",
           "277ba45540": "Orca onboarding",
           "97c42cda00": "Şunlar için GitHub CLI'yi kurun:",
           "ae3b00ca82": "GitHub görevlerini ayarla",
@@ -14266,7 +14292,8 @@
             "4a40af029b": "Ajan süresi",
             "00a6903322": "Oluşturulan ajanlar",
             "c0e2e9dcd9": "Tekrar hoş geldiniz",
-            "af761a0c0d": "Ayarlar"
+            "af761a0c0d": "Ayarlar",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "Gönder",
@@ -15762,6 +15789,7 @@
             "88fea8e84e": "Gönderme",
             "50b00dc327": "Ayrıntıları Kopyala",
             "6d3ebe216a": "Tanılama metni",
+            "835037edc9": "Orca",
             "8e24fe4f75": "Çökme raporu gönderildi.",
             "8b8473c544": "Çökme raporu kopyalandı.",
             "765591798d": "Çökme raporları kontrol ediliyor...",
@@ -18949,7 +18977,9 @@
       "agentOptional": "Ajan [İsteğe bağlı]",
       "createDescription": "Projeyi ve çalışma alanı adını seçin. Bir ajan başlatmak istiyorsanız ajan seçin."
     },
-    "JiraIssueWorkspace": {},
+    "JiraIssueWorkspace": {
+      "pendingChange": "Başka bir sorun değişikliği devam ediyor."
+    },
     "jiraProjectPicker": {
       "search": "Jira projelerinde ara",
       "empty": "Proje bulunamadı.",
@@ -19022,7 +19052,10 @@
     }
   },
   "dashboardPopout": {
-    "recoverableError": {},
+    "recoverableError": {
+      "title": "Orca panosunda bir hata oluştu.",
+      "description": "Pano işlenmeyi tamamlayamadı. Yeniden yüklemek için tekrar deneyin veya yeniden açın."
+    },
     "bucket": {
       "attention": "Sizi Bekliyor",
       "working": "Çalışıyor",
@@ -19965,6 +19998,7 @@
       "count": "{{key}} sorununa bağlı {{count}} çalışma alanı",
       "startAnother": "Yeni çalışma alanı başlat",
       "empty": "Bir Jira sorununu çalışma alanına bağlayın veya başka bir görünüm seçin.",
+      "openFailed": "Bu Jira sorununa bağlı çalışma alanı açılamıyor.",
       "mode": "Çalışma alanı var",
       "search": "Bağlı sorunlarda ara",
       "single": "{{key}} sorununa bağlı 1 çalışma alanı"
@@ -20008,6 +20042,8 @@
       "loadError": "Durum değişiklikleri yüklenemedi.",
       "retry": "Yeniden dene",
       "loading": "Durum değişiklikleri yükleniyor…",
+      "completeInJira": "“{{name}}” işlemini Jira'da tamamla",
+      "unsupported": "Jira, Orca'nın henüz toplayamadığı alanları gerektiriyor: {{fields}}.",
       "chooseResolution": "Bir çözüm seçin",
       "comment": "Yorum",
       "back": "Geri",
