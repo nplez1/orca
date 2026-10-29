@@ -1550,9 +1550,17 @@ assertion) existed. So a reader must date a red shard against `git log` before t
 the run-level word on the Actions page is a day behind the tree.
 
 The Linux red set keeps its one entry. The daemon disconnect race failed again in that same scheduled
-run (`##[warning] unit shard tolerated a known Linux red, already triaged`) and passed in the two
-nightlies since — the second of which prompted its own prunable notice, because one pass is not the two
-consecutive green nights its `exit` condition asks for.
+run (`##[warning] unit shard tolerated a known Linux red, already triaged`) and passed in the three
+runs since — the last two of which prompted its own `did not fail here, so its known-red entry may be
+prunable` notice. One pass is not the two consecutive green **scheduled** nights its `exit` condition
+asks for, so it stays and the notice is read as information.
+
+**Confirmed on the revision this record lands on:** run `40797794635` on `fdd5850d0f` (dispatch,
+2026-10-29T01:01Z) — `plan` green, all five test shards green, `relay integration` skipped as intended,
+and the daemon entry passing rather than absorbed. The run's `##[error]` lines are all upstream
+harness noise a green run carries: an optional `unit-selection-attempt-1` artifact that does not exist
+on a fresh dispatch, a deliberate `TS2322` fixture in the typecheck-path tests, and the `report.json`
+ENOENT cases in the shard-verdict usage tests.
 
 ### `local(sync)`: a file upstream owns is restored, not deleted
 
