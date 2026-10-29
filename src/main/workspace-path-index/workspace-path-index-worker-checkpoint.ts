@@ -13,6 +13,7 @@ import {
   workspacePathCatalogCheckpointPublishedScope,
   writeWorkspacePathCatalogCheckpoint
 } from './workspace-path-catalog-checkpoint-writer'
+import { pinRestoredWorkspacePathCheckpoint } from './workspace-path-index-worker-checkpoint-pins'
 import type {
   WorkspacePathIndexWorkerRequest,
   WorkspacePathIndexWorkerResponse
@@ -69,6 +70,13 @@ async function restoreCheckpoint(
     }
   }
   const { generation, manifest, loadMilliseconds, directoryValidationMilliseconds } = outcome.result
+  // Pin before publishing: this generation reads blocks out of the checkpoint payload, and the
+  // host budget evicts oldest-first — which is exactly this directory.
+  pinRestoredWorkspacePathCheckpoint({
+    rootKey: request.key,
+    checkpointDirectory: request.checkpointDirectory,
+    generationId: manifest.generationId
+  })
   // Marked here, and only here: a restored snapshot is last-known, so its queries stay bounded
   // until reconciliation publishes a fresh generation. A spilled catalog that was written by this
   // session (a spill, not a restore) keeps exact-count semantics.

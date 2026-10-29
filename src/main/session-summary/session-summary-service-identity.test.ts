@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import { SessionSummaryStore } from './session-summary-store'
 import { SessionSummaryService, type SessionSummaryStatusEntry } from './session-summary-service'
 import type { SessionSummarySourceEvent } from './session-summary-fold'
+import { resetSessionSummaryFoldSlotsForTests } from './session-summary-fold-slots'
+
+afterEach(resetSessionSummaryFoldSlotsForTests)
 
 function events(count: number): SessionSummarySourceEvent[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -56,9 +59,10 @@ describe('SessionSummaryService viewer-supplied identity', () => {
     const reads: unknown[] = []
     const service = new SessionSummaryService({
       store,
-      readEvents: async ({ identity }) => {
+      readEvents: async ({ identity, fromEventIndex }) => {
         reads.push(identity)
-        return events(2)
+        const all = events(2)
+        return { events: all.slice(fromEventIndex), totalEvents: all.length }
       },
       getAgentStatusEntry: () => entry,
       createBrain: () => ({
@@ -250,7 +254,10 @@ describe('SessionSummaryService stale ledger with a request-only identity', () =
     }
     const service = new SessionSummaryService({
       store,
-      readEvents: async () => events(3),
+      readEvents: async ({ fromEventIndex }) => {
+        const all = events(3)
+        return { events: all.slice(fromEventIndex), totalEvents: all.length }
+      },
       getAgentStatusEntry: () => currentEntry,
       createBrain: () => ({
         complete: async () =>

@@ -33,10 +33,11 @@ type ParserSessionOptions = {
 export async function parseCopilotSessionFile(
   file: FileWithMtime,
   platform: NodeJS.Platform = process.platform,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
   const lines = createInterface({
-    input: openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan'),
+    input: openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan', signal),
     crlfDelay: Infinity
   })
   return parseCopilotSessionLines({ file, lines, platform, messages })

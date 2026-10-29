@@ -100,6 +100,7 @@ export async function readJsonObjectIfExists(
     if (error instanceof WslTranscriptFsError) {
       throw error
     }
+    // An oversized sidecar is enrichment this session can live without: the session still lists.
     return null
   }
 }

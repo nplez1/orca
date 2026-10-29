@@ -264,6 +264,41 @@ describe('WorkerThreadRequestQueue', () => {
     expect(workers[0].terminated).toBe(true)
   })
 
+  it('rejects a concurrent call at its own deadline instead of leaving it unsettled', async () => {
+    // Why: the deadline handler used to deregister the call before the fault, so `failAll` never
+    // saw it and the promise stayed pending — one slow query wedged the path-index scheduler.
+    vi.useFakeTimers()
+    const workers: FakeWorker[] = []
+    const queue = makeQueue(workers)
+
+    const query = settle(queue.dispatchConcurrent((id) => ({ id, label: 'query' }), TIMEOUT_MS))
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
+
+    await expect(query).resolves.toMatchObject({ message: `timed out after ${TIMEOUT_MS}ms` })
+    expect(workers[0].terminated).toBe(true)
+    queue.dispose()
+  })
+
+  it('fails concurrent calls when aborting the active call destroys their worker', async () => {
+    const workers: FakeWorker[] = []
+    const queue = makeQueue(workers)
+    const controller = new AbortController()
+
+    const build = settle(
+      queue.dispatch((id) => ({ id, label: 'build' }), TIMEOUT_MS, controller.signal)
+    )
+    const query = settle(queue.dispatchConcurrent((id) => ({ id, label: 'query' }), TIMEOUT_MS))
+    await Promise.resolve()
+
+    controller.abort(new Error('pane closed'))
+
+    await expect(build).resolves.toMatchObject({ message: 'pane closed' })
+    // The concurrent call failed with its worker, not with someone else's cancellation.
+    await expect(query).resolves.toMatchObject({ message: 'unavailable: worker request aborted' })
+    queue.dispose()
+  })
+
   it('stops respawning and fails the rest of the queue once deaths hit the cap', async () => {
     const workers: FakeWorker[] = []
     const queue = makeQueue(workers)

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -27,10 +27,12 @@ import {
   type WorkspacePathCatalogCheckpointRestoreOutcome
 } from './workspace-path-catalog-checkpoint-restore'
 import {
+  pinWorkspacePathCatalogCheckpoint,
   pruneWorkspacePathCatalogCheckpointsToBudget,
   publishWorkspacePathCatalogCheckpoint,
   readWorkspacePathCatalogCheckpointManifest,
   removeWorkspacePathCatalogCheckpoint,
+  unpinWorkspacePathCatalogCheckpoint,
   workspacePathCatalogCheckpointDirectory,
   workspacePathCatalogCheckpointPayloadPath
 } from './workspace-path-catalog-checkpoint-store'
@@ -290,6 +292,77 @@ describe('workspace path catalog checkpoints', () => {
     expect(await readdir(fixture.checkpointRoot)).toEqual([])
   })
 
+  it('keeps a checkpoint a restored root is still reading from', async () => {
+    const fixture = await setUp()
+    const otherHash = workspacePathCatalogCheckpointIdentityHash('/root/restored')
+    const otherDirectory = workspacePathCatalogCheckpointDirectory(
+      fixture.checkpointRoot,
+      otherHash
+    )
+    for (const [directory, key, generationId] of [
+      [fixture.checkpointDirectory, OWNERSHIP_KEY, 'generation-restored'],
+      [otherDirectory, 'local::restored', 'generation-newer']
+    ] as const) {
+      const written = await writeSpilledGeneration(
+        fixture.spillDirectory,
+        fixture.source,
+        generationId
+      )
+      await writeWorkspacePathCatalogCheckpoint({
+        checkpointDirectory: directory,
+        ownershipKey: key,
+        generation: { catalog: written }
+      })
+    }
+    // The restored root is the older identity: age its payload so eviction order does not rest on
+    // write timing. `measureDirectoryBytes` reads file mtimes, not the directory's.
+    await agePayloadFiles(fixture.checkpointDirectory, 120_000)
+    await agePayloadFiles(otherDirectory, 60_000)
+    pinWorkspacePathCatalogCheckpoint(fixture.checkpointDirectory)
+
+    // Room for the restored root alone: the newer checkpoint is the one that goes.
+    const restoredBytes = await measureDirectory(fixture.checkpointDirectory)
+    expect(
+      await pruneWorkspacePathCatalogCheckpointsToBudget(fixture.checkpointRoot, restoredBytes + 1)
+    ).toBe(true)
+    expect(await readdir(fixture.checkpointRoot)).toEqual([fixture.identityHash])
+
+    // Unpinned, a budget that cannot hold it removes it: the skip was the pin, not the size.
+    unpinWorkspacePathCatalogCheckpoint(fixture.checkpointDirectory)
+    expect(
+      await pruneWorkspacePathCatalogCheckpointsToBudget(fixture.checkpointRoot, restoredBytes - 1)
+    ).toBe(true)
+    expect(await readdir(fixture.checkpointRoot)).toEqual([])
+  })
+
+  it('measures a resident payload against its own root, not every checkpoint for the host', async () => {
+    const fixture = await setUp()
+    // A sibling identity whose payload alone passes the per-root ceiling this write is given.
+    const otherDirectory = workspacePathCatalogCheckpointDirectory(
+      fixture.checkpointRoot,
+      workspacePathCatalogCheckpointIdentityHash('/root/heavy')
+    )
+    await mkdir(otherDirectory, { recursive: true })
+    await writeFile(join(otherDirectory, 'host-heavy.wpc'), Buffer.alloc(64 * 1024))
+
+    const resident = await buildResidentCatalog(['src/alpha/one.ts', 'src/alpha/two.ts'])
+    expect(resident.storageKind).toBe('packed-folded')
+    await writeWorkspacePathCatalogCheckpoint({
+      checkpointDirectory: fixture.checkpointDirectory,
+      ownershipKey: OWNERSHIP_KEY,
+      generation: { catalog: resident },
+      residentEncodeEnabled: true,
+      perRootBudgetBytes: 32 * 1024
+    })
+
+    // The optimisation used to switch itself off for every root once the host root passed the
+    // per-root number; this root now checkpoints on its own few hundred bytes.
+    expect(
+      await readWorkspacePathCatalogCheckpointManifest(fixture.checkpointDirectory)
+    ).not.toBeNull()
+    await rm(otherDirectory, { recursive: true, force: true })
+  })
+
   it('keeps two roots isolated and never serves one payload for the other', async () => {
     const fixture = await setUp()
     const firstHash = workspacePathCatalogCheckpointIdentityHash('/root/a')
@@ -547,6 +620,14 @@ async function measureDirectory(directory: string): Promise<number> {
     bytes += (await stat(join(directory, name))).size
   }
   return bytes
+}
+
+/** Eviction orders by payload mtime, so age the files a checkpoint directory holds. */
+async function agePayloadFiles(directory: string, millisecondsAgo: number): Promise<void> {
+  const aged = new Date(AGED_CHECKPOINT_MTIME.getTime() - millisecondsAgo)
+  for (const name of await readdir(directory)) {
+    await utimes(join(directory, name), aged, aged)
+  }
 }
 
 function fenceIdentity(query: string): WorkspacePathSearchFenceIdentity {

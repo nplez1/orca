@@ -28,6 +28,27 @@ export function workspacePathCatalogCheckpointDirectory(
   return join(rootDirectory, identityHash)
 }
 
+/**
+ * Identities whose payload a live restored generation reads.
+ *
+ * Why: a restored checkpoint carries the oldest write time in the host root, so oldest-first budget
+ * eviction picks it first — while its root is still answering queries out of that payload. Pinned
+ * directories are skipped, the way `pendingSpillDeletes` keeps an in-use spill file alive.
+ */
+const pinnedCheckpointDirectories = new Set<string>()
+
+export function pinWorkspacePathCatalogCheckpoint(checkpointDirectory: string): void {
+  pinnedCheckpointDirectories.add(checkpointDirectory)
+}
+
+export function unpinWorkspacePathCatalogCheckpoint(checkpointDirectory: string): void {
+  pinnedCheckpointDirectories.delete(checkpointDirectory)
+}
+
+export function pinnedWorkspacePathCatalogCheckpoints(): readonly string[] {
+  return [...pinnedCheckpointDirectories]
+}
+
 export function workspacePathCatalogCheckpointPayloadPath(
   checkpointDirectory: string,
   payloadFile: string
@@ -93,6 +114,7 @@ export async function pruneWorkspacePathCatalogCheckpointGenerations(
 export async function removeWorkspacePathCatalogCheckpoint(
   checkpointDirectory: string
 ): Promise<void> {
+  unpinWorkspacePathCatalogCheckpoint(checkpointDirectory)
   await rm(checkpointDirectory, { recursive: true, force: true })
 }
 
@@ -119,6 +141,9 @@ export async function pruneWorkspacePathCatalogCheckpointsToBudget(
   for (const candidate of measured) {
     if (totalBytes <= budgetBytes) {
       break
+    }
+    if (pinnedCheckpointDirectories.has(join(rootDirectory, candidate.name))) {
+      continue
     }
     await rm(join(rootDirectory, candidate.name), {
       recursive: true,
@@ -175,6 +200,13 @@ export async function measureWorkspacePathCatalogCheckpointRootBytes(
     total += entry.bytes
   }
   return total
+}
+
+/** Sums one identity's own directory, for the per-root budget that directory is measured against. */
+export async function measureWorkspacePathCatalogCheckpointDirectoryBytes(
+  checkpointDirectory: string
+): Promise<number> {
+  return (await measureDirectoryBytes(checkpointDirectory)).bytes
 }
 
 async function measureDirectoryBytes(

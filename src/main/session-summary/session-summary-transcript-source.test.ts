@@ -95,7 +95,10 @@ describe('readSessionSummaryTranscriptEvents', () => {
       signal: signal()
     })
 
-    expect(events?.map((event) => event.text)).toEqual(['Add a sticky-note icon', 'Icon replaced.'])
+    expect(events?.events.map((event) => event.text)).toEqual([
+      'Add a sticky-note icon',
+      'Icon replaced.'
+    ])
   })
 
   it('reads a Copilot session from its session-state directory', async () => {
@@ -117,7 +120,7 @@ describe('readSessionSummaryTranscriptEvents', () => {
       signal: signal()
     })
 
-    expect(events?.map((event) => event.text)).toEqual([
+    expect(events?.events.map((event) => event.text)).toEqual([
       'Why is the pane empty?',
       'The transcript never resolved.'
     ])
@@ -208,6 +211,60 @@ describe('readSessionSummaryTranscriptEvents', () => {
       signal: signal()
     })
 
-    expect(events?.map((event) => event.text)).toEqual(['Why is the pane empty?'])
+    expect(events?.events.map((event) => event.text)).toEqual(['Why is the pane empty?'])
+  })
+
+  it('folds from the cursor instead of collecting the events it already folded', async () => {
+    const dir = await tempDir()
+    const transcriptPath = join(dir, '2026-01-01T00-00-00-000Z_pi-session-1.jsonl')
+    await writeFile(transcriptPath, piTranscript('Add a sticky-note icon', 'Icon replaced.'))
+    const { readSessionSummaryTranscriptEvents } = await loadSource()
+
+    const read = await readSessionSummaryTranscriptEvents({
+      identity: {
+        agentType: 'pi',
+        providerSession: { key: 'session_id', id: 'pi-session-1', transcriptPath }
+      },
+      signal: signal(),
+      fromEventIndex: 1
+    })
+
+    expect(read?.events.map((event) => event.text)).toEqual(['Icon replaced.'])
+    // The total still counts the skipped message: the pane's backlog is derived from it.
+    expect(read?.totalEvents).toBe(2)
+  })
+
+  it('refuses to retain more unfolded text than the fold may hold', async () => {
+    const dir = await tempDir()
+    const transcriptPath = join(dir, '2026-01-01T00-00-00-000Z_pi-session-1.jsonl')
+    await writeFile(transcriptPath, piTranscript('a message', 'a reply'))
+    const { readSessionSummaryEventsFromFile } = await loadSource()
+
+    await expect(
+      readSessionSummaryEventsFromFile({
+        filePath: transcriptPath,
+        parser: 'pi',
+        signal: signal(),
+        // The ceiling in production is 24 MB of text; the shape is the same at a few bytes.
+        maxRetainedBytes: 4
+      })
+    ).rejects.toThrow(/MB of unfolded messages, which is too much to fold/)
+  })
+
+  it('stops a read when the caller aborts it', async () => {
+    const dir = await tempDir()
+    const transcriptPath = join(dir, '2026-01-01T00-00-00-000Z_pi-session-1.jsonl')
+    await writeFile(transcriptPath, piTranscript('Add a sticky-note icon', 'Icon replaced.'))
+    const { readSessionSummaryTranscriptEvents } = await loadSource()
+
+    await expect(
+      readSessionSummaryTranscriptEvents({
+        identity: {
+          agentType: 'pi',
+          providerSession: { key: 'session_id', id: 'pi-session-1', transcriptPath }
+        },
+        signal: AbortSignal.abort(new Error('pane closed'))
+      })
+    ).rejects.toThrow()
   })
 })
