@@ -103,7 +103,8 @@ describe('status bar port row open routing', () => {
     })
     ;(window as unknown as { api: unknown }).api = {
       shell: {
-        openUrl: openUrlMock
+        openUrl: openUrlMock,
+        openUrlInSystemBrowser: openUrlMock
       },
       ui: {
         writeClipboardText: vi.fn()

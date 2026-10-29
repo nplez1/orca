@@ -321,7 +321,7 @@ export default function BrowserTab({
           <CloseSplitPaneMenuItem onCloseSplitPane={onCloseSplitPane} />
           <DropdownMenuItem
             inset
-            onSelect={() => void window.api.shell.openUrl(openInBrowserUrl)}
+            onSelect={() => void window.api.shell.openUrlInSystemBrowser(openInBrowserUrl)}
             disabled={!isHttpUrl}
           >
             {translate('auto.components.tab.bar.BrowserTab.6e0bc8f3a8', 'Open In Browser')}

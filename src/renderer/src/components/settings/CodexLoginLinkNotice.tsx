@@ -29,7 +29,11 @@ export function CodexLoginLinkNotice(): React.JSX.Element | null {
             ? translate('auto.components.settings.AccountsPane.codexLoginLinkCopied', 'Copied')
             : translate('auto.components.settings.AccountsPane.codexLoginLinkCopy', 'Copy link')}
         </Button>
-        <Button variant="ghost" size="xs" onClick={() => void window.api.shell.openUrl(url)}>
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={() => void window.api.shell.openUrlInSystemBrowser(url)}
+        >
           <ExternalLink />
           {translate('auto.components.settings.AccountsPane.codexLoginLinkOpen', 'Open')}
         </Button>

@@ -5,6 +5,10 @@ import type {
   ShellOpenLocalPathResult
 } from '../../shared/shell-open-types'
 import type { ExecutionHostId } from '../../shared/execution-host'
+import {
+  contextualLinkOpenChannel,
+  contextualLinkRouterReadyChannel
+} from '../../shared/contextual-link-channels'
 import type { PreloadApi } from '../api-types'
 
 export const shellApi = {
@@ -23,6 +27,19 @@ export const shellApi = {
     ipcRenderer.invoke('shell:openInExternalEditor', request),
 
   openUrl: (url: string): Promise<void> => ipcRenderer.invoke('shell:openUrl', url),
+
+  openUrlInSystemBrowser: (url: string): Promise<void> =>
+    ipcRenderer.invoke('shell:openUrlInSystemBrowser', url),
+
+  onContextualLinkRequested: (callback: (url: string) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, url: string): void => callback(url)
+    ipcRenderer.on(contextualLinkOpenChannel, listener)
+    return () => ipcRenderer.removeListener(contextualLinkOpenChannel, listener)
+  },
+
+  markContextualLinkRouterReady: (): void => {
+    ipcRenderer.send(contextualLinkRouterReadyChannel)
+  },
 
   openFilePath: (path: string, ownerHostId: ExecutionHostId): Promise<boolean> =>
     ipcRenderer.invoke('shell:openFilePath', path, ownerHostId),

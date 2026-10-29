@@ -193,12 +193,14 @@ export type GlobalSettings = GlobalSettingsBase & {
   nodeDistMirrorUrl?: string
   /** Why: corporate TLS-intercepting proxies can break HTTP/2 downloads; opt-in Chromium process-wide HTTP/1.1 switch. */
   electronHttp1CompatibilityMode?: boolean
-  /** Opt-in in-app browsing (isolated guest surface); default keeps links opening in the system browser. */
+  /** In-app browsing (isolated guest surface); on by default, so links stay in context. */
   openLinksInApp: boolean
   /** Worktree-scoped localhost hostnames to distinguish tabs; opt-in since a non-localhost host can break apps binding cookies/sessions to localhost. */
   localhostWorktreeLabelsEnabled?: boolean
   /** Tracks the one-time first-use prompt for terminal link routing (avoid silently changing where links open). */
   openLinksInAppPreferencePrompted: boolean
+  /** Stamps the one-time default change to in-app routing, so a later opt-out is not overwritten. */
+  openLinksInAppDefaultedOnForAllUsers?: boolean
   /** Opt-in: Shift+modifier click inverts openLinksInApp instead of always forcing the system browser. Off keeps the historical one-way escape hatch. */
   openLinksInAppModifierInverts?: boolean
   /** Show link actions on plain click in the terminal and chat; off restores modifier-click-only terminal links. */

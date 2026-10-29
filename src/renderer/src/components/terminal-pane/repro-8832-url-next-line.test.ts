@@ -77,7 +77,9 @@ function openUrlAt(
 describe('#8832 hard-wrapped path candidates glue next-line text into URLs', () => {
   beforeEach(() => {
     vi.stubGlobal('navigator', { userAgent: 'Macintosh' })
-    vi.stubGlobal('window', { api: { shell: { openUrl: openUrlMock } } })
+    vi.stubGlobal('window', {
+      api: { shell: { openUrl: openUrlMock, openUrlInSystemBrowser: openUrlMock } }
+    })
     registerHttpLinkStoreAccessor(() => ({
       settings: { openLinksInApp: false },
       setActiveWorktree: vi.fn(),

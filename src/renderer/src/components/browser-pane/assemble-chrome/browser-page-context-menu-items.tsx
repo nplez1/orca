@@ -80,7 +80,7 @@ function buildMenuSections({
   const openExternally = (url: string): void => {
     const targetUrl = normalizeExternalBrowserUrl(url)
     if (targetUrl) {
-      void window.api.shell.openUrl(targetUrl)
+      void window.api.shell.openUrlInSystemBrowser(targetUrl)
     }
   }
 

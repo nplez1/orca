@@ -16,6 +16,7 @@ import {
   normalizeOsc52ClipboardDefaultOn,
   osc52ClipboardDefaultOnOverridesPersistedOff
 } from '../../../shared/osc52-clipboard-settings'
+import { normalizeLinkRoutingDefaultInApp } from '../../../shared/link-routing-settings'
 import {
   migrateTerminalScrollbackRows,
   migrateTerminalTuiScrollSensitivityDefault
@@ -46,6 +47,10 @@ export type PreparedLoadedTerminalSettings = {
   migratedOsc52Clipboard: Pick<
     GlobalSettings,
     'terminalAllowOsc52Clipboard' | 'terminalAllowOsc52ClipboardDefaultedOnForAllUsers'
+  >
+  migratedLinkRouting: Pick<
+    GlobalSettings,
+    'openLinksInApp' | 'openLinksInAppPreferencePrompted' | 'openLinksInAppDefaultedOnForAllUsers'
   >
   migratedFloatingTerminalCwd: GlobalSettings['floatingTerminalCwd']
   migratedFloatingTerminalTrustedCwds: GlobalSettings['floatingTerminalTrustedCwds']
@@ -125,6 +130,10 @@ export function prepareLoadedTerminalSettings(
     : true
   // Legacy off values conflate default and opt-out; migrate only unstamped profiles.
   const migratedOsc52Clipboard = normalizeOsc52ClipboardDefaultOn(parsed.settings)
+  const migratedLinkRouting = normalizeLinkRoutingDefaultInApp(parsed.settings)
+  if (parsed.settings?.openLinksInAppDefaultedOnForAllUsers !== true) {
+    markNeedsSave()
+  }
   const osc52ClipboardNoticePending =
     osc52ClipboardDefaultOnOverridesPersistedOff(parsed.settings) ||
     parsed.ui?.osc52ClipboardDefaultOnNoticePending === true
@@ -183,6 +192,7 @@ export function prepareLoadedTerminalSettings(
     migratedOptionAsAlt,
     migratedFloatingTerminalEnabled,
     migratedOsc52Clipboard,
+    migratedLinkRouting,
     migratedFloatingTerminalCwd,
     migratedFloatingTerminalTrustedCwds,
     osc52ClipboardNoticePending

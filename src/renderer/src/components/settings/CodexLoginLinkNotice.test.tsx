@@ -30,7 +30,8 @@ function stubApi(pendingUrl: string | null): {
         }
       },
       ui: { writeClipboardText },
-      shell: { openUrl }
+      // The Open button hands the sign-in page to the OS browser, never to the relaying shell call.
+      shell: { openUrl, openUrlInSystemBrowser: openUrl }
     }
   })
   return { listeners, writeClipboardText, openUrl }

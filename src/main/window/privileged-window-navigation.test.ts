@@ -5,20 +5,38 @@ vi.mock('electron', () => ({
   shell: { openExternal: (url: string) => openExternal(url) }
 }))
 
+import { markContextualLinkRouterReady } from './contextual-link-relay'
 import { installPrivilegedWindowNavigationPolicy } from './privileged-window-navigation'
 
 describe('privileged window navigation policy', () => {
-  function createFixture(currentUrl: string) {
+  function createFixture(currentUrl: string, options: { routesLinks?: boolean } = {}) {
     const handlers = new Map<string, (...args: unknown[]) => void>()
+    const popupHandlers: ((details: { url: string }) => unknown)[] = []
     const contents = {
+      id: 1,
       getURL: () => currentUrl,
-      setWindowOpenHandler: vi.fn(),
+      isDestroyed: () => false,
+      send: vi.fn(),
+      setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => unknown) => {
+        popupHandlers.push(handler)
+      }),
       on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
         handlers.set(event, handler)
       })
     }
+    if (options.routesLinks) {
+      markContextualLinkRouterReady(contents)
+    }
     installPrivilegedWindowNavigationPolicy(contents as never)
     return {
+      contents,
+      windowOpen(url: string) {
+        const handler = popupHandlers[0]
+        if (!handler) {
+          throw new Error('no window-open handler was registered')
+        }
+        return handler({ url })
+      },
       willNavigate(url: string) {
         const event = { preventDefault: vi.fn() }
         const handler = handlers.get('will-navigate')
@@ -90,5 +108,47 @@ describe('privileged window navigation policy', () => {
 
     expect(event.preventDefault).toHaveBeenCalled()
     expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  // The window owns the link-routing preference, so main must hand web links over instead of
+  // opening the OS browser behind the user's back.
+  it('relays an external navigation to the window router instead of the OS browser', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    const event = fixture.willNavigate('https://example.com/')
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(fixture.contents.send).toHaveBeenCalledWith(
+      'link:openContextual',
+      'https://example.com/'
+    )
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('relays a popup request to the window router', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    expect(fixture.windowOpen('https://example.com/')).toEqual({ action: 'deny' })
+    expect(fixture.contents.send).toHaveBeenCalledWith(
+      'link:openContextual',
+      'https://example.com/'
+    )
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('still opens the OS browser when the window announces no router', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html'
+    )
+
+    expect(fixture.windowOpen('https://example.com/')).toEqual({ action: 'deny' })
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/')
+    expect(fixture.contents.send).not.toHaveBeenCalled()
   })
 })

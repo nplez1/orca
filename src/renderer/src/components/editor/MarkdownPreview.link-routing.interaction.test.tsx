@@ -114,6 +114,7 @@ describe('MarkdownPreview http link routing (Cmd vs Cmd+Shift click)', () => {
     ;(window as unknown as { api: unknown }).api = {
       shell: {
         openUrl: openUrlMock,
+        openUrlInSystemBrowser: openUrlMock,
         openFileUri: openFileUriMock,
         pathExists: pathExistsMock
       },

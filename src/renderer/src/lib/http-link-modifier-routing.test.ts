@@ -24,7 +24,10 @@ describe('modifier routing across link source owners', () => {
     vi.clearAllMocks()
     registerHttpLinkStoreAccessor(() => storeState)
     registerWorkspaceHttpLinkBrowserOpener(openRuntimeBrowserTabMock)
-    vi.stubGlobal('window', { api: { shell: { openUrl: openUrlMock } } })
+    // The router's system branch has one destination and one channel; both stubs prove it was used.
+    vi.stubGlobal('window', {
+      api: { shell: { openUrl: openUrlMock, openUrlInSystemBrowser: openUrlMock } }
+    })
   })
 
   afterEach(() => {

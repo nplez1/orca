@@ -42,7 +42,8 @@ beforeEach(() => {
     configurable: true,
     value: {
       updater: { getVersion: async () => '1.4.236', listBuilds, check },
-      shell: { openUrl },
+      // Installer downloads go to the OS browser, bypassing in-app link routing.
+      shell: { openUrl, openUrlInSystemBrowser: openUrl },
       ui: { set: async () => {} }
     }
   })

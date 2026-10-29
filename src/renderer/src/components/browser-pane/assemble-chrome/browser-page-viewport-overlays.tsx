@@ -153,7 +153,7 @@ function BrowserPageLoadFailure({
       loadError={loadError}
       externalUrl={failureExternalUrl}
       onRetry={onRetry}
-      onOpenExternal={(url) => void window.api.shell.openUrl(url)}
+      onOpenExternal={(url) => void window.api.shell.openUrlInSystemBrowser(url)}
       certificateFailure={certificateFailure}
       sshRoutedHint={sshRouted}
       onRecheckSshRoute={sshRouted ? ssh.recheck : null}

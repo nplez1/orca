@@ -53,7 +53,7 @@ function installSubscription(
   const unsubscribe = vi.fn()
   vi.stubGlobal('window', {
     api: {
-      shell: { openUrl },
+      shell: { openUrl, openUrlInSystemBrowser: openUrl },
       docPreview: {
         onExternalLink: (callback: (payload: DocPreviewExternalLink) => void) => {
           listener = callback
@@ -99,7 +99,9 @@ describe('document preview external-link confirmation', () => {
   it.each([10, 100])(
     'bounds delivery to one equality check per preview at %s listeners',
     async (count) => {
-      vi.stubGlobal('window', { api: { shell: { openUrl }, docPreview: docPreviewApi } })
+      vi.stubGlobal('window', {
+        api: { shell: { openUrl, openUrlInSystemBrowser: openUrl }, docPreview: docPreviewApi }
+      })
       const confirm = vi.fn<ConfirmationDialogContextValue>().mockResolvedValue(true)
       const baseline = ipcRenderer.listenerCount(DOC_PREVIEW_EXTERNAL_LINK_CHANNEL)
       const disposers = Array.from({ length: count }, (_, index) =>

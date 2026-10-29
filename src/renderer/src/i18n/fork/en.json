@@ -669,6 +669,13 @@
           "8e832829e7": "Let Orca query {{value0}}",
           "e3340ac4e1": "When off, Orca never asks {{value0}} for usage and never reads its sign-in from software installed on this computer.",
           "e9b8e0fc2e": "{{value0}} is off. Orca will not query it or read its sign-in from software installed on this computer."
+        },
+        "BrowserLinkRoutingSetting": {
+          "descriptionBase": "Open http(s) links in Orca's built-in browser — from anywhere in the app.",
+          "description": "Open http(s) links in Orca's built-in browser — from anywhere in the app. {{shortcut}} always uses your system browser."
+        },
+        "BrowserLinkRoutingBackgroundSetting": {
+          "description": "Links join the browser without taking focus from where you clicked."
         }
       },
       "right": {
@@ -920,6 +927,14 @@
         "description": "This workspace has no open tabs.",
         "newAgent": "New {{agent}} agent",
         "newTerminal": "New terminal"
+      },
+      "link": {
+        "actions": {
+          "copied": "Copied",
+          "copyLink": "Copy Link",
+          "openInOrcaBrowser": "Open in Orca Browser",
+          "openInSystemBrowser": "Open in System Browser"
+        }
       }
     },
     "runtime": {

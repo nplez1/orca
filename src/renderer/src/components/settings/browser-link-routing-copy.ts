@@ -14,12 +14,12 @@ export function getBrowserLinkRoutingDescription(
   if (modifierInverts) {
     return translate(
       'auto.components.settings.BrowserLinkRoutingSetting.descriptionBase',
-      "Open http(s) links in Orca's built-in browser — from the terminal, markdown, and the editor."
+      "Open http(s) links in Orca's built-in browser — from anywhere in the app."
     )
   }
   return translate(
     'auto.components.settings.BrowserLinkRoutingSetting.description',
-    "Open http(s) links in Orca's built-in browser — from the terminal, markdown, and the editor. {{shortcut}} always uses your system browser.",
+    "Open http(s) links in Orca's built-in browser — from anywhere in the app. {{shortcut}} always uses your system browser.",
     { shortcut: getBrowserLinkRoutingShortcutLabel(platform) }
   )
 }
@@ -69,7 +69,7 @@ function getLinkRoutingBackgroundTitle(): string {
 function getLinkRoutingBackgroundDescription(): string {
   return translate(
     'auto.components.settings.BrowserLinkRoutingBackgroundSetting.description',
-    'Links from the terminal, chat, and markdown join the browser without taking focus from where you clicked.'
+    'Links join the browser without taking focus from where you clicked.'
   )
 }
 

@@ -216,6 +216,7 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   terminalScrollbackRows: 'replicated',
   uiHangDiagnosticsEnabled: 'replicated',
   openLinksInApp: 'replicated',
+  openLinksInAppDefaultedOnForAllUsers: 'hostLocal',
   localhostWorktreeLabelsEnabled: 'replicated',
   openLinksInAppModifierInverts: 'replicated',
   openLinksInAppInBackground: 'replicated',
