@@ -430,7 +430,16 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     diff === null ? true : packageJsonChangedForTests(injected.git, diff.base)
   for (const [file, failures] of unexpectedByFile) {
     const rerun = reruns.get(file) ?? NO_RERUN
-    const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))
+    // Why the entries per file: a suite-level row is waived only when the re-run's named failures are
+    // ones this file's allowlist already covers, so a red that only appears in isolation never passes
+    // unjudged.
+    const fileEntries = entries.filter((entry) => entry.file === file)
+    const reproduced = new Set(
+      reproducedFailures(failures, rerun, {
+        known: new Set(fileEntries.map((entry) => entry.test).filter(Boolean)),
+        fileCovered: fileEntries.some((entry) => entry.test === null)
+      }).map((failure) => failure.test)
+    )
     // Why not `diff.files.has(file)`: a branch that changes `src/x.ts`, the module beside a test, an
     // imported module, or the harness every test runs under breaks `x.test.ts` without the test file
     // itself being in the diff.

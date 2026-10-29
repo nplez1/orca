@@ -12,34 +12,24 @@ export const REVIEWER_CLAIM = /^(?:claude[-/]opus|opus\s+\d+\.\d+)\b[\s\S]*\bhig
 
 /** Wording that names a finding without claiming it was closed. */
 export const OPEN_VERDICT_WORDS =
-  /\b(?:not\s+yet|not\s+(?:clean|fixed|addressed|resolved)|will\s+be|to\s+be\s+(?:fixed|addressed|resolved)|later|todo|tbd|unresolved|outstanding|pending|unfixed|still\s+open|deferred|won'?t\s+fix|skipped|follow-?up)\b/i
+  /\b(?:not\s+yet|not\s+(?:clean|fixed|addressed|resolved)|will\s+be|to\s+be\s+(?:fixed|addressed|resolved)|later|todo|tbd|unresolved|outstanding|pending|unfixed|still\s+open|open|deferred|won'?t\s+fix|skipped|follow-?up)\b/i
 
 /** One `R<n>` (or `round <n>`) naming the round a verdict belongs to. */
 const ROUND_REF = /\bR(\d+)\b|\bround\s*(\d+)\b/gi
 
-/** A count of blocking findings, which is a finding until something says they were fixed. */
-const BLOCKER_COUNT = /\b(\d+)\s+(?:blocking|blockers?)\b/gi
-
 /**
  * A closed verdict, in the two shapes AGENTS.md allows: the round came back clean, or a counted set
- * of blocking findings was fixed. Why counted: "found 2 BLOCKERs" is a finding, not a resolution.
- * Why `[^,;)]`: the closing verb has to be in the same clause, or `R1 (2 blocking, 1 fixed)` reads
- * as a closed round — the comma is where one finding ends and the next begins.
+ * of blocking findings was fixed. Why the verb has to sit next to the count: "found 2 BLOCKERs" is a
+ * finding, not a resolution, and `R1 (3 blocking: 1 fixed)` closes one of three — #210 G4 asks for an
+ * *adjacent* `fixed`, which is also what refuses "2 blockers found and 1 fixed".
  */
+const CLOSED_COUNT =
+  /\b\d+\s+(?:blocking|blockers?)\s*(?:[,:-]\s*)?(?:all\s+)?(?:were\s+|are\s+)?(?:fixed|resolved|addressed)\b/gi
 const CLOSED_VERDICT =
-  /\bclean\b|\b(?:\d+|no)\s+(?:blocking|blockers?)\b[^,;)]*?\b(?:fixed|resolved|addressed)\b/gi
+  /\bclean\b|\b\d+\s+(?:blocking|blockers?)\s*(?:[,:-]\s*)?(?:all\s+)?(?:were\s+|are\s+)?(?:fixed|resolved|addressed)\b|\bno\s+(?:blocking|blockers?)\b/gi
 
-/** The clause a position sits in: split on the separators a claim uses between findings. */
-function clauseAt(text, index) {
-  const before = text.slice(0, index)
-  const start = Math.max(...[',', ';', '('].map((separator) => before.lastIndexOf(separator))) + 1
-  const rest = text.slice(index)
-  const ends = [',', ';', ')']
-    .map((separator) => rest.indexOf(separator))
-    .filter((position) => position !== -1)
-  const end = index + (ends.length === 0 ? rest.length : Math.min(...ends))
-  return text.slice(start, end)
-}
+/** Every count of blocking findings, whether or not the same place closes it. */
+const BLOCKER_COUNT = /\b(?:\d+|no)\s+(?:blocking|blockers?)\b/gi
 /** Markdown emphasis, headings and bullets are noise around the claim, not a different claim. */
 function normaliseBodyLine(line) {
   return String(line)
@@ -93,12 +83,12 @@ export function reviewClaim(body) {
     }
     // Why every blocker count: a count of findings is a finding until the same clause says they were
     // fixed, and `clean` elsewhere in the line must not close them.
+    const closedCounts = new Set([...roundsText.matchAll(CLOSED_COUNT)].map((match) => match.index))
     for (const count of roundsText.matchAll(BLOCKER_COUNT)) {
-      const clause = clauseAt(roundsText, count.index)
-      if (!/\b(?:fixed|resolved|addressed)\b/i.test(clause)) {
+      if (!closedCounts.has(count.index)) {
         return {
           ok: false,
-          reason: `the review line counts ${count[0].trim()} without saying they were fixed (${JSON.stringify(clause.trim())}): "${claim}"`
+          reason: `the review line counts ${count[0].trim()} without the closing verb beside it: "${claim}"`
         }
       }
     }

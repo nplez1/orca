@@ -10,7 +10,7 @@ describe('the exit a verdict composes', () => {
   const SUITE_FILE = 'src/main/a.test.ts'
 
   /** A gate run with the spawns, globs and diff replaced: the composition is the thing under test. */
-  function gateRun({ report = {}, log = '', run = {}, sources = {} } = {}) {
+  function gateRun({ report = {}, log = '', run = {}, sources = {}, entries = [] } = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'orca-gate-evaluate-'))
     const reportPath = join(dir, 'report.json')
     const logPath = join(dir, 'run.log')
@@ -19,7 +19,7 @@ describe('the exit a verdict composes', () => {
       writeFileSync(reportPath, JSON.stringify(report))
     }
     writeFileSync(logPath, log)
-    writeFileSync(allowlist, JSON.stringify({ entries: [] }))
+    writeFileSync(allowlist, JSON.stringify({ entries }))
     const base = {
       run: () => ({ outcome: 'complete', status: 0, elapsedMs: 5, forkTestsPassed: true, ...run }),
       git: (args) => (args.join(' ') === 'rev-parse HEAD' ? REVISION : null),
@@ -91,35 +91,11 @@ describe('the exit a verdict composes', () => {
   it('lets an allowlisted red explain a non-zero exit, which every run on this machine has', () => {
     // Why this must pass: 17 tests are allowlisted reds here, so a full run always exits 1. A gate
     // that refused that would fail every run — the report's completeness is what is checked instead.
-    const dir = mkdtempSync(join(tmpdir(), 'orca-gate-allowlisted-'))
-    const allowlist = join(dir, 'known-red.json')
-    writeFileSync(
-      allowlist,
-      JSON.stringify({
-        entries: [{ file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream' }]
-      })
-    )
-    const reportPath = join(dir, 'report.json')
-    const logPath = join(dir, 'run.log')
-    writeFileSync(reportPath, JSON.stringify(failingReport))
-    writeFileSync(logPath, '')
-    const result = evaluate(
-      { allowlist, vitestArgs: [], timeoutMs: 1000, allowDirty: false },
-      {
-        dir,
-        reportPath,
-        logPath,
-        sources: {
-          run: () => ({ outcome: 'complete', status: 1, elapsedMs: 1, forkTestsPassed: true }),
-          git: (args) => (args.join(' ') === 'rev-parse HEAD' ? REVISION : null),
-          diff: () => null,
-          runnable: () => [SUITE_FILE],
-          quarantined: () => [],
-          forkTests: () => [FORK_TEST],
-          isolation: () => new Map()
-        }
-      }
-    )
+    const { result } = gateRun({
+      report: failingReport,
+      run: { status: 1 },
+      entries: [{ file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream' }]
+    })
     expect(result.counts).toEqual({ passed: 0, failed: 1, known: 1 })
     expect(result.unexpected).toEqual([])
     expect(result.problems).toEqual([])
@@ -130,11 +106,45 @@ describe('the exit a verdict composes', () => {
     // The hole G2 actually named: a report that describes less than the lane. The allowlisted red may
     // explain the exit; a missing file means the run proves nothing about the suite.
     const { result } = gateRun({
-      report: passingReport(),
+      report: failingReport,
       run: { status: 1 },
+      entries: [{ file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream' }],
       sources: { runnable: () => [SUITE_FILE, 'src/main/b.test.ts'] }
     })
+    expect(result.unexpected).toEqual([])
     expect(result.problems.join('\n')).toContain('does not name 1 file(s)')
+    expect(result.exitCode).toBe(1)
+  })
+
+  it('keeps a suite error whose re-run found a red the allowlist never saw', () => {
+    // The full run's suite row replaced the named cases, so a red that appears only in isolation was
+    // never judged. Waiving the row as a load flake would pass it.
+    const suiteReport = {
+      numTotalTests: 0,
+      numFailedTests: 0,
+      testResults: [{ name: SUITE_FILE, status: 'failed', message: 'collect failed' }]
+    }
+    const { result } = gateRun({
+      report: suiteReport,
+      run: { status: 1 },
+      sources: {
+        diff: () => ({ base: 'base', files: new Set(['src/main/unrelated.ts']) }),
+        isolation: (files) =>
+          new Map(
+            files.map((file) => [
+              file,
+              {
+                complete: true,
+                failures: new Set(['foo']),
+                passes: new Set(),
+                filePassed: false
+              }
+            ])
+          )
+      }
+    })
+    expect(result.flaky).toEqual([])
+    expect(result.unexpected.map((failure) => failure.test)).toEqual(['(suite)'])
     expect(result.exitCode).toBe(1)
   })
 

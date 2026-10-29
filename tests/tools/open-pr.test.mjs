@@ -486,7 +486,7 @@ it('names what a refused review claim is missing', () => {
   })
   expect(reviewClaim('Reviewed by Opus 5.5, high: R1 found 2 blockers')).toMatchObject({
     ok: false,
-    reason: expect.stringContaining('without saying they were fixed')
+    reason: expect.stringContaining('closing verb beside it')
   })
   expect(reviewClaim('Reviewed by Opus 5.5, high: R1 (2 blocking fixed), R2')).toMatchObject({
     ok: false,
@@ -498,15 +498,19 @@ it('names what a refused review claim is missing', () => {
   })
 })
 
-it('refuses a claim whose blocker count is not closed by the same clause', () => {
+it('refuses a claim whose blocker count is not closed where it is counted', () => {
   for (const claim of [
     // `clean` elsewhere in the line used to satisfy the round without closing these findings.
     'Reviewed by Opus 5.5, high: R1 found 2 blockers, everything else clean',
-    // The closing verb is in the next clause, not this one.
+    // The closing verb is in the next clause, not beside the count.
     'Reviewed by Opus 5.5, high: R1 (2 blocking, 1 fixed)',
+    'Reviewed by Opus 5.5, high: R1 (3 blocking: 1 fixed)',
+    'Reviewed by Opus 5.5, high: R1 2 blockers found and 1 fixed',
+    'Reviewed by Opus 5.5, high: R1 (2 blockers - one fixed)',
     // A count that says what is left open in another word.
     'Reviewed by Opus 5.5, high: R1 (2 blocking fixed, 1 deferred)',
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), follow-up filed for the rest'
+    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), follow-up filed for the rest',
+    'Reviewed by Opus 5.5, high: R1 1 SHOULD-FIX open, R1 clean'
   ]) {
     expect(reviewClaim(claim), claim).toMatchObject({ ok: false })
   }

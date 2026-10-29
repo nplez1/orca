@@ -189,16 +189,26 @@ export function rerunReportsFor(report, files) {
  * entry, a failing `beforeAll` reports its cases as skipped. Only a pass waives a failure, and a
  * pass does not waive one the same report also failed or a hook broke under.
  */
-export function reproducedFailures(failures, rerun) {
+export function reproducedFailures(
+  failures,
+  rerun,
+  { known = new Set(), fileCovered = false } = {}
+) {
   if (!rerun.complete) {
     return failures
   }
   return failures.filter((failure) => {
     if (failure.test === '(suite)') {
-      // Why the suite row itself: a file that holds an allowlisted always-red test fails in isolation
-      // too, so `!filePassed` would make a one-off teardown error unwaivable for ever. Only the same
-      // suite-level error coming back is the failure reproducing.
-      return rerun.failures.has('(suite)')
+      // Why not `filePassed`: a file that holds an allowlisted always-red test fails in isolation too,
+      // so that would make a one-off teardown error unwaivable for ever.
+      if (rerun.failures.has('(suite)')) {
+        return true
+      }
+      // Why the re-run's other failures as well: the suite row replaces the named cases in the full
+      // run, so a test that only appears in isolation was never judged against the allowlist. Waiving
+      // the row would pass a real red nobody read. A file-level entry covers every case, so there the
+      // named failures are known and the row alone is what is being waived.
+      return fileCovered ? false : [...rerun.failures].some((test) => !known.has(test))
     }
     return (
       !rerun.passes.has(failure.test) ||
