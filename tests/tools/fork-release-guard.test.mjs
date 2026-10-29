@@ -183,6 +183,20 @@ describe('the release dispatch guard', () => {
     expect(result.stdout).toContain('does not exist yet')
   })
 
+  // A stray tag sorts first under git's version sort — `np.41-hotfix` beats `np.9` — and the guard
+  // can only compare versions it can parse, so one of them would refuse every release from then on.
+  it('ignores a tag that is not an np.<n> release when it looks for the newest', () => {
+    const { run, sha } = scenario({
+      target: 'missing',
+      tag: 'v1.2.3-np.10',
+      existingTags: ['v1.2.3-np.9', 'v1.2.3-np.41-hotfix']
+    })
+    const result = run(['refs/heads/nplez1/main', 'v1.2.3-np.10', sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('above the newest published release v1.2.3-np.9')
+  })
+
   it('refuses a bad suffix on a re-dispatch too', () => {
     // A re-dispatch publishes into the same tag, so it has to fail for the same reason a new tag
     // would — the shape check never depends on the tag being new.

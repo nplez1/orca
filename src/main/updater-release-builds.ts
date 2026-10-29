@@ -150,7 +150,8 @@ function parseReleaseEntry(
   }
 }
 
-// REST exposes older builds the short Atom feed omits; use only for explicit picker requests.
+// The picker wants every published build, which the resolver's newest-first page of releases does not
+// give it. Both read the same REST endpoint, so both spend the same per-IP quota.
 export async function listReleaseBuilds(
   channel: ReleaseChannel,
   platform: NodeJS.Platform = process.platform,

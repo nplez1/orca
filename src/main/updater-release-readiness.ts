@@ -1,12 +1,11 @@
 import { net } from 'electron'
 import { parse } from 'yaml'
 import {
+  FETCH_TIMEOUT_MS,
+  getPlatformManifestName,
   getReleaseAssetUrl,
-  getReleaseDownloadUrl,
-  getPlatformManifestName
+  getReleaseDownloadUrl
 } from './updater-release-targets'
-
-const FETCH_TIMEOUT_MS = 5000
 
 /** Whether a tag has the platform manifest and installer assets an installed build could fetch. */
 export type ReleaseReadiness = 'ready' | 'not-ready' | 'unavailable'

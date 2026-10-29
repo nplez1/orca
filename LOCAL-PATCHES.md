@@ -152,6 +152,16 @@ Anchors:
   probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
   restores the single file has to take these two with it.
 
+Two upstream-owned files also diverge here, and neither is a `local(...)` patch — they are fixes
+upstream would want, recorded so the next sync does not quietly undo them:
+
+- `src/shared/release-channel.ts` — `PLATFORM_UPDATE_MANIFESTS` holds one manifest per platform and
+  `getPlatformUpdateManifestName(platform, arch)` replaces `getUpdateManifestNamesForPlatform`, so a
+  Linux release's manifest is matched to the running architecture rather than "either arch counts".
+  Upstream's array-valued table accepts `latest-linux-arm64.yml` on an x64 build and vice versa.
+- `src/shared/app-version.ts` — `isForkReleaseAppVersion` (`-np.<n>`, and nothing else). It is what
+  lets `releases/latest` resolve this fork's own release line.
+
 The probe window above is history worth keeping: it is why every newer candidate is probed rather
 than a fixed six, and the fault it fixed — a manifest-less entry hiding this repo's release behind it
 — is the same one the release list now removes at the source. Upstream never needs any of this, so it

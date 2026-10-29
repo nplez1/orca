@@ -195,13 +195,18 @@ summary-less release went live whenever the generator could not produce one.
 `gh release edit --draft=false` at the end of the linux job makes it public, which is the window for
 exactly this check — and the guard above is what now refuses a body with no summary. **A release does
 not go public without the change summary**: the body must carry `## What changed` for the range since
-the previous `-np.` tag. A minimal body means the generator did not run, and the run fails before the
-draft exists: read its warning in the run log, fix the cause, and re-run the workflow, or write the
-notes by hand with `gh release edit v<version> --notes-file notes.md` (the second run then passes the
-same guard). An install-only body is the failure the generator replaced, not an acceptable fallback.
+the previous `-np.` tag. When the guard refuses, nothing has gone public: on the generated notes it
+stops before a draft or a tag exists, so there is nothing to edit afterwards, and on the draft it
+leaves the release a draft no installed build can see. The recovery is the cause, not the body — the
+generator's own warning is in the same step's log, and a shallow clone or a missing previous tag is
+the usual one. Fix it and dispatch again. An install-only body is the failure the generator replaced,
+not an acceptable fallback.
+
 Reading the draft is still worth doing, because the guard proves a summary _exists_, not that it is
 right — a generator bug or a mis-resolved previous tag is exactly what a reader catches and no check
-can.
+can. A body that is present but wrong is an edit, not a refusal: `gh release edit v<version>
+--notes-file notes.md` before it goes live, and the linux job's check runs on whatever the body then
+says.
 
 ```bash
 gh release view v<version> --repo nplez1/orca --json body --jq .body | less

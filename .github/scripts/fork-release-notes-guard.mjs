@@ -16,7 +16,7 @@ import { pathToFileURL } from 'node:url'
 // The generator emits `## What changed` for a first release and `## What changed since <tag>` otherwise.
 const SUMMARY_HEADING = /^## What changed/m
 // Its own last-resort body when history is unusable. It carries the heading, so only its text says so.
-const FALLBACK_MARKER = /A change summary could not be generated/
+const FALLBACK_MARKER = /^\*\*A change summary could not be generated/m
 export const MIN_SUMMARY_BYTES = 400
 
 /** `ok` with the reason, so the caller only has to decide how to fail. */
@@ -68,8 +68,10 @@ function main(argv) {
   if (!result.ok) {
     process.stderr.write(
       `::error::refusing to publish: ${label} has no usable change summary — ${result.reason}. ` +
-        "Nothing has gone public. Read the step's warning or the generator's output, fix the cause and " +
-        're-run, or write the notes by hand with `gh release edit <tag> --notes-file notes.md`.\n'
+        'Nothing has gone public. On the generated notes this stops before a draft or a tag exists, ' +
+        'so there is nothing to edit afterwards; on the draft it leaves the release a draft, which no ' +
+        "installed build can see. Fix the cause (the generator's warning is in the same step's log — a " +
+        'shallow clone or a missing previous tag is the usual one) and dispatch again.\n'
     )
     return 1
   }

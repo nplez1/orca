@@ -32,8 +32,11 @@ fi
 
 # Why the tag on the version check: electron-builder creates the tag when it publishes, so the tags
 # in this checkout are the releases this fork already published. `v:refname` is git's own version
-# sort, so no second opinion on ordering is coded here.
-newest_tag="$(git tag -l 'v*-np.*' --sort=-v:refname 2>/dev/null | head -1 || true)"
+# sort, so no second opinion on ordering is coded here — but the shape is filtered first, because one
+# stray tag (`v1.4.214-np.41-hotfix`) sorting first would make every later release uncomparable.
+newest_tag="$(git tag -l 'v[0-9]*-np.*' --sort=-v:refname 2>/dev/null \
+  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-np\.[0-9]+$' \
+  | head -1 || true)"
 
 errors="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/fork-release-guard.XXXXXX")"
 # Why the error file: "the release is missing" and "gh could not tell me" are different answers, and
