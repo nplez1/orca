@@ -11,6 +11,7 @@ import {
 import { sep } from 'node:path'
 import type { RuntimeStore as Store } from '../../runtime/runtime-store-contract'
 import { resolveAuthorizedPath } from './filesystem-auth'
+import { isFolderProjectRoot } from '../folder-project-root'
 import { toWindowsWslPath } from '../../../shared/wsl-paths'
 import { resolveBundledRipgrepWslRouting } from '../../ripgrep/bundled-ripgrep-wsl-routing'
 import { getLocalGitOptionsForRegisteredWorktree } from '../local-worktree-runtime-options'
@@ -81,7 +82,8 @@ export async function listQuickOpenFiles(
     followSymlinks: options.followSymlinks,
     excludePathPrefixes,
     // Normalize Windows output to forward slashes.
-    forceSlashSeparator: sep === '\\'
+    forceSlashSeparator: sep === '\\',
+    isFolderProject: isFolderProjectRoot(store, rootPath, authorizedRootPath)
   })
 
   const runRg = (args: string[]): Promise<void> =>

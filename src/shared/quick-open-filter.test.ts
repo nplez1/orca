@@ -158,17 +158,6 @@ describe('buildRgArgsForQuickOpen', () => {
     expect(ignoredPass).not.toContain('--follow')
   })
 
-  it('forceSlashSeparator emits --path-separator /', () => {
-    const { primary } = buildRgArgsForQuickOpen({
-      searchRoot: '/r',
-      excludePathPrefixes: [],
-      forceSlashSeparator: true
-    })
-    const idx = primary.indexOf('--path-separator')
-    expect(idx).toBeGreaterThanOrEqual(0)
-    expect(primary[idx + 1]).toBe('/')
-  })
-
   it('excludePathPrefixes are escaped as directory-match globs', () => {
     const { primary } = buildRgArgsForQuickOpen({
       searchRoot: '/r',
@@ -179,6 +168,40 @@ describe('buildRgArgsForQuickOpen', () => {
     expect(primary).toContain('!packages/app/**')
     // Glob metacharacters in a literal name must be escaped.
     expect(primary).toContain('!feature\\[1\\]')
+  })
+
+  it("keeps an enclosing checkout's ignore files out of a folder project", () => {
+    const { primary, ignoredPass } = buildRgArgsForQuickOpen({
+      searchRoot: '.',
+      excludePathPrefixes: [],
+      forceSlashSeparator: false,
+      isFolderProject: true
+    })
+
+    expect(primary).toContain('--no-ignore-parent')
+    expect(ignoredPass).toContain('--no-ignore-parent')
+  })
+
+  it('leaves parent ignore files in force for a checkout that has its own repo', () => {
+    const { primary, ignoredPass } = buildRgArgsForQuickOpen({
+      searchRoot: '.',
+      excludePathPrefixes: [],
+      forceSlashSeparator: false
+    })
+
+    expect(primary).not.toContain('--no-ignore-parent')
+    expect(ignoredPass).not.toContain('--no-ignore-parent')
+  })
+
+  it('forceSlashSeparator emits --path-separator /', () => {
+    const { primary } = buildRgArgsForQuickOpen({
+      searchRoot: '/r',
+      excludePathPrefixes: [],
+      forceSlashSeparator: true
+    })
+    const idx = primary.indexOf('--path-separator')
+    expect(idx).toBeGreaterThanOrEqual(0)
+    expect(primary[idx + 1]).toBe('/')
   })
 })
 

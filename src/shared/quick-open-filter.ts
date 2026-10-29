@@ -148,6 +148,8 @@ export type RgArgsOptions = {
   excludePathPrefixes: readonly string[]
   /** On Windows rg emits `\\`-separated paths; pass true to force `/` output. */
   forceSlashSeparator: boolean
+  /** A folder project has no repo, so an enclosing checkout's ignore files are not its own. */
+  isFolderProject?: boolean
 }
 
 export type RgArgs = {
@@ -162,6 +164,9 @@ export type RgArgs = {
 export function buildRgArgsForQuickOpen(opts: RgArgsOptions): RgArgs {
   const followArgs = opts.followSymlinks ? ['--follow'] : []
   const sepArgs = opts.forceSlashSeparator ? ['--path-separator', '/'] : []
+  // Why: a folder project inside a git checkout would otherwise be classified by the parent repo's
+  // .gitignore (`*.log`, `dist/`), which says nothing about this workspace's files.
+  const parentIgnoreArgs = opts.isFolderProject ? ['--no-ignore-parent'] : []
   const hiddenDirGlobs = buildHiddenDirExcludeGlobs()
   const excludeGlobs: string[] = []
   for (const prefix of opts.excludePathPrefixes) {
@@ -175,6 +180,7 @@ export function buildRgArgsForQuickOpen(opts: RgArgsOptions): RgArgs {
     '--no-config',
     '--null',
     '--hidden',
+    ...parentIgnoreArgs,
     ...followArgs,
     ...sepArgs,
     ...hiddenDirGlobs,
@@ -189,6 +195,7 @@ export function buildRgArgsForQuickOpen(opts: RgArgsOptions): RgArgs {
     '--null',
     '--hidden',
     '--no-ignore-vcs',
+    ...parentIgnoreArgs,
     ...followArgs,
     ...sepArgs,
     ...hiddenDirGlobs,

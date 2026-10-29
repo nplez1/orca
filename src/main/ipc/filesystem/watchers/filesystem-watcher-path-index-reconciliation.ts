@@ -9,6 +9,7 @@ import {
 } from '../../../../shared/cross-platform-path'
 import { buildRgArgsForQuickOpen } from '../../../../shared/quick-open-filter'
 import type { WorkspacePathSearchCorrelationId } from '../../../../shared/workspace-path-search-instrumentation'
+import { isFolderProjectRoot } from '../../folder-project-root'
 import { getLocalGitOptionsForRegisteredWorktree } from '../../local-worktree-runtime-options'
 import {
   applyLocalWorkspacePathIndexDelta,
@@ -85,7 +86,8 @@ export async function reconcileLocalWorkspacePathIndexEvents(
       const rgArgs = buildRgArgsForQuickOpen({
         searchRoot: relativePath,
         excludePathPrefixes: [],
-        forceSlashSeparator: process.platform === 'win32'
+        forceSlashSeparator: process.platform === 'win32',
+        isFolderProject: isFolderProjectRoot(store, rootPath)
       })
       await scanScope('included', rgArgs.primary)
       await scanScope('all', rgArgs.ignoredPass)
