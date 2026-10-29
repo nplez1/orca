@@ -201,6 +201,11 @@ export abstract class OrcaRuntimeWithEmitDaemonPtyTransientFact extends OrcaRunt
     return isCursorNativeAgentTitle(rawTitle) && meta?.staleWorkingTitleClear !== true
   }
 
+  /** The title a pane's tracker currently shows, for callers outside the runtime's own lanes. */
+  getTrackedPtyTitle(ptyId: string): string | null {
+    return this.getTrackedDisplayTitleForPty(ptyId)
+  }
+
   /** Display fallback for identities intentionally omitted from liveness records. */
   protected getTrackedDisplayTitleForPty(ptyId: string): string | null {
     return (
