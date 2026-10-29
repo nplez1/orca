@@ -5,7 +5,8 @@ import { RuntimeClientError } from '../runtime-client'
 import { parseOrcaYaml } from '../../shared/orca-yaml'
 import {
   getEphemeralVmRecipeResultProjectRoot,
-  type EphemeralVmRecipeDoctorCheck
+  type EphemeralVmRecipeDoctorCheck,
+  type EphemeralVmRecipeResult
 } from '../../shared/ephemeral-vm-recipes'
 import { getEphemeralVmRecipeResultWarnings } from '../../shared/ephemeral-vm-recipe-diagnostics'
 // Why: import directly from the doctor module (not the barrel) — it uses Node
@@ -73,14 +74,18 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
         : { recipeId, repoPath, ok: false as const, error: loaded.error }
     const writeResultPath = getStringFlag(flags, 'write-result')
     const resultPath = writeResultPath ? resolve(cwd, writeResultPath) : null
-    const writeFailure =
+    const write =
       resultPath && result.ok && result.recipeResult
         ? writeEphemeralVmRecipeResultFile(resultPath, result.recipeResult)
         : null
-    if (writeFailure) {
+    if (write && !write.written) {
       // Why still report the result: the hook has already moved the lease, so this output is the
       // only place the deadline that now exists can be read.
-      console.error(`warning: could not write ${resultPath}: ${writeFailure}`)
+      console.error(`warning: could not write ${resultPath}: ${write.error}`)
+    } else if (write && !write.restricted) {
+      console.error(
+        `warning: wrote ${resultPath}, but could not restrict its permissions to this user`
+      )
     }
     if (json) {
       const sensitive = describeSensitiveExtendResult(result)
@@ -92,7 +97,7 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
       console.log(
         formatExtendEphemeralVmRecipeResult(
           result,
-          resultPath && !writeFailure ? { resultPath } : {}
+          write?.written ? { resultPath: write.path } : {}
         )
       )
     } else {
@@ -100,7 +105,7 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
       // capture an error a destroy hook would then try to parse.
       console.error(formatExtendEphemeralVmRecipeResult(result))
     }
-    if (!result.ok || writeFailure) {
+    if (!result.ok || (write && !write.written)) {
       process.exitCode = 1
     }
   },
@@ -309,8 +314,6 @@ function loadRecipe(
     ? { recipe }
     : { error: `Recipe "${recipeId}" was not found in environmentRecipes.` }
 }
-
-/** Writes the updated result so a destroy hook — or a second `extend` — can consume it. */
 
 /**
  * What to tell the reader after a create that reported a failure.

@@ -69,6 +69,25 @@ describe('POSIX secure files', () => {
     expect(statMode(userDataPath)).toBe(0o700)
   })
 
+  posixModeIt('leaves the directory alone when the caller says so, and needs it to exist', () => {
+    // Why: a caller writing into a directory it does not own — a repo checkout, a shared /tmp —
+    // cannot afford the parent being hardened to 0700 under it.
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
+    const parent = tempDir()
+    chmodSync(parent, 0o755)
+    const targetPath = join(parent, 'secret.json')
+
+    expect(writeSecureFile(targetPath, 'contents', { hardenDirectory: false })).toBe(true)
+
+    expect(statMode(targetPath)).toBe(0o600)
+    expect(statMode(parent)).toBe(0o755)
+    // The parent is the caller's, so it is not created either.
+    expect(() =>
+      writeSecureFile(join(parent, 'absent', 'secret.json'), 'contents', { hardenDirectory: false })
+    ).toThrow()
+    expect(statMode(parent)).toBe(0o755)
+  })
+
   posixModeIt('re-hardens a POSIX directory when its metadata changes after caching', () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
     const userDataPath = tempDir()

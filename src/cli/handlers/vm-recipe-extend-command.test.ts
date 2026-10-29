@@ -172,7 +172,7 @@ describe('orca vm recipe extend', () => {
     expect(stdout.join('\n')).not.toContain('"connection"')
     if (process.platform !== 'win32') {
       expect(statSync(extendedPath).mode & 0o777).toBe(0o600)
-      // Why: the shared secure-write helpers also chmod the parent to 0700, which would
+      // Why: the shared secure-write helper also chmods the parent to 0700, which would
       // silently lock down the directory the caller wrote into.
       expect(statSync(caller).mode & 0o777).toBe(0o755)
     }

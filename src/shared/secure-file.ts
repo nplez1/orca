@@ -109,18 +109,22 @@ export function writeDurableSecureJsonFile(targetPath: string, value: unknown): 
 
 /** Publish a staged file and return whether user-only file permissions hold. Windows addon creates restricted or throws;
  * without it, plain best-effort writes report false, as do filesystems dropping restrictions.
- * shouldPublish may discard the hardened stage. Windows parent hardening may finish later; true says nothing about its ACL. */
+ * shouldPublish may discard the hardened stage. Windows parent hardening may finish later; true says nothing about its ACL.
+ * `hardenDirectory: false` restricts the file only, for a caller writing into a directory it does not own; the
+ * directory must already exist then, because creating it is what would leave the caller unable to reach it again. */
 export function writeSecureFile(
   targetPath: string,
   contents: string,
-  options: { durable?: boolean; shouldPublish?: () => boolean } = {}
+  options: { durable?: boolean; shouldPublish?: () => boolean; hardenDirectory?: boolean } = {}
 ): boolean {
   const dir = dirname(targetPath)
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true, mode: 0o700 })
+  if (options.hardenDirectory !== false) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true, mode: 0o700 })
+    }
+    // Windows dir hardening stays async + path-cached (it stormed the main thread, #4901); POSIX keeps the metadata cache to catch chmod/ctime drift.
+    hardenSecurePathOnce(dir, true)
   }
-  // Windows dir hardening stays async + path-cached (it stormed the main thread, #4901); POSIX keeps the metadata cache to catch chmod/ctime drift.
-  hardenSecurePathOnce(dir, true)
 
   const tmpFile = `${targetPath}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`
   try {

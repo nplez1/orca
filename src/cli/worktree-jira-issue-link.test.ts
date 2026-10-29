@@ -266,6 +266,28 @@ describe('resolveJiraIssueLinkUpdates', () => {
     ).rejects.toThrow(/socket hang up/)
   })
 
+  it('names the read it could not finish, and keeps the transport code', async () => {
+    const rpc = client({
+      sites: [ACME],
+      lookupThrows: new RuntimeClientError('runtime_timeout', 'jira_summary_lookup:auth:401')
+    })
+
+    const failure = await resolveJiraIssueLinkUpdates({
+      value: 'ABC-1',
+      client: rpc,
+      hostId: 'local'
+    }).catch((error: unknown) => error)
+
+    // The code stays the transport's, so a script can still tell this apart from a bad key.
+    expect(failure).toMatchObject({
+      code: 'runtime_timeout',
+      message: expect.stringContaining("Couldn't read ABC-1 from Acme")
+    })
+    expect(failure).toMatchObject({
+      message: expect.stringContaining('jira_summary_lookup:auth:401')
+    })
+  })
+
   it('keeps an auth failure as an auth failure', async () => {
     const rpc = client({
       sites: [ACME],

@@ -330,7 +330,11 @@ describe('writeEphemeralVmRecipeResultFile', () => {
     }
     const target = join(dir, 'extended.json')
 
-    expect(writeEphemeralVmRecipeResultFile(target, parsed.result)).toBeNull()
+    expect(writeEphemeralVmRecipeResultFile(target, parsed.result)).toEqual({
+      written: true,
+      path: target,
+      restricted: process.platform !== 'win32'
+    })
 
     expect(statSync(target).size).toBeGreaterThan(0)
     if (process.platform !== 'win32') {
@@ -350,7 +354,7 @@ describe('writeEphemeralVmRecipeResultFile', () => {
 
     const failure = writeEphemeralVmRecipeResultFile(join(dir, 'absent', 'x.json'), parsed.result)
 
-    expect(failure).toBeTruthy()
+    expect(failure).toMatchObject({ written: false })
     expect(existsSync(join(dir, 'absent'))).toBe(false)
   })
 })

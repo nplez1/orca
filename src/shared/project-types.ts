@@ -136,8 +136,8 @@ export type ProjectHostSetupCreateResult = {
   project: Project
   setup: ProjectHostSetup
   /** The host-wide placement mode the call left in effect, present only when the call carried
-   *  one. A host that predates the field strips it, which is how a caller tells that its
-   *  `worktreeLayoutMode` was ignored rather than applied. */
+   *  one. A host that answers without it — a build from before the field — cannot confirm the
+   *  mode, which is different from reporting one that differs. */
   worktreeLayoutMode?: WorktreeLayoutMode
 }
 

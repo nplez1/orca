@@ -49,6 +49,6 @@ export function confirmWorktreeLayoutApplied(
   }
   throw new RuntimeClientError(
     'incompatible_runtime',
-    `This host did not apply --worktree-layout ${requested}: it kept ${reported}. Update Orca on that host, or set the mode in its settings.`
+    `This host did not apply --worktree-layout ${requested}: it kept ${reported}. Any other change in this call did apply; update Orca on that host, or set the mode in its settings.`
   )
 }

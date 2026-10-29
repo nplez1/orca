@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import {
   getEphemeralVmLifetimeLossError,
   getEphemeralVmRecipeResultLifetime,
@@ -6,6 +6,7 @@ import {
   parseEphemeralVmRecipeResult,
   type EphemeralVmRecipeResult
 } from '../shared/ephemeral-vm-recipes'
+import { writeSecureFile } from '../shared/secure-file'
 import { redactEphemeralVmRecipeDiagnosticText } from '../shared/ephemeral-vm-recipe-diagnostics'
 import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lifetime'
 import { runEphemeralVmRecipeExtend } from '../shared/ephemeral-vm-recipe-extend-runner'
@@ -236,27 +237,23 @@ export function describeSensitiveExtendResult(
 
 /** Publishes the updated result where a destroy hook — or a second `extend` — reads it.
  *
- *  Atomic and 0600, but the file only: the shared secure-write helpers also harden the *parent*
- *  directory to 0700, which would silently lock down the repo directory the caller wrote into
- *  (and throw on a parent they do not own). The failure is returned rather than thrown, because
- *  the hook has already moved the lease and the caller still has to see what it produced.
- *
- *  Returns the failure message, or null when the file holds the result. */
+ *  Restricted to the caller (0600, or the Windows ACL), because it carries the connection verbatim.
+ *  The stage-and-rename hardens the *file* only: hardening the parent directory to 0700 would
+ *  silently lock down the repo directory the caller wrote into, and throw on one they do not own.
+ *  The failure is reported rather than thrown, because the hook has already moved the lease and
+ *  the caller still has to see what it produced. */
 export function writeEphemeralVmRecipeResultFile(
   path: string,
   result: EphemeralVmRecipeResult
-): string | null {
-  const temporary = `${path}.${process.pid}.tmp`
+): { written: true; path: string; restricted: boolean } | { written: false; error: string } {
   try {
-    writeFileSync(temporary, JSON.stringify(result, null, 2), { mode: 0o600 })
-    // The umask can strip bits from `mode` but never add them; chmod sets exactly 0o600.
-    chmodSync(temporary, 0o600)
-    // The rename publishes the staged inode, so the mode above is the published file's.
-    renameSync(temporary, path)
-    return null
+    const restricted = writeSecureFile(path, JSON.stringify(result, null, 2), {
+      durable: true,
+      hardenDirectory: false
+    })
+    return { written: true, path, restricted }
   } catch (error) {
-    rmSync(temporary, { force: true })
-    return error instanceof Error ? error.message : String(error)
+    return { written: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 

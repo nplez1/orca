@@ -84,7 +84,15 @@ export function applyAndReportWorktreeLayoutMode<T extends object>(
   if (!requested) {
     return result
   }
-  applyProjectSetupWorktreeLayoutMode(deps, requested)
+  try {
+    applyProjectSetupWorktreeLayoutMode(deps, requested)
+  } catch (error) {
+    // Why named: by now the setup write has landed, so "runtime_unavailable" alone would read as
+    // if nothing had happened.
+    throw new Error(
+      `The project setup was written, but the host-wide layout mode was not: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
   const settings = deps.getStore()?.getSettings?.()
   return settings ? { ...result, worktreeLayoutMode: resolveWorktreeLayoutMode(settings) } : result
 }
