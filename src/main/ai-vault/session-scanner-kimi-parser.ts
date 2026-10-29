@@ -31,9 +31,8 @@ export async function parseKimiSessionFile(
 ): Promise<AiVaultSession | null> {
   let stateRecord: Record<string, unknown> | null
   try {
-    stateRecord = asRecord(
-      JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal)) as unknown
-    )
+    const raw: unknown = JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal))
+    stateRecord = asRecord(raw)
   } catch (error) {
     // An oversized state file is a fact about the session, not an absent one.
     if (error instanceof NodeFileReadTooLargeError) {

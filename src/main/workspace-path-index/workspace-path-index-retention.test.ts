@@ -1,19 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { WorkspacePathIndexEntry } from './workspace-path-index-lease'
+import {
+  createWorkspacePathIndexEntry,
+  type WorkspacePathIndexEntry
+} from './workspace-path-index-lease'
 import { WorkspacePathIndexRetention } from './workspace-path-index-retention'
 
 /** Why: the last root a session closes used to keep its catalog until some other lease released. */
 
 const RETENTION_MS = 5 * 60_000
+const OWNER = {
+  executionHost: { provider: 'local', incarnationId: 'retention-test-host' },
+  authorizedCanonicalRoot: '/repo/app'
+}
 
 function entry(key: string, lastUsedAt: number): WorkspacePathIndexEntry {
-  // SAFETY: retention reads only `key`, `leases`, and `lastUsedAt`; the rest is unreachable here.
-  return {
-    key,
-    owner: {},
-    leases: new Set<string>(),
-    lastUsedAt
-  } as unknown as WorkspacePathIndexEntry
+  const created = createWorkspacePathIndexEntry(key, OWNER)
+  created.lastUsedAt = lastUsedAt
+  return created
 }
 
 function harness(): {

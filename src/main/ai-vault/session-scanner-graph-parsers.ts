@@ -63,9 +63,8 @@ export async function parseRovoSessionFile(
   messages?: TranscriptMessageSink,
   signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
-  const metadata = asRecord(
-    JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal)) as unknown
-  )
+  const raw: unknown = JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal))
+  const metadata = asRecord(raw)
   if (!metadata) {
     return null
   }

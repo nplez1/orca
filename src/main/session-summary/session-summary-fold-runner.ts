@@ -20,8 +20,10 @@ import {
 } from './session-summary-fold'
 import { IDLE_FOLD, type SessionSummaryStatusEntry } from './session-summary-snapshot'
 import type { SessionSummaryStore, SessionSummaryStoreEntry } from './session-summary-store'
-import type { SessionSummarySessionIdentity } from './session-summary-transcript-source'
-import type { SessionSummaryEventRead } from './session-summary-transcript-source'
+import type {
+  SessionSummaryEventRead,
+  SessionSummarySessionIdentity
+} from './session-summary-transcript-source'
 import type { SessionSummaryTranscriptHost } from './session-summary-transcript-host'
 
 export type SessionSummaryFoldRunnerDeps = {

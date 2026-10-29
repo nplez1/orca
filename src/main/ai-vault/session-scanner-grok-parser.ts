@@ -32,9 +32,8 @@ export async function parseGrokSessionFile(
   messages?: TranscriptMessageSink,
   signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
-  const record = asRecord(
-    JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal)) as unknown
-  )
+  const raw: unknown = JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal))
+  const record = asRecord(raw)
   if (!record) {
     return null
   }
