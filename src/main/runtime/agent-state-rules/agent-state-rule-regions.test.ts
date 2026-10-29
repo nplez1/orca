@@ -193,16 +193,31 @@ describe('the bundled Codex text anchors', () => {
 })
 
 describe('the bundled title anchors', () => {
-  it.each(['✳ Claude Code', '* Claude Code', '◇  Ready (repo)', 'π - orca', 'OC | orca'])(
-    'reads %s as an explicit idle title',
-    (title) => {
-      expect(detectExplicitIdleStatusFromTitle(title)).toBe('idle')
-    }
-  )
+  it.each([
+    '✳ Claude Code',
+    '* Claude Code',
+    '◇  Ready (repo)',
+    'π - orca',
+    'OC | orca',
+    // Why `Pi` and `OMP`: a pi build and Orca's own renderer both rebrand the title to `Pi - <session>`,
+    // and OMP's owner label does the same for its panes.
+    'Pi - orca',
+    'OMP - orca'
+  ])('reads %s as an explicit idle title', (title) => {
+    expect(detectExplicitIdleStatusFromTitle(title)).toBe('idle')
+  })
 
   it('marks an agent rest title only when an anchor matches it', () => {
     expect(showsIdleTitleAnchor('✳ Claude Code')).toBe(true)
     expect(showsIdleTitleAnchor('Claude Code')).toBe(false)
+  })
+
+  it("does not read Orca's own permission label as pi's idle title", () => {
+    // Why: `Pi - action required` is shaped exactly like the idle title, so a brand-blind anchor
+    // would answer idle over a pane whose dialog is waiting.
+    expect(showsIdleTitleAnchor('Pi - action required')).toBe(false)
+    expect(showsIdleTitleAnchor('OMP - action required')).toBe(false)
+    expect(detectExplicitIdleStatusFromTitle('Pi - action required')).toBeNull()
   })
 
   it('leaves a name-only title to the agent idle-title rule', () => {
