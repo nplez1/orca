@@ -40,6 +40,15 @@ export function isPerfPrereleaseAppVersion(value: string): boolean {
   return parsed?.prerelease.some((identifier) => identifier.toLowerCase() === 'perf') ?? false
 }
 
+/** This fork's own release line, and the only suffix `fork-release.yml` may stamp. */
+const FORK_RELEASE_VERSION = /^\d+\.\d+\.\d+-np\.\d+$/
+
+/** Its releases are published as normal GitHub releases, not prereleases, so this is what a stable
+ *  check must accept from `releases/latest` without treating any other prerelease as one. */
+export function isForkReleaseAppVersion(value: string): boolean {
+  return FORK_RELEASE_VERSION.test(value)
+}
+
 function compareIdentifiers(left: string, right: string): number {
   const leftNumeric = /^\d+$/.test(left)
   const rightNumeric = /^\d+$/.test(right)

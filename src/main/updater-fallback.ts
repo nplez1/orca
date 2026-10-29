@@ -1,6 +1,7 @@
 import type { UpdateStatus } from '../shared/update-status-types'
 import {
   compareAppVersions,
+  isForkReleaseAppVersion,
   isPrereleaseAppVersion,
   isValidAppVersion
 } from '../shared/app-version'
@@ -8,6 +9,7 @@ import {
 export const compareVersions = compareAppVersions
 export const isPrereleaseVersion = isPrereleaseAppVersion
 export const isValidVersion = isValidAppVersion
+export const isForkReleaseVersion = isForkReleaseAppVersion
 
 export function statusesEqual(left: UpdateStatus, right: UpdateStatus): boolean {
   if (left.source !== right.source) {

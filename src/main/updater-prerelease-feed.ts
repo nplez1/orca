@@ -1,42 +1,29 @@
 import { net } from 'electron'
-import { parse } from 'yaml'
-import { compareVersions, isPrereleaseVersion, isValidVersion } from './updater-fallback'
+import { FETCH_TIMEOUT_MS, RELEASES_REPO } from './updater-release-targets'
+import { getPlatformManifestReadiness, requestGitHubReleaseHead } from './updater-release-readiness'
+import {
+  compareVersions,
+  isForkReleaseVersion,
+  isPrereleaseVersion,
+  isValidVersion
+} from './updater-fallback'
 
-const ATOM_FEED_URL = 'https://github.com/nplez1/orca/releases.atom'
-const RELEASES_DOWNLOAD_BASE = 'https://github.com/nplez1/orca/releases/download'
-const FETCH_TIMEOUT_MS = 5000
+// Why callers keep importing this from here: the updater's tests mock this module wholesale, so the
+// surface they pin has to stay on it.
+export { getReleaseDownloadUrl } from './updater-release-targets'
+
+const RELEASES_API_URL = `https://api.github.com/repos/${RELEASES_REPO}/releases?per_page=100`
+const ATOM_FEED_URL = `https://github.com/${RELEASES_REPO}/releases.atom`
 // How many newer candidates are probed when the feed holds fewer than this. The tag after the
 // primary is the fallback feed a missing manifest walks back to, so the window must reach past
 // the primary even when nothing newer is left to probe.
 const MAX_MANIFEST_PROBE_CANDIDATES = 6
 
-// Why: GitHub's atom feed lists every release (prerelease or stable) in a
-// single flat list. Each entry has a /releases/tag/<tag> URL we can mine
-// without any channel filtering.
-const TAG_HREF_RE = /href="https:\/\/github\.com\/nplez1\/orca\/releases\/tag\/([^"]+)"/g
-
-export function getReleaseDownloadUrl(tag: string): string {
-  return `${RELEASES_DOWNLOAD_BASE}/${encodeURIComponent(tag)}`
-}
-
-function getPlatformManifestName(): string {
-  if (process.platform === 'darwin') {
-    return 'latest-mac.yml'
-  }
-  if (process.platform === 'linux') {
-    // Match electron-updater getChannelFilePrefix(): non-x64 Linux appends -${arch}.
-    return process.arch === 'x64' ? 'latest-linux.yml' : `latest-linux-${process.arch}.yml`
-  }
-  return 'latest.yml'
-}
-
-function getReleaseManifestUrl(tag: string): string {
-  return `${getReleaseDownloadUrl(tag)}/${getPlatformManifestName()}`
-}
-
-function getReleaseAssetUrl(tag: string, assetName: string): string {
-  return `${getReleaseDownloadUrl(tag)}/${encodeURIComponent(assetName)}`
-}
+// Each feed entry carries a /releases/tag/<tag> URL we can mine without any channel filtering.
+const TAG_HREF_RE = new RegExp(
+  `href="https://github\\.com/${RELEASES_REPO}/releases/tag/([^"]+)"`,
+  'g'
+)
 
 export function normalizeTagToVersion(tag: string): string {
   return tag.replace(/^v/i, '')
@@ -59,7 +46,73 @@ export function isPerfPrereleaseTag(tag: string): boolean {
   )
 }
 
+// Why the release list and not the feed: GitHub's atom feed lists *tags*, not releases, and caps
+// them at ten. A sync mirrors upstream's tags into this repo, so most of the ten are tags with no
+// release and no manifest in this repo — and the fork's own release is pushed out of the feed
+// entirely on a busy day, which every installed build reads as "no update available". The REST
+// list is this repo's releases only, up to a hundred of them, and a mirrored tag has no release.
+//
+// Why the atom feed is still here: an unauthenticated REST call shares a 60/hour per-IP quota, and
+// a rate-limited or offline client has to keep working. The feed is a smaller, noisier answer, not
+// a broken one.
 async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
+  const tags = (await fetchReleaseListTags()) ?? (await fetchReleaseAtomTags())
+  if (!tags) {
+    return null
+  }
+  tags.sort((left, right) => compareVersions(right.version, left.version))
+  return tags
+}
+
+type GitHubReleaseListEntry = {
+  tag_name?: unknown
+  draft?: unknown
+  assets?: unknown
+}
+
+async function fetchReleaseListTags(): Promise<ReleaseFeedTag[] | null> {
+  try {
+    const res = await net.fetch(RELEASES_API_URL, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    })
+    if (!res.ok) {
+      return null
+    }
+    const payload: unknown = JSON.parse(await res.text())
+    if (!Array.isArray(payload)) {
+      return null
+    }
+    const entries: (GitHubReleaseListEntry | null)[] = payload
+    const tags: ReleaseFeedTag[] = []
+    for (const entry of entries) {
+      // A bare tag has no release at all, but a draft or an asset-less release is the same dead
+      // end for the updater: there is nothing at releases/download/<tag> to pin a feed to.
+      if (
+        !entry ||
+        entry.draft === true ||
+        !Array.isArray(entry.assets) ||
+        entry.assets.length === 0
+      ) {
+        continue
+      }
+      const tag = typeof entry.tag_name === 'string' ? entry.tag_name : null
+      if (!tag) {
+        continue
+      }
+      const version = normalizeTagToVersion(tag)
+      if (!isValidVersion(version)) {
+        continue
+      }
+      tags.push({ tag, version })
+    }
+    return tags
+  } catch {
+    return null
+  }
+}
+
+async function fetchReleaseAtomTags(): Promise<ReleaseFeedTag[] | null> {
   try {
     const res = await net.fetch(ATOM_FEED_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
     if (!res.ok) {
@@ -76,153 +129,16 @@ async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
       }
     }
 
-    tags.sort((left, right) => compareVersions(right.version, left.version))
     return tags
   } catch {
     return null
   }
 }
 
-type ManifestAssetEntry = {
-  url?: unknown
-  path?: unknown
-}
-
-function getManifestAssetNames(manifestText: string): string[] {
-  const parsed = parse(manifestText) as {
-    files?: ManifestAssetEntry[]
-    path?: unknown
-  } | null
-
-  const names = new Set<string>()
-  for (const file of Array.isArray(parsed?.files) ? parsed.files : []) {
-    const value = typeof file.url === 'string' ? file.url : file.path
-    if (typeof value === 'string' && value.trim()) {
-      names.add(value.trim())
-    }
-  }
-  if (typeof parsed?.path === 'string' && parsed.path.trim()) {
-    names.add(parsed.path.trim())
-  }
-  return [...names]
-}
-
-type ReleaseReadiness = 'ready' | 'not-ready' | 'unavailable'
-
-type ReleaseHeadResponse = { statusCode: number; redirectUrl?: string }
-
-function requestGitHubReleaseHead(assetUrl: string): Promise<ReleaseHeadResponse | null> {
-  return new Promise((resolve) => {
-    const request = net.request({ method: 'HEAD', url: assetUrl, redirect: 'manual' })
-    let settled = false
-    const settle = (response: ReleaseHeadResponse | null): void => {
-      if (settled) {
-        return
-      }
-      settled = true
-      clearTimeout(timeout)
-      resolve(response)
-    }
-    const timeout = setTimeout(() => {
-      try {
-        request.abort()
-      } catch {
-        // The request may already have been cancelled by Electron.
-      }
-      settle(null)
-    }, FETCH_TIMEOUT_MS)
-
-    request.on('redirect', (statusCode, _method, redirectUrl) => {
-      // GitHub's redirect proves existence without fetching the signed storage URL.
-      settle({ statusCode, redirectUrl })
-    })
-    request.on('response', (response) => settle({ statusCode: response.statusCode }))
-    request.on('error', () => settle(null))
-    try {
-      request.end()
-    } catch {
-      settle(null)
-    }
-  })
-}
-
-async function getGitHubReleaseAssetReadiness(assetUrl: string): Promise<ReleaseReadiness> {
-  const response = await requestGitHubReleaseHead(assetUrl)
-  if (!response) {
-    return 'unavailable'
-  }
-  const ready =
-    response.redirectUrl !== undefined
-      ? response.statusCode >= 300 && response.statusCode < 400
-      : response.statusCode >= 200 && response.statusCode < 300
-  return response.statusCode === 404 ? 'not-ready' : ready ? 'ready' : 'unavailable'
-}
-
-async function getReleaseAssetReadiness(tag: string, assetName: string): Promise<ReleaseReadiness> {
-  const isRelativeAsset = !/^https?:\/\//i.test(assetName)
-  const isGitHubReleaseAsset =
-    process.platform === 'win32' &&
-    (isRelativeAsset ||
-      /^https:\/\/github\.com\/nplez1\/orca\/releases\/download\//i.test(assetName))
-  const assetUrl = isRelativeAsset
-    ? getReleaseAssetUrl(tag, assetName.split('/').findLast(Boolean) ?? assetName)
-    : assetName
-  if (isGitHubReleaseAsset) {
-    return getGitHubReleaseAssetReadiness(assetUrl)
-  }
-
-  try {
-    const res = await net.fetch(assetUrl, {
-      method: 'HEAD',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-    })
-    if (res.status === 404) {
-      return 'not-ready'
-    }
-    return res.ok ? 'ready' : 'unavailable'
-  } catch {
-    return 'unavailable'
-  }
-}
-
-async function getPlatformManifestReadiness(tag: string): Promise<ReleaseReadiness> {
-  try {
-    // Feed entries may precede manifests or installer assets; do not offer downloads that would 404.
-    const manifestUrl = getReleaseManifestUrl(tag)
-    const res = await net.fetch(manifestUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
-    if (res.status === 404) {
-      return 'not-ready'
-    }
-    if (!res.ok) {
-      return 'unavailable'
-    }
-    const manifestText = await res.text()
-    let assetNames: string[]
-    try {
-      assetNames = getManifestAssetNames(manifestText)
-    } catch {
-      return 'not-ready'
-    }
-    if (assetNames.length === 0) {
-      return 'not-ready'
-    }
-    const assetResults = await Promise.all(
-      assetNames.map((assetName) => getReleaseAssetReadiness(tag, assetName))
-    )
-    return assetResults.includes('not-ready')
-      ? 'not-ready'
-      : assetResults.includes('unavailable')
-        ? 'unavailable'
-        : 'ready'
-  } catch {
-    return 'unavailable'
-  }
-}
-
 export async function fetchLatestStableReleaseTag(): Promise<string | null> {
   try {
     // Resolve only the release-page redirect; installer redirects continue on to signed storage URLs.
-    const latestUrl = 'https://github.com/nplez1/orca/releases/latest'
+    const latestUrl = `https://github.com/${RELEASES_REPO}/releases/latest`
     const response = await requestGitHubReleaseHead(latestUrl)
     if (!response?.redirectUrl || response.statusCode < 300 || response.statusCode >= 400) {
       return null
@@ -234,7 +150,13 @@ export async function fetchLatestStableReleaseTag(): Promise<string | null> {
     }
     const tag = decodeURIComponent(match[1])
     const version = normalizeTagToVersion(tag)
-    if (!isValidVersion(version) || isPrereleaseVersion(version)) {
+    // Why the fork's own line is allowed here: every release this fork publishes carries the
+    // `-np.<n>` prerelease suffix, so rejecting prereleases rejected the only thing `releases/latest`
+    // can resolve to here — the fallback could never pin a feed.
+    if (
+      !isValidVersion(version) ||
+      (isPrereleaseVersion(version) && !isForkReleaseVersion(version))
+    ) {
       return null
     }
     return (await getPlatformManifestReadiness(tag)) === 'ready' ? tag : null
@@ -298,12 +220,11 @@ export async function fetchNewerReleaseTagsWithReadiness(
     return { tags: [], state: 'no-newer' }
   }
 
-  // Why every newer candidate, and not just the first six: a fork's releases.atom also carries
-  // the parent's release entries, and those tags have no manifest in this repo. Six of them
-  // sorting above this repo's own tag filled a six-wide window completely, which deferred every
-  // check indefinitely and left installed builds with no update offer at all. The window keeps
-  // its original width as a floor, because the tag after the primary is the fallback feed a
-  // missing manifest walks back to. See LOCAL-PATCHES.md.
+  // Why every newer candidate, and not just the first six: the atom fallback carries tags with no
+  // manifest in this repo, and six of them sorting above this repo's own tag filled a six-wide
+  // window completely, which deferred every check indefinitely and left installed builds with no
+  // update offer at all. The window keeps its original width as a floor, because the tag after the
+  // primary is the fallback feed a missing manifest walks back to. See LOCAL-PATCHES.md.
   const newerCandidateCount = candidates.filter(
     ({ version }) => compareVersions(version, currentVersion) > 0
   ).length
