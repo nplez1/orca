@@ -2,6 +2,7 @@ import { accessSync, constants } from 'node:fs'
 import { delimiter, dirname, isAbsolute, join, relative } from 'node:path'
 import { RuntimeClientError } from './types'
 import { resolveLaunchUserDataPath } from './launch-user-data-path'
+import { CLI_COMMAND_NAME } from '../../main/cli/cli-install-constants'
 
 /** A remote server’s Node-based CLI cannot start a local app server. */
 export function canStartOrcaServer(env: NodeJS.ProcessEnv): boolean {
@@ -11,13 +12,17 @@ export function canStartOrcaServer(env: NodeJS.ProcessEnv): boolean {
   )
 }
 
-/** Linux installs the app's CLI as `orca-ide`: a bare `orca` there is often the screen reader. */
-export function appCliName(platform: NodeJS.Platform): string {
-  return platform === 'linux' ? 'orca-ide' : 'orca'
+/**
+ * The installed CLI this build puts on PATH.
+ *
+ * Why not upstream's `orca`/`orca-ide`: those name an official install (or, on Linux, GNOME's screen
+ * reader), so a supervisor configured with them either starts the wrong application or nothing.
+ */
+export function appCliName(_platform: NodeJS.Platform): string {
+  return CLI_COMMAND_NAME
 }
 
-const NOT_AN_APP_CLI =
-  "This `orca` command isn't running from an installed Orca app. On a host Orca reaches over SSH, it belongs to that connection's server and can't start one of its own."
+const NOT_AN_APP_CLI = `This \`${CLI_COMMAND_NAME}\` command isn't running from an installed Orca app. On a host Orca reaches over SSH, it belongs to that connection's server and can't start one of its own.`
 
 export function serverOnlyServeMessage(platform: NodeJS.Platform): string {
   return `${NOT_AN_APP_CLI} Install the Orca app on this machine and run \`${appCliName(platform)} serve\` from a plain login shell, or set ORCA_APP_EXECUTABLE to the Orca app executable.`

@@ -293,8 +293,12 @@ describe('registerPtyHandlers', () => {
     })
 
     // Why: the resolved launcher's basename, not a name invented here — this is what the prepended
-    // PATH actually holds, and a bare `orca` would reach an official install instead.
+    // PATH actually holds, and a bare `orca` there would reach an official install instead.
     it('names the resolved launcher for headless browser launches', () => {
+      // Why pinned: BUNDLED_CLI_PATH is the darwin launcher, and an unpinned test would only pass
+      // on the macOS host.
+      const originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
       const inheritedBrowser = process.env.BROWSER
       delete process.env.BROWSER
       try {
@@ -314,6 +318,10 @@ describe('registerPtyHandlers', () => {
         expect(env.ORCA_CLI_COMMAND).toBe(BUNDLED_CLI_PATH)
         expect(env.BROWSER).toBe(`${basename(BUNDLED_CLI_PATH)} open-url --url %s`)
       } finally {
+        Object.defineProperty(process, 'platform', {
+          configurable: true,
+          value: originalPlatform
+        })
         if (inheritedBrowser === undefined) {
           delete process.env.BROWSER
         } else {

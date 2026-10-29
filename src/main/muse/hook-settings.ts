@@ -9,6 +9,7 @@ import {
   type HookDefinition
 } from '../agent-hooks/installer-utils'
 import { readManagedHookEventsFromJson } from '../agent-hooks/managed-hooks-json-events'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { wrapWindowsBatchHookCommand } from '../agent-hooks/windows-direct-cmd-hook-command'
 import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
 import { parseMuseSettingsText } from './hook-config-json'
@@ -60,7 +61,7 @@ export function getMuseRemoteConfigPath(remoteHome: string): string {
 }
 
 export function getMuseRemoteManagedHooksPath(remoteHome: string): string {
-  return `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/${MUSE_MANAGED_HOOKS_FILE_NAME}`
+  return `${remoteHome.replace(/\/$/, '')}/${HOME_DIRECTORY_NAME}/agent-hooks/${MUSE_MANAGED_HOOKS_FILE_NAME}`
 }
 
 export function getMuseManagedCommand(scriptPath: string): string {

@@ -1,6 +1,7 @@
 /** Keep bundle-keyed coordination outside the macOS app being replaced so desktop installs can park supervised serve processes. */
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
+import { APP_DATA_DIRECTORY_NAME } from './app-directory-names'
 import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from './local-build-compatibility-contract'
 
 /**
@@ -49,9 +50,16 @@ export type ServeParkRecord = {
   supervisorPids: number[]
 }
 
-/** Electron's default macOS userData base, shared by every profile of one user. */
+/**
+ * The macOS userData base whose `bundle-coordination` tree parks supervised serve processes.
+ *
+ * Why this build's own directory and not upstream's `orca`: the tree holds park records and acks that
+ * this install writes, and creating it under an official install's profile made that profile look like
+ * an official install had run (which `hasOfficialOrcaProfile` then reports). It still sits outside the
+ * bundle being replaced, which is the property the layout needs.
+ */
 export function macCoordinationRoot(homeDir: string): string {
-  return join(homeDir, 'Library', 'Application Support', 'orca')
+  return join(homeDir, 'Library', 'Application Support', APP_DATA_DIRECTORY_NAME)
 }
 
 export function bundleCoordinationDir(realBundlePath: string, macUserDataRoot: string): string {

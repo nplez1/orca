@@ -22,9 +22,12 @@ function ownerDirectory(): string {
 /**
  * Every install's owner directory: this build's, then the one an official Orca owns.
  *
- * Why both: the Grok hook config is a single shared file, so a peer registered under either name
- * keeps it in use — and quit cleanup used to strip an official install's entries because it only
+ * Why both: the Grok hook config is a single shared file, so a running peer registered under either
+ * name keeps it in use — and quit cleanup used to strip an official install's entries because it only
  * looked in this build's directory.
+ *
+ * Only the release check reads the second one: it proves liveness per record, while the commit gate
+ * must not be held open by a dead record this build is not allowed to prune.
  */
 function ownerDirectories(): string[] {
   return [ownerDirectoryIn(HOME_DIRECTORY_NAME), ownerDirectoryIn(LEGACY_HOME_DIRECTORY_NAME)]
@@ -69,7 +72,7 @@ export async function releaseGrokHookOwnerAndCheckForPeers(): Promise<boolean> {
 
 /** Fast second check after liveness pruning closes the registration race before cleanup commits. */
 export async function hasRegisteredGrokHookOwner(
-  directories: readonly string[] = ownerDirectories()
+  directories: readonly string[] = [ownerDirectory()]
 ): Promise<boolean> {
   for (const directory of directories) {
     if (await hasRegisteredOwnerIn(directory)) {

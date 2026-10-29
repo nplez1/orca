@@ -194,11 +194,11 @@ describe('MuseHookService', () => {
     const remote = createAgentHookMemorySftp()
     const service = new MuseHookService()
     expect((await service.installRemote(remote.sftp, '/home/alice smith')).state).toBe('installed')
-    const remoteHooksPath = '/home/alice smith/.orca/agent-hooks/muse-hooks.json'
+    const remoteHooksPath = '/home/alice smith/.orca-np/agent-hooks/muse-hooks.json'
     const installed = remote.fs.files.get(remoteHooksPath)
-    expect(installed).toContain('/home/alice smith/.orca/agent-hooks/muse-hook.sh')
+    expect(installed).toContain('/home/alice smith/.orca-np/agent-hooks/muse-hook.sh')
     expect(installed).not.toMatch(/powershell|EncodedCommand|muse-hook.cmd/)
-    expect(remote.fs.files.get('/home/alice smith/.orca/agent-hooks/muse-hook.sh')).toContain(
+    expect(remote.fs.files.get('/home/alice smith/.orca-np/agent-hooks/muse-hook.sh')).toContain(
       '#!/bin/sh'
     )
     await service.installRemote(remote.sftp, '/home/alice smith')

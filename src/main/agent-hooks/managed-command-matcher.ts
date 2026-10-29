@@ -35,7 +35,10 @@ export function createManagedCommandMatcher(
     scriptStem
   )
   const legacyNativeHook = nativeHookNeedle(LEGACY_HOME_DIRECTORY_NAME, scriptFileName)
-  const sweepsLegacyHome = options.sweepLegacyHomeDirectory ?? !hasOfficialOrcaProfile()
+  // Why read per call and not at construction: a service that builds its matcher at module load would
+  // otherwise freeze the answer for the life of the process, and installing or removing the official
+  // app changes it.
+  const explicitLegacySweep = options.sweepLegacyHomeDirectory
   return (command) => {
     if (!command) {
       return false
@@ -44,9 +47,10 @@ export function createManagedCommandMatcher(
     if (matchesManagedHook(lines, ownNeedles, ownNativeHook)) {
       return true
     }
-    const legacyLines = sweepsLegacyHome
-      ? lines
-      : lines.filter((line) => !line.toLowerCase().includes(localLegacyHomePrefix()))
+    const legacyLines =
+      (explicitLegacySweep ?? !hasOfficialOrcaProfile())
+        ? lines
+        : lines.filter((line) => !line.toLowerCase().includes(localLegacyHomePrefix()))
     return matchesManagedHook(legacyLines, legacyNeedles, legacyNativeHook)
   }
 }

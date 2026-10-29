@@ -104,7 +104,9 @@ describe('Grok hook owners', () => {
     registerGrokHookOwner()
 
     await expect(releaseGrokHookOwnerAndCheckForPeers()).resolves.toBe(true)
-    await expect(hasRegisteredGrokHookOwner()).resolves.toBe(true)
+    // The commit gate reads this build's own directory only; the peer above already held the
+    // removal open, and a dead record under the official name must not block it forever.
+    await expect(hasRegisteredGrokHookOwner()).resolves.toBe(false)
   })
 
   it('leaves the official install’s owner records untouched', async () => {

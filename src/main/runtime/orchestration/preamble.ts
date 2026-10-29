@@ -12,7 +12,7 @@ export type PreambleParams = {
   coordinatorHandle: string
   workerHandle: string
   devMode?: boolean
-  // Packaged WSL uses orca-ide; other hosts retain their existing launcher.
+  // A packaged WSL pane uses this build's guest command (`orca-np`); other hosts keep theirs.
   cliCommand?: OrchestrationCliCommand
   // Supply actual preflight drift only; spurious warnings train workers to ignore stale-base evidence.
   baseDrift?: {
