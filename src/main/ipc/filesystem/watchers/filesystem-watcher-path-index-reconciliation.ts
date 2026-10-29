@@ -82,9 +82,6 @@ export async function reconcileLocalWorkspacePathIndexEvents(
       if (info.isSymbolicLink()) {
         continue
       }
-      // Why no `isFolderProject` here: this scan's search root is a subtree, and `--no-ignore-parent`
-      // would then drop the workspace's own root ignore files (`.ignore`, `.gitignore`) instead of
-      // only the enclosing checkout's — a worse answer than the one the full listing gives.
       const rgArgs = buildRgArgsForQuickOpen({
         searchRoot: relativePath,
         excludePathPrefixes: [],
