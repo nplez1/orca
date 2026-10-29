@@ -201,7 +201,8 @@ export class WslCliInstaller {
 
   async remove(): Promise<CliInstallStatus> {
     const status = await this.getStatus()
-    if (!status.supported || !status.commandPath) {
+    // A supported status proves the guest answered, but not which distro answered for it.
+    if (!status.supported || !status.commandPath || this.distro === null) {
       return status
     }
     if (status.state === 'conflict') {
@@ -211,7 +212,7 @@ export class WslCliInstaller {
       return status
     }
 
-    await this.run(this.distro as string, buildSafeRemoveCommand(status.commandPath))
+    await this.run(this.distro, buildSafeRemoveCommand(status.commandPath))
     return this.getStatus()
   }
 
