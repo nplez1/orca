@@ -8,7 +8,8 @@ import {
   FORK_LINT_STEPS,
   matchesEntry,
   resolveGateSteps,
-  resolveLintSteps
+  resolveLintSteps,
+  unaccountedFailureLines
 } from '../../local/gate-lint.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
@@ -247,5 +248,80 @@ describe('the verdict a run produces', () => {
     )
     expect(verdict.staleEntries.map((row) => row.step)).toEqual(['check:other-ratchet'])
     expect(verdict.staleSteps.map((row) => row.step)).toEqual(['check:gone-ratchet'])
+  })
+})
+
+describe('a failure the parser could only partly attribute', () => {
+  const astGrepRows = [
+    'test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details.test.tsx: 1 flaky-test finding(s), baseline allows 0.',
+    'test-no-wall-clock:src/renderer/src/components/github/check-details-cache.test.ts: 4 flaky-test finding(s), baseline allows 0.',
+    'Wait on the condition (expect.poll, vi.waitFor, locator assertions) instead of sleeping or',
+    'polling, use fake timers or fixed timestamps instead of the wall clock, put',
+    'A deliberate exception takes `// ast-grep-ignore: <rule-id> -- <reason>` above the line.'
+  ].join('\n')
+
+  const astGrepEntries = ['test-no-real-time-wait:', 'test-no-wall-clock:'].map((rule) =>
+    entry({ step: 'lint:ast-grep-gates', match: `^${rule}` })
+  )
+
+  it('accepts a partly parsed step whose every failure line is allowlisted', () => {
+    // The real output of `lint:ast-grep-gates` on this machine: two ratchet rows and its fix hint.
+    const verdict = classifyRun(
+      [{ id: 'lint:ast-grep-gates', exitCode: 1, output: astGrepRows }],
+      astGrepEntries
+    )
+    expect(verdict.known).toHaveLength(2)
+    expect(verdict.unexpected).toEqual([])
+  })
+
+  it('fails the same step when a lint diagnostic rides along beside the allowlisted rows', () => {
+    // The hole this closes: the combined step runs the ast-grep lint scan too, and its diagnostics
+    // are in no shape `extractFailureLines` reads, so they used to be skipped entirely.
+    const verdict = classifyRun(
+      [
+        {
+          id: 'lint:ast-grep-gates',
+          exitCode: 1,
+          output: `${astGrepRows}\nerror[no-explicit-any]: Do not use any type assertions.\n   ┌─ src/main/a.ts:12:3`
+        }
+      ],
+      astGrepEntries
+    )
+    expect(verdict.known).toHaveLength(2)
+    expect(verdict.unexpected).toEqual([
+      {
+        step: 'lint:ast-grep-gates',
+        line: 'unattributed failure output: error[no-explicit-any]: Do not use any type assertions.'
+      }
+    ])
+  })
+
+  it('fails a step that crashed beside a row it managed to print', () => {
+    const verdict = classifyRun(
+      [
+        {
+          id: 'lint:ast-grep-gates',
+          exitCode: 1,
+          output: `::error::entry a\nError: spawn ast-grep ENOENT`
+        }
+      ],
+      [entry({ step: 'lint:ast-grep-gates', match: '^entry a$' })]
+    )
+    expect(verdict.known).toHaveLength(1)
+    expect(verdict.unexpected).toEqual([
+      {
+        step: 'lint:ast-grep-gates',
+        line: 'unattributed failure output: Error: spawn ast-grep ENOENT'
+      }
+    ])
+  })
+
+  it('does not double-count a line it already extracted', () => {
+    expect(
+      unaccountedFailureLines('::error file=src/a.ts::1 focus read(s), baseline allows 0.', [
+        'src/a.ts: 1 focus read(s), baseline allows 0.'
+      ])
+    ).toEqual([])
+    expect(unaccountedFailureLines('panel note: nothing to do here')).toEqual([])
   })
 })

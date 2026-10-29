@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { forkTestFiles, quarantinedFiles } from '../../local/gate-unit.mjs'
+import { forkTestFiles } from '../../local/gate-unit.mjs'
+import { quarantinedFiles } from '../../local/unit-lane-files.mjs'
 import {
   allowlistEntries,
   collectCases,
@@ -235,10 +236,29 @@ describe('the isolated re-run', () => {
     ).toEqual(['came back', 'went away'])
   })
 
-  it('waives a collect failure only when the file itself passed', () => {
-    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
-    expect(reproducedFailures(suite, rerun())).toHaveLength(1)
+  it('waives a one-off suite error only when the re-run raised none', () => {
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'teardown' }]
+    // Why not `filePassed`: a file that also holds an allowlisted always-red test can never pass in
+    // isolation, so requiring that would make a one-off teardown error unwaivable for ever.
+    expect(reproducedFailures(suite, rerun())).toHaveLength(0)
     expect(reproducedFailures(suite, rerun({ filePassed: true }))).toHaveLength(0)
+    expect(reproducedFailures(suite, rerun({ failures: new Set(['(suite)']) }))).toHaveLength(1)
+    expect(
+      reproducedFailures(suite, rerun({ failures: new Set(['(suite)']), filePassed: true }))
+    ).toHaveLength(1)
+  })
+
+  it('keeps a suite error whose re-run found a red the allowlist never saw', () => {
+    // The full run's suite row replaced every named case, so the re-run's `foo` was never judged —
+    // waiving the row would pass a real failure nobody read.
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
+    const found = rerun({ failures: new Set(['foo']) })
+    expect(reproducedFailures(suite, found)).toHaveLength(1)
+    expect(reproducedFailures(suite, found, { known: new Set(['bar']) })).toHaveLength(1)
+    // A named entry covering the re-run's failure is the known case, and a file-level entry covers
+    // every case in the file.
+    expect(reproducedFailures(suite, found, { known: new Set(['foo']) })).toHaveLength(0)
+    expect(reproducedFailures(suite, found, { fileCovered: true })).toHaveLength(0)
   })
 
   it('reads one file out of a report the selector over-matched', () => {
