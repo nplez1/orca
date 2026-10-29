@@ -13,8 +13,9 @@ export class JiraWriteTimeoutError extends Error {
 }
 
 /** Stops waiting on a Jira write, so no surface stays pending behind one nobody
- *  answered. Transport-level bounds are shorter (the main process's fetch, the
- *  remote RPC), so this only fires when no answer arrives at all. */
+ *  answered. Each transport bounds itself first (the main process's fetch at 30 s, the
+ *  remote RPC at 60 s, so the host's own verdict arrives); this is the backstop for a
+ *  host that never answers at all. */
 export async function withJiraWriteDeadline<TResult>(work: Promise<TResult>): Promise<TResult> {
   const signal = AbortSignal.timeout(JIRA_WRITE_DEADLINE_MS)
   const expired = new Promise<never>((_resolve, reject) => {

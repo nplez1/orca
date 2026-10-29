@@ -4,6 +4,7 @@ import { translate } from '@/i18n/i18n'
 import { readRuntimeJiraPayload } from '../../runtime/runtime-jira-payload-stream'
 import { RuntimeRpcCallError } from '../../runtime/runtime-rpc-result'
 import { assertJiraTransitionFieldsSupported } from '../../runtime/jira-capability-probe'
+import type { JiraCapabilityProbe } from '../../runtime/jira-capability-probe'
 import { foldIssueUpdateForCapabilities } from '../../runtime/runtime-jira-text-fields'
 import { rethrowJiraWriteTimeout } from '../../runtime/jira-write-deadline'
 import { JIRA_WRITE_RPC_TIMEOUT_MS } from '../../../../shared/jira/jira-write-deadline'
@@ -79,14 +80,24 @@ export function createWebJiraApi(): PreloadApi['jira'] {
     // Why the probe only when the payload needs it: a plain title edit gains nothing from
     // a round trip, and a probe failure must not block a write it cannot shape.
     updateIssue: async ({ key, updates, siteId }) => {
-      const needsCapabilities = Boolean(
-        updates.transitionFields ||
-        updates.transitionComment !== undefined ||
-        updates.textFieldKeys?.length
+      const needsVerdict = Boolean(
+        updates.transitionFields || updates.transitionComment !== undefined
       )
-      const supports = needsCapabilities
-        ? await hostCapabilityProbe()
-        : async (): Promise<boolean> => true
+      const needsShaping = needsVerdict || Boolean(updates.textFieldKeys?.length)
+      let supports: JiraCapabilityProbe = async () => true
+      if (needsShaping) {
+        try {
+          supports = await hostCapabilityProbe()
+        } catch (error) {
+          // Why: shaping must never fail a write, so an unanswerable probe falls back to
+          // the ADF older hosts handle — but with a transition the verdict decides
+          // whether the write may be sent at all.
+          if (needsVerdict) {
+            throw error
+          }
+          supports = async () => false
+        }
+      }
       await assertJiraTransitionFieldsSupported(supports, updates)
       return jiraCall<JiraMutationResult>(
         'updateIssue',

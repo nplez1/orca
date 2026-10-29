@@ -12,6 +12,7 @@ import type {
 } from '../../../shared/jira/jira-types'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
+import { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
 import {
   assertJiraTransitionFieldsSupported,
   jiraCapabilityProbeForTarget
@@ -132,8 +133,9 @@ export async function jiraListEditFieldsForTarget(
       : await window.api.jira.listEditFields(args)
   } catch (error) {
     // Why outside the branch: a host that predates the method cannot answer for editing,
-    // which is "unavailable", not "this read failed" — the web client included.
-    if (error instanceof RuntimeRpcCallError && error.code === 'method_not_found') {
+    // which is "unavailable", not "this read failed" — the web client included, whose
+    // call rejects with a plain Error carrying a code rather than a RuntimeRpcCallError.
+    if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
       return []
     }
     throw error
