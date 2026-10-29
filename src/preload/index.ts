@@ -29,7 +29,6 @@ import { hostedReviewApi } from './api/hosted-review-bridge'
 import { glApiBridge } from './api/gl-bridge'
 import { bitbucketApi } from './api/bitbucket-bridge'
 import { linearApi } from './api/linear-bridge'
-import { jenkinsApi } from './api/jenkins-bridge'
 import { jiraApi } from './api/jira-bridge'
 import { starNagApi } from './api/star-nag-bridge'
 import { diagnosticsApi } from './api/diagnostics-bridge'
@@ -63,7 +62,6 @@ import { notebookApi } from './api/notebook-bridge'
 import { fsApi } from './api/fs-bridge'
 import { gitApi } from './api/git-bridge'
 import { uiApi } from './api/ui-bridge'
-import { uiHangDiagnosticsApi } from './api/ui-hang-diagnostics-api'
 import { statsApi } from './api/stats-bridge'
 import { memoryApi } from './api/memory-bridge'
 import { claudeUsageApi } from './api/claude-usage-bridge'
@@ -78,9 +76,6 @@ import { rateLimitsApi } from './api/rate-limits-bridge'
 import { opencodeGoCredentialsApi } from './api/opencode-go-credentials-bridge'
 import { minimaxCredentialsApi } from './api/minimax-credentials-bridge'
 import { zcodePlanCredentialsApi } from './api/zcode-plan-credentials-bridge'
-import { deepseekCredentialsApi } from './api/deepseek-credentials-bridge'
-import { fireworksCredentialsApi } from './api/fireworks-credentials-bridge'
-import { copilotCredentialsApi } from './api/copilot-credentials-bridge'
 import { grokAccountsApi } from './api/grok-accounts-bridge'
 import { cursorAccountsApi } from './api/cursor-accounts-bridge'
 import { sshApi } from './api/ssh-bridge'
@@ -90,7 +85,7 @@ import { automationsApi } from './api/automations-bridge'
 import { e2eApi } from './api/e2e-bridge'
 import { mobileApi } from './api/mobile-bridge'
 import { agentStatusApi } from './api/agent-status-bridge'
-import { sessionSummaryApi } from './api/session-summary-bridge'
+import { forkPreloadApi } from './api/fork-preload-api'
 import { speechApi } from './api/speech-bridge'
 
 installBrowserFindListener()
@@ -132,14 +127,12 @@ const api = {
   bitbucket: bitbucketApi,
   linear: linearApi,
   jira: jiraApi,
-  jenkins: jenkinsApi,
   starNag: starNagApi,
   telemetryTrack: telemetryTrackApi,
   telemetrySetOptIn: telemetrySetOptInApi,
   telemetryAcknowledgeBanner: telemetryAcknowledgeBannerApi,
   telemetryGetConsentState: telemetryGetConsentStateApi,
   diagnostics: diagnosticsApi,
-  uiHangDiagnostics: uiHangDiagnosticsApi,
   settings: settingsApi,
   agentAwake: agentAwakeApi,
   localhostWorktreeLabels: localhostWorktreeLabelsApi,
@@ -184,9 +177,6 @@ const api = {
   opencodeGoCredentials: opencodeGoCredentialsApi,
   minimaxCredentials: minimaxCredentialsApi,
   zcodePlanCredentials: zcodePlanCredentialsApi,
-  deepseekCredentials: deepseekCredentialsApi,
-  fireworksCredentials: fireworksCredentialsApi,
-  copilotCredentials: copilotCredentialsApi,
   grokAccounts: grokAccountsApi,
   cursorAccounts: cursorAccountsApi,
   ssh: sshApi,
@@ -196,7 +186,7 @@ const api = {
   e2e: e2eApi,
   mobile: mobileApi,
   agentStatus: agentStatusApi,
-  sessionSummary: sessionSummaryApi,
+  ...forkPreloadApi,
   speech: speechApi
 } satisfies PreloadApi
 

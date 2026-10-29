@@ -4,10 +4,7 @@ import { createWebE2EApi } from './preload-api/web-e2e-api'
 import {
   createClaudeAccountsApi,
   createCodexAccountsApi,
-  createCopilotCredentialsApi,
   createCursorAccountsApi,
-  createDeepSeekCredentialsApi,
-  createFireworksCredentialsApi,
   createGrokAccountsApi,
   createZcodePlanCredentialsApi,
   createOpenCodeGoCredentialsApi,
@@ -19,6 +16,7 @@ import { createWebAppApi } from './preload-api/web-app-api'
 import { createBrowserApi, createEmulatorApi } from './preload-api/web-browser-api'
 import { createCliApi } from './preload-api/web-cli-api'
 import { createWebDiagnosticsApi } from './preload-api/web-diagnostics-api'
+import { createWebForkPreloadApi } from './preload-api/web-fork-preload-api'
 import { withFallback } from './preload-api/web-fallback-api'
 import { createFileApi } from './preload-api/web-filesystem-api'
 import { createGitApi } from './preload-api/web-git-api'
@@ -119,9 +117,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     opencodeGoCredentials: createOpenCodeGoCredentialsApi(),
     minimaxCredentials: createMiniMaxCredentialsApi(),
     zcodePlanCredentials: createZcodePlanCredentialsApi(),
-    deepseekCredentials: createDeepSeekCredentialsApi(),
-    fireworksCredentials: createFireworksCredentialsApi(),
-    copilotCredentials: createCopilotCredentialsApi(),
+    ...createWebForkPreloadApi(),
     grokAccounts: createGrokAccountsApi(),
     cursorAccounts: createCursorAccountsApi(),
     codexAccounts: createCodexAccountsApi(),
