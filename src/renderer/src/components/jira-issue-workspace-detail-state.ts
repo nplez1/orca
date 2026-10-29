@@ -174,6 +174,7 @@ export function useJiraIssueWorkspaceDetail({
     displayed,
     providerSettings,
     sourceContext,
+    editedFieldsRef,
     reloadTransitions,
     refreshSignal,
     setFullIssue
