@@ -155,6 +155,7 @@ export function EditorDiffFileSurface({
       language={resolvedLanguage}
       filePath={activeFile.filePath}
       relativePath={activeFile.relativePath}
+      oldPath={activeFile.branchOldPath}
       sideBySide={sideBySide}
       editable={isEditable}
       worktreeId={activeFile.worktreeId}

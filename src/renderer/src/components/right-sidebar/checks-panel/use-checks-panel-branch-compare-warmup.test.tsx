@@ -98,6 +98,21 @@ describe('useChecksPanelBranchCompareWarmup', () => {
     unmountProbes()
   })
 
+  it('maps the review base onto the repo default when the worktree pins a commit', async () => {
+    await mountProbe(
+      <Probe
+        isPanelVisible
+        activeReview={{ baseRefName: 'release/2.0' }}
+        worktreeBaseRef={'a'.repeat(40)}
+      />
+    )
+    await flush()
+    await flush()
+
+    expect(mocks.getRuntimeGitBranchCompare.mock.calls[0][1]).toBe('origin/release/2.0')
+    unmountProbes()
+  })
+
   it('reuses a compare that already answers for this base and head', async () => {
     useAppStore.setState({
       gitBranchCompareSummaryByWorktree: { [WORKTREE_ID]: summary() }

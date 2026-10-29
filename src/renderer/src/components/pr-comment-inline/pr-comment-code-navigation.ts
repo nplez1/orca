@@ -21,6 +21,13 @@ export type PRCommentCodeTarget = {
   /** Repo-relative path, exactly as GitHub reports it. */
   relativePath: string
   line: number
+  /**
+   * Whether the tab should scroll to that line.
+   *
+   * False for an outdated thread: its line belongs to a revision the provider no longer maps, so the
+   * file still opens — only the scroll to a line nobody vouches for is withheld.
+   */
+  reveal: boolean
 }
 
 /**
@@ -37,25 +44,22 @@ function matchesCommentPath(
 }
 
 /**
- * The line a comment can be opened at, or null when no line can be trusted.
+ * Where a comment can be opened, or null when the workspace cannot hold the file at all.
  *
- * Only an outdated thread returns null: its line number belongs to a revision the provider no
- * longer maps, so there is nothing to scroll to. A checkout that has moved on is not a reason to
- * refuse — the comment still belongs to this file in this workspace.
+ * A comment with no path, no line number, or no worktree has nothing to open — that is the only case
+ * the caller may fall back to the provider for. An outdated thread still opens its file, without the
+ * scroll.
  */
 export function resolvePRCommentCodeTarget(
   comment: PRComment,
   worktreePath: string | null | undefined
 ): PRCommentCodeTarget | null {
-  if (comment.isOutdated) {
-    return null
-  }
   const relativePath = comment.path
   const line = comment.line
   if (!relativePath || typeof line !== 'number' || !worktreePath?.trim()) {
     return null
   }
-  return { relativePath, line }
+  return { relativePath, line, reveal: comment.isOutdated !== true }
 }
 
 /**
@@ -63,9 +67,9 @@ export function resolvePRCommentCodeTarget(
  * that surface can show.
  *
  * A thread is only readable against the code it reviews, so the branch diff — merge base to head,
- * which is the review's own diff — comes first; Changes mode carries the uncommitted hunks; and a
- * plain tab is the answer only once a compare against the review's own base proves the file is
- * outside the review, because then this worktree holds no hunks for it at all.
+ * which is the review's own diff — comes first, and Changes mode carries everything else. There is
+ * no plain-tab outcome: Changes mode explains an empty result itself, while a plain tab would hide
+ * the workspace's changes instead of showing that there are none.
  */
 export type PRCommentCodeSurface =
   | { kind: 'branch-diff'; entry: GitBranchChangeEntry; compare: GitBranchCompareSummary }
@@ -111,7 +115,8 @@ export function resolvePRCommentCodeSurface({
       ? branchCompare
       : null
   const entry = reviewDiffCompare
-    ? branchChanges?.find((candidate) => matchesCommentPath(candidate, relativePath))
+    ? (branchChanges?.find((candidate) => candidate.path === relativePath) ??
+      branchChanges?.find((candidate) => matchesCommentPath(candidate, relativePath)))
     : undefined
   if (reviewDiffCompare && entry) {
     return { kind: 'branch-diff', entry, compare: reviewDiffCompare }
@@ -184,7 +189,7 @@ export function usePRCommentCodeNavigation({
         // an occupied path) — a path-keyed write would leave the tab in plain Edit mode.
         const changesMode = !!opened && canUseChangesModeForFile(opened)
         setEditorViewMode(fileId, changesMode ? 'changes' : 'edit')
-        if (!changesMode) {
+        if (!changesMode && target.reveal) {
           lineRevealFileId = fileId
         }
       }
@@ -202,7 +207,10 @@ export function usePRCommentCodeNavigation({
               matchLength: 0
             })
           }
-          setScrollToDiffCommentId(getPRCommentInlineId(comment.id))
+          // An outdated thread has no line the provider still maps, so the file opens without a scroll.
+          if (target.reveal) {
+            setScrollToDiffCommentId(getPRCommentInlineId(comment.id))
+          }
         })
       })
       return true

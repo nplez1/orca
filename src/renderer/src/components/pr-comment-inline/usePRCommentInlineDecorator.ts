@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { useAppStore } from '@/store'
 import { resolvePRCommentInlineDisplay } from '@/lib/pr-comment-inline-display'
@@ -71,18 +71,23 @@ export function usePRCommentInlineDecorator({
   const displayOverrides = useAppStore((s) => s.prCommentInlineDisplayById)
   const setPRCommentInlineDisplay = useAppStore((s) => s.setPRCommentInlineDisplay)
 
-  const [modelLineCount, setModelLineCount] = useState<number | null>(null)
-  useEffect(() => {
-    const model = editor?.getModel() ?? null
-    if (!model) {
-      setModelLineCount(null)
-      return
-    }
-    const sync = (): void => setModelLineCount(model.getLineCount())
-    sync()
-    const subscription = model.onDidChangeContent(sync)
-    return () => subscription.dispose()
-  }, [editor, monacoModelIdentity])
+  // Why the model's own line count: a thread is drawn for whatever revision the workspace is
+  // reviewing, so one past the last line has nowhere honest to go. Read the model itself so the first
+  // paint is already right — a null count would draw it once and then pull it back.
+  const modelLineCount = useSyncExternalStore(
+    useCallback(
+      (onChange: () => void) => {
+        const model = editor?.getModel() ?? null
+        if (!model) {
+          return () => {}
+        }
+        const subscription = model.onDidChangeContent(onChange)
+        return () => subscription.dispose()
+      },
+      [editor]
+    ),
+    () => editor?.getModel()?.getLineCount() ?? null
+  )
 
   const displayOf = useCallback(
     (thread: PRCommentInlineThread) =>
@@ -107,8 +112,7 @@ export function usePRCommentInlineDecorator({
   }, [displayOf, pendingRevealCommentId, setPRCommentInlineDisplay, threads])
 
   // Why: threads are drawn for whatever revision the workspace is reviewing, so a comment whose line
-  // the file no longer has cannot be placed at all. Dropping it is the one case where drawing it
-  // would invent a fact about code the reviewer never saw.
+  // the file no longer has cannot be placed at all — drawing it would invent a fact.
   const placeableThreads = useMemo(() => {
     if (!threads) {
       return null

@@ -48,9 +48,9 @@ export function useChecksPanelBranchCompareWarmup({
   const worktreeBaseRef = activeWorktree?.baseRef
   const repoBaseRef = repo?.worktreeBaseRef
   // Why the same default-base probe the Source Control tab runs: `resolveSourceControlBaseRef` only
-  // honours the review's base branch by matching it against a candidate ref, so passing no default
-  // throws the review's base away and this files no compare at all — the jump then lands in Changes
-  // mode with nothing to show.
+  // honours the review's base branch by matching it against a candidate ref, so with no default and
+  // no repo-level base a worktree that pins none resolves to null here while the tab files
+  // `origin/main` — and this then files no compare at all.
   const defaultBaseRef = useSourceControlBaseRefDefault({
     activeRepoConnectionId: repo?.connectionId ?? null,
     activeRepoExecutionHostId: repo?.executionHostId ?? null,

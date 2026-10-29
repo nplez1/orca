@@ -27,9 +27,12 @@ export type WorktreePRCommentInline = {
   enabled: boolean
   /** Namespaces these threads away from the worktree's local notes; null with no review. */
   scope: string | null
-  /** Threads for inline drawing, or null only when the user turned inline comments off. */
-  inlineThreadsByPath: Map<string, PRCommentInlineThread[]> | null
-  /** Every thread whether or not inline drawing is on, so a surface can still navigate to one. */
+  /**
+   * The active review's threads, keyed by the provider's path.
+   *
+   * Populated whenever a review is known, whatever the head or the setting says: `enabled` decides
+   * how a thread starts (open or as a gutter bubble), and the decorator decides what it can place.
+   */
   threadsByPath: Map<string, PRCommentInlineThread[]> | null
   /**
    * Whether the checkout is known to be the revision the comments were resolved against.
@@ -82,9 +85,6 @@ export function buildPRCommentInlineFromComments(
   return {
     enabled: input.enabled,
     scope: getPRCommentInlineScope(input.repoId, input.prNumber),
-    // Why: the workspace's active review is always drawn. `blocker` still reports a moved head so
-    // the sidebar can explain it, and the decorator refuses any thread whose line is not on screen.
-    inlineThreadsByPath: input.enabled ? grouped : null,
     threadsByPath: grouped,
     blocker: input.blocker,
     commentsHeadSha: input.commentsHeadSha,
@@ -101,7 +101,6 @@ export function buildPRCommentInlineFromComments(
 const NO_REVIEW: WorktreePRCommentInline = {
   enabled: true,
   scope: null,
-  inlineThreadsByPath: null,
   threadsByPath: null,
   blocker: null,
   commentsHeadSha: null,
@@ -115,10 +114,6 @@ const NO_REVIEW: WorktreePRCommentInline = {
  * The review identity comes from the same caches the Checks panel writes — the branch-keyed PR cache
  * and the repo/PR-keyed comments cache — so the sidebar and the editor can never disagree about
  * which pull request a worktree is reviewing.
- *
- * The active review is whatever the Checks pane would show for this worktree — same PR cache, same
- * staleness rule, same suppression list — so the editor and the sidebar can never disagree about
- * which pull request is on screen.
  */
 export function deriveWorktreePRCommentInline(
   state: WorktreePRCommentInlineInput,

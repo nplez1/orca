@@ -49,6 +49,7 @@ function buildState(overrides: {
   comments?: PRComment[]
   commentsHeadSha?: string | null
   prHeadSha?: string
+  prState?: PRInfo['state']
   worktreeHead?: string
 }): Pick<AppState, 'worktreesByRepo' | 'repos' | 'settings' | 'prCache' | 'commentsCache'> {
   const settings = createGlobalSettingsFixture()
@@ -65,7 +66,7 @@ function buildState(overrides: {
   const pr = {
     number: 42,
     title: 'Review me',
-    state: 'open',
+    state: overrides.prState ?? 'open',
     url: 'https://example.test/pr/42',
     checksStatus: 'success',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -126,8 +127,8 @@ describe('buildPRCommentInlineFromComments', () => {
       prNumber: 42,
       prRepo: null
     })
-    expect([...(review.inlineThreadsByPath?.keys() ?? [])].sort()).toEqual(['src/a.ts', 'src/b.ts'])
-    expect(review.inlineThreadsByPath?.get('src/a.ts')?.[0].replies).toHaveLength(1)
+    expect([...(review.threadsByPath?.keys() ?? [])].sort()).toEqual(['src/a.ts', 'src/b.ts'])
+    expect(review.threadsByPath?.get('src/a.ts')?.[0].replies).toHaveLength(1)
   })
 
   it('still draws the threads when the caller reports a moved head, and keeps reporting why', () => {
@@ -142,12 +143,11 @@ describe('buildPRCommentInlineFromComments', () => {
       commentsHeadSha: null
     })
 
-    expect(review.inlineThreadsByPath?.get('src/a.ts')).toHaveLength(1)
     expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
     expect(review.blocker).toEqual({ kind: 'unverified-head' })
   })
 
-  it('draws nothing once the user turns inline comments off, but still exposes the threads', () => {
+  it('still exposes the threads when the user turns inline comments off, so they land collapsed', () => {
     const review = buildPRCommentInlineFromComments({
       repoPath: '/repo',
       repoId: 'repo-1',
@@ -159,7 +159,9 @@ describe('buildPRCommentInlineFromComments', () => {
       commentsHeadSha: HEAD_SHA
     })
 
-    expect(review.inlineThreadsByPath).toBeNull()
+    // Why: `enabled` decides how a thread starts, not whether it exists — dropping the map here would
+    // hide the review entirely and leave a comment jump with nothing to reveal.
+    expect(review.enabled).toBe(false)
     expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
   })
 })
@@ -170,7 +172,7 @@ describe('deriveWorktreePRCommentInline', () => {
 
     expect(review.blocker).toBeNull()
     expect(review.prNumber).toBe(42)
-    expect(review.inlineThreadsByPath?.get('src/a.ts')).toHaveLength(1)
+    expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
   })
 
   it('still draws the workspace review when the checkout has moved off the reviewed head', () => {
@@ -185,7 +187,7 @@ describe('deriveWorktreePRCommentInline', () => {
       commentsHeadSha: HEAD_SHA,
       prHeadSha: HEAD_SHA
     })
-    expect(review.inlineThreadsByPath?.get('src/a.ts')).toHaveLength(1)
+    expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
     expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
   })
 
@@ -193,10 +195,10 @@ describe('deriveWorktreePRCommentInline', () => {
     const review = deriveWorktreePRCommentInline(buildState({ commentsHeadSha: null }), worktree.id)
 
     expect(review.blocker).toEqual({ kind: 'unverified-head' })
-    expect(review.inlineThreadsByPath?.get('src/a.ts')).toHaveLength(1)
+    expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
   })
 
-  it('withholds placement while the pull request head has moved past the fetched comments', () => {
+  it('draws the review when the pull request head moved past the fetched comments', () => {
     // The checkout and the PR agree on OTHER_SHA, but the cached comments still describe HEAD_SHA,
     // which is exactly the window a head-keyed checks cache would otherwise paper over.
     const review = deriveWorktreePRCommentInline(
@@ -210,6 +212,7 @@ describe('deriveWorktreePRCommentInline', () => {
       commentsHeadSha: HEAD_SHA,
       prHeadSha: OTHER_SHA
     })
+    expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
   })
 
   it('still draws the review when the checkout is at the commented revision but the pull request moved on', () => {
@@ -224,7 +227,17 @@ describe('deriveWorktreePRCommentInline', () => {
       commentsHeadSha: HEAD_SHA,
       prHeadSha: OTHER_SHA
     })
-    expect(review.inlineThreadsByPath?.get('src/a.ts')).toHaveLength(1)
+    expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
+  })
+
+  it('reports no review for a merged pull request the checkout has moved past', () => {
+    const review = deriveWorktreePRCommentInline(
+      buildState({ prState: 'merged', worktreeHead: OTHER_SHA }),
+      worktree.id
+    )
+
+    expect(review.scope).toBeNull()
+    expect(review.threadsByPath).toBeNull()
   })
 
   it('reports no review for an unknown worktree or an unmatched branch', () => {

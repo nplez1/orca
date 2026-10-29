@@ -100,19 +100,14 @@ export type PRCommentInlineBlocker =
   | { kind: 'unverified-head' }
 
 /**
- * Why inline placement is suppressed, or null when it is safe.
+ * Why the checkout may not be the revision the comments describe, or null when it is.
  *
- * A comment's `line` is a line number in the commit its thread was resolved against, so it may only
- * be drawn when the checkout is that same commit — otherwise the comment lands on whatever code has
- * since taken that line, and reads as a fact about it. The checkout must also still be the pull
- * request's current head, so a worktree left behind on an older revision does not quietly present
- * that revision's review as the current one.
+ * Advisory only — surfaces draw the review and let the decorator drop the threads it has no line for.
+ * A comment's `line` is a line number in the commit its thread was resolved against, so a moved
+ * checkout is worth telling the user about: the note may sit a line or two off.
  *
- * An unverifiable head counts as a mismatch: a comment on the wrong line is worse than asking the
- * user to open the file from the Checks pane.
- *
- * A user-facing `enabled: false` is not a blocker — that was a deliberate choice and does not
- * deserve a warning.
+ * An unverifiable head counts as a mismatch, and a user-facing `enabled: false` does not — that was a
+ * deliberate choice and earns no warning.
  */
 export function resolvePRCommentInlineBlocker(input: {
   enabled: boolean

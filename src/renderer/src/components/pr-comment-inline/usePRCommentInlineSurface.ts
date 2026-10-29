@@ -8,8 +8,8 @@ import type { WorktreePRCommentInline } from './worktree-pr-comment-inline'
 /**
  * Everything one editor surface needs to draw and act on a file's review threads.
  *
- * `threads` is null when the file carries no threads or the head rule forbids placing them, which
- * is the single signal a surface checks before drawing anything.
+ * `threads` is null when the file carries no threads, which is the single signal a surface checks
+ * before drawing anything.
  */
 export type PRCommentInlineSurface = {
   scope: string | null
@@ -77,18 +77,22 @@ export function usePRCommentInlineReviewActions(
  *
  * Kept as a hook so both the plain file editor and a worktree diff tab reach the same thread set
  * through the same path normalisation — GitHub always names a path with `/`, and an editor surface
- * may not.
+ * may not. `alternatePath` is the pre-rename name the provider still files an old thread under.
  */
 export function usePRCommentInlineSurface(
   review: WorktreePRCommentInline | null,
-  filePath: string
+  filePath: string,
+  alternatePath?: string | null
 ): PRCommentInlineSurface | null {
   const { onReply, onResolveThread } = usePRCommentInlineReviewActions(review)
   const scrollToDiffCommentId = useAppStore((s) => s.scrollToDiffCommentId)
   const setScrollToDiffCommentId = useAppStore((s) => s.setScrollToDiffCommentId)
   const scope = review?.scope ?? null
   const enabled = review?.enabled ?? false
-  const threads = review?.inlineThreadsByPath?.get(normalizePRCommentPath(filePath)) ?? null
+  const threads =
+    review?.threadsByPath?.get(normalizePRCommentPath(filePath)) ??
+    (alternatePath ? review?.threadsByPath?.get(normalizePRCommentPath(alternatePath)) : null) ??
+    null
 
   const onPendingRevealConsumed = useCallback((): void => {
     setScrollToDiffCommentId(null)

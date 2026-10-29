@@ -114,9 +114,8 @@ export function ChecksPanelActiveContent({
   }, [settings, updateSettings])
   const handleOpenCommentInCode = useCallback(
     (comment: PRComment): void => {
-      // Why: an outdated thread has no line the provider still maps, so the code cannot show it.
-      // Everything else opens in the workspace — the provider is a last resort, not a fallback for
-      // a checkout that merely moved on.
+      // Why: only an unopenable comment falls back to the provider — an outdated thread still opens
+      // its file, just without the scroll.
       if (!openCommentInCode(comment) && comment.url) {
         void window.api.shell.openUrl(comment.url)
       }

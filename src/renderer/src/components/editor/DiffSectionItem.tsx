@@ -126,7 +126,11 @@ export function DiffSectionItem({
   // Why: review threads run their own decorator instance rather than joining the local-note list, so
   // the note flow's add-note overlay and draft zone stay out of a comment a user only wants to reply to.
   // Mounted before the local-note decorator because a collapsed thread's line is one the "+" must skip.
-  const prCommentSurface = usePRCommentInlineSurface(prCommentReview ?? null, section.path)
+  const prCommentSurface = usePRCommentInlineSurface(
+    prCommentReview ?? null,
+    section.path,
+    section.oldPath
+  )
   const prCommentGutter = usePRCommentInlineDecorator({
     editor: modifiedEditor,
     monacoModelIdentity: `${modelPathBase}:modified`,

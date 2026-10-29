@@ -44,14 +44,15 @@ describe('resolvePRCommentCodeTarget', () => {
   it('opens the recorded line whenever the provider still maps it', () => {
     expect(resolvePRCommentCodeTarget(comment({ path: 'src/a.ts', line: 42 }), '/repo')).toEqual({
       relativePath: 'src/a.ts',
-      line: 42
+      line: 42,
+      reveal: true
     })
   })
 
-  it('refuses only an outdated thread, whose line the provider no longer maps', () => {
+  it('still opens an outdated thread, but withholds the scroll it cannot vouch for', () => {
     expect(
       resolvePRCommentCodeTarget(comment({ path: 'src/a.ts', line: 42, isOutdated: true }), '/repo')
-    ).toBeNull()
+    ).toEqual({ relativePath: 'src/a.ts', line: 42, reveal: false })
   })
 
   it('refuses a comment no worktree can hold', () => {
@@ -154,12 +155,12 @@ describe('resolvePRCommentCodeSurface', () => {
     }
   })
 
-  it('still rejects a different branch that merely ends in the same characters', () => {
+  it('still rejects a compare against an unrelated base branch', () => {
     expect(
       resolvePRCommentCodeSurface({
         relativePath: 'src/a.ts',
         reviewBaseRefName: 'main',
-        branchCompare: compare({ baseRef: 'origin/feature/not-main' }),
+        branchCompare: compare({ baseRef: 'origin/develop' }),
         branchChanges: [branchEntry('src/a.ts')]
       }).kind
     ).toBe('changes')

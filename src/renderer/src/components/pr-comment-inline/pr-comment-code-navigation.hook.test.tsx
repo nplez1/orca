@@ -140,15 +140,21 @@ describe('usePRCommentCodeNavigation', () => {
     unmountProbes()
   })
 
-  it('refuses an outdated comment, whose line is no longer evidence', async () => {
+  it('opens an outdated comment in the workspace without scrolling to a line it cannot vouch for', async () => {
     await mountProbe(<Probe />)
-    let opened = true
+    let opened = false
     await act(async () => {
       opened = navigate?.(comment({ isOutdated: true })) ?? false
     })
+    await flush()
+    await settleRevealFrames()
 
-    expect(opened).toBe(false)
-    expect(useAppStore.getState().openFiles).toEqual([])
+    expect(opened).toBe(true)
+    expect(
+      useAppStore.getState().openFiles.find((file) => file.relativePath === 'src/a.ts')
+    ).toBeDefined()
+    // The provider is the last resort, not the answer to a checkout that merely moved on.
+    expect(useAppStore.getState().scrollToDiffCommentId).toBeNull()
     unmountProbes()
   })
 })

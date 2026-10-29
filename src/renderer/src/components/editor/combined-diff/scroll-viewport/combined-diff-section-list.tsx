@@ -141,7 +141,8 @@ export function CombinedDiffSectionList({
                   setSections={setSections}
                   modifiedEditorsRef={modifiedEditorsRef}
                   handleSectionSaveRef={handleSectionSaveRef}
-                  prCommentReview={prCommentReview}
+                  // A commit diff shows a historical revision, so review-head lines must not be placed on it.
+                  prCommentReview={isCommitMode ? null : prCommentReview}
                   renderHeaderTrailingContent={(section) => {
                     const fileNoteCount = commentCountByFilePath.get(section.path) ?? 0
                     return fileNoteCount > 0 ? (

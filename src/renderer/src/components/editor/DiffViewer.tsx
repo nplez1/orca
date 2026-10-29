@@ -43,6 +43,7 @@ export default function DiffViewer({
   language,
   filePath,
   relativePath,
+  oldPath,
   sideBySide,
   editable,
   worktreeId,
@@ -95,7 +96,7 @@ export default function DiffViewer({
   // Why: the worktree diff shows the same file the PR reviews, so it draws the same review threads —
   // through its own decorator instance so the local-note add-note flow is untouched.
   const worktreePRComments = useWorktreePRCommentInline(worktreeId)
-  const prCommentSurface = usePRCommentInlineSurface(worktreePRComments, relativePath)
+  const prCommentSurface = usePRCommentInlineSurface(worktreePRComments, relativePath, oldPath)
 
   // Why: only forward the pending scroll id when this viewer owns the comment, else unrelated viewers race to ack it.
   const pendingScrollForThisViewer = useMemo(() => {
