@@ -1513,33 +1513,50 @@ entries passed on Linux** (22/23 pruned entries passed; one absent because it is
 test). So the Mac red set transfers clean, and the four failures are branch gap plus one upstream flake —
 no environment class of Linux's own, the same conclusion the dispatch reached.
 
-### `local(ci)`: the 10-28 merge re-enabled four workflows, and one wedged the cache lane
+### `local(ci)`: four new upstream workflows arrived active, and one was deleting the release line's caches
 
 `node local/check-actions-enablement.mjs` after the 2026-10-28 nightly repair reported **four**
 workflows active that are not on the fork's live list. Enablement is repository state, not tree state,
-so the merge re-enabled them with no diff a reader could see:
+and a workflow file the fork has never had arrives **active** — so a merge that adds one switches it on
+with no diff a reader could see. These four came in with upstream's `d9a7aa89c8` (2026-10-25),
+`581e23319d`, `8b64ec281a` and `965286939d` (2026-10-27).
 
-- **`unit-module-cache.yml`** — the damaging one. It calls `unit-tests.yml` with
-  `runner: blacksmith-8vcpu-ubuntu-2404`, a label this fork provisions no runner for
-  (`gh api repos/nplez1/orca/actions/runners` → `total_count: 0`), so its push-triggered run
-  `40695036546` (2026-10-28T13:17Z, matched by the `**/package.json` path filter) sat `queued` with all
-  five shards for 12 h. Its `concurrency` group is the branch with `cancel-in-progress: true`, so it
-  also **superseded that evening's scheduled run** (`40781154313`, `22:35Z` → `skipped`) — which is how
-  a wedged run costs the cache lane without ever reporting red. Cancelled, then disabled.
-- `computer-macos-native.yml` — upstream's computer-use E2E on `macos-15`, triggered on every PR and
-  daily at 06:00 UTC. No consumer here, and the most expensive label in the set.
+- **`ci-branch-cache-sweep.yml` — the one that made this more than tidying drift.** Its keep-set is
+  `new Set(['refs/heads/main'])`, and this fork's default branch is **`nplez1/main`**
+  (`gh api repos/nplez1/orca --jq .default_branch`), so the release line was what it swept. Its only run,
+  `40762364436` (2026-10-28T20:20Z), logged `Removed 28 idle branch caches (9.39 GB)` and all 28 were
+  `refs/heads/nplez1/main`: `node-cache-*`, `electron-builder-*`, `electron-package-Linux-ARM64-43.8.1`,
+  `native-modules-*` and `pnpm-lockfile-verified-*`. It ran every three hours. The damage is checkable
+  from the other side: the confirmation run below reports `Cache not found for input keys:` for
+  `electron-package-Linux-ARM64-43.8.1`, `native-modules-…-4480ff7f…` and `pnpm-lockfile-verified-Linux-arm64-…`
+  — keys this sweep had deleted 4.5 h earlier, matching down to the lockfile-hash suffix. **Never
+  re-enable it without moving the keep-set to this fork's default branch in a fork hunk**, and it does
+  not belong in `ALLOWED_INERT` either: it has a `schedule`, which is the same reason that list already
+  gives for `fork-main-tests.yml` not being inert-able.
+- **`unit-module-cache.yml`** — asks for `blacksmith-8vcpu-ubuntu-2404`, which nothing here answers, so
+  its run `40695036546` queued all five shards for 12 h before this session cancelled it. Two
+  corrections to the first reading of it, both worth having written down, because both make the wedge
+  **less** costly than it looked. That run was a **push on `main`** — the upstream mirror, carrying
+  upstream's own `f173998203` — not on `nplez1/main`, so `unit-module-cache-${{ github.ref }}` never put
+  it in the release line's concurrency group; and the 22:35Z scheduled run `40781154313` was not
+  superseded, it was **skipped by design**, because `unit_plan` carries
+  `if: github.ref == 'refs/heads/main'` and a schedule on `nplez1/main` can never satisfy it. Every
+  scheduled run of this workflow on this fork is skipped for that reason. So the wedge cost a queue slot
+  and an Actions tab that read "queued" for half a day, not a night of coverage.
+- `computer-macos-native.yml` — upstream's computer-use E2E on `macos-15`, on every PR plus 06:00 UTC.
+  No consumer here, and the most expensive label in the set.
 - `wsl-orcad-e2e-frozen-runner-retry.yml` — inert in practice (it hangs off a `workflow_run` whose
-  parent is disabled) but it is upstream's lane, not this fork's.
-- `ci-branch-cache-sweep.yml` — benign and passing (one green run, `40762364436`), but not on the live
-  list either. Disabled for consistency; **re-enabling it deliberately — an `ALLOWED_INERT` entry plus
-  this record — is the alternative** if Actions cache storage becomes a problem, not leaving it as
-  unrecorded drift.
+  parent is disabled), but it is upstream's lane, not this fork's.
 
-After `--fix`: `76 workflows on nplez1/orca, 10 active (3 required + 7 allowed-inert)` and `OK`. The
-trade, named: the cache producer never had a working runner here, so nothing is lost by disabling it,
-but this fork publishes **no** PR transform cache at all (`pr.yml` is off, so there is no PR consumer
-either) and the nightly pays cold transforms. The useful follow-up is a repoint to `ubuntu-24.04-arm`
-so the producer's key matches the nightly's own restore, not a bare re-enable.
+After `--fix`: `76 workflows on nplez1/orca, 10 active (3 required + 7 allowed-inert)` and `OK`.
+
+**Disabled is the end state for the cache producer, not a repoint.** The tempting fix — run it on
+`ubuntu-24.04-arm` so its key lines up with the nightly — fails in both halves. The nightly passes no
+`module_cache`, whose default in `unit-tests.yml` is `'off'`, so there is no restore step for a producer
+key to match; and a cache written by a run on `main` is visible only to runs on `main` or on the default
+branch, which is `nplez1/main`. Making it real costs three hunks in upstream-owned files — the caller's
+runner, `unit_plan`'s `if:` guard, and `module_cache: warm` on the nightly — for a cache nothing here
+consumes, since `pr.yml` is off and there is no PR shard to warm. Disabled, and no fork hunk taken.
 
 **The nightly itself was already green, and the red an alarm names is stale.** Read at
 2026-10-29T01:00Z: `node local/check-nightly-liveness.mjs` → `PASS`; the newest verdict is run
@@ -1549,18 +1566,25 @@ commit, before `029137ad95` (the sync's 25-file red set) and `1776dcc575` (a dar
 assertion) existed. So a reader must date a red shard against `git log` before treating it as current;
 the run-level word on the Actions page is a day behind the tree.
 
-The Linux red set keeps its one entry. The daemon disconnect race failed again in that same scheduled
-run (`##[warning] unit shard tolerated a known Linux red, already triaged`) and passed in the three
-runs since — the last two of which prompted its own `did not fail here, so its known-red entry may be
-prunable` notice. One pass is not the two consecutive green **scheduled** nights its `exit` condition
-asks for, so it stays and the notice is read as information.
+The Linux red set keeps its one entry. The daemon disconnect race failed in that same scheduled run
+(`##[warning] unit shard tolerated a known Linux red, already triaged`) and passed in **every** run
+since: `40695078222` (on `d96a57ffc6`, shard 3 green; that run failed only shard 1's cooldown
+assertion), `40701735011` (on `1776dcc575`, all five shards) and `40797794635` (below) — the last two
+carrying its own `did not fail here, so its known-red entry may be prunable` notice. It stays anyway:
+the passes are dispatches, and the entry's exit condition asks for two consecutive green **scheduled**
+nights, which has not happened since 2026-10-08. Three failures in seven observations is also too weak
+for a pass count to mean a fix — two passes in a row would happen by luck about a third of the time — so
+the entry now asks for the upstream fix, or five consecutive green scheduled nights.
 
 **Confirmed on the revision this record lands on:** run `40797794635` on `fdd5850d0f` (dispatch,
 2026-10-29T01:01Z) — `plan` green, all five test shards green, `relay integration` skipped as intended,
-and the daemon entry passing rather than absorbed. The run's `##[error]` lines are all upstream
-harness noise a green run carries: an optional `unit-selection-attempt-1` artifact that does not exist
-on a fresh dispatch, a deliberate `TS2322` fixture in the typecheck-path tests, and the `report.json`
-ENOENT cases in the shard-verdict usage tests.
+and the daemon entry passing rather than absorbed. The `##[error]` lines a green run carries are all
+asserted test output, not reds: `src/entry.ts(1,14): error TS2322` is the broken fixture
+`config/scripts/build-cli.test.mjs:171` writes and then asserts the compiler reports, and
+`cannot read report.json: ENOENT` is `tests/tools/unit-shard-verdict.test.mjs` (23 cases, green)
+exercising its own error paths. `Unable to download artifact(s): unit-selection-attempt-1` is the
+optional artifact a fresh dispatch has none of. That run also paid the sweep's bill: the three cold
+`Cache not found` restores named above.
 
 ### `local(sync)`: a file upstream owns is restored, not deleted
 
