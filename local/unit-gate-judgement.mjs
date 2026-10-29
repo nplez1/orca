@@ -251,6 +251,148 @@ export function collectedQuarantinedFiles(report, quarantined) {
     .filter((file) => set.has(file))
 }
 
+// What Vitest substitutes into an `it.each` title: printf tokens (including a literal `%%`), `$name`
+// off a table row, and a template literal's own interpolations.
+const SUBSTITUTION = /(%[$#%sdifjoOp]|\$\{[^}]*\}|\$[A-Za-z_][\w.]*)/
+const MODIFIERS_WITH_ARGUMENTS = new Set(['each', 'for', 'runIf', 'skipIf'])
+// Why the suffix: the repo also names its case tables `itRunsUnixShell.each(...)`, `testEach(...)`.
+const TITLE_CALLER = /\b(?:describe|it|test|suite)[\w$]*/g
+const NEVER_RUNS = new Set(['skip', 'todo'])
+const RELATIVE_SPECIFIER = /(['"`])((?:\.{1,2}\/)[^'"`\n]*)\1/g
+
+/**
+ * The relative modules a test file pulls its cases in from, so a title can be found where it is
+ * written rather than only in the file the entry names: `orca-runtime.test.ts` does `await
+ * import('./orca-runtime-tests/x.spec')`. Callers read those files; this function stays pure.
+ */
+export function importedCaseSpecifiers(source) {
+  return [
+    ...new Set(
+      [...source.matchAll(RELATIVE_SPECIFIER)]
+        .map((match) => match[2])
+        .filter((specifier) => specifier.includes('.spec'))
+    )
+  ]
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** A source title as a pattern: the parts Vitest fills in become wildcards. */
+function titlePattern(text) {
+  return text
+    .split(SUBSTITUTION)
+    .map((part, index) => (index % 2 === 1 ? '[\\s\\S]*?' : escapeRegExp(part)))
+    .join('')
+}
+
+function skipSpace(source, index) {
+  while (index < source.length && /\s/.test(source[index])) {
+    index++
+  }
+  return index
+}
+
+function closeOf(source, open) {
+  let depth = 0
+  for (let index = open; index < source.length; index++) {
+    const char = source[index]
+    if (char === '(') {
+      depth++
+    } else if (char === ')') {
+      depth--
+      if (depth === 0) {
+        return index
+      }
+    }
+  }
+  return -1
+}
+
+function readLiteral(source, index) {
+  const quote = source[index]
+  if (quote !== "'" && quote !== '"' && quote !== '`') {
+    return null
+  }
+  let text = ''
+  for (let scan = index + 1; scan < source.length; scan++) {
+    const char = source[scan]
+    if (char === '\\') {
+      text += source[scan + 1] ?? ''
+      scan++
+    } else if (char === quote) {
+      return { text, end: scan + 1 }
+    } else {
+      text += char
+    }
+  }
+  return null
+}
+
+/** The title strings the file gives a `describe` and each test, in source order. */
+function collectTitles(source) {
+  const describes = []
+  const tests = []
+  for (const caller of source.matchAll(TITLE_CALLER)) {
+    let index = skipSpace(source, caller.index + caller[0].length)
+    let runs = true
+    while (source[index] === '.') {
+      index = skipSpace(source, index + 1)
+      const name = /^[\w$]+/.exec(source.slice(index))?.[0] ?? ''
+      index = skipSpace(source, index + name.length)
+      // Why: a skipped or todo case never fails, so its title cannot be a known red.
+      if (NEVER_RUNS.has(name)) {
+        runs = false
+      }
+      if (source[index] === '<') {
+        const end = source.indexOf('>', index)
+        index = skipSpace(source, end === -1 ? index : end + 1)
+      }
+      // Why: `it.concurrent(` takes no arguments of its own, `.each(table)(` does.
+      if (MODIFIERS_WITH_ARGUMENTS.has(name) && source[index] === '(') {
+        const close = closeOf(source, index)
+        index = skipSpace(source, close === -1 ? index : close + 1)
+      }
+    }
+    if (!runs || source[index] !== '(') {
+      continue
+    }
+    const literal = readLiteral(source, skipSpace(source, index + 1))
+    if (literal) {
+      ;(caller[0].startsWith('describe') ? describes : tests).push(literal.text)
+    }
+  }
+  return { describes, tests }
+}
+
+/**
+ * Whether the file can still produce `title` as a Vitest full name, which is its `describe` chain and
+ * its own title joined by single spaces.
+ *
+ * Why this exists: `gate-unit.mjs` derives staleness only from entries that matched a failure, so an
+ * entry whose test was deleted is structurally invisible — it sits in the manifest for ever, and the
+ * run that would disprove it costs 25 minutes. A static check catches the same rot at PR time.
+ *
+ * It over-approximates on purpose: the cost of a false "still there" is that rot hides until the next
+ * full run, while the cost of a false "dead" is a live entry deleted. `source` may therefore be the
+ * file plus the `.spec` modules it imports, and two shapes still count as present when they are not:
+ * a title surviving only in a comment, and one behind a callee the scan cannot resolve, such as
+ * `(cond ? it : it.skip)('title')`.
+ */
+export function titleExistsInSource(title, source) {
+  const { describes, tests } = collectTitles(source)
+  const chain = describes.length > 0 ? `(?:${describes.map(titlePattern).join('|')}) ` : null
+  return tests.some((text) => {
+    const own = titlePattern(text)
+    if (new RegExp(`^${own}$`).test(title)) {
+      return true
+    }
+    // Why 1..4: describe blocks nest, and a deeper chain is the only shape left to allow.
+    return chain !== null && new RegExp(`^(?:${chain}){1,4}${own}$`).test(title)
+  })
+}
+
 /**
  * Vitest exits non-zero for a failing test, so its status alone proves nothing — it proves something
  * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which explains a failed

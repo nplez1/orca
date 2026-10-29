@@ -19,6 +19,13 @@
     "the electron, node-pty, live-shell and cross-version-wire ones — are upstream-quarantined and",
     "deliberately absent here.",
     "",
+    "A dead entry cannot be reported by the gate at all: staleness is derived only from an entry that",
+    "matched a failure, so an entry naming a case upstream deleted would sit here for ever. Every",
+    "entry's title is therefore also checked against its own file, statically, by",
+    "tests/tools/unit-gate.test.mjs (`titleExistsInSource` in local/unit-gate-judgement.mjs). A title",
+    "Vitest only assembles at run time — an `it.each` substitution — is matched with that part as a",
+    "wildcard.",
+    "",
     "An entry may carry a `match` regex, tested against the first line of the failure message. It is",
     "what stops an allowlisted test from covering a NEW failure under the same name: without it the",
     "entry matches on file and title alone, so a passed-in reason stays \"known\" for as long as the",
@@ -680,23 +687,6 @@
       "flaky": false
     },
     {
-      "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
-      "test": "complete streaming profile validation accepts extra columns that shadow every SQLite rowid alias",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite refuses the extra column that shadows its rowid alias (`cannot add rowid alias: rowid`) where the contract expects it accepted.",
-      "flaky": false,
-      "match": "cannot add rowid alias"
-    },
-    {
-      "file": "src/main/sqlite/sync-database-portability.test.ts",
-      "test": "SQLite runtime contract rejects explicit undefined bindings before modifying rows",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite's own binding behaviour differs from what the contract assumes ('rejects explicit undefined bindings').",
-      "flaky": false
-    },
-    {
       "file": "config/scripts/reclaim-worktree-generated-files.test.mjs",
       "test": "reclaims read-only generated directories without chmodding hardlinked package files",
       "class": "host-toolchain",
@@ -704,69 +694,6 @@
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream file, byte-identical to 0571e45107. The script recovers only from EACCES/EPERM; under bun on macOS (1.4.3 and 1.4.4 both probed) fs.rm on a 0o555 directory fails with ENOTEMPTY instead, where Node reports EACCES, so the in-process case cannot recover and its afterEach then also fails ENOTEMPTY. The CLI cases, which spawn Node, pass.",
       "flaky": false,
       "match": "Some generated directories could not be removed"
-    },
-    {
-      "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
-      "test": "reads committed SQLite and changes stopped fixtures without rewriting retained JSON",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false,
-      "match": "Unable to read profile state database"
-    },
-    {
-      "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
-      "test": "refuses a fixture write while a runtime is admitted and releases the refused owner",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false,
-      "match": "Unable to read profile state database"
-    },
-    {
-      "file": "src/main/runtime/editor-view-layout-apply.test.ts",
-      "test": "main's Store apply keeps an editor tab's in-memory view a view-only re-send sticks, a close drops it, and no view reaches disk",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false,
-      "match": "Unable to read profile state database"
-    },
-    {
-      "file": "src/main/runtime/restored-editor-move-restart.test.ts",
-      "test": "an editor tab Orca moved survives restart main loads the moved tab and its file record in the new workspace only",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false,
-      "match": "Unable to read profile state database"
-    },
-    {
-      "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
-      "test": "a terminal created by the CLI, across a restart, layout-owner build is left alone while its run owns it, and after a restart is shown like any other",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false,
-      "match": "Unable to read profile state database"
-    },
-    {
-      "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
-      "test": "a terminal created by the CLI, across a restart, layout-owner build one whose pane was saved stays in that pane after a restart, with no second tab",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false,
-      "match": "Unable to read profile state database"
-    },
-    {
-      "file": "src/main/ai-vault-search/session-search-indexer.test.ts",
-      "test": "stops everything on close, including work already queued",
-      "class": "sqlite-binding",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false,
-      "match": "unable to open database file"
     }
   ],
   "prunedSince": [
@@ -930,6 +857,69 @@
       "class": "macos-path-semantics",
       "commit": "05fd6bd8e0",
       "reason": "same unresolved-tmpdir defect in a spawned child's reported cwd"
+    },
+    {
+      "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
+      "test": "complete streaming profile validation accepts extra columns that shadow every SQLite rowid alias",
+      "class": "sqlite-binding",
+      "commit": "e5f1eef466",
+      "reason": "upstream #34661 (`e5f1eef466`) reworked this case to build the shadowed-rowid table through `CREATE TABLE` instead of an `ALTER TABLE … ADD COLUMN` alias, which SQLite 3.54 refuses; the recorded cause blamed a bundled binding, but the change was a Node runtime upgrade every machine took. Re-measured 2026-10-29: 16/16 pass."
+    },
+    {
+      "file": "src/main/sqlite/sync-database-portability.test.ts",
+      "test": "SQLite runtime contract rejects explicit undefined bindings before modifying rows",
+      "class": "sqlite-binding",
+      "commit": "e5f1eef466",
+      "reason": "the case no longer exists: upstream #34661 (`e5f1eef466`) deleted it because Node 26.10 binds an explicit `undefined` as NULL, so the contract it asserted was gone. A dead entry can never be reported stale by the gate — it derives staleness only from entries that matched a failure — which is why `tests/tools/unit-gate.test.mjs` now checks every title against its file."
+    },
+    {
+      "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
+      "test": "reads committed SQLite and changes stopped fixtures without rewriting retained JSON",
+      "class": "sqlite-binding",
+      "commit": "2ecae9a7470",
+      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4's WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
+    },
+    {
+      "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
+      "test": "refuses a fixture write while a runtime is admitted and releases the refused owner",
+      "class": "sqlite-binding",
+      "commit": "2ecae9a7470",
+      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4's WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
+    },
+    {
+      "file": "src/main/runtime/editor-view-layout-apply.test.ts",
+      "test": "main's Store apply keeps an editor tab's in-memory view a view-only re-send sticks, a close drops it, and no view reaches disk",
+      "class": "sqlite-binding",
+      "commit": "a886dcd1fe9",
+      "reason": "already green before the prune: upstream #33533 (`a886dcd1fe9`, merged by the 2026-10-28 sync) added `terminal-topology-profile-fixture` to the SQLite harness list the import scan keys on, so the file had been running in the Node project since that sync. Re-measured 2026-10-29: 3/3, 1/1 and 9/9 pass."
+    },
+    {
+      "file": "src/main/runtime/restored-editor-move-restart.test.ts",
+      "test": "an editor tab Orca moved survives restart main loads the moved tab and its file record in the new workspace only",
+      "class": "sqlite-binding",
+      "commit": "a886dcd1fe9",
+      "reason": "already green before the prune: upstream #33533 (`a886dcd1fe9`, merged by the 2026-10-28 sync) added `terminal-topology-profile-fixture` to the SQLite harness list the import scan keys on, so the file had been running in the Node project since that sync. Re-measured 2026-10-29: 3/3, 1/1 and 9/9 pass."
+    },
+    {
+      "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
+      "test": "a terminal created by the CLI, across a restart, layout-owner build is left alone while its run owns it, and after a restart is shown like any other",
+      "class": "sqlite-binding",
+      "commit": "a886dcd1fe9",
+      "reason": "already green before the prune: upstream #33533 (`a886dcd1fe9`, merged by the 2026-10-28 sync) added `terminal-topology-profile-fixture` to the SQLite harness list the import scan keys on, so the file had been running in the Node project since that sync. Re-measured 2026-10-29: 3/3, 1/1 and 9/9 pass."
+    },
+    {
+      "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
+      "test": "a terminal created by the CLI, across a restart, layout-owner build one whose pane was saved stays in that pane after a restart, with no second tab",
+      "class": "sqlite-binding",
+      "commit": "a886dcd1fe9",
+      "reason": "already green before the prune: upstream #33533 (`a886dcd1fe9`, merged by the 2026-10-28 sync) added `terminal-topology-profile-fixture` to the SQLite harness list the import scan keys on, so the file had been running in the Node project since that sync. Re-measured 2026-10-29: 3/3, 1/1 and 9/9 pass."
+    },
+    {
+      "file": "src/main/ai-vault-search/session-search-indexer.test.ts",
+      "test": "stops everything on close, including work already queued",
+      "class": "sqlite-binding",
+      "commit": "2ecae9a7470",
+      "reason": "the file now runs in the Node project, not Bun: its `node:sqlite` dependency is indirect, so `findSqliteRuntimeTests` never classified it, and it was only failing on Bun 1.4.4's WAL reopen (`unable to open database file`). Added to `NODE_RUNTIME_INCLUDE` in this revision; it passes 3/3 (persisted-profile-state.unit) and 42/42 (session-search-indexer) there, against 2/3 and 1/42 under Bun."
     }
   ]
 }

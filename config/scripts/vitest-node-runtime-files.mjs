@@ -20,6 +20,12 @@ const NODE_RUNTIME_INCLUDE = [
   // Node project like upstream's own session-search suites above.
   'src/main/ai-vault-search/session-search-instance.test.ts',
   'src/main/ai-vault-search/session-search-list-latency.test.ts',
+  // LOCAL(nplez1): reaches node:sqlite only through the indexer, the schema and its fixture, none of
+  // which `findSqliteRuntimeTests` follows, so it ran under Bun and failed on the WAL reopen.
+  'src/main/ai-vault-search/session-search-indexer.test.ts',
+  // LOCAL(nplez1): imports the profile-state modules directly rather than one of the harnesses the
+  // import scan keys on, so it ran under Bun and failed on the WAL reopen.
+  'tests/e2e/helpers/persisted-profile-state.unit.test.ts',
   'src/main/ai-vault/session-scanner-unlimited-dedup.test.ts',
   // The parse cache persists through node:sqlite.
   'src/main/ai-vault/session-parse-cache-antigravity-upgrade.test.ts',

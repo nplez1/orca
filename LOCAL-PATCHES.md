@@ -629,7 +629,15 @@ signature that identifies it. None imports a module this fork changed.
 - `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
   `src/main/persistence/profile-state/profile-state-streaming-validation.test.ts` ("cannot add
   rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
-  assume; neither file is imported by anything this fork touches.
+  assume; neither file is imported by anything this fork touches. **Both are closed, and the second
+  diagnosis was wrong about the cause (2026-10-29).** The rowid case did fail on SQLite 3.54's refusal
+  to add a `rowid` alias by `ALTER TABLE … ADD COLUMN` — that part held — but the upgrade came in with a
+  Node release every machine took, so the fix was to update the test, not to allowlist it; upstream
+  #34661 (`e5f1eef466`) rebuilt it to shadow the aliases through `CREATE TABLE`. The undefined-bindings
+  case was the same story with a different ending: #34661 deleted it, because Node 26.10 binds an
+  explicit `undefined` as NULL, so the contract it asserted no longer existed. Neither was something
+  "the bundled SQLite" did to this fork alone, and that is what made the first one dangerous: a dead
+  entry can never be reported stale.
 - `src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
   output", the PTY/subprocess class recorded above.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
@@ -704,6 +712,9 @@ What it deliberately does not do:
   cache is keyed `(HEAD, allowlist hash)` under `.git/orca-gate/`, which is what stops a re-run on an
   unchanged revision from proving anything.
 - A missing or unreadable report, a run with no tests, and a timeout all fail closed.
+- It does not, on its own, report a _dead_ entry — one naming a case that no longer exists — because
+  staleness comes only from an entry that matched a failure. `tests/tools/unit-gate.test.mjs` closes
+  that statically instead, so the blind spot is checked at PR time rather than by the next full run.
 
 The first reconciled run (2026-10-21, `1a64dbe2f6`) found 29 failing cases: 24 allowlisted across nine
 files, and two files that are red on their own and so are deliberately **not** listed —
@@ -912,9 +923,10 @@ could not split.
 It is fork-local: upstream keeps `pnpm lint`'s exit code and CI is unchanged.
 `tests/tools/lint-gate.test.mjs` covers the chain reader, the per-step failure split and the
 classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: the whole chain is
-~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is **not**
-empty: it holds two entries, both under `lint:ast-grep-gates` (see `local(lint)` below). It is the place
-a future red on the base branch gets recorded with its evidence instead of being re-derived by hand.
+~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is now
+**empty**: its two entries were fixed in the tree on 2026-10-29 rather than allowlisted (see
+`local(lint)` below). It is the place a future red on the base branch gets recorded with its evidence
+instead of being re-derived by hand.
 This file stays the evidence and the JSON the assertion, as with the unit red set.
 
 ### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
@@ -1287,6 +1299,18 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   `-shm` behind, which hid it. Probe: writer in WAL mode, `close()`, `new DatabaseSync(p, { readOnly: true })`
   — Node 26.11.1 opens it, bun 1.4.3 opens it, bun 1.4.4 throws `unable to open database file`. The same
   HEAD passes all five files under bun 1.4.3. Product code runs on Electron's Node, not this path.
+  **All seven are closed (2026-10-29), and none of them by a test fix.** The three topology files were
+  already green: upstream #33533 (`a886dcd1fe9`, merged with the 10-28 sync) added
+  `terminal-topology-profile-fixture` to the harness list `config/scripts/vitest-sqlite-runtime-scan.mjs`
+  keys on, so `getNodeRuntimeInclude()` had been routing them to the Node project all along. The other
+  two — `tests/e2e/helpers/persisted-profile-state.unit.test.ts` and
+  `src/main/ai-vault-search/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
+  scan does not follow, so they really were running under Bun; both are now listed in
+  `NODE_RUNTIME_INCLUDE` with the reason, and both pass (3/3 and 42/42) where they failed 2/3 and 1/42.
+  `vitest-node-runtime-boundary.test.ts` pins the two entries, because nothing else would notice their
+  removal. The hazard the audit named is the real reason this mattered: the entries' `match`,
+  `Unable to read profile state database`, is exactly what a genuine profile-state open regression
+  throws, so the allowlist could not have seen one.
 - **`verify-cli-bin`, `macos-path-semantics`** — new upstream case; the child's `process.cwd()` reports
   `/private/var/…` against the unresolved `os.tmpdir()` the case compares.
 - **`reclaim-worktree-generated-files`, `host-toolchain`** — new upstream file. The script recovers from
@@ -1719,34 +1743,55 @@ The `orca-runtime` pair above is the other two.
 
 Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
 test fix that will conflict once, benignly, when upstream makes the same change — the same trade
-upstream itself made in #33540. **The class is now empty**: 40 entries at the 2026-10-26 baseline, 17
-today, and all 17 are `host-toolchain` (8) and `sqlite-binding` (9) — a different machine's different bun
-and SQLite, which is not something this fork can fix in a test. The `host-toolchain` entries that were
-bash 3.2 rather than bun or SQLite are gone with the bash install recorded above.
+upstream itself made in #33540. **The `sqlite-binding` class is now empty too**: 40 entries at the
+2026-10-26 baseline, 17 after that repair, and **8 today, all `host-toolchain`** — the dev-rebuild
+timeouts (6), the bun `fs.rm` on a read-only directory (1) and one facade case (1). The nine
+`sqlite-binding` entries went on 2026-10-29: seven because the suites were re-seated or re-routed into
+the Node project (`a886dcd1fe9` for the four topology cases, and `2ecae9a7470` for the three the
+import scan had never classified), two because upstream #34661 (`e5f1eef466`) deleted or rebuilt the
+cases they named. The `host-toolchain` entries that were bash 3.2 rather than
+bun or SQLite are gone with the bash install recorded above.
 
-### `local(lint)`: two flaky-test-pattern reds inherited from #198
+**The manifest can now notice its own dead entries.** `local/gate-unit.mjs` derives staleness only
+from an entry that _matched a failure_, so an entry naming a test upstream deleted is structurally
+invisible: it sits in the file for ever and no run will ever derive it, because deriving it needs a
+failure it can no longer produce. `tests/tools/unit-gate.test.mjs` therefore checks every entry's title
+against its own file, statically, at PR time — a Vitest full name is the `describe` chain and the
+case title joined by single spaces, so `titleExistsInSource` in `local/unit-gate-judgement.mjs`
+rebuilds that shape from the file's title literals (treating an `it.each` substitution as a
+wildcard). It found the one dead entry this section used to describe and no other.
 
-`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` fails
+### `local(lint)`: the two #198 flaky-test-pattern reds, fixed in the tree and pruned
+
+`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` failed
 `lint:ast-grep-gates` on two files that commit merged, and on nothing else. That step is where these
 live now: the 2026-10-28 sync folded upstream's `check:flaky-test-pattern-ratchet` into
-`lint:ast-grep-gates`, and `local/lint-known-red.json` follows the rename. The red itself did not change.
+`lint:ast-grep-gates`, and `local/lint-known-red.json` followed the rename. The red itself did not
+change.
 
 ```
 test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details.test.tsx: 1 flaky-test finding(s), baseline allows 0.
 test-no-wall-clock:src/renderer/src/components/github/check-details-cache.test.ts: 4 flaky-test finding(s), baseline allows 0.
 ```
 
-Both are static ast-grep findings, so they are deterministic, not flaky-that-time: neither file was
-touched by the branch that ran the gate, and both arrive through the base commit. Recording them is
-the `local(lint)` mechanism's reason for existing — the alternative was a branch either fixing another
-branch's fresh tests or quietly not running the gate.
+Both are static ast-grep findings, so they are deterministic rather than flaky-that-time, and both
+arrive through `941acb70e0` — the fork's own work, not a foreign red. They were allowlisted for one
+release line and are now fixed where the ratchet asked for them, so both entries are gone:
 
-`local/lint-known-red.json` carries one narrow entry per file (the `match` names the rule and the
-path, so a _new_ finding in either file still fails the gate). The fix belongs to whoever owns the
-checks-panel work: a wall-clock read and a real-time wait in a test are what
-`config/scripts/check-flaky-test-pattern-ratchet.mjs` exists to catch (now reached through
-`lint:ast-grep-gates`), and both want fake timers or a fixed timestamp, not a suppression. **Pruning
-wins**: when that lands, delete both entries and this section in the same commit.
+- `check-details-cache.test.ts` pins the clock with `vi.useFakeTimers()` + `vi.setSystemTime()`. That
+  is what the four `Date.now()` reads needed: `checkDetailsNeedRefresh` compares a payload's `readAt`
+  against the wall clock, so the TTL cases were really asking how fast the machine ran them.
+- `checks-list-expanded-details.test.tsx` drives `useDelayedFlag`'s 200 ms deferral with
+  `vi.advanceTimersByTimeAsync(250)` instead of sleeping 250 real milliseconds to catch a label a fast
+  machine never shows. The case went from a real quarter-second wait to milliseconds.
+
+**The claim that stood here was false, which is the argument for fixing rather than allowlisting.** It
+said the entries' `match` named the rule and the path, "so a _new_ finding in either file still fails
+the gate". It does not. The ratchet prints one line per rule and file — `<rule>:<path>: N flaky-test
+finding(s), baseline allows M.` — and the regex is anchored on the rule and the path alone, so a fifth
+`Date.now()` in `check-details-cache.test.ts` would have printed the same line and been masked. A
+`match` narrows an entry to one file; it does not pin the count, so it cannot notice new findings in
+an allowlisted file.
 
 ### `local(lint)`: a base-branch typecheck red, repaired rather than recorded
 
@@ -1762,9 +1807,9 @@ whole-step `lint-known-red.json` entry covering six lines (one `max-lines` error
 `docs/site` warnings from `6aba202d5e`). `d96a57ffc6` recorded it as stale on the 2026-10-28 sync and
 pruned it, and that commit's own note in `local/lint-known-red.json` says so — but the section describing
 it stayed behind, saying of itself "delete the entry and this section". Both are gone now.
-`local/lint-known-red.json` holds two entries, each narrowed by `match` to one rule and path, both under
-`lint:ast-grep-gates`. Nothing in the file covers a whole step any more, which is what the file's own note
-asks for.
+`local/lint-known-red.json` is empty as of 2026-10-29: both entries it held under `lint:ast-grep-gates`
+were fixed in the tree with fake timers rather than allowlisted, so nothing in the file covers a whole
+step — or any step at all. The file keeps its note and its mechanism for the next base-branch red.
 
 ## Syncing with upstream
 

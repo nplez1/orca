@@ -23,23 +23,12 @@
     "reproducing is reported stale; `node local/gate-lint.mjs --prune` drops it.",
     "",
     "2026-10-28 sync: upstream folded `check:flaky-test-pattern-ratchet` into `lint:ast-grep-gates`,",
-    "so the two #198 entries follow that step. The bare `oxlint` entry went stale and was pruned."
+    "so the two #198 entries follow that step. The bare `oxlint` entry went stale and was pruned.",
+    "",
+    "2026-10-29: the two #198 entries were fixed in the tree — fake timers in `check-details-cache`,",
+    "`advanceTimersByTimeAsync` in `checks-list-expanded-details` — and pruned with them. `entries` is",
+    "empty on purpose: an empty list is what this mechanism is aiming at."
   ],
-  "recordedAt": "2026-10-28",
-  "entries": [
-    {
-      "step": "lint:ast-grep-gates",
-      "match": "^test-no-wall-clock:src/renderer/src/components/github/check-details-cache\\.test\\.ts:",
-      "class": "foreign-red",
-      "owner": "941acb70e0 fix(checks): keep cached check details on screen instead of re-spinning (#198)",
-      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198. The step was renamed by the 2026-10-28 sync (upstream folds the flaky ratchet into ast-grep-gates); the red is unchanged."
-    },
-    {
-      "step": "lint:ast-grep-gates",
-      "match": "^test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details\\.test\\.tsx:",
-      "class": "foreign-red",
-      "owner": "941acb70e0 fix(checks): keep cached check details on screen instead of re-spinning (#198)",
-      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198. Same step rename as the entry above."
-    }
-  ]
+  "recordedAt": "2026-10-29",
+  "entries": []
 }

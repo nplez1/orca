@@ -78,6 +78,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   act(() => {
     root.unmount()
   })
@@ -561,6 +562,9 @@ describe('ChecksList expanded check details', () => {
   // The bug this pane had: a poll that landed while a detail was open deleted its entry before
   // refetching, so the rows came back as a spinner on their own.
   it('keeps its rows on screen while a moved check refreshes behind them', async () => {
+    // Why fake timeouts: the refreshing label is deferred 200 ms, and sleeping that long for real
+    // made the case wait on how loaded the machine was.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const runningCheck: PRCheckDetail = {
       name: 'test: unit',
       status: 'in_progress',
@@ -600,9 +604,15 @@ describe('ChecksList expanded check details', () => {
     expect(onLoadCheckDetails).toHaveBeenCalledTimes(2)
     expect(container.textContent).toContain('Verify failed')
     expect(container.textContent).not.toContain('Loading check details…')
-    // Why the wait: the refreshing label is deferred, so a fast read never flashes it.
+    // Why both assertions: the label is *deferred*, so proving it appears says nothing unless it is
+    // also absent before the delay. With the clock faked, the pair is what pins `useDelayedFlag`.
+    expect(container.textContent).not.toContain('Refreshing check details…')
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250))
+      await vi.advanceTimersByTimeAsync(199)
+    })
+    expect(container.textContent).not.toContain('Refreshing check details…')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(51)
     })
     expect(container.textContent).toContain('Refreshing check details…')
 
