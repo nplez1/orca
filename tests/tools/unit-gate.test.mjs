@@ -360,6 +360,12 @@ describe('a title the file can still produce', () => {
     const rows = `it.each([{ name: 'macos' }])('launches through the $name launcher', () => {})`
     expect(titleExistsInSource('launches through the macos launcher', rows)).toBe(true)
     expect(titleExistsInSource('launches through the $name launcher', rows)).toBe(true)
+    // Why `%%`: Vitest renders it as one `%`, so a literal-`%%` pattern would call the case dead.
+    const percent = `it.each([1])('shows 50%% done for %s', () => {})`
+    expect(titleExistsInSource('shows 50% done for 1', percent)).toBe(true)
+    expect(titleExistsInSource('shows an object: %$', `it.each([1])('shows an object: %$')`)).toBe(
+      true
+    )
   })
 
   it('covers the shapes this repo writes titles in', () => {

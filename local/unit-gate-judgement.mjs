@@ -251,9 +251,9 @@ export function collectedQuarantinedFiles(report, quarantined) {
     .filter((file) => set.has(file))
 }
 
-// What Vitest substitutes into an `it.each` title: printf tokens, `$name` off a table row, and a
-// template literal's own interpolations.
-const SUBSTITUTION = /(%[$#sdifjoOp]|\$\{[^}]*\}|\$[A-Za-z_][\w.]*)/
+// What Vitest substitutes into an `it.each` title: printf tokens (including a literal `%%`), `$name`
+// off a table row, and a template literal's own interpolations.
+const SUBSTITUTION = /(%[$#%sdifjoOp]|\$\{[^}]*\}|\$[A-Za-z_][\w.]*)/
 const MODIFIERS_WITH_ARGUMENTS = new Set(['each', 'for', 'runIf', 'skipIf'])
 // Why the suffix: the repo also names its case tables `itRunsUnixShell.each(...)`, `testEach(...)`.
 const TITLE_CALLER = /\b(?:describe|it|test|suite)[\w$]*/g
@@ -376,8 +376,9 @@ function collectTitles(source) {
  *
  * It over-approximates on purpose: the cost of a false "still there" is that rot hides until the next
  * full run, while the cost of a false "dead" is a live entry deleted. `source` may therefore be the
- * file plus the `.spec` modules it imports, and a title surviving only in a comment still counts as
- * present — the one shape this check cannot tell apart without parsing.
+ * file plus the `.spec` modules it imports, and two shapes still count as present when they are not:
+ * a title surviving only in a comment, and one behind a callee the scan cannot resolve, such as
+ * `(cond ? it : it.skip)('title')`.
  */
 export function titleExistsInSource(title, source) {
   const { describes, tests } = collectTitles(source)
