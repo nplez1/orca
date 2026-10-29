@@ -1,73 +1,76 @@
 #!/usr/bin/env bash
-# Refuse a tag mirror that would move or delete a tag this fork already publishes.
+# Refuse a tag mirror that would move a tag this fork already publishes.
 #
-# Why: `.github/workflows/fork-upstream-tags.yml` pushes `refs/tags/v*` without `--force`, so today
-# an existing tag cannot be moved — but that was a property of the command line, not of the job, and
+# Why: `.github/workflows/fork-upstream-tags.yml` pushes `refs/tags/v*` without `--force`, so today an
+# existing tag cannot be moved — but that was a property of the command line, not of the job, and
 # nothing said so if someone added `--force`, `--mirror` or a refspec. Worse, the PAT the mirror
 # authenticates with belongs to the account that is the `exempt` bypass actor on the only ruleset
 # protecting `refs/heads/nplez1/main`, and no tag ruleset exists at all — so there is no server-side
 # backstop either.
 #
-# This makes the guarantee explicit and testable: read both remotes, and refuse when a tag the mirror
-# is about to send already exists somewhere else. Tags that exist only on the fork are left alone (the
-# mirror only adds), and a tag identical on both is a no-op.
+# This makes the guarantee explicit and testable: compare the tags this checkout is about to push
+# against the tags the fork already has, and refuse when one name exists at another commit. Tags that
+# exist only on the fork are left alone (the mirror only adds), and a tag identical on both is a no-op.
+# It reads local refs rather than upstream's, because local refs are exactly what the push sends.
 #
-# usage: fork-tag-mirror-guard.sh ORIGIN-REMOTE UPSTREAM-REMOTE
+# Written for bash 3.2, which is what macOS still ships: no associative arrays, and the comparison is
+# awk, so a workstation without Homebrew bash runs the same code the runner does.
+#
+# usage: fork-tag-mirror-guard.sh ORIGIN-REMOTE
 # exit: 0 only additions, 1 a tag would move, 2 environment problem
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: fork-tag-mirror-guard.sh ORIGIN-REMOTE UPSTREAM-REMOTE" >&2
+if [ "$#" -ne 1 ]; then
+  echo "usage: fork-tag-mirror-guard.sh ORIGIN-REMOTE" >&2
   exit 2
 fi
 
 origin="$1"
-upstream="$2"
+remote_file="$(mktemp -t orca-mirror-remote)"
+local_file="$(mktemp -t orca-mirror-local)"
+trap 'rm -f "$remote_file" "$local_file"' EXIT
 
 # `--refs` drops the `^{}` dereference lines, so an annotated tag compares as its tag object on both
-# sides rather than as tag object here and commit there.
-remote_tags() {
-  git ls-remote --tags --refs "$1" 'v*' 2>/dev/null | awk '{ sub(/^refs\/tags\//, "", $2); print $2, $1 }'
-}
-
-upstream_tags="$(remote_tags "$upstream")" || {
-  echo "mirror guard: cannot read tags from $upstream" >&2
-  exit 2
-}
-origin_tags="$(remote_tags "$origin")" || {
-  echo "mirror guard: cannot read tags from $origin" >&2
-  exit 2
-}
-
-if [ -z "$upstream_tags" ]; then
-  echo "mirror guard: $upstream publishes no v* tags — refusing to push an empty mirror" >&2
+# sides rather than as tag object locally and commit remotely.
+if ! git ls-remote --tags --refs "$origin" 'v*' 2>/dev/null |
+  awk '{ sub(/^refs\/tags\//, "", $2); print $2, $1 }' >"$remote_file"; then
+  echo "mirror guard: cannot read tags from $origin — nothing was pushed" >&2
   exit 2
 fi
 
-declare -A existing=()
+# What the push will actually send: the checkout's own v* tags, which the mirror job fetched from
+# upstream a moment ago.
+if ! git for-each-ref --format='%(refname:short) %(objectname)' 'refs/tags/v*' >"$local_file"; then
+  echo "mirror guard: cannot read this checkout's tags — nothing was pushed" >&2
+  exit 2
+fi
 
-declare -A existing=()
-while read -r name sha; do
-  [ -n "${name:-}" ] && existing["$name"]="$sha"
-done <<<"$origin_tags"
+if [ ! -s "$local_file" ]; then
+  echo "mirror guard: this checkout has no v* tags to mirror, so the fetch found nothing upstream — nothing was pushed" >&2
+  exit 2
+fi
 
-moved=0
-added=0
-while read -r name sha; do
-  [ -n "${name:-}" ] || continue
-  current="${existing[$name]:-}"
-  if [ -z "$current" ]; then
-    added=$((added + 1))
-  elif [ "$current" != "$sha" ]; then
-    printf 'mirror guard: refusing to move %s — %s has it at %s, %s now has it at %s\n' \
-      "$name" "$origin" "$current" "$upstream" "$sha" >&2
-    moved=$((moved + 1))
-  fi
-done <<<"$upstream_tags"
+counts="$(awk -v origin="$origin" '
+  BEGIN { added = 0; moved = 0 }
+  NR == FNR { remote[$1] = $2; next }
+  {
+    if (!($1 in remote)) { added++; next }
+    if (remote[$1] != $2) {
+      printf "mirror guard: refusing to move %s — %s has it at %s, this checkout has it at %s\n", $1, origin, remote[$1], $2 > "/dev/stderr"
+      moved++
+    }
+  }
+  END { printf "%d %d\n", added, moved }
+' "$remote_file" "$local_file")"
+read -r added moved <<<"$counts"
 
-if [ "$moved" -gt 0 ]; then
-  echo "mirror guard: $moved tag(s) already exist at another commit; nothing was pushed." >&2
+if [ "${moved:-0}" -gt 0 ]; then
+  # Why no automatic remedy: the fork's own tag and a moved upstream tag are both legitimate, and
+  # choosing which one wins is a release decision this job must not make.
+  echo "mirror guard: at least one tag already exists at another commit; nothing was pushed." >&2
+  echo "mirror guard: decide deliberately — adopt upstream's commit for that tag by hand, or stop" >&2
+  echo "mirror guard: mirroring that name — then re-run. The mirror never moves a tag itself." >&2
   exit 1
 fi
 
-printf 'mirror guard: %d tag(s) to add, 0 to move\n' "$added"
+printf 'mirror guard: %s tag(s) to add, 0 to move\n' "${added:-0}"

@@ -80,6 +80,11 @@ jobs:
   unit-plan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Why read-only: this job installs dependencies, which runs third-party composite actions and
+    # package lifecycle scripts. It needs nothing from the release token, so it does not get one —
+    # the same reasoning as the pins above.
+    permissions:
+      contents: read
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
     steps:

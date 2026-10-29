@@ -148,28 +148,31 @@ function runChecks() {
   })
 }
 
+/**
+ * The lookup is a quoted phrase plus a local exact-title filter: unquoted, GitHub search reads
+ * `health:` as a qualifier and stops matching, which would file a second issue every day.
+ */
+export function issueLookupArgs() {
+  return [
+    'issue',
+    'list',
+    '--repo',
+    REPO,
+    '--state',
+    'open',
+    '--search',
+    `"${ISSUE_TITLE}" in:title`,
+    '--json',
+    'number,title',
+    '--limit',
+    '50'
+  ]
+}
+
 function openIssue() {
-  try {
-    return findOpenIssue(
-      gh([
-        'issue',
-        'list',
-        '--repo',
-        REPO,
-        '--state',
-        'open',
-        '--search',
-        `${ISSUE_TITLE} in:title`,
-        '--json',
-        'number,title',
-        '--limit',
-        '50'
-      ])
-    )
-  } catch (error) {
-    console.error(`ci-health: cannot list issues: ${String(error.message).split('\n')[0]}`)
-    return null
-  }
+  // Not caught: a lookup that failed is not "no issue". Reading it as one files a second issue on a
+  // red day and closes nothing on a green one, so the caller exits 2 instead.
+  return findOpenIssue(gh(issueLookupArgs()))
 }
 
 function writeBody(args, body) {
@@ -185,7 +188,18 @@ function main() {
 
   const checks = runChecks()
   const verdict = judgeHealth(checks, { runUrl })
-  const issue = dryRun ? null : openIssue()
+
+  let issue = null
+  if (!dryRun) {
+    try {
+      issue = openIssue()
+    } catch (error) {
+      console.error(
+        `ci-health: cannot tell which issue is ours: ${String(error.message).split('\n')[0]}`
+      )
+      process.exit(2)
+    }
+  }
   const action = decideAction({ ok: verdict.ok, issueNumber: issue?.number })
 
   console.error(`ci-health: ${verdict.ok ? 'both checks clean' : 'attention needed'} — ${action}`)

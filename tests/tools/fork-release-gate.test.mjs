@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { needsOf, readWorkflow, runScripts, triggerKeys } from './workflow-file.mjs'
 
@@ -49,9 +50,27 @@ describe('the release dispatch is gated on test evidence', () => {
   })
 
   it('no longer says tests are not run here', () => {
-    const text = JSON.stringify(RELEASE)
+    // The claim lived in a comment, which a YAML parse drops, so read the file itself.
+    const text = readFileSync(
+      new URL('../../.github/workflows/fork-release.yml', import.meta.url),
+      'utf8'
+    )
 
     expect(text).not.toContain('Tests and lint are deliberately not run here')
+    expect(text).toContain('nothing publishes without the unit')
+  })
+
+  it('nothing in the file can skip or soften the gate', () => {
+    const text = readFileSync(
+      new URL('../../.github/workflows/fork-release.yml', import.meta.url),
+      'utf8'
+    )
+
+    // Not just the legs: a `continue-on-error` or an `if:` on the suite job would open the same hole.
+    expect(text).not.toContain('continue-on-error')
+    for (const job of Object.values(RELEASE.jobs)) {
+      expect(job.if).toBeUndefined()
+    }
   })
 
   it('keeps the artifact legs serialized, which is why they share one release', () => {

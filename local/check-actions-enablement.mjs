@@ -8,13 +8,16 @@
  * pull_request/push/schedule trigger then spends minutes and adds mystery checks to every PR.
  *
  *   node local/check-actions-enablement.mjs          report only; exit 1 on drift
- *   node local/check-actions-enablement.mjs --fix    disable everything that drifted
+ *   node local/check-actions-enablement.mjs --fix    disable everything that drifted, and stop the
+ *                                                   runs it had already started
  *
- * Two things this check does beyond comparing names, because a name is not what spends the minutes:
- * it reads each allowed-inert file's `on:` keys and fails when one gained a trigger that fires
- * without a human (`schedule`, `push`, `pull_request`), and it pages through the workflow list so a
- * 101st file is not invisible. Exit codes: 0 clean, 1 drift or an unverifiable entry, 2 cannot
- * reach the API — "cannot tell" is never a pass.
+ * Three things this does beyond comparing names, because a name is not what spends the minutes: it
+ * reads each allowed-inert file's `on:` keys and fails when one gained a trigger that fires without a
+ * human (`schedule`, `push`, `pull_request`); it pages through the workflow list so a 101st file is
+ * not invisible; and `--fix` cancels the queued and in-progress runs of whatever it disables, because
+ * disabling a workflow does not stop a run that is already going — that is how "Unit transform cache
+ * producer" wedged for 12 hours on 2026-10-28. Exit codes: 0 clean, 1 drift or an unverifiable entry,
+ * 2 cannot reach the API — "cannot tell" is never a pass.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -58,6 +61,15 @@ export const ALLOWED_INERT = [
 /** Inert means nothing fires it but a human dispatch or a caller. */
 export const INERT_TRIGGERS = new Set(['workflow_dispatch', 'workflow_call'])
 
+/** Run states that would still execute, i.e. that `--fix` has to cancel rather than wait out. */
+export const CANCELLABLE_STATUSES = new Set([
+  'queued',
+  'requested',
+  'waiting',
+  'pending',
+  'in_progress'
+])
+
 /**
  * The `on:` keys of a workflow file. Handles the three shapes GitHub accepts — `on: push`,
  * `on: [push, pull_request]`, and the `on: { push: … }` map — and the YAML-1.1 reading of `on:`
@@ -86,24 +98,36 @@ export function workflowsFromPages(pages) {
   return pages.flatMap((page) => page?.workflows ?? [])
 }
 
+export function workflowListArgs() {
+  return ['api', '--paginate', '--slurp', `repos/${REPO}/actions/workflows?per_page=100`]
+}
+
+/** The runs `--fix` must cancel: disabling a workflow does not touch a run already going. */
+export function cancellableRuns(runs) {
+  return (runs ?? [])
+    .filter((run) => CANCELLABLE_STATUSES.has(run.status))
+    .map((run) => run.databaseId)
+}
+
 /**
  * Judge enablement from already-fetched data, so the decision is testable without a network.
  * `triggers` maps a workflow path to its `on:` keys, or to `{ error }` when the file could not be
- * read from the tree — an unreadable allowed-inert entry is reported, never silently tolerated.
+ * read — a missing entry is reported too, never treated as "inert, presumably".
  */
 export function judgeEnablement(
   { workflows, triggers = {} },
   { required = REQUIRED, allowedInert = ALLOWED_INERT } = {}
 ) {
   const allowed = new Set([...required, ...allowedInert])
+  const byPath = new Map(workflows.map((workflow) => [workflow.path, workflow]))
   const active = workflows.filter((w) => w.state === 'active')
   const drift = active.filter((w) => !allowed.has(w.path))
   const missing = required
-    .map((path) => ({ path, workflow: workflows.find((w) => w.path === path) }))
+    .map((path) => ({ path, workflow: byPath.get(path) }))
     .filter(({ workflow }) => !workflow || workflow.state !== 'active')
     .map(({ path, workflow }) => ({ path, state: workflow ? workflow.state : 'absent' }))
   const stale = allowedInert
-    .filter((path) => !workflows.some((w) => w.path === path))
+    .filter((path) => !byPath.has(path))
     .map((path) => ({ path, reason: 'no workflow file by that path on the repository' }))
 
   const overTriggered = []
@@ -111,6 +135,7 @@ export function judgeEnablement(
   for (const path of allowedInert) {
     const facts = triggers[path]
     if (facts === undefined) {
+      unreadable.push({ path, reason: 'triggers not supplied, so "inert" is unproven' })
       continue
     }
     if (!Array.isArray(facts)) {
@@ -123,8 +148,22 @@ export function judgeEnablement(
     }
   }
 
-  const problems =
-    drift.length + missing.length + stale.length + overTriggered.length + unreadable.length
+  // Everything `--fix` is allowed to turn off. An allowed-inert entry that fires on its own is
+  // disabled too: "disabled is also fine" is the entry's own contract.
+  const disableTargets = [
+    ...drift.map((w) => ({
+      path: w.path,
+      id: w.id,
+      why: "active but not on the fork's live list"
+    })),
+    ...overTriggered.map((o) => ({
+      path: o.path,
+      id: byPath.get(o.path)?.id ?? null,
+      why: `allowed-inert, but it fires on ${o.triggers.join(', ')}`
+    }))
+  ]
+
+  const problems = disableTargets.length + missing.length + stale.length + unreadable.length
   return {
     total: workflows.length,
     activeCount: active.length,
@@ -133,8 +172,19 @@ export function judgeEnablement(
     stale,
     overTriggered,
     unreadable,
+    disableTargets,
     ok: problems === 0
   }
+}
+
+/**
+ * The problems left after a run: under `--fix`, a target that was disabled (and had its runs
+ * cancelled) is resolved; one that failed to disable is not.
+ */
+export function residualProblems({ verdict, fix = false, disabled = [] }) {
+  const handled = new Set(fix ? disabled : [])
+  const outstanding = verdict.disableTargets.filter((target) => !handled.has(target.path)).length
+  return outstanding + verdict.missing.length + verdict.stale.length + verdict.unreadable.length
 }
 
 function gh(args) {
@@ -165,7 +215,54 @@ function firstLine(error) {
     .trim()
 }
 
-/** Print the verdict, disabling drift under `--fix`, and return the problems that remain. */
+/**
+ * Print the verdict, disabling and cancelling under `--fix`, and return the paths it handled plus
+ * the ones it could not. Kept out of `main` so the arithmetic is testable.
+ */
+function apply(verdict, fix) {
+  const disabled = []
+  const failed = []
+  for (const target of verdict.disableTargets) {
+    if (!fix) {
+      continue
+    }
+    if (target.id === null) {
+      failed.push(target.path)
+      console.error(`  FAILED   no workflow id to disable for ${target.path}`)
+      continue
+    }
+    try {
+      gh(['workflow', 'disable', String(target.id), '--repo', REPO])
+      const runs = cancellableRuns(
+        JSON.parse(
+          gh([
+            'run',
+            'list',
+            '--repo',
+            REPO,
+            '--workflow',
+            target.path,
+            '--limit',
+            '50',
+            '--json',
+            'databaseId,status'
+          ])
+        )
+      )
+      for (const runId of runs) {
+        gh(['run', 'cancel', String(runId), '--repo', REPO])
+      }
+      disabled.push(target.path)
+      const cancelled = runs.length > 0 ? `, cancelled ${runs.length} run(s) already going` : ''
+      console.log(`  disabled ${target.path} (${target.why})${cancelled}`)
+    } catch (error) {
+      failed.push(target.path)
+      console.error(`  FAILED   could not disable ${target.path}: ${firstLine(error)}`)
+    }
+  }
+  return { disabled, failed }
+}
+
 function report(verdict, fix) {
   console.log(
     `check-actions: ${verdict.total} workflows on ${REPO}, ${verdict.activeCount} active ` +
@@ -189,28 +286,11 @@ function report(verdict, fix) {
   for (const u of verdict.unreadable) {
     console.log(`  UNKNOWN  cannot read the triggers of ${u.path}: ${u.reason}`)
   }
-  const driftErrors = []
-  if (fix && verdict.drift.length > 0) {
-    for (const w of verdict.drift) {
-      try {
-        gh(['workflow', 'disable', String(w.id), '--repo', REPO])
-        console.log(`  disabled ${w.path}`)
-      } catch (error) {
-        driftErrors.push(w.path)
-        console.error(`  FAILED   could not disable ${w.path}: ${firstLine(error)}`)
-      }
-    }
-  }
-  // A drift entry this run disabled is no longer a problem; one that failed to disable still is.
-  const residualDrift = fix ? driftErrors.length : verdict.drift.length
-  const residual =
-    residualDrift +
-    verdict.missing.length +
-    verdict.stale.length +
-    verdict.overTriggered.length +
-    verdict.unreadable.length
+
+  const { disabled, failed } = apply(verdict, fix)
+  const residual = residualProblems({ verdict, fix, disabled })
   if (residual > 0) {
-    if (residualDrift > 0 && !fix) {
+    if (verdict.disableTargets.length > 0 && !fix) {
       console.log('  fix: node local/check-actions-enablement.mjs --fix')
     }
     if (verdict.overTriggered.length > 0 || verdict.stale.length > 0) {
@@ -218,6 +298,9 @@ function report(verdict, fix) {
         '  a file listed as allowed-inert has become a real lane, or no longer exists: ' +
           'decide whether it belongs on the live list, and record it in LOCAL-PATCHES.md § local(ci)'
       )
+    }
+    for (const path of failed) {
+      console.log(`  STILL    ${path} could not be disabled`)
     }
   }
   return residual
@@ -227,11 +310,7 @@ function main() {
   const fix = process.argv.includes('--fix')
   let workflows
   try {
-    workflows = workflowsFromPages(
-      JSON.parse(
-        gh(['api', '--paginate', '--slurp', `repos/${REPO}/actions/workflows?per_page=100`])
-      )
-    )
+    workflows = workflowsFromPages(JSON.parse(gh(workflowListArgs())))
   } catch (error) {
     console.error(`check-actions: gh api failed: ${firstLine(error)}`)
     process.exit(2)

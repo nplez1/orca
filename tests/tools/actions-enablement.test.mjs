@@ -5,9 +5,12 @@ import {
   ALLOWED_INERT,
   INERT_TRIGGERS,
   REQUIRED,
+  cancellableRuns,
   judgeEnablement,
   readTriggers,
+  residualProblems,
   triggersOf,
+  workflowListArgs,
   workflowsFromPages
 } from '../../local/check-actions-enablement.mjs'
 
@@ -86,6 +89,25 @@ describe('judging enablement', () => {
         all: ['workflow_dispatch', 'pull_request']
       }
     ])
+    // And --fix is allowed to turn it off: "disabled is also fine" is the entry's own contract.
+    expect(verdict.disableTargets.map((target) => target.path)).toContain(
+      '.github/workflows/layout-owner-e2e.yml'
+    )
+  })
+
+  it('fails an allowed-inert entry with no trigger facts at all, rather than assuming inert', () => {
+    const state = healthy()
+    delete state.triggers['.github/workflows/zcode-account-contract.yml']
+
+    const verdict = judgeEnablement(state)
+
+    expect(verdict.ok).toBe(false)
+    expect(verdict.unreadable).toEqual([
+      {
+        path: '.github/workflows/zcode-account-contract.yml',
+        reason: 'triggers not supplied, so "inert" is unproven'
+      }
+    ])
   })
 
   it('accepts a called workflow, which only a caller can start', () => {
@@ -136,6 +158,44 @@ describe('the workflow list', () => {
 
   it('treats a page with no workflows key as empty', () => {
     expect(workflowsFromPages([{}, { workflows: null }])).toEqual([])
+  })
+
+  it('asks for every page, so the list cannot be silently truncated at 100', () => {
+    expect(workflowListArgs()).toEqual(expect.arrayContaining(['--paginate', '--slurp']))
+  })
+})
+
+describe('what --fix is allowed to stop', () => {
+  it('cancels the runs that would still execute, and leaves finished ones alone', () => {
+    const runs = [
+      { databaseId: 1, status: 'in_progress' },
+      { databaseId: 2, status: 'queued' },
+      { databaseId: 3, status: 'completed' },
+      { databaseId: 4, status: 'waiting' }
+    ]
+
+    expect(cancellableRuns(runs)).toEqual([1, 2, 4])
+    expect(cancellableRuns(undefined)).toEqual([])
+  })
+
+  it('counts a disabled target as resolved and a failed one as outstanding', () => {
+    const state = healthy()
+    state.workflows.push(active('.github/workflows/wsl-orcad-e2e.yml', 'WSL'))
+    const verdict = judgeEnablement(state)
+    const path = '.github/workflows/wsl-orcad-e2e.yml'
+
+    expect(residualProblems({ verdict })).toBe(1)
+    expect(residualProblems({ verdict, fix: true, disabled: [path] })).toBe(0)
+    expect(residualProblems({ verdict, fix: true, disabled: [] })).toBe(1)
+  })
+
+  it('still counts a required workflow that was disabled as outstanding under --fix', () => {
+    const state = healthy()
+    state.workflows = state.workflows.map((w) =>
+      w.path === '.github/workflows/fork-main-tests.yml' ? disabled(w.path) : w
+    )
+
+    expect(residualProblems({ verdict: judgeEnablement(state), fix: true, disabled: [] })).toBe(1)
   })
 })
 

@@ -20,8 +20,12 @@ const git = (cwd, ...args) =>
     encoding: 'utf8'
   })
 
-/** A scratch origin (the fork) and upstream, both cloned from one seed so a shared tag is one commit. */
-function pair({ origin = [], upstream = [] } = {}) {
+/**
+ * A scratch fork (`origin`) and a checkout whose local tags stand in for what the mirror job just
+ * fetched from upstream — the guard compares the local refs against the fork, because those are what
+ * the push sends.
+ */
+function pair({ origin = [], local = [] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'tag-mirror-'))
   dirs.push(dir)
   const seed = join(dir, 'seed')
@@ -29,7 +33,7 @@ function pair({ origin = [], upstream = [] } = {}) {
   writeFileSync(join(seed, 'sha'), 'shared')
   git(seed, 'add', 'sha')
   git(seed, 'commit', '-q', '-m', 'first')
-  const clone = (name, tags) => {
+  const repo = (name, tags) => {
     const path = join(dir, name)
     git(dir, 'clone', '-q', seed, path)
     for (const tag of tags) {
@@ -37,24 +41,16 @@ function pair({ origin = [], upstream = [] } = {}) {
     }
     return path
   }
-  return { dir, origin: clone('origin', origin), upstream: clone('upstream', upstream) }
+  return { dir, origin: repo('origin', origin), checkout: repo('checkout', local) }
 }
 
-const guard = (origin, upstream) =>
-  spawnSync('bash', [GUARD, origin, upstream], { encoding: 'utf8' })
-
-/** One more commit, so a tag can be moved onto it without touching history. */
-function advance(path) {
-  writeFileSync(join(path, 'sha'), `${Date.now()}-${Math.random()}`)
-  git(path, 'add', 'sha')
-  git(path, 'commit', '-q', '-m', 'second')
-}
+const guard = (cwd, ...args) => spawnSync('bash', [GUARD, ...args], { cwd, encoding: 'utf8' })
 
 describe('the tag mirror guard', () => {
   it('passes when the fork only needs new tags', () => {
-    const { origin, upstream } = pair({ origin: ['v1.0.0'], upstream: ['v1.0.0', 'v1.1.0'] })
+    const { origin, checkout } = pair({ origin: ['v1.0.0'], local: ['v1.0.0', 'v1.1.0'] })
 
-    const result = guard(origin, upstream)
+    const result = guard(checkout, origin)
 
     expect(result.stderr).toBe('')
     expect(result.stdout).toContain('1 tag(s) to add, 0 to move')
@@ -62,11 +58,12 @@ describe('the tag mirror guard', () => {
   })
 
   it('refuses a tag the fork already publishes at another commit, naming both sides', () => {
-    const { origin, upstream } = pair({ origin: ['v1.0.0'], upstream: ['v1.0.0'] })
-    advance(upstream)
-    git(upstream, 'tag', '-f', 'v1.0.0')
+    const { origin, checkout } = pair({ origin: ['v1.0.0'], local: [] })
+    writeFileSync(join(checkout, 'sha'), 'a second commit')
+    git(checkout, 'commit', '-q', '-am', 'second')
+    git(checkout, 'tag', 'v1.0.0')
 
-    const result = guard(origin, upstream)
+    const result = guard(checkout, origin)
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('refusing to move v1.0.0')
@@ -74,33 +71,43 @@ describe('the tag mirror guard', () => {
   })
 
   it('leaves a fork-only tag alone: the mirror only adds', () => {
-    const { origin, upstream } = pair({ origin: ['v0.9.0-np.1'], upstream: ['v1.0.0'] })
+    const { origin, checkout } = pair({ origin: ['v0.9.0-np.1'], local: ['v1.0.0'] })
 
-    const result = guard(origin, upstream)
+    const result = guard(checkout, origin)
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('1 tag(s) to add')
   })
 
   it('compares annotated tags as tag objects, not as tag object against commit', () => {
-    const { dir, upstream } = pair({ origin: [], upstream: [] })
-    git(upstream, 'tag', '-a', 'v1.2.3', '-m', 'release')
-    const clone = join(dir, 'clone')
-    git(dir, 'clone', '-q', upstream, clone)
+    const { dir, checkout } = pair({ origin: [], local: [] })
+    git(checkout, 'tag', '-a', 'v1.2.3', '-m', 'release')
+    const origin = join(dir, 'annotated')
+    git(dir, 'clone', '-q', checkout, origin)
 
-    const result = guard(clone, upstream)
+    const result = guard(checkout, origin)
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('0 tag(s) to add, 0 to move')
   })
 
-  it('refuses to push an empty mirror, which is not a mirror', () => {
-    const { origin, upstream } = pair({ origin: ['v1.0.0'], upstream: [] })
+  it('refuses to push nothing, which is not a mirror', () => {
+    const { origin, checkout } = pair({ origin: ['v1.0.0'], local: ['v9.9.9'] })
+    git(checkout, 'tag', '-d', 'v9.9.9')
 
-    const result = guard(origin, upstream)
+    const result = guard(checkout, origin)
 
     expect(result.status).toBe(2)
-    expect(result.stderr).toContain('publishes no v* tags')
+    expect(result.stderr).toContain('no v* tags to mirror')
+  })
+
+  it('fails closed when the fork cannot be read, instead of treating every tag as new', () => {
+    const { dir, checkout } = pair({ origin: [], local: ['v1.0.0'] })
+
+    const result = guard(checkout, join(dir, 'not-a-repository'))
+
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('cannot read tags from')
   })
 
   it('reports a usage error rather than silently passing', () => {
@@ -118,7 +125,7 @@ describe('the workflow that calls it', () => {
     .join('\n')
 
   it('guards before it pushes, and pushes without force', () => {
-    expect(mirror).toContain('fork-tag-mirror-guard.sh origin upstream')
+    expect(mirror).toContain('fork-tag-mirror-guard.sh origin')
     expect(mirror.indexOf('fork-tag-mirror-guard.sh')).toBeLessThan(mirror.indexOf('git push'))
     expect(mirror).toContain('git push --atomic origin --tags')
     expect(mirror).not.toContain('--force')

@@ -8,7 +8,9 @@
  * branch is `nplez1/main`. The enablement check cannot get ahead of that, because GitHub has no
  * workflow to disable until the file is there — so the only lever is sweeping immediately, which is
  * what this wrapper exists to make unskippable. On 2026-10-28T13:17Z that push started "Unit transform
- * cache producer", which then wedged for 12 hours.
+ * cache producer", which then wedged for 12 hours; a sweep alone would not have stopped a run already
+ * going, which is why `check-actions-enablement --fix` also cancels the queued and in-progress runs of
+ * whatever it disables.
  *
  * The two halves are one command on purpose: a runbook line that says "push, then remember to sweep"
  * is the same failure with more words.
@@ -16,7 +18,8 @@
  *   node local/sync/push-upstream-mirror.mjs            push, then `check-actions-enablement --fix`
  *   node local/sync/push-upstream-mirror.mjs --dry-run   print the plan and what is on now; changes nothing
  *
- * Exit: 0 pushed and clean, 1 the push or the sweep failed, 2 refused before pushing.
+ * Exit: 0 pushed and clean, 1 the push or the sweep failed, 2 refused before pushing or the sweep could
+ * not tell.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -50,6 +53,36 @@ export function refusalsFor({ remotes, hasUpstreamMain, toplevel, root }) {
   return problems
 }
 
+/**
+ * What the run meant, from the two exit statuses. A sweep that exited 2 never reached a verdict, which
+ * is not the same as a fleet that drifted — and the difference decides what the operator does next.
+ */
+export function judgeRun({ pushStatus, sweepStatus }) {
+  if (pushStatus !== 0) {
+    return {
+      code: 1,
+      message: 'the push failed, so no sweep was attempted — fix the push and run this again'
+    }
+  }
+  if (sweepStatus === 0) {
+    return { code: 0, message: 'pushed, and the fleet swept in the same step' }
+  }
+  if (sweepStatus === 2) {
+    return {
+      code: 2,
+      message:
+        'the push landed but the sweep could not reach the API, so a new workflow may still be ' +
+        'running — run `node local/check-actions-enablement.mjs --fix` as soon as it can'
+    }
+  }
+  return {
+    code: 1,
+    message:
+      'the push landed but the fleet is not clean — run `node local/check-actions-enablement.mjs` ' +
+      'and record the outcome in LOCAL-PATCHES.md § local(ci)'
+  }
+}
+
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' })
 
 function facts(cwd) {
@@ -60,7 +93,7 @@ function facts(cwd) {
       .map((line) => line.trim())
       .filter(Boolean)
   } catch {
-    return { remotes, hasUpstreamMain: false }
+    return { remotes, hasUpstreamMain: false, toplevel: null, root: ROOT }
   }
   const verify = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'upstream/main'], { cwd })
   let toplevel = null
@@ -88,20 +121,22 @@ function main() {
   console.log(`  2. ${SWEEP.join(' ')}`)
 
   if (dryRun) {
-    // Report-only: the sweep is the interesting half when nothing is being pushed.
+    // Report-only: the sweep is the interesting half when nothing is being pushed, and its verdict is
+    // this run's verdict — 0 clean, 1 drift, 2 could not tell.
     const check = spawnSync('node', ['local/check-actions-enablement.mjs'], {
       cwd: ROOT,
       encoding: 'utf8'
     })
     process.stdout.write(`${check.stdout ?? ''}${check.stderr ?? ''}`)
-    process.exit(0)
+    process.exit(check.status ?? 2)
   }
 
   const push = spawnSync('git', MIRROR_PUSH, { cwd, encoding: 'utf8' })
   process.stdout.write(`${push.stdout ?? ''}${push.stderr ?? ''}`)
   if (push.status !== 0) {
-    console.error('push-upstream-mirror: the push failed, so no sweep was attempted')
-    process.exit(1)
+    const verdict = judgeRun({ pushStatus: push.status ?? 1, sweepStatus: null })
+    console.error(`push-upstream-mirror: ${verdict.message}`)
+    process.exit(verdict.code)
   }
 
   // Never skipped, never deferred: the push is what turns new workflow files on.
@@ -111,14 +146,13 @@ function main() {
     stdio: ['ignore', 'pipe', 'pipe']
   })
   process.stdout.write(`${sweep.stdout ?? ''}${sweep.stderr ?? ''}`)
-  if (sweep.status !== 0) {
-    console.error(
-      'push-upstream-mirror: the push landed but the fleet is not clean — ' +
-        'run `node local/check-actions-enablement.mjs` and record the outcome in LOCAL-PATCHES.md § local(ci)'
-    )
-    process.exit(1)
+  const verdict = judgeRun({ pushStatus: 0, sweepStatus: sweep.status ?? 2 })
+  if (verdict.code === 0) {
+    console.log(`push-upstream-mirror: ${verdict.message}`)
+  } else {
+    console.error(`push-upstream-mirror: ${verdict.message}`)
   }
-  console.log('push-upstream-mirror: pushed, and the fleet swept in the same step')
+  process.exit(verdict.code)
 }
 
 if (

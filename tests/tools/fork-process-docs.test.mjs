@@ -117,3 +117,17 @@ it('pushes the upstream mirror through the enablement sweep, not as a bare git p
   expect(blocks).not.toMatch(/^git push origin upstream\/main:main/m)
   expect(blocks).toContain('node local/check-actions-enablement.mjs')
 })
+
+it('says why the PR lane does not run repo-wide lint yet, with the measured failures', () => {
+  const live = section(
+    read('LOCAL-PATCHES.md'),
+    '### `local(ci)`: which workflows are live on this fork'
+  ).join('\n')
+
+  // A required check that is red on its own base is worse than none; the ledger has to say so.
+  const flat = live.replace(/\s+/g, ' ')
+
+  expect(flat).toContain('2 of 36 lint step(s) failed')
+  expect(flat).toContain('changed lines')
+  expect(flat).toContain('fork-pr-gates: changed lines')
+})

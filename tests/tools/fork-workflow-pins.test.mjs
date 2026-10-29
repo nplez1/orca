@@ -1,22 +1,29 @@
+import { readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { allUses, readWorkflow, usesLines } from './workflow-file.mjs'
 
+const WORKFLOW_DIR = new URL('../../.github/workflows/', import.meta.url)
+
 /**
- * The fork's own workflows, which this fork owns rather than syncs. Upstream's files are tag-pinned
- * throughout and changing them would diverge on every sync — the release-adjacent lanes are where a
- * moved tag reaches a signing secret.
+ * The fork's own workflows, discovered rather than listed: a new `fork-*.yml` is covered the moment
+ * it lands, which is the failure a fixed list has. Upstream's files are tag-pinned throughout and
+ * repinning them is divergence that costs more at the next sync — the release-adjacent lanes are
+ * where a moved tag reaches a signing secret.
  */
-const FORK_WORKFLOWS = [
-  '.github/workflows/fork-release.yml',
-  '.github/workflows/fork-main-tests.yml',
-  '.github/workflows/fork-upstream-tags.yml',
-  '.github/workflows/fork-ci-health.yml',
-  '.github/workflows/fork-pr-gates.yml'
-]
+const FORK_WORKFLOWS = readdirSync(WORKFLOW_DIR)
+  .filter((name) => name.startsWith('fork-') && name.endsWith('.yml'))
+  .sort()
+  .map((name) => `.github/workflows/${name}`)
 
 const PINNED = /^[^@\s]+@[0-9a-f]{40} # v\d+(?:\.\d+){1,2}$/
 
 describe('fork workflow action pins', () => {
+  it('finds the fork workflows it means to check', () => {
+    expect(FORK_WORKFLOWS.length).toBeGreaterThanOrEqual(6)
+    expect(FORK_WORKFLOWS).toContain('.github/workflows/fork-release.yml')
+    expect(FORK_WORKFLOWS.every((path) => path.startsWith('.github/workflows/fork-'))).toBe(true)
+  })
+
   for (const path of FORK_WORKFLOWS) {
     it(`pins every third-party action in ${path} to a SHA and names its tag`, () => {
       const unpinned = usesLines(path).filter((uses) => !PINNED.test(uses))

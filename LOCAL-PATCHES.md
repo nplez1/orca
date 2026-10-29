@@ -2270,12 +2270,20 @@ this question: it is what the billable-minutes meter reads.
 relay, cross-version-wire, mobile web, Windows probes — which arrives with every sync, spends 40+
 minutes per PR to re-tread a branch that just ran the same suites locally, and would put a dozen
 unfamiliar checks on every PR. The cheapest useful lane is the fork's own, and that is now
-`fork-pr-gates.yml`: `pull_request` plus `workflow_dispatch`, `pnpm tc` and `pnpm exec oxlint` — the two
-classes that would have caught the type breaks and the four `pnpm lint` drifts (#161) that reached this
-line unnoticed. It is deliberately not the unit selection: `ci-unit-selection.mjs` computes a
-reverse-import closure that one changed file turns into ~3,000 of 13,064 test files, which is a shard
-planner, not a PR lane. The unit suite stays on `fork-main-tests.yml` nightly and now also gates a
-release (`fork-release.yml`).
+`fork-pr-gates.yml`: `pull_request` plus `workflow_dispatch`, running `pnpm tc` and
+`pnpm run check:code-quality:changed` — the two classes that reached this line unnoticed and are
+enforceable on any branch today. It is deliberately not the unit selection: `ci-unit-selection.mjs`
+computes a reverse-import closure that one changed file turns into ~3,000 of 13,064 test files, which
+is a shard planner, not a PR lane. The unit suite stays on `fork-main-tests.yml` nightly and now also
+gates a release (`fork-release.yml`).
+
+**Why not repo-wide `pnpm lint`, measured on `nplez1/main` at 2026-10-29:** it reports "2 of 36 lint
+step(s) failed" — `oxlint` is red for `src/cli/handlers/vm.ts` (336 counted lines against a limit of
+300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. That is the debt
+`fork-main-gates.yml` exists to surface, and a required check that is red on its own base teaches
+everyone to ignore red — the PR #57 failure shape. So the lane judges the pull request's **changed
+lines** with the rule set the repository already enforces on a diff, and repo-wide `pnpm lint`
+becomes the third gate here once the release line is green.
 
 **To make it a required check**, once it has run at least once on a PR (GitHub will not offer a check
 name that has never reported):
@@ -2283,13 +2291,15 @@ name that has never reported):
 ```bash
 ruleset=$(mktemp -t orca-ruleset)          # unique per agent: /tmp is shared
 gh api repos/nplez1/orca/rulesets/23697698 >"$ruleset"
-# add {"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"typecheck"},{"context":"lint"}]}}
+# add {"type":"required_status_checks","parameters":{"required_status_checks":[
+#   {"context":"fork-pr-gates: typecheck"},{"context":"fork-pr-gates: changed lines"}]}}
 # to .rules[], then PUT the whole object back with -X PUT
 ```
 
-The ruleset is repository state a sync cannot carry, like the enablement itself, so this paragraph is
-the record of the intent rather than a patch. `fork-ci-health.yml` reports the lane going missing; it
-does not police the ruleset.
+The contexts are the job `name:` values, spelled in full because a bare `typecheck` or `lint` could be
+satisfied by any other workflow with a job of that name. The ruleset is repository state a sync cannot
+carry, like the enablement itself, so this paragraph is the record of the intent rather than a patch.
+`fork-ci-health.yml` reports the lane going missing; it does not police the ruleset.
 
 **A sweep is never complete, and the first one wasn't.** Nine workflows survived it on 2026-10-19 —
 eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-switch-e2e`,
@@ -2298,6 +2308,23 @@ eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-swit
 — the WSL orcad lane, triggered because both touched `src/main/pi/**`, a path in its filter. So
 after any sync that adds workflows, re-run the listing above rather than assuming the sweep still
 covers the tree.
+
+**The sweep is now also the response to a push that activates a workflow (audit #221 C5).** Disabling a
+workflow does not stop a run that is already going, which is why the 2026-10-28T13:17Z mirror push
+could start "Unit transform cache producer" and leave it wedged for 12 hours: nobody swept, and a sweep
+that only disabled would not have stopped it either. Two things changed:
+
+- `local/check-actions-enablement.mjs --fix` cancels the queued and in-progress runs of everything it
+  disables. It also disables an allowed-inert entry that has gained a `schedule`, `push` or
+  `pull_request` trigger, because "disabled is also fine" is what allowed-inert means.
+- `local/sync/push-upstream-mirror.mjs` is the mirror push and that sweep in one command, so the two
+  cannot be separated. It refuses to push when a remote is missing, when `upstream/main` was not
+  fetched, or when it is run from a checkout other than the one it lives in — the push would otherwise
+  target one repository while the sweep targeted another.
+
+What neither fixes: a run started by the push itself, before the sweep reaches it. That window is
+seconds now instead of unlimited, and it is closed properly only by not mirroring upstream `main` at
+all, which upstream-bound branches still need.
 
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 

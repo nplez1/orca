@@ -7,6 +7,7 @@ import {
   MARKER,
   decideAction,
   findOpenIssue,
+  issueLookupArgs,
   judgeHealth
 } from '../../local/ci-health-report.mjs'
 import { REPO_ROOT, readWorkflow, runScripts, triggerKeys } from './workflow-file.mjs'
@@ -123,5 +124,19 @@ describe('the lane that runs it', () => {
     for (const entry of CHECKS) {
       expect(existsSync(join(REPO_ROOT, entry.script)), entry.script).toBe(true)
     }
+  })
+})
+
+describe('the issue lookup', () => {
+  it('quotes the title, which GitHub search needs to read as a phrase not a qualifier', () => {
+    const args = issueLookupArgs()
+
+    expect(args[args.indexOf('--search') + 1]).toBe(`"${ISSUE_TITLE}" in:title`)
+  })
+
+  it('lists only open issues, so a closed one is not silently updated', () => {
+    const args = issueLookupArgs()
+
+    expect(args[args.indexOf('--state') + 1]).toBe('open')
   })
 })

@@ -1,12 +1,16 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { MIRROR_PUSH, SWEEP, refusalsFor } from '../../local/sync/push-upstream-mirror.mjs'
+import {
+  MIRROR_PUSH,
+  SWEEP,
+  judgeRun,
+  refusalsFor
+} from '../../local/sync/push-upstream-mirror.mjs'
 
 const SCRIPT = new URL('../../local/sync/push-upstream-mirror.mjs', import.meta.url).pathname
-const REPO_ROOT = new URL('../../', import.meta.url).pathname
 const dirs = []
 
 afterEach(() => {
@@ -18,16 +22,17 @@ afterEach(() => {
 const run = (cwd, ...args) => spawnSync('node', [SCRIPT, ...args], { cwd, encoding: 'utf8' })
 
 describe('the mirror push refuses to run half of itself', () => {
-  it('pushes the one ref pair, atomically, and sweeps right after', () => {
-    expect(MIRROR_PUSH).toEqual(['push', '--atomic', 'origin', 'upstream/main:main'])
-    expect(SWEEP.join(' ')).toContain('local/check-actions-enablement.mjs --fix')
-  })
-
   it('refuses without both remotes, naming which one is missing', () => {
     const problems = refusalsFor({ remotes: ['origin'], hasUpstreamMain: true })
 
     expect(problems).toHaveLength(1)
     expect(problems[0]).toContain("no 'upstream' remote")
+  })
+
+  it('refuses when upstream/main was never fetched', () => {
+    expect(refusalsFor({ remotes: ['origin', 'upstream'], hasUpstreamMain: false })[0]).toContain(
+      'git fetch upstream'
+    )
   })
 
   it('refuses a checkout other than the one it lives in, so the sweep cannot land elsewhere', () => {
@@ -42,26 +47,56 @@ describe('the mirror push refuses to run half of itself', () => {
     expect(problems[0]).toContain('the checkout this script lives in')
   })
 
-  it('refuses when upstream/main was never fetched', () => {
-    expect(refusalsFor({ remotes: ['origin', 'upstream'], hasUpstreamMain: false })[0]).toContain(
-      'git fetch upstream'
-    )
-  })
-
-  it('passes when both remotes exist and upstream/main resolves', () => {
-    expect(refusalsFor({ remotes: ['origin', 'upstream'], hasUpstreamMain: true })).toEqual([])
+  it('passes when both remotes exist, upstream/main resolves, and it is the right checkout', () => {
+    expect(
+      refusalsFor({
+        remotes: ['origin', 'upstream'],
+        hasUpstreamMain: true,
+        toplevel: '/here',
+        root: '/here'
+      })
+    ).toEqual([])
   })
 })
 
-describe('running it', () => {
-  it('prints the plan, pushes nothing, and reports what is on now', () => {
-    const result = run(REPO_ROOT, '--dry-run')
+describe('what a run means', () => {
+  it('is success only when the push landed and the sweep came back clean', () => {
+    expect(judgeRun({ pushStatus: 0, sweepStatus: 0 }).code).toBe(0)
+  })
 
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('git push --atomic origin upstream/main:main')
-    expect(result.stdout).toContain('check-actions-enablement.mjs --fix')
-    // The report-only half actually ran, which is what makes --dry-run worth having.
-    expect(result.stdout).toContain('check-actions:')
+  it('does not report a failed push as a swept fleet', () => {
+    const verdict = judgeRun({ pushStatus: 128, sweepStatus: null })
+
+    expect(verdict.code).toBe(1)
+    expect(verdict.message).toContain('no sweep was attempted')
+  })
+
+  it('separates "the sweep drifted" from "the sweep could not tell"', () => {
+    const drifted = judgeRun({ pushStatus: 0, sweepStatus: 1 })
+    const unknown = judgeRun({ pushStatus: 0, sweepStatus: 2 })
+
+    expect(drifted.code).toBe(1)
+    expect(drifted.message).toContain('not clean')
+    expect(unknown.code).toBe(2)
+    expect(unknown.message).toContain('could not reach the API')
+  })
+})
+
+describe('the script itself', () => {
+  it('pushes the one ref pair, atomically, and sweeps with --fix right after', () => {
+    const source = readFileSync(
+      new URL('../../local/sync/push-upstream-mirror.mjs', import.meta.url),
+      'utf8'
+    )
+
+    expect(MIRROR_PUSH).toEqual(['push', '--atomic', 'origin', 'upstream/main:main'])
+    expect(SWEEP.join(' ')).toContain('local/check-actions-enablement.mjs --fix')
+    // The constants are what the run uses, not a description of it.
+    expect(source).toContain('spawnSync(SWEEP[0], SWEEP.slice(1)')
+    expect(source).toContain("spawnSync('git', MIRROR_PUSH")
+    expect(source.indexOf("spawnSync('git', MIRROR_PUSH")).toBeLessThan(
+      source.indexOf('spawnSync(SWEEP[0]')
+    )
   })
 
   it('exits 2 before pushing when run from another checkout', () => {
