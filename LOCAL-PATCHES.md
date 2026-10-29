@@ -46,6 +46,14 @@ conflict adjacency, and because each is a trap a well-meaning future edit can fa
   (`src/main/agent-hooks/managed-hook-install-lock.ts`). It guards the shared `~/.claude` hooks, which
   an official Orca install manages too, so both must contend on one lock path. Pointing it at this
   fork's own home directory would give the two installs separate locks over one shared file.
+- **Quick Open passes `--no-ignore-parent` for a folder project, and only there**
+  (`src/shared/quick-open-filter.ts`, `src/main/ipc/filesystem/filesystem-list-files.ts`,
+  `src/main/ipc/filesystem/filesystem-search-file-paths.ts`). A folder workspace inside a git checkout
+  has no repository, so the enclosing checkout's `.gitignore`/`.ignore` classify its files as ignored
+  and Quick Open hides them; `isFolderProjectRoot` decides it from the store, and a checkout with its
+  own repo keeps the flag off so a repo nested in a superproject still honours the enclosing rules.
+  The watcher's subtree rescans deliberately do not take the flag: their search root sits below the
+  workspace, so ripgrep would then drop the workspace's _own_ root ignore files.
 
 ## Patches
 

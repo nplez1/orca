@@ -197,6 +197,52 @@ describe('filesystem-list-files', () => {
     expect(spawnMock.mock.calls[0]?.[1]).not.toContain('--version')
   })
 
+  it('asks ripgrep to keep the enclosing checkout ignore rules out for a folder workspace root', async () => {
+    const source = createMockProcess()
+    const broad = createMockProcess()
+    spawnMock.mockImplementation((_command, args: string[]) =>
+      isIgnoredRgPass(args) ? broad : source
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the folder-scope decision reads only getFolderWorkspaces off this store.
+    const folderStore = {
+      getFolderWorkspaces: () => [{ folderPath: '/mock/root' }]
+    } as unknown as Store
+
+    const listing = listQuickOpenFiles('/mock/root', folderStore)
+    source.stdout?.emit('data', 'notes.md\0debug.log\0')
+    source.emit('close', 0, null)
+    await flushMicrotasks()
+    broad.stdout?.emit('data', 'notes.md\0debug.log\0')
+    broad.emit('close', 0, null)
+    await flushMicrotasks()
+
+    await expect(listing).resolves.toEqual(['notes.md', 'debug.log'])
+    expect(spawnMock.mock.calls[0]?.[1]).toContain('--no-ignore-parent')
+  })
+
+  it('keeps the enclosing checkout ignore rules for a git worktree root', async () => {
+    const source = createMockProcess()
+    const broad = createMockProcess()
+    spawnMock.mockImplementation((_command, args: string[]) =>
+      isIgnoredRgPass(args) ? broad : source
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the folder-scope decision reads only getRepos off this store.
+    const gitStore = {
+      getRepos: () => [{ path: '/mock/root', kind: 'git' }]
+    } as unknown as Store
+
+    const listing = listQuickOpenFiles('/mock/root', gitStore)
+    source.stdout?.emit('data', 'notes.md\0')
+    source.emit('close', 0, null)
+    await flushMicrotasks()
+    broad.stdout?.emit('data', 'notes.md\0')
+    broad.emit('close', 0, null)
+    await flushMicrotasks()
+
+    await expect(listing).resolves.toEqual(['notes.md'])
+    expect(spawnMock.mock.calls[0]?.[1]).not.toContain('--no-ignore-parent')
+  })
+
   it('keeps source files first when only a serialized byte budget is provided', async () => {
     const source = createMockProcess()
     const broad = createMockProcess()

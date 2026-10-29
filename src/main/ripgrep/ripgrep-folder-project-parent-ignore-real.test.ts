@@ -30,25 +30,56 @@ function git(cwd: string, ...args: string[]): void {
   expect(result.code, result.stderr).toBe(0)
 }
 
-describe.skipIf(process.platform === 'win32')('real ripgrep and an enclosing checkout', () => {
-  it('lists a folder project inside a git checkout by its own files, not the parent ignore rules', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'orca-rg-folder-project-'))
-    const checkout = join(parent, 'checkout')
-    const folderProject = join(checkout, 'notes')
-    try {
-      await mkdir(folderProject, { recursive: true })
-      await writeFile(join(checkout, '.gitignore'), 'dist/\n*.log\n')
-      git(checkout, 'init', '-q')
-      await writeFile(join(folderProject, 'notes.md'), '# notes')
-      await writeFile(join(folderProject, 'debug.log'), 'kept')
+/**
+ * A folder project inside a git checkout, with the parent naming files in the workspace both ways an
+ * enclosing checkout can: `.gitignore` (VCS rules, which the broad pass already ignores) and `.ignore`
+ * (which it does not). The workspace's own root rules must survive either way.
+ */
+async function makeCheckoutWithFolderProject(): Promise<{
+  parent: string
+  checkout: string
+  folder: string
+}> {
+  const parent = await mkdtemp(join(tmpdir(), 'orca-rg-folder-project-'))
+  const checkout = join(parent, 'checkout')
+  const folder = join(checkout, 'notes')
+  await mkdir(join(folder, 'dist'), { recursive: true })
+  await mkdir(join(folder, 'pkg', 'out'), { recursive: true })
+  await writeFile(join(checkout, '.gitignore'), 'dist/\n*.log\n')
+  await writeFile(join(checkout, '.ignore'), '*.log\n')
+  await writeFile(join(folder, '.ignore'), 'out/\n')
+  await writeFile(join(folder, 'notes.md'), '# notes')
+  await writeFile(join(folder, 'debug.log'), 'parent-named')
+  await writeFile(join(folder, 'dist', 'bundle.js'), 'parent-named dir')
+  await writeFile(join(folder, 'pkg', 'keep.md'), '# pkg')
+  await writeFile(join(folder, 'pkg', 'debug.log'), 'parent-named')
+  await writeFile(join(folder, 'pkg', 'out', 'scratch.js'), 'workspace-named dir')
+  git(checkout, 'init', '-q')
+  return { parent, checkout, folder }
+}
 
+describe.skipIf(process.platform === 'win32')('real ripgrep and an enclosing checkout', () => {
+  it('lists a folder project by its own files, not the parent checkout ignore rules', async () => {
+    const { parent, folder } = await makeCheckoutWithFolderProject()
+    try {
       const checkoutRules = buildRgArgsForQuickOpen({
         searchRoot: '.',
         excludePathPrefixes: [],
         forceSlashSeparator: false
       })
-      // The parent's patterns are what makes the bug visible: they name this workspace's files.
-      expect(await capture(folderProject, checkoutRules.primary)).toEqual(['notes.md'])
+      // The bug: the parent's patterns name this workspace's files, and the narrow pass obeys them.
+      expect(await capture(folder, checkoutRules.primary)).toEqual([
+        '.ignore',
+        'notes.md',
+        'pkg/keep.md'
+      ])
+      // The broad pass ignores VCS rules but not `.ignore`, so the parent's `*.log` still applied.
+      expect(await capture(folder, checkoutRules.ignoredPass)).toEqual([
+        '.ignore',
+        'dist/bundle.js',
+        'notes.md',
+        'pkg/keep.md'
+      ])
 
       const folderProjectRules = buildRgArgsForQuickOpen({
         searchRoot: '.',
@@ -56,13 +87,45 @@ describe.skipIf(process.platform === 'win32')('real ripgrep and an enclosing che
         forceSlashSeparator: false,
         isFolderProject: true
       })
-      expect(await capture(folderProject, folderProjectRules.primary)).toEqual([
+      const expected = [
+        '.ignore',
         'debug.log',
-        'notes.md'
-      ])
-      expect(await capture(folderProject, folderProjectRules.ignoredPass)).toEqual([
-        'debug.log',
-        'notes.md'
+        'dist/bundle.js',
+        'notes.md',
+        'pkg/debug.log',
+        'pkg/keep.md'
+      ]
+      expect(await capture(folder, folderProjectRules.primary)).toEqual(expected)
+      expect(await capture(folder, folderProjectRules.ignoredPass)).toEqual(expected)
+      // The workspace's own `.ignore` still applies: `out/` stays pruned either way.
+      expect(await capture(folder, folderProjectRules.primary)).not.toContain('pkg/out/scratch.js')
+    } finally {
+      await rm(parent, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the workspace root ignore files when a watcher rescans a subfolder', async () => {
+    const { parent, folder } = await makeCheckoutWithFolderProject()
+    try {
+      // The index reconciliation scans a subtree, so the workspace root sits above the search root —
+      // and `--no-ignore-parent` there would drop the workspace's own rules, not just the checkout's.
+      const subtreeScan = buildRgArgsForQuickOpen({
+        searchRoot: 'pkg',
+        excludePathPrefixes: [],
+        forceSlashSeparator: false
+      })
+      expect(await capture(folder, subtreeScan.primary)).toEqual(['pkg/keep.md'])
+
+      const withParentIgnoresDropped = buildRgArgsForQuickOpen({
+        searchRoot: 'pkg',
+        excludePathPrefixes: [],
+        forceSlashSeparator: false,
+        isFolderProject: true
+      })
+      expect(await capture(folder, withParentIgnoresDropped.primary)).toEqual([
+        'pkg/debug.log',
+        'pkg/keep.md',
+        'pkg/out/scratch.js'
       ])
     } finally {
       await rm(parent, { recursive: true, force: true })

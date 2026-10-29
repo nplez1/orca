@@ -9,7 +9,6 @@ import {
 } from '../../../../shared/cross-platform-path'
 import { buildRgArgsForQuickOpen } from '../../../../shared/quick-open-filter'
 import type { WorkspacePathSearchCorrelationId } from '../../../../shared/workspace-path-search-instrumentation'
-import { isFolderProjectRoot } from '../../folder-project-root'
 import { getLocalGitOptionsForRegisteredWorktree } from '../../local-worktree-runtime-options'
 import {
   applyLocalWorkspacePathIndexDelta,
@@ -83,11 +82,13 @@ export async function reconcileLocalWorkspacePathIndexEvents(
       if (info.isSymbolicLink()) {
         continue
       }
+      // Why no `isFolderProject` here: this scan's search root is a subtree, and `--no-ignore-parent`
+      // would then drop the workspace's own root ignore files (`.ignore`, `.gitignore`) instead of
+      // only the enclosing checkout's — a worse answer than the one the full listing gives.
       const rgArgs = buildRgArgsForQuickOpen({
         searchRoot: relativePath,
         excludePathPrefixes: [],
-        forceSlashSeparator: process.platform === 'win32',
-        isFolderProject: isFolderProjectRoot(store, rootPath)
+        forceSlashSeparator: process.platform === 'win32'
       })
       await scanScope('included', rgArgs.primary)
       await scanScope('all', rgArgs.ignoredPass)

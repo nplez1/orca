@@ -158,6 +158,17 @@ describe('buildRgArgsForQuickOpen', () => {
     expect(ignoredPass).not.toContain('--follow')
   })
 
+  it('forceSlashSeparator emits --path-separator /', () => {
+    const { primary } = buildRgArgsForQuickOpen({
+      searchRoot: '/r',
+      excludePathPrefixes: [],
+      forceSlashSeparator: true
+    })
+    const idx = primary.indexOf('--path-separator')
+    expect(idx).toBeGreaterThanOrEqual(0)
+    expect(primary[idx + 1]).toBe('/')
+  })
+
   it('excludePathPrefixes are escaped as directory-match globs', () => {
     const { primary } = buildRgArgsForQuickOpen({
       searchRoot: '/r',
@@ -191,17 +202,6 @@ describe('buildRgArgsForQuickOpen', () => {
 
     expect(primary).not.toContain('--no-ignore-parent')
     expect(ignoredPass).not.toContain('--no-ignore-parent')
-  })
-
-  it('forceSlashSeparator emits --path-separator /', () => {
-    const { primary } = buildRgArgsForQuickOpen({
-      searchRoot: '/r',
-      excludePathPrefixes: [],
-      forceSlashSeparator: true
-    })
-    const idx = primary.indexOf('--path-separator')
-    expect(idx).toBeGreaterThanOrEqual(0)
-    expect(primary[idx + 1]).toBe('/')
   })
 })
 
