@@ -85,7 +85,7 @@ export function JiraIssueWorkspaceContent({
             <JiraIssueMarkdown
               target={imageTarget}
               content={displayed.description}
-              className="text-[14px] leading-relaxed"
+              className="text-sm leading-relaxed"
             />
           ) : (
             <p className="text-sm italic text-muted-foreground">
@@ -104,7 +104,7 @@ export function JiraIssueWorkspaceContent({
                 {translate('auto.components.JiraIssueWorkspace.9a980b06b9', 'Comments')}
               </span>
               {comments.length > 0 ? (
-                <span className="text-[12px] text-muted-foreground">{comments.length}</span>
+                <span className="text-xs text-muted-foreground">{comments.length}</span>
               ) : null}
             </div>
             {commentsError ? (
@@ -152,7 +152,7 @@ export function JiraIssueWorkspaceContent({
                       {comment.user?.displayName ??
                         translate('auto.components.JiraIssueWorkspace.666cfdd835', 'Unknown')}
                     </span>
-                    <span className="shrink-0 text-[12px] text-muted-foreground">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {formatUiRelativeTimeFromDate(comment.createdAt)}
                     </span>
                   </div>

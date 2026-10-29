@@ -1,7 +1,12 @@
 import { ArrowRight, FolderOpen, LoaderCircle, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { JiraIssueAssigneeControl } from '@/components/jira-issue-assignee-control'
 import { JiraSprintPicker, backlogLabel, sprintTriggerLabel } from '@/components/jira-sprint-picker'
@@ -44,14 +49,14 @@ export function JiraIssueWorkspaceHeader({
     <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-muted-foreground">
             <span className="font-mono">{displayed.key}</span>
             {displayed.siteName ? <span>{displayed.siteName}</span> : null}
             <span>{displayed.project.key}</span>
             <span>{formatUiRelativeTimeFromDate(displayed.updatedAt)}</span>
             {issueLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
           </div>
-          <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
+          <h2 className="mt-1 text-xl font-semibold leading-tight text-foreground">
             {displayed.title}
           </h2>
         </div>
@@ -164,12 +169,12 @@ export function JiraIssueMetadataBar({
           }
         />
 
-        <Popover>
-          <PopoverTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
               type="button"
               disabled={pendingField === 'priority'}
-              className="rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
+              className="rounded-md px-1.5 py-0.5 text-2xs text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
             >
               {displayed.priority?.name ??
                 translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
@@ -177,35 +182,34 @@ export function JiraIssueMetadataBar({
                 <LoaderCircle className="ml-1 inline size-3 animate-spin" />
               ) : null}
             </button>
-          </PopoverTrigger>
-          <PopoverContent className="popover-scroll-content scrollbar-sleek w-48 p-1" align="start">
-            <button
-              type="button"
-              onClick={() =>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="popover-scroll-content scrollbar-sleek w-48"
+            align="start"
+          >
+            <DropdownMenuItem
+              onSelect={() =>
                 void mutateIssue('priority', { priorityId: null }, { priority: undefined })
               }
-              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
             >
               {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
-            </button>
+            </DropdownMenuItem>
             {prioritiesError ? (
               <p className="px-2 py-1.5 text-2xs text-destructive">{prioritiesError}</p>
             ) : (
               priorities.map((priority) => (
-                <button
+                <DropdownMenuItem
                   key={priority.id}
-                  type="button"
-                  onClick={() =>
+                  onSelect={() =>
                     void mutateIssue('priority', { priorityId: priority.id }, { priority })
                   }
-                  className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-2xs hover:bg-accent"
                 >
                   {priority.name}
-                </button>
+                </DropdownMenuItem>
               ))
             )}
-          </PopoverContent>
-        </Popover>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <JiraIssueAssigneeControl
           issue={displayed}
@@ -226,7 +230,7 @@ export function JiraIssueMetadataBar({
               type="button"
               disabled={pendingField === 'sprint'}
               title={sprintAssignment.sprint?.name ?? backlogLabel()}
-              className="flex max-w-[220px] items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
+              className="flex max-w-[220px] items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
             >
               <span className="truncate">{sprintTriggerLabel(sprintAssignment.sprint)}</span>
               {pendingField === 'sprint' ? (

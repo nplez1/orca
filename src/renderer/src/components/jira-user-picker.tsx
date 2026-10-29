@@ -24,7 +24,7 @@ export function JiraUserOptionList({
           key={user.accountId}
           type="button"
           onClick={() => onSelect(user)}
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent"
         >
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt="" className="size-5 rounded-full" />
@@ -219,7 +219,7 @@ export function JiraUserPicker({
           type="button"
           disabled={disabled}
           aria-label={label}
-          className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-left text-[12px] transition hover:bg-muted/40 disabled:opacity-50"
+          className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-left text-xs transition hover:bg-muted/40 disabled:opacity-50"
         >
           <span className={value ? 'truncate' : 'truncate text-muted-foreground'}>
             {triggerLabel}
@@ -232,7 +232,7 @@ export function JiraUserPicker({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={translate('components.jiraUserPicker.search', 'Search users')}
-          className="mb-1 h-7 text-[12px]"
+          className="mb-1 h-7 text-xs"
           autoFocus
         />
         {fixedOptions?.map((option) => (
@@ -243,15 +243,15 @@ export function JiraUserPicker({
               option.onSelect()
               setOpen(false)
             }}
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent"
           >
             {option.label}
           </button>
         ))}
         {error ? (
-          <p className="px-2 py-1.5 text-[12px] text-destructive">{error}</p>
+          <p className="px-2 py-1.5 text-xs text-destructive">{error}</p>
         ) : users.length === 0 && !loading ? (
-          <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">
             {translate('components.jiraUserPicker.empty', 'No users found')}
           </p>
         ) : (

@@ -76,7 +76,7 @@ export function TaskPageJiraIssueAssigneeField({
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="flex min-w-0 flex-col gap-1">
-        <label className="text-[11px] font-medium text-muted-foreground">{assigneeLabel}</label>
+        <label className="text-2xs font-medium text-muted-foreground">{assigneeLabel}</label>
         <JiraUserPicker
           // Cached candidates belong to one provider, project, and site.
           key={JSON.stringify([

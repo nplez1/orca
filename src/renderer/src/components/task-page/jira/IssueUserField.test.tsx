@@ -146,8 +146,11 @@ it.each(['empty', 'denied', 'pending'])(
       target: { value: '  account-known  ' }
     })
     await waitFor(() => expect(search).toHaveBeenCalledWith(source, '  account-known  ', 'site-1'))
-    if (result !== 'pending') {
+    // A denied lookup is not an empty roster, so it must say why (see #219 J6).
+    if (result === 'empty') {
       await screen.findByText('No users found')
+    } else if (result === 'denied') {
+      await screen.findByText('Browse users denied')
     }
     expect(screen.getByRole('button', { name: 'Create issue' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Use known user ID "account-known"' }))

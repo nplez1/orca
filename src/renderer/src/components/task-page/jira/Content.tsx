@@ -139,7 +139,7 @@ export function TaskPageJiraContent({
           <TaskPageJiraBoardUnavailableNotice onRetry={boardMode.retryBoard} />
         ) : null}
         <div className="flex min-h-10 flex-none flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3 py-1">
-          <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="min-w-0 text-2xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {translate('auto.components.TaskPage.63b2abd3aa', 'Jira issues')}
           </div>
           <TaskPageJiraViewControls

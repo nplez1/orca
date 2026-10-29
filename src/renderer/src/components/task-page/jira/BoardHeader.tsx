@@ -38,7 +38,7 @@ export function TaskPageJiraBoardHeader({
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3 py-2">
         <div className="min-w-0">
-          <div className="truncate text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="truncate text-2xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {boardName ?? translate('auto.components.TaskPage.jiraBoardView', 'Jira board')}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">

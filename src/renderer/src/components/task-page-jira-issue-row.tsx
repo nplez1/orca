@@ -113,7 +113,7 @@ export function JiraIssueRow({
       >
         <span
           className={cn(
-            'block truncate font-mono text-[12px] text-muted-foreground',
+            'block truncate font-mono text-xs text-muted-foreground',
             columns ? '@max-3xl:!hidden' : 'max-md:!hidden'
           )}
         >
@@ -127,7 +127,7 @@ export function JiraIssueRow({
           <div className="flex min-w-0 items-center gap-2">
             <span
               className={cn(
-                'shrink-0 font-mono text-[11px] text-muted-foreground',
+                'shrink-0 font-mono text-2xs text-muted-foreground',
                 columns ? '@3xl:hidden' : 'md:hidden'
               )}
             >
@@ -148,14 +148,14 @@ export function JiraIssueRow({
           >
             <span
               className={cn(
-                'inline-flex min-w-0 items-center rounded-full border px-1.5 py-0.5 text-[11px] font-medium',
+                'inline-flex min-w-0 items-center rounded-full border px-1.5 py-0.5 text-2xs font-medium',
                 getStatusTone(issue.status.categoryKey)
               )}
             >
               <span className="truncate">{issue.status.name}</span>
             </span>
             <TaskPageJiraPriorityBadge priority={issue.priority} className="shrink-0" />
-            <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+            <span className="min-w-0 truncate text-2xs text-muted-foreground">
               {issue.assignee?.displayName ?? unassignedLabel()}
             </span>
           </div>
@@ -167,7 +167,7 @@ export function JiraIssueRow({
           >
             <span
               className={cn(
-                'max-w-[160px] truncate text-[10px] text-muted-foreground',
+                'max-w-[160px] truncate text-3xs text-muted-foreground',
                 columns ? '@7xl:!hidden' : 'xl:!hidden'
               )}
             >
@@ -176,13 +176,13 @@ export function JiraIssueRow({
             {labels.map((label) => (
               <span
                 key={label}
-                className="max-w-[140px] truncate rounded-full border border-border/50 bg-muted/35 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                className="max-w-[140px] truncate rounded-full border border-border/50 bg-muted/35 px-1.5 py-0.5 text-3xs text-muted-foreground"
               >
                 {label}
               </span>
             ))}
             {issue.labels.length > labels.length ? (
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-3xs text-muted-foreground">
                 +{issue.labels.length - labels.length}
               </span>
             ) : null}
@@ -210,7 +210,7 @@ export function JiraIssueRow({
             <div className="flex min-w-0 max-md:!hidden">
               <span
                 className={cn(
-                  'inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                  'inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-2xs font-medium',
                   getStatusTone(issue.status.categoryKey)
                 )}
               >
@@ -227,7 +227,7 @@ export function JiraIssueRow({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="block min-w-0 truncate text-[12px] text-muted-foreground max-md:!hidden">
+                <div className="block min-w-0 truncate text-xs text-muted-foreground max-md:!hidden">
                   {formatUpdatedAt(issue.updatedAt)}
                 </div>
               </TooltipTrigger>
@@ -236,7 +236,7 @@ export function JiraIssueRow({
               </TooltipContent>
             </Tooltip>
 
-            <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground max-lg:!hidden">
+            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground max-lg:!hidden">
               {issue.assignee?.avatarUrl ? (
                 <img
                   src={issue.assignee.avatarUrl}
@@ -244,7 +244,7 @@ export function JiraIssueRow({
                   className="size-5 shrink-0 rounded-full"
                 />
               ) : (
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-[10px]">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-3xs">
                   {issue.assignee?.displayName?.slice(0, 1) ?? '-'}
                 </span>
               )}
