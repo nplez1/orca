@@ -2181,6 +2181,27 @@ same failure means the secret is missing entirely, because an empty `token` does
 the built-in one — so a missing or lapsed credential is a config error, never a repeat of the
 permissions rejection. Set a fresh PAT as the repository secret and nothing else changes.
 
+**What that PAT is allowed to do is wider than the job needs (audit #221 C3).** The secret belongs to
+`nplez1`, which is the `exempt` bypass actor on the only ruleset protecting `refs/heads/nplez1/main`,
+so the same credential the mirror holds for tags could push, force-push or delete the release line.
+It is also handed to `actions/checkout`, which persists it in `.git/config` for the whole job, and no
+tag ruleset exists — so "an existing tag is never moved" depended only on the absence of `--force`.
+
+Three parts, of which only the third is in the tree:
+
+1. **Operational fix, not applied here: a non-bypass identity.** A machine user or a GitHub App whose
+   token holds Contents and Workflows write on this repository and nothing else. A sync cannot create
+   an account or rotate a secret, so this stays a named follow-up rather than a patch.
+2. **Operational fix, not applied here: a `refs/tags/v*` ruleset** with `update` and `deletion` rules.
+   `gh api repos/nplez1/orca/rulesets` currently returns one branch ruleset and nothing for tags;
+   creating one is repository state, and the fork's `v*-np.*` updater tags are only ever created, so
+   the rules would not block a release.
+3. **In the tree: the guarantee is checked, not inherited.** `actions/checkout` is SHA-pinned, and
+   `.github/scripts/fork-tag-mirror-guard.sh` reads both remotes and fails the job when a tag it would
+   send already exists at another commit. `git push --atomic origin --tags` carries no `--force` and no
+   `--mirror`, and `tests/tools/fork-tag-mirror-guard.test.mjs` fails if either appears in the script
+   that runs the push.
+
 **Verified 2026-10-16:** with the secret set and the change merged (`077e5e06`), a dispatched run
 went green in 1m18s and mirrored `v1.4.223`, `v1.4.224` and `v1.4.227` — the first successful run
 since 2026-10-08, and `v1.4.224` is the highest tag that suite pins.
