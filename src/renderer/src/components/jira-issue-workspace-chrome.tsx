@@ -101,13 +101,17 @@ export function JiraIssueMetadataBar({
   transitionsError,
   reloadTransitions,
   priorities,
+  prioritiesError,
   editFields,
   editFieldsLoading,
+  editFieldsError,
+  reloadEditFields,
   providerSettings,
   sourceContext,
   owner,
   runtimeContextKey,
   sprintAssignment,
+  sprintAssignmentError,
   mutateIssue,
   submitIssueFields
 }: {
@@ -118,8 +122,11 @@ export function JiraIssueMetadataBar({
   transitionsError: string | null
   reloadTransitions: () => void
   priorities: JiraPriority[]
+  prioritiesError: string | null
   editFields: JiraEditableField[]
   editFieldsLoading: boolean
+  editFieldsError: string | null
+  reloadEditFields: () => void
   /** Kept in the contract for the sheet's self-user pass-through; the assignee
    *  control now resolves the signed-in user itself from the source context. */
   selfUser: JiraUser | null
@@ -130,6 +137,7 @@ export function JiraIssueMetadataBar({
   runtimeContextKey: string
   /** Null on a host that cannot answer, or when no board is in scope to move into. */
   sprintAssignment: JiraSprintAssignment | null
+  sprintAssignmentError: string | null
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
@@ -180,18 +188,22 @@ export function JiraIssueMetadataBar({
             >
               {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
             </button>
-            {priorities.map((priority) => (
-              <button
-                key={priority.id}
-                type="button"
-                onClick={() =>
-                  void mutateIssue('priority', { priorityId: priority.id }, { priority })
-                }
-                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-              >
-                {priority.name}
-              </button>
-            ))}
+            {prioritiesError ? (
+              <p className="px-2 py-1.5 text-2xs text-destructive">{prioritiesError}</p>
+            ) : (
+              priorities.map((priority) => (
+                <button
+                  key={priority.id}
+                  type="button"
+                  onClick={() =>
+                    void mutateIssue('priority', { priorityId: priority.id }, { priority })
+                  }
+                  className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-2xs hover:bg-accent"
+                >
+                  {priority.name}
+                </button>
+              ))
+            )}
           </PopoverContent>
         </Popover>
 
@@ -222,6 +234,10 @@ export function JiraIssueMetadataBar({
               ) : null}
             </button>
           </JiraSprintPicker>
+        ) : sprintAssignmentError ? (
+          <span className="max-w-[220px] truncate text-2xs text-destructive">
+            {sprintAssignmentError}
+          </span>
         ) : null}
 
         <JiraIssueStoryPointsControl
@@ -231,17 +247,26 @@ export function JiraIssueMetadataBar({
           mutateIssue={mutateIssue}
         />
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          className="ml-auto"
-          disabled={pendingField === 'fields' || editFieldsLoading || editFields.length === 0}
-          onClick={() => setEditFieldsOpen(true)}
-        >
-          {editFieldsLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
-          {translate('auto.components.JiraIssueWorkspace.editFields', 'Edit fields')}
-        </Button>
+        {editFieldsError && editFields.length === 0 ? (
+          <div className="ml-auto flex min-w-0 items-center gap-1 text-2xs text-destructive">
+            <span className="max-w-[220px] truncate">{editFieldsError}</span>
+            <Button type="button" variant="ghost" size="xs" onClick={reloadEditFields}>
+              {translate('auto.components.JiraIssueWorkspace.retryEditFields', 'Retry')}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="ml-auto"
+            disabled={pendingField === 'fields' || editFieldsLoading || editFields.length === 0}
+            onClick={() => setEditFieldsOpen(true)}
+          >
+            {editFieldsLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
+            {translate('auto.components.JiraIssueWorkspace.editFields', 'Edit fields')}
+          </Button>
+        )}
       </div>
       <JiraIssueEditFieldsDialog
         open={editFieldsOpen}

@@ -12,14 +12,15 @@ function normalizeSiteId(value: unknown): string | undefined {
 export function registerJiraUserSearchHandlers(): void {
   ipcMain.handle(
     'jira:listAssignableUsers',
-    async (_event, args: { key: string; query?: string; siteId?: string }) => {
+    async (_event, args: { key: string; query?: string; siteId?: string; strict?: boolean }) => {
       if (typeof args?.key !== 'string' || !args.key.trim()) {
         return []
       }
       return listAssignableUsers(
         args.key.trim(),
         typeof args.query === 'string' ? args.query : undefined,
-        normalizeSiteId(args.siteId)
+        normalizeSiteId(args.siteId),
+        args.strict === true
       )
     }
   )

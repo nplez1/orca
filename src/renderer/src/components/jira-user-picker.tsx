@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { jiraSearchUsers, type RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import type { JiraUser } from '../../../shared/jira/jira-types'
 
 const USER_SEARCH_DEBOUNCE_MS = 250
@@ -99,9 +100,10 @@ export function useJiraUserSearch({
   active: boolean
   query: string
   searchUsers: (query: string) => Promise<JiraUser[]>
-}): { users: JiraUser[]; loading: boolean } {
+}): { users: JiraUser[]; loading: boolean; error: string | null } {
   const [users, setUsers] = useState<JiraUser[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!active) {
@@ -111,6 +113,7 @@ export function useJiraUserSearch({
     }
     let cancelled = false
     setLoading(true)
+    setError(null)
     // Why: the previous query's matches must not sit under the new query while it is in flight.
     setUsers([])
     const timer = setTimeout(() => {
@@ -120,9 +123,20 @@ export function useJiraUserSearch({
             setUsers(found)
           }
         })
-        .catch(() => {
+        .catch((failure: unknown) => {
           if (!cancelled) {
             setUsers([])
+            // Why: an empty list from a failed lookup would read as "nobody is
+            // assignable", which is a claim this read never made.
+            setError(
+              extractIpcErrorMessage(
+                failure,
+                translate(
+                  'components.jiraUserPicker.searchFailed',
+                  'Could not load people assignable to this issue.'
+                )
+              )
+            )
           }
         })
         .finally(() => {
@@ -137,7 +151,7 @@ export function useJiraUserSearch({
     }
   }, [active, query, searchUsers])
 
-  return { users, loading }
+  return { users, loading, error }
 }
 
 export function JiraUserPicker({
@@ -171,7 +185,7 @@ export function JiraUserPicker({
     (value: string) => jiraSearchUsers(providerSettings, value, siteId),
     [providerSettings, siteId]
   )
-  const { users, loading } = useJiraUserSearch({
+  const { users, loading, error } = useJiraUserSearch({
     active: open,
     query,
     searchUsers: searchUsers ?? defaultSearch
@@ -234,7 +248,9 @@ export function JiraUserPicker({
             {option.label}
           </button>
         ))}
-        {users.length === 0 && !loading ? (
+        {error ? (
+          <p className="px-2 py-1.5 text-[12px] text-destructive">{error}</p>
+        ) : users.length === 0 && !loading ? (
           <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
             {translate('components.jiraUserPicker.empty', 'No users found')}
           </p>

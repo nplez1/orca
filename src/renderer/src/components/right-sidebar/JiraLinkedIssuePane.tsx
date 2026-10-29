@@ -181,6 +181,8 @@ export function JiraLinkedIssuePane({
                 issue={displayed}
                 fields={detail.editFields}
                 loading={detail.editFieldsLoading}
+                error={detail.editFieldsError}
+                onRetry={detail.reloadEditFields}
                 pending={detail.pendingField === 'fields'}
                 providerSettings={providerSettings}
                 onSubmit={detail.submitIssueFields}
@@ -273,18 +275,22 @@ function JiraPriorityRow({
         >
           {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
         </button>
-        {detail.priorities.map((priority) => (
-          <button
-            key={priority.id}
-            type="button"
-            onClick={() =>
-              void detail.mutateIssue('priority', { priorityId: priority.id }, { priority })
-            }
-            className={MENU_ITEM_CLASS}
-          >
-            <TaskPageJiraPriorityBadge priority={priority} />
-          </button>
-        ))}
+        {detail.prioritiesError ? (
+          <p className="px-2 py-1.5 text-2xs text-destructive">{detail.prioritiesError}</p>
+        ) : (
+          detail.priorities.map((priority) => (
+            <button
+              key={priority.id}
+              type="button"
+              onClick={() =>
+                void detail.mutateIssue('priority', { priorityId: priority.id }, { priority })
+              }
+              className={MENU_ITEM_CLASS}
+            >
+              <TaskPageJiraPriorityBadge priority={priority} />
+            </button>
+          ))
+        )}
       </PopoverContent>
     </Popover>
   )

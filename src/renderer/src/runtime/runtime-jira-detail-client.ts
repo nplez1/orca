@@ -114,9 +114,12 @@ export async function jiraAddIssueCommentForTarget(
 export async function jiraListEditFieldsForTarget(
   target: RuntimeClientTarget,
   key: string,
-  siteId?: string | null
+  siteId?: string | null,
+  /** Ask for the failure instead of an empty list, for a surface that would
+   *  otherwise render an empty form as "nothing to edit". */
+  strict = false
 ): Promise<JiraEditableField[]> {
-  const args = { key, siteId: siteId ?? undefined }
+  const args = { key, siteId: siteId ?? undefined, ...(strict ? { strict: true } : {}) }
   if (target.kind !== 'environment') {
     return window.api.jira.listEditFields(args)
   }
@@ -166,16 +169,13 @@ export async function jiraIssueCommentsForTarget(
 
 export async function jiraListPrioritiesForTarget(
   target: RuntimeClientTarget,
-  siteId?: string | null
+  siteId?: string | null,
+  strict = false
 ): Promise<JiraPriority[]> {
+  const args = { ...(siteId ? { siteId } : {}), ...(strict ? { strict: true } : {}) }
   return target.kind === 'environment'
-    ? callRuntimeRpc<JiraPriority[]>(
-        target,
-        'jira.listPriorities',
-        siteId ? { siteId } : undefined,
-        { timeoutMs: 30_000 }
-      )
-    : window.api.jira.listPriorities(siteId ? { siteId } : undefined)
+    ? callRuntimeRpc<JiraPriority[]>(target, 'jira.listPriorities', args, { timeoutMs: 30_000 })
+    : window.api.jira.listPriorities(args)
 }
 
 export async function jiraListTransitionsForTarget(

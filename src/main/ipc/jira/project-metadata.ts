@@ -41,7 +41,10 @@ export function registerJiraProjectMetadataHandlers(
     }
   )
 
-  ipcMain.handle('jira:listPriorities', async (_event, args?: { siteId?: string }) => {
-    return listPriorities(normalizeSiteId(args?.siteId))
-  })
+  ipcMain.handle(
+    'jira:listPriorities',
+    async (_event, args?: { siteId?: string; strict?: boolean }) => {
+      return listPriorities(normalizeSiteId(args?.siteId), args?.strict === true)
+    }
+  )
 }

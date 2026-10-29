@@ -156,15 +156,19 @@ export default function JiraIssueWorkspace({
               transitionsError={detail.transitionsError}
               reloadTransitions={() => void detail.reloadTransitions()}
               priorities={detail.priorities}
+              prioritiesError={detail.prioritiesError}
               users={detail.users}
               editFields={detail.editFields}
               editFieldsLoading={detail.editFieldsLoading}
+              editFieldsError={detail.editFieldsError}
+              reloadEditFields={() => void detail.reloadEditFields()}
               selfUser={selfUser}
               providerSettings={providerSettings}
               sourceContext={sourceContext}
               owner={owner}
               runtimeContextKey={runtimeContextKey}
               sprintAssignment={detail.sprintAssignment}
+              sprintAssignmentError={detail.sprintAssignmentError}
               mutateIssue={detail.mutateIssue}
               submitIssueFields={detail.submitIssueFields}
             />
