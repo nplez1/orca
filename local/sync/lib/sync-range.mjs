@@ -48,6 +48,14 @@ export function mergePair() {
 const inHistory = (commit) => gitText(['merge-base', '--is-ancestor', commit, 'HEAD']) !== null
 
 /**
+ * Whether the ancestry test can be applied at all. A REBASE rewrites the branch, so its pre-sync tip is
+ * deliberately not in the rebased HEAD's history and the test would refuse every rebase sync — the shape
+ * the runbook's `--rebase` procedure produces. The state file records that shape; with no state file there
+ * is nothing to associate the ref with either, so only a merge-shaped sync is checked.
+ */
+const ancestryApplies = (state) => state?.mode !== 'rebase'
+
+/**
  * The pre-sync tip, which is what "ours" means for every check that compares a range. The state file is
  * written by `pre-sync.mjs --prepare`; the backup ref covers a sync prepared by hand from the runbook.
  * Neither is accepted on its own: when HEAD is a merge, the tip has to be its first parent.
@@ -64,7 +72,7 @@ export function resolvePreSyncTip() {
         problem: `${source} (${file}) names ${short(tip)} as the pre-sync tip, but this is a merge of ${short(pair.tip)} and ${short(pair.base)}: the state file does not belong to this merge`
       }
     }
-    if (pair === null && !inHistory(tip)) {
+    if (pair === null && ancestryApplies(state) && !inHistory(tip)) {
       return {
         tip: null,
         source: null,
@@ -84,7 +92,7 @@ export function resolvePreSyncTip() {
       problem: `ref ${BACKUP_REF} is at ${short(backup)}, not at HEAD's first parent ${short(pair.tip)}: it is not this merge's rollback target, so the range it defines is the wrong one`
     }
   }
-  if (pair === null && !inHistory(backup)) {
+  if (pair === null && ancestryApplies(readSyncState().state) && !inHistory(backup)) {
     return {
       tip: null,
       source: null,
@@ -124,7 +132,7 @@ export function pinnedUpstreamBase(tip, source) {
         problem: `${stateSource} (${file}) records new base ${short(resolved)}, but this is a merge of ${short(pair.tip)} and ${short(pair.base)}: the state file does not belong to this merge`
       }
     }
-    if (pair === null && !inHistory(resolved)) {
+    if (pair === null && ancestryApplies(state) && !inHistory(resolved)) {
       return {
         base: null,
         source: null,

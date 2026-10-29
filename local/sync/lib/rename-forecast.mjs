@@ -21,7 +21,13 @@ const RESOLVE_EXTS = [
   '.d.ts'
 ]
 const JS_TO_TS = { '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] }
-const RENDERER_ALIAS = { prefix: '@/', root: 'src/renderer/src/' }
+// The repo's renderer aliases, from config/tsconfig.web.json. `@renderer/` is the older spelling and is
+// still used by config scripts and tests, so a sweep that only knew `@/` would skip those references
+// entirely.
+const RENDERER_ALIASES = [
+  { prefix: '@/', root: 'src/renderer/src/' },
+  { prefix: '@renderer/', root: 'src/renderer/src/' }
+]
 const MOCK_CALL =
   /^(?:vi|jest)\.(?:mock|doMock|unmock|doUnmock|importActual|importMock|requireActual)$/
 const PATHISH = /^[\w@.][\w@.+-]*(?:\/[\w@.+[\]-]+)+\/?$/
@@ -150,8 +156,9 @@ function basePath(importer, spec, kind, set) {
     const joined = path.posix.normalize(path.posix.join(path.posix.dirname(importer), clean))
     return joined.startsWith('..') ? null : joined
   }
-  if (clean.startsWith(RENDERER_ALIAS.prefix)) {
-    return RENDERER_ALIAS.root + clean.slice(RENDERER_ALIAS.prefix.length)
+  const alias = RENDERER_ALIASES.find(({ prefix }) => clean.startsWith(prefix))
+  if (alias) {
+    return alias.root + clean.slice(alias.prefix.length)
   }
   const repoRelative = clean.replace(/^\.\//, '')
   return kind === 'string' && set.top.has(repoRelative.split('/')[0]) ? repoRelative : null
@@ -222,8 +229,11 @@ export function suggestSpecifier(importer, target, spec) {
   const shown = bare
     ? target.replace(/\.d\.ts$|\.[cm]?[jt]sx?$|\.json$/, '').replace(/\/index$/, '')
     : target
-  if (spec.startsWith(RENDERER_ALIAS.prefix) && shown.startsWith(RENDERER_ALIAS.root)) {
-    return RENDERER_ALIAS.prefix + shown.slice(RENDERER_ALIAS.root.length)
+  const alias = RENDERER_ALIASES.find(
+    ({ prefix, root }) => spec.startsWith(prefix) && shown.startsWith(root)
+  )
+  if (alias) {
+    return alias.prefix + shown.slice(alias.root.length)
   }
   if (!spec.startsWith('.')) {
     return shown

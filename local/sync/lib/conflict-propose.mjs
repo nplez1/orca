@@ -18,10 +18,17 @@
  */
 const SETTLED_DELETION_STATUSES = ['expected-deletion', 'restore']
 
+// `keep-ours` / `take-theirs` are the LEDGER's words, which are about the fork and upstream, not about
+// git's stages. On a merge the fork is `ours`; a rebase replays the fork onto upstream, so the stages
+// invert and the same verb would check out the opposite side. `stage()` is the only place that mapping
+// lives.
 const CHECKOUT = {
-  'keep-ours': { side: 'ours', action: 'keep-ours' },
-  'take-theirs': { side: 'theirs', action: 'take-theirs' }
+  'keep-ours': { owner: 'fork', action: 'keep-ours' },
+  'take-theirs': { owner: 'upstream', action: 'take-theirs' }
 }
+
+const stage = (owner, rebase) =>
+  owner === 'fork' ? (rebase ? 'theirs' : 'ours') : rebase ? 'ours' : 'theirs'
 
 // `DU` is deleted by us: on a merge the fork is the "ours" side, so it is the one that removed the file.
 // A REBASE inverts the sides — "ours" is the upstream commit being replayed onto and "theirs" is the
@@ -87,7 +94,7 @@ export function proposeResolution(file, { rebase = false } = {}) {
       reason: deletion.reason ?? '',
       git: restore
         ? [
-            ['checkout', '--theirs', '--', file.path],
+            ['checkout', `--${stage('upstream', rebase)}`, '--', file.path],
             ['add', '--', file.path]
           ]
         : [['rm', '-f', '--', file.path]]
@@ -124,7 +131,7 @@ export function proposeResolution(file, { rebase = false } = {}) {
       provenance,
       reason: note,
       git: [
-        ['checkout', `--${CHECKOUT[action].side}`, '--', file.path],
+        ['checkout', `--${stage(CHECKOUT[action].owner, rebase)}`, '--', file.path],
         ['add', '--', file.path]
       ]
     }

@@ -172,6 +172,17 @@ function main() {
       () => typecheck(options)
     ]
   ]
+  // A waiver naming no gate is a typo, and finding it after the typecheck gate has run is finding it too
+  // late: validate before a single gate executes.
+  const knownGates = new Set(gates.map(([id]) => id))
+  for (const [id] of options.waivers) {
+    if (!knownGates.has(id)) {
+      console.error(
+        `pre-sync: no gate ${String(id)} to waive — one of ${[...knownGates].join(', ')}`
+      )
+      process.exit(2)
+    }
+  }
   for (const [id, title, look, run] of gates) {
     try {
       report.addOutcome(id, title, look, run())
@@ -184,15 +195,9 @@ function main() {
       })
     }
   }
-  // A waiver naming no gate is a typo: refuse it rather than print a waiver that covers nothing.
-  const knownGates = new Set(gates.map(([id]) => id))
+  // A row that produced a result is reported as an ignored waiver rather than failing the run: a stale
+  // flag from a previous run must not lose this run's report.
   for (const [id, reason] of options.waivers) {
-    if (!knownGates.has(id)) {
-      console.error(
-        `pre-sync: no gate ${String(id)} to waive — one of ${[...knownGates].join(', ')}`
-      )
-      process.exit(2)
-    }
     report.waive(id, reason)
   }
   const prepared = options.prepare ? prepare(options, report.failures.length, options.rebase) : null

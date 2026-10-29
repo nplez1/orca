@@ -56,11 +56,22 @@ test('a waiver naming no check is refused', () => {
   assert.throws(() => built.waive('typo', 'reason'), /no check typo to waive/)
 })
 
-test('a waiver on a row that produced a result is refused', () => {
-  const built = report(['a', STATUS.passed])
-  assert.throws(() => built.waive('a', 'reason'), /only a check that could not run can be waived/)
-  const failed = report(['b', STATUS.failed])
-  assert.throws(() => failed.waive('b', 'reason'), /reported failed/)
+test('a waiver on a row that produced a result is recorded as ignored, not counted', () => {
+  // A stale `--waive` from a previous run must not crash the run whose cause it was covering: the row
+  // now produces a result, so the waiver covers nothing and says so.
+  const built = report(['a', STATUS.passed], ['b', STATUS.failed])
+  built.waive('a', 'stale reason')
+  built.waive('b', 'stale reason')
+  assert.deepEqual(built.waived.size, 0)
+  assert.deepEqual(
+    built.ignoredWaivers.map((entry) => [entry.id, entry.status]),
+    [
+      ['a', 'passed'],
+      ['b', 'failed']
+    ]
+  )
+  assert.equal(built.result(), 'fail')
+  assert.match(built.render(), /WAIVED \(ignored\): a reported passed/)
   // A `skipped` row is an explicit operator choice, so recording why is allowed.
   const skipped = report(['c', STATUS.skipped])
   skipped.waive('c', 'asked for --skip-typecheck')

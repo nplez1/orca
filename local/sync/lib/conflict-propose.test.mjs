@@ -241,3 +241,55 @@ test('proposeAll drops the undecided ones instead of emitting nulls', () => {
   assert.equal(proposals[0].path, 'src/old.ts')
   assert.equal(applyableProposals(proposals).length, 1)
 })
+
+test('a rebase swaps which stage a ledger verb checks out', () => {
+  const keep = {
+    path: 'src/x.ts',
+    status: 'UU',
+    class: 'both-rewrote',
+    expectedDeletion: null,
+    ledger: [ledgerEntry('keep-ours')]
+  }
+  const merge = proposeResolution(keep)
+  assert.deepEqual(merge.git[0], ['checkout', '--ours', '--', 'src/x.ts'])
+  assert.deepEqual(proposeResolution(keep, { rebase: true }).git[0], [
+    'checkout',
+    '--theirs',
+    '--',
+    'src/x.ts'
+  ])
+
+  const theirs = {
+    path: 'src/y.ts',
+    status: 'UU',
+    class: 'union',
+    expectedDeletion: null,
+    hunks: forkUntouched,
+    ledger: [ledgerEntry('take-theirs')]
+  }
+  assert.deepEqual(proposeResolution(theirs).git[0], ['checkout', '--theirs', '--', 'src/y.ts'])
+  assert.deepEqual(proposeResolution(theirs, { rebase: true }).git[0], [
+    'checkout',
+    '--ours',
+    '--',
+    'src/y.ts'
+  ])
+})
+
+test("a manifest restore takes upstream's version, which is `ours` during a rebase", () => {
+  const entry = settledDeletion('restore')
+  const file = {
+    path: 'src/old.ts',
+    status: 'UD',
+    class: 'modify/delete',
+    expectedDeletion: entry,
+    ledger: []
+  }
+  assert.deepEqual(proposeResolution(file).git[0], ['checkout', '--theirs', '--', 'src/old.ts'])
+  assert.deepEqual(proposeResolution(file, { rebase: true }).git[0], [
+    'checkout',
+    '--ours',
+    '--',
+    'src/old.ts'
+  ])
+})

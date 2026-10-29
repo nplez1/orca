@@ -211,6 +211,7 @@ export class Report {
     this.meta = meta
     this.checks = []
     this.waived = new Map()
+    this.ignoredWaivers = []
   }
 
   // Positional rather than an options object: both tools add eight checks, and the field names
@@ -224,19 +225,19 @@ export class Report {
   /**
    * Record a deliberate exception for a check that could not run. A check that did not run is not a
    * pass, so it fails the run unless an operator said, in writing, which one and why. Only a row that
-   * could not run can be waived: a waiver on a row that produced a result would be a claim about nothing.
+   * could not run is counted: a waiver left over from a previous run — the cause is fixed, the row now
+   * produces a result — is reported as ignored rather than crashing the run it was meant to unblock.
    */
   waive(id, reason) {
     const check = this.checks.find((candidate) => candidate.id === id)
     if (!check) {
       throw new Error(`no check ${id} to waive`)
     }
-    if (check.status !== STATUS.unavailable && check.status !== STATUS.skipped) {
-      throw new Error(
-        `${id} reported ${check.status}; only a check that could not run can be waived`
-      )
+    if (check.status === STATUS.unavailable || check.status === STATUS.skipped) {
+      this.waived.set(id, reason)
+    } else {
+      this.ignoredWaivers.push({ id, reason, status: check.status })
     }
-    this.waived.set(id, reason)
     return this
   }
 
@@ -307,6 +308,11 @@ export class Report {
     for (const [id, reason] of this.waived) {
       lines.push(`WAIVED: ${id} — ${reason}`)
     }
+    for (const waiver of this.ignoredWaivers) {
+      lines.push(
+        `WAIVED (ignored): ${waiver.id} reported ${waiver.status}, so the waiver "${waiver.reason}" covers nothing`
+      )
+    }
     const verdict =
       this.failures.length > 0
         ? `result: FAIL — ${this.failures.length} of ${this.checks.length} check(s) failed`
@@ -335,6 +341,7 @@ export class Report {
       notRun: this.notRun.map((check) => ({ id: check.id, status: check.status })),
       unwaived: this.unwaived.map((check) => check.id),
       waived: [...this.waived].map(([id, reason]) => ({ id, reason })),
+      ignoredWaivers: this.ignoredWaivers,
       ...extra
     }
   }
