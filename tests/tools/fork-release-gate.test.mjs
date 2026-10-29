@@ -85,3 +85,47 @@ describe('the release dispatch is gated on test evidence', () => {
     expect(needsOf(RELEASE, 'unit-tests')).toContain('release-ref')
   })
 })
+
+describe('a release does not go public without its change summary', () => {
+  const text = () =>
+    readFileSync(new URL('../../.github/workflows/fork-release.yml', import.meta.url), 'utf8')
+
+  it('fails the run instead of substituting a minimal body', () => {
+    // The old step printed `**Orca NP <version>** / Built from <sha>` and carried on, which is the
+    // install-instructions-only release the generator exists to remove.
+    expect(text()).not.toContain('publishing a minimal body instead')
+    expect(text()).not.toContain('Built from `%s`')
+  })
+
+  it('guards the generated notes before anything is created', () => {
+    const steps = RELEASE.jobs.macos.steps
+    const notes = steps.findIndex((step) =>
+      (step.run ?? '').includes('fork-release-notes-guard.mjs /tmp/notes.md')
+    )
+    const create = steps.findIndex((step) => (step.run ?? '').includes('gh release create'))
+
+    expect(notes).toBeGreaterThan(-1)
+    // Before the draft exists, so a refusal leaves no tag and no assets behind to clean up.
+    expect(notes).toBeLessThan(create)
+  })
+
+  it('re-checks the body of the release it is about to undraft', () => {
+    const publish = runScripts(RELEASE).find((run) => run.includes('--draft=false')) ?? ''
+
+    expect(publish).toContain('fork-release-notes-guard.mjs -')
+    // The check has to gate the undraft, not follow it.
+    expect(publish.indexOf('fork-release-notes-guard.mjs')).toBeLessThan(
+      publish.indexOf('--draft=false')
+    )
+  })
+
+  it('undrafts nowhere else, and only from the last platform leg', () => {
+    const undrafting = Object.entries(RELEASE.jobs)
+      .filter(([, job]) =>
+        runScripts({ jobs: { job } }).some((run) => run.includes('--draft=false'))
+      )
+      .map(([name]) => name)
+
+    expect(undrafting).toEqual(['linux'])
+  })
+})
