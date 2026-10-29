@@ -204,4 +204,22 @@ describe('MuseHookService', () => {
     await service.installRemote(remote.sftp, '/home/alice smith')
     expect(remote.fs.files.get(remoteHooksPath)).toBe(installed)
   })
+
+  // Why: an earlier build of this fork, and an official install, register the same `.orca` pointer on a
+  // remote host, so neither can be taken over — but the status has to say which file it found.
+  it('names a pre-rename or official pointer instead of claiming the user owns it', async () => {
+    const remote = createAgentHookMemorySftp()
+    const stalePointer = '/home/alice/.orca/agent-hooks/muse-hooks.json'
+    remote.fs.files.set(
+      '/home/alice/.config/muse/settings.json',
+      `${JSON.stringify({ managed_hooks_path: stalePointer }, null, 2)}\n`
+    )
+
+    const status = await new MuseHookService().installRemote(remote.sftp, '/home/alice')
+
+    expect(status.state).toBe('not_installed')
+    expect(status.detail).toContain(stalePointer)
+    expect(status.detail).toMatch(/pre-rename or official Orca registration/)
+    expect(remote.fs.files.get('/home/alice/.config/muse/settings.json')).toContain(stalePointer)
+  })
 })

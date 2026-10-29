@@ -47,6 +47,9 @@ export function createManagedCommandMatcher(
     if (matchesManagedHook(lines, ownNeedles, ownNativeHook)) {
       return true
     }
+    // Why the split: a resolved path under this user's own `~/.orca` may be an official install's,
+    // while a remote host's or a frozen `${HOME}` template's `.orca` path may be this build's — the two
+    // cannot be told apart from the command alone, so the remote forms are swept and the local one is not.
     const legacyLines =
       (explicitLegacySweep ?? !hasOfficialOrcaProfile())
         ? lines

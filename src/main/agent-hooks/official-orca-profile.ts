@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -7,6 +7,9 @@ import { join } from 'node:path'
  * derive it from its own identity constants, and the value belongs to another application.
  */
 const OFFICIAL_DATA_DIRECTORY_NAME = 'orca'
+
+/** The only child this build ever wrote into that profile, before the coordination root moved. */
+const PRE_RENAME_PARK_DIRECTORY_NAME = 'bundle-coordination'
 
 /** Where an official Orca install keeps its profile, matching Electron's per-platform appData. */
 export function officialOrcaProfilePath(
@@ -49,5 +52,24 @@ export function hasOfficialOrcaProfile(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const profilePath = officialOrcaProfilePath(platform, homeDirectory, env)
-  return profilePath !== null && existsSync(profilePath)
+  return profilePath !== null && existsSync(profilePath) && !holdsOnlyPreRenameParkTree(profilePath)
+}
+
+/**
+ * Whether the directory holds nothing but the park/ack tree builds before this one wrote there.
+ *
+ * Why: that tree was the only thing this build ever created under upstream's profile name, so a
+ * machine that ran a supervised serve with an older build must not look like an official install
+ * forever — the legacy sweep would stay off for good.
+ */
+function holdsOnlyPreRenameParkTree(profilePath: string): boolean {
+  try {
+    const entries = readdirSync(profilePath)
+    // An empty profile proves nothing either way, so it stays "the official app's": the sweep only
+    // ever deletes this build's own leftovers, and a wrong "absent" would take another install's.
+    return entries.length > 0 && entries.every((entry) => entry === PRE_RENAME_PARK_DIRECTORY_NAME)
+  } catch {
+    // Why: an unreadable profile cannot prove the tree was this build's, so treat it as the official app's.
+    return false
+  }
 }

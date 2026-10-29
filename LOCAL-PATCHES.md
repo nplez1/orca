@@ -2488,10 +2488,18 @@ What is deliberately left alone, because either side of the pair is indistinguis
 
 - **`~/.orca` agent-hook entries.** The matcher sweeps them when they cannot be an official install's:
   an unresolved `${HOME}` template or another host's home (remote registrations, Codex's frozen
-  command form). A resolved `.orca` path in this user's home is swept only when
-  `hasOfficialOrcaProfile()` finds no official profile directory — otherwise it is that install's.
-  Grok's owner directories are read from both installs; only this build's is pruned, and only a live
-  process in the other one holds the removal open.
+  command form). Those remote forms are swept because a remote `.orca` path may be either install's
+  and the command alone cannot tell them apart. A resolved `.orca` path in this user's home is swept
+  only when `hasOfficialOrcaProfile()` finds no official profile directory — otherwise it is that
+  install's. Grok's owner directories are read from both installs; only this build's is pruned, and
+  only a live process in the other one holds the removal open.
+- **A Muse pointer to a pre-rename hooks file.** `managed_hooks_path` naming
+  `~/.orca/agent-hooks/muse-hooks.json` — on the local machine or an SSH host — is reported as "a
+  pre-rename or official Orca registration" and left alone, because an official install writes the
+  same pointer. Re-registering Muse hooks writes the new file instead of adopting that one.
+- **A `{HOME}/.orca` profile holding nothing but `bundle-coordination`.** That tree is the only thing
+  builds before this one ever wrote there, so the probe treats such a profile as absent and the legacy
+  sweep still runs; anything else in the directory is the official app's.
 - **A pre-rename `serve` unit and a pre-rename WSL registration.** Both were written under upstream's
   names with upstream's marker, exactly like the official app's, so neither can be removed or adopted
   safely. The launchd _label_ is still recognised, which is what lets an upgrade park the supervisor

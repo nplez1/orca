@@ -2,7 +2,10 @@ import { accessSync, constants } from 'node:fs'
 import { delimiter, dirname, isAbsolute, join, relative } from 'node:path'
 import { RuntimeClientError } from './types'
 import { resolveLaunchUserDataPath } from './launch-user-data-path'
-import { getOrcaCliCommandNameForPlatform } from '../../shared/orca-cli-command-name'
+import {
+  getOrcaCliCommandNameForPlatform,
+  getRelayCliCommandNameForPlatform
+} from '../../shared/orca-cli-command-name'
 
 /** A remote server’s Node-based CLI cannot start a local app server. */
 export function canStartOrcaServer(env: NodeJS.ProcessEnv): boolean {
@@ -22,8 +25,12 @@ export function appCliName(platform: NodeJS.Platform): string {
   return getOrcaCliCommandNameForPlatform(platform)
 }
 
+/**
+ * Names the command the caller actually typed. That is the relay/server shim (`orca`), not this
+ * build's installed app CLI: the message explains why an `orca` that is not an app CLI cannot serve.
+ */
 function notAnAppCli(platform: NodeJS.Platform): string {
-  return `This \`${appCliName(platform)}\` command isn't running from an installed Orca app. On a host Orca reaches over SSH, it belongs to that connection's server and can't start one of its own.`
+  return `This \`${getRelayCliCommandNameForPlatform(platform)}\` command isn't running from an installed Orca app. On a host Orca reaches over SSH, it belongs to that connection's server and can't start one of its own.`
 }
 
 export function serverOnlyServeMessage(platform: NodeJS.Platform): string {

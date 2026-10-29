@@ -46,4 +46,16 @@ describe('hasOfficialOrcaProfile', () => {
     mkdirSync(join(home, '.config', 'orca-np'), { recursive: true })
     expect(hasOfficialOrcaProfile('linux', home, {})).toBe(false)
   })
+
+  // Why: builds before the coordination root moved wrote `bundle-coordination` into upstream's
+  // profile, and a machine that only ever ran that build must still sweep its own `.orca` leftovers.
+  it('ignores a profile holding only this build’s pre-rename park tree', () => {
+    const profilePath = join(home, 'Library', 'Application Support', 'orca')
+    mkdirSync(join(profilePath, 'bundle-coordination', 'abc'), { recursive: true })
+    expect(hasOfficialOrcaProfile('darwin', home, {})).toBe(false)
+
+    // Anything else in there is the official app's.
+    mkdirSync(join(profilePath, 'Local Storage'), { recursive: true })
+    expect(hasOfficialOrcaProfile('darwin', home, {})).toBe(true)
+  })
 })

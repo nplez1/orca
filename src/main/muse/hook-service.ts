@@ -28,6 +28,8 @@ import {
   getMuseManagedCommandMatcher,
   getMuseManagedHooksPath,
   getMuseManagedScriptPath,
+  museForeignPointerDetail,
+  museRemoteForeignPointerDetail,
   getMuseRemoteConfigPath,
   getMuseRemoteManagedCommand,
   getMuseRemoteManagedHooksPath,
@@ -201,7 +203,7 @@ export class MuseHookService {
         state: 'not_installed',
         configPath,
         managedHooksPresent: false,
-        detail: `managed_hooks_path points at ${existingPointer}; leaving the user's managed hooks untouched`
+        detail: museForeignPointerDetail(existingPointer)
       }
     }
     const scriptPath = getMuseManagedScriptPath()
@@ -246,7 +248,7 @@ export class MuseHookService {
           state: 'not_installed',
           configPath: remoteConfigPath,
           managedHooksPresent: false,
-          detail: `managed_hooks_path points at ${existingPointer}; leaving the user's managed hooks untouched`
+          detail: museRemoteForeignPointerDetail(existingPointer, remoteHome)
         }
       }
       const command = getMuseRemoteManagedCommand(remoteScriptPath)
