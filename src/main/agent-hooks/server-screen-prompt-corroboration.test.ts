@@ -327,6 +327,7 @@ describe('the corroboration loop', () => {
   let reads: number
   let screen: { reason: 'agent-approval-prompt'; since: number } | null | undefined
   let current: EnrichedAgentHookEventPayload
+  let dialogClaimed: boolean
   /** Stands in for the store: every write re-enters arm(), exactly as commitStatusRowMutation does. */
   let commit: (row: EnrichedAgentHookEventPayload) => void
 
@@ -336,6 +337,7 @@ describe('the corroboration loop', () => {
     reads = 0
     screen = { reason: 'agent-approval-prompt', since: 1_200 }
     current = row('working')
+    dialogClaimed = false
     commit = () => {}
   })
 
@@ -351,6 +353,7 @@ describe('the corroboration loop', () => {
         return screen
       },
       forgetScreenPrompt: (paneKey) => forgotten.push(paneKey),
+      claimsDialog: () => dialogClaimed,
       currentRow: () => current,
       publishScreenPromptRow: (next) => {
         current = { ...next, receivedAt: current.receivedAt + 1, stateStartedAt: 1 }
@@ -578,6 +581,28 @@ describe('the corroboration loop', () => {
     vi.advanceTimersByTime(200_000)
     expect(reads).toBe(settled)
     expect(published).toHaveLength(0)
+  })
+
+  it('keeps watching a pane that is blind but still claims a dialog', () => {
+    // Why no bound here: a collapsed card or a narrow pane answers "cannot see it" while the pane's
+    // own title still claims a dialog. Widening it makes the card readable again with no new hook,
+    // so giving up would leave the row Working over a dialog a person still has to answer (#228).
+    screen = undefined
+    dialogClaimed = true
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(200_000)
+    const watched = reads
+    expect(watched).toBeGreaterThan(SCREEN_PROMPT_FAST_RECHECK_COUNT)
+
+    vi.advanceTimersByTime(60_000)
+    expect(reads).toBeGreaterThan(watched)
+    expect(published).toHaveLength(0)
+
+    // And the card is picked up the moment it becomes readable.
+    screen = { reason: 'agent-approval-prompt', since: 1_200 }
+    vi.advanceTimersByTime(5_000)
+    expect(published.at(-1)?.payload.state).toBe('waiting')
   })
 
   it('forgets the pane once a hook row proves no dialog is holding it', () => {

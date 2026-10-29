@@ -10,16 +10,19 @@ type ScreenPromptReader = (
 
 type ScreenPromptForgetter = (paneKey: string) => void
 
+type ScreenPromptDialogClaim = (paneKey: string, agentType: string | undefined) => boolean
+
 /** Switch point for both pane-owning hosts (main and orcad): the screen is the only witness of a
  *  dialog some agents' hooks cannot report, and only the host can read a pane's terminal. */
 export function wireScreenPromptReader(
   server: Pick<
     AgentHookServerScreenPromptWiring,
-    'setScreenPromptReader' | 'setScreenPromptForgetter'
+    'setScreenPromptReader' | 'setScreenPromptForgetter' | 'setScreenPromptDialogClaim'
   >,
   runtime: {
     readPaneScreenPrompt: ScreenPromptReader
     forgetPaneScreenPrompt: ScreenPromptForgetter
+    paneClaimsDialog: ScreenPromptDialogClaim
   }
 ): void {
   server.setScreenPromptReader((paneKey, agentType) =>
@@ -28,6 +31,11 @@ export function wireScreenPromptReader(
   // Why required: a reader that keeps a per-pane stamp with no forgetter reverts to the stale-clock
   // bug this binding exists to fix, and nothing would report it.
   server.setScreenPromptForgetter((paneKey) => runtime.forgetPaneScreenPrompt(paneKey))
+  // Why bound with the reader: only the pane side knows whether a title still claims a dialog, and
+  // that claim is what tells a blind read apart from a pane with nothing to read.
+  server.setScreenPromptDialogClaim((paneKey, agentType) =>
+    runtime.paneClaimsDialog(paneKey, agentType)
+  )
 }
 
 /**
@@ -41,11 +49,14 @@ export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerS
    *  relay's parser, which has no screen to read. */
   private screenPromptReader: ScreenPromptReader | null = null
   private screenPromptForgetter: ScreenPromptForgetter | null = null
+  private screenPromptDialogClaim: ScreenPromptDialogClaim | null = null
 
   private readonly screenPromptCorroboration = new ScreenPromptCorroboration({
     readsScreen: () => this.screenPromptReader !== null,
     readScreenPrompt: (paneKey, agentType) => this.screenPromptReader?.(paneKey, agentType),
     forgetScreenPrompt: (paneKey) => this.screenPromptForgetter?.(paneKey),
+    claimsDialog: (paneKey, agentType) =>
+      this.screenPromptDialogClaim?.(paneKey, agentType) === true,
     currentRow: (paneKey) =>
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: main stores enriched rows; this shared view only declares their base event type.
       this.state.lastStatusByPaneKey.get(paneKey) as EnrichedAgentHookEventPayload | undefined,
@@ -65,6 +76,11 @@ export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerS
   /** Binds the pane-side stamp withdrawal; null leaves every stamp to the screen's own read. */
   setScreenPromptForgetter(forgetter: ScreenPromptForgetter | null): void {
     this.screenPromptForgetter = forgetter
+  }
+
+  /** Binds the pane-side dialog claim; null makes every blind read give up after the limit. */
+  setScreenPromptDialogClaim(claim: ScreenPromptDialogClaim | null): void {
+    this.screenPromptDialogClaim = claim
   }
 
   /** The pane's screen gained a dialog: earlier and surer evidence than any deferred read. */

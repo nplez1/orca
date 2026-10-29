@@ -110,6 +110,28 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
     }
   }
 
+  /** Whether the pane's own title still claims a dialog is open. The one question that separates a
+   *  pane this reader is blind to from a pane that holds no dialog at all: pi's `π !` is its own
+   *  claim, painted for exactly as long as a dialog or a startup prompt holds the pane. */
+  paneClaimsDialog(paneKey: string, agentType: string | undefined): boolean {
+    if (agentType !== 'pi') {
+      return false
+    }
+    try {
+      const handle = this.getAgentStatusTerminalHandleForPaneKey(paneKey)
+      if (!handle) {
+        return false
+      }
+      const snapshot = this.getTerminalAgentStatusSnapshot(
+        handle,
+        this.getTerminalAgentStatusPtyId(handle)
+      )
+      return getPiStateTitleStatus(snapshot.title ?? '') === 'permission'
+    } catch {
+      return false
+    }
+  }
+
   /** The tail gained a dialog this pane must answer: tell the store now rather than wait its timer,
    *  which is the only way a dialog painted long after the agent's last hook is ever noticed. */
   notePaneScreenPromptGained(paneKey: string): void {

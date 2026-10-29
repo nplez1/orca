@@ -96,6 +96,9 @@ export type ScreenPromptCorroborationHost = {
    *  never letting a stale stamp outlive the wait it was earned by. */
   forgetScreenPrompt?: (paneKey: string) => void
   currentRow: (paneKey: string) => EnrichedAgentHookEventPayload | undefined
+  /** Whether the pane's own title still claims a dialog, which bounds how long a blind read is
+   *  retried. Absent where the host cannot answer; the caller then gives up after the limit. */
+  claimsDialog?: (paneKey: string, agentType: string | undefined) => boolean
   /** Publishes the repaint and returns the `receivedAt` the stored row ended up with. */
   publishScreenPromptRow: (row: AgentHookEventPayload) => number | undefined
 }
@@ -262,14 +265,17 @@ export class ScreenPromptCorroboration {
     // cadence, not the slow one: the first read after an on-gain trigger usually lands before the
     // emulator has parsed the chunk that paints the dialog, and a 5 s first retry would report
     // Needs You late rather than wrong.
-    // Why the same bound as a published wait: a pane that never answers again — a restored row whose
-    // terminal never reconnects — must not read forever. The two paths share the counter the release
-    // path already bounds itself with.
     if (reading === undefined) {
-      pane.unreadableRechecks = (pane.unreadableRechecks ?? 0) + 1
-      if (pane.unreadableRechecks > SCREEN_PROMPT_UNREADABLE_RECHECK_LIMIT) {
-        this.forget(paneKey)
-        return
+      // Why the claim decides the bound: a pane whose own title still claims a dialog is blind, not
+      // empty — widening it or expanding the card makes it readable again with no new hook, so it is
+      // watched without a limit. Only an unclaimed pane that never answers is given up on, because a
+      // restored row whose terminal never reconnects must not read forever (#208, #228).
+      if (this.host.claimsDialog?.(paneKey, current.payload.agentType) !== true) {
+        pane.unreadableRechecks = (pane.unreadableRechecks ?? 0) + 1
+        if (pane.unreadableRechecks > SCREEN_PROMPT_UNREADABLE_RECHECK_LIMIT) {
+          this.forget(paneKey)
+          return
+        }
       }
       this.scheduleRecheck(paneKey)
       return

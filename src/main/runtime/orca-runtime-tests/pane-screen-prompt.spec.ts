@@ -381,4 +381,22 @@ describe('the ask card a pi pane is holding', () => {
     })
     expect(gained).toEqual([paneKey])
   })
+
+  // Why this exists separately: the store needs to know whether a blind read is a pane it cannot see
+  // or a pane with nothing to see, and only the title can answer that.
+  it.each([
+    ['π', PI_NEEDS_INPUT_TITLE, true],
+    ['Pi', '\x1b]0;Pi ! worker\x07', true],
+    ['π', PI_WORKING_TITLE, false],
+    ['π', PI_IDLE_TITLE, false]
+  ])('answers claimsDialog=%s for a %s title', async (_label, title, expected) => {
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', title + PI_ASK_CARD, 1_000)
+    await flush()
+
+    expect(runtime.paneClaimsDialog(paneKey, 'pi')).toBe(expected)
+    // Why the other agents answer false: their dialogs have no title claim, so a blind read for them
+    // is still bounded.
+    expect(runtime.paneClaimsDialog(paneKey, 'copilot')).toBe(false)
+  })
 })

@@ -182,6 +182,7 @@ describe('TrustDialogStatusObserver', () => {
     ].join('\r\n')
 
     it('publishes the wait its hooks cannot, and settles on a session boundary', async () => {
+      // The fixture only supplies a pane of a known grid size; the pi dialog below is written into it.
       const { published, write } = await pane('codex-0-158-0-trustprompt', 'pi')
       await write(`\x1b[2J\x1b[H${PI_TRUST_GRID}\r\n`)
       await vi.advanceTimersByTimeAsync(2_000)
