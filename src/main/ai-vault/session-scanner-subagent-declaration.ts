@@ -36,8 +36,11 @@ const ACTIVE_AGENT_TAG_PATTERN = /<active_agent\s+name="([^"]+)"/i
  * A name a person typed can end in 8 characters of the same alphabet — `fix login#issue-42` is not
  * hex, and `release#20261028` is a calendar date — so the suffix has to pass two checks the
  * spawner's UUID-derived id always does: hex, and not a date. Sized against the ids real runs
- * persist (`Explore#06356862`), an id shaped like a date is ~1 in 50,000, and a name wrongly read
- * as a sub-agent shows at top level rather than disappearing.
+ * persist (`Explore#06356862`), an id shaped like a date is ~1 in 50,000.
+ *
+ * What is left: a name that is 8 plain hex characters at startup is indistinguishable from an id,
+ * and a wrongly nested row is then hidden by the shared nesting rule whenever its parent is not in
+ * the list. That residual is why this check is deliberately the strict one.
  */
 function isSpawnedAgentId(id: string): boolean {
   return (

@@ -2,12 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { normalize, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const { handleMock, openPathMock, showItemInFolderMock, statMock } = vi.hoisted(() => ({
-  handleMock: vi.fn<(channel: string, handler: (...args: unknown[]) => unknown) => void>(),
-  openPathMock: vi.fn(),
-  showItemInFolderMock: vi.fn(),
-  statMock: vi.fn()
-}))
+const { handleMock, openPathMock, realpathMock, showItemInFolderMock, statMock } = vi.hoisted(
+  () => ({
+    handleMock: vi.fn<(channel: string, handler: (...args: unknown[]) => unknown) => void>(),
+    openPathMock: vi.fn(),
+    realpathMock: vi.fn<(path: string) => Promise<string>>(),
+    showItemInFolderMock: vi.fn(),
+    statMock: vi.fn()
+  })
+)
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock },
@@ -18,6 +21,7 @@ vi.mock('electron', () => ({
 vi.mock('node:fs/promises', () => ({
   constants: { COPYFILE_EXCL: 1 },
   copyFile: vi.fn(),
+  realpath: realpathMock,
   stat: statMock
 }))
 
@@ -46,6 +50,8 @@ function fileStats(mode: number): { isFile: () => boolean; mode: number } {
 beforeEach(() => {
   handleMock.mockReset()
   openPathMock.mockReset()
+  realpathMock.mockReset()
+  realpathMock.mockImplementation(async (path: string) => path)
   showItemInFolderMock.mockReset()
   statMock.mockReset()
   openPathMock.mockResolvedValue('')
@@ -54,19 +60,21 @@ beforeEach(() => {
 describe('resolveDefaultAppOpenTarget', () => {
   it('refuses the file kinds `shell.openPath` would execute', async () => {
     // Why: on macOS these run in Terminal or launch a bundle, and a cloned repo keeps whatever a
-    // README links to — Git preserves the executable bit and adds no quarantine flag.
+    // README links to — Git preserves the executable bit and adds no quarantine flag. The mode is a
+    // plain document's, so each case fails on the name alone.
     for (const name of [
       'docs/guide.command',
-      'build/tool',
       'dist/setup.exe',
       'run.ps1',
       'deploy.bat',
       'shortcut.lnk',
       'app.desktop',
-      'Orca Preview.app',
-      'notes.terminal'
+      'notes.terminal',
+      'deploy.tool',
+      'installer.msi',
+      'payload.jar'
     ]) {
-      statMock.mockResolvedValueOnce(fileStats(0o755))
+      statMock.mockResolvedValueOnce(fileStats(0o644))
       await expect(resolveDefaultAppOpenTarget(resolve(name))).resolves.toEqual({
         ok: false,
         reason: 'executable-target'
@@ -74,15 +82,43 @@ describe('resolveDefaultAppOpenTarget', () => {
     }
   })
 
-  it('refuses a document that carries the executable bit', async () => {
-    // An extensionless or .md file launched by shebang is the same execution without a tell in the
-    // name, so the mode is checked as well.
-    statMock.mockResolvedValueOnce(fileStats(0o755))
-
-    await expect(resolveDefaultAppOpenTarget(resolve('docs/guide.md'))).resolves.toEqual({
+  it('refuses an app bundle, and a symlink that points at one', async () => {
+    // The bundle is a directory, and a link's own name carries no extension, so both are refusals the
+    // extension list only reaches through `realpath`.
+    statMock.mockResolvedValueOnce({ isFile: () => false, mode: 0o755 })
+    await expect(resolveDefaultAppOpenTarget(resolve('Payload.app'))).resolves.toEqual({
       ok: false,
       reason: 'executable-target'
     })
+
+    realpathMock.mockResolvedValueOnce(resolve('Payload.app'))
+    statMock.mockResolvedValueOnce({ isFile: () => false, mode: 0o755 })
+    await expect(resolveDefaultAppOpenTarget(resolve('docs/guide'))).resolves.toEqual({
+      ok: false,
+      reason: 'executable-target'
+    })
+  })
+
+  it('sees through the trailing dots Win32 strips when it opens a file', async () => {
+    // `evil.exe.` runs `evil.exe`; `extname('evil.exe.')` is `.` alone.
+    statMock.mockResolvedValueOnce(fileStats(0o644))
+
+    await expect(resolveDefaultAppOpenTarget(resolve('evil.exe.'))).resolves.toEqual({
+      ok: false,
+      reason: 'executable-target'
+    })
+  })
+
+  it('refuses a document that carries the executable bit', async () => {
+    // An extensionless or .md file launched by shebang is the same execution without a tell in the
+    // name, so the mode is checked as well.
+    for (const name of ['docs/guide.md', 'build/tool']) {
+      statMock.mockResolvedValueOnce(fileStats(0o755))
+      await expect(resolveDefaultAppOpenTarget(resolve(name))).resolves.toEqual({
+        ok: false,
+        reason: 'executable-target'
+      })
+    }
   })
 
   it('resolves an ordinary document', async () => {
@@ -95,7 +131,7 @@ describe('resolveDefaultAppOpenTarget', () => {
     })
   })
 
-  it('does not treat a directory as an executable launch target', async () => {
+  it('does not treat a plain directory as an executable launch target', async () => {
     statMock.mockResolvedValueOnce({ isFile: () => false, mode: 0o755 })
 
     await expect(resolveDefaultAppOpenTarget(resolve('scripts'))).resolves.toMatchObject({

@@ -33,11 +33,12 @@ describe('timestampMs on foreign transcript epochs', () => {
     expect(timestampMs('2026-05-01T10:00:00.000Z')).toBe(Date.parse('2026-05-01T10:00:00.000Z'))
   })
 
-  it('clamps a far-future number so a row cannot pin itself above every real session', () => {
+  it('drops a far-future number instead of pinning the row above every real session', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-29T12:00:00.000Z'))
-    // A microsecond epoch is inside the Date range but lands in the year 55840.
-    expect(timestampMs(1_700_000_000_000_000)).toBe(Date.parse('2026-10-29T12:00:00.000Z'))
+    // A microsecond epoch is inside the Date range but lands in the year 55840, and clamping it to
+    // now would still sort the row to the top on every fresh read.
+    expect(timestampMs(1_700_000_000_000_000)).toBeNaN()
     // A transcript written a minute ahead by a skewed clock keeps its own timestamp.
     expect(timestampMs(Date.parse('2026-10-29T12:01:00.000Z'))).toBe(
       Date.parse('2026-10-29T12:01:00.000Z')

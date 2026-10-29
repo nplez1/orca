@@ -39,6 +39,7 @@ vi.mock('electron', () => ({
 vi.mock('node:fs/promises', () => ({
   constants: { COPYFILE_EXCL: 1 },
   copyFile: vi.fn(),
+  realpath: (path: string) => Promise.resolve(path),
   stat: statMock
 }))
 

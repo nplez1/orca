@@ -7,6 +7,10 @@ import type { PRCheckDetail } from '../../shared/github/check-types'
 import type { JenkinsSaveServerResult } from '../../shared/jenkins-servers'
 
 const BUILD_URL = 'https://ci.example.com/job/team/job/repo/12/'
+const JENKINS_BUILD_TREE_QUERY =
+  'number,building,result,displayName,fullDisplayName,description,url,timestamp,duration,' +
+  'estimatedDuration,actions[_class,causes[_class,shortDescription],parameters[_class,name,value]],' +
+  'changeSets[items[commitId,msg,comment,author[fullName]]]'
 const check: Pick<PRCheckDetail, 'name' | 'status' | 'conclusion'> & { url: string } = {
   name: 'continuous-integration/jenkins/pr-merge',
   status: 'completed',
@@ -34,6 +38,10 @@ async function loadModules() {
   })
   vi.doMock('../network/proxy-settings', () => ({
     ensureElectronProxyFromEnvironment: async () => undefined
+  }))
+  // The unconfigured-host check resolves names; a real resolver would make these tests depend on DNS.
+  vi.doMock('node:dns/promises', () => ({
+    lookup: async () => [{ address: '93.184.216.34', family: 4 }]
   }))
   const { setSecretStore } = await import('../../shared/secret-store')
   setSecretStore({
@@ -90,6 +98,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.doUnmock('node:os')
+  vi.doUnmock('node:dns/promises')
   vi.doUnmock('../network/proxy-settings')
 })
 
@@ -473,7 +482,8 @@ describe('getJenkinsBuildDetails', () => {
     for (const url of [
       'http://jenkins.internal/job/team/job/repo/12/',
       'http://10.0.0.5:8080/job/team/job/repo/12/',
-      'http://localhost:8080/job/team/job/repo/12/'
+      'http://localhost:8080/job/team/job/repo/12/',
+      'http://[::ffff:7f00:1]:8080/job/team/job/repo/12/'
     ]) {
       await expect(details.getJenkinsBuildDetails({ url, check })).resolves.toMatchObject({
         ok: false,
@@ -481,6 +491,50 @@ describe('getJenkinsBuildDetails', () => {
       })
     }
     expect(requests).toEqual([])
+  })
+
+  it('does not follow a redirect from an unconfigured host into the network', async () => {
+    const { details } = await loadModules()
+    route = (url) =>
+      url.startsWith('https://ci.example-builds.net/')
+        ? new Response(null, {
+            status: 302,
+            headers: { location: 'http://10.0.0.5:8080/job/team/job/repo/12/api/json' }
+          })
+        : json(buildBody())
+
+    const result = await details.getJenkinsBuildDetails({
+      url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+      check
+    })
+
+    expect(result).toMatchObject({ ok: false, reason: 'not-configured' })
+    expect(requests.map((entry) => entry.url)).toEqual([
+      `https://ci.example-builds.net/job/team/job/repo/12/api/json?tree=${JENKINS_BUILD_TREE_QUERY}`
+    ])
+  })
+
+  it('follows a redirect that stays publicly routable', async () => {
+    const { details } = await loadModules()
+    route = (url) =>
+      url.includes('/moved/')
+        ? json(buildBody())
+        : new Response(null, {
+            status: 302,
+            headers: {
+              location: 'https://ci.example-builds.net/moved/job/team/job/repo/12/api/json'
+            }
+          })
+
+    // A hop inside the same public host is what a Jenkins behind a path alias answers.
+    await details.getJenkinsBuildDetails({
+      url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+      check
+    })
+
+    expect(requests.map((entry) => entry.url)).toContain(
+      'https://ci.example-builds.net/moved/job/team/job/repo/12/api/json'
+    )
   })
 
   it('still reads a private host once its server is configured', async () => {
@@ -496,10 +550,7 @@ describe('getJenkinsBuildDetails', () => {
 
     expect(result.ok).toBe(true)
     expect(requests[0].url).toBe(
-      'http://jenkins.internal/job/team/job/repo/12/api/json?tree=' +
-        'number,building,result,displayName,fullDisplayName,description,url,timestamp,duration,' +
-        'estimatedDuration,actions[_class,causes[_class,shortDescription],parameters[_class,name,value]],' +
-        'changeSets[items[commitId,msg,comment,author[fullName]]]'
+      `http://jenkins.internal/job/team/job/repo/12/api/json?tree=${JENKINS_BUILD_TREE_QUERY}`
     )
   })
 })

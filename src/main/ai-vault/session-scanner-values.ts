@@ -21,9 +21,10 @@ const FUTURE_TIMESTAMP_SKEW_MS = 24 * 60 * 60 * 1000
  * microsecond epoch is inside the Date range but lands in the year 55840, so it would pin its row
  * above every real session forever.
  *
- * The far-future clamp is for numbers only, because only a number can be a unit mistake worth
- * re-reading: an ISO string says which instant it means, and extended-year values like
- * `+010000-01-01` are deliberately preserved.
+ * Why an impossible value is dropped rather than clamped to now: the row would still sort to the
+ * top, and the same line would decode to a different instant on every read. Dropped, the other
+ * timestamps in the transcript — or the file's own mtime — decide the order. Numbers only: an ISO
+ * string states which instant it means, and extended-year values like `+010000-01-01` are preserved.
  */
 export function timestampMs(value: unknown): number {
   if (typeof value === 'string') {
@@ -34,11 +35,10 @@ export function timestampMs(value: unknown): number {
     return Number.NaN
   }
   const parsed = value > 1_000_000_000_000 ? value : value * 1000
-  if (parsed > MAX_DATE_MS) {
+  if (parsed > MAX_DATE_MS || parsed > Date.now() + FUTURE_TIMESTAMP_SKEW_MS) {
     return Number.NaN
   }
-  const now = Date.now()
-  return parsed > now + FUTURE_TIMESTAMP_SKEW_MS ? now : parsed
+  return parsed
 }
 
 /**

@@ -403,14 +403,15 @@ it('strips a byte-order mark from the record at offset 0 only', async () => {
   })
   expect(bytes).toEqual(['{"type":"session"}', '{"b":2}'])
 
-  // A BOM anywhere past offset 0 is data, not a file prefix.
+  // A BOM that is not the file's first byte is data, not a prefix. The mocked stream ignores `start`,
+  // so this reads from 0 and the record it keeps the BOM on is the mid-file one.
   const midFile = Buffer.concat([Buffer.from('{"a":1}\n'), bom, Buffer.from('{"b":2}\n')])
   source.chunks = [midFile]
-  const resumed: string[] = []
+  const kept: string[] = []
   await consumeCompleteJsonlLines({
     path: '/log',
-    start: Buffer.byteLength('{"a":1}\n'),
-    onLine: (line) => resumed.push(line)
+    start: 0,
+    onLine: (line) => kept.push(line)
   })
-  expect(resumed).toEqual(['{"a":1}', '\uFEFF{"b":2}'])
+  expect(kept).toEqual(['{"a":1}', '\uFEFF{"b":2}'])
 })

@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises'
+import { realpath, stat } from 'node:fs/promises'
 import type { Stats } from 'node:fs'
 import { extname, isAbsolute, normalize, win32 } from 'node:path'
 import { parseRoutableExecutionHostId } from '../../shared/execution-host'
@@ -48,7 +48,8 @@ function statLocalTarget(
 /**
  * Extensions a default-app launch hands to an interpreter or a package loader rather than to an
  * application that opens a document: `.command`/`.tool`/`.terminal` run in Terminal on macOS,
- * `.app` launches a bundle, and the Windows kinds are launchers too.
+ * bundles (`.app`, `.workflow`) launch through LaunchServices, and the Windows kinds are launchers
+ * or script hosts too.
  *
  * Why a deny list rather than an allow list of documents: a deny list cannot break the media,
  * PDF and archive previews that legitimately use "open with the default app", and these kinds have
@@ -58,17 +59,40 @@ const EXECUTABLE_LAUNCH_EXTENSIONS = new Set([
   '.app',
   '.bat',
   '.cmd',
+  '.cpl',
+  '.com',
   '.command',
   '.desktop',
   '.exe',
+  '.fileloc',
+  '.hta',
+  '.jar',
   '.lnk',
+  '.msc',
+  '.msi',
+  '.pif',
   '.ps1',
+  '.reg',
+  '.scr',
   '.terminal',
   '.tool',
   '.url',
   '.vbs',
+  '.workflow',
   '.wsf'
 ])
+/** Kinds Windows alone runs through a script host; refusing them elsewhere would only break editors. */
+const WINDOWS_SCRIPT_EXTENSIONS = new Set(['.js', '.jse', '.vbe'])
+
+/**
+ * The extension a launch would act on.
+ *
+ * Why strip trailing dots and spaces first: Win32 removes them when it opens the file, so
+ * `evil.exe.` runs `evil.exe` while `extname` reports `.` alone.
+ */
+function launchExtension(path: string): string {
+  return extname(path.replace(/[.\s]+$/, '')).toLowerCase()
+}
 
 export type DefaultAppOpenTarget =
   | { ok: true; path: string }
@@ -89,14 +113,22 @@ export async function resolveDefaultAppOpenTarget(
   if (!target.ok) {
     return target
   }
-  if (isExecutableOpenTarget(target.path, target.stats)) {
+  // Why resolve the link: `stat` already follows it, so the type has to be read from the file it
+  // describes. `docs/guide -> ../Payload.app` is a bundle launch with no extension of its own.
+  const realPath = await realpath(target.path).catch(() => target.path)
+  if (isExecutableOpenTarget(realPath, target.stats)) {
     return { ok: false, reason: 'executable-target' }
   }
   return { ok: true, path: target.path }
 }
 
 function isExecutableOpenTarget(path: string, stats: Stats): boolean {
-  if (EXECUTABLE_LAUNCH_EXTENSIONS.has(extname(path).trim().toLowerCase())) {
+  const extension = launchExtension(path)
+  // A bundle is a directory, so the extension decides before `isFile` is consulted.
+  if (EXECUTABLE_LAUNCH_EXTENSIONS.has(extension)) {
+    return true
+  }
+  if (process.platform === 'win32' && WINDOWS_SCRIPT_EXTENSIONS.has(extension)) {
     return true
   }
   // Windows synthesizes mode bits, so the executable bit there is not evidence about the file.

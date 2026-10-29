@@ -1,3 +1,5 @@
+import { lookup } from 'node:dns/promises'
+
 /**
  * Whether a Jenkins build URL that matched no configured server may be fetched at all.
  *
@@ -7,9 +9,9 @@
  * probe this machine's intranet from outside. No credentials travel on such a request, so the risk
  * is the probe itself rather than exfiltration — which is why the answer is "do not send it".
  *
- * Only literal addresses are judged. Resolving a name first would repeat the very request this
- * check exists to avoid, and a name that resolves into a private range is covered by the
- * single-label and private-suffix rules below.
+ * Three checks, because a host name is not one input: the literal address, the addresses it
+ * resolves to here (a split-horizon name is the ordinary intranet setup), and — through
+ * `isPubliclyRoutableUrl`, which every redirect hop is put through — wherever a redirect leads.
  */
 
 /** Suffixes that are private by construction (RFC 6762 `.local`, RFC 8375 `.home.arpa`). */
@@ -27,6 +29,20 @@ const PRIVATE_HOST_SUFFIXES = [
   '.invalid',
   '.example'
 ]
+
+/** Resolved addresses for a host name, or null when this machine cannot resolve it. */
+export type HostAddressLookup = (hostname: string) => Promise<readonly string[] | null>
+
+async function lookupHostAddresses(hostname: string): Promise<readonly string[] | null> {
+  try {
+    const addresses = await lookup(hostname, { all: true, verbatim: true })
+    return addresses.map((entry) => entry.address)
+  } catch {
+    // Why allow an unresolvable name: the fetch cannot reach anything either, and refusing here
+    // would report a name that does not exist as if it were a network policy failure.
+    return null
+  }
+}
 
 function isIpv4InRange(octets: readonly number[], start: readonly number[], bits: number): boolean {
   let remaining = bits
@@ -65,18 +81,56 @@ function isPrivateIpv4(host: string): boolean {
   return PRIVATE_IPV4_RANGES.some((range) => isIpv4InRange(octets, range.start, range.bits))
 }
 
+function stripAddressBrackets(host: string): string {
+  return host
+    .replace(/^\[|\]$/g, '')
+    .split('%')[0]
+    .toLowerCase()
+}
+
+/**
+ * The IPv4 address an IPv4-mapped IPv6 literal carries.
+ *
+ * Why both spellings: `new URL('http://[::ffff:127.0.0.1]/')` re-serializes its hostname as
+ * `[::ffff:7f00:1]`, so the dotted form never reaches this module from the URL parser — but it does
+ * from a DNS answer.
+ */
+function mappedIpv4(address: string): string | null {
+  const dotted = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(address)
+  if (dotted) {
+    return dotted[1]
+  }
+  const groups = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(address)
+  if (!groups) {
+    return null
+  }
+  const high = Number.parseInt(groups[1], 16)
+  const low = Number.parseInt(groups[2], 16)
+  return [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.')
+}
+
 function isPrivateIpv6(host: string): boolean {
-  const address = host.replace(/^\[|\]$/g, '').toLowerCase()
-  // An IPv4-mapped address is private when the address it carries is.
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(address)
+  const address = stripAddressBrackets(host)
+  const mapped = mappedIpv4(address)
   if (mapped) {
-    return isPrivateIpv4(mapped[1])
+    return isPrivateIpv4(mapped)
   }
   if (address === '::' || address === '::1') {
     return true
   }
-  // fc00::/7 unique-local and fe80::/10 link-local cover the intranet cases.
-  return /^f[cd][0-9a-f]{0,2}:/.test(address) || /^fe[89ab][0-9a-f]?:/.test(address)
+  // The first group decides both ranges, and comparing it as a number keeps `fc::` and `fe8::`
+  // public — a prefix regex over the text would swallow them.
+  const firstGroup = /^([0-9a-f]{1,4})(?::|$)/.exec(address)?.[1]
+  if (!firstGroup) {
+    return false
+  }
+  const first = Number.parseInt(firstGroup, 16)
+  // fc00::/7 unique-local, fe80::/10 link-local.
+  return (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80
+}
+
+function isIpLiteral(host: string): boolean {
+  return /\d/.test(host) && (/^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':'))
 }
 
 /** A single-label name (`http://jenkins/…`) is an intranet host, never a public Jenkins. */
@@ -84,6 +138,7 @@ function isSingleLabelHost(host: string): boolean {
   return !host.includes('.') && !host.includes(':')
 }
 
+/** Whether the address itself is one only this machine or its network can reach. */
 export function isPrivateJenkinsHost(host: string): boolean {
   const normalized = host.trim().toLowerCase().replace(/\.$/, '')
   if (normalized.length === 0 || normalized === 'localhost') {
@@ -98,21 +153,41 @@ export function isPrivateJenkinsHost(host: string): boolean {
   return isPrivateIpv4(normalized) || isPrivateIpv6(normalized)
 }
 
+function parseHttpUrl(url: string): URL | null {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 /**
- * Whether a build URL may be read without a configured server.
+ * Whether this URL may be requested without a configured server.
  *
  * Unconfigured public Jenkins is a supported case — an open-source project's build link renders
- * with no setup — so this only refuses the hosts that cannot be that.
+ * with no setup — so this refuses only what cannot be that: a private literal, a private name, or a
+ * name that resolves to an address only this network can reach.
  */
-export function allowsUnconfiguredJenkinsFetch(url: string): boolean {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
+export async function isPubliclyRoutableUrl(
+  url: string,
+  lookupAddresses: HostAddressLookup = lookupHostAddresses
+): Promise<boolean> {
+  const parsed = parseHttpUrl(url)
+  if (!parsed) {
     return false
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+  const hostname = parsed.hostname
+  if (isPrivateJenkinsHost(hostname)) {
     return false
   }
-  return !isPrivateJenkinsHost(parsed.hostname)
+  if (isIpLiteral(stripAddressBrackets(hostname))) {
+    // Already judged above; a literal has nothing left to resolve.
+    return true
+  }
+  const addresses = await lookupAddresses(stripAddressBrackets(hostname))
+  if (addresses === null) {
+    return true
+  }
+  return addresses.every((address) => !isPrivateJenkinsHost(address))
 }

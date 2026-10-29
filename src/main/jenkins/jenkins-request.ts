@@ -144,6 +144,14 @@ export type JenkinsCredentialArgs = {
   configured?: boolean
   /** The matched server's configured prefix, which bounds where credentials may travel. */
   serverBaseUrl?: string | null
+  /**
+   * Vets every redirect hop before the next request is sent.
+   *
+   * Why hand-followed: a public host answering `302 Location: http://10.0.0.5/…` reaches this
+   * machine's intranet under `redirect: 'follow'`, which is the request an unconfigured host is not
+   * allowed to make. Passing a guard here switches the transport to manual redirects.
+   */
+  redirectGuard?: (url: string) => Promise<boolean>
   signal?: AbortSignal
 }
 
@@ -172,6 +180,41 @@ export function jenkinsSignal(signal: AbortSignal | undefined): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout
 }
 
+/** A redirect the transport follows only after the guard vets its destination. */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
+const MAX_REDIRECT_HOPS = 4
+
+function redirectFailure(message: string): JenkinsRequestFailure {
+  return { reason: 'not-configured', message, identifiedAsJenkins: false, jenkinsVersion: null }
+}
+
+/** The URL to follow, null to use the response as-is, or the failure that stops the chain. */
+async function nextRedirectHop(
+  response: Response,
+  requestUrl: string,
+  hop: number,
+  args: JenkinsCredentialArgs
+): Promise<string | JenkinsRequestFailure | null> {
+  if (!REDIRECT_STATUSES.has(response.status)) {
+    return null
+  }
+  const location = response.headers.get('location')
+  await releaseBody(response)
+  if (hop >= MAX_REDIRECT_HOPS) {
+    return redirectFailure(`Jenkins redirected more than ${MAX_REDIRECT_HOPS} times`)
+  }
+  let nextUrl: string
+  try {
+    nextUrl = new URL(location ?? '', requestUrl).toString()
+  } catch {
+    return redirectFailure('Jenkins redirected without a usable target')
+  }
+  if (!location || !(await args.redirectGuard?.(nextUrl))) {
+    return redirectFailure(`Jenkins redirected to a host that is not publicly routable: ${nextUrl}`)
+  }
+  return nextUrl
+}
+
 export async function jenkinsGetJson(
   args: JenkinsCredentialArgs & { url: string }
 ): Promise<JenkinsRequestResult> {
@@ -179,15 +222,29 @@ export async function jenkinsGetJson(
   await applyJenkinsProxy(args.url)
 
   let response: Response
-  try {
-    response = await httpClient.fetch(args.url, {
-      method: 'GET',
-      redirect: 'follow',
-      headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
-      signal: jenkinsSignal(args.signal)
-    })
-  } catch (error) {
-    return { ok: false, failure: classifyJenkinsTransportError(error) }
+  let requestUrl = args.url
+  for (let hop = 0; ; hop += 1) {
+    try {
+      response = await httpClient.fetch(requestUrl, {
+        method: 'GET',
+        redirect: args.redirectGuard ? 'manual' : 'follow',
+        headers: { Accept: 'application/json', ...jenkinsAuthHeaders(args) },
+        signal: jenkinsSignal(args.signal)
+      })
+    } catch (error) {
+      return { ok: false, failure: classifyJenkinsTransportError(error) }
+    }
+    const hopResult = args.redirectGuard
+      ? await nextRedirectHop(response, requestUrl, hop, args)
+      : null
+    if (typeof hopResult === 'string') {
+      requestUrl = hopResult
+      continue
+    }
+    if (hopResult) {
+      return { ok: false, failure: hopResult }
+    }
+    break
   }
 
   const jenkinsVersion = response.headers.get('x-jenkins')
