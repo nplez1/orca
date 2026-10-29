@@ -1,6 +1,7 @@
 import { setImmediate as yieldToEventLoop } from 'node:timers/promises'
 import type SyncDatabase from '../sqlite/sync-database'
 import { deleteSearchMessages } from './session-search-message-rows'
+import { usableRetentionCutoffMs } from './session-search-retention-policy'
 
 export const RETENTION_DELETE_ROWS_PER_STEP = 256
 // Reclaim freed pages incrementally to avoid a long vacuum after the purge.
@@ -11,12 +12,18 @@ export async function deleteExpiredSearchFiles(
   db: SyncDatabase,
   cutoffMs: number | null,
   closed: () => boolean,
-  yieldStep: () => Promise<void> = yieldToEventLoop
+  yieldStep: () => Promise<void> = yieldToEventLoop,
+  /** Retention window the cutoff implements, so a jumped clock cannot empty the index. */
+  windowMs: number | null = null
 ): Promise<void> {
-  if (cutoffMs !== null) {
+  const newest = db.prepare('SELECT max(mtime_ms) AS mtime_ms FROM files').get() as
+    | { mtime_ms: number | null }
+    | undefined
+  const cutoff = usableRetentionCutoffMs(cutoffMs, newest?.mtime_ms ?? null, windowMs)
+  if (cutoff !== null) {
     const expired = db
       .prepare('SELECT path FROM files WHERE mtime_ms < ? ORDER BY mtime_ms')
-      .all(cutoffMs) as { path: string }[]
+      .all(cutoff) as { path: string }[]
     for (const { path } of expired) {
       if (closed()) {
         return
@@ -26,7 +33,7 @@ export async function deleteExpiredSearchFiles(
         // Recheck expiry under the write lock in case a read refreshed this file after the initial scan.
         const file = db
           .prepare('SELECT session_row_id FROM files WHERE path = ? AND mtime_ms < ?')
-          .get(path, cutoffMs) as { session_row_id: number | null } | undefined
+          .get(path, cutoff) as { session_row_id: number | null } | undefined
         if (file) {
           db.prepare('DELETE FROM sessions WHERE id = ?').run(file.session_row_id)
           db.prepare('DELETE FROM files WHERE path = ?').run(path)

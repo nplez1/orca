@@ -7,6 +7,10 @@ import {
 import { openSessionSearchIndexFile } from './session-search-index-test-fixture'
 import { SessionSearchStore } from './session-search-store'
 
+// Realistic mtimes: the cutoff is a wall-clock bound, and a purge whose cutoff sits past the newest
+// indexed file is refused as a clock jump.
+const BASE = 1_700_000_000_000
+
 function seed(db: SyncDatabase, id: number, rows: number, mtime: number): void {
   db.prepare(
     `INSERT INTO sessions(id,agent,session_id,file_path,title,cwd,cwd_key,resume_command)
@@ -62,16 +66,36 @@ it('seeks the expiring end of the file list instead of scanning it', async () =>
   }
 })
 
+it('keeps every row when a clock jump puts the cutoff past the whole index', async () => {
+  const index = await openSessionSearchIndexFile('ss-retention-clock-jump')
+  try {
+    seed(index.db, 1, 1, BASE - 400 * 86_400_000)
+    // Every indexed file predates the jumped cutoff, which is a bad clock rather than an old index.
+    await deleteExpiredSearchFiles(
+      index.db,
+      BASE,
+      () => false,
+      async () => {},
+      30 * 86_400_000
+    )
+    expect(count(index.db, 'sessions')).toBe(1)
+    expect(count(index.db, 'files')).toBe(1)
+    expect(visibleSessionIds(index.db)).toEqual(['1'])
+  } finally {
+    await index.close()
+  }
+})
+
 it('hides an expiring session at once, then reclaims its rows in bounded steps', async () => {
   const index = await openSessionSearchIndexFile('ss-retention-yield')
-  seed(index.db, 1, 1025, 1)
-  seed(index.db, 2, 1, 200)
+  seed(index.db, 1, 1025, BASE - 100)
+  seed(index.db, 2, 1, BASE)
   let previous = 1025
   const steps: number[] = []
   try {
     await deleteExpiredSearchFiles(
       index.db,
-      100,
+      BASE,
       () => false,
       async () => {
         const left = count(index.db, 'messages WHERE session_row_id=1')
@@ -96,10 +120,10 @@ it('finishes an interrupted deletion after reopening', async () => {
   let closed = false
   let steps = 0
   try {
-    seed(index.db, 1, 513, 1)
+    seed(index.db, 1, 513, BASE - 100)
     await deleteExpiredSearchFiles(
       index.db,
-      100,
+      BASE,
       () => closed,
       async () => {
         if (++steps === 2) {
@@ -131,9 +155,9 @@ it('cancels retention between batches and resumes without exposing a partial ses
   const index = await openSessionSearchIndexFile('ss-retention-cancel')
   const store = new SessionSearchStore(index.path)
   try {
-    seed(index.db, 1, 1025, 1)
+    seed(index.db, 1, 1025, BASE - 100)
     const controller = new AbortController()
-    const purge = store.purgeOlderThan(100, controller.signal)
+    const purge = store.purgeOlderThan(BASE, controller.signal)
     setImmediate(() => controller.abort())
     await purge
     const remaining = count(index.db, 'messages')
@@ -151,18 +175,18 @@ it('cancels retention between batches and resumes without exposing a partial ses
 it('keeps a file a read refreshed after the expiry list was taken', async () => {
   const index = await openSessionSearchIndexFile('ss-retention-refreshed')
   try {
-    seed(index.db, 1, 2, 1)
-    seed(index.db, 2, 2, 2)
+    seed(index.db, 1, 2, BASE - 200)
+    seed(index.db, 2, 2, BASE - 100)
     let refreshed = false
     // Refresh the second file after the expiry snapshot but before its deletion transaction.
     await deleteExpiredSearchFiles(
       index.db,
-      100,
+      BASE,
       () => false,
       async () => {
         if (!refreshed) {
           refreshed = true
-          index.db.prepare('UPDATE files SET mtime_ms = 500 WHERE path = ?').run('2')
+          index.db.prepare('UPDATE files SET mtime_ms = ? WHERE path = ?').run(BASE + 100, '2')
         }
       }
     )
