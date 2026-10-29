@@ -3,6 +3,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -109,8 +110,12 @@ export function resolveLegacyHomeStoreIn(
 ): LegacyHomeStoreResolution {
   const current = resolveHomeStorePathIn(home, segment, ...segments)
   const marker = adoptionMarkerPathIn(home, [segment, ...segments])
-  if (existsSync(marker)) {
-    return { path: current, adoption: { kind: 'decided' } }
+  const recorded = readAdoptionRecord(marker)
+  if (recorded !== null) {
+    // Why a recorded decision can still report: the marker distinguishes "nothing to import" from "a copy
+    // exists that this build chose not to import", and only the second stays worth telling the user —
+    // while still being a decision, so signing out cannot resurrect the pre-rename copy.
+    return { path: current, adoption: recorded }
   }
   const legacy = resolveLegacyHomeStorePathIn(home, segment, ...segments)
   const legacyExists = existsSync(legacy)
@@ -122,17 +127,16 @@ export function resolveLegacyHomeStoreIn(
       markAdoptionDecided(marker)
       return { path: current, adoption: { kind: 'decided' } }
     }
-    // Why neither adopted nor decided: this build's copy wins and is left alone, but the pre-rename
-    // copy is still un-imported. Recording that as the decision is what made re-entering credentials
-    // permanent — the old copy could then never be adopted and nothing ever said so.
-    return {
-      path: current,
-      adoption: {
-        kind: 'failed',
-        legacyPath: legacy,
-        reason: `${current} already exists, so the copy in ${LEGACY_HOME_DIRECTORY_NAME} was not imported`
-      }
+    // Why neither adopted nor the plain decision: this build's copy wins and is left alone, but the
+    // pre-rename copy is still un-imported. The decision is recorded so deleting this build's copy
+    // cannot re-adopt an official install's, and the record keeps the report alive.
+    const adoption = {
+      kind: 'failed' as const,
+      legacyPath: legacy,
+      reason: `${current} already exists, so the copy in ${LEGACY_HOME_DIRECTORY_NAME} was not imported`
     }
+    recordUnimportedCopy(marker, adoption)
+    return { path: current, adoption }
   }
   if (!legacyExists) {
     markAdoptionDecided(marker)
@@ -179,17 +183,83 @@ export function adoptLegacyHomeStoreIn(
 function markAdoptionDecided(marker: string): void {
   try {
     mkdirSync(dirname(marker), { recursive: true })
-    writeFileSync(marker, '', { flag: 'wx' })
+    writeFileSync(marker, ADOPTION_DECIDED, { flag: 'wx' })
   } catch (error) {
     // Why not fatal: an unwritable marker costs one redundant adoption check next run, while throwing
     // here would take the store's own caller down over a bookkeeping file. EEXIST is the normal case —
     // another process decided the same store first.
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
-    if (code !== 'EEXIST') {
+    if (errorCode(error) !== 'EEXIST') {
       console.warn('[orca] Could not record that a pre-rename store has been considered', error)
     }
   }
+}
+
+/**
+ * Record that a decision was made but the pre-rename copy was not imported.
+ *
+ * Why a record at all, when the outcome is recomputed on every read: deleting this build's copy after
+ * the user re-entered credentials would otherwise make the store "missing" again, and the next read
+ * would silently adopt an official install's copy — the resurrection the decided marker prevents.
+ */
+function recordUnimportedCopy(
+  marker: string,
+  adoption: Extract<LegacyHomeStoreAdoption, { kind: 'failed' }>
+): void {
+  try {
+    mkdirSync(dirname(marker), { recursive: true })
+    writeFileSync(
+      marker,
+      JSON.stringify({
+        kind: 'unimported',
+        legacyPath: adoption.legacyPath,
+        reason: adoption.reason
+      }),
+      { flag: 'wx' }
+    )
+  } catch (error) {
+    if (errorCode(error) !== 'EEXIST') {
+      console.warn('[orca] Could not record an un-imported pre-rename store', error)
+    }
+  }
+}
+
+const ADOPTION_DECIDED = ''
+
+/** The recorded outcome, or null when this store has not been decided yet. */
+function readAdoptionRecord(marker: string): LegacyHomeStoreAdoption | null {
+  let text: string
+  try {
+    text = readFileSync(marker, 'utf8')
+  } catch {
+    return null
+  }
+  if (text === ADOPTION_DECIDED) {
+    return { kind: 'decided' }
+  }
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'kind' in parsed &&
+      parsed.kind === 'unimported' &&
+      'legacyPath' in parsed &&
+      typeof parsed.legacyPath === 'string' &&
+      'reason' in parsed &&
+      typeof parsed.reason === 'string'
+    ) {
+      return { kind: 'failed', legacyPath: parsed.legacyPath, reason: parsed.reason }
+    }
+  } catch {
+    // An unreadable record reads as decided: the marker's presence is the decision.
+  }
+  // A marker this build cannot parse was written by something else; treat it as decided so nothing is
+  // adopted over this build's copy.
+  return { kind: 'decided' }
+}
+
+function errorCode(error: unknown): unknown {
+  return typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
 }
 
 /** {@link adoptLegacyHomeStoreIn} for the real home directory. */

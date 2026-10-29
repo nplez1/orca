@@ -15,6 +15,10 @@ const LEGACY_MAX_BYTES = 64 * 1024 * 1024
 // stays wrong for good. 4 carries the `<current_datetime>` prefix as a Copilot title, 5 carries
 // `subagent: null` (every Pi sub-agent at top level), and 6 predates 7 (re-read hidden-cached Codex
 // threads) and 8 (list pi/omp chats in a shared folder) — each of which the current version must apply.
+//
+// Why the branch still exists when a matching file is unlikely: no build wrote a current-schema JSON
+// file, so this now only deletes the retired file. Keeping the shape means a future writer that ships
+// the same schema is read rather than dropped, and the file is removed either way.
 const LEGACY_JSON_SCHEMA_VERSIONS: readonly number[] = [SESSION_PARSE_CACHE_SCHEMA_VERSION]
 
 /** Import before live I/O so newer or deleted rows cannot be overwritten; existing database rows win. */

@@ -131,6 +131,11 @@ export function JiraIntegrationCard(): React.JSX.Element {
       }
     >
       <IntegrationCardDetails>
+        {jiraStatus.credentialError ? (
+          // Why shown here: an unreadable or un-imported sites file reads as "not connected" otherwise,
+          // and the user's next move is to connect a site, which hides the problem for good.
+          <p className="text-xs text-destructive">{jiraStatus.credentialError}</p>
+        ) : null}
         <UnsealedCredentialNotice
           protection={jiraStatus.credentialProtection ?? null}
           credentialName={translate(

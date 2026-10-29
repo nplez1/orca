@@ -221,11 +221,13 @@ export class RelocationRollbackFailedError extends Error {
   constructor(
     readonly currentPath: string,
     readonly originalPath: string,
-    cause: unknown
+    /** The failure that started the rollback, and the rollback's own — both are the user's problem. */
+    cause: unknown,
+    rollbackCause: unknown
   ) {
     super(
       `Moving the checkout into its project folder failed and moving it back to ${originalPath} failed too, so the folder is still at ${currentPath}`,
-      { cause }
+      { cause: { move: cause, rollback: rollbackCause } }
     )
     this.name = 'RelocationRollbackFailedError'
   }
@@ -292,7 +294,7 @@ export async function relocatePrimaryCheckout(args: {
     } catch (rollbackError) {
       // Why a distinct error naming `to`: the caller otherwise reports the original failure as if the
       // move had been undone, and the checkout is somewhere its records do not name.
-      throw new RelocationRollbackFailedError(to, from, rollbackError)
+      throw new RelocationRollbackFailedError(to, from, error, rollbackError)
     }
     // Why repair again: the repair above may already have pointed every linked worktree's gitdir at
     // the new path, so moving the directory back without this leaves them all broken — the failure

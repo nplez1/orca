@@ -168,4 +168,27 @@ describe('home directory migration', () => {
     // Nothing overwrote the copy the user has just written.
     expect(readFileSync(join(currentDir(), 'sites.json'), 'utf-8')).toBe('{"sites":["re-entered"]}')
   })
+
+  // Why this sequence: recording the decision is what stops a sign-out from adopting an official
+  // install's copy, and the report has to survive that decision.
+  it('does not adopt the pre-rename copy after the fork copy is deleted', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["only-copy"]}')
+    writeFileSync(currentDir(), 'not a directory')
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption.kind).toBe('failed')
+
+    rmSync(currentDir(), { force: true })
+    mkdirSync(currentDir(), { recursive: true })
+    writeFileSync(join(currentDir(), 'sites.json'), '{"sites":["re-entered"]}')
+    expect(resolveLegacyHomeStoreIn(home, 'sites.json').adoption.kind).toBe('failed')
+
+    // The user signs out, which deletes this build's copy.
+    rmSync(join(currentDir(), 'sites.json'))
+
+    const after = resolveLegacyHomeStoreIn(home, 'sites.json')
+    expect(after.adoption).toMatchObject({ kind: 'failed' })
+    // Nothing was copied in: the pre-rename copy may belong to an official install.
+    expect(existsSync(join(currentDir(), 'sites.json'))).toBe(false)
+  })
 })

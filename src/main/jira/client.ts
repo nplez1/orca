@@ -153,6 +153,9 @@ export async function connect(
 }
 
 export function disconnect(siteId?: string): void {
+  // Why before the tokens go: an unreadable sites file cannot record the removal, so deleting the tokens
+  // first would leave site rows pointing at credentials that no longer exist.
+  assertSiteFileWritable()
   const file = getSiteFile()
   const ids = siteId ? [siteId] : file.sites.map((site) => site.id)
   for (const id of ids) {
@@ -210,6 +213,8 @@ export async function testConnection(
 }
 
 export function clearToken(siteId: string): void {
+  // Why before the deletion: see `disconnect`.
+  assertSiteFileWritable()
   deleteToken(siteId)
   noteReplicatedCredentialChanged()
   // Why: auth failure removes the site; drop cached attachment data URLs too.

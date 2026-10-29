@@ -98,7 +98,7 @@ function readServersFile(): JenkinsServersRead {
       file: { version: 1, servers: [] },
       unreadable: new JenkinsServerStoreUnreadableError(
         path,
-        `Could not read the Jenkins servers saved in ${path}, so they are not shown`
+        `Could not read the Jenkins servers saved in ${path}, so they are not shown. Repair or move that file aside to start from an empty list.`
       ),
       adoptionFailure
     }

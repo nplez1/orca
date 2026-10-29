@@ -238,6 +238,12 @@ function dropRowsFromAnotherParser(db: SyncDatabase): void {
   if (stored === current) {
     return
   }
+  // Why only an older stamp drops the rows: a newer one means a newer build's parser wrote them, and
+  // discarding it would empty the cache on every downgrade-and-return, the way an older cache file is
+  // discarded. Its rows are left alone and its stamp is kept, so this build reads them as they are.
+  if (typeof stored === 'string' && Number(stored) > SESSION_PARSE_PARSER_VERSION) {
+    return
+  }
   db.exec('DELETE FROM rows')
   db.prepare('INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)').run(
     PARSER_VERSION_KEY,

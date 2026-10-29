@@ -141,17 +141,12 @@ function storedSchemaVersion(db: SyncDatabase): string | null {
 }
 
 /**
- * Wait out any other writer before unlinking, so a removal mid-transaction is not what this build does.
+ * Close the handle before the files are removed.
  *
- * Why best-effort: the lock proves no other process is writing *now*; a process that opens the file
- * afterwards holds a handle to an unlinked inode until it notices, which SQLite cannot prevent.
+ * Why not an exclusive lock: `BEGIN EXCLUSIVE` is released by the close that precedes the unlink, and in
+ * WAL mode it does not block readers anyway. A second process that opens this file after this point
+ * holds a handle to an unlinked inode until it notices, which SQLite gives no way to prevent from here.
  */
 function releaseForRemoval(db: SyncDatabase): void {
-  try {
-    db.exec('BEGIN EXCLUSIVE')
-    db.exec('ROLLBACK')
-  } catch {
-    // A busy or read-only file is still removed; busy_timeout already waited.
-  }
   db.close()
 }

@@ -155,4 +155,20 @@ describe('JiraIntegrationCard account scope', () => {
       sectionId: 'default-runtime'
     })
   })
+
+  // An unreadable or un-imported sites file otherwise reads as "not connected", and the user's next
+  // move is to connect a site, which hides the problem for good.
+  it('shows why a saved site list could not be read', async () => {
+    const state = installStore({})
+    state.jiraStatus = {
+      connected: false,
+      viewer: null,
+      sites: [],
+      credentialError: 'Could not read the Jira sites saved in /home/ada/.orca-np/jira-sites.json'
+    }
+
+    const rendered = await renderCard()
+
+    expect(rendered.textContent).toContain('Could not read the Jira sites saved in')
+  })
 })

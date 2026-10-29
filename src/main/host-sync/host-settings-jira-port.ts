@@ -2,6 +2,7 @@ import type { ReplicatedHostCredential } from '../../shared/host-settings-replic
 import type { JiraSite } from '../../shared/jira/jira-types'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 import {
+  assertSiteFileWritable,
   deleteToken,
   getSiteFile,
   getSiteTokenProtection,
@@ -137,6 +138,9 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
       if (credential.id !== `${HOST_SETTINGS_JIRA_KIND}:${decoded.site.id}`) {
         throw new Error('Jira site payload does not match the credential it arrived as')
       }
+      // Why before the token: a sites file this build cannot read would otherwise collect a token for a
+      // site that can never be written down, which is the orphan R4 names.
+      assertSiteFileWritable()
       saveToken(decoded.site.id, decoded.token)
       // Why merge rather than replace: the file also records which site this host is looking at, and
       // a replicated site list must not move that.
@@ -151,6 +155,9 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
       if (siteId === null) {
         return
       }
+      // Why before the deletion: an unreadable file cannot show this site is gone, so removing the token
+      // would leave the record pointing at nothing.
+      assertSiteFileWritable()
       deleteToken(siteId)
       const file = getSiteFile()
       writeSiteFile({ ...file, sites: file.sites.filter((site) => site.id !== siteId) })

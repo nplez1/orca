@@ -113,7 +113,7 @@ describe('versioned cache database', () => {
     }
   })
 
-  it('rebuilds a corrupt file once, then refuses to loop', () => {
+  it('removes every file the index is made of', () => {
     writeVersion('1')
     removeVersionedCacheDatabase(cachePath())
     expect(existsSync(cachePath())).toBe(false)

@@ -31,6 +31,7 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
   )
   const [servers, setServers] = useState<JenkinsServerSummary[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [dialogServer, setDialogServer] = useState<JenkinsServerSummary | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
@@ -45,10 +46,15 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
       if (mountedRef.current) {
         setServers(Array.isArray(next) ? next : [])
         setLoadFailed(false)
+        setLoadError(null)
       }
-    } catch {
+    } catch (error) {
       if (mountedRef.current) {
         setLoadFailed(true)
+        // Why the message and not just a failed state: an unreadable profiles file and a pre-rename copy
+        // this build could not import both read as "nothing configured" otherwise, and the user's next
+        // move is to re-enter credentials that hide the problem for good.
+        setLoadError(readIpcErrorMessage(error) ?? null)
       }
     }
   }, [mountedRef])
@@ -169,6 +175,7 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
         </Button>
       }
     >
+      {loadError ? <p className="text-xs text-destructive">{loadError}</p> : null}
       {servers !== null && servers.length > 0 && (
         <IntegrationCardDetails>
           {servers.map((server) => {

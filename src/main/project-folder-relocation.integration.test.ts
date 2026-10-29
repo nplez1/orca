@@ -163,6 +163,14 @@ describe('relocating a primary checkout with linked worktrees', () => {
     expect(afterRepair.code, afterRepair.stderr).toBe(0)
   })
 
+  it('refuses the volume question for a path it cannot read, instead of claiming another volume', async () => {
+    // The real implementation, not a mock: a path that cannot be stat'ed is what produced the old
+    // "the destination is on a different volume" misreport.
+    await expect(
+      volumeRelationBetween(join(root, 'missing-checkout'), join(root, 'orca', 'workspaces'))
+    ).resolves.toBe('unreadable')
+  })
+
   it('creates the container it is moving into', async () => {
     // A checkout with no worktrees yet: the container does not exist, which is the normal first
     // relocation. The volume check has to answer without stat'ing the missing container, or it

@@ -4,7 +4,7 @@
 //
 // Electron-free: a paired Orca host serves this store too, so the path is always
 // passed in rather than resolved from `app`.
-import { mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
 import type {
@@ -160,6 +160,11 @@ export class SessionSummaryStore {
 
   private save(): void {
     try {
+      // Why skip a vanished directory: a headless host's own store can be flushed by the exit hook after
+      // its directory is gone, and recreating it would leave an empty cache behind.
+      if (!existsSync(dirname(this.filePath))) {
+        return
+      }
       mkdirSync(dirname(this.filePath), { recursive: true })
       // Why a per-writer temp name: a paired host serves this store too, and one fixed `.tmp` name
       // meant two writers published each other's file. The durable helper fsyncs before the rename.

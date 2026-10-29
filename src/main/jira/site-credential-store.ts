@@ -155,7 +155,7 @@ function readSiteFileFromDisk(): JiraSiteFileRead {
       file: emptySiteFile(),
       unreadable: new JiraSiteFileUnreadableError(
         path,
-        `Could not read the Jira sites saved in ${path}, so they are not shown`
+        `Could not read the Jira sites saved in ${path}, so they are not shown. Repair or move that file aside to start from an empty list.`
       ),
       adoptionFailure
     }
