@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import type {
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
@@ -177,7 +178,7 @@ export class SessionSummaryStore {
         } satisfies SessionSummaryStoreFile)
       )
     } catch (error) {
-      console.warn('[session-summary] failed to persist summary cache:', error)
+      recordSwallowedFailure('session-summary', error, 'failed to persist summary cache')
     }
   }
 }

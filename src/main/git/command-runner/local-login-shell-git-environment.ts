@@ -1,4 +1,5 @@
 import { waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
+import { recordSwallowedFailure } from '../../observability/swallowed-failure'
 import { resolveLoginShellEnvironment } from '../../startup/login-shell-environment'
 import type { ResolvedCommand } from './wsl-command-resolution'
 
@@ -51,8 +52,10 @@ function probeShellEnvironment(
       (error: unknown) => {
         // Why degrade instead of reject: every later git child shares this promise,
         // so one failed probe must not fail them all for the rest of the session.
-        console.warn(
-          `[shell-env] login-shell probe failed (${String(error)}); git keeps the launch environment`
+        recordSwallowedFailure(
+          'shell-env',
+          error,
+          'login-shell probe failed; git keeps the launch environment'
         )
         settledShellEnvironment = process.env
         return process.env

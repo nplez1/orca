@@ -14,6 +14,7 @@ import {
 import type { WorkspacePathCatalog } from '../../shared/workspace-path-catalog'
 import { parseWslPath } from '../wsl'
 import { resolveAuthorizedPath } from './filesystem/filesystem-auth'
+import { isFolderProjectRoot } from './folder-project-root'
 import { getLocalGitOptionsForRegisteredWorktree } from './local-worktree-runtime-options'
 import { scanRipgrepPaths } from './quick-open-rg-path-scan'
 import { RipgrepUnavailableError } from '../../shared/ripgrep-process-availability'
@@ -79,7 +80,8 @@ export async function buildWorkspacePathCatalogFromDiscovery(
   const rgArgs = buildRgArgsForQuickOpen({
     searchRoot: '.',
     excludePathPrefixes: options.workerBuild ? [] : excludePathPrefixes,
-    forceSlashSeparator: sep === '\\'
+    forceSlashSeparator: sep === '\\',
+    isFolderProject: isFolderProjectRoot(store, rootPath, authorizedRootPath)
   })
   if (options.workerBuild) {
     return buildWorkspacePathCatalogInWorker({

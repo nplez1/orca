@@ -17,6 +17,7 @@ import {
   isCheckoutOutsideProjectFolder,
   planPrimaryCheckoutRelocation,
   relocatePrimaryCheckout,
+  resolveRelocationTarget,
   volumeRelationBetween,
   type RelocationDecision,
   type RelocationOutcome
@@ -60,6 +61,18 @@ export type WorktreePsSnapshot = {
 
 /** Big enough that a real repo cannot truncate it; truncation is treated as "cannot verify". */
 export const WORKTREE_LIVENESS_PROBE_LIMIT = 10_000
+
+/**
+ * A checkout on a WSL filesystem resolves through the same repo path: when the distro cannot answer,
+ * this reports no branch and the plan refuses rather than naming a folder by guess.
+ *
+ * Why the routing connection and not `connectionId`: a row may name its SSH host only as
+ * `ssh:<target>`, and reading the raw field answers "local" — the branch would then be resolved by a
+ * local `git` run against a path this machine cannot read.
+ */
+async function resolveDefaultBranchName(repo: Repo): Promise<string | null> {
+  return getRepoDefaultBranchName(repo.path, getRepoRoutingConnectionId(repo))
+}
 
 /**
  * Whether any workspace of this repo still has a terminal attached.
@@ -114,20 +127,20 @@ export class RuntimeRepositoryRelocationController {
   ): Promise<RuntimeRepoRelocationResult> {
     const store = this.requireStore()
     const repo = await this.deps.resolveRepo(repoSelector)
-    const decision = planPrimaryCheckoutRelocation({
+    const candidate = {
       repo,
       executionHostId: getRepoExecutionHostId(repo),
       settings: store.getSettings(),
-      // A checkout on a WSL filesystem resolves through the same repo path: when the distro cannot
-      // answer, this reports no branch and the plan refuses rather than naming a folder by guess.
-      // Why the resolver: a row may name its SSH host only as `ssh:<target>`, and reading the raw
-      // `connectionId` answers "local" for it — the branch is then resolved by a local `git` run
-      // against a path this machine cannot read.
-      defaultBranchName: await getRepoDefaultBranchName(
-        repo.path,
-        getRepoRoutingConnectionId(repo)
-      ),
       platform: process.platform
+    }
+    // Why the target decides whether to ask git: the branch only *names* the folder, so a project
+    // this refuses needs no subprocess — and inside a git checkout, git would answer with the parent
+    // repo's branch, which is not this project's name to take.
+    const target = resolveRelocationTarget(candidate)
+    const decision = planPrimaryCheckoutRelocation({
+      ...candidate,
+      defaultBranchName:
+        target && !target.alreadyInContainer ? await resolveDefaultBranchName(repo) : null
     })
     if (decision.kind !== 'ready' || options.dryRun) {
       return toWireResult(repo.id, decision)

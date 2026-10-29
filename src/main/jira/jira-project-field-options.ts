@@ -4,6 +4,7 @@ import {
   type JiraObjectListFieldKind
 } from '../../shared/jira-field-rendering'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { clearToken, isAuthError } from './client'
 import { mapCreateFieldAllowedValue } from './jira-issue-mapping'
 import { asRecord, asString, type JiraRecord } from './jira-record-pages'
@@ -51,7 +52,7 @@ export async function readIssueProjectKey(
       clearToken(entry.site.id)
       throw error
     }
-    console.warn('[jira] issue project read failed:', error)
+    recordSwallowedFailure('jira', error, 'issue project read failed')
     return ''
   }
 }
@@ -113,7 +114,7 @@ export async function readProjectFieldOptions(
         clearToken(entry.site.id)
         throw error
       }
-      console.warn(`[jira] project ${kind} read failed:`, error)
+      recordSwallowedFailure('jira', error, `project ${kind} read failed`)
     }
   }
   return options

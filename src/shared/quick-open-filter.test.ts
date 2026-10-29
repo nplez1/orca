@@ -180,6 +180,29 @@ describe('buildRgArgsForQuickOpen', () => {
     // Glob metacharacters in a literal name must be escaped.
     expect(primary).toContain('!feature\\[1\\]')
   })
+
+  it("keeps an enclosing checkout's ignore files out of a folder project", () => {
+    const { primary, ignoredPass } = buildRgArgsForQuickOpen({
+      searchRoot: '.',
+      excludePathPrefixes: [],
+      forceSlashSeparator: false,
+      isFolderProject: true
+    })
+
+    expect(primary).toContain('--no-ignore-parent')
+    expect(ignoredPass).toContain('--no-ignore-parent')
+  })
+
+  it('leaves parent ignore files in force for a checkout that has its own repo', () => {
+    const { primary, ignoredPass } = buildRgArgsForQuickOpen({
+      searchRoot: '.',
+      excludePathPrefixes: [],
+      forceSlashSeparator: false
+    })
+
+    expect(primary).not.toContain('--no-ignore-parent')
+    expect(ignoredPass).not.toContain('--no-ignore-parent')
+  })
 })
 
 it('pins both Quick Open passes to config-independent NUL output', () => {

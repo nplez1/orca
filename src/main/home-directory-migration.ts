@@ -13,6 +13,7 @@ import {
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { HOME_DIRECTORY_NAME, LEGACY_HOME_DIRECTORY_NAME } from '../shared/app-directory-names'
+import { recordSwallowedFailure } from './observability/swallowed-failure'
 
 /**
  * Where a store this build owns lives under the fork's home directory, and how it hands over the
@@ -155,9 +156,10 @@ export function resolveLegacyHomeStoreIn(
     // Why no marker and no fallback: the copy is retried on the next read, which is the retry a
     // settings pane offers, and the pre-rename copy is left exactly where it is.
     const reason = error instanceof Error ? error.message : String(error)
-    console.warn(
-      `[orca] Could not move ${[segment, ...segments].join('/')} into ${HOME_DIRECTORY_NAME}, so it is not being used. Its copy in ${LEGACY_HOME_DIRECTORY_NAME} is untouched.`,
-      error
+    recordSwallowedFailure(
+      'orca',
+      error,
+      `could not move ${[segment, ...segments].join('/')} into ${HOME_DIRECTORY_NAME}, so it is not being used; its copy in ${LEGACY_HOME_DIRECTORY_NAME} is untouched`
     )
     return { path: current, adoption: { kind: 'failed', legacyPath: legacy, reason } }
   }
@@ -189,7 +191,11 @@ function markAdoptionDecided(marker: string): void {
     // here would take the store's own caller down over a bookkeeping file. EEXIST is the normal case —
     // another process decided the same store first.
     if (errorCode(error) !== 'EEXIST') {
-      console.warn('[orca] Could not record that a pre-rename store has been considered', error)
+      recordSwallowedFailure(
+        'orca',
+        error,
+        'could not record that a pre-rename store has been considered'
+      )
     }
   }
 }
@@ -218,7 +224,7 @@ function recordUnimportedCopy(
     )
   } catch (error) {
     if (errorCode(error) !== 'EEXIST') {
-      console.warn('[orca] Could not record an un-imported pre-rename store', error)
+      recordSwallowedFailure('orca', error, 'could not record an un-imported pre-rename store')
     }
   }
 }
