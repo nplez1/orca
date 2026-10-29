@@ -100,6 +100,8 @@ export type RpcContext = {
   clientId?: string
   // Key navigation by revocable device identity, never bearer token or socket id.
   pairedDeviceId?: string
+  // Whether a paired device row still exists, for state a pairing owns rather than a socket.
+  pairedDeviceRegistry?: { has(deviceId: string): boolean }
   // Delegated phones use their parent desktop's workspaces.
   pairedDeviceParentId?: string
   // Host-assigned transport identity; absent means the caller could not be established.

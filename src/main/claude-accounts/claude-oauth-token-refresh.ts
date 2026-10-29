@@ -15,7 +15,8 @@ import {
   composeRefreshedFields,
   forgetPendingRotation,
   pendingRotation,
-  rememberPendingRotation
+  rememberPendingRotation,
+  setPendingRotationBusyProbe
 } from './claude-oauth-pending-rotations'
 
 export { flushPendingClaudeOAuthRotations } from './claude-oauth-pending-rotations'
@@ -63,6 +64,9 @@ const MINT_REFUSAL_WINDOW_MS = 15 * 60 * 1000
 const inFlight = new Map<string, Promise<ClaudeOAuthRefreshOutcome>>()
 const rejectedRefreshTokens = new Set<string>()
 const mintedTokens = new Map<string, MintedToken>()
+// Why registered here: the pending-rotation queue must not write a key while this module's exchange
+// owns it, and this module is the only place that knows an exchange is running.
+setPendingRotationBusyProbe((key) => inFlight.has(key))
 
 /**
  * Merge a token-endpoint response into the stored blob, keeping every field the caller already

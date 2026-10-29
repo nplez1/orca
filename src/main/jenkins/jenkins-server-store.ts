@@ -6,6 +6,7 @@ import { asRecord } from '../../shared/jenkins-payload'
 import { isJenkinsUrlUnderBase, normalizeJenkinsBaseUrl } from '../../shared/jenkins-urls'
 import type { JenkinsServerProfile } from '../../shared/jenkins-servers'
 import {
+  credentialFileHasContent,
   restrictCredentialFileToOwner,
   readStoredCredentialToken,
   writeEncryptedCredential
@@ -93,7 +94,10 @@ export function listJenkinsServers(): JenkinsServerProfile[] {
 }
 
 export function hasJenkinsServerToken(serverId: string): boolean {
-  return existsSync(getTokenPath(serverId))
+  // Why content rather than existence: the token file is created empty when a write fails partway, and
+  // an empty file authenticates nothing — calling it a token reports the server as unreadable forever
+  // and keeps a host on a stale one instead of letting the main clear it.
+  return credentialFileHasContent(getTokenPath(serverId))
 }
 
 /** How a server's stored token sits on disk, or null when it has none. */

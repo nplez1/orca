@@ -38,14 +38,27 @@ const ROTATION_RETRY_DELAYS_MS = [500, 2_000, 8_000] as const
 
 const waiting = new Map<string, Omit<PendingClaudeOAuthRotation, 'key'>>()
 const retryAttempts = new Map<string, number>()
-let loaded = false
+/** Whether the file's contents are known, so a write cannot drop another account's rotation. */
+let complete = false
 let overridePath: string | null = null
 let scheduleRetry: (run: () => void, delayMs: number) => void = (run, delayMs) =>
   void setTimeout(run, delayMs)
+let isExchangeInFlight: (key: string) => boolean = () => false
 
 /** @internal — a test's temporary home, so a run never writes the real one. */
 export function setPendingRotationFilePathForTests(path: string | null): void {
   overridePath = path
+}
+
+/**
+ * @internal — whether a refresh exchange for this key is running.
+ *
+ * Why the queue has to know: an exchange owns the write for its own key, and a retry that lands in the
+ * middle of one can make the exchange's compare-and-set write `superseded` and drop a token the server
+ * has already spent.
+ */
+export function setPendingRotationBusyProbe(probe: ((key: string) => boolean) | null): void {
+  isExchangeInFlight = probe ?? (() => false)
 }
 
 /** @internal — a scheduler a test drives, so no case waits on a real timer. */
@@ -59,7 +72,8 @@ export function setPendingRotationRetryScheduler(
 export function resetPendingRotationsForTests(): void {
   waiting.clear()
   retryAttempts.clear()
-  loaded = false
+  complete = false
+  isExchangeInFlight = () => false
 }
 
 export function getPendingRotationPath(): string {
@@ -92,6 +106,15 @@ export function composeRefreshedFields(
  * plaintext would trade a sign-out for a credential on disk in the clear.
  */
 function persist(): void {
+  // Why refuse to write what could not be read: the file may hold another account's rotation that this
+  // process cannot decrypt yet (a locked keychain is the case this whole file exists for), and
+  // overwriting or deleting it would destroy the only copy of that login.
+  if (!complete) {
+    console.warn(
+      '[claude-oauth-refresh] could not read the pending rotation file; leaving it untouched'
+    )
+    return
+  }
   const entries: PendingClaudeOAuthRotation[] = [...waiting].map(([key, rotation]) => ({
     key,
     ...rotation
@@ -123,70 +146,90 @@ function writePendingClaudeOAuthRotations(
   return true
 }
 
-/** Why an unavailable secret store reads as empty: without it the file cannot be decrypted, and the
- *  file stays for the launch that can open it. */
+/** Why `missing` and `unreadable` are different: only the first means there is nothing to keep. */
+type PendingRotationRead =
+  | { kind: 'missing' }
+  | { kind: 'unreadable' }
+  | { kind: 'rotations'; rotations: PendingClaudeOAuthRotation[] }
+
 function readPendingClaudeOAuthRotations(
   path: string = getPendingRotationPath()
-): PendingClaudeOAuthRotation[] {
+): PendingRotationRead {
   if (!existsSync(path)) {
-    return []
+    return { kind: 'missing' }
   }
   let parsed: unknown
   try {
     const raw = readFileSync(path, 'utf8')
     if (!raw.startsWith(ENVELOPE_PREFIX)) {
-      return []
+      return { kind: 'unreadable' }
     }
     parsed = JSON.parse(
       getSecretStore().decryptString(Buffer.from(raw.slice(ENVELOPE_PREFIX.length), 'base64'))
     )
   } catch {
-    return []
+    return { kind: 'unreadable' }
   }
-  return Array.isArray(parsed) ? parsed.filter(isPendingRotation) : []
+  if (!Array.isArray(parsed)) {
+    return { kind: 'unreadable' }
+  }
+  return { kind: 'rotations', rotations: parsed.filter(isPendingRotation) }
 }
 
 function isPendingRotation(value: unknown): value is PendingClaudeOAuthRotation {
-  if (!value || typeof value !== 'object') {
+  const record = recordOf(value)
+  const target = record === null ? null : recordOf(record.target)
+  if (record === null || target === null) {
     return false
   }
-  const record = value as Record<string, unknown>
-  const target = record.target
-  if (!target || typeof target !== 'object') {
-    return false
-  }
-  const targetRecord = target as Record<string, unknown>
   const wellFormedTarget =
-    targetRecord.kind === 'file'
-      ? typeof targetRecord.path === 'string'
-      : targetRecord.kind === 'keychain' &&
-        typeof targetRecord.service === 'string' &&
-        typeof targetRecord.account === 'string'
+    target.kind === 'file'
+      ? typeof target.path === 'string'
+      : target.kind === 'keychain' &&
+        typeof target.service === 'string' &&
+        typeof target.account === 'string'
   return (
     typeof record.key === 'string' &&
     typeof record.spentStoreToken === 'string' &&
-    !!record.fields &&
-    typeof record.fields === 'object' &&
+    recordOf(record.fields) !== null &&
     wellFormedTarget
   )
 }
 
-/** The rotations this process knows about, hydrated from disk on first use. */
+function recordOf(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? { ...value } : null
+}
+
+/**
+ * The rotations this process knows about.
+ *
+ * Why the read is retried while it fails: on Windows and Linux `safeStorage` cannot decrypt before the app
+ * is `ready`, so the first attempt legitimately fails at startup. Treating that as "nothing pending" would
+ * blind the rest of the process and let the dead token be spent.
+ */
 function queue(): Map<string, Omit<PendingClaudeOAuthRotation, 'key'>> {
-  if (!loaded) {
-    // Why set before reading: a file that refuses to be read must not be retried on every access.
-    loaded = true
-    for (const rotation of readPendingClaudeOAuthRotations()) {
-      if (!waiting.has(rotation.key)) {
-        waiting.set(rotation.key, {
-          target: rotation.target,
-          spentStoreToken: rotation.spentStoreToken,
-          fields: rotation.fields
-        })
-      }
-    }
+  if (!complete) {
+    complete = hydrate()
   }
   return waiting
+}
+
+/** Read the file into the queue; whether its contents are now known. */
+function hydrate(): boolean {
+  const read = readPendingClaudeOAuthRotations()
+  if (read.kind === 'unreadable') {
+    return false
+  }
+  for (const rotation of read.kind === 'rotations' ? read.rotations : []) {
+    if (!waiting.has(rotation.key)) {
+      waiting.set(rotation.key, {
+        target: rotation.target,
+        spentStoreToken: rotation.spentStoreToken,
+        fields: rotation.fields
+      })
+    }
+  }
+  return true
 }
 
 export function pendingRotation(key: string): Omit<PendingClaudeOAuthRotation, 'key'> | undefined {
@@ -199,6 +242,9 @@ export function rememberPendingRotation(
 ): void {
   queue().set(key, rotation)
   persist()
+  // Why reset: a freshly minted rotation gets its own attempts. The spent budget belonged to the token
+  // this one replaced, and a long session would otherwise lose its backoff after three failures.
+  retryAttempts.delete(key)
   scheduleUpcomingRetry(key)
 }
 
@@ -219,6 +265,11 @@ async function flushPendingRotation(key: string): Promise<boolean> {
   if (!rotation) {
     return false
   }
+  // Why defer to the exchange: it is already writing this rotation under the store's compare-and-set,
+  // and a second write here would make that one look superseded and drop the newer token.
+  if (isExchangeInFlight(key)) {
+    return false
+  }
   let outcome: Awaited<ReturnType<typeof writeClaudeOAuthCredentialRotation>>
   try {
     outcome = await writeClaudeOAuthCredentialRotation(
@@ -230,6 +281,12 @@ async function flushPendingRotation(key: string): Promise<boolean> {
     return false
   }
   if (outcome === 'failed') {
+    return false
+  }
+  // Why the identity check: the write can block on a keychain prompt, and an exchange that started
+  // meanwhile may have replaced this rotation with a newer one — forgetting it then deletes the only
+  // working login.
+  if (queue().get(key) !== rotation) {
     return false
   }
   forgetPendingRotation(key)
@@ -250,7 +307,13 @@ function scheduleUpcomingRetry(key: string): void {
   }
   retryAttempts.set(key, attempts + 1)
   scheduleRetry(() => {
-    void flushPendingRotation(key)
+    // Why chain the next step from here: a single 500 ms retry would make the longer delays dead code,
+    // and a store that stays locked for a minute would never be retried again.
+    void flushPendingRotation(key).then((written) => {
+      if (!written && pendingRotation(key) !== undefined) {
+        scheduleUpcomingRetry(key)
+      }
+    })
   }, ROTATION_RETRY_DELAYS_MS[attempts])
 }
 
@@ -268,4 +331,15 @@ export async function flushPendingClaudeOAuthRotations(): Promise<void> {
 
 function pendingRotationKeys(): string[] {
   return [...queue().keys()]
+}
+
+/**
+ * Whether anything is waiting in this process.
+ *
+ * Why no disk read: the quit hook asks this on the way out, where an adoption sweep or a keychain
+ * prompt must not run. A launch that never flushed hydrates nothing and leaves the file for the next
+ * launch — which flushes it before any `claude` run can spend the token it replaces.
+ */
+export function hasPendingClaudeOAuthRotations(): boolean {
+  return waiting.size > 0
 }

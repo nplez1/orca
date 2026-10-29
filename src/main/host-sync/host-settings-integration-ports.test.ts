@@ -246,6 +246,22 @@ describe('the Jira credential port', () => {
     expect(port.protectionOf('jira:site-1')).toBe('plaintext')
   })
 
+  // Why this case: the token cache can answer while a fresh classification read fails (antivirus lock on
+  // Windows). If `list()` judged by the classification and `unreadableIds()` by the token, the site would
+  // be in neither — and the sender would then name it as a removal.
+  it('still exports a site whose token reads when its file cannot be classified', () => {
+    jiraState.sites = [jiraSite]
+    jiraState.tokens.set('site-1', 'jira-token')
+
+    const port = createHostSettingsJiraPort()
+
+    expect(port.unreadableIds()).toEqual([])
+    expect(port.list()).toHaveLength(1)
+    expect(port.list()[0]).toMatchObject({ protection: 'sealed' })
+    // Why the other direction here: overstating protection is what would record a plaintext copy as sealed.
+    expect(port.protectionOf('jira:site-1')).toBe('plaintext')
+  })
+
   it('does not name a site it holds no token file for', () => {
     jiraState.sites = [jiraSite]
 
@@ -337,6 +353,19 @@ describe('the Jenkins credential port', () => {
 
     expect(port.unreadableIds()).toEqual(['jenkins:ci-1'])
     expect(port.list()).toEqual([])
+    expect(port.protectionOf('jenkins:ci-1')).toBe('plaintext')
+  })
+
+  it('still exports a server whose token reads when its file cannot be classified', () => {
+    jenkinsState.servers = [jenkinsServer]
+    // No protection recorded: the classification read failed while the token itself reads fine.
+    jenkinsState.tokens.set('ci-1', 'jenkins-token')
+
+    const port = createHostSettingsJenkinsPort()
+
+    expect(port.unreadableIds()).toEqual([])
+    expect(port.list()).toHaveLength(1)
+    expect(port.list()[0]).toMatchObject({ protection: 'sealed' })
     expect(port.protectionOf('jenkins:ci-1')).toBe('plaintext')
   })
 })

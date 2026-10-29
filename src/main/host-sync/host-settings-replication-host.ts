@@ -5,7 +5,10 @@ import {
   type HostSettingsSyncState
 } from '../../shared/host-settings-replication'
 import { HOST_SETTINGS_CREDENTIAL_REGISTRY } from './host-settings-credential-ports'
-import type { HostSettingsCredentialRegistry } from './host-settings-credential-port'
+import type {
+  HostSettingsCredentialPort,
+  HostSettingsCredentialRegistry
+} from './host-settings-credential-port'
 import {
   createInMemoryHostSettingsReplicationHoldings,
   EMPTY_HOST_SETTINGS_REPLICATION_RECORD,
@@ -87,30 +90,41 @@ export function applyHostSettingsReplication(
     callerFingerprint?: string
     /** From the RPC context: the paired device row, which survives a re-pair of that device. */
     callerDeviceId?: string
+    /** From the RPC context: whether a pairing row this host recorded still exists. */
+    isPairedDeviceAlive?: (deviceId: string) => boolean
   } = {}
 ): HostSettingsReplicationApplyResult {
   const holdings = options.holdings ?? defaultHoldings
   const record = holdings.read()
   const { callerFingerprint, callerDeviceId } = options
 
-  // Why the device id and not only the fingerprint: every pairing offer mints a fresh token, so the
-  // fingerprint of the same laptop changes on a re-pair — and refusing that forever left a host nothing
-  // could ever configure again, silently. A re-pair of the device this host already pinned is the one
-  // case where a different caller may take it over; replacing the machine is not, because that is how
-  // the last desktop to reconnect came to delete the other one's credentials.
-  const isPairedRepair =
-    payload.baseRevision === null &&
-    callerDeviceId !== undefined &&
-    record.mainDeviceId !== null &&
-    record.mainDeviceId === callerDeviceId
-
-  if (
-    callerFingerprint !== undefined &&
+  // Why removing the pairing is the escape hatch: every pairing mints a fresh device row and token, so
+  // a re-pair of the same laptop is indistinguishable from another machine by both identities. What the
+  // host can check is whether the row its pin names is still there — and the user can remove that row
+  // on this host, which is explicit and visible rather than a silent takeover by whoever reconnects.
+  //
+  // Why an unrecorded row also frees the pin: a record written by a build before this one has no device
+  // id, so nothing can be verified; the next snapshot stamps one, and the pin is enforced from then on.
+  const pinVerified =
     record.mainFingerprint !== null &&
-    record.mainFingerprint !== callerFingerprint &&
-    !isPairedRepair
-  ) {
-    return { decision: 'refusedNotTheMain' }
+    record.mainDeviceId !== null &&
+    (options.isPairedDeviceAlive?.(record.mainDeviceId) ?? true)
+
+  const isPinnedCaller =
+    callerFingerprint !== undefined && record.mainFingerprint === callerFingerprint
+
+  if (callerFingerprint !== undefined && record.mainFingerprint !== null && !isPinnedCaller) {
+    // Why a delta is always refused: a delta cannot establish a relationship in the first place, so the
+    // only thing it can do here is delete what the pinned machine put on this host.
+    if (payload.baseRevision !== null) {
+      return { decision: 'refusedNotTheMain' }
+    }
+    if (pinVerified) {
+      console.warn(
+        '[host-settings] refused a snapshot from a different paired machine; remove the stale pairing on this host to hand it over'
+      )
+      return { decision: 'refusedNotTheMain' }
+    }
   }
 
   const decision = decideHostSettingsPayload(record.revision, payload)
@@ -159,7 +173,7 @@ export function applyHostSettingsReplication(
     registry,
     // Why the record rather than the payload: it is the only list of what replication put here, and a
     // value on the host that is not in it is the user's own — see `applyHostSettingsPayload`.
-    replicatedIds: record.ids,
+    replicatedIds: [...record.ids, ...recoverReplicatedIds(registry, contractPayload, record)],
     now: options.now ?? Date.now()
   })
 
@@ -220,3 +234,43 @@ export function applyHostSettingsReplication(
 }
 
 export { EMPTY_HOST_SETTINGS_REPLICATION_RECORD }
+
+/**
+ * Ids this host already holds with the main's exact value, when the holdings record says it never synced.
+ *
+ * Why: a corrupt or unwritten holdings file makes every value on the host look like the user's own, so
+ * the host keeps a credential the main can no longer rotate or revoke — silently and for good. An
+ * identical value is the one piece of evidence that this is replication's copy rather than the user's.
+ */
+function recoverReplicatedIds(
+  registry: HostSettingsCredentialRegistry,
+  payload: HostSettingsReplicationPayload,
+  record: { ids: readonly string[]; revision: number | null }
+): string[] {
+  if (record.ids.length > 0 || record.revision !== null) {
+    return []
+  }
+  const heldById = new Map<string, string>()
+  const listed = new Set<HostSettingsCredentialPort>()
+  const recovered: string[] = []
+  for (const credential of payload.upserts) {
+    const port = registry.forCredentialId(credential.id)
+    if (!port || port.kind !== credential.kind) {
+      continue
+    }
+    if (!listed.has(port)) {
+      listed.add(port)
+      try {
+        for (const held of port.list()) {
+          heldById.set(held.id, held.payload)
+        }
+      } catch {
+        // A family this host cannot read proves nothing either way, which is the safe answer here.
+      }
+    }
+    if (heldById.get(credential.id) === credential.payload) {
+      recovered.push(credential.id)
+    }
+  }
+  return recovered
+}

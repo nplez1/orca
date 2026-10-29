@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
 import { canSealReplicatedCredential } from './host-settings-credential-port'
-import { createHostSettingsJiraPort } from './host-settings-jira-port'
-import { createHostSettingsJenkinsPort } from './host-settings-jenkins-port'
-import { createHostSettingsApiKeyPort } from './host-settings-api-key-port'
+import { HOST_SETTINGS_CREDENTIAL_PORTS } from './host-settings-credential-ports'
 
 /** Only the three answers this policy reads; the encryptor is never reached. */
 function stubStore(options: { available?: boolean; gap?: string | null; throws?: boolean }): void {
@@ -54,27 +52,14 @@ describe('the plaintext-replication refusal', () => {
 
   // Why every port: the receiver asks the port that owns the credential, so one adapter wired to
   // `isEncryptionAvailable()` alone would defeat the refusal for its own family while the others hold.
+  // Why the exported registry: building a port here with `canSeal: canSealReplicatedCredential` and then
+  // asking that port would only prove the test passed its own argument.
   it('wires the same answer into every credential port this build replicates', () => {
     stubStore({ available: true, gap: 'basic_text' })
+    expect(HOST_SETTINGS_CREDENTIAL_PORTS.map((port) => port.canSeal())).not.toContain(true)
+    expect(HOST_SETTINGS_CREDENTIAL_PORTS.length).toBeGreaterThan(0)
 
-    const ports = [
-      createHostSettingsApiKeyPort({
-        kind: 'api-key:deepseek',
-        id: 'api-key:deepseek',
-        label: 'DeepSeek API key',
-        store: {
-          has: () => false,
-          read: () => null,
-          save: () => {},
-          clear: () => {},
-          protection: () => null
-        },
-        canSeal: canSealReplicatedCredential
-      }),
-      createHostSettingsJiraPort(),
-      createHostSettingsJenkinsPort()
-    ]
-
-    expect(ports.map((port) => port.canSeal())).toEqual([false, false, false])
+    stubStore({ available: true, gap: null })
+    expect(HOST_SETTINGS_CREDENTIAL_PORTS.map((port) => port.canSeal())).not.toContain(false)
   })
 })

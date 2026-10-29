@@ -76,6 +76,10 @@ export function applyHostSettingsPayload(input: {
     }
     // Why kept rather than replaced: this is the host's own value, and taking it over would both
     // switch the account this machine uses and hand the main the right to delete it.
+    //
+    // Known limit: a value the user re-enters here for an id replication already owns is still replaced,
+    // because the local save paths do not clear the replicated claim. Fixing that needs the stores to
+    // report their own writes, which is why this guard is the record and not the value.
     if (heldHere && !replicated.has(credential.id)) {
       outcomes[credential.id] = 'keptHostValue'
       continue

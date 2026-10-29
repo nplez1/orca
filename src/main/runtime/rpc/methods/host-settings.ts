@@ -39,7 +39,12 @@ export const HOST_SETTINGS_METHODS = [
           : { callerFingerprint: ctx.authenticatedCallerFingerprint }),
         // Why the device row as well: it is what a re-pair of the same device keeps, so it is the only
         // identity that can tell an explicit re-pair from a different machine claiming the host.
-        ...(ctx.pairedDeviceId === undefined ? {} : { callerDeviceId: ctx.pairedDeviceId })
+        ...(ctx.pairedDeviceId === undefined ? {} : { callerDeviceId: ctx.pairedDeviceId }),
+        // Why the live-registry probe: removing the pairing this host pinned is how the user hands the
+        // host to another machine, and it is the only escape hatch that does not reopen the takeover.
+        ...(ctx.pairedDeviceRegistry === undefined
+          ? {}
+          : { isPairedDeviceAlive: (deviceId: string) => ctx.pairedDeviceRegistry!.has(deviceId) })
       })
   }),
   defineMethod({

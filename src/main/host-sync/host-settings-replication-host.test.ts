@@ -4,7 +4,10 @@ import type { ReplicatedHostCredential } from '../../shared/host-settings-replic
 import { HOST_SETTINGS_METHODS } from '../runtime/rpc/methods/host-settings'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
 import { applyHostSettingsReplication } from './host-settings-replication-host'
-import { createInMemoryHostSettingsReplicationHoldings } from './host-settings-replication-holdings'
+import {
+  createInMemoryHostSettingsReplicationHoldings,
+  EMPTY_HOST_SETTINGS_REPLICATION_RECORD
+} from './host-settings-replication-holdings'
 
 const CREDENTIAL_ID = 'api-key:deepseek'
 const NOW = 1_700_000_000_000
@@ -40,7 +43,15 @@ function fakePort(
     canSeal: () => options.canSeal ?? true,
     unreadableIds: () => [],
     protectionOf: (id) => (held.has(id) ? writeProtection : null),
-    list: () => [],
+    list: () =>
+      [...held].map(([id, payload]) => ({
+        id,
+        kind: CREDENTIAL_ID,
+        label: id,
+        protection: writeProtection,
+        onlyIfEmpty: false,
+        payload
+      })),
     apply: (incoming) => {
       if (incoming.payload === 'explodes') {
         throw new Error('disk full')
@@ -213,37 +224,78 @@ describe('applying a payload on the host', () => {
     expect(port.held.size).toBe(0)
   })
 
-  it('lets an explicit re-pair of the same paired device take the pin, but not a different device', () => {
+  it('hands the host over once the pairing the pin names has been removed', () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
+    const live = new Set(['device-a', 'device-b'])
+    const isPairedDeviceAlive = (deviceId: string) => live.has(deviceId)
 
     applyHostSettingsReplication(snapshot(1), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
-      callerFingerprint: 'main-a',
-      callerDeviceId: 'device-a'
+      callerFingerprint: 'laptop-a',
+      callerDeviceId: 'device-a',
+      isPairedDeviceAlive
     })
 
-    // Why this must be allowed: the fingerprint is derived from the pairing token, and every new pairing
-    // offer mints a fresh one — so re-pairing the same laptop changes it while the device row stays.
-    const repair = applyHostSettingsReplication(snapshot(2), {
+    // Removing the pairing on the host is the escape hatch: it is explicit, it is visible in the
+    // paired-device list, and it is the only signal that distinguishes "this machine is gone" from
+    // "another machine is claiming the host".
+    live.delete('device-a')
+    const handedOver = applyHostSettingsReplication(snapshot(2), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
-      callerFingerprint: 'main-a-repaired',
-      callerDeviceId: 'device-a'
+      callerFingerprint: 'laptop-b',
+      callerDeviceId: 'device-b',
+      isPairedDeviceAlive
     })
-    expect(repair).toMatchObject({ decision: 'applied' })
-    expect(holdings.read().mainFingerprint).toBe('main-a-repaired')
+
+    expect(handedOver).toMatchObject({ decision: 'applied' })
+    expect(holdings.read().mainFingerprint).toBe('laptop-b')
+    expect(holdings.read().mainDeviceId).toBe('device-b')
+  })
+
+  it('takes a device id from the pinned caller, so a record written before it existed is enforced next push', () => {
+    // A host configured by an older build: the pin has no device id, so nothing can be verified yet.
+    const holdings = createInMemoryHostSettingsReplicationHoldings({
+      ids: [CREDENTIAL_ID],
+      revision: 1,
+      syncedAt: NOW,
+      mainFingerprint: 'laptop-a',
+      mainDeviceId: null
+    })
+    const alive = () => true
+
+    applyHostSettingsReplication(snapshot(2), {
+      registry: registry(fakePort()),
+      holdings,
+      now: NOW,
+      callerFingerprint: 'laptop-a',
+      callerDeviceId: 'device-a',
+      isPairedDeviceAlive: alive
+    })
     expect(holdings.read().mainDeviceId).toBe('device-a')
 
-    // A delta still may not move it, so a second paired client cannot take over by syncing.
-    expect(
-      applyHostSettingsReplication(
-        { ...snapshot(3), baseRevision: 2 },
-        { registry: registry(fakePort()), holdings, now: NOW, callerFingerprint: 'main-a' }
-      )
-    ).toEqual({ decision: 'refusedNotTheMain' })
+    // From here the pin is enforceable: a second machine is refused, delta or snapshot.
+    for (const [revision, baseRevision] of [
+      [3, 2],
+      [4, null]
+    ] as const) {
+      expect(
+        applyHostSettingsReplication(
+          { ...snapshot(revision), baseRevision },
+          {
+            registry: registry(fakePort()),
+            holdings,
+            now: NOW,
+            callerFingerprint: 'desktop-b',
+            callerDeviceId: 'device-b',
+            isPairedDeviceAlive: alive
+          }
+        )
+      ).toEqual({ decision: 'refusedNotTheMain' })
+    }
   })
 
   it('does not let a second desktop take the host by reconnecting with a snapshot', () => {
@@ -267,7 +319,6 @@ describe('applying a payload on the host', () => {
       callerFingerprint: 'desktop-b',
       callerDeviceId: 'device-b'
     })
-
     expect(takeover).toEqual({ decision: 'refusedNotTheMain' })
     expect(holdings.read().mainFingerprint).toBe('laptop-a')
     expect(port.held.has(CREDENTIAL_ID)).toBe(true)
@@ -332,6 +383,32 @@ describe('applying a payload on the host', () => {
     // A snapshot that does not mention it must not delete it either — it was never a replica.
     applyHostSettingsReplication(snapshot(2, []), { registry: registry(port), holdings, now: NOW })
     expect(port.held.get(CREDENTIAL_ID)).toBe('sk-host-own')
+  })
+
+  it('recognises its own replicated copy when the holdings record was lost', () => {
+    const port = fakePort()
+    // A corrupt or unwritten holdings file reads back empty, so nothing on the host looks replicated.
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    applyHostSettingsReplication(snapshot(1), {
+      registry: { forCredentialId: () => port },
+      holdings,
+      now: NOW
+    })
+    holdings.write(EMPTY_HOST_SETTINGS_REPLICATION_RECORD)
+
+    const result = applyHostSettingsReplication(snapshot(2), {
+      registry: { forCredentialId: () => port },
+      holdings,
+      now: NOW
+    })
+
+    // Why adopt it: keeping it as "the user's own" would leave the host on a credential the main can
+    // never rotate or revoke again, which is the same loss the fix exists to prevent.
+    expect(result).toMatchObject({
+      decision: 'applied',
+      report: { outcomes: { [CREDENTIAL_ID]: 'applied' } }
+    })
+    expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
   })
 
   it('does not strand a credential the main holds but could not read', () => {

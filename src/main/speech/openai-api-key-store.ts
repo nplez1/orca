@@ -6,7 +6,7 @@ import {
   classifyUnenvelopedCredential,
   type SecretAtRestProtection
 } from '../../shared/secret-at-rest-protection'
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -27,10 +27,13 @@ function ensureOrcaDir(): void {
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     return
   }
+  // Why also on an existing directory: this home holds every credential store, and one created by an
+  // older build stays group- and world-readable until something tightens it. Read first so a save does
+  // not chmod a directory that is already restricted.
   try {
-    // Why also on an existing directory: this home holds every credential store, and one created by an
-    // older build stays group- and world-readable until something tightens it.
-    chmodSync(dir, 0o700)
+    if ((statSync(dir).mode & 0o777) !== 0o700) {
+      chmodSync(dir, 0o700)
+    }
   } catch {
     // Best-effort: an unwritable mode does not make the key below unreadable.
   }
