@@ -262,10 +262,19 @@ export class ScreenPromptCorroboration {
     // cadence, not the slow one: the first read after an on-gain trigger usually lands before the
     // emulator has parsed the chunk that paints the dialog, and a 5 s first retry would report
     // Needs You late rather than wrong.
+    // Why the same bound as a published wait: a pane that never answers again — a restored row whose
+    // terminal never reconnects — must not read forever. The two paths share the counter the release
+    // path already bounds itself with.
     if (reading === undefined) {
+      pane.unreadableRechecks = (pane.unreadableRechecks ?? 0) + 1
+      if (pane.unreadableRechecks > SCREEN_PROMPT_UNREADABLE_RECHECK_LIMIT) {
+        this.forget(paneKey)
+        return
+      }
       this.scheduleRecheck(paneKey)
       return
     }
+    pane.unreadableRechecks = 0
     const next = screenPromptRow(pane.working, current, reading)
     if (!next) {
       const delay = SCREEN_PROMPT_PAINT_RETRIES_MS[pane.rechecks]

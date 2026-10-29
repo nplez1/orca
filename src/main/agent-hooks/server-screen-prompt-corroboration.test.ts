@@ -567,6 +567,19 @@ describe('the corroboration loop', () => {
     expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
   })
 
+  it('stops reading a pane whose screen never becomes readable', () => {
+    // Why a bound: a restored row whose terminal never reconnects would otherwise be re-read every
+    // 5 s for the life of the process. The release path already bounds itself this way.
+    screen = undefined
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(200_000)
+    const settled = reads
+    vi.advanceTimersByTime(200_000)
+    expect(reads).toBe(settled)
+    expect(published).toHaveLength(0)
+  })
+
   it('forgets the pane once a hook row proves no dialog is holding it', () => {
     screen = undefined
     const loop = corroboration()
