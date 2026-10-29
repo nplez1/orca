@@ -65,6 +65,10 @@ so a sync can take upstream's side there.
 through them any more: this fork publishes one stream, so every channel maps to `MAIN_RELEASE_REPO`
 and the picker offers only stable and rc (`OFFERED_RELEASE_CHANNELS`).
 
+An unsupported channel stays visible-and-disabled rather than disappearing, so a user who heard
+about it learns why it is unavailable instead of silently not finding it; with the dev channels
+unlisted, that rendering only matters if one is offered again.
+
 Why both halves: hiding the channels is a UI courtesy, but a channel persisted by an older build
 still reaches `getReleaseRepoForChannel`, and resolving that to upstream's repo would update an Orca
 NP install into an official Orca. The mapping is the part that has to be right; the hiding is what
