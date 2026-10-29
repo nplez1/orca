@@ -29,7 +29,7 @@ const CLOSED_VERDICT =
   /\bclean\b|\b\d+\s+(?:blocking|blockers?)\s*(?:[,:-]\s*)?(?:all\s+)?(?:were\s+|are\s+)?(?:fixed|resolved|addressed)\b|\bno\s+(?:blocking|blockers?)\b/gi
 
 /** Every count of blocking findings, whether or not the same place closes it. */
-const BLOCKER_COUNT = /\b(?:\d+|no)\s+(?:blocking|blockers?)\b/gi
+const BLOCKER_COUNT = /\b\d+\s+(?:blocking|blockers?)\b/gi
 /** Markdown emphasis, headings and bullets are noise around the claim, not a different claim. */
 function normaliseBodyLine(line) {
   return String(line)

@@ -520,6 +520,9 @@ it('accepts the claim shapes a real review produces, including a delta round', (
   for (const claim of [
     REVIEW_CLAIM_EXAMPLE,
     'Reviewed by Opus 5.5, high: R1 (0 blocking fixed), delta clean on R2',
+    // 'no blockers' is a clean verdict, not a count that needs closing.
+    'Reviewed by Opus 5.5, high: R1 clean, no blockers',
+    'Reviewed by Opus 5.5, high: R1 (no blocking findings)',
     'Reviewed by claude/opus, high: R1 (1 blocker fixed), clean on R2',
     'Reviewed by Opus 5.5, high: round 2 delta clean',
     'Reviewed by Opus 5.5, high: R1, 2 blockers addressed',
