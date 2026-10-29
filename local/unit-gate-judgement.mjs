@@ -42,7 +42,10 @@ export function collectCases(report) {
         passes.push({ file: path, test })
       }
     }
-    if (!sawFailedCase && file.status === 'failed') {
+    // Why the message on its own: an afterAll or teardown error is not the failure a named entry
+    // accounts for, so absorbing the row must not absorb this red beside it — the rule
+    // `check-unit-shard-verdict.mjs` already applies to a shard.
+    if (file.status === 'failed' && (file.message || !sawFailedCase)) {
       failures.push({
         file: path,
         test: '(suite)',
@@ -239,15 +242,41 @@ export function collectedQuarantinedFiles(report, quarantined) {
  * Vitest exits non-zero for a failing test, so its status alone proves nothing — it proves something
  * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which fails a shard that
  * failed without the tolerated teardown race.
+ *
+ * Why only unexpected failures and blocking unhandled errors: an allowlisted red explains nothing, and
+ * this machine always carries some, so counting it here made the check unreachable — a worker crash
+ * that printed no failure of its own read as "a known red explains the exit".
  */
-export function unexplainedSuiteExit({ outcome, status, failedCount, unhandledCount }) {
+export function unexplainedSuiteExit({ outcome, status, unexpectedCount, blockingUnhandledCount }) {
   if (outcome !== 'complete') {
     return `the suite did not run to completion: ${outcome}`
   }
-  if (status === 0 || failedCount > 0 || unhandledCount > 0) {
+  if (status === 0 || unexpectedCount > 0 || blockingUnhandledCount > 0) {
     return null
   }
   return `the suite exited ${status === null ? 'without a status' : status} and neither the report nor the log explains it; failing closed`
+}
+
+/**
+ * Files the run was supposed to collect and the report never mentions.
+ *
+ * Why: the report is the whole evidence base, so a narrowed include, a project that silently dropped
+ * out or a worker that died between files leaves a report over whatever ran — which reads green. The
+ * missing set is printed, so the failure names the files instead of "something is off".
+ */
+export function missingReportedFiles(report, expected) {
+  const reported = new Set((report?.testResults ?? []).map((file) => repoPath(file.name)))
+  return [...expected].filter((file) => !reported.has(file)).sort()
+}
+
+/** The problem a missing file set is, worded once so the gate and its test say the same thing. */
+export function reportFileSetProblem(report, expected, limit = 12) {
+  const missing = missingReportedFiles(report, expected)
+  if (missing.length === 0) {
+    return null
+  }
+  const more = missing.length > limit ? ` …and ${missing.length - limit} more` : ''
+  return `the report does not name ${missing.length} file(s) the lane should have run: ${missing.slice(0, limit).join(', ')}${more}`
 }
 
 /** Vitest prints its own count; a mismatch means the log shape moved, so the verdict fails closed. */

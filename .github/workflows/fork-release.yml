@@ -11,7 +11,9 @@ name: Fork release
 # releases in its own repository.
 #
 # Tests and lint are deliberately not run here. They are the gate for a PR, not for a
-# build you intend to hand to someone; run `pnpm test` yourself when it matters.
+# build you intend to hand to someone; run `pnpm test` yourself when it matters. What is gated is the
+# dispatch itself: the `release-ref` job refuses any ref but `refs/heads/nplez1/main`, and any tag
+# that already points at another commit.
 
 on:
   workflow_dispatch:
@@ -32,7 +34,55 @@ env:
   PUBLISH_OWNER: nplez1
 
 jobs:
+  # Why a job of its own: every leg publishes into the same release, so a dispatch from anywhere but
+  # the fork's release line, or into a tag that already points at a different commit, has to fail
+  # before the first artifact is built. `workflow_dispatch` accepts any ref, and the tag check used
+  # to be "the tag exists, upload into it".
+  release-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Require the fork's release branch
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/nplez1/main" ]; then
+            echo "::error::a release must be dispatched from refs/heads/nplez1/main, not $GITHUB_REF — this tag is the update feed every installed build reads."
+            exit 1
+          fi
+
+      - name: Require an existing tag to point at this commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUFFIX: ${{ inputs.version_suffix }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          tag="v${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
+          if ! gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json targetCommitish >/dev/null 2>&1; then
+            echo "$tag does not exist yet; this run creates it at $GITHUB_SHA"
+            exit 0
+          fi
+          target="$(gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json targetCommitish --jq '.targetCommitish')"
+          # Why the tag ref as well: a release created by electron-builder records the branch it was
+          # published from, not the SHA, so the comparison has to resolve that name before refusing.
+          if [ "${target,,}" = "${GITHUB_SHA,,}" ] || [ "$(git rev-parse "$target^{commit}" 2>/dev/null || true)" = "$GITHUB_SHA" ]; then
+            echo "$tag already exists at $GITHUB_SHA; uploading into it"
+            exit 0
+          fi
+          echo "::error::$tag already exists at $target, not $GITHUB_SHA. Re-dispatching from a newer commit would replace its assets while the tag and notes still point at the old revision."
+          exit 1
+
   macos:
+    needs: release-ref
     runs-on: macos-15
     steps:
       # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
@@ -171,7 +221,9 @@ jobs:
           tag="v$RELEASE_VERSION"
 
           if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" >/dev/null 2>&1; then
-            echo "$tag already exists; uploading into it"
+            # Why this is not a second check: the release-ref job already refused a tag that points at
+            # any other commit, so reaching here means this tag is this SHA's.
+            echo "$tag already exists at $GITHUB_SHA; uploading into it"
           else
             gh release create "$tag" \
               --repo "$PUBLISH_OWNER/orca" \

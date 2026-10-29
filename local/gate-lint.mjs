@@ -229,6 +229,39 @@ export function extractFailureLines(output) {
   return [...new Set(lines)]
 }
 
+/**
+ * Failure evidence the line parser above cannot attribute, so a step cannot pass on a partial parse.
+ *
+ * Why this exists: `extractFailureLines` judges only the lines whose shape it recognises, so a step
+ * that exits non-zero printing two allowlisted rows plus an ast-grep diagnostic or a crash block
+ * passed — the unrecognised text was never read. `lint:ast-grep-gates` is exactly that shape: one
+ * step running two gates, where the flaky-test ratchet prints rows and the lint half prints
+ * diagnostics.
+ */
+const UNACCOUNTED_EVIDENCE = [
+  // ast-grep / rustc-style diagnostics, which is what the lint half of that step prints.
+  /^(?:error|warning|note)\[[\w.:-]+\]\s*:/,
+  // A crash block: a `Name: message` header whose name ends in Error/Exception, or a bare fatal one.
+  /^[A-Za-z]*(?:Error|Exception)\b\s*:/i,
+  /^(?:panic|fatal|error)\b\s*:/i
+]
+
+/** Lines of a failing step's output that carry failure evidence nothing has accounted for. */
+export function unaccountedFailureLines(output, accounted = []) {
+  const known = new Set(accounted)
+  const lines = []
+  for (const raw of String(output ?? '').split('\n')) {
+    const line = raw.trim()
+    if (line.length === 0 || known.has(line)) {
+      continue
+    }
+    if (UNACCOUNTED_EVIDENCE.some((pattern) => pattern.test(line))) {
+      lines.push(line)
+    }
+  }
+  return [...new Set(lines)]
+}
+
 /** Whether a failure line is covered by a known-red entry. An entry without `match` covers all. */
 export function matchesEntry(line, entry) {
   if (!entry.match) {
@@ -294,6 +327,12 @@ export function classifyRun(results, entries, chainSteps = results.map((result) 
       } else {
         unexpected.push({ step: result.id, line })
       }
+    }
+    // Why after the lines and not instead of them: every parsed line above is attributable, and what
+    // this adds is the evidence beside them that no entry could ever have covered. A step failing
+    // for a reason its own parse could not split still has to fail the gate.
+    for (const line of unaccountedFailureLines(result.output, lines)) {
+      unexpected.push({ step: result.id, line: `unattributed failure output: ${line}` })
     }
   }
   const seenSteps = new Set(results.map((result) => result.id))

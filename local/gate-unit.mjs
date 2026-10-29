@@ -28,23 +28,14 @@
  *
  * Exit: 0 pass, 1 fail, 2 usage or environment problem.
  */
-import { spawnSync } from 'node:child_process'
-import {
-  existsSync,
-  globSync,
-  mkdirSync,
-  mkdtempSync,
-  closeSync,
-  openSync,
-  readFileSync,
-  writeFileSync
-} from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
 import { flakeWaiver, packageJsonChangedForTests } from './gate-flake-coupling.mjs'
+import { forkTestFiles, quarantinedFiles, runnableFiles } from './unit-lane-files.mjs'
+import { rerunIsolation, runSuite } from './unit-suite-run.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
@@ -65,28 +56,16 @@ import {
   judge,
   judgeUnhandled,
   prunableEntries,
+  reportFileSetProblem,
   quarantinedEntryProblems,
-  rerunReportsFor,
   reproducedFailures,
   unexplainedSuiteExit
 } from './unit-gate-judgement.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-/** Why this switch: the unit and PR workflows set it, and it is what makes `config/vitest.config.ts`
- *  apply upstream's `UNIT_EXCLUDE` instead of `defaultExclude`. */
-const UNIT_LANE_ENV = { ORCA_BALANCE_UNIT_SHARDS: '1' }
-/** Why: `config/vitest.config.ts` records dependencies only when `CI` is unset, so upstream's lane runs
- *  without it. With it on, an upstream fire-and-forget `import()` still pending when a file ends is
- *  reported as `EnvironmentTeardownError: Cannot load …` against the next file (LOCAL-PATCHES.md,
- *  2026-10-25 sync). Narrower than setting `CI`, which other suites read for their own behaviour. */
-const UNIT_LANE_ARGS = ['--experimental.recordDependencies=false']
-/** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
-const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
-const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000
 const MAX_SUMMARY_LIST = 12
-const RUN_VITEST = join(ROOT, 'config', 'scripts', 'run-vitest.mjs')
 
 function usage() {
   return 'usage: node local/gate-unit.mjs [--allowlist PATH] [--no-cache] [--allow-dirty] [--timeout-ms N] [-- <vitest args>]'
@@ -210,210 +189,6 @@ function changedSince(runGit, base) {
   return new Set((diff ?? '').split('\n').filter(Boolean))
 }
 
-function runStep(label, program, args, logFd, timeoutMs, env) {
-  process.stderr.write(`gate-unit: ${label}\n`)
-  const started = Date.now()
-  const result = spawnSync(program, args, {
-    cwd: ROOT,
-    // Why the merge rather than a bare env: PATH and the Bun pin have to survive the overlay.
-    env: env ? { ...process.env, ...env } : process.env,
-    stdio: ['ignore', logFd, logFd],
-    timeout: timeoutMs,
-    killSignal: 'SIGKILL'
-  })
-  const timedOut = result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGKILL'
-  // Why the error: a spawn that never started (ENOENT, EACCES) has a null status, which would
-  // otherwise read as a clean exit of zero. `timedOut` is the one error that has its own outcome.
-  return {
-    status: result.status,
-    timedOut,
-    error: timedOut ? null : (result.error?.message ?? null),
-    elapsedMs: Date.now() - started
-  }
-}
-
-function normalise(name) {
-  return String(name ?? '').replaceAll('\\', '/')
-}
-
-/**
- * Files `UNIT_INCLUDE` collects but `UNIT_EXCLUDE` drops. Upstream's unit lane does not run them
- * either, so a red there is not this fork's to record — but a gate that quietly stopped applying the
- * exclusion would look green for the wrong reason, which is why the run is checked against this list.
- */
-export function quarantinedFiles(root = ROOT) {
-  const included = new Set(globSync(UNIT_INCLUDE, { cwd: root }).map(normalise))
-  const collected = globSync(UNIT_INCLUDE, { cwd: root, exclude: UNIT_EXCLUDE }).map(normalise)
-  const runnable = new Set(collected)
-  return [...included].filter((file) => !runnable.has(file)).sort()
-}
-
-export function forkTestFiles(root = ROOT) {
-  return globSync(FORK_TEST_INCLUDE, { cwd: root, exclude: ['**/node_modules/**'] })
-    .map(normalise)
-    .sort()
-}
-
-function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
-  const logFd = openSync(logPath, 'w')
-  let elapsedMs = 0
-  let forkTestsPassed = true
-  try {
-    // Why first: it costs a second and its failure would invalidate any verdict the suite produced.
-    // Why its own deadline: a hung sync test must not cost the suite's whole hour before it starts.
-    const forkStep =
-      forkTests.length === 0
-        ? { status: 0, timedOut: false, elapsedMs: 0 }
-        : runStep(
-            'fork-local tests',
-            process.execPath,
-            ['--test', ...forkTests],
-            logFd,
-            Math.min(timeoutMs, FORK_TEST_TIMEOUT_MS)
-          )
-    elapsedMs += forkStep.elapsedMs
-    if (forkStep.timedOut) {
-      return { outcome: 'timed-out', elapsedMs, forkTestsPassed: false }
-    }
-    if (forkStep.error) {
-      return {
-        outcome: `fork-local tests could not run: ${String(forkStep.error)}`,
-        elapsedMs,
-        forkTestsPassed: false
-      }
-    }
-    if (forkStep.status !== 0) {
-      return { outcome: 'fork-local tests failed', elapsedMs, forkTestsPassed: false }
-    }
-    // Why objects: a heterogeneous tuple array widens `label` to `string | string[]` under the
-    // fork's type-aware lint, which then rejects it inside the failure template.
-    for (const preparation of [
-      { label: 'build:packages', program: 'pnpm', args: ['run', 'build:packages'] },
-      {
-        label: 'ensure native runtime',
-        program: 'node',
-        args: [join(ROOT, 'config', 'scripts', 'ensure-native-runtime.mjs'), '--runtime=node']
-      }
-    ]) {
-      const step = runStep(
-        preparation.label,
-        preparation.program,
-        preparation.args,
-        logFd,
-        timeoutMs
-      )
-      elapsedMs += step.elapsedMs
-      if (step.timedOut) {
-        return { outcome: 'timed-out', elapsedMs, forkTestsPassed }
-      }
-      if (step.error) {
-        return {
-          outcome: `${preparation.label} could not run: ${String(step.error)}`,
-          elapsedMs,
-          forkTestsPassed
-        }
-      }
-      if (step.status !== 0) {
-        return { outcome: `${preparation.label} failed`, elapsedMs, forkTestsPassed }
-      }
-    }
-    // Why the cap line: the doubling this gate once showed (2,575 s against a 1,400 s baseline) was
-    // a worker cap inherited from the shell, and a run log that named it would have said so in one
-    // line instead of a per-file concurrency reconstruction.
-    if (process.env.VITEST_MAX_WORKERS !== undefined) {
-      process.stderr.write(`gate-unit: VITEST_MAX_WORKERS=${process.env.VITEST_MAX_WORKERS}\n`)
-    }
-    const suite = runStep(
-      'full unit suite',
-      'node',
-      [
-        RUN_VITEST,
-        'run',
-        '--config',
-        'config/vitest.config.ts',
-        '--reporter=default',
-        '--reporter=json',
-        `--outputFile.json=${reportPath}`,
-        ...UNIT_LANE_ARGS,
-        ...vitestArgs
-      ],
-      logFd,
-      timeoutMs,
-      UNIT_LANE_ENV
-    )
-    elapsedMs += suite.elapsedMs
-    if (suite.timedOut) {
-      return { outcome: 'timed-out', elapsedMs, forkTestsPassed }
-    }
-    if (suite.error) {
-      return {
-        outcome: `the full unit suite could not run: ${String(suite.error)}`,
-        elapsedMs,
-        forkTestsPassed
-      }
-    }
-    return { outcome: 'complete', status: suite.status, elapsedMs, forkTestsPassed }
-  } finally {
-    closeSyncSafe(logFd)
-  }
-}
-
-function closeSyncSafe(fd) {
-  try {
-    closeSync(fd)
-  } catch {
-    // The descriptor is already closed when a step threw before the suite started.
-  }
-}
-
-/**
- * One isolated re-run of every unexpected file in a single Vitest invocation, reported per file as
- * the tests that passed and failed inside it. Batched so N failing files pay one cold start instead
- * of N serial ones; each file still runs in its own worker, and the report is filtered by exact
- * path, so the per-file attribution of a serial re-run is unchanged.
- *
- * Why per test rather than per file: the file's own allowlisted reds still fail when it re-runs with
- * its siblings, so "the file exited non-zero" cannot tell a load flake from a real break once entries
- * are named. A missing report is not evidence of anything, so it reads as "every failure reproduced".
- */
-function rerunIsolation(files, dir, timeoutMs) {
-  if (files.length === 0) {
-    return new Map()
-  }
-  const reportPath = join(dir, 'isolation-report.json')
-  const logFd = openSync(join(dir, 'isolation.log'), 'a')
-  try {
-    const step = runStep(
-      `isolation re-run ${files.length} file(s)`,
-      'node',
-      [
-        RUN_VITEST,
-        'run',
-        '--config',
-        'config/vitest.config.ts',
-        '--reporter=json',
-        `--outputFile.json=${reportPath}`,
-        ...UNIT_LANE_ARGS,
-        ...files
-      ],
-      logFd,
-      timeoutMs,
-      UNIT_LANE_ENV
-    )
-    if (step.timedOut || !existsSync(reportPath)) {
-      return new Map(files.map((file) => [file, NO_RERUN]))
-    }
-    try {
-      return rerunReportsFor(JSON.parse(readFileSync(reportPath, 'utf8')), files)
-    } catch {
-      // Why not readJsonFile: that exits the process, losing the summary this verdict is for.
-      return new Map(files.map((file) => [file, NO_RERUN]))
-    }
-  } finally {
-    closeSyncSafe(logFd)
-  }
-}
-
 function reportResult(result) {
   console.log(formatVerdict(result))
   const forkTests = result.forkTests ?? { files: 0, passed: false }
@@ -489,8 +264,24 @@ function currentGateInputs() {
   return gateInputsFingerprint({ files, toolchain: toolchainVersions() })
 }
 
-function evaluate(options, { reportPath, logPath, dir }) {
-  const revision = git(['rev-parse', 'HEAD'])
+/**
+ * Everything `evaluate` reads from outside itself. Why a bag: the exit composition is the one rule a
+ * suite run cannot test cheaply, so the spawns, globs and diff are replaceable — and a default here
+ * means `main` passes nothing.
+ */
+const SOURCES = Object.freeze({
+  run: runSuite,
+  git,
+  diff: branchDiff,
+  runnable: runnableFiles,
+  quarantined: quarantinedFiles,
+  forkTests: forkTestFiles,
+  isolation: rerunIsolation
+})
+
+export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {}) {
+  const injected = { ...SOURCES, ...sources }
+  const revision = injected.git(['rev-parse', 'HEAD'])
   if (!revision) {
     console.error(`cannot resolve HEAD in ${ROOT}`)
     process.exit(2)
@@ -500,9 +291,10 @@ function evaluate(options, { reportPath, logPath, dir }) {
   // Reporting those as unseen would invite pruning an entry the full run needs.
   const fullRun = options.vitestArgs.length === 0
   const entries = allowlistEntries(manifest)
-  const quarantined = quarantinedFiles()
-  const forkTests = forkTestFiles()
-  const run = runSuite({
+  const expected = fullRun ? injected.runnable() : null
+  const quarantined = injected.quarantined()
+  const forkTests = injected.forkTests()
+  const run = injected.run({
     reportPath,
     logPath,
     timeoutMs: options.timeoutMs,
@@ -556,6 +348,15 @@ function evaluate(options, { reportPath, logPath, dir }) {
     // missing from it while it is very much a failure of this run.
     counts.failed = cases.failures.length
     counts.known = known.length
+    // Why: the report is the whole evidence base, so a run that silently collected less than the
+    // lane defines — a narrowed include, a dropped project, a worker that died between files — is a
+    // verdict on whatever ran, not on the suite. The missing files are printed by name.
+    if (expected) {
+      const fileSetProblem = reportFileSetProblem(report, expected)
+      if (fileSetProblem) {
+        problems.push(fileSetProblem)
+      }
+    }
     // Why: a verdict that silently stopped excluding them would still look green, and the reason
     // would be a switch in a config file rather than anything about the code being shipped.
     const ranQuarantined = collectedQuarantinedFiles(report, quarantinedSet)
@@ -586,8 +387,10 @@ function evaluate(options, { reportPath, logPath, dir }) {
   const exitProblem = unexplainedSuiteExit({
     outcome: run.outcome,
     status: run.status,
-    failedCount: counts.failed,
-    unhandledCount: unhandled.headlines.length
+    // Why after judging: an allowlisted red explains nothing about the exit, and this machine always
+    // carries some, so passing the failure count in made this check unreachable.
+    unexpectedCount: unexpected.length,
+    blockingUnhandledCount: judgedUnhandled.blocking.length
   })
   if (exitProblem) {
     problems.push(exitProblem)
@@ -597,7 +400,7 @@ function evaluate(options, { reportPath, logPath, dir }) {
   // invocation. A failure that does not come back is a load-order flake — a different claim from
   // "this change broke it" — so it is waived unless the file is in the diff. Judged per test: the
   // file's allowlisted reds still fail when it re-runs with its siblings.
-  const diff = branchDiff()
+  const diff = injected.diff()
   const flaky = []
   const blocking = []
   const unexpectedByFile = new Map()
@@ -606,10 +409,11 @@ function evaluate(options, { reportPath, logPath, dir }) {
     list.push(failure)
     unexpectedByFile.set(failure.file, list)
   }
-  const reruns = rerunIsolation([...unexpectedByFile.keys()], dir, options.timeoutMs)
+  const reruns = injected.isolation([...unexpectedByFile.keys()], dir, options.timeoutMs)
   // Why computed once: a diff that touched package.json only through build or lint scripts cannot change
   // what any test executes, so treating it as a harness change blocked every load flake in this branch.
-  const packageJsonShared = diff === null ? true : packageJsonChangedForTests(git, diff.base)
+  const packageJsonShared =
+    diff === null ? true : packageJsonChangedForTests(injected.git, diff.base)
   for (const [file, failures] of unexpectedByFile) {
     const rerun = reruns.get(file) ?? NO_RERUN
     const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))

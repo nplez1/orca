@@ -18,7 +18,9 @@ import {
 import { branchDiff } from '../../local/gate-unit.mjs'
 import {
   NO_RERUN,
+  collectCases,
   declaredUnhandledMismatch,
+  missingReportedFiles,
   rerunReportsFor,
   reproducedFailures,
   unexplainedSuiteExit
@@ -29,22 +31,44 @@ const noSource = () => ''
 describe('a run the report cannot explain fails closed', () => {
   it('passes a clean exit', () => {
     expect(
-      unexplainedSuiteExit({ outcome: 'complete', status: 0, failedCount: 0, unhandledCount: 0 })
+      unexplainedSuiteExit({
+        outcome: 'complete',
+        status: 0,
+        unexpectedCount: 0,
+        blockingUnhandledCount: 0
+      })
     ).toBeNull()
   })
 
-  it('passes a non-zero exit that a failure or an unhandled error accounts for', () => {
-    const base = { outcome: 'complete', status: 1, failedCount: 39, unhandledCount: 0 }
+  it('passes a non-zero exit that an unexpected failure or a blocking error accounts for', () => {
+    const base = { outcome: 'complete', status: 1, unexpectedCount: 39, blockingUnhandledCount: 0 }
     expect(unexplainedSuiteExit(base)).toBeNull()
-    expect(unexplainedSuiteExit({ ...base, failedCount: 0, unhandledCount: 1 })).toBeNull()
+    expect(
+      unexplainedSuiteExit({ ...base, unexpectedCount: 0, blockingUnhandledCount: 1 })
+    ).toBeNull()
   })
 
-  it('fails a non-zero exit with nothing behind it', () => {
+  it('fails a non-zero exit whose only failures were allowlisted', () => {
+    // Why: the machine always carries allowlisted reds, so counting them as an explanation made this
+    // check unreachable — a worker crash that printed no failure of its own read as explained.
     expect(
-      unexplainedSuiteExit({ outcome: 'complete', status: 1, failedCount: 0, unhandledCount: 0 })
+      unexplainedSuiteExit({
+        outcome: 'complete',
+        status: 1,
+        unexpectedCount: 0,
+        blockingUnhandledCount: 0
+      })
     ).toMatch(/exited 1 .*failing closed/)
+  })
+
+  it('fails a non-zero exit with no status at all', () => {
     expect(
-      unexplainedSuiteExit({ outcome: 'complete', status: null, failedCount: 0, unhandledCount: 0 })
+      unexplainedSuiteExit({
+        outcome: 'complete',
+        status: null,
+        unexpectedCount: 0,
+        blockingUnhandledCount: 0
+      })
     ).toMatch(/without a status/)
   })
 
@@ -53,8 +77,8 @@ describe('a run the report cannot explain fails closed', () => {
       unexplainedSuiteExit({
         outcome: 'timed-out',
         status: null,
-        failedCount: 0,
-        unhandledCount: 0
+        unexpectedCount: 0,
+        blockingUnhandledCount: 0
       })
     ).toMatch(/did not run to completion/)
   })
@@ -66,6 +90,75 @@ describe('a run the report cannot explain fails closed', () => {
     expect(declaredUnhandledMismatch(2, 1)).toMatch(/declared 2 .*1 could be read/)
     // The base compared with `>`, so a log that yielded more headlines than Vitest declared passed.
     expect(declaredUnhandledMismatch(1, 2)).toMatch(/declared 1 .*2 could be read/)
+  })
+})
+
+describe('a file error beside an allowlisted failure', () => {
+  const failing = (fullName) => ({ fullName, status: 'failed', failureMessages: ['boom'] })
+  const passing = (fullName) => ({ fullName, status: 'passed' })
+
+  it('records the teardown error too, so absorbing the named red does not absorb it', () => {
+    // `check-unit-shard-verdict.mjs` already ruled on this: an afterAll or teardown error is not the
+    // failure a named entry accounts for, and 17 tests are always red here — a file among them that
+    // throws in teardown reported green.
+    const cases = collectCases({
+      testResults: [
+        {
+          name: '/repo/src/main/a.test.ts',
+          status: 'failed',
+          message: 'Error: afterAll timed out',
+          assertionResults: [failing('an allowlisted red'), passing('a green one')]
+        }
+      ]
+    })
+    expect(cases.failures).toEqual([
+      {
+        file: expect.stringContaining('src/main/a.test.ts'),
+        test: 'an allowlisted red',
+        detail: 'boom'
+      },
+      {
+        file: expect.stringContaining('src/main/a.test.ts'),
+        test: '(suite)',
+        detail: 'afterAll timed out'
+      }
+    ])
+  })
+
+  it('still records a file that failed without a failing case and without a message', () => {
+    const cases = collectCases({
+      testResults: [{ name: 'src/main/b.test.ts', status: 'failed', assertionResults: [] }]
+    })
+    expect(cases.failures).toEqual([
+      {
+        file: 'src/main/b.test.ts',
+        test: '(suite)',
+        detail: 'the file failed without a failing case'
+      }
+    ])
+  })
+
+  it('does not invent a failure in a file that passed, whatever message it carries', () => {
+    const cases = collectCases({
+      testResults: [
+        {
+          name: 'src/main/c.test.ts',
+          status: 'passed',
+          message: 'a console warning',
+          assertionResults: [passing('one')]
+        }
+      ]
+    })
+    expect(cases.failures).toEqual([])
+  })
+
+  it('fails a run whose report omits files the lane should have collected', () => {
+    const report = { testResults: [{ name: 'src/main/a.test.ts' }] }
+    expect(missingReportedFiles(report, ['src/main/a.test.ts', 'src/main/b.test.ts'])).toEqual([
+      'src/main/b.test.ts'
+    ])
+    expect(missingReportedFiles(report, ['src/main/a.test.ts'])).toEqual([])
+    expect(missingReportedFiles({}, ['src/main/a.test.ts'])).toEqual(['src/main/a.test.ts'])
   })
 })
 

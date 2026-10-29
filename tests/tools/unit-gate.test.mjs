@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { forkTestFiles, quarantinedFiles } from '../../local/gate-unit.mjs'
+import { forkTestFiles, quarantinedFiles } from '../../local/unit-lane-files.mjs'
 import {
   allowlistEntries,
   collectCases,
