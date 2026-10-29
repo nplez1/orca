@@ -34,9 +34,13 @@ function writeStub(binDir, name, source) {
 /**
  * The whole provider surface the script may touch, plus an `ssh` that answers however the case needs:
  * a real ssh would depend on a host, and the cancel case deliberately never reaches one.
+ *
+ * `ssh` also records that it was called, which is the only point at which the script's signal trap is
+ * guaranteed to be armed — a wait on the provisioner's marker would race the arming itself.
  */
 function makeBin({ created, sshExitCode }) {
   const binDir = makeDir('orca-vm-create-bin-')
+  const sshMarker = join(binDir, 'ssh-ran')
   writeStub(
     binDir,
     'team-machines',
@@ -53,8 +57,12 @@ function makeBin({ created, sshExitCode }) {
       ''
     ].join('\n')
   )
-  writeStub(binDir, 'ssh', `#!/bin/sh\nexit ${sshExitCode}\n`)
-  return { binDir, destroyLog: join(binDir, 'destroy.log') }
+  writeStub(
+    binDir,
+    'ssh',
+    ['#!/bin/sh', `: > ${JSON.stringify(sshMarker)}`, `exit ${sshExitCode}`, ''].join('\n')
+  )
+  return { binDir, destroyLog: join(binDir, 'destroy.log'), sshMarker }
 }
 
 function scriptEnv(binDir, overrides = {}) {
@@ -93,13 +101,15 @@ async function waitForPath(path) {
 it('releases the machine when the create is cancelled mid-flight', async () => {
   // Why this case exists: Orca cancels by killing the recipe's process group, so a script that cleans
   // up only on explicit `exit` paths skips every release exactly when the machine is likeliest to leak.
-  const { binDir, destroyLog } = makeBin({
+  const { binDir, destroyLog, sshMarker } = makeBin({
     created: { id: 'res-cancelled', address: 'host.example.com' },
     sshExitCode: 1
   })
   const create = runCreate(binDir)
 
-  await waitForPath(join(binDir, 'create.json'))
+  // Why the ssh marker: the trap is armed just before the first ssh call, so waiting for it is the
+  // first moment a SIGTERM is guaranteed to reach the handler rather than kill the shell outright.
+  await waitForPath(sshMarker)
   create.child.kill('SIGTERM')
 
   // The trap runs once the foreground `sleep` of the SSH retry loop returns, so this settles in ~2s.

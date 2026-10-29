@@ -124,6 +124,31 @@ it('retries the follow-up read instead of throwing away the grant', async () => 
   })
 })
 
+it('prints what a failed extend verb said, so a --json provider error is not swallowed', async () => {
+  const binDir = makeDir('orca-vm-extend-fail-bin-')
+  writeFileSync(
+    join(binDir, 'team-machines'),
+    [
+      `#!${process.execPath}`,
+      'const [verb] = process.argv.slice(2)',
+      "if (verb === 'extend') {",
+      '  process.stdout.write(JSON.stringify({ error: "provider said no" }))',
+      '  process.exit(9)',
+      '}',
+      ''
+    ].join('\n')
+  )
+  chmodSync(join(binDir, 'team-machines'), 0o755)
+
+  const { code, stdout, stderr } = await runExtend(binDir)
+
+  expect(code).toBe(1)
+  expect(stdout).toBe('')
+  // `set -e` used to end the script on the failed verb, discarding the answer it printed.
+  expect(stderr).toContain('provider said no')
+  expect(stderr).toContain('was not extended')
+})
+
 it('says why it failed, and names the resource, when no read reports a deadline', async () => {
   const { binDir, showReads } = makeBin({ extendOutput: JSON.stringify({ ok: true }) })
 
@@ -134,4 +159,7 @@ it('says why it failed, and names the resource, when no read reports a deadline'
   expect(showReads()).toBe(3)
   expect(stderr).toContain('res-1')
   expect(stderr).toContain('reclaimed early')
+  // Why this wording: extend is paid and not idempotent, so the advice must not be "extend again".
+  expect(stderr).toContain('before extending again')
+  expect(stderr).not.toContain('Re-run extend')
 })

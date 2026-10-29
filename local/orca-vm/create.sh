@@ -31,40 +31,55 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 name="orca-${ORCA_WORKSPACE_NAME}"
-log "allocating $name"
+# Why the instance id: Orca files this host under it, and a machine left behind is reported under it,
+# so the two lines are what let an operator match a provider console row to Orca's own record.
+log "allocating $name (instance ${ORCA_VM_INSTANCE_ID:-unknown})"
 
 released=0
+# Why empty rather than unset: the trap is armed before the provisioner answers, and `set -u` would end
+# the handler on an undefined id — which is the one case that most needs its warning.
+resource_id=''
 # Why this exists: a create that half-succeeds must not leave a machine nobody knows about.
 release() {
   if [ "$released" -eq 1 ]; then
     return 0
   fi
   released=1
+  # Why its own message: a cancel that lands before the provisioner printed an id may still have left a
+  # machine behind, and there is nothing here to release it with — so this is for a human to check.
+  if [ -z "$resource_id" ]; then
+    log "WARNING: cancelled before an id was reported — a machine may exist under $name"
+    return 0
+  fi
   log "releasing $resource_id"
   $DESTROY_VERB "$resource_id" >&2 ||
     log "WARNING: cleanup failed — $resource_id may still be running"
 }
 
 # Why a trap and not just the explicit exits: Orca cancels a create by killing the recipe's process
-# group, so every explicit `exit` below is skipped exactly when the machine is likeliest to leak.
+# group, so every explicit `exit` below is skipped exactly when the machine is likeliest to leak. PIPE
+# is here for the other half of the same defect: the app closing this script's pipes (a quit) ends the
+# next write, and that is also a create nobody is waiting for any more.
 on_signal() {
-  log "cancelled — releasing $resource_id"
+  # Why PIPE is ignored inside the handler: its own release writes to the pipes that just closed, and
+  # a SIGPIPE there would end the handler before the machine was released.
+  trap '' PIPE
+  log "cancelled — releasing $resource_id" || true
   release
   exit 130
 }
+
+# Armed before the first allocation rather than after it: a cancel during the provisioning call itself is
+# exactly the case where a machine appears and no `exit` path runs.
+trap on_signal INT TERM HUP PIPE
 
 created="$($PROVISION_VERB --name "$name")" || { log "provisioning failed"; exit 1; }
 resource_id="$(printf '%s' "$created" | jq -r '.id // empty')"
 host="$(printf '%s' "$created" | jq -r '.address // empty')"
 
-# Armed only once the id is known: before that there is nothing to release.
-trap on_signal INT TERM HUP
-
 if [ -z "$resource_id" ] || [ -z "$host" ]; then
   log "could not read id/address from provisioner output: $created"
-  if [ -n "$resource_id" ]; then
-    release
-  fi
+  release
   exit 1
 fi
 
@@ -113,7 +128,3 @@ jq -c -n \
     connection:{type:"ssh",projectRoot:$projectRoot,
       target:{label:$label,host:$host,port:22,username:$username,relayGracePeriodSeconds:$relayGrace}},
     userData:{resourceId:$resourceId}}'
-
-# The machine is Orca's to track from here, so a signal that lands after the result is printed must not
-# release the host the app is about to persist.
-trap - INT TERM HUP

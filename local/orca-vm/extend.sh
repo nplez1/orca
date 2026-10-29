@@ -36,8 +36,15 @@ fi
 
 log "extending $resource_id by $lifetime"
 # Captured rather than streamed: the grant often reports the new deadline itself, and that answer
-# cannot be reread once it has gone straight to stderr.
-extended="$($EXTEND_VERB "$resource_id" "$lifetime")"
+# cannot be reread once it has gone straight to stderr. Why the failure branch prints it: a provider
+# CLI usually reports the reason on stdout, and `set -e` would otherwise discard it unseen.
+extended="$($EXTEND_VERB "$resource_id" "$lifetime")" || {
+  if [ -n "$extended" ]; then
+    printf '%s\n' "$extended" >&2
+  fi
+  log "extend: the provisioner's extend verb failed — the lease was not extended"
+  exit 1
+}
 if [ -n "$extended" ]; then
   printf '%s\n' "$extended" >&2
 fi
@@ -61,7 +68,7 @@ while [ -z "$release_at" ] && [ "$attempt" -lt "$SHOW_ATTEMPTS" ]; do
   fi
 done
 if [ -z "$release_at" ]; then
-  log "extend: the provider granted the extension but reported no deadline for $resource_id in $SHOW_ATTEMPTS reads — Orca keeps the old deadline, so this host can be reclaimed early. Re-run extend to pick the new deadline up."
+  log "extend: the provider granted the extension but reported no deadline for $resource_id in $SHOW_ATTEMPTS reads — Orca keeps the old deadline, so this host can be reclaimed early. Check the provider's own deadline for $resource_id before extending again: a second extend buys more time a second time."
   exit 1
 fi
 
@@ -71,7 +78,7 @@ result="$(printf '%s' "$payload" | jq -c --arg release "$release_at" '.recipeRes
 # Why the shape check: jq exits non-zero on a non-numeric argument, and the extension has already been
 # granted by this point — a countdown we cannot format must not turn a moved deadline into a failure.
 case "$remaining" in
-  '' | *[!0-9]*) ;;
+  '' | 0 | *[!0-9]*) ;;
   *) result="$(printf '%s' "$result" | jq -c --argjson seconds "$remaining" '.userData.lifetimeSeconds = $seconds')" ;;
 esac
 printf '%s\n' "$result"
