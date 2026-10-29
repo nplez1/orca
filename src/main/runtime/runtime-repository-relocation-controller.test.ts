@@ -37,12 +37,20 @@ async function makeCheckout(path: string): Promise<void> {
 }
 
 function makeController(options: {
-  repo: { id: string; path: string; displayName: string; worktreeBasePath?: string }
+  repo: {
+    id: string
+    path: string
+    displayName: string
+    worktreeBasePath?: string
+    kind?: 'git' | 'folder'
+  }
   hasRelocationStore?: boolean
   hasLiveSessions?: boolean
   truncateList?: boolean
+  /** Defaults to the production resolver, which is what the rest of these tests exercise. */
+  resolveDefaultBranchName?: (repo: Repo) => Promise<string | null>
 }): RuntimeRepositoryRelocationController {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the controller reads only id, path and displayName off this row.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the controller reads only id, path, kind and displayName off this row.
   const repo = { badgeColor: '#000000', addedAt: 1, ...options.repo } as Repo
   const store = {
     getSettings: () => ({
@@ -72,7 +80,10 @@ function makeController(options: {
     }),
     notifyRepoRelocated: vi.fn(),
     invalidateResolvedWorktrees: vi.fn(),
-    notifyReposChanged: vi.fn()
+    notifyReposChanged: vi.fn(),
+    ...(options.resolveDefaultBranchName
+      ? { resolveDefaultBranchName: options.resolveDefaultBranchName }
+      : {})
   })
 }
 
@@ -224,5 +235,73 @@ describe('RuntimeRepositoryRelocationController', () => {
       repoId: 'r1',
       decision: 'unknown-default-branch'
     })
+  })
+
+  it('refuses a folder project without asking git about a branch', async () => {
+    // The folder sits inside a real checkout whose branch is `develop`, which is exactly the answer
+    // that would be wrong to take: it is the parent's, not this project's.
+    const parent = join(root, 'Code')
+    await makeCheckout(parent)
+    git(parent, 'symbolic-ref', 'HEAD', 'refs/heads/develop')
+    const folder = join(parent, 'notes')
+    await mkdir(folder, { recursive: true })
+    const resolveDefaultBranchName = vi.fn()
+    const controller = makeController({
+      repo: {
+        id: 'r1',
+        path: folder,
+        displayName: 'notes',
+        worktreeBasePath: join(root, 'ws', 'notes'),
+        kind: 'folder'
+      },
+      resolveDefaultBranchName
+    })
+
+    await expect(controller.relocate('name:notes', { dryRun: true })).resolves.toEqual({
+      repoId: 'r1',
+      decision: 'not-a-git-repo'
+    })
+    expect(resolveDefaultBranchName).not.toHaveBeenCalled()
+  })
+
+  it('asks git about the branch only for a checkout it would actually move', async () => {
+    const container = join(root, 'ws', 'orca')
+    await makeCheckout(join(container, 'main'))
+    const resolveDefaultBranchName = vi.fn()
+    const controller = makeController({
+      repo: {
+        id: 'r1',
+        path: join(container, 'main'),
+        displayName: 'orca',
+        worktreeBasePath: container
+      },
+      resolveDefaultBranchName
+    })
+
+    await controller.relocate('name:orca', { dryRun: true })
+
+    expect(resolveDefaultBranchName).not.toHaveBeenCalled()
+  })
+
+  it('asks git about the branch for a checkout it would move', async () => {
+    const checkout = join(root, 'Code', 'homelab')
+    const container = join(root, 'ws', 'homelab')
+    await makeCheckout(checkout)
+    const resolveDefaultBranchName = vi.fn(async () => 'main')
+    const controller = makeController({
+      repo: { id: 'r1', path: checkout, displayName: 'homelab', worktreeBasePath: container },
+      resolveDefaultBranchName
+    })
+
+    await expect(controller.relocate('name:homelab', { dryRun: true })).resolves.toEqual({
+      repoId: 'r1',
+      decision: 'ready',
+      plan: {
+        containerPath: container,
+        targetPath: join(container, 'main'),
+        defaultBranchName: 'main'
+      }
+    })
+    expect(resolveDefaultBranchName).toHaveBeenCalledTimes(1)
   })
 })
