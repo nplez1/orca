@@ -4,12 +4,13 @@ import React, { act, useRef } from 'react'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 import type { EditableJiraIssueField } from './jira-issue-workspace-hydration'
 import { useJiraIssueWorkspaceRefresh } from './use-jira-issue-workspace-refresh'
 
 const mocks = vi.hoisted(() => ({
   jiraGetIssue: vi.fn(),
-  patchJiraIssue: vi.fn()
+  patchJiraIssue: vi.fn<(key: string, issue: JiraIssue | null, options?: unknown) => void>()
 }))
 
 vi.mock('@/store', () => ({
@@ -21,9 +22,7 @@ vi.mock('@/runtime/runtime-jira-client', () => ({
   jiraGetIssue: (...args: unknown[]) => mocks.jiraGetIssue(...args)
 }))
 
-const settings = { hostId: null } as unknown as Parameters<
-  typeof useJiraIssueWorkspaceRefresh
->[0]['providerSettings']
+const settings = defaultScopeHost(null)
 
 function issue(key: string, title = `Title ${key}`): JiraIssue {
   return {
@@ -74,9 +73,9 @@ function Probe({
   return <div>{current.key}</div>
 }
 
-function renderedIssue(): JiraIssue | undefined {
+function renderedIssue(): JiraIssue | null | undefined {
   const call = mocks.patchJiraIssue.mock.calls.find(([scope]) => scope === 'renderedIssue')
-  return call?.[1] as JiraIssue | undefined
+  return call?.[1]
 }
 
 afterEach(() => {

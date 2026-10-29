@@ -4,9 +4,11 @@ import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraBoardOverview } from '../../../../../shared/jira/jira-types'
+import type { TaskPageJiraBoardModel } from '../../task-page-jira-board-types'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
 import { TaskPageJiraBoard } from './Board'
 
-const mocks = vi.hoisted(() => ({ board: {} as Record<string, unknown> }))
+const mocks = vi.hoisted((): { board: Record<string, unknown> } => ({ board: {} }))
 
 vi.mock('../../use-task-page-jira-board', () => ({
   useTaskPageJiraBoard: () => mocks.board
@@ -71,17 +73,17 @@ function boardState(overrides: Record<string, unknown>): Record<string, unknown>
   }
 }
 
-const model = {
-  accountBackedTaskSourceHostId: null,
+const model: TaskPageJiraBoardModel = {
+  accountBackedTaskSourceHostId: LOCAL_EXECUTION_HOST_ID,
   jiraTaskSourceContext: null,
-  jiraStatus: { sites: [], viewer: null },
+  jiraStatus: { connected: false, viewer: null, sites: [], selectedSiteId: null },
   jiraIssueAttachmentIndex: new Map(),
   selectedJiraIssue: null,
   openJiraDetailPage: () => {},
   handleOpenOrUseJiraItem: () => {},
   handleUseJiraItem: () => {},
   getJiraIssueWorkspaces: () => []
-} as unknown as Parameters<typeof TaskPageJiraBoard>[0]['model']
+}
 
 function renderBoard(): void {
   render(

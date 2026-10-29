@@ -183,10 +183,7 @@ export function JiraIssueMetadataBar({
               ) : null}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="popover-scroll-content scrollbar-sleek w-48"
-            align="start"
-          >
+          <DropdownMenuContent className="w-48" align="start">
             <DropdownMenuItem
               onSelect={() =>
                 void mutateIssue('priority', { priorityId: null }, { priority: undefined })

@@ -232,7 +232,7 @@ export function JiraUserPicker({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={translate('components.jiraUserPicker.search', 'Search users')}
-          className="mb-1 h-7 text-xs"
+          className="mb-1 h-7"
           autoFocus
         />
         {fixedOptions?.map((option) => (

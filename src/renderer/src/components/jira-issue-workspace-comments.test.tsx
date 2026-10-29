@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraComment } from '../../../shared/jira/jira-types'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 import { useJiraIssueComments } from './jira-issue-workspace-comments'
 
 const mocks = vi.hoisted(() => ({
@@ -26,9 +27,7 @@ vi.mock('sonner', () => ({
   toast: { error: mocks.toastError, success: vi.fn(), message: vi.fn() }
 }))
 
-const settings = { hostId: null } as unknown as Parameters<
-  typeof useJiraIssueComments
->[0]['providerSettings']
+const settings = defaultScopeHost(null)
 
 function readFailure(error: unknown): void {
   mocks.jiraIssueComments.mockRejectedValue(error)

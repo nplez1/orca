@@ -50,6 +50,11 @@ vi.mock('./client', () => ({
   isAuthError: (...args: unknown[]) => isAuthErrorMock(...args)
 }))
 
+/** The abort signal a request init carries, read without a cast. */
+function writeSignalOf(init: unknown): unknown {
+  return typeof init === 'object' && init !== null && 'signal' in init ? init.signal : undefined
+}
+
 function makeEntry(id = 'site-1'): JiraClientForSite {
   return {
     site: {
@@ -474,7 +479,7 @@ describe('Jira issue mutations', () => {
     )
 
     for (const [, , init] of jiraRequestMock.mock.calls) {
-      expect((init as { signal?: AbortSignal }).signal).toBeInstanceOf(AbortSignal)
+      expect(writeSignalOf(init)).toBeInstanceOf(AbortSignal)
     }
   })
 
