@@ -8,7 +8,7 @@ import { forkAdded, forkSurface, manifestEntry, survivalVerdict } from './fork-s
 import { blobs, upstreamMoves } from './fork-surface-git.mjs'
 import { addedLines } from './rename-forecast.mjs'
 import { isDeletedCodeModule } from './post-sync-checks.mjs'
-import { BACKUP_REF, pinnedUpstreamBase } from './sync-range.mjs'
+import { BACKUP_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 import { STATUS, git, gitText, repoRoot, splitNul, tailText } from './run.mjs'
 
 function readManifestSymbols() {
@@ -243,14 +243,10 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
 
 export function forkSymbolSurvival(tip, source, { merged = 'HEAD', problem = null } = {}) {
   if (problem !== null) {
-    return {
-      status: STATUS.failed,
-      summary: `the pre-sync tip does not belong to this sync: ${problem}`,
-      details: [
-        'the scan would read the wrong tip and report clean, so it refuses instead',
-        're-run `node local/sync/pre-sync.mjs --prepare` before relying on this check'
-      ]
-    }
+    return foreignTipFailure(
+      problem,
+      'the scan would read the wrong tip and report clean, so it refuses instead'
+    )
   }
   if (!tip) {
     return {

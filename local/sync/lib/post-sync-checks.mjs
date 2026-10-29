@@ -7,7 +7,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { readDeletionManifest } from './expected-deletions.mjs'
-import { BACKUP_REF, UPSTREAM_REF, pinnedUpstreamBase } from './sync-range.mjs'
+import { BACKUP_REF, UPSTREAM_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 import {
   STATUS,
   changedNames,
@@ -229,14 +229,10 @@ export function identitySweep() {
 // scan over modified files — it does not prove that no content was lost anywhere else.
 export function lostContent(tip, source, problem = null) {
   if (problem !== null) {
-    return {
-      status: STATUS.failed,
-      summary: `the pre-sync tip does not belong to this sync: ${problem}`,
-      details: [
-        'the scan would compare the wrong range and report clean, so it refuses instead',
-        're-run `node local/sync/pre-sync.mjs --prepare` before relying on this check'
-      ]
-    }
+    return foreignTipFailure(
+      problem,
+      'the scan would compare the wrong range and report clean, so it refuses instead'
+    )
   }
   if (!tip) {
     return {
@@ -460,7 +456,9 @@ function readExpectedDeletions(base = null) {
     presentAtHead: at('HEAD') ?? new Set(),
     presentUpstream: at(base),
     upstreamBlobOf: (entryPath) =>
-      base === null ? null : gitText(['rev-parse', '--verify', '--quiet', `${base}:${entryPath}`])
+      base === null
+        ? null
+        : gitText(['rev-parse', '--verify', '--quiet', [base, entryPath].join(':')])
   })
   const acknowledged = {}
   for (const entry of manifest.entries) {
@@ -474,14 +472,10 @@ function readExpectedDeletions(base = null) {
 
 export function deletedForkModules(tip, source, problem = null) {
   if (problem !== null) {
-    return {
-      status: STATUS.failed,
-      summary: `the pre-sync tip does not belong to this sync: ${problem}`,
-      details: [
-        'the scan would read the wrong tip and report clean, so it refuses instead',
-        're-run `node local/sync/pre-sync.mjs --prepare` before relying on this check'
-      ]
-    }
+    return foreignTipFailure(
+      problem,
+      'the scan would read the wrong tip and report clean, so it refuses instead'
+    )
   }
   if (!tip) {
     return {

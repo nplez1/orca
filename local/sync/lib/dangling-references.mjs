@@ -14,7 +14,7 @@
 import { danglingReferences } from './orphan-sweep.mjs'
 import { addedLines, referencesIn } from './rename-forecast.mjs'
 import { STATUS, changedNames, git, gitText, splitNul, tailText } from './run.mjs'
-import { BACKUP_REF, pinnedUpstreamBase } from './sync-range.mjs'
+import { BACKUP_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/
 // One argv entry per scanned file overflows ARG_MAX on a wide sync, so the pathspec goes in batches.
@@ -26,11 +26,10 @@ const unresolved = (tip, pinned) =>
 
 export function danglingForkReferences(tip, source, problem = null) {
   if (problem !== null) {
-    return {
-      status: STATUS.failed,
-      summary: `the pre-sync tip does not belong to this sync: ${problem}`,
-      details: ['the scan would compare the wrong range and report clean, so it refuses instead']
-    }
+    return foreignTipFailure(
+      problem,
+      'the scan would compare the wrong range and report clean, so it refuses instead'
+    )
   }
   if (!tip) {
     return {

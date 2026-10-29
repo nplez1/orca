@@ -6,10 +6,26 @@
 // worktree, can leave either one pointing at a commit from a different sync. Either ref on its own then
 // scans the wrong range and reports a pass, which is worse than reporting nothing.
 
-import { gitText, readSyncState, refExists, shortCommit as short } from './run.mjs'
+import { STATUS, gitText, readSyncState, refExists, shortCommit as short } from './run.mjs'
 
 export const UPSTREAM_REF = 'upstream/main'
 export const BACKUP_REF = 'backup/nplez1-main-pre-sync'
+
+/**
+ * The one failed outcome for "this sync's tip belongs to some other sync". Shared rather than copied:
+ * four checks refuse for exactly this reason, and a message that drifts between them is how one of them
+ * quietly starts reporting a pass again.
+ */
+export function foreignTipFailure(problem, detail) {
+  return {
+    status: STATUS.failed,
+    summary: `the pre-sync tip does not belong to this sync: ${String(problem)}`,
+    details: [
+      detail,
+      're-run `node local/sync/pre-sync.mjs --prepare` before relying on this check'
+    ]
+  }
+}
 
 /**
  * The two commits a merge of this sync must be built from: HEAD's own parents, or HEAD and MERGE_HEAD
