@@ -98,10 +98,20 @@ describe('withSessionSummaryFoldSlot', () => {
     ).rejects.toThrow('chunk failed')
 
     // Every slot must be free again: the limit only works if a failure gives its slot back.
-    await Promise.all(
-      Array.from({ length: SESSION_SUMMARY_CONCURRENT_FOLDS }, () =>
-        withSessionSummaryFoldSlot(signal(), async () => undefined)
-      )
+    const entered: number[] = []
+    const gates = Array.from({ length: SESSION_SUMMARY_CONCURRENT_FOLDS }, deferred)
+    const running = gates.map((gate, index) =>
+      withSessionSummaryFoldSlot(signal(), async () => {
+        entered.push(index)
+        await gate.promise
+      })
     )
+    await Promise.resolve()
+    expect(entered).toHaveLength(SESSION_SUMMARY_CONCURRENT_FOLDS)
+
+    for (const gate of gates) {
+      gate.resolve()
+    }
+    await Promise.all(running)
   })
 })

@@ -3,13 +3,13 @@ import { pinnedWorkspacePathCatalogCheckpoints } from './workspace-path-catalog-
 import {
   pinRestoredWorkspacePathCheckpoint,
   releaseRestoredWorkspacePathCheckpoint,
-  releaseSupersededRestoredWorkspacePathCheckpoint,
+  releaseRestoredWorkspacePathCheckpointIfUnused,
   resetRestoredWorkspacePathCheckpointPinsForTests
 } from './workspace-path-index-worker-checkpoint-pins'
 
 /**
  * Why: host-budget eviction drops the oldest checkpoint directory, and a restored one is the oldest
- * — so the pin has to end exactly when that generation stops being read here.
+ * — so the pin has to end exactly when nothing in the worker reads out of that directory any more.
  */
 
 const ROOT = 'local::restored-root'
@@ -23,55 +23,53 @@ function pinned(): readonly string[] {
   return pinnedWorkspacePathCatalogCheckpoints()
 }
 
+function pin(): void {
+  pinRestoredWorkspacePathCheckpoint({
+    rootKey: ROOT,
+    checkpointDirectory: DIRECTORY,
+    generationId: 'generation-restored'
+  })
+}
+
 describe('restored checkpoint pins', () => {
   it('pins a restored generation directory', () => {
-    pinRestoredWorkspacePathCheckpoint({
-      rootKey: ROOT,
-      checkpointDirectory: DIRECTORY,
-      generationId: 'generation-restored'
-    })
+    pin()
 
     expect(pinned()).toEqual([DIRECTORY])
   })
 
-  it('releases the pin when the restored generation becomes the served one no longer', () => {
-    pinRestoredWorkspacePathCheckpoint({
-      rootKey: ROOT,
-      checkpointDirectory: DIRECTORY,
-      generationId: 'generation-restored'
-    })
+  it('keeps the pin while any retained generation still reads out of that directory', () => {
+    pin()
 
-    // The restore's own publish must not release the pin it just took.
-    releaseSupersededRestoredWorkspacePathCheckpoint(ROOT, 'generation-restored')
+    releaseRestoredWorkspacePathCheckpointIfUnused(ROOT, ['/checkpoints/other-identity', DIRECTORY])
+
     expect(pinned()).toEqual([DIRECTORY])
-
-    releaseSupersededRestoredWorkspacePathCheckpoint(ROOT, 'generation-built')
-    expect(pinned()).toEqual([])
   })
 
-  it('releases on a drop of that generation, and keeps it for another', () => {
-    pinRestoredWorkspacePathCheckpoint({
-      rootKey: ROOT,
-      checkpointDirectory: DIRECTORY,
-      generationId: 'generation-restored'
-    })
+  it('releases the pin once nothing retained reads out of that directory', () => {
+    pin()
 
-    releaseRestoredWorkspacePathCheckpoint(ROOT, 'generation-built')
-    expect(pinned()).toEqual([DIRECTORY])
+    releaseRestoredWorkspacePathCheckpointIfUnused(ROOT, ['/checkpoints/other-identity'])
 
-    releaseRestoredWorkspacePathCheckpoint(ROOT, 'generation-restored')
     expect(pinned()).toEqual([])
   })
 
   it('releases on a whole-root drop', () => {
-    pinRestoredWorkspacePathCheckpoint({
-      rootKey: ROOT,
-      checkpointDirectory: DIRECTORY,
-      generationId: 'generation-restored'
-    })
+    pin()
 
     releaseRestoredWorkspacePathCheckpoint(ROOT)
 
     expect(pinned()).toEqual([])
+  })
+
+  it('replaces a stale pin when the same root restores again', () => {
+    pin()
+    pinRestoredWorkspacePathCheckpoint({
+      rootKey: ROOT,
+      checkpointDirectory: '/checkpoints/replacement',
+      generationId: 'generation-restored-2'
+    })
+
+    expect(pinned()).toEqual(['/checkpoints/replacement'])
   })
 })

@@ -4,13 +4,13 @@ import {
 } from './workspace-path-catalog-checkpoint-store'
 
 /**
- * Restored checkpoints this worker is still serving from.
+ * Restored checkpoints this worker may still be reading from.
  *
- * Why keyed by the restored generation and not just the root: host-budget eviction drops the oldest
- * checkpoint directory first, and a restored one is the oldest — so the pin has to end exactly when
- * that generation stops being readable here, not when a write happens to succeed. Otherwise a root
- * that never writes again (the default policy refuses resident re-encodes) pins its directory for
- * the life of the worker, and enough of them refuse every new checkpoint.
+ * Why this exists: host-budget eviction drops the oldest checkpoint directory first, and a restored
+ * one is the oldest — so the pin has to end exactly when nothing in this worker reads out of that
+ * directory any more. Not when a write happens to succeed: the default policy refuses resident
+ * re-encodes, so many roots never write again, and their stale pins would refuse every new
+ * checkpoint once enough of them held the host budget.
  */
 const restored = new Map<string, { directory: string; generationId: string }>()
 
@@ -27,28 +27,37 @@ export function pinRestoredWorkspacePathCheckpoint(args: {
   pinWorkspacePathCatalogCheckpoint(args.checkpointDirectory)
 }
 
-/** Releases the pin when a different generation becomes the one this worker serves. */
-export function releaseSupersededRestoredWorkspacePathCheckpoint(
-  rootKey: string,
-  publishedGenerationId: string
-): void {
+/** Releases the pin unconditionally: the root is gone, or a different restore replaced it. */
+export function releaseRestoredWorkspacePathCheckpoint(rootKey: string): void {
   const pinned = restored.get(rootKey)
-  if (pinned && pinned.generationId !== publishedGenerationId) {
-    releaseRestoredWorkspacePathCheckpoint(rootKey)
-  }
-}
-
-/** Releases the pin when that generation leaves the worker; a different generation changes nothing. */
-export function releaseRestoredWorkspacePathCheckpoint(
-  rootKey: string,
-  generationId?: string
-): void {
-  const pinned = restored.get(rootKey)
-  if (!pinned || (generationId !== undefined && generationId !== pinned.generationId)) {
+  if (!pinned) {
     return
   }
   restored.delete(rootKey)
   unpinWorkspacePathCatalogCheckpoint(pinned.directory)
+}
+
+/**
+ * Releases the pin once no retained generation still reads out of its directory.
+ *
+ * Why the directories in use and not just this root's generation: a spilled delta on a restored
+ * catalog writes its replacement spill into that same directory, so a published generation can keep
+ * the directory live after the restored one stops being the one served.
+ */
+export function releaseRestoredWorkspacePathCheckpointIfUnused(
+  rootKey: string,
+  spillDirectoriesInUse: Iterable<string>
+): void {
+  const pinned = restored.get(rootKey)
+  if (!pinned) {
+    return
+  }
+  for (const directory of spillDirectoriesInUse) {
+    if (directory === pinned.directory) {
+      return
+    }
+  }
+  releaseRestoredWorkspacePathCheckpoint(rootKey)
 }
 
 /** Test-only: a pin must not outlive the suite that created it. */

@@ -1,6 +1,20 @@
 import type { WorkspacePathCatalogGeneration } from '../../shared/workspace-path-catalog'
+import { dirname } from 'node:path'
 import { removeWorkspacePathCatalogSpill } from './workspace-path-catalog-spill'
-import { releaseSupersededRestoredWorkspacePathCheckpoint } from './workspace-path-index-worker-checkpoint-pins'
+import { releaseRestoredWorkspacePathCheckpointIfUnused } from './workspace-path-index-worker-checkpoint-pins'
+
+/** Directories a retained generation still reads a spill out of, for the checkpoint pin check. */
+export function workspacePathIndexWorkerSpillDirectories(
+  generations: Map<string, WorkspacePathCatalogGeneration>
+): string[] {
+  const directories: string[] = []
+  for (const generation of generations.values()) {
+    if (generation.catalog.storageKind === 'disk-spilled') {
+      directories.push(dirname(generation.catalog.spillFilePath))
+    }
+  }
+  return directories
+}
 
 const MAX_RETAINED_GENERATIONS_PER_ROOT = 2
 
@@ -21,8 +35,6 @@ export function publishWorkspacePathIndexWorkerGeneration(args: {
   const generationKey = workspacePathIndexWorkerGenerationKey(args.rootKey, args.generationId)
   args.generations.set(generationKey, args.generation)
   args.latestGenerationIds.set(args.rootKey, args.generationId)
-  // A fresh build makes a restored generation stop being the one this worker serves.
-  releaseSupersededRestoredWorkspacePathCheckpoint(args.rootKey, args.generationId)
   const ownedKeys = [...args.generations.keys()].filter((key) =>
     key.startsWith(`${args.rootKey}\u0000`)
   )
@@ -44,6 +56,11 @@ export function publishWorkspacePathIndexWorkerGeneration(args: {
       }
     }
   }
+  // After the insert and any eviction: the restored checkpoint's directory may now be unreferenced.
+  releaseRestoredWorkspacePathCheckpointIfUnused(
+    args.rootKey,
+    workspacePathIndexWorkerSpillDirectories(args.generations)
+  )
 }
 
 /** Removes one generation without disturbing the root's other retained generations. */
@@ -59,18 +76,22 @@ export function dropWorkspacePathIndexWorkerGeneration(args: {
   if (args.latestGenerationIds.get(args.rootKey) === args.generationId) {
     args.latestGenerationIds.delete(args.rootKey)
   }
-  if (generation?.catalog.storageKind !== 'disk-spilled') {
-    return
+  if (generation?.catalog.storageKind === 'disk-spilled') {
+    const spillFilePath = generation.catalog.spillFilePath
+    const spillStillShared = [...args.generations.values()].some(
+      (candidate) =>
+        candidate.catalog.storageKind === 'disk-spilled' &&
+        candidate.catalog.spillFilePath === spillFilePath
+    )
+    if (!spillStillShared) {
+      void removeWorkspacePathCatalogSpill(generation.catalog).catch(() => undefined)
+    }
   }
-  const spillFilePath = generation.catalog.spillFilePath
-  const spillStillShared = [...args.generations.values()].some(
-    (candidate) =>
-      candidate.catalog.storageKind === 'disk-spilled' &&
-      candidate.catalog.spillFilePath === spillFilePath
+  // The restored checkpoint's directory may no longer be read by anything retained here.
+  releaseRestoredWorkspacePathCheckpointIfUnused(
+    args.rootKey,
+    workspacePathIndexWorkerSpillDirectories(args.generations)
   )
-  if (!spillStillShared) {
-    void removeWorkspacePathCatalogSpill(generation.catalog).catch(() => undefined)
-  }
 }
 
 export function dropWorkspacePathIndexWorkerRoot(args: {

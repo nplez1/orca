@@ -149,20 +149,16 @@ export async function runSessionSummaryFold(args: {
   const { deps, callbacks, paneKey, host, signal } = args
   const report = callbacks.onStatus
   try {
-    const session = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
-    const identity = sessionSummaryIdentityOf(session)
-    const stored = storedEntry(deps, paneKey, identity)
-    // Why the slot covers the read: `readEvents` builds the fold's whole event array, so N panes
-    // restoring at once would allocate N transcripts before any fold was admitted.
+    // Why the slot covers the read, and why nothing is resolved before it: `readEvents` builds the
+    // fold's whole event array, so N panes restoring at once would allocate N transcripts before any
+    // fold was admitted — and a wait that long is long enough for the pane's identity to change.
     await withSessionSummaryFoldSlot(signal, () =>
       runAdmittedFold({
         deps,
         report,
         paneKey,
         host,
-        session,
-        identity,
-        stored,
+        requestedSession: args.requestedSession,
         signal,
         foldParams: args.foldParams
       })
@@ -185,19 +181,20 @@ export async function runSessionSummaryFold(args: {
   }
 }
 
-/** One admitted fold: read the transcript, fold the new events, persist, report. */
+/** One admitted fold: resolve the pane's session, read the transcript, fold, persist, report. */
 async function runAdmittedFold(args: {
   deps: SessionSummaryFoldRunnerDeps
   report: SessionSummaryFoldCallbacks['onStatus']
   paneKey: string
   host: SessionSummaryTranscriptHost
-  session: SessionSummarySessionRef
-  identity: SessionSummaryStoreEntry['identity']
-  stored: SessionSummaryStoreEntry
+  requestedSession?: SessionSummarySessionRef
   signal: AbortSignal
   foldParams: ResolvedSourceControlAiGenerationParams | null
 }): Promise<void> {
-  const { deps, report, paneKey, host, session, identity, stored, signal } = args
+  const { deps, report, paneKey, host, signal } = args
+  const session = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
+  const identity = sessionSummaryIdentityOf(session)
+  const stored = storedEntry(deps, paneKey, identity)
   const read = await deps.readEvents({
     identity: session,
     host,

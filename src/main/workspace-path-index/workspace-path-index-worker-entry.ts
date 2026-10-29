@@ -148,7 +148,7 @@ async function handleRequest(
             rootKey: request.key,
             generationId: request.generationId
           })
-          releaseRestoredWorkspacePathCheckpoint(request.key, request.generationId)
+          releaseRestoredWorkspacePathCheckpoint(request.key)
         } else {
           dropWorkspacePathIndexWorkerRoot({
             generations,

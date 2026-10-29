@@ -314,8 +314,10 @@ describe('workspace path catalog checkpoints', () => {
         generation: { catalog: written }
       })
     }
-    // The restored root is the older identity (it was written first), so oldest-first eviction
-    // would take it first.
+    // The restored root is the older identity: age its payload so eviction order does not rest on
+    // write timing. `measureDirectoryBytes` reads file mtimes, not the directory's.
+    await agePayloadFiles(fixture.checkpointDirectory, 120_000)
+    await agePayloadFiles(otherDirectory, 60_000)
     pinWorkspacePathCatalogCheckpoint(fixture.checkpointDirectory)
 
     // Room for the restored root alone: the newer checkpoint is the one that goes.
@@ -618,6 +620,14 @@ async function measureDirectory(directory: string): Promise<number> {
     bytes += (await stat(join(directory, name))).size
   }
   return bytes
+}
+
+/** Eviction orders by payload mtime, so age the files a checkpoint directory holds. */
+async function agePayloadFiles(directory: string, millisecondsAgo: number): Promise<void> {
+  const aged = new Date(AGED_CHECKPOINT_MTIME.getTime() - millisecondsAgo)
+  for (const name of await readdir(directory)) {
+    await utimes(join(directory, name), aged, aged)
+  }
 }
 
 function fenceIdentity(query: string): WorkspacePathSearchFenceIdentity {
