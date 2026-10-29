@@ -1,8 +1,8 @@
 import { quotePosixShellDoubleQuotedApostrophe } from '../../shared/shell-argument-quoting'
 import { quotePowerShellLiteral } from '../../shared/powershell-native-argument'
 
-const MANAGED_MARKER = '# Orca managed WSL CLI launcher'
-const BRIDGE_MANAGED_MARKER = '# Orca managed WSL CLI PowerShell bridge'
+const MANAGED_MARKER = '# Orca NP managed WSL CLI launcher'
+const BRIDGE_MANAGED_MARKER = '# Orca NP managed WSL CLI PowerShell bridge'
 
 const FIND_INTEROP_POWERSHELL = `if command -v powershell.exe >/dev/null 2>&1; then
   ORCA_POWERSHELL=powershell.exe
@@ -15,7 +15,7 @@ fi`
 
 export function buildWslLauncher(
   windowsLauncherPath: string,
-  bridgePath = '${XDG_DATA_HOME:-$HOME/.local/share}/orca/orca-wsl-bridge.ps1'
+  bridgePath = '${XDG_DATA_HOME:-$HOME/.local/share}/orca-np/orca-wsl-bridge.ps1'
 ): string {
   return buildLauncher(
     windowsLauncherPath,
@@ -199,8 +199,9 @@ function bridgeLines(lines: readonly string[]): string {
 }
 
 export function getBridgePathFromCommandPath(commandPath: string): string {
-  // Current and legacy command names share one bridge under ~/.local/share/orca.
-  return `${commandPath.replace(/\/\.local\/bin\/(?:orca|orca-ide)$/, '/.local/share/orca')}/orca-wsl-bridge.ps1`
+  // Why one bridge directory: the install command and the status probe both derive it from the
+  // command path, and a fixed name lets this build sit beside an official install's.
+  return `${commandPath.replace(/\/\.local\/bin\/(?:orca|orca-ide|orca-np)$/, '/.local/share/orca-np')}/orca-wsl-bridge.ps1`
 }
 
 export function buildSafeReplaceGuard(path: string, managedMarker: string): string {
@@ -228,12 +229,7 @@ export function buildRegistrationLockPrelude(commandPath: string): string {
   ].join('\n')
 }
 
-export function buildManagedLegacyRemoveCommand(quotedLegacyCommandPath: string): string {
-  // Preserve user-owned commands and symlinks when removing the managed legacy wrapper.
-  return `if [ ! -L ${quotedLegacyCommandPath} ] && [ -f ${quotedLegacyCommandPath} ] && grep -Fq ${quotePosixShellDoubleQuotedApostrophe(MANAGED_MARKER)} ${quotedLegacyCommandPath}; then rm -f ${quotedLegacyCommandPath}; fi`
-}
-
-export function buildSafeRemoveCommand(commandPath: string, legacyCommandPath?: string): string {
+export function buildSafeRemoveCommand(commandPath: string): string {
   const bridgePath = getBridgePathFromCommandPath(commandPath)
   return [
     // Runs under sh; Ubuntu 20.04 dash lacks pipefail, and no pipeline here needs it.
@@ -241,11 +237,7 @@ export function buildSafeRemoveCommand(commandPath: string, legacyCommandPath?: 
     buildRegistrationLockPrelude(commandPath),
     buildSafeReplaceGuard(commandPath, MANAGED_MARKER),
     buildSafeReplaceGuard(bridgePath, BRIDGE_MANAGED_MARKER),
-    `rm -f ${quotePosixShellDoubleQuotedApostrophe(commandPath)} ${quotePosixShellDoubleQuotedApostrophe(bridgePath)}`,
-    // A leftover managed legacy command would let startup reconciliation undo removal.
-    ...(legacyCommandPath
-      ? [buildManagedLegacyRemoveCommand(quotePosixShellDoubleQuotedApostrophe(legacyCommandPath))]
-      : [])
+    `rm -f ${quotePosixShellDoubleQuotedApostrophe(commandPath)} ${quotePosixShellDoubleQuotedApostrophe(bridgePath)}`
   ].join('\n')
 }
 
