@@ -4,10 +4,10 @@
 // 512), and every chunk of every fold spawns an agent CLI. Bounding only the chunks still leaves
 // panes × chunks processes; this box has already taken a Jetsam kill from a swarm of them.
 
-/** Chunks inside one fold; four agent CLIs is what this box starts at once. */
+/** Chunks inside one fold; each one spawns an agent CLI, so this is the per-fold fan-out. */
 export const SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY = 4
 
-/** Folds running at once across every pane. */
+/** Folds running at once across every pane, so the process-wide CLI ceiling is this times the above. */
 export const SESSION_SUMMARY_CONCURRENT_FOLDS = 2
 
 type FoldWaiter = { grant: () => void; cancel: () => void }
@@ -15,8 +15,27 @@ type FoldWaiter = { grant: () => void; cancel: () => void }
 let activeFolds = 0
 const waiters: FoldWaiter[] = []
 
+/**
+ * Runs `run` while holding one of the process-wide fold slots.
+ *
+ * Why the caller holds it around the transcript read too: the read builds the fold's whole event
+ * array, so N panes restoring at once would still allocate N transcripts in the main process before
+ * any fold was admitted.
+ */
+export async function withSessionSummaryFoldSlot<T>(
+  signal: AbortSignal,
+  run: () => Promise<T>
+): Promise<T> {
+  await acquireSessionSummaryFoldSlot(signal)
+  try {
+    return await run()
+  } finally {
+    releaseSessionSummaryFoldSlot()
+  }
+}
+
 /** Resolves once a slot is held, so every caller must pair it with a release. */
-export async function acquireSessionSummaryFoldSlot(signal: AbortSignal): Promise<void> {
+async function acquireSessionSummaryFoldSlot(signal: AbortSignal): Promise<void> {
   signal.throwIfAborted()
   if (activeFolds < SESSION_SUMMARY_CONCURRENT_FOLDS) {
     activeFolds += 1

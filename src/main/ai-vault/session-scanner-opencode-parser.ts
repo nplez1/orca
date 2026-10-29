@@ -43,15 +43,18 @@ export async function parseOpenCodeSessionFile(
   accumulator.cwd = openCodeSessionCwd(record)
   updateTimeline(accumulator, timeObjectValue(record.time, 'created'))
   updateTimeline(accumulator, timeObjectValue(record.time, 'updated'))
-  await consumeOpenCodeMessages(accumulator, findOpenCodeStorageRoot(file.path), sessionId)
+  await consumeOpenCodeMessages(accumulator, findOpenCodeStorageRoot(file.path), sessionId, signal)
   return finalizeSession(accumulator, platform)
 }
 
 // Rebuild arbitrary directory order by creation time; undated files sort last so they cannot displace the first prompt.
-async function readOpenCodeMessagesInOrder(messageDir: string): Promise<Record<string, unknown>[]> {
+async function readOpenCodeMessagesInOrder(
+  messageDir: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>[]> {
   let entries
   try {
-    entries = await wslGatedReaddir(messageDir, 'scan')
+    entries = await wslGatedReaddir(messageDir, 'scan', signal)
   } catch (error) {
     // Propagate WSL refusal so an unreachable message directory is not cached as an empty transcript.
     if (error instanceof WslTranscriptFsError) {
@@ -66,9 +69,10 @@ async function readOpenCodeMessagesInOrder(messageDir: string): Promise<Record<s
     }
     let message: Record<string, unknown> | null = null
     try {
-      message = asRecord(
-        JSON.parse(await wslGatedReadFile(join(messageDir, entry.name), 'utf-8', 'scan')) as unknown
+      const raw: unknown = JSON.parse(
+        await wslGatedReadFile(join(messageDir, entry.name), 'utf-8', 'scan', signal)
       )
+      message = asRecord(raw)
     } catch (error) {
       // Skip malformed live writes, but propagate WSL refusal so incomplete transcripts remain retryable.
       if (error instanceof WslTranscriptFsError) {
@@ -94,13 +98,15 @@ async function readOpenCodeMessagesInOrder(messageDir: string): Promise<Record<s
 export async function consumeOpenCodeMessages(
   accumulator: SessionAccumulator,
   storageRoot: string | null,
-  sessionId: string
+  sessionId: string,
+  signal?: AbortSignal
 ): Promise<void> {
   if (!storageRoot) {
     return
   }
   for (const message of await readOpenCodeMessagesInOrder(
-    join(storageRoot, 'message', sessionId)
+    join(storageRoot, 'message', sessionId),
+    signal
   )) {
     const role = extractString(message.role)
     if (role === 'user' || role === 'assistant') {

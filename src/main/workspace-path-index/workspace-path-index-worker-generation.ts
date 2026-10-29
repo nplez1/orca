@@ -1,5 +1,6 @@
 import type { WorkspacePathCatalogGeneration } from '../../shared/workspace-path-catalog'
 import { removeWorkspacePathCatalogSpill } from './workspace-path-catalog-spill'
+import { releaseSupersededRestoredWorkspacePathCheckpoint } from './workspace-path-index-worker-checkpoint-pins'
 
 const MAX_RETAINED_GENERATIONS_PER_ROOT = 2
 
@@ -20,6 +21,8 @@ export function publishWorkspacePathIndexWorkerGeneration(args: {
   const generationKey = workspacePathIndexWorkerGenerationKey(args.rootKey, args.generationId)
   args.generations.set(generationKey, args.generation)
   args.latestGenerationIds.set(args.rootKey, args.generationId)
+  // A fresh build makes a restored generation stop being the one this worker serves.
+  releaseSupersededRestoredWorkspacePathCheckpoint(args.rootKey, args.generationId)
   const ownedKeys = [...args.generations.keys()].filter((key) =>
     key.startsWith(`${args.rootKey}\u0000`)
   )

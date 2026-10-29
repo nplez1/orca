@@ -19,7 +19,6 @@ import {
   pruneWorkspacePathCatalogCheckpointGenerations,
   publishWorkspacePathCatalogCheckpoint,
   reserveWorkspacePathCatalogCheckpointDiskBudget,
-  unpinWorkspacePathCatalogCheckpoint,
   workspacePathCatalogCheckpointPayloadPath
 } from './workspace-path-catalog-checkpoint-store'
 import { workspacePathCatalogResidentCheckpointEncodeEnabled } from './workspace-path-catalog-checkpoint-policy'
@@ -135,8 +134,6 @@ export async function writeWorkspacePathCatalogCheckpoint(args: {
   }
   await publishWorkspacePathCatalogCheckpoint(directory, manifest)
   await pruneWorkspacePathCatalogCheckpointGenerations(directory, payloadFile)
-  // A write supersedes whatever restored generation this identity was pinned for.
-  unpinWorkspacePathCatalogCheckpoint(directory)
   return {
     payloadBytes,
     writeMilliseconds: performance.now() - startedAt,

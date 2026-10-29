@@ -86,7 +86,7 @@ export async function parseRovoSessionFile(
   )
 
   const contextPath = join(dirname(file.path), 'session_context.json')
-  const context = await readJsonObjectIfExists(contextPath)
+  const context = await readJsonObjectIfExists(contextPath, signal)
   if (context) {
     consumeRovoSessionContext(accumulator, context)
   }

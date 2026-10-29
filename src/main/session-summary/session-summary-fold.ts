@@ -14,11 +14,7 @@ import {
   mergeSessionSummaryDeltas,
   normalizeSessionSummaryDelta
 } from './session-summary-ledger'
-import {
-  SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY,
-  acquireSessionSummaryFoldSlot,
-  releaseSessionSummaryFoldSlot
-} from './session-summary-fold-slots'
+import { SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY } from './session-summary-fold-slots'
 import { extractSessionSummaryJson } from './session-summary-json'
 import { rewriteReports } from './session-summary-report'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
@@ -169,8 +165,11 @@ export async function foldSessionSummaryEvents(args: {
   // them run to the generation timeout, and a pane close must reach every chunk's own process.
   const foldController = new AbortController()
   const abortFromCaller = (): void => foldController.abort(signal.reason)
+  if (signal.aborted) {
+    // A listener cannot observe an abort that already happened.
+    foldController.abort(signal.reason)
+  }
   signal.addEventListener('abort', abortFromCaller, { once: true })
-  await acquireSessionSummaryFoldSlot(foldController.signal)
   try {
     const foldSignal = foldController.signal
     const deltas = await mapWithConcurrency(
@@ -251,6 +250,5 @@ export async function foldSessionSummaryEvents(args: {
     }
   } finally {
     signal.removeEventListener('abort', abortFromCaller)
-    releaseSessionSummaryFoldSlot()
   }
 }

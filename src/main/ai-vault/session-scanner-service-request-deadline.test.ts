@@ -74,14 +74,17 @@ describe('AI Vault service request deadlines', () => {
       work: {
         ...WORK,
         stage: 'reading',
-        readingFile: { agent: 'claude', path: '/sessions/huge.jsonl' }
+        readingFiles: [
+          { agent: 'claude', path: '/sessions/huge.jsonl' },
+          { agent: 'claude', path: '/sessions/second.jsonl' }
+        ]
       }
     })
 
     child.emit('exit', 134)
 
     await expect(scan).rejects.toThrow(
-      'AI Vault service exited (134). (while reading /sessions/huge.jsonl)'
+      'AI Vault service exited (134). (while reading /sessions/huge.jsonl, /sessions/second.jsonl)'
     )
     client.dispose()
   })

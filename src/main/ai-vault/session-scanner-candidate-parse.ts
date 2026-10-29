@@ -138,7 +138,7 @@ export async function parseSessionCandidate(
   }
 ): Promise<SessionParseResult> {
   const { platform, executionHostId, parseStats, antigravityWorkspaceResolver, signal } = context
-  noteAiVaultScanReadingFile(signal, candidate.agent, candidate.file.path)
+  const finishedReading = noteAiVaultScanReadingFile(signal, candidate.agent, candidate.file.path)
   try {
     let session = context.listed
       ? await parseListedSessionFile(candidate, platform, parseStats, signal)
@@ -160,6 +160,8 @@ export async function parseSessionCandidate(
         message: errorMessage(err)
       }
     }
+  } finally {
+    finishedReading()
   }
 }
 

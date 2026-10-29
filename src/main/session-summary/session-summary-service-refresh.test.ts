@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
@@ -6,7 +6,10 @@ import { SessionSummaryService } from './session-summary-service'
 import { SessionSummaryStore } from './session-summary-store'
 import type { SessionSummaryStatusEntry } from './session-summary-service'
 import type { SessionSummarySourceEvent } from './session-summary-fold'
+import { resetSessionSummaryFoldSlotsForTests } from './session-summary-fold-slots'
 import { emptySessionSummaryLedger } from './session-summary-ledger'
+
+afterEach(resetSessionSummaryFoldSlotsForTests)
 
 function events(count: number): SessionSummarySourceEvent[] {
   return Array.from({ length: count }, (_, index) => ({

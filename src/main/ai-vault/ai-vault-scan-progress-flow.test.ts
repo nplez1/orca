@@ -130,9 +130,9 @@ describe('Session History scanner totals and service-client progress state', () 
       ],
       read: { done: 4, total: 4, skipped: 0 }
     })
-    // The last transcript parsed, so a scanner fault can name the file it died on.
-    expect(final.readingFile?.agent).toBe('claude')
-    expect(final.readingFile?.path).toMatch(/\.jsonl$/)
+    // Every parse has ended, so the scan must not leave a stale in-flight path behind: a later
+    // fault would blame a file that already closed.
+    expect(final.readingFiles).toBeUndefined()
 
     const { child, scan, published } = startScan()
     readyAiVaultServiceChild(child)

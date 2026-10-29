@@ -1,8 +1,7 @@
-import { mkdtemp, mkdir, open, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { LOCAL_TRANSCRIPT_MAX_BYTES } from './session-summary-transcript-source'
 
 /**
  * Which provider transcripts the fold can read.
@@ -235,24 +234,21 @@ describe('readSessionSummaryTranscriptEvents', () => {
     expect(read?.totalEvents).toBe(2)
   })
 
-  it('refuses an oversized local transcript instead of reading it into the main process', async () => {
+  it('refuses to retain more unfolded text than the fold may hold', async () => {
     const dir = await tempDir()
     const transcriptPath = join(dir, '2026-01-01T00-00-00-000Z_pi-session-1.jsonl')
-    // Sparse: the size is what the cap checks, so the bytes never need to exist.
-    const handle = await open(transcriptPath, 'w')
-    await handle.truncate(LOCAL_TRANSCRIPT_MAX_BYTES + 1)
-    await handle.close()
-    const { readSessionSummaryTranscriptEvents } = await loadSource()
+    await writeFile(transcriptPath, piTranscript('a message', 'a reply'))
+    const { readSessionSummaryEventsFromFile } = await loadSource()
 
     await expect(
-      readSessionSummaryTranscriptEvents({
-        identity: {
-          agentType: 'pi',
-          providerSession: { key: 'session_id', id: 'pi-session-1', transcriptPath }
-        },
-        signal: signal()
+      readSessionSummaryEventsFromFile({
+        filePath: transcriptPath,
+        parser: 'pi',
+        signal: signal(),
+        // The ceiling in production is 24 MB of text; the shape is the same at a few bytes.
+        maxRetainedBytes: 4
       })
-    ).rejects.toThrow(/over 24 MB, which is too large to fold/)
+    ).rejects.toThrow(/MB of unfolded messages, which is too much to fold/)
   })
 
   it('stops a read when the caller aborts it', async () => {

@@ -1,5 +1,8 @@
 import type { WorkspacePathIndexEntry } from './workspace-path-index-lease'
 
+/** A delay above this overflows Node's timer, which fires at once and would re-arm forever. */
+const MAX_TIMER_MILLISECONDS = 2_147_483_647
+
 /** Retains released roots by recency and disposes expired or excess generations. */
 export class WorkspacePathIndexRetention {
   private expiryTimer: NodeJS.Timeout | null = null
@@ -68,7 +71,7 @@ export class WorkspacePathIndexRetention {
         this.expiryTimer = null
         this.afterRelease()
       },
-      Math.max(1, wait)
+      Math.max(1, Math.min(wait, MAX_TIMER_MILLISECONDS))
     )
     this.expiryTimer.unref?.()
   }

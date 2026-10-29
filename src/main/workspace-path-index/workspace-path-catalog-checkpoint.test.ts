@@ -314,8 +314,8 @@ describe('workspace path catalog checkpoints', () => {
         generation: { catalog: written }
       })
     }
-    // The restored root is the older identity, so oldest-first eviction would take it first.
-    await utimes(fixture.checkpointDirectory, AGED_CHECKPOINT_MTIME, AGED_CHECKPOINT_MTIME)
+    // The restored root is the older identity (it was written first), so oldest-first eviction
+    // would take it first.
     pinWorkspacePathCatalogCheckpoint(fixture.checkpointDirectory)
 
     // Room for the restored root alone: the newer checkpoint is the one that goes.

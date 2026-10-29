@@ -293,8 +293,9 @@ describe('WorkerThreadRequestQueue', () => {
 
     controller.abort(new Error('pane closed'))
 
-    await expect(query).resolves.toMatchObject({ message: 'pane closed' })
     await expect(build).resolves.toMatchObject({ message: 'pane closed' })
+    // The concurrent call failed with its worker, not with someone else's cancellation.
+    await expect(query).resolves.toMatchObject({ message: 'unavailable: worker request aborted' })
     queue.dispose()
   })
 

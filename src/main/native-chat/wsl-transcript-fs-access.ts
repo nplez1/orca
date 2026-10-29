@@ -123,15 +123,20 @@ export async function wslGatedReadFile(
     const read = await readNodeFileWithinLimit(path, maxBytes, { signal })
     return read.buffer.toString(encoding)
   }
-  // Why the size check after the read on a remote path: the WSL and SSH readers materialize the
-  // text themselves, so this cannot bound their allocation — but it stops the parse, and an oversize
-  // file still reports itself as one issue instead of exhausting the scanner's heap.
+  // A remote read materializes its own text, so the size has to be known before it starts. The
+  // probe is best-effort: a path whose stat fails still gets its read, whose error is the one worth
+  // reporting (a missing transcript is not an oversized one).
+  const probed = await transcriptFileStat(path, priority, signal).catch(() => null)
+  if (probed && probed.size > maxBytes) {
+    throw new NodeFileReadTooLargeError(probed.size, maxBytes)
+  }
   const text = await runReusableFsOperation(
     { operation: 'readfile', path, encoding },
     priority,
     signal,
     () => readFile(path, encoding)
   )
+  // ...and again after: the probe can be stale, and the parsers all ask for utf-8.
   const bytes = Buffer.byteLength(text, 'utf-8')
   if (bytes > maxBytes) {
     throw new NodeFileReadTooLargeError(bytes, maxBytes)

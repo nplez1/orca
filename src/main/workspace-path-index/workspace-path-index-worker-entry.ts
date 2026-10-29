@@ -7,6 +7,7 @@ import {
 import { WORKSPACE_PATH_PROVISIONAL_PAGE_BUDGET } from '../../shared/workspace-path-provisional-page-budget'
 import { openWorkspacePathCatalogSpillReader } from './workspace-path-catalog-spill'
 import { handleWorkspacePathIndexCheckpointRequest } from './workspace-path-index-worker-checkpoint'
+import { releaseRestoredWorkspacePathCheckpoint } from './workspace-path-index-worker-checkpoint-pins'
 import type { WorkspacePathSearchInstrumentationEvent } from '../../shared/workspace-path-search-instrumentation'
 import { WorkspacePathIndexWorkerBuildLane } from './workspace-path-index-worker-build-lane'
 import { applyWorkspacePathIndexDelta } from './workspace-path-index-worker-delta'
@@ -147,12 +148,14 @@ async function handleRequest(
             rootKey: request.key,
             generationId: request.generationId
           })
+          releaseRestoredWorkspacePathCheckpoint(request.key, request.generationId)
         } else {
           dropWorkspacePathIndexWorkerRoot({
             generations,
             latestGenerationIds,
             rootKey: request.key
           })
+          releaseRestoredWorkspacePathCheckpoint(request.key)
         }
         return { id: request.id, ok: true }
       case 'discard-optional':

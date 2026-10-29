@@ -23,12 +23,14 @@ import { REMOTE_TRANSCRIPT_MAX_BYTES } from './session-summary-remote-transcript
 import type { SessionSummarySourceEvent } from './session-summary-fold'
 
 /**
- * Local transcripts fold in the Electron main process, so they share the remote reader's ceiling.
+ * Fold ceiling in retained message text, not transcript bytes.
  *
- * Why a cap at all: local reads were unbounded, and a 500 MB Claude transcript with inline base64
- * images exhausts the app heap rather than failing one session's fold.
+ * Why text and not file size: the fold's parsers stream line by line and events before the ledger's
+ * cursor are counted rather than kept, so what this bounds is the event array the fold holds in the
+ * main process — the allocation a 500 MB transcript with inline base64 images used to exhaust. A
+ * file-size cap would instead refuse long sessions that now fold fine.
  */
-export const LOCAL_TRANSCRIPT_MAX_BYTES = REMOTE_TRANSCRIPT_MAX_BYTES
+export const LOCAL_TRANSCRIPT_MAX_RETAINED_BYTES = REMOTE_TRANSCRIPT_MAX_BYTES
 
 export type SessionSummaryEventRead = {
   /** Events from the transcript, starting at the index the caller asked for. */
@@ -130,22 +132,15 @@ export async function readSessionSummaryEventsFromFile(args: {
   parser: AiVaultAgent
   signal: AbortSignal
   fromEventIndex?: number
+  /** Overrides the fold ceiling; tests use a few bytes instead of 24 MB. */
+  maxRetainedBytes?: number
 }): Promise<SessionSummaryEventRead | null> {
   const { filePath, parser, signal } = args
   const skipEvents = Math.max(0, args.fromEventIndex ?? 0)
+  const maxRetainedBytes = args.maxRetainedBytes ?? LOCAL_TRANSCRIPT_MAX_RETAINED_BYTES
   const stats = await stat(filePath)
   if (!stats.isFile()) {
     return null
-  }
-  if (stats.size > LOCAL_TRANSCRIPT_MAX_BYTES) {
-    // Why fail instead of reading what fits: a shortened transcript renumbers every event, and the
-    // ledger's cursor would then point at messages this fold never saw.
-    throw new Error(
-      `This session's transcript is over ${Math.max(
-        1,
-        Math.round(LOCAL_TRANSCRIPT_MAX_BYTES / (1024 * 1024))
-      )} MB, which is too large to fold.`
-    )
   }
   const file: FileWithMtime = {
     path: filePath,
@@ -163,6 +158,16 @@ export async function readSessionSummaryEventsFromFile(args: {
   // concurrent AI Vault scan of another file can't leak into the fold.
   const collected: TranscriptMessage[] = []
   let received = 0
+  let retainedBytes = 0
+  let retainedOverflow: Error | null = null
+  // Why a controller of our own: the ceiling has to stop the read, and a throw out of the consumer
+  // is swallowed by the channel so a faulty sink can never break a parse.
+  const readController = new AbortController()
+  const abortRead = (): void => readController.abort(signal.reason)
+  if (signal.aborted) {
+    readController.abort(signal.reason)
+  }
+  signal.addEventListener('abort', abortRead, { once: true })
   const unregister = registerTranscriptConsumer({
     beginRead(start) {
       if (start.candidate.file.path !== filePath) {
@@ -170,19 +175,43 @@ export async function readSessionSummaryEventsFromFile(args: {
       }
       return {
         message(message) {
+          if (retainedOverflow) {
+            return
+          }
           received += 1
           // Why count before the cursor instead of collecting it: the ledger already covers these
           // messages, and their text is what made every fold re-read the whole conversation.
-          if (received > skipEvents) {
-            collected.push(message)
+          if (received <= skipEvents) {
+            return
           }
+          retainedBytes += Buffer.byteLength(message.text, 'utf-8')
+          if (retainedBytes > maxRetainedBytes) {
+            // Why fail instead of folding what fits: a shortened transcript renumbers every event,
+            // and the ledger's cursor would then point at messages this fold never saw.
+            retainedOverflow = new Error(
+              `This session has over ${Math.max(
+                1,
+                Math.round(maxRetainedBytes / (1024 * 1024))
+              )} MB of unfolded messages, which is too much to fold in one pass.`
+            )
+            readController.abort(retainedOverflow)
+            return
+          }
+          collected.push(message)
         },
         finish() {}
       }
     }
   })
   try {
-    await readWholeTranscript({ candidate, platform: process.platform, signal })
+    await readWholeTranscript({
+      candidate,
+      platform: process.platform,
+      signal: readController.signal
+    })
+    if (retainedOverflow) {
+      throw retainedOverflow
+    }
     return {
       events: collected.map((message) => ({
         role: message.role,
@@ -191,7 +220,10 @@ export async function readSessionSummaryEventsFromFile(args: {
       })),
       totalEvents: received
     }
+  } catch (error) {
+    throw retainedOverflow ?? error
   } finally {
+    signal.removeEventListener('abort', abortRead)
     unregister()
   }
 }

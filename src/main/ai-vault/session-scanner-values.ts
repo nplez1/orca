@@ -1,7 +1,6 @@
 import { homedir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import { resolveAbsoluteDirOverride } from '../../shared/absolute-dir-override'
-import { NodeFileReadTooLargeError } from '../../shared/node-bounded-file-reader'
 import { wslGatedReadFile } from '../native-chat/wsl-transcript-fs-access'
 import { WslTranscriptFsError } from '../native-chat/wsl-transcript-fs-gate'
 import { asRecord } from './session-scanner-record-value'
@@ -97,14 +96,11 @@ export async function readJsonObjectIfExists(
   } catch (error) {
     // Propagate cancellation so it cannot be cached as absent enrichment.
     throwIfAiVaultScanCancelled(signal)
-    // An oversized file is a fact about this session, not an absent one: report it as its own issue.
-    if (error instanceof NodeFileReadTooLargeError) {
-      throw error
-    }
     // Propagate WSL refusal as an issue; caching null can prevent retries for unchanged files.
     if (error instanceof WslTranscriptFsError) {
       throw error
     }
+    // An oversized sidecar is enrichment this session can live without: the session still lists.
     return null
   }
 }

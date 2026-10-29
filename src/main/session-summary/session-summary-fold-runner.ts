@@ -19,6 +19,7 @@ import {
   type SessionSummaryChunkCache
 } from './session-summary-fold'
 import { IDLE_FOLD, type SessionSummaryStatusEntry } from './session-summary-snapshot'
+import { withSessionSummaryFoldSlot } from './session-summary-fold-slots'
 import type { SessionSummaryStore, SessionSummaryStoreEntry } from './session-summary-store'
 import type {
   SessionSummaryEventRead,
@@ -151,72 +152,21 @@ export async function runSessionSummaryFold(args: {
     const session = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
     const identity = sessionSummaryIdentityOf(session)
     const stored = storedEntry(deps, paneKey, identity)
-    const read = await deps.readEvents({
-      identity: session,
-      host,
-      signal,
-      fromEventIndex: stored.ledger.foldedThrough
-    })
-    const eventsReadAt = deps.now()
-    signal.throwIfAborted()
-    if (!read) {
-      report({
-        status: 'unavailable',
-        fold: IDLE_FOLD,
-        // Why: "no readable transcript yet" is true for a session that has not written one,
-        // and misleading for one whose transcript exists somewhere this fold cannot read.
-        ...(session.providerSession?.id
-          ? { error: unavailableTranscriptReason(session, deps.canReadTranscript) }
-          : {})
+    // Why the slot covers the read: `readEvents` builds the fold's whole event array, so N panes
+    // restoring at once would allocate N transcripts before any fold was admitted.
+    await withSessionSummaryFoldSlot(signal, () =>
+      runAdmittedFold({
+        deps,
+        report,
+        paneKey,
+        host,
+        session,
+        identity,
+        stored,
+        signal,
+        foldParams: args.foldParams
       })
-      return
-    }
-    const newEvents = read.events
-    const messageCount = read.totalEvents
-    if (newEvents.length === 0) {
-      // Persist first: the snapshot a listener receives reads the store, so reporting
-      // 'ready' before the write showed a ready status over an absent ledger.
-      persist(deps, paneKey, identity, stored, messageCount)
-      report({
-        // No readable content yet is 'unavailable', not a summary of nothing.
-        status: messageCount === 0 ? 'unavailable' : 'ready',
-        fold: IDLE_FOLD,
-        messageCount,
-        ...(messageCount === 0
-          ? { error: unavailableTranscriptReason(session, deps.canReadTranscript, 'empty') }
-          : {})
-      })
-      return
-    }
-    const result = await foldSessionSummaryEvents({
-      brain: deps.createBrain(args.foldParams),
-      ledger: stored.ledger,
-      events: newEvents,
-      signal,
-      readAt: eventsReadAt,
-      cache: chunkCacheFor(stored),
-      onProgress: (progress) =>
-        report({
-          status: 'folding',
-          fold: {
-            running: true,
-            completedChunks: progress.completedChunks,
-            totalChunks: progress.totalChunks
-          },
-          messageCount
-        })
-    })
-    signal.throwIfAborted()
-    persist(deps, paneKey, identity, { ...stored, ledger: result.ledger }, messageCount)
-    report({
-      status: 'ready',
-      fold: {
-        running: false,
-        completedChunks: result.completedChunks,
-        totalChunks: result.totalChunks
-      },
-      messageCount
-    })
+    )
   } catch (error) {
     if (signal.aborted) {
       return // Pane closed: cancel-on-close, nothing to report.
@@ -233,6 +183,87 @@ export async function runSessionSummaryFold(args: {
       error: error instanceof Error ? error.message : String(error)
     })
   }
+}
+
+/** One admitted fold: read the transcript, fold the new events, persist, report. */
+async function runAdmittedFold(args: {
+  deps: SessionSummaryFoldRunnerDeps
+  report: SessionSummaryFoldCallbacks['onStatus']
+  paneKey: string
+  host: SessionSummaryTranscriptHost
+  session: SessionSummarySessionRef
+  identity: SessionSummaryStoreEntry['identity']
+  stored: SessionSummaryStoreEntry
+  signal: AbortSignal
+  foldParams: ResolvedSourceControlAiGenerationParams | null
+}): Promise<void> {
+  const { deps, report, paneKey, host, session, identity, stored, signal } = args
+  const read = await deps.readEvents({
+    identity: session,
+    host,
+    signal,
+    fromEventIndex: stored.ledger.foldedThrough
+  })
+  const eventsReadAt = deps.now()
+  signal.throwIfAborted()
+  if (!read) {
+    report({
+      status: 'unavailable',
+      fold: IDLE_FOLD,
+      // Why: "no readable transcript yet" is true for a session that has not written one,
+      // and misleading for one whose transcript exists somewhere this fold cannot read.
+      ...(session.providerSession?.id
+        ? { error: unavailableTranscriptReason(session, deps.canReadTranscript) }
+        : {})
+    })
+    return
+  }
+  const newEvents = read.events
+  const messageCount = read.totalEvents
+  if (newEvents.length === 0) {
+    // Persist first: the snapshot a listener receives reads the store, so reporting
+    // 'ready' before the write showed a ready status over an absent ledger.
+    persist(deps, paneKey, identity, stored, messageCount)
+    report({
+      // No readable content yet is 'unavailable', not a summary of nothing.
+      status: messageCount === 0 ? 'unavailable' : 'ready',
+      fold: IDLE_FOLD,
+      messageCount,
+      ...(messageCount === 0
+        ? { error: unavailableTranscriptReason(session, deps.canReadTranscript, 'empty') }
+        : {})
+    })
+    return
+  }
+  const result = await foldSessionSummaryEvents({
+    brain: deps.createBrain(args.foldParams),
+    ledger: stored.ledger,
+    events: newEvents,
+    signal,
+    readAt: eventsReadAt,
+    cache: chunkCacheFor(stored),
+    onProgress: (progress) =>
+      report({
+        status: 'folding',
+        fold: {
+          running: true,
+          completedChunks: progress.completedChunks,
+          totalChunks: progress.totalChunks
+        },
+        messageCount
+      })
+  })
+  signal.throwIfAborted()
+  persist(deps, paneKey, identity, { ...stored, ledger: result.ledger }, messageCount)
+  report({
+    status: 'ready',
+    fold: {
+      running: false,
+      completedChunks: result.completedChunks,
+      totalChunks: result.totalChunks
+    },
+    messageCount
+  })
 }
 
 function storedEntry(

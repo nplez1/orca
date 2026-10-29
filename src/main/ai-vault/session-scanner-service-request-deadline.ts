@@ -50,6 +50,6 @@ export function noteAiVaultServiceScanProgress(
     return
   }
   // Kept on the call, not only forwarded: a child that dies mid-parse leaves no other record.
-  call.readingFile = work.readingFile
+  call.readingFiles = work.readingFiles
   call.scanListener?.work(work)
 }

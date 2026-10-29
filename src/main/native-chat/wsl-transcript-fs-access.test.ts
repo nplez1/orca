@@ -42,6 +42,7 @@ import {
   closeTranscriptHandle,
   openTranscriptReadStream,
   readTranscriptSlice,
+  TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES,
   wslGatedLstat,
   openTranscriptFile,
   readTranscriptFile,
@@ -144,8 +145,18 @@ describe('transcript filesystem accessor on WSL UNC', () => {
       'stat',
       'lstat',
       'readdir',
+      // The whole-file read probes the size first, so an oversized file is refused before its text
+      // is materialized in this process.
+      'stat',
       'readfile'
     ])
+  })
+
+  it('refuses a WSL file past the whole-file ceiling before reading it', async () => {
+    mocks.stat.mockResolvedValue({ size: TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES + 1 })
+
+    await expect(wslGatedReadFile(UNC_PATH, 'utf-8', 'scan')).rejects.toThrow(/too large/i)
+    expect(mocks.readFile).not.toHaveBeenCalled()
   })
 
   it('opts positional reads and opens out of coalescing', async () => {
