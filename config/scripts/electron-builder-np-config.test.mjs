@@ -35,6 +35,7 @@ describe('Orca NP electron-builder overlay', () => {
         // `name` is the only field the overlay adds; a channel build's `version` is carried through.
         release.extraMetadata ? 'extraMetadata.name' : 'extraMetadata',
         'linux.executableName',
+        'mac.artifactName',
         'productName',
         'protocols[].name',
         'rpm.artifactName',
@@ -54,6 +55,34 @@ describe('Orca NP electron-builder overlay', () => {
     expect(np.extraMetadata.name).toBe('orca-np')
     // A dev-channel build stages its own version here; taking it away ships the wrong one.
     expect(np.extraMetadata.version).toBe(release.extraMetadata?.version)
+  })
+
+  // Why: electron-builder writes a mac zip's blockmap beside the file it archived, then publishes
+  // the zip under a GitHub-safe name — swapping spaces for dashes only in the published copy. With
+  // "Orca NP" in the product name the zip went out as `Orca-NP-…-mac.zip` and its blockmap as
+  // `Orca.NP-…-mac.zip.blockmap`, so the updater's `<zip url>.blockmap` request 404'd and every
+  // macOS update re-downloaded the whole app instead of a diff.
+  it('names the mac zip so the blockmap the updater asks for exists', () => {
+    const artifactName = np.mac.artifactName
+    expect(artifactName).toBe('Orca-NP-${version}-${arch}-mac.${ext}')
+
+    const expand = (arch) =>
+      artifactName
+        .replaceAll('${version}', '1.4.214-np.41')
+        .replaceAll('${arch}', arch)
+        .replaceAll('${ext}', 'zip')
+
+    for (const arch of ['x64', 'arm64']) {
+      const zip = expand(arch)
+      // GitHub rejects the space, so electron-builder renames a name that contains one — which is
+      // what split the zip from its blockmap. Nothing to rename means nothing to split.
+      expect(zip).toMatch(/^[0-9A-Za-z._-]+$/)
+      expect(`${zip}.blockmap`).toMatch(/^[0-9A-Za-z._-]+$/)
+      expect(zip).toContain(`-${arch}-mac.zip`)
+    }
+
+    // The dmg keeps upstream's name: `dmg.artifactName` is target-specific and wins over mac's.
+    expect(np.dmg.artifactName).toBe(release.dmg.artifactName)
   })
 
   it('drives the packaged product name from the shared display name', () => {

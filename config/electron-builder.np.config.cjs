@@ -52,6 +52,17 @@ module.exports = {
   extraMetadata: { ...release.extraMetadata, name: packageName },
   // Why the scheme stays `orca`: official clients and share links open `orca://`.
   protocols: release.protocols.map((protocol) => ({ ...protocol, name: productName })),
+  mac: {
+    ...release.mac,
+    // Why: the space in "Orca NP" makes electron-builder publish the zip as
+    // `Orca-NP-1.4.214-np.41-mac.zip` but its blockmap as `Orca.NP-1.4.214-np.41-mac.zip.blockmap`
+    // — it only swaps spaces for dashes in names GitHub rejects, and the blockmap is written before
+    // that swap. The updater asks for `<zip url>.blockmap`, gets a 404 and falls back to a full
+    // download, so every macOS update re-downloads the whole app instead of a diff. A name that is
+    // already GitHub-safe keeps the two identical. The dmg keeps upstream's name: `dmg.artifactName`
+    // is target-specific and wins over this one.
+    artifactName: `Orca-NP-\${version}-\${arch}-mac.\${ext}`
+  },
   win: {
     ...release.win,
     executableName: productName,
