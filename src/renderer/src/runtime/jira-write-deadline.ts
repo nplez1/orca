@@ -12,15 +12,13 @@ export class JiraWriteTimeoutError extends Error {
   }
 }
 
-/** Races a Jira write against its deadline. `signal` reaches transports that can
- *  cancel (the remote RPC); the local IPC channel cannot, so the race is what bounds
- *  the wait there — the main process bounds its own fetch separately. */
-export async function withJiraWriteDeadline<TResult>(
-  work: (signal: AbortSignal) => Promise<TResult>
-): Promise<TResult> {
+/** Stops waiting on a Jira write, so no surface stays pending behind one nobody
+ *  answered. Transport-level bounds are shorter (the main process's fetch, the
+ *  remote RPC), so this only fires when no answer arrives at all. */
+export async function withJiraWriteDeadline<TResult>(work: Promise<TResult>): Promise<TResult> {
   const signal = AbortSignal.timeout(JIRA_WRITE_DEADLINE_MS)
   const expired = new Promise<never>((_resolve, reject) => {
     signal.addEventListener('abort', () => reject(new JiraWriteTimeoutError()), { once: true })
   })
-  return await Promise.race([work(signal), expired])
+  return await Promise.race([work, expired])
 }

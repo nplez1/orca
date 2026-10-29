@@ -11,12 +11,11 @@ import type {
   JiraTransition
 } from '../../../shared/jira/jira-types'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
 import {
-  assertRuntimeEnvironmentCapability,
-  callRuntimeRpc,
-  runtimeEnvironmentSupportsCapability
-} from './runtime-rpc-client'
-import { JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY } from '../../../shared/jira/jira-detail-capabilities'
+  assertJiraTransitionFieldsSupported,
+  jiraCapabilityProbeForTarget
+} from './jira-capability-probe'
 import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { readRuntimeJiraPayload } from './runtime-jira-payload-stream'
 import { withJiraWriteDeadline } from './jira-write-deadline'
@@ -81,19 +80,12 @@ export async function jiraUpdateIssueForTarget(
     target.kind === 'environment' &&
     (updates.transitionFields || updates.transitionComment !== undefined)
   ) {
-    await assertRuntimeEnvironmentCapability(
-      target.environmentId,
-      JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
-      'Update the remote Orca server to submit required transition fields, or complete the transition in Jira.'
-    )
+    await assertJiraTransitionFieldsSupported(jiraCapabilityProbeForTarget(target), updates)
   }
   const args = { key, updates, siteId: siteId ?? undefined }
-  return withJiraWriteDeadline((signal) =>
+  return withJiraWriteDeadline(
     target.kind === 'environment'
-      ? callRuntimeRpc<JiraMutationResult>(target, 'jira.updateIssue', args, {
-          timeoutMs: 30_000,
-          signal
-        })
+      ? callRuntimeRpc<JiraMutationResult>(target, 'jira.updateIssue', args, { timeoutMs: 30_000 })
       : window.api.jira.updateIssue(args)
   )
 }
