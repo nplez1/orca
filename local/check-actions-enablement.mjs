@@ -179,7 +179,8 @@ export function judgeEnablement(
 
 /**
  * The problems left after a run: under `--fix`, a target that was disabled (and had its runs
- * cancelled) is resolved; one that failed to disable is not.
+ * cancelled) is resolved. One that failed to disable is not — and neither is one that was disabled
+ * but still has a run this command could not cancel.
  */
 export function residualProblems({ verdict, fix = false, disabled = [], failed = [] }) {
   const handled = new Set(fix ? disabled : [])
@@ -319,7 +320,12 @@ function report(verdict, fix) {
       )
     }
     for (const path of failed) {
-      console.log(`  STILL    ${path} could not be disabled`)
+      // A workflow can be off and still be a problem: disabling does not stop a run already going.
+      console.log(
+        disabled.includes(path)
+          ? `  STILL    ${path} is disabled, but a run of it may still be going`
+          : `  STILL    ${path} could not be disabled`
+      )
     }
   }
   return residual
