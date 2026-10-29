@@ -1,5 +1,4 @@
 import type { BrowserWindow } from 'electron'
-import { errorMessage } from '../shared/error-message'
 import {
   decideEphemeralVmRuntimeReclaim,
   type EphemeralVmRuntimeReclaimed
@@ -16,6 +15,7 @@ import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm/runtime-en
 import { clearRuntimeEnvironmentCapabilityEvidence } from './ipc/runtime-environments/runtime-environment-capability-evidence'
 import { clearRuntimeEnvironmentManualDisconnect } from './ipc/runtime-environments/runtime-environment-manual-disconnect'
 import { tryWithEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
+import { recordSwallowedFailure } from './observability/swallowed-failure'
 import { removeRuntimeOwnedSshTarget } from './ephemeral-vm/runtime-ssh'
 import { removeEphemeralVmRuntimeSshTarget } from './ephemeral-vm/runtime-ssh-cleanup'
 import { getRuntimeEnvironmentStatusSnapshots } from './ipc/runtime-environments/runtime-environment-request-connections'
@@ -133,15 +133,13 @@ export class EphemeralVmRuntimeReclaimer {
           }
         } catch (error) {
           // Why: one unreadable runtime must not stop the others being reclaimed.
-          console.warn(`[ephemeral-vm] Reclaim sweep failed for ${id}: ${errorMessage(error)}`)
+          recordSwallowedFailure('ephemeral-vm', error, `reclaim sweep failed for ${id}`)
         }
       }
     } catch (error) {
       // Why: the interval has no handler, so even failing to read the store must not become an
       // unhandled rejection.
-      console.warn(
-        `[ephemeral-vm] Reclaim sweep could not read the runtimes: ${errorMessage(error)}`
-      )
+      recordSwallowedFailure('ephemeral-vm', error, 'reclaim sweep could not read the runtimes')
     } finally {
       this.sweeping = false
     }
@@ -228,8 +226,10 @@ export class EphemeralVmRuntimeReclaimer {
         }
       )
     } catch (error) {
-      console.warn(
-        `[ephemeral-vm] Could not release the reclaimed host's servers: ${errorMessage(error)}`
+      recordSwallowedFailure(
+        'ephemeral-vm',
+        error,
+        "could not release the reclaimed host's servers"
       )
     }
     try {
@@ -239,7 +239,7 @@ export class EphemeralVmRuntimeReclaimer {
         removeTarget: removeRuntimeOwnedSshTarget
       })
     } catch (error) {
-      console.warn(`[ephemeral-vm] Could not remove the reclaimed host: ${errorMessage(error)}`)
+      recordSwallowedFailure('ephemeral-vm', error, 'could not remove the reclaimed host')
     }
   }
 }

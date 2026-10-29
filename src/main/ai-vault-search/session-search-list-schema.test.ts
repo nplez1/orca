@@ -320,7 +320,7 @@ it.each([
     const reopened = openSessionSearchDatabase(path)
     expect(warn).toHaveBeenCalledWith(
       '[ai-vault-search] list schema check skipped:',
-      'database is locked'
+      expect.objectContaining({ message: 'database is locked' })
     )
     try {
       expect(count(reopened, 'sessions')).toBe(0)

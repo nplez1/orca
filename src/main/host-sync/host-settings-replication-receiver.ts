@@ -7,6 +7,7 @@ import {
   type HostSettingsSyncState
 } from '../../shared/host-settings-replication'
 import type { HostSettingsCredentialRegistry } from './host-settings-credential-port'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 /**
  * Whether this host may apply a payload as it stands.
@@ -97,7 +98,11 @@ export function applyHostSettingsPayload(input: {
       // partway through (a malformed payload, a full disk) may already have written the value, and one
       // throwing credential must not stop the rest of the payload from being applied — nor abort the
       // whole RPC, which the main would read as "unreachable" and leave the ledger with nothing.
-      console.warn(`[orca] Could not apply replicated credential ${credential.id}`, error)
+      recordSwallowedFailure(
+        'orca',
+        error,
+        `could not apply replicated credential ${credential.id}`
+      )
       outcomes[credential.id] = 'applyFailed'
       continue
     }
@@ -112,7 +117,11 @@ export function applyHostSettingsPayload(input: {
         // Why `applyFailed` and not a refusal: the weaker copy is still on disk, so neither side may
         // treat this as "the host does not hold it" — a refusal would take it out of both the host's
         // record and the main's ledger, and nothing would ever clean it up.
-        console.warn(`[orca] Could not withdraw downgraded credential ${credential.id}`, error)
+        recordSwallowedFailure(
+          'orca',
+          error,
+          `could not withdraw downgraded credential ${credential.id}`
+        )
         outcomes[credential.id] = 'applyFailed'
         continue
       }
@@ -134,7 +143,7 @@ export function applyHostSettingsPayload(input: {
     try {
       port.remove(id)
     } catch (error) {
-      console.warn(`[orca] Could not remove replicated credential ${id}`, error)
+      recordSwallowedFailure('orca', error, `could not remove replicated credential ${id}`)
       outcomes[id] = 'removalUnverified'
       continue
     }

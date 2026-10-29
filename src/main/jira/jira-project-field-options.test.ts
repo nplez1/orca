@@ -1,6 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraClientForSite } from './authenticated-request'
 import type { JiraCreateField } from '../../shared/jira/jira-types'
+import { _resetTracerForTests, setActiveSink, type TracerSink } from '../observability/tracer'
+
+function captureSpans(): unknown[] {
+  const records: unknown[] = []
+  const sink: TracerSink = {
+    push: (record) => records.push(record),
+    flush() {},
+    close() {}
+  }
+  setActiveSink(sink)
+  return records
+}
 
 const { clearTokenMock, isAuthErrorMock, jiraRequestMock } = vi.hoisted(() => ({
   clearTokenMock: vi.fn(),
@@ -84,10 +96,20 @@ describe('readIssueProjectKey', () => {
   it('returns an empty key when the read fails, rather than guessing one', async () => {
     jiraRequestMock.mockRejectedValue(new Error('boom'))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const spans = captureSpans()
     const { readIssueProjectKey } = await import('./jira-project-field-options')
 
     expect(await readIssueProjectKey(entry, 'APP-1')).toBe('')
+    // Why: returning '' is the whole problem the sink exists for — support cannot see a failure
+    // that only reached a console nobody collects.
+    expect(spans).toEqual([
+      expect.objectContaining({
+        name: 'swallowed-failure',
+        attributes: { subsystem: 'jira', detail: 'issue project read failed' }
+      })
+    ])
     warn.mockRestore()
+    _resetTracerForTests()
   })
 
   it('returns an empty key when the response carries no project', async () => {

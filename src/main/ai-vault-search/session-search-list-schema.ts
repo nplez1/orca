@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import type { AiVaultSession } from '../../shared/ai-vault-types'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import SyncDatabase from '../sqlite/sync-database'
 import {
   CacheDatabaseNewerThanBuildError,
@@ -159,10 +160,7 @@ export function prepareSessionListSchema(path: string): void {
     disposition = judged.disposition
     newerVersion = judged.newerVersion
   } catch (error) {
-    console.warn(
-      '[ai-vault-search] list schema check skipped:',
-      error instanceof Error ? error.message : String(error)
-    )
+    recordSwallowedFailure('ai-vault-search', error, 'list schema check skipped')
   } finally {
     db?.close()
   }

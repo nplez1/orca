@@ -1,5 +1,4 @@
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
-import { errorMessage } from '../../shared/error-message'
 import {
   newEphemeralVmInstanceId,
   runEphemeralVmRecipeStart,
@@ -12,6 +11,7 @@ import {
   upsertEphemeralVmProvisioningAttempt
 } from '../../shared/ephemeral-vm-provisioning-attempts'
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { cleanupFailedEphemeralVmStart } from './failed-start-cleanup'
 import {
   persistProvisionedEphemeralVmRuntime,
@@ -194,8 +194,10 @@ function forgetProvisioningAttempt(userDataPath: string, instanceId: string): vo
   try {
     removeEphemeralVmProvisioningAttempt(userDataPath, instanceId)
   } catch (error) {
-    console.warn(
-      `[ephemeral-vm] Could not clear the provisioning record for ${instanceId}: ${errorMessage(error)}`
+    recordSwallowedFailure(
+      'ephemeral-vm',
+      error,
+      `could not clear the provisioning record for ${instanceId}`
     )
   }
 }

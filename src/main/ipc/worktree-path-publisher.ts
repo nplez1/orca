@@ -10,6 +10,7 @@ import {
   type DarwinFilesystemCache
 } from './worktree-apfs-clone'
 import { materializeWorktreePathThroughStaging } from './worktree-materialization-staging'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import type { WorktreeCopyBudget } from './worktree-include-copy-budget'
 import type { WorktreeSharedDirectoriesMode } from '../../shared/repo-types'
 
@@ -120,7 +121,11 @@ export async function createWorktreeLinkedPath(
       }
       // Why: APFS clone-copy can fail across volumes or on non-APFS disks.
       if (!(error instanceof ApfsCloneUnavailableError)) {
-        console.warn(`[worktree-symlinks] APFS clone-copy unavailable for "${target}":`, error)
+        recordSwallowedFailure(
+          'worktree-symlinks',
+          error,
+          `APFS clone-copy unavailable for "${target}"`
+        )
       }
       if (mode === 'copy' && !realCopyFallbackAllowed()) {
         throw new WorktreeCopyBudgetFallbackError(target)

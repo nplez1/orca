@@ -1,5 +1,6 @@
 import http2 from 'node:http2'
 import type { MoneyAmount } from '../../../shared/money-amount'
+import { recordSwallowedFailure } from '../../observability/swallowed-failure'
 import { decodeFireworksBalance, encodeGetBalanceRequest } from './fireworks-balance-protobuf'
 
 /**
@@ -142,8 +143,7 @@ export async function fetchFireworksBalance(args: {
     }
     return decodeFireworksBalance(response.message)
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.warn('[fireworks] GetBalance unavailable; falling back to spend only:', message)
+    recordSwallowedFailure('fireworks', error, 'GetBalance unavailable; falling back to spend only')
     return null
   }
 }

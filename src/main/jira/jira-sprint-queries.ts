@@ -1,5 +1,6 @@
 import type { JiraSprint, JiraSprintAssignment } from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { clearToken, getSingleClient, isAuthError } from './client'
 import { JIRA_AGILE_API, mapJiraSprint, mapJiraSprintField } from './jira-agile-api'
@@ -88,7 +89,7 @@ export async function getIssueSprintAssignment(request: {
         if (isAuthError(error)) {
           throw error
         }
-        console.warn('[jira] board sprint list unavailable:', error)
+        recordSwallowedFailure('jira', error, 'board sprint list unavailable')
       }
     }
     // The current sprint stays pickable even when its own board was not listed.

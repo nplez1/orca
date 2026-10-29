@@ -15,6 +15,7 @@ import {
 import { dirname, join, resolve } from 'node:path'
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { getSafeRelativePath } from '../git/worktree-symlink-detection'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { WorktreeLinkedPathTargetExistsError } from './worktree-apfs-clone'
 
 const WORKTREE_STAGING_DIRECTORY_PREFIX = '.orca-worktree-stage-'
@@ -149,9 +150,10 @@ export async function materializeWorktreePathThroughStaging(
     materializationFailure = error
   }
   await removeWorktreeMaterializationStagingDirectory(stagingDirectory).catch((error: unknown) => {
-    console.error(
-      `[worktree-symlinks] ${materialized ? 'Materialized' : 'Failed to materialize'} "${target}" but could not clean staging directory "${stagingDirectory}":`,
-      error
+    recordSwallowedFailure(
+      'worktree-symlinks',
+      error,
+      `${materialized ? 'materialized' : 'failed to materialize'} "${target}" but could not clean staging directory "${stagingDirectory}"`
     )
   })
   if (materializationFailed) {
@@ -210,9 +212,10 @@ export async function removeStaleWorktreeMaterializationStagingDirectories(
       try {
         await removeWorktreeMaterializationStagingDirectory(stagingDirectory)
       } catch (error) {
-        console.error(
-          `[worktree-symlinks] Failed to remove stale staging directory "${stagingDirectory}":`,
-          error
+        recordSwallowedFailure(
+          'worktree-symlinks',
+          error,
+          `failed to remove stale staging directory "${stagingDirectory}"`
         )
       }
     }

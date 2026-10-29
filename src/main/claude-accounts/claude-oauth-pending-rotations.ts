@@ -2,6 +2,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { getSecretStore } from '../../shared/secret-store'
 import { writeSecureFile } from '../../shared/secure-file'
 import { adoptLegacyHomeStore } from '../home-directory-migration'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import {
   applyRefreshedFields,
   writeClaudeOAuthCredentialRotation,
@@ -128,7 +129,7 @@ function persist(): void {
       console.warn('[claude-oauth-refresh] could not seal the pending rotation to disk')
     }
   } catch (error) {
-    console.warn('[claude-oauth-refresh] could not write the pending rotation', error)
+    recordSwallowedFailure('claude-oauth-refresh', error, 'could not write the pending rotation')
   }
 }
 

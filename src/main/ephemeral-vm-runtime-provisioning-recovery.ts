@@ -1,4 +1,3 @@
-import { errorMessage } from '../shared/error-message'
 import {
   flagEphemeralVmProvisioningAttemptInterrupted,
   listEphemeralVmProvisioningAttempts,
@@ -6,6 +5,7 @@ import {
   type EphemeralVmProvisioningAttempt
 } from '../shared/ephemeral-vm-provisioning-attempts'
 import { listEphemeralVmRuntimes } from '../shared/ephemeral-vm-runtime-store'
+import { recordSwallowedFailure } from './observability/swallowed-failure'
 import { isEphemeralVmProvisioningInFlight } from './ephemeral-vm/runtime-provisioning'
 
 /**
@@ -43,9 +43,7 @@ export function flagInterruptedEphemeralVmProvisioning(args: {
   try {
     return reconcileInterruptedProvisioning(args)
   } catch (error) {
-    console.warn(
-      `[ephemeral-vm] Could not check for creates that never reported: ${errorMessage(error)}`
-    )
+    recordSwallowedFailure('ephemeral-vm', error, 'could not check for creates that never reported')
     return []
   }
 }

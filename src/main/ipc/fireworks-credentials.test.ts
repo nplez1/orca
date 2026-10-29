@@ -88,7 +88,7 @@ describe('registerFireworksCredentialsHandlers', () => {
   })
 
   it('survives an undecryptable credential file without failing the status call', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     hasFireworksCredentialsMock.mockReturnValue(true)
     readFireworksCredentialsMock.mockImplementation(() => {
       throw new Error('Fireworks credentials could not be decrypted')
@@ -100,7 +100,7 @@ describe('registerFireworksCredentialsHandlers', () => {
       apiKeyConfigured: true,
       accountIdOverride: null
     })
-    expect(errorSpy).toHaveBeenCalled()
+    expect(warnSpy).toHaveBeenCalled()
   })
 
   it('persists a pasted key together with a trimmed override', async () => {
@@ -178,7 +178,7 @@ describe('registerFireworksCredentialsHandlers', () => {
   })
 
   it('logs but does not throw when the post-save refresh rejects', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const refresh = vi.fn(() => Promise.reject(new Error('refresh boom')))
     const invalidateFireworksCredentialState = vi.fn()
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: same two-member stub as makeRefreshStub; only these members are reachable from the handler, and the rejection is the behaviour under test.
@@ -191,7 +191,7 @@ describe('registerFireworksCredentialsHandlers', () => {
     await invoke('fireworksCredentials:save', 'fw_key', null)
     await new Promise((resolve) => setImmediate(resolve))
 
-    expect(errorSpy).toHaveBeenCalledWith(
+    expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('failed to trigger rate-limit refresh after save'),
       expect.any(Error)
     )

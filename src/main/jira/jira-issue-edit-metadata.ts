@@ -4,6 +4,7 @@ import {
 } from '../../shared/jira-field-rendering'
 import type { JiraCreateField, JiraEditableField } from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { requireStrictJiraSite } from './jira-read-failure'
@@ -92,7 +93,7 @@ export async function listEditFields(
       clearToken(entry.site.id)
       throw error
     }
-    console.warn('[jira] listEditFields failed:', error)
+    recordSwallowedFailure('jira', error, 'listEditFields failed')
     if (strict) {
       throw error
     }
