@@ -85,7 +85,10 @@ function harness(
   }
   const service = new SessionSummaryService({
     store,
-    readEvents: async () => currentEvents,
+    readEvents: async ({ fromEventIndex }) =>
+      currentEvents
+        ? { events: currentEvents.slice(fromEventIndex), totalEvents: currentEvents.length }
+        : null,
     getAgentStatusEntry: () => currentEntry,
     createBrain: () => brain,
     now: () => 1000
@@ -353,9 +356,11 @@ describe('SessionSummaryService host routing', () => {
     const updates: SessionSummarySnapshot[] = []
     const service = new SessionSummaryService({
       store: args.store,
-      readEvents: async ({ host }) => {
+      readEvents: async ({ host, fromEventIndex }) => {
         hostReads.push({ host })
         return args.events
+          ? { events: args.events.slice(fromEventIndex), totalEvents: args.events.length }
+          : null
       },
       getAgentStatusEntry: () => currentEntry,
       createBrain: () => ({

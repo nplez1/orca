@@ -60,10 +60,11 @@ export function rovoSessionCwd(metadata: Record<string, unknown>): string | null
 export async function parseRovoSessionFile(
   file: FileWithMtime,
   platform: NodeJS.Platform = process.platform,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
   const metadata = asRecord(
-    JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan')) as unknown
+    JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal)) as unknown
   )
   if (!metadata) {
     return null
@@ -182,9 +183,10 @@ export async function parseMessageGraphSessionFile(
   agent: MessageGraphAgent,
   file: FileWithMtime,
   platform: NodeJS.Platform = process.platform,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
-  const input = openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan')
+  const input = openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan', signal)
   const lines = createInterface({ input, crlfDelay: Infinity })
   try {
     return await parseMessageGraphSessionLines({ agent, file, lines, platform, messages })

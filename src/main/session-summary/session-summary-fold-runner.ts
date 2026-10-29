@@ -16,21 +16,23 @@ import { emptySessionSummaryLedger, hasProducedLedger } from './session-summary-
 import {
   foldSessionSummaryEvents,
   type SessionFoldBrain,
-  type SessionSummaryChunkCache,
-  type SessionSummarySourceEvent
+  type SessionSummaryChunkCache
 } from './session-summary-fold'
 import { IDLE_FOLD, type SessionSummaryStatusEntry } from './session-summary-snapshot'
 import type { SessionSummaryStore, SessionSummaryStoreEntry } from './session-summary-store'
 import type { SessionSummarySessionIdentity } from './session-summary-transcript-source'
+import type { SessionSummaryEventRead } from './session-summary-transcript-source'
 import type { SessionSummaryTranscriptHost } from './session-summary-transcript-host'
 
 export type SessionSummaryFoldRunnerDeps = {
   store: SessionSummaryStore
+  /** Events from `fromEventIndex` on, plus the transcript's total, so a fold never re-reads a prefix. */
   readEvents: (args: {
     identity: SessionSummarySessionIdentity
     host: SessionSummaryTranscriptHost
     signal: AbortSignal
-  }) => Promise<SessionSummarySourceEvent[] | null>
+    fromEventIndex: number
+  }) => Promise<SessionSummaryEventRead | null>
   getAgentStatusEntry: (paneKey: string) => SessionSummaryStatusEntry | undefined
   /**
    * Whether this build can decode that agent's transcript at all. Injected rather than
@@ -146,14 +148,16 @@ export async function runSessionSummaryFold(args: {
   try {
     const session = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
     const identity = sessionSummaryIdentityOf(session)
-    const events = await deps.readEvents({
+    const stored = storedEntry(deps, paneKey, identity)
+    const read = await deps.readEvents({
       identity: session,
       host,
-      signal
+      signal,
+      fromEventIndex: stored.ledger.foldedThrough
     })
     const eventsReadAt = deps.now()
     signal.throwIfAborted()
-    if (!events) {
+    if (!read) {
       report({
         status: 'unavailable',
         fold: IDLE_FOLD,
@@ -165,18 +169,18 @@ export async function runSessionSummaryFold(args: {
       })
       return
     }
-    const stored = storedEntry(deps, paneKey, identity)
-    const newEvents = events.slice(stored.ledger.foldedThrough)
+    const newEvents = read.events
+    const messageCount = read.totalEvents
     if (newEvents.length === 0) {
       // Persist first: the snapshot a listener receives reads the store, so reporting
       // 'ready' before the write showed a ready status over an absent ledger.
-      persist(deps, paneKey, identity, stored, events.length)
+      persist(deps, paneKey, identity, stored, messageCount)
       report({
         // No readable content yet is 'unavailable', not a summary of nothing.
-        status: events.length === 0 ? 'unavailable' : 'ready',
+        status: messageCount === 0 ? 'unavailable' : 'ready',
         fold: IDLE_FOLD,
-        messageCount: events.length,
-        ...(events.length === 0
+        messageCount,
+        ...(messageCount === 0
           ? { error: unavailableTranscriptReason(session, deps.canReadTranscript, 'empty') }
           : {})
       })
@@ -197,11 +201,11 @@ export async function runSessionSummaryFold(args: {
             completedChunks: progress.completedChunks,
             totalChunks: progress.totalChunks
           },
-          messageCount: events.length
+          messageCount
         })
     })
     signal.throwIfAborted()
-    persist(deps, paneKey, identity, { ...stored, ledger: result.ledger }, events.length)
+    persist(deps, paneKey, identity, { ...stored, ledger: result.ledger }, messageCount)
     report({
       status: 'ready',
       fold: {
@@ -209,7 +213,7 @@ export async function runSessionSummaryFold(args: {
         completedChunks: result.completedChunks,
         totalChunks: result.totalChunks
       },
-      messageCount: events.length
+      messageCount
     })
   } catch (error) {
     if (signal.aborted) {

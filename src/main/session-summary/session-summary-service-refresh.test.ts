@@ -53,9 +53,10 @@ function harness(options: {
   const reads: string[] = []
   const service = new SessionSummaryService({
     store,
-    readEvents: async () => {
+    readEvents: async ({ fromEventIndex }) => {
       reads.push('read')
-      return events(4)
+      const all = events(4)
+      return { events: all.slice(fromEventIndex), totalEvents: all.length }
     },
     getAgentStatusEntry: (paneKey) => currentEntry(paneKey),
     canReadTranscript: () => true,
@@ -179,7 +180,10 @@ describe('SessionSummaryService report staleness', () => {
     })
     const service = new SessionSummaryService({
       store,
-      readEvents: async () => events(6),
+      readEvents: async ({ fromEventIndex }) => {
+        const all = events(6)
+        return { events: all.slice(fromEventIndex), totalEvents: all.length }
+      },
       getAgentStatusEntry: () => defaultEntry(),
       canReadTranscript: () => true,
       createBrain: () => ({

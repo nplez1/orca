@@ -88,7 +88,8 @@ export function sessionSummaryHostService(): SessionSummaryService {
   const service = new SessionSummaryService({
     store: new SessionSummaryStore(join(userDataPath, 'session-summaries.json')),
     // The transcript is on this machine: this is the local half of the fold.
-    readEvents: ({ identity, signal }) => readSessionSummaryTranscriptEvents({ identity, signal }),
+    readEvents: ({ identity, signal, fromEventIndex }) =>
+      readSessionSummaryTranscriptEvents({ identity, signal, fromEventIndex }),
     getAgentStatusEntry: (paneKey) =>
       agentHookServer.getStatusSnapshot().find((entry) => entry.paneKey === paneKey),
     canReadTranscript: canReadAgentTranscript,

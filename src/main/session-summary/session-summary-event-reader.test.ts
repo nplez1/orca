@@ -72,7 +72,7 @@ describe('createSessionSummaryEventReader', () => {
     })
 
     expect(fetchSshTranscript).not.toHaveBeenCalled()
-    expect(events?.map((event) => event.role)).toEqual(['user', 'assistant'])
+    expect(events?.events.map((event) => event.role)).toEqual(['user', 'assistant'])
   })
 
   // The whole point of the SSH path: the same parser over a fetched copy.
@@ -98,7 +98,7 @@ describe('createSessionSummaryEventReader', () => {
     expect(fetchSshTranscript).toHaveBeenCalledWith(
       expect.objectContaining({ targetId: 'target-1', remotePath: '/remote/sess-1.jsonl' })
     )
-    expect(events?.map((event) => event.role)).toEqual(['user', 'assistant'])
+    expect(events?.events.map((event) => event.role)).toEqual(['user', 'assistant'])
     expect(dispose).toHaveBeenCalled()
   })
 

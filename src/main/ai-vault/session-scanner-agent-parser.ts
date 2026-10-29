@@ -79,21 +79,22 @@ export async function parseAgentSessionFile(
     case 'codebuddy':
       return parseCodebuddySessionFile(candidate.file, platform, messages)
     case 'claude':
-      return parseClaudeSessionFile(candidate.file, platform, messages)
+      return parseClaudeSessionFile(candidate.file, platform, messages, signal)
     case 'codex':
       return parseCodexSessionFile(
         candidate.file,
         platform,
         candidate.codexHome,
         undefined,
-        messages
+        messages,
+        signal
       )
     case 'gemini':
       return parseGeminiSessionFile(candidate.file, platform, messages, signal)
     case 'antigravity':
       return parseAntigravitySessionFile(candidate.file, platform, messages)
     case 'copilot':
-      return parseCopilotSessionFile(candidate.file, platform, messages)
+      return parseCopilotSessionFile(candidate.file, platform, messages, signal)
     case 'cursor':
       return parseCursorSessionFile(candidate.file, platform, messages)
     case 'opencode': {
@@ -102,7 +103,7 @@ export async function parseAgentSessionFile(
       if (sqliteCandidate) {
         return readOpenCodeSqliteCandidate(sqliteCandidate, platform, messages, signal)
       }
-      return parseOpenCodeSessionFile(candidate.file, platform, messages)
+      return parseOpenCodeSessionFile(candidate.file, platform, messages, signal)
     }
     case 'opencode2': {
       const sqliteCandidate = splitOpenCodeSqliteCandidate(candidate.file.path)
@@ -118,19 +119,19 @@ export async function parseAgentSessionFile(
         : null
     }
     case 'grok':
-      return parseGrokSessionFile(candidate.file, platform, messages)
+      return parseGrokSessionFile(candidate.file, platform, messages, signal)
     case 'hermes':
       return parseHermesSessionFile(candidate.file, platform, messages, signal)
     case 'rovo':
-      return parseRovoSessionFile(candidate.file, platform, messages)
+      return parseRovoSessionFile(candidate.file, platform, messages, signal)
     case 'openclaw':
-      return parseMessageGraphSessionFile('openclaw', candidate.file, platform, messages)
+      return parseMessageGraphSessionFile('openclaw', candidate.file, platform, messages, signal)
     case 'pi':
-      return parseMessageGraphSessionFile('pi', candidate.file, platform, messages)
+      return parseMessageGraphSessionFile('pi', candidate.file, platform, messages, signal)
     case 'omp':
-      return parseMessageGraphSessionFile('omp', candidate.file, platform, messages)
+      return parseMessageGraphSessionFile('omp', candidate.file, platform, messages, signal)
     case 'prime-agent':
-      return parseMessageGraphSessionFile('prime-agent', candidate.file, platform, messages)
+      return parseMessageGraphSessionFile('prime-agent', candidate.file, platform, messages, signal)
     case 'droid':
       return parseDroidSessionFile(candidate.file, platform, messages)
     case 'cline':
@@ -138,12 +139,12 @@ export async function parseAgentSessionFile(
     case 'devin':
       return parseDevinSessionFile(candidate.file, platform, messages, signal)
     case 'kimi':
-      return parseKimiSessionFile(candidate.file, platform, messages)
+      return parseKimiSessionFile(candidate.file, platform, messages, signal)
     case 'muse':
-      return parseMuseSessionFile(candidate.file, platform, messages)
+      return parseMuseSessionFile(candidate.file, platform, messages, signal)
     case 'jcode':
-      return parseJcodeSessionFile(candidate.file, platform, messages)
+      return parseJcodeSessionFile(candidate.file, platform, messages, signal)
     case 'kiro':
-      return parseKiroSessionFile(candidate.file, platform, messages)
+      return parseKiroSessionFile(candidate.file, platform, messages, signal)
   }
 }

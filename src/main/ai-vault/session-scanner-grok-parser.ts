@@ -29,9 +29,12 @@ const GROK_PREVIEW_SCAN_LIMIT = 4096
 export async function parseGrokSessionFile(
   file: FileWithMtime,
   platform: NodeJS.Platform = process.platform,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
-  const record = asRecord(JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan')) as unknown)
+  const record = asRecord(
+    JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal)) as unknown
+  )
   if (!record) {
     return null
   }

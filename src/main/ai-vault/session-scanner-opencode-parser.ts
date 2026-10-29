@@ -29,9 +29,12 @@ export function openCodeSessionCwd(record: Record<string, unknown>): string | nu
 export async function parseOpenCodeSessionFile(
   file: FileWithMtime,
   platform: NodeJS.Platform = process.platform,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
-  const record = asRecord(JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan')) as unknown)
+  const record = asRecord(
+    JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal)) as unknown
+  )
   if (!record) {
     return null
   }

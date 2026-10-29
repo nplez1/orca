@@ -47,9 +47,12 @@ describe('SessionSummaryService re-opening the pane', () => {
     let entryUpdatedAt = 0
     const service = new SessionSummaryService({
       store,
-      readEvents: async () => {
+      readEvents: async ({ fromEventIndex }) => {
         reads += 1
-        return currentEvents
+        return {
+          events: currentEvents.slice(fromEventIndex),
+          totalEvents: currentEvents.length
+        }
       },
       getAgentStatusEntry: () => ({
         agentType: 'pi',

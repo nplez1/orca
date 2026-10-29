@@ -1,7 +1,11 @@
 import { createReadStream, type Dirent, type Stats } from 'node:fs'
-import { access, lstat, open, readdir, readFile, stat, type FileHandle } from 'node:fs/promises'
+import { access, lstat, open, readdir, stat, type FileHandle } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
+import {
+  NodeFileReadTooLargeError,
+  readNodeFileWithinLimit
+} from '../../shared/node-bounded-file-reader'
 import { isWslUncPath } from '../../shared/wsl-paths'
 import { runWslTranscriptFsTask, type WslTranscriptFsTaskPriority } from './wsl-transcript-fs-gate'
 import {
@@ -99,15 +103,39 @@ export function wslGatedReaddir(
   )
 }
 
+/**
+ * Whole-file ceiling for the JSON parsers, in the scanner child's 384 MB heap.
+ *
+ * Why 16 MB: `readFile` + `JSON.parse` holds the source string and a decoded object graph at
+ * roughly four times the file size, so a few concurrent 16 MB parses still fit; an unbounded read of
+ * a 200 MB summary file with inline images does not, and the scanner has no per-file guard.
+ */
+export const TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES = 16 * 1024 * 1024
+
 export function wslGatedReadFile(
   path: string,
   encoding: BufferEncoding,
   priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxBytes: number = TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES
 ): Promise<string> {
-  return runReusableFsOperation({ operation: 'readfile', path, encoding }, priority, signal, () =>
-    readFile(path, encoding)
-  )
+  if (!isWslUncPath(path)) {
+    return readNodeFileWithinLimit(path, maxBytes, { signal }).then((read) =>
+      read.buffer.toString(encoding)
+    )
+  }
+  // A remote path cannot be bounded by the reader, so its size is checked first — one gated call
+  // before the read, never nested inside it.
+  return wslGatedStat(path, priority, signal).then((stats) => {
+    if (stats.size > maxBytes) {
+      throw new NodeFileReadTooLargeError(stats.size, maxBytes)
+    }
+    return runReusableFsOperation({ operation: 'readfile', path, encoding }, priority, signal, () =>
+      readNodeFileWithinLimit(path, maxBytes, { signal }).then((read) =>
+        read.buffer.toString(encoding)
+      )
+    )
+  })
 }
 
 // Do not coalesce opens: joiners would share one handle and both close it.

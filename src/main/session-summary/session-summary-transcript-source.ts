@@ -19,7 +19,23 @@ import {
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import { COPILOT_SESSIONS_DIR } from '../ai-vault/session-scanner-agent-sources'
 import type { SessionFileCandidate, FileWithMtime } from '../ai-vault/session-scanner-types'
+import { REMOTE_TRANSCRIPT_MAX_BYTES } from './session-summary-remote-transcript'
 import type { SessionSummarySourceEvent } from './session-summary-fold'
+
+/**
+ * Local transcripts fold in the Electron main process, so they share the remote reader's ceiling.
+ *
+ * Why a cap at all: local reads were unbounded, and a 500 MB Claude transcript with inline base64
+ * images exhausts the app heap rather than failing one session's fold.
+ */
+export const LOCAL_TRANSCRIPT_MAX_BYTES = REMOTE_TRANSCRIPT_MAX_BYTES
+
+export type SessionSummaryEventRead = {
+  /** Events from the transcript, starting at the index the caller asked for. */
+  events: SessionSummarySourceEvent[]
+  /** Every event the transcript holds, including the ones the caller asked us to skip. */
+  totalEvents: number
+}
 
 // Compile-checked: every transcript agent must name a real AI Vault agent.
 const CANDIDATE_AGENTS: Record<NativeChatTranscriptAgent, AiVaultAgent> = {
@@ -62,7 +78,9 @@ export type SessionSummarySessionIdentity = {
 export async function readSessionSummaryTranscriptEvents(args: {
   identity: SessionSummarySessionIdentity
   signal: AbortSignal
-}): Promise<SessionSummarySourceEvent[] | null> {
+  /** Events before this index are already folded: their text is counted, never retained. */
+  fromEventIndex?: number
+}): Promise<SessionSummaryEventRead | null> {
   const { identity, signal } = args
   const providerSession = identity.providerSession
   const agentType = identity.agentType
@@ -76,7 +94,8 @@ export async function readSessionSummaryTranscriptEvents(args: {
   return readSessionSummaryEventsFromFile({
     filePath: source.path,
     parser: source.parser,
-    signal
+    signal,
+    fromEventIndex: args.fromEventIndex
   })
 }
 
@@ -110,11 +129,23 @@ export async function readSessionSummaryEventsFromFile(args: {
   filePath: string
   parser: AiVaultAgent
   signal: AbortSignal
-}): Promise<SessionSummarySourceEvent[] | null> {
+  fromEventIndex?: number
+}): Promise<SessionSummaryEventRead | null> {
   const { filePath, parser, signal } = args
+  const skipEvents = Math.max(0, args.fromEventIndex ?? 0)
   const stats = await stat(filePath)
   if (!stats.isFile()) {
     return null
+  }
+  if (stats.size > LOCAL_TRANSCRIPT_MAX_BYTES) {
+    // Why fail instead of reading what fits: a shortened transcript renumbers every event, and the
+    // ledger's cursor would then point at messages this fold never saw.
+    throw new Error(
+      `This session's transcript is over ${Math.max(
+        1,
+        Math.round(LOCAL_TRANSCRIPT_MAX_BYTES / (1024 * 1024))
+      )} MB, which is too large to fold.`
+    )
   }
   const file: FileWithMtime = {
     path: filePath,
@@ -131,6 +162,7 @@ export async function readSessionSummaryEventsFromFile(args: {
   // Collect decoded messages via the parser's fan-out; scoped to this path so a
   // concurrent AI Vault scan of another file can't leak into the fold.
   const collected: TranscriptMessage[] = []
+  let received = 0
   const unregister = registerTranscriptConsumer({
     beginRead(start) {
       if (start.candidate.file.path !== filePath) {
@@ -138,7 +170,12 @@ export async function readSessionSummaryEventsFromFile(args: {
       }
       return {
         message(message) {
-          collected.push(message)
+          received += 1
+          // Why count before the cursor instead of collecting it: the ledger already covers these
+          // messages, and their text is what made every fold re-read the whole conversation.
+          if (received > skipEvents) {
+            collected.push(message)
+          }
         },
         finish() {}
       }
@@ -146,11 +183,14 @@ export async function readSessionSummaryEventsFromFile(args: {
   })
   try {
     await readWholeTranscript({ candidate, platform: process.platform, signal })
-    return collected.map((message) => ({
-      role: message.role,
-      text: message.text,
-      timestamp: message.timestamp
-    }))
+    return {
+      events: collected.map((message) => ({
+        role: message.role,
+        text: message.text,
+        timestamp: message.timestamp
+      })),
+      totalEvents: received
+    }
   } finally {
     unregister()
   }
