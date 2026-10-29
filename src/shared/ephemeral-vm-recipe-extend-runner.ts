@@ -42,6 +42,8 @@ export type EphemeralVmRecipeExtendResult =
       stderr: string
       exitCode: number | null
       signal: NodeJS.Signals | null
+      /** Set when the caller's signal stopped the hook (deadline or cancel) before it answered. */
+      aborted?: true
       recipeResult?: EphemeralVmRecipeResult
     }
 
@@ -78,6 +80,17 @@ export async function runEphemeralVmRecipeExtend(
     onStderr: args.onStderr,
     spawnCommand: args.spawnCommand
   })
+
+  if (processResult.aborted) {
+    // Why before the exit code: a killed hook reports no code, and "exited with code unknown" would
+    // hide the deadline that actually ended it from the caller that owns that deadline.
+    return {
+      ok: false,
+      context: args.context,
+      error: 'Extend was stopped before it reported a result.',
+      ...processResult
+    }
+  }
 
   if (processResult.exitCode !== 0) {
     return {

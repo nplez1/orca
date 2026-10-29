@@ -42,6 +42,10 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
     if (!requestedLifetime) {
       throw new RuntimeClientError('invalid_argument', 'Missing --lifetime.')
     }
+    // Why parsed here rather than in the runner: a non-numeric value is an argument error, and the
+    // command must not start a hook it cannot bound.
+    const timeoutFlag = getStringFlag(flags, 'timeout-ms')
+    const timeoutMs = timeoutFlag === null ? undefined : Number(timeoutFlag)
     const repoPath = getStringFlag(flags, 'repo-path') ?? cwd
     const recipe = loadRecipe(repoPath, recipeId)
     const result = recipe
@@ -49,7 +53,8 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
           repoPath,
           recipe,
           recipeResultPath: resolve(cwd, recipeResultPath),
-          requestedLifetime
+          requestedLifetime,
+          ...(timeoutMs === undefined ? {} : { timeoutMs })
         })
       : {
           recipeId,
