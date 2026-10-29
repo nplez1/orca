@@ -1,5 +1,6 @@
 import { dirname, join, resolve } from 'node:path'
 import { SERVE_USER_DATA_PATH_ENV } from '../../shared/serve-user-data-path'
+import { DEV_APP_DATA_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getPlatformUserDataPath } from './metadata'
 
 /** Dev builds read ORCA_DEV_USER_DATA_PATH rather than --user-data-dir. */
@@ -14,7 +15,8 @@ export function resolveLaunchUserDataPath(env: NodeJS.ProcessEnv = process.env):
   }
   if (launchesDevApp(env)) {
     return resolve(
-      env.ORCA_DEV_USER_DATA_PATH || join(dirname(getPlatformUserDataPath()), 'orca-dev')
+      env.ORCA_DEV_USER_DATA_PATH ||
+        join(dirname(getPlatformUserDataPath()), DEV_APP_DATA_DIRECTORY_NAME)
     )
   }
   return getPlatformUserDataPath()
