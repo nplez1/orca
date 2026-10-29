@@ -422,6 +422,7 @@
     "minimizeNotice": {
       "body": "Orca はシステムトレイで実行中です"
     },
+    "activityWaiting": "Orca - アクティビティ待機中",
     "activityWaitingSuffix": "件のアクティビティが待機中"
   },
   "worktreeJumpPalette": {
@@ -503,6 +504,7 @@
       "df1d56bf87": "ワークスペースシェルでエラーが発生しました。",
       "9e0b441a91": "右サイドバーを切り替えます",
       "e81217c1b7": "アプリ名を非表示",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "アプリケーションメニュー",
       "caea5b51b9": "今すぐ再起動",
       "0a9e810705": "変更は再起動するまで保存されません。以前のタブはディスク上に安全に保存されています。",
@@ -635,6 +637,7 @@
           }
         },
         "worktrees": {
+          "e50495aae6": "ブランチを強制削除",
           "14bc053a47": "ローカル {{value0}} は更新されませんでした",
           "localBaseRefRefreshFailedForWorktree": "「{{value1}}」のローカル {{value0}} は更新されませんでした",
           "903b51c2ed": "ワークスペースは {{value0}} から作成されましたが、Orca はローカル {{value1}} を fast-forward できませんでした。{{value2}}",
@@ -644,6 +647,11 @@
           "localBaseRefRefreshFailedDetailNotFastForward": "ローカル {{value0}} が存在しないか、リモートのベースからクリーンに fast-forward できません。手動で更新する前に、ローカルにのみ存在するコミットがないか確認してください。",
           "localBaseRefRefreshFailedDetailError": "ローカル {{value0}} の更新中に Git がエラーを返しました。ロックされた refs や異常なワークツリー状態がないか確認し、ローカル {{value0}} を手動で更新してください。",
           "0216895fb5": "ブランチの削除に失敗しました",
+          "5366d13eec": "ワークスペースを削除しました、ブランチは保持されました",
+          "2e17f825d4": "ワークツリーを削除しました、ブランチは保持されました",
+          "78e08cd877": "Git はブランチ\"{{value0}}\"を安全に削除できなかったため、Orca はローカルコミットを失わないように保持しました。",
+          "3b57982bf6": "ワークスペース\"{{value1}}\"を削除した後、Git はブランチ\"{{value0}}\"を安全に削除できなかったため、Orca はローカルコミットを失わないように保持しました。",
+          "81f13f48d2": "ワークツリー\"{{value1}}\"を削除した後、Git はブランチ\"{{value0}}\"を安全に削除できなかったため、Orca はローカルコミットを失わないように保持しました。",
           "runtimeScopeForbiddenTitle": "この接続は制限付き（モバイル）アクセスです",
           "runtimeScopeForbiddenDescription": "モバイル向けペアリングではワークスペースを使用できません。[設定] → [リモート Orca サーバー] → [この Orca サーバーを共有する] から、ブラウザ用リンクで再接続してください。",
           "createdWithoutParentNesting": "「{{value0}}」の配下にネストせずに作成しました",
@@ -1077,15 +1085,6 @@
           }
         }
       },
-      "jira": {
-        "issue": {
-          "workspace": {
-            "open": {
-              "failed": "この Issue にリンクされたワークスペースを開けませんでした。"
-            }
-          }
-        }
-      },
       "linear": {
         "usage": {
           "examples": {
@@ -1378,6 +1377,7 @@
         "cd50cec5d7": "Orca を通じて複数のコーディング Agent を調整します。",
         "58a868e8e4": "オーケストレーション",
         "7c79d3b7bf": "任意",
+        "b1c2f8b0ac": "Claude、Codex、Gemini、OpenCode Go、MiniMax、Grok の任意のアカウント切り替えと使用量設定。",
         "f70ac54d38": "AI プロバイダーアカウント",
         "4121f7a0a2": "AI Agent を管理し、デフォルトを設定し、コマンドをカスタマイズします。",
         "b49abbd2f7": "Agent",
@@ -1519,6 +1519,8 @@
         "28986b3747": "失敗したチェックに対して AI Agent を開始しました。",
         "1690fd7f4a": "修正が必要なチェックはありません。",
         "9e7c221b8d": "チェックの再実行に失敗しました",
+        "e463ec935f": "リクエストされた再実行をチェックする",
+        "ddafe851e1": "チェックの再実行が要求されました",
         "0bbdc673c1": "チェックの更新に失敗しました",
         "e7007aa1d8": "リポジトリパスがないとチェックを更新できません。",
         "675bc0d638": "キャンセル",
@@ -1714,7 +1716,6 @@
         "b0b92666c9": "コメント",
         "a585fd204e": "Jira コメントを追加…",
         "2441be6f9f": "ワークスペースを開始",
-        "showWorkspace": "ワークスペースを表示",
         "9178090e26": "コメントはまだありません。",
         "5cd09beaf9": "再試行",
         "9a980b06b9": "コメント",
@@ -1992,6 +1993,8 @@
         "98583589c6": "失敗したチェックのため AI Agent を開始できませんでした: {{value0}}",
         "51c65c0265": "修正が必要なチェックはありません。",
         "788a782bb0": "チェックの再実行に失敗しました",
+        "18f2af42ac": "リクエストされた再実行をチェックする",
+        "5963a6a852": "チェックの再実行が要求されました",
         "246b2c6456": "チェックの更新に失敗しました",
         "c057f2fcb0": "リポジトリパスがないとチェックを更新できません。",
         "6591b1fa82": "キャンセル",
@@ -2397,8 +2400,6 @@
         "linearModeHasWorktreeTooltip": "Orca ワークスペースにリンクされた Linear チケット",
         "linearEmptyHasWorktree": "Orca ワークスペースにリンクされた Linear チケットはまだありません。Linear の Issue から作業を開始すると、ここに表示されます。",
         "linearOpenAttachedWorkspace": "{{value0}} にリンクされたワークスペースを開く",
-        "jiraOpenAttachedWorkspace": "{{value0}} にリンクされたワークスペースを開く",
-        "jiraShowWorkspace": "ワークスペースを表示",
         "linearWorktreesColumn": "ワークスペース",
         "jiraSortAscending": "昇順",
         "jiraSortDescending": "降順",
@@ -3689,6 +3690,7 @@
             "bbcd9b7b85": "ワークスペースを折りたたむ",
             "c4a8968bdd": "ワークスペースを展開する",
             "b10695d6ce": "セッションを強制終了する",
+            "288a4dd177": "Orca",
             "53dd5560ae": "Orca を折りたたむ",
             "e419d27083": "Orca を展開する",
             "41ae4fa725": "終了中…",
@@ -4327,6 +4329,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "出力",
               "5d66fdd7c2": "入力",
               "7080aeaebb": "推論",
@@ -6358,6 +6361,7 @@
           "d676c41fc6": "ローカルの Gemini CLI インストールから OAuth 認証情報を抽出して、Google で認証します。これは、Orca ではなく、Gemini CLI アプリに発行された認証情報を使用します。 Google が CLI を更新すると壊れる可能性があります。ご自身の責任でご使用ください。",
           "0c7f915b01": "Gemini CLI 認証情報を使用する",
           "973741a871": "既存の Gemini CLI セッションを利用可能な状態に保ちます。Gemini の認証情報では Antigravity にサインインできません。",
+          "0c64dc2a64": "Gemini CLI (レガシー)",
           "db209ee572": "削除",
           "8a0f870153": "再認証",
           "3d245ef7d9": "Codex はこのサインインが古いと報告しました",
@@ -6935,7 +6939,12 @@
             "title": "Agent ダッシュボード",
             "description": "ワークツリー Agent を監視するカンバンボード。ウィンドウ内またはポップアウトで表示できます。",
             "copy": "左サイドバーに Agent ダッシュボードのエントリを追加します。対応が必要な Agent、作業中の Agent、完了した Agent を監視し、必要に応じてアイドル状態の Agent も表示できます。",
-            "toggleLabel": "Agent ダッシュボードの切り替え"
+            "toggleLabel": "Agent ダッシュボードの切り替え",
+            "modeLabel": "開き方",
+            "modeCopy": "ダッシュボードをサイドバー横のウィンドウ内ボードまたは別のポップアウトウィンドウとして表示します。",
+            "modeAriaLabel": "Agent ダッシュボードの開き方",
+            "modeInWindow": "ウィンドウ内",
+            "modePopout": "ポップアウト"
           },
           "browserExtensions": {
             "copy": "ローカルブラウザプロファイル向けに 設定 › ブラウザ › 拡張機能 を追加します。",
@@ -7070,10 +7079,6 @@
           "5734db82af": "ワークスペースを削除する前に確認ダイアログを表示します。",
           "4fbf910ded": "リポジトリ名付きのサブフォルダー内にワークスペースを作成します。",
           "ba3480642f": "ネストワークスペース",
-          "f9b2070017": "Workspace Layout",
-          "0cda18153c": "Where each project's main checkout and its workspaces are created.",
-          "b266f3f40e": "One folder per project",
-          "9285cedcf2": "Flat",
           "a246f5ce6f": "ワークスペースフォルダーが作成されるルートディレクトリ。",
           "5567191a6e": "ブラウズ",
           "0e9fc0eadc": "ワークスペースディレクトリ",
@@ -9146,6 +9151,7 @@
               "dashboard": "ダッシュボード",
               "agent": "Agent",
               "kanban": "かんばん",
+              "popout": "ポップアウト",
               "board": "ボード",
               "inWindow": "窓内",
               "worktrees": "ワークツリー"
@@ -12147,6 +12153,8 @@
             "f316a8ca2b": "未解決のコメントが選択されていません。",
             "d00ebdc402": "{{value0}} のコメントを AI で解決",
             "5eb2163b6b": "Agent を開始する前にプロンプトを確認してください。プロンプトの送信後、Orca は選択したホスト上のスレッドを解決し、解決できないコメントには返信します。",
+            "f273f2271c": "Agent を開始しました。{{value0}} 件を解決し、{{value1}} 件に返信し、{{value2}} 件をスキップし、{{value3}} 件の処理に失敗しました。{{value4}}",
+            "aa95b81a3a": "Agent を開始しました。{{value0}} 件を解決し、{{value1}} 件に返信し、{{value2}} 件をスキップし、{{value3}} 件の処理に失敗しました。",
             "495b2f8c4b": "Agent を開始しましたが、選択したコメントの解決または返信ができませんでした。",
             "review": {
               "auto_retry": "Orca は {{time}} に再試行します。",
@@ -12158,6 +12166,7 @@
               "branch": "ブランチを同期"
             },
             "7e4b2a19c0": "返信先の GitHub PR を特定できませんでした。",
+            "430f1a62d4": "選択したスレッドをホスト上で解決できませんでした。",
             "updateReactionFailed": "反応を更新できませんでした。",
             "gitlabMoreActions": "その他の MR 操作",
             "gitlabLinkAnother": "別の MR をリンクする"
@@ -13675,6 +13684,7 @@
           "1b5e182e9f": "Orca へようこそ",
           "4db04f2f57": "の",
           "adaa0aa627": "オンボーディングステップ {{value0}}: {{value1}} に進みます。",
+          "a249f81538": "Orca",
           "277ba45540": "Orca のオンボーディング",
           "97c42cda00": "GitHub CLI をインストールして以下を実行します。",
           "ae3b00ca82": "GitHub タスクをセットアップする",
@@ -13977,7 +13987,8 @@
             "4a40af029b": "Agent 時間",
             "00a6903322": "Agent が生成されました",
             "c0e2e9dcd9": "おかえり",
-            "af761a0c0d": "設定"
+            "af761a0c0d": "設定",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "送信",
@@ -15473,6 +15484,7 @@
             "88fea8e84e": "送信しないでください",
             "50b00dc327": "詳細をコピー",
             "6d3ebe216a": "診断テキスト",
+            "835037edc9": "Orca",
             "8e24fe4f75": "クラッシュレポートが送信されました。",
             "8b8473c544": "クラッシュレポートがコピーされました。",
             "765591798d": "クラッシュレポートを確認しています…",
@@ -18713,7 +18725,9 @@
       "agentOptional": "Agent [オプション]",
       "createDescription": "プロジェクトとワークスペース名を選択します。開始する場合は Agent を選択してください。"
     },
-    "JiraIssueWorkspace": {},
+    "JiraIssueWorkspace": {
+      "pendingChange": "別の Issue の変更が進行中です。"
+    },
     "jiraProjectPicker": {
       "search": "Jira プロジェクトを検索",
       "empty": "プロジェクトが見つかりませんでした。",
@@ -18786,7 +18800,10 @@
     }
   },
   "dashboardPopout": {
-    "recoverableError": {},
+    "recoverableError": {
+      "title": "Orca のダッシュボードでエラーが発生しました。",
+      "description": "ダッシュボードのレンダリングを完了できませんでした。再マウントを試すか、開き直してください。"
+    },
     "bucket": {
       "attention": "対応が必要",
       "working": "作業中",
@@ -19969,6 +19986,7 @@
       "count": "{{key}} にリンクされたワークスペース {{count}} 件",
       "startAnother": "新規ワークスペースを開始",
       "empty": "Jira Issue をワークスペースにリンクするか、別のビューを選択してください。",
+      "openFailed": "この Jira Issue にリンクされたワークスペースを開けませんでした。",
       "mode": "ワークスペースあり",
       "search": "リンクされた Issue を検索",
       "single": "{{key}} にリンクされたワークスペース 1 件"
@@ -19995,6 +20013,8 @@
       "loadError": "ステータス変更を読み込めませんでした。",
       "retry": "再試行",
       "loading": "ステータス変更を読み込んでいます…",
+      "completeInJira": "Jira で「{{name}}」を完了",
+      "unsupported": "Jira には、Orca がまだ取得できないフィールドが必要です: {{fields}}。",
       "chooseResolution": "解決策を選択",
       "comment": "コメント",
       "back": "戻る",

@@ -191,9 +191,7 @@ export function ReleaseChannelSection(): React.JSX.Element {
             'auto.components.settings.ReleaseChannelSection.channelAriaLabel',
             'Update channel'
           )}
-          // Why disabled rather than hidden: a Linux/Windows dev who has heard
-          // about a dev channel should see that it exists and why it is
-          // unavailable, instead of silently not finding it.
+          // Show unsupported channels disabled with reasons so users can discover why they are unavailable.
           options={OFFERED_RELEASE_CHANNELS.map((channel) => {
             const supported = isChannelSupportedOnPlatform(channel, platform)
             return {

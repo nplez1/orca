@@ -58,6 +58,13 @@ describe('fork-only steps run from the gate, not from package.json', () => {
     expect(FORK_LINT_STEPS.map((step) => step.id)).toContain('check-upstream-identity-literals')
   })
 
+  it('runs the fork comment ratchet on this repository', () => {
+    const { scripts } = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
+    expect(resolveGateSteps(scripts).map((step) => step.id)).toContain(
+      'check-upstream-file-comments'
+    )
+  })
+
   it('runs a fork step once when a sync puts it back into the chain', () => {
     const steps = resolveGateSteps({
       lint: 'oxlint && node config/scripts/check-upstream-identity-literals.mjs'
@@ -68,6 +75,7 @@ describe('fork-only steps run from the gate, not from package.json', () => {
     expect(ids).toEqual([
       'oxlint',
       'check-upstream-identity-literals',
+      'check-upstream-file-comments',
       'check:process-host-imports',
       'check:workspace-path-sync-fs-ratchet',
       'check:compat-boundary-imports'

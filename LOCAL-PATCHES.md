@@ -18,7 +18,15 @@ They are never proposed upstream, and they must never reach an upstream-bound PR
   this sync's hunks have an upstream side that changed only comments. A rationale paragraph above
   upstream's code is conflict adjacency and nothing else. The rule covers the fork's own added blocks
   too: a fork hook should name an exported function in a fork file, not explain itself in prose above
-  upstream's code.
+  upstream's code. **Enforced** by `node local/check-upstream-file-comments.mjs`
+  (`check-upstream-file-comments` in `local/gate-lint.mjs`) against
+  `local/upstream-file-comments-baseline.json`: per-file maxima for the files carrying the most, plus a
+  frozen total, measured against the current upstream merge base so a sync moves the ruler with it.
+  The total may only move down, and a shrink is a red until `--prune` locks it in, so slack cannot be
+  spent elsewhere. Growth needs `--accept <reason>`, recorded in the baseline so it is a reviewed
+  edit — including after a sync, which is why the re-baseline step is in `UPSTREAM-SYNC-RUNBOOK.md`
+  § Step 3. A comment that has to stay above upstream's code carries `fork-comment-ok: <why>`. A file
+  that needs one is worth re-reading as a fork-owned module instead.
   The tree does not satisfy this yet, and the size of the gap is the point: **20 files under `src/` carry
   a `LOCAL(nplez1)` comment and 19 of them are files upstream owns**, some running to five lines (the
   monitoring-policy note in `claude-pane-hold-evidence.ts`, which § `local(agents)` relies on). The marker
@@ -64,6 +72,10 @@ so a sync can take upstream's side there.
 `HOURLY_/DAILY_/ADHOC_RELEASE_REPO` still _name_ upstream's channel repos, but nothing resolves
 through them any more: this fork publishes one stream, so every channel maps to `MAIN_RELEASE_REPO`
 and the picker offers only stable and rc (`OFFERED_RELEASE_CHANNELS`).
+
+An unsupported channel stays visible-and-disabled rather than disappearing, so a user who heard
+about it learns why it is unavailable instead of silently not finding it; with the dev channels
+unlisted, that rendering only matters if one is offered again.
 
 Why both halves: hiding the channels is a UI courtesy, but a channel persisted by an older build
 still reaches `getReleaseRepoForChannel`, and resolving that to upstream's repo would update an Orca
@@ -187,6 +199,41 @@ the owner's, so the check failed on the first sync to carry it (np.29). The cons
 when `MAC_CERTS` is — and keeps upstream's value as the unsigned fallback.
 
 Anchor: `config/electron-builder.config.cjs`, `ORCA_MAC_TEAM_ID`.
+
+### `local(i18n)`: the fork's strings live in overlays, not in upstream's catalogs
+
+Upstream owns every file under `src/renderer/src/i18n/locales/` byte-for-byte. The fork's added
+strings, its rewording of upstream's copy, and — the awkward one — the keys a dropped feature
+orphans all live in `src/renderer/src/i18n/fork/`:
+
+- `fork/en.json` holds the added and reworded English strings. `locales/en.json` is upstream's.
+- `fork/<lang>.json` holds the same for es/fr/ja/ko/pt/ru/tr/zh/zh-Hant, merged over upstream's file
+  by `loadForkLocaleOverlay` at read time.
+- A **`null` leaf is a tombstone**: the fork dropped a feature, extraction then finds no source
+  reference for upstream's key, and `verify:localization-extraction` fails on any key no source
+  references — so before the overlay existed, deleting the feature _forced_ deleting upstream's
+  entries and rewriting ~21–25 hunks per catalog.
+- `mergeCatalogs` (`config/scripts/fork-english-catalog.mjs`) and `mergeLocaleOverlay`
+  (`src/renderer/src/i18n/fork-catalog-overlay.ts`) are the same rule on the Node and renderer sides;
+  `tests/tools/i18n-catalog-overlay-parity.test.mjs` fails if they drift.
+
+Two failure modes a sync can produce here, both loud by design: a tombstone whose key upstream has
+**deleted** makes `verify:localization-catalogs` fail until the tombstone is removed, and a fork
+string upstream has **added under the same key** has to move out of the overlay. Both are reported by
+name.
+
+Anchors: `src/renderer/src/i18n/{i18n.ts,fork-catalog-overlay.ts,fork/*.json}`,
+`config/scripts/fork-english-catalog.mjs`, `config/scripts/verify-localization-catalog*.mjs`,
+`config/scripts/verify-localization-extraction.mjs`.
+
+Not covered, deliberately: **the main process does not read the overlays.** `src/main/i18n/main-i18n.ts`
+imports `locales/*.json` directly, so a fork string used by a menu, tray or dialog would silently fall
+back to English. Nothing is lost today — every non-null overlay entry is renderer-only — but a fork
+string that needs main-process copy belongs in `src/main`'s own catalog, not in the overlay.
+
+Tests that pin the mechanism: `config/scripts/fork-english-catalog.test.mjs`,
+`src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the overlay-fetch-failure path),
+`tests/tools/i18n-catalog-overlay-parity.test.mjs`.
 
 ### `local(dev)`: rebuild-and-relaunch helper
 

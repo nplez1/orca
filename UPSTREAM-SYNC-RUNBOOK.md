@@ -252,6 +252,19 @@ state file; `--prepare` re-points a stale backup after archiving where it used t
 A row reported `N/A` is **not** a pass: the run exits non-zero unless `--waive <id>:<reason>` records the
 exception, and the waiver is printed in the report, in `--json` and in the verdict line.
 
+The fork-comment ratchet measures against the **new** merge base, so a sync can move its numbers in
+either direction and the next `gate-lint` run says so. Treat that red as part of the sync, not as a
+follow-up:
+
+```bash
+node local/check-upstream-file-comments.mjs          # what moved, per file
+node local/check-upstream-file-comments.mjs --prune  # it shrank: lock the lower number in
+node local/check-upstream-file-comments.mjs --init --accept "<what the sync added and why>"
+```
+
+The baseline change belongs in the sync's own commit, with the reason, so the next reader can tell
+fork growth from a re-measurement.
+
 A merge can also re-enable workflows **at the repository**, which no tree diff shows: new upstream
 workflows arrive enabled and an edited file comes back on even though the fork had disabled it. Sweep
 before handing off to the release:

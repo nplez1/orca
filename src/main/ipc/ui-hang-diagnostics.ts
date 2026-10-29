@@ -10,11 +10,14 @@ import {
   recordRendererUiHangSample
 } from '../diagnostics/ui-hang-log-sink'
 
-export function isUiHangLoggingEnabled(store: Store): boolean {
+// Narrow enough that a test can supply the settings reader without the whole store.
+type UiHangSettingsStore = Pick<Store, 'getSettings'>
+
+export function isUiHangLoggingEnabled(store: UiHangSettingsStore): boolean {
   return store.getSettings().uiHangDiagnosticsEnabled === true
 }
 
-export function registerUiHangDiagnosticsHandlers(store: Store): void {
+export function registerUiHangDiagnosticsHandlers(store: UiHangSettingsStore): void {
   ipcMain.handle('uiHangDiagnostics:getStatus', (): UiHangDiagnosticsStatus =>
     getUiHangDiagnosticsStatus(isUiHangLoggingEnabled(store))
   )

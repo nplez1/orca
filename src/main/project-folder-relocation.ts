@@ -12,9 +12,9 @@ import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../shared/execu
 import { isProjectFolderLayout, resolveWorktreeLayoutMode } from '../shared/orca-workspace-layout'
 import { isFolderRepo } from '../shared/repo-kind'
 import type { Repo } from '../shared/repo-types'
+import { areWorktreePathsEqual } from '../shared/worktree-path-comparison'
 import { getRepoMainWorktreeId } from '../shared/worktree/id'
 import { getRuntimePathOps, sanitizeWorktreeName } from './ipc/project-folder-placement'
-import { areWorktreePathsEqual } from './ipc/worktree-path-comparison'
 import { computeWorkspaceRoot, getWorktreePathSettings } from './ipc/worktree-logic'
 
 export type RelocationSkipReason =

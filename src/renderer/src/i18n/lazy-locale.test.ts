@@ -92,7 +92,8 @@ describe('renderer i18n lazy locale loading', () => {
         await setRendererUiLanguage('ja')
         expect(i18n.language).toBe('ja')
         expect(i18n.t('menu.file', { defaultValue: 'File' })).toBe('ファイル')
-        expect(request).toHaveBeenCalledTimes(2)
+        // fork-comment-ok: both assets load on every attempt, so two attempts are four requests
+        expect(request).toHaveBeenCalledTimes(4)
       } finally {
         request.mockRestore()
       }

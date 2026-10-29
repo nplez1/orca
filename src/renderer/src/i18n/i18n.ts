@@ -17,6 +17,7 @@ import ruCatalogUrl from './locales/ru.json?url'
 import trCatalogUrl from './locales/tr.json?url'
 import zhCatalogUrl from './locales/zh.json?url'
 import zhHantCatalogUrl from './locales/zh-Hant.json?url'
+import { loadForkLocaleOverlay, mergeLocaleOverlay } from './fork-catalog-overlay'
 import { isPseudoLocalizationLocale, pseudoLocalizeString } from './pseudo-localization'
 import { advanceTranslationResourceVersion } from './translation-resource-version'
 import { DEFAULT_LOCALE, resolveUiLocale } from './supported-languages'
@@ -48,13 +49,21 @@ function localeCatalogUrl(language: string): string | undefined {
   return Object.entries(NON_DEFAULT_LOCALE_URLS).find(([name]) => name === language)?.[1]
 }
 
-async function loadLocaleCatalog(language: string, url: string): Promise<Record<string, unknown>> {
+async function fetchCatalog(url: string): Promise<Record<string, unknown>> {
   const response = await fetch(url, { cache: 'no-cache' })
   if (!response.ok) {
     throw new Error(`Language catalog request failed: ${response.status}`)
   }
+  return response.json()
+}
+
+async function loadLocaleCatalog(language: string, url: string): Promise<Record<string, unknown>> {
+  const catalogPromise = fetchCatalog(url)
+  const overlayPromise = loadForkLocaleOverlay(language)
+  const catalog = await catalogPromise
+  const overlay = await overlayPromise
   const categories = new Intl.PluralRules(language).resolvedOptions().pluralCategories
-  return withPluralCategoriesFromOther(await response.json(), categories)
+  return withPluralCategoriesFromOther(mergeLocaleOverlay(catalog, overlay), categories)
 }
 
 const lazyLocaleBackend: BackendModule = {

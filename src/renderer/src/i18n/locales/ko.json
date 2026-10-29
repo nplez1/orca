@@ -422,6 +422,7 @@
     "minimizeNotice": {
       "body": "Orca가 시스템 트레이에서 계속 실행 중입니다"
     },
+    "activityWaiting": "Orca - 활동 대기 중",
     "activityWaitingSuffix": "activity waiting"
   },
   "worktreeJumpPalette": {
@@ -503,6 +504,7 @@
       "df1d56bf87": "워크스페이스 셸에 오류가 발생했습니다.",
       "9e0b441a91": "오른쪽 사이드바 표시/숨기기",
       "e81217c1b7": "앱 이름 숨기기",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "애플리케이션 메뉴",
       "caea5b51b9": "지금 재시작",
       "0a9e810705": "다시 시작할 때까지 변경사항이 저장되지 않습니다. 이전 탭은 디스크에 안전합니다.",
@@ -635,6 +637,7 @@
           }
         },
         "worktrees": {
+          "e50495aae6": "브랜치 강제 삭제",
           "14bc053a47": "로컬 {{value0}}이(가) 새로 고쳐지지 않았습니다.",
           "localBaseRefRefreshFailedForWorktree": "\"{{value1}}\"의 로컬 {{value0}}이(가) 새로 고쳐지지 않았습니다.",
           "903b51c2ed": "{{value0}}에서 워크스페이스를 만들었지만 Orca가 로컬 {{value1}}을(를) fast-forward할 수 없습니다. {{value2}}",
@@ -644,6 +647,11 @@
           "localBaseRefRefreshFailedDetailNotFastForward": "로컬 {{value0}}이(가) 없거나 원격 베이스에서 깨끗하게 fast-forward할 수 없습니다. 수동으로 업데이트하기 전에 로컬 전용 커밋이 있는지 확인하세요.",
           "localBaseRefRefreshFailedDetailError": "로컬 {{value0}}을(를) 업데이트하는 중 Git이 오류를 반환했습니다. 잠긴 refs나 비정상적인 워크트리 상태가 있는지 확인한 다음 로컬 {{value0}}을(를) 수동으로 업데이트하세요.",
           "0216895fb5": "브랜치를 삭제하지 못했습니다.",
+          "5366d13eec": "워크스페이스가 삭제되었고 브랜치는 유지되었습니다",
+          "2e17f825d4": "워크트리가 삭제되었고 브랜치는 유지되었습니다",
+          "78e08cd877": "Git이 \"{{value0}}\" 브랜치를 안전하게 삭제할 수 없어 Orca가 로컬 커밋 손실을 방지하기 위해 유지했습니다.",
+          "3b57982bf6": "\"{{value1}}\" 워크스페이스를 삭제한 후 Git이 \"{{value0}}\" 브랜치를 안전하게 삭제할 수 없어 Orca가 로컬 커밋 손실을 방지하기 위해 유지했습니다.",
+          "81f13f48d2": "\"{{value1}}\" 워크트리를 삭제한 후 Git이 \"{{value0}}\" 브랜치를 안전하게 삭제할 수 없어 Orca가 로컬 커밋 손실을 방지하기 위해 유지했습니다.",
           "runtimeScopeForbiddenTitle": "이 연결은 제한된(모바일) 액세스입니다",
           "runtimeScopeForbiddenDescription": "모바일 범위 페어링에서는 워크스페이스를 사용할 수 없습니다. 설정 → 원격 Orca 서버 → 이 Orca 서버 공유에서 브라우저 액세스 링크로 다시 연결하세요.",
           "createdWithoutParentNesting": "\"{{value0}}\" 아래에 중첩하지 않고 생성했습니다",
@@ -1077,15 +1085,6 @@
           }
         }
       },
-      "jira": {
-        "issue": {
-          "workspace": {
-            "open": {
-              "failed": "이 이슈에 연결된 워크스페이스를 열 수 없습니다."
-            }
-          }
-        }
-      },
       "linear": {
         "usage": {
           "examples": {
@@ -1378,6 +1377,7 @@
         "cd50cec5d7": "Orca를 통해 여러 코딩 에이전트를 조율합니다.",
         "58a868e8e4": "오케스트레이션",
         "7c79d3b7bf": "선택 사항",
+        "b1c2f8b0ac": "Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok의 선택적 계정 전환 및 사용량 설정.",
         "f70ac54d38": "AI 제공자 계정",
         "4121f7a0a2": "AI agents를 관리하고, 기본값을 설정하고, 명령을 사용자 정의하세요.",
         "b49abbd2f7": "에이전트",
@@ -1519,6 +1519,8 @@
         "28986b3747": "실패한 체크를 위한 AI agent를 시작했습니다.",
         "1690fd7f4a": "수정할 실패한 체크가 없습니다.",
         "9e7c221b8d": "체크를 다시 실행하지 못했습니다.",
+        "e463ec935f": "체크 재실행 요청됨",
+        "ddafe851e1": "체크 재실행이 요청되었습니다",
         "0bbdc673c1": "체크를 새로고침하지 못했습니다.",
         "e7007aa1d8": "repos 경로가 없으면 체크를 새로고침할 수 없습니다.",
         "675bc0d638": "취소",
@@ -1714,7 +1716,6 @@
         "b0b92666c9": "댓글",
         "a585fd204e": "Jira 댓글 추가...",
         "2441be6f9f": "워크스페이스 시작",
-        "showWorkspace": "워크스페이스 표시",
         "9178090e26": "아직 댓글이 없습니다.",
         "5cd09beaf9": "다시 시도",
         "9a980b06b9": "댓글",
@@ -1992,6 +1993,8 @@
         "98583589c6": "실패한 체크를 수정하기 위해 AI agent를 시작하지 못했습니다: {{value0}}",
         "51c65c0265": "수정할 실패한 체크가 없습니다.",
         "788a782bb0": "체크를 다시 실행하지 못했습니다.",
+        "18f2af42ac": "체크 재실행 요청됨",
+        "5963a6a852": "체크 재실행이 요청되었습니다",
         "246b2c6456": "체크를 새로고침하지 못했습니다.",
         "c057f2fcb0": "repos 경로가 없으면 체크를 새로고침할 수 없습니다.",
         "6591b1fa82": "취소",
@@ -2397,8 +2400,6 @@
         "linearModeHasWorktreeTooltip": "Orca 워크스페이스에 연결된 Linear 티켓",
         "linearEmptyHasWorktree": "아직 Orca 워크스페이스에 연결된 Linear 티켓이 없습니다. Linear 이슈에서 작업을 시작하면 여기에 표시됩니다.",
         "linearOpenAttachedWorkspace": "{{value0}}에 연결된 워크스페이스 열기",
-        "jiraOpenAttachedWorkspace": "{{value0}}에 연결된 워크스페이스 열기",
-        "jiraShowWorkspace": "워크스페이스 표시",
         "linearWorktreesColumn": "워크스페이스",
         "jiraSortAscending": "오름차순",
         "jiraSortDescending": "내림차순",
@@ -3689,6 +3690,7 @@
             "bbcd9b7b85": "워크스페이스 축소",
             "c4a8968bdd": "워크스페이스 확장",
             "b10695d6ce": "세션 강제 종료",
+            "288a4dd177": "Orca",
             "53dd5560ae": "Orca 접기",
             "e419d27083": "Orca 확장",
             "41ae4fa725": "강제 종료 중…",
@@ -4327,6 +4329,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "출력",
               "5d66fdd7c2": "입력",
               "7080aeaebb": "추론",
@@ -6358,6 +6361,7 @@
           "d676c41fc6": "Google 인증을 위해 로컬 Gemini CLI 설치에서 OAuth 자격 증명을 추출합니다. 이는 Orca가 아닌 Gemini CLI 앱에 발급된 자격 증명을 사용합니다. Google이 CLI를 업데이트하면 중단될 수 있습니다. 자신의 책임하에 사용하십시오.",
           "0c7f915b01": "Gemini CLI 자격 증명 사용",
           "973741a871": "기존 Gemini CLI 세션은 계속 사용할 수 있습니다. Gemini 자격 증명으로는 Antigravity에 로그인되지 않습니다.",
+          "0c64dc2a64": "Gemini CLI (레거시)",
           "db209ee572": "제거",
           "8a0f870153": "재인증",
           "3d245ef7d9": "Codex에서 이 로그인이 오래되었다고 보고했습니다.",
@@ -6935,7 +6939,12 @@
             "title": "에이전트 대시보드",
             "description": "워크트리 전반에 걸친 에이전트를 모니터링하는 칸반 보드. 윈도우 내 또는 팝업으로 표시됩니다.",
             "copy": "왼쪽 사이드바에 에이전트 대시보드 항목을 추가합니다. 사용자 확인이 필요한 에이전트, 작업 중인 에이전트, 완료된 에이전트를 모니터링하고 필요하면 유휴 에이전트도 표시합니다.",
-            "toggleLabel": "에이전트 대시보드 전환"
+            "toggleLabel": "에이전트 대시보드 전환",
+            "modeLabel": "열기 형식",
+            "modeCopy": "대시보드를 사이드바 옆 윈도우 내 보드 또는 별도의 팝업 윈도우로 표시합니다.",
+            "modeAriaLabel": "에이전트 대시보드 열기 모드",
+            "modeInWindow": "윈도우 내",
+            "modePopout": "팝업"
           },
           "browserExtensions": {
             "copy": "로컬 브라우저 프로필에 설정 › 브라우저 › 확장 프로그램을 추가합니다.",
@@ -7070,10 +7079,6 @@
           "5734db82af": "워크스페이스를 삭제하기 전에 확인 대화상자를 표시합니다.",
           "4fbf910ded": "repo 이름이 지정된 하위 폴더 내에 워크스페이스를 만듭니다.",
           "ba3480642f": "워크스페이스 중첩",
-          "f9b2070017": "Workspace Layout",
-          "0cda18153c": "Where each project's main checkout and its workspaces are created.",
-          "b266f3f40e": "One folder per project",
-          "9285cedcf2": "Flat",
           "a246f5ce6f": "워크스페이스 폴더가 생성되는 루트 디렉터리입니다.",
           "5567191a6e": "찾아보기",
           "0e9fc0eadc": "워크스페이스 디렉터리",
@@ -9109,6 +9114,7 @@
               "dashboard": "대시보드",
               "agent": "에이전트",
               "kanban": "칸반",
+              "popout": "팝업",
               "board": "보드",
               "inWindow": "창 내부",
               "worktrees": "작업 트리"
@@ -12147,6 +12153,8 @@
             "f316a8ca2b": "선택한 해결되지 않은 댓글이 없습니다.",
             "d00ebdc402": "AI로 {{value0}} 댓글 해결",
             "5eb2163b6b": "에이전트를 시작하기 전에 프롬프트를 확인하세요. 프롬프트가 전달된 후 Orca가 선택한 호스트 스레드를 해결하고, 해결할 수 없는 댓글에는 답글을 남깁니다.",
+            "f273f2271c": "agent를 시작했습니다. {{value0}}개 해결됨, {{value1}}개 답글, {{value2}}개 건너뜀, {{value3}}개 실패.{{value4}}",
+            "aa95b81a3a": "agent를 시작했습니다. {{value0}}개 해결됨, {{value1}}개 답글, {{value2}}개 건너뜀, {{value3}}개 실패.",
             "495b2f8c4b": "agent를 시작했지만 선택한 댓글을 해결하거나 답글할 수 없습니다.",
             "review": {
               "auto_retry": "Orca가 {{time}}에 다시 시도합니다.",
@@ -12158,6 +12166,7 @@
               "branch": "Sync Branch"
             },
             "7e4b2a19c0": "답글을 게시할 GitHub PR을 확인하지 못했습니다.",
+            "430f1a62d4": "선택한 스레드를 호스트에서 해결하지 못했습니다.",
             "updateReactionFailed": "반응을 업데이트하지 못했습니다.",
             "gitlabMoreActions": "더 많은 MR 작업",
             "gitlabLinkAnother": "다른 MR 연결"
@@ -13675,6 +13684,7 @@
           "1b5e182e9f": "Orca에 오신 것을 환영합니다",
           "4db04f2f57": "/",
           "adaa0aa627": "온보딩 단계 {{value0}}: {{value1}}로 이동",
+          "a249f81538": "Orca",
           "277ba45540": "Orca 온보딩",
           "97c42cda00": "GitHub CLI를 설치하여 다음을 수행합니다.",
           "ae3b00ca82": "GitHub 작업 설정",
@@ -13977,7 +13987,8 @@
             "4a40af029b": "Agent 시간",
             "00a6903322": "시작된 Agents",
             "c0e2e9dcd9": "다시 오신 것을 환영합니다",
-            "af761a0c0d": "설정"
+            "af761a0c0d": "설정",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "보내기",
@@ -15473,6 +15484,7 @@
             "88fea8e84e": "보내지 않음",
             "50b00dc327": "세부정보 복사",
             "6d3ebe216a": "진단 텍스트",
+            "835037edc9": "Orca",
             "8e24fe4f75": "크래시 보고서가 전송되었습니다.",
             "8b8473c544": "크래시 보고서가 복사되었습니다.",
             "765591798d": "크래시 보고서 확인 중...",
@@ -18713,7 +18725,9 @@
       "agentOptional": "에이전트 [선택 사항]",
       "createDescription": "프로젝트와 워크스페이스 이름을 선택하세요. 원하면 시작할 에이전트를 선택하세요."
     },
-    "JiraIssueWorkspace": {},
+    "JiraIssueWorkspace": {
+      "pendingChange": "다른 이슈 변경이 진행 중입니다."
+    },
     "jiraProjectPicker": {
       "search": "Jira 프로젝트 검색",
       "empty": "프로젝트를 찾을 수 없습니다.",
@@ -18786,7 +18800,10 @@
     }
   },
   "dashboardPopout": {
-    "recoverableError": {},
+    "recoverableError": {
+      "title": "Orca 대시보드에서 오류가 발생했습니다.",
+      "description": "대시보드 렌더링을 완료하지 못했습니다. 다시 시도해 다시 마운트하거나 다시 열어 보세요."
+    },
     "bucket": {
       "attention": "확인 필요",
       "working": "작업 중",
@@ -19969,6 +19986,7 @@
       "count": "{{key}}에 연결된 워크스페이스 {{count}}개",
       "startAnother": "새 워크스페이스 시작",
       "empty": "Jira 이슈를 워크스페이스에 연결하거나 다른 보기를 선택하세요.",
+      "openFailed": "이 Jira 이슈에 연결된 워크스페이스를 열 수 없습니다.",
       "mode": "워크스페이스 있음",
       "search": "연결된 이슈 검색",
       "single": "{{key}}에 연결된 워크스페이스 1개"
@@ -19995,6 +20013,8 @@
       "loadError": "상태 변경을 로드하지 못했습니다.",
       "retry": "다시 시도",
       "loading": "상태 변경 로드 중…",
+      "completeInJira": "Jira에서 “{{name}}” 완료",
+      "unsupported": "Jira에는 Orca가 아직 수집할 수 없는 필드가 필요합니다: {{fields}}.",
       "chooseResolution": "해결 방법 선택",
       "comment": "댓글",
       "back": "뒤로",
