@@ -36,7 +36,10 @@ export const HOST_SETTINGS_METHODS = [
         // in-process owner, which is the user at this machine and always allowed.
         ...(ctx.authenticatedCallerFingerprint === undefined
           ? {}
-          : { callerFingerprint: ctx.authenticatedCallerFingerprint })
+          : { callerFingerprint: ctx.authenticatedCallerFingerprint }),
+        // Why the device row as well: it is what a re-pair of the same device keeps, so it is the only
+        // identity that can tell an explicit re-pair from a different machine claiming the host.
+        ...(ctx.pairedDeviceId === undefined ? {} : { callerDeviceId: ctx.pairedDeviceId })
       })
   }),
   defineMethod({

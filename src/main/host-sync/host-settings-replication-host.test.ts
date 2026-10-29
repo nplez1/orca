@@ -213,27 +213,29 @@ describe('applying a payload on the host', () => {
     expect(port.held.size).toBe(0)
   })
 
-  it('lets a re-paired or replacement main take the pin with a snapshot, but not with a delta', () => {
+  it('lets an explicit re-pair of the same paired device take the pin, but not a different device', () => {
     const holdings = createInMemoryHostSettingsReplicationHoldings()
 
     applyHostSettingsReplication(snapshot(1), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
-      callerFingerprint: 'main-a'
+      callerFingerprint: 'main-a',
+      callerDeviceId: 'device-a'
     })
 
     // Why this must be allowed: the fingerprint is derived from the pairing token, and every new pairing
-    // offer mints a fresh one — so re-pairing the same laptop changes it. Refusing forever left a host
-    // nothing could ever configure again, silently.
-    const replacement = applyHostSettingsReplication(snapshot(2), {
+    // offer mints a fresh one — so re-pairing the same laptop changes it while the device row stays.
+    const repair = applyHostSettingsReplication(snapshot(2), {
       registry: registry(fakePort()),
       holdings,
       now: NOW,
-      callerFingerprint: 'main-b'
+      callerFingerprint: 'main-a-repaired',
+      callerDeviceId: 'device-a'
     })
-    expect(replacement).toMatchObject({ decision: 'applied' })
-    expect(holdings.read().mainFingerprint).toBe('main-b')
+    expect(repair).toMatchObject({ decision: 'applied' })
+    expect(holdings.read().mainFingerprint).toBe('main-a-repaired')
+    expect(holdings.read().mainDeviceId).toBe('device-a')
 
     // A delta still may not move it, so a second paired client cannot take over by syncing.
     expect(
@@ -242,6 +244,68 @@ describe('applying a payload on the host', () => {
         { registry: registry(fakePort()), holdings, now: NOW, callerFingerprint: 'main-a' }
       )
     ).toEqual({ decision: 'refusedNotTheMain' })
+  })
+
+  it('does not let a second desktop take the host by reconnecting with a snapshot', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    const port = fakePort()
+
+    applyHostSettingsReplication(snapshot(1), {
+      registry: registry(port),
+      holdings,
+      now: NOW,
+      callerFingerprint: 'laptop-a',
+      callerDeviceId: 'device-a'
+    })
+
+    // Desktop B holds no DeepSeek key of its own, so its snapshot names none: the takeover used to move
+    // the pin, delete A's key from this host, and leave every agent here on B's account.
+    const takeover = applyHostSettingsReplication(snapshot(2, []), {
+      registry: registry(port),
+      holdings,
+      now: NOW,
+      callerFingerprint: 'desktop-b',
+      callerDeviceId: 'device-b'
+    })
+
+    expect(takeover).toEqual({ decision: 'refusedNotTheMain' })
+    expect(holdings.read().mainFingerprint).toBe('laptop-a')
+    expect(port.held.has(CREDENTIAL_ID)).toBe(true)
+    expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
+  })
+
+  it('lets the host owner take the host back, so a lost desktop does not strand it', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+
+    applyHostSettingsReplication(snapshot(1), {
+      registry: registry(fakePort()),
+      holdings,
+      now: NOW,
+      callerFingerprint: 'laptop-a',
+      callerDeviceId: 'device-a'
+    })
+
+    // No fingerprint is the user at this machine, and configuring the host locally is the escape hatch
+    // left when the pinned device no longer exists to re-pair.
+    const owner = applyHostSettingsReplication(snapshot(2), {
+      registry: registry(fakePort()),
+      holdings,
+      now: NOW
+    })
+    expect(owner).toMatchObject({ decision: 'applied' })
+    expect(holdings.read().mainFingerprint).toBeNull()
+    expect(holdings.read().mainDeviceId).toBeNull()
+
+    expect(
+      applyHostSettingsReplication(snapshot(3), {
+        registry: registry(fakePort()),
+        holdings,
+        now: NOW,
+        callerFingerprint: 'desktop-b',
+        callerDeviceId: 'device-b'
+      })
+    ).toMatchObject({ decision: 'applied' })
+    expect(holdings.read().mainFingerprint).toBe('desktop-b')
   })
 
   it('keeps a value the user entered on this host, and never records it as a replica', () => {

@@ -85,23 +85,30 @@ export function applyHostSettingsReplication(
     holdings?: HostSettingsReplicationHoldings
     /** From the RPC context: which paired caller this is, when the transport could name one. */
     callerFingerprint?: string
+    /** From the RPC context: the paired device row, which survives a re-pair of that device. */
+    callerDeviceId?: string
   } = {}
 ): HostSettingsReplicationApplyResult {
   const holdings = options.holdings ?? defaultHoldings
   const record = holdings.read()
-  const { callerFingerprint } = options
+  const { callerFingerprint, callerDeviceId } = options
+
+  // Why the device id and not only the fingerprint: every pairing offer mints a fresh token, so the
+  // fingerprint of the same laptop changes on a re-pair — and refusing that forever left a host nothing
+  // could ever configure again, silently. A re-pair of the device this host already pinned is the one
+  // case where a different caller may take it over; replacing the machine is not, because that is how
+  // the last desktop to reconnect came to delete the other one's credentials.
+  const isPairedRepair =
+    payload.baseRevision === null &&
+    callerDeviceId !== undefined &&
+    record.mainDeviceId !== null &&
+    record.mainDeviceId === callerDeviceId
 
   if (
     callerFingerprint !== undefined &&
     record.mainFingerprint !== null &&
     record.mainFingerprint !== callerFingerprint &&
-    // Why a snapshot may replace the pin: the fingerprint is derived from the pairing token, and every
-    // new pairing offer mints a fresh one — so re-pairing the same laptop, or replacing it, changes the
-    // fingerprint. Refusing that forever left a host nothing could ever configure again, silently, which
-    // is worse than the problem the pin solves. A snapshot is the push that establishes a relationship;
-    // a *delta* from a different caller is still refused, so a second paired client cannot delete what
-    // the first configured merely by syncing.
-    payload.baseRevision !== null
+    !isPairedRepair
   ) {
     return { decision: 'refusedNotTheMain' }
   }
@@ -191,15 +198,21 @@ export function applyHostSettingsReplication(
       )
   )
 
+  const establishesAuthority = contractPayload.baseRevision === null
   holdings.write({
     ids: [...stillHeld],
     revision: contractPayload.revision,
     syncedAt: state.kind === 'neverSynced' || state.kind === 'failed' ? null : state.syncedAt,
     // Why the pin follows a snapshot: see the refusal above. A delta never moves it.
-    mainFingerprint:
-      contractPayload.baseRevision === null && callerFingerprint !== undefined
-        ? callerFingerprint
-        : record.mainFingerprint
+    mainFingerprint: !establishesAuthority ? record.mainFingerprint : (callerFingerprint ?? null),
+    // Why the local owner clears the pin: a caller with no fingerprint is the user at this machine, so
+    // configuring the host here is how they take it back from a desktop that has since gone away — the
+    // one escape hatch left when the pinned device no longer exists to re-pair.
+    mainDeviceId: !establishesAuthority
+      ? record.mainDeviceId
+      : callerFingerprint === undefined
+        ? null
+        : (callerDeviceId ?? record.mainDeviceId)
   })
 
   lastState = state
