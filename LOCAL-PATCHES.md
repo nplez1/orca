@@ -629,7 +629,14 @@ signature that identifies it. None imports a module this fork changed.
 - `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
   `src/main/persistence/profile-state/profile-state-streaming-validation.test.ts` ("cannot add
   rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
-  assume; neither file is imported by anything this fork touches.
+  assume; neither file is imported by anything this fork touches. **Both diagnoses were wrong, and
+  both cases are gone (2026-10-29).** Neither was a bundled-binding difference: upstream #34661
+  (`e5f1eef466`) deleted the first, because Node 26.10 binds an explicit `undefined` as NULL so the
+  contract it asserted no longer existed, and rebuilt the second to shadow the rowid aliases through
+  `CREATE TABLE` instead of an `ALTER TABLE … ADD COLUMN` alias, which SQLite 3.54 refuses. Both were
+  Node runtime changes every machine took, not something "the bundled SQLite" did to this fork alone,
+  and the second now runs 16/16 green. That is what made the first one dangerous: a dead entry can
+  never be reported stale.
 - `src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
   output", the PTY/subprocess class recorded above.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
@@ -704,6 +711,9 @@ What it deliberately does not do:
   cache is keyed `(HEAD, allowlist hash)` under `.git/orca-gate/`, which is what stops a re-run on an
   unchanged revision from proving anything.
 - A missing or unreadable report, a run with no tests, and a timeout all fail closed.
+- It does not, on its own, report a _dead_ entry — one naming a case that no longer exists — because
+  staleness comes only from an entry that matched a failure. `tests/tools/unit-gate.test.mjs` closes
+  that statically instead, so the blind spot is checked at PR time rather than by the next full run.
 
 The first reconciled run (2026-10-21, `1a64dbe2f6`) found 29 failing cases: 24 allowlisted across nine
 files, and two files that are red on their own and so are deliberately **not** listed —
@@ -1731,10 +1741,22 @@ The `orca-runtime` pair above is the other two.
 
 Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
 test fix that will conflict once, benignly, when upstream makes the same change — the same trade
-upstream itself made in #33540. **The class is now empty**: 40 entries at the 2026-10-26 baseline, 17
-today, and all 17 are `host-toolchain` (8) and `sqlite-binding` (9) — a different machine's different bun
-and SQLite, which is not something this fork can fix in a test. The `host-toolchain` entries that were
-bash 3.2 rather than bun or SQLite are gone with the bash install recorded above.
+upstream itself made in #33540. **The `sqlite-binding` class is now empty too**: 40 entries at the
+2026-10-26 baseline, 17 after that repair, and **8 today, all `host-toolchain`** — the dev-rebuild
+timeouts (6), the bun `fs.rm` on a read-only directory (1) and one facade case (1). The nine
+`sqlite-binding` entries went on 2026-10-29: six because the suites were re-seated or re-routed into
+the Node project (`a886dcd1fe9`, and `2ecae9a7470`), three because upstream #34661 (`e5f1eef466`)
+deleted or rebuilt the cases they named. The `host-toolchain` entries that were bash 3.2 rather than
+bun or SQLite are gone with the bash install recorded above.
+
+**The manifest can now notice its own dead entries.** `local/gate-unit.mjs` derives staleness only
+from an entry that _matched a failure_, so an entry naming a test upstream deleted is structurally
+invisible: it sits in the file for ever and no run will ever derive it, because deriving it needs a
+failure it can no longer produce. `tests/tools/unit-gate.test.mjs` therefore checks every entry's title
+against its own file, statically, at PR time — a Vitest full name is the `describe` chain and the
+case title joined by single spaces, so `titleExistsInSource` in `local/unit-gate-judgement.mjs`
+rebuilds that shape from the file's title literals (treating an `it.each` substitution as a
+wildcard). It found the one dead entry this section used to describe and no other.
 
 ### `local(lint)`: the two #198 flaky-test-pattern reds, fixed in the tree and pruned
 

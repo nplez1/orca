@@ -251,6 +251,118 @@ export function collectedQuarantinedFiles(report, quarantined) {
     .filter((file) => set.has(file))
 }
 
+// `%s`, `%d` … and `$name` are what Vitest substitutes into an `it.each` title.
+const SUBSTITUTION = /(%[sdifjoO#%]|\$\{[^}]*\})/
+const MODIFIERS_WITH_ARGUMENTS = new Set(['each', 'for', 'runIf', 'skipIf'])
+const TITLE_CALLER = /\b(?:describe|it|test|suite)\b/g
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** A source title as a pattern: the parts Vitest fills in become wildcards. */
+function titlePattern(text) {
+  return text
+    .split(SUBSTITUTION)
+    .map((part, index) => (index % 2 === 1 ? '[\\s\\S]*?' : escapeRegExp(part)))
+    .join('')
+}
+
+function skipSpace(source, index) {
+  while (index < source.length && /\s/.test(source[index])) {
+    index++
+  }
+  return index
+}
+
+function closeOf(source, open) {
+  let depth = 0
+  for (let index = open; index < source.length; index++) {
+    const char = source[index]
+    if (char === '(') {
+      depth++
+    } else if (char === ')') {
+      depth--
+      if (depth === 0) {
+        return index
+      }
+    }
+  }
+  return -1
+}
+
+function readLiteral(source, index) {
+  const quote = source[index]
+  if (quote !== "'" && quote !== '"' && quote !== '`') {
+    return null
+  }
+  let text = ''
+  for (let scan = index + 1; scan < source.length; scan++) {
+    const char = source[scan]
+    if (char === '\\') {
+      text += source[scan + 1] ?? ''
+      scan++
+    } else if (char === quote) {
+      return { text, end: scan + 1 }
+    } else {
+      text += char
+    }
+  }
+  return null
+}
+
+/** The title strings the file gives a `describe` and each test, in source order. */
+function collectTitles(source) {
+  const describes = []
+  const tests = []
+  for (const caller of source.matchAll(TITLE_CALLER)) {
+    let index = skipSpace(source, caller.index + caller[0].length)
+    while (source[index] === '.') {
+      index = skipSpace(source, index + 1)
+      const name = /^[\w$]+/.exec(source.slice(index))?.[0] ?? ''
+      index = skipSpace(source, index + name.length)
+      if (source[index] === '<') {
+        const end = source.indexOf('>', index)
+        index = skipSpace(source, end === -1 ? index : end + 1)
+      }
+      // Why: `it.concurrent(` takes no arguments of its own, `.each(table)(` does.
+      if (MODIFIERS_WITH_ARGUMENTS.has(name) && source[index] === '(') {
+        const close = closeOf(source, index)
+        index = skipSpace(source, close === -1 ? index : close + 1)
+      }
+    }
+    if (source[index] !== '(') {
+      continue
+    }
+    const literal = readLiteral(source, skipSpace(source, index + 1))
+    if (literal) {
+      ;(caller[0] === 'describe' ? describes : tests).push(literal.text)
+    }
+  }
+  return { describes, tests }
+}
+
+/**
+ * Whether the file can still produce `title` as a Vitest full name, which is its `describe` chain and
+ * its own title joined by single spaces.
+ *
+ * Why this exists: `gate-unit.mjs` derives staleness only from entries that matched a failure, so an
+ * entry whose test was deleted is structurally invisible — it sits in the manifest for ever, and the
+ * run that would disprove it costs 25 minutes. A static check catches the same rot at PR time.
+ */
+export function titleExistsInSource(title, source) {
+  const { describes, tests } = collectTitles(source)
+  const chain = describes.length > 0 ? `(?:${describes.map(titlePattern).join('|')}) ` : null
+  return tests.some((text) => {
+    const own = titlePattern(text)
+    if (new RegExp(`^${own}$`).test(title)) {
+      return true
+    }
+    // Why 1..4: describe blocks nest, and a deeper chain is the only shape left to allow.
+    return chain !== null && new RegExp(`^(?:${chain}){1,4}${own}$`).test(title)
+  })
+}
+
 /**
  * Vitest exits non-zero for a failing test, so its status alone proves nothing — it proves something
  * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which explains a failed

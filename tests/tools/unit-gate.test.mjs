@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { forkTestFiles } from '../../local/gate-unit.mjs'
@@ -13,7 +13,8 @@ import {
   quarantinedEntryProblems,
   repoPath,
   reproducedFailures,
-  reportForFile
+  reportForFile,
+  titleExistsInSource
 } from '../../local/unit-gate-judgement.mjs'
 
 const ROOT = join(import.meta.dirname, '..', '..')
@@ -336,7 +337,49 @@ describe('the fork-local lane', () => {
 
 const manifest = JSON.parse(readFileSync(join(ROOT, 'local/unit-known-red.json'), 'utf8'))
 
+describe('a title the file can still produce', () => {
+  const source = `
+    describe('SQLite runtime contract', () => {
+      it('admits the actual runtime driver', () => {})
+      it.each(['a', 'b'])('rejects %s before changing rows', () => {})
+    })
+  `
+
+  it('finds a plain case through its describe chain', () => {
+    expect(
+      titleExistsInSource('SQLite runtime contract admits the actual runtime driver', source)
+    ).toBe(true)
+  })
+
+  it('treats what Vitest substitutes into an each title as a wildcard', () => {
+    expect(
+      titleExistsInSource('SQLite runtime contract rejects a before changing rows', source)
+    ).toBe(true)
+  })
+
+  it('reports a title the file no longer names, which is the rot this catches', () => {
+    expect(titleExistsInSource('SQLite runtime contract rejects undefined bindings', source)).toBe(
+      false
+    )
+    // The whole describe chain has to be there too: a renamed block is the same rot as a deleted case.
+    expect(
+      titleExistsInSource('Sync database contract admits the actual runtime driver', source)
+    ).toBe(false)
+  })
+})
+
 describe('the known-red manifest', () => {
+  it('names only titles its own file can still produce', () => {
+    // Why: the gate learns staleness only from an entry that matched a failure, so an entry for a
+    // deleted test never surfaces — it sits in the manifest for as long as nobody re-reads the file.
+    const dead = manifest.entries
+      .filter((entry) => {
+        const file = join(ROOT, entry.file)
+        return !titleExistsInSource(entry.test, existsSync(file) ? readFileSync(file, 'utf8') : '')
+      })
+      .map((entry) => `${entry.file} › ${entry.test}`)
+    expect(dead).toEqual([])
+  })
   it('names no file the gate does not run, which would be dead weight', () => {
     const quarantined = new Set(quarantinedFiles())
     // Why: if UNIT_INCLUDE and UNIT_EXCLUDE ever agreed completely the check below would be vacuous.
