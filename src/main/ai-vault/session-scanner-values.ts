@@ -61,7 +61,7 @@ export function sessionIdFromFileName(filePath: string): string {
  */
 const BYTE_ORDER_MARK = '\uFEFF'
 
-export function stripLeadingByteOrderMark(line: string): string {
+function stripLeadingByteOrderMark(line: string): string {
   return line.startsWith(BYTE_ORDER_MARK) ? line.slice(BYTE_ORDER_MARK.length) : line
 }
 

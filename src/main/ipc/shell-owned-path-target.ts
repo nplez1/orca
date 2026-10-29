@@ -1,4 +1,5 @@
 import { stat } from 'node:fs/promises'
+import type { Stats } from 'node:fs'
 import { extname, isAbsolute, normalize, win32 } from 'node:path'
 import { parseRoutableExecutionHostId } from '../../shared/execution-host'
 import type { ShellOpenLocalPathFailureReason } from '../../shared/shell-open-types'
@@ -21,14 +22,27 @@ export async function validateLocalPathTarget(
     isAbsolute
   }
 ): Promise<{ ok: true; path: string } | { ok: false; reason: 'not-absolute' | 'not-found' }> {
+  const target = await statLocalTarget(pathValue, pathApi)
+  return target.ok ? { ok: true, path: target.path } : target
+}
+
+function statLocalTarget(
+  pathValue: string,
+  pathApi: { normalize: (path: string) => string; isAbsolute: (path: string) => boolean } = {
+    normalize,
+    isAbsolute
+  }
+): Promise<
+  { ok: true; path: string; stats: Stats } | { ok: false; reason: 'not-absolute' | 'not-found' }
+> {
   const normalizedPath = pathApi.normalize(pathValue)
   if (!pathApi.isAbsolute(normalizedPath)) {
-    return { ok: false, reason: 'not-absolute' }
+    return Promise.resolve({ ok: false, reason: 'not-absolute' })
   }
-  if (!(await pathExists(normalizedPath))) {
-    return { ok: false, reason: 'not-found' }
-  }
-  return { ok: true, path: normalizedPath }
+  return stat(normalizedPath).then(
+    (stats) => ({ ok: true as const, path: normalizedPath, stats }),
+    () => ({ ok: false as const, reason: 'not-found' as const })
+  )
 }
 
 /**
@@ -71,27 +85,18 @@ export type DefaultAppOpenTarget =
 export async function resolveDefaultAppOpenTarget(
   pathValue: string
 ): Promise<DefaultAppOpenTarget> {
-  const normalizedPath = normalize(pathValue)
-  if (!isAbsolute(normalizedPath)) {
-    return { ok: false, reason: 'not-absolute' }
+  const target = await statLocalTarget(pathValue)
+  if (!target.ok) {
+    return target
   }
-  let stats
-  try {
-    stats = await stat(normalizedPath)
-  } catch {
-    return { ok: false, reason: 'not-found' }
-  }
-  if (isExecutableOpenTarget(normalizedPath, stats)) {
+  if (isExecutableOpenTarget(target.path, target.stats)) {
     return { ok: false, reason: 'executable-target' }
   }
-  return { ok: true, path: normalizedPath }
+  return { ok: true, path: target.path }
 }
 
-function isExecutableOpenTarget(
-  path: string,
-  stats: { isFile: () => boolean; mode: number }
-): boolean {
-  if (EXECUTABLE_LAUNCH_EXTENSIONS.has(extname(path).toLowerCase())) {
+function isExecutableOpenTarget(path: string, stats: Stats): boolean {
+  if (EXECUTABLE_LAUNCH_EXTENSIONS.has(extname(path).trim().toLowerCase())) {
     return true
   }
   // Windows synthesizes mode bits, so the executable bit there is not evidence about the file.
