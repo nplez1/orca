@@ -1513,6 +1513,47 @@ entries passed on Linux** (22/23 pruned entries passed; one absent because it is
 test). So the Mac red set transfers clean, and the four failures are branch gap plus one upstream flake —
 no environment class of Linux's own, the same conclusion the dispatch reached.
 
+### `local(ci)`: the 10-28 merge re-enabled four workflows, and one wedged the cache lane
+
+`node local/check-actions-enablement.mjs` after the 2026-10-28 nightly repair reported **four**
+workflows active that are not on the fork's live list. Enablement is repository state, not tree state,
+so the merge re-enabled them with no diff a reader could see:
+
+- **`unit-module-cache.yml`** — the damaging one. It calls `unit-tests.yml` with
+  `runner: blacksmith-8vcpu-ubuntu-2404`, a label this fork provisions no runner for
+  (`gh api repos/nplez1/orca/actions/runners` → `total_count: 0`), so its push-triggered run
+  `40695036546` (2026-10-28T13:17Z, matched by the `**/package.json` path filter) sat `queued` with all
+  five shards for 12 h. Its `concurrency` group is the branch with `cancel-in-progress: true`, so it
+  also **superseded that evening's scheduled run** (`40781154313`, `22:35Z` → `skipped`) — which is how
+  a wedged run costs the cache lane without ever reporting red. Cancelled, then disabled.
+- `computer-macos-native.yml` — upstream's computer-use E2E on `macos-15`, triggered on every PR and
+  daily at 06:00 UTC. No consumer here, and the most expensive label in the set.
+- `wsl-orcad-e2e-frozen-runner-retry.yml` — inert in practice (it hangs off a `workflow_run` whose
+  parent is disabled) but it is upstream's lane, not this fork's.
+- `ci-branch-cache-sweep.yml` — benign and passing (one green run, `40762364436`), but not on the live
+  list either. Disabled for consistency; **re-enabling it deliberately — an `ALLOWED_INERT` entry plus
+  this record — is the alternative** if Actions cache storage becomes a problem, not leaving it as
+  unrecorded drift.
+
+After `--fix`: `76 workflows on nplez1/orca, 10 active (3 required + 7 allowed-inert)` and `OK`. The
+trade, named: the cache producer never had a working runner here, so nothing is lost by disabling it,
+but this fork publishes **no** PR transform cache at all (`pr.yml` is off, so there is no PR consumer
+either) and the nightly pays cold transforms. The useful follow-up is a repoint to `ubuntu-24.04-arm`
+so the producer's key matches the nightly's own restore, not a bare re-enable.
+
+**The nightly itself was already green, and the red an alarm names is stale.** Read at
+2026-10-29T01:00Z: `node local/check-nightly-liveness.mjs` → `PASS`; the newest verdict is run
+`40701735011` on `1776dcc575`, all five shards, and `5432633b47` after it touches docs only. The last
+**scheduled** run `40675428994` (`10:51Z`) is the red one, and it ran on `7b86cb08` — the pre-merge
+commit, before `029137ad95` (the sync's 25-file red set) and `1776dcc575` (a darwin-only cooldown
+assertion) existed. So a reader must date a red shard against `git log` before treating it as current;
+the run-level word on the Actions page is a day behind the tree.
+
+The Linux red set keeps its one entry. The daemon disconnect race failed again in that same scheduled
+run (`##[warning] unit shard tolerated a known Linux red, already triaged`) and passed in the two
+nightlies since — the second of which prompted its own prunable notice, because one pass is not the two
+consecutive green nights its `exit` condition asks for.
+
 ### `local(sync)`: a file upstream owns is restored, not deleted
 
 The fork deleted 39 files upstream still owns and still edits, so every one was a modify/delete conflict
