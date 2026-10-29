@@ -245,6 +245,7 @@ export function TaskPageJiraBoard({
               {board.sprintIssues.length === 0 &&
               board.sprintIsLast &&
               !board.sprintBlanked &&
+              !board.sprintError &&
               board.overview?.activeSprints.length ? (
                 <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                   {translate(
