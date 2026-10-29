@@ -127,3 +127,57 @@ test('the manifest entry is pending until a reviewer settles it', () => {
     reason: ''
   })
 })
+
+test('a member reached through an arrow body, a call argument or a nested literal is a name', () => {
+  // The shapes Zustand slices, factory calls and nested settings defaults actually use. Before this,
+  // every one of them returned nothing at all.
+  const text = [
+    'const useUiStore = create<State>((set) => ({ npFlag: true }))',
+    'const createUiSlice = (set) => ({ npSliceFlag: false })',
+    'const useSlice = create(() => ({ forkField: 1 }))',
+    'const DEFAULTS = { nested: { forkNested: 2 } }',
+    'function factory() { return { fromReturn: 1 } }',
+    'export default { forkMember: true, other: { deeper: 1 } }'
+  ].join('\n')
+  assert.deepEqual(names(text), [
+    'DEFAULTS',
+    'DEFAULTS.nested',
+    'DEFAULTS.nested.forkNested',
+    'createUiSlice',
+    'createUiSlice.npSliceFlag',
+    'default',
+    'default.forkMember',
+    'default.other',
+    'default.other.deeper',
+    'factory',
+    'factory.fromReturn',
+    'useSlice',
+    'useSlice.forkField',
+    'useUiStore',
+    'useUiStore.npFlag'
+  ])
+})
+
+test('a channel a top-level call registers is a name, and a nested one is not', () => {
+  const text = [
+    "ipcMain.handle('np:fork-channel', () => 1)",
+    'ipcMain.on(`np:template-channel`, () => 2)',
+    'function register() {',
+    "  ipcMain.handle('np:inside-a-function', () => 3)",
+    '}',
+    'register()'
+  ].join('\n')
+  const surface = forkSurface('src/main/ipc.ts', text)
+  assert.deepEqual([...surface.keys()].sort(), [
+    'channel:np:fork-channel',
+    'channel:np:template-channel',
+    'register'
+  ])
+  assert.equal(surface.get('channel:np:fork-channel').kind, 'channel')
+})
+
+test('a nested literal inside a class member is not invented', () => {
+  // Recursion follows object literals only; a class member's value is not one.
+  const text = 'export class Store {\n  method() { return { notAMember: 1 } }\n}'
+  assert.deepEqual(names(text), ['Store', 'Store.method'])
+})
