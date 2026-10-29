@@ -1,9 +1,12 @@
 import type { PreloadApi } from '../../../../preload/api-types'
+import type { JiraMutationResult } from '../../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
 import { readRuntimeJiraPayload } from '../../runtime/runtime-jira-payload-stream'
 import { RuntimeRpcCallError } from '../../runtime/runtime-rpc-result'
 import { assertJiraTransitionFieldsSupported } from '../../runtime/jira-capability-probe'
 import { foldIssueUpdateForCapabilities } from '../../runtime/runtime-jira-text-fields'
+import { rethrowJiraWriteTimeout } from '../../runtime/jira-write-deadline'
+import { JIRA_WRITE_RPC_TIMEOUT_MS } from '../../../../shared/jira/jira-write-deadline'
 import { callRuntimeResult, getRemoteRuntimeStatus } from './web-runtime-calls'
 import { assertActiveEnvironment, requireActiveEnvironment } from './web-runtime-session'
 
@@ -73,14 +76,27 @@ export function createWebJiraApi(): PreloadApi['jira'] {
     cancelGenerateIssueSummary: () => Promise.resolve(),
     // Why the probe: an older server would complete the transition without its
     // required fields, or reject a plain-text value it cannot shape for its site.
+    // Why the probe only when the payload needs it: a plain title edit gains nothing from
+    // a round trip, and a probe failure must not block a write it cannot shape.
     updateIssue: async ({ key, updates, siteId }) => {
-      const supports = await hostCapabilityProbe()
+      const needsCapabilities = Boolean(
+        updates.transitionFields ||
+        updates.transitionComment !== undefined ||
+        updates.textFieldKeys?.length
+      )
+      const supports = needsCapabilities
+        ? await hostCapabilityProbe()
+        : async (): Promise<boolean> => true
       await assertJiraTransitionFieldsSupported(supports, updates)
-      return jiraCall('updateIssue', {
-        key,
-        updates: await foldIssueUpdateForCapabilities(supports, updates),
-        siteId
-      })
+      return jiraCall<JiraMutationResult>(
+        'updateIssue',
+        {
+          key,
+          updates: await foldIssueUpdateForCapabilities(supports, updates),
+          siteId
+        },
+        JIRA_WRITE_RPC_TIMEOUT_MS
+      ).catch(rethrowJiraWriteTimeout)
     },
     addIssueComment: (args) => jiraCall('addIssueComment', args),
     issueComments: (args) => readJiraPayload('issueCommentsStream', 'issueComments', args),

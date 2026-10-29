@@ -12,15 +12,15 @@ import { runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
 export type JiraCapabilityProbe = (capability: RuntimeCapability) => Promise<boolean>
 
 /** The probe for a captured target: the local (or web) host runs this build, so a
- *  capability question only has an answer worth asking about a remote environment. */
+ *  capability question only has an answer worth asking about a remote environment.
+ *  Why no catch here: a status read that failed must not be reported to the user as
+ *  "update the server" — only the fold, which cannot fail a write, tolerates it. */
 export function jiraCapabilityProbeForTarget(target: RuntimeClientTarget): JiraCapabilityProbe {
   if (target.kind !== 'environment') {
     return async () => true
   }
   return (capability) =>
-    runtimeEnvironmentSupportsCapability(target.environmentId, capability, 30_000).catch(
-      () => false
-    )
+    runtimeEnvironmentSupportsCapability(target.environmentId, capability, 30_000)
 }
 
 /** Refuses a transition-fields write on a host that would drop the fields, instead of

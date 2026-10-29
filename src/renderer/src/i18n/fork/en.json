@@ -1002,7 +1002,12 @@
       "loadFailed": "Unable to load this Jira board."
     },
     "issue": {
-      "writeTimedOut": "Jira did not answer in time, so this change may not have been saved. Reload the issue."
+      "writeTimedOut": "Jira did not answer in time, so this change may not have been saved. Reload the issue.",
+      "transitionsError": "Failed to load status changes.",
+      "prioritiesError": "Failed to load the priorities this issue can be set to.",
+      "assignableUsersError": "Failed to load the people assignable to this issue.",
+      "editFieldsError": "Failed to load the fields you can edit on this issue.",
+      "sprintAssignmentError": "Failed to load this issue’s sprint."
     },
     "settings": {
       "boardLoadFailed": "Jira settings could not be loaded."

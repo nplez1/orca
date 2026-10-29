@@ -7,6 +7,11 @@ export const JIRA_WRITE_DEADLINE_MS = 45_000
  *  shared Jira request slot instead of holding it for the session. */
 export const JIRA_WRITE_FETCH_TIMEOUT_MS = 30_000
 
+/** Why above the host's fetch deadline: the host's own verdict on a write it aborted has
+ *  to reach the client first, or the client would time out into the blind rollback this
+ *  deadline exists to avoid. */
+export const JIRA_WRITE_RPC_TIMEOUT_MS = 60_000
+
 /** Reported when the fetch deadline fires: the write may still land, so callers
  *  re-read the issue rather than rolling the field back blindly. */
 export const JIRA_WRITE_TIMEOUT_MESSAGE =

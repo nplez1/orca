@@ -49,6 +49,8 @@ type TaskPageJiraBoardColumnsProps = {
    *  Start/Show workspace handler the row's hover cluster uses. */
   onOpenOrStartWorkspace?: (issue: JiraIssue) => void
   onStartWorkspace?: (issue: JiraIssue) => void
+  /** The sprint read failed, so an empty lane is unknown rather than empty. */
+  emptyStateUnknown?: boolean
 }
 
 function isSelected(issue: JiraIssue, selectedIssue: JiraIssue | null): boolean {
@@ -199,7 +201,8 @@ export function TaskPageJiraBoardColumns({
   onDropOther,
   dragOverColumnKey,
   onOpenOrStartWorkspace,
-  onStartWorkspace
+  onStartWorkspace,
+  emptyStateUnknown = false
 }: TaskPageJiraBoardColumnsProps): JSX.Element {
   const renderColumn = (
     key: string,
@@ -226,7 +229,7 @@ export function TaskPageJiraBoardColumns({
         <span className="text-2xs text-muted-foreground">{issues.length}</span>
       </div>
       <div className="space-y-2 p-2">
-        {issues.length === 0 ? (
+        {issues.length === 0 && !emptyStateUnknown ? (
           <p className="px-1 py-2 text-xs text-muted-foreground">
             {translate('auto.components.TaskPage.jiraBoardEmptyColumn', 'No issues')}
           </p>

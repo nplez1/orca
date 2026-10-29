@@ -47,9 +47,16 @@ export function jiraIssueRollbackPatch(
 }
 
 /** Deep equality for an editable field: scalars by value, a label list element-wise,
- *  and a status/priority/assignee by the id it points at. */
-function referenceId(value: unknown): unknown {
-  return typeof value === 'object' && value !== null && 'id' in value ? value.id : undefined
+ *  and a status/priority/assignee by the id it points at — `id` for a status or
+ *  priority, `accountId` for a Jira user. */
+function referenceKey(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) {
+    return undefined
+  }
+  if ('id' in value) {
+    return value.id
+  }
+  return 'accountId' in value ? value.accountId : undefined
 }
 
 function sameFieldValue(left: unknown, right: unknown): boolean {
@@ -59,11 +66,14 @@ function sameFieldValue(left: unknown, right: unknown): boolean {
   if (Array.isArray(left) && Array.isArray(right)) {
     return left.length === right.length && left.every((value, index) => value === right[index])
   }
-  const leftId = referenceId(left)
-  return leftId !== undefined && leftId === referenceId(right)
+  const leftKey = referenceKey(left)
+  return leftKey !== undefined && leftKey === referenceKey(right)
 }
 
-/** Whether a re-read carries the optimistic patch, for a write whose answer was lost. */
+/** Whether a re-read carries the optimistic patch, for a write whose answer was lost.
+ *  An optimistic patch that names no editable field (a sprint move) proves nothing, so
+ *  it counts as not landed rather than as a silent success. */
 export function jiraIssueFieldsLanded(issue: JiraIssue, patch: Partial<JiraIssue>): boolean {
-  return editedJiraIssueFields(patch).every((field) => sameFieldValue(issue[field], patch[field]))
+  const fields = editedJiraIssueFields(patch)
+  return fields.length > 0 && fields.every((field) => sameFieldValue(issue[field], patch[field]))
 }

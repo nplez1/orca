@@ -65,17 +65,15 @@ export async function jiraGetIssueSprintAssignment(
 ): Promise<JiraSprintAssignment | null> {
   const target = getJiraRuntimeTarget(settings)
   const args = { key, ...(siteId ? { siteId } : {}), ...(boardId ? { boardId } : {}) }
-  if (target.kind !== 'environment') {
-    return window.api.jira.getIssueSprintAssignment(args)
-  }
   try {
-    return await callRuntimeRpc<JiraSprintAssignment>(
-      target,
-      'jira.getIssueSprintAssignment',
-      args,
-      { timeoutMs: 30_000 }
-    )
+    return target.kind === 'environment'
+      ? await callRuntimeRpc<JiraSprintAssignment>(target, 'jira.getIssueSprintAssignment', args, {
+          timeoutMs: 30_000
+        })
+      : await window.api.jira.getIssueSprintAssignment(args)
   } catch (error) {
+    // Why outside the branch: the web client also talks to a server that may predate
+    // the method, and a missing method there must hide the control, not show an error.
     if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
       return null
     }

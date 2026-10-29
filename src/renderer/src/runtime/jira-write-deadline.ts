@@ -22,3 +22,18 @@ export async function withJiraWriteDeadline<TResult>(work: Promise<TResult>): Pr
   })
   return await Promise.race([work, expired])
 }
+
+// Why: every transport reports a lost answer in its own words, and a caller that treats
+// one as an ordinary failure rolls back a field the host may have saved.
+const TRANSPORT_TIMEOUT = /timed out|timeout/i
+
+/** Rethrows a transport timeout as the write-timeout the queue re-reads after. */
+export function rethrowJiraWriteTimeout(error: unknown): never {
+  if (error instanceof JiraWriteTimeoutError) {
+    throw error
+  }
+  if (error instanceof Error && TRANSPORT_TIMEOUT.test(error.message)) {
+    throw new JiraWriteTimeoutError()
+  }
+  throw error
+}

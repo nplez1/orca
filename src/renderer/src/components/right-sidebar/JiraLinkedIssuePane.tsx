@@ -147,6 +147,7 @@ export function JiraLinkedIssuePane({
               <IssueAssigneeCombobox
                 label={translate('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
                 roster={detail.users.map(jiraUserOption)}
+                rosterError={detail.usersError}
                 selected={displayed.assignee ? [jiraUserOption(displayed.assignee)] : []}
                 isSelf={viewerAccountId ? (option) => option.id === viewerAccountId : undefined}
                 search={searchAssignees}

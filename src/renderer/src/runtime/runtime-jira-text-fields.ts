@@ -23,7 +23,9 @@ export async function foldTextFieldsForCapabilities(
   if (!values || !textFieldKeys || textFieldKeys.length === 0) {
     return { values, textFieldKeys: textFieldKeys ? [...textFieldKeys] : undefined }
   }
-  if (await supports(JIRA_TEXT_FIELDS_RUNTIME_CAPABILITY)) {
+  // Why the tolerant read: shaping must never fail a write, so an unanswerable
+  // capability question takes the conservative path and sends the ADF it used to.
+  if (await supports(JIRA_TEXT_FIELDS_RUNTIME_CAPABILITY).catch(() => false)) {
     return { values, textFieldKeys: [...textFieldKeys] }
   }
   const folded = { ...values }

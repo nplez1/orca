@@ -225,6 +225,7 @@ export function TaskPageJiraBoard({
                 <TaskPageJiraBoardColumns
                   columns={filteredColumns.columns}
                   otherIssues={filteredColumns.otherIssues}
+                  emptyStateUnknown={Boolean(board.sprintError)}
                   selectedIssue={model.selectedJiraIssue}
                   issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
                   sourceContext={model.jiraTaskSourceContext}
