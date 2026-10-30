@@ -46,6 +46,31 @@ const FAILING_TEST_LIMIT = 5
 /** The manifest this runner's known reds live in; the Mac allowlist names a different environment. */
 export const DEFAULT_KNOWN_RED = 'local/nightly-linux-known-red.json'
 
+/**
+ * An unhandled error is a claim about the run, not about a test, and its headline can carry a
+ * machine-specific path (a pnpm store location, a dev-server URL). So a manifest entry may give a
+ * `match` regex source instead of an exact `headline`; either form tolerates the headline.
+ */
+export function unhandledMatchers(manifest) {
+  const declared = Array.isArray(manifest) ? manifest : []
+  return declared.map((entry) =>
+    typeof entry?.match === 'string'
+      ? new RegExp(entry.match)
+      : new RegExp(`^${String(entry?.headline ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+  )
+}
+
+export function toleratedUnhandled(headline, matchers = []) {
+  if (headline === TOLERATED_UNHANDLED_ERROR) {
+    return true
+  }
+  return matchers.some((matcher) => matcher.test(headline))
+}
+
+export function declaredUnhandledEntries(manifest) {
+  return Array.isArray(manifest?.unhandledErrors) ? manifest.unhandledErrors : []
+}
+
 /** One matcher for both this shard verdict and the cross-shard checker, so the two always agree. */
 function matchingEntry(knownRed, file, test) {
   return knownRed.find((entry) => entryMatchesFailure(entry, { file, test }))
@@ -119,7 +144,14 @@ function failedFilesWithoutFailingTest(report) {
  * unhandled errors were raised) and the test step's own outcome (so a failure the report cannot
  * explain still fails).
  */
-export function decideUnitShardVerdict({ reportText, logText, outcome, knownRed = [] }) {
+export function decideUnitShardVerdict({
+  reportText,
+  logText,
+  outcome,
+  knownRed = [],
+  unhandledErrors = []
+}) {
+  const unhandledMatcherList = unhandledMatchers(unhandledErrors)
   const problems = []
   const tolerated = []
   const absorbed = []
@@ -204,7 +236,7 @@ export function decideUnitShardVerdict({ reportText, logText, outcome, knownRed 
     )
   }
   for (const headline of unhandled.headlines) {
-    if (headline === TOLERATED_UNHANDLED_ERROR) {
+    if (toleratedUnhandled(headline, unhandledMatcherList)) {
       tolerated.push(headline)
     } else {
       problems.push(`unhandled error: ${headline}`)
@@ -265,14 +297,14 @@ function loadKnownRed(knownRedPath) {
       console.log(`::error::unit shard: cannot read the known-red manifest ${path}`)
       process.exit(1)
     }
-    return []
+    return { entries: [], unhandledErrors: [] }
   }
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     if (!Array.isArray(parsed.entries)) {
       throw new Error('no entries array')
     }
-    return parsed.entries
+    return parsed
   } catch (error) {
     console.log(`::error::unit shard: cannot read the known-red manifest ${path}: ${error.message}`)
     process.exit(1)
@@ -294,8 +326,14 @@ function main() {
     process.exit(1)
   }
 
-  const knownRed = loadKnownRed(knownRedPath)
-  const verdict = decideUnitShardVerdict({ reportText, logText, outcome, knownRed })
+  const manifest = loadKnownRed(knownRedPath)
+  const verdict = decideUnitShardVerdict({
+    reportText,
+    logText,
+    outcome,
+    knownRed: Array.isArray(manifest) ? manifest : manifest.entries,
+    unhandledErrors: declaredUnhandledEntries(manifest)
+  })
   for (const headline of verdict.tolerated) {
     console.log(
       `::warning::unit shard tolerated the Vitest worker teardown race (vitest-dev/vitest#11153): ${headline}`

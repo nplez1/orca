@@ -1551,6 +1551,19 @@ Three fixes with one cause: a signal that was **absent** was read as a signal th
   back to the merge's first parent (`HEAD^1..HEAD`, what that merge contributed) and to `unknown` when
   there is nothing to compare against, and `unknown` never waives. The `7811f60dd6` PASS above — "1
   flaky re-run passed" — was judged the old way, immediately after a 556-commit merge.
+- **Run-level unhandled errors are allowed by headline, and now by regex, on both lanes.** An
+  unhandled error is a claim about the run rather than about one test, and its headline can embed a
+  machine-specific path — a pnpm store location, a dev-server URL. `local/unit-known-red.json` and
+  `local/nightly-linux-known-red.json` therefore each carry an `unhandledErrors` list whose entries
+  may give a `match` regex source instead of an exact `headline`; `local/gate-unit.mjs` (via
+  `unit-gate-judgement.mjs`) and `local/check-unit-shard-verdict.mjs` honour both forms. Three
+  headlines are classified this way, and each is a **claim with a test**: monaco-editor's own
+  `CancellationError` raised when the editor is disposed, a `node-runtime` pool worker dying mid-run
+  (already documented here), and the browser-mode dev server failing to serve Monaco's TypeScript
+  worker because the URL embeds the dependency store path. None of the three names a repository file
+  or a test, and the runs that carried them had 0 unexpected named failures — which is the standard
+  they must keep: if a run ever reports one of these _and_ an unexpected failure, the failure is the
+  finding, not the headline.
 - `local/unit-known-red.json` entries carry an optional `match` regex, tested against the first line
   of the failure. Without it an entry matched on file and title alone, so an allowlisted test that
   started failing for a **new** reason stayed "known" for as long as its title did. 9 of the current 17

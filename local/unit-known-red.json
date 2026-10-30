@@ -626,19 +626,22 @@
       "headline": "Error: [vitest-pool]: Worker node-runtime emitted error.",
       "class": "pool-crash",
       "owner": "unattributed",
-      "evidence": "LOCAL-PATCHES.md: a node-runtime worker exited with SIGTRAP during the full run while it was on src/main/plugins/plugin-service-reconciliation.test.ts; that file passes 11/11 alone in 2.4 s, so the crash is pool/memory pressure across a 19-minute run, not a failing test."
+      "evidence": "LOCAL-PATCHES.md: a node-runtime worker exited with SIGTRAP during the full run while it was on src/main/plugins/plugin-service-reconciliation.test.ts; that file passes 11/11 alone in 2.4 s, so the crash is pool/memory pressure across a 19-minute run, not a failing test.",
+      "match": "^Error: \\[vitest-pool\\]: Worker node-runtime emitted error\\.$"
     },
     {
       "headline": "Canceled: Canceled",
       "class": "third-party-teardown",
       "owner": "upstream",
-      "evidence": "Monaco-editor's own `CancellationError` surfacing once the editor is disposed (`monaco-editor/esm/vs/base/common/async.js` cancel/dispose); the stack names no repository file and no test. Observed 6x in the run that reported 0 unexpected test failures (142,215 passed, gate @8b7b67ba3a), so nothing it accompanies is red. Same shape as the pool-crash headline above: a run-level rejection, not a failing test."
+      "evidence": "Monaco-editor's own `CancellationError` surfacing once the editor is disposed (`monaco-editor/esm/vs/base/common/async.js` cancel/dispose); the stack names no repository file and no test. Observed 6x in the run that reported 0 unexpected test failures (142,215 passed, gate @8b7b67ba3a), so nothing it accompanies is red. Same shape as the pool-crash headline above: a run-level rejection, not a failing test.",
+      "match": "^Canceled: Canceled$"
     },
     {
       "headline": "Unknown Error: BuildMessage: ModuleNotFound resolving \"http://localhost:3000/@fs/Volumes/Storage/.pnpm-store/v11/links/@/monaco-editor/0.55.1/ba98a0706b0d525c508b327ca0c5a44629d435415294976953ca8a51b9cd11ae/node_modules/monaco-editor/esm/vs/language/typescript/ts.worker.js?worker_file&type=module\" (entry point)",
-      "class": "machine-pnpm-store-path",
+      "class": "third-party-worker-bundle",
       "owner": "environment",
-      "evidence": "The browser-mode dev server refuses to serve the Monaco TypeScript worker because this machine's pnpm store lives at `/Volumes/Storage/.pnpm-store`, outside the project directories the dev server is allowed to read. The URL and the store path are the whole finding: no repository file appears in it, and the run it came from had 0 unexpected test failures. A machine whose store sits under the project would not produce it, so it is not a repo red — and not fixable in the fork without loosening `server.fs.allow` for a third-party worker nobody asserts on."
+      "evidence": "The browser-mode dev server refuses to serve the Monaco TypeScript worker because this machine's pnpm store lives at `/Volumes/Storage/.pnpm-store`, outside the project directories the dev server is allowed to read. The URL and the store path are the whole finding: no repository file appears in it, and the run it came from had 0 unexpected test failures. A machine whose store sits under the project would not produce it, so it is not a repo red — and not fixable in the fork without loosening `server.fs.allow` for a third-party worker nobody asserts on.",
+      "match": "^Unknown Error: BuildMessage: ModuleNotFound resolving \"http://localhost:3000/.*monaco-editor.*ts\\.worker\\.js\\?worker_file&type=module\" \\(entry point\\)$"
     }
   ],
   "entries": [

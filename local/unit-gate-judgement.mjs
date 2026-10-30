@@ -96,8 +96,17 @@ export function judgeUnhandled(headlines, entries) {
   }
   const known = []
   const blocking = []
+  // A headline can carry a machine-specific path (a pnpm store location, a dev-server URL), so an
+  // entry may declare a `match` regex source instead of an exact `headline`.
+  const matchers = declared.map((candidate) =>
+    typeof candidate.match === 'string' ? { candidate, regex: new RegExp(candidate.match) } : null
+  )
+  const matches = (candidate, headline) =>
+    typeof candidate.match === 'string'
+      ? matchers.find((m) => m.candidate === candidate).regex.test(headline)
+      : String(candidate.headline) === headline
   for (const [headline, count] of counts) {
-    const entry = declared.find((candidate) => String(candidate.headline) === headline)
+    const entry = declared.find((candidate) => matches(candidate, headline))
     if (entry) {
       known.push({ ...entry, headline, count })
     } else {

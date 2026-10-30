@@ -83,5 +83,25 @@
       "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
     }
   ],
-  "prunedSince": []
+  "prunedSince": [],
+  "unhandledErrors": [
+    {
+      "match": "^Canceled: Canceled$",
+      "class": "third-party-teardown",
+      "owner": "upstream",
+      "evidence": "monaco-editor's own CancellationError raised when the editor is disposed; the stack names no repository file and no test. Observed on both machines, in runs whose only named failures were already triaged."
+    },
+    {
+      "match": "^Error: \\[vitest-pool\\]: Worker node-runtime emitted error\\.$",
+      "class": "pool-crash",
+      "owner": "unattributed",
+      "evidence": "LOCAL-PATCHES.md records a node-runtime worker dying mid-run on this pool; it names no test, and the run it came from had every named failure already triaged. Same claim as the Mac manifest's entry."
+    },
+    {
+      "match": "^Unknown Error: BuildMessage: ModuleNotFound resolving \"http://localhost:3000/.*monaco-editor.*ts\\.worker\\.js\\?worker_file&type=module\" \\(entry point\\)$",
+      "class": "third-party-worker-bundle",
+      "owner": "upstream",
+      "evidence": "The browser-mode dev server cannot serve Monaco's TypeScript worker from the dependency store — the URL embeds the store path, which differs per machine and per runner. No repository file appears in it and no test asserts on it."
+    }
+  ]
 }
