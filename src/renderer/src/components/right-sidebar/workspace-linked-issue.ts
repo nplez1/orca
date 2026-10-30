@@ -193,7 +193,11 @@ export function linkedIssueFromAttachment(
         url: item.url || null,
         title: item.title || null
       }
-    default:
+    // The pane has no detail body for these, so an attachment of one is not selectable here.
+    case 'gitlab':
+    case 'bitbucket':
+    case 'azure-devops':
+    case 'gitea':
       return null
   }
 }
