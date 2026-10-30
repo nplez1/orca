@@ -223,7 +223,7 @@ describe('SshConnectionStore', () => {
       expect(sshStore.setTargetHidden('missing', true)).toBeNull()
     })
 
-    it('keeps the hidden flag across a config sync that rewrites the endpoint', () => {
+    it('keeps the hidden flag across a config sync that rewrites the endpoint', async () => {
       seedConfigTarget({ hidden: true })
       loadUserSshConfigMock.mockReturnValue([{ host: 'cluster' }])
       sshConfigHostsToTargetsMock.mockReturnValue([
@@ -237,7 +237,8 @@ describe('SshConnectionStore', () => {
         }
       ])
 
-      sshStore.importFromSshConfig()
+      // Why awaited: upstream's import returns { targets, repoReadoptions } and writes asynchronously.
+      await sshStore.importFromSshConfig()
 
       // A sync must not be a back door that un-hides the host.
       expect(sshStore.getTarget('ssh-config-1')?.hidden).toBe(true)

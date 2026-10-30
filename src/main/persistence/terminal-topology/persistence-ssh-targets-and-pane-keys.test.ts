@@ -458,7 +458,8 @@ describe('Store', () => {
         username: 'dev'
       }
     ])
-    sshStore.importFromSshConfig()
+    // Why awaited: the import writes asynchronously, so a flush right after it persists stale rows.
+    await sshStore.importFromSshConfig()
 
     store.flush()
     const reloaded = await createStore()

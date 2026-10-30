@@ -35,6 +35,12 @@ const jiraMock = vi.hoisted(() => ({
   }
 }))
 const shellMock = vi.hoisted(() => ({ openUrl: vi.fn() }))
+// LOCAL(nplez1): #234 routes the pill's link through the in-app router, not the shell bridge.
+const { openAppHttpLink } = vi.hoisted(() => ({ openAppHttpLink: vi.fn() }))
+vi.mock('@/lib/app-http-link-open', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openAppHttpLink
+}))
 const popoverMock = vi.hoisted(() => ({ contentMounted: true }))
 const jiraSearchMock = vi.hoisted(() => vi.fn(async (): Promise<JiraIssue[]> => []))
 const jiraConnectionMock = vi.hoisted(() => ({
@@ -283,7 +289,7 @@ describe('SmartWorkspaceNameField Jira accessibility', () => {
     expect(onClearSelectedSource).toHaveBeenCalledOnce()
 
     fireEvent.keyDown(pill as HTMLElement, { key: 'Enter', altKey: true })
-    expect(shellMock.openUrl).toHaveBeenCalledWith('https://github.com/orca/ide/issues/123')
+    expect(openAppHttpLink).toHaveBeenCalledWith('https://github.com/orca/ide/issues/123')
     expect(onPlainEnter).not.toHaveBeenCalled()
   })
 

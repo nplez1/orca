@@ -29,6 +29,13 @@ import { useSourceControlHostedReviewEligibility } from './use-hosted-review-eli
 import { useSourceControlHostedReviewState } from './use-hosted-review-state'
 import { useSourceControlPullRequestGeneration } from './use-pull-request-generation'
 
+// LOCAL(nplez1): #234 opens the new review through the in-app router, not the shell bridge.
+const { openAppHttpLink } = vi.hoisted(() => ({ openAppHttpLink: vi.fn() }))
+vi.mock('@/lib/app-http-link-open', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openAppHttpLink
+}))
+
 const runtime = vi.hoisted(() => ({ cancel: vi.fn(), generate: vi.fn() }))
 
 vi.mock('@/runtime/runtime-git-generation-client', async (importOriginal) => {
@@ -424,8 +431,7 @@ describe('useSourceControlHostedReviewCreation', () => {
   ])(
     'reveals the created PR only when its worktree is $name after the panel closed mid-run',
     async ({ selectedAtFinish, reveals }) => {
-      const openUrl = vi.fn()
-      vi.stubGlobal('api', { shell: { openUrl } })
+      const openUrl = openAppHttpLink.mockClear()
       useAppStore.setState({ activeWorktreeId: 'wt-1' })
       const { generate, finish } = deferredGeneration()
       const input = makeInput({

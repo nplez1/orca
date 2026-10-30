@@ -127,7 +127,7 @@ describe('runtime local create prepared-pool re-arm ordering', () => {
     createLocalMock.mockResolvedValueOnce({
       worktree,
       worktreePath: worktree.path,
-      includeCopyWarning: 'Some files were skipped.',
+      materializationWarning: 'Some files were skipped.',
       created: { path: worktree.path, head: 'abc', branch: 'app' },
       addResult: { upstreamWarning: 'Check the push destination.' },
       metadataResult: { lineage: null, workspaceLineage: null, warnings: [] }

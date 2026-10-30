@@ -44,24 +44,26 @@ describe('detectInstalledAgents disabled-agent filtering', () => {
 
   it('keeps a shared command for an enabled agent without reporting the disabled agent', async () => {
     Object.defineProperty(process, 'platform', { value: 'linux' })
+    // LOCAL(nplez1): this build's launcher is `orca-np`, which is what the agent-teams probe names.
     detectCommandsMock.mockImplementation(
       async (commands) =>
-        new Set(commands.filter((command) => command === 'claude' || command === 'orca'))
+        new Set(commands.filter((command) => command === 'claude' || command === 'orca-np'))
     )
 
     await expect(
       detectInstalledAgents(undefined, { disabledTuiAgents: ['claude'] })
     ).resolves.toEqual(['claude-agent-teams'])
     expect(detectCommandsMock).toHaveBeenCalledExactlyOnceWith(
-      expect.arrayContaining(['claude', 'orca']),
+      expect.arrayContaining(['claude', 'orca-np']),
       { context: undefined }
     )
 
     await expect(
       detectInstalledAgents(undefined, { disabledTuiAgents: ['claude-agent-teams'] })
     ).resolves.toEqual(['claude'])
-    expect(detectCommandsMock).toHaveBeenLastCalledWith(expect.not.arrayContaining(['orca']), {
-      context: undefined
-    })
+    expect(detectCommandsMock).toHaveBeenLastCalledWith(
+      expect.not.arrayContaining(['orca-np', 'orca-np-dev']),
+      { context: undefined }
+    )
   })
 })

@@ -15,6 +15,12 @@ import {
   seedRemoteWorktree
 } from './quick-open-file-list-test-harness'
 
+// Why the source module too: `runtime-file-client` re-exports the search from
+// `runtime-file-path-search-client`, so mocking only the listing module leaves the real search bound.
+vi.mock('@/runtime/runtime-file-path-search-client', async () => {
+  const mocks = await import('./__mocks__/quick-open-runtime-file-client')
+  return { searchRuntimeFilePaths: mocks.searchRuntimeFilePathsMock }
+})
 vi.mock('@/runtime/runtime-file-search-client', async () => {
   const mocks = await import('./__mocks__/quick-open-runtime-file-client')
   return {

@@ -213,7 +213,11 @@ describe('remote paired pane: does a client "working" row clear past the stale b
   // arbitrates across machines on `updatedAt`, so a host clock running behind leaves the raw row
   // non-terminal forever. The DOT still settles (the row is stale), and the dot is what the user
   // sees; pinned so a future fix has to change this deliberately.
-  it('cross-machine skew (client clock ahead): the raw row stays non-terminal working forever', () => {
+  // Upstream's freshness guard on the retention fallback (kept by the 2026-10-30 merge) means a
+  // stale client row no longer outlives the host's older-clock done. This still reads as skew —
+  // the host's timestamp precedes the client's own write — but the host verdict now wins, which is
+  // the fix the old version of this test was pinned to catch.
+  it('cross-machine skew (client clock ahead): the host done still retires the stale client row', () => {
     const store = seedPairedClientStore()
     replayClientOscWorking(store, T0)
 
@@ -234,11 +238,8 @@ describe('remote paired pane: does a client "working" row clear past the stale b
 
     const after = T0 + 2 * AGENT_STATUS_STALE_AFTER_MS + 1
     const entry = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
-    // The row is RETAINED as `working` (non-terminal) past the stale boundary,
-    // because the client clock outranks the host clock forever.
-    expect(entry?.state, 'raw row stays non-terminal working').toBe('working')
-    const fresh = isExplicitAgentStatusFresh(entry!, after, AGENT_STATUS_STALE_AFTER_MS)
-    expect(fresh, 'but it reads stale, so the yellow dot still clears').toBe(false)
+    // The host's done retires the row even though its stamp is older than the client write.
+    expect(entry?.state, 'host done retires the stale client row').toBe('done')
     expect(sidebarHasLiveWorking(store, after), 'yellow working dot clears').toBe(false)
   })
 

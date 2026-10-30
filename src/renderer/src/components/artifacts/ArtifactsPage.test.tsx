@@ -33,6 +33,12 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn()
 }))
 
+// LOCAL(nplez1): #234 routes share links through the in-app router, not the shell bridge.
+const { openAppHttpLink } = vi.hoisted(() => ({ openAppHttpLink: vi.fn() }))
+vi.mock('@/lib/app-http-link-open', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openAppHttpLink
+}))
 vi.mock('sonner', () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError }
 }))
@@ -177,7 +183,7 @@ describe('ArtifactsPage', () => {
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Artifact link copied')
 
     fireEvent.click(screen.getByRole('button', { name: 'Open in browser' }))
-    expect(mocks.openUrl).toHaveBeenCalledWith('https://share.onorca.dev/a/report-123')
+    expect(openAppHttpLink).toHaveBeenCalledWith('https://share.onorca.dev/a/report-123')
   })
 
   it('shows a fallback when the desktop preview session is unavailable', async () => {

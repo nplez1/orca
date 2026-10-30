@@ -20,6 +20,12 @@ import {
 import { PluginDetailPage } from './PluginDetailPage'
 import type { PluginPagePreview } from '../state/use-plugin-catalog'
 
+// LOCAL(nplez1): #234 routes the repository link through the in-app router.
+const { openAppHttpLink } = vi.hoisted(() => ({ openAppHttpLink: vi.fn() }))
+vi.mock('@/lib/app-http-link-open', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openAppHttpLink
+}))
 vi.mock('../../ui/tooltip', () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -193,7 +199,10 @@ describe('PluginDetailPage', () => {
       (button) => button.textContent === 'Repository'
     )
     await act(async () => repository?.click())
-    expect(window.api.shell.openUrl).toHaveBeenCalledWith('https://github.com/acme/icons')
+    expect(openAppHttpLink).toHaveBeenCalledWith(
+      'https://github.com/acme/icons',
+      expect.objectContaining({ event: expect.anything() })
+    )
   })
 
   it('never claims no access when the plugin could not be read, and retries', async () => {

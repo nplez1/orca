@@ -10,6 +10,12 @@ import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 
 const openUrl = vi.fn()
+const { openAppHttpLink } = vi.hoisted(() => ({ openAppHttpLink: vi.fn() }))
+// LOCAL(nplez1): #234 routes the link through this entry point, not straight to the shell bridge.
+vi.mock('@/lib/app-http-link-open', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openAppHttpLink
+}))
 const writeClipboardText = vi.fn().mockResolvedValue(undefined)
 const onOpenIssue = vi.fn()
 const onStartWorkspace = vi.fn()
@@ -57,7 +63,11 @@ async function openRowMenu(user: ReturnType<typeof userEvent.setup>) {
 }
 
 beforeEach(() => {
-  Object.assign(window, { api: { shell: { openUrl }, ui: { writeClipboardText } } })
+  // LOCAL(nplez1): #234 routes the issue link through the in-app router, whose system fallback is
+  // the explicit variant, so `openUrl` is no longer reached.
+  Object.assign(window, {
+    api: { shell: { openUrl, openUrlInSystemBrowser: openUrl }, ui: { writeClipboardText } }
+  })
   vi.clearAllMocks()
   localStorage.clear()
 })
@@ -114,7 +124,7 @@ describe('Jira task row context menu', () => {
     const user = userEvent.setup()
     const menu = await openRowMenu(user)
     await user.click(within(menu).getByRole('menuitem', { name: 'Open in Jira' }))
-    expect(openUrl).toHaveBeenCalledWith(issue.url)
+    expect(openAppHttpLink).toHaveBeenCalledWith(issue.url)
     expect(onOpenIssue).not.toHaveBeenCalled()
   })
 

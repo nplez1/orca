@@ -272,9 +272,11 @@ describe('openComputerUsePermissions', () => {
 
   it("falls back to this install's own helper bundle id when the plist is unreadable", async () => {
     resolveHelperAppPathMock.mockReturnValue('/Applications/Orca Computer Use.app')
-    vi.mocked(readFile)
-      .mockResolvedValueOnce('{"accessibility":"granted","screenshots":"granted"}')
-      .mockResolvedValueOnce('{"accessibility":"not-granted","screenshots":"not-granted"}')
+    // Why one reply: the reset reports the state it read *after* revoking, so there is no
+    // pre-reset snapshot to answer with.
+    vi.mocked(readFile).mockResolvedValueOnce(
+      '{"accessibility":"not-granted","screenshots":"not-granted"}'
+    )
     vi.mocked(spawnSync).mockReturnValue({ status: 0 } as ReturnType<typeof spawnSync>)
     // Why: an empty PlistBuddy reply is how the shared reader reports "unreadable".
     plistBuddyStdout.value = ''

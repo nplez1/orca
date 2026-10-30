@@ -176,7 +176,12 @@ describe('installLocalWatcher on a stopped WSL distro', () => {
         UNC_ROOT,
         UNC_ROOT,
         UNC_ROOT,
-        { cancelled: false, listeners: new Map(), indexConsumers: new Set(), abortController: new AbortController() },
+        {
+          cancelled: false,
+          listeners: new Map(),
+          indexConsumers: new Set(),
+          abortController: new AbortController()
+        },
         scheduleRetry
       )
     }
@@ -192,7 +197,13 @@ describe('installLocalWatcher on a stopped WSL distro', () => {
 
     it('retries instead of remembering the root unwatchable, and installs once the share answers', async () => {
       statMock.mockRejectedValueOnce(new Error('ENOENT')).mockRejectedValueOnce(new Error('ENOENT'))
-      const root = { listeners: new Map(), batch: createDebouncedBatch(), subscription: {} }
+      const root = {
+        listeners: new Map(),
+        batch: createDebouncedBatch(),
+        // Why: a cancelled install flushes through this controller, so the stub needs one.
+        indexReconciliationController: new AbortController(),
+        subscription: {}
+      }
       createWslWatcherMock.mockResolvedValue(root)
       const retries: (() => Promise<void>)[] = []
       const scheduleRetry = vi.fn(
