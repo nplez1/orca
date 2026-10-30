@@ -56,6 +56,11 @@ export const labelOnlyCreateCases: {
   }
 ]
 
+export const generatedNameCreateRequest: Pick<CreateWorktreeArgs, 'name' | 'nameWasGenerated'> = {
+  name: 'nautilus',
+  nameWasGenerated: true
+}
+
 export type FirstWorkRenameOutcome = {
   /** Post-attempt worktree, merged with whatever meta the rename wrote. */
   worktree: Worktree

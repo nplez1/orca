@@ -46,8 +46,12 @@ import { readClipboardImageSource } from './clipboard-image-source'
 import { readClipboardCopiedFilePaths } from './clipboard-copied-file-paths'
 import { buildClipboardImageThumbnail } from './clipboard-image-thumbnail'
 import { readClipboardNativeImage } from './clipboard-native-image'
-import { publishClipboardText } from './clipboard-text-publisher'
 import { restoreNativeChatPastes, sweepExpiredNativeChatPastes } from './native-chat-paste-files'
+import {
+  ClipboardPublisherBusyError,
+  publishClipboardOperation,
+  publishClipboardText
+} from './clipboard-text-publisher'
 import { savePastedTextAsFile, type SavePastedTextAsFileArgs } from './native-chat-pasted-text-file'
 import { agentSessionPastedImageName } from '../../shared/agent-session-attachments'
 import type { AgentSessionAttachmentStore } from '../native-chat/agent-session-attachments/agent-session-attachment-store'
@@ -213,12 +217,19 @@ export function registerClipboardHandlers(
           return { ok: false, reason: isENOENT(error) ? 'not-found' : 'invalid-path' }
         }
       }
-      return writeFileToClipboard(request.filePath, {
-        platform: process.platform,
-        desktop: process.env.XDG_CURRENT_DESKTOP,
-        resolveFilePath,
-        writeBuffer: (format, buffer) => clipboard.writeBuffer(format, buffer),
-        runProcess
+      return publishClipboardOperation(request.filePath.length * 2, () =>
+        writeFileToClipboard(request.filePath, {
+          platform: process.platform,
+          desktop: process.env.XDG_CURRENT_DESKTOP,
+          resolveFilePath,
+          writeBuffer: (format, buffer) => clipboard.writeBuffer(format, buffer),
+          runProcess
+        })
+      ).catch((error: unknown) => {
+        if (error instanceof ClipboardPublisherBusyError) {
+          return { ok: false, reason: 'clipboard-busy' }
+        }
+        throw error
       })
     }
   )
@@ -257,23 +268,25 @@ export function registerClipboardHandlers(
     } catch {
       return
     }
-    // createFromDataURL silently fails on large images in some macOS/Electron versions; decode base64 then use createFromBuffer.
-    const buffer = Buffer.from(contentBase64, 'base64')
-    try {
-      assertClipboardImageByteLengthWithinLimit(buffer.byteLength)
-    } catch {
-      return
-    }
-    const image = nativeImage.createFromBuffer(buffer)
-    if (image.isEmpty()) {
-      return
-    }
-    try {
-      assertClipboardImageDimensionsWithinLimit(image.getSize())
-    } catch {
-      return
-    }
-    clipboard.writeImage(image)
+    return publishClipboardOperation(contentBase64.length * 2, () => {
+      // createFromDataURL silently fails on large images in some macOS/Electron versions; decode base64 then use createFromBuffer.
+      const buffer = Buffer.from(contentBase64, 'base64')
+      try {
+        assertClipboardImageByteLengthWithinLimit(buffer.byteLength)
+      } catch {
+        return
+      }
+      const image = nativeImage.createFromBuffer(buffer)
+      if (image.isEmpty()) {
+        return
+      }
+      try {
+        assertClipboardImageDimensionsWithinLimit(image.getSize())
+      } catch {
+        return
+      }
+      clipboard.writeImage(image)
+    })
   })
 }
 

@@ -23,6 +23,7 @@ import type {
   JiraIssueUpdate,
   JiraTransition
 } from '../../../shared/jira/jira-types'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 export type JiraBoardMovePrompt = {
   issue: JiraIssue
@@ -154,9 +155,9 @@ export function JiraBoardMoveDialog({
             ) : null}
             <Button
               variant="secondary"
-              onClick={() => {
+              onClick={(event) => {
                 if (prompt) {
-                  void window.api.shell.openUrl(prompt.issue.url)
+                  openAppHttpLink(prompt.issue.url, { event })
                 }
               }}
             >

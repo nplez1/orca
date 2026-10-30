@@ -140,7 +140,7 @@ export abstract class RateLimitServiceInactiveAccounts extends RateLimitServiceP
             continue
           }
         }
-        const home = account.resolveHome()
+        const home = await account.resolveHome()
         if (home.kind === 'skip') {
           continue
         }

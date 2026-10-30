@@ -5,6 +5,7 @@ import type { EphemeralVmRecipeResultWarning } from '../../shared/ephemeral-vm-r
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
 import type { EphemeralVmRuntimeContextMenuItemRun } from '../../shared/ephemeral-vm-recipe-context-menu-runner'
 import type { EphemeralVmRuntimeReclaimed } from '../../shared/ephemeral-vm-runtime-reclaim'
+import type { EphemeralVmFailure } from '../../shared/ephemeral-vm-failure-copy'
 
 export type EphemeralVmApi = {
   listRecipes: (args: { repoId: string }) => Promise<{
@@ -13,6 +14,8 @@ export type EphemeralVmApi = {
     recipes: OrcaHooks['environmentRecipes']
     diagnostics: NonNullable<OrcaHooks['environmentRecipeDiagnostics']>
     message?: string
+    messageCode?: string
+    messageParams?: Record<string, string | number>
   }>
   listRecipeCatalog: () => Promise<
     {
@@ -53,7 +56,7 @@ export type EphemeralVmApi = {
         stderr: string
         warnings: EphemeralVmRecipeResultWarning[]
       }
-    | { ok: false; error: string; stderr: string; stdout: string }
+    | ({ ok: false; stderr: string; stdout: string } & EphemeralVmFailure)
   >
   cancelProvision: (args: { provisionId: string }) => Promise<{ cancelled: boolean }>
   onProvisionEvent: (

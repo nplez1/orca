@@ -28,6 +28,7 @@ import {
   uniquePathEntries
 } from './cli-install-path-format'
 import { runMacPrivilegedCommand, writeWindowsUserPath } from './cli-privileged-processes'
+import { isSameDirectoryEntry } from './cli-command-filesystem-transaction'
 import {
   invalidateWindowsUserPathRegistryCache,
   readFreshWindowsUserPathRegistry,
@@ -184,6 +185,10 @@ export abstract class CliInstallLocation {
       reachedDefaultCommandPath ||= isDefaultCommandPath
 
       if (!(await isExecutableFile(commandPath))) {
+        continue
+      }
+      // Orca terminals put the launcher's own dir first on PATH.
+      if (await isSameDirectoryEntry(commandPath, launcherPath)) {
         continue
       }
 

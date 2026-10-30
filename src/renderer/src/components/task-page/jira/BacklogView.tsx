@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { LoaderCircle } from 'lucide-react'
 import { formatRelativeTime } from '../task-page-source-context'
-import { getJiraStatusTone } from '../../task-page-jira-status-tone'
+import { getJiraStatusTone } from './task-page-jira-status-tone'
 
 type TaskPageJiraBoardState = ReturnType<typeof useTaskPageJiraBoard>
 

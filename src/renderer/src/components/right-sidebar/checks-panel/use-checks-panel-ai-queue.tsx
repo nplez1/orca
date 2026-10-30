@@ -1,5 +1,5 @@
 import { useSavedSourceControlActionStart } from '../use-saved-source-control-action-start'
-import { resolveSourceControlActionRecipe } from '../../../../../shared/source-control-ai'
+import { captureSourceControlActionSelection } from '../../../../../shared/source-control-ai-operation-policy'
 import {
   checksPanelReviewStableKey,
   clearPendingPRCommentAiAck,
@@ -66,7 +66,7 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
   const savedStart = useSavedSourceControlActionStart()
   const openOrStart = (composer: ChecksAgentComposerState): void => {
     void savedStart.start(() => {
-      const recipe = resolveSourceControlActionRecipe({
+      const selection = captureSourceControlActionSelection({
         settings: model.settings,
         repo,
         actionId: composer.actionId
@@ -92,7 +92,7 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
               )
           }
       const launchContext = {
-        initialRecipe: recipe,
+        initialSelection: selection,
         worktreeId: activeWorktreeId,
         groupId: activeWorktreeId,
         connectionId: model.activeConnectionId,
@@ -102,7 +102,7 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
       }
       return {
         ...launchContext,
-        recipe,
+        selection,
         basePrompt: composer.prompt,
         settings: model.settings,
         repo,

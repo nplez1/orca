@@ -38,6 +38,7 @@ type NewWorkspaceComposerAdvancedSectionProps = Pick<
   | 'onNameValueChange'
   | 'selectedRepoIsGit'
   | 'branchesEnabled'
+  | 'canReuseSelectedBranch'
   | 'branchNameOverride'
   | 'onBranchNameOverrideChange'
   | 'parentWorktreeId'
@@ -85,6 +86,7 @@ export function NewWorkspaceComposerAdvancedSection({
   onNameValueChange,
   selectedRepoIsGit,
   branchesEnabled = true,
+  canReuseSelectedBranch,
   branchNameInputId,
   branchNameOverride,
   onBranchNameOverrideChange,
@@ -196,6 +198,7 @@ export function NewWorkspaceComposerAdvancedSection({
 
           {selectedRepoIsGit &&
           branchesEnabled &&
+          !canReuseSelectedBranch &&
           (!smartNameSelection || smartNameSelection.kind === 'branch') ? (
             <div className="space-y-1">
               <label

@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, Check } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import SmartWorkspaceNameField from '@/components/new-workspace/SmartWorkspaceNameField'
 import { TaskImpliedSourceNameField } from './TaskImpliedSourceNameField'
 import { LockedComposerValue } from './LockedComposerValue'
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { shouldShowComposerBaseRefPicker } from './base-ref-picker-visibility'
 import { ComposerBaseRefPicker } from './ComposerBaseRefPicker'
+import { ComposerBranchChoice } from './ComposerBranchChoice'
 import type { NewWorkspaceComposerCardProps } from './new-workspace-composer-card-props'
 
 type NewWorkspaceComposerNameSectionProps = Pick<
@@ -42,7 +43,11 @@ type NewWorkspaceComposerNameSectionProps = Pick<
   | 'forkPushWarning'
   | 'canReuseSelectedBranch'
   | 'reuseSelectedBranch'
+  | 'reuseEligibleBranch'
+  | 'branchNameOverride'
+  | 'onBranchNameOverrideChange'
   | 'onReuseSelectedBranchChange'
+  | 'onOpenSelectedBranchWorkspace'
   | 'baseBranch'
   | 'onBaseBranchChange'
   | 'startFromResetHint'
@@ -84,7 +89,11 @@ export function NewWorkspaceComposerNameSection({
   forkPushWarning,
   canReuseSelectedBranch,
   reuseSelectedBranch,
+  reuseEligibleBranch,
+  branchNameOverride,
+  onBranchNameOverrideChange,
   onReuseSelectedBranchChange,
+  onOpenSelectedBranchWorkspace,
   baseBranch,
   onBaseBranchChange,
   startFromResetHint,
@@ -199,49 +208,23 @@ export function NewWorkspaceComposerNameSection({
       ) : null}
       <div
         className={cn(
-          'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
+          'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
           showReuseBranchOption ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         )}
         aria-hidden={!showReuseBranchOption}
+        inert={!showReuseBranchOption}
       >
         <div className="min-h-0">
-          <div className="space-y-1 pt-1">
-            <label className="group flex w-fit items-center gap-2 text-xs text-foreground">
-              <span
-                className={cn(
-                  'flex size-4 items-center justify-center rounded-[3px] border shadow-sm transition',
-                  reuseSelectedBranch
-                    ? 'border-emerald-500/60 bg-emerald-500 text-white'
-                    : 'border-foreground/20 bg-background dark:border-white/20 dark:bg-muted/10'
-                )}
-              >
-                <Check
-                  className={cn(
-                    'size-3 transition-opacity',
-                    reuseSelectedBranch ? 'opacity-100' : 'opacity-0'
-                  )}
-                />
-              </span>
-              <input
-                type="checkbox"
-                checked={reuseSelectedBranch}
-                onChange={(event) => onReuseSelectedBranchChange(event.target.checked)}
-                disabled={!canReuseSelectedBranch}
-                className="sr-only"
-              />
-              <span>
-                {translate(
-                  'auto.components.NewWorkspaceComposerCard.reuseExistingBranch',
-                  'Reuse branch'
-                )}
-              </span>
-            </label>
-            <p className="pl-6 text-[11px] text-muted-foreground">
-              {translate(
-                'auto.components.NewWorkspaceComposerCard.reuseExistingBranchHint',
-                'Check out the existing branch instead of creating a new one from it.'
-              )}
-            </p>
+          <div className="pt-3">
+            <ComposerBranchChoice
+              existingBranchName={reuseEligibleBranch ?? smartNameSelection?.label}
+              reuseSelectedBranch={reuseSelectedBranch}
+              onReuseSelectedBranchChange={onReuseSelectedBranchChange}
+              branchNameOverride={branchNameOverride}
+              onBranchNameOverrideChange={onBranchNameOverrideChange}
+              onOpenSelectedBranchWorkspace={onOpenSelectedBranchWorkspace}
+              disabled={!canReuseSelectedBranch}
+            />
           </div>
         </div>
       </div>

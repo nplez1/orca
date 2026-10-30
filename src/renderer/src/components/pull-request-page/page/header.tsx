@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import { getSolidStateTone } from '../presentation/state-badge'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 export function PullRequestPageHeader({
   workItem,
@@ -123,7 +124,7 @@ export function PullRequestPageHeader({
                   variant="ghost"
                   size="icon-sm"
                   data-link-url={workItem.url}
-                  onClick={() => window.api.shell.openUrl(workItem.url)}
+                  onClick={(event) => openAppHttpLink(workItem.url, { event })}
                   aria-label={translate(
                     'auto.components.PullRequestPage.8ecda455a0',
                     'Open on GitHub'
@@ -192,7 +193,7 @@ export function PullRequestPageHeader({
                     {translate('auto.components.PullRequestPage.1a2570e18e', 'Start new workspace')}
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem onSelect={() => window.api.shell.openUrl(workItem.url)}>
+                <DropdownMenuItem onSelect={() => openAppHttpLink(workItem.url)}>
                   <ExternalLink className="size-4" />
                   {translate('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}
                 </DropdownMenuItem>

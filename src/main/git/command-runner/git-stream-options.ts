@@ -7,6 +7,8 @@ export type GitStreamOptions = {
   cwd: string
   env?: NodeJS.ProcessEnv
   wslDistro?: string
+  /** Runs the host's Git even in a WSL-runtime project (local-git-runtime-route.ts); say why. */
+  hostGit?: true
   preferWslDirectGit?: boolean
   signal?: AbortSignal
   /** Byte backstop; defaults to DEFAULT_GIT_MAX_BUFFER. */

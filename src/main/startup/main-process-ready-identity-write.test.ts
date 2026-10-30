@@ -161,7 +161,7 @@ vi.mock('./dev-education-suppression', () => ({
   suppressDevEducationForStore: vi.fn()
 }))
 vi.mock('../browser/browser-session-proxy', () => ({
-  applyBrowserSessionProxies: vi.fn(async () => {}),
+  awaitBrowserSessionProxies: vi.fn(async () => {}),
   setBrowserNetworkProxySettingsResolver: vi.fn(),
   invalidateBrowserSessionProxyApplication: vi.fn()
 }))

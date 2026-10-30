@@ -2,10 +2,12 @@ import { ImeTextarea } from '@/lib/ime-text-field'
 import { CornerDownLeft, Pencil, Trash } from 'lucide-react'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { getDiffCommentLineLabel } from '@/lib/diff-comment-compat'
+import { getDiffCommentLineMetaLabel } from './diff-comment-line-meta-label'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useCommentCardResize } from './useCommentCardResize'
 import { translate } from '@/i18n/i18n'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 // Render note cards in per-zone React roots; keep persisted DiffComment names while UI says Note to distinguish PR review comments.
 
@@ -50,6 +52,8 @@ export function DiffCommentCard({
   onSubmitEdit,
   headerActions
 }: Props): React.JSX.Element {
+  // Zone cards live in separate React roots, so subscribe directly to language changes.
+  useUiLanguageRevision()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(body)
   const [submitting, setSubmitting] = useState(false)
@@ -100,8 +104,13 @@ export function DiffCommentCard({
   const trimmedDraft = draft.trim()
   const canSubmit = !submitting && trimmedDraft.length > 0 && trimmedDraft !== body
   const lineLabel =
-    label === undefined ? getDiffCommentLineLabel({ lineNumber, startLine }).toLowerCase() : label
-  const metaText = [author || 'Note', lineLabel, createdAtLabel || (sentAt ? 'sent' : null)]
+    label === undefined ? getDiffCommentLineMetaLabel({ lineNumber, startLine }) : label
+  const metaText = [
+    author || translate('auto.components.diff.comments.DiffCommentCard.noteAuthorFallback', 'Note'),
+    lineLabel,
+    createdAtLabel ||
+      (sentAt ? translate('auto.components.diff.comments.DiffCommentCard.sentMeta', 'sent') : null)
+  ]
     .filter(Boolean)
     .join(' ')
 
@@ -160,7 +169,7 @@ export function DiffCommentCard({
                     onClick={(ev) => {
                       ev.preventDefault()
                       ev.stopPropagation()
-                      void window.api.shell.openUrl(url)
+                      openAppHttpLink(url, { event: ev })
                     }}
                   >
                     {translate('auto.components.diff.comments.DiffCommentCard.6978871a3d', 'Open')}

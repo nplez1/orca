@@ -17,6 +17,8 @@ export type WorktreeProvisionTerminalOptions = {
   activate?: boolean
   surfaceOwner?: false
   keepPaneOnStartFailure?: true
+  /** The worktree's create was the user's act (E9). */
+  wslUserAct?: true
 }
 
 export type WorktreeTerminalProvisioningHost = {
@@ -42,7 +44,12 @@ export type WorktreeTerminalProvisioningHost = {
   armWorktreeSetupRunner?: (handle: string, worktreeId: string, completionToken: string) => void
 }
 
+// What every terminal of this create shares: who surfaces it, and whether the create was the user's act (E9).
+type TerminalSurfacing = { surfaceOwner?: false; wslUserAct?: true }
+
 export type WorktreeTerminalProvisioningArgs = {
+  /** The create was the user's act: its terminals may start a stopped WSL distro. */
+  wslUserAct?: true
   worktreeSelector: string
   worktreeId: string
   worktreePath: string
@@ -65,7 +72,7 @@ export async function createWorktreeDefaultTabTerminals(
   selector: string,
   worktreeId: string,
   defaultTabs: CreateWorktreeResult['defaultTabs'] | undefined,
-  surfacing: { surfaceOwner?: false } = {},
+  surfacing: TerminalSurfacing = {},
   startupHandle?: string
 ): Promise<string[]> {
   if (!defaultTabs || defaultTabs.tabs.length === 0 || !host.canSpawn()) {
@@ -114,7 +121,7 @@ async function startDefaultTabsInLayout(
     selector: string
     worktreeId: string
     defaultTabs: NonNullable<CreateWorktreeResult['defaultTabs']>
-    surfacing: { surfaceOwner?: false }
+    surfacing: TerminalSurfacing
   },
   templates: NonNullable<CreateWorktreeResult['defaultTabs']>['tabs']
 ): Promise<string[]> {
@@ -186,7 +193,10 @@ export async function provisionWorktreeTerminals(
   if (!host.canSpawn()) {
     return { setupSpawned: false, setupTerminalHandle: null }
   }
-  const surfacing = args.surfaceOwner === false ? { surfaceOwner: false as const } : {}
+  const surfacing: TerminalSurfacing = {
+    ...(args.surfaceOwner === false ? { surfaceOwner: false as const } : {}),
+    ...(args.wslUserAct ? { wslUserAct: true as const } : {})
+  }
   let setupSpawned = false
   let setupTerminalHandle: string | null = null
   let shellSkippedForSetup = false

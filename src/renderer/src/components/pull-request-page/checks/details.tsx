@@ -16,6 +16,7 @@ import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { assignUniqueListKeys } from './details-list-keys'
 import { useDelayedFlag } from '@/hooks/use-delayed-flag'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 export function CheckDetailsPanel({
   check,
@@ -254,7 +255,7 @@ export function CheckDetailsPanel({
                 size="xs"
                 className="h-7 gap-1 px-2 text-[11px]"
                 data-link-url={openUrl}
-                onClick={() => window.api.shell.openUrl(openUrl)}
+                onClick={(event) => openAppHttpLink(openUrl, { event })}
               >
                 {translate('auto.components.PullRequestPage.1b14d0a69c', 'Open in GitHub')}
                 <ExternalLink className="size-3" />

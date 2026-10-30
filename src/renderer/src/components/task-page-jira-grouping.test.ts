@@ -16,7 +16,7 @@ import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspa
 import {
   getSingleJiraProjectScope,
   loadTaskPageJiraProjectStatusOrder
-} from './task-page-jira-status-order'
+} from './task-page/jira/task-page-jira-status-order'
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira/jira-types'
 import type { Worktree } from '../../../shared/worktree/types'
 

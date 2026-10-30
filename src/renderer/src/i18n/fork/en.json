@@ -1179,7 +1179,9 @@
       "unsupported": null
     },
     "workspace": {
-      "openFailed": null
+      "openFailed": null,
+      "single": "1 workspace linked to {{key}}",
+      "count": "{{count}} workspaces linked to {{key}}"
     }
   },
   "prChecks": {
@@ -1262,6 +1264,9 @@
   "workspace": {
     "exactBranch": {
       "updateRuntime": "Update the remote runtime to copy a workspace to it"
+    },
+    "activity": {
+      "setup": "Setting up…"
     }
   }
 }

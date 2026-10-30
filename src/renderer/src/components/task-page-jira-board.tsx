@@ -27,6 +27,7 @@ import {
   buildJiraIssueRowWorkspaceAction,
   jiraIssueWorkspaceActionLabel
 } from './jira-issue-row-actions'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 export function jiraBoardIssueRefKey(issue: Pick<JiraIssue, 'key' | 'siteId'>): string {
   return `${issue.siteId ?? 'site'}:${issue.key}`
@@ -286,7 +287,7 @@ export function TaskPageJiraBoard({
                                 size="icon-xs"
                                 onClick={(event) => {
                                   event.stopPropagation()
-                                  void window.api.shell.openUrl(issue.url)
+                                  openAppHttpLink(issue.url, { event })
                                 }}
                                 aria-label={translate(
                                   'auto.components.TaskPage.4ac8ff2275',

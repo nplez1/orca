@@ -303,14 +303,14 @@ describe('AntigravityHookService', () => {
             OldEvent: [
               {
                 type: 'command',
-                command: '/home/dev/.orca/agent-hooks/antigravity-hook.sh'
+                command: '/home/dev/.orca-np/agent-hooks/antigravity-hook.sh'
               }
             ],
             PreToolUse: [
               {
                 matcher: '*',
                 hooks: [
-                  { type: 'command', command: '/home/dev/.orca/agent-hooks/antigravity-hook.sh' }
+                  { type: 'command', command: '/home/dev/.orca-np/agent-hooks/antigravity-hook.sh' }
                 ]
               }
             ]
@@ -337,7 +337,7 @@ describe('AntigravityHookService', () => {
         '/'
       )
     )
-    expect(preToolCommands[0]).not.toContain('/home/dev/.orca/agent-hooks/antigravity-hook.sh')
+    expect(preToolCommands[0]).not.toContain('/home/dev/.orca-np/agent-hooks/antigravity-hook.sh')
     const commands = config['orca-status'].PostToolUse.flatMap((definition) =>
       (definition.hooks ?? []).map((hook) => hook.command)
     )

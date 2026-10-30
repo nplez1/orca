@@ -50,6 +50,8 @@ export function useChecksDetailTimer({
     isGitLabReview ? activeGitLabReview.number : prNumber
   ].join(':')
   const reviewHeadSha = activeGitLabReview?.headSha ?? pr?.headSha ?? null
+  // The first read after the panel opens (or its review changes) is the user looking; later polls are background (E9).
+  const wakeNextReadRef = useRef(true)
   useEffect(() => {
     if (lastIdentityRef.current !== requestIdentity) {
       const previousReview = lastReviewRef.current
@@ -62,6 +64,7 @@ export function useChecksDetailTimer({
       // back with the run that preceded it. Force it and a new head never inherits the old rows.
       forceNextFetchRef.current =
         previousReview?.key === reviewKey && previousReview.headSha !== reviewHeadSha
+      wakeNextReadRef.current = true
       policyRef.current.reset()
       pollIntervalRef.current = 60_000
       prevChecksRef.current = ''
@@ -69,6 +72,7 @@ export function useChecksDetailTimer({
       setComments([])
     }
     if (!isPanelVisible || (!isGitLabReview && !prNumber)) {
+      wakeNextReadRef.current = true
       return
     }
     // The one rule the scheduler and the attempt guard both read. Returning it from one place is what
@@ -117,6 +121,8 @@ export function useChecksDetailTimer({
           return
         }
         const token = Symbol()
+        const shown = wakeNextReadRef.current
+        wakeNextReadRef.current = false
         const force = forceNextFetchRef.current
         inFlightRef.current = { identity: requestIdentity, token }
         hasAttemptedRef.current = true
@@ -129,7 +135,7 @@ export function useChecksDetailTimer({
         try {
           await (isGitLabReview
             ? fetchGitLabDetails({ background })
-            : fetchChecks({ force, background }))
+            : fetchChecks({ force, background, ...(shown ? { wakeWslDistro: true } : {}) }))
         } finally {
           if (inFlightRef.current?.token === token) {
             inFlightRef.current = null

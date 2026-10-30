@@ -20,6 +20,7 @@ import type { PullRequestPageProjectOrigin } from '../page-types'
 import { translate } from '@/i18n/i18n'
 import type { GitHubPRMergeStatePresentation } from '@/components/github-pr-merge-state'
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
+import { codeHostErrorText } from '@/lib/code-host-error-copy'
 
 export async function changePullRequestState(args: {
   canMutateState: boolean
@@ -176,7 +177,7 @@ export async function mergePullRequest(args: {
             prRepo: args.prRepo
           })
     if (!result.ok) {
-      toast.error(result.error)
+      toast.error(codeHostErrorText(result))
       return
     }
     args.applyStatePatch('merged')
@@ -248,7 +249,7 @@ export async function setPullRequestAutoMerge(args: {
             prRepo: args.prRepo
           })
     if (!result.ok) {
-      toast.error(result.error)
+      toast.error(codeHostErrorText(result))
       return
     }
     if (args.mergeTarget.kind === 'environment') {

@@ -14,6 +14,7 @@ import { useStatusBarMenuFocusHandoff } from './ProviderDetailsMenu'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 import { useStatusBarDensity } from './status-bar-density'
 import { getUsageOwnerHostScope, useOwnerUsageRateLimits } from './use-owner-usage-rate-limits'
+import { translate } from '@/i18n/i18n'
 
 export function useStatusBarController(floatingTerminalOpen: boolean) {
   const floatingTerminalShortcut = useShortcutLabel('floatingTerminal.toggle')
@@ -88,7 +89,10 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     setIsRefreshing(true)
     try {
       // Why: re-run PATH detection so a freshly-installed/removed CLI's bar appears/hides without restarting Orca.
-      await Promise.all([(refreshRemote ?? refreshRateLimits)(), refreshDetectedAgents()])
+      await Promise.all([
+        (refreshRemote ?? refreshRateLimits)(),
+        refreshDetectedAgents(undefined, { wakeWslDistro: true })
+      ])
     } finally {
       if (mountedRef.current) {
         setIsRefreshing(false)
@@ -123,8 +127,11 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const anyVisible = hasVisibleUsageMeters || showResourceUsage
 
   const floatingTerminalActionLabel = floatingTerminalOpen
-    ? 'Minimize Floating Workspace'
-    : 'Show Floating Workspace'
+    ? translate(
+        'auto.components.status.bar.floatingWorkspace.minimize',
+        'Minimize Floating Workspace'
+      )
+    : translate('auto.components.status.bar.floatingWorkspace.show', 'Show Floating Workspace')
   const showFloatingWorkspaceAttentionDot = !floatingTerminalOpen && hasFloatingUnread
 
   // Why: the shown accounts are the owning host's; without a scope Settings opens on the default host.

@@ -1,3 +1,4 @@
+import { taskProviderErrorMessage, taskProviderErrorText } from '@/lib/task-provider-error-copy'
 import { useState } from 'react'
 import { ChevronDown, CircleAlert, ExternalLink, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,7 @@ import type {
   JiraMutationResult,
   JiraTransition
 } from '../../../shared/jira/jira-types'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 type Props = {
   issue: JiraIssue
@@ -79,7 +81,7 @@ export function JiraIssueTransitionControl({
       // so it can name the field Jira refused beside the control that failed.
       return {
         ok: false,
-        error: result.error,
+        error: taskProviderErrorMessage(result),
         ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
         ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
       }
@@ -88,7 +90,7 @@ export function JiraIssueTransitionControl({
         ok: false,
         error:
           error instanceof Error
-            ? error.message
+            ? taskProviderErrorText(error.message)
             : translate(
                 'auto.components.JiraIssueWorkspace.ea21952aa3',
                 'Failed to update Jira issue.'
@@ -217,7 +219,7 @@ export function JiraIssueTransitionControl({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => void window.api.shell.openUrl(issue.url)}
+                onClick={(event) => openAppHttpLink(issue.url, { event })}
               >
                 <ExternalLink className="size-3" />
                 {translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}

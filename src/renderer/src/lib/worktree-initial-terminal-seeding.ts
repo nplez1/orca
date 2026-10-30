@@ -126,6 +126,7 @@ export function ensureWorktreeHasInitialTerminal(
       ...(sequenced.startupEnv ? { env: { ...startup.env, ...sequenced.startupEnv } } : {})
     }
     wrappedSetupCommandStr = sequenced.setupCommand
+    setup = { ...setup, envVars: { ...setup.envVars, ...sequenced.setupEnv } }
   }
 
   const backendStartupTerminalSpawned = opts?.backendStartupTerminalSpawned === true

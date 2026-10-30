@@ -14,13 +14,8 @@ import { isPositiveHostedReviewNumber } from '../../../../../../shared/hosted-re
 import { displayNameUpdatePinsLabel } from '../../../../../../shared/worktree/display-name-provenance'
 import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../../../shared/sidebar-inputs-switch'
-import { applyWorktreeUpdates, getRepoIdFromWorktreeId } from '../../worktree-helpers'
-import { getHostedReviewCacheKey } from '../../hosted-review-cache-identity'
-import { getGitHubPRCacheKeyCandidates } from '../../../../../../shared/github/github-cache-key'
-import {
-  applyDetectedWorktreeUpdates,
-  findKnownWorktreeById
-} from '../listing/detected-worktree-meta'
+import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
+import { findKnownWorktreeById } from '../listing/detected-worktree-meta'
 import {
   bumpHostedReviewLinkMutationGeneration,
   hasChangedHostedReviewLinkUpdates,
@@ -34,6 +29,7 @@ import { persistWorktreeMeta } from './worktree-meta-persist'
 import { planWorktreeRename, settleWorktreeRename } from './worktree-rename-across-hosts'
 import { updateFolderWorkspaceMeta } from './folder-workspace-meta-update'
 import { refreshHostedReviewAfterMetaUpdate } from './refresh-hosted-review-after-meta-update'
+import { buildWorktreeMetaStateUpdate } from './worktree-meta-state-update'
 import { withPendingSidebarRowWrites } from '@/lib/sidebar-pending-layer'
 import { isRuntimeSelectorNotFoundError } from '../listing/runtime-worktree-rpc-errors'
 import { runtimeTargetForWorktreeOwner } from '../listing/worktree-owner-target'
@@ -158,8 +154,12 @@ export function createUpdateWorktreeMeta(
     // workspace is renamed; a host that refuses keeps its name and is reported.
     const renamePlan = planWorktreeRename(get(), worktreeId, enriched, executionHostId)
 
+    // A failed save must leave the error visible even when the recovery fetch also fails.
+    const deferUpdate =
+      mutationUpdates.firstAgentMessageRenameError === null &&
+      mutationUpdates.displayName === undefined
     let didApply = false
-    set((s) => {
+    const buildUpdate = (s: ReturnType<WorktreeSliceGet>) => {
       if (
         shouldApplyUpdate &&
         !shouldApplyUpdate(findKnownWorktreeById(s, worktreeId, executionHostId))
@@ -169,77 +169,19 @@ export function createUpdateWorktreeMeta(
       didApply = true
       // Why the plan first: a rename covers every same-id row, and only with the name itself — the
       // rest of a mixed update belongs to the host the user edited.
-      const base = renamePlan ? renamePlan.applyOptimistic(s) : s
-      const nextWorktrees = applyWorktreeUpdates(
-        base.worktreesByRepo,
+      const base = renamePlan ? { ...s, ...renamePlan.applyOptimistic(s) } : s
+      return buildWorktreeMetaStateUpdate(base, {
         worktreeId,
-        enriched,
-        executionHostId
-      )
-      const nextDetectedWorktrees = applyDetectedWorktreeUpdates(
-        base.detectedWorktreesByRepo,
-        worktreeId,
-        enriched,
-        executionHostId
-      )
-      const cacheKey =
-        reviewRepo && reviewBranch
-          ? getHostedReviewCacheKey(
-              reviewRepo.path,
-              reviewBranch,
-              s.settings,
-              reviewRepo.id,
-              reviewRepo.connectionId,
-              reviewRepo.executionHostId,
-              true
-            )
-          : null
-      const prCacheKeys =
-        reviewRepo && reviewBranch ? getGitHubPRCacheKeyCandidates(reviewRepo, reviewBranch) : []
-      const prCacheKey = prCacheKeys[0] ?? null
-      const hostedReviewCache = s.hostedReviewCache ?? {}
-      const prCache = s.prCache ?? {}
-      if (
-        nextWorktrees === s.worktreesByRepo &&
-        nextDetectedWorktrees === s.detectedWorktreesByRepo &&
-        !cacheKey &&
-        !prCacheKey
-      ) {
-        return s
-      }
-
-      const nextHostedReviewCache =
-        cacheKey && hostedReviewCache[cacheKey]
-          ? (() => {
-              const next = { ...hostedReviewCache }
-              delete next[cacheKey]
-              return next
-            })()
-          : hostedReviewCache
-      const nextPRCache = prCacheKeys.some((key) => prCache[key])
-        ? (() => {
-            const next = { ...prCache }
-            for (const key of prCacheKeys) {
-              delete next[key]
-            }
-            return next
-          })()
-        : prCache
-
-      return {
-        ...(nextWorktrees !== s.worktreesByRepo
-          ? { worktreesByRepo: nextWorktrees, sortEpoch: s.sortEpoch + 1 }
-          : {}),
-        ...(nextDetectedWorktrees !== s.detectedWorktreesByRepo
-          ? { detectedWorktreesByRepo: nextDetectedWorktrees }
-          : {}),
-        ...(nextHostedReviewCache !== hostedReviewCache
-          ? { hostedReviewCache: nextHostedReviewCache }
-          : {}),
-        ...(nextPRCache !== prCache ? { prCache: nextPRCache } : {})
-      }
-    })
-    if (shouldApplyUpdate && !didApply) {
+        updates: enriched,
+        executionHostId,
+        reviewRepo,
+        reviewBranch
+      })
+    }
+    if (!deferUpdate) {
+      set(buildUpdate)
+    }
+    if (!deferUpdate && shouldApplyUpdate && !didApply) {
       return { ok: true }
     }
     if (hasHostedReviewLinkUpdates(enriched)) {
@@ -261,6 +203,9 @@ export function createUpdateWorktreeMeta(
       ? await settleWorktreeRename({ state: get(), worktreeId, plan: renamePlan, writePrimary })
       : null
     try {
+      if (deferUpdate) {
+        set(buildUpdate)
+      }
       if (rename?.primaryError) {
         throw rename.primaryError.reason
       }

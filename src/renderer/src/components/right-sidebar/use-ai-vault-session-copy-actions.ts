@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
+import { formatClipboardFilePath } from '@/lib/clipboard-file-path'
 import { openAiVaultSessionLogInOrca } from './ai-vault-session-log-open'
 import type { AiVaultSession } from '../../../../shared/ai-vault-types'
 
@@ -35,7 +36,7 @@ export function useAiVaultSessionCopyActions(): AiVaultSessionCopyActions {
   const copySessionPath = useCallback(
     (session: AiVaultSession): void => {
       void copyText(
-        session.filePath,
+        formatClipboardFilePath(session.filePath, session.executionHostId),
         translate('auto.components.right.sidebar.AiVaultPanel.logPath', 'Log path')
       )
     },

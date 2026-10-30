@@ -6,6 +6,7 @@ import { formatEphemeralVmCountdown } from '../../../../shared/ephemeral-vm-life
 import { useSecondTickNow } from '@/components/sidebar/prompt-cache-countdown-clock'
 import { resolveEphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
 import { translate } from '@/i18n/i18n'
+import { ephemeralVmCleanupErrorText } from '@/lib/ephemeral-vm-error-copy'
 import { cn } from '@/lib/utils'
 import { Button } from '../ui/button'
 import {
@@ -142,6 +143,7 @@ export function EphemeralVmRuntimeRow({
 }: EphemeralVmRuntimeRowProps): React.JSX.Element {
   const hasError = cleanupFailed || runtime.status === 'failed'
   const isExtending = extendingLifetime !== null
+  const cleanupError = ephemeralVmCleanupErrorText(runtime)
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div
@@ -162,11 +164,11 @@ export function EphemeralVmRuntimeRow({
           {runtime.recipeId} · {getEphemeralVmRecipeResultProjectRoot(runtime.recipeResult)}
         </p>
         <EphemeralVmLeaseStatus runtime={runtime} />
-        {runtime.cleanupLastError ? (
+        {cleanupError ? (
           // Why no truncation: for a reclaimed host this retained record is the only account of what
           // went wrong, so a reader has to be able to read all of it.
           <p className="mt-0.5 text-[11px] leading-snug break-words text-destructive">
-            {runtime.cleanupLastError}
+            {cleanupError}
           </p>
         ) : null}
       </div>

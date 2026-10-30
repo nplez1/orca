@@ -18,6 +18,7 @@ import {
 } from './wsl-transcript-fs-process-dispatch'
 import type { WslTranscriptFsReusableProcessCall } from './wsl-transcript-fs-process-protocol'
 import { wslTranscriptFsLaneKey } from './wsl-transcript-fs-route'
+import { admitWslTranscriptPath } from './wsl-transcript-running-admission'
 import {
   readSshTranscript,
   statSshTranscript,
@@ -45,14 +46,19 @@ function runReusableFsOperation<T>(
   localTask: () => Promise<T>
 ): Promise<T> {
   return isWslUncPath(request.path)
-    ? runWslTranscriptFsTask(
-        { operation: request.operation, path: request.path, priority, signal },
-        (taskSignal) =>
-          runWslTranscriptFsProcess<T>(
-            request,
-            taskSignal,
-            wslTranscriptFsLaneKey(request.path, priority)
-          )
+    ? admitWslTranscriptPath(request.path).then(() =>
+        runWslTranscriptFsTask(
+          { operation: request.operation, path: request.path, priority, signal },
+          async (taskSignal) => {
+            // Queued work runs later: ask again right before the touch.
+            await admitWslTranscriptPath(request.path)
+            return runWslTranscriptFsProcess<T>(
+              request,
+              taskSignal,
+              wslTranscriptFsLaneKey(request.path, priority)
+            )
+          }
+        )
       )
     : localTask()
 }
@@ -157,6 +163,15 @@ export function openTranscriptFile(
   if (!isWslUncPath(path)) {
     return open(path, 'r')
   }
+  return openAdmittedWslTranscriptFile(path, priority, signal)
+}
+
+async function openAdmittedWslTranscriptFile(
+  path: string,
+  priority: WslTranscriptFsTaskPriority,
+  signal?: AbortSignal
+): Promise<TranscriptFileHandle> {
+  await admitWslTranscriptPath(path)
   return runWslTranscriptFsTask<TranscriptFileHandle>(
     {
       operation: 'open',
@@ -166,8 +181,10 @@ export function openTranscriptFile(
       dedupe: false,
       onAbandonedResult: (handle) => void closeTranscriptHandle(handle, path)
     },
-    (taskSignal) =>
-      openWslTranscriptFsProcess(path, taskSignal, wslTranscriptFsLaneKey(path, priority))
+    async (taskSignal) => {
+      await admitWslTranscriptPath(path)
+      return openWslTranscriptFsProcess(path, taskSignal, wslTranscriptFsLaneKey(path, priority))
+    }
   )
 }
 
@@ -193,6 +210,8 @@ export function readTranscriptFile(
   return runWslTranscriptFsTask(
     { operation: 'read', path, priority, signal, dedupe: false },
     async (taskSignal) => {
+      // An open 9P handle still reconnects (and boots) a distro that stopped since the open.
+      await admitWslTranscriptPath(path)
       if (!isWslTranscriptFsProcessHandle(handle)) {
         return (handle as FileHandle).read(buffer, offset, length, position)
       }

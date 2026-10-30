@@ -1,6 +1,7 @@
 import type { PathExistenceResult } from '../../shared/path-existence-batch'
 import type { RuntimeFileReadChunkResult } from '../../shared/runtime-types'
 import type { SearchOptions, SearchResult } from '../../shared/code-search-types'
+import type { PdfExportResult } from '../../shared/pdf-export-failure-copy'
 import type { FilePathSearchResult } from '../../shared/file-path-search-result'
 import type { PathSearchMode } from '../../shared/quick-open-path-search'
 import type {
@@ -32,6 +33,8 @@ import type {
 } from '../../shared/local-log-tail-types'
 import type { SshMutationExpectation } from '../../shared/ssh-types'
 import type { LocalFileAccess } from '../../shared/local-file-access'
+import type { RemoteFilePreviewAddress } from '../../shared/remote-file-preview-address'
+import type { FileBytesWritePrecondition } from '../../shared/file-bytes-write'
 import type {
   FileWriteDiskPrecondition,
   FileWriteResult
@@ -54,12 +57,7 @@ import type {
 } from '../../shared/native-file-drop-preparation'
 
 export type ExportApi = {
-  htmlToPdf: (args: {
-    html: string
-    title: string
-  }) => Promise<
-    { success: true; filePath: string } | { success: false; cancelled?: boolean; error?: string }
-  >
+  htmlToPdf: (args: { html: string; title: string }) => Promise<PdfExportResult>
 }
 
 export type FilesystemApi = {
@@ -80,6 +78,7 @@ export type FilesystemApi = {
       followSymlinks?: boolean
       /** A user act (open or Retry); may start a stopped WSL distro. */
       wakeWslDistro?: boolean
+      access?: LocalFileAccess
     }) => Promise<DirEntry[]>
     readFile: (args: {
       filePath: string
@@ -88,14 +87,27 @@ export type FilesystemApi = {
       access?: LocalFileAccess
       /** A user act (open, expand, Retry); may start a stopped WSL distro. */
       wakeWslDistro?: boolean
+      /** A viewer that reads images and PDFs by URL; other readers keep their base64. */
+      rangePreview?: boolean
     }) => Promise<{
       content: string
       isBinary: boolean
       mediaUrl?: string
+      size?: number
       isImage?: boolean
       mimeType?: string
       fileIdentity?: string
     }>
+    /** A PDF preview's bytes, for the renderer that minted its orca-media URL only. */
+    readPreviewRange: (args: { url: string; offset: number; length: number }) => Promise<Uint8Array>
+    grantRuntimeFilePreview: (args: RemoteFilePreviewAddress) => Promise<{
+      content: string
+      isBinary: true
+      mimeType: string
+      mediaUrl: string
+      isImage?: true
+      size?: number
+    } | null>
     readLocalLogTail: (args: LocalLogTailReadArgs) => Promise<LocalLogTailReadResult>
     startLocalLogTail: (args: LocalLogTailWatchArgs) => Promise<void>
     stopLocalLogTail: (args: { subscriptionId: string }) => Promise<void>
@@ -137,6 +149,16 @@ export type FilesystemApi = {
         connectionId?: string
         access?: LocalFileAccess
         diskPrecondition?: FileWriteDiskPrecondition
+      } & SshMutationExpectation
+    ) => Promise<FileWriteResult>
+    /** Atomic replacement of a binary file; absent where only text saves are served. */
+    writeFileBytes?: (
+      args: {
+        filePath: string
+        bytes: Uint8Array
+        connectionId?: string
+        access?: LocalFileAccess
+        diskPrecondition: FileBytesWritePrecondition
       } & SshMutationExpectation
     ) => Promise<FileWriteResult>
     createFile: (

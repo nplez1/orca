@@ -9,6 +9,7 @@ import {
   type AiVaultSession
 } from '../../shared/ai-vault-types'
 import { normalizeExecutionHostId } from '../../shared/execution-host'
+import { aiVaultScanIssueText } from '../../shared/ai-vault-scan-issue-copy'
 
 const aiVaultAgentSet = new Set<string>(AI_VAULT_AGENTS)
 
@@ -102,7 +103,14 @@ const aiVaultScanIssueSchema = z.object({
     .union([z.enum(['host', 'scope', 'notice']), z.string().transform(() => 'scope' as const)])
     .optional(),
   path: z.string(),
-  message: z.string()
+  message: z.string(),
+  // Optional localization hints; malformed ones fall back to the English message.
+  messageCode: z.string().optional().catch(undefined),
+  messageParams: z
+    .record(z.string(), z.union([z.string(), z.number()]))
+    .optional()
+    .catch(undefined),
+  messageDetail: z.string().optional().catch(undefined)
 })
 
 const aiVaultListResultEnvelopeSchema = z
@@ -228,7 +236,9 @@ export function parseAiVaultListResult(
       agent: 'codex',
       path: AI_VAULT_LIST_SKIP_ISSUE_PATH,
       // The drain re-counts these across pages, so the wording is a contract with that reader.
-      message: `Skipped ${invalidCount} invalid Agent Session History result ${invalidCount === 1 ? 'entry' : 'entries'}.`
+      ...aiVaultScanIssueText('invalidResultsSkipped', {
+        params: { count: invalidCount }
+      })
     })
   }
   return {

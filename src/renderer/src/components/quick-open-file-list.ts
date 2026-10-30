@@ -13,7 +13,7 @@ import { resolveRuntimeFileListDerivedState } from './runtime-file-list-derived-
 import { useRuntimePathSearchSchedulerLifecycle } from './use-runtime-path-search-scheduler-lifecycle'
 import { NO_LISTING, scheduleRuntimeFilePathSearch } from './runtime-path-search-request'
 import { useQuickOpenRecentListing } from './quick-open-recent-file-merge'
-import { getRuntimeFileListTarget } from './quick-open-file-list-target'
+import { getRuntimeFileListTarget, useKeyedExcludeRequest } from './quick-open-file-list-target'
 
 export {
   getNestedWorktreeExcludeRequest,
@@ -93,7 +93,7 @@ export function useRuntimeFileListForWorktree({
     () => getRuntimeFileListTarget(worktreeId, worktreePath, repoWorktrees),
     [repoWorktrees, worktreeId, worktreePath]
   )
-  const { excludeRequest } = target
+  const excludeRequest = useKeyedExcludeRequest(target.excludeRequest)
 
   const operationOwnerState = useAppStore(
     useShallow((state) => ({

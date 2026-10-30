@@ -19,11 +19,15 @@ import { EditorFileLoadErrorView } from './EditorFileLoadErrorView'
 import { RecoverableRenderErrorBoundary } from '../error-boundaries/RecoverableRenderErrorBoundary'
 import type { FileContent } from './editor-panel-content-types'
 import { ExternalFileChangeBanner } from './ExternalFileChangeBanner'
+import { PluginFileTypeSuggestion } from './PluginFileTypeSuggestion'
 import type { useMarkdownDocuments } from './useMarkdownDocuments'
 import { EditorMarkdownFileSurface } from './EditorMarkdownFileSurface'
 import type { MarkdownRenderState } from './markdown-render-mode'
 import { useWorktreePRCommentInline } from '../pr-comment-inline/worktree-pr-comment-inline'
 import { usePRCommentInlineSurface } from '../pr-comment-inline/usePRCommentInlineSurface'
+import type { ActivePluginCustomEditor } from '@/store/plugin-custom-editors'
+import PluginCustomEditorFrame from './PluginCustomEditorFrame'
+import PluginBytesCustomEditorSurface from './PluginBytesCustomEditorSurface'
 
 // Retry is a user act: it may start a stopped WSL distro.
 const USER_RETRY = { wakeWslDistro: true }
@@ -49,6 +53,7 @@ export function EditorEditFileSurface({
   isMermaid,
   isCsv,
   isNotebook,
+  customEditor,
   mdViewMode,
   inlineMarkdownRenderState,
   isChangesMode,
@@ -81,6 +86,7 @@ export function EditorEditFileSurface({
   isMermaid: boolean
   isCsv: boolean
   isNotebook: boolean
+  customEditor?: ActivePluginCustomEditor | null
   mdViewMode: MarkdownViewMode
   inlineMarkdownRenderState: MarkdownRenderState | null
   isChangesMode: boolean
@@ -91,7 +97,11 @@ export function EditorEditFileSurface({
   markdownAnnotationsEnabled: boolean
   pendingEditorReveal: PendingEditorReveal | null
   markdownDocuments: MarkdownDocumentsController
-  getConflictNavigation: (file: OpenFile, content: string) => EditorConflictNavigation | undefined
+  getConflictNavigation: (
+    file: OpenFile,
+    content: string,
+    viewStateId: string
+  ) => EditorConflictNavigation | undefined
   getMarkdownSourceLineOffset: (frontMatterRaw: string) => number
   handleContentChange: (content: string) => void
   handleDirtyStateHint: (dirty: boolean) => void
@@ -132,8 +142,20 @@ export function EditorEditFileSurface({
       />
     )
   }
+  if (customEditor?.contentKind === 'bytes') {
+    return (
+      <PluginBytesCustomEditorSurface
+        key={`${activeFile.id}\u0000${customEditor.key}`}
+        editor={customEditor}
+        file={activeFile}
+        fileContent={fileContent}
+        onSave={handleSave}
+        reloadContent={reloadContent}
+      />
+    )
+  }
   if (fileContent.isBinary) {
-    if (fileContent.mediaUrl) {
+    if (fileContent.mediaUrl && !fileContent.isImage) {
       return (
         <MediaViewer
           key={fileContent.mediaUrl}
@@ -153,6 +175,8 @@ export function EditorEditFileSurface({
       return (
         <ImageViewer
           content={fileContent.content}
+          src={fileContent.mediaUrl}
+          byteSize={fileContent.size}
           filePath={activeFile.filePath}
           mimeType={fileContent.mimeType}
           preferenceKey={pdfPreferenceKey}
@@ -161,11 +185,14 @@ export function EditorEditFileSurface({
       )
     }
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        {translate(
-          'auto.components.editor.EditorContent.b9de81ba52',
-          'Binary file — cannot display'
-        )}
+      <div className="flex h-full flex-col">
+        <PluginFileTypeSuggestion filePath={activeFile.filePath} />
+        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          {translate(
+            'auto.components.editor.EditorContent.b9de81ba52',
+            'Binary file — cannot display'
+          )}
+        </div>
       </div>
     )
   }
@@ -260,7 +287,18 @@ export function EditorEditFileSurface({
     </RecoverableRenderErrorBoundary>
   )
 
-  const editorSurface = isMarkdown ? (
+  const editorSurface = customEditor ? (
+    <PluginCustomEditorFrame
+      key={`${activeFile.id}\u0000${customEditor.key}`}
+      editor={customEditor}
+      fileId={activeFile.id}
+      content={currentContent}
+      readOnly={activeFile.readOnly === true}
+      onContentChange={handleContentChange}
+      onSave={handleSave}
+      onDirtyHint={handleDirtyStateHint}
+    />
+  ) : isMarkdown ? (
     <EditorMarkdownFileSurface
       activeFile={activeFile}
       viewStateScopeId={viewStateScopeId}
@@ -279,7 +317,11 @@ export function EditorEditFileSurface({
       monacoEditor={monacoEditor}
     />
   ) : isMermaid && mdViewMode === 'rich' ? (
-    <MermaidViewer key={activeFile.id} content={currentContent} filePath={activeFile.filePath} />
+    <MermaidViewer
+      key={activeFile.id}
+      content={currentContent}
+      scrollCacheKey={`${editorViewStateKey}:mermaid-diagram`}
+    />
   ) : isCsv && mdViewMode === 'rich' ? (
     <CsvViewer
       key={activeFile.id}
@@ -313,11 +355,17 @@ export function EditorEditFileSurface({
   return (
     <div className="flex flex-1 min-h-0 flex-col">
       {externalChangeBanner}
+      {customEditor ? null : (
+        <PluginFileTypeSuggestion
+          filePath={activeFile.filePath}
+          purpose={monacoLanguage === 'plaintext' ? 'open' : 'editor'}
+        />
+      )}
       {activeFile.conflict && (
         <ConflictBanner
           file={activeFile}
           entry={activeConflictEntry}
-          conflictNavigation={getConflictNavigation(activeFile, currentContent)}
+          conflictNavigation={getConflictNavigation(activeFile, currentContent, viewStateScopeId)}
         />
       )}
       <div className="min-h-0 flex-1 relative">{editorSurface}</div>

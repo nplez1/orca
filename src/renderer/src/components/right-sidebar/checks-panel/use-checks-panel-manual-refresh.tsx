@@ -18,6 +18,8 @@ import { recordChecksPanelPRRefreshBreadcrumb } from '../checks-panel-pr-refresh
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
 import type { ChecksPanelManualRefreshInput } from './manual-refresh-dependencies'
 
+// The manual Refresh is a user act: it may start a stopped WSL distro (E9).
+const MANUAL_STATUS_READ = { admissionTier: 'interactive', wakeWslDistro: true } as const
 export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput) {
   const {
     activeConnectionId,
@@ -126,9 +128,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
             worktreePath: activeWorktreePath,
             connectionId: copy ? copy.connectionId : (activeConnectionId ?? undefined)
           }
-          const status = await getRuntimeGitStatus(statusContext, {
-            admissionTier: 'interactive'
-          })
+          const status = await getRuntimeGitStatus(statusContext, MANUAL_STATUS_READ)
           const observedBranch = status.branch ?? (status.head ? null : undefined)
           updateWorktreeGitIdentity(
             activeWorktreeId,
@@ -272,7 +272,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
           branch,
           refreshedPR.headSha,
           refreshedPR.prRepo,
-          { force: true, repoId: repo.id }
+          { force: true, repoId: repo.id, wakeWslDistro: true }
         ).then(
           (result) => {
             if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {

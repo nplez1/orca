@@ -15,7 +15,6 @@ import type { LinearIssueEditSectionProps } from '@/components/linear-item-drawe
 import {
   LINEAR_EDIT_MENU_ITEM_WITH_ICON_CLASS,
   LINEAR_ESTIMATE_PRESETS,
-  PRIORITY_LABELS,
   formatLinearEstimateLabel
 } from '@/components/linear-item-drawer-edit-controls'
 import { translate } from '@/i18n/i18n'
@@ -23,6 +22,25 @@ import {
   IssueAssigneeCombobox,
   type IssueAssigneeOption
 } from './right-sidebar/IssueAssigneeCombobox'
+
+// Upstream moved the priority copy into the catalog, so the labels resolve at read time.
+const PRIORITY_LABELS: Record<number, string> = {
+  get 0() {
+    return translate('auto.components.TaskPage.713179dfdc', 'No priority')
+  },
+  get 1() {
+    return translate('auto.components.TaskPage.f373ab1a4f', 'Urgent')
+  },
+  get 2() {
+    return translate('auto.components.TaskPage.345b169f1f', 'High')
+  },
+  get 3() {
+    return translate('auto.components.TaskPage.7fd59c18d8', 'Medium')
+  },
+  get 4() {
+    return translate('auto.components.TaskPage.69591944e7', 'Low')
+  }
+}
 import { IssuePanePropertyRow } from './right-sidebar/IssuePanePropertyRow'
 
 const checkIcon = (

@@ -16,6 +16,7 @@ import { useLandingPreflightRuntime } from './landing-preflight-runtime'
 import { GitHubStarButton } from './GitHubStarButton'
 import { useOrcaStarState } from './orca-star-state'
 import { OrcaBrandMark } from './OrcaBrandMark'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 type ShortcutItem = {
   id: string
@@ -76,7 +77,7 @@ function PreflightBanner({
             <p className="text-xs leading-snug text-muted-foreground">{issue.description}</p>
             <button
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline cursor-pointer"
-              onClick={() => window.api.shell.openUrl(issue.fixUrl)}
+              onClick={(event) => openAppHttpLink(issue.fixUrl, { event })}
             >
               {issue.fixLabel}
               <ExternalLink className="size-3" />
@@ -101,8 +102,15 @@ export default function Landing(): React.JSX.Element {
   const repos = useAppStore((s) => s.repos)
   const openModal = useAppStore((s) => s.openModal)
 
-  const createTargetLabel =
-    repos.length > 0 && repos.every((repo) => isGitRepoKind(repo)) ? 'Worktree' : 'Workspace'
+  const createActionLabel =
+    repos.length > 0 && repos.every((repo) => isGitRepoKind(repo))
+      ? translate('auto.components.NewWorkspaceComposerModal.createWorktree', 'Create worktree')
+      : translate('auto.components.NewWorkspaceComposerModal.createWorkspace', 'Create workspace')
+  const moveUpLabel = translate('auto.components.Landing.moveUpWorkspace', 'Move up workspace')
+  const moveDownLabel = translate(
+    'auto.components.Landing.moveDownWorkspace',
+    'Move down workspace'
+  )
   const hasProjects = repos.length > 0
   const hasGitHubProject = useMemo(() => hasGitHubBackedProject(repos), [repos])
   const showGitHubSupportFooter = repos.length === 0 || hasGitHubProject
@@ -116,15 +124,18 @@ export default function Landing(): React.JSX.Element {
   const nextWorktreeShortcut = useShortcutKeyDetails('worktree.navigateDown')
   const shortcuts = useMemo<ShortcutItem[]>(() => {
     return [
-      {
-        id: 'create',
-        shortcut: createWorktreeShortcut,
-        action: `Create ${createTargetLabel.toLowerCase()}`
-      },
-      { id: 'up', shortcut: previousWorktreeShortcut, action: 'Move up workspace' },
-      { id: 'down', shortcut: nextWorktreeShortcut, action: 'Move down workspace' }
+      { id: 'create', shortcut: createWorktreeShortcut, action: createActionLabel },
+      { id: 'up', shortcut: previousWorktreeShortcut, action: moveUpLabel },
+      { id: 'down', shortcut: nextWorktreeShortcut, action: moveDownLabel }
     ]
-  }, [createTargetLabel, createWorktreeShortcut, nextWorktreeShortcut, previousWorktreeShortcut])
+  }, [
+    createActionLabel,
+    moveUpLabel,
+    moveDownLabel,
+    createWorktreeShortcut,
+    nextWorktreeShortcut,
+    previousWorktreeShortcut
+  ])
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-background">
@@ -160,8 +171,7 @@ export default function Landing(): React.JSX.Element {
               onClick={() => openModal('new-workspace-composer', { telemetrySource: 'unknown' })}
             >
               <GitBranchPlus className="size-3.5" />
-              {translate('auto.components.Landing.76a95f7f47', 'Create')}{' '}
-              {createTargetLabel.toLowerCase()}
+              {createActionLabel}
             </button>
           </div>
 

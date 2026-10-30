@@ -10,6 +10,7 @@ export type DebouncedBatch = {
   flushQueued: boolean
   cancelled: boolean
   indexReconciliationMarked: boolean
+  statAbortController: AbortController
 }
 
 export function createDebouncedBatch(): DebouncedBatch {
@@ -21,12 +22,14 @@ export function createDebouncedBatch(): DebouncedBatch {
     flushInFlight: false,
     flushQueued: false,
     cancelled: false,
-    indexReconciliationMarked: false
+    indexReconciliationMarked: false,
+    statAbortController: new AbortController()
   }
 }
 
 export function cancelLocalBatchFlush(root: WatchedRoot): void {
   root.batch.cancelled = true
+  root.batch.statAbortController.abort()
   root.batch.flushQueued = false
   if (root.batch.timer) {
     clearTimeout(root.batch.timer)

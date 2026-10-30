@@ -27,16 +27,28 @@ import { gitSpawn } from './git-spawn'
 import { acquireGitAdmission } from './git-subprocess-admission'
 import { GitCommandTimeoutError, gitCommandTimeoutMs } from './git-command-timeout'
 import type { GitStreamOptions, GitStreamResult } from './git-stream-options'
+import { routeLocalGitOptions, runAdmittedWslGit } from './local-git-runtime-route'
+import { gitRunsIn } from './git-runs-in'
 
 export type { GitStreamOptions, GitStreamResult } from './git-stream-options'
 
 /** Stream bounded stdout so large repositories cannot overflow V8 and parsers can stop early. */
 export async function gitStreamStdout(
   args: string[],
-  options: GitStreamOptions
+  callerOptions: GitStreamOptions
 ): Promise<GitStreamResult> {
+  const options = routeLocalGitOptions(callerOptions)
   const maxBuffer = options.maxBuffer ?? DEFAULT_GIT_MAX_BUFFER
   const timeoutMs = gitCommandTimeoutMs(args, options.timeoutMs, options.timeoutMsForTest)
+  return runAdmittedWslGit(options, () => streamInSpan(args, options, maxBuffer, timeoutMs))
+}
+
+function streamInSpan(
+  args: string[],
+  options: GitStreamOptions,
+  maxBuffer: number,
+  timeoutMs: number | undefined
+): Promise<GitStreamResult> {
   return withGitSpan({ args, cwd: options.cwd }, async (span) => {
     const checkoutRoutingReady = pendingWslDriveCheckoutGitRouting(args, options)
     if (checkoutRoutingReady) {
@@ -72,6 +84,7 @@ export async function gitStreamStdout(
       signal: options.signal
     })
     span?.setAttribute('git.queue_wait_ms', grant.queueWaitMs)
+    span?.setAttribute('git.runs_in', gitRunsIn(resolved))
     const terminationState: { current: Promise<void> | null } = { current: null }
     const stream = (command: ResolvedCommand): Promise<GitStreamResult> =>
       new Promise<GitStreamResult>((resolve, reject) => {

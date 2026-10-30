@@ -50,6 +50,8 @@ export type TranscriptReadStart = {
    * session carry the same path, so a path match enlists the wrong consumer.
    */
   readToken?: string
+  /** Offsets where this replacement read reports the digest of the bytes before them. */
+  prefixOffsets?: ReadonlySet<number>
 }
 
 export type TranscriptReadOutcome = {
@@ -61,16 +63,22 @@ export type TranscriptReadOutcome = {
   incomplete: boolean
   /** Cancellation leaves the file pending without recording a failure. */
   cancelled?: boolean
+  /** SHA-256 of bytes [0, byteOffset); absent when the read could not hash its whole prefix. */
+  prefixHash?: string
 }
 
 export type TranscriptReadConsumer = {
   message(message: TranscriptMessage): void
   finish(outcome: TranscriptReadOutcome): void
+  /** The read has consumed exactly [0, offset), whose bytes hash to digest. */
+  prefixReached?(offset: number, digest: string): void
 }
 
 export type TranscriptConsumer = {
   /** Decline reads whose previousByteOffset exceeds your cursor, then request a whole read separately. */
   beginRead(start: TranscriptReadStart): TranscriptReadConsumer | null
+  /** Cursor this consumer could resume at if a replacement read proves the bytes before it unchanged. */
+  resumableOffset?(candidate: SessionFileCandidate): number | null
 }
 
 const consumers = new Set<TranscriptConsumer>()
@@ -84,6 +92,21 @@ export function registerTranscriptConsumer(consumer: TranscriptConsumer): () => 
 
 export function transcriptConsumers(): readonly TranscriptConsumer[] {
   return [...consumers]
+}
+
+export function transcriptResumableOffsets(candidate: SessionFileCandidate): Set<number> {
+  const offsets = new Set<number>()
+  for (const consumer of consumers) {
+    try {
+      const offset = consumer.resumableOffset?.(candidate)
+      if (typeof offset === 'number' && offset > 0) {
+        offsets.add(offset)
+      }
+    } catch {
+      // A consumer failure only costs that consumer its resume.
+    }
+  }
+  return offsets
 }
 
 export function hasTranscriptConsumers(): boolean {

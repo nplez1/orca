@@ -10,6 +10,7 @@ import { isRenderableProjectViewLayout } from '../../../../shared/github/project
 import type { GitHubProjectViewSummary } from '../../../../shared/github/project-types'
 import type { GitHubProjectViewError } from '../../../../shared/github/project-result-types'
 import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 const ORCA_FEATURE_REQUEST_URL = `${ORCA_REPOSITORY_URL}/issues/new`
 
@@ -123,7 +124,7 @@ function ProjectViewTab({
             type="button"
             size="xs"
             variant="outline"
-            onClick={() => void window.api.shell.openUrl(ORCA_FEATURE_REQUEST_URL)}
+            onClick={(event) => openAppHttpLink(ORCA_FEATURE_REQUEST_URL, { event })}
           >
             {translate(
               'auto.components.github.project.ProjectViewWrapper.4d2a77a119',

@@ -24,6 +24,8 @@ export const worktreesApi = {
   cancelListDetected: (args) => ipcRenderer.invoke('worktrees:cancelListDetected', args),
 
   listCached: () => ipcRenderer.invoke('worktrees:listCached'),
+  scanStartingWslDistro: (args) => ipcRenderer.invoke('worktrees:scanStartingWslDistro', args),
+
   create: (args) => ipcRenderer.invoke('worktrees:create', args),
 
   adoptProvisionedRoot: (args) => ipcRenderer.invoke('worktrees:adoptProvisionedRoot', args),
@@ -45,7 +47,8 @@ export const worktreesApi = {
 
   sleep: (request) => ipcRenderer.invoke('worktrees:sleep', request),
   sleepReopened: (worktreeId) => ipcRenderer.invoke('worktrees:sleepReopened', worktreeId),
-  resumeSleptPane: (pane) => ipcRenderer.invoke('worktrees:resumeSleptPane', pane),
+  resumeSleptPane: (pane, automatic) =>
+    ipcRenderer.invoke('worktrees:resumeSleptPane', pane, automatic),
   retireStrandedSleepRecord: (args) =>
     ipcRenderer.invoke('worktrees:retireStrandedSleepRecord', args),
 

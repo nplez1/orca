@@ -28,7 +28,7 @@ import {
   isOrphanedWorktreeError
 } from '../ipc/worktree-logic'
 import { cleanupLocalOrphanedWorktreeDirectory } from '../local-orphaned-worktree-cleanup'
-import { recoverLocalWindowsWorktreeRemoval } from '../local-worktree-removal-recovery'
+import { recoverPartialLocalWorktreeRemoval } from '../local-worktree-removal-recovery'
 import { findRegisteredDeletableWorktree } from '../worktree-removal-safety'
 import { CLIENT_REMOVAL_HOME } from '../worktree-removal-home-guard'
 import type { RuntimeStore } from './runtime-store-contract'
@@ -48,7 +48,7 @@ export function removeRuntimeRegisteredLocalWorktree(
     args.repo.path,
     async (): Promise<RemoveWorktreeResult & { warning?: string }> =>
       // Recheck after queue wait: another client may already have accepted this deletion.
-      waitForPendingWorktreeRemoval(args.target.id)
+      waitForPendingWorktreeRemoval(args.target.id, undefined, args.requestedDeleteBranch)
         ? { removing: true }
         : acceptRuntimeRegisteredLocalWorktreeRemoval(args)
   )
@@ -70,6 +70,8 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
   deleteBranch: boolean
   /** Opt-in `git push --delete` of the branch's upstream; paired with the local branch delete. */
   deleteRemoteBranch: boolean
+  /** Legacy callers join accepted policy; explicit requests must match it. */
+  requestedDeleteBranch?: boolean
   acquireWatcherRemoval: (path: string) => Promise<{ finish: (removed: boolean) => Promise<void> }>
   stopPtys: () => Promise<void>
   closeWatchers: (path: string) => Promise<void>
@@ -260,7 +262,7 @@ export async function finishRuntimeLocalWorktreeRemoval(
       if (usesNativeWindowsRemoval(canonicalPath, localOptions)) {
         throw error
       }
-      const recovered = await recoverLocalWindowsWorktreeRemoval({
+      const recovered = await recoverPartialLocalWorktreeRemoval({
         error,
         force: args.force,
         canonicalWorktreePath: canonicalPath,

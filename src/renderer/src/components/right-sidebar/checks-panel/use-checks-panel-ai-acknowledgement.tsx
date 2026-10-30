@@ -16,6 +16,7 @@ import type { ChecksPanelReviewDataState } from './use-checks-panel-review-data'
 import { clearPRCommentsListSelection } from '../pr-comments-list-selection'
 import { translate } from '@/i18n/i18n'
 import type { ChecksAgentComposerState } from './panel-state-types'
+import { codeHostErrorText } from '@/lib/code-host-error-copy'
 
 type ChecksPanelAiAcknowledgementInput = Pick<
   ChecksPanelControllerState,
@@ -135,7 +136,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
                 }
                 return true
               }
-              lastHostError = result.error
+              lastHostError = codeHostErrorText(result)
               console.warn('In-thread fixing reply failed:', result.error)
               return false
             } catch (err) {
@@ -165,7 +166,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
                 }
                 return true
               }
-              lastHostError = result.error
+              lastHostError = codeHostErrorText(result)
               console.warn('Conversation fixing reply failed:', result.error)
               return false
             } catch (err) {

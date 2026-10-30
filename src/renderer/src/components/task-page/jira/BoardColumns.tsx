@@ -8,7 +8,7 @@ import {
 } from '@/lib/jira-issue-workspace-attachment'
 import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
 import { JiraAttachedWorkspaceChip } from './JiraAttachedWorkspaceChip'
-import { getJiraStatusTone } from '../../task-page-jira-status-tone'
+import { getJiraStatusTone } from './task-page-jira-status-tone'
 import { TaskPageJiraPriorityBadge } from '../../task-page-jira-priority-badge'
 import { getJiraPrioritySurfaceTone } from '../../task-page-jira-priority-tone'
 import { cn } from '@/lib/utils'

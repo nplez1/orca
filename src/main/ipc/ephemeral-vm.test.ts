@@ -228,11 +228,11 @@ describe('registerEphemeralVmHandlers', () => {
     )
     const pluginService = pluginServiceWithRecipes([
       {
-        pluginKey: 'orca-samples.recipes',
+        pluginKey: 'samples.recipes',
         recipe: { id: 'shared', name: 'Plugin Shared', create: 'plugin-shared' }
       },
       {
-        pluginKey: 'orca-samples.recipes',
+        pluginKey: 'samples.recipes',
         recipe: { id: 'global', name: 'Plugin Global', create: 'plugin-global' }
       }
     ])
@@ -268,7 +268,7 @@ describe('registerEphemeralVmHandlers', () => {
     writeFileSync(destroyPath, "require('fs').writeFileSync('plugin-cleaned.txt', 'yes')")
     const registrations = [
       {
-        pluginKey: 'orca-samples.recipes',
+        pluginKey: 'samples.recipes',
         recipe: {
           id: 'plugin-cloud',
           name: 'Plugin Cloud',
@@ -319,7 +319,7 @@ describe('registerEphemeralVmHandlers', () => {
     })
     const pluginService = pluginServiceWithRecipes([
       {
-        pluginKey: 'orca-samples.recipes',
+        pluginKey: 'samples.recipes',
         recipe: {
           id: 'shared-id',
           name: 'Later Plugin Recipe',

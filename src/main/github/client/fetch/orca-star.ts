@@ -1,5 +1,6 @@
 import { ghExecFileAsync, acquire, release } from '../../gh-utils'
 import { ORCA_REPOSITORY } from '../../../../shared/orca-repository'
+import { runAsDefaultWslCliUserAct } from '../../../git/command-runner/default-wsl-cli-fallback'
 
 // Bound optional star prompts more tightly than user work; failures can fall back to the browser.
 const STAR_GH_TIMEOUT_MS = 15_000
@@ -47,10 +48,13 @@ async function runOrcaStarredCheck(): Promise<boolean | null> {
 export async function starOrca(): Promise<boolean> {
   await acquire()
   try {
-    await ghExecFileAsync(['api', '-X', 'PUT', `user/starred/${ORCA_REPOSITORY}`], {
-      encoding: 'utf-8',
-      timeout: STAR_GH_TIMEOUT_MS
-    })
+    // Starring is always a click, so it may start the stopped distro its gh lives in (E9).
+    await runAsDefaultWslCliUserAct(() =>
+      ghExecFileAsync(['api', '-X', 'PUT', `user/starred/${ORCA_REPOSITORY}`], {
+        encoding: 'utf-8',
+        timeout: STAR_GH_TIMEOUT_MS
+      })
+    )
     return true
   } catch {
     return false

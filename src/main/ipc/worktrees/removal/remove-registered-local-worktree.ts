@@ -15,7 +15,7 @@ import {
 } from '../../../git/worktree'
 import { getConfiguredWorktreeIncludePaths } from '../../../git/worktree-include-file'
 import { getWorktreeSharedLinkPaths } from '../../../git/worktree-shared-directories'
-import { recoverLocalWindowsWorktreeRemoval } from '../../../local-worktree-removal-recovery'
+import { recoverPartialLocalWorktreeRemoval } from '../../../local-worktree-removal-recovery'
 import { withWorktreeRemoveStageSpan } from '../../../observability/instrumentation'
 import { assertNestedWorktreeRemovalApproval } from '../../../nested-worktree-removal-plan'
 import { findRegisteredDeletableWorktree } from '../../../worktree-removal-safety'
@@ -242,8 +242,8 @@ async function finishLocalWorktreeRemoval({
       if (usesNativeWindowsRemoval(canonicalWorktreePath, localWorktreeGitOptions)) {
         throw error
       }
-      // Git for Windows may deregister before recursive filesystem deletion fails.
-      const recoveredRemovalResult = await recoverLocalWindowsWorktreeRemoval({
+      // Git deregisters even when its recursive filesystem deletion fails partway.
+      const recoveredRemovalResult = await recoverPartialLocalWorktreeRemoval({
         error,
         force: args.force ?? false,
         canonicalWorktreePath,

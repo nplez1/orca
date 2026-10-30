@@ -16,6 +16,7 @@ import {
   scheduleRightPanelCommentFocusTimer
 } from './right-panel-comment-focus-timers'
 import { translate } from '@/i18n/i18n'
+import { codeHostErrorText } from '@/lib/code-host-error-copy'
 
 export type RightPanelCommentSubmitResult = { ok: true } | { ok: false; error: string }
 
@@ -119,7 +120,7 @@ export function RightPanelCommentComposer({
         setBody('')
         onCancel?.()
       } else {
-        setError(result.error)
+        setError(codeHostErrorText(result))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to post comment.')

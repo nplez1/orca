@@ -1,13 +1,15 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
+import { LOCALIZATION_SURFACES } from './localization-surfaces.mjs'
+
 // Why: upstream owns every file under locales/ byte-for-byte, so the fork's added, overridden and
 // dropped strings live in overlays under i18n/fork/ that every reader merges on top. They sit
 // outside locales/, which verifiers readdir as one locale per .json file. A `null` leaf is a
 // tombstone: the fork dropped a feature, extraction then finds no source reference for upstream's
 // key, and deleting it from its file was the only way to satisfy that check without an overlay.
-const I18N_RELATIVE_DIR = path.join('src', 'renderer', 'src', 'i18n')
-const UPSTREAM_LOCALES_RELATIVE_DIR = path.join(I18N_RELATIVE_DIR, 'locales')
+const I18N_RELATIVE_DIR = path.dirname(LOCALIZATION_SURFACES.desktop.localesDir)
+const UPSTREAM_LOCALES_RELATIVE_DIR = LOCALIZATION_SURFACES.desktop.localesDir
 export const UPSTREAM_EN_CATALOG_RELATIVE_PATH = path.join(UPSTREAM_LOCALES_RELATIVE_DIR, 'en.json')
 export const UPSTREAM_RUNTIME_REQUIRED_RELATIVE_PATH = path.join(
   I18N_RELATIVE_DIR,
@@ -80,6 +82,65 @@ async function readOptionalCatalog(filePath) {
     }
     throw error
   }
+}
+
+/** The overlay sits beside a surface's own catalogs, so a surface without one merges to upstream's file. */
+export function forkOverlayDirectoryRelativePath(surface) {
+  return path.join(path.dirname(surface.localesDir), 'fork')
+}
+
+export async function hasForkOverlayForSurface(root, surface) {
+  try {
+    await fs.access(path.join(root, forkOverlayDirectoryRelativePath(surface)))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function readEnglishCatalogForSurface(root, surface) {
+  const upstream = JSON.parse(
+    await fs.readFile(path.join(root, surface.localesDir, 'en.json'), 'utf8')
+  )
+  return mergeCatalogs(upstream, await readForkEnglishCatalogForSurface(root, surface))
+}
+
+export async function readRuntimeRequiredCatalogsForSurface(root, surface) {
+  const upstream = JSON.parse(
+    await fs.readFile(path.join(root, surface.runtimeRequiredPath), 'utf8')
+  )
+  const fork = await readOptionalCatalog(
+    path.join(root, forkOverlayDirectoryRelativePath(surface), 'en-runtime-required.json')
+  )
+  return { upstream, merged: mergeCatalogs(upstream, fork) }
+}
+
+export async function writeForkRuntimeRequiredCatalogForSurface(root, surface, catalog) {
+  await writeCatalog(
+    path.join(root, forkOverlayDirectoryRelativePath(surface), 'en-runtime-required.json'),
+    catalog
+  )
+}
+
+export async function readForkEnglishCatalogForSurface(root, surface) {
+  return readOptionalCatalog(
+    path.join(root, forkOverlayDirectoryRelativePath(surface), 'en.json')
+  )
+}
+
+export async function readForkLocaleCatalogForSurface(root, surface, locale) {
+  return readOptionalCatalog(
+    path.join(root, forkOverlayDirectoryRelativePath(surface), `${locale}.json`)
+  )
+}
+
+/** New English keys land in the overlay, so upstream's en.json is never written. */
+export async function writeMissingEnglishEntriesForSurface(root, surface, entries) {
+  const overlay = await readForkEnglishCatalogForSurface(root, surface)
+  for (const [key, value] of entries) {
+    setCatalogEntry(overlay, key, value)
+  }
+  await writeCatalog(path.join(root, forkOverlayDirectoryRelativePath(surface), 'en.json'), overlay)
 }
 
 export async function readForkEnglishCatalog(root) {

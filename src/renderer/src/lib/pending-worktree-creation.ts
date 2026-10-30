@@ -5,6 +5,7 @@ import type { TuiAgent } from '../../../shared/tui-agent'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
 import type {
   CreateSparseCheckoutRequest,
+  CreateWorktreeArgs,
   SetupDecision,
   WorktreeCheckoutProgress
 } from '../../../shared/worktree/create-types'
@@ -87,7 +88,7 @@ export type WorktreeCreationRequest = {
   branchNameOverride?: string
   /** Refuse a branch-name collision instead of suffixing; set when the branch is implied. */
   exactBranchName?: boolean
-  branchIntent?: 'open-existing'
+  branchIntent?: CreateWorktreeArgs['branchIntent']
   /** Parent picked in the composer's Advanced drawer. Sidebar nesting only, no git effect. */
   parentWorktreeId?: string
   workspaceStatus?: WorkspaceStatus

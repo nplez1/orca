@@ -363,6 +363,23 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   // Why hostLocal: a `…MigrationApplied` marker — copying it would suppress the host's own run.
   uiLanguagePortugueseMigrationApplied: 'hostLocal',
   claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal',
+  // Why replicated: preferences and per-host selections a user made, not machine capabilities.
+  // `browserDefaultProfileIdByHostId` names a profile per host, so the main is the authority.
+  browserDefaultProfileIdByHostId: 'replicated',
+  codexShareHistoryAcrossAccounts: 'replicated',
+  nativeChatLinkPreviews: 'replicated',
+  pluginAppTheme: 'replicated',
+  pluginAppThemeDark: 'replicated',
+  pluginAppThemeLight: 'replicated',
+  pluginDismissedFileTypes: 'replicated',
+  pluginFileTypeSuggestions: 'replicated',
+  pluginIconTheme: 'replicated',
+  pluginUpdatePolicy: 'replicated',
+  terminalPluginPalettes: 'replicated',
+  themeBeforePlugin: 'replicated',
+  // Why replicated, like `autoRenameBranchFromWorkDefaultedOn`: a one-shot default marker that must
+  // follow the user's preference rather than re-fire a default on a host that has not seen it.
+  pluginSystemDefaultedOn: 'replicated',
   // Why hostLocal, like `httpProxyUrl`: which mirror of nodejs.org this network can reach.
   nodeDistMirrorUrl: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>

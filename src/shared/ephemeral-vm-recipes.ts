@@ -6,6 +6,7 @@ import {
   readEphemeralVmLifetime,
   type EphemeralVmLifetimeReadResult
 } from './ephemeral-vm-lifetime'
+import { ephemeralVmFailure, type EphemeralVmFailure } from './ephemeral-vm-failure-copy'
 
 const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([
@@ -137,7 +138,7 @@ export type EphemeralVmRecipeResult = z.infer<typeof EphemeralVmRecipeResultSche
 
 export type EphemeralVmRecipeResultParseResult =
   | { ok: true; result: EphemeralVmRecipeResult }
-  | { ok: false; error: string }
+  | ({ ok: false } & EphemeralVmFailure)
 
 export type EphemeralVmRecipeDoctorCheckStatus = 'pass' | 'warn' | 'fail'
 
@@ -158,14 +159,14 @@ export type EphemeralVmRecipeDoctorResult = {
 export function parseEphemeralVmRecipeResult(stdout: string): EphemeralVmRecipeResultParseResult {
   const trimmed = stdout.trim()
   if (!trimmed) {
-    return { ok: false, error: 'Recipe produced no JSON result.' }
+    return { ok: false, ...ephemeralVmFailure('recipeResultMissing') }
   }
   let parsed: unknown
   try {
     assertJsonTextStructureWithinLimits(trimmed, EPHEMERAL_VM_RECIPE_JSON_STRUCTURE_LIMITS)
     parsed = JSON.parse(trimmed)
   } catch {
-    return { ok: false, error: 'Recipe stdout must be one JSON object.' }
+    return { ok: false, ...ephemeralVmFailure('recipeResultNotJsonObject') }
   }
   const result = EphemeralVmRecipeResultSchema.safeParse(parsed)
   if (!result.success) {
@@ -173,10 +174,10 @@ export function parseEphemeralVmRecipeResult(stdout: string): EphemeralVmRecipeR
   }
   const connection = getEphemeralVmRecipeResultConnection(result.data)
   if (connection.type === 'orca-server' && !parsePairingCode(connection.pairingCode)) {
-    return { ok: false, error: 'Recipe result pairingCode is not a valid Orca pairing code.' }
+    return { ok: false, ...ephemeralVmFailure('recipeResultPairingCodeInvalid') }
   }
   if (!isAbsoluteRuntimePath(connection.projectRoot)) {
-    return { ok: false, error: 'Recipe result projectRoot must be an absolute runtime path.' }
+    return { ok: false, ...ephemeralVmFailure('recipeResultProjectRootNotAbsolute') }
   }
   // Why a bad deadline is not a parse failure: `create` has already run, so refusing the whole
   // result here would leave a machine the provider is billing for with no record and no cleanup. It

@@ -17,6 +17,7 @@ import {
   getRuntimeWorktreeRemovalOptionsKey
 } from '../runtime-worktree-selection'
 
+import type { RemoveManagedWorktreeOptions } from '../runtime-worktree-selection'
 import { hostSleepKey } from '../terminal/stop/worktree-terminal-sleep-key'
 import { resolveWorktreeHostRouting, type LaunchHostRepo } from '../worktree-launch-host-repo'
 import type {
@@ -161,13 +162,18 @@ export function queueWorkspaceDelete<T>(
   runtime: LifecycleRuntime & ObservingRuntime,
   selector: string,
   hostId: string | undefined,
-  requested: Partial<Record<RemovalFlag, boolean>> & { deleteRemoteBranch?: boolean },
+  requested: Partial<Record<RemovalFlag, boolean>> &
+    Pick<RemoveManagedWorktreeOptions, 'deleteBranch'> & { deleteRemoteBranch?: boolean },
   /** Called with the normalized flags, plus the caller's host when it named one. */
   run: (
-    removal: Record<RemovalFlag, boolean> & { deleteRemoteBranch: boolean; hostId?: string }
+    removal: Record<RemovalFlag, boolean> &
+      Pick<RemoveManagedWorktreeOptions, 'hostId' | 'deleteBranch'> & {
+        deleteRemoteBranch: boolean
+      }
   ) => Promise<T>
 ): Promise<T> {
-  const removal: Record<RemovalFlag, boolean> = {
+  const removal = {
+    ...(requested.deleteBranch !== undefined ? { deleteBranch: requested.deleteBranch } : {}),
     force: requested.force === true,
     runHooks: requested.runHooks === true,
     allowUnverifiedPtyStop: requested.allowUnverifiedPtyStop === true,

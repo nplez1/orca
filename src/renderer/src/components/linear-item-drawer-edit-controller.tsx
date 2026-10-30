@@ -1,3 +1,4 @@
+import { taskProviderErrorMessage, taskProviderErrorText } from '@/lib/task-provider-error-copy'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -75,7 +76,8 @@ export function useLinearIssueEditController({
           useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        onError: (err) => toast.error(err)
+        formatError: taskProviderErrorMessage,
+        onError: (err) => toast.error(taskProviderErrorText(err))
       })
     },
     [
@@ -110,7 +112,8 @@ export function useLinearIssueEditController({
           useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        onError: (err) => toast.error(err)
+        formatError: taskProviderErrorMessage,
+        onError: (err) => toast.error(taskProviderErrorText(err))
       })
     },
     [
@@ -143,7 +146,8 @@ export function useLinearIssueEditController({
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        onError: (err) => toast.error(err)
+        formatError: taskProviderErrorMessage,
+        onError: (err) => toast.error(taskProviderErrorText(err))
       })
     },
     [
@@ -202,7 +206,8 @@ export function useLinearIssueEditController({
           useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        onError: (err) => toast.error(err)
+        formatError: taskProviderErrorMessage,
+        onError: (err) => toast.error(taskProviderErrorText(err))
       })
     },
     [
@@ -258,7 +263,8 @@ export function useLinearIssueEditController({
           useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        onError: (err) => toast.error(err)
+        formatError: taskProviderErrorMessage,
+        onError: (err) => toast.error(taskProviderErrorText(err))
       })
     },
     [

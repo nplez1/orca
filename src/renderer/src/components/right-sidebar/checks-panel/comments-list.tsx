@@ -141,9 +141,12 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
                           size="icon-xs"
                           className="relative"
                           aria-label={translate(
-                            'auto.components.right.sidebar.checks.panel.content.d91f2a6c39',
-                            'Send {{value0}} queued comments to AI',
-                            { value0: selectedCommentQueueCount }
+                            'auto.components.right.sidebar.checks.panel.content.sendQueuedCommentsToAi',
+                            'Send {{count}} queued comments to AI',
+                            {
+                              count: selectedCommentQueueCount,
+                              defaultValue_one: 'Send {{count}} queued comment to AI'
+                            }
                           )}
                           disabled={
                             selectedCommentQueueCount === 0 ||
@@ -167,9 +170,12 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
                         {resolveCommentsWithAIDisabled && resolveCommentsWithAIDisabledReason
                           ? resolveCommentsWithAIDisabledReason
                           : translate(
-                              'auto.components.right.sidebar.checks.panel.content.d91f2a6c39',
-                              'Send {{value0}} queued comments to AI',
-                              { value0: selectedCommentQueueCount }
+                              'auto.components.right.sidebar.checks.panel.content.sendQueuedCommentsToAi',
+                              'Send {{count}} queued comments to AI',
+                              {
+                                count: selectedCommentQueueCount,
+                                defaultValue_one: 'Send {{count}} queued comment to AI'
+                              }
                             )}
                       </TooltipContent>
                     </Tooltip>

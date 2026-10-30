@@ -1,7 +1,7 @@
 import { deriveCliWriterTopology } from './cli-writer-observation'
 import { transitionHookPresence } from '../../../shared/agent-hook-presence-transition'
 import {
-  reconcileRemoteCodexState,
+  reconcileCodexStatusEvent,
   markCodexLeadTurnInterrupted,
   withPreservedCodexRootContext
 } from '../../../shared/agent-hook-listener/providers/codex-state'
@@ -9,8 +9,7 @@ import {
   resolveAgentStatusIdentity,
   shouldSuppressInheritedTerminalStatus
 } from '../../../shared/agent-status-identity'
-import type { EnrichedAgentHookEventPayload } from './server-types'
-import type { AgentHookEventPayload } from '../../../shared/agent-hook-listener/listener-event'
+import type { EnrichedAgentHookEventPayload, IncomingAgentHookEvent } from './server-types'
 import type { AgentStatusObservationOrigin } from '../../../shared/agent-status-observation'
 import { ClaudeOwedNotificationExpiryTimers } from '../../../shared/claude-owed-notification-expiry-timers'
 import { setClaudeMainAgentTurnState } from '../../../shared/agent-hook-listener/providers/claude-roster-state'
@@ -48,7 +47,7 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
   }
 
   protected applyNormalizedStatus(
-    incoming: AgentHookEventPayload & { authorityRestartId?: string },
+    incoming: IncomingAgentHookEvent,
     onAccepted?: () => void,
     origin: AgentStatusObservationOrigin = 'hook',
     observedAt?: number,
@@ -62,7 +61,10 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     if (!transitioned) {
       return undefined
     }
-    const { authorityRestartId, ...transitionedPayload } = { ...incoming, ...transitioned }
+    const { authorityRestartId, codexRosterAuthority, ...transitionedPayload } = {
+      ...incoming,
+      ...transitioned
+    }
     // Why the strip: the marker beside the transcript is the durable half of this link, and a
     // transcript path on every row would ride the persisted snapshot and the renderer fanout for
     // no reader.
@@ -176,22 +178,12 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
       this.emitEnrichedStatus(enriched)
       return enriched
     }
-    const stateReconciledPayload =
-      (terminalOwnedPayload.connectionId || !terminalOwnedPayload.hookEventName) &&
-      terminalOwnedPayload.payload.agentType === 'codex' &&
-      (terminalOwnedPayload.hookEventName || terminalOwnedPayload.payload.mainAgent)
-        ? {
-            ...terminalOwnedPayload,
-            payload: reconcileRemoteCodexState(
-              this.state,
-              terminalOwnedPayload.paneKey,
-              terminalOwnedPayload.hookEventName,
-              terminalOwnedPayload.toolAgentId,
-              terminalOwnedPayload.payload,
-              previous?.payload
-            )
-          }
-        : terminalOwnedPayload
+    const stateReconciledPayload = reconcileCodexStatusEvent(
+      this.state,
+      terminalOwnedPayload,
+      previous?.payload,
+      codexRosterAuthority
+    )
     const previousCodexRoot =
       stateReconciledPayload.payload.agentType === 'codex' &&
       stateReconciledPayload.toolAgentId &&

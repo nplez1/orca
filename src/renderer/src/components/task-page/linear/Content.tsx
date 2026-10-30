@@ -47,7 +47,9 @@ export function TaskPageLinearContent({
     <LinearIssueWorkspace
       issue={selectedLinearIssue}
       variant="page"
-      backLabel={activeLinearIssueContextLabel ?? 'Linear list'}
+      backLabel={
+        activeLinearIssueContextLabel ?? translate('taskProviders.linear.listLabel', 'Linear list')
+      }
       onUse={handleUseLinearItem}
       onOpenIssue={openRelatedLinearIssue}
       onClose={closeTaskDetailPage}

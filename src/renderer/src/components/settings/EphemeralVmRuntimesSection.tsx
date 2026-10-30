@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useEphemeralVmRuntimes'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+import { ephemeralVmCleanupErrorText } from '@/lib/ephemeral-vm-error-copy'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { EphemeralVmCleanupStopDialog } from './EphemeralVmCleanupStopDialog'
@@ -182,7 +183,7 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
       }
       if (hasCleanupFailed(cleaned)) {
         throw new Error(
-          cleaned.cleanupLastError ??
+          ephemeralVmCleanupErrorText(cleaned) ??
             translate(
               'auto.components.settings.EphemeralVmRuntimesSection.cloudVmCleanupFailedToast',
               'Couldn’t clean up Cloud VM runtime.'

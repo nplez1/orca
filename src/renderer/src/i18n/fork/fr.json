@@ -1,93 +1,22 @@
 {
   "auto": {
-    "App": {
-      "5096cbbc86": null
-    },
     "components": {
-      "GitHubItemDialog": {
-        "ddafe851e1": null,
-        "e463ec935f": null
-      },
       "JiraIssueWorkspace": {
         "showWorkspace": "Afficher l'espace de travail"
-      },
-      "PullRequestPage": {
-        "18f2af42ac": null,
-        "5963a6a852": null
       },
       "TaskPage": {
         "jiraOpenAttachedWorkspace": "Ouvrir l'espace de travail attaché à {{value0}}",
         "jiraShowWorkspace": "Afficher l'espace de travail"
       },
-      "crash": {
-        "report": {
-          "CrashReportDialog": {
-            "835037edc9": null
-          }
-        }
-      },
-      "mobile": {
-        "slides": {
-          "HomeSlide": {
-            "5d94e8ddcc": null
-          }
-        }
-      },
-      "onboarding": {
-        "OnboardingFlow": {
-          "a249f81538": null
-        }
-      },
-      "right": {
-        "sidebar": {
-          "ChecksPanel": {
-            "430f1a62d4": null,
-            "aa95b81a3a": null,
-            "f273f2271c": null
-          }
-        }
-      },
       "settings": {
         "AccountsPane": {
           "0c64dc2a64": null
-        },
-        "ExperimentalPane": {
-          "agentDashboard": {
-            "modeAriaLabel": null,
-            "modeCopy": null,
-            "modeInWindow": null,
-            "modeLabel": null,
-            "modePopout": null
-          }
         },
         "GeneralWorkspaceSettingsSection": {
           "0cda18153c": "Where each project's main checkout and its workspaces are created.",
           "9285cedcf2": "Flat",
           "b266f3f40e": "One folder per project",
           "f9b2070017": "Workspace Layout"
-        },
-        "experimental": {
-          "search": {
-            "agentDashboard": {
-              "popout": null
-            }
-          }
-        }
-      },
-      "stats": {
-        "share": {
-          "card": {
-            "utils": {
-              "19f4b4dc75": null
-            }
-          }
-        }
-      },
-      "status": {
-        "bar": {
-          "ResourceUsageStatusSegment": {
-            "288a4dd177": null
-          }
         }
       }
     },
@@ -119,28 +48,5 @@
         }
       }
     }
-  },
-  "components": {
-    "JiraIssueWorkspace": {
-      "pendingChange": null
-    }
-  },
-  "dashboardPopout": {
-    "recoverableError": {
-      "description": null,
-      "title": null
-    }
-  },
-  "jira": {
-    "transitions": {
-      "completeInJira": null,
-      "unsupported": null
-    },
-    "workspace": {
-      "openFailed": null
-    }
-  },
-  "tray": {
-    "activityWaiting": null
   }
 }

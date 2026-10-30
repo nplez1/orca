@@ -80,30 +80,30 @@ function overlayNewCardUnreadStatus(
 
 /** The review's own state, with no checks verdict — the collection summary owns that half. */
 function getReviewStateLabel(review: WorktreeCardPrDisplay): string {
-  const label = getReviewLabel(review)
+  const values = { review: getReviewLabel(review) }
   if (review.state === 'merged') {
-    return `${label}: Merged`
+    return translate('workspace.reviewStatus.merged', '{{review}}: Merged', values)
   }
   if (review.state === 'closed') {
-    return `${label}: Closed`
+    return translate('workspace.reviewStatus.closed', '{{review}}: Closed', values)
   }
   if (review.state === 'draft') {
-    return `${label}: Draft`
+    return translate('workspace.reviewStatus.draft', '{{review}}: Draft', values)
   }
-  return `${label}: Open`
+  return translate('workspace.reviewStatus.open', '{{review}}: Open', values)
 }
 
 /** This one review's checks verdict. Stated only when no collection summary covers it. */
 function getReviewChecksLabel(review: WorktreeCardPrDisplay): string | null {
-  const label = getReviewLabel(review)
+  const values = { review: getReviewLabel(review) }
   if (review.status === 'failure') {
-    return `${label} checks: Failed`
+    return translate('workspace.reviewStatus.checksFailed', '{{review}} checks: Failed', values)
   }
   if (review.status === 'pending') {
-    return `${label} checks: Pending`
+    return translate('workspace.reviewStatus.checksPending', '{{review}} checks: Pending', values)
   }
   if (review.status === 'success') {
-    return `${label} checks: Passing`
+    return translate('workspace.reviewStatus.checksPassing', '{{review}} checks: Passing', values)
   }
   return null
 }
@@ -182,7 +182,9 @@ export function WorktreeCardStatusSlot({
       ? `${passiveStatusLabel} · ${translate('workspace.links.lastKnownStatus', 'Last known status')}`
       : passiveStatusLabel
   const passiveStatusAnnouncement =
-    newCardStyle && isUnread ? `${reviewLabel} · Unread` : reviewLabel
+    newCardStyle && isUnread
+      ? translate('workspace.activity.unreadLabel', '{{status}} · Unread', { status: reviewLabel })
+      : reviewLabel
   // Working/permission own the lane; retain unread in accessible copy and restore its dot afterward.
   const showNewCardUnreadAlert =
     newCardStyle && isUnread && showStatus && status !== 'working' && status !== 'permission'

@@ -108,7 +108,7 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
           recordSessionScanIssue(issues, {
             agent: 'cursor',
             path: refusal.chatsRoot,
-            message: refusal.message
+            ...refusal.text
           })
         }
 

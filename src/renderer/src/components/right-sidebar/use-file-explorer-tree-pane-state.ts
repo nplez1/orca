@@ -16,11 +16,13 @@ import { useFileExplorerImport } from './useFileExplorerImport'
 import { useFileExplorerInlineInput } from './useFileExplorerInlineInput'
 import { useFileExplorerNodeCommands } from './use-file-explorer-node-commands'
 import { useFileExplorerRowScrolling } from './use-file-explorer-row-scrolling'
+import { useFileExplorerLoadMore } from './use-file-explorer-load-more'
 import { useFileExplorerTreeLoadEffects } from './use-file-explorer-tree-load-effects'
 import { useFileExplorerWatch } from './useFileExplorerWatch'
 import type { useFileExplorerSelection } from './useFileExplorerSelection'
 import type { useFileExplorerTree } from './useFileExplorerTree'
 import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
+import type { LocalPathOpenOwner } from '@/lib/local-path-open-guard'
 
 type UseFileExplorerTreePaneStateParams = {
   onRevealOutsideRoot?: () => void
@@ -43,6 +45,7 @@ type UseFileExplorerTreePaneStateParams = {
   rowProjection: FileExplorerRowProjection
   rowExpandedPaths: Set<string>
   visibleRowCount: number
+  pathOwner: LocalPathOpenOwner
 }
 
 type UseFileExplorerTreePaneStateResult = {
@@ -82,7 +85,8 @@ export function useFileExplorerTreePaneState({
   selectedNode,
   rowProjection,
   rowExpandedPaths,
-  visibleRowCount
+  visibleRowCount,
+  pathOwner
 }: UseFileExplorerTreePaneStateParams): UseFileExplorerTreePaneStateResult {
   const {
     dirCache,
@@ -95,6 +99,7 @@ export function useFileExplorerTreePaneState({
     markPathAsDirectory,
     refreshTree,
     refreshDir,
+    loadMoreDir,
     isDirStale,
     resetAndLoad
   } = tree
@@ -174,6 +179,7 @@ export function useFileExplorerTreePaneState({
   })
 
   useFileExplorerTreeLoadEffects({
+    workspaceKey: activeWorktreeId,
     visibleFilesWorktreePath,
     displayRootPath,
     expanded: effectiveExpanded,
@@ -238,9 +244,18 @@ export function useFileExplorerTreePaneState({
     loadingDirPaths,
     rootCache,
     loadDir,
+    loadMoreDir,
     setSelectedPath: setSingleSelectedPath,
     activeFileId,
     openFiles
+  })
+
+  useFileExplorerLoadMore({
+    virtualizer: rowScrolling.virtualizer,
+    rowProjection,
+    dirCache,
+    loadingDirPaths,
+    loadMoreDir
   })
 
   const handlers = useFileExplorerHandlers({
@@ -275,7 +290,8 @@ export function useFileExplorerTreePaneState({
     refreshDir,
     handleClick: handlers.handleClick,
     toggleDir: hasNameFilter ? handleToggleNameFilterDir : toggleDir,
-    scrollToIndex: rowScrolling.scrollToIndex
+    scrollToIndex: rowScrolling.scrollToIndex,
+    pathOwner
   })
 
   return {

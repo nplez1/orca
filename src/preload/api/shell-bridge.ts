@@ -1,3 +1,4 @@
+import type { RepoIconPickResult } from '../../shared/repo-icon-pick-failure-copy'
 import { ipcRenderer } from 'electron'
 import type {
   ShellOpenExternalEditorRequest,
@@ -9,6 +10,7 @@ import {
   contextualLinkOpenChannel,
   contextualLinkRouterReadyChannel
 } from '../../shared/contextual-link-channels'
+import type { ShellPathExistence } from '../../shared/path-existence-batch'
 import type { PreloadApi } from '../api-types'
 
 export const shellApi = {
@@ -47,9 +49,10 @@ export const shellApi = {
   openFileUri: (uri: string, ownerHostId: ExecutionHostId): Promise<void> =>
     ipcRenderer.invoke('shell:openFileUri', uri, ownerHostId),
 
-  pathsExist: (paths: string[]): Promise<boolean[]> =>
+  pathsExist: (paths: string[]): Promise<ShellPathExistence[]> =>
     ipcRenderer.invoke('shell:pathsExist', paths),
-  pathExists: (path: string): Promise<boolean> => ipcRenderer.invoke('shell:pathExists', path),
+  pathExists: (path: string, options?: { wakeWslDistro?: boolean }): Promise<boolean> =>
+    ipcRenderer.invoke('shell:pathExists', path, options),
 
   pickAttachment: (): Promise<string | null> => ipcRenderer.invoke('shell:pickAttachment'),
 
@@ -57,7 +60,7 @@ export const shellApi = {
 
   pickImage: (): Promise<string | null> => ipcRenderer.invoke('shell:pickImage'),
 
-  pickRepoIconImage: (): Promise<{ dataUrl: string; fileName: string } | null> =>
+  pickRepoIconImage: (): Promise<RepoIconPickResult> =>
     ipcRenderer.invoke('shell:pickRepoIconImage'),
 
   pickAudio: (): Promise<string | null> => ipcRenderer.invoke('shell:pickAudio'),

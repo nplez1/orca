@@ -96,7 +96,7 @@ vi.mock('./pty/provider/state-cleanup', async () =>
   (await import('./worktrees-test-module-mocks')).ptyStateCleanupModuleMock()
 )
 
-describe('desktop label-only creation through first work', () => {
+describe('desktop worktree naming through first work', () => {
   function expectCreatedWorktree(result: unknown): asserts result is CreateWorktreeResult {
     expect(result).toEqual(
       expect.objectContaining({

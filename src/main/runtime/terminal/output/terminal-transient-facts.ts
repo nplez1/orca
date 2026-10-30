@@ -197,13 +197,13 @@ export abstract class OrcaRuntimeWithEmitDaemonPtyTransientFact extends OrcaRunt
     return null
   }
 
-  protected isLiveCursorNativeTitle(rawTitle: string, meta?: TerminalTitleFactMeta): boolean {
-    return isCursorNativeAgentTitle(rawTitle) && meta?.staleWorkingTitleClear !== true
+  /** The same title for main's synthetic title producer, which must see its own frames. */
+  getTrackedPtyTitle(ptyId: string): string | null {
+    return this.getTrackedRawTitleForPty(ptyId)
   }
 
-  /** The title a pane's tracker currently shows, for callers outside the runtime's own lanes. */
-  getTrackedPtyTitle(ptyId: string): string | null {
-    return this.getTrackedDisplayTitleForPty(ptyId)
+  protected isLiveCursorNativeTitle(rawTitle: string, meta?: TerminalTitleFactMeta): boolean {
+    return isCursorNativeAgentTitle(rawTitle) && meta?.staleWorkingTitleClear !== true
   }
 
   /** Display fallback for identities intentionally omitted from liveness records. */

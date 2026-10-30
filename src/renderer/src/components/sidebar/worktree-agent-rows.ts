@@ -1,3 +1,5 @@
+import type { Tab } from '../../../../shared/tab-types'
+import { parseAgentStatusPaneIdentity } from '../../../../shared/agent-status-worktree-attribution'
 import type { DashboardAgentRow } from '@/components/dashboard/useDashboardData'
 import { isExplicitAgentStatusFresh } from '@/lib/agent-status'
 import { unplacedWorkingAgentTypes } from '@/lib/unplaced-working-agent-types'
@@ -163,6 +165,7 @@ function yieldingPermissionAgentTypes(args: {
 
 export function buildWorktreeAgentRows(args: {
   tabs: TerminalTab[]
+  representedTabs?: ReadonlyMap<string, Tab>
   entries: AgentStatusEntry[]
   retained: RetainedAgentEntry[]
   runtimePaneTitlesByTabId?: Record<string, Record<number, string>>
@@ -178,7 +181,10 @@ export function buildWorktreeAgentRows(args: {
 
   const entriesByTabId = new Map<string, AgentStatusEntry[]>()
   for (const entry of args.entries) {
-    const parsed = parsePaneKey(entry.paneKey)
+    const parsed = parseAgentStatusPaneIdentity(
+      entry.paneKey,
+      args.representedTabs?.get(entry.paneKey)
+    )
     if (!parsed) {
       continue
     }
@@ -247,7 +253,11 @@ export function buildWorktreeAgentRows(args: {
     }
     const rowEntry = entryWithRuntimeOrchestration(entry, args.runtimeAgentOrchestrationByPaneKey)
     const startedAt = effectiveWorktreeAgentRowStartedAt(rowEntry)
-    const tab = tabFromWorktreeAttributedStatusEntry(rowEntry, startedAt)
+    const tab = tabFromWorktreeAttributedStatusEntry(
+      rowEntry,
+      startedAt,
+      args.representedTabs?.get(rowEntry.paneKey)
+    )
     if (!tab) {
       continue
     }

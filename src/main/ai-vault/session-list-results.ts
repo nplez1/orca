@@ -6,25 +6,29 @@ import type {
 import type { ExecutionHostId } from '../../shared/execution-host'
 import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
 import { dedupeScannedSessions } from './session-root-dedup'
+import type { AiVaultScanIssueText } from '../../shared/ai-vault-scan-issue-copy'
 import {
   requestedAiVaultSessionDepth,
   truncateAiVaultListResult
 } from '../../shared/ai-vault-session-depth'
 
-export function aiVaultScanIssueResult(args: {
+export function aiVaultScanIssueResult({
+  executionHostId,
+  path,
+  ...text
+}: {
   executionHostId?: ExecutionHostId
   path: string
-  message: string
-}): AiVaultListResult {
+} & AiVaultScanIssueText): AiVaultListResult {
   return {
     sessions: [],
     issues: [
       {
-        ...(args.executionHostId ? { executionHostId: args.executionHostId } : {}),
+        ...(executionHostId ? { executionHostId } : {}),
         agent: 'codex',
         kind: 'host',
-        path: args.path,
-        message: args.message
+        path,
+        ...text
       }
     ],
     scannedAt: new Date().toISOString()

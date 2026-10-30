@@ -1,14 +1,16 @@
-import { parseGitHubReviewState, type PRComment } from '../../../../shared/github/comment-types'
-import { isReportableReviewSubmission } from '../../../../shared/pr-review-verdicts'
+import type { PRComment } from '../../../../shared/github/comment-types'
+import { runCoalescedProbe, type CoalescedProbes } from '../../../git/coalesced-probe'
+import { extractExecError } from '../../../git/exec-error'
+import { githubReadExecutionScope } from '../../github-read-execution-scope'
 import { GITHUB_WORK_ITEMS_SSH_REMOTE_REQUIRED_MESSAGE } from '../../../../shared/work-items'
 import { ghExecFileAsync, acquire, release, type LocalGitExecOptions } from '../../gh-utils'
 import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
-import { mapGraphQLReactionGroups, type GitHubGraphQLReactionGroup } from '../../comment-reactions'
 import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from '../../rate-limit'
 import { assertRateLimitBudget } from './../lookup/pr-lookup-rate-limit'
 import { REVIEW_THREADS_QUERY } from './pr-review-threads-query'
+import { parsePRConversationResponse, parseRestPRComments } from './pr-conversation-response'
 /** Combine conversation comments, review summaries and GraphQL threads with resolution metadata. */
-export async function getPRComments(
+async function readPRComments(
   repoPath: string,
   prNumber: number,
   options?: {
@@ -37,10 +39,8 @@ export async function getPRComments(
   if (connectionId && !ownerRepo) {
     throw new Error(GITHUB_WORK_ITEMS_SSH_REMOTE_REQUIRED_MESSAGE)
   }
-  if (ownerRepo) {
-    await assertRateLimitBudget('core', ownerRepo, ghOptions)
-  }
   await acquire()
+  let restBudgetFailed = false
   try {
     if (ownerRepo) {
       // Explicit refresh bypasses the polling cache.
@@ -49,227 +49,76 @@ export async function getPRComments(
 
       // Retain successful comment sources when another endpoint fails.
       const reviewThreadsGuard = repositoryRateLimitGuard(ownerRepo, 'graphql', ghOptions)
-      let reviewThreadsFetch: Promise<{ stdout: string; stderr: string } | null>
+      let threadsResult: { stdout: string } | null = null
       if (reviewThreadsGuard.blocked) {
-        reviewThreadsFetch = Promise.resolve(null)
+        threadsResult = null
       } else {
         noteRepositoryRateLimitSpend(ownerRepo, 'graphql', 1, ghOptions)
-        reviewThreadsFetch = ghExecFileAsync(
-          [
-            'api',
-            'graphql',
-            '-f',
-            `query=${REVIEW_THREADS_QUERY}`,
-            '-f',
-            `owner=${ownerRepo.owner}`,
-            '-f',
-            `repo=${ownerRepo.repo}`,
-            '-F',
-            `pr=${prNumber}`
-          ],
-          ghOptions
-        )
+        try {
+          threadsResult = await ghExecFileAsync(
+            [
+              'api',
+              'graphql',
+              '-f',
+              `query=${REVIEW_THREADS_QUERY}`,
+              '-f',
+              `owner=${ownerRepo.owner}`,
+              '-f',
+              `repo=${ownerRepo.repo}`,
+              '-F',
+              `pr=${prNumber}`
+            ],
+            ghOptions
+          )
+        } catch (error) {
+          // gh exits nonzero for partial GraphQL errors; keep the successful sources.
+          const { stdout } = extractExecError(error)
+          threadsResult = stdout ? { stdout } : null
+          console.warn('Failed to fetch review threads:', error)
+        }
       }
-      const [issueResult, threadsResult, reviewsResult] = await Promise.allSettled([
-        ghExecFileAsync(
-          ['api', ...cacheArgs, `${base}/issues/${prNumber}/comments?per_page=100`],
-          ghOptions
-        ),
-        reviewThreadsFetch,
-        // Review summaries live outside issue comments and inline threads.
-        ghExecFileAsync(
-          ['api', ...cacheArgs, `${base}/pulls/${prNumber}/reviews?per_page=100`],
-          ghOptions
-        )
-      ])
-      noteRepositoryRateLimitSpend(ownerRepo, 'core', 2, ghOptions)
 
-      type RESTComment = {
-        id: number
-        user: { login: string; avatar_url: string; type?: string } | null
-        body: string
-        created_at: string
-        html_url: string
-      }
-      let issueComments: PRComment[] = []
-      if (issueResult.status === 'fulfilled') {
-        issueComments = (JSON.parse(issueResult.value.stdout) as RESTComment[]).map(
-          (c): PRComment => ({
-            id: c.id,
-            author: c.user?.login ?? 'ghost',
-            authorAvatarUrl: c.user?.avatar_url ?? '',
-            body: c.body ?? '',
-            createdAt: c.created_at,
-            url: c.html_url,
-            isBot: c.user?.type === 'Bot'
+      let conversation: ReturnType<typeof parsePRConversationResponse> = { reviewComments: [] }
+      if (threadsResult) {
+        try {
+          conversation = parsePRConversationResponse(threadsResult.stdout, {
+            includeReviewVerdicts: options?.includeReviewVerdicts
           })
-        )
-      } else {
-        console.warn('Failed to fetch issue comments:', issueResult.reason)
+        } catch {
+          console.warn('Invalid review threads response; falling back to REST')
+        }
       }
+      const { issueComments, reviewSummaries, reviewComments } = conversation
 
-      type GQLThread = {
-        id: string
-        isResolved: boolean
-        line: number | null
-        startLine: number | null
-        originalLine: number | null
-        originalStartLine: number | null
-        comments: {
-          nodes: {
-            id: string
-            databaseId: number
-            author: { __typename?: string; login: string; avatarUrl: string } | null
-            body: string
-            createdAt: string
-            url: string
-            path: string
-            reactionGroups?: GitHubGraphQLReactionGroup[] | null
-          }[]
+      const readRestSource = async (endpoint: string): Promise<PRComment[]> => {
+        await assertRateLimitBudget('core', ownerRepo, ghOptions).catch((error: unknown) => {
+          restBudgetFailed = true
+          throw error
+        })
+        try {
+          noteRepositoryRateLimitSpend(ownerRepo, 'core', 1, ghOptions)
+          const { stdout } = await ghExecFileAsync(['api', ...cacheArgs, endpoint], ghOptions)
+          return parseRestPRComments(stdout, endpoint.includes('/reviews?'), {
+            includeReviewVerdicts: options?.includeReviewVerdicts
+          })
+        } catch (error) {
+          console.warn('Failed to fetch PR conversation fallback:', error)
+          return []
         }
       }
-      type GQLIssueComment = {
-        id: string
-        databaseId: number
-        author: { __typename?: string; login: string; avatarUrl: string } | null
-        body: string
-        /** Present on review submissions. GraphQL and REST spell the verdicts the same way. */
-        state?: string | null
-        createdAt: string
-        url: string
-        reactionGroups?: GitHubGraphQLReactionGroup[] | null
-      }
-      let graphQLReviewSummaries: PRComment[] | undefined
-      const reviewComments: PRComment[] = []
-      if (threadsResult.status === 'fulfilled' && threadsResult.value) {
-        const threadsData = JSON.parse(threadsResult.value.stdout) as {
-          data?: {
-            repository?: {
-              pullRequest?: {
-                reviewThreads?: { nodes?: GQLThread[] | null } | null
-                comments?: { nodes?: GQLIssueComment[] | null } | null
-                reviews?: { nodes?: GQLIssueComment[] | null } | null
-              } | null
-            } | null
-          } | null
-        }
-        // GraphQL can exit 0 with a null repository and errors; retain the successful REST halves.
-        const pullRequest = threadsData.data?.repository?.pullRequest
-        if (!pullRequest) {
-          console.warn('Review threads response missing pullRequest; keeping REST results')
-        }
-        const graphQLIssueComments = (pullRequest?.comments?.nodes ?? []).map((c): PRComment => ({
-          id: c.databaseId,
-          author: c.author?.login ?? 'ghost',
-          authorAvatarUrl: c.author?.avatarUrl ?? '',
-          body: c.body ?? '',
-          createdAt: c.createdAt,
-          url: c.url,
-          isBot: c.author?.__typename === 'Bot',
-          reactionSubjectId: c.id,
-          reactions: mapGraphQLReactionGroups(c.reactionGroups)
-        }))
-        if (graphQLIssueComments.length > 0) {
-          issueComments = graphQLIssueComments
-        }
-        // Incomplete GraphQL payloads must preserve REST review summaries.
-        graphQLReviewSummaries = pullRequest
-          ? (pullRequest.reviews?.nodes ?? []).reduce<PRComment[]>((reviews, review) => {
-              const body = review.body ?? ''
-              const reviewState = parseGitHubReviewState(review.state)
-              const reportable = options?.includeReviewVerdicts
-                ? isReportableReviewSubmission(body, reviewState)
-                : body.trim().length > 0
-              if (!review.databaseId || !reportable) {
-                return reviews
-              }
-              reviews.push({
-                id: review.databaseId,
-                author: review.author?.login ?? 'ghost',
-                authorAvatarUrl: review.author?.avatarUrl ?? '',
-                body,
-                createdAt: review.createdAt,
-                url: review.url,
-                isBot: review.author?.__typename === 'Bot',
-                reviewState,
-                reactionSubjectId: review.id,
-                reactions: mapGraphQLReactionGroups(review.reactionGroups)
-              })
-              return reviews
-            }, [])
-          : undefined
-
-        const threads = pullRequest?.reviewThreads?.nodes ?? []
-        for (const thread of threads) {
-          for (const c of thread.comments.nodes) {
-            reviewComments.push({
-              id: c.databaseId,
-              author: c.author?.login ?? 'ghost',
-              authorAvatarUrl: c.author?.avatarUrl ?? '',
-              body: c.body ?? '',
-              createdAt: c.createdAt,
-              url: c.url,
-              isBot: c.author?.__typename === 'Bot',
-              reactionSubjectId: c.id,
-              reactions: mapGraphQLReactionGroups(c.reactionGroups),
-              path: c.path,
-              threadId: thread.id,
-              isResolved: thread.isResolved,
-              isOutdated: thread.line == null,
-              // Outdated code nulls current line numbers; retain original positions.
-              line: thread.line ?? thread.originalLine ?? undefined,
-              startLine: thread.startLine ?? thread.originalStartLine ?? undefined
-            })
-          }
-        }
-      } else {
-        if (threadsResult.status === 'rejected') {
-          console.warn('Failed to fetch review threads:', threadsResult.reason)
-        }
-      }
-
-      // Empty-body approvals add no conversation text.
-      type RESTReview = {
-        id: number
-        user: { login: string; avatar_url: string; type?: string } | null
-        body: string
-        state: string
-        submitted_at: string
-        html_url: string
-      }
-      let reviewSummaries: PRComment[] = []
-      if (graphQLReviewSummaries) {
-        reviewSummaries = graphQLReviewSummaries
-      } else if (reviewsResult.status === 'fulfilled') {
-        reviewSummaries = (JSON.parse(reviewsResult.value.stdout) as RESTReview[])
-          .filter((r) => r.id != null)
-          .reduce<PRComment[]>((reviews, r) => {
-            const body = r.body ?? ''
-            const reviewState = parseGitHubReviewState(r.state)
-            // Why: the same keep-rule as the GraphQL path, so the fallback cannot disagree with it.
-            const reportable = options?.includeReviewVerdicts
-              ? isReportableReviewSubmission(body, reviewState)
-              : body.trim().length > 0
-            if (!reportable) {
-              return reviews
-            }
-            reviews.push({
-              id: r.id,
-              author: r.user?.login ?? 'ghost',
-              authorAvatarUrl: r.user?.avatar_url ?? '',
-              body,
-              createdAt: r.submitted_at,
-              url: r.html_url,
-              isBot: r.user?.type === 'Bot',
-              reviewState
-            })
-            return reviews
-          }, [])
-      } else {
-        console.warn('Failed to fetch review summaries:', reviewsResult.reason)
-      }
-
-      const all = [...issueComments, ...reviewComments, ...reviewSummaries]
+      const [issueResult, reviewsResult] = await Promise.all([
+        issueComments === undefined
+          ? readRestSource(`${base}/issues/${prNumber}/comments?per_page=100`)
+          : null,
+        reviewSummaries === undefined
+          ? readRestSource(`${base}/pulls/${prNumber}/reviews?per_page=100`)
+          : null
+      ])
+      const all = [
+        ...(issueComments ?? issueResult ?? []),
+        ...reviewComments,
+        ...(reviewSummaries ?? reviewsResult ?? [])
+      ]
       all.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
       return all
     }
@@ -297,9 +146,41 @@ export async function getPRComments(
       url: c.url ?? ''
     }))
   } catch (err) {
+    if (restBudgetFailed) {
+      throw err
+    }
     console.warn('getPRComments failed:', err)
     return []
   } finally {
     release()
   }
+}
+
+const commentReads: CoalescedProbes<PRComment[]> = new Map()
+
+export function getPRComments(
+  repoPath: string,
+  prNumber: number,
+  options?: {
+    noCache?: boolean
+    prRepo?: GitHubApiRepository | null
+    includeReviewVerdicts?: boolean
+  },
+  connectionId?: string | null,
+  localGitOptions: LocalGitExecOptions = {}
+): Promise<PRComment[]> {
+  // Forced refreshes often follow a mutation, so they must not join a read that started before it.
+  if (options?.noCache) {
+    return readPRComments(repoPath, prNumber, options, connectionId, localGitOptions)
+  }
+  const key = JSON.stringify([
+    repoPath,
+    prNumber,
+    options?.prRepo ?? null,
+    connectionId ?? null,
+    githubReadExecutionScope(localGitOptions)
+  ])
+  return runCoalescedProbe(commentReads, key, () =>
+    readPRComments(repoPath, prNumber, options, connectionId, localGitOptions)
+  )
 }

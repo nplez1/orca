@@ -1,3 +1,4 @@
+import type { StackedReviewFailureReason } from './stacked-hosted-review-failure-copy'
 import type {
   CheckStatus,
   GitHubRepositoryIdentity,
@@ -73,6 +74,8 @@ export type HostedReviewForBranchArgs = {
   currentHeadOid?: string | null
   /** Only selected-worktree surfaces set active: O(1) checks refresh per minute; O(N) lists refresh more slowly within the shared API budget (#11532). */
   active?: boolean
+  /** Desktop IPC only: an explicit Refresh, which may start a stopped WSL distro (E9). */
+  wakeWslDistro?: boolean
 }
 
 export type HostedReviewSummary = {
@@ -123,10 +126,13 @@ export type CreateHostedReviewFailureReason =
   | 'review_lookup_unavailable'
   | 'provider_not_supported'
   | 'same_base_branch'
+  /** Bitbucket, Azure DevOps and Gitea need a base branch, head branch and title. */
+  | 'base_head_title_required'
   | 'rejected'
   | 'repository_not_found'
   | 'create_failed'
   | 'creation_unconfirmed'
+  | StackedReviewFailureReason
 
 export type CreateHostedReviewResult =
   | { ok: true; number: number; url: string }
@@ -154,9 +160,11 @@ export type CreateStackedHostedReviewResult =
       ok: false
       code: CreateHostedReviewErrorCode
       error: string
-      /** Set when the failure comes from the plain create step. */
+      /** Plain create-step reason or a stacked `stack_*` reason; absent from older hosts. */
       reason?: CreateHostedReviewFailureReason
       base?: string
+      /** The current branch named by `stack_head_ambiguous`. */
+      head?: string
       createdReview?: HostedReviewSummary
     }
 
@@ -219,6 +227,8 @@ export type HostedReviewCreationEligibilityArgs = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  /** The user's Create PR: it may start the repo's stopped WSL distro (E9). */
+  wakeWslDistro?: boolean
 }
 
 export type HostedReviewDecision = 'approved' | 'changes_requested' | 'review_required' | null

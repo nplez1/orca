@@ -450,6 +450,7 @@ describe('registerPtyHandlers', () => {
           expect(entries.indexOf(shimDir)).toBeLessThan(entries.indexOf('/usr/bin'))
           // Why: the skill stubs resolve ORCA_CLI_COMMAND before PATH, so the shim is named directly.
           expect(env.ORCA_CLI_COMMAND).toBe(join(shimDir, 'orca'))
+          expect(env.ORCA_USER_DATA_PATH).toBe('/tmp/orca-user-data')
         } finally {
           Object.defineProperty(process, 'platform', {
             configurable: true,

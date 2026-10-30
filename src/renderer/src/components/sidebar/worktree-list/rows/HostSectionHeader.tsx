@@ -106,12 +106,12 @@ function EphemeralHostLeaseMarker({
   )
 }
 
-function formatSectionActivityLabel(count: number, label: string): string {
-  return `${count} ${label}${count === 1 ? '' : 's'}`
-}
-
 function SectionMetricsBadge({ count }: { count: number }): React.JSX.Element {
-  const totalLabel = formatSectionActivityLabel(count, 'workspace')
+  const totalLabel = translate(
+    'auto.components.sidebar.HostSectionHeader.workspaceCount',
+    '{{count}} workspaces',
+    { count, defaultValue_one: '{{count}} workspace' }
+  )
 
   return (
     <span

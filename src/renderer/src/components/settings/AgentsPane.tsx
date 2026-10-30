@@ -11,6 +11,7 @@ import { SessionSummaryAiSetting } from './SessionSummaryAiSetting'
 import { AgentRuntimeSetting } from './AgentRuntimeSetting'
 import { AgentSessionSearchSection } from './AgentSessionSearchSection'
 import { CodexTerminalServerIsolationSetting } from './CodexTerminalServerIsolationSetting'
+import { CodexHistorySharingSetting } from './CodexHistorySharingSetting'
 import {
   getAgentGeneratedTabTitlesDescription,
   getAgentGeneratedTabTitlesTitle
@@ -75,12 +76,19 @@ export function AgentsPane({
         hostScope={hostScope}
         renderPermissions={renderAgentPermissions}
       />
+      <section className="space-y-3">
+        <CodexHistorySharingSetting
+          settings={settings}
+          updateSettings={updateSettings}
+          hostScope={hostScope}
+        />
+      </section>
       <section className="space-y-8">
         <SettingsSubsectionHeader title={getLocalExecutionHostLabel()} />
         <AgentRuntimeSetting
           settings={settings}
           updateSettings={updateSettings}
-          refresh={refreshLocalAgents}
+          refresh={() => refreshLocalAgents(undefined, { wakeWslDistro: true })}
           wslSupportedPlatform={wslSupportedPlatform}
           wslAvailable={wslAvailable}
           wslDistros={wslDistros}

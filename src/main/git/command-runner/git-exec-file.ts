@@ -28,6 +28,8 @@ import { createAbortError } from './abort-error'
 import { readCapturedGitBuffer, readCapturedGitString } from './captured-git-output'
 import { runUnlessGitCwdKnownMissing } from './missing-git-spawn-cwd'
 import { trackGitWorktreeMutation } from '../git-worktree-mutation-state'
+import { routeLocalGitOptions, runAdmittedWslGit } from './local-git-runtime-route'
+import { gitRunsIn } from './git-runs-in'
 
 async function gitExecFileAsyncUnlocked(
   args: string[],
@@ -78,6 +80,8 @@ async function gitExecFileAsyncUnlocked(
             signal: options.admissionSignal ?? options.signal
           })
       span?.setAttribute('git.queue_wait_ms', grant.queueWaitMs)
+      // Which Git ran: a project's runtime can route it into a distro whatever its cwd.
+      span?.setAttribute('git.runs_in', gitRunsIn(resolved))
       const timeoutMs = gitCommandTimeoutMs(args, options.timeout, options.timeoutMsForTest)
       const capture = (
         command: ResolvedCommand
@@ -177,21 +181,24 @@ async function gitExecFileAsyncUnlocked(
 
 export function gitExecFileAsync(
   args: string[],
-  options: GitExecOptions
+  callerOptions: GitExecOptions
 ): Promise<{ stdout: string; stderr: string }> {
+  const options = routeLocalGitOptions(callerOptions)
   const releaseMutation = trackGitWorktreeMutation(args, options)
   const terminationState: { current: Promise<void> | null } = { current: null }
   const command = resolveGitFetchHeadCommand(args, options.cwd)
   // Missing folders start no child and must not record a git.exec span.
-  const result = runUnlessGitCwdKnownMissing(options, () =>
-    command.needsLock
-      ? runWithGitFetchHeadLock(
-          command.cwd,
-          options.signal,
-          () => gitExecFileAsyncUnlocked(args, options, terminationState),
-          command.gitDir
-        )
-      : gitExecFileAsyncUnlocked(args, options, terminationState)
+  const result = runAdmittedWslGit(options, () =>
+    runUnlessGitCwdKnownMissing(options, () =>
+      command.needsLock
+        ? runWithGitFetchHeadLock(
+            command.cwd,
+            options.signal,
+            () => gitExecFileAsyncUnlocked(args, options, terminationState),
+            command.gitDir
+          )
+        : gitExecFileAsyncUnlocked(args, options, terminationState)
+    )
   )
   return result.finally(() => {
     // A timed-out caller can settle before its child exits.
@@ -242,6 +249,7 @@ async function gitExecFileAsyncBufferInSpan(
       signal: options.signal
     })
     span?.setAttribute('git.queue_wait_ms', grant.queueWaitMs)
+    span?.setAttribute('git.runs_in', gitRunsIn(resolved))
     const timeoutMs = gitCommandTimeoutMs(args, options.timeout, options.timeoutMsForTest)
     let termination: Promise<void> | null = null
     try {
@@ -282,9 +290,12 @@ async function gitExecFileAsyncBufferInSpan(
 
 export function gitExecFileAsyncBuffer(
   args: string[],
-  options: Parameters<typeof gitExecFileAsyncBufferInSpan>[1]
+  callerOptions: Parameters<typeof gitExecFileAsyncBufferInSpan>[1]
 ): Promise<{ stdout: Buffer }> {
-  return runUnlessGitCwdKnownMissing(options, () => gitExecFileAsyncBufferInSpan(args, options))
+  const options = routeLocalGitOptions(callerOptions)
+  return runAdmittedWslGit(options, () =>
+    runUnlessGitCwdKnownMissing(options, () => gitExecFileAsyncBufferInSpan(args, options))
+  )
 }
 
 export { gitExecFileSync } from './git-exec-file-sync'

@@ -364,7 +364,8 @@ describe('Jira client credential storage', () => {
 
     await expect(jira.testConnection(siteId)).resolves.toEqual({
       ok: false,
-      error: 'Not connected to Jira.'
+      error: 'Not connected to Jira.',
+      errorCode: 'jira.notConnected'
     })
 
     expect(fetchMock).not.toHaveBeenCalled()
@@ -561,7 +562,11 @@ describe('Jira client credential storage', () => {
         apiToken: '',
         authType: 'server'
       })
-    ).resolves.toEqual({ ok: false, error: 'Personal access token is required.' })
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Personal access token is required.',
+      errorCode: 'jira.personalTokenRequired'
+    })
     expect(netFetchMock).not.toHaveBeenCalled()
   })
 
@@ -575,7 +580,11 @@ describe('Jira client credential storage', () => {
         apiToken: '',
         authType: 'server'
       })
-    ).resolves.toEqual({ ok: false, error: 'Password is required.' })
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Password is required.',
+      errorCode: 'jira.passwordRequired'
+    })
     expect(netFetchMock).not.toHaveBeenCalled()
   })
 

@@ -18,6 +18,9 @@ vi.mock('../browser/browser-route-session-runtime', async () => ({
     attachGuest: (await import('./createMainWindow-test-harness')).attachRouteGuestMock
   }
 }))
+vi.mock('../browser/browser-javascript-dialogs', () => ({
+  installBrowserJavaScriptDialogs: vi.fn()
+}))
 vi.mock('../browser/browser-client-page-renderer-runtime', async () => {
   const harness = await import('./createMainWindow-test-harness')
   return {
@@ -64,6 +67,7 @@ describe('createMainWindow', () => {
       on: vi.fn(),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       setWindowOpenHandler: vi.fn(),
       send: vi.fn(),
@@ -123,6 +127,7 @@ describe('createMainWindow', () => {
       }),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       setWindowOpenHandler: vi.fn((handler) => {
         windowOpenHandler = handler
@@ -300,6 +305,7 @@ describe('createMainWindow', () => {
       }),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       setWindowOpenHandler: vi.fn(),
       send: vi.fn(),
@@ -357,6 +363,7 @@ describe('createMainWindow', () => {
         on: vi.fn(),
         setZoomLevel: vi.fn(),
         setBackgroundThrottling: vi.fn(),
+        setWebRTCIPHandlingPolicy: vi.fn(),
         invalidate: vi.fn(),
         setWindowOpenHandler: vi.fn(),
         send: vi.fn(),
@@ -401,6 +408,7 @@ describe('createMainWindow', () => {
         on: vi.fn(),
         setZoomLevel: vi.fn(),
         setBackgroundThrottling: vi.fn(),
+        setWebRTCIPHandlingPolicy: vi.fn(),
         invalidate: vi.fn(),
         setWindowOpenHandler: vi.fn(),
         send: vi.fn(),
@@ -451,6 +459,7 @@ describe('createMainWindow', () => {
       on: vi.fn(),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       isDestroyed: vi.fn(() => false),
       setWindowOpenHandler: vi.fn(),
@@ -525,6 +534,7 @@ describe('createMainWindow', () => {
       on: vi.fn(),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       isDestroyed: vi.fn(() => false),
       setWindowOpenHandler: vi.fn(),
@@ -603,6 +613,7 @@ describe('createMainWindow', () => {
       on: vi.fn(),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       isDestroyed: vi.fn(() => false),
       setWindowOpenHandler: vi.fn(),
@@ -651,6 +662,7 @@ describe('createMainWindow', () => {
       on: vi.fn(),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       isDestroyed: vi.fn(() => false),
       setWindowOpenHandler: vi.fn(),
@@ -697,6 +709,7 @@ describe('createMainWindow', () => {
       on: vi.fn(),
       setZoomLevel: vi.fn(),
       setBackgroundThrottling: vi.fn(),
+      setWebRTCIPHandlingPolicy: vi.fn(),
       invalidate: vi.fn(),
       isDestroyed: vi.fn(() => false),
       setWindowOpenHandler: vi.fn(),

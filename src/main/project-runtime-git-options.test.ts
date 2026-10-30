@@ -50,10 +50,14 @@ function makeProject(overrides: Partial<Project> = {}): Project {
   }
 }
 
-function makeStore(project: Project): Store {
+function makeStore(
+  project: Project,
+  localWindowsRuntimeDefault: unknown = { kind: 'windows-host' }
+): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: runtime resolution reads only getProjects and getSettings.
   return {
     getProjects: () => [project],
-    getSettings: () => ({ localWindowsRuntimeDefault: { kind: 'windows-host' } })
+    getSettings: () => ({ localWindowsRuntimeDefault })
   } as unknown as Store
 }
 
@@ -105,6 +109,26 @@ describe('project runtime git options', () => {
     )
 
     expect(options).toEqual({ cwd: String.raw`C:\repo`, wslDistro: 'Ubuntu' })
+  })
+
+  it('keeps WSL Git for a drive project that inherits WSL and never chose Windows Git', () => {
+    const store = makeStore(makeProject(), { kind: 'wsl', distro: 'Ubuntu' })
+
+    const options = withPlatform('win32', () => getLocalProjectGitExecOptions(store, makeRepo()))
+
+    expect(options).toEqual({ cwd: String.raw`C:\repo`, wslDistro: 'Ubuntu' })
+  })
+
+  it('runs Windows Git for a WSL project converted to Windows Git', () => {
+    const project = makeProject({
+      localWindowsRuntimePreference: { kind: 'wsl', distro: 'Ubuntu', git: 'windows-host' }
+    })
+
+    const options = withPlatform('win32', () =>
+      getLocalProjectGitExecOptions(makeStore(project), makeRepo())
+    )
+
+    expect(options).toEqual({ cwd: String.raw`C:\repo` })
   })
 
   it('returns repair state for missing cached WSL distro before local git execution', () => {
@@ -181,6 +205,17 @@ describe('project runtime git options', () => {
       expect(
         withPlatform('win32', () => getWorktreeMirrorDistro(makeStore(project), makeRepo()))
       ).toBe('Ubuntu')
+    })
+
+    it('names no distro for a project converted to Windows Git', () => {
+      _setWslCachesForTests({ available: true, distros: ['Ubuntu'] })
+      const project = makeProject({
+        localWindowsRuntimePreference: { kind: 'wsl', distro: 'Ubuntu', git: 'windows-host' }
+      })
+
+      expect(
+        withPlatform('win32', () => getWorktreeMirrorDistro(makeStore(project), makeRepo()))
+      ).toBeUndefined()
     })
 
     it('names no distro for a host-runtime project', () => {

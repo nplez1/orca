@@ -2,7 +2,7 @@ import type { JiraPriority } from '../../../shared/jira/jira-types'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { getJiraPrioritySeverity } from './task-page-jira-priority-tone'
-import { getJiraPriorityTone } from './task-page-jira-status-tone'
+import { getJiraPriorityTone } from './task-page/jira/task-page-jira-status-tone'
 
 /**
  * The severity chip for a Jira issue.

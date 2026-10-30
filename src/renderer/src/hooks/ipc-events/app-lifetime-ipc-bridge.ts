@@ -21,6 +21,7 @@ import { registerEphemeralVmReclaimIpcBridge } from './ephemeral-vm-reclaim-ipc-
 import { registerMobileAndTerminalCloseIpcBridge } from './mobile-terminal-close-ipc-bridge'
 import { registerMobileDriverIpcBridge } from './mobile-driver-ipc-bridge'
 import { registerOrcaProfileAuthIpcBridge } from './orca-profile-auth-ipc-bridge'
+import { registerPreflightWslRetryIpcBridge } from './preflight-wsl-retry-ipc-bridge'
 import { registerOsMarkdownFileOpenBridge } from './os-markdown-file-open-bridge'
 import { registerProjectCatalogIpcBridge } from './project-catalog-ipc-bridge'
 import { registerRateLimitIpcBridge } from './rate-limit-ipc-bridge'
@@ -97,6 +98,7 @@ export function installAppLifetimeIpcEvents(): () => void {
   registerEphemeralVmReclaimIpcBridge(unsubs)
   registerQuitAndStopAllSessionsIpcBridge(unsubs)
   registerOrcaProfileAuthIpcBridge(unsubs)
+  registerPreflightWslRetryIpcBridge(unsubs)
   registerWorkspaceShortcutIpcBridge(unsubs)
   registerOsMarkdownFileOpenBridge(unsubs)
   registerWslAccountNoticeIpcBridge(unsubs)

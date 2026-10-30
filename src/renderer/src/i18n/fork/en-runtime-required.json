@@ -8,6 +8,9 @@
             "subagentSession_other": "{{count}} subagent sessions"
           }
         }
+      },
+      "taskPageJiraBoard": {
+        "changeStatusFailed": "Failed to change status."
       }
     }
   },

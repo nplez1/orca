@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
 import { WorkspaceAttachmentOrigins } from './WorkspaceAttachmentOrigins'
 import {
@@ -98,7 +99,9 @@ export function WorktreeLinkedItemRow({
                 size="icon-xs"
                 aria-label={translate('workspace.links.openItem', 'Open {{label}}', { label })}
                 data-link-url={item.url}
-                onClick={() => void window.api.shell.openUrl(item.url ?? '')}
+                onClick={(event) =>
+                  openAppHttpLink(item.url ?? '', { worktreeId: workspace?.id, event })
+                }
               >
                 <ExternalLink className="size-3" />
               </Button>

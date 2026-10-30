@@ -96,6 +96,9 @@ export const EphemeralVmRuntimeRecordSchema = z.object({
   cleanupDisabled: z.boolean().optional(),
   cleanupLastAttemptAt: z.number().finite().optional(),
   cleanupLastError: z.string().min(1).optional(),
+  /** Optional open code + params so the renderer can localize `cleanupLastError`; English stays authoritative. */
+  cleanupLastErrorCode: z.string().min(1).optional(),
+  cleanupLastErrorParams: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
   /**
    * When Orca released this host's registrations and forgot its workspace rows, because the
    * provider's lease had lapsed and the machine was not coming back.

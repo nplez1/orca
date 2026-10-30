@@ -38,8 +38,6 @@ export type ProcessSpec = {
   terminationBarrier?: boolean | ProcessTerminationBarrier
   /** Called once when the child exits or tree termination is verified. */
   onChildTerminated?: () => void
-  /** Every raw stdout chunk as it arrives, including any past the capture cap. */
-  onStdout?: (chunk: Buffer | string) => void
   /** Every raw stderr chunk as it arrives, including any past the capture cap. */
   onStderr?: (chunk: Buffer | string) => void
 }
@@ -70,8 +68,6 @@ export type ProcessResult = {
   deadlineOverrunMs?: number
   /** True when stdout or stderr exceeded `maxOutputBytes` and was clipped. */
   outputTruncated?: boolean
-  /** Shutdown settled without tree proof or output EOF; escaped descendants may remain. */
-  terminationUnverified?: boolean
 }
 
 export const DEFAULT_PROCESS_TIMEOUT_MS = 30_000

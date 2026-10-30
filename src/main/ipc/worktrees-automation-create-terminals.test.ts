@@ -188,4 +188,39 @@ describe('automation creates: main provisions setup and default tabs', () => {
     )
     expect(provision).not.toHaveBeenCalled()
   })
+
+  // E9: today the window never sends a startup command with an automation create; if one does, it stays background.
+  it("starts an automation create's startup terminal as background work, never the user's act", async () => {
+    getDefaultTabsLaunchMock.mockReturnValue(undefined)
+    shouldRunSetupForCreateMock.mockReturnValue(false)
+
+    await handlers['worktrees:create'](null, {
+      repoId: 'repo-1',
+      name: 'improve-dashboard',
+      startup: { command: 'claude' },
+      automationProvenanceRequest
+    })
+
+    expect(runtime.createTerminal).toHaveBeenCalled()
+    for (const call of vi.mocked(runtime.createTerminal).mock.calls) {
+      expect(call[1]).not.toHaveProperty('wslUserAct')
+    }
+  })
+
+  it("starts the window's own create's startup terminal as the user's act", async () => {
+    getDefaultTabsLaunchMock.mockReturnValue(undefined)
+    shouldRunSetupForCreateMock.mockReturnValue(false)
+
+    await handlers['worktrees:create'](null, {
+      repoId: 'repo-1',
+      name: 'improve-dashboard',
+      startup: { command: 'claude' }
+    })
+
+    expect(runtime.createTerminal).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ wslUserAct: true }),
+      expect.anything()
+    )
+  })
 })

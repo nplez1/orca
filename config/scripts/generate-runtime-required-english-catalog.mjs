@@ -3,27 +3,12 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
 import {
-  readEnglishCatalog,
-  readRuntimeRequiredCatalogs,
-  writeForkRuntimeRequiredCatalog
+  readEnglishCatalogForSurface,
+  readRuntimeRequiredCatalogsForSurface,
+  writeForkRuntimeRequiredCatalogForSurface
 } from './fork-english-catalog.mjs'
 import { collectLocalizationReferences } from './verify-localization-catalog.mjs'
-
-export const EN_CATALOG_RELATIVE_PATH = path.join(
-  'src',
-  'renderer',
-  'src',
-  'i18n',
-  'locales',
-  'en.json'
-)
-export const RUNTIME_REQUIRED_RELATIVE_PATH = path.join(
-  'src',
-  'renderer',
-  'src',
-  'i18n',
-  'en-runtime-required.json'
-)
+import { readLocalizationSurface } from './localization-surfaces.mjs'
 
 // i18next resolves CLDR plural suffixes only from catalog, never defaultValue.
 const PLURAL_SUFFIX_RE = /_(zero|one|two|few|many|other)$/
@@ -115,10 +100,18 @@ function reportKeys(label, keys) {
 
 export async function main(root = process.cwd(), argv = process.argv.slice(2), sharedReferences) {
   const fix = argv.includes('--fix')
-  const catalogEntries = flattenCatalogEntries(await readEnglishCatalog(root))
-  const references = sharedReferences ?? (await collectLocalizationReferences(root))
+  const surface = readLocalizationSurface(argv)
+  const catalogEntries = flattenCatalogEntries(await readEnglishCatalogForSurface(root, surface))
+  const references =
+    sharedReferences ?? (await collectLocalizationReferences(root, surface.sourceRoots))
   const requiredKeys = collectRuntimeRequiredKeys(catalogEntries, references)
-  const runtimeCatalogs = await readRuntimeRequiredCatalogs(root)
+  const runtimeCatalogs = await readRuntimeRequiredCatalogsForSurface(root, surface)
+  // Why two labels: upstream's boot subset stays upstream's bytes, so the fork writes an overlay.
+  const upstreamRuntimeLabel = surface.runtimeRequiredPath.split(path.sep).join('/')
+  const forkRuntimeLabel = path
+    .join(path.dirname(surface.runtimeRequiredPath), 'fork', 'en-runtime-required.json')
+    .split(path.sep)
+    .join('/')
 
   if (fix) {
     const upstreamShipped = flattenCatalogEntries(runtimeCatalogs.upstream)
@@ -128,12 +121,13 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2), s
         (key) => catalogEntries.has(key) && upstreamShipped.get(key) !== catalogEntries.get(key)
       )
     )
-    await writeForkRuntimeRequiredCatalog(
+    await writeForkRuntimeRequiredCatalogForSurface(
       root,
+      surface,
       buildRuntimeRequiredCatalog(catalogEntries, forkKeys)
     )
     console.log(
-      `Wrote ${forkKeys.size} fork entries to fork/en-runtime-required.json; ${requiredKeys.size} of ${catalogEntries.size} English entries must ship.`
+      `Wrote ${forkKeys.size} fork entries to ${forkRuntimeLabel}; ${requiredKeys.size} of ${catalogEntries.size} English entries must ship.`
     )
     return 0
   }
@@ -146,7 +140,7 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2), s
   )
 
   if (missing.length > 0 || contradicting.length > 0) {
-    console.error('src/renderer/src/i18n/en-runtime-required.json no longer covers en.json.')
+    console.error(`${upstreamRuntimeLabel} + ${forkRuntimeLabel} no longer cover en.json.`)
     console.error('')
     if (missing.length > 0) {
       reportKeys(
@@ -158,7 +152,7 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2), s
       reportKeys('Shipped entries whose text disagrees with en.json', contradicting)
     }
     console.error('')
-    console.error('Run `pnpm run sync:localization-runtime-catalog` to regenerate it.')
+    console.error(`Run \`${surface.syncRuntimeCatalogCommand}\` to regenerate it.`)
     return 1
   }
 
@@ -167,7 +161,7 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2), s
       ? `, ${superfluous.length} shipped entry/entries are no longer required (harmless; sync to drop them).`
       : '.'
   console.log(
-    `en-runtime-required.json covers en.json: ${requiredKeys.size} of ${catalogEntries.size} English entries must ship in the boot bundle${superfluousNote}`
+    `${upstreamRuntimeLabel} + ${forkRuntimeLabel} cover en.json: ${requiredKeys.size} of ${catalogEntries.size} English entries must ship in the boot bundle${superfluousNote}`
   )
   return 0
 }

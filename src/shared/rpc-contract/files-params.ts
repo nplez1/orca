@@ -1,4 +1,5 @@
 import { PATH_EXISTENCE_BATCH_MAX } from '../path-existence-batch'
+import { FILE_READ_DIR_MAX_PAGE_ENTRIES } from '../file-dir-page'
 import { z } from 'zod'
 import { QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS } from '../quick-open-path-search'
 import { RUNTIME_NAVIGATION_TARGETS } from '../runtime-navigation'
@@ -40,6 +41,8 @@ const FilePathSearchNameFilter = WorktreeSelector.extend({
 
 /** Legacy mode keeps its original 32-row ceiling; larger pages require explicit name-filter opt-in. */
 export const FilePathSearch = z.union([FilePathSearchQuickOpen, FilePathSearchNameFilter])
+
+export const ChatImageRead = WorktreeSelector.extend({ path: z.string().min(1).max(4096) })
 
 export const ResolveTerminalPath = WorktreeSelector.extend({
   pathText: z
@@ -99,6 +102,12 @@ export const FileTreePath = WorktreeSelector.extend({
     .pipe(z.string())
 })
 
+/** With `after` or `limit` the reply is a `DirEntryPage`; without both it stays the bare entry array. */
+export const FileDirRead = FileTreePath.extend({
+  after: z.object({ name: z.string().min(1).max(4096), isDirectory: z.boolean() }).optional(),
+  limit: z.number().int().positive().max(FILE_READ_DIR_MAX_PAGE_ENTRIES).optional()
+})
+
 export const ServerDirectoryBrowse = z.object({
   path: z
     .unknown()
@@ -106,14 +115,18 @@ export const ServerDirectoryBrowse = z.object({
     .pipe(z.string())
 })
 
-export const FileReadChunk = FileOpen.extend({
+const FileChunkRange = {
   offset: z.number().int().nonnegative(),
   length: z
     .number()
     .int()
     .positive()
     .max(512 * 1024)
-})
+}
+
+export const FileReadChunk = FileOpen.extend(FileChunkRange)
+
+export const DocPreviewFileReadChunk = DocPreviewFileRead.extend(FileChunkRange)
 
 export const FileSearch = WorktreeSelector.extend({
   query: z

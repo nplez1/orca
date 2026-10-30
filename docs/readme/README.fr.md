@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub><a href="../../README.md">English</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a> · <a href="README.pt.md">Português</a> · <a href="README.tr.md">Türkçe</a></sub>
+  <sub><a href="../../README.md">English</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a> · <a href="README.pt.md">Português</a> · <a href="README.tr.md">Türkçe</a> · <a href="README.ru.md">Русский</a></sub>
 </p>
 
 <p align="center">
@@ -314,7 +314,7 @@ Associez l'app mobile Orca à Orca NP pour surveiller et piloter vos agents depu
 - **Communauté upstream :** les canaux d'Orca upstream couvrent tout ce dont ce fork hérite — [Discord](https://discord.gg/fzjDKHxv8Q), [@orca_build sur X](https://x.com/orca_build) et les [issues upstream](https://github.com/stablyai/orca/issues) pour les bugs qui se reproduisent aussi dans Orca officiel.
 - **Groupe WeChat upstream :** le groupe 11 est complet. Scannez pour rejoindre le groupe WeChat 12 de la communauté Orca.
 
-  <img src="../assets/wechat-qr-group12.jpg" alt="QR code WeChat groupe 12 de la communauté Orca" width="160" />
+  <img src="../assets/wechat-qr.jpg" alt="QR code du groupe WeChat de la communauté Orca" width="160" />
 
 - **Docs :** [onorca.dev/docs](https://www.onorca.dev/docs) documente Orca upstream.
 - **Soutenez-nous :** [Mettez une star](https://github.com/nplez1/orca) sur ce repo pour suivre le fork, ou sur [upstream](https://github.com/stablyai/orca).

@@ -1,6 +1,6 @@
 import { parseEphemeralVmRecipeResult, type EphemeralVmRecipeResult } from './ephemeral-vm-recipes'
 import {
-  getEphemeralVmRecipeCheckoutModeError,
+  getEphemeralVmRecipeCheckoutModeFailure,
   getEphemeralVmRecipeResultSchemaVersion
 } from './ephemeral-vm-recipe-checkout-mode'
 import { runRecipeCommand } from './ephemeral-vm-recipe-process'
@@ -99,12 +99,12 @@ export async function runEphemeralVmRecipeExtend(
   if (!parsed.ok) {
     return { ok: false, context: args.context, error: parsed.error, ...processResult }
   }
-  const checkoutModeError = getEphemeralVmRecipeCheckoutModeError(args.recipe, parsed.result)
-  if (checkoutModeError) {
+  const checkoutModeFailure = getEphemeralVmRecipeCheckoutModeFailure(args.recipe, parsed.result)
+  if (checkoutModeFailure) {
     return {
       ok: false,
       context: args.context,
-      error: checkoutModeError,
+      ...checkoutModeFailure,
       recipeResult: parsed.result,
       ...processResult
     }

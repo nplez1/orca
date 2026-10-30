@@ -40,6 +40,7 @@ export async function withJiraDeadline<T>(
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', abort)
+    controller.abort()
   }
 }
 

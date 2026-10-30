@@ -56,6 +56,7 @@ describe('file explorer stale-filter keyboard activation', () => {
         requestDelete: vi.fn(),
         requestDeleteAll: vi.fn(),
         scrollToIndex: vi.fn(),
+        pathOwner: 'local',
         activeWorktreeId: 'worktree-1'
       })
     )

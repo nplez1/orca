@@ -1,3 +1,4 @@
+import { taskProviderErrorMessage } from '@/lib/task-provider-error-copy'
 import type {
   JiraFieldErrors,
   JiraIssue,
@@ -158,7 +159,11 @@ export function enqueueJiraIssueMutation({
         if (result.timedOut === true) {
           throw new JiraWriteTimeoutError()
         }
-        throw new JiraMutationFailure(result.error, result.fieldErrors, result.errorMessages)
+        throw new JiraMutationFailure(
+          taskProviderErrorMessage(result),
+          result.fieldErrors,
+          result.errorMessages
+        )
       }
       saved = true
       write.confirmed = { ...write.confirmed, ...optimistic }

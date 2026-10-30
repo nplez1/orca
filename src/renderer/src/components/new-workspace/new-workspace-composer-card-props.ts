@@ -103,9 +103,11 @@ export type NewWorkspaceComposerCardProps = {
    *  link is fixed. */
   impliedTaskSourceUrl?: string | null
   onClearSmartNameSelection: () => void
+  reuseEligibleBranch?: string | null
   canReuseSelectedBranch: boolean
   reuseSelectedBranch: boolean
   onReuseSelectedBranchChange: (next: boolean) => void
+  onOpenSelectedBranchWorkspace?: () => void
   showCreateMultiple?: boolean
   createMultiple?: boolean
   onCreateMultipleChange?: (next: boolean) => void

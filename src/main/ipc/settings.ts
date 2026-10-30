@@ -42,6 +42,9 @@ import {
 } from '../../shared/computer-awake-mode'
 import { resolveAiVaultSearchSettings } from '../../shared/ai-vault-search-settings'
 import { applySessionSearchSettingsChange } from '../ai-vault-search/session-search-enablement'
+import { getRuntimeEnvironmentRegistryRoot } from './runtime-environments/runtime-environment-registry-root'
+
+const registryRoot = getRuntimeEnvironmentRegistryRoot
 
 type LegacyTerminalScrollbackSettingsUpdate = Partial<GlobalSettings> & {
   terminalScrollbackBytes?: unknown
@@ -92,7 +95,7 @@ export function registerSettingsHandlers(
   })
 
   ipcMain.handle('settings:get', () =>
-    readSettingsWithRuntimeEnvironmentPreference(store, app.getPath('userData'))
+    readSettingsWithRuntimeEnvironmentPreference(store, registryRoot())
   )
 
   ipcMain.handle(
@@ -110,7 +113,7 @@ export function registerSettingsHandlers(
 
   // PTYs can bind before hydration; transport authority selection needs persisted settings synchronously.
   ipcMain.on('settings:get-sync', (event) => {
-    event.returnValue = readSettingsWithRuntimeEnvironmentPreference(store, app.getPath('userData'))
+    event.returnValue = readSettingsWithRuntimeEnvironmentPreference(store, registryRoot())
   })
 
   ipcMain.handle('settings:set', async (event, args: Partial<GlobalSettings>) => {
@@ -269,7 +272,7 @@ export function registerSettingsHandlers(
       }
       const requestedId = requestedEnvironmentId?.trim() || null
       const environmentId =
-        requestedId === null ? null : resolveEnvironment(app.getPath('userData'), requestedId).id
+        requestedId === null ? null : resolveEnvironment(registryRoot(), requestedId).id
       return store.updateSettings(
         { activeRuntimeEnvironmentId: environmentId },
         { notifyListeners: true, originWebContentsId: event.sender.id }

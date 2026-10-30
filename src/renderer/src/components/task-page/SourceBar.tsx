@@ -16,6 +16,7 @@ import {
   SelectContent,
   SelectItem
 } from '@/components/ui/select'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 export function TaskPageSourceBar({
   model
 }: {
@@ -175,11 +176,11 @@ export function TaskPageSourceBar({
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  onClick={() => {
+                  onClick={(event) => {
                     if (!selectedLinearTeamForExternalLink?.url) {
                       return
                     }
-                    void window.api.shell.openUrl(selectedLinearTeamForExternalLink.url)
+                    openAppHttpLink(selectedLinearTeamForExternalLink.url, { event })
                   }}
                   disabled={!selectedLinearTeamForExternalLink}
                   aria-label={

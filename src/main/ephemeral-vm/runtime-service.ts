@@ -13,6 +13,10 @@ import {
 } from '../../shared/ephemeral-vm-recipe-runner'
 import { getProvisionedRootResumeIntegrityError } from './resume-integrity'
 import { runControlledEphemeralVmRuntimeCleanup } from './runtime-cleanup-control'
+import {
+  ephemeralVmFailure,
+  pickEphemeralVmFailureCode
+} from '../../shared/ephemeral-vm-failure-copy'
 
 export type CleanupEphemeralVmRuntimeArgs = {
   userDataPath: string
@@ -108,13 +112,16 @@ async function cleanupEphemeralVmRuntimeOnce(
   })
 
   if (!cleanup.ok) {
+    const failure = cleanup.error
+      ? { error: cleanup.error, ...pickEphemeralVmFailureCode(cleanup) }
+      : ephemeralVmFailure('destroyFailed')
     const failed = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
       status: 'cleanup_failed',
       cleanupStatus: 'failed',
-      cleanupLastError: cleanup.error ?? 'Destroy failed.',
+      cleanupLastError: failure,
       updatedAt: Date.now()
     })
-    return { ok: false, runtime: failed, error: cleanup.error ?? 'Destroy failed.' }
+    return { ok: false, runtime: failed, error: failure.error }
   }
 
   const cleaned = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {

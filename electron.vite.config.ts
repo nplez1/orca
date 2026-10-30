@@ -23,6 +23,7 @@ const BUNDLED_MAIN_DEPENDENCIES = new Set([
   '@xterm/addon-serialize',
   'tldts',
   'smol-toml',
+  'yaml',
   'fflate',
   // Why: pure JS with no assets, so bundling beats a Resources/node_modules copy
   // that the packaging guard would otherwise demand for a bare `parse5` import.

@@ -56,6 +56,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
           body
           state
           createdAt
+          submittedAt
           url
           reactionGroups {
             content

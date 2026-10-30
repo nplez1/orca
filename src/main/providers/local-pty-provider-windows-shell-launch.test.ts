@@ -16,7 +16,8 @@ const {
   killWithDescendantSweepMock,
   isWslAvailableAsyncMock,
   wslUncDirectoryExistsAsyncMock,
-  createShellPromptReadinessProbeMock
+  createShellPromptReadinessProbeMock,
+  readWslDistroRunningStateMock
 } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
   statSyncMock: vi.fn(),
@@ -31,7 +32,8 @@ const {
   killWithDescendantSweepMock: vi.fn(),
   isWslAvailableAsyncMock: vi.fn(),
   wslUncDirectoryExistsAsyncMock: vi.fn(),
-  createShellPromptReadinessProbeMock: vi.fn()
+  createShellPromptReadinessProbeMock: vi.fn(),
+  readWslDistroRunningStateMock: vi.fn()
 }))
 
 vi.mock('fs', () => ({
@@ -95,17 +97,9 @@ vi.mock('./windows-pty-job-membership', () => ({
   isWindowsPtyJobReadable: () => true
 }))
 
-vi.mock('../wsl', () => ({
-  parseWslPath: (path: string) => {
-    const match = path.match(/^\\\\wsl\.localhost\\([^\\]+)(.*)$/)
-    if (!match) {
-      return null
-    }
-    return {
-      distro: match[1],
-      linuxPath: (match[2] || '').replace(/\\/g, '/') || '/'
-    }
-  },
+vi.mock('../wsl', async () => ({
+  // The real parser, so both UNC spellings (\\wsl.localhost and \\wsl$) reach the launch plan.
+  parseWslPath: (await import('../../shared/wsl-paths')).parseWslUncPath,
   toLinuxPath: (path: string) => path.replace(/^C:\\/i, '/mnt/c/').replace(/\\/g, '/'),
   toWindowsWslPath: (path: string, distro: string) =>
     `\\\\wsl.localhost\\${distro}${path.replace(/\//g, '\\')}`,
@@ -113,6 +107,10 @@ vi.mock('../wsl', () => ({
   isWslAvailableAsync: () => isWslAvailableAsyncMock(),
   // Fixture WSL UNC directories exist; avoid launching wsl.exe to validate them.
   wslUncDirectoryExistsAsync: (...args: unknown[]) => wslUncDirectoryExistsAsyncMock(...args)
+}))
+
+vi.mock('../wsl-background-distro-gate', () => ({
+  readWslDistroRunningState: (...args: unknown[]) => readWslDistroRunningStateMock(...args)
 }))
 
 vi.mock('../shell-prompt-readiness-probe', () => ({
@@ -127,6 +125,7 @@ import {
   type LocalPtyMockProcess
 } from './local-pty-provider-test-harness'
 import { POWERLEVEL10K_WIZARD_DISABLE_ENV } from '../pty/powerlevel10k-wizard-env'
+import { wslDistroHoldMessage } from '../../shared/wsl-distro-stopped-hold'
 
 describe('LocalPtyProvider', () => {
   let provider: LocalPtyProvider
@@ -739,6 +738,82 @@ describe('LocalPtyProvider', () => {
           })
         })
       )
+    })
+
+    it('holds a daemon-off passive restore of a stopped WSL distro without spawning wsl.exe', async () => {
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+      readWslDistroRunningStateMock.mockResolvedValue('stopped')
+      spawnMock.mockClear()
+
+      await expect(
+        provider.spawn({
+          cols: 80,
+          rows: 24,
+          cwd: '\\\\wsl.localhost\\Ubuntu\\home\\fake\\repo',
+          sessionId: 'restored-session',
+          wslPassiveRestore: true
+        })
+      ).rejects.toThrow(wslDistroHoldMessage('Ubuntu', 'stopped'))
+      expect(readWslDistroRunningStateMock).toHaveBeenCalledWith('Ubuntu', {
+        retryUnverifiable: true
+      })
+      expect(spawnMock).not.toHaveBeenCalled()
+    })
+
+    it('restores a daemon-off WSL pane once its distro reads running', async () => {
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+      readWslDistroRunningStateMock.mockResolvedValue('running')
+
+      await provider.spawn({
+        cols: 80,
+        rows: 24,
+        cwd: '\\\\wsl.localhost\\Ubuntu\\home\\fake\\repo',
+        sessionId: 'restored-session',
+        wslPassiveRestore: true
+      })
+      expect(spawnMock.mock.calls.at(-1)?.[0]).toBe('wsl.exe')
+    })
+
+    // A UNC cwd runs in the guest whatever shell was picked, so the cwd alone names the distro.
+    describe('a non-WSL shell whose cwd is a WSL UNC path', () => {
+      const uncSpawn = (cwd: string, extra: { wslPassiveRestore?: true } = {}) =>
+        provider.spawn({
+          cols: 80,
+          rows: 24,
+          cwd,
+          sessionId: 'wt-1::C:/folder@@pane1',
+          shellOverride: 'powershell.exe',
+          ...extra
+        })
+
+      beforeEach(() => {
+        Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+        readWslDistroRunningStateMock.mockReset()
+        readWslDistroRunningStateMock.mockResolvedValue('stopped')
+        spawnMock.mockClear()
+      })
+
+      it.each([
+        ['\\\\wsl.localhost\\Ubuntu\\home\\fake\\repo'],
+        ['\\\\wsl$\\Ubuntu\\home\\fake\\repo']
+      ])('holds its passive restore while the distro is stopped (%s)', async (cwd) => {
+        await expect(uncSpawn(cwd, { wslPassiveRestore: true })).rejects.toThrow(
+          wslDistroHoldMessage('Ubuntu', 'stopped')
+        )
+        expect(spawnMock).not.toHaveBeenCalled()
+      })
+
+      it("starts the user's own launch without reading the distro", async () => {
+        await uncSpawn('\\\\wsl.localhost\\Ubuntu\\home\\fake\\repo')
+        expect(spawnMock.mock.calls.at(-1)?.[0]).toBe('wsl.exe')
+        expect(readWslDistroRunningStateMock).not.toHaveBeenCalled()
+      })
+
+      it('leaves a host cwd alone', async () => {
+        await uncSpawn('C:\\folder', { wslPassiveRestore: true })
+        expect(spawnMock).toHaveBeenCalledTimes(1)
+        expect(readWslDistroRunningStateMock).not.toHaveBeenCalled()
+      })
     })
   })
 })
