@@ -133,8 +133,10 @@ export function useChecksDetailTimer({
         // that are already on screen, not a load.
         const background = prevChecksRef.current !== ''
         try {
+          // Why two flags on the GitLab path: `background` is the host's WSL refusal (upstream E9 —
+          // a wake is a foreground read), while `suppressLoading` is the fork's "rows already shown".
           await (isGitLabReview
-            ? fetchGitLabDetails({ background })
+            ? fetchGitLabDetails({ background: !shown, suppressLoading: background })
             : fetchChecks({ force, background, ...(shown ? { wakeWslDistro: true } : {}) }))
         } finally {
           if (inFlightRef.current?.token === token) {

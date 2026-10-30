@@ -4,6 +4,15 @@
       "settings": {
         "AccountsPane": {
           "0c64dc2a64": null
+        },
+        "OpenAiTranscriptionKeyDialog": {
+          "d246b2bdb3": "本機執行階段金鑰使用 Electron 加密儲存（如果可用）儲存在 ~/.orca-np 中。"
+        },
+        "ShortcutsPane": {
+          "d8c988dab4": "~/.orca-np/keybindings.json"
+        },
+        "sshHostServer": {
+          "runtimeNoexec": "此主機不允許執行 ~/.orca-np-remote 中的程式，因此 Orca 無法在該處啟動伺服器。通常是因為家目錄以 noexec 選項掛載。請洽主機管理員，允許在該處執行程式後再重新連線。"
         }
       }
     },

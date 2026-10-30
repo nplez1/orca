@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { lstat, mkdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { readNodeFileWithinLimit } from '../../shared/node-bounded-file-reader'
 import { renameFileWithWindowsRetryAsync } from '../../shared/windows-retry-file-operations'
 import {
@@ -24,7 +25,7 @@ export function hostTerminalPolicyPath(home: string, machine: string | null): st
     .update(`${process.platform}:${machine}`)
     .digest('hex')
     .slice(0, 16)
-  return join(home, '.orca', 'host-settings', key, 'terminals.json')
+  return join(home, HOME_DIRECTORY_NAME, 'host-settings', key, 'terminals.json')
 }
 
 async function readSavedMaximum(path: string): Promise<number | null> {

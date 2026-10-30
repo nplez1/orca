@@ -17,6 +17,15 @@
           "9285cedcf2": "Flat",
           "b266f3f40e": "One folder per project",
           "f9b2070017": "Workspace Layout"
+        },
+        "OpenAiTranscriptionKeyDialog": {
+          "d246b2bdb3": "Las claves del runtime local se almacenan en ~/.orca-np mediante el almacenamiento cifrado de Electron cuando está disponible."
+        },
+        "ShortcutsPane": {
+          "d8c988dab4": "~/.orca-np/keybindings.json"
+        },
+        "sshHostServer": {
+          "runtimeNoexec": "Este host no permite ejecutar programas desde ~/.orca-np-remote, por lo que Orca no puede iniciar su servidor allí. Esto normalmente significa que la carpeta de inicio está montada con noexec. Pídale al administrador del host que permita la ejecución de programas allí y luego conéctese nuevamente."
         }
       }
     },

@@ -182,7 +182,8 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       headShaOverride,
       commitAsCurrent = false,
       isRequestCurrent,
-      background = false
+      background = false,
+      suppressLoading = background
     }: {
       mrNumberOverride?: number | null
       headShaOverride?: string | null
@@ -190,6 +191,8 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       isRequestCurrent?: () => boolean
       /** A poll or tab entry: refused rather than booting a stopped WSL distro. */
       background?: boolean
+      /** Rows are already on screen, so a refresh must not flash the loading state. */
+      suppressLoading?: boolean
     } = {}) => {
       const {
         activeGitLabReview,
@@ -230,10 +233,10 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       }
       // Why: a background poll must not invalidate the generation a foreground request is about to
       // clear, or the flags it set stay true with nobody left to unset them.
-      const loadingGeneration = background
+      const loadingGeneration = suppressLoading
         ? gitLabDetailsLoadingGenerationRef.current
         : gitLabDetailsLoadingGenerationRef.current + 1
-      if (!background) {
+      if (!suppressLoading) {
         gitLabDetailsLoadingGenerationRef.current = loadingGeneration
         setChecksLoading(true)
         setCommentsLoading(true)
@@ -280,7 +283,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         pollIntervalRef.current = Math.min(Math.max(60_000, pollIntervalRef.current * 2), 900_000)
       } finally {
         if (
-          !background &&
+          !suppressLoading &&
           gitLabDetailsLoadingGenerationRef.current === loadingGeneration &&
           isCurrentAsyncResult(requestKey)
         ) {

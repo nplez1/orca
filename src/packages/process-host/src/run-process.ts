@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 10-line delta rides inside it, and splitting costs a permanent sync hunk. */
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 10-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import {
   spawn as nodeSpawn,
   spawnSync as nodeSpawnSync,

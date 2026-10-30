@@ -150,6 +150,9 @@ export async function fetchLatestStableReleaseTag(): Promise<string | null> {
       return null
     }
     const tag = decodeURIComponent(target.pathname.slice(tagPathPrefix.length))
+    if (tag.includes('/')) {
+      return null
+    }
     const version = normalizeTagToVersion(tag)
     // Why the fork's own line is allowed here: every release this fork publishes carries the
     // `-np.<n>` prerelease suffix, so rejecting prereleases rejected the only thing `releases/latest`

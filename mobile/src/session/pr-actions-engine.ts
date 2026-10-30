@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 1-line delta rides inside it, and splitting costs a permanent sync hunk. */
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 1-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { GitHubPRMergeMethod, PRState } from '../../../src/shared/github/pull-request-types'
 import { githubRepoIdentityKey } from '../../../src/shared/github/repository-identity-key'
 import { classifyPrSidebarFailure } from './mobile-pr-sidebar-state'

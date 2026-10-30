@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 91-line delta rides inside it, and splitting costs a permanent sync hunk. */
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 91-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { describe, expect, it } from 'vitest'
 import { applyAgentRowLineage } from '@/components/dashboard/agent-row-lineage'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'

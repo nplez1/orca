@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 12-line delta rides inside it, and splitting costs a permanent sync hunk. */
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 12-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { showWorktreeCreateWarningToast } from './worktree-create-warning-toast'
 import { createWorktreeOnRuntimeHost } from './host-planned-agent-launch'
 import { runtimeRpcTargetForAuthorityKey } from '@/runtime/runtime-client-target'

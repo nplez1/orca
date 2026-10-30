@@ -157,10 +157,11 @@ export function buildMirroredAgentStatusPatch(
     const nextEntry =
       existing &&
       !hostDialogOutranksClient &&
+      // Why the fallback is not gated on the fence: a republished dialog pierces, and gating here
+      // handed it the win on every republish — the stale-wait pin this fence exists to prevent. A
+      // genuinely new dialog already wins through `hostDialogOutranksClient` above.
       (clientOwnsEntry ||
-        (!hostPiercesFence &&
-          isAgentStatusFresh(existing, now) &&
-          existing.updatedAt > entry.updatedAt))
+        (isAgentStatusFresh(existing, now) && existing.updatedAt > entry.updatedAt))
         ? {
             ...normalizeCompatibleAgentStatusEntryForOwner(existing, entry.agentType),
             ...(clientOwnsEntry && existing.state === 'working' && entry.state === 'working'

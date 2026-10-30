@@ -105,7 +105,8 @@ describe('AgentKanbanCard', () => {
     const attentionCard = card({
       bucket: 'attention',
       dotState: 'waiting',
-      askSummary: 'Approve deploy?'
+      askSummary: 'Approve deploy?',
+      verdict: 'failed'
     })
     const { container, rerender } = renderCard({ card: attentionCard, now: 2_000 })
 

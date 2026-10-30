@@ -4,6 +4,15 @@
       "settings": {
         "AccountsPane": {
           "0c64dc2a64": null
+        },
+        "OpenAiTranscriptionKeyDialog": {
+          "d246b2bdb3": "As chaves do runtime local são armazenadas em ~/.orca-np usando armazenamento criptografado do Electron quando disponível."
+        },
+        "ShortcutsPane": {
+          "d8c988dab4": "~/.orca-np/keybindings.json"
+        },
+        "sshHostServer": {
+          "runtimeNoexec": "Este host não permite executar programas em ~/.orca-np-remote, então o Orca não consegue iniciar o servidor lá. Isso geralmente significa que a pasta pessoal está montada com noexec. Peça ao administrador do host para permitir a execução de programas lá e conecte novamente."
         }
       }
     },

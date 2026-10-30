@@ -128,7 +128,9 @@ function paneTitleClaimsOwnState(ptyId: string, profile: SyntheticAgentTitleProf
   if (profile.titleIdentityGroup !== 'pi-compatible') {
     return false
   }
-  const title = state.runtime?.getTrackedPtyTitle(ptyId) ?? null
+  // Why the visible title: it also falls back to the tracker's last normalized title, which is
+  // exactly the title this lane must not erase.
+  const title = state.runtime?.getTrackedVisiblePtyTitle(ptyId) ?? null
   return getPiStateTitleStatus(title ?? '') !== null
 }
 

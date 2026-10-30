@@ -17,6 +17,15 @@
           "9285cedcf2": "Flat",
           "b266f3f40e": "One folder per project",
           "f9b2070017": "Workspace Layout"
+        },
+        "OpenAiTranscriptionKeyDialog": {
+          "d246b2bdb3": "ローカルランタイムキーは、利用可能な場合は Electron 暗号化ストレージを使用して ~/.orca-np に保存されます。"
+        },
+        "ShortcutsPane": {
+          "d8c988dab4": "~/.orca-np/keybindings.json"
+        },
+        "sshHostServer": {
+          "runtimeNoexec": "このホストでは ~/.orca-np-remote からのプログラムの実行が許可されていないため、Orca はそこでサーバーを起動できません。これは通常、ホームフォルダーが noexec でマウントされていることを意味します。ホストの管理者にそこでプログラムの実行を許可するよう依頼してから、再度接続してください。"
         }
       }
     },

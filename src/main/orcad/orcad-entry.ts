@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 3-line delta rides inside it, and splitting costs a permanent sync hunk. */
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 3-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 // Compose the Node-host runtime; paired desktop pages work even without a local browser engine.
 import process from 'node:process'
 import { getAppEnvironment } from '../../shared/app-environment'

@@ -45,7 +45,8 @@ beforeEach(() => {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: driveSyntheticTitle only reads these two runtime members.
   mainProcessState.runtime = {
     ingestSyntheticTitleFrame: hooks.ingest,
-    getTrackedPtyTitle: (ptyId: string) => titles.get(ptyId) ?? null
+    getTrackedPtyTitle: (ptyId: string) => titles.get(ptyId) ?? null,
+    getTrackedVisiblePtyTitle: (ptyId: string) => titles.get(ptyId) ?? null
   } as unknown as typeof mainProcessState.runtime
 })
 

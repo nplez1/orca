@@ -1,0 +1,17 @@
+{
+  "auto": {
+    "components": {
+      "settings": {
+        "OpenAiTranscriptionKeyDialog": {
+          "d246b2bdb3": "Schlüssel der lokalen Laufzeitumgebung werden in ~/.orca-np gespeichert, sofern verfügbar mit der verschlüsselten Speicherung von Electron."
+        },
+        "ShortcutsPane": {
+          "d8c988dab4": "~/.orca-np/keybindings.json"
+        },
+        "sshHostServer": {
+          "runtimeNoexec": "Dieser Host erlaubt das Ausführen von Programmen aus ~/.orca-np-remote nicht. Deshalb kann Orca seinen Server dort nicht starten. Meist ist das Home-Verzeichnis mit noexec eingehängt. Die Administration des Hosts bitten, das Ausführen von Programmen dort zu erlauben, und anschließend erneut verbinden."
+        }
+      }
+    }
+  }
+}

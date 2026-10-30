@@ -1,3 +1,4 @@
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -268,7 +269,7 @@ export function JiraIssueRow({
                 size="icon-xs"
                 onClick={(event) => {
                   event.stopPropagation()
-                  window.api.shell.openUrl(issue.url)
+                  openAppHttpLink(issue.url, { event })
                 }}
                 aria-label={translate(
                   'auto.components.TaskPage.4ac8ff2275',

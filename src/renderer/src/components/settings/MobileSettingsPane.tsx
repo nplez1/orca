@@ -9,7 +9,6 @@ import {
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { MobileRelayBetaNotice } from './MobileRelayBetaNotice'
-import { openAppHttpLink } from '@/lib/app-http-link-open'
 export { getMobileSettingsPaneSearchEntries }
 
 const ORCA_IOS_APP_STORE_URL = 'https://apps.apple.com/app/orca-ide/id6766130217'
@@ -38,7 +37,7 @@ export function MobileSettingsPane(): React.JSX.Element {
             )}{' '}
             <button
               type="button"
-              onClick={(event) => openAppHttpLink(ORCA_IOS_APP_STORE_URL, { event })}
+              onClick={() => void window.api.shell.openUrlInSystemBrowser(ORCA_IOS_APP_STORE_URL)}
               className="cursor-pointer underline underline-offset-2 hover:text-foreground"
             >
               {translate('auto.components.settings.MobileSettingsPane.b5a2ed83ff', 'App Store')}
@@ -47,7 +46,7 @@ export function MobileSettingsPane(): React.JSX.Element {
             <button
               type="button"
               // Link the pinned release APK until Android distribution moves to Google Play.
-              onClick={(event) => openAppHttpLink(ORCA_ANDROID_APK_URL, { event })}
+              onClick={() => void window.api.shell.openUrlInSystemBrowser(ORCA_ANDROID_APK_URL)}
               className="cursor-pointer underline underline-offset-2 hover:text-foreground"
             >
               {translate(

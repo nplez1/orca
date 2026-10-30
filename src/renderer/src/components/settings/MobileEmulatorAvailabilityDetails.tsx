@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { translate } from '@/i18n/i18n'
 import { emulatorMessageText } from '@/lib/emulator-error-copy'
-import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 type CodedMessage = { message?: string; messageCode?: unknown; messageParams?: unknown }
 
@@ -145,7 +144,7 @@ export function MobileEmulatorAvailabilityDetails({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={(event) => openAppHttpLink(ANDROID_STUDIO_URL, { event })}
+                  onClick={() => void window.api.shell.openUrlInSystemBrowser(ANDROID_STUDIO_URL)}
                 >
                   {translate(
                     'auto.components.settings.MobileEmulatorSdkStatus.b94ff260e6',

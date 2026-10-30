@@ -4,6 +4,15 @@
       "settings": {
         "AccountsPane": {
           "0c64dc2a64": null
+        },
+        "OpenAiTranscriptionKeyDialog": {
+          "d246b2bdb3": "Yerel çalışma zamanı anahtarları, mevcut olduğunda Electron şifreli depolama kullanılarak ~/.orca-np içinde saklanır."
+        },
+        "ShortcutsPane": {
+          "d8c988dab4": "~/.orca-np/keybindings.json"
+        },
+        "sshHostServer": {
+          "runtimeNoexec": "Bu ana makine ~/.orca-np-remote dizininden program çalıştırmaya izin vermediği için Orca sunucusunu burada başlatamıyor. Bu genellikle ev klasörünün noexec ile bağlandığı anlamına gelir. Ana makinenin yöneticisinden burada program çalıştırılmasına izin vermesini isteyin, ardından yeniden bağlanın."
         }
       }
     },

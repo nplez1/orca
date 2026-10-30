@@ -173,12 +173,15 @@ export function getPRComments(
   if (options?.noCache) {
     return readPRComments(repoPath, prNumber, options, connectionId, localGitOptions)
   }
+  // Why the flag is in the key: the verdict filter changes what the fetch returns, so a Checks-panel
+  // read and a PR-page read of the same PR must not join one fetch and inherit its filtering.
   const key = JSON.stringify([
     repoPath,
     prNumber,
     options?.prRepo ?? null,
     connectionId ?? null,
-    githubReadExecutionScope(localGitOptions)
+    githubReadExecutionScope(localGitOptions),
+    options?.includeReviewVerdicts === true
   ])
   return runCoalescedProbe(commentReads, key, () =>
     readPRComments(repoPath, prNumber, options, connectionId, localGitOptions)

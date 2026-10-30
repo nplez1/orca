@@ -2,6 +2,7 @@ import { translate } from '@/i18n/i18n'
 import type { GitHubRerunPRChecksResult, PRCheckDetail } from '../../../shared/github/check-types'
 import { selectRerunTargets } from '../../../shared/jenkins-rebuild'
 import { rerunJenkinsCheck } from '@/runtime/jenkins-rebuild-client'
+import { codeHostErrorText } from '@/lib/code-host-error-copy'
 
 /**
  * One "Rerun" action over a failure list that can contain both GitHub Actions checks and Jenkins
@@ -55,7 +56,8 @@ export async function rerunChecksAcrossProviders({
       if (result.ok) {
         githubStarted = result.count
       } else {
-        errors.push(result.error)
+        // Why the helper: a code-host failure carries an error code whose copy upstream owns.
+        errors.push(codeHostErrorText(result))
       }
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error))

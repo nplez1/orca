@@ -6,6 +6,7 @@ import {
   type AiVaultScanIssue
 } from './ai-vault-types'
 import type { ExecutionHostId } from './execution-host'
+import { aiVaultScanIssueText } from './ai-vault-scan-issue-copy'
 import { describeAiVaultScanError } from './ai-vault-scan-error-message'
 
 /**
@@ -213,7 +214,9 @@ function mergedSkipNotices(issues: readonly AiVaultScanIssue[]): AiVaultScanIssu
     ...issues.filter((issue) => issue.path !== AI_VAULT_LIST_SKIP_ISSUE_PATH),
     {
       ...firstSkip!,
-      message: `Skipped ${total} invalid Agent Session History result ${total === 1 ? 'entry' : 'entries'}.`
+      // Rebuilt from the code, not re-messaged: the display prefers code+params over `message`, so a
+      // stale `messageParams.count` from the first page would win over the sum.
+      ...aiVaultScanIssueText('invalidResultsSkipped', { params: { count: total } })
     }
   ]
 }

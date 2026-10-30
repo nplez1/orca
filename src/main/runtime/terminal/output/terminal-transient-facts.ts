@@ -202,6 +202,11 @@ export abstract class OrcaRuntimeWithEmitDaemonPtyTransientFact extends OrcaRunt
     return this.getTrackedRawTitleForPty(ptyId)
   }
 
+  /** The title the pane currently shows, for a caller deciding whether to overrule it. */
+  getTrackedVisiblePtyTitle(ptyId: string): string | null {
+    return this.getTrackedDisplayTitleForPty(ptyId)
+  }
+
   protected isLiveCursorNativeTitle(rawTitle: string, meta?: TerminalTitleFactMeta): boolean {
     return isCursorNativeAgentTitle(rawTitle) && meta?.staleWorkingTitleClear !== true
   }

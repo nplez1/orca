@@ -1,8 +1,11 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
 import {
+  forkOverlayDirectoryRelativePath,
+  hasForkOverlayForSurface,
   readEnglishCatalogForSurface,
   readRuntimeRequiredCatalogsForSurface,
   writeForkRuntimeRequiredCatalogForSurface
@@ -106,14 +109,32 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2), s
     sharedReferences ?? (await collectLocalizationReferences(root, surface.sourceRoots))
   const requiredKeys = collectRuntimeRequiredKeys(catalogEntries, references)
   const runtimeCatalogs = await readRuntimeRequiredCatalogsForSurface(root, surface)
-  // Why two labels: upstream's boot subset stays upstream's bytes, so the fork writes an overlay.
+  // Why an existence probe rather than a surface flag: a surface has an overlay exactly when the
+  // overlay directory exists. Mobile has none, and writing one there would produce a file its app
+  // never loads while the file it does load went stale.
+  const forkOverlay = await hasForkOverlayForSurface(root, surface)
   const upstreamRuntimeLabel = surface.runtimeRequiredPath.split(path.sep).join('/')
   const forkRuntimeLabel = path
-    .join(path.dirname(surface.runtimeRequiredPath), 'fork', 'en-runtime-required.json')
+    .join(forkOverlayDirectoryRelativePath(surface), 'en-runtime-required.json')
     .split(path.sep)
     .join('/')
+  const requiredLabel = forkOverlay
+    ? `${upstreamRuntimeLabel} + ${forkRuntimeLabel}`
+    : upstreamRuntimeLabel
 
   if (fix) {
+    if (!forkOverlay) {
+      const catalog = buildRuntimeRequiredCatalog(catalogEntries, requiredKeys)
+      await fs.writeFile(
+        path.join(root, surface.runtimeRequiredPath),
+        `${JSON.stringify(catalog, null, 2)}\n`,
+        'utf8'
+      )
+      console.log(
+        `Wrote ${requiredKeys.size} of ${catalogEntries.size} English entries to ${upstreamRuntimeLabel}.`
+      )
+      return 0
+    }
     const upstreamShipped = flattenCatalogEntries(runtimeCatalogs.upstream)
     // Why: upstream's subset stays upstream's bytes; the fork ships what it omits or contradicts.
     const forkKeys = new Set(
@@ -140,7 +161,7 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2), s
   )
 
   if (missing.length > 0 || contradicting.length > 0) {
-    console.error(`${upstreamRuntimeLabel} + ${forkRuntimeLabel} no longer cover en.json.`)
+    console.error(`${requiredLabel} no longer covers en.json.`)
     console.error('')
     if (missing.length > 0) {
       reportKeys(
@@ -161,7 +182,7 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2), s
       ? `, ${superfluous.length} shipped entry/entries are no longer required (harmless; sync to drop them).`
       : '.'
   console.log(
-    `${upstreamRuntimeLabel} + ${forkRuntimeLabel} cover en.json: ${requiredKeys.size} of ${catalogEntries.size} English entries must ship in the boot bundle${superfluousNote}`
+    `${requiredLabel} covers en.json: ${requiredKeys.size} of ${catalogEntries.size} English entries must ship in the boot bundle${superfluousNote}`
   )
   return 0
 }

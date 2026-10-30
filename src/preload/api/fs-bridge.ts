@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 39-line delta rides inside it, and splitting costs a permanent sync hunk. */
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 39-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { PathExistenceResult } from '../../shared/path-existence-batch'
 import { ipcRenderer, webUtils } from 'electron'
 import type {
