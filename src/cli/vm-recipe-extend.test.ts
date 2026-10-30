@@ -235,7 +235,8 @@ describe('orca vm recipe extend deadline', () => {
     writeFileSync(hangPath, '#!/bin/sh\nexec sleep 30\n')
     chmodSync(hangPath, 0o755)
 
-    const startedAt = Date.now()
+    // Why a monotonic clock: this is a hang guard on elapsed time, not a wall-clock reading.
+    const startedAt = performance.now()
     const result = await extendEphemeralVmRecipeFromFile({
       repoPath,
       recipe: recipe({ extend: './hang.sh', extendDurations: ['4h'] }),
@@ -251,7 +252,7 @@ describe('orca vm recipe extend deadline', () => {
     // Why this wording: extend is paid and not idempotent, so the advice must not be "extend again".
     expect(result.error).toContain('before extending again')
     expect(result.transcript).toBeDefined()
-    expect(Date.now() - startedAt).toBeLessThan(10_000)
+    expect(performance.now() - startedAt).toBeLessThan(10_000)
   })
 
   it('refuses a timeout that cannot be a deadline rather than ignoring it', () => {

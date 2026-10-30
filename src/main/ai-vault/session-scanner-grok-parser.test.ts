@@ -16,6 +16,10 @@ afterEach(async () => {
   tempRoots = []
 })
 
+// Why fixed: the parser only carries a file's mtime through, so the wall clock dates the fixture.
+const FIXTURE_MTIME_MS = 1_777_634_000_000
+const FIXTURE_MODIFIED_AT = new Date(FIXTURE_MTIME_MS).toISOString()
+
 describe('AI Vault Grok session parser', () => {
   it.each([false, true])(
     'bounds preview scanning while preserving full turns with capture %s',
@@ -160,8 +164,8 @@ describe('AI Vault Grok session parser', () => {
     const session = await withFullFirstUserPromptCapture(() =>
       parseGrokSessionFile({
         path: summaryPath,
-        mtimeMs: Date.now(),
-        modifiedAt: new Date().toISOString()
+        mtimeMs: FIXTURE_MTIME_MS,
+        modifiedAt: FIXTURE_MODIFIED_AT
       })
     )
 
@@ -183,7 +187,7 @@ describe('AI Vault Grok session parser', () => {
 
     await expect(
       parseGrokSessionFile(
-        { path: summaryPath, mtimeMs: Date.now(), modifiedAt: new Date().toISOString() },
+        { path: summaryPath, mtimeMs: FIXTURE_MTIME_MS, modifiedAt: FIXTURE_MODIFIED_AT },
         'linux'
       )
     ).rejects.toThrow(/too large/i)
@@ -200,7 +204,7 @@ describe('AI Vault Grok session parser', () => {
     const result = await parseSessionCandidate(
       {
         agent: 'grok',
-        file: { path: summaryPath, mtimeMs: Date.now(), modifiedAt: new Date().toISOString() },
+        file: { path: summaryPath, mtimeMs: FIXTURE_MTIME_MS, modifiedAt: FIXTURE_MODIFIED_AT },
         codexHome: null
       },
       {

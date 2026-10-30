@@ -37,6 +37,9 @@ function userRecord(data: Record<string, unknown>): Record<string, unknown> {
   return { type: 'user.message', data, timestamp: '2026-10-19T21:40:06.000Z' }
 }
 
+// Why fixed: the parser only carries a file's mtime through, so the wall clock dates the fixture.
+const FIXTURE_MTIME_MS = 1_777_634_000_000
+
 async function parse(
   records: Record<string, unknown>[],
   platform: NodeJS.Platform = 'linux'
@@ -46,7 +49,7 @@ async function parse(
   const path = join(dir, 'events.jsonl')
   await writeFile(path, records.map((record) => JSON.stringify(record)).join('\n'))
   const session = await parseCopilotSessionFile(
-    { path, mtimeMs: Date.now(), modifiedAt: new Date().toISOString() },
+    { path, mtimeMs: FIXTURE_MTIME_MS, modifiedAt: new Date(FIXTURE_MTIME_MS).toISOString() },
     platform
   )
   if (!session) {
@@ -144,7 +147,7 @@ describe('parseCopilotSessionFile identity', () => {
     await writeFile(path, JSON.stringify({ type: 'user.message', data: { content: 'hi' } }))
 
     const session = await parseCopilotSessionFile(
-      { path, mtimeMs: Date.now(), modifiedAt: new Date().toISOString() },
+      { path, mtimeMs: FIXTURE_MTIME_MS, modifiedAt: new Date(FIXTURE_MTIME_MS).toISOString() },
       'linux'
     )
 
