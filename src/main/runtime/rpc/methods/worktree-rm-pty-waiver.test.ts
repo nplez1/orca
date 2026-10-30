@@ -41,8 +41,9 @@ const forwarded = (overrides: Partial<Record<string, unknown>> = {}): Record<str
   runHooks: false,
   allowUnverifiedPtyStop: false,
   allowFailedArchiveHook: false,
-  // Why (fork): local(worktrees) forwards this alongside the other removal options.
+  // Why (fork): local(worktrees) forwards these alongside the other removal options.
   deleteRemoteBranch: false,
+  waitForBackgroundRemoval: false,
   hostId: 'local',
   ...overrides
 })

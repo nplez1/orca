@@ -27,8 +27,9 @@ const forwarded = (hostId?: string): Record<string, unknown> => ({
   runHooks: false,
   allowUnverifiedPtyStop: false,
   allowFailedArchiveHook: false,
-  // Why (fork): local(worktrees) forwards this alongside the other removal options.
+  // Why (fork): local(worktrees) forwards these alongside the other removal options.
   deleteRemoteBranch: false,
+  waitForBackgroundRemoval: false,
   ...(hostId ? { hostId } : {})
 })
 

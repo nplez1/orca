@@ -178,7 +178,7 @@ describe('Dashboard and retained sidebar destination contract', () => {
       const view = render(
         <TooltipProvider>
           <AgentKanbanBoard
-            snapshot={{ ...snapshot, cards: [card] }}
+            snapshot={{ ...snapshot, cards: [card], cardClickAction: 'preview' }}
             onAckAgent={() => {}}
             onRevealAgent={revealDashboardAgent}
           />

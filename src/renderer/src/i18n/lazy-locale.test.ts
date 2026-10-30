@@ -93,7 +93,9 @@ describe('renderer i18n lazy locale loading', () => {
     const request = vi.spyOn(globalThis, 'fetch')
     try {
       await Promise.all([loadRendererUiLanguage('ko'), loadRendererUiLanguage('ko')])
-      expect(request).toHaveBeenCalledTimes(1)
+      // LOCAL(nplez1): one shared upstream catalog request plus one fork overlay read, which is
+      // skipped for a locale with no overlay.
+      expect(request).toHaveBeenCalledTimes(2)
       expect(i18n.getFixedT('ko')('menu.file', { defaultValue: 'File' })).toBe('파일')
     } finally {
       request.mockRestore()
@@ -120,8 +122,9 @@ describe('renderer i18n lazy locale loading', () => {
         await i18n.changeLanguage(await loadRendererUiLanguage('ja'))
         expect(i18n.language).toBe('ja')
         expect(i18n.t('menu.file', { defaultValue: 'File' })).toBe('ファイル')
-        // fork-comment-ok: both assets load on every attempt, so two attempts are four requests
-        expect(request).toHaveBeenCalledTimes(4)
+        // LOCAL(nplez1): the failed attempt fetches only the upstream catalog — the fork overlay is
+        // read after it succeeds — so the retry adds two more reads, not two per attempt.
+        expect(request).toHaveBeenCalledTimes(3)
       } finally {
         request.mockRestore()
       }

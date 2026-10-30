@@ -11,7 +11,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('electron', () => ({
   ipcMain: {
     handle: (name: string, fn: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
-      mocks.handlers.set(name, fn)
+      mocks.handlers.set(name, fn),
+    // registerShellHandlers also registers the contextual-link router handshake through `on`.
+    on: () => undefined
   },
   shell: {},
   dialog: {}

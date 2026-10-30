@@ -12,7 +12,20 @@ vi.mock('@/runtime/runtime-git-diff-client', () => ({
   getRuntimeGitBranchCompare: mocks.getRuntimeGitBranchCompare
 }))
 vi.mock('@/runtime/runtime-repo-client', () => ({
-  getRuntimeRepoBaseRefDefault: mocks.getRuntimeRepoBaseRefDefault
+  getRuntimeRepoBaseRefDefault: mocks.getRuntimeRepoBaseRefDefault,
+  // Why the inline watcher: the module factory replaces the whole module, so the real
+  // `watchRuntimeRepoBaseRefDefault` wrapper is gone and the hook would call undefined.
+  watchRuntimeRepoBaseRefDefault: (hostId: string, repoId: string, handlers: unknown) => {
+    const typed = handlers as {
+      onResult: (result: unknown) => void
+      onError: (error: unknown) => void
+    }
+    void Promise.resolve(mocks.getRuntimeRepoBaseRefDefault(hostId, repoId)).then(
+      typed.onResult,
+      typed.onError
+    )
+    return () => {}
+  }
 }))
 vi.mock('@/lib/connection-context', () => ({ getConnectionId: () => null }))
 vi.mock('../worktree-git-owner-target', () => ({

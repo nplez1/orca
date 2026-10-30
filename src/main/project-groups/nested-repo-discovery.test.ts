@@ -133,7 +133,8 @@ describe('scanNestedRepos', () => {
       }
       vi.mocked(isGitRepoAsync).mockResolvedValueOnce(true)
       expect((await scanNestedRepos({ path })).selectedPathKind).toBe('git_repo')
-      expect(isGitRepoAsync).toHaveBeenCalledWith(path)
+      // LOCAL(nplez1): this fork probes the Git marker before spawning `git rev-parse`, so a real
+      // repository is answered by the marker and `isGitRepoAsync` is never reached.
     }
   )
 
