@@ -1,4 +1,5 @@
 import type { SecretAtRestProtection } from '../secret-at-rest-protection'
+import type { TaskProviderErrorCode } from '../task-provider-failure'
 // Cloud uses email/token Basic auth and REST v3; Server/Data Center uses PAT Bearer auth and REST v2. Legacy absent values mean cloud.
 export type JiraAuthType = 'cloud' | 'server'
 
@@ -321,4 +322,7 @@ export type JiraMutationResult =
       // Why: the deadline fired, so the host may still commit. A caller must re-read
       // the issue instead of rolling its optimistic patch back as a failure.
       timedOut?: boolean
+      // Why: the provider code lets a surface choose its own copy for the same failure;
+      // `taskProviderErrorMessage` reads it, and a Jira rejection without one renders raw.
+      errorCode?: TaskProviderErrorCode
     }

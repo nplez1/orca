@@ -66,9 +66,12 @@ export function exposedObjectLiterals(expression) {
         return
       }
       if (ts.isBlock(body)) {
-        const returns = body.statements.filter((statement) => ts.isReturnStatement(statement))
-        if (returns.length === 1 && returns[0].expression) {
-          visit(returns[0].expression)
+        // Every top-level return, not just a lone one: a function with an early-return guard exposes
+        // the same literal on both paths, and stopping at the first hid names a merge had dropped.
+        for (const statement of body.statements) {
+          if (ts.isReturnStatement(statement) && statement.expression) {
+            visit(statement.expression)
+          }
         }
       } else {
         visit(body)

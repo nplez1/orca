@@ -95,6 +95,22 @@ function feedFiles() {
   return [...FEED_FILES, ...glob]
 }
 
+/** True when one of `file`'s relative imports resolves to a file that carries the slug. */
+function importsHolder(file, holders) {
+  const source = readFileSync(path.join(repoRoot(), file), 'utf8')
+  const dir = path.posix.dirname(file)
+  for (const match of source.matchAll(/from\s+'(\.{1,2}\/[^']+)'/g)) {
+    const specifier = match[1]
+    for (const candidate of [specifier, `${specifier}.ts`, `${specifier}/index.ts`]) {
+      const resolved = path.posix.normalize(path.posix.join(dir, candidate))
+      if (holders.has(resolved)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
 export function updaterFeed() {
   const files = feedFiles()
   if (files === null) {
@@ -104,6 +120,11 @@ export function updaterFeed() {
   const missing = []
   const scanFailures = []
   const globbed = files.filter((file) => !FEED_FILES.includes(file))
+  // The slug may be held once and derived everywhere else, so a feed file that imports a file which
+  // does carry it is satisfied through that constant — the alternative is a copy of the literal that
+  // can drift, which is what this check exists to prevent.
+  const holders = new Set()
+  const silent = []
   for (const file of files) {
     const present = existsSync(path.join(repoRoot(), file))
     const grepped = present ? git(['grep', '-n', '-F', '-e', FORK_SLUG, '--', file]) : null
@@ -117,18 +138,27 @@ export function updaterFeed() {
     }
     const hits = grepped?.ok ? grepped.stdout.split('\n').filter(Boolean) : []
     if (hits.length > 0) {
+      holders.add(file)
       details.push(...hits)
       continue
     }
-    // The runbook greps the whole file list in one command, so a generic `updater-*.ts` helper
-    // that never names a repo is normal and only reported. A missing reference in the two files
-    // that hold the fork's feed override is the failure this check exists for.
-    if (FEED_FILES.includes(file)) {
-      missing.push(file)
-      details.push(`${file}: no reference to ${FORK_SLUG}${present ? '' : ' (file is missing)'}`)
-    } else {
+    silent.push({ file, present })
+  }
+  // The runbook greps the whole file list in one command, so a generic `updater-*.ts` helper that
+  // never names a repo is normal and only reported. A missing reference in a file that holds the
+  // fork's feed override is the failure this check exists for — unless the file reaches the slug
+  // through a checked constant, which is the shape `updater-release-targets.ts` exists for.
+  for (const { file, present } of silent) {
+    if (!FEED_FILES.includes(file)) {
       details.push(`${file}: no reference, expected for a generic updater helper`)
+      continue
     }
+    if (importsHolder(file, holders)) {
+      details.push(`${file}: names ${FORK_SLUG} through a checked constant, not a literal`)
+      continue
+    }
+    missing.push(file)
+    details.push(`${file}: no reference to ${FORK_SLUG}${present ? '' : ' (file is missing)'}`)
   }
   if (globbed.length === 0) {
     details.push(

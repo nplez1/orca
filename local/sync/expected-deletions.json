@@ -214,5 +214,14 @@
       "status": "expected-deletion",
       "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     }
+  ],
+  "symbols": [
+    {
+      "path": "src/renderer/src/i18n/i18n.ts",
+      "symbol": "fetchCatalog",
+      "status": "expected-deletion",
+      "supersededBy": "upstream `loadLocaleCatalog` in the same file",
+      "reason": "The fork's own catalog fetcher; upstream's rewritten bootstrap fetches the same catalog and the fork overlay now rides inside `loadLocaleCatalog`, so the two would be two fetchers for one catalog. Nothing in the merged tree references it. evidence: convergence-ledger.md Localization catalogs"
+    }
   ]
 }

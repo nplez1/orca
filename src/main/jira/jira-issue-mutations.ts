@@ -83,9 +83,11 @@ function describeUpdateFailure(error: unknown): JiraMutationResult {
       ...(error.errorMessages ? { errorMessages: error.errorMessages } : {})
     }
   }
-  return error instanceof Error
-    ? { ok: false, error: error.message }
-    : taskProviderFailure('jira.updateFailed', 'Failed to update issue.')
+  return {
+    ok: false,
+    error: error instanceof Error ? error.message : 'Failed to update issue.',
+    errorCode: 'jira.updateFailed'
+  }
 }
 
 /** The deadline's own abort, which says the write may still land: a plain failure
