@@ -131,7 +131,7 @@ describe('revealDashboardAgent', () => {
         TooltipProvider,
         null,
         createElement(AgentKanbanBoard, {
-          snapshot: { generatedAt: 0, cards: [card] },
+          snapshot: { generatedAt: 0, cards: [card], cardClickAction: 'preview' },
           onAckAgent: () => {},
           onRevealAgent: revealDashboardAgent
         })

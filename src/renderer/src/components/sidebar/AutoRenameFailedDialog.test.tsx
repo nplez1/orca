@@ -63,6 +63,9 @@ function WorkspaceFailure() {
   ) : null
 }
 
+// Why: this suite drives react-dom/client with a manual act(), which only flushes state under it.
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true)
+
 let container: HTMLDivElement
 let root: Root
 
