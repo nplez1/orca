@@ -46,9 +46,30 @@ vi.mock('./GithubLinkedIssuePane', () => ({
   )
 }))
 vi.mock('./JiraLinkedIssuePane', () => ({
-  JiraLinkedIssuePane: ({ sourceContext }: { sourceContext: TaskSourceContext }) => {
+  JiraLinkedIssuePane: ({
+    sourceContext,
+    issueSwitcher
+  }: {
+    sourceContext: TaskSourceContext
+    issueSwitcher?: {
+      options: readonly { key: string }[]
+      onSelectIssue: (key: string) => void
+    }
+  }) => {
     mocks.jiraSources.push(sourceContext)
-    return <output data-testid="jira-source">{JSON.stringify(sourceContext)}</output>
+    return (
+      <>
+        <output data-testid="jira-source">{JSON.stringify(sourceContext)}</output>
+        {issueSwitcher && issueSwitcher.options.length > 1 ? (
+          <button
+            type="button"
+            onClick={() => issueSwitcher.onSelectIssue(issueSwitcher.options[1]?.key ?? '')}
+          >
+            select-second-jira
+          </button>
+        ) : null}
+      </>
+    )
   }
 }))
 vi.mock('./LinearLinkedIssuePane', () => ({
@@ -312,5 +333,54 @@ describe('IssuePane issue selection', () => {
     fireEvent.click(screen.getByText('select-second-linear'))
 
     expect(sourceShown('linear-source')).toMatchObject({ hostId: 'runtime:other-host' })
+  })
+
+  it("routes a picked Jira issue through that issue's own site and account", () => {
+    // Same rule for Jira, whose source only survives normalization when it agrees with the issue's
+    // own site and project key — the arm that decides which site a picked key is read from.
+    const otherSite: TaskSourceContext = {
+      kind: 'task-source',
+      provider: 'jira',
+      projectId: 'jira-project',
+      hostId: 'runtime:other-jira-host',
+      providerIdentity: {
+        provider: 'jira',
+        siteId: 'site-1',
+        siteUrl: 'https://acme.atlassian.net',
+        projectKey: 'PROJ'
+      }
+    }
+    mocks.worktree = worktree({
+      linkedWorkItem: jiraWorkItem('PROJ-1'),
+      linkedItems: [
+        {
+          provider: 'jira',
+          type: 'issue',
+          number: 0,
+          identifier: 'PROJ-1',
+          jiraIdentifier: 'PROJ-1',
+          url: 'https://acme.atlassian.net/browse/PROJ-1'
+        },
+        {
+          provider: 'jira',
+          type: 'issue',
+          number: 0,
+          identifier: 'PROJ-7',
+          jiraIdentifier: 'PROJ-7',
+          url: 'https://acme.atlassian.net/browse/PROJ-7',
+          taskSourceContext: otherSite
+        }
+      ]
+    })
+    render(<IssuePane />)
+
+    expect(sourceShown('jira-source')).toMatchObject({ hostId: 'runtime:workspace-host' })
+
+    fireEvent.click(screen.getByText('select-second-jira'))
+
+    expect(sourceShown('jira-source')).toMatchObject({
+      hostId: 'runtime:other-jira-host',
+      providerIdentity: expect.objectContaining({ siteId: 'site-1' })
+    })
   })
 })
