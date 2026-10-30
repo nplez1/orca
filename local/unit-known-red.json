@@ -36,8 +36,8 @@
     "kind": "full",
     "revision": "ef2897da2b",
     "subject": "the 2026-10-29 reconciliation: eight fork-local classes added after the base gate on this machine red 80 records",
-    "failingRecords": 163,
-    "allowlisted": 48,
+    "failingRecords": 165,
+    "allowlisted": 50,
     "upstreamQuarantined": 0,
     "fixed": 115,
     "repairedCases": [
@@ -697,7 +697,7 @@
     },
     {
       "file": "src/main/minimax/minimax-api-key-store.test.ts",
-      "test": "clears the cached key and removes the file",
+      "test": "minimax-api-key-store clears the cached key and removes the file",
       "class": "fork-home-migration-mock",
       "owner": "fork",
       "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
@@ -705,7 +705,7 @@
     },
     {
       "file": "src/main/minimax/minimax-api-key-store.test.ts",
-      "test": "reports a transient read failure as unreadable, not undecryptable, and retries next read",
+      "test": "minimax-api-key-store reports a transient read failure as unreadable, not undecryptable, and retries next read",
       "class": "fork-home-migration-mock",
       "owner": "fork",
       "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
@@ -713,7 +713,7 @@
     },
     {
       "file": "src/main/deepseek/deepseek-api-key-store.test.ts",
-      "test": "clears the cached key and removes the file",
+      "test": "deepseek-api-key-store clears the cached key and removes the file",
       "class": "fork-home-migration-mock",
       "owner": "fork",
       "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
@@ -721,7 +721,7 @@
     },
     {
       "file": "src/main/fireworks/fireworks-credentials-store.test.ts",
-      "test": "clears the cached payload and removes the file",
+      "test": "fireworks-credentials-store clears the cached payload and removes the file",
       "class": "fork-home-migration-mock",
       "owner": "fork",
       "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
@@ -729,7 +729,7 @@
     },
     {
       "file": "src/main/zcode/zcode-plan-api-key-store.test.ts",
-      "test": "restores the previous envelope when a plaintext replacement cannot be restricted",
+      "test": "zcode-plan-api-key-store restores the previous envelope when a plaintext replacement cannot be restricted",
       "class": "fork-home-migration-mock",
       "owner": "fork",
       "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
@@ -737,7 +737,7 @@
     },
     {
       "file": "src/main/zcode/zcode-plan-api-key-store.test.ts",
-      "test": "removes a rejected plaintext replacement when restoring the previous key fails",
+      "test": "zcode-plan-api-key-store removes a rejected plaintext replacement when restoring the previous key fails",
       "class": "fork-home-migration-mock",
       "owner": "fork",
       "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
@@ -757,6 +757,22 @@
       "class": "fork-credentials-ratchet",
       "owner": "fork",
       "evidence": "Fork file src/main/claude-accounts/claude-oauth-pending-rotations.ts (added by afbf7860833, e09393fec57) uses rmSync without an fsAllowances row and calls writeClaudeOAuthCredentialRotation without a CREDENTIAL_ROTATION_OWNERS row in the ratchet test (src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts:33,132). The ratchet is doing its job: the pending-rotation write path needs review before it is declared, so allowing it here would approve unreviewed persistence.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/ensure-native-runtime.test.mjs",
+      "test": "ensure-native-runtime finds the installed node-gyp entry from an addon without build tools on PATH",
+      "class": "host-pnpm-shim",
+      "owner": "fork",
+      "evidence": "The case proves that a bare `pnpm exec node-gyp` cannot find node-gyp with PATH emptied, and asserts pnpm's \"Command \"node-gyp\" not found\". This machine resolves pnpm to the Hermes heavy-run shim at ~/.local/bin/pnpm, which answers with its own line instead, so the pinned message never appears. CI has no shim; the shim is machine infrastructure, not repo state.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/mobile-web-app/mobile-web-app-terminal-font-render.test.mjs",
+      "test": "terminal font startup and late painting opens on a stalled font and replaces cached fallback glyphs when it finally arrives",
+      "class": "mobile-font-repaint",
+      "owner": "upstream",
+      "evidence": "This suite reports both cases skipped while Playwright's chromium headless shell is absent, because its beforeAll fixture cannot start. With the browsers installed on 2026-10-29 the fixture starts and the canvas-repaint assertion fails deterministically (3 runs of 3): the CDP screenshot after \"Orca Nerd Font Symbols\" loads is byte-identical to the stalled-font frame. That is a real render finding and needs an owner; it was invisible before because the whole suite skipped.",
       "flaky": false
     }
   ],
