@@ -2304,3 +2304,10 @@ file, and the run that carried them had 0 unexpected test failures. See
 parent process's earlier append left `/bin/bash` 3.2 ahead of it and ~14 `.mjs` suites failed on
 `set -u` empty-array expansion), and `mobile/` needs its own `pnpm install --frozen-lockfile`
 (24 bundle tests fail on `Could not resolve "expo-localization"` otherwise). Neither is repo state.
+
+**Shipped.** `v1.4.214-np.43` was published from `402c238a18e` by
+`fork-release.yml` run 41132916318 — unit plan, 12/12 shards, macOS, Windows and Linux all green
+(the Linux lane absorbed the 18 credential-store and host-toolchain reds through
+`local/nightly-linux-known-red.json`, and the unit lane reported no unhandled headline). All 16
+assets are present, including `latest-mac.yml`, `latest.yml` and `latest-linux.yml`, and
+`releases/latest` resolves to `v1.4.214-np.43`.
