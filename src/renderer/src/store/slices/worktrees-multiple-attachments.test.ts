@@ -4,6 +4,7 @@ import {
   normalizeWorkspaceAttachmentUpdate
 } from '../../../../shared/workspace-attachments'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
+import { buildWorkspaceAttachmentEdits } from '@/components/sidebar/worktree-attachment-editing'
 import { makeFolderWorkspace, makeWorktree } from './worktrees-slice-test-fixtures'
 import {
   createTestStore,
@@ -91,6 +92,34 @@ describe('workspace attachment collections', () => {
       linkedIssue: 9
     })
     expect(getWorkspaceAttachments(store.getState().worktreesByRepo.repo1[0])).toHaveLength(2)
+  })
+
+  it('removes the issue the pane shows without unlinking the others the workspace holds', async () => {
+    // The issue pane's unlink addresses one attachment, so a workspace linked to several issues
+    // must keep the ones the user is not looking at.
+    const store = createTestStore()
+    const wt = makeWorktree({
+      id: 'repo1::/work',
+      repoId: 'repo1',
+      linkedIssue: 12,
+      linkedItems: [
+        { provider: 'github', type: 'issue', number: 12 },
+        { provider: 'github', type: 'issue', number: 13 }
+      ]
+    })
+    store.setState({ worktreesByRepo: { repo1: [wt] } })
+    const items = getWorkspaceAttachments(wt)
+    await store
+      .getState()
+      .updateWorktreeMeta(
+        wt.id,
+        buildWorkspaceAttachmentEdits({ initial: items, draft: items.slice(1) })
+      )
+    const saved = store.getState().worktreesByRepo.repo1[0]
+    // Why 13: the active slot names an issue the workspace no longer links, so the remaining
+    // issue becomes the active one rather than the workspace losing its task.
+    expect(saved.linkedIssue).toBe(13)
+    expect(getWorkspaceAttachments(saved).map((item) => item.number)).toEqual([13])
   })
 
   it('routes folder links to the owning folder update instead of dropping them', async () => {

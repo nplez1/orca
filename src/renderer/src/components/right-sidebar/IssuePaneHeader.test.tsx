@@ -147,4 +147,48 @@ describe('IssuePaneHeader', () => {
     await user.click(unlink)
     expect(onUnlinkIssue).not.toHaveBeenCalled()
   })
+
+  it('keeps a one-issue workspace a plain link and switches only when there is a choice', () => {
+    const single = {
+      options: [{ key: 'github:#12', provider: 'github' as const, identifier: '#12', title: null }],
+      selectedKey: 'github:#12',
+      onSelectIssue: () => {}
+    }
+    const { rerender } = render(
+      <TooltipProvider delayDuration={0}>
+        <IssuePaneHeader
+          provider="github"
+          identifier="#12"
+          title="Crash on launch"
+          openUrl="https://github.invalid/acme/orca/issues/12"
+          onRefresh={() => {}}
+          onOpenIssue={() => {}}
+          issueSwitcher={single}
+        />
+      </TooltipProvider>
+    )
+    expect(screen.queryByLabelText('Switch issue')).toBeNull()
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <IssuePaneHeader
+          provider="github"
+          identifier="#12"
+          title="Crash on launch"
+          openUrl="https://github.invalid/acme/orca/issues/12"
+          onRefresh={() => {}}
+          onOpenIssue={() => {}}
+          issueSwitcher={{
+            ...single,
+            options: [
+              ...single.options,
+              { ...single.options[0], key: 'github:#13', identifier: '#13' }
+            ]
+          }}
+        />
+      </TooltipProvider>
+    )
+    expect(screen.getByLabelText('Switch issue')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '#12' })).toBeTruthy()
+  })
 })

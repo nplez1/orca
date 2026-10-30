@@ -14,6 +14,7 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import { translate } from '@/i18n/i18n'
 import { IssuePaneHeader } from './IssuePaneHeader'
+import type { IssuePaneIssueSwitcherProps } from './IssuePaneIssueSwitcher'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
@@ -55,11 +56,13 @@ function readSourceContext(
 export function GithubLinkedIssuePane({
   worktree,
   linkedIssue,
-  sourceContext
+  sourceContext,
+  issueSwitcher
 }: {
   worktree: GithubPaneWorktree
   linkedIssue: GithubLinked
   sourceContext: TaskSourceContext | null
+  issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
   const repo = useAppStore((s) => findLinkedIssueRepo(s.repos, worktree, linkedIssue.number))
   // Why a distinct state: the link names a repo this device does not have, which is a setup
@@ -68,7 +71,7 @@ export function GithubLinkedIssuePane({
     linkedIssueRepoIsOffDevice(s.repos, worktree, linkedIssue.number)
   )
   const scopedSourceContext = repo ? readSourceContext(sourceContext, repo.id) : null
-  const linkActions = useLinkedIssuePaneActions()
+  const linkActions = useLinkedIssuePaneActions(linkedIssue)
   const [workItem, setWorkItem] = useState<GitHubWorkItem | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -129,6 +132,7 @@ export function GithubLinkedIssuePane({
           onUnlinkIssue={linkActions.unlinkIssue}
           onLinkAnotherIssue={linkActions.linkAnotherIssue}
           linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
+          issueSwitcher={issueSwitcher}
         />
         <IssuePaneMessage
           kind={repoIsOffDevice ? 'repoOffDevice' : 'unavailable'}
@@ -152,6 +156,7 @@ export function GithubLinkedIssuePane({
         onUnlinkIssue={linkActions.unlinkIssue}
         onLinkAnotherIssue={linkActions.linkAnotherIssue}
         linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
+        issueSwitcher={issueSwitcher}
       />
       {!workItem ? (
         loading ? (

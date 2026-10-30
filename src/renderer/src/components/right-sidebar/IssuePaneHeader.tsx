@@ -11,6 +11,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { IssueProviderIcon, issueProviderLabel } from './issue-provider-presentation'
+import {
+  IssuePaneIssueIdentifier,
+  IssuePaneIssueSwitcher,
+  type IssuePaneIssueSwitcherProps
+} from './IssuePaneIssueSwitcher'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
 /** Inline-editable title for the pane header. Commits on Enter or blur, resets
@@ -145,7 +150,8 @@ export function IssuePaneHeader({
   onOpenIssue,
   onUnlinkIssue,
   onLinkAnotherIssue,
-  linkActionsDisabledReason = null
+  linkActionsDisabledReason = null,
+  issueSwitcher
 }: {
   provider: SupportedWorkspaceLinkedIssue['provider']
   identifier: string
@@ -163,13 +169,11 @@ export function IssuePaneHeader({
   onLinkAnotherIssue?: () => void
   /** Why the link actions cannot run here; disables them and explains instead. */
   linkActionsDisabledReason?: string | null
+  /** Present when the workspace has more than one issue: the identifier becomes a
+   *  split control that keeps opening the issue and adds issue selection. */
+  issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
   const providerLabel = issueProviderLabel(provider)
-  const openTitle = translate(
-    'auto.components.right.sidebar.IssuePane.openIn',
-    'Open on {{value0}}',
-    { value0: providerLabel }
-  )
 
   return (
     <header className="flex-none border-b border-border/60 px-3 py-3">
@@ -178,25 +182,22 @@ export function IssuePaneHeader({
           provider={provider}
           className="size-3.5 shrink-0 text-muted-foreground"
         />
-        {openUrl && onOpenIssue ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="min-w-0 flex-1 truncate rounded px-0.5 text-left font-mono text-[11px] text-muted-foreground underline decoration-border underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                onClick={(event) => onOpenIssue(openUrl, event)}
-              >
-                {identifier}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {openTitle}
-            </TooltipContent>
-          </Tooltip>
+        {issueSwitcher && issueSwitcher.options.length > 1 ? (
+          <IssuePaneIssueSwitcher
+            provider={provider}
+            identifier={identifier}
+            openUrl={openUrl}
+            onOpenIssue={onOpenIssue}
+            switcher={issueSwitcher}
+          />
         ) : (
-          <span className="min-w-0 flex-1 truncate px-0.5 font-mono text-[11px] text-muted-foreground">
-            {identifier}
-          </span>
+          <IssuePaneIssueIdentifier
+            provider={provider}
+            identifier={identifier}
+            openUrl={openUrl}
+            onOpenIssue={onOpenIssue}
+            className="flex-1"
+          />
         )}
         <Tooltip>
           <TooltipTrigger asChild>

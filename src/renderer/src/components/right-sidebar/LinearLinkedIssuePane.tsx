@@ -11,6 +11,7 @@ import { scopedLinearCacheKeyForSource } from '@/store/slices/linear/linear-slic
 import { translate } from '@/i18n/i18n'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
+import type { IssuePaneIssueSwitcherProps } from './IssuePaneIssueSwitcher'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
@@ -33,13 +34,15 @@ function linearCommentView(comment: LinearComment): IssueCommentView {
  *  title/description editor, reusing the Task view's Linear hydration hook. */
 export function LinearLinkedIssuePane({
   linkedIssue,
-  sourceContext
+  sourceContext,
+  issueSwitcher
 }: {
   linkedIssue: LinearLinked
   /** The issue's provider account: the host the workspace's creation-time task came from, else the
    *  workspace's own host. Never the Active Server, so one source drives every read, write and
    *  cache key this pane owns. */
   sourceContext: TaskSourceContext
+  issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
   const fetchLinearIssue = useAppStore((s) => s.fetchLinearIssue)
   // Why only the owner's own key: the cache is in-memory, and a reader with no source at all writes
@@ -54,7 +57,7 @@ export function LinearLinkedIssuePane({
   )
   const issue = entry?.data ?? null
   const [refreshing, setRefreshing] = useState(false)
-  const linkActions = useLinkedIssuePaneActions()
+  const linkActions = useLinkedIssuePaneActions(linkedIssue)
 
   useEffect(() => {
     // Why: 'all' — the identifier may belong to a different Linear workspace
@@ -84,6 +87,7 @@ export function LinearLinkedIssuePane({
           onUnlinkIssue={linkActions.unlinkIssue}
           onLinkAnotherIssue={linkActions.linkAnotherIssue}
           linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
+          issueSwitcher={issueSwitcher}
         />
         {entry !== undefined && entry.data === null ? (
           <IssuePaneMessage kind="unavailable" providerLabel="Linear" onRetry={refresh} />
@@ -100,6 +104,7 @@ export function LinearLinkedIssuePane({
       sourceContext={sourceContext}
       refreshing={refreshing}
       onRefresh={refresh}
+      issueSwitcher={issueSwitcher}
     />
   )
 }
@@ -108,14 +113,19 @@ function LinearLinkedIssueDetail({
   issue,
   sourceContext,
   refreshing,
-  onRefresh
+  onRefresh,
+  issueSwitcher
 }: {
   issue: LinearIssue
   sourceContext: TaskSourceContext
   refreshing: boolean
   onRefresh: () => void
+  issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
-  const linkActions = useLinkedIssuePaneActions()
+  const linkActions = useLinkedIssuePaneActions({
+    provider: 'linear',
+    identifier: issue.identifier
+  })
   const providerSettings: RuntimeLinearSettings = sourceContext
   const requestKey = `${sourceContext.hostId}:${issue.workspaceId ?? 'selected'}:${issue.id}`
   const detail = useLinearIssueWorkspaceDetail({ issue, providerSettings, requestKey })
@@ -133,6 +143,7 @@ function LinearLinkedIssueDetail({
         onUnlinkIssue={linkActions.unlinkIssue}
         onLinkAnotherIssue={linkActions.linkAnotherIssue}
         linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
+        issueSwitcher={issueSwitcher}
       />
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
         <div className="p-2">

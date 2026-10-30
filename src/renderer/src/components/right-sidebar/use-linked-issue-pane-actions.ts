@@ -4,8 +4,17 @@ import { useAppStore } from '@/store'
 import { useActiveWorktree } from '@/store/selectors'
 import { openHttpLink } from '@/lib/http-link-routing'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
+import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments'
+import type { WorkspaceAttachmentMutation } from '../../../../shared/workspace-attachment-mutation'
+import { getWorkspaceAttachmentKey } from '../../../../shared/workspace-attachment-normalization'
+import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import { translate } from '@/i18n/i18n'
+import { buildWorkspaceAttachmentEdits } from '@/components/sidebar/worktree-attachment-editing'
 import { buildIssueUnlinkUpdates } from '@/components/sidebar/workspace-issue-unlink-updates'
+import {
+  findWorkspaceIssueAttachment,
+  type SupportedWorkspaceLinkedIssue
+} from './workspace-linked-issue'
 
 export type LinkedIssuePaneActions = {
   /** Opens the issue on its provider, honoring Orca's Link Routing setting and
@@ -18,15 +27,12 @@ export type LinkedIssuePaneActions = {
   linkActionsDisabledReason: string | null
 }
 
+/** The issue an action taken from the pane is about. */
+export type LinkedIssuePaneTarget = Pick<SupportedWorkspaceLinkedIssue, 'provider' | 'identifier'>
+
 /** Link actions for the issue pane, owned by the active workspace's own link
- *  slots rather than by the pane body.
- *
- *  Every provider goes through `buildIssueUnlinkUpdates`, which is the same
- *  clearing rule the workspace dialog's Issue field uses: a workspace holds one
- *  issue at a time, so unlinking empties the GitHub number slot, the Linear key,
- *  and the created-from work item together rather than only the slot the pane
- *  happens to be rendering. */
-export function useLinkedIssuePaneActions(): LinkedIssuePaneActions {
+ *  slots rather than by the pane body. */
+export function useLinkedIssuePaneActions(target?: LinkedIssuePaneTarget): LinkedIssuePaneActions {
   const worktree = useActiveWorktree()
   const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
   const openModal = useAppStore((s) => s.openModal)
@@ -63,14 +69,28 @@ export function useLinkedIssuePaneActions(): LinkedIssuePaneActions {
     if (!worktree || linkActionsDisabledReason) {
       return
     }
-    void updateWorktreeMeta(worktree.id, buildIssueUnlinkUpdates(worktree), {
+    // Why the shown issue's attachment rather than `buildIssueUnlinkUpdates`: that rule clears one
+    // slot per provider, which was right when a workspace held one issue and is wrong now that it
+    // holds several — it would unlink an issue the user is not looking at. Removing the one
+    // attachment leaves the host's selection rule to re-point the slots at what remains.
+    const items = getWorkspaceAttachments(worktree)
+    const attached = target ? findWorkspaceIssueAttachment(worktree, target) : null
+    const updates: Partial<WorktreeMeta> & WorkspaceAttachmentMutation = attached
+      ? buildWorkspaceAttachmentEdits({
+          initial: items,
+          draft: items.filter(
+            (item) => getWorkspaceAttachmentKey(item) !== getWorkspaceAttachmentKey(attached)
+          )
+        })
+      : buildIssueUnlinkUpdates(worktree)
+    void updateWorktreeMeta(worktree.id, updates, {
       executionHostId: worktree.hostId
     }).then((result) => {
       if (!result.ok) {
         toast.error(result.error)
       }
     })
-  }, [linkActionsDisabledReason, updateWorktreeMeta, worktree])
+  }, [linkActionsDisabledReason, target, updateWorktreeMeta, worktree])
 
   const linkAnotherIssue = useCallback((): void => {
     if (!worktree || linkActionsDisabledReason) {

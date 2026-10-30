@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -21,7 +21,30 @@ vi.mock('@/store/selectors', () => ({
   useActiveWorktree: () => mocks.worktree,
   useRepoById: () => mocks.repo
 }))
-vi.mock('./GithubLinkedIssuePane', () => ({ GithubLinkedIssuePane: () => null }))
+vi.mock('./GithubLinkedIssuePane', () => ({
+  GithubLinkedIssuePane: ({
+    linkedIssue,
+    issueSwitcher
+  }: {
+    linkedIssue: { identifier: string }
+    issueSwitcher?: {
+      options: readonly { key: string }[]
+      onSelectIssue: (key: string) => void
+    }
+  }) => (
+    <>
+      <output data-testid="github-issue">{linkedIssue.identifier}</output>
+      {issueSwitcher && issueSwitcher.options.length > 1 ? (
+        <button
+          type="button"
+          onClick={() => issueSwitcher.onSelectIssue(issueSwitcher.options[1]?.key ?? '')}
+        >
+          select-second
+        </button>
+      ) : null}
+    </>
+  )
+}))
 vi.mock('./JiraLinkedIssuePane', () => ({
   JiraLinkedIssuePane: ({ sourceContext }: { sourceContext: TaskSourceContext }) => {
     mocks.jiraSources.push(sourceContext)
@@ -211,5 +234,32 @@ describe('IssuePane linked-issue owner', () => {
       provider: 'jira',
       hostId: 'runtime:workspace-host'
     })
+  })
+})
+
+describe('IssuePane issue selection', () => {
+  it("shows the workspace's own issue first and swaps to the one picked", () => {
+    mocks.worktree = worktree({
+      linkedIssue: 12,
+      linkedItems: [
+        { provider: 'github', type: 'issue', number: 12, title: 'Crash on launch' },
+        { provider: 'github', type: 'issue', number: 13, title: 'Checkout is slow' }
+      ]
+    })
+    render(<IssuePane />)
+
+    expect(screen.getByTestId('github-issue').textContent).toBe('#12')
+
+    fireEvent.click(screen.getByText('select-second'))
+
+    expect(screen.getByTestId('github-issue').textContent).toBe('#13')
+  })
+
+  it('offers no choice for a workspace with a single issue', () => {
+    mocks.worktree = worktree({ linkedIssue: 12 })
+    render(<IssuePane />)
+
+    expect(screen.getByTestId('github-issue').textContent).toBe('#12')
+    expect(screen.queryByText('select-second')).toBeNull()
   })
 })

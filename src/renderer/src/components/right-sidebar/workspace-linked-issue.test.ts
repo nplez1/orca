@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { Worktree } from '../../../../shared/worktree/types'
-import { resolveIssuePaneLinkedIssue, resolveWorkspaceLinkedIssue } from './workspace-linked-issue'
+import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
+import {
+  findWorkspaceIssueAttachment,
+  resolveIssuePaneIssues,
+  resolveIssuePaneLinkedIssue,
+  resolveWorkspaceLinkedIssue
+} from './workspace-linked-issue'
 
 type LinkedIssueSource = Pick<
   Worktree,
@@ -10,6 +16,7 @@ type LinkedIssueSource = Pick<
   | 'linkedLinearIssueOrganizationUrlKey'
   | 'linkedGitLabIssue'
   | 'linkedWorkItem'
+  | 'linkedItems'
 >
 
 function source(overrides: Partial<LinkedIssueSource> = {}): LinkedIssueSource {
@@ -20,7 +27,23 @@ function source(overrides: Partial<LinkedIssueSource> = {}): LinkedIssueSource {
     linkedLinearIssueOrganizationUrlKey: null,
     linkedGitLabIssue: null,
     linkedWorkItem: null,
+    linkedItems: [],
     ...overrides
+  }
+}
+
+function githubIssue(number: number, title?: string): WorkspaceAttachment {
+  return { provider: 'github', type: 'issue', number, ...(title ? { title } : {}) }
+}
+
+function jiraIssue(key: string, title?: string): WorkspaceAttachment {
+  return {
+    provider: 'jira',
+    type: 'issue',
+    number: 0,
+    identifier: key,
+    jiraIdentifier: key,
+    ...(title ? { title } : {})
   }
 }
 
@@ -216,5 +239,95 @@ describe('resolveIssuePaneLinkedIssue', () => {
   it('returns null for a missing worktree', () => {
     expect(resolveIssuePaneLinkedIssue(null)).toBeNull()
     expect(resolveIssuePaneLinkedIssue(undefined)).toBeNull()
+  })
+})
+
+const githubSource: TaskSourceContext = {
+  kind: 'task-source',
+  provider: 'github',
+  projectId: 'github-project',
+  hostId: 'runtime:github-host'
+}
+
+describe('resolveIssuePaneIssues', () => {
+  it('lists every attached issue, putting the workspace own one first', () => {
+    const issues = resolveIssuePaneIssues(
+      source({
+        linkedIssue: 13,
+        linkedItems: [githubIssue(12, 'Crash on launch'), githubIssue(13), jiraIssue('PROJ-7')]
+      })
+    )
+
+    expect(issues.map((entry) => entry.issue.identifier)).toEqual(['#13', '#12', 'PROJ-7'])
+  })
+
+  it('keeps the account each issue was attached from', () => {
+    const issues = resolveIssuePaneIssues(
+      source({ linkedItems: [{ ...githubIssue(12), taskSourceContext: githubSource }] })
+    )
+
+    expect(issues[0]?.sourceContext).toMatchObject({
+      provider: 'github',
+      hostId: 'runtime:github-host'
+    })
+  })
+
+  it('titles an issue from its attachment so the picker can show it', () => {
+    const issues = resolveIssuePaneIssues(
+      source({ linkedItems: [githubIssue(12, 'Crash on launch')] })
+    )
+
+    expect(issues.map((entry) => entry.issue.title)).toEqual(['Crash on launch'])
+  })
+
+  it('synthesizes the active issue when no attachment carries it yet', () => {
+    // The slot can name an issue before `linkedItems` lists it, and the pane still has to show it.
+    expect(
+      resolveIssuePaneIssues(source({ linkedIssue: 12 })).map((entry) => entry.issue.identifier)
+    ).toEqual(['#12'])
+  })
+
+  it('drops providers the pane has no detail body for', () => {
+    expect(resolveIssuePaneIssues(source({ linkedGitLabIssue: 5 }))).toEqual([])
+    expect(
+      resolveIssuePaneIssues(source({ linkedGitLabIssue: 5, linkedItems: [githubIssue(9)] })).map(
+        (entry) => entry.issue.identifier
+      )
+    ).toEqual(['#9'])
+  })
+
+  it('lists each issue once when an attachment and a slot name the same issue', () => {
+    expect(
+      resolveIssuePaneIssues(source({ linkedIssue: 12, linkedItems: [githubIssue(12)] })).map(
+        (entry) => entry.key
+      )
+    ).toEqual(['github:#12'])
+  })
+
+  it('returns nothing for a missing worktree', () => {
+    expect(resolveIssuePaneIssues(null)).toEqual([])
+    expect(resolveIssuePaneIssues(undefined)).toEqual([])
+  })
+})
+
+describe('findWorkspaceIssueAttachment', () => {
+  it('addresses the issue the pane shows rather than the active one', () => {
+    const worktree = source({ linkedIssue: 12, linkedItems: [githubIssue(12), githubIssue(13)] })
+
+    expect(
+      findWorkspaceIssueAttachment(worktree, { provider: 'github', identifier: '#13' })
+    ).toMatchObject({ provider: 'github', number: 13 })
+    expect(
+      findWorkspaceIssueAttachment(worktree, { provider: 'jira', identifier: 'PROJ-7' })
+    ).toBeNull()
+  })
+
+  it('matches a Jira key through its own identifier field', () => {
+    expect(
+      findWorkspaceIssueAttachment(source({ linkedItems: [jiraIssue('PROJ-7')] }), {
+        provider: 'jira',
+        identifier: 'PROJ-7'
+      })
+    ).toMatchObject({ provider: 'jira', jiraIdentifier: 'PROJ-7' })
   })
 })
