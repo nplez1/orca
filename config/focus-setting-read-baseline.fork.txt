@@ -18,9 +18,9 @@
 1 src/renderer/src/components/right-sidebar/use-linked-issue-pane-actions.ts # transitive reader: openHttpLink reads the setting for Link Routing, which is not a Jira/Linear surface (2026-10-16 owner-routing migration)
 1 src/renderer/src/components/settings/JiraBoardSettings.tsx # settings scope: the default Jira board is a global setting, so the pane's board list belongs to the focused host's Jira account, and the memo keys on that host id alone (2026-10-16 owner-routing migration)
 0 src/renderer/src/components/sidebar/workspace-board-task-status-sync.ts # fork has 0 where upstream allows 3; lowered by a fork prune
-0 src/renderer/src/components/task-page-jira-status-order.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 8 src/renderer/src/components/task-page/TaskPage.tsx # fork has 8 where upstream allows 9; lowered by a fork prune
 1 src/renderer/src/components/task-page/jira/IssueAssigneeField.tsx # fork has 1 where upstream allows 2; lowered by a fork prune
+0 src/renderer/src/components/task-page/jira/task-page-jira-status-order.ts
 2 src/renderer/src/components/task-page/jira/use-task-page-jira-creation-metadata.ts
 2 src/renderer/src/components/task-page/jira/use-task-page-jira-issue-creation.ts
 1 src/renderer/src/components/task-page/linear/task-page-linear-issue-model.tsx # fork has 1 where upstream allows 2; lowered by a fork prune
