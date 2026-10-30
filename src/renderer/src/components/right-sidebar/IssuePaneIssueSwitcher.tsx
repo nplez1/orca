@@ -50,6 +50,8 @@ export function IssuePaneIssueIdentifier({
       <TooltipTrigger asChild>
         <button
           type="button"
+          // Why the attribute: this is a button-styled link, so the app's link menu needs it declared.
+          data-link-url={openUrl}
           className={cn(
             shared,
             'rounded text-left underline decoration-border underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'

@@ -370,6 +370,7 @@
             "retry": "Retry",
             "save": "Save",
             "status": "Status",
+            "switchIssue": "Switch issue",
             "title": "Issue title",
             "unavailable": "Couldn't load this {{value0}} issue.",
             "unlinkIssue": "Unlink issue from workspace",
