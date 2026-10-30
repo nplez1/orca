@@ -33,7 +33,12 @@ export const FORK_SLUG = 'nplez1/orca'
 export const BUILDER_CONFIG = './config/electron-builder.config.cjs'
 // The update feed must keep naming the fork: without it an update check resolves upstream
 // releases and a fork install "upgrades" to a build carrying none of the fork's patches.
-const FEED_FILES = ['src/main/updater-prerelease-feed.ts', 'src/shared/release-channel.ts']
+// `updater-release-targets.ts` holds RELEASES_REPO, the one declaration every feed URL derives from.
+const FEED_FILES = [
+  'src/main/updater-release-targets.ts',
+  'src/main/updater-prerelease-feed.ts',
+  'src/shared/release-channel.ts'
+]
 const FEED_GLOB = { dir: 'src/main/updater', prefix: 'updater-' }
 
 export function localizationVerifiers() {

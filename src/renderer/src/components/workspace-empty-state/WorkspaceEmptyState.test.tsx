@@ -17,7 +17,7 @@ vi.mock('@/components/tab-bar/use-tab-bar-default-agent', () => ({
   useTabBarDefaultAgent: () => mocks.launchingDefaultAgent()
 }))
 
-vi.mock('../../../../resources/logo.svg', () => ({ default: 'logo.svg' }))
+vi.mock('../../../../../resources/logo.svg', () => ({ default: 'logo.svg' }))
 
 const { WorkspaceEmptyState } = await import('./WorkspaceEmptyState')
 

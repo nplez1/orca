@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 93-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { withFreshOmpLaunch } from '../../../shared/omp-fresh-launch'
 import { describe, expect, it, vi } from 'vitest'
 import {

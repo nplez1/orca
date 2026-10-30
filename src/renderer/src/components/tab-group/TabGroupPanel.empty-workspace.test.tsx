@@ -30,7 +30,7 @@ vi.mock('@/lib/pane-manager/client-hosted-browser-row-state', () => ({
 vi.mock('@/components/tab-bar/use-tab-bar-default-agent', () => ({
   useTabBarDefaultAgent: () => ({ agent: null, isAgentLaunchPending: false })
 }))
-vi.mock('../../../../resources/logo.svg', () => ({ default: 'logo.svg' }))
+vi.mock('../../../../../resources/logo.svg', () => ({ default: 'logo.svg' }))
 vi.mock('./useTabGroupWorkspaceModel', () => ({
   useTabGroupWorkspaceModel: () => ({
     activeTab: null,

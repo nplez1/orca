@@ -18584,9 +18584,6 @@
         "checksPassingOfTotal_one": "{{passing}} von {{count}} Check erfolgreich",
         "checksPassingOfTotal_other": "{{passing}} von {{count}} Checks erfolgreich"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "Status konnte nicht geändert werden."
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "Statusänderungen konnten nicht geladen werden.",
         "loadCommentsFailed": "Kommentare konnten nicht geladen werden."

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 6-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'

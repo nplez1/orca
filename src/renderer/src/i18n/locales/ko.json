@@ -18083,9 +18083,6 @@
         "allChecksPassing": "모든 검사 통과",
         "checksPassingOfTotal_other": "검사 {{count}}개 중 {{passing}}개 통과"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "상태를 변경하지 못했습니다."
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "상태 변경 내역을 불러오지 못했습니다.",
         "loadCommentsFailed": "댓글을 불러오지 못했습니다."

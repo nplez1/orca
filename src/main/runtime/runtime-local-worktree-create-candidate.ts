@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 21-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { Repo } from '../../shared/repo-types'
 import type { WorktreeLayoutMode } from '../../shared/orca-workspace-layout'
 import { WorktreeCreateCollisionError } from '../../shared/new-workspace/worktree-create-collision'

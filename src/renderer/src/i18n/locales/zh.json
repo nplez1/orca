@@ -18083,9 +18083,6 @@
         "allChecksPassing": "所有检查均通过",
         "checksPassingOfTotal_other": "{{count}} 项检查中有 {{passing}} 项通过"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "更改状态失败。"
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "加载状态变更失败。",
         "loadCommentsFailed": "加载评论失败。"

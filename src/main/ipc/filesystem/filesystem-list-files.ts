@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 2-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import {
   FileInventoryBudget,
   FileInventoryCapacityError

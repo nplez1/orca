@@ -18083,9 +18083,6 @@
         "allChecksPassing": "すべてのチェックに成功",
         "checksPassingOfTotal_other": "{{count}} 件中 {{passing}} 件のチェックに成功"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "ステータスを変更できませんでした。"
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "ステータスの変更を読み込めませんでした。",
         "loadCommentsFailed": "コメントを読み込めませんでした。"

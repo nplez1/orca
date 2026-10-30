@@ -627,11 +627,9 @@ export async function main(
         ([key]) => getCatalogEntry(catalog, key) === undefined
       )
       const added = applyMissingEnglishEntries(catalog, missing)
-      if (forkOverlay) {
-        await writeMissingEnglishEntriesForSurface(root, surface, entries)
-      } else {
-        await fs.writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8')
-      }
+      await (forkOverlay
+        ? writeMissingEnglishEntriesForSurface(root, surface, entries)
+        : fs.writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8'))
       catalogKeys = new Set(flattenCatalogKeys(catalog))
       console.log(`Added ${added} missing localization key(s) to en.json.`)
     } else {

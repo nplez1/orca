@@ -19642,9 +19642,6 @@
         "checksPassingOfTotal_other": "Verificações bem-sucedidas: {{passing}} de {{count}}",
         "checksPassingOfTotal_many": "Verificações bem-sucedidas: {{passing}} de {{count}}"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "Falha ao alterar o status."
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "Falha ao carregar as alterações de status.",
         "loadCommentsFailed": "Falha ao carregar os comentários."

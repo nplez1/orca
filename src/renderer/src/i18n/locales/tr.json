@@ -18570,9 +18570,6 @@
         "checksPassingOfTotal_other": "{{count}} kontrolden {{passing}} tanesi başarılı",
         "checksPassingOfTotal_one": "{{count}} kontrolden {{passing}} tanesi başarılı"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "Durum değiştirilemedi."
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "Durum değişiklikleri yüklenemedi.",
         "loadCommentsFailed": "Yorumlar yüklenemedi."

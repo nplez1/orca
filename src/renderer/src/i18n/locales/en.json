@@ -18897,9 +18897,6 @@
         "checksPassingOfTotal_one": "{{passing}} of {{count}} check passing",
         "checksPassingOfTotal_other": "{{passing}} of {{count}} checks passing"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "Failed to change status."
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "Failed to load status changes.",
         "loadCommentsFailed": "Failed to load comments."

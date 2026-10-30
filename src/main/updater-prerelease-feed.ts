@@ -144,11 +144,12 @@ export async function fetchLatestStableReleaseTag(): Promise<string | null> {
       return null
     }
     const target = new URL(response.redirectUrl, latestUrl)
-    const match = target.pathname.match(/^\/nplez1\/orca\/releases\/tag\/([^/]+)$/)
-    if (target.origin !== 'https://github.com' || !match) {
+    // Derived from the one declaration of the repo, so a retarget cannot leave this regex behind.
+    const tagPathPrefix = `/${RELEASES_REPO}/releases/tag/`
+    if (target.origin !== 'https://github.com' || !target.pathname.startsWith(tagPathPrefix)) {
       return null
     }
-    const tag = decodeURIComponent(match[1])
+    const tag = decodeURIComponent(target.pathname.slice(tagPathPrefix.length))
     const version = normalizeTagToVersion(tag)
     // Why the fork's own line is allowed here: every release this fork publishes carries the
     // `-np.<n>` prerelease suffix, so rejecting prereleases rejected the only thing `releases/latest`

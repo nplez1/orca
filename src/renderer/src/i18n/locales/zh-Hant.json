@@ -18325,9 +18325,6 @@
         "allChecksPassing": "所有檢查皆通過",
         "checksPassingOfTotal_other": "{{count}} 項檢查中有 {{passing}} 項通過"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "無法變更狀態。"
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "無法載入狀態變更。",
         "loadCommentsFailed": "無法載入留言。"

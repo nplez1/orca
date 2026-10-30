@@ -19154,9 +19154,6 @@
         "checksPassingOfTotal_many": "Пройдено: {{passing}} из {{count}} проверок",
         "checksPassingOfTotal_other": "Пройдено: {{passing}} из {{count}} проверки"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "Не удалось изменить статус."
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "Не удалось загрузить изменения статуса.",
         "loadCommentsFailed": "Не удалось загрузить комментарии."

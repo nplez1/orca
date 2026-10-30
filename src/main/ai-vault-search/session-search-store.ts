@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 35-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type SyncDatabase from '../sqlite/sync-database'
 import { asRecord } from '../ai-vault/session-scanner-record-value'
 import type { SessionFileCandidate } from '../ai-vault/session-scanner-types'

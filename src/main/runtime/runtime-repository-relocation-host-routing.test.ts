@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../shared/repo-types'
 import { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
 
-vi.mock('../ipc/filesystem-auth', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))
+vi.mock('../ipc/filesystem/filesystem-auth', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))
 vi.mock('../worktree-root-preparation', () => ({ prepareLocalWorktreeRootForRepo: vi.fn() }))
 
 const branchReads = vi.hoisted(() => {

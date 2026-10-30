@@ -219,7 +219,6 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       addPRConversationComment,
       addPRReviewCommentReply,
       clearSentCommentSelection,
-      refreshCommentsAfterReplies,
       commentsRef,
       setComments,
       asyncResultKeyRef

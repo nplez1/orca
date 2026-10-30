@@ -18555,9 +18555,6 @@
         "checksPassingOfTotal_other": "Verificaciones superadas: {{passing}} de {{count}}",
         "checksPassingOfTotal_many": "Verificaciones superadas: {{passing}} de {{count}}"
       },
-      "taskPageJiraBoard": {
-        "changeStatusFailed": "No se pudo cambiar el estado."
-      },
       "jiraIssue": {
         "loadStatusChangesFailed": "No se pudieron cargar los cambios de estado.",
         "loadCommentsFailed": "No se pudieron cargar los comentarios."

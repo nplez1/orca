@@ -264,17 +264,14 @@ export function VaultSessionRow({
               subagentChildrenExpanded && 'rotate-90'
             )}
           />
-          {subagentChildCount === 1
-            ? translate(
-                'auto.components.right.sidebar.AiVaultSessionRow.subagentSession_one',
-                '{{count}} subagent session',
-                { count: subagentChildCount }
-              )
-            : translate(
-                'auto.components.right.sidebar.AiVaultSessionRow.subagentSession_other',
-                '{{count}} subagent sessions',
-                { count: subagentChildCount }
-              )}
+          {translate(
+            'auto.components.right.sidebar.AiVaultSessionRow.subagentSession',
+            '{{count}} subagent sessions',
+            {
+              count: subagentChildCount,
+              defaultValue_one: '{{count}} subagent session'
+            }
+          )}
         </button>
       ) : null}
       {!detailsExpanded && !searchHit ? (

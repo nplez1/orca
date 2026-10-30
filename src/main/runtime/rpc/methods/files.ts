@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 21-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { defineMethod, defineStreamingMethod } from '../core'
 import { runFileWatchStream } from './file-watch-stream-lifecycle'
 import { FILE_MUTATION_METHODS } from './files-mutation-methods'

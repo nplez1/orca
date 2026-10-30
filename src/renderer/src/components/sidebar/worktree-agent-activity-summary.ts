@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 35-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { getStructuredAgentSessionTabsByPaneKey } from '@/components/native-chat/structured-agent-session-tabs'
 import {
   selectVisibleAgentOrchestration,
