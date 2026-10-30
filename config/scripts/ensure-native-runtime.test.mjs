@@ -1,35 +1,21 @@
 import { spawnSync } from 'node:child_process'
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync
-} from 'node:fs'
-import { tmpdir } from 'node:os'
-import { createRequire } from 'node:module'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, parse } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { runProcessSync } from '@orca/process-host'
 import { DEFAULT_MAX_OUTPUT_BYTES } from '@orca/process-host/process-spec'
 import { resolveCliCommand } from '../../src/shared/node-cli-command-resolution.ts'
 import { removeTreeSync } from '../../src/shared/windows-transient-lock-removal.ts'
+import {
+  envForNativeFixture,
+  mkTempProject,
+  writeFakeNodeGyp
+} from './ensure-native-runtime-fixture.mjs'
 import { resolvePnpmCliInvocation } from './pnpm-cli-invocation.mjs'
-import { copyScriptWithLocalModules } from './script-module-dependencies.mjs'
 import {
   nodeGypRebuildInvocation,
   nodeGypRebuildTimeoutMs
 } from './windows-process-tree-gyp-rebuild.mjs'
-
-const sourceScriptPath = fileURLToPath(new URL('./ensure-native-runtime.mjs', import.meta.url))
-// Fixture import walk misses createRequire CJS edges; name siblings explicitly or temp project cannot load.
-const REQUIRED_CJS_SIBLINGS = [
-  'node-pty-job-ownership.cjs',
-  'windows-process-tree-creation-time.cjs'
-]
 
 describe('ensure-native-runtime', () => {
   it('rechecks Node native modules in fresh child processes after rebuilding', () => {
@@ -185,113 +171,6 @@ describe('ensure-native-runtime', () => {
     }
   )
 
-  it.skipIf(process.platform === 'win32').each(['', '--force'])(
-    'fails fast on a node-pty from another store instead of retrying a rebuild that cannot help%s',
-    (forceFlag) => {
-      const projectDir = mkTempProject()
-
-      try {
-        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
-        const logPath = join(projectDir, 'native-runtime.log')
-        const markerPath = join(projectDir, 'rebuilt.marker')
-        writeLoadableNativeModules(projectDir)
-        writeNodePtyPatchFile(projectDir)
-        writePatchedNodePtyBuildArtifacts(projectDir)
-        writeUnpatchedNodePtyLoader(projectDir, { declaredStore: '/elsewhere/.pnpm-store/v11' })
-        writeFakeNodeGyp(projectDir)
-
-        const result = spawnSync(
-          process.execPath,
-          [scriptPath, '--runtime=node', ...(forceFlag ? [forceFlag] : [])],
-          {
-            cwd: projectDir,
-            encoding: 'utf8',
-            env: envForNativeFixture(projectDir, {
-              ORCA_NATIVE_TEST_LOG: logPath,
-              ORCA_NATIVE_TEST_MARKER: markerPath
-            })
-          }
-        )
-
-        expect(result.status, result.stderr).toBe(1)
-        expect(result.stderr).toContain("is not Orca's patched copy")
-        expect(result.stderr).toContain(`never looks in the build/orca-napi-${process.platform}-`)
-        expect(result.stderr).toContain('different pnpm store')
-        expect(result.stderr).toContain("--store-dir '/elsewhere/.pnpm-store/v11'")
-        expect(result.stderr).not.toContain('Native modules still do not load')
-        expect(existsSync(logPath) ? readFileSync(logPath, 'utf8') : '').not.toContain(
-          'node-gyp rebuild'
-        )
-        expect(existsSync(markerPath)).toBe(false)
-      } finally {
-        rmSync(projectDir, { recursive: true, force: true })
-      }
-    }
-  )
-
-  it.skipIf(process.platform === 'win32')(
-    'drops the store remedy when node_modules records no readable store',
-    () => {
-      const projectDir = mkTempProject()
-
-      try {
-        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
-        writeLoadableNativeModules(projectDir)
-        writeNodePtyPatchFile(projectDir)
-        writePatchedNodePtyBuildArtifacts(projectDir)
-        writeUnpatchedNodePtyLoader(projectDir)
-        writeFileSync(join(projectDir, 'node_modules', '.modules.yaml'), '{ not json')
-
-        const result = spawnSync(process.execPath, [scriptPath, '--runtime=node'], {
-          cwd: projectDir,
-          encoding: 'utf8',
-          env: envForNativeFixture(projectDir, {
-            ORCA_NATIVE_TEST_LOG: join(projectDir, 'native-runtime.log'),
-            ORCA_NATIVE_TEST_MARKER: join(projectDir, 'rebuilt.marker')
-          })
-        })
-
-        expect(result.status, result.stderr).toBe(1)
-        expect(result.stderr).toContain("pnpm did not apply Orca's node-pty patch")
-        expect(result.stderr).not.toContain('--store-dir')
-      } finally {
-        rmSync(projectDir, { recursive: true, force: true })
-      }
-    }
-  )
-
-  it.skipIf(process.platform === 'win32')(
-    'leaves a checkout without the node-pty patch file alone',
-    () => {
-      const projectDir = mkTempProject()
-
-      try {
-        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
-        const logPath = join(projectDir, 'native-runtime.log')
-        writeLoadableNativeModules(projectDir)
-        writeUnpatchedNodePtyLoader(projectDir)
-        writeFakeNodeGyp(projectDir)
-
-        const result = spawnSync(process.execPath, [scriptPath, '--runtime=node'], {
-          cwd: projectDir,
-          encoding: 'utf8',
-          env: envForNativeFixture(projectDir, {
-            ORCA_NATIVE_TEST_LOG: logPath,
-            ORCA_NATIVE_TEST_MARKER: join(projectDir, 'rebuilt.marker')
-          })
-        })
-
-        expect(result.status, result.stderr).toBe(0)
-        expect(result.stderr).not.toContain("is not Orca's patched copy")
-        expect(existsSync(logPath) ? readFileSync(logPath, 'utf8') : '').not.toContain(
-          'node-gyp rebuild'
-        )
-      } finally {
-        rmSync(projectDir, { recursive: true, force: true })
-      }
-    }
-  )
-
   it.skipIf(process.platform === 'win32')(
     'keeps the fast path when the platform-specific patched artifacts exist',
     () => {
@@ -376,47 +255,6 @@ describe('ensure-native-runtime', () => {
     }
   })
 })
-
-function mkTempProject() {
-  const projectDir = mkdtempSync(join(tmpdir(), 'orca-native-runtime-'))
-  // Copy walked windows-process-tree-gyp-rebuild dependency or every case fails before its intended check.
-  copyScriptWithLocalModules(sourceScriptPath, join(projectDir, 'config', 'scripts'))
-  const processPackage = join(projectDir, 'node_modules', '@orca', 'process-host')
-  mkdirSync(processPackage, { recursive: true })
-  writeFileSync(
-    join(processPackage, 'package.json'),
-    JSON.stringify({ name: '@orca/process-host', type: 'module', exports: './index.mjs' })
-  )
-  writeFileSync(
-    join(processPackage, 'index.mjs'),
-    `import { appendFileSync } from 'node:fs'
-import { runProcessSync as run } from ${JSON.stringify(pathToFileURL(createRequire(import.meta.url).resolve('@orca/process-host')).href)}
-export function runProcessSync(options) {
-  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-gyp timeout=\${options.timeoutMs}\\n\`)
-  return run(options)
-}
-`
-  )
-  for (const name of REQUIRED_CJS_SIBLINGS) {
-    copyFileSync(
-      fileURLToPath(new URL(`./${name}`, import.meta.url)),
-      join(projectDir, 'config', 'scripts', name)
-    )
-  }
-  return projectDir
-}
-
-function envForNativeFixture(projectDir, extraEnv) {
-  // An inherited tracking preference would mask the Windows default under test.
-  const inherited = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'trackfileaccess')
-  )
-  return {
-    ...inherited,
-    ...extraEnv,
-    npm_config_node_gyp: join(projectDir, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js')
-  }
-}
 
 function writeFakeNativeModules(projectDir, { windowsRegistryRequiresMarker = false } = {}) {
   const nodePtyDir = join(projectDir, 'node_modules', 'node-pty')
@@ -553,37 +391,6 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
 `
 }
 
-// An upstream copy: no per-ABI slot lookup, so Orca's patch can never be active.
-function writeUnpatchedNodePtyLoader(projectDir, { declaredStore = null } = {}) {
-  const nodePtyDir = join(projectDir, 'node_modules', 'node-pty')
-  writeFileSync(
-    join(nodePtyDir, 'lib', 'utils.js'),
-    `
-const { appendFileSync } = require('node:fs')
-
-exports.loadNativeModule = function loadNativeModule(nativeName) {
-  const dir = '../prebuilds/' + process.platform + '-' + process.arch + '/'
-  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-pty load \${nativeName} dir=\${dir}\\n\`)
-  return {
-    dir,
-    module: {
-      listJobProcessIds: () => [],
-      terminateJob: () => true,
-      assignCurrentProcessToJob: () => true,
-      assignCurrentProcessToStrictJob: () => true
-    }
-  }
-}
-`
-  )
-  if (declaredStore) {
-    writeFileSync(
-      join(projectDir, 'node_modules', '.modules.yaml'),
-      JSON.stringify({ storeDir: declaredStore }, null, 2)
-    )
-  }
-}
-
 function writePatchedNodePtyBuildArtifacts(projectDir) {
   const buildDir = join(projectDir, 'node_modules', 'node-pty', 'build', 'Release')
   mkdirSync(buildDir, { recursive: true })
@@ -598,28 +405,4 @@ function writePatchedNodePtyBuildArtifacts(projectDir) {
   if (process.platform === 'darwin') {
     writeFileSync(join(buildDir, 'spawn-helper'), '')
   }
-}
-
-function writeFakeNodeGyp(projectDir) {
-  const toolDir = join(projectDir, 'node_modules', 'node-gyp', 'bin')
-  mkdirSync(toolDir, { recursive: true })
-  writeFileSync(
-    join(toolDir, 'node-gyp.js'),
-    `
-const { appendFileSync, writeFileSync, writeSync } = require('node:fs')
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-gyp \${process.argv.slice(2).join(' ')}\\n\`)
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`cwd=\${process.cwd()}\\n\`)
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`cxxflags=\${process.env.CXXFLAGS || ''}\\n\`)
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`trackFileAccess=\${process.env.TrackFileAccess ?? ''}\\n\`)
-if (process.env.ORCA_NATIVE_TEST_VERBOSE_OUTPUT_BYTES) {
-  const output = Buffer.alloc(Number(process.env.ORCA_NATIVE_TEST_VERBOSE_OUTPUT_BYTES), 'x')
-  for (let offset = 0; offset < output.length;) {
-    offset += writeSync(1, output.subarray(offset))
-  }
-  writeSync(1, 'node-gyp stdout complete\\n')
-  writeSync(2, 'node-gyp stderr complete\\n')
-}
-writeFileSync(process.env.ORCA_NATIVE_TEST_MARKER, 'rebuilt')
-`
-  )
 }

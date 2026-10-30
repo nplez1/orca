@@ -16,6 +16,7 @@ import { runProcessSync } from '@orca/process-host'
 import { describeProcessFailure } from './process-failure-message.mjs'
 import {
   isSharedNativePackage,
+  isSharedPackageDir,
   isSourceBuildDir,
   nativeBuildEntryName,
   nodePtyBuildArtifactPaths,
@@ -134,6 +135,13 @@ function verifyNodeRuntimeAfterRebuild() {
 }
 
 function ensureElectronRuntime() {
+  const unpatchedNodePtyLoader = describeUnpatchedNodePtyLoader()
+  if (unpatchedNodePtyLoader) {
+    // Node and Electron both dead-end here: a shared rebuild publishes a slot this loader never probes.
+    console.error(`[native-runtime] ${unpatchedNodePtyLoader}`)
+    process.exit(1)
+  }
+
   const initial = runElectronCheck()
   const patchedNodePtyRebuildReason = getPatchedNodePtyRebuildReason()
   if (initial.ok && !patchedNodePtyRebuildReason) {
@@ -394,7 +402,7 @@ function describeUnpatchedNodePtyLoader() {
   const slot = nativeBuildEntryName('node-pty')
   const nodePtyDir = dirname(dirname(utilsPath))
   const declaredStore = readDeclaredPnpmStoreDir()
-  const foreignStore = declaredStore !== null && !isInsideDir(declaredStore, nodePtyDir)
+  const foreignStore = describeForeignStore(nodePtyDir, declaredStore)
   return (
     `the installed node-pty at ${nodePtyDir} is not Orca's patched copy: its lib/utils.js never ` +
     `looks in the build/${slot} slot, so it can only load an upstream prebuild and Orca's patch is ` +
@@ -402,8 +410,24 @@ function describeUnpatchedNodePtyLoader() {
       foreignStore
         ? `it resolves from a different pnpm store than node_modules declares (${declaredStore})`
         : `pnpm did not apply Orca's node-pty patch, so this install predates it or patches were skipped`
-    }. Reinstall with pnpm install --frozen-lockfile --force${foreignStore ? quotedStoreArg(declaredStore) : ''}.`
+    }. Reinstall from the worktree root with pnpm install --frozen-lockfile --force${
+      foreignStore ? quotedStoreArg(declaredStore) : ''
+    }.`
   )
+}
+
+/** Only a shared copy outside the recorded store is cured by --store-dir; a project-local one is not. */
+function describeForeignStore(nodePtyDir, declaredStore) {
+  if (declaredStore === null || !isSharedPackageDir(nodePtyDir, projectDir)) {
+    return null
+  }
+  let storeDir = declaredStore
+  try {
+    storeDir = realpathSync(declaredStore)
+  } catch {
+    // An unreachable store cannot contain the copy either way.
+  }
+  return isInsideDir(storeDir, nodePtyDir) ? null : declaredStore
 }
 
 // cmd.exe passes POSIX single quotes through literally, so the printed command must quote per platform.
