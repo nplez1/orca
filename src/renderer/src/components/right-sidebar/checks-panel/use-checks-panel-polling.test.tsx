@@ -364,6 +364,22 @@ describe('useChecksPanelPolling live behavior', () => {
     )
   })
 
+  it('retracts a refresh error an earlier read predates, and only on a read that lands', async () => {
+    const model = createModel()
+    renderHook(() => useChecksPanelPolling(model))
+
+    await act(async () => poller.run?.())
+
+    expect(model.retractStalePRRefreshError).toHaveBeenCalledExactlyOnceWith('cache', 1_000_000)
+
+    vi.mocked(model.retractStalePRRefreshError).mockClear()
+    vi.mocked(model.fetchPRChecks).mockRejectedValueOnce(new Error('gh: 502'))
+    vi.setSystemTime(2_000_000)
+    await act(async () => poller.run?.())
+
+    expect(model.retractStalePRRefreshError).not.toHaveBeenCalled()
+  })
+
   it('drops replacement MR details when the relink scope changes in flight', async () => {
     let resolveDetails!: (value: {
       item: { projectRef: null }

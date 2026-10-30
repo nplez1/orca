@@ -31,6 +31,7 @@ export function createModel(overrides: Partial<PollingInput> = {}): PollingInput
     prCacheKey: 'cache',
     prNumber: 42,
     prevChecksRef: { current: '' },
+    retractStalePRRefreshError: vi.fn(),
     repo: {
       id: 'repo-1',
       path: '/workspace/repo',

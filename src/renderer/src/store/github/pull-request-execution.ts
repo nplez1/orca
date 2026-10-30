@@ -193,7 +193,7 @@ export function startPullRequestLookup(args: {
             requestStartedAt,
             requestStartedEntry: requestStartedHostedReviewEntry
           })
-          return updates.prCache || updates.hostedReviewCache ? updates : s
+          return Object.keys(updates).length > 0 ? updates : s
         })
         if (skippedStaleLinkedPRLookup) {
           return null
