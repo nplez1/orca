@@ -859,3 +859,55 @@ describe('TaskPageJiraBoard external refresh signal', () => {
     expect(mocks.jiraGetBoardOverview.mock.calls.length).toBe(overviewCalls + 1)
   })
 })
+
+/** A failed sprint read must not read as an empty sprint: the page is cleared before
+ *  the read, so its `isLast: true` empty page would otherwise claim the filter matched
+ *  nothing in a sprint nobody answered for. */
+describe('TaskPageJiraBoard sprint read failure', () => {
+  beforeEach(() => {
+    clearTaskPageJiraBoardCache()
+    localStorage.clear()
+    mocks.jiraGetBoardOverview.mockResolvedValue(boardOverview)
+    mocks.jiraListBoardIssues.mockImplementation(
+      (_settings: unknown, request: JiraBoardIssuePageRequest) =>
+        request.scope === 'sprint'
+          ? Promise.reject(new Error('Jira board read failed.'))
+          : Promise.resolve({
+              issues: [backlogIssue],
+              startAt: request.startAt ?? 0,
+              nextPageToken: null,
+              total: 1,
+              isLast: true
+            })
+    )
+    mocks.jiraListTransitions.mockResolvedValue([startTransition])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+  })
+
+  it('reports the failure instead of claiming the sprint is empty', async () => {
+    renderBoard()
+
+    await screen.findByText('September sprint')
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('failed'))
+    expect(screen.queryByText('No issues match this filter in the active sprint.')).toBeNull()
+  })
+
+  it('still reports an empty sprint once the read succeeds', async () => {
+    mocks.jiraListBoardIssues.mockImplementation(
+      (_settings: unknown, request: JiraBoardIssuePageRequest) =>
+        Promise.resolve({
+          issues: request.scope === 'sprint' ? [] : [backlogIssue],
+          startAt: request.startAt ?? 0,
+          nextPageToken: null,
+          total: 0,
+          isLast: true
+        })
+    )
+
+    renderBoard()
+
+    expect(
+      await screen.findByText('No issues match this filter in the active sprint.')
+    ).toBeTruthy()
+  })
+})

@@ -111,7 +111,7 @@ export function JiraSchemaFieldControl({
           })}
         />
         {unnamed && displayValue && displayValue !== value ? (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-2xs text-muted-foreground">
             {translate('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
               value0: displayValue
             })}
@@ -188,7 +188,7 @@ export function JiraSchemaFieldControl({
         disabled={disabled}
       />
       {displayValue && displayValue !== value ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-2xs text-muted-foreground">
           {translate('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
             value0: displayValue
           })}

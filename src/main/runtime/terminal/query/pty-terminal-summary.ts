@@ -50,7 +50,12 @@ export abstract class OrcaRuntimeWithBuildPtyTerminalSummary extends OrcaRuntime
 
     const recorded = this.paneOfPty(pty)
     const pane = parsePaneKey(recorded.paneKey ?? '')
-    const orphaned = !ptyHoldsRecordedSurface(pty.ptyId, recorded, this.ptySurfaceTopology())
+    const orphaned = !ptyHoldsRecordedSurface(
+      pty.ptyId,
+      recorded,
+      this.ptySurfaceTopology(),
+      pty.connected
+    )
     const processTitle = getLatestPtyTitle(this.getPtyDisplayRecord(pty))
     const title = this.getPtyManualTitle(pty, orphaned) ?? processTitle
     const paneTitle =
@@ -160,7 +165,7 @@ export abstract class OrcaRuntimeWithBuildPtyTerminalSummary extends OrcaRuntime
     if (
       !pane ||
       // A pane a window retracted before it closed stays an orphan, as the summary reports it.
-      !ptyHoldsRecordedSurface(pty.ptyId, recorded, this.ptySurfaceTopology()) ||
+      !ptyHoldsRecordedSurface(pty.ptyId, recorded, this.ptySurfaceTopology(), pty.connected) ||
       this.leaves.has(this.getLeafKey(pane.tabId, pane.leafId)) ||
       this.getLeavesForPty(pty.ptyId).length > 0
     ) {

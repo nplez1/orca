@@ -7,6 +7,15 @@ import {
 
 const NEWLINE_BYTE = 0x0a
 const CARRIAGE_RETURN_BYTE = 0x0d
+const UTF8_BYTE_ORDER_MARK = [0xef, 0xbb, 0xbf]
+
+/** A BOM is only ever a file prefix, so this runs for the record that starts at offset 0. */
+function startsWithByteOrderMark(line: Buffer): boolean {
+  return (
+    line.length >= UTF8_BYTE_ORDER_MARK.length &&
+    UTF8_BYTE_ORDER_MARK.every((byte, index) => line[index] === byte)
+  )
+}
 
 type JsonlReadResult = {
   consumedThrough: number
@@ -67,6 +76,11 @@ export async function consumeCompleteJsonlLines(args: {
           line = Buffer.concat([...remainderParts, line], recordLength)
           remainderParts = []
           remainderLength = 0
+        }
+        // Why: a BOM-prefixed transcript would otherwise fail to parse exactly one record — the
+        // header that carries the session id, cwd and lineage.
+        if (consumedThrough === 0 && startsWithByteOrderMark(line)) {
+          line = line.subarray(UTF8_BYTE_ORDER_MARK.length)
         }
         const lineEnd = line.at(-1) === CARRIAGE_RETURN_BYTE ? line.length - 1 : line.length
         if (args.onLineBytes) {

@@ -6,6 +6,7 @@ import {
 } from '../deepseek/deepseek-api-key-store'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import type { RateLimitService } from '../rate-limits/service'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 export type DeepSeekCredentialsStatus = {
   configured: boolean
@@ -25,7 +26,12 @@ function refreshAfterDeepSeekCredentialChange(
 ): void {
   rateLimits?.invalidateDeepSeekCredentialState()
   void rateLimits?.refresh().catch((error: unknown) => {
-    console.error(`[deepseek] failed to trigger rate-limit refresh after ${action}:`, error)
+    recordSwallowedFailure(
+      'deepseek',
+      error,
+      `failed to trigger rate-limit refresh after ${action}`,
+      'error'
+    )
   })
 }
 

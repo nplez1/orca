@@ -2,7 +2,7 @@
 
 import React, { act } from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import type {
   JiraComment,
@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   jiraGetIssueSprintAssignment: vi.fn(),
   jiraIssueComments: vi.fn(),
   jiraListAssignableUsers: vi.fn(),
+  jiraListEditFields: vi.fn(),
   jiraListPriorities: vi.fn(),
   jiraListTransitions: vi.fn(),
   jiraUpdateIssue: vi.fn(),
@@ -39,7 +40,7 @@ vi.mock('@/runtime/runtime-jira-client', () => ({
   jiraListAssignableUsers: (...args: unknown[]) => mocks.jiraListAssignableUsers(...args),
   jiraListPriorities: (...args: unknown[]) => mocks.jiraListPriorities(...args),
   jiraListTransitions: (...args: unknown[]) => mocks.jiraListTransitions(...args),
-  jiraListEditFields: async () => [],
+  jiraListEditFields: (...args: unknown[]) => mocks.jiraListEditFields(...args),
   jiraUpdateIssue: (...args: unknown[]) => mocks.jiraUpdateIssue(...args)
 }))
 
@@ -101,6 +102,29 @@ function Probe(): React.JSX.Element {
     providerSettings: DEFAULT_SCOPE_HOST
   })
   return <div data-testid="key">{detail.displayed?.key ?? 'loading'}</div>
+}
+
+/** Renders the side reads' error states, so a failed read is observable instead of
+ *  looking like a site that offers nothing. */
+function SideReadProbe(): React.JSX.Element {
+  const detail = useJiraIssueWorkspaceDetail({
+    issue: issueFor('ABC-1'),
+    sprintBoard: sprintBoardFor('site-1'),
+    providerSettings: DEFAULT_SCOPE_HOST
+  })
+  return (
+    <div>
+      <div data-testid="edit-fields-error">{detail.editFieldsError ?? 'none'}</div>
+      <div data-testid="users-error">{detail.usersError ?? 'none'}</div>
+      <div data-testid="priorities-error">{detail.prioritiesError ?? 'none'}</div>
+      <div data-testid="sprint-error">{detail.sprintAssignmentError ?? 'none'}</div>
+      <button
+        type="button"
+        aria-label="retry-fields"
+        onClick={() => void detail.reloadEditFields()}
+      />
+    </div>
+  )
 }
 
 const sprintAssignment: JiraSprintAssignment = {
@@ -168,6 +192,11 @@ function SprintProbe({
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+})
+
+beforeEach(() => {
+  // Every surface reads the edit fields, so a resolved empty list is the default here.
+  mocks.jiraListEditFields.mockReset().mockResolvedValue([])
 })
 
 describe('useJiraIssueWorkspaceDetail with a bare fetch key', () => {
@@ -329,6 +358,64 @@ describe('useJiraIssueWorkspaceDetail sprint assignment', () => {
 
     await waitFor(() => expect(mocks.jiraGetIssue).toHaveBeenCalled())
     expect(mocks.jiraGetIssueSprintAssignment).not.toHaveBeenCalled()
+  })
+})
+
+describe('useJiraIssueWorkspaceDetail side reads', () => {
+  it('reports a failed read instead of an empty picker', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([] satisfies JiraComment[])
+    mocks.jiraListTransitions.mockResolvedValue([] satisfies JiraTransition[])
+    mocks.jiraListEditFields.mockRejectedValue(
+      new Error("Error invoking remote method 'jira:listEditFields': Error: Jira returned 502")
+    )
+    mocks.jiraListAssignableUsers.mockRejectedValue(new Error('assignable read failed'))
+    mocks.jiraListPriorities.mockRejectedValue(new Error('priority read failed'))
+    mocks.jiraGetIssueSprintAssignment.mockRejectedValue(new Error('sprint read failed'))
+
+    render(<SideReadProbe />)
+
+    // The IPC wrapper is unwrapped, so the user reads Jira's own reason.
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-fields-error').textContent).toBe('Jira returned 502')
+    )
+    expect(screen.getByTestId('users-error').textContent).toBe('assignable read failed')
+    expect(screen.getByTestId('priorities-error').textContent).toBe('priority read failed')
+    expect(screen.getByTestId('sprint-error').textContent).toBe('sprint read failed')
+    // The strict flag is what makes a failure distinguishable from an empty answer.
+    expect(mocks.jiraListEditFields).toHaveBeenCalledWith(
+      DEFAULT_SCOPE_HOST,
+      'ABC-1',
+      'site-1',
+      true
+    )
+    expect(mocks.jiraListPriorities).toHaveBeenCalledWith(DEFAULT_SCOPE_HOST, 'site-1', true)
+    expect(mocks.jiraListAssignableUsers).toHaveBeenCalledWith(
+      DEFAULT_SCOPE_HOST,
+      'ABC-1',
+      undefined,
+      'site-1',
+      true
+    )
+  })
+
+  it('clears a read failure once the retry answers', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([] satisfies JiraComment[])
+    mocks.jiraListTransitions.mockResolvedValue([] satisfies JiraTransition[])
+    mocks.jiraListAssignableUsers.mockResolvedValue([] satisfies JiraUser[])
+    mocks.jiraListPriorities.mockResolvedValue([] satisfies JiraPriority[])
+    mocks.jiraListEditFields.mockRejectedValueOnce(new Error('Jira returned 502'))
+    mocks.jiraListEditFields.mockResolvedValue([])
+    const user = userEvent.setup()
+
+    render(<SideReadProbe />)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('edit-fields-error').textContent).toBe('Jira returned 502')
+    )
+    await user.click(screen.getByRole('button', { name: 'retry-fields' }))
+    await waitFor(() => expect(screen.getByTestId('edit-fields-error').textContent).toBe('none'))
   })
 })
 

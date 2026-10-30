@@ -131,6 +131,11 @@ export function JiraIntegrationCard(): React.JSX.Element {
       }
     >
       <IntegrationCardDetails>
+        {jiraStatus.credentialError ? (
+          // Why shown here: an unreadable or un-imported sites file reads as "not connected" otherwise,
+          // and the user's next move is to connect a site, which hides the problem for good.
+          <p className="text-xs text-destructive">{jiraStatus.credentialError}</p>
+        ) : null}
         <UnsealedCredentialNotice
           protection={jiraStatus.credentialProtection ?? null}
           credentialName={translate(
@@ -212,7 +217,7 @@ export function JiraIntegrationCard(): React.JSX.Element {
                 </div>
               )
             })}
-            <p className="text-[11px] text-muted-foreground/70">
+            <p className="text-2xs text-muted-foreground/70">
               {translate(
                 'auto.components.settings.task.tracker.integration.cards.8c20e76308',
                 'Each connected Jira site has one token stored by the active runtime.'

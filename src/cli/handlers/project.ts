@@ -31,7 +31,10 @@ import {
   resolveHostFlagTarget
 } from '../execution-host-flag'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../flags'
-import { getOptionalWorktreeLayoutMode } from '../project-worktree-layout-flag'
+import {
+  confirmWorktreeLayoutApplied,
+  getOptionalWorktreeLayoutMode
+} from '../project-worktree-layout-flag'
 import { findProjectSetups, resolveProjectIdSelector } from '../project-selector'
 import { resolveRepoPathArgument } from '../repo-path-arguments'
 import { RuntimeClientError, type RuntimeRpcSuccess } from '../runtime-client'
@@ -182,6 +185,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
   },
   'project setup-create': async ({ flags, client, cwd, json }) => {
     const path = getOptionalStringFlag(flags, 'path')
+    const layoutMode = getOptionalWorktreeLayoutMode(flags)
     const args: ProjectHostSetupCreateArgs = {
       // Resolve SSH targets to reject nonexistent hosts; runtime metadata may precede provisioning.
       hostId: await getResolvedHostId(flags, client),
@@ -193,7 +197,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
       kind: getOptionalRepoKind(flags),
       displayName: getOptionalStringFlag(flags, 'display-name'),
       worktreeBasePath: getOptionalStringFlag(flags, 'worktree-base-path'),
-      worktreeLayoutMode: getOptionalWorktreeLayoutMode(flags),
+      worktreeLayoutMode: layoutMode,
       gitUsername: getOptionalStringFlag(flags, 'git-username'),
       setupState: getOptionalSetupState(flags),
       setupMethod: getOptionalIndependentSetupMethod(flags),
@@ -204,10 +208,12 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
       'projectHostSetup.create',
       args
     )
+    confirmWorktreeLayoutApplied(layoutMode, result.result.result)
     printResult(result, json, formatProjectHostSetupCreateResult)
   },
   'project setup-update': async ({ flags, client, cwd, json }) => {
     const path = getOptionalStringFlag(flags, 'path')
+    const layoutMode = getOptionalWorktreeLayoutMode(flags)
     const args: ProjectHostSetupUpdateArgs = {
       setupId: getRequiredStringFlag(flags, 'setup'),
       hostId: await getOptionalSetupHostId(flags, client),
@@ -218,7 +224,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
             ? undefined
             : resolveRepoPathArgument(path, cwd, client.isRemote, 'Project setup update'),
         worktreeBasePath: getOptionalStringFlag(flags, 'worktree-base-path'),
-        worktreeLayoutMode: getOptionalWorktreeLayoutMode(flags),
+        worktreeLayoutMode: layoutMode,
         gitUsername: getOptionalStringFlag(flags, 'git-username'),
         kind: getOptionalRepoKind(flags),
         setupState: getOptionalSetupState(flags),
@@ -230,6 +236,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
       'projectHostSetup.update',
       args
     )
+    confirmWorktreeLayoutApplied(layoutMode, result.result.result)
     printResult(result, json, formatProjectHostSetupUpdateResult)
   },
   'project setup-delete': async ({ flags, client, json }) => {

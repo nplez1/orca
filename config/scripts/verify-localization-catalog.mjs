@@ -9,8 +9,10 @@ import process from 'node:process'
 import ts from 'typescript-api'
 
 import {
+  collectCatalogTombstones,
   mergeCatalogs,
   readForkEnglishCatalog,
+  readForkLocaleCatalog,
   writeMissingEnglishEntries
 } from './fork-english-catalog.mjs'
 import { canonicalGenericRenderings } from './locale-generic-ui-terms.mjs'
@@ -277,6 +279,19 @@ function flattenCatalogEntries(value, prefix = '', entries = new Map()) {
 
 function getCatalogEntry(catalog, key) {
   return key.split('.').reduce((cursor, part) => cursor?.[part], catalog)
+}
+
+function reportStaleTombstones(overlay, upstreamCatalog, label) {
+  const stale = collectCatalogTombstones(overlay).filter(
+    (key) => getCatalogEntry(upstreamCatalog, key) === undefined
+  )
+  if (stale.length === 0) {
+    return 0
+  }
+  console.error(`${label} tombstones keys upstream no longer ships:`)
+  console.error(formatMissingKeys('stale', stale.slice(0, 20)))
+  console.error('Delete those entries; every tombstone must name a key upstream still ships.')
+  return 1
 }
 
 function setCatalogEntry(catalog, key, value) {
@@ -582,7 +597,11 @@ export async function main(
     return 1
   }
   // The fork's English strings live in an overlay merged over upstream's byte-identical en.json.
-  const catalog = mergeCatalogs(upstreamCatalog, await readForkEnglishCatalog(root))
+  const forkEnglishCatalog = await readForkEnglishCatalog(root)
+  if (reportStaleTombstones(forkEnglishCatalog, upstreamCatalog, 'en.json overlay') !== 0) {
+    return 1
+  }
+  const catalog = mergeCatalogs(upstreamCatalog, forkEnglishCatalog)
   const pluginCatalogs = options.pluginCatalogs ?? []
   if (pluginCatalogs.length > 0) {
     if (options.fix) {
@@ -666,11 +685,22 @@ export async function main(
   for (const fileName of localeFiles) {
     const localeName = fileName.replace(/\.json$/, '')
     const localeCatalogPath = path.join(localesDir, fileName)
-    const localeCatalog = await readCatalogFile(localeCatalogPath)
-    if (localeCatalog === undefined || reportDottedCatalogKeys(fileName, localeCatalog) !== 0) {
+    const upstreamLocaleCatalog = await readCatalogFile(localeCatalogPath)
+    if (
+      upstreamLocaleCatalog === undefined ||
+      reportDottedCatalogKeys(fileName, upstreamLocaleCatalog) !== 0
+    ) {
       return 1
     }
-    const exitCode = verifyLocaleCatalog(catalog, localeName, localeCatalog)
+    const forkLocaleCatalog = await readForkLocaleCatalog(root, localeName)
+    if (reportStaleTombstones(forkLocaleCatalog, upstreamLocaleCatalog, fileName) !== 0) {
+      return 1
+    }
+    const exitCode = verifyLocaleCatalog(
+      catalog,
+      localeName,
+      mergeCatalogs(upstreamLocaleCatalog, forkLocaleCatalog)
+    )
     if (exitCode !== 0) {
       console.error('')
       console.error('Fix or retire the existing target entry in a localization PR.')

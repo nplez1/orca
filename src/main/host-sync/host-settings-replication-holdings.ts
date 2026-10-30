@@ -12,13 +12,15 @@ import { getAppEnvironment } from '../../shared/app-environment'
  *   the main being asleep is the normal state of the machine this feature is for, and a host that
  *   forgot its revision would take a full snapshot on every reconnect.
  * - `mainFingerprint` is the first paired caller to send a snapshot. Without it, any paired desktop
- *   could push removals at a host configured by another one, and the two would fight.
+ *   could push removals at a host configured by another one, and the two would fight. `mainDeviceId`
+ *   is the same claim under the identity a re-pair keeps, so re-pairing that one device can move it.
  */
 export type HostSettingsReplicationRecord = {
   ids: string[]
   revision: number | null
   syncedAt: number | null
   mainFingerprint: string | null
+  mainDeviceId: string | null
 }
 
 export type HostSettingsReplicationHoldings = {
@@ -30,7 +32,8 @@ export const EMPTY_HOST_SETTINGS_REPLICATION_RECORD: HostSettingsReplicationReco
   ids: [],
   revision: null,
   syncedAt: null,
-  mainFingerprint: null
+  mainFingerprint: null,
+  mainDeviceId: null
 }
 
 /** In-memory, for a test and for a host whose app environment is not up yet. */
@@ -66,7 +69,8 @@ export function createFileHostSettingsReplicationHoldings(
           revision: typeof parsed?.revision === 'number' ? parsed.revision : null,
           syncedAt: typeof parsed?.syncedAt === 'number' ? parsed.syncedAt : null,
           mainFingerprint:
-            typeof parsed?.mainFingerprint === 'string' ? parsed.mainFingerprint : null
+            typeof parsed?.mainFingerprint === 'string' ? parsed.mainFingerprint : null,
+          mainDeviceId: typeof parsed?.mainDeviceId === 'string' ? parsed.mainDeviceId : null
         }
       } catch {
         // Why empty rather than throwing: a corrupt record costs one redundant snapshot, while a throw

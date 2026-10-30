@@ -7,6 +7,14 @@ import {
   jiraListTransitions
 } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+import {
+  describeJiraSideReadFailure,
+  EDIT_FIELDS_READ_FAILED,
+  PRIORITIES_READ_FAILED,
+  SPRINT_READ_FAILED,
+  TRANSITIONS_READ_FAILED,
+  USERS_READ_FAILED
+} from './jira-issue-side-read-error'
 import type {
   JiraEditableField,
   JiraPriority,
@@ -20,11 +28,17 @@ export type JiraIssueSideDataState = {
   transitionsLoading: boolean
   transitionsError: string | null
   priorities: JiraPriority[]
+  /** Why an error per read: an empty list and a failed read look identical on screen,
+   *  and "No users found" for a request nobody answered is a false claim. */
+  prioritiesError: string | null
   users: JiraUser[]
+  usersError: string | null
   /** Custom fields Jira allows this user to edit on the issue, with values. */
   editFields: JiraEditableField[]
   editFieldsLoading: boolean
+  editFieldsError: string | null
   sprintAssignment: JiraSprintAssignment | null
+  sprintAssignmentError: string | null
   reloadTransitions: () => Promise<void>
   reloadEditFields: () => Promise<void>
   reloadSprintAssignment: () => Promise<void>
@@ -34,14 +48,6 @@ export type JiraIssueSideDataState = {
   restoreSprintAssignment: (assignment: JiraSprintAssignment | null) => void
 }
 
-/** An assignment with no current sprint and nothing to move into reads as no control. */
-function offerableAssignment(assignment: JiraSprintAssignment | null): JiraSprintAssignment | null {
-  if (!assignment) {
-    return null
-  }
-  return assignment.sprint || assignment.sprints.length > 0 ? assignment : null
-}
-
 /** The assignment read for one issue, keyed so a switch cannot show the previous one's. */
 type SprintAssignmentState = {
   issueKey: string
@@ -49,9 +55,13 @@ type SprintAssignmentState = {
   assignment: JiraSprintAssignment | null
 }
 
+/** An assignment with no current sprint and nothing to move into reads as no control. */
+function offerable(assignment: JiraSprintAssignment | null): JiraSprintAssignment | null {
+  return assignment?.sprint || assignment?.sprints.length ? assignment : null
+}
+
 /** Transitions, priorities, assignable users, editable custom fields, and the sprint
- *  assignment for one Jira issue. Keyed on the issue key + site so a refresh of the
- *  same issue does not re-run these. */
+ *  assignment for one issue, keyed so a refresh of the same issue does not re-run them. */
 export function useJiraIssueSideData({
   providerSettings,
   issueKey,
@@ -69,9 +79,13 @@ export function useJiraIssueSideData({
   const [transitionsLoading, setTransitionsLoading] = useState(false)
   const [transitionsError, setTransitionsError] = useState<string | null>(null)
   const [priorities, setPriorities] = useState<JiraPriority[]>([])
+  const [prioritiesError, setPrioritiesError] = useState<string | null>(null)
   const [users, setUsers] = useState<JiraUser[]>([])
+  const [usersError, setUsersError] = useState<string | null>(null)
   const [editFields, setEditFields] = useState<JiraEditableField[]>([])
   const [editFieldsLoading, setEditFieldsLoading] = useState(false)
+  const [editFieldsError, setEditFieldsError] = useState<string | null>(null)
+  const [sprintAssignmentError, setSprintAssignmentError] = useState<string | null>(null)
   const [sprintState, setSprintState] = useState<SprintAssignmentState | null>(null)
   const requestIdRef = useRef(0)
   // Fences a reload against an in-flight initial read so a stale list cannot
@@ -79,14 +93,14 @@ export function useJiraIssueSideData({
   const transitionsReadIdRef = useRef(0)
   // Why a key ref rather than the request counter: a reload for the old issue
   // must be dropped without also discarding the new issue's in-flight load.
-  const editFieldsIssueKeyRef = useRef<string | null>(issueKey)
+  const issueKeyRef = useRef<string | null>(issueKey)
   // Why keyed on the issue: switching issues must not show the previous one's sprint,
   // and a read still in flight for it must not land on the new one.
   const sprintAssignment =
-    sprintState?.issueKey === issueKey ? offerableAssignment(sprintState.assignment) : null
+    sprintState?.issueKey === issueKey ? offerable(sprintState.assignment) : null
 
   useEffect(() => {
-    editFieldsIssueKeyRef.current = issueKey
+    issueKeyRef.current = issueKey
   }, [issueKey])
 
   useEffect(() => {
@@ -95,9 +109,13 @@ export function useJiraIssueSideData({
       setTransitionsLoading(false)
       setTransitionsError(null)
       setPriorities([])
+      setPrioritiesError(null)
       setUsers([])
+      setUsersError(null)
       setEditFields([])
       setEditFieldsLoading(false)
+      setEditFieldsError(null)
+      setSprintAssignmentError(null)
       setSprintState(null)
       return
     }
@@ -106,47 +124,70 @@ export function useJiraIssueSideData({
     // not land its transitions, loading flag or error on the issue now selected, so
     // each effect run claims its own read id rather than sharing the last one.
     const transitionsReadId = ++transitionsReadIdRef.current
+    const current = (): boolean => requestId === requestIdRef.current
     // Clear the previous issue's data so it cannot linger while the new read runs.
     setTransitions([])
     setTransitionsLoading(true)
     setTransitionsError(null)
     setPriorities([])
+    setPrioritiesError(null)
     setUsers([])
+    setUsersError(null)
     setEditFields([])
     setEditFieldsLoading(true)
+    setEditFieldsError(null)
+    setSprintAssignmentError(null)
     void Promise.all([
       jiraListTransitions(providerSettings, issueKey, issueSiteId).catch(
         (error): JiraTransition[] => {
-          if (
-            requestId === requestIdRef.current &&
-            transitionsReadId === transitionsReadIdRef.current
-          ) {
-            setTransitionsError(
-              error instanceof Error ? error.message : 'Failed to load status changes.'
-            )
+          if (current() && transitionsReadId === transitionsReadIdRef.current) {
+            setTransitionsError(describeJiraSideReadFailure(error, ...TRANSITIONS_READ_FAILED))
           }
           return []
         }
       ),
-      // Why the local catches: a priorities or assignable-users failure must not
-      // reject the whole Promise.all and silently blank the transitions list.
-      jiraListPriorities(providerSettings, issueSiteId).catch(() => []),
-      jiraListAssignableUsers(providerSettings, issueKey, undefined, issueSiteId).catch(() => []),
-      jiraListEditFields(providerSettings, issueKey, issueSiteId).catch(() => []),
-      // Why the local catch: sprint assignment is optional next to the fields above,
-      // so a read that fails must not blank them all.
+      // Why the strict reads and the named failures: a priorities, users or field
+      // read that fails is not the same answer as a site that offers none, and the
+      // surfaces below would otherwise say "none" for a request nobody answered.
+      jiraListPriorities(providerSettings, issueSiteId, true).catch((error): JiraPriority[] => {
+        if (current()) {
+          setPrioritiesError(describeJiraSideReadFailure(error, ...PRIORITIES_READ_FAILED))
+        }
+        return []
+      }),
+      jiraListAssignableUsers(providerSettings, issueKey, undefined, issueSiteId, true).catch(
+        (error): JiraUser[] => {
+          if (current()) {
+            setUsersError(describeJiraSideReadFailure(error, ...USERS_READ_FAILED))
+          }
+          return []
+        }
+      ),
+      jiraListEditFields(providerSettings, issueKey, issueSiteId, true).catch(
+        (error): JiraEditableField[] => {
+          if (current()) {
+            setEditFieldsError(describeJiraSideReadFailure(error, ...EDIT_FIELDS_READ_FAILED))
+          }
+          return []
+        }
+      ),
       sprintBoardId
         ? jiraGetIssueSprintAssignment(
             providerSettings,
             issueKey,
             issueSiteId,
             sprintBoardId
-          ).catch(() => null)
+          ).catch((error): JiraSprintAssignment | null => {
+            if (current()) {
+              setSprintAssignmentError(describeJiraSideReadFailure(error, ...SPRINT_READ_FAILED))
+            }
+            return null
+          })
         : Promise.resolve(null)
     ])
       .then(
         ([nextTransitions, nextPriorities, nextUsers, nextEditFields, nextSprintAssignment]) => {
-          if (requestId !== requestIdRef.current) {
+          if (!current()) {
             return
           }
           if (transitionsReadId === transitionsReadIdRef.current) {
@@ -161,7 +202,7 @@ export function useJiraIssueSideData({
       )
       .catch(() => {})
       .finally(() => {
-        if (requestId === requestIdRef.current) {
+        if (current()) {
           setEditFieldsLoading(false)
           if (transitionsReadId === transitionsReadIdRef.current) {
             setTransitionsLoading(false)
@@ -184,9 +225,7 @@ export function useJiraIssueSideData({
       }
     } catch (error) {
       if (readId === transitionsReadIdRef.current) {
-        setTransitionsError(
-          error instanceof Error ? error.message : 'Failed to load status changes.'
-        )
+        setTransitionsError(describeJiraSideReadFailure(error, ...TRANSITIONS_READ_FAILED))
       }
     } finally {
       if (readId === transitionsReadIdRef.current) {
@@ -200,11 +239,21 @@ export function useJiraIssueSideData({
       return
     }
     const requestedKey = issueKey
-    const next = await jiraListEditFields(providerSettings, requestedKey, issueSiteId).catch(
-      () => null
-    )
-    if (next && editFieldsIssueKeyRef.current === requestedKey) {
-      setEditFields(next)
+    setEditFieldsLoading(true)
+    setEditFieldsError(null)
+    try {
+      const next = await jiraListEditFields(providerSettings, requestedKey, issueSiteId, true)
+      if (issueKeyRef.current === requestedKey) {
+        setEditFields(next)
+      }
+    } catch (error) {
+      if (issueKeyRef.current === requestedKey) {
+        setEditFieldsError(describeJiraSideReadFailure(error, ...EDIT_FIELDS_READ_FAILED))
+      }
+    } finally {
+      if (issueKeyRef.current === requestedKey) {
+        setEditFieldsLoading(false)
+      }
     }
   }, [issueKey, issueSiteId, providerSettings])
 
@@ -213,31 +262,42 @@ export function useJiraIssueSideData({
       return
     }
     const requestedKey = issueKey
-    const next = await jiraGetIssueSprintAssignment(
-      providerSettings,
-      requestedKey,
-      issueSiteId,
-      sprintBoardId
-    ).catch(() => null)
-    // Why by key: a reload issued for one issue must not overwrite the next one's.
-    if (next) {
-      setSprintState((current) =>
-        current && current.issueKey !== requestedKey
-          ? current
-          : { issueKey: requestedKey, assignment: next }
+    try {
+      const next = await jiraGetIssueSprintAssignment(
+        providerSettings,
+        requestedKey,
+        issueSiteId,
+        sprintBoardId
       )
+      // Why by key: a reload issued for one issue must not overwrite the next one's.
+      // Why only a non-null answer: a host that cannot answer (no board method, or a
+      // failed read) must leave the assignment a rollback already put back.
+      if (next) {
+        setSprintState((currentState) =>
+          currentState && currentState.issueKey !== requestedKey
+            ? currentState
+            : { issueKey: requestedKey, assignment: next }
+        )
+      }
+      if (issueKeyRef.current === requestedKey && next) {
+        setSprintAssignmentError(null)
+      }
+    } catch (error) {
+      if (issueKeyRef.current === requestedKey) {
+        setSprintAssignmentError(describeJiraSideReadFailure(error, ...SPRINT_READ_FAILED))
+      }
     }
   }, [issueKey, issueSiteId, providerSettings, sprintBoardId])
 
   const selectSprint = useCallback(
     (sprintId: string | null): void => {
-      setSprintState((current) => {
-        if (!current || current.issueKey !== issueKey || !current.assignment) {
-          return current
+      setSprintState((currentState) => {
+        if (!currentState || currentState.issueKey !== issueKey || !currentState.assignment) {
+          return currentState
         }
-        const { assignment } = current
+        const { assignment } = currentState
         return {
-          issueKey: current.issueKey,
+          issueKey: currentState.issueKey,
           assignment: {
             ...assignment,
             sprint: assignment.sprints.find((sprint) => sprint.id === sprintId) ?? null
@@ -265,10 +325,14 @@ export function useJiraIssueSideData({
     transitionsLoading,
     transitionsError,
     priorities,
+    prioritiesError,
     users,
+    usersError,
     editFields,
     editFieldsLoading,
+    editFieldsError,
     sprintAssignment,
+    sprintAssignmentError,
     reloadTransitions,
     reloadEditFields,
     reloadSprintAssignment,

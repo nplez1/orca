@@ -6,6 +6,7 @@ import {
   removeEphemeralVmRuntime,
   upsertEphemeralVmRuntime
 } from '../../shared/ephemeral-vm-runtime-store'
+import { removeEphemeralVmProvisioningAttempt } from '../../shared/ephemeral-vm-provisioning-attempts'
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
 import {
   toEphemeralVmRuntimeContextMenuFields,
@@ -15,7 +16,7 @@ import {
 import type {
   ProvisionEphemeralVmRuntimeArgs,
   ProvisionEphemeralVmRuntimeResult
-} from './runtime-service'
+} from './runtime-provisioning'
 import { cleanupFailedEphemeralVmStart } from './failed-start-cleanup'
 
 export type EphemeralVmCompatibilityPersistence = {
@@ -86,6 +87,21 @@ export async function persistProvisionedEphemeralVmRuntime(
         )
       ) {
         removeEphemeralVmRuntime(args.userDataPath, compatibility.instanceId)
+      }
+      // Why the provisioning row goes with a successful destroy: that is the one case where nothing was
+      // left behind, and the row exists only to say otherwise. A failed destroy keeps it, along with the
+      // `cleanup_failed` record above it.
+      if (cleaned) {
+        try {
+          removeEphemeralVmProvisioningAttempt(
+            args.userDataPath,
+            start.context.instanceId ?? compatibility.instanceId
+          )
+        } catch {
+          // Why swallowed: this whole path runs because a write just failed, often for the same disk
+          // reason, and replacing the persistence error with a bookkeeping one would report the wrong
+          // failure. The machine was destroyed, so a leftover row only costs a startup warning.
+        }
       }
     }
     throw error

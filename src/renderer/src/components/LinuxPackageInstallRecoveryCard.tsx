@@ -159,7 +159,7 @@ export function LinuxPackageInstallRecoveryCard({
         label: translate('auto.components.UpdateCard.47126bcf57', 'Download Manually'),
         onClick: () => {
           setActionError(null)
-          void window.api.shell.openUrl(releaseUrl).catch((error: unknown) => {
+          void window.api.shell.openUrlInSystemBrowser(releaseUrl).catch((error: unknown) => {
             if (isCurrentRecovery()) {
               setActionError(toMessage(error))
             }

@@ -10,8 +10,21 @@ name: Fork release
 # is why it needs no GitHub App token: the workflow's own GITHUB_TOKEN can create
 # releases in its own repository.
 #
-# Tests and lint are deliberately not run here. They are the gate for a PR, not for a
-# build you intend to hand to someone; run `pnpm test` yourself when it matters.
+# Tests and lint are not run as a PR gate for this branch, but nothing publishes without the unit
+# suite: `unit-tests` below runs it on the dispatched commit, and the `macos` job waits for it. Before
+# 2026-10-29 the header here said the opposite — a dispatch from the Actions UI published to every
+# auto-updating install with no test evidence at all, because the local release gate's verdict lives in
+# `.git/orca-gate/` on one machine, which CI cannot see. To release without waiting for a full run
+# there is no flag: fix the red, or classify it in `local/nightly-linux-known-red.json` with evidence.
+#
+# What is also gated is the dispatch itself: the `release-ref` job refuses any ref but
+# `refs/heads/nplez1/main`, and any tag that already points at another commit.
+#
+# Why every `uses:` is pinned to a commit SHA with its tag in a trailing comment: these jobs hold
+# `contents: write` and, on macOS, the Apple certificate and notarisation secrets. The repository
+# allows `allowed_actions: all` with `sha_pinning_required: false`, so a moved tag would run new code
+# inside the signing job. `oven-sh/setup-bun` in `unit-tests.yml` is already pinned, so the standard
+# is the repository's own. Refresh a pin by re-reading the tag's commit and updating both halves.
 
 on:
   workflow_dispatch:
@@ -32,29 +45,97 @@ env:
   PUBLISH_OWNER: nplez1
 
 jobs:
+  # Why a job of its own: every leg publishes into the same release, so a dispatch from anywhere but
+  # the fork's release line, or into a tag that already points at a different commit, has to fail
+  # before the first artifact is built. `workflow_dispatch` accepts any ref, and the tag check used
+  # to be "the tag exists, upload into it".
+  release-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: package.json
+
+      - name: Require the fork's release branch and this commit's tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUFFIX: ${{ inputs.version_suffix }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          bash .github/scripts/fork-release-ref-guard.sh \
+            "$GITHUB_REF" "v${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}" "$GITHUB_SHA" "$PUBLISH_OWNER/orca"
+
+  # Why: the suite, on the exact commit being released, before a single artifact is built. It is the
+  # same reusable workflow, the same shard plan and the same fork shard verdict every other unit lane
+  # uses, so a red here means what it means on `fork-main-tests.yml` — and `local/nightly-linux-known-red.json`
+  # absorbs the Linux-only reds with evidence instead of being bypassed. ~12 min of wall clock on a
+  # public repository that bills nothing, once per release.
+  unit-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Why read-only: this job installs dependencies, which runs third-party composite actions and
+    # package lifecycle scripts. It needs nothing from the release token, so it does not get one —
+    # the same reasoning as the pins above.
+    permissions:
+      contents: read
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Shard plan
+        id: plan
+        run: node config/scripts/ci-unit-plan.mjs
+
+  unit-tests:
+    needs: [release-ref, unit-plan]
+    # Parity with `fork-main-tests.yml`: same Node major, same runner, same shard assignments, and
+    # the relay job dropped for the same reason — this fork provisions no `blacksmith-*` runner for
+    # it, and ships no cloud relay, so the job would queue forever rather than test anything.
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      node_versions: '["24"]'
+      runner: ubuntu-24.04-arm
+      shards: ${{ needs.unit-plan.outputs.shards }}
+      run_relay_integration: false
+
   macos:
+    needs: [release-ref, unit-tests]
     runs-on: macos-15
     steps:
       # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
       # and the default clone carries one commit and no tags. Deepening to the tag would not be
       # enough either — this fork rebases onto upstream, so the previous tag is not on HEAD's line.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
         with:
           install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
           cache: pnpm
 
       - name: Cache electron-builder downloads
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ~/Library/Caches/electron
@@ -127,8 +208,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
 
       # Why generated: the notes must say what changed, and a hand-maintained list goes stale. The
-      # script derives the summary from git and never exits non-zero, so a release can still be cut
-      # when history is unusable (see "Release notes" in RELEASE-RUNBOOK.md).
+      # script derives the summary from git and never exits non-zero, so the guard below — not the
+      # generator — decides whether this release has a summary (see "Release notes" in
+      # RELEASE-RUNBOOK.md).
       - name: Generate the release notes
         shell: bash
         env:
@@ -141,18 +223,11 @@ jobs:
             --repo "$PUBLISH_OWNER/orca" \
             --signing "$SIGNING" \
             --out /tmp/notes.md || true
-          # Why the check: an empty file is not the only failure — a missing file, a partially
-          # written body, or the generator's last-resort stub all publish a release with no change
-          # summary. Require the heading the generator always emits and a body long enough to be the
-          # whole template rather than a fragment; anything else gets the minimal body instead.
-          size=0
-          if [ -f /tmp/notes.md ]; then
-            size="$(wc -c </tmp/notes.md | tr -d '[:space:]')"
-          fi
-          if ! grep -q '^## What changed' /tmp/notes.md 2>/dev/null || [ "$size" -lt 400 ]; then
-            echo "::warning title=Release notes::The notes body is empty or incomplete; publishing a minimal body instead."
-            printf '**Orca NP %s**\n\nBuilt from `%s`.\n' "$RELEASE_VERSION" "$GITHUB_SHA" >/tmp/notes.md
-          fi
+          # Why this fails instead of substituting a minimal body: the runbook promises no release
+          # goes public without its change summary, and a minimal body published anyway is exactly
+          # the install-instructions-only release the generator was introduced to remove. Nothing
+          # is created at this point, so failing here leaves no draft, no tag and no assets behind.
+          node .github/scripts/fork-release-notes-guard.mjs /tmp/notes.md --label "the generated notes"
 
       # Why create the release up front, as a draft: electron-builder's publisher would otherwise
       # have two artifact legs race to create it, and the loser aborts the whole job with
@@ -162,7 +237,8 @@ jobs:
       # Why a draft: until the manifest check below passes, the release has assets a user can
       # download but no `latest-mac.yml`, so no installed build can update from it. A draft is
       # hidden from the releases list, so a run that dies in that window leaves nothing visible.
-      # It goes live at the end of the windows job, once every platform's manifest is up.
+      # It goes live at the end of the linux job, once every platform's manifest is up and the body
+      # has been re-checked for its change summary.
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -171,7 +247,9 @@ jobs:
           tag="v$RELEASE_VERSION"
 
           if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" >/dev/null 2>&1; then
-            echo "$tag already exists; uploading into it"
+            # Why this is not a second check: the release-ref job already refused a tag that points at
+            # any other commit, so reaching here means this tag is this SHA's.
+            echo "$tag already exists at $GITHUB_SHA; uploading into it"
           else
             gh release create "$tag" \
               --repo "$PUBLISH_OWNER/orca" \
@@ -245,21 +323,21 @@ jobs:
     needs: macos
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
         with:
           install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
           cache: pnpm
 
       - name: Cache electron-builder downloads
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ~\AppData\Local\electron\Cache
@@ -349,21 +427,21 @@ jobs:
     needs: windows
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
         with:
           install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: package.json
           cache: pnpm
 
       - name: Cache electron-builder downloads
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ~/.cache/electron
@@ -465,11 +543,19 @@ jobs:
       # Why here and not in an earlier job: every platform uploads into one release, and a release
       # that goes live before the last platform's manifest exists offers downloads that no installed
       # build can update from. Flipping it last makes "published" mean "complete".
+      #
+      # Why the body is checked again here: this is the step that makes the release public, and the
+      # body can change between generation and now — a re-dispatch appends into an existing release,
+      # and the runbook tells whoever reads the draft to edit a wrong body before it goes live. A
+      # failure leaves the release a draft, which no installed build can see.
       - name: Publish the release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release edit "v$RELEASE_VERSION" --repo "$PUBLISH_OWNER/orca" --draft=false
-          echo "published v$RELEASE_VERSION"
+          tag="v$RELEASE_VERSION"
+          gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json body --jq .body \
+            | node .github/scripts/fork-release-notes-guard.mjs - --site draft --label "the draft body of $tag"
+          gh release edit "$tag" --repo "$PUBLISH_OWNER/orca" --draft=false
+          echo "published $tag"

@@ -93,7 +93,7 @@ async function showRow(owner: RuntimeClientTarget) {
 
 it('opens the link once across status answers and shows signed in', async () => {
   const openUrl = vi.fn(async () => undefined)
-  Object.assign(window, { api: { shell: { openUrl } } })
+  Object.assign(window, { api: { shell: { openUrl, openUrlInSystemBrowser: openUrl } } })
   const owner = { kind: 'local' } as const
   publish(owner, null, 'signedOut')
   const view = await showRow(owner)
@@ -115,7 +115,7 @@ it('opens nothing for a Start the host answers after the row unmounts', async ()
   const start = Promise.withResolvers<{ flowId: string }>()
   fake.start = start.promise
   const openUrl = vi.fn(async () => undefined)
-  Object.assign(window, { api: { shell: { openUrl } } })
+  Object.assign(window, { api: { shell: { openUrl, openUrlInSystemBrowser: openUrl } } })
   const owner = { kind: 'environment', environmentId: 'unmounted' } as const
   const view = await showRow(owner)
   await userEvent.click(view.getByRole('button', { name: 'Sign in' }))

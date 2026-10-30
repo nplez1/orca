@@ -23,12 +23,8 @@ import {
   ledgerResolution,
   parseLedger
 } from './lib/conflict-classify.mjs'
-import {
-  deletionFor,
-  parseExpectedDeletions,
-  pendingDeletionPaths,
-  staleDeletions
-} from './lib/expected-deletions.mjs'
+import { deletionFor, pendingDeletionPaths } from './lib/expected-deletions.mjs'
+import { readDeletionManifestFromGit } from './lib/deletion-manifest-git.mjs'
 import { planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
 import { proveFile } from './lib/conflict-prove.mjs'
 import { proposeAll } from './lib/conflict-propose.mjs'
@@ -342,25 +338,17 @@ function attachExpectedDeletions(files, manifest) {
  * Checked against HEAD on read, because a manifest that still calls a restored file deleted would talk a
  * resolver into deleting it again — the stale paths are named in the note, and the note now reaches the
  * text report as well as `--json`, so a human sees them without asking for JSON. The note does not stop
- * `--apply`: a stale entry is a manifest to fix, not a resolution to trust.
+ * `--apply`: a stale entry is a manifest to fix, not a resolution to trust. An entry bound to an upstream
+ * blob that has since changed comes back as `pending-decision`, which `--apply` will not act on.
  */
-function loadExpectedDeletions() {
-  let text
+function loadExpectedDeletions(upstream = null) {
+  let text = null
   try {
     text = readFileSync(DELETIONS_URL, 'utf8')
   } catch {
-    return { entries: [], note: `no deletion manifest at ${DELETIONS_URL.pathname}` }
+    // readDeletionManifest reports a missing manifest as a note; nothing here needs to know why.
   }
-  const { entries, note } = parseExpectedDeletions(text)
-  const atHead = new Set(
-    (gitText(['ls-tree', '-r', '--name-only', 'HEAD']) ?? '').split('\n').filter(Boolean)
-  )
-  const stale = staleDeletions(entries, atHead)
-  const problems = [note]
-  if (stale.length > 0) {
-    problems.push(`manifest calls deleted but HEAD still has: ${stale.join('; ')}`)
-  }
-  return { entries, note: problems.filter(Boolean).join(' | ') || null }
+  return readDeletionManifestFromGit({ text, manifestPath: DELETIONS_URL.pathname, upstream })
 }
 
 /** Runs each proposal's git steps. Never commits: resolving the index is the point, not finishing. */
@@ -593,7 +581,9 @@ function main() {
       options.source === 'merge-tree' ? readMergeTree(options.base, options.other) : readLive()
     const ledger = loadLedger()
     attachLedger(result.files, ledger)
-    const manifest = loadExpectedDeletions()
+    const manifest = loadExpectedDeletions(
+      result.state?.kind === 'merge-tree' ? result.state.other : null
+    )
     attachExpectedDeletions(result.files, manifest)
     // Why in result.notes and not only in the JSON payload: headRows renders result.notes, so a stale
     // manifest went unreported in the text and --summary reports — the two a human actually reads.
@@ -613,7 +603,9 @@ function main() {
       for (const file of result.files) {
         file.proposal = null
       }
-      for (const proposal of proposeAll(result.files)) {
+      // A rebase swaps the merge sides, so a modify/delete reads the fork's deletion from the other stage.
+      const rebase = result.state?.kind === 'rebase'
+      for (const proposal of proposeAll(result.files, { rebase })) {
         const file = result.files.find((candidate) => candidate.path === proposal.path)
         if (file) {
           file.proposal = proposal
@@ -637,6 +629,20 @@ function main() {
       result.notes.push(
         `${settled.length} of ${result.files.length} conflicted path(s) carry a settled resolution; the rest are manual`
       )
+      // A verb that is present but refused looks exactly like no verb at all, so say which ones and why:
+      // `take-theirs` needs a file the fork left alone, `delete` needs a modify/delete the fork made.
+      const refused = result.files.filter(
+        (file) =>
+          !file.proposal &&
+          (file.ledger ?? []).some((entry) =>
+            ['take-theirs', 'delete'].includes(entry.resolution?.action)
+          )
+      )
+      if (refused.length > 0) {
+        result.notes.push(
+          `${refused.length} ledger verb(s) were not applied because applying them would discard fork work: ${refused.map((file) => file.path).join('; ')}`
+        )
+      }
       if (options.apply) {
         const outcome = applyProposals(settled.map((file) => file.proposal))
         result.notes.push(

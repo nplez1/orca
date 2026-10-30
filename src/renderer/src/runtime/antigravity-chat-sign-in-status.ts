@@ -90,7 +90,7 @@ function openStartedLinks(): void {
     if (local.opens && flow?.flowId === local.opens && flow.phase === 'waiting' && flow.url) {
       const { flowId } = flow
       local.opens = null
-      void window.api.shell.openUrl(flow.url).catch(() => {
+      void window.api.shell.openUrlInSystemBrowser(flow.url).catch(() => {
         if (flowOf(local.owner)?.flowId === flowId) {
           note(local, { openFailed: true })
         }

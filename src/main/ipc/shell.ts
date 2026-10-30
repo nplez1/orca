@@ -25,9 +25,13 @@ import {
 import {
   isLocallyOwned,
   pathExists,
-  resolveOwnedPathTarget,
-  validateLocalPathTarget
+  resolveDefaultAppOpenTarget,
+  resolveOwnedPathTarget
 } from './shell-owned-path-target'
+import {
+  registerContextualLinkRouterHandshake,
+  relayContextualLink
+} from '../window/contextual-link-relay'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
 
@@ -98,11 +102,23 @@ async function openInExternalEditor(
   }
 }
 
+/** Accepts web URLs only: OS handoff must never receive file:, javascript:, or a custom scheme. */
+function httpUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.toString() : null
+  } catch {
+    return null
+  }
+}
+
 async function openWithSystemDefault(pathValue: string, ownerHostId: unknown): Promise<boolean> {
   if (!isLocallyOwned(ownerHostId)) {
     return false
   }
-  const target = await validateLocalPathTarget(pathValue)
+  // Why not `validateLocalPathTarget`: this handler is reachable from a markdown link, so the file
+  // type decides whether the OS may execute it.
+  const target = await resolveDefaultAppOpenTarget(pathValue)
   if (!target.ok) {
     return false
   }
@@ -138,20 +154,30 @@ export function registerShellHandlers(
       openInExternalEditor(store, request, listRuntimeEnvironments)
   )
 
-  ipcMain.handle('shell:openUrl', (_event, rawUrl: string) => {
-    let parsed: URL
-    try {
-      parsed = new URL(rawUrl)
-    } catch {
-      return
-    }
+  registerContextualLinkRouterHandshake()
 
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      return
+  // Every in-app link open funnels here, so the user's link-routing preference decides the
+  // destination and a window without a router still falls back to the OS browser.
+  ipcMain.handle('shell:openUrl', (event, rawUrl: string): Promise<void> | undefined => {
+    const url = httpUrl(rawUrl)
+    if (!url) {
+      return undefined
     }
-
-    return shell.openExternal(parsed.toString())
+    if (relayContextualLink(event.sender, url)) {
+      return undefined
+    }
+    return shell.openExternal(url)
   })
+
+  // Explicit handoff to the OS browser: used by the "Open in System Browser" actions and by the
+  // router's own system-browser branch, which must not relay back into the router.
+  ipcMain.handle(
+    'shell:openUrlInSystemBrowser',
+    (_event, rawUrl: string): Promise<void> | undefined => {
+      const url = httpUrl(rawUrl)
+      return url ? shell.openExternal(url) : undefined
+    }
+  )
 
   ipcMain.handle(
     'shell:openFilePath',
@@ -185,12 +211,9 @@ export function registerShellHandlers(
       return
     }
 
-    const target = await validateLocalPathTarget(filePath)
-    if (!target.ok) {
-      return
-    }
-
-    await openWithSystemDefault(target.path, ownerHostId)
+    // Owner and file type are both decided inside; this handler is the markdown-link route, so
+    // nothing it forwards may be executable.
+    await openWithSystemDefault(filePath, ownerHostId)
   })
 
   ipcMain.handle('shell:pathsExist', async (_event, paths: string[]): Promise<boolean[]> => {

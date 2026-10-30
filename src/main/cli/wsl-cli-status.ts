@@ -1,8 +1,14 @@
 import type { CliInstallStatus } from '../../shared/cli-install-types'
 import { getBridgePathFromCommandPath, getPosixDirname } from './wsl-cli-scripts'
 import { quotePosixShellDoubleQuotedApostrophe } from '../../shared/shell-argument-quoting'
+import { CLI_COMMAND_NAME } from './cli-install-constants'
 
-const WSL_COMMAND_NAME = 'orca-ide'
+/**
+ * The command this build registers in the WSL guest. Why not upstream's `orca-ide`: an official
+ * Orca install registers that exact name and bridge path with an identical managed marker, so each
+ * launch saw the other's launcher as `stale` and took the command back.
+ */
+const WSL_COMMAND_NAME = CLI_COMMAND_NAME
 
 export type WslCliRunOptions = {
   /** Only the `$PATH` check needs it; everything else reads $HOME or absolute paths. */

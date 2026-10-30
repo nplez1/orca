@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import { SessionSummaryStore } from './session-summary-store'
 import { SessionSummaryService } from './session-summary-service'
 import type { SessionSummarySourceEvent } from './session-summary-fold'
+import { resetSessionSummaryFoldSlotsForTests } from './session-summary-fold-slots'
+
+afterEach(resetSessionSummaryFoldSlotsForTests)
 
 function events(count: number): SessionSummarySourceEvent[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -45,15 +48,27 @@ describe('SessionSummaryService re-opening the pane', () => {
     let reads = 0
     let currentEvents = events(4)
     let entryUpdatedAt = 0
+    let providerSessionId: string | null = 'pi-1'
     const service = new SessionSummaryService({
       store,
-      readEvents: async () => {
+      readEvents: async ({ fromEventIndex }) => {
         reads += 1
-        return currentEvents
+        return {
+          events: currentEvents.slice(fromEventIndex),
+          totalEvents: currentEvents.length
+        }
       },
       getAgentStatusEntry: () => ({
         agentType: 'pi',
-        providerSession: { key: 'session_id', id: 'pi-1', transcriptPath: '/tmp/pi-1.jsonl' },
+        ...(providerSessionId
+          ? {
+              providerSession: {
+                key: 'session_id',
+                id: providerSessionId,
+                transcriptPath: '/tmp/pi-1.jsonl'
+              }
+            }
+          : {}),
         updatedAt: entryUpdatedAt
       }),
       canReadTranscript: () => true,
@@ -75,6 +90,10 @@ describe('SessionSummaryService re-opening the pane', () => {
       /** Moves the row's own clock, which is what "the agent did something" means here. */
       setAgentUpdatedAt: (at: number) => {
         entryUpdatedAt = at
+      },
+      /** Drops the row, the way a pane re-opened in a new agent before it reports a session. */
+      clearAgentStatusEntry: () => {
+        providerSessionId = null
       },
       /** Ages the stored brief, so the freshness window can be exercised without waiting. */
       ageBrief: (byMs: number) => {
@@ -130,6 +149,23 @@ describe('SessionSummaryService re-opening the pane', () => {
 
     await waitFor(() => h.reads() > afterFirstFold)
     expect(h.reads()).toBe(afterFirstFold + 1)
+  })
+
+  // The pane outlives the conversation: one agent exits, another starts in the same terminal, and
+  // the cache is keyed by the pane. Until the new agent names its session, the stored brief cannot
+  // be attributed to it, so it must not be served as that agent's.
+  it('withholds a stored brief when the pane can no longer name its session', async () => {
+    const h = reopenHarness()
+    const afterFirstFold = await foldOnce(h)
+    h.setAgentUpdatedAt(NOW + 1_000)
+    h.clearAgentStatusEntry()
+
+    const reopened = h.service.open({ paneKey: 'tab:leaf', revalidateWithinMs: 5 * 60_000 })
+
+    // The stale brief used to win this branch and report itself ready for a session it never read.
+    expect(reopened.status).toBe('unavailable')
+    expect(reopened.ledger).toBeNull()
+    expect(h.reads()).toBe(afterFirstFold)
   })
 
   // The refresh button passes no window: it always folds — and stays cheap when nothing is new,

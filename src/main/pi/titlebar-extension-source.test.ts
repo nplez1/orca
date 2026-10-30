@@ -38,6 +38,8 @@ function createHarness(
     setTitle?: (title: string) => void
     globals?: Record<string | symbol, unknown>
     env?: Record<string, string>
+    /** Absent leaves `process.kill` undefined, which the owner probe reads as "cannot verify". */
+    killImpl?: (pid: number, signal: number) => void
   } = {}
 ): Harness {
   const titles: string[] = []
@@ -60,7 +62,7 @@ function createHarness(
     }
   }
 
-  const context = {
+  const context: Record<string, unknown> = {
     module,
     exports: module.exports,
     process: {
@@ -68,7 +70,8 @@ function createHarness(
       pid: options.env?.ORCA_PI_TITLE_MARKER_OWNED === undefined ? 111 : 222,
       title: options.processTitle ?? 'pi',
       argv: ['node', 'pi'],
-      cwd: options.cwdImpl ?? (() => CWD)
+      cwd: options.cwdImpl ?? (() => CWD),
+      ...(options.killImpl ? { kill: options.killImpl } : {})
     },
     console: { warn: vi.fn(), error: vi.fn(), log: vi.fn() },
     Promise,
@@ -77,7 +80,7 @@ function createHarness(
     clearInterval: (timer: ReturnType<typeof setInterval>) => clearInterval(timer),
     setTimeout: (...args: Parameters<typeof setTimeout>) => setTimeout(...args),
     clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer)
-  } as Record<string, unknown>
+  }
   context.globalThis = options.globals ?? context
 
   const output = ts.transpileModule(getPiTitlebarExtensionSource(options.kind ?? 'pi'), {
@@ -659,6 +662,57 @@ describe('getPiTitlebarExtensionSource', () => {
     await harness.callHook('agent_start')
     await harness.callHook('ui_prompt_start')
     await vi.advanceTimersByTimeAsync(1000)
+    expect(harness.titles).not.toContain(PROMPT_TITLE)
+    expect(harness.lastTitle()).toMatch(BRAILLE_RE)
+  })
+
+  it('claims the marker when the inherited owner pid is gone', async () => {
+    // Why: a pi started from an earlier pi's shell inherits a dead owner PID, and a marker that
+    // never paints also switches off the ask-card lane that gates on `π !` (#229).
+    const probed: number[] = []
+    const harness = createHarness({
+      env: { ORCA_PI_TITLE_MARKER_OWNED: '111' },
+      killImpl: (pid) => {
+        probed.push(pid)
+        throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' })
+      }
+    })
+
+    await harness.callHook('agent_start')
+    await harness.callHook('ui_prompt_start')
+
+    expect(probed).toContain(111)
+    expect(harness.lastTitle()).toBe(PROMPT_TITLE)
+  })
+
+  it('leaves the marker to a foreign owner it can prove is running', async () => {
+    const harness = createHarness({
+      env: { ORCA_PI_TITLE_MARKER_OWNED: '111' },
+      killImpl: () => {}
+    })
+
+    await harness.callHook('agent_start')
+    await harness.callHook('ui_prompt_start')
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(harness.titles).not.toContain(PROMPT_TITLE)
+    expect(harness.lastTitle()).toMatch(BRAILLE_RE)
+  })
+
+  it('keeps suppression for an owner it cannot prove dead', async () => {
+    // EPERM and an unreadable probe cannot prove the owner exited, exactly as the status lane treats
+    // them: claiming the pane here would double-report a live pi's dialog.
+    const harness = createHarness({
+      env: { ORCA_PI_TITLE_MARKER_OWNED: '111' },
+      killImpl: () => {
+        throw Object.assign(new Error('probe failed'), { code: 'EPERM' })
+      }
+    })
+
+    await harness.callHook('agent_start')
+    await harness.callHook('ui_prompt_start')
+    await vi.advanceTimersByTimeAsync(1000)
+
     expect(harness.titles).not.toContain(PROMPT_TITLE)
     expect(harness.lastTitle()).toMatch(BRAILLE_RE)
   })

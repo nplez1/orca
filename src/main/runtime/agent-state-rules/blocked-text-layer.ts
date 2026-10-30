@@ -12,7 +12,7 @@ import {
 // Any pane can contain another agent's dialog; the latest live blocker wins.
 
 const BUILT_IN_SENTINEL_RE =
-  /update available|choose working directory to|codex just got an upgrade|available\s*\u00B7|esc\s*skip|enter\s*confirm\s*\u00B7|enter\/esc\s*(?:continue|confirm)|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always/
+  /update available|choose working directory to|codex just got an upgrade|available\s*\u00B7|esc\s*skip|enter\s*confirm\s*\u00B7|enter\/esc\s*(?:continue|confirm)|hooks need review|do you trust|trust this|trusted workspace|trust (?:project|parent) folder|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always/
 
 /** Cheap negative test; identity remains stable until rules change for caller caches. */
 export const terminalWaitBlockedSentinelRe = compiledFromActiveAgentStateRules(
@@ -61,7 +61,10 @@ function findBlockedSignalInLiveWindow(normalized: string): BlockedTextSignal | 
   const trustIndex = Math.max(
     normalized.lastIndexOf('do you trust'),
     normalized.lastIndexOf('trust this'),
-    normalized.lastIndexOf('trusted workspace')
+    normalized.lastIndexOf('trusted workspace'),
+    // Why pi's wording: Pi-Bolt asks `Trust project folder?` and never uses the other three.
+    normalized.lastIndexOf('trust project folder'),
+    normalized.lastIndexOf('trust parent folder')
   )
   const trustSegment = trustIndex === -1 ? '' : normalized.slice(trustIndex)
   if (

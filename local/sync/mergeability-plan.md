@@ -263,7 +263,7 @@ Two candidate causes, both cheap to settle:
 - the plan job may be failing at parse/dependency time without creating a run.
 
 ```bash
-gh workflow run fork-main-tests.yml --repo nplez1/orca    # ~50 billed minutes
+gh workflow run fork-main-tests.yml --repo nplez1/orca    # 7 jobs, all billable 0 on a public repo
 gh run list --workflow fork-main-tests.yml -L 3
 ```
 

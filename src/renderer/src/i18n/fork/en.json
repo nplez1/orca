@@ -1,112 +1,912 @@
 {
-  "settings": {
-    "appearance": {
-      "statusBar": {
-        "deepseekToggleDescription": "Show DeepSeek account balance in the status bar.",
-        "fireworksToggleDescription": "Show Fireworks.ai rated spend in the status bar.",
-        "deepseekLabel": "DeepSeek Balance",
-        "fireworksLabel": "Fireworks.ai Spend",
-        "copilotToggleDescription": "Show GitHub Copilot AI credit usage in the status bar.",
-        "copilotLabel": "GitHub Copilot Usage"
-      },
-      "search": {
-        "deepseekTitle": "DeepSeek Balance",
-        "deepseekDescription": "Show your DeepSeek account balance in the status bar.",
-        "deepseekKeyword": "deepseek",
-        "balanceKeyword": "balance",
-        "creditsKeyword": "credits",
-        "cnyKeyword": "cny",
-        "fireworksTitle": "Fireworks.ai Spend",
-        "fireworksDescription": "Show your Fireworks.ai rated spend in the status bar.",
-        "fireworksKeyword": "fireworks",
-        "fireworksAiKeyword": "fireworks.ai",
-        "spendKeyword": "spend",
-        "copilotTitle": "GitHub Copilot Usage",
-        "copilotDescription": "Show your GitHub Copilot AI credit usage in the status bar.",
-        "copilotKeyword": "copilot",
-        "githubKeyword": "github",
-        "aiCreditsKeyword": "ai credits",
-        "tokenKeyword": "token"
-      }
-    },
-    "accounts": {
-      "search": {
-        "copilotTitle": "GitHub Copilot Usage",
-        "copilotDescription": "Track GitHub Copilot AI credit usage for your enterprise through your GitHub CLI sign-in, or a GitHub token with enterprise billing read. The enterprise slug is detected for you.",
-        "copilotKeyword": "copilot",
-        "githubKeyword": "github",
-        "aiCreditsKeyword": "ai credits",
-        "tokenKeyword": "token"
-      }
-    },
-    "aiGeneration": {
-      "noEffortForModel": "This model has no effort setting."
-    },
-    "sessionSummaryAi": {
-      "title": "Session summaries",
-      "description": "The agent and model that summarize a session in the Summary tab. A fold runs only while that tab is open, reads only what was added since the last fold, and its result is cached.",
-      "keyword": {
-        "summary": "summary",
-        "agent": "agent",
-        "model": "model",
-        "transcript": "transcript"
-      },
-      "discovering": "Discovering models…",
-      "modelsUnavailable": "Couldn't list this agent's models — using its built-in list.",
-      "refreshModels": "Refresh models"
-    },
-    "agents": {
-      "undetectedDefaultHint": "Install one, then Refresh: an agent needs to be detected on this host before a new tab can launch it as your default."
+  "activity": {
+    "sessionSummary": {
+      "asOf": "(as of #{{index}})",
+      "backlogHint": "{{count}} events to catch up on",
+      "blockers": "Blockers",
+      "decisions": "Decisions",
+      "done": "Done",
+      "factCount": "{{count}} facts · whole session",
+      "factCountSince": "{{count}} since your last message",
+      "failed": "Could not summarize this session.",
+      "failedHint": "Could not summarize this session",
+      "hostOutdated": "This host runs an older Orca. Update Orca there to summarize its sessions.",
+      "hostOutdatedHint": "Update Orca on this host to summarize",
+      "label": "Session summary",
+      "ledger": "Ledger",
+      "noTranscriptHint": "No readable transcript",
+      "notFocused": "Focus an agent session to see its summary.",
+      "nothingSince": "Nothing has happened since your last message.",
+      "nothingYet": "Nothing notable in this session yet.",
+      "now": "Now",
+      "plan": "Plan",
+      "refresh": "Refresh summary",
+      "showFullSession": "Show the full session",
+      "showSince": "Show since your last message",
+      "stale": "Couldn't refresh — showing the last summary.",
+      "staleHint": "Couldn't refresh — showing the last summary",
+      "timeline": "Timeline",
+      "timelineCount": "{{count}} events · whole session",
+      "timelineCountSince": "{{count}} events since your last message",
+      "unavailable": "No readable transcript for this session yet.",
+      "unavailableInWindow": "Session summaries are not available in this window.",
+      "unsupportedHost": "Session summaries are not available for a workspace on this host.",
+      "unsupportedHostHint": "Session summaries are not available on this host",
+      "upToDate": "Up to date",
+      "updating": "Updating…"
     }
   },
   "auto": {
-    "web": {
-      "web": {
-        "preload": {
-          "api": {
+    "App": {
+      "5096cbbc86": null
+    },
+    "components": {
+      "GitHubItemDialog": {
+        "ddafe851e1": null,
+        "e463ec935f": null
+      },
+      "JiraIssueStoryPointsControl": {
+        "cancel": "Cancel",
+        "clearHint": "An empty value clears the field.",
+        "current": "Story points: {{value0}}",
+        "invalid": "Enter a number.",
+        "label": "Story points",
+        "none": "No points",
+        "save": "Save",
+        "value": "Points: {{value0}}"
+      },
+      "JiraIssueWorkspace": {
+        "anotherUpdatePending": "Another Jira update is still in progress.",
+        "editFields": "Edit fields",
+        "editFieldsDescription": "Custom fields Jira allows you to change on {{value0}}.",
+        "editFieldsEmpty": "Jira reports no editable custom fields on this issue.",
+        "editFieldsSaving": "Saving…",
+        "editFieldsTitle": "Edit Jira fields",
+        "failedToLoadComments": "Failed to load comments.",
+        "noIssueSelected": "No Jira issue is selected.",
+        "retryEditFields": "Retry",
+        "showWorkspace": "Show workspace"
+      },
+      "JiraSprintPicker": {
+        "active": "Active",
+        "addToSprint": "+ Sprint",
+        "backlog": "Backlog",
+        "findSprint": "Find a sprint…",
+        "future": "Future",
+        "noSprintMatch": "No sprint matches.",
+        "sprint": "Sprint"
+      },
+      "LinearItemDrawer": {
+        "e6cd6f6d3e": "Estimate"
+      },
+      "NewWorkspaceComposerCard": {
+        "pickAnotherHost": "This workspace already lives on that host. Pick another one to copy this branch there.",
+        "test": {
+          "fixture": {}
+        }
+      },
+      "PullRequestPage": {
+        "18f2af42ac": null,
+        "5963a6a852": null
+      },
+      "TaskPage": {
+        "16d73d88ad": "Backlog",
+        "jiraAllFilter": "All",
+        "jiraBacklogCount": "Backlog · {{value0}} issues",
+        "jiraBacklogEmpty": "No backlog issues match this filter.",
+        "jiraBacklogLoadedCount": "{{value0}} loaded",
+        "jiraBacklogPageEmpty": "No matching issues in this page. Load more to continue searching the backlog.",
+        "jiraBoardAlreadyInColumn": "{{value0}} is already in {{value1}}.",
+        "jiraBoardHasNoSprints": "This board does not use sprints; showing its board-filter backlog.",
+        "jiraBoardIssueFilterLabel": "Filter board issues",
+        "jiraBoardIssueFilterPlaceholder": "Filter issues by key, summary, or assignee",
+        "jiraBoardIssueMoving": "{{value0}} is still moving.",
+        "jiraBoardLoading": "Loading…",
+        "jiraBoardLoadingMore": "Loading…",
+        "jiraBoardNoSprintDescription": "No active sprint · board-filter backlog",
+        "jiraBoardRequiresNewRuntime": "This Jira runtime does not support board views. Showing the issue list instead.",
+        "jiraBoardSprintLoading": "Loading sprint details from the board",
+        "jiraBoardStatusColumns": "Status columns · active sprint only",
+        "jiraBoardUpdateFailed": "Jira board update failed.",
+        "jiraBoardView": "Jira board",
+        "jiraBoardViews": "Jira board views",
+        "jiraCardStoryPoints": "{{value0}}sp",
+        "jiraCardStoryPointsLabel": "{{value0}} story points",
+        "jiraCardStoryPointsTitle": "Story points",
+        "jiraChooseOtherStatusTransition": "{{value0}} does not sit in a board column. Choose the status change to apply.",
+        "jiraChooseTransition": "Choose a status change",
+        "jiraChooseTransitionDescription": "More than one Jira transition can move {{value0}} to that column. Choose one to continue.",
+        "jiraCurrentSprint": "Current sprint",
+        "jiraFilterGroupLabel": "Filter Jira issues",
+        "jiraFilterLabel": "Filter",
+        "jiraIssueListView": "Issue list",
+        "jiraIssueMoved": "{{value0}} moved to {{value1}}",
+        "jiraLoadMoreBacklog": "Load more backlog issues",
+        "jiraLoadMoreSprint": "Load more sprint issues",
+        "jiraMeFilter": "Me",
+        "jiraNoActiveSprint": "This board has no active sprint; showing its backlog.",
+        "jiraNoAvailableTransitions": "Jira lists no available transitions for {{value0}}; the issue may be closed or you may lack permission.",
+        "jiraNoOtherStatusTransition": "Jira has no move from {{value0}} to a status outside the board columns.",
+        "jiraNoPendingTransition": "No transition is pending.",
+        "jiraNoStatusTransitionAvailable": "Jira cannot move {{value0}} to {{value1}}. Available moves: {{value2}}.",
+        "jiraOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
+        "jiraReturnToBoard": "Return to board",
+        "jiraShowWorkspace": "Show workspace",
+        "jiraSprintAssigned": "{{value0}} moved to {{value1}}",
+        "jiraSprintEmpty": "No issues match this filter in the active sprint.",
+        "jiraSprintView": "Sprint",
+        "jiraTaskSettings": "Jira task settings",
+        "jiraTransitionFieldsDescription": "Jira requires these fields before it will apply the {{value0}} transition.",
+        "jiraTransitionFieldsTitle": "Update fields to move {{value0}}",
+        "jiraUnassignedFilter": "Unassigned"
+      },
+      "activity": {
+        "ActivityPrototypePage": {
+          "test": {
+            "fixtures": {}
+          }
+        }
+      },
+      "automations": {
+        "automations": {
+          "page": {
+            "fixtures": {},
             "test": {
               "harness": {}
             }
           }
         }
       },
-      "pairingSecurity": {}
-    },
-    "store": {
-      "slices": {
-        "github": {
-          "slice": {
-            "test": {
-              "harness": {}
-            }
-          }
-        },
-        "worktrees": {
-          "metadata": {
-            "worktree": {
-              "rename": {
-                "across": {
-                  "hosts": {
-                    "3b80b33a5a": "Renamed on every other host, but {{hosts}} did not take the new name."
+      "browser": {
+        "pane": {
+          "BrowserPane": {},
+          "stream": {
+            "remote": {
+              "remote": {
+                "browser": {
+                  "stream": {
+                    "lifecycle": {
+                      "test": {
+                        "harness": {}
+                      }
+                    }
                   }
                 }
               }
             }
+          }
+        }
+      },
+      "comment": {
+        "composer": {
+          "20fc7f3d3d": "Code",
+          "564c4d0787": "List",
+          "705066a871": "Italic",
+          "96d2a26262": "Quote",
+          "f3e93f1b3a": "Bold"
+        }
+      },
+      "crash": {
+        "report": {
+          "CrashReportDialog": {
+            "835037edc9": null
+          }
+        }
+      },
+      "floating": {
+        "terminal": {
+          "floating": {
+            "terminal": {
+              "panel": {
+                "test": {
+                  "fixtures": {}
+                }
+              }
+            }
+          }
+        }
+      },
+      "github": {
+        "pr": {
+          "admin": {
+            "bypass": {
+              "cef3455aa7": "GitHub has requested changes on this pull request. Merging will ask you to bypass the rule with your admin privileges.",
+              "confirmation": {
+                "1859e45dbc": "Bypass branch protection?",
+                "28c23a473f": "Merge anyway",
+                "3db0f1be2f": "This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges."
+              },
+              "d3d99c95fa": "GitHub requires an approving review before this pull request can merge. Merging will ask you to bypass the rule with your admin privileges."
+            }
+          }
+        }
+      },
+      "hosted": {
+        "review": {
+          "merge": {
+            "readiness": {
+              "approvalRequired": "Approval required",
+              "behind": "Behind base",
+              "blocked": "Blocked",
+              "changesRequested": "Changes requested",
+              "checking": "Checking",
+              "conflicts": "Conflicts",
+              "mergeQueue": "Merge queue",
+              "ready": "Ready to merge",
+              "unresolvedThreads": "Unresolved threads"
+            }
+          }
+        }
+      },
+      "link": {
+        "actions": {
+          "copied": "Copied",
+          "copyLink": "Copy Link",
+          "openInOrcaBrowser": "Open in Orca Browser",
+          "openInSystemBrowser": "Open in System Browser"
+        },
+        "routing": {
+          "preference": {
+            "dialog": {
+              "badge": "Links",
+              "description": "Use Orca's browser for links anywhere in the app, or keep your system browser.",
+              "keep": {
+                "title": "Keep links in Orca's browser?"
+              },
+              "title": "Open links in Orca's browser?"
+            }
+          }
+        }
+      },
+      "mobile": {
+        "slides": {
+          "HomeSlide": {
+            "5d94e8ddcc": null
+          }
+        }
+      },
+      "native": {
+        "chat": {
+          "NativeChatStructuredSession": {}
+        }
+      },
+      "onboarding": {
+        "OnboardingFlow": {
+          "a249f81538": null
+        }
+      },
+      "pr": {
+        "comment": {
+          "inline": {
+            "PRCommentThreadCard": {
+              "2002706ed8": "Hide thread",
+              "21e296c94d": "Show {{value0}} {{value1}}",
+              "27eb8f6ea9": "Resolved",
+              "3868fce1a3": "Replies are unavailable here.",
+              "3b01798961": "Resolve thread",
+              "90e6e6fd21": "Reply to this thread",
+              "b1daf89414": "Hide {{value0}} {{value1}}",
+              "b50141162f": "Unresolve thread",
+              "be8d2e8f48": "Reply",
+              "dfcd8f7f21": "bot",
+              "e2be68390f": "Open on GitHub"
+            },
+            "usePRCommentInlineDecorator": {
+              "c3b537227a": "Replies are unavailable here."
+            }
+          }
+        }
+      },
+      "right": {
+        "sidebar": {
+          "AiVaultPanelControls": {
+            "hiddenSubagentSessions": "{{value0}} subagent sessions hidden (parent not loaded)",
+            "noEnabledAgents": "No agents enabled in Settings",
+            "showSubagentSessions": "Show subagent sessions"
           },
-          "slice": {
-            "test": {
-              "fixtures": {}
+          "AiVaultScanProgressStrip": {},
+          "AiVaultSessionRow": {
+            "subagentSession_one": "{{count}} subagent session",
+            "subagentSession_other": "{{count}} subagent sessions"
+          },
+          "ChecksPanel": {
+            "430f1a62d4": null,
+            "495b2f8c4b": "Started the agent, but could not reply on the selected comments.",
+            "5eb2163b6b": "Review the prompt before starting an agent. After the prompt is delivered, Orca replies to comments it cannot resolve on the host and leaves every thread open for you to close.",
+            "7e4b2a19c0": "Could not identify the GitHub PR to reply on.",
+            "aa95b81a3a": "Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.",
+            "d00ebdc402": "Fix {{value0}} Comments With AI",
+            "f273f2271c": "Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.{{value3}}"
+          },
+          "FileExplorer": {
+            "filterScannedPartialWorkspace": "Only part of this workspace was searched — add more of the name to narrow it down",
+            "filterShowingFirstMatches": "Showing the first {{value0}} of {{value1}} matches — add more of the name to narrow it down"
+          },
+          "FileExplorerNameFilter": {
+            "indexing": "Indexing files…",
+            "liveScanComplete": "Complete results from a full scan — the file index is still building",
+            "projectionBudget": "The filtered file list is too large to display — add more of the name to narrow it down",
+            "projectionFailed": "Could not build the filtered file list",
+            "searching": "Searching files…",
+            "updateFailed": "File search is unavailable — showing previous results when available",
+            "updating": "Updating file list"
+          },
+          "IssueAssignee": {
+            "assignees": "Assignees",
+            "label": "Assignee",
+            "noResults": "No people found",
+            "search": "Search people",
+            "searching": "Searching…",
+            "unassigned": "Unassigned",
+            "you": "You"
+          },
+          "IssueComments": {
+            "empty": "No comments yet.",
+            "retry": "Retry",
+            "title": "Comments",
+            "unknownAuthor": "Unknown"
+          },
+          "IssuePane": {
+            "editableFields": "{{value0}} editable",
+            "fields": "Fields",
+            "filterLabels": "Filter labels",
+            "folderWorkspaceLink": "A folder workspace keeps the issue it was created from.",
+            "labels": "Labels",
+            "linkAnotherIssue": "Link another issue",
+            "moreActions": "More issue actions",
+            "noDescription": "No description provided.",
+            "noEditableFields": "None editable",
+            "noIssue": "No issue is linked to this workspace.",
+            "noLabels": "None",
+            "noLabelsFound": "No labels found",
+            "openIn": "Open on {{value0}}",
+            "priority": "Priority",
+            "providerGithub": "GitHub",
+            "providerGitlab": "GitLab",
+            "providerJira": "Jira",
+            "providerLinear": "Linear",
+            "refresh": "Refresh issue",
+            "repoOffDevice": "The repo this {{value0}} issue lives in isn't set up on this device.",
+            "retry": "Retry",
+            "save": "Save",
+            "status": "Status",
+            "title": "Issue title",
+            "unavailable": "Couldn't load this {{value0}} issue.",
+            "unlinkIssue": "Unlink issue from workspace",
+            "unlinkIssueDescription": "Orca will hide {{value0}} from this workspace. The issue on {{value1}} won’t be changed."
+          },
+          "SourceControlAgentActionDialogForm": {},
+          "checks": {
+            "panel": {
+              "comment": {
+                "controls": {
+                  "3dd06603e1": "Show in code"
+                },
+                "row": {
+                  "5cca1251df": "Show in code"
+                }
+              },
+              "comments": {
+                "list": {
+                  "38a6c0254e": "Hide comments in code",
+                  "6b9c7f83c4": "Comments are not shown in code because they do not belong to the commit that is checked out.",
+                  "a2a5fb7686": "Show comments in code",
+                  "a8502d9752": "(comments fetched at)",
+                  "c0227ee68e": "(checked out)"
+                }
+              },
+              "content": {},
+              "review": {
+                "verdicts": {
+                  "0bf5a253a984": "Changes requested",
+                  "35c764378830": "Reviewed",
+                  "3aa4a3edaf3c": "Pending",
+                  "47c8e272bfb7": "Review verdicts",
+                  "543f808ca47b": "Approved",
+                  "c040f814f131": "Commented",
+                  "c9f1d84c1d34": "Dismissed"
+                }
+              }
+            }
+          },
+          "fileExplorerOperationOwner": {
+            "listUnavailable": "Files are unavailable for this workspace — check the connection and try again."
+          },
+          "index": {
+            "issue": "Issue"
+          }
+        }
+      },
+      "settings": {
+        "AccountsPane": {
+          "0c64dc2a64": "Gemini",
+          "aa4de4475b": "Gemini CLI (legacy)"
+        },
+        "AdvancedPane": {
+          "9b1f52e764": "Extra logging for troubleshooting Orca itself.",
+          "c22adcc7c5": "Debug Options"
+        },
+        "AgentSessionSearchSection": {
+          "allHistory": "All history",
+          "contentDescription": "Indexes session titles, working directories, branches, and message text from transcripts on this machine. When off, search covers titles and paths but not conversation contents.",
+          "contentTitle": "Index conversation content",
+          "description": "Search your local agent sessions by title, project, and conversation content.",
+          "lastDays": "Last {{value0}} days",
+          "retentionDescription": "How far back to index transcripts. All history indexes every transcript the scan can find.",
+          "retentionTitle": "History range",
+          "title": "Session History Search"
+        },
+        "BrowserDefaultZoomSetting": {},
+        "BrowserLinkRoutingBackgroundSetting": {
+          "description": "Links join the browser without taking focus from where you clicked."
+        },
+        "BrowserLinkRoutingSetting": {
+          "description": "Open http(s) links in Orca's built-in browser — from anywhere in the app. {{shortcut}} always uses your system browser.",
+          "descriptionBase": "Open http(s) links in Orca's built-in browser — from anywhere in the app.",
+          "destinationAriaLabel": "Default link destination",
+          "inAppOption": "In-App Browser",
+          "systemOption": "System Browser"
+        },
+        "BrowserTerminalLinkActionsSetting": {},
+        "EphemeralVmRuntimesSection": {
+          "extendLifetime": "Extend lifetime",
+          "extendTo": "Extend to {{value0}}",
+          "extending": "Extending…",
+          "leaseExpired": "Lease expired {{value0}}. The provider can remove this host at any time, including while Orca is offline.",
+          "leaseExtended": "Lease extended.",
+          "leaseExtendedUntil": "Lease extended to {{value0}}.",
+          "leaseProvider": "Provider: {{value0}}",
+          "leaseRemaining": "{{value0}} left",
+          "providerDeadline": "Provider deadline {{value0}}",
+          "reclaimedHost": "Released from Orca on {{value0}}: this host stopped answering after its provider deadline, so its workspace rows were removed. The provider still owns the resource — Cleanup releases it now."
+        },
+        "ExperimentalPane": {
+          "agentDashboard": {
+            "clickAriaLabel": "Agent Dashboard card click action",
+            "clickCopy": "Open the agent's workspace, or show the live terminal preview first.",
+            "clickLabel": "Clicking a card",
+            "clickPreview": "Preview",
+            "clickWorkspace": "Open workspace",
+            "description": "Kanban board for monitoring agents across worktrees as a full view in the main area.",
+            "modeAriaLabel": null,
+            "modeCopy": null,
+            "modeInWindow": null,
+            "modeLabel": null,
+            "modePopout": null
+          },
+          "nativeChat": {}
+        },
+        "FloatingWorkspacePane": {
+          "81afb79785": "New floating terminals and agents start here. Floating markdown notes always live in the floating-workspace folder, next to its AGENTS.md instructions.",
+          "revealFailed": "Could not open the floating workspace folder."
+        },
+        "GeneralEditorSettingsSection": {
+          "34155c6ed5": "Draw each review thread below its commented line, with reply and resolve controls. When off, the thread stays reachable from a small marker in the gutter.",
+          "7fea4145c9": "Show GitHub review threads on the lines they were left on in the code.",
+          "9c020a16db": "PR Comments Inline"
+        },
+        "GeneralWorkspaceSettingsSection": {
+          "0cda18153c": "Where each project's main checkout and its workspaces are created.",
+          "9285cedcf2": "Flat",
+          "b266f3f40e": "One folder per project",
+          "deleteRemoteBranchOnWorkspaceDelete": "Delete Remote Branch By Default",
+          "deleteRemoteBranchOnWorkspaceDeleteDescription": "Pre-check the remote-branch option in the delete-workspace dialog. The branch is always kept when its local copy is kept.",
+          "deleteRemoteBranchOnWorkspaceDeleteRowDescription": "Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone.",
+          "f9b2070017": "Workspace Layout"
+        },
+        "JiraBoardSettings": {
+          "chooseBoard": "Choose a board",
+          "defaultBoard": "Default board",
+          "defaultBoardHelp": "The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter. Search to find a board on a Jira site with many.",
+          "description": "Choose the default Jira board shown in Tasks.",
+          "loadingBoards": "Loading boards...",
+          "noBoardsForSearch": "Jira returned no boards matching this search.",
+          "noBoardsMatch": "No boards match this search.",
+          "noBoardsReturned": "Jira returned no boards for this site. Check that the account can see a board.",
+          "retry": "Retry",
+          "searchBoards": "Search boards by name...",
+          "title": "Jira board view",
+          "unnamedBoard": "Board {{value0}}",
+          "useListView": "No default board (use issue list)"
+        },
+        "MobilePairingConnectionOptions": {},
+        "NativeChatSupportedAgents": {},
+        "OpenAiTranscriptionKeyDialog": {
+          "d246b2bdb3": "Local runtime keys are stored in ~/.orca-np using Electron encrypted storage when available."
+        },
+        "ProviderUsageEnableSwitch": {
+          "8e832829e7": "Let Orca query {{value0}}",
+          "e3340ac4e1": "When off, Orca never asks {{value0}} for usage and never reads its sign-in from software installed on this computer.",
+          "e9b8e0fc2e": "{{value0}} is off. Orca will not query it or read its sign-in from software installed on this computer."
+        },
+        "ShortcutsPane": {
+          "d8c988dab4": "~/.orca-np/keybindings.json"
+        },
+        "SshPane": {
+          "hostHidden": "{{value0}} is hidden from host lists",
+          "hostUnhidden": "{{value0}} is available again",
+          "hostVisibilityFailed": "Failed to update host visibility"
+        },
+        "SshTargetCard": {
+          "hiddenBadge": "Hidden"
+        },
+        "SshTargetDestructiveActions": {},
+        "SshTargetForm": {},
+        "SshTargetList": {
+          "hiddenSection": "Hidden ({{value0}})",
+          "hiddenSectionHint": "These hosts come from your SSH config. They stay out of the lists where you pick a host, but anything already running on them keeps working."
+        },
+        "SshTargetVisibilityToggle": {
+          "hide": "Hide host",
+          "unhide": "Unhide host"
+        },
+        "UiHangDiagnosticsSetting": {
+          "2b5bd8a767": "Local log writes are disabled by policy (CI or ORCA_DIAGNOSTICS_DISABLED).",
+          "38d00b7a2e": "Off by default. Records UI-thread stalls and window freezes so you can share them when reporting a hang.",
+          "7879895603": "Log UI hangs",
+          "9fa69c4cae": "Written while logging is on.",
+          "e19f83d807": "Log file"
+        },
+        "WorktreeSymlinksSection": {
+          "sharedDirectoriesApfsCopy": "APFS clone, then copy",
+          "sharedDirectoriesApfsOnly": "APFS clone only (skip if unavailable)",
+          "sharedDirectoriesApfsSymlink": "APFS clone, then symlink",
+          "sharedDirectoriesModeDescription": "APFS clones and copies are independent per worktree. Symlinks share changes with the primary checkout. Copy fallback has no size or entry-count cap and can be slow or use substantial disk space. SSH worktrees do not materialize sharedDirectories yet.",
+          "sharedDirectoriesModeLabel": "orca.yaml sharedDirectories behavior",
+          "sharedDirectoriesSymlink": "Symlink (current behavior)"
+        },
+        "accounts": {
+          "pane": {
+            "copilot": {
+              "actions": {
+                "1d08d465f5": "GitHub Copilot credentials saved.",
+                "41c1907a73": "GitHub Copilot credential update failed.",
+                "70efb28dee": "GitHub token is required."
+              },
+              "section": {
+                "022c7c89d5": "Orca reads your Copilot AI-credit entitlement through your GitHub CLI sign-in, which needs the user scope. Paste a token only for an enterprise billing override. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits available to you each month.",
+                "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
+                "13ae4d0b21": "Not saved",
+                "233569347b": "Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.",
+                "259e2dff8e": "Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.",
+                "2976a89a84": "Saved",
+                "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
+                "467c761749": "Enterprise slug",
+                "4cf256a883": "Forget token",
+                "4d5c01e15c": "Optional. Paste a GitHub token that can read enterprise billing and the slug it belongs to.",
+                "6a27446bd3": "Using your GitHub CLI sign-in",
+                "6a327922f7": "Copied",
+                "74858f3994": "Paste your GitHub token",
+                "7e6b3de4ea": "GitHub token",
+                "886fc8ca30": "Stored locally",
+                "9e59104270": "Copy command",
+                "ae9c8d3fd2": "Optional override",
+                "b03cd42103": "Save",
+                "d5f964d2ec": "Credentials not set",
+                "d7c06dead5": "your-enterprise",
+                "dc3eaf8d70": "GitHub Copilot",
+                "ed307672cd": "Configure GitHub Copilot usage tracking for your account.",
+                "ef36dc11a9": "Replace",
+                "f1c1fd4ffb": "Run this to finish setting up the GitHub CLI for your Copilot entitlement:",
+                "f8bb20c24c": "Open console",
+                "fa8def1ab4": "Optional. Required only when using an enterprise billing token override."
+              }
+            },
+            "deepseek": {
+              "actions": {
+                "312f213d4f": "DeepSeek API key is required.",
+                "82ad607eeb": "DeepSeek credential update failed.",
+                "e77c0b006a": "DeepSeek API key saved."
+              },
+              "section": {
+                "0c4385003d": "Paste the API key from your DeepSeek platform account for local balance fetching.",
+                "16fb212002": "Stored locally",
+                "21f2625976": "Save",
+                "27efc84bc7": "Create a key in your DeepSeek platform account and paste it here. The DeepSeek API exposes only the current balance — there is no usage or cost history to show — and the balance may be denominated in CNY or USD depending on the account.",
+                "28c8b91c5d": "DeepSeek",
+                "47e631f32d": "Open console",
+                "53ce175669": "Configure DeepSeek usage tracking for your account.",
+                "59d9d40b95": "DeepSeek API key",
+                "64da8edf4b": "Replace",
+                "71ec71b74d": "Paste your DeepSeek API key",
+                "bc10d6273f": "Forget key",
+                "c62df1a6cd": "Credentials not set",
+                "d47451b104": "Not saved",
+                "e60b2e635a": "Stored locally in the Orca encrypted credential store and sent to DeepSeek only to refresh your balance.",
+                "f5d5cdde38": "Saved"
+              }
+            },
+            "fireworks": {
+              "actions": {
+                "54af23897c": "Fireworks credential update failed.",
+                "ee4388904a": "Fireworks API key is required.",
+                "f2c3ea1168": "Fireworks credentials saved."
+              },
+              "section": {
+                "077467c5d6": "Not saved",
+                "084f43d064": "Credentials not set",
+                "1b29aa7268": "Paste your Fireworks API key",
+                "1fd991909e": "Fireworks API key",
+                "2ccc2fea25": "Replace",
+                "2cea3b33f9": "Fireworks account ID",
+                "51bcc16ae3": "Fireworks.ai",
+                "545da4ee6c": "Forget key",
+                "56669b1597": "Stored locally in the Orca encrypted credential store and sent to Fireworks.ai only to refresh your rated spend.",
+                "5e8948033a": "Paste the API key from your Fireworks.ai account for local spend fetching.",
+                "5f31aaba69": "Configure Fireworks.ai usage tracking for your account.",
+                "797cd4833e": "Account ID (optional)",
+                "b98b4449d5": "Save",
+                "c1c89f3dac": "Optional account ID override for keys that can see more than one Fireworks.ai account.",
+                "c9bd728853": "Auto-detected from the API key",
+                "d2eb5b59e0": "Saved",
+                "d74a913846": "Orca discovers the account ID from your API key. Set an override only when the key can see multiple accounts; leave it blank to keep auto-detection. Saving with the API key field blank keeps your stored key, and Forget key clears the account ID as well.",
+                "d8c675f9f0": "Open console",
+                "fb3c265f9d": "Stored locally",
+                "fd8437b974": "Create a key in your Fireworks.ai account and paste it here. Orca refreshes rated spend for the current billing period, in US dollars."
+              }
+            }
+          },
+          "search": {
+            "01a85f426c": "account id",
+            "0bbd8d1b24": "DeepSeek Usage",
+            "249878a2e7": "deepseek",
+            "54714130c4": "api key",
+            "5636d2d71b": "spend",
+            "6d465bfd03": "fireworks",
+            "aef1562679": "credits",
+            "c0a759aceb": "balance",
+            "ca8cf669e2": "usage",
+            "d3b18e19e2": "Configure Fireworks.ai usage tracking with an API key and an optional account ID override.",
+            "d9d1e324dc": "Configure DeepSeek usage tracking with an API key. DeepSeek publishes only the account balance, not usage or cost history.",
+            "f23a201868": "Fireworks.ai Usage"
+          }
+        },
+        "advanced": {
+          "search": {
+            "2046f3a33e": "unresponsive",
+            "20e4fb106c": "freeze",
+            "47b1470553": "diagnostics",
+            "644da2eee3": "UI Hang Logging",
+            "6f65714112": "debug",
+            "70e4c7cdc0": "jank",
+            "74e2892304": "log",
+            "8fabd940ab": "Record UI-thread stalls and window freezes to a log file for troubleshooting.",
+            "b2f94335b1": "hang"
+          }
+        },
+        "agent-session-search-search": {
+          "content": "content",
+          "conversation": "conversation",
+          "description": "Index agent session transcripts so conversations are searchable on this machine.",
+          "history": "history",
+          "index": "index",
+          "retention": "retention",
+          "search": "search",
+          "session": "session",
+          "title": "Session History Search",
+          "transcript": "transcript"
+        },
+        "appearance": {
+          "search": {}
+        },
+        "experimental": {
+          "search": {
+            "agentDashboard": {
+              "click": "click",
+              "description": "Kanban board for monitoring agents across worktrees as a full view in the main area.",
+              "openWorkspace": "open workspace",
+              "popout": null,
+              "preview": "preview"
             }
           }
         },
-        "worktree": {
-          "removal": {
-            "vmNotReleasedTitle": "Workspace removed — its VM may still be running",
-            "vmNotReleasedBody": "Its server never answered, so Orca removed the workspace locally and left the machine to its provider lease. Settings → Ephemeral VMs shows it while it is still running.",
-            "vmReleasedTitle": "Workspace removed — its VM was released",
-            "vmReleasedBody": "Its server never answered, so Orca released the machine without it instead of leaving it allocated."
+        "sshHostServer": {},
+        "tasks": {
+          "search": {
+            "jiraBoard": "board sprint backlog"
+          }
+        },
+        "terminal": {
+          "advanced": {
+            "platform": {
+              "search": {}
+            }
+          },
+          "pane": {
+            "appearance": {
+              "search": {}
+            }
           }
         }
+      },
+      "sidebar": {
+        "AddRemoteHostDialog": {
+          "sshAlreadyHidden": "That SSH host is hidden in Settings → SSH hosts. Unhide it there rather than adding a second copy."
+        },
+        "DeleteWorktreeRemoteBranchOption": {
+          "alsoDeleteRemoteBranch": "Also delete the remote branch",
+          "alsoDeleteRemoteBranchHint": "Permanently deletes this workspace's branch on its remote. Cannot be undone, and is skipped when the local branch is kept."
+        },
+        "EphemeralVmContextMenuItems": {
+          "failed": "Couldn’t run {{value0}}",
+          "ranItem": "Ran {{value0}}",
+          "running": "Running {{value0}}…"
+        },
+        "EphemeralVmExtendLifetimeMenu": {
+          "extendFailed": "Couldn’t extend the lease. Try again.",
+          "extendLifetime": "Extend lifetime",
+          "extendTo": "Extend to {{value0}}",
+          "extended": "Lease extended",
+          "extendedUntil": "Lease extended to {{value0}}",
+          "extending": "Extending…"
+        },
+        "SidebarWorkspaceOptionsMenu": {},
+        "SidebarWorkspaceStatusFilterSection": {
+          "040f28a2a6": "Status",
+          "63cf2888f5": "{{value0}} hidden",
+          "66ae0c2967": "Show all",
+          "bda5f9404e": "All statuses"
+        },
+        "WorktreeBranchHostSelect": {
+          "label": "Select host"
+        },
+        "WorktreeCard": {
+          "ephemeralLeaseEndedAt": "Lease ended {{value0}}",
+          "ephemeralLeaseEndsAt": "Lease ends {{value0}}",
+          "ephemeralLeaseExpired": "Expired",
+          "ephemeralLeaseProvider": "Provider: {{value0}}",
+          "ephemeralLeaseRemaining": "Exp {{value0}}"
+        },
+        "WorktreeCardMetadataStatusBadges": {
+          "mergeVerdictTitle": "Merge: {{value0}}"
+        },
+        "WorktreeContextMenu": {
+          "addToAnotherHost": "Add to another host…"
+        },
+        "WorktreeIssueLinkField": {},
+        "WorktreeList": {
+          "addToHost": "Add to…",
+          "ephemeralLeaseExpired": "Expired",
+          "ephemeralLeaseRemaining": "Exp {{value0}}"
+        },
+        "add": {
+          "repo": {
+            "local": {
+              "start": {
+                "actions": {}
+              }
+            }
+          }
+        },
+        "remote": {
+          "branch": {
+            "cleanup": {
+              "toast": {
+                "alreadyAbsent": "The remote had no branch named {{value0}}.",
+                "failed": "Could not delete the remote branch for {{value0}}",
+                "hostDidNotReport": "The connected host did not report deleting the remote branch. Check the branch on its remote before assuming it is gone.",
+                "keptTitle": "Remote branch kept for {{value0}}",
+                "noUpstream": "This branch tracks no remote branch, so nothing was deleted there.",
+                "skippedPreserved": "Orca kept the local branch, so it left the remote branch in place too."
+              }
+            }
+          }
+        },
+        "useWorktreeMetaJiraLink": {},
+        "worktree": {
+          "card": {
+            "meta": {
+              "row": {}
+            }
+          }
+        },
+        "worktreeIssueDisplacement": {}
+      },
+      "stats": {
+        "share": {
+          "card": {
+            "utils": {
+              "19f4b4dc75": null
+            }
+          }
+        }
+      },
+      "status": {
+        "bar": {
+          "NativeChatResumeStatusSegment": {},
+          "ResourceUsageStatusSegment": {
+            "288a4dd177": null
+          },
+          "StatusBar": {},
+          "providerAllowance": {
+            "unit": {
+              "credit": "credits"
+            },
+            "usedOfLimit": "{{value0}} of {{value1}}",
+            "usedOfLimitUnit": "{{value0}} of {{value1}} {{value2}}"
+          },
+          "providerCredits": {
+            "balance": "{{value0}} available",
+            "item": {
+              "granted": "Granted",
+              "spentThisMonth": "Spent this month",
+              "toppedUp": "Topped up"
+            },
+            "period": {
+              "currentMonth": "this month",
+              "last30Days": "in the last 30 days"
+            },
+            "spend": "{{value0}} spent",
+            "spendPeriod": "{{value0}} spent {{value1}}"
+          },
+          "tooltip": {
+            "df60b41813": "Balance cannot fund further calls"
+          }
+        }
+      },
+      "tab": {
+        "bar": {
+          "BrowserTab": {},
+          "EditorFileTabContextMenu": {},
+          "SortableTabContextMenu": {},
+          "TabBar": {
+            "ab589350e5": "Could not build launch command for {{value0}}."
+          },
+          "TabBarDefaultAgentButton": {
+            "2a0cbdc8a1": "Open {{value0}} in a new tab"
+          },
+          "TabBarNewTabButton": {
+            "6417e68a08": "Hold for all new tab options",
+            "729bccd8bd": "More options"
+          }
+        }
+      },
+      "terminal": {
+        "pane": {
+          "remote": {
+            "runtime": {
+              "pty": {
+                "transport": {
+                  "test": {
+                    "harness": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "workspace": {
+        "cleanup": {
+          "WorkspaceCleanupDialog": {}
+        }
+      },
+      "workspaceEmptyState": {
+        "agentShortcut": "New agent tab",
+        "description": "This workspace has no open tabs.",
+        "logo": "Orca logo",
+        "newAgent": "New {{agent}} agent",
+        "newTerminal": "New terminal",
+        "terminalShortcut": "New terminal tab",
+        "title": "ORCA"
+      }
+    },
+    "hooks": {
+      "ipc": {
+        "events": {
+          "terminal": {
+            "create": {
+              "test": {
+                "harness": {}
+              }
+            }
+          }
+        }
+      },
+      "useComposerState": {},
+      "useIpcEvents": {},
+      "useSettingsNavigationMetadata": {
+        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, Fireworks.ai, and GitHub Copilot."
       }
     },
     "lib": {
@@ -136,802 +936,7 @@
         }
       }
     },
-    "hooks": {
-      "useComposerState": {},
-      "useIpcEvents": {},
-      "useSettingsNavigationMetadata": {},
-      "ipc": {
-        "events": {
-          "terminal": {
-            "create": {
-              "test": {
-                "harness": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "components": {
-      "JiraIssueWorkspace": {
-        "showWorkspace": "Show workspace",
-        "editFieldsTitle": "Edit Jira fields",
-        "editFieldsDescription": "Custom fields Jira allows you to change on {{value0}}.",
-        "editFieldsEmpty": "Jira reports no editable custom fields on this issue.",
-        "editFieldsSaving": "Saving…",
-        "editFields": "Edit fields",
-        "noIssueSelected": "No Jira issue is selected.",
-        "anotherUpdatePending": "Another Jira update is still in progress."
-      },
-      "LinearItemDrawer": {
-        "e6cd6f6d3e": "Estimate"
-      },
-      "NewWorkspaceComposerCard": {
-        "test": {
-          "fixture": {}
-        },
-        "pickAnotherHost": "This workspace already lives on that host. Pick another one to copy this branch there."
-      },
-      "TaskPage": {
-        "jiraCardStoryPoints": "{{value0}}sp",
-        "jiraCardStoryPointsLabel": "{{value0}} story points",
-        "jiraCardStoryPointsTitle": "Story points",
-        "jiraOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
-        "jiraShowWorkspace": "Show workspace",
-        "16d73d88ad": "Backlog",
-        "jiraBacklogCount": "Backlog · {{value0}} issues",
-        "jiraNoActiveSprint": "This board has no active sprint; showing its backlog.",
-        "jiraBoardHasNoSprints": "This board does not use sprints; showing its board-filter backlog.",
-        "jiraBacklogLoadedCount": "{{value0}} loaded",
-        "jiraBacklogEmpty": "No backlog issues match this filter.",
-        "jiraBacklogPageEmpty": "No matching issues in this page. Load more to continue searching the backlog.",
-        "jiraBoardLoadingMore": "Loading…",
-        "jiraLoadMoreBacklog": "Load more backlog issues",
-        "jiraBoardRequiresNewRuntime": "This Jira runtime does not support board views. Showing the issue list instead.",
-        "jiraIssueMoved": "{{value0}} moved to {{value1}}",
-        "jiraCurrentSprint": "Current sprint",
-        "jiraSprintEmpty": "No issues match this filter in the active sprint.",
-        "jiraLoadMoreSprint": "Load more sprint issues",
-        "jiraBoardView": "Jira board",
-        "jiraBoardStatusColumns": "Status columns · active sprint only",
-        "jiraBoardNoSprintDescription": "No active sprint · board-filter backlog",
-        "jiraBoardSprintLoading": "Loading sprint details from the board",
-        "jiraIssueListView": "Issue list",
-        "jiraBoardViews": "Jira board views",
-        "jiraSprintView": "Sprint",
-        "jiraFilterLabel": "Filter",
-        "jiraMeFilter": "Me",
-        "jiraAllFilter": "All",
-        "jiraBoardIssueFilterPlaceholder": "Filter issues by key, summary, or assignee",
-        "jiraBoardIssueFilterLabel": "Filter board issues",
-        "jiraReturnToBoard": "Return to board",
-        "jiraTaskSettings": "Jira task settings",
-        "jiraChooseTransition": "Choose a status change",
-        "jiraChooseTransitionDescription": "More than one Jira transition can move {{value0}} to that column. Choose one to continue.",
-        "jiraFilterGroupLabel": "Filter Jira issues",
-        "jiraBoardLoading": "Loading…",
-        "jiraUnassignedFilter": "Unassigned",
-        "jiraTransitionFieldsTitle": "Update fields to move {{value0}}",
-        "jiraTransitionFieldsDescription": "Jira requires these fields before it will apply the {{value0}} transition.",
-        "jiraChooseOtherStatusTransition": "{{value0}} does not sit in a board column. Choose the status change to apply.",
-        "jiraBoardIssueMoving": "{{value0}} is still moving.",
-        "jiraBoardAlreadyInColumn": "{{value0}} is already in {{value1}}.",
-        "jiraNoAvailableTransitions": "Jira lists no available transitions for {{value0}}; the issue may be closed or you may lack permission.",
-        "jiraNoStatusTransitionAvailable": "Jira cannot move {{value0}} to {{value1}}. Available moves: {{value2}}.",
-        "jiraNoOtherStatusTransition": "Jira has no move from {{value0}} to a status outside the board columns.",
-        "jiraNoPendingTransition": "No transition is pending.",
-        "jiraSprintAssigned": "{{value0}} moved to {{value1}}"
-      },
-      "github": {
-        "pr": {
-          "admin": {
-            "bypass": {
-              "cef3455aa7": "GitHub has requested changes on this pull request. Merging will ask you to bypass the rule with your admin privileges.",
-              "d3d99c95fa": "GitHub requires an approving review before this pull request can merge. Merging will ask you to bypass the rule with your admin privileges.",
-              "confirmation": {
-                "1859e45dbc": "Bypass branch protection?",
-                "3db0f1be2f": "This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.",
-                "28c23a473f": "Merge anyway"
-              }
-            }
-          }
-        }
-      },
-      "workspace": {
-        "cleanup": {
-          "WorkspaceCleanupDialog": {}
-        }
-      },
-      "terminal": {
-        "pane": {
-          "remote": {
-            "runtime": {
-              "pty": {
-                "transport": {
-                  "test": {
-                    "harness": {}
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "tab": {
-        "bar": {
-          "BrowserTab": {},
-          "EditorFileTabContextMenu": {},
-          "SortableTabContextMenu": {},
-          "TabBarDefaultAgentButton": {
-            "2a0cbdc8a1": "Open {{value0}} in a new tab"
-          },
-          "TabBarNewTabButton": {
-            "729bccd8bd": "More options",
-            "6417e68a08": "Hold for all new tab options"
-          },
-          "TabBar": {
-            "ab589350e5": "Could not build launch command for {{value0}}."
-          }
-        }
-      },
-      "status": {
-        "bar": {
-          "StatusBar": {},
-          "tooltip": {
-            "df60b41813": "Balance cannot fund further calls"
-          },
-          "NativeChatResumeStatusSegment": {},
-          "providerCredits": {
-            "period": {
-              "currentMonth": "this month",
-              "last30Days": "in the last 30 days"
-            },
-            "item": {
-              "granted": "Granted",
-              "toppedUp": "Topped up",
-              "spentThisMonth": "Spent this month"
-            },
-            "balance": "{{value0}} available",
-            "spend": "{{value0}} spent",
-            "spendPeriod": "{{value0}} spent {{value1}}"
-          },
-          "providerAllowance": {
-            "unit": {
-              "credit": "credits"
-            },
-            "usedOfLimit": "{{value0}} of {{value1}}",
-            "usedOfLimitUnit": "{{value0}} of {{value1}} {{value2}}"
-          }
-        }
-      },
-      "sidebar": {
-        "SidebarWorkspaceOptionsMenu": {},
-        "WorktreeCard": {
-          "ephemeralLeaseExpired": "Expired",
-          "ephemeralLeaseRemaining": "Exp {{value0}}",
-          "ephemeralLeaseEndsAt": "Lease ends {{value0}}",
-          "ephemeralLeaseEndedAt": "Lease ended {{value0}}",
-          "ephemeralLeaseProvider": "Provider: {{value0}}"
-        },
-        "WorktreeCardMetadataStatusBadges": {
-          "mergeVerdictTitle": "Merge: {{value0}}"
-        },
-        "WorktreeContextMenu": {
-          "addToAnotherHost": "Add to another host…"
-        },
-        "WorktreeList": {
-          "ephemeralLeaseRemaining": "Exp {{value0}}",
-          "ephemeralLeaseExpired": "Expired",
-          "addToHost": "Add to…"
-        },
-        "add": {
-          "repo": {
-            "local": {
-              "start": {
-                "actions": {}
-              }
-            }
-          }
-        },
-        "remote": {
-          "branch": {
-            "cleanup": {
-              "toast": {
-                "failed": "Could not delete the remote branch for {{value0}}",
-                "alreadyAbsent": "The remote had no branch named {{value0}}.",
-                "noUpstream": "This branch tracks no remote branch, so nothing was deleted there.",
-                "skippedPreserved": "Orca kept the local branch, so it left the remote branch in place too.",
-                "keptTitle": "Remote branch kept for {{value0}}",
-                "hostDidNotReport": "The connected host did not report deleting the remote branch. Check the branch on its remote before assuming it is gone."
-              }
-            }
-          }
-        },
-        "worktree": {
-          "card": {
-            "meta": {
-              "row": {}
-            }
-          }
-        },
-        "AddRemoteHostDialog": {
-          "sshAlreadyHidden": "That SSH host is hidden in Settings → SSH hosts. Unhide it there rather than adding a second copy."
-        },
-        "WorktreeIssueLinkField": {},
-        "worktreeIssueDisplacement": {},
-        "WorktreeBranchHostSelect": {
-          "label": "Select host"
-        },
-        "EphemeralVmExtendLifetimeMenu": {
-          "extendLifetime": "Extend lifetime",
-          "extendTo": "Extend to {{value0}}",
-          "extending": "Extending…",
-          "extended": "Lease extended",
-          "extendedUntil": "Lease extended to {{value0}}",
-          "extendFailed": "Couldn’t extend the lease. Try again."
-        },
-        "EphemeralVmContextMenuItems": {
-          "failed": "Couldn’t run {{value0}}",
-          "ranItem": "Ran {{value0}}",
-          "running": "Running {{value0}}…"
-        },
-        "DeleteWorktreeRemoteBranchOption": {
-          "alsoDeleteRemoteBranch": "Also delete the remote branch",
-          "alsoDeleteRemoteBranchHint": "Permanently deletes this workspace's branch on its remote. Cannot be undone, and is skipped when the local branch is kept."
-        },
-        "SidebarWorkspaceStatusFilterSection": {
-          "bda5f9404e": "All statuses",
-          "63cf2888f5": "{{value0}} hidden",
-          "040f28a2a6": "Status",
-          "66ae0c2967": "Show all"
-        },
-        "useWorktreeMetaJiraLink": {}
-      },
-      "settings": {
-        "AccountsPane": {
-          "aa4de4475b": "Gemini CLI (legacy)"
-        },
-        "AdvancedPane": {
-          "c22adcc7c5": "Debug Options",
-          "9b1f52e764": "Extra logging for troubleshooting Orca itself."
-        },
-        "BrowserDefaultZoomSetting": {},
-        "ExperimentalPane": {
-          "nativeChat": {},
-          "agentDashboard": {
-            "description": "Kanban board for monitoring agents across worktrees as a full view in the main area.",
-            "clickLabel": "Clicking a card",
-            "clickCopy": "Open the agent's workspace, or show the live terminal preview first.",
-            "clickAriaLabel": "Agent Dashboard card click action",
-            "clickWorkspace": "Open workspace",
-            "clickPreview": "Preview"
-          }
-        },
-        "FloatingWorkspacePane": {
-          "81afb79785": "New floating terminals and agents start here. Floating markdown notes always live in the floating-workspace folder, next to its AGENTS.md instructions.",
-          "revealFailed": "Could not open the floating workspace folder."
-        },
-        "GeneralEditorSettingsSection": {
-          "34155c6ed5": "Draw each review thread below its commented line, with reply and resolve controls. When off, the thread stays reachable from a small marker in the gutter.",
-          "9c020a16db": "PR Comments Inline",
-          "7fea4145c9": "Show GitHub review threads on the lines they were left on in the code."
-        },
-        "GeneralWorkspaceSettingsSection": {
-          "f9b2070017": "Workspace Layout",
-          "0cda18153c": "Where each project's main checkout and its workspaces are created.",
-          "b266f3f40e": "One folder per project",
-          "9285cedcf2": "Flat",
-          "deleteRemoteBranchOnWorkspaceDelete": "Delete Remote Branch By Default",
-          "deleteRemoteBranchOnWorkspaceDeleteDescription": "Pre-check the remote-branch option in the delete-workspace dialog. The branch is always kept when its local copy is kept.",
-          "deleteRemoteBranchOnWorkspaceDeleteRowDescription": "Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone."
-        },
-        "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "Local runtime keys are stored in ~/.orca-np using Electron encrypted storage when available."
-        },
-        "ShortcutsPane": {
-          "d8c988dab4": "~/.orca-np/keybindings.json"
-        },
-        "SshPane": {
-          "hostHidden": "{{value0}} is hidden from host lists",
-          "hostUnhidden": "{{value0}} is available again",
-          "hostVisibilityFailed": "Failed to update host visibility"
-        },
-        "SshTargetCard": {
-          "hiddenBadge": "Hidden"
-        },
-        "SshTargetDestructiveActions": {},
-        "SshTargetForm": {},
-        "WorktreeSymlinksSection": {
-          "sharedDirectoriesModeLabel": "orca.yaml sharedDirectories behavior",
-          "sharedDirectoriesModeDescription": "APFS clones and copies are independent per worktree. Symlinks share changes with the primary checkout. Copy fallback has no size or entry-count cap and can be slow or use substantial disk space. SSH worktrees do not materialize sharedDirectories yet.",
-          "sharedDirectoriesSymlink": "Symlink (current behavior)",
-          "sharedDirectoriesApfsSymlink": "APFS clone, then symlink",
-          "sharedDirectoriesApfsCopy": "APFS clone, then copy",
-          "sharedDirectoriesApfsOnly": "APFS clone only (skip if unavailable)"
-        },
-        "accounts": {
-          "search": {
-            "0bbd8d1b24": "DeepSeek Usage",
-            "d9d1e324dc": "Configure DeepSeek usage tracking with an API key. DeepSeek publishes only the account balance, not usage or cost history.",
-            "249878a2e7": "deepseek",
-            "54714130c4": "api key",
-            "c0a759aceb": "balance",
-            "ca8cf669e2": "usage",
-            "aef1562679": "credits",
-            "f23a201868": "Fireworks.ai Usage",
-            "d3b18e19e2": "Configure Fireworks.ai usage tracking with an API key and an optional account ID override.",
-            "6d465bfd03": "fireworks",
-            "5636d2d71b": "spend",
-            "01a85f426c": "account id"
-          },
-          "pane": {
-            "deepseek": {
-              "actions": {
-                "312f213d4f": "DeepSeek API key is required.",
-                "e77c0b006a": "DeepSeek API key saved.",
-                "82ad607eeb": "DeepSeek credential update failed."
-              },
-              "section": {
-                "28c8b91c5d": "DeepSeek",
-                "53ce175669": "Configure DeepSeek usage tracking for your account.",
-                "47e631f32d": "Open console",
-                "16fb212002": "Stored locally",
-                "c62df1a6cd": "Credentials not set",
-                "e60b2e635a": "Stored locally in the Orca encrypted credential store and sent to DeepSeek only to refresh your balance.",
-                "59d9d40b95": "DeepSeek API key",
-                "0c4385003d": "Paste the API key from your DeepSeek platform account for local balance fetching.",
-                "f5d5cdde38": "Saved",
-                "d47451b104": "Not saved",
-                "71ec71b74d": "Paste your DeepSeek API key",
-                "64da8edf4b": "Replace",
-                "21f2625976": "Save",
-                "bc10d6273f": "Forget key",
-                "27efc84bc7": "Create a key in your DeepSeek platform account and paste it here. The DeepSeek API exposes only the current balance — there is no usage or cost history to show — and the balance may be denominated in CNY or USD depending on the account."
-              }
-            },
-            "fireworks": {
-              "actions": {
-                "ee4388904a": "Fireworks API key is required.",
-                "f2c3ea1168": "Fireworks credentials saved.",
-                "54af23897c": "Fireworks credential update failed."
-              },
-              "section": {
-                "51bcc16ae3": "Fireworks.ai",
-                "5f31aaba69": "Configure Fireworks.ai usage tracking for your account.",
-                "d8c675f9f0": "Open console",
-                "fb3c265f9d": "Stored locally",
-                "084f43d064": "Credentials not set",
-                "56669b1597": "Stored locally in the Orca encrypted credential store and sent to Fireworks.ai only to refresh your rated spend.",
-                "1fd991909e": "Fireworks API key",
-                "5e8948033a": "Paste the API key from your Fireworks.ai account for local spend fetching.",
-                "d2eb5b59e0": "Saved",
-                "077467c5d6": "Not saved",
-                "1b29aa7268": "Paste your Fireworks API key",
-                "2ccc2fea25": "Replace",
-                "b98b4449d5": "Save",
-                "545da4ee6c": "Forget key",
-                "fd8437b974": "Create a key in your Fireworks.ai account and paste it here. Orca refreshes rated spend for the current billing period, in US dollars.",
-                "2cea3b33f9": "Fireworks account ID",
-                "c1c89f3dac": "Optional account ID override for keys that can see more than one Fireworks.ai account.",
-                "797cd4833e": "Account ID (optional)",
-                "c9bd728853": "Auto-detected from the API key",
-                "d74a913846": "Orca discovers the account ID from your API key. Set an override only when the key can see multiple accounts; leave it blank to keep auto-detection. Saving with the API key field blank keeps your stored key, and Forget key clears the account ID as well."
-              }
-            },
-            "copilot": {
-              "actions": {
-                "41c1907a73": "GitHub Copilot credential update failed.",
-                "1d08d465f5": "GitHub Copilot credentials saved.",
-                "70efb28dee": "GitHub token is required."
-              },
-              "section": {
-                "d7c06dead5": "your-enterprise",
-                "467c761749": "Enterprise slug",
-                "fa8def1ab4": "Optional. Required only when using an enterprise billing token override.",
-                "4cf256a883": "Forget token",
-                "b03cd42103": "Save",
-                "ef36dc11a9": "Replace",
-                "74858f3994": "Paste your GitHub token",
-                "13ae4d0b21": "Not saved",
-                "2976a89a84": "Saved",
-                "7e6b3de4ea": "GitHub token",
-                "4d5c01e15c": "Optional. Paste a GitHub token that can read enterprise billing and the slug it belongs to.",
-                "259e2dff8e": "Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.",
-                "d5f964d2ec": "Credentials not set",
-                "886fc8ca30": "Stored locally",
-                "f8bb20c24c": "Open console",
-                "ed307672cd": "Configure GitHub Copilot usage tracking for your account.",
-                "dc3eaf8d70": "GitHub Copilot",
-                "6a27446bd3": "Using your GitHub CLI sign-in",
-                "233569347b": "Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.",
-                "f1c1fd4ffb": "Run this to finish setting up the GitHub CLI for your Copilot entitlement:",
-                "6a327922f7": "Copied",
-                "9e59104270": "Copy command",
-                "ae9c8d3fd2": "Optional override",
-                "022c7c89d5": "Orca reads your Copilot AI-credit entitlement through your GitHub CLI sign-in, which needs the user scope. Paste a token only for an enterprise billing override. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits available to you each month.",
-                "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
-                "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well."
-              }
-            }
-          }
-        },
-        "advanced": {
-          "search": {
-            "644da2eee3": "UI Hang Logging",
-            "8fabd940ab": "Record UI-thread stalls and window freezes to a log file for troubleshooting.",
-            "6f65714112": "debug",
-            "b2f94335b1": "hang",
-            "20e4fb106c": "freeze",
-            "2046f3a33e": "unresponsive",
-            "70e4c7cdc0": "jank",
-            "74e2892304": "log",
-            "47b1470553": "diagnostics"
-          }
-        },
-        "appearance": {
-          "search": {}
-        },
-        "experimental": {
-          "search": {
-            "agentDashboard": {
-              "description": "Kanban board for monitoring agents across worktrees as a full view in the main area.",
-              "click": "click",
-              "preview": "preview",
-              "openWorkspace": "open workspace"
-            }
-          }
-        },
-        "tasks": {
-          "search": {
-            "jiraBoard": "board sprint backlog"
-          }
-        },
-        "terminal": {
-          "advanced": {
-            "platform": {
-              "search": {}
-            }
-          },
-          "pane": {
-            "appearance": {
-              "search": {}
-            }
-          }
-        },
-        "EphemeralVmRuntimesSection": {
-          "providerDeadline": "Provider deadline {{value0}}",
-          "leaseProvider": "Provider: {{value0}}",
-          "leaseRemaining": "{{value0}} left",
-          "leaseExpired": "Lease expired {{value0}}. The provider can remove this host at any time, including while Orca is offline.",
-          "reclaimedHost": "Released from Orca on {{value0}}: this host stopped answering after its provider deadline, so its workspace rows were removed. The provider still owns the resource — Cleanup releases it now.",
-          "extendLifetime": "Extend lifetime",
-          "extending": "Extending…",
-          "extendTo": "Extend to {{value0}}",
-          "leaseExtended": "Lease extended.",
-          "leaseExtendedUntil": "Lease extended to {{value0}}."
-        },
-        "MobilePairingConnectionOptions": {},
-        "BrowserTerminalLinkActionsSetting": {},
-        "sshHostServer": {},
-        "NativeChatSupportedAgents": {},
-        "AgentSessionSearchSection": {
-          "contentTitle": "Index conversation content",
-          "contentDescription": "Indexes session titles, working directories, branches, and message text from transcripts on this machine. When off, search covers titles and paths but not conversation contents.",
-          "retentionTitle": "History range",
-          "retentionDescription": "How far back to index transcripts. All history indexes every transcript the scan can find.",
-          "title": "Session History Search",
-          "description": "Search your local agent sessions by title, project, and conversation content.",
-          "allHistory": "All history",
-          "lastDays": "Last {{value0}} days"
-        },
-        "agent-session-search-search": {
-          "title": "Session History Search",
-          "description": "Index agent session transcripts so conversations are searchable on this machine.",
-          "session": "session",
-          "history": "history",
-          "search": "search",
-          "transcript": "transcript",
-          "index": "index",
-          "conversation": "conversation",
-          "content": "content",
-          "retention": "retention"
-        },
-        "SshTargetList": {
-          "hiddenSection": "Hidden ({{value0}})",
-          "hiddenSectionHint": "These hosts come from your SSH config. They stay out of the lists where you pick a host, but anything already running on them keeps working."
-        },
-        "SshTargetVisibilityToggle": {
-          "hide": "Hide host",
-          "unhide": "Unhide host"
-        },
-        "UiHangDiagnosticsSetting": {
-          "7879895603": "Log UI hangs",
-          "38d00b7a2e": "Off by default. Records UI-thread stalls and window freezes so you can share them when reporting a hang.",
-          "e19f83d807": "Log file",
-          "9fa69c4cae": "Written while logging is on.",
-          "2b5bd8a767": "Local log writes are disabled by policy (CI or ORCA_DIAGNOSTICS_DISABLED)."
-        },
-        "JiraBoardSettings": {
-          "title": "Jira board view",
-          "description": "Choose the default Jira board shown in Tasks.",
-          "defaultBoard": "Default board",
-          "chooseBoard": "Choose a board",
-          "useListView": "No default board (use issue list)",
-          "retry": "Retry",
-          "unnamedBoard": "Board {{value0}}",
-          "searchBoards": "Search boards by name...",
-          "loadingBoards": "Loading boards...",
-          "noBoardsMatch": "No boards match this search.",
-          "noBoardsForSearch": "Jira returned no boards matching this search.",
-          "noBoardsReturned": "Jira returned no boards for this site. Check that the account can see a board."
-        },
-        "ProviderUsageEnableSwitch": {
-          "8e832829e7": "Let Orca query {{value0}}",
-          "e3340ac4e1": "When off, Orca never asks {{value0}} for usage and never reads its sign-in from software installed on this computer.",
-          "e9b8e0fc2e": "{{value0}} is off. Orca will not query it or read its sign-in from software installed on this computer."
-        }
-      },
-      "right": {
-        "sidebar": {
-          "ChecksPanel": {
-            "d00ebdc402": "Fix {{value0}} Comments With AI",
-            "5eb2163b6b": "Review the prompt before starting an agent. After the prompt is delivered, Orca replies to comments it cannot resolve on the host and leaves every thread open for you to close.",
-            "f273f2271c": "Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.{{value3}}",
-            "aa95b81a3a": "Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.",
-            "495b2f8c4b": "Started the agent, but could not reply on the selected comments.",
-            "7e4b2a19c0": "Could not identify the GitHub PR to reply on."
-          },
-          "FileExplorer": {
-            "filterScannedPartialWorkspace": "Only part of this workspace was searched — add more of the name to narrow it down",
-            "filterShowingFirstMatches": "Showing the first {{value0}} of {{value1}} matches — add more of the name to narrow it down"
-          },
-          "SourceControlAgentActionDialogForm": {},
-          "checks": {
-            "panel": {
-              "content": {},
-              "review": {
-                "verdicts": {
-                  "0bf5a253a984": "Changes requested",
-                  "543f808ca47b": "Approved",
-                  "c040f814f131": "Commented",
-                  "c9f1d84c1d34": "Dismissed",
-                  "3aa4a3edaf3c": "Pending",
-                  "35c764378830": "Reviewed",
-                  "47c8e272bfb7": "Review verdicts"
-                }
-              },
-              "comment": {
-                "controls": {
-                  "3dd06603e1": "Show in code"
-                },
-                "row": {
-                  "5cca1251df": "Show in code"
-                }
-              },
-              "comments": {
-                "list": {
-                  "a8502d9752": "(comments fetched at)",
-                  "c0227ee68e": "(checked out)",
-                  "6b9c7f83c4": "Comments are not shown in code because they do not belong to the commit that is checked out.",
-                  "a2a5fb7686": "Show comments in code",
-                  "38a6c0254e": "Hide comments in code"
-                }
-              }
-            }
-          },
-          "index": {
-            "issue": "Issue"
-          },
-          "fileExplorerOperationOwner": {
-            "listUnavailable": "Files are unavailable for this workspace — check the connection and try again."
-          },
-          "AiVaultPanelControls": {
-            "noEnabledAgents": "No agents enabled in Settings",
-            "showSubagentSessions": "Show subagent sessions",
-            "hiddenSubagentSessions": "{{value0}} subagent sessions hidden (parent not loaded)"
-          },
-          "AiVaultSessionRow": {
-            "subagentSession_one": "{{count}} subagent session",
-            "subagentSession_other": "{{count}} subagent sessions"
-          },
-          "FileExplorerNameFilter": {
-            "projectionBudget": "The filtered file list is too large to display — add more of the name to narrow it down",
-            "projectionFailed": "Could not build the filtered file list",
-            "updating": "Updating file list",
-            "updateFailed": "File search is unavailable — showing previous results when available",
-            "indexing": "Indexing files…",
-            "searching": "Searching files…",
-            "liveScanComplete": "Complete results from a full scan — the file index is still building"
-          },
-          "AiVaultScanProgressStrip": {},
-          "IssuePane": {
-            "providerGithub": "GitHub",
-            "providerLinear": "Linear",
-            "providerJira": "Jira",
-            "providerGitlab": "GitLab",
-            "refresh": "Refresh issue",
-            "openIn": "Open on {{value0}}",
-            "unavailable": "Couldn't load this {{value0}} issue.",
-            "retry": "Retry",
-            "noIssue": "No issue is linked to this workspace.",
-            "noDescription": "No description provided.",
-            "status": "Status",
-            "priority": "Priority",
-            "labels": "Labels",
-            "noLabels": "None",
-            "save": "Save",
-            "filterLabels": "Filter labels",
-            "noLabelsFound": "No labels found",
-            "title": "Issue title",
-            "moreActions": "More issue actions",
-            "unlinkIssue": "Unlink issue from workspace",
-            "unlinkIssueDescription": "Orca will hide {{value0}} from this workspace. The issue on {{value1}} won’t be changed.",
-            "linkAnotherIssue": "Link another issue",
-            "folderWorkspaceLink": "A folder workspace keeps the issue it was created from.",
-            "fields": "Fields",
-            "editableFields": "{{value0}} editable",
-            "noEditableFields": "None editable",
-            "repoOffDevice": "The repo this {{value0}} issue lives in isn't set up on this device."
-          },
-          "IssueAssignee": {
-            "label": "Assignee",
-            "assignees": "Assignees",
-            "unassigned": "Unassigned",
-            "search": "Search people",
-            "searching": "Searching…",
-            "noResults": "No people found",
-            "you": "You"
-          },
-          "IssueComments": {
-            "title": "Comments",
-            "retry": "Retry",
-            "empty": "No comments yet.",
-            "unknownAuthor": "Unknown"
-          }
-        }
-      },
-      "floating": {
-        "terminal": {
-          "floating": {
-            "terminal": {
-              "panel": {
-                "test": {
-                  "fixtures": {}
-                }
-              }
-            }
-          }
-        }
-      },
-      "browser": {
-        "pane": {
-          "BrowserPane": {},
-          "stream": {
-            "remote": {
-              "remote": {
-                "browser": {
-                  "stream": {
-                    "lifecycle": {
-                      "test": {
-                        "harness": {}
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "automations": {
-        "automations": {
-          "page": {
-            "fixtures": {},
-            "test": {
-              "harness": {}
-            }
-          }
-        }
-      },
-      "activity": {
-        "ActivityPrototypePage": {
-          "test": {
-            "fixtures": {}
-          }
-        }
-      },
-      "native": {
-        "chat": {
-          "NativeChatStructuredSession": {}
-        }
-      },
-      "JiraIssueStoryPointsControl": {
-        "label": "Story points",
-        "current": "Story points: {{value0}}",
-        "value": "Points: {{value0}}",
-        "none": "No points",
-        "clearHint": "An empty value clears the field.",
-        "invalid": "Enter a number.",
-        "cancel": "Cancel",
-        "save": "Save"
-      },
-      "hosted": {
-        "review": {
-          "merge": {
-            "readiness": {
-              "ready": "Ready to merge",
-              "checking": "Checking",
-              "conflicts": "Conflicts",
-              "changesRequested": "Changes requested",
-              "approvalRequired": "Approval required",
-              "unresolvedThreads": "Unresolved threads",
-              "behind": "Behind base",
-              "mergeQueue": "Merge queue",
-              "blocked": "Blocked"
-            }
-          }
-        }
-      },
-      "pr": {
-        "comment": {
-          "inline": {
-            "PRCommentThreadCard": {
-              "be8d2e8f48": "Reply",
-              "90e6e6fd21": "Reply to this thread",
-              "21e296c94d": "Show {{value0}} {{value1}}",
-              "b1daf89414": "Hide {{value0}} {{value1}}",
-              "2002706ed8": "Hide thread",
-              "e2be68390f": "Open on GitHub",
-              "3b01798961": "Resolve thread",
-              "b50141162f": "Unresolve thread",
-              "27eb8f6ea9": "Resolved",
-              "dfcd8f7f21": "bot",
-              "3868fce1a3": "Replies are unavailable here."
-            },
-            "usePRCommentInlineDecorator": {
-              "c3b537227a": "Replies are unavailable here."
-            }
-          }
-        }
-      },
-      "comment": {
-        "composer": {
-          "f3e93f1b3a": "Bold",
-          "705066a871": "Italic",
-          "20fc7f3d3d": "Code",
-          "96d2a26262": "Quote",
-          "564c4d0787": "List"
-        }
-      },
-      "JiraSprintPicker": {
-        "backlog": "Backlog",
-        "active": "Active",
-        "future": "Future",
-        "addToSprint": "+ Sprint",
-        "sprint": "Sprint",
-        "findSprint": "Find a sprint…",
-        "noSprintMatch": "No sprint matches."
-      },
-      "workspaceEmptyState": {
-        "agentShortcut": "New agent tab",
-        "terminalShortcut": "New terminal tab",
-        "logo": "Orca logo",
-        "title": "ORCA",
-        "description": "This workspace has no open tabs.",
-        "newAgent": "New {{agent}} agent",
-        "newTerminal": "New terminal"
-      }
-    },
     "runtime": {
-      "host": {
-        "session": {
-          "mirror": {
-            "frame": {
-              "fixtures": {}
-            }
-          }
-        }
-      },
       "fixtures": {
         "web": {
           "session": {
@@ -946,195 +951,316 @@
             }
           }
         }
+      },
+      "host": {
+        "session": {
+          "mirror": {
+            "frame": {
+              "fixtures": {}
+            }
+          }
+        }
       }
     },
     "ssh": {
       "managedServerMove": {}
+    },
+    "store": {
+      "slices": {
+        "github": {
+          "slice": {
+            "test": {
+              "harness": {}
+            }
+          }
+        },
+        "worktree": {
+          "removal": {
+            "vmNotReleasedBody": "Its server never answered, so Orca removed the workspace locally and left the machine to its provider lease. Settings → Ephemeral VMs shows it while it is still running.",
+            "vmNotReleasedTitle": "Workspace removed — its VM may still be running",
+            "vmReleasedBody": "Its server never answered, so Orca released the machine without it instead of leaving it allocated.",
+            "vmReleasedTitle": "Workspace removed — its VM was released"
+          }
+        },
+        "worktrees": {
+          "2e17f825d4": "Worktree deleted, local branch kept",
+          "3b57982bf6": "Git could not safely delete local branch \"{{value0}}\" after deleting workspace \"{{value1}}\", so Orca kept it to avoid losing local commits.",
+          "5366d13eec": "Workspace deleted, local branch kept",
+          "78e08cd877": "Git could not safely delete local branch \"{{value0}}\", so Orca kept it to avoid losing local commits.",
+          "81f13f48d2": "Git could not safely delete local branch \"{{value0}}\" after deleting worktree \"{{value1}}\", so Orca kept it to avoid losing local commits.",
+          "e50495aae6": "Force Delete Local Branch",
+          "metadata": {
+            "worktree": {
+              "rename": {
+                "across": {
+                  "hosts": {
+                    "3b80b33a5a": "Renamed on every other host, but {{hosts}} did not take the new name."
+                  }
+                }
+              }
+            }
+          },
+          "slice": {
+            "test": {
+              "fixtures": {}
+            }
+          }
+        }
+      }
+    },
+    "web": {
+      "pairingSecurity": {},
+      "web": {
+        "preload": {
+          "api": {
+            "test": {
+              "harness": {}
+            }
+          }
+        }
+      }
     }
   },
+  "checkBuild": {
+    "commits": "Commits",
+    "estimated": "Estimated",
+    "number": "Number",
+    "parameters": "Parameters",
+    "queued": "Queued",
+    "title": "Build",
+    "triggeredBy": "Triggered by"
+  },
+  "checkDetails": {
+    "duration": "Duration",
+    "failures": "Failures",
+    "hiddenStages": "+{{value0}} more stages",
+    "openJenkinsSettings": "Open Jenkins settings",
+    "toggleStage": "Toggle stage steps"
+  },
   "components": {
+    "JiraIssueWorkspace": {
+      "pendingChange": null
+    },
+    "agentSessionContinuation": {},
+    "jiraOptionMultiSelect": {
+      "noMatch": "No options match your search.",
+      "search": "Search options..."
+    },
+    "jiraSchemaField": {
+      "currentValue": "Current: {{value0}}",
+      "noUser": "None"
+    },
+    "jiraStatusRow": {
+      "description": "Jira requires these fields before it will apply this status change.",
+      "refused": "Jira refused this change. Review the reason below, or finish it in Jira.",
+      "title": "Change {{value0}} to {{value1}}"
+    },
+    "jiraUserMultiPicker": {
+      "noOtherMatch": "No other users match."
+    },
+    "jiraUserPicker": {
+      "searchFailed": "Could not load people assignable to this issue."
+    },
     "native-chat": {
       "queuedMessages": {}
     },
     "tab": {
       "bar": {
-        "SortableTabContextMenu": {},
         "BrowserTab": {},
-        "EditorFileTabContextMenu": {}
+        "EditorFileTabContextMenu": {},
+        "SortableTabContextMenu": {}
+      }
+    }
+  },
+  "dashboardPopout": {
+    "recoverableError": {
+      "description": null,
+      "title": null
+    }
+  },
+  "jenkins": {
+    "buildDetails": {
+      "failed": "Jenkins could not return this build.",
+      "forbidden": "The saved Jenkins account cannot read this job on {{value0}}.",
+      "notConfigured": "Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to see build details.",
+      "notFound": "This Jenkins build is no longer available. Build retention may have pruned it.",
+      "timedOut": "Timed out loading this Jenkins build.",
+      "timeout": "{{value0}} did not respond in time.",
+      "unauthorized": "Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.",
+      "unknownServer": "this Jenkins server",
+      "unreachable": "Could not reach {{value0}}. Build details are read from this machine, so a Jenkins on another network stays out of reach."
+    },
+    "rerun": {
+      "action": "Rerun build",
+      "failed": "Jenkins could not rerun this build.",
+      "forbidden": "Jenkins did not offer a rerun for this build on {{value0}}. The saved account needs the Build permission on the job.",
+      "inFlight": "A rerun of this Jenkins build is already starting.",
+      "noBuild": "This check does not link to a numbered Jenkins build, so there is nothing to rerun. Open it in Jenkins instead.",
+      "notConfigured": "Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to rerun this build.",
+      "notFound": "This Jenkins build is no longer available — build retention may have pruned it. Nothing was started.",
+      "notJenkins": "This check does not link to a Jenkins build, so it cannot be rerun here.",
+      "notReplayable": "Jenkins has no rerun for this build: the job is a freestyle job rather than a pipeline, or it is disabled.",
+      "rerunning": "Rerunning…",
+      "started": "Jenkins is rerunning this build",
+      "startedBuild": "Jenkins is rerunning build #{{value0}}",
+      "timedOut": "Timed out waiting for Jenkins to rerun the build. Check Jenkins before retrying, in case a build did start.",
+      "timeout": "{{value0}} did not respond in time. Check Jenkins before retrying, in case a build did start.",
+      "unauthorized": "Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.",
+      "unavailable": "Rerunning Jenkins builds is not available in this client.",
+      "unconfirmed": "Jenkins did not confirm the rerun. Check Jenkins before retrying, in case a build did start.",
+      "unreachable": "Could not reach {{value0}}. Check Jenkins before retrying, in case a build did start. Builds are triggered from this machine, so a Jenkins on another network stays out of reach."
+    },
+    "settings": {
+      "add": "Add server",
+      "addTitle": "Add Jenkins server",
+      "apiToken": "API token",
+      "apiTokenHint": "Create one in Jenkins under your user profile → Configure → API Token.",
+      "baseUrl": "Server URL",
+      "baseUrlHint": "Include the path Jenkins is served under, if it is not at the root.",
+      "baseUrlPlaceholder": "https://ci.example.com/jenkins",
+      "cancel": "Cancel",
+      "card": {
+        "description": "Read build stages, status and timing for checks that link to Jenkins."
+      },
+      "connected": "Connected",
+      "connectedVersion": "Connected to Jenkins {{value0}}",
+      "description": "Orca reads build stages and timing from this server for checks that link to it. The token is stored encrypted when your OS keychain is available.",
+      "edit": "Edit {{value0}}",
+      "editTitle": "Edit Jenkins server",
+      "label": "Name",
+      "labelPlaceholder": "Build server",
+      "noToken": "no token saved",
+      "remove": "Remove {{value0}}",
+      "save": "Save",
+      "saveFailed": "Could not save this Jenkins server.",
+      "search": {
+        "description": "Add Jenkins servers to read build stages and timing in the Checks panel.",
+        "keyword": {
+          "build": "build",
+          "ci": "ci",
+          "integration": "integration",
+          "jenkins": "jenkins",
+          "stages": "stages"
+        },
+        "title": "Jenkins Integration"
+      },
+      "sectionDescription": "Connect build servers so Orca can show what a pipeline stage is doing without leaving the review.",
+      "sectionTitle": "CI providers",
+      "statusCount": "{{value0}} configured",
+      "statusNone": "Not configured",
+      "statusUnknown": "Unknown",
+      "test": "Test",
+      "testFailed": "Could not reach this Jenkins server.",
+      "tokenKeep": "Leave blank to keep the saved token",
+      "unavailable": "Jenkins servers cannot be managed here.",
+      "username": "Username"
+    }
+  },
+  "jira": {
+    "board": {
+      "loadFailed": "Unable to load this Jira board.",
+      "noTarget": "No Jira host is available for this move.",
+      "noTransitionSelected": "No status change is selected."
+    },
+    "issue": {
+      "assignableUsersError": "Failed to load the people assignable to this issue.",
+      "editFieldsError": "Failed to load the fields you can edit on this issue.",
+      "prioritiesError": "Failed to load the priorities this issue can be set to.",
+      "sprintAssignmentError": "Failed to load this issue’s sprint.",
+      "transitionsError": "Failed to load status changes.",
+      "writeTimedOut": "Jira did not answer in time, so this change may not have been saved. Reload the issue."
+    },
+    "settings": {
+      "boardLoadFailed": "Jira settings could not be loaded."
+    },
+    "transitions": {
+      "completeInJira": null,
+      "unsupported": null
+    },
+    "workspace": {
+      "openFailed": null
+    }
+  },
+  "prChecks": {
+    "rerun": {
+      "githubStarted": "Check rerun requested",
+      "githubStartedPlural": "Check reruns requested",
+      "jenkinsStarted": "Reruns requested for {{value0}} Jenkins builds",
+      "mixedStarted": "Reruns requested: {{value0}} GitHub rerun(s), {{value1}} Jenkins build(s)",
+      "nothingFailed": "No failed checks to rerun.",
+      "nothingRerunnable": "No rerunnable checks found.",
+      "partialFailure": "{{value0}} rerun(s) already started. {{value1}}"
+    }
+  },
+  "settings": {
+    "accounts": {
+      "search": {
+        "aiCreditsKeyword": "ai credits",
+        "copilotDescription": "Track GitHub Copilot AI credit usage for your enterprise through your GitHub CLI sign-in, or a GitHub token with enterprise billing read. The enterprise slug is detected for you.",
+        "copilotKeyword": "copilot",
+        "copilotTitle": "GitHub Copilot Usage",
+        "githubKeyword": "github",
+        "tokenKeyword": "token"
       }
     },
-    "agentSessionContinuation": {},
-    "jiraOptionMultiSelect": {
-      "search": "Search options...",
-      "noMatch": "No options match your search."
+    "agents": {
+      "undetectedDefaultHint": "Install one, then Refresh: an agent needs to be detected on this host before a new tab can launch it as your default."
     },
-    "jiraUserMultiPicker": {
-      "noOtherMatch": "No other users match."
+    "aiGeneration": {
+      "noEffortForModel": "This model has no effort setting."
     },
-    "jiraSchemaField": {
-      "noUser": "None",
-      "currentValue": "Current: {{value0}}"
+    "appearance": {
+      "search": {
+        "aiCreditsKeyword": "ai credits",
+        "balanceKeyword": "balance",
+        "cnyKeyword": "cny",
+        "copilotDescription": "Show your GitHub Copilot AI credit usage in the status bar.",
+        "copilotKeyword": "copilot",
+        "copilotTitle": "GitHub Copilot Usage",
+        "creditsKeyword": "credits",
+        "deepseekDescription": "Show your DeepSeek account balance in the status bar.",
+        "deepseekKeyword": "deepseek",
+        "deepseekTitle": "DeepSeek Balance",
+        "fireworksAiKeyword": "fireworks.ai",
+        "fireworksDescription": "Show your Fireworks.ai rated spend in the status bar.",
+        "fireworksKeyword": "fireworks",
+        "fireworksTitle": "Fireworks.ai Spend",
+        "githubKeyword": "github",
+        "spendKeyword": "spend",
+        "tokenKeyword": "token"
+      },
+      "statusBar": {
+        "copilotLabel": "GitHub Copilot Usage",
+        "copilotToggleDescription": "Show GitHub Copilot AI credit usage in the status bar.",
+        "deepseekLabel": "DeepSeek Balance",
+        "deepseekToggleDescription": "Show DeepSeek account balance in the status bar.",
+        "fireworksLabel": "Fireworks.ai Spend",
+        "fireworksToggleDescription": "Show Fireworks.ai rated spend in the status bar."
+      }
     },
-    "jiraStatusRow": {
-      "title": "Change {{value0}} to {{value1}}",
-      "description": "Jira requires these fields before it will apply this status change.",
-      "refused": "Jira refused this change. Review the reason below, or finish it in Jira."
+    "sessionSummaryAi": {
+      "description": "The agent and model that summarize a session in the Summary tab. A fold runs only while that tab is open, reads only what was added since the last fold, and its result is cached.",
+      "discovering": "Discovering models…",
+      "keyword": {
+        "agent": "agent",
+        "model": "model",
+        "summary": "summary",
+        "transcript": "transcript"
+      },
+      "modelsUnavailable": "Couldn't list this agent's models — using its built-in list.",
+      "refreshModels": "Refresh models",
+      "title": "Session summaries"
     }
   },
   "terminal": {
     "codexSharedServerBanner": {}
   },
+  "tray": {
+    "activityWaiting": null
+  },
   "workspace": {
     "exactBranch": {
       "updateRuntime": "Update the remote runtime to copy a workspace to it"
-    }
-  },
-  "jira": {
-    "board": {
-      "noTarget": "No Jira host is available for this move.",
-      "noTransitionSelected": "No status change is selected."
-    }
-  },
-  "checkBuild": {
-    "title": "Build",
-    "number": "Number",
-    "triggeredBy": "Triggered by",
-    "queued": "Queued",
-    "estimated": "Estimated",
-    "parameters": "Parameters",
-    "commits": "Commits"
-  },
-  "jenkins": {
-    "settings": {
-      "sectionTitle": "CI providers",
-      "sectionDescription": "Connect build servers so Orca can show what a pipeline stage is doing without leaving the review.",
-      "search": {
-        "title": "Jenkins Integration",
-        "description": "Add Jenkins servers to read build stages and timing in the Checks panel.",
-        "keyword": {
-          "jenkins": "jenkins",
-          "integration": "integration",
-          "ci": "ci",
-          "build": "build",
-          "stages": "stages"
-        }
-      },
-      "unavailable": "Jenkins servers cannot be managed here.",
-      "connectedVersion": "Connected to Jenkins {{value0}}",
-      "connected": "Connected",
-      "testFailed": "Could not reach this Jenkins server.",
-      "statusUnknown": "Unknown",
-      "statusNone": "Not configured",
-      "statusCount": "{{value0}} configured",
-      "card": {
-        "description": "Read build stages, status and timing for checks that link to Jenkins."
-      },
-      "add": "Add server",
-      "noToken": "no token saved",
-      "test": "Test",
-      "edit": "Edit {{value0}}",
-      "remove": "Remove {{value0}}",
-      "saveFailed": "Could not save this Jenkins server.",
-      "editTitle": "Edit Jenkins server",
-      "addTitle": "Add Jenkins server",
-      "description": "Orca reads build stages and timing from this server for checks that link to it. The token is stored encrypted when your OS keychain is available.",
-      "label": "Name",
-      "labelPlaceholder": "Build server",
-      "baseUrl": "Server URL",
-      "baseUrlPlaceholder": "https://ci.example.com/jenkins",
-      "baseUrlHint": "Include the path Jenkins is served under, if it is not at the root.",
-      "username": "Username",
-      "apiToken": "API token",
-      "tokenKeep": "Leave blank to keep the saved token",
-      "apiTokenHint": "Create one in Jenkins under your user profile → Configure → API Token.",
-      "cancel": "Cancel",
-      "save": "Save"
-    },
-    "buildDetails": {
-      "unknownServer": "this Jenkins server",
-      "notConfigured": "Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to see build details.",
-      "unauthorized": "Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.",
-      "forbidden": "The saved Jenkins account cannot read this job on {{value0}}.",
-      "notFound": "This Jenkins build is no longer available. Build retention may have pruned it.",
-      "unreachable": "Could not reach {{value0}}. Build details are read from this machine, so a Jenkins on another network stays out of reach.",
-      "timeout": "{{value0}} did not respond in time.",
-      "failed": "Jenkins could not return this build.",
-      "timedOut": "Timed out loading this Jenkins build."
-    },
-    "rerun": {
-      "action": "Rerun build",
-      "rerunning": "Rerunning…",
-      "inFlight": "A rerun of this Jenkins build is already starting.",
-      "noBuild": "This check does not link to a numbered Jenkins build, so there is nothing to rerun. Open it in Jenkins instead.",
-      "notReplayable": "Jenkins has no rerun for this build: the job is a freestyle job rather than a pipeline, or it is disabled.",
-      "notConfigured": "Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to rerun this build.",
-      "unauthorized": "Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.",
-      "forbidden": "Jenkins did not offer a rerun for this build on {{value0}}. The saved account needs the Build permission on the job.",
-      "notFound": "This Jenkins build is no longer available — build retention may have pruned it. Nothing was started.",
-      "unreachable": "Could not reach {{value0}}. Check Jenkins before retrying, in case a build did start. Builds are triggered from this machine, so a Jenkins on another network stays out of reach.",
-      "timeout": "{{value0}} did not respond in time. Check Jenkins before retrying, in case a build did start.",
-      "unconfirmed": "Jenkins did not confirm the rerun. Check Jenkins before retrying, in case a build did start.",
-      "failed": "Jenkins could not rerun this build.",
-      "timedOut": "Timed out waiting for Jenkins to rerun the build. Check Jenkins before retrying, in case a build did start.",
-      "notJenkins": "This check does not link to a Jenkins build, so it cannot be rerun here.",
-      "unavailable": "Rerunning Jenkins builds is not available in this client.",
-      "started": "Jenkins is rerunning this build",
-      "startedBuild": "Jenkins is rerunning build #{{value0}}"
-    }
-  },
-  "prChecks": {
-    "rerun": {
-      "nothingFailed": "No failed checks to rerun.",
-      "nothingRerunnable": "No rerunnable checks found.",
-      "partialFailure": "{{value0}} rerun(s) already started. {{value1}}",
-      "mixedStarted": "Reruns requested: {{value0}} GitHub rerun(s), {{value1}} Jenkins build(s)",
-      "jenkinsStarted": "Reruns requested for {{value0}} Jenkins builds",
-      "githubStarted": "Check rerun requested",
-      "githubStartedPlural": "Check reruns requested"
-    }
-  },
-  "checkDetails": {
-    "duration": "Duration",
-    "hiddenStages": "+{{value0}} more stages",
-    "failures": "Failures",
-    "openJenkinsSettings": "Open Jenkins settings",
-    "toggleStage": "Toggle stage steps"
-  },
-  "activity": {
-    "sessionSummary": {
-      "now": "Now",
-      "ledger": "Ledger",
-      "refresh": "Refresh summary",
-      "nothingSince": "Nothing has happened since your last message.",
-      "showFullSession": "Show the full session",
-      "showSince": "Show since your last message",
-      "factCount": "{{count}} facts · whole session",
-      "factCountSince": "{{count}} since your last message",
-      "timelineCount": "{{count}} events · whole session",
-      "timelineCountSince": "{{count}} events since your last message",
-      "asOf": "(as of #{{index}})",
-      "timeline": "Timeline",
-      "plan": "Plan",
-      "done": "Done",
-      "blockers": "Blockers",
-      "decisions": "Decisions",
-      "updating": "Updating…",
-      "backlogHint": "{{count}} events to catch up on",
-      "upToDate": "Up to date",
-      "label": "Session summary",
-      "failed": "Could not summarize this session.",
-      "failedHint": "Could not summarize this session",
-      "unavailable": "No readable transcript for this session yet.",
-      "noTranscriptHint": "No readable transcript",
-      "unavailableInWindow": "Session summaries are not available in this window.",
-      "notFocused": "Focus an agent session to see its summary.",
-      "hostOutdated": "This host runs an older Orca. Update Orca there to summarize its sessions.",
-      "unsupportedHost": "Session summaries are not available for a workspace on this host.",
-      "hostOutdatedHint": "Update Orca on this host to summarize",
-      "unsupportedHostHint": "Session summaries are not available on this host",
-      "nothingYet": "Nothing notable in this session yet.",
-      "staleHint": "Couldn't refresh — showing the last summary",
-      "stale": "Couldn't refresh — showing the last summary."
     }
   }
 }

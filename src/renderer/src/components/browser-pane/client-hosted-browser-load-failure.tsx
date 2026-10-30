@@ -26,7 +26,7 @@ export function ClientHostedBrowserLoadFailure({
       loadError={browserTab.loadError}
       onRetry={onRetry}
       autoRetry={{ active: isActive, loading: browserTab.loading }}
-      onOpenExternal={(url) => void window.api.shell.openUrl(url)}
+      onOpenExternal={(url) => void window.api.shell.openUrlInSystemBrowser(url)}
       externalUrl={getOpenableExternalUrl(failedNavigationUrl)}
       certificateFailure={certificateFailure}
       expectedBrowserPageId={browserTab.id}

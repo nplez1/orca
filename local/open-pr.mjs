@@ -18,7 +18,8 @@
 // review claim, and a head with no cached unit-gate PASS *when the change is global enough that a
 // targeted run proves nothing* — the full suite itself moved to the release gate, so requiring it per
 // branch is what made agents run it five times a session. `--waive-gate <n>:<reason>` records a
-// deliberate exception, prints it, and expects the PR body to state it.
+// deliberate exception and writes it into the PR body, because a waiver a reader cannot find is not
+// recorded.
 //
 //   body=$(mktemp "${TMPDIR:-/tmp}/orca-pr-body.XXXXXX")
 //   node local/open-pr.mjs --title "fix(git): ..." --body-file "$body"
@@ -30,10 +31,11 @@
 // overrides either.
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { reviewClaim, waiverDisclosure } from './pr-body-claims.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
@@ -60,7 +62,9 @@ export const REVIEW_CLAIM_EXAMPLE =
   'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2'
 
 function run(command, args) {
-  return execFileSync(command, args, { encoding: 'utf8' }).trim()
+  // Why the buffer: the default is 1 MiB, and `ls-tree` over this repository's 41k upstream files
+  // aborts with ENOBUFS — which the derivation reads as "no fork line", silently dropping the check.
+  return execFileSync(command, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim()
 }
 
 // Why untrimmed: a fingerprint is over bytes, and `git show` output ends with the newline the file
@@ -122,7 +126,8 @@ export function usage() {
   --base <branch>     base branch (defaults: ${FORK_BASE}, or ${UPSTREAM_BASE} with --upstream)
   --branch <branch>   head branch (defaults to the checked-out branch)
   --waive-gate <n>:<reason>
-                      open the PR without gate <n> (1 = unit gate, 2 = review), stating why
+                      open the PR without gate <n> (1 = unit gate, 2 = review), and write
+                      \`Gate <n> waived: <reason>\` into the PR body
   --dry-run           print the gh command instead of running it, and report a gate refusal
                       instead of aborting on it
 
@@ -133,6 +138,8 @@ by its targeted tests instead. Gate 1 is fork-local either way, so an upstream P
 with the reason. Gate 2 needs a
 line in the body shaped like:
   ${REVIEW_CLAIM_EXAMPLE}
+Where that line names a round, the round needs a closed verdict of its own — \`clean\`, or a count of
+blocking findings that were fixed — and the reviewer has to be the Opus reviewer AGENTS.md names.
 `
 }
 
@@ -152,55 +159,6 @@ export function parseGateWaivers(entries = []) {
     waivers.set(Number(match[1]), match[2].trim())
   }
   return waivers
-}
-
-/** Markdown emphasis, headings and bullets are noise around the claim, not a different claim. */
-function normaliseBodyLine(line) {
-  return String(line)
-    .replace(/^[\s>*_#-]+/, '')
-    .replace(/[*_]/g, '')
-    .trim()
-}
-
-export function reviewClaim(body) {
-  let fenced = false
-  for (const raw of String(body ?? '').split('\n')) {
-    if (raw.trimStart().startsWith('```')) {
-      fenced = !fenced
-      continue
-    }
-    if (fenced) {
-      continue
-    }
-    const line = normaliseBodyLine(raw)
-    const match = /^reviewed by\s+(.+)$/i.exec(line)
-    if (!match) {
-      continue
-    }
-    const claim = match[1].trim()
-    const rounds = /\bR\d+\b|\bround\s*\d+/i.test(claim)
-    // Why a closed set: "R1 (3 blocking, unresolved)" and "findings TBD" name a finding without
-    // claiming it was resolved, and a gate that accepts them enforces nothing.
-    const verdict = /\b(clean|fixed|addressed|nits?)\b/i.test(claim)
-    const stillOpen =
-      /\b(unresolved|outstanding|pending|tbd)\b|\bnot\s+(clean|fixed|addressed)\b/i.test(claim)
-    if (rounds && verdict && !stillOpen) {
-      return { ok: true, line: `Reviewed by ${claim}` }
-    }
-    if (stillOpen) {
-      return {
-        ok: false,
-        reason: `the review line records an open finding: "${claim}"`
-      }
-    }
-    return {
-      ok: false,
-      reason: rounds
-        ? `the review line states no closed verdict (clean / fixed / addressed / nit): "${claim}"`
-        : `the review line names no review round (R1, round 1): "${claim}"`
-    }
-  }
-  return { ok: false, reason: 'the body has no "Reviewed by" line' }
 }
 
 /** Why a subject prefix and not a path: `.husky/commit-msg` enforces the same invariant locally. */
@@ -372,11 +330,87 @@ export function evaluateGates({
 
 export const FORK_OWNED_PATHS = [
   'local/',
+  '.agents/skills/',
+  '.github/workflows/fork-*.yml',
+  '.github/scripts/fork-release-notes.mjs',
+  '.github/scripts/fork-release-ref-guard.sh',
   'LOCAL-PATCHES.md',
   'BRANCHES.md',
   'UPSTREAM-SYNC-RUNBOOK.md',
   '.husky/commit-msg'
 ]
+
+/** Where the fork's own line lives, most authoritative first. */
+export const FORK_LINE_REFS = [
+  'refs/remotes/origin/nplez1/main',
+  'refs/heads/nplez1/main',
+  'nplez1/main'
+]
+
+/**
+ * The fork-owned set, derived instead of listed: the files the fork's own line adds to a top-level
+ * tree the upstream base does not carry at all.
+ *
+ * Why top-level trees: the hand list could not keep up — `.agents/skills/**`,
+ * `.github/workflows/fork-*.yml`, `.github/scripts/fork-release-notes.mjs` and `local/orca-vm/` were
+ * all fork-added and all absent from it. Why not files, and not nested directories either:
+ * BRANCHES.md records that upstream work is cut from code that has already landed on `nplez1/main`,
+ * so every new `src/` file — including one in a directory the fork created, a provider for instance —
+ * is "added since upstream/main" and would be refused. That is the one path fork work has to reach
+ * upstream, so a tree upstream already owns stays reviewable; a whole tree it lacks does not.
+ *
+ * Returns `null` when no fork line is reachable, in which case only the literal list applies.
+ */
+export function derivedForkOwnedPaths(upstreamBase, gitRun = git, refs = FORK_LINE_REFS) {
+  const attempt = (args) => {
+    try {
+      return gitRun(args)
+    } catch {
+      return null
+    }
+  }
+  for (const ref of refs) {
+    if (attempt(['rev-parse', '--verify', '--quiet', ref]) === null) {
+      continue
+    }
+    const added = attempt([
+      'diff',
+      '--name-only',
+      '--diff-filter=A',
+      '--no-renames',
+      `${upstreamBase}...${ref}`
+    ])
+    const upstreamTop = attempt(['ls-tree', '--name-only', upstreamBase])
+    if (added === null || upstreamTop === null) {
+      return null
+    }
+    const owned = new Set(
+      upstreamTop
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    )
+    return added
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((path) => !owned.has(path.split('/')[0]))
+  }
+  return null
+}
+
+/**
+ * The changed paths in `range` that are fork-owned, by the literal list and by the derived set.
+ * Both, because they answer different questions: the list catches a fork file the branch *modified*
+ * (`.husky/commit-msg` exists upstream), the derived set catches a fork tree nobody listed.
+ */
+export function forkOwnedPathsInRange(range, upstreamBase, gitRun = git) {
+  const changed = changedPathsIn(range, gitRun)
+  const listed = forkOnlyPathsIn(range, gitRun)
+  const derived = derivedForkOwnedPaths(upstreamBase, gitRun)
+  const derivedInDiff = derived === null ? [] : changed.filter((path) => derived.includes(path))
+  return [...new Set([...listed, ...derivedInDiff])]
+}
 
 /**
  * The changed paths a PR will show. Exported and injectable for the same reason `forkOnlyPathsIn` is:
@@ -453,13 +487,21 @@ export function needsFullUnitGate(changedPaths) {
 }
 
 /**
+ * Why the glob magic on a wildcard entry: a pathspec is a prefix match, so `.github/workflows/fork-`
+ * would match a file literally named that, and `fork-*.yml` needs `:(glob)` to match a pattern.
+ */
+function forkOwnedPathspec(path) {
+  return path.includes('*') ? `:(top,glob)${path}` : `:(top)${path}`
+}
+
+/**
  * Why a path check on top of the subject check: the subject prefix is a convention, and a squash or
  * a differently-worded commit carries the same files upstream without one.
  */
 export function forkOnlyPathsIn(range, gitRun = git) {
   // Why `:(top)`: pathspecs are relative to the current directory, so a run from a subdirectory would
   // look under `<subdir>/local/` and find nothing.
-  return gitRun(['diff', '--name-only', range, '--', ...FORK_OWNED_PATHS.map((p) => `:(top)${p}`)])
+  return gitRun(['diff', '--name-only', range, '--', ...FORK_OWNED_PATHS.map(forkOwnedPathspec)])
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
@@ -534,7 +576,7 @@ function main() {
           `Rebase the branch onto ${baseRef} without them, or open the PR against the fork.`
       )
     }
-    const paths = forkOnlyPathsIn(`${baseCommit}...${branchHead}`)
+    const paths = forkOwnedPathsInRange(`${baseCommit}...${branchHead}`, baseCommit)
     if (paths.length > 0) {
       const listed = paths
         .slice(0, 8)
@@ -559,11 +601,14 @@ function main() {
     )
   }
 
+  // Why before the gates: the waiver line is part of the body that gets published, so gate 2 has to
+  // read the text the reader will see. Writing it later left the waiver in a terminal scrollback.
+  const disclosure = waiverDisclosure(readFileSync(options.bodyFile, 'utf8'), waivers)
   const gateResult = evaluateGates({
     upstream: options.upstream,
     waivers,
     head: branchHead,
-    body: readFileSync(options.bodyFile, 'utf8'),
+    body: disclosure.body,
     // Why three dots: the merge-base diff is what the PR will show, so a branch that has already
     // pulled the base in must not look global because of the base's own files.
     changedPaths: changedPathsIn(`${baseCommit}...${branchHead}`)
@@ -572,7 +617,12 @@ function main() {
     console.log(`open-pr: ${line}`)
   }
   for (const [gate, reason] of gateResult.waived) {
-    console.log(`open-pr: WAIVED gate ${gate} — ${reason}\n  state this in the PR body`)
+    console.log(`open-pr: WAIVED gate ${gate} — ${reason}`)
+  }
+  for (const line of disclosure.lines) {
+    console.log(
+      `open-pr: ${options.dryRun ? 'would append to' : 'appended to'} the PR body: ${line}`
+    )
   }
   if (gateResult.problems.length > 0 && !options.dryRun) {
     fail(gateResult.problems.join('\n\n'))
@@ -604,6 +654,12 @@ function main() {
       `gh ${args.map((arg) => (arg.includes(' ') ? JSON.stringify(arg) : arg)).join(' ')}`
     )
     return
+  }
+
+  if (disclosure.lines.length > 0) {
+    // Why the file and not a `--body` argument: the caller may re-read it, and the record of the
+    // waiver should live where every other PR's body lives.
+    writeFileSync(options.bodyFile, disclosure.body)
   }
 
   console.log(

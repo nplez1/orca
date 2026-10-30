@@ -68,7 +68,7 @@ export function SshForwardedPortsSection({
                 onEdit={() => setDialogState({ mode: 'edit', entry })}
                 // Use the system browser: this forward listens locally, while Orca’s browser may run on another host.
                 onOpenInBrowser={() =>
-                  void window.api.shell.openUrl(browserUrlForPortForwardEntry(entry))
+                  void window.api.shell.openUrlInSystemBrowser(browserUrlForPortForwardEntry(entry))
                 }
               />
             ))}

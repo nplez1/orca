@@ -17,10 +17,6 @@ import { grantDirAcl, isPermissionError } from '../win32-utils'
 import { resolveHooksJsonWritePath } from './hook-config-write-path'
 import { writeRollingFileBackup } from '../rolling-file-backup'
 import { renameOverLockedTarget } from './locked-executable-rename'
-import {
-  getWindowsNativeHookAgent,
-  WINDOWS_NATIVE_HOOK_EXECUTABLE_NAME
-} from './windows-native-hook-executable'
 
 export type HookCommandConfig = {
   type: 'command'
@@ -69,45 +65,10 @@ export {
   type HooksJsonSnapshot
 } from './hooks-json-read'
 
-// Match script names so reinstalls sweep entries from old and parallel installations.
-export function createManagedCommandMatcher(
-  scriptFileName: string
-): (command: string | undefined) => boolean {
-  const scriptStem = scriptFileName.replace(/\.(?:cmd|ps1|sh)$/, '')
-  // Sweep every platform suffix after a platform switch.
-  const needles = [
-    `agent-hooks/${scriptFileName}`,
-    `agent-hooks/${scriptStem}.cmd`,
-    `agent-hooks/${scriptStem}.ps1`,
-    `agent-hooks/${scriptStem}.sh`
-  ]
-  // The native executable selects its provider through argv[1].
-  const nativeHook = `agent-hooks/${WINDOWS_NATIVE_HOOK_EXECUTABLE_NAME} ${getWindowsNativeHookAgent(scriptFileName)} `
-  return (command) => {
-    if (!command) {
-      return false
-    }
-    const decodedCommand = decodePowerShellEncodedCommand(command)
-    const searchText = decodedCommand ? `${command}\n${decodedCommand}` : command
-    const normalizedCommand = searchText.replaceAll('\\', '/')
-    return (
-      needles.some((needle) => normalizedCommand.includes(needle)) ||
-      normalizedCommand.split('\n').some((line) => `${line} `.includes(nativeHook))
-    )
-  }
-}
-
-function decodePowerShellEncodedCommand(command: string): string | null {
-  const match = command.match(/\s-EncodedCommand\s+(\S+)/i)
-  if (!match) {
-    return null
-  }
-  try {
-    return Buffer.from(match[1], 'base64').toString('utf16le')
-  } catch {
-    return null
-  }
-}
+export {
+  createManagedCommandMatcher,
+  type ManagedCommandMatcherOptions
+} from './managed-command-matcher'
 
 // Parallel Orca instances must share one user-wide script path.
 export function getSharedManagedScriptPath(scriptFileName: string): string {
@@ -128,6 +89,14 @@ export {
   wrapWindowsHookCommand
 } from './windows-hook-command'
 
+// The agent's own process identity on Windows, as the native hook reports it.
+//
+// Why the env var: batch has no `$PPID`, so the JSON has to come from the process that could read it
+// (the native `orca-agent-hook.exe`, or a launcher that captured it) and this is how it reaches curl.
+// An unset value sends an empty field, which the listener already reads as "no identity" — exactly
+// what a hook sending nothing looked like before, so the change cannot regress the outer guard.
+export const WINDOWS_HOOK_AGENT_PROCESS_VAR = 'ORCA_HOOK_AGENT_PROCESS'
+
 /** Extra form lines precede payload@- and must end with ` ^`. */
 export function buildWindowsAgentHookPostCommand(
   source: AgentHookSource,
@@ -145,6 +114,7 @@ export function buildWindowsAgentHookPostCommand(
     '  --data-urlencode "worktreeId=%ORCA_WORKTREE_ID%" ^',
     '  --data-urlencode "env=%ORCA_AGENT_HOOK_ENV%" ^',
     '  --data-urlencode "version=%ORCA_AGENT_HOOK_VERSION%" ^',
+    `  --data-urlencode "agentProcess=%${WINDOWS_HOOK_AGENT_PROCESS_VAR}%" ^`,
     ...extraFormLines,
     '  --data-urlencode "payload@-" >nul 2>nul'
   ].join('\r\n')
@@ -164,6 +134,7 @@ export function buildWindowsAgentHookCurlPostCommand(source: AgentHookSource): s
     '--data-urlencode "worktreeId=%ORCA_WORKTREE_ID%"',
     '--data-urlencode "env=%ORCA_AGENT_HOOK_ENV%"',
     '--data-urlencode "version=%ORCA_AGENT_HOOK_VERSION%"',
+    `--data-urlencode "agentProcess=%${WINDOWS_HOOK_AGENT_PROCESS_VAR}%"`,
     '--data-urlencode "payload@-"',
     '>nul 2>&1'
   ].join(' ')

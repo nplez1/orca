@@ -14,8 +14,10 @@ set -eu
 EXTEND_VERB="team-machines extend"
 # Reports the resource as JSON, including its absolute deadline.
 SHOW_VERB="team-machines show"
+# How many times to ask for the deadline when the extend verb's own answer does not carry it.
+SHOW_ATTEMPTS=3
 
-log() { printf '%s\n' "$*" >&2; }
+log() { printf '%s\n' "$*" >&2 || true; }
 
 if ! command -v jq >/dev/null 2>&1; then
   log "extend: jq is required"
@@ -33,22 +35,50 @@ if [ -z "$resource_id" ] || [ -z "$lifetime" ]; then
 fi
 
 log "extending $resource_id by $lifetime"
-$EXTEND_VERB "$resource_id" "$lifetime" >&2
+# Captured rather than streamed: the grant often reports the new deadline itself, and that answer
+# cannot be reread once it has gone straight to stderr. Why the failure branch prints it: a provider
+# CLI usually reports the reason on stdout, and `set -e` would otherwise discard it unseen.
+extended="$($EXTEND_VERB "$resource_id" "$lifetime")" || {
+  if [ -n "$extended" ]; then
+    printf '%s\n' "$extended" >&2
+  fi
+  log "extend: the provisioner's extend verb failed — the lease was not extended"
+  exit 1
+}
+if [ -n "$extended" ]; then
+  printf '%s\n' "$extended" >&2
+fi
 
-# Why re-read instead of adding the duration locally: only the provider's own deadline is enforced,
-# so a local sum would count down to an instant nobody guarantees.
-resource="$($SHOW_VERB "$resource_id" --json)"
-release_at="$(printf '%s' "$resource" | jq -r '.expiresAt // empty')"
-remaining="$(printf '%s' "$resource" | jq -r '.remainingSeconds // empty')"
+# Why not add the duration locally: only the provider's own deadline is enforced, so a local sum would
+# count down to an instant nobody guarantees. The grant's own answer counts; the follow-up read is the
+# fallback because it is the step that can fail.
+release_at="$(printf '%s' "$extended" | jq -r '.expiresAt // empty' 2>/dev/null || true)"
+remaining="$(printf '%s' "$extended" | jq -r '.remainingSeconds // empty' 2>/dev/null || true)"
+
+# Why retry: the lease is already extended here, so one failed read would throw away the deadline the
+# user just paid for and leave the app counting down to the old one — reclaiming the host early.
+attempt=0
+while [ -z "$release_at" ] && [ "$attempt" -lt "$SHOW_ATTEMPTS" ]; do
+  attempt=$((attempt + 1))
+  resource="$($SHOW_VERB "$resource_id" --json || true)"
+  release_at="$(printf '%s' "$resource" | jq -r '.expiresAt // empty' 2>/dev/null || true)"
+  remaining="$(printf '%s' "$resource" | jq -r '.remainingSeconds // empty' 2>/dev/null || true)"
+  if [ -z "$release_at" ] && [ "$attempt" -lt "$SHOW_ATTEMPTS" ]; then
+    sleep 1
+  fi
+done
 if [ -z "$release_at" ]; then
-  log "provider reported no expiresAt — refusing to report an extension that moved no deadline"
+  log "extend: the provider granted the extension but reported no deadline for $resource_id in $SHOW_ATTEMPTS reads — Orca keeps the old deadline, so this host can be reclaimed early. Check the provider's own deadline for $resource_id before extending again: a second extend buys more time a second time."
   exit 1
 fi
 
 # Everything else is passed through untouched: an unchanged `connection` is what keeps the host
 # attached with its live terminals rather than forcing a reconnect.
 result="$(printf '%s' "$payload" | jq -c --arg release "$release_at" '.recipeResult | .userData.releaseAt = $release')"
-if [ -n "$remaining" ]; then
-  result="$(printf '%s' "$result" | jq -c --argjson seconds "$remaining" '.userData.lifetimeSeconds = $seconds')"
-fi
+# Why the shape check: jq exits non-zero on a non-numeric argument, and the extension has already been
+# granted by this point — a countdown we cannot format must not turn a moved deadline into a failure.
+case "$remaining" in
+  '' | 0 | *[!0-9]*) ;;
+  *) result="$(printf '%s' "$result" | jq -c --argjson seconds "$remaining" '.userData.lifetimeSeconds = $seconds')" ;;
+esac
 printf '%s\n' "$result"

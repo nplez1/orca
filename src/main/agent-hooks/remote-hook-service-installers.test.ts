@@ -491,7 +491,7 @@ describe('remote hook service installers', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: '/tmp/old/agent-hooks/antigravity-hook.sh'
+                    command: '/home/dev/.orca/agent-hooks/antigravity-hook.sh'
                   }
                 ]
               }
@@ -524,7 +524,7 @@ describe('remote hook service installers', () => {
     )
     expect(preToolCommands).toHaveLength(1)
     expect(preToolCommands[0]).toContain('/home/dev/.orca-np/agent-hooks/antigravity-hook.sh')
-    expect(preToolCommands).not.toContain('/tmp/old/agent-hooks/antigravity-hook.sh')
+    expect(preToolCommands).not.toContain('/home/dev/.orca/agent-hooks/antigravity-hook.sh')
     const postToolCommands = config['orca-status'].PostToolUse.flatMap((definition) =>
       (definition.hooks ?? []).map((hook) => hook.command)
     )
@@ -545,7 +545,7 @@ describe('remote hook service installers', () => {
                   {
                     type: 'command',
                     command:
-                      "if [ -x '/tmp/old/agent-hooks/gemini-hook.sh' ]; then /bin/sh '/tmp/old/agent-hooks/gemini-hook.sh'; fi"
+                      "if [ -x '/home/dev/.orca/agent-hooks/gemini-hook.sh' ]; then /bin/sh '/home/dev/.orca/agent-hooks/gemini-hook.sh'; fi"
                   }
                 ]
               },

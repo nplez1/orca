@@ -433,6 +433,34 @@ describe('legacy compatibility through RpcDispatcher', () => {
     expect(counts(harness.db)).toEqual(before)
   })
 
+  it('accepts the fork’s own CLI names, and refuses one outside the set', async () => {
+    // Why: the host validates this against a closed enum, so a name it does not know fails the
+    // whole check as invalid params. `orca-np-dev` is a packaged launcher name and has to be in
+    // that set, not only in the client's list.
+    const harness = createHarness()
+    for (const compatibilityCliCommand of ['orca', 'orca-np', 'orca-np-dev']) {
+      const accepted = await harness.dispatcher.dispatch(
+        request(
+          'orchestration.check',
+          { terminal: WORKER_HANDLE, compatibilityCliCommand },
+          evidence('worker'),
+          `cli-name-${compatibilityCliCommand}`
+        )
+      )
+      expect(accepted).toMatchObject({ ok: true })
+    }
+
+    const refused = await harness.dispatcher.dispatch(
+      request(
+        'orchestration.check',
+        { terminal: WORKER_HANDLE, compatibilityCliCommand: 'not-a-launcher' },
+        evidence('worker'),
+        'cli-name-unknown'
+      )
+    )
+    expect(refused).toMatchObject({ ok: false, error: { code: 'invalid_argument' } })
+  })
+
   it('rejects invalid typed ACKs and consumes only the filtered legacy page', async () => {
     const harness = createHarness()
     await harness.dispatcher.dispatch(

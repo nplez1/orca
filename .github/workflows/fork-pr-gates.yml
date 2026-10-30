@@ -1,0 +1,81 @@
+name: Fork PR gates
+
+# Why this exists: `pr.yml` is `disabled_manually` on this fork, so a pull request has no status
+# checks at all while the ruleset requires one — and the reason recorded for disabling it (billed
+# minutes) does not hold. Standard runners bill nothing on a public repository: the Actions timing API
+# returns 0 ms for the nightly (7 jobs) and for a full three-platform release. See `LOCAL-PATCHES.md`
+# § local(ci), which also records the decision this file implements.
+#
+# Why these two gates and not `pr.yml`: upstream's file is the whole fleet — package, e2e, relay,
+# cross-version-wire, mobile web, Windows probes — it arrives with every sync, and it spends 40+
+# minutes per PR re-treading a branch that just ran the same suites locally. Typecheck and the
+# changed-lines quality gate are the two classes that reached this fork's release line unnoticed and
+# are green to enforce on any branch today. The unit suite is not here on purpose:
+# `ci-unit-selection.mjs` turns one changed file into ~3,000 of 13,064 test files, which is a shard
+# planner, not a PR lane. It runs nightly and now also gates a release.
+#
+# Why not `pnpm lint` here yet: measured on `nplez1/main` at 2026-10-29, `pnpm lint` reports "2 of 36
+# lint step(s) failed" — `oxlint` on its own is red for `src/cli/handlers/vm.ts` (336 counted lines,
+# limit 300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. A repo-wide lane that is
+# red on its own base teaches everyone to ignore it, so this lane judges the PR's changed lines
+# instead, and repo-wide lint becomes the third gate here once the release line is green.
+#
+# Draft PRs run it too: the cost is a few free minutes, and a draft whose types do not compile is
+# worth knowing about before it is marked ready.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-pr-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    # Why the prefix: the ruleset matches a check by name, so a bare `typecheck` could be satisfied by
+    # any other workflow that happens to run a job with that name.
+    name: 'fork-pr-gates: typecheck'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # Why `native-runtime: node`: the same preparation `fork-main-gates.yml` uses before `pnpm tc`
+      # on this runner, so a green here means what a green there means.
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Typecheck
+        run: pnpm tc
+
+  changed-lines:
+    name: 'fork-pr-gates: changed lines'
+    # Why pull_request only: the gate diffs the pull request's merge commit against its first parent,
+    # and on a dispatch HEAD is not a merge commit — it would fall back to merge-base against a base
+    # branch a shallow checkout does not have. A dispatch still runs the typecheck half.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Why depth 2: the gate diffs the pull request's merge commit against its first parent, and a
+      # single-commit clone does not carry the base tree it needs.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: none
+
+      # The rule set the repository already enforces on a diff, scoped to this pull request's own
+      # lines: a finding on code the PR did not touch is debt on the base, not this change's problem.
+      - name: Changed-lines code quality
+        run: pnpm run check:code-quality:changed

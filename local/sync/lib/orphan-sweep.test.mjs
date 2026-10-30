@@ -98,3 +98,18 @@ test('isSweepCandidate takes fork-only source under src/ and leaves out tests an
   assert.equal(isSweepCandidate('src/shared/a.fixture.tsx'), false)
   assert.equal(isSweepCandidate('local/sync/x.mjs'), false)
 })
+
+test('a .js specifier in a TS file resolves to the .ts module beside it', () => {
+  assert.equal(
+    resolveSpecifier(
+      './handlers/connector.js',
+      'src/cli/handler-group-manifest.ts',
+      known('src/cli/handlers/connector.ts')
+    ),
+    'src/cli/handlers/connector.ts'
+  )
+  assert.equal(
+    resolveSpecifier('./thing.mjs', 'src/a/b.mjs', known('src/a/thing.mts')),
+    'src/a/thing.mts'
+  )
+})

@@ -1,11 +1,12 @@
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getSecretStore } from '../../shared/secret-store'
 import { readCredentialFileProtection } from '../credential-file-protection'
+import { writeCredentialFileAtomic } from '../integration-credential-file'
 import {
   classifyUnenvelopedCredential,
   type SecretAtRestProtection
 } from '../../shared/secret-at-rest-protection'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -23,7 +24,18 @@ function getOrcaDir(): string {
 function ensureOrcaDir(): void {
   const dir = getOrcaDir()
   if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    return
+  }
+  // Why also on an existing directory: this home holds every credential store, and one created by an
+  // older build stays group- and world-readable until something tightens it. Read first so a save does
+  // not chmod a directory that is already restricted.
+  try {
+    if ((statSync(dir).mode & 0o777) !== 0o700) {
+      chmodSync(dir, 0o700)
+    }
+  } catch {
+    // Best-effort: an unwritable mode does not make the key below unreadable.
   }
 }
 
@@ -80,14 +92,17 @@ export function saveOpenAiSpeechApiKey(apiKey: string): void {
     throw new Error('OpenAI API key is required')
   }
   ensureOrcaDir()
+  // Why the atomic credential writer rather than `writeFileSync`: `mode` applies only at creation, so a
+  // rewrite kept whatever mode the file already had, and the in-place truncate lost the key to a crash
+  // mid-write. This stages, fsyncs and renames, and restricts the new inode on both platforms.
   if (getSecretStore().isEncryptionAvailable()) {
-    writeFileSync(getOpenAiKeyPath(), getSecretStore().encryptString(trimmed), { mode: 0o600 })
+    writeCredentialFileAtomic(getOpenAiKeyPath(), getSecretStore().encryptString(trimmed))
     cachedOpenAiSpeechApiKey = trimmed
     return
   }
 
   console.warn('[speech] secret encryption unavailable — storing OpenAI speech key in plaintext')
-  writeFileSync(getOpenAiKeyPath(), trimmed, { encoding: 'utf8', mode: 0o600 })
+  writeCredentialFileAtomic(getOpenAiKeyPath(), Buffer.from(trimmed, 'utf8'))
   cachedOpenAiSpeechApiKey = trimmed
 }
 

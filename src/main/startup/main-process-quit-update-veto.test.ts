@@ -84,11 +84,15 @@ it('keeps startup services live when the updater has vetoed before-quit', async 
   app.emit('before-quit', { defaultPrevented: false })
 
   expect(state.isQuitting).toBe(true)
-  expect(fenceAndCloseNow).toHaveBeenCalledOnce()
-  expect(setMobileRelayPairingProvider).toHaveBeenCalledWith(null)
-  expect(unsubscribeAgentAwakeStatusChanges).toHaveBeenCalledOnce()
-  expect(dispose).toHaveBeenCalledOnce()
-  expect(stop).toHaveBeenCalledOnce()
+  // Why nothing stopped here: a renderer close guard can still veto after before-quit, and none of
+  // these can be restarted from a veto — so they stop at will-quit, which is past every veto (A6).
+  expect(fenceAndCloseNow).not.toHaveBeenCalled()
+  expect(setMobileRelayPairingProvider).not.toHaveBeenCalled()
+  expect(unsubscribeAgentAwakeStatusChanges).not.toHaveBeenCalled()
+  expect(dispose).not.toHaveBeenCalled()
+  expect(stop).not.toHaveBeenCalled()
+  expect(state.agentAwakeService).toEqual({ dispose })
+  expect(state.unsubscribeAgentAwakeStatusChanges).toBe(unsubscribeAgentAwakeStatusChanges)
   for (const listener of process.listeners('exit')) {
     if (!exitListenersBefore.includes(listener)) {
       process.removeListener('exit', listener)

@@ -1,7 +1,11 @@
 import { createReadStream, type Dirent, type Stats } from 'node:fs'
-import { access, lstat, open, readdir, readFile, stat, type FileHandle } from 'node:fs/promises'
+import { access, lstat, open, readFile, readdir, stat, type FileHandle } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
+import {
+  NodeFileReadTooLargeError,
+  readNodeFileWithinLimit
+} from '../../shared/node-bounded-file-reader'
 import { isWslUncPath } from '../../shared/wsl-paths'
 import { runWslTranscriptFsTask, type WslTranscriptFsTaskPriority } from './wsl-transcript-fs-gate'
 import {
@@ -99,15 +103,45 @@ export function wslGatedReaddir(
   )
 }
 
-export function wslGatedReadFile(
+/**
+ * Whole-file ceiling for the JSON parsers, in the scanner child's 384 MB heap.
+ *
+ * Why 16 MB: `readFile` + `JSON.parse` holds the source string and a decoded object graph at
+ * roughly four times the file size, so a few concurrent 16 MB parses still fit; an unbounded read of
+ * a 200 MB summary file with inline images does not, and the scanner has no per-file guard.
+ */
+export const TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES = 16 * 1024 * 1024
+
+export async function wslGatedReadFile(
   path: string,
   encoding: BufferEncoding,
   priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxBytes: number = TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES
 ): Promise<string> {
-  return runReusableFsOperation({ operation: 'readfile', path, encoding }, priority, signal, () =>
-    readFile(path, encoding)
+  if (!isWslUncPath(path) && !parseSshTranscriptPath(path)) {
+    const read = await readNodeFileWithinLimit(path, maxBytes, { signal })
+    return read.buffer.toString(encoding)
+  }
+  // A remote read materializes its own text, so the size has to be known before it starts. The
+  // probe is best-effort: a path whose stat fails still gets its read, whose error is the one worth
+  // reporting (a missing transcript is not an oversized one).
+  const probed = await transcriptFileStat(path, priority, signal).catch(() => null)
+  if (probed && probed.size > maxBytes) {
+    throw new NodeFileReadTooLargeError(probed.size, maxBytes)
+  }
+  const text = await runReusableFsOperation(
+    { operation: 'readfile', path, encoding },
+    priority,
+    signal,
+    () => readFile(path, encoding)
   )
+  // ...and again after: the probe can be stale, and the parsers all ask for utf-8.
+  const bytes = Buffer.byteLength(text, 'utf-8')
+  if (bytes > maxBytes) {
+    throw new NodeFileReadTooLargeError(bytes, maxBytes)
+  }
+  return text
 }
 
 // Do not coalesce opens: joiners would share one handle and both close it.

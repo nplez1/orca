@@ -141,7 +141,11 @@ export function HostAccountSignInPrompt(props: {
             {url}
           </span>
           <CopyButton text={url} label={translate('accounts.hostSignIn.copyLink', 'Copy link')} />
-          <Button variant="ghost" size="xs" onClick={() => void window.api.shell.openUrl(url)}>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void window.api.shell.openUrlInSystemBrowser(url)}
+          >
             <ExternalLink />
             {translate('accounts.hostSignIn.open', 'Open')}
           </Button>

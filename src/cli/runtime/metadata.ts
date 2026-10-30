@@ -68,6 +68,6 @@ export function getPlatformUserDataPath(
     }
     return join(appData, APP_DATA_DIRECTORY_NAME)
   }
-  // Match Electron’s packaged userData path.
-  return join(process.env.XDG_CONFIG_HOME || join(homeDir, '.config'), 'orca')
+  // Match Electron's packaged userData path, which configure-process pins to this build's directory.
+  return join(process.env.XDG_CONFIG_HOME || join(homeDir, '.config'), APP_DATA_DIRECTORY_NAME)
 }

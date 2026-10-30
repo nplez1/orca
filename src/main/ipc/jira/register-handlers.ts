@@ -246,12 +246,15 @@ export function registerJiraHandlers(): void {
     }
   )
 
-  ipcMain.handle('jira:listEditFields', async (_event, args: { key: string; siteId?: string }) => {
-    if (typeof args?.key !== 'string' || !args.key.trim()) {
-      return []
+  ipcMain.handle(
+    'jira:listEditFields',
+    async (_event, args: { key: string; siteId?: string; strict?: boolean }) => {
+      if (typeof args?.key !== 'string' || !args.key.trim()) {
+        return []
+      }
+      return listEditFields(args.key.trim(), normalizeJiraSiteId(args.siteId), args.strict === true)
     }
-    return listEditFields(args.key.trim(), normalizeJiraSiteId(args.siteId))
-  })
+  )
 
   registerJiraProjectMetadataHandlers(normalizeJiraSiteId)
 

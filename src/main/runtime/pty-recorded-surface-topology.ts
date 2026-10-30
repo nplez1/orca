@@ -66,11 +66,19 @@ export type PtySurfaceTopology = {
   ptyIdHoldingPane: (tabId: string, leafId: string) => string | null | undefined
 }
 
-/** Keep an uncontradicted claim; false reports a live PTY whose surface is gone. */
+/** Keep an uncontradicted claim; false reports a live PTY whose surface is gone.
+ *
+ *  `ptyConnected` is the record's own view of the process, not the graph's: a renderer publishes a
+ *  leaf without a PTY whenever it has not mounted that pane (a background tab, a parked view) or has
+ *  not re-learned a restored one's binding, and neither is a statement that the surface is gone. So an
+ *  unbound leaf keeps a claim that the record still backs, while a leaf bound to another PTY, a pane
+ *  the graph no longer publishes, and a disconnected record all report the surface lost
+ *  (#18191, #232). */
 export function ptyHoldsRecordedSurface(
   ptyId: string,
   recorded: PtyPane,
-  topology: PtySurfaceTopology
+  topology: PtySurfaceTopology,
+  ptyConnected: boolean
 ): boolean {
   const pane = parsePaneKey(recorded.paneKey ?? '')
   if (!recorded.tabId || !pane || pane.tabId !== recorded.tabId) {
@@ -79,5 +87,6 @@ export function ptyHoldsRecordedSurface(
   if (recorded.recordedAtGraphSequence >= topology.graphSequence) {
     return true
   }
-  return topology.ptyIdHoldingPane(pane.tabId, pane.leafId) === ptyId
+  const holding = topology.ptyIdHoldingPane(pane.tabId, pane.leafId)
+  return holding === ptyId || (holding === null && ptyConnected)
 }

@@ -378,7 +378,7 @@ export function JiraConnectDialog({
               isServerBasic={isServerBasic}
               supportsScopedTokens={supportsScopedTokens}
             />
-            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
+            <p className="flex items-center gap-1.5 text-2xs text-muted-foreground/70">
               <Lock className="size-3 shrink-0" />
               {credentialStorageCopy}
             </p>

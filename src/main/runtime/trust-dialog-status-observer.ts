@@ -12,10 +12,11 @@ const TRUST_KEYWORD_RE = /trust/i
 const TRUST_KEYWORD_CARRY_CHARS = 'trust'.length - 1
 const TRUST_DIALOG_PAINT_BYTES = 4096
 // A live dialog ends on its key footer with the trust choice just above; quoted dialog text in a reply does not.
+// Pi's own selector paints `↑↓ navigate  enter select  escape/ctrl+c cancel` under its choices.
 const TRUST_DIALOG_FOOTER_RE =
-  /^(?:enter to confirm \u00b7 esc to cancel|enter continue \u00b7 esc quit)$/
+  /^(?:enter to confirm \u00b7 esc to cancel|enter continue \u00b7 esc quit|\u2191\u2193 navigate\s+enter select\s+escape\/ctrl\+c cancel)$/
 const TRUST_DIALOG_CHOICE_RE =
-  /^(?:[\u276f\u203a]\s*)?(?:\d+\.\s*)?(?:yes, i trust this folder|trust and continue)$/
+  /^(?:[\u276f\u203a\u2192]\s*)?(?:\d+\.\s*)?(?:yes, i trust this folder|trust and continue|trust)$/
 const TRUST_DIALOG_CHOICE_ROWS = 6
 /** Screen reads while our row is up are throttled to this; a working agent's output cannot hold the row. */
 const TRUST_DIALOG_READ_INTERVAL_MS = 400
@@ -28,7 +29,7 @@ type PaneScan = {
   pendingBytes: number
   resolvingAgent?: boolean
   /** The waiting row we published, identified by its receipt stamp like hook-silence rechecks. */
-  owned?: { agent: 'claude' | 'codex'; receivedAt: number }
+  owned?: { agent: 'claude' | 'codex' | 'pi'; receivedAt: number }
   misses: number
   outputSinceRead?: boolean
   readTimer?: ReturnType<typeof setTimeout>
@@ -60,7 +61,7 @@ function isTrustDialogOnScreen(emulator: HeadlessEmulator): boolean {
   return reason === 'agent-trust-workspace' || reason === 'codex-trust-workspace'
 }
 
-/** Projects a Claude/Codex folder-trust dialog into the pane's status row; hooks only start after trust. */
+/** Projects a Claude/Codex/Pi folder-trust dialog into the pane's status row; hooks only start after trust. */
 export class TrustDialogStatusObserver {
   private readonly panes = new Map<string, PaneScan>()
 
@@ -121,8 +122,10 @@ export class TrustDialogStatusObserver {
   }
 
   private publishWaiting(ptyId: string, pane: PaneScan, agent: TuiAgent | null): void {
-    // Only Claude's and Codex's dialogs are verified to precede their hooks and repaint without flicker.
-    if (agent !== 'claude' && agent !== 'codex') {
+    // Only these dialogs are verified to precede their hooks and repaint without flicker. Pi's trust
+    // prompt is shown before its session starts, so no hook can report it and no agent row exists yet
+    // — this observer is the pane's only witness, exactly as it is for Claude and Codex (#230).
+    if (agent !== 'claude' && agent !== 'codex' && agent !== 'pi') {
       return
     }
     const before = this.deps.readStatus(ptyId)

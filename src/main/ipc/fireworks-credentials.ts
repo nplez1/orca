@@ -7,6 +7,7 @@ import {
 } from '../fireworks/fireworks-credentials-store'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import type { RateLimitService } from '../rate-limits/service'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 export type FireworksCredentialsStatus = {
   configured: boolean
@@ -22,7 +23,7 @@ function getFireworksCredentialsStatus(): FireworksCredentialsStatus {
   } catch (error) {
     // Why: an undecryptable file must not break the whole Accounts pane; the
     // status call only exists to seed the form's draft fields.
-    console.error('[fireworks] failed to read stored credentials:', error)
+    recordSwallowedFailure('fireworks', error, 'failed to read stored credentials', 'error')
   }
   return { configured: apiKeyConfigured, apiKeyConfigured, accountIdOverride }
 }
@@ -35,7 +36,12 @@ function refreshAfterFireworksCredentialChange(
 ): void {
   rateLimits?.invalidateFireworksCredentialState()
   void rateLimits?.refresh().catch((error: unknown) => {
-    console.error(`[fireworks] failed to trigger rate-limit refresh after ${action}:`, error)
+    recordSwallowedFailure(
+      'fireworks',
+      error,
+      `failed to trigger rate-limit refresh after ${action}`,
+      'error'
+    )
   })
 }
 

@@ -104,7 +104,8 @@ beforeEach(() => {
         call: runtimeEnvironmentCall
       },
       shell: {
-        openUrl
+        openUrl,
+        openUrlInSystemBrowser: openUrl
       }
     }
   })

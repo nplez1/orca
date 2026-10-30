@@ -114,6 +114,28 @@ describe('serve user-Quit window close', () => {
     expect(instance.destroy).not.toHaveBeenCalled()
   })
 
+  // Why: a close guard can veto after `before-quit` latched `isQuitting`, and that path sent no IPC —
+  // so the latch stayed set, which disabled tray-hide and marked later closes as quits (A6).
+  it('clears the quit latch when the renderer reports the quit was vetoed', () => {
+    const { ipcHandlers } = setupWindow()
+    const onQuitAborted = vi.fn()
+    createMainWindow(null, { getIsQuitting: () => true, onQuitAborted })
+
+    ipcHandlers['window:quit-cancelled']?.({ sender: { id: 42 } })
+
+    expect(onQuitAborted).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a quit-cancelled report from another window', () => {
+    const { ipcHandlers } = setupWindow()
+    const onQuitAborted = vi.fn()
+    createMainWindow(null, { getIsQuitting: () => true, onQuitAborted })
+
+    ipcHandlers['window:quit-cancelled']?.({ sender: { id: 7 } })
+
+    expect(onQuitAborted).not.toHaveBeenCalled()
+  })
+
   it('keeps a plain window close without a deadline', async () => {
     const { windowHandlers, instance } = setupWindow()
     createMainWindow(null, { getIsQuitting: () => false })

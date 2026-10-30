@@ -36,3 +36,27 @@ export function hostTargetStatusFixture(supported: boolean) {
     capabilities: supported ? [PROJECT_HOST_SETUP_HOST_TARGET_RUNTIME_CAPABILITY] : []
   })
 }
+
+/** A `projectHostSetup.create|update` answer carrying the host-wide mode it left in effect. */
+export function setupLayoutFixture(
+  id: string,
+  setup: { id: string; hostId: string; displayName?: string },
+  worktreeLayoutMode: string | undefined
+) {
+  return okFixture(id, {
+    result: {
+      project: { ...ORCA_PROJECT, sourceRepoIds: [] },
+      setup: {
+        projectId: ORCA_PROJECT.id,
+        repoId: '',
+        path: '/srv/orca',
+        setupState: 'ready',
+        setupMethod: 'provisioned',
+        createdAt: 1,
+        updatedAt: 2,
+        ...setup
+      },
+      ...(worktreeLayoutMode ? { worktreeLayoutMode } : {})
+    }
+  })
+}

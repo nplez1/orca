@@ -19,10 +19,8 @@ import {
   redactRuntimeEnvironment,
   type PublicKnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
-import {
-  cleanupEphemeralVmRuntime,
-  provisionEphemeralVmRuntime
-} from '../ephemeral-vm/runtime-service'
+import { cleanupEphemeralVmRuntime } from '../ephemeral-vm/runtime-service'
+import { provisionEphemeralVmRuntime } from '../ephemeral-vm/runtime-provisioning'
 import { connectRuntimeOwnedSshTarget } from '../ephemeral-vm/runtime-ssh'
 import {
   getRecipeRepo,
@@ -36,6 +34,7 @@ import type { PluginService } from '../plugins/plugin-service'
 import { getApprovedPluginVmRecipes } from '../plugins/plugin-approved-vm-recipes'
 import { resolveProvisionedRootSource } from '../ephemeral-vm/provisioned-root-source'
 import { startEphemeralVmRuntimeReclaim } from '../ephemeral-vm-runtime-reclaim'
+import { flagInterruptedEphemeralVmProvisioning } from '../ephemeral-vm-runtime-provisioning-recovery'
 import { getCurrentMainWindow } from './ssh/ssh-ipc-context'
 
 const activeProvisionControllers = new Map<string, AbortController>()
@@ -78,6 +77,10 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
     userDataPath: app.getPath('userData'),
     getMainWindow: getCurrentMainWindow
   })
+  // Why here: a create runs detached, so this is the only point at which an attempt that never
+  // reported can be told apart from one whose app was killed mid-flight. It warns and records the
+  // flag; nothing can destroy the machine, because no recipe result ever arrived to build destroy from.
+  flagInterruptedEphemeralVmProvisioning({ userDataPath: app.getPath('userData') })
 
   ipcMain.handle('ephemeralVm:listRecipes', async (_event, args: { repoId: string }) => {
     return listRecipes(store, args.repoId, await getApprovedPluginVmRecipes(pluginService))

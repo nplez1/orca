@@ -67,6 +67,8 @@ export function installTerminalLinkTestEnvironment(doubles: TerminalLinkTestDoub
       api: {
         shell: {
           openUrl: openUrlMock,
+          // The router's system branch has one destination; both channels prove the handoff.
+          openUrlInSystemBrowser: openUrlMock,
           openFileUri: openFileUriMock,
           openFilePath: openFilePathMock,
           pathExists: vi.fn().mockResolvedValue(true)

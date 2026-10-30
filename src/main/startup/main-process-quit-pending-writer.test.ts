@@ -53,7 +53,13 @@ const dependencies: Record<string, Record<string, unknown>> = {
   '../terminal-history-gc': { cancelHistoryGc: idle() },
   './window-all-closed-quit-policy': { shouldQuitWhenAllWindowsClosed: vi.fn(() => false) },
   './configure-process': { isDevParentShutdownRequested: vi.fn(() => false) },
-  '../persistence': { getCanonicalUserDataPath: vi.fn(() => '/unused') }
+  '../persistence': { getCanonicalUserDataPath: vi.fn(() => '/unused') },
+  // Why mocked: quit starts this import without awaiting it, so the real module would evaluate the
+  // unmocked `electron` (and its icon paths) after the test that started it had already ended.
+  '../claude-accounts/claude-oauth-pending-rotations': {
+    hasPendingClaudeOAuthRotations: vi.fn(() => false),
+    flushPendingClaudeOAuthRotations: settled()
+  }
 }
 
 afterEach(() => {
@@ -177,6 +183,31 @@ it('starts the SSH shutdown and the final save at once when no pane grid waits',
 it('stops the hook server without clearing the status store the chat teardown reads', async () => {
   await startQuit(async () => {})
   expect(stopAgentHookServer).toHaveBeenCalledWith({ keepStatus: true })
+})
+
+// Why: before-quit runs while the renderer can still veto, and nothing here can be restarted from a
+// veto — a cancelled quit used to leave the app open with no agent-awake service and no rate-limit
+// polling (A6). They stop at will-quit instead.
+it('stops the services a vetoed quit could not have restarted, at will-quit', async () => {
+  const fenceAndCloseNow = vi.fn()
+  const setMobileRelayPairingProvider = vi.fn()
+  const unsubscribeAgentAwakeStatusChanges = vi.fn()
+  const dispose = vi.fn()
+  const stopRateLimits = vi.fn()
+  const { state } = await startQuit(async () => {}, {
+    desktopRelayService: { fenceAndCloseNow },
+    runtimeRpc: { setMobileRelayPairingProvider, stop: settled() },
+    unsubscribeAgentAwakeStatusChanges,
+    agentAwakeService: { dispose },
+    rateLimits: { stop: stopRateLimits }
+  })
+
+  expect(fenceAndCloseNow).toHaveBeenCalledOnce()
+  expect(setMobileRelayPairingProvider).toHaveBeenCalledWith(null)
+  expect(unsubscribeAgentAwakeStatusChanges).toHaveBeenCalledOnce()
+  expect(dispose).toHaveBeenCalledOnce()
+  expect(stopRateLimits).toHaveBeenCalledOnce()
+  expect(state.isQuitting).toBe(true)
 })
 
 it.each([

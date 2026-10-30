@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 
 import { JIRA_IMAGE_CAPABILITY } from '../../../shared/jira/jira-attachment-image'
+import {
+  JIRA_WRITE_FETCH_TIMEOUT_MS,
+  JIRA_WRITE_RPC_TIMEOUT_MS
+} from '../../../shared/jira/jira-write-deadline'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   jiraAddIssueCommentForTarget,
@@ -60,7 +64,6 @@ describe('captured Jira detail owners', () => {
     await jiraListAssignableUsersForTarget(owner, 'ENG-1', 'x'.repeat(20_000), 'site-1')
 
     for (const method of [
-      'updateIssue',
       'addIssueComment',
       'listTransitions',
       'listPriorities',
@@ -70,6 +73,16 @@ describe('captured Jira detail owners', () => {
         expect.objectContaining({ method: `jira.${method}`, selector: 'env-1', timeoutMs: 30_000 })
       )
     }
+    // Why above the host's own 30 s fetch deadline: the host's "timed out" verdict, which
+    // says the write may still land, has to reach the client before its own deadline does.
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'jira.updateIssue',
+        selector: 'env-1',
+        timeoutMs: JIRA_WRITE_RPC_TIMEOUT_MS
+      })
+    )
+    expect(JIRA_WRITE_RPC_TIMEOUT_MS).toBeGreaterThan(JIRA_WRITE_FETCH_TIMEOUT_MS)
     expect(runtimeCall).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'jira.listTransitions',

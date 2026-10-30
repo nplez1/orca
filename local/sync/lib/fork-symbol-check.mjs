@@ -7,7 +7,8 @@ import { parseExpectedSymbols } from './expected-deletions.mjs'
 import { forkAdded, forkSurface, manifestEntry, survivalVerdict } from './fork-symbols.mjs'
 import { blobs, upstreamMoves } from './fork-surface-git.mjs'
 import { addedLines } from './rename-forecast.mjs'
-import { BACKUP_REF, isDeletedCodeModule, pinnedUpstreamBase } from './post-sync-checks.mjs'
+import { isDeletedCodeModule } from './post-sync-checks.mjs'
+import { BACKUP_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 import { STATUS, git, gitText, repoRoot, splitNul, tailText } from './run.mjs'
 
 function readManifestSymbols() {
@@ -240,7 +241,13 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
   }
 }
 
-export function forkSymbolSurvival(tip, source, { merged = 'HEAD' } = {}) {
+export function forkSymbolSurvival(tip, source, { merged = 'HEAD', problem = null } = {}) {
+  if (problem !== null) {
+    return foreignTipFailure(
+      problem,
+      'the scan would read the wrong tip and report clean, so it refuses instead'
+    )
+  }
   if (!tip) {
     return {
       status: STATUS.unavailable,

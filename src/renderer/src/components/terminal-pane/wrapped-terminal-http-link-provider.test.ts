@@ -21,7 +21,7 @@ describe('wrapped terminal HTTP link provider', () => {
     const url = `https://example.com/${'a'.repeat(30)}`
     const { terminal } = await terminalWithRows([` ${url.slice(0, 38)} `, ` ${url.slice(38)} `], 40)
     const openUrl = vi.fn()
-    vi.stubGlobal('window', { api: { shell: { openUrl } } })
+    vi.stubGlobal('window', { api: { shell: { openUrl, openUrlInSystemBrowser: openUrl } } })
     registerHttpLinkStoreAccessor(() => ({
       settings: { openLinksInApp: false },
       setActiveWorktree: vi.fn(),
@@ -129,7 +129,7 @@ describe('wrapped terminal HTTP link provider', () => {
     const url = `https://example.com/${'a'.repeat(90)}`
     const { terminal, linksAt } = await terminalWithRows([url.slice(0, 80), url.slice(80)], 40)
     const openUrl = vi.fn()
-    vi.stubGlobal('window', { api: { shell: { openUrl } } })
+    vi.stubGlobal('window', { api: { shell: { openUrl, openUrlInSystemBrowser: openUrl } } })
     registerHttpLinkStoreAccessor(() => ({
       settings: { openLinksInApp: false },
       setActiveWorktree: vi.fn(),
@@ -197,7 +197,7 @@ describe('wrapped terminal HTTP link provider', () => {
       40
     )
     const openUrl = vi.fn()
-    vi.stubGlobal('window', { api: { shell: { openUrl } } })
+    vi.stubGlobal('window', { api: { shell: { openUrl, openUrlInSystemBrowser: openUrl } } })
     registerHttpLinkStoreAccessor(() => ({
       settings: { openLinksInApp: false },
       setActiveWorktree: vi.fn(),

@@ -13,6 +13,13 @@ describe('Pi/OMP native state-title markers', () => {
     ['π : my-project', 'working'],
     ['π > my-project', 'idle'],
     ['π ! my-project', 'permission'],
+    // Why the `Pi` brand: pi builds that rebrand their own title paint `Pi !`, and the whole
+    // ask-card lane gates on this classification, so the glyph must not be what decides.
+    ['Pi : my-project', 'working'],
+    ['Pi > my-project', 'idle'],
+    ['Pi ! my-project', 'permission'],
+    ['⠋ Pi : my-project', 'working'],
+    ['Pi !', 'permission'],
     ['zsh | π : my-project', 'working'],
     ['zsh | tmux | π > my-project', 'idle'],
     ['zsh | π ! my-project', 'permission'],

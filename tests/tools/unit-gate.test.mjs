@@ -1,18 +1,21 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { forkTestFiles, quarantinedFiles } from '../../local/gate-unit.mjs'
+import { forkTestFiles } from '../../local/gate-unit.mjs'
+import { quarantinedFiles } from '../../local/unit-lane-files.mjs'
 import {
   allowlistEntries,
   collectCases,
   collectedQuarantinedFiles,
+  importedCaseSpecifiers,
   judge,
   judgeUnhandled,
   prunableEntries,
   quarantinedEntryProblems,
   repoPath,
   reproducedFailures,
-  reportForFile
+  reportForFile,
+  titleExistsInSource
 } from '../../local/unit-gate-judgement.mjs'
 
 const ROOT = join(import.meta.dirname, '..', '..')
@@ -235,10 +238,29 @@ describe('the isolated re-run', () => {
     ).toEqual(['came back', 'went away'])
   })
 
-  it('waives a collect failure only when the file itself passed', () => {
-    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
-    expect(reproducedFailures(suite, rerun())).toHaveLength(1)
+  it('waives a one-off suite error only when the re-run raised none', () => {
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'teardown' }]
+    // Why not `filePassed`: a file that also holds an allowlisted always-red test can never pass in
+    // isolation, so requiring that would make a one-off teardown error unwaivable for ever.
+    expect(reproducedFailures(suite, rerun())).toHaveLength(0)
     expect(reproducedFailures(suite, rerun({ filePassed: true }))).toHaveLength(0)
+    expect(reproducedFailures(suite, rerun({ failures: new Set(['(suite)']) }))).toHaveLength(1)
+    expect(
+      reproducedFailures(suite, rerun({ failures: new Set(['(suite)']), filePassed: true }))
+    ).toHaveLength(1)
+  })
+
+  it('keeps a suite error whose re-run found a red the allowlist never saw', () => {
+    // The full run's suite row replaced every named case, so the re-run's `foo` was never judged —
+    // waiving the row would pass a real failure nobody read.
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
+    const found = rerun({ failures: new Set(['foo']) })
+    expect(reproducedFailures(suite, found)).toHaveLength(1)
+    expect(reproducedFailures(suite, found, { known: new Set(['bar']) })).toHaveLength(1)
+    // A named entry covering the re-run's failure is the known case, and a file-level entry covers
+    // every case in the file.
+    expect(reproducedFailures(suite, found, { known: new Set(['foo']) })).toHaveLength(0)
+    expect(reproducedFailures(suite, found, { fileCovered: true })).toHaveLength(0)
   })
 
   it('reads one file out of a report the selector over-matched', () => {
@@ -316,7 +338,110 @@ describe('the fork-local lane', () => {
 
 const manifest = JSON.parse(readFileSync(join(ROOT, 'local/unit-known-red.json'), 'utf8'))
 
+describe('a title the file can still produce', () => {
+  const source = `
+    describe('SQLite runtime contract', () => {
+      it('admits the actual runtime driver', () => {})
+      it.each(['a', 'b'])('rejects %s before changing rows', () => {})
+    })
+  `
+
+  it('finds a plain case through its describe chain', () => {
+    expect(
+      titleExistsInSource('SQLite runtime contract admits the actual runtime driver', source)
+    ).toBe(true)
+  })
+
+  it('treats what Vitest substitutes into an each title as a wildcard', () => {
+    expect(
+      titleExistsInSource('SQLite runtime contract rejects a before changing rows', source)
+    ).toBe(true)
+    // Why both forms: a `$name` from a table row is substituted the same way as a printf token.
+    const rows = `it.each([{ name: 'macos' }])('launches through the $name launcher', () => {})`
+    expect(titleExistsInSource('launches through the macos launcher', rows)).toBe(true)
+    expect(titleExistsInSource('launches through the $name launcher', rows)).toBe(true)
+    // Why `%%`: Vitest renders it as one `%`, so a literal-`%%` pattern would call the case dead.
+    const percent = `it.each([1])('shows 50%% done for %s', () => {})`
+    expect(titleExistsInSource('shows 50% done for 1', percent)).toBe(true)
+    expect(titleExistsInSource('shows an object: %$', `it.each([1])('shows an object: %$')`)).toBe(
+      true
+    )
+  })
+
+  it('covers the shapes this repo writes titles in', () => {
+    const nested = `describe('outer', () => { describe('inner', () => { it('deep case', () => {}) }) })`
+    expect(titleExistsInSource('outer inner deep case', nested)).toBe(true)
+    // `src/main/cli/packaged-cli-assets.test.ts` names its table `itRunsUnixShell`.
+    const aliased = `itRunsUnixShell.each([['a']])('runs %s', () => {})`
+    expect(titleExistsInSource('runs a', aliased)).toBe(true)
+    const generic = `it.each<[string]>([['a']])('runs %s', () => {})`
+    expect(titleExistsInSource('runs a', generic)).toBe(true)
+    const quoted = `describe("main's store", () => { it('keeps a tab\\'s view', () => {}) })`
+    expect(titleExistsInSource("main's store keeps a tab's view", quoted)).toBe(true)
+    const template = 'it(`reads ${n} rows`, () => {})'
+    expect(titleExistsInSource('reads 3 rows', template)).toBe(true)
+  })
+
+  it('reports a title the file no longer names, which is the rot this catches', () => {
+    expect(titleExistsInSource('SQLite runtime contract rejects undefined bindings', source)).toBe(
+      false
+    )
+    // The whole describe chain has to be there too: a renamed block is the same rot as a deleted case.
+    expect(
+      titleExistsInSource('Sync database contract admits the actual runtime driver', source)
+    ).toBe(false)
+    // Why: a skipped or todo case never fails, so an entry naming one can never be a known red.
+    expect(titleExistsInSource('old case', `it.skip('old case', () => {})`)).toBe(false)
+    expect(titleExistsInSource('later case', `it.todo('later case')`)).toBe(false)
+    expect(titleExistsInSource('old case', `describe('outer', () => {})`)).toBe(false)
+  })
+})
+
+const SPEC_EXTENSIONS = ['', '.ts', '.tsx', '.mts', '.cts', '.mjs', '.js']
+
+/** A test file's own source plus the `.spec` modules it imports its cases from. */
+function sourceWithImportedCases(file) {
+  const absolute = join(ROOT, file)
+  if (!existsSync(absolute)) {
+    return ''
+  }
+  const source = readFileSync(absolute, 'utf8')
+  const parts = [source]
+  for (const specifier of importedCaseSpecifiers(source)) {
+    for (const extension of SPEC_EXTENSIONS) {
+      const candidate = join(dirname(absolute), `${specifier}${extension}`)
+      if (existsSync(candidate)) {
+        parts.push(readFileSync(candidate, 'utf8'))
+        break
+      }
+    }
+  }
+  return parts.join('\n')
+}
+
+describe('a title imported from a spec module', () => {
+  it('is found where the spec module writes it', () => {
+    // Why this shape: `src/main/runtime/orca-runtime.test.ts` pulls every case in through
+    // `await import('./orca-runtime-tests/x.spec')`, so the entry's own file names no title at all.
+    const file = 'src/main/runtime/orca-runtime.test.ts'
+    const title =
+      'OrcaRuntimeService keeps existing-folder imports split by runtime host on the same normalized path'
+    expect(importedCaseSpecifiers(sourceWithImportedCases(file)).length).toBeGreaterThan(0)
+    expect(titleExistsInSource(title, sourceWithImportedCases(file))).toBe(true)
+    // The same title in the file alone, to prove the follow is what found it.
+    expect(titleExistsInSource(title, readFileSync(join(ROOT, file), 'utf8'))).toBe(false)
+  })
+})
+
 describe('the known-red manifest', () => {
+  it('names only titles its own file can still produce', () => {
+    // Why: the gate learns staleness only from an entry that matched a failure, so an entry for a
+    // deleted test never surfaces — it sits in the manifest for as long as nobody re-reads the file.
+    const dead = manifest.entries
+      .filter((entry) => !titleExistsInSource(entry.test, sourceWithImportedCases(entry.file)))
+      .map((entry) => `${entry.file} › ${entry.test}`)
+    expect(dead).toEqual([])
+  })
   it('names no file the gate does not run, which would be dead weight', () => {
     const quarantined = new Set(quarantinedFiles())
     // Why: if UNIT_INCLUDE and UNIT_EXCLUDE ever agreed completely the check below would be vacuous.

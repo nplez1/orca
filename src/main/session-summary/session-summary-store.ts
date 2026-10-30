@@ -4,8 +4,10 @@
 //
 // Electron-free: a paired Orca host serves this store too, so the path is always
 // passed in rather than resolved from `app`.
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import type {
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
@@ -24,6 +26,27 @@ export type SessionSummaryStoreEntry = {
 }
 
 const MAX_ENTRIES = 200
+
+/** How long a change may sit in memory before it is written; a pane close is not an emergency. */
+const SAVE_DEBOUNCE_MS = 1_000
+
+// One exit hook for every store with a queued write: `set` runs on the main thread, and a quit inside
+// the debounce window would otherwise drop the fold the user just paid a model call for.
+const storesWithQueuedWrites = new Set<SessionSummaryStore>()
+let exitFlushRegistered = false
+
+function registerExitFlush(): void {
+  if (exitFlushRegistered) {
+    return
+  }
+  exitFlushRegistered = true
+  process.once('exit', () => {
+    for (const store of storesWithQueuedWrites) {
+      store.flush()
+    }
+    storesWithQueuedWrites.clear()
+  })
+}
 
 /**
  * Bumped when a ledger's *shape* changes, so every cached ledger is discarded and folded again.
@@ -53,6 +76,8 @@ function isSessionSummaryStoreFile(value: unknown): value is SessionSummaryStore
 
 export class SessionSummaryStore {
   private entries: Record<string, SessionSummaryStoreEntry> = {}
+  private saveTimer: NodeJS.Timeout | null = null
+  private queued = false
 
   constructor(private readonly filePath: string) {
     this.load()
@@ -73,7 +98,7 @@ export class SessionSummaryStore {
         delete this.entries[key]
       }
     }
-    this.save()
+    this.scheduleSave()
   }
 
   /** Drops a pane's cache entirely — a new session took the pane, or it never folded. */
@@ -82,7 +107,40 @@ export class SessionSummaryStore {
       return
     }
     delete this.entries[paneKey]
+    this.scheduleSave()
+  }
+
+  /** Write a queued change now. Quit paths and tests that reopen the file call this. */
+  flush(): void {
+    if (!this.queued) {
+      return
+    }
+    this.clearTimer()
+    this.queued = false
+    storesWithQueuedWrites.delete(this)
     this.save()
+  }
+
+  private scheduleSave(): void {
+    this.queued = true
+    storesWithQueuedWrites.add(this)
+    registerExitFlush()
+    if (this.saveTimer) {
+      return
+    }
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null
+      this.flush()
+    }, SAVE_DEBOUNCE_MS)
+    // A pending cache write must not be what keeps a quitting process alive.
+    this.saveTimer.unref?.()
+  }
+
+  private clearTimer(): void {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
   }
 
   private load(): void {
@@ -103,18 +161,24 @@ export class SessionSummaryStore {
 
   private save(): void {
     try {
+      // Why skip a vanished directory: a headless host's own store can be flushed by the exit hook after
+      // its directory is gone, and recreating it would leave an empty cache behind.
+      if (!existsSync(dirname(this.filePath))) {
+        return
+      }
       mkdirSync(dirname(this.filePath), { recursive: true })
-      const tmpPath = `${this.filePath}.tmp`
-      writeFileSync(
-        tmpPath,
+      // Why a per-writer temp name: a paired host serves this store too, and one fixed `.tmp` name
+      // meant two writers published each other's file. The durable helper fsyncs before the rename.
+      writeFileDurableSync(
+        durableWriteTempPath(this.filePath),
+        this.filePath,
         JSON.stringify({
           version: STORE_VERSION,
           entries: this.entries
         } satisfies SessionSummaryStoreFile)
       )
-      renameSync(tmpPath, this.filePath)
     } catch (error) {
-      console.warn('[session-summary] failed to persist summary cache:', error)
+      recordSwallowedFailure('session-summary', error, 'failed to persist summary cache')
     }
   }
 }

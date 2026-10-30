@@ -62,7 +62,9 @@ describe('edge-wrapped terminal HTTP links', () => {
   })
 
   beforeEach(() => {
-    vi.stubGlobal('window', { api: { shell: { openUrl: openUrlMock } } })
+    vi.stubGlobal('window', {
+      api: { shell: { openUrl: openUrlMock, openUrlInSystemBrowser: openUrlMock } }
+    })
     registerHttpLinkStoreAccessor(() => ({
       settings: { openLinksInApp: false },
       setActiveWorktree: vi.fn(),

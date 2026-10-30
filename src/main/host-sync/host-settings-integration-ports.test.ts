@@ -30,6 +30,8 @@ const jiraState = vi.hoisted(
     selectedSiteId: JiraSiteSelection | null
     tokens: Map<string, string>
     protections: Map<string, SecretAtRestProtection>
+    /** Ids whose token file is there but cannot be read right now. */
+    unreadable: Set<string>
     written: JiraSiteFile[]
     deleted: string[]
   } => ({
@@ -38,6 +40,7 @@ const jiraState = vi.hoisted(
     selectedSiteId: null,
     tokens: new Map(),
     protections: new Map(),
+    unreadable: new Set(),
     written: [],
     deleted: []
   })
@@ -48,9 +51,17 @@ const jenkinsState = vi.hoisted(
     servers: JenkinsServerProfile[]
     tokens: Map<string, string>
     protections: Map<string, SecretAtRestProtection>
+    unreadable: Set<string>
     saved: { server: JenkinsServerProfile; token: string | null }[]
     removed: string[]
-  } => ({ servers: [], tokens: new Map(), protections: new Map(), saved: [], removed: [] })
+  } => ({
+    servers: [],
+    tokens: new Map(),
+    protections: new Map(),
+    unreadable: new Set(),
+    saved: [],
+    removed: []
+  })
 )
 
 vi.mock('../jira/site-credential-store', async () => {
@@ -69,7 +80,8 @@ vi.mock('../jira/site-credential-store', async () => {
       jiraState.activeSiteId = file.activeSiteId
     },
     hasStoredToken: (siteId: string): boolean => jiraState.tokens.has(siteId),
-    readToken: (siteId: string): string | null => jiraState.tokens.get(siteId) ?? null,
+    readToken: (siteId: string): string | null =>
+      jiraState.unreadable.has(siteId) ? null : (jiraState.tokens.get(siteId) ?? null),
     saveToken: (siteId: string, token: string): void => {
       jiraState.tokens.set(siteId, token)
       jiraState.protections.set(siteId, 'sealed')
@@ -108,7 +120,8 @@ vi.mock('../jenkins/jenkins-server-store', async () => {
       return true
     },
     readJenkinsServerToken: (serverId: string): string | null =>
-      jenkinsState.tokens.get(serverId) ?? null,
+      jenkinsState.unreadable.has(serverId) ? null : (jenkinsState.tokens.get(serverId) ?? null),
+    hasJenkinsServerToken: (serverId: string): boolean => jenkinsState.tokens.has(serverId),
     getJenkinsServerTokenProtection: (serverId: string): SecretAtRestProtection | null =>
       jenkinsState.protections.get(serverId) ?? null
   }
@@ -123,11 +136,13 @@ beforeEach(() => {
   jiraState.selectedSiteId = null
   jiraState.tokens = new Map()
   jiraState.protections = new Map()
+  jiraState.unreadable = new Set()
   jiraState.written = []
   jiraState.deleted = []
   jenkinsState.servers = []
   jenkinsState.tokens = new Map()
   jenkinsState.protections = new Map()
+  jenkinsState.unreadable = new Set()
   jenkinsState.saved = []
   jenkinsState.removed = []
 })
@@ -214,6 +229,44 @@ describe('the Jira credential port', () => {
     expect(jiraState.deleted).toEqual([])
     expect(jiraState.sites).toHaveLength(1)
   })
+
+  // Why: a token file that exists but cannot be read right now (EBUSY under a Windows antivirus scan,
+  // EACCES) is not a deleted site. Reporting it as absent puts it in the removal list, and every host
+  // then deletes a working token because one machine's read failed.
+  it('reports a site whose token cannot be read as unreadable rather than absent', () => {
+    jiraState.sites = [jiraSite]
+    jiraState.tokens.set('site-1', 'jira-token')
+    jiraState.unreadable.add('site-1')
+
+    const port = createHostSettingsJiraPort()
+
+    expect(port.unreadableIds()).toEqual(['jira:site-1'])
+    expect(port.list()).toEqual([])
+    // Why not null: null claims this host holds nothing, which is what makes a removal look verified.
+    expect(port.protectionOf('jira:site-1')).toBe('plaintext')
+  })
+
+  // Why this case: the token cache can answer while a fresh classification read fails (antivirus lock on
+  // Windows). If `list()` judged by the classification and `unreadableIds()` by the token, the site would
+  // be in neither — and the sender would then name it as a removal.
+  it('still exports a site whose token reads when its file cannot be classified', () => {
+    jiraState.sites = [jiraSite]
+    jiraState.tokens.set('site-1', 'jira-token')
+
+    const port = createHostSettingsJiraPort()
+
+    expect(port.unreadableIds()).toEqual([])
+    expect(port.list()).toHaveLength(1)
+    expect(port.list()[0]).toMatchObject({ protection: 'sealed' })
+    // Why the other direction here: overstating protection is what would record a plaintext copy as sealed.
+    expect(port.protectionOf('jira:site-1')).toBe('plaintext')
+  })
+
+  it('does not name a site it holds no token file for', () => {
+    jiraState.sites = [jiraSite]
+
+    expect(createHostSettingsJiraPort().unreadableIds()).toEqual([])
+  })
 })
 
 describe('the Jenkins credential port', () => {
@@ -289,5 +342,30 @@ describe('the Jenkins credential port', () => {
 
     expect(jenkinsState.removed).toEqual(['ci-1'])
     expect(port.protectionOf('jenkins:ci-1')).toBeNull()
+  })
+
+  it('reports a server whose token cannot be read as unreadable rather than absent', () => {
+    jenkinsState.servers = [jenkinsServer]
+    jenkinsState.tokens.set('ci-1', 'jenkins-token')
+    jenkinsState.unreadable.add('ci-1')
+
+    const port = createHostSettingsJenkinsPort()
+
+    expect(port.unreadableIds()).toEqual(['jenkins:ci-1'])
+    expect(port.list()).toEqual([])
+    expect(port.protectionOf('jenkins:ci-1')).toBe('plaintext')
+  })
+
+  it('still exports a server whose token reads when its file cannot be classified', () => {
+    jenkinsState.servers = [jenkinsServer]
+    // No protection recorded: the classification read failed while the token itself reads fine.
+    jenkinsState.tokens.set('ci-1', 'jenkins-token')
+
+    const port = createHostSettingsJenkinsPort()
+
+    expect(port.unreadableIds()).toEqual([])
+    expect(port.list()).toHaveLength(1)
+    expect(port.list()[0]).toMatchObject({ protection: 'sealed' })
+    expect(port.protectionOf('jenkins:ci-1')).toBe('plaintext')
   })
 })

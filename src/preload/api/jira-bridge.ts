@@ -102,12 +102,16 @@ export const jiraApi = {
   listCreateFields: (args: { projectIdOrKey: string; issueTypeId: string; siteId?: string }) =>
     ipcRenderer.invoke('jira:listCreateFields', args),
 
-  listEditFields: (args: { key: string; siteId?: string }): Promise<JiraEditableField[]> =>
-    ipcRenderer.invoke('jira:listEditFields', args),
+  listEditFields: (args: {
+    key: string
+    siteId?: string
+    strict?: boolean
+  }): Promise<JiraEditableField[]> => ipcRenderer.invoke('jira:listEditFields', args),
 
-  listPriorities: (args?: { siteId?: string }) => ipcRenderer.invoke('jira:listPriorities', args),
+  listPriorities: (args?: { siteId?: string; strict?: boolean }) =>
+    ipcRenderer.invoke('jira:listPriorities', args),
 
-  listAssignableUsers: (args: { key: string; query?: string; siteId?: string }) =>
+  listAssignableUsers: (args: { key: string; query?: string; siteId?: string; strict?: boolean }) =>
     ipcRenderer.invoke('jira:listAssignableUsers', args),
   listAssignableUsersForProject: (args: {
     projectIdOrKey: string

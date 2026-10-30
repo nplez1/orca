@@ -50,7 +50,12 @@ beforeEach(() => {
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
-      shell: { openUrl, openFileUri, pathExists: vi.fn(async () => true) }
+      shell: {
+        openUrl,
+        openUrlInSystemBrowser: openUrl,
+        openFileUri,
+        pathExists: vi.fn(async () => true)
+      }
     }
   })
   registerHttpLinkStoreAccessor(() => ({

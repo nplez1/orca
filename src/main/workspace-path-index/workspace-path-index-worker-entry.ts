@@ -7,6 +7,7 @@ import {
 import { WORKSPACE_PATH_PROVISIONAL_PAGE_BUDGET } from '../../shared/workspace-path-provisional-page-budget'
 import { openWorkspacePathCatalogSpillReader } from './workspace-path-catalog-spill'
 import { handleWorkspacePathIndexCheckpointRequest } from './workspace-path-index-worker-checkpoint'
+import { releaseRestoredWorkspacePathCheckpoint } from './workspace-path-index-worker-checkpoint-pins'
 import type { WorkspacePathSearchInstrumentationEvent } from '../../shared/workspace-path-search-instrumentation'
 import { WorkspacePathIndexWorkerBuildLane } from './workspace-path-index-worker-build-lane'
 import { applyWorkspacePathIndexDelta } from './workspace-path-index-worker-delta'
@@ -141,6 +142,8 @@ async function handleRequest(
       }
       case 'drop':
         if (request.generationId) {
+          // The generation module releases the checkpoint pin when that drop leaves nothing reading
+          // out of the restored directory.
           dropWorkspacePathIndexWorkerGeneration({
             generations,
             latestGenerationIds,
@@ -153,6 +156,7 @@ async function handleRequest(
             latestGenerationIds,
             rootKey: request.key
           })
+          releaseRestoredWorkspacePathCheckpoint(request.key)
         }
         return { id: request.id, ok: true }
       case 'discard-optional':

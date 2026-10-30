@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   findInstallerAssetName,
+  getPlatformUpdateManifestName,
   getReleaseNotesUrlForVersion,
   getReleaseRepoForChannel,
   getVersionChannel,
@@ -193,14 +194,43 @@ describe('release channel', () => {
   })
 
   it('detects an installable artifact from the platform update manifest', () => {
-    expect(hasInstallableArtifactForPlatform('win32', ['latest.yml'])).toBe(true)
-    expect(hasInstallableArtifactForPlatform('win32', ['latest-mac.yml'])).toBe(false)
-    expect(hasInstallableArtifactForPlatform('darwin', ['latest-mac.yml'])).toBe(true)
-    expect(hasInstallableArtifactForPlatform('darwin', ['latest.yml'])).toBe(false)
-    expect(hasInstallableArtifactForPlatform('linux', ['latest-linux-arm64.yml'])).toBe(true)
-    expect(hasInstallableArtifactForPlatform('linux', [])).toBe(false)
+    expect(hasInstallableArtifactForPlatform('win32', ['latest.yml'], 'x64')).toBe(true)
+    expect(hasInstallableArtifactForPlatform('win32', ['latest-mac.yml'], 'x64')).toBe(false)
+    expect(hasInstallableArtifactForPlatform('darwin', ['latest-mac.yml'], 'arm64')).toBe(true)
+    expect(hasInstallableArtifactForPlatform('darwin', ['latest.yml'], 'arm64')).toBe(false)
+    expect(hasInstallableArtifactForPlatform('linux', [], 'x64')).toBe(false)
     // Unknown platforms should get a download-time explanation rather than an unexplained empty picker.
-    expect(hasInstallableArtifactForPlatform('freebsd', [])).toBe(true)
+    expect(hasInstallableArtifactForPlatform('freebsd', [], 'x64')).toBe(true)
+  })
+
+  it('names the manifest electron-updater reads for one platform and architecture', () => {
+    expect(getPlatformUpdateManifestName('darwin', 'arm64')).toBe('latest-mac.yml')
+    expect(getPlatformUpdateManifestName('darwin', 'x64')).toBe('latest-mac.yml')
+    expect(getPlatformUpdateManifestName('win32', 'x64')).toBe('latest.yml')
+    expect(getPlatformUpdateManifestName('linux', 'x64')).toBe('latest-linux.yml')
+    expect(getPlatformUpdateManifestName('linux', 'arm64')).toBe('latest-linux-arm64.yml')
+    expect(getPlatformUpdateManifestName('freebsd', 'x64')).toBeNull()
+  })
+
+  // Why one manifest and not either: this fork publishes Linux x64 only, so accepting
+  // `latest-linux-arm64.yml` too offered arm64 users a release whose own manifest 404s — the picker
+  // row looked installable and the download behind it could not exist.
+  it('does not accept the other Linux architecture’s manifest', () => {
+    expect(hasInstallableArtifactForPlatform('linux', ['latest-linux.yml'], 'x64')).toBe(true)
+    expect(hasInstallableArtifactForPlatform('linux', ['latest-linux-arm64.yml'], 'x64')).toBe(
+      false
+    )
+    expect(hasInstallableArtifactForPlatform('linux', ['latest-linux-arm64.yml'], 'arm64')).toBe(
+      true
+    )
+    expect(hasInstallableArtifactForPlatform('linux', ['latest-linux.yml'], 'arm64')).toBe(false)
+    expect(
+      hasInstallableArtifactForPlatform(
+        'linux',
+        ['latest-linux.yml', 'latest-linux-arm64.yml'],
+        'arm64'
+      )
+    ).toBe(true)
   })
 
   it('finds the directly runnable installer for a platform', () => {

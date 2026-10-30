@@ -10,7 +10,10 @@ import {
   type EphemeralVmRecipeResult
 } from '../shared/ephemeral-vm-recipes'
 import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lifetime'
-import { updateEphemeralVmRuntimeStatus } from '../shared/ephemeral-vm-runtime-store'
+import {
+  listEphemeralVmRuntimes,
+  updateEphemeralVmRuntimeStatus
+} from '../shared/ephemeral-vm-runtime-store'
 import { updateEnvironmentFromPairingCode } from '../shared/runtime-environment-store'
 import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
 import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environments/runtime-environments'
@@ -30,7 +33,19 @@ export type ExtendEphemeralVmRuntimeLeaseArgs = {
   /** The lifetime the caller asked for, in any accepted spelling. */
   lifetime: string
   signal?: AbortSignal
+  /** Overrides the hook deadline; for callers (and tests) that own a stricter budget than Orca's. */
+  hookTimeoutMs?: number
 }
+
+/**
+ * How long an extend hook may run before Orca gives up on it.
+ *
+ * Why a deadline rather than trusting the hook: this call holds the runtime's lifecycle lock, and the
+ * reclaim sweep's per-runtime work is gated on that lock, so a hook waiting on a network that never
+ * answers would stop every later extend from starting and leave the runtime unreclaimable. The hook is
+ * a provider CLI, not something Orca can inspect, so the only bound available is a clock.
+ */
+export const EPHEMERAL_VM_EXTEND_HOOK_TIMEOUT_MS = 120_000
 
 /**
  * Canonicalize a requested lifetime and refuse anything the recipe does not offer.
@@ -75,6 +90,11 @@ async function extendLocked(
     throw new Error('This host has already been released, so its lease can no longer be extended.')
   }
 
+  // Why a deadline on the hook: this call holds the runtime's lifecycle lock, so a hook waiting on a
+  // network that never answers stops every later extend for this runtime. Composed with the caller's
+  // own signal so a cancel keeps working, and kept separate from it so a timeout can be named.
+  const hookTimeoutMs = args.hookTimeoutMs ?? EPHEMERAL_VM_EXTEND_HOOK_TIMEOUT_MS
+  const deadline = AbortSignal.timeout(hookTimeoutMs)
   const extend = await runEphemeralVmRecipeExtend({
     repoPath: resolved.repo.repo.path,
     // Why the command comes from the snapshot rather than `resolved.recipe`: the hook that extends
@@ -84,12 +104,32 @@ async function extendLocked(
     context: contextFromRuntime(resolved.repo.repo.path, existing),
     recipeResult: existing.recipeResult,
     lifetime,
-    ...(args.signal ? { signal: args.signal } : {})
+    signal: args.signal ? AbortSignal.any([args.signal, deadline]) : deadline
   })
   if (!extend.ok) {
     // Why leave the record untouched on failure: nothing about the lease moved, so persisting a
     // failure the user can immediately retry would only make the host look broken meanwhile.
-    throw new Error(extend.error)
+    throw new Error(
+      deadline.aborted
+        ? `Extending the lease did not finish within ${hookTimeoutMs} ms and was stopped. The provider may already have granted the extension, so check its own deadline for this host before extending again.`
+        : extend.error
+    )
+  }
+
+  // Why re-read after the hook: nothing takes this lock for the whole hook's duration — a workspace
+  // delete during it is deliberate and must not wait — so the record that was actionable when the
+  // lease was requested may be tearing down by the time the answer arrives. Writing the new
+  // recipeResult onto a `cleaned` record is what made a finished host report "cleanup failed".
+  //
+  // Why the record alone and not the recipe context: that call re-resolves the repo and the recipe, and
+  // a repo removed from Orca while the hook ran would discard a granted extension with "Repo not found".
+  const afterHook = listEphemeralVmRuntimes(args.userDataPath).find(
+    (entry) => entry.id === args.runtimeId
+  )
+  if (!afterHook || !isEphemeralVmHostActionable(afterHook)) {
+    throw new Error(
+      'This host was released while its lease was being extended, so the new deadline was not applied.'
+    )
   }
 
   // Why the shared rule: an answer that loses the deadline would leave a lease the user just paid for
@@ -97,7 +137,7 @@ async function extendLocked(
   // sweep may release this host before the user retries — acceptable, because a release destroys
   // nothing and the action is retryable against a record that still parses.
   const lostLifetimeError = getEphemeralVmLifetimeLossError(
-    existing.recipeResult,
+    afterHook.recipeResult,
     extend.result,
     'Extend'
   )
@@ -105,8 +145,8 @@ async function extendLocked(
     throw new Error(lostLifetimeError)
   }
 
-  const connectionChanged = !connectionsEqual(existing.recipeResult, extend.result)
-  const updated = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
+  const connectionChanged = !connectionsEqual(afterHook.recipeResult, extend.result)
+  const updated = updateEphemeralVmRuntimeStatus(args.userDataPath, afterHook.id, {
     recipeResult: extend.result,
     updatedAt: Date.now()
   })

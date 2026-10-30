@@ -9,6 +9,7 @@ import { jiraAddIssueComment, jiraIssueComments } from '@/runtime/runtime-jira-c
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import type { JiraComment } from '../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 
 export type JiraIssueCommentsState = {
   comments: JiraComment[]
@@ -58,7 +59,15 @@ export function useJiraIssueComments({
         setComments(fetched)
       } catch (error) {
         if (requestId === requestIdRef.current) {
-          setCommentsError(error instanceof Error ? error.message : 'Failed to load comments.')
+          setCommentsError(
+            extractIpcErrorMessage(
+              error,
+              translate(
+                'auto.components.JiraIssueWorkspace.failedToLoadComments',
+                'Failed to load comments.'
+              )
+            )
+          )
         }
       } finally {
         if (requestId === requestIdRef.current) {
@@ -123,9 +132,10 @@ export function useJiraIssueComments({
       setCommentDraft('')
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : translate('auto.components.JiraIssueWorkspace.fa132c8aed', 'Failed to add comment.')
+        extractIpcErrorMessage(
+          error,
+          translate('auto.components.JiraIssueWorkspace.fa132c8aed', 'Failed to add comment.')
+        )
       )
     } finally {
       setCommentSubmitting(false)

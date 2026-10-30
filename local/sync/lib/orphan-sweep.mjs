@@ -27,6 +27,10 @@ const EXTENSIONS = [
   '/index.mjs'
 ]
 
+// A `.js` specifier in a TypeScript file is the ESM spelling of the `.ts` module beside it, and the
+// bundler resolves it that way. Without this every `import './x.js'` in a TS file reads as dangling.
+const JS_TO_TS = { '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] }
+
 /** The repo path a specifier names, or null when it is a package or cannot be resolved. */
 export function resolveSpecifier(specifier, fromPath, known) {
   let base
@@ -39,10 +43,13 @@ export function resolveSpecifier(specifier, fromPath, known) {
     }
     base = alias[1] + specifier.slice(alias[0].length)
   }
-  for (const extension of EXTENSIONS) {
-    const candidate = base + extension
-    if (known.has(candidate)) {
-      return candidate
+  const extension = posix.extname(base)
+  const swapped = (JS_TO_TS[extension] ?? []).map((to) => base.slice(0, -extension.length) + to)
+  for (const candidate of [...swapped, base]) {
+    for (const suffix of EXTENSIONS) {
+      if (known.has(candidate + suffix)) {
+        return candidate + suffix
+      }
     }
   }
   return null

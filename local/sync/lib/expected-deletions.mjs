@@ -8,6 +8,8 @@
  */
 export const EXPECTED_DELETION_STATUSES = ['expected-deletion', 'pending-decision', 'restore']
 
+const BLOB = /^[0-9a-f]{40}([0-9a-f]{24})?$/
+
 const DEFAULT_STATUS = 'expected-deletion'
 
 /**
@@ -40,8 +42,14 @@ export function parseExpectedDeletions(text) {
       status,
       class: item.class ?? 'unclassified',
       commit: item.commit ?? null,
+      // The upstream blob this decision was judged against. A decision about one version of a file does
+      // not carry to another, so a changed blob turns the entry back into a question.
+      upstreamBlob: item.upstreamBlob ?? null,
       reason: item.reason ?? ''
     })
+    if (item.upstreamBlob != null && !BLOB.test(String(item.upstreamBlob))) {
+      problems.push(`${path}: upstreamBlob "${item.upstreamBlob}" is not a blob SHA`)
+    }
   }
   const counts = new Map()
   for (const entry of entries) {
@@ -75,6 +83,98 @@ export function staleDeletions(entries, presentAtHead) {
   return entries
     .filter((entry) => entry.status !== 'restore' && presentAtHead.has(entry.path))
     .map((entry) => entry.path)
+}
+
+/**
+ * The entry as this sync may read it. Upstream repurposing a file changes its blob, and a `delete`
+ * judged against the old one must not keep proposing `git rm -f` against the new. `upstreamBlob` is
+ * the path's blob in the upstream tree being merged, or null when it cannot be read (upstream deleted
+ * the path, or the ref does not resolve) — an answer nobody can check is not evidence the decision
+ * changed.
+ */
+export function boundDeletion(entry, upstreamBlob) {
+  if (!entry || !entry.upstreamBlob || !upstreamBlob) {
+    return { entry, rebound: false }
+  }
+  return entry.upstreamBlob === upstreamBlob
+    ? { entry, rebound: false }
+    : { entry: { ...entry, status: 'pending-decision' }, rebound: true }
+}
+
+/**
+ * Entries neither side has any more: upstream deleted the file and so did the fork, so the entry can
+ * never conflict again. `staleDeletions` only catches the opposite case (the file came back).
+ */
+export function prunableDeletions(entries, { presentAtHead, presentUpstream }) {
+  return entries
+    .filter((entry) => !presentAtHead.has(entry.path) && !presentUpstream.has(entry.path))
+    .map((entry) => entry.path)
+}
+
+/**
+ * The manifest as one sync may read it: entries with the binding applied, plus the one note a report
+ * shows. `presentUpstream` is null when the upstream tree cannot be read, which makes pruning unknown
+ * rather than clean; `upstreamBlobOf` answers null for a path upstream no longer has, which leaves that
+ * entry's status alone — a question nobody can check is not evidence the decision changed.
+ */
+export function readDeletionManifest({
+  text,
+  manifestPath = 'local/sync/expected-deletions.json',
+  presentAtHead,
+  presentUpstream = null,
+  upstreamBlobOf = null
+}) {
+  if (text === null) {
+    return {
+      entries: [],
+      prunable: [],
+      rebind: 0,
+      rebound: [],
+      failure: null,
+      note: `no deletion manifest at ${manifestPath}`
+    }
+  }
+  const { entries, note: parseNote } = parseExpectedDeletions(text)
+  const problems = []
+  const stale = staleDeletions(entries, presentAtHead)
+  if (stale.length > 0) {
+    problems.push(`manifest calls deleted but HEAD still has: ${stale.join('; ')}`)
+  }
+  const prunable =
+    presentUpstream === null ? [] : prunableDeletions(entries, { presentAtHead, presentUpstream })
+  if (prunable.length > 0) {
+    problems.push(`both sides deleted it, so the entry can be pruned: ${prunable.join('; ')}`)
+  }
+  const rebound = []
+  const unbound = []
+  const bound = entries.map((entry) => {
+    if (entry.status !== 'pending-decision' && !entry.upstreamBlob) {
+      unbound.push(entry.path)
+    }
+    const result = boundDeletion(entry, upstreamBlobOf === null ? null : upstreamBlobOf(entry.path))
+    if (result.rebound) {
+      rebound.push(`${entry.path} (judged ${entry.upstreamBlob.slice(0, 10)})`)
+    }
+    return result.entry
+  })
+  if (unbound.length > 0) {
+    problems.push(
+      `settled without an upstreamBlob, so nothing binds them to the version that was judged: ${unbound.join('; ')}`
+    )
+  }
+  if (rebound.length > 0) {
+    problems.push(
+      `judged against an upstream blob that has changed, so these are questions again: ${rebound.join('; ')}`
+    )
+  }
+  return {
+    entries: bound,
+    prunable,
+    rebound,
+    // `failure` is the manifest being untrustworthy; `note` is everything a reader should see.
+    failure: parseNote,
+    note: [parseNote, ...problems].filter(Boolean).join(' | ') || null
+  }
 }
 
 /**

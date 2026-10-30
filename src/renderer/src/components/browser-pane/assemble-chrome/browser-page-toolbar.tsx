@@ -251,7 +251,7 @@ export function BrowserPageToolbar({
           if (!externalUrl) {
             return
           }
-          void window.api.shell.openUrl(externalUrl)
+          void window.api.shell.openUrlInSystemBrowser(externalUrl)
         },
         label: translate(
           'auto.components.browser.pane.BrowserPane.0f41bf80c7',

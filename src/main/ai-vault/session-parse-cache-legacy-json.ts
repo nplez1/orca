@@ -2,6 +2,7 @@
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import {
+  SESSION_PARSE_CACHE_SCHEMA_VERSION,
   parsePersistedSessionParseCacheRow,
   type SessionParseCacheDatabase
 } from './session-parse-cache-database'
@@ -9,13 +10,16 @@ import type { PersistedSessionParseCacheEntry } from './session-parse-cache-stor
 
 // Match the old writer's maximum file size.
 const LEGACY_MAX_BYTES = 64 * 1024 * 1024
-// Only schema 6 is admitted, because this file's directory is Orca NP's own — every build that ever
-// wrote it was a fork build, so upstream's JSON schemas never appear here. 4 and 5 are rejected on
-// purpose, each for the fault 6 exists to fix: a 4 row carries the `<current_datetime>` prefix as a
-// Copilot session title, and a 5 row carries `subagent: null`, which would leave every Pi sub-agent
-// transcript at top level. Rows are matched on mtime + size, so a replayed-wrong row is wrong until
-// the transcript changes.
-const LEGACY_JSON_SCHEMA_VERSIONS: readonly number[] = [6]
+// Only the current schema is admitted, because a row replayed from an older one keeps a parser's old
+// semantics: rows match on mtime + size, so a finished transcript never changes and the wrong row
+// stays wrong for good. 4 carries the `<current_datetime>` prefix as a Copilot title, 5 carries
+// `subagent: null` (every Pi sub-agent at top level), and 6 predates 7 (re-read hidden-cached Codex
+// threads) and 8 (list pi/omp chats in a shared folder) — each of which the current version must apply.
+//
+// Why the branch still exists when a matching file is unlikely: no build wrote a current-schema JSON
+// file, so this now only deletes the retired file. Keeping the shape means a future writer that ships
+// the same schema is read rather than dropped, and the file is removed either way.
+const LEGACY_JSON_SCHEMA_VERSIONS: readonly number[] = [SESSION_PARSE_CACHE_SCHEMA_VERSION]
 
 /** Import before live I/O so newer or deleted rows cannot be overwritten; existing database rows win. */
 export function importLegacySessionParseCacheJson(

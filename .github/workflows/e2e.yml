@@ -325,7 +325,9 @@ jobs:
       # as green.
       - name: Verdict on known failures (${{ matrix.shard_name }})
         if: ${{ github.repository != 'stablyai/orca' && steps.run-e2e.outcome != 'skipped' }}
-        run: node local/check-e2e-known-failure-titles.mjs ci-shards/results.json local/e2e-known-failure-titles.json
+        run: >-
+          node local/check-e2e-known-failure-titles.mjs ci-shards/results.json
+          local/e2e-known-failure-titles.json ${{ steps.run-e2e.outcome }}
 
       - name: Summarize E2E failures
         if: always()

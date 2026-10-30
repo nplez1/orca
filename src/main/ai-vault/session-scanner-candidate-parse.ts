@@ -21,7 +21,7 @@ import { canStopParsingSessions } from './session-scan-cutoff'
 import type { SessionFileCandidate, SessionParseResult } from './session-scanner-types'
 import { errorMessage } from './session-scanner-values'
 import { throwIfAiVaultScanCancelled } from './ai-vault-scan-cancellation'
-import { noteAiVaultScanWorkChanged } from './ai-vault-scan-progress'
+import { noteAiVaultScanReadingFile, noteAiVaultScanWorkChanged } from './ai-vault-scan-progress'
 
 const SESSION_PARSE_CONCURRENCY = 8
 
@@ -138,6 +138,7 @@ export async function parseSessionCandidate(
   }
 ): Promise<SessionParseResult> {
   const { platform, executionHostId, parseStats, antigravityWorkspaceResolver, signal } = context
+  const finishedReading = noteAiVaultScanReadingFile(signal, candidate.agent, candidate.file.path)
   try {
     let session = context.listed
       ? await parseListedSessionFile(candidate, platform, parseStats, signal)
@@ -159,6 +160,8 @@ export async function parseSessionCandidate(
         message: errorMessage(err)
       }
     }
+  } finally {
+    finishedReading()
   }
 }
 

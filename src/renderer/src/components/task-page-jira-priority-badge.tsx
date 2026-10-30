@@ -26,7 +26,7 @@ export function TaskPageJiraPriorityBadge({
         // Why the explicit border and fill: `getJiraPriorityTone` is text-only by design (it is shared
         // with the list cells), so without these the pill falls back to the border token at full
         // opacity and loses its fill entirely.
-        'inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/50 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium',
+        'inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/50 bg-muted/40 px-1.5 py-0.5 text-2xs font-medium',
         // Why upstream's function: one priority palette for the list cells and the board card.
         getJiraPriorityTone(priority?.name),
         className

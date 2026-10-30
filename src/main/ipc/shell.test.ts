@@ -24,7 +24,9 @@ const {
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: handleMock
+    handle: handleMock,
+    // The link-router handshake is a listener, not a handler.
+    on: vi.fn()
   },
   shell: {
     showItemInFolder: showItemInFolderMock,
@@ -39,6 +41,7 @@ vi.mock('electron', () => ({
 vi.mock('node:fs/promises', () => ({
   constants: { COPYFILE_EXCL: 1 },
   copyFile: vi.fn(),
+  realpath: (path: string) => Promise.resolve(path),
   stat: statMock
 }))
 
@@ -125,7 +128,7 @@ describe('registerShellHandlers', () => {
       spawnArgs: args
     }))
     spawnMock.mockReturnValue(createSpawnedProcess())
-    statMock.mockResolvedValue({ isDirectory: () => true })
+    statMock.mockResolvedValue({ isDirectory: () => true, isFile: () => true, mode: 0o644 })
   })
 
   function getHandler(channel: string): (event: unknown, ...args: unknown[]) => Promise<unknown> {

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -129,5 +129,25 @@ describe('parseCopilotSessionFile titles', () => {
     expect(session.title).toBe('refactor the parser')
     expect(session.previewMessages[0]?.text).toBe('refactor the parser')
     expect(session.title).not.toContain('current_datetime')
+  })
+})
+
+describe('parseCopilotSessionFile identity', () => {
+  it('names an events.jsonl session after its own directory, not "events"', async () => {
+    // Copilot's layout is <session-state>/<uuid>/events.jsonl, so the constant file name used to
+    // give every session the same id.
+    const dir = await mkdtemp(join(tmpdir(), 'orca-copilot-identity-'))
+    tempDirs.push(dir)
+    const sessionDir = join(dir, 'a1b2c3d4-1111-4222-8333-444455556666')
+    await mkdir(sessionDir, { recursive: true })
+    const path = join(sessionDir, 'events.jsonl')
+    await writeFile(path, JSON.stringify({ type: 'user.message', data: { content: 'hi' } }))
+
+    const session = await parseCopilotSessionFile(
+      { path, mtimeMs: Date.now(), modifiedAt: new Date().toISOString() },
+      'linux'
+    )
+
+    expect(session?.sessionId).toBe('a1b2c3d4-1111-4222-8333-444455556666')
   })
 })

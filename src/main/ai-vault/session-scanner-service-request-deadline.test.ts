@@ -63,6 +63,32 @@ describe('AI Vault service request deadlines', () => {
     client.dispose()
   })
 
+  it('names the transcript in flight when the child dies mid-parse', async () => {
+    // Why: the file that exhausts the child's 384 MB heap dies with it, so the last progress report
+    // is the only thing that can say which one it was.
+    const { children, client } = setup()
+    const { scan, child, id } = await startScan(client, children)
+    child.emit('message', {
+      type: 'progress',
+      id,
+      work: {
+        ...WORK,
+        stage: 'reading',
+        readingFiles: [
+          { agent: 'claude', path: '/sessions/huge.jsonl' },
+          { agent: 'claude', path: '/sessions/second.jsonl' }
+        ]
+      }
+    })
+
+    child.emit('exit', 134)
+
+    await expect(scan).rejects.toThrow(
+      'AI Vault service exited (134). (while reading /sessions/huge.jsonl, /sessions/second.jsonl)'
+    )
+    client.dispose()
+  })
+
   it('forwards only its own scan work to the scan listener', async () => {
     const { children, client } = setup()
     const work = vi.fn()

@@ -32,14 +32,14 @@ function makeHostStatus(
   } satisfies CliInstallStatus
 }
 
-// Frozen from v1.4.138-rc.2: the upgrade regression only reproduces when the
-// persisted managed script still names the pre-native Windows batch launcher.
-const PRE_RC4_MANAGED_WSL_LAUNCHER = `#!/usr/bin/env bash
+// Frozen layout from an earlier build of this fork: the persisted managed script still names the
+// pre-native Windows batch launcher, so an upgrade has to recognise and replace it.
+const PRE_RENAME_MANAGED_WSL_LAUNCHER = `#!/usr/bin/env bash
 set -euo pipefail
-# Orca managed WSL CLI launcher
+# Orca NP managed WSL CLI launcher
 # ORCA_WIN_LAUNCHER_B64=QzpcUHJvZ3JhbSBGaWxlc1xPcmNhXHJlc291cmNlc1xiaW5cb3JjYS5jbWQ=
 ORCA_WIN_LAUNCHER='C:\\Program Files\\Orca\\resources\\bin\\orca.cmd'
-ORCA_BRIDGE_PS1='/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
+ORCA_BRIDGE_PS1='/home/alice/.local/share/orca-np/orca-wsl-bridge.ps1'
 if command -v powershell.exe >/dev/null 2>&1; then
   ORCA_POWERSHELL=powershell.exe
 elif [ -x /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ]; then
@@ -52,19 +52,28 @@ ORCA_BRIDGE_PS1_WIN=$(wslpath -w "$ORCA_BRIDGE_PS1")
 exec "$ORCA_POWERSHELL" -NoProfile -ExecutionPolicy Bypass -File "$ORCA_BRIDGE_PS1_WIN" "$ORCA_WIN_LAUNCHER" "$@"
 `
 
+/** An official Orca install's own registration: same guest directory, its own command and marker. */
+const OFFICIAL_ORCA_WSL_LAUNCHER = `#!/usr/bin/env bash
+set -euo pipefail
+# Orca managed WSL CLI launcher
+# ORCA_WIN_LAUNCHER_B64=QzpcVXNlcnNcYWxpY2VcQXBwRGF0YVxMb2NhbFxQcm9ncmFtc1xvcmNhXFJlc291cmNlc1xiaW5cb3JjYS5leGU=
+ORCA_WIN_LAUNCHER='C:\\Users\\alice\\AppData\\Local\\Programs\\orca\\resources\\bin\\orca.exe'
+exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File /mnt/c/bridge.ps1 "$ORCA_WIN_LAUNCHER" "$@"
+`
+
 function createWslRunner(
   initialFile: string | null = null,
   pathIncludesLocalBin = true,
   options: {
     initialBridge?: string | null
-    initialLegacyFile?: string | null
+    officialOrcaCommand?: string | null
     failInstall?: boolean
     interopReady?: boolean
   } = {}
 ) {
-  const commandPath = '/home/alice/.local/bin/orca-ide'
-  const legacyCommandPath = '/home/alice/.local/bin/orca'
-  const bridgePath = '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
+  const commandPath = '/home/alice/.local/bin/orca-np'
+  const officialCommandPath = '/home/alice/.local/bin/orca-ide'
+  const bridgePath = '/home/alice/.local/share/orca-np/orca-wsl-bridge.ps1'
   const files = new Map<string, string>()
   if (initialFile !== null) {
     files.set(commandPath, initialFile)
@@ -75,8 +84,8 @@ function createWslRunner(
   ) {
     files.set(bridgePath, options.initialBridge ?? _internals.buildWslBridgeScript())
   }
-  if (options.initialLegacyFile) {
-    files.set(legacyCommandPath, options.initialLegacyFile)
+  if (options.officialOrcaCommand) {
+    files.set(officialCommandPath, options.officialOrcaCommand)
   }
   const calls: string[] = []
   const runner = vi.fn(async (_distro: string, command: string) => {
@@ -93,7 +102,7 @@ function createWslRunner(
       }
       if (
         files.has(bridgePath) &&
-        !files.get(bridgePath)?.includes('# Orca managed WSL CLI PowerShell bridge')
+        !files.get(bridgePath)?.includes('# Orca NP managed WSL CLI PowerShell bridge')
       ) {
         throw new Error('__ORCA_CONFLICT__')
       }
@@ -105,9 +114,6 @@ function createWslRunner(
         )?.[1] ?? ''
       files.set(commandPath, launcher)
       files.set(bridgePath, bridge)
-      if (files.get(legacyCommandPath)?.includes('# Orca managed WSL CLI launcher')) {
-        files.delete(legacyCommandPath)
-      }
       return ''
     }
     if (command.includes('command -v powershell.exe')) {
@@ -117,18 +123,12 @@ function createWslRunner(
       if (command.includes(`rm -f '${commandPath}'`)) {
         if (
           files.has(bridgePath) &&
-          !files.get(bridgePath)?.includes('# Orca managed WSL CLI PowerShell bridge')
+          !files.get(bridgePath)?.includes('# Orca NP managed WSL CLI PowerShell bridge')
         ) {
           throw new Error('__ORCA_CONFLICT__')
         }
         files.delete(commandPath)
         files.delete(bridgePath)
-      }
-      if (
-        command.includes(legacyCommandPath) &&
-        files.get(legacyCommandPath)?.includes('# Orca managed WSL CLI launcher')
-      ) {
-        files.delete(legacyCommandPath)
       }
       return ''
     }
@@ -139,9 +139,6 @@ function createWslRunner(
       if (command.includes(bridgePath)) {
         return files.get(bridgePath) ?? '__ORCA_MISSING__'
       }
-      if (command.includes(legacyCommandPath)) {
-        return files.get(legacyCommandPath) ?? '__ORCA_MISSING__'
-      }
     }
     throw new Error(`Unexpected WSL command: ${command}`)
   })
@@ -150,7 +147,7 @@ function createWslRunner(
     calls,
     getBridge: () => files.get(bridgePath) ?? null,
     getFile: () => files.get(commandPath) ?? null,
-    getLegacyFile: () => files.get(legacyCommandPath) ?? null
+    getOfficialCommand: () => files.get(officialCommandPath) ?? null
   }
 }
 
@@ -180,14 +177,14 @@ describe('WslCliInstaller', () => {
     await expect(installer.getStatus()).resolves.toMatchObject({
       supported: true,
       state: 'not_installed',
-      commandPath: '/home/alice/.local/bin/orca-ide'
+      commandPath: '/home/alice/.local/bin/orca-np'
     })
   })
 
   it('reports installed WSL launchers whose bin directory is missing from PATH', async () => {
     const launcher = _internals.buildWslLauncher(
       'C:\\Orca\\orca.cmd',
-      '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
+      '/home/alice/.local/share/orca-np/orca-wsl-bridge.ps1'
     )
     const wsl = createWslRunner(launcher, false)
     const installer = new WslCliInstaller({
@@ -207,7 +204,7 @@ describe('WslCliInstaller', () => {
   it('accepts current managed WSL scripts with an extra heredoc trailing newline', async () => {
     const launcher = `${_internals.buildWslLauncher(
       'C:\\Orca\\orca.cmd',
-      '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
+      '/home/alice/.local/share/orca-np/orca-wsl-bridge.ps1'
     )}\n`
     const wsl = createWslRunner(launcher)
     const installer = new WslCliInstaller({
@@ -215,7 +212,7 @@ describe('WslCliInstaller', () => {
       distro: 'Ubuntu',
       hostInstaller: { getStatus: async () => makeHostStatus('C:\\Orca\\orca.cmd') },
       wslRunner: async (distro, command) => {
-        if (command.includes('cat /home/alice/.local/share/orca/orca-wsl-bridge.ps1')) {
+        if (command.includes('cat /home/alice/.local/share/orca-np/orca-wsl-bridge.ps1')) {
           return `${_internals.buildWslBridgeScript()}\n`
         }
         return wsl.runner(distro, command)
@@ -261,7 +258,7 @@ describe('WslCliInstaller', () => {
 
   it('repairs a managed launcher whose bridge is missing, but preserves a conflicting bridge', async () => {
     const nativeLauncher = 'C:\\Orca\\resources\\bin\\orca-np.exe'
-    const missingBridge = createWslRunner(PRE_RC4_MANAGED_WSL_LAUNCHER, true, {
+    const missingBridge = createWslRunner(PRE_RENAME_MANAGED_WSL_LAUNCHER, true, {
       initialBridge: null
     })
     const missingBridgeInstaller = new WslCliInstaller({
@@ -277,8 +274,8 @@ describe('WslCliInstaller', () => {
     })
     expect(missingBridge.getBridge()).toBe(_internals.buildWslBridgeScript())
 
-    const staleBridge = createWslRunner(PRE_RC4_MANAGED_WSL_LAUNCHER, true, {
-      initialBridge: '# Orca managed WSL CLI PowerShell bridge\nWrite-Output "stale"\n'
+    const staleBridge = createWslRunner(PRE_RENAME_MANAGED_WSL_LAUNCHER, true, {
+      initialBridge: '# Orca NP managed WSL CLI PowerShell bridge\nWrite-Output "stale"\n'
     })
     const staleBridgeInstaller = new WslCliInstaller({
       platform: 'win32',
@@ -292,7 +289,7 @@ describe('WslCliInstaller', () => {
     })
     expect(staleBridge.getBridge()).toBe(_internals.buildWslBridgeScript())
 
-    const conflictingBridge = createWslRunner(PRE_RC4_MANAGED_WSL_LAUNCHER, true, {
+    const conflictingBridge = createWslRunner(PRE_RENAME_MANAGED_WSL_LAUNCHER, true, {
       initialBridge: 'Write-Output "user-owned bridge"\n'
     })
     const conflictingBridgeInstaller = new WslCliInstaller({
@@ -308,7 +305,7 @@ describe('WslCliInstaller', () => {
       status: { state: 'conflict' }
     })
     expect(conflictingBridge.getBridge()).toBe('Write-Output "user-owned bridge"\n')
-    expect(conflictingBridge.getFile()).toBe(PRE_RC4_MANAGED_WSL_LAUNCHER)
+    expect(conflictingBridge.getFile()).toBe(PRE_RENAME_MANAGED_WSL_LAUNCHER)
     expect(
       conflictingBridge.calls.some((command) => command.includes('cat > "$command_tmp"'))
     ).toBe(false)
@@ -318,7 +315,7 @@ describe('WslCliInstaller', () => {
     const nativeLauncher = 'C:\\Orca\\resources\\bin\\orca-np.exe'
     const currentLauncher = _internals.buildWslLauncher(
       nativeLauncher,
-      '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
+      '/home/alice/.local/share/orca-np/orca-wsl-bridge.ps1'
     )
     const wsl = createWslRunner(currentLauncher, true, {
       initialBridge: 'Write-Output "user-owned bridge"\n'
@@ -339,45 +336,11 @@ describe('WslCliInstaller', () => {
     expect(wsl.getFile()).toBe(currentLauncher)
   })
 
-  it('moves a legacy-only managed registration to orca-ide without touching unmanaged names', async () => {
-    const nativeLauncher = 'C:\\Orca\\resources\\bin\\orca-np.exe'
-    const managedLegacy = createWslRunner(null, true, {
-      initialBridge: _internals.buildWslBridgeScript(),
-      initialLegacyFile: PRE_RC4_MANAGED_WSL_LAUNCHER
-    })
-    const installer = new WslCliInstaller({
-      platform: 'win32',
-      distro: 'Ubuntu',
-      hostInstaller: { getStatus: async () => makeHostStatus(nativeLauncher) },
-      wslRunner: managedLegacy.runner
-    })
-
-    await expect(installer.repairManagedRegistration()).resolves.toMatchObject({
-      changed: true,
-      status: { state: 'installed', currentTarget: nativeLauncher }
-    })
-    expect(managedLegacy.getLegacyFile()).toBeNull()
-
-    const unmanagedLegacy = createWslRunner(null, true, {
-      initialLegacyFile: '#!/bin/sh\necho user-owned\n'
-    })
-    const unmanagedInstaller = new WslCliInstaller({
-      platform: 'win32',
-      distro: 'Ubuntu',
-      hostInstaller: { getStatus: async () => makeHostStatus(nativeLauncher) },
-      wslRunner: unmanagedLegacy.runner
-    })
-    await expect(unmanagedInstaller.repairManagedRegistration()).resolves.toMatchObject({
-      changed: false,
-      status: { state: 'not_installed' }
-    })
-    expect(unmanagedLegacy.getLegacyFile()).toBe('#!/bin/sh\necho user-owned\n')
-  })
-
-  it('does not adopt a legacy-managed registration when the bridge is user-owned', async () => {
+  // Why: an official Orca install registers `~/.local/bin/orca-ide` with the same managed marker.
+  // Taking that command over is what made each launch undo the other install's registration.
+  it('leaves an official install’s orca-ide registration alone', async () => {
     const wsl = createWslRunner(null, true, {
-      initialBridge: 'Write-Output "user-owned bridge"\n',
-      initialLegacyFile: PRE_RC4_MANAGED_WSL_LAUNCHER
+      officialOrcaCommand: OFFICIAL_ORCA_WSL_LAUNCHER
     })
     const installer = new WslCliInstaller({
       platform: 'win32',
@@ -386,13 +349,33 @@ describe('WslCliInstaller', () => {
       wslRunner: wsl.runner
     })
 
+    await expect(installer.getStatus()).resolves.toMatchObject({
+      state: 'not_installed',
+      commandPath: '/home/alice/.local/bin/orca-np'
+    })
     await expect(installer.repairManagedRegistration()).resolves.toMatchObject({
       changed: false,
-      managed: true,
       status: { state: 'not_installed' }
     })
-    expect(wsl.getLegacyFile()).toBe(PRE_RC4_MANAGED_WSL_LAUNCHER)
-    expect(wsl.calls.some((command) => command.includes('cat > "$command_tmp"'))).toBe(false)
+    expect(wsl.getOfficialCommand()).toBe(OFFICIAL_ORCA_WSL_LAUNCHER)
+    expect(wsl.calls.some((command) => command.includes('orca-ide'))).toBe(false)
+  })
+
+  it('registers the guest command and bridge under this build’s own names', async () => {
+    const wsl = createWslRunner()
+    const installer = new WslCliInstaller({
+      platform: 'win32',
+      distro: 'Ubuntu',
+      hostInstaller: { getStatus: async () => makeHostStatus() },
+      wslRunner: wsl.runner
+    })
+
+    const status = await installer.install()
+    expect(status).toMatchObject({ state: 'installed', commandName: 'orca-np' })
+    expect(status.commandPath).toBe('/home/alice/.local/bin/orca-np')
+    const installCommand = wsl.calls.find((command) => command.includes('cat > "$command_tmp"'))
+    expect(installCommand).toContain('/home/alice/.local/share/orca-np/orca-wsl-bridge.ps1')
+    expect(installCommand).not.toContain('/.local/share/orca/')
   })
 
   it.skipIf(process.platform === 'win32')(
@@ -400,12 +383,12 @@ describe('WslCliInstaller', () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'orca-wsl-cli-rollback-'))
       const home = join(root, 'home with spaces')
-      const commandPath = join(home, '.local', 'bin', 'orca-ide')
-      const bridgePath = join(home, '.local', 'share', 'orca', 'orca-wsl-bridge.ps1')
+      const commandPath = join(home, '.local', 'bin', 'orca-np')
+      const bridgePath = join(home, '.local', 'share', 'orca-np', 'orca-wsl-bridge.ps1')
       const bridge = _internals.buildWslBridgeScript()
       await mkdir(join(home, '.local', 'bin'), { recursive: true })
-      await mkdir(join(home, '.local', 'share', 'orca'), { recursive: true })
-      await writeFile(commandPath, PRE_RC4_MANAGED_WSL_LAUNCHER, 'utf8')
+      await mkdir(join(home, '.local', 'share', 'orca-np'), { recursive: true })
+      await writeFile(commandPath, PRE_RENAME_MANAGED_WSL_LAUNCHER, 'utf8')
       await writeFile(bridgePath, bridge, 'utf8')
 
       const runner = async (_distro: string, command: string): Promise<string> => {
@@ -439,7 +422,7 @@ describe('WslCliInstaller', () => {
 
       try {
         await expect(installer.repairManagedRegistration()).rejects.toThrow()
-        await expect(readFile(commandPath, 'utf8')).resolves.toBe(PRE_RC4_MANAGED_WSL_LAUNCHER)
+        await expect(readFile(commandPath, 'utf8')).resolves.toBe(PRE_RENAME_MANAGED_WSL_LAUNCHER)
         await expect(readFile(bridgePath, 'utf8')).resolves.toBe(bridge)
       } finally {
         await rm(root, { recursive: true, force: true })

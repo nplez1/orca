@@ -20,16 +20,42 @@ import { asRecord, extractString, sessionIdFromFileName } from './session-scanne
  * rather than Pi guarantees: if they change, sub-agent rows reappear at top
  * level, which is the safe direction to fail — never a hidden real session.
  */
-// The suffix is the spawner's agent id, sliced to 8. Ids are UUID-derived hex
-// today, but the workflow lane also passes crafted ids, so accept a wider
-// alphabet than hex rather than miss a whole spawning path.
-const SUBAGENT_SESSION_NAME_PATTERN = /^(.+)#[0-9a-zA-Z_-]{8}$/
+// The suffix is the spawner's agent id sliced to 8. Ids are UUID-derived hex today, but the
+// workflow lane also passes crafted ids, so accept a wider alphabet here and judge the id below.
+const SUBAGENT_SESSION_NAME_PATTERN = /^(.+)#([0-9a-zA-Z_-]{8})$/
+/** The workflow lane slices `wf-agent-<n>` to the spawner's 8 characters, so its id is a constant. */
+const WORKFLOW_LANE_AGENT_ID = 'wf-agent'
+const UUID_DERIVED_AGENT_ID_PATTERN = /^[0-9a-f]{8}$/i
+/** `YYYYMMDD`, 1900-2099: a date somebody typed into a name, never a UUID-derived id. */
+const CALENDAR_DATE_SUFFIX_PATTERN = /^(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$/
 const ACTIVE_AGENT_TAG_PATTERN = /<active_agent\s+name="([^"]+)"/i
+
+/**
+ * Whether a name's suffix is a spawner id rather than a person's words.
+ *
+ * A name a person typed can end in 8 characters of the same alphabet — `fix login#issue-42` is not
+ * hex, and `release#20261028` is a calendar date — so the suffix has to pass two checks the
+ * spawner's UUID-derived id always does: hex, and not a date. Sized against the ids real runs
+ * persist (`Explore#06356862`), an id shaped like a date is ~1 in 50,000.
+ *
+ * What is left: a name that is 8 plain hex characters at startup is indistinguishable from an id,
+ * and a wrongly nested row is then hidden by the shared nesting rule whenever its parent is not in
+ * the list. That residual is why this check is deliberately the strict one.
+ */
+function isSpawnedAgentId(id: string): boolean {
+  return (
+    id === WORKFLOW_LANE_AGENT_ID ||
+    (UUID_DERIVED_AGENT_ID_PATTERN.test(id) && !CALENDAR_DATE_SUFFIX_PATTERN.test(id))
+  )
+}
 
 /** Agent type from a `session_info` name like `Explore#06356862`, else null. */
 export function subagentAgentTypeFromSessionName(name: unknown): string | null {
   const match = typeof name === 'string' ? SUBAGENT_SESSION_NAME_PATTERN.exec(name.trim()) : null
-  return match?.[1]?.trim() || null
+  if (!match || !isSpawnedAgentId(match[2])) {
+    return null
+  }
+  return match[1].trim() || null
 }
 
 /** Agent type from a system preamble carrying `<active_agent name="…"/>`, else null. */
@@ -62,6 +88,12 @@ export function consumeSubagentDeclarationRecord(
     return
   }
   if (record.type !== 'message' || accumulator.declaredSubagentAgentType !== null) {
+    return
+  }
+  // Why the startup guard here too: only the preamble the spawner writes before the conversation
+  // starts is a declaration. A system message later in a session is the person's own context, and
+  // matching it would nest their session under an unrelated row.
+  if (accumulator.messageCount > 0) {
     return
   }
   const message = asRecord(record.message)

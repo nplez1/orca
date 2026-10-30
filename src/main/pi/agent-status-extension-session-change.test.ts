@@ -160,21 +160,19 @@ describe('Pi session changes', () => {
     expect(posts(harness).at(-2)).not.toHaveProperty('session_boundary')
   })
 
+  // Why: a completion Orca refuses is retried a bounded number of times and then given up on — the
+  // posts that come after it must still go out, so one dead endpoint cannot wedge the pane's queue.
   it('gives up on a completion Orca keeps refusing, then sends what came after', async () => {
-    let attempts = 0
     const harness = createPi(async () => {
-      attempts += 1
-      if (attempts >= 3 && attempts <= 6) {
-        throw new Error('Orca down')
-      }
-      return { ok: true }
+      throw new Error('Orca down')
     })
     await holdRunOpen(harness)
     await harness.replacePiSession('new')
     await harness.callHook('session_start', { reason: 'new' }, session('B'))
     await vi.advanceTimersByTimeAsync(5_000)
 
-    expect(agentEndCount(harness)).toBe(5)
+    // One attempt plus the three bounded retries, then the queue moves on.
+    expect(agentEndCount(harness)).toBe(4)
     expect(posts(harness).at(-1)).toMatchObject({
       hook_event_name: 'session_start',
       session_id: 'B'

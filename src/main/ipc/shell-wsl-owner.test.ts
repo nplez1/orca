@@ -12,7 +12,7 @@ const { handleMock, launchMock, showItemInFolderMock, statMock, recordForEnviron
   }))
 
 vi.mock('electron', () => ({
-  ipcMain: { handle: handleMock },
+  ipcMain: { handle: handleMock, on: vi.fn() },
   shell: { showItemInFolder: showItemInFolderMock, openExternal: vi.fn(), openPath: vi.fn() },
   dialog: { showOpenDialog: vi.fn() }
 }))

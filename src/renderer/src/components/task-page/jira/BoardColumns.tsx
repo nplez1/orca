@@ -49,6 +49,8 @@ type TaskPageJiraBoardColumnsProps = {
    *  Start/Show workspace handler the row's hover cluster uses. */
   onOpenOrStartWorkspace?: (issue: JiraIssue) => void
   onStartWorkspace?: (issue: JiraIssue) => void
+  /** The sprint read failed, so an empty lane is unknown rather than empty. */
+  emptyStateUnknown?: boolean
 }
 
 function isSelected(issue: JiraIssue, selectedIssue: JiraIssue | null): boolean {
@@ -125,7 +127,7 @@ function JiraBoardCard({
       >
         <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="min-w-0">
-            <span className="block truncate font-mono text-[11px] text-muted-foreground">
+            <span className="block truncate font-mono text-2xs text-muted-foreground">
               {issue.key}
             </span>
             <h3 className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
@@ -136,7 +138,7 @@ function JiraBoardCard({
             {issue.status.name ? (
               <span
                 className={cn(
-                  'max-w-24 shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+                  'max-w-24 shrink-0 truncate rounded-full border px-1.5 py-0.5 text-3xs font-medium',
                   getJiraStatusTone(issue.status.categoryKey)
                 )}
               >
@@ -156,14 +158,14 @@ function JiraBoardCard({
                   'auto.components.TaskPage.jiraCardStoryPointsTitle',
                   'Story points'
                 )}
-                className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+                className="shrink-0 text-3xs tabular-nums text-muted-foreground"
               >
                 {storyPoints}
               </span>
             ) : null}
           </div>
         </div>
-        <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
+        <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-2xs text-muted-foreground">
           <span className="truncate">
             {issue.assignee?.displayName ??
               translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
@@ -173,10 +175,7 @@ function JiraBoardCard({
               <JiraAttachedWorkspaceChip label={attachedWorkspaceLabel} />
             ) : null}
             {issue.priority?.name ? (
-              <TaskPageJiraPriorityBadge
-                priority={issue.priority}
-                className="shrink-0 text-[10px]"
-              />
+              <TaskPageJiraPriorityBadge priority={issue.priority} className="shrink-0 text-3xs" />
             ) : null}
           </div>
         </div>
@@ -202,7 +201,8 @@ export function TaskPageJiraBoardColumns({
   onDropOther,
   dragOverColumnKey,
   onOpenOrStartWorkspace,
-  onStartWorkspace
+  onStartWorkspace,
+  emptyStateUnknown = false
 }: TaskPageJiraBoardColumnsProps): JSX.Element {
   const renderColumn = (
     key: string,
@@ -226,10 +226,10 @@ export function TaskPageJiraBoardColumns({
     >
       <div className="flex h-9 items-center justify-between border-b border-border/50 px-3">
         <span className="truncate text-xs font-medium text-foreground">{label}</span>
-        <span className="text-[11px] text-muted-foreground">{issues.length}</span>
+        <span className="text-2xs text-muted-foreground">{issues.length}</span>
       </div>
       <div className="space-y-2 p-2">
-        {issues.length === 0 ? (
+        {issues.length === 0 && !emptyStateUnknown ? (
           <p className="px-1 py-2 text-xs text-muted-foreground">
             {translate('auto.components.TaskPage.jiraBoardEmptyColumn', 'No issues')}
           </p>

@@ -78,7 +78,7 @@ const TIMELINE_KIND_LABELS: Record<SessionSummaryTimelineKind, string> = {
 
 function sectionLabel(text: string): React.JSX.Element {
   return (
-    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="mb-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
       {text}
     </div>
   )
@@ -87,11 +87,11 @@ function sectionLabel(text: string): React.JSX.Element {
 function TimelineRow({ entry }: { entry: SessionSummaryTimelineEntry }): React.JSX.Element {
   return (
     <div className="flex items-baseline gap-2 py-0.5 text-xs">
-      <span className="shrink-0 rounded-sm bg-muted px-1 py-px text-[11px] text-muted-foreground">
+      <span className="shrink-0 rounded-sm bg-muted px-1 py-px text-2xs text-muted-foreground">
         {translate(`activity.sessionSummary.kind.${entry.kind}`, TIMELINE_KIND_LABELS[entry.kind])}
       </span>
       <span className="min-w-0 flex-1 break-words text-foreground">{entry.text}</span>
-      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+      <span className="shrink-0 font-mono text-2xs text-muted-foreground">
         #{entry.sourceIndex}
       </span>
     </div>
@@ -140,7 +140,7 @@ function Disclosure({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-baseline gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        className="flex w-full items-baseline gap-1.5 text-left text-2xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
       >
         <span aria-hidden="true" className="w-2 shrink-0">
           {open ? '▾' : '▸'}
@@ -253,7 +253,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
       {report ? (
         <div>
           {report.through < ledger.foldedThrough ? (
-            <span className="mr-1 text-[11px] text-muted-foreground">
+            <span className="mr-1 text-2xs text-muted-foreground">
               {translate('activity.sessionSummary.asOf', '(as of #{{index}})', {
                 index: report.through
               })}
@@ -298,7 +298,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
         <button
           type="button"
           onClick={() => setShowFullSession((full) => !full)}
-          className="text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+          className="text-2xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
         >
           {showFullSession
             ? translate('activity.sessionSummary.showSince', 'Show since your last message')

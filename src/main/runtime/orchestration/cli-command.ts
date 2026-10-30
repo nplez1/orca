@@ -2,8 +2,9 @@ import type { ProjectExecutionRuntimeResolution } from '../../../shared/project-
 import { isWslUncPath } from '../../../shared/wsl-paths'
 import { splitWorktreeIdForFilesystem } from '../../../shared/worktree/id'
 import { getAppEnvironment, hasAppEnvironment } from '../../../shared/app-environment'
+import { CLI_COMMAND_NAME } from '../../cli/cli-install-constants'
 
-export type OrchestrationCliCommand = 'orca' | 'orca-dev' | 'orca-ide'
+export type OrchestrationCliCommand = 'orca' | 'orca-dev' | 'orca-ide' | 'orca-np'
 
 /** Dev builds run the CLI as `orca-dev`; a packaged app, or a process with no app, must not advertise it. */
 export function runtimeOrchestrationCliCommand(): OrchestrationCliCommand | undefined {
@@ -28,13 +29,16 @@ export function resolveTerminalOrchestrationCliCommand(args: {
   if (args.runtimeCliCommand) {
     return args.runtimeCliCommand
   }
+  // Why the guest command and not upstream's `orca-ide`: this build registers `orca-np` in the WSL
+  // guest and puts only that name on the managed PATH, so `orca-ide` reaches an official install or
+  // nothing at all.
   if (args.isWsl !== null && args.isWsl !== undefined) {
-    return args.isWsl ? 'orca-ide' : 'orca'
+    return args.isWsl ? CLI_COMMAND_NAME : 'orca'
   }
   if (args.projectRuntime?.status === 'resolved' && args.projectRuntime.runtime.kind === 'wsl') {
-    return 'orca-ide'
+    return CLI_COMMAND_NAME
   }
 
   const worktreePath = splitWorktreeIdForFilesystem(args.worktreeId)?.worktreePath
-  return worktreePath && isWslUncPath(worktreePath) ? 'orca-ide' : 'orca'
+  return worktreePath && isWslUncPath(worktreePath) ? CLI_COMMAND_NAME : 'orca'
 }

@@ -169,7 +169,7 @@ export const JIRA_METHODS = [
     permission: 'workspace',
     params: IssueKey,
     handler: async (params, { runtime }) =>
-      runtime.jiraListEditFields(params.key.trim(), params.siteId)
+      runtime.jiraListEditFields(params.key.trim(), params.siteId, params.strict)
   }),
   defineMethod({
     name: 'jira.createIssue',

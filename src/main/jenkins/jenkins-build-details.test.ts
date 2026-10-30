@@ -7,6 +7,10 @@ import type { PRCheckDetail } from '../../shared/github/check-types'
 import type { JenkinsSaveServerResult } from '../../shared/jenkins-servers'
 
 const BUILD_URL = 'https://ci.example.com/job/team/job/repo/12/'
+const JENKINS_BUILD_TREE_QUERY =
+  'number,building,result,displayName,fullDisplayName,description,url,timestamp,duration,' +
+  'estimatedDuration,actions[_class,causes[_class,shortDescription],parameters[_class,name,value]],' +
+  'changeSets[items[commitId,msg,comment,author[fullName]]]'
 const check: Pick<PRCheckDetail, 'name' | 'status' | 'conclusion'> & { url: string } = {
   name: 'continuous-integration/jenkins/pr-merge',
   status: 'completed',
@@ -34,6 +38,10 @@ async function loadModules() {
   })
   vi.doMock('../network/proxy-settings', () => ({
     ensureElectronProxyFromEnvironment: async () => undefined
+  }))
+  // The unconfigured-host check resolves names; a real resolver would make these tests depend on DNS.
+  vi.doMock('node:dns/promises', () => ({
+    lookup: async () => [{ address: '93.184.216.34', family: 4 }]
   }))
   const { setSecretStore } = await import('../../shared/secret-store')
   setSecretStore({
@@ -90,6 +98,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.doUnmock('node:os')
+  vi.doUnmock('node:dns/promises')
   vi.doUnmock('../network/proxy-settings')
 })
 
@@ -462,6 +471,113 @@ describe('getJenkinsBuildDetails', () => {
 
     expect(result.ok).toBe(true)
     expect(new Headers(requests[0].init.headers).get('Authorization')).toBeNull()
+  })
+
+  it('sends no request at all to an unconfigured host that is not publicly routable', async () => {
+    const { details } = await loadModules()
+    route = () => json(buildBody())
+
+    // Why: the check URL is a commit status anybody who can push may write, so an intranet host in
+    // it must not turn the desktop into a probe of this machine's network.
+    for (const url of [
+      'http://jenkins.internal/job/team/job/repo/12/',
+      'http://10.0.0.5:8080/job/team/job/repo/12/',
+      'http://localhost:8080/job/team/job/repo/12/',
+      'http://[::ffff:7f00:1]:8080/job/team/job/repo/12/'
+    ]) {
+      await expect(details.getJenkinsBuildDetails({ url, check })).resolves.toMatchObject({
+        ok: false,
+        reason: 'not-configured'
+      })
+    }
+    expect(requests).toEqual([])
+  })
+
+  it('does not follow a redirect from an unconfigured host', async () => {
+    const { details } = await loadModules()
+    route = () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: 'http://10.0.0.5:8080/job/team/job/repo/12/api/json' }
+      })
+
+    const result = await details.getJenkinsBuildDetails({
+      url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+      check
+    })
+
+    expect(result).toMatchObject({ ok: false, reason: 'not-configured' })
+    // One request left this machine; the redirect target was never contacted.
+    expect(requests).toHaveLength(1)
+    expect(requests[0].init.redirect).toBe('manual')
+  })
+
+  it('refuses a redirect that stays on the same public host too', async () => {
+    const { details } = await loadModules()
+    route = () =>
+      new Response(null, {
+        status: 301,
+        headers: { location: 'https://ci.example-builds.net/moved/job/team/job/repo/12/' }
+      })
+
+    // Following one hop means vetting every hop through `net.request`, which an unconfigured host is
+    // not worth: it is read only when it answers directly, and configuring it is how to follow it.
+    await expect(
+      details.getJenkinsBuildDetails({
+        url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+        check
+      })
+    ).resolves.toMatchObject({ ok: false, reason: 'not-configured' })
+    expect(requests).toHaveLength(1)
+  })
+
+  it('reads the desktop transport cancelling a manual redirect as the same refusal', async () => {
+    const { details } = await loadModules()
+    // `net.fetch` rejects `redirect: 'manual'` with this error instead of handing back the 3xx.
+    route = () => {
+      throw new Error('Redirect was cancelled')
+    }
+
+    await expect(
+      details.getJenkinsBuildDetails({
+        url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+        check
+      })
+    ).resolves.toMatchObject({ ok: false, reason: 'not-configured' })
+  })
+
+  it('leaves redirects to the transport for a configured server', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection, 'https://ci.example-builds.net')
+    route = (url) =>
+      url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
+
+    const result = await details.getJenkinsBuildDetails({
+      url: 'https://ci.example-builds.net/job/team/job/repo/12/',
+      check
+    })
+
+    // The mocked transport cannot follow a hop itself, so the contract under test is the option: a
+    // configured server's build permalink redirects inside its own prefix and must still resolve.
+    expect(result.ok).toBe(true)
+    expect(requests[0].init.redirect).toBe('follow')
+  })
+
+  it('still reads a private host once its server is configured', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection, 'http://jenkins.internal')
+    route = (url) =>
+      url.includes('wfapi') ? new Response(null, { status: 404 }) : json(buildBody())
+
+    const result = await details.getJenkinsBuildDetails({
+      url: 'http://jenkins.internal/job/team/job/repo/12/',
+      check
+    })
+
+    expect(result.ok).toBe(true)
+    expect(requests[0].url).toBe(
+      `http://jenkins.internal/job/team/job/repo/12/api/json?tree=${JENKINS_BUILD_TREE_QUERY}`
+    )
   })
 })
 

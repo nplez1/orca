@@ -41,6 +41,34 @@ describe('pi ask-card screen', () => {
   })
 })
 
+/** The footers pi paints outside `ask_user_question`: the collapsed card, a footer clipped by pane
+ *  width, and pi-tui's own selector, which a permission gate, a plan review and the project-trust
+ *  prompt use. None of them matched an anchor, so the lane read "no card" while a dialog held the
+ *  pane (#227). */
+const OTHER_PI_CARD_FOOTERS = [
+  ' Ctrl+] to expand · Esc to cancel',
+  ' Enter to select · ↑/↓ to navigate · …',
+  ' ↑↓ navigate  enter select  escape/ctrl+c cancel',
+  ' ↑↓ navigate  enter submit  escape/ctrl+c cancel',
+  ' enter submit  shift+enter/ctrl+j newline  escape/ctrl+c cancel  ctrl+g external editor'
+]
+
+describe("pi's other dialog footers", () => {
+  it.each(OTHER_PI_CARD_FOOTERS)('reads %j as a card', (footer) => {
+    expect(showsPiAskDialogScreen([footer])).toBe(true)
+  })
+
+  it.each([
+    // Half a footer is a composer hint or a transcript quote, never the pair only a card paints.
+    ' ↑↓ navigate  enter select',
+    // The expand affordance alone names the card's state, not that a card holds the pane.
+    ' Ctrl+] to expand',
+    ' enter submit  shift+enter newline'
+  ])('still reads %j as no card', (line) => {
+    expect(showsPiAskDialogScreen([line])).toBe(false)
+  })
+})
+
 describe('pi ask-card gained stamp', () => {
   it('keeps the first sighting while the card stays on screen', () => {
     const gained = new PiAskDialogScreenGained()

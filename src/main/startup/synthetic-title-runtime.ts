@@ -13,6 +13,7 @@ import {
 } from '../synthetic-title-spinner'
 import { shouldSendSyntheticTitleFrame } from '../synthetic-title-visibility'
 import { shouldCopySyntheticTitleFrameToPtyData } from '../synthetic-title-frame-routing'
+import { getPiStateTitleStatus } from '../../shared/pi-state-title-marker'
 import { mainProcessState as state } from './main-process-state'
 
 // Cursor redraws overwrite one-shot OSC titles; reassert at Pi's 80ms cadence and share the animation with OpenCode.
@@ -116,6 +117,20 @@ export function resumeSyntheticTitleSpinnerTimer(): void {
   ensureSyntheticTitleSpinnerTimer()
 }
 
+/** Whether the pane's own title already claims a pi state.
+ *
+ *  Why: the synthetic label carries no `π` marker, so writing it over pi's own title erases the very
+ *  evidence the ask-card lane gates on (see `getPiStateTitleStatus`) — and it is sticky, because pi
+ *  suppresses a repeat of the title it last emitted. The label exists for a pi pane quiet at rest
+ *  without one, never to overrule the titlebar extension that owns this title. */
+function paneTitleClaimsOwnState(ptyId: string, profile: SyntheticAgentTitleProfile): boolean {
+  if (profile.titleIdentityGroup !== 'pi-compatible') {
+    return false
+  }
+  const title = state.runtime?.getTrackedPtyTitle(ptyId) ?? null
+  return getPiStateTitleStatus(title ?? '') !== null
+}
+
 export function driveSyntheticTitleFromHook(
   paneKey: string,
   agentState: AgentStatusState,
@@ -144,6 +159,14 @@ export function driveSyntheticTitleFromHook(
   // Stop before the next tick can restore working; only permission frames ring BEL, completion owns its own notifications.
   stopSyntheticTitleSpinner(paneKey)
   const needsUserInput = agentState === 'blocked' || agentState === 'waiting'
+  if (paneTitleClaimsOwnState(ptyId, profile)) {
+    // Why the bell alone: that extra BEL is what fires the permission notification, and the label it
+    // would ride on is the write this guard exists to refuse.
+    if (needsUserInput) {
+      sendSyntheticTitle(ptyId, '\x07', { force: true })
+    }
+    return
+  }
   const label = needsUserInput ? profile.permissionLabel : profile.idleLabel
   sendSyntheticTitle(ptyId, `\x1b]0;${label}\x07${needsUserInput ? '\x07' : ''}`, { force: true })
 }

@@ -121,6 +121,11 @@ export class WorkerThreadRequestQueue<
       const abort = (): void => {
         if (this.active === call) {
           this.host.destroy()
+          // The worker is gone, so concurrent calls on it would otherwise wait out their own
+          // deadlines. Their failure is the worker's, not this caller's cancellation.
+          this.concurrentCalls.failAll(
+            this.options.createUnavailableError('worker request aborted')
+          )
         } else {
           this.queue = this.queue.filter((queued) => queued !== call)
         }

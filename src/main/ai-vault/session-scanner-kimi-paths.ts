@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline'
 import { resolveAbsoluteDirOverride } from '../../shared/absolute-dir-override'
 import { openTranscriptReadStream, wslGatedStat } from '../native-chat/wsl-transcript-fs-access'
 import { WslTranscriptFsError } from '../native-chat/wsl-transcript-fs-gate'
-import { asRecord, extractString } from './session-scanner-values'
+import { asRecord, extractString, parseJsonObject } from './session-scanner-values'
 import {
   KimiSessionIndexCache,
   KIMI_WORK_DIR_CACHE_MAX_INDEX_PATHS,
@@ -106,17 +106,12 @@ async function parseKimiSessionIndex(
       crlfDelay: Infinity
     })
     for await (const line of lines) {
-      if (!line.trim()) {
+      const record = parseJsonObject(line)
+      if (!record) {
         continue
       }
-      let record: Record<string, unknown> | null
-      try {
-        record = asRecord(JSON.parse(line) as unknown)
-      } catch {
-        continue
-      }
-      const sessionId = extractString(record?.sessionId)
-      const workDir = extractString(record?.workDir)
+      const sessionId = extractString(record.sessionId)
+      const workDir = extractString(record.workDir)
       if (sessionId && workDir) {
         // Later lines win so a resumed session reflects its most recent workDir.
         map.set(sessionId, workDir)

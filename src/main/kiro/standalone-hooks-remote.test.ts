@@ -21,9 +21,9 @@ describe('KiroHookService.installRemote with the V3 standalone hooks file', () =
       ...KIRO_STANDALONE_HOOK_TRIGGERS
     ])
     for (const entry of file.hooks) {
-      expect(entry.action.command).toContain('/home/dev/.orca/agent-hooks/kiro-hook.sh')
+      expect(entry.action.command).toContain('/home/dev/.orca-np/agent-hooks/kiro-hook.sh')
     }
-    const script = fs.files.get('/home/dev/.orca/agent-hooks/kiro-hook.sh') ?? ''
+    const script = fs.files.get('/home/dev/.orca-np/agent-hooks/kiro-hook.sh') ?? ''
     expect(script.startsWith('#!/bin/sh')).toBe(true)
     expect(script).toContain('/hook/kiro')
   })

@@ -165,4 +165,72 @@ describe('scanAiVaultSessions — Pi sub-agent transcripts', () => {
 
     expect(result.sessions.find((session) => session.sessionId === id)?.subagent).toBeNull()
   })
+
+  it('leaves a resumed session with an ordinary dated name at top level', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-pi-dated-name-'))
+    tempRoots.push(root)
+    const roots = isolatedScanRoots(root)
+    const parentPath = await writePiTranscript({
+      piSessionsDir: roots.piSessionsDir,
+      id: PARENT_ID,
+      timestamp: PARENT_TIMESTAMP,
+      records: [userMessage('release notes', '2026-10-01T00:00:01.000Z')]
+    })
+    const id = '01a11ec9-2222-720f-8e54-a0b222222222'
+
+    // Pi writes `parentSession` when a conversation is compacted or resumed elsewhere, so only the
+    // name's suffix says whether this is a sub-agent — and `release#20261028` is a user's own name.
+    await writePiTranscript({
+      piSessionsDir: roots.piSessionsDir,
+      id,
+      timestamp: '2026-10-02T00:00:00.000Z',
+      parentSession: parentPath,
+      records: [
+        { type: 'session_info', timestamp: '2026-10-02T00:00:00.500Z', name: 'release#20261028' },
+        userMessage('ship it', '2026-10-02T00:00:01.000Z')
+      ]
+    })
+
+    const result = await scanAiVaultSessions({ ...roots, platform: 'linux' })
+
+    expect(result.sessions.find((session) => session.sessionId === id)?.subagent).toBeNull()
+  })
+
+  it('ignores an active-agent preamble that arrives after the conversation started', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-pi-late-preamble-'))
+    tempRoots.push(root)
+    const roots = isolatedScanRoots(root)
+    const parentPath = await writePiTranscript({
+      piSessionsDir: roots.piSessionsDir,
+      id: PARENT_ID,
+      timestamp: PARENT_TIMESTAMP,
+      records: [userMessage('fan out', '2026-10-01T00:00:01.000Z')]
+    })
+    const id = '01a11ec9-3333-720f-8e54-a0b333333333'
+
+    // Only the preamble written before the first turn is the spawner's declaration; a later system
+    // message is the person's own context and must not nest their session.
+    await writePiTranscript({
+      piSessionsDir: roots.piSessionsDir,
+      id,
+      timestamp: '2026-10-02T00:00:00.000Z',
+      parentSession: parentPath,
+      records: [
+        userMessage('read this repo', '2026-10-02T00:00:01.000Z'),
+        {
+          type: 'message',
+          timestamp: '2026-10-02T00:00:02.000Z',
+          message: {
+            role: 'system',
+            content: '',
+            sections: { preamble: '<active_agent name="Explore"/>' }
+          }
+        }
+      ]
+    })
+
+    const result = await scanAiVaultSessions({ ...roots, platform: 'linux' })
+
+    expect(result.sessions.find((session) => session.sessionId === id)?.subagent).toBeNull()
+  })
 })

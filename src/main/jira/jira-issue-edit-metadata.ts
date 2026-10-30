@@ -4,8 +4,10 @@ import {
 } from '../../shared/jira-field-rendering'
 import type { JiraCreateField, JiraEditableField } from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
+import { requireStrictJiraSite } from './jira-read-failure'
 import { describeFieldDraft } from './jira-field-drafts'
 import { mapCreateField } from './jira-issue-mapping'
 import { readProjectFieldOptions, withJiraProjectFieldOptions } from './jira-project-field-options'
@@ -30,13 +32,18 @@ function isWritableField(field: JiraCreateField, meta: JiraRecord): boolean {
  * Fields this user can edit on one issue, each with the value the issue holds.
  * Reads `?expand=editmeta`, the edit-side sibling of the create metadata Orca
  * already reads, so the site's own field ids and required flags decide what is
- * offered rather than a hardcoded list. Returns `[]` when the read fails.
+ * offered rather than a hardcoded list. Returns `[]` when the read fails, unless
+ * `strict` asks for the failure, which a surface that would otherwise render an
+ * empty form needs in order to say the read failed instead.
  */
 export async function listEditFields(
   key: string,
-  siteId?: string | null
+  siteId?: string | null,
+  strict = false
 ): Promise<JiraEditableField[]> {
-  const entry = getClients(siteId)[0]
+  const entries = getClients(siteId)
+  requireStrictJiraSite(entries, siteId, strict)
+  const entry = entries[0]
   if (!entry) {
     return []
   }
@@ -86,7 +93,10 @@ export async function listEditFields(
       clearToken(entry.site.id)
       throw error
     }
-    console.warn('[jira] listEditFields failed:', error)
+    recordSwallowedFailure('jira', error, 'listEditFields failed')
+    if (strict) {
+      throw error
+    }
     return []
   } finally {
     release()

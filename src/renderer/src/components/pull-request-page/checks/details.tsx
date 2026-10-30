@@ -253,6 +253,7 @@ export function CheckDetailsPanel({
                 variant="ghost"
                 size="xs"
                 className="h-7 gap-1 px-2 text-[11px]"
+                data-link-url={openUrl}
                 onClick={() => window.api.shell.openUrl(openUrl)}
               >
                 {translate('auto.components.PullRequestPage.1b14d0a69c', 'Open in GitHub')}

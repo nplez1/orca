@@ -115,9 +115,10 @@ export function LinkRoutingPreferenceDialogProvider({
   return (
     <LinkRoutingPreferenceDialogContext.Provider value={requestPreference}>
       {children}
+      {/* Dismissing keeps the current default: closing must not pick a destination nobody chose. */}
       <Dialog
         open={activeRequest !== null}
-        onOpenChange={(open) => !open && settleActiveRequest(false)}
+        onOpenChange={(open) => !open && settleActiveRequest(openLinksInAppDefault)}
       >
         <DialogContent
           showCloseButton={false}
@@ -128,10 +129,7 @@ export function LinkRoutingPreferenceDialogProvider({
             <DialogHeader className="gap-3">
               <div className="flex items-center justify-between gap-3">
                 <Badge variant="outline" className="bg-background/70 text-muted-foreground">
-                  {translate(
-                    'auto.components.link.routing.preference.dialog.badge',
-                    'Terminal link'
-                  )}
+                  {translate('auto.components.link.routing.preference.dialog.badge', 'Links')}
                 </Badge>
                 {displayedRequest?.options.preview ? (
                   <Badge variant="secondary">
@@ -144,11 +142,11 @@ export function LinkRoutingPreferenceDialogProvider({
                   {openLinksInAppDefault
                     ? translate(
                         'auto.components.link.routing.preference.dialog.keep.title',
-                        "Keep terminal links in Orca's browser?"
+                        "Keep links in Orca's browser?"
                       )
                     : translate(
                         'auto.components.link.routing.preference.dialog.title',
-                        "Open terminal links in Orca's browser?"
+                        "Open links in Orca's browser?"
                       )}
                 </DialogTitle>
                 <DialogDescription className="text-sm leading-relaxed">
@@ -159,7 +157,7 @@ export function LinkRoutingPreferenceDialogProvider({
                       )
                     : translate(
                         'auto.components.link.routing.preference.dialog.description',
-                        "Use Orca's browser for terminal links, or keep your system browser."
+                        "Use Orca's browser for links anywhere in the app, or keep your system browser."
                       )}
                 </DialogDescription>
               </div>

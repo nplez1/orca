@@ -21,11 +21,18 @@ export type JiraIssueWorkspaceDetailState = {
   transitionsLoading: boolean
   transitionsError: string | null
   priorities: JiraPriority[]
+  /** Why: a picker that failed to load must say so, not render as an empty list. */
+  prioritiesError: string | null
   users: JiraUser[]
+  usersError: string | null
   /** Custom fields Jira allows editing on this issue, with their current values. */
   editFields: JiraEditableField[]
   editFieldsLoading: boolean
+  editFieldsError: string | null
   sprintAssignment: JiraSprintAssignment | null
+  sprintAssignmentError: string | null
+  /** Re-lists the issue's editable fields; the fields control's Retry. */
+  reloadEditFields: () => Promise<void>
   pendingField: string | null
   titleDraft: string
   setTitleDraft: (value: string) => void

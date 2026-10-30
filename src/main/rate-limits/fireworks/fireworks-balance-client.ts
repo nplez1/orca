@@ -1,5 +1,6 @@
 import http2 from 'node:http2'
 import type { MoneyAmount } from '../../../shared/money-amount'
+import { recordSwallowedFailure } from '../../observability/swallowed-failure'
 import { decodeFireworksBalance, encodeGetBalanceRequest } from './fireworks-balance-protobuf'
 
 /**
@@ -132,8 +133,10 @@ export async function fetchFireworksBalance(args: {
       encodeGetBalanceRequest(`accounts/${args.accountId}`)
     )
     if (response.grpcStatus !== GRPC_STATUS_OK) {
-      console.warn(
-        `[fireworks] GetBalance returned grpc-status=${response.grpcStatus ?? 'none'} ${response.grpcMessage ?? ''}`.trim()
+      recordSwallowedFailure(
+        'fireworks',
+        `grpc-status=${response.grpcStatus ?? 'none'} ${response.grpcMessage ?? ''}`.trim(),
+        'GetBalance answered an error status; falling back to spend only'
       )
       return null
     }
@@ -142,8 +145,7 @@ export async function fetchFireworksBalance(args: {
     }
     return decodeFireworksBalance(response.message)
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.warn('[fireworks] GetBalance unavailable; falling back to spend only:', message)
+    recordSwallowedFailure('fireworks', error, 'GetBalance unavailable; falling back to spend only')
     return null
   }
 }

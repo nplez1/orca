@@ -5,7 +5,7 @@ import {
   spawnMock,
   wslUncDirectoryExistsAsyncMock
 } from './pty-ipc-mock-registry'
-import { TEST_CODEX_HOME, BUNDLED_CLI_PATH } from './pty-ipc-test-constants'
+import { TEST_CODEX_HOME, BUNDLED_CLI_PATH, BUNDLED_RESOURCES_PATH } from './pty-ipc-test-constants'
 import { installFakeAppEnvironment } from '../../../../config/scripts/vitest-host-ports-setup'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { LocalPtyProvider } from '../../providers/local-pty-provider'
@@ -27,7 +27,7 @@ import {
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { OrcaRuntimeService } from '../../runtime/orca-runtime'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
@@ -281,8 +281,47 @@ describe('registerPtyHandlers', () => {
           }
         )
 
-        expect(env.BROWSER).toBe('orca open-url --url %s')
+        // Why not a bare `orca`: that names an official install's CLI or GNOME's screen reader.
+        expect(env.BROWSER).toBe('orca-np open-url --url %s')
       } finally {
+        if (inheritedBrowser === undefined) {
+          delete process.env.BROWSER
+        } else {
+          process.env.BROWSER = inheritedBrowser
+        }
+      }
+    })
+
+    // Why: the resolved launcher's basename, not a name invented here — this is what the prepended
+    // PATH actually holds, and a bare `orca` there would reach an official install instead.
+    it('names the resolved launcher for headless browser launches', () => {
+      // Why pinned: BUNDLED_CLI_PATH is the darwin launcher, and an unpinned test would only pass
+      // on the macOS host.
+      const originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+      const inheritedBrowser = process.env.BROWSER
+      delete process.env.BROWSER
+      try {
+        const env = buildPtyHostEnv(
+          'pty-headless-resolved',
+          {},
+          {
+            isPackaged: true,
+            userDataPath: '/tmp/orca-user-data',
+            resourcesPath: BUNDLED_RESOURCES_PATH,
+            selectedCodexHomePath: null,
+            agentStatusHooksEnabled: false,
+            routeBrowserOpensToClient: true
+          }
+        )
+
+        expect(env.ORCA_CLI_COMMAND).toBe(BUNDLED_CLI_PATH)
+        expect(env.BROWSER).toBe(`${basename(BUNDLED_CLI_PATH)} open-url --url %s`)
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          configurable: true,
+          value: originalPlatform
+        })
         if (inheritedBrowser === undefined) {
           delete process.env.BROWSER
         } else {
@@ -324,7 +363,8 @@ describe('registerPtyHandlers', () => {
           }
         )
 
-        expect(env.BROWSER).toBe('orca-ide open-url --url %s')
+        // The guest command this build registers, not upstream's `orca-ide`.
+        expect(env.BROWSER).toBe('orca-np open-url --url %s')
       } finally {
         if (inheritedBrowser === undefined) {
           delete process.env.BROWSER

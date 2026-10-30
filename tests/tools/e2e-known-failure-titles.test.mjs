@@ -44,7 +44,7 @@ function fileSuite(file, { specs = [], describes = [] }) {
 
 const dirs = []
 
-function run(report, titles) {
+function run(report, titles, outcome = 'success') {
   const dir = mkdtempSync(join(tmpdir(), 'known-failures-'))
   dirs.push(dir)
   const reportPath = join(dir, 'report.json')
@@ -52,7 +52,7 @@ function run(report, titles) {
   writeFileSync(reportPath, JSON.stringify(report))
   writeFileSync(titlesPath, JSON.stringify({ titles }))
   try {
-    const stdout = execFileSync(process.execPath, [SCRIPT, reportPath, titlesPath], {
+    const stdout = execFileSync(process.execPath, [SCRIPT, reportPath, titlesPath, outcome], {
       encoding: 'utf8'
     })
     return { status: 0, stdout, stderr: '' }
@@ -182,7 +182,8 @@ it('exits 0 for a recorded failure and 1 for an unrecorded one', () => {
       ],
       errors: []
     },
-    titles
+    titles,
+    'failure'
   )
   expect(recorded.status).toBe(0)
   expect(recorded.stdout).toContain('::notice::known failure (upstream)')
@@ -204,7 +205,8 @@ it('exits 0 for a recorded failure and 1 for an unrecorded one', () => {
       ],
       errors: []
     },
-    titles
+    titles,
+    'failure'
   )
   expect(unrecorded.status).toBe(1)
   expect(unrecorded.stdout).toContain('::error::unexpected E2E failure')
@@ -215,11 +217,13 @@ it('fails when the report is missing, so a crashed run cannot pass as green', ()
   dirs.push(dir)
   const titlesPath = join(dir, 'titles.json')
   writeFileSync(titlesPath, JSON.stringify({ titles: [] }))
-  const result = run({}, [])
-  expect(result.status).toBe(0)
+  // A report with no spec in it proves nothing, whatever the run step said.
+  const empty = run({}, [], 'success')
+  expect(empty.status).toBe(1)
+  expect(empty.stdout).toContain('holds no specs')
   let failed = false
   try {
-    execFileSync(process.execPath, [SCRIPT, join(dir, 'missing.json'), titlesPath], {
+    execFileSync(process.execPath, [SCRIPT, join(dir, 'missing.json'), titlesPath, 'success'], {
       stdio: 'pipe'
     })
   } catch (error) {
@@ -227,4 +231,34 @@ it('fails when the report is missing, so a crashed run cannot pass as green', ()
     expect(String(error.stderr)).toContain('cannot read')
   }
   expect(failed).toBe(true)
+})
+
+it('judges the step outcome, so a failure nothing explains cannot pass', () => {
+  const titles = []
+  const clean = {
+    suites: [
+      fileSuite('tabs.spec.ts', {
+        specs: [spec({ file: 'tabs.spec.ts', title: 'x', status: 'passed' })]
+      })
+    ],
+    errors: []
+  }
+  expect(run(clean, titles, 'success').status).toBe(0)
+  const failedRun = run(clean, titles, 'failure')
+  expect(failedRun.status).toBe(1)
+  expect(failedRun.stdout).toContain('neither the report nor a recorded failure explains it')
+  const unknownOutcome = run(clean, titles, 'cancelled')
+  expect(unknownOutcome.status).toBe(1)
+  expect(unknownOutcome.stdout).toContain('unknown test-step outcome "cancelled"')
+})
+
+it('needs the step outcome as an argument, so a run cannot be judged without one', () => {
+  let failure = null
+  try {
+    execFileSync(process.execPath, [SCRIPT, 'report.json', 'titles.json'], { stdio: 'pipe' })
+  } catch (error) {
+    failure = error
+  }
+  expect(failure?.status).toBe(2)
+  expect(String(failure?.stderr)).toContain('OUTCOME')
 })

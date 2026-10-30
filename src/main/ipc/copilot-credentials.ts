@@ -11,6 +11,7 @@ import {
   type CopilotGhCredentialsResult
 } from '../rate-limits/copilot/copilot-gh-credentials'
 import type { RateLimitService } from '../rate-limits/service'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 /** Where Copilot usage credentials came from, so the pane can explain itself. */
 export type CopilotCredentialsSource = 'stored' | 'github-cli' | 'none'
@@ -36,7 +37,7 @@ function readStoredEnterpriseSlug(): string | null {
     return readCopilotCredentials()?.enterpriseSlug ?? null
   } catch (error) {
     // Why: an undecryptable file must not break the pane; the form only needs a draft.
-    console.error('[copilot] failed to read stored credentials:', error)
+    recordSwallowedFailure('copilot', error, 'failed to read stored credentials', 'error')
     return null
   }
 }
@@ -72,7 +73,12 @@ function refreshAfterCopilotCredentialChange(
 ): void {
   rateLimits?.invalidateCopilotCredentialState()
   void rateLimits?.refresh().catch((error: unknown) => {
-    console.error(`[copilot] failed to trigger rate-limit refresh after ${action}:`, error)
+    recordSwallowedFailure(
+      'copilot',
+      error,
+      `failed to trigger rate-limit refresh after ${action}`,
+      'error'
+    )
   })
 }
 

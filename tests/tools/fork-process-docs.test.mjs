@@ -77,3 +77,57 @@ it('states the fork PR base the hook and the script both enforce', () => {
   expect(hook).toContain('nplez1/main')
   expect(hook).not.toContain('PR branches are cut from origin/main')
 })
+
+it('records what the runners actually bill, instead of the billed-minutes premise', () => {
+  const live = section(
+    read('LOCAL-PATCHES.md'),
+    '### `local(ci)`: which workflows are live on this fork'
+  ).join('\n')
+
+  // Standard runners bill nothing on a public repository, so a minutes budget is not a reason to
+  // disable a lane — and it was the recorded reason for disabling `pr.yml` (issue #221 C2).
+  expect(live).not.toMatch(/billed minutes/i)
+  expect(live).not.toContain('1,500 min/month')
+  expect(live).toContain('actions/runs')
+  expect(live).toContain('billable')
+})
+
+it('names the cheap PR lane it decided on, and why the unit suite is not it', () => {
+  const live = section(
+    read('LOCAL-PATCHES.md'),
+    '### `local(ci)`: which workflows are live on this fork'
+  ).join('\n')
+  const workflow = read('.github/workflows/fork-pr-gates.yml')
+
+  expect(live).toContain('fork-pr-gates.yml')
+  expect(live).toContain('cheapest useful lane')
+  expect(workflow).toContain('pull_request')
+  expect(read('local/check-actions-enablement.mjs')).toContain(
+    "'.github/workflows/fork-pr-gates.yml'"
+  )
+})
+
+it('pushes the upstream mirror through the enablement sweep, not as a bare git push', () => {
+  // A workflow file new to that push arrives active; sweeping afterwards in the same step is the only
+  // lever, because there is no workflow to disable until the file exists (issue #221 C5).
+  const step = section(read('UPSTREAM-SYNC-RUNBOOK.md'), '## Step 4 — push').join('\n')
+  const blocks = codeBlocks(step).join('\n')
+
+  expect(blocks).toContain('node local/sync/push-upstream-mirror.mjs')
+  expect(blocks).not.toMatch(/^git push origin upstream\/main:main/m)
+  expect(blocks).toContain('node local/check-actions-enablement.mjs')
+})
+
+it('says why the PR lane does not run repo-wide lint yet, with the measured failures', () => {
+  const live = section(
+    read('LOCAL-PATCHES.md'),
+    '### `local(ci)`: which workflows are live on this fork'
+  ).join('\n')
+
+  // A required check that is red on its own base is worse than none; the ledger has to say so.
+  const flat = live.replace(/\s+/g, ' ')
+
+  expect(flat).toContain('2 of 36 lint step(s) failed')
+  expect(flat).toContain('changed lines')
+  expect(flat).toContain('fork-pr-gates: changed lines')
+})

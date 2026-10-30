@@ -17,8 +17,8 @@ import {
   type WorktreeLayoutMode
 } from '../../shared/orca-workspace-layout'
 import type { Repo } from '../../shared/repo-types'
+import { areWorktreePathsEqual } from '../../shared/worktree-path-comparison'
 import { requireEmojiShortcodeDataset } from './deferred-emoji-shortcode-dataset'
-import { areWorktreePathsEqual } from './worktree-path-comparison'
 
 setEmojiShortcodeDatasetLoader(requireEmojiShortcodeDataset)
 

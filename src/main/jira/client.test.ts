@@ -825,4 +825,37 @@ describe('Jira site file cross-process visibility', () => {
 
     expect(jira.getStatus()).toMatchObject({ selectedSiteId: 'site-beta' })
   })
+
+  // The bug this names: an unreadable sites file read as "no sites", and the next save wrote that
+  // emptiness over every site while their tokens stayed behind in jira-tokens/.
+  it('reports a sites file it cannot read, and refuses to write over it', async () => {
+    writeJiraFiles('site-alpha', 'token-alpha')
+    const jira = await loadClientModule()
+    expect(jira.getStatus()).toMatchObject({ connected: true })
+
+    const sitesPath = join(tempHome, HOME_DIRECTORY_NAME, 'jira-sites.json')
+    writeFileSync(sitesPath, '{"version":1,"sites":[', { encoding: 'utf-8' })
+
+    expect(jira.getStatus().credentialError).toContain('Could not read the Jira sites saved in')
+    expect(
+      await jira.connect({
+        siteUrl: 'https://other.atlassian.net',
+        email: 'ada@example.com',
+        apiToken: 'token-other'
+      })
+    ).toMatchObject({ ok: false, error: expect.stringContaining('Could not read the Jira sites') })
+    // The bytes that still hold the sites are untouched.
+    expect(readFileSync(sitesPath, 'utf-8')).toBe('{"version":1,"sites":[')
+  })
+
+  // J5's shape at this store's boundary: an un-imported copy used to look like "nothing configured".
+  it('reports a pre-rename sites file it could not import', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mkdirSync(join(tempHome, '.orca'), { recursive: true })
+    writeFileSync(join(tempHome, '.orca', 'jira-sites.json'), '{"version":1,"sites":[]}')
+    writeFileSync(join(tempHome, HOME_DIRECTORY_NAME), 'not a directory')
+    const jira = await loadClientModule()
+
+    expect(jira.getStatus().credentialError).toContain('Could not import the Jira sites saved in')
+  })
 })

@@ -161,7 +161,7 @@ function EditFieldsForm({
         ) : null}
         {fields.map((entry) => (
           <div key={entry.field.key} className="flex min-w-0 flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">
+            <label className="text-2xs font-medium text-muted-foreground">
               {entry.field.name}
               {entry.field.required ? <span className="ml-0.5 text-destructive">*</span> : null}
             </label>
@@ -188,7 +188,7 @@ function EditFieldsForm({
               }
             />
             {fieldErrors[entry.field.key] ? (
-              <p className="text-[11px] text-destructive">{fieldErrors[entry.field.key]}</p>
+              <p className="text-2xs text-destructive">{fieldErrors[entry.field.key]}</p>
             ) : null}
           </div>
         ))}

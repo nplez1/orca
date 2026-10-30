@@ -85,7 +85,7 @@ export function registerTerminalListSurfaceLostOrphanTests(): void {
     }
   }
 
-  function leaf(tabId: string, leafId: string, ptyId: string) {
+  function leaf(tabId: string, leafId: string, ptyId: string | null) {
     return {
       tabId,
       worktreeId: WORKTREE_ID,
@@ -280,6 +280,42 @@ export function registerTerminalListSurfaceLostOrphanTests(): void {
         expect(dropped?.tabId).toBe('tab-dropped')
       }
     )
+
+    it('keeps a live pane attached when the graph publishes it without a PTY', async () => {
+      // The field state in #232: a pane restored from an earlier session, whose PTY main still holds
+      // connected but whose leaf the renderer republishes with no PTY (the controller never re-spawned
+      // it, so the binding is not re-learned). The claim is stale and the leaf names nothing, which
+      // used to read as a lost surface: `orphaned: true`, a synthetic `pty:` tab id, and a recorded
+      // key that `show` and `ps` use but `terminal list` did not.
+      const runtime = makeRuntime()
+      if (!ORCA_LAYOUT_OWNER_IS_MAIN) {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: recordPtyWorktree is protected; reaching it is the only way to stamp a restored claim with no graph standing.
+        const stamp = runtime as unknown as {
+          recordPtyWorktree: (
+            ptyId: string,
+            worktreeId: string,
+            state: Record<string, unknown>
+          ) => void
+        }
+        stamp.recordPtyWorktree(DROPPED_PTY, WORKTREE_ID, {
+          connected: true,
+          tabId: 'tab-dropped',
+          paneKey: `tab-dropped:${DROPPED_LEAF}`,
+          surfaceRecordedAtGraphSequence: 0
+        })
+      }
+      // A later statement that names the pane but binds no PTY.
+      runtime.syncWindowGraph(1, {
+        tabs: [tab('tab-kept', KEPT_LEAF), tab('tab-dropped', DROPPED_LEAF)],
+        leaves: [leaf('tab-kept', KEPT_LEAF, KEPT_PTY), leaf('tab-dropped', DROPPED_LEAF, null)]
+      })
+
+      const { terminals } = await runtime.listTerminals(`id:${WORKTREE_ID}`)
+      const restored = terminals.find((terminal) => terminal.ptyId === DROPPED_PTY)
+      expect(restored?.orphaned).toBe(false)
+      expect(restored?.tabId).toBe('tab-dropped')
+      expect(restored?.leafId).toBe(DROPPED_LEAF)
+    })
 
     it('does not call every pane orphaned when the graph goes away', async () => {
       const runtime = makeRuntime()

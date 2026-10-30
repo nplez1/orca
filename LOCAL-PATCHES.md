@@ -18,7 +18,20 @@ They are never proposed upstream, and they must never reach an upstream-bound PR
   this sync's hunks have an upstream side that changed only comments. A rationale paragraph above
   upstream's code is conflict adjacency and nothing else. The rule covers the fork's own added blocks
   too: a fork hook should name an exported function in a fork file, not explain itself in prose above
-  upstream's code.
+  upstream's code. **Enforced** by `node local/check-upstream-file-comments.mjs`
+  (`check-upstream-file-comments` in `local/gate-lint.mjs`) against
+  `local/upstream-file-comments-baseline.json`: per-file maxima for the files carrying the most, plus a
+  frozen total, measured against the current upstream merge base so a sync moves the ruler with it.
+  The total may only move down, and a shrink is a red until `--prune` locks it in, so slack cannot be
+  spent elsewhere. Growth needs `--accept <reason>`, recorded in the baseline so it is a reviewed
+  edit — including after a sync, which is why the re-baseline step is in `UPSTREAM-SYNC-RUNBOOK.md`
+  § Step 3. A comment that has to stay above upstream's code carries `fork-comment-ok: <why>`. A file
+  that needs one is worth re-reading as a fork-owned module instead.
+  The tree does not satisfy this yet, and the size of the gap is the point: **20 files under `src/` carry
+  a `LOCAL(nplez1)` comment and 19 of them are files upstream owns**, some running to five lines (the
+  monitoring-policy note in `claude-pane-hold-evidence.ts`, which § `local(agents)` relies on). The marker
+  sweep belongs to the architecture epic's comment-hunk ratchet, not to this file; until it lands, treat
+  each existing marker as a hunk to resolve on every sync and do not add one without a reason here.
 - **No deleting a file upstream still owns.** Restore it and neutralise at a seam instead — a deletion
   is re-applied on every sync, and each upstream edit to the deleted file arrives as a modify/delete
   conflict (19 of the 30 pending ones). A genuine supersession lives in
@@ -33,6 +46,17 @@ conflict adjacency, and because each is a trap a well-meaning future edit can fa
   (`src/main/agent-hooks/managed-hook-install-lock.ts`). It guards the shared `~/.claude` hooks, which
   an official Orca install manages too, so both must contend on one lock path. Pointing it at this
   fork's own home directory would give the two installs separate locks over one shared file.
+- **Quick Open passes `--no-ignore-parent` for a folder project, and only there**
+  (`src/shared/quick-open-filter.ts`, `src/main/ipc/filesystem/filesystem-list-files.ts`,
+  `src/main/ipc/filesystem/filesystem-search-file-paths.ts`,
+  `src/main/ipc/workspace-path-catalog-builder.ts`). A folder workspace inside a git checkout has no
+  repository, so the enclosing checkout's `.gitignore`/`.ignore` classify its files as ignored and
+  Quick Open hides them; `isFolderProjectRoot` decides it from the store, and a checkout with its own
+  repo keeps the flag off so a repo nested in a superproject still honours the enclosing rules.
+  The watcher's subtree rescans deliberately do not take the flag: their search root sits below the
+  workspace, so ripgrep would then drop the workspace's _own_ root ignore files — which also leaves the
+  index classifying a directory created later by the enclosing checkout's rules until the next full
+  build, the behaviour this fork had before the fix.
 
 ## Patches
 
@@ -44,15 +68,25 @@ fork offers to replace itself with an official release — and because local bui
 
 Anchors to re-point (`stablyai/orca` → `nplez1/orca`):
 
-- `src/main/updater-prerelease-feed.ts` — `ATOM_FEED_URL`, `RELEASES_DOWNLOAD_BASE`, `TAG_HREF_RE`,
-  and the Windows absolute-asset regex.
+- `src/main/updater-prerelease-feed.ts` — `ATOM_FEED_URL`, `RELEASES_API_URL`, `TAG_HREF_RE`.
+- `src/main/updater-release-targets.ts` — `RELEASES_REPO` and the download base every manifest and
+  asset URL is built from.
+- `src/main/updater-release-readiness.ts` — the Windows absolute-asset regex, which decides when a
+  HEAD request has to go through `net.request` to see GitHub's redirect.
 - `src/main/updater/updater-setup.ts` — the `latest/download` fallback.
-- `src/main/updater/updater-release-feed.ts` — the `latest/download` fallback.
 - `src/shared/release-channel.ts` — `MAIN_RELEASE_REPO`.
+
+`src/main/updater/updater-release-feed.ts` is **not** on this list: it has no fork hunk. Its only
+`latest/download` mention is an upstream comment (line 119) explaining why the concrete tag is pinned,
+so a sync can take upstream's side there.
 
 `HOURLY_/DAILY_/ADHOC_RELEASE_REPO` still _name_ upstream's channel repos, but nothing resolves
 through them any more: this fork publishes one stream, so every channel maps to `MAIN_RELEASE_REPO`
 and the picker offers only stable and rc (`OFFERED_RELEASE_CHANNELS`).
+
+An unsupported channel stays visible-and-disabled rather than disappearing, so a user who heard
+about it learns why it is unavailable instead of silently not finding it; with the dev channels
+unlisted, that rendering only matters if one is offered again.
 
 Why both halves: hiding the channels is a UI courtesy, but a channel persisted by an older build
 still reaches `getReleaseRepoForChannel`, and resolving that to upstream's repo would update an Orca
@@ -96,37 +130,65 @@ Whether Orca NP publishes its own mobile app is a product decision; `config/scri
 records the APK update-source half as reported-not-policed, and the About, Settings and protocol-block
 links are not checked at all.
 
-### `local(updater)`: probe every newer release, not a fixed window
+### `local(updater)`: read this repo's releases, not the ten-entry tag feed
 
-Upstream's resolver probes only the six newest candidates at or above the installed version
-(`MAX_MANIFEST_PROBE_CANDIDATES`), which is sound upstream because every entry in upstream's atom feed
-is one of its own releases and therefore has a manifest. It is not sound here: `nplez1/orca`'s feed
-also carries the parent repo's release entries (`v1.4.196`–`v1.4.202` at fork time, plus a `pr-…` and a
-`mobile-android-…` tag), and those tags have no manifest in this repo — `releases/download/v1.4.202/latest-mac.yml`
-404s. All seven of them sort above `1.4.197-np.N`, so an installed fork build filled the whole window
-with manifest-less entries and never reached this repo's own tag.
+Upstream's resolver reads GitHub's atom feed and probes only the six newest candidates at or above the
+installed version (`MAX_MANIFEST_PROBE_CANDIDATES`). Both halves are sound upstream, where the feed is
+one repo's own releases and every one of them has a manifest. Neither holds here.
 
-The state that produces is not "no update" — it is `not-ready` with no `lastGoodTag`, which
-`pinDefaultReleaseFeed` turns into a `ReleaseFeedPreflightError`, so the check is re-armed on the
-silent 1h→6h retry cadence and no `available` status is ever sent. Automatic and menu checks both
-fail; the menu one shows "Couldn't reach the update server", which is a misleading cause. Net effect:
-nobody running a build published here ever sees an in-app update offer.
+**The feed lists tags, not releases, and caps them at ten.** `nplez1/orca/releases.atom` carries every
+tag the repo has — the sync mirrors upstream's `v*` tags and the fork's own `archive/*` branch tags —
+measured on 2026-10-29 as eight mirrored tags against two of this repo's releases
+(`v1.4.214-np.41`, `v1.4.214-np.40`), out of ten entries. Those tags have no release and no manifest
+here (`releases/download/v1.4.244/latest-mac.yml` 404s), and they sort above every `1.4.214-np.*`. A
+day with nine new mirrored tags pushes this repo's newest release out of the feed entirely — after
+which there is no candidate left to probe at all.
+
+**The state that produces is not "no update".** `pinDefaultReleaseFeed` gets `no-newer` from the feed
+and falls through to `fetchLatestStableReleaseTag`, whose `releases/latest` redirect resolves to this
+fork's newest release — a `-np.` version, which the pre-release filter rejected outright, so the
+fallback returned null and every check ended in
+`ReleaseFeedPreflightError('manifest-unavailable', …)`. Automatic and menu checks both fail, the menu
+shows "Couldn't reach the update server", and the check is re-armed on the silent 1h→6h cadence.
+Nobody running a build published here saw an in-app update offer.
 
 Anchors:
 
-- `src/main/updater-prerelease-feed.ts` — `probeCandidates`, widened from a fixed six-wide
-  `slice(newestNewerIndex, newestNewerIndex + MAX_MANIFEST_PROBE_CANDIDATES)` to
-  `Math.max(newerCandidateCount, MAX_MANIFEST_PROBE_CANDIDATES)` entries. Keeping six as a _floor_ is
-  deliberate: the tag after the primary is the fallback feed a missing manifest walks back to, and
-  widening only when more newer candidates exist leaves upstream-shaped feeds byte-identical.
-- `src/main/updater-prerelease-feed.test.ts` — `probes every newer candidate concurrently`.
-- `src/main/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case.
+- `src/main/updater-prerelease-feed.ts` — `fetchReleaseListTags` reads
+  `api.github.com/repos/nplez1/orca/releases?per_page=100` and keeps entries that are not drafts and
+  carry at least one asset, which a bare mirrored tag never does. `fetchReleaseAtomTags` is the same
+  atom reader as before, kept as the fallback: the REST call is unauthenticated and shares a 60/hour
+  per-IP quota, and a throttled client must still resolve updates. `fetchLatestStableReleaseTag`
+  accepts `-np.<n>` (via `isForkReleaseVersion`) alongside non-prerelease versions, because that is
+  the only thing `releases/latest` can resolve to here.
+- `probeCandidates` still widens to every newer candidate. It is no longer load-bearing against the
+  atom noise — the release list has none — but it costs one round trip and stays true for the fallback
+  feed, where the mirrored tags are.
+- `src/main/updater-prerelease-feed.test.ts` — `finds this repo's own release when mirrored tags have
+  crowded out the atom feed` (this incident), `takes its candidate tags from the release list`, the
+  draft/asset-less case, and both fallback cases.
+- `src/main/updater-latest-stable-feed.test.ts` — `accepts the fork's own -np. release line`.
+- `src/main/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case, which now
+  exercises the atom fallback.
 - `src/main/updater.publishing-window-feed.test.ts` — the last-good pin reaching `available`.
+- `src/main/updater-release-targets.ts` and `src/main/updater-release-readiness.ts` — the URL and
+  probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
+  restores the single file has to take these two with it.
 
-Still fork-only, and still incomplete: the resolver only ever sees the tags in a feed that GitHub caps
-at ten entries, so the manifest-less entries ahead of this repo's tag recede by one per release. A
-release published while it sits seventh is skipped by every build already installed; the next one
-lands inside the window. Upstream never needs any of this, so it is not proposed there.
+Two upstream-owned files also diverge here, and neither is a `local(...)` patch — they are fixes
+upstream would want, recorded so the next sync does not quietly undo them:
+
+- `src/shared/release-channel.ts` — `PLATFORM_UPDATE_MANIFESTS` holds one manifest per platform and
+  `getPlatformUpdateManifestName(platform, arch)` replaces `getUpdateManifestNamesForPlatform`, so a
+  Linux release's manifest is matched to the running architecture rather than "either arch counts".
+  Upstream's array-valued table accepts `latest-linux-arm64.yml` on an x64 build and vice versa.
+- `src/shared/app-version.ts` — `isForkReleaseAppVersion` (`-np.<n>`, and nothing else). It is what
+  lets `releases/latest` resolve this fork's own release line.
+
+The probe window above is history worth keeping: it is why every newer candidate is probed rather
+than a fixed six, and the fault it fixed — a manifest-less entry hiding this repo's release behind it
+— is the same one the release list now removes at the source. Upstream never needs any of this, so it
+is not proposed there.
 
 ### `local(build)`: do not bake an updater `publisherName` into Windows builds
 
@@ -148,6 +210,41 @@ the owner's, so the check failed on the first sync to carry it (np.29). The cons
 when `MAC_CERTS` is — and keeps upstream's value as the unsigned fallback.
 
 Anchor: `config/electron-builder.config.cjs`, `ORCA_MAC_TEAM_ID`.
+
+### `local(i18n)`: the fork's strings live in overlays, not in upstream's catalogs
+
+Upstream owns every file under `src/renderer/src/i18n/locales/` byte-for-byte. The fork's added
+strings, its rewording of upstream's copy, and — the awkward one — the keys a dropped feature
+orphans all live in `src/renderer/src/i18n/fork/`:
+
+- `fork/en.json` holds the added and reworded English strings. `locales/en.json` is upstream's.
+- `fork/<lang>.json` holds the same for es/fr/ja/ko/pt/ru/tr/zh/zh-Hant, merged over upstream's file
+  by `loadForkLocaleOverlay` at read time.
+- A **`null` leaf is a tombstone**: the fork dropped a feature, extraction then finds no source
+  reference for upstream's key, and `verify:localization-extraction` fails on any key no source
+  references — so before the overlay existed, deleting the feature _forced_ deleting upstream's
+  entries and rewriting ~21–25 hunks per catalog.
+- `mergeCatalogs` (`config/scripts/fork-english-catalog.mjs`) and `mergeLocaleOverlay`
+  (`src/renderer/src/i18n/fork-catalog-overlay.ts`) are the same rule on the Node and renderer sides;
+  `tests/tools/i18n-catalog-overlay-parity.test.mjs` fails if they drift.
+
+Two failure modes a sync can produce here, both loud by design: a tombstone whose key upstream has
+**deleted** makes `verify:localization-catalogs` fail until the tombstone is removed, and a fork
+string upstream has **added under the same key** has to move out of the overlay. Both are reported by
+name.
+
+Anchors: `src/renderer/src/i18n/{i18n.ts,fork-catalog-overlay.ts,fork/*.json}`,
+`config/scripts/fork-english-catalog.mjs`, `config/scripts/verify-localization-catalog*.mjs`,
+`config/scripts/verify-localization-extraction.mjs`.
+
+Not covered, deliberately: **the main process does not read the overlays.** `src/main/i18n/main-i18n.ts`
+imports `locales/*.json` directly, so a fork string used by a menu, tray or dialog would silently fall
+back to English. Nothing is lost today — every non-null overlay entry is renderer-only — but a fork
+string that needs main-process copy belongs in `src/main`'s own catalog, not in the overlay.
+
+Tests that pin the mechanism: `config/scripts/fork-english-catalog.test.mjs`,
+`src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the overlay-fetch-failure path),
+`tests/tools/i18n-catalog-overlay-parity.test.mjs`.
 
 ### `local(dev)`: rebuild-and-relaunch helper
 
@@ -420,11 +517,18 @@ Claude session-cron callbacks, because a shell the agent started as part of its 
 work. The fork owner chose (2026-09-25) to keep this policy and express it on upstream's fold rather
 than revert to upstream's semantics.
 
-Anchors, all on upstream-owned files and marked `LOCAL(nplez1)`:
+Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
 
-- `src/shared/agent-hook-listener/providers/claude-roster-state.ts` — `resolveClaudePaneStatus`: the
-  fold's `hasLiveAgentWork` is "the roster has a working child **or** a background shell is running",
-  and `hasLiveNonAgentWork` is the session-cron set alone.
+- `src/shared/agent-hook-listener/providers/claude-pane-hold-evidence.ts` — `resolveClaudePaneStatus`
+  is where the policy actually lives, and the file a conflict resolver has to keep the fork's side of.
+  Through `claudePaneHoldEvidence` it splits the fold's two inputs: `hasLiveAgentWork` is the pane's
+  running or owed agent work **or** a running non-agent child task
+  (`state.claudeRunningNonAgentTaskPaneKeys`), so a background shell the agent started is agent work;
+  `hasLiveNonAgentWork` is the session-cron set **plus `owedShell`**, because an owed shell is a pending
+  wake-up rather than the running shell the policy is about.
+- `src/shared/agent-hook-listener/providers/claude-roster-state.ts` — a caller, not the anchor: it
+  imports `resolveClaudePaneStatus` and applies it to roster records. **No fork hunk in this file**, so a
+  conflict there is upstream's to resolve.
 - `src/shared/agent-hook-listener/providers/grok-events.ts` — the payload drops
   `resolution.workingMode`, so a grok background shell reads plain `working`. Grok has no cron concept,
   so it never earns the badge.
@@ -483,11 +587,13 @@ issue #99). Four parts, one patch.
 upstream the pair names a commit upstream never had, which is how a fork build could re-lock a skill
 to a ref that does not exist in the repository the lock claims.
 
-**Lock ownership.** `isOrcaSkillLockSource` accepts **both** owners, `nplez1/orca` and
-`stablyai/orca`. The upstream entry is not compatibility slack: every copy installed before this
-patch is locked to `stablyai/orca`, and dropping it would relabel this app's own skills as a third
-party's same-named copies, so the review dialog would offer them as **Not from Orca** and never
-rewrite them from the fork.
+**Lock ownership.** `readSkillLockSources` (`src/main/skills/skill-lock-sources.ts`) reports each
+installed skill's recorded source verbatim, so a lock written by an official install (`stablyai/orca`)
+still reads and a copy of this app's own skills is not relabelled as a third party's same-named copies.
+The predicate that used to make that call — `isOrcaSkillLockSource`, which accepted both owners and
+rejected a lookalike — was **deleted on 2026-10-27** (`ddc2a7827f`), and
+`convergence-ledger.md:1875-1885` records the deletion. Do not re-add an owner allowlist without
+deciding again which owners it should hold.
 
 **The stubs' resolver.** The shared block `<!-- block: resolver -->` in
 `skill-stubs/_shared/cli-resolution.md` (inserted into each stub with a
@@ -521,14 +627,23 @@ Generated from those sources, so never edited directly: `skills/*/SKILL.md` and
 `src/cli/bundled-skill-guides.ts` (`pnpm run generate:bundled-skill-guides`), and
 `resources/skills/current-manifest.json` (`pnpm run generate:skill-bundle-manifest`).
 
-Tests that go red if a sync restores upstream's names: `src/shared/agent-feature-install-commands.test.ts`
-(the literal fork URL and the pinned-commit pair), `src/shared/skill-freshness.test.ts` (both lock
-owners accepted, a lookalike owner rejected), `src/cli/skills.test.ts` and
-`src/main/skills/skill-update-run.test.ts` (the executed rail), and
-`src/main/ipc/pty-spawn-env-terminal-basics.test.ts` plus
-`src/main/ipc/pty-daemon-spawn-agent-home-env.test.ts` (packaged / dev / WSL `ORCA_CLI_COMMAND`).
+Tests that go red if a sync restores upstream's names:
+`src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts` and
+`src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts` (packaged / dev `ORCA_CLI_COMMAND`),
+`src/main/pty/wsl-orca-env.test.ts` (the WSL lane's bare registered name) and
+`src/main/skills/skill-lock-sources.test.ts` (the lock reader); `src/cli/skills.test.ts` covers the CLI's
+skill listing and not the install rail.
 `pnpm lint` gates the generated content through `verify:bundled-skill-guides` and
 `verify:skill-bundle-manifest`, so a hand-edited stub or a stale manifest fails there.
+
+`ORCA_SKILLS_REPOSITORY_URL` has no test of its own: it appears in one source file and in no test, so the
+install rail's bytes rest on `verify:bundled-skill-guides`. Three paths this section named before
+2026-10-29 do not exist — `src/shared/agent-feature-install-commands.test.ts` and
+`src/shared/skill-freshness.test.ts` were retired on 2026-10-27 — and the `isOrcaSkillLockSource`
+predicate they covered is gone; see the lock paragraph above. The two PTY environment test paths this
+section also named moved into `src/main/ipc/pty/`, where the tests above now live.
+`src/main/skills/skill-update-run.test.ts` was retired on the same date; nothing replaced it, so the
+paths above are the whole of what a sync can turn red here.
 
 Not covered, deliberately: `~/.agents/.skill-lock.json` on an existing machine still records
 `stablyai/orca` until the next update rewrites it, and `src/renderer/src/i18n/locales/*.json` keep a
@@ -603,7 +718,15 @@ signature that identifies it. None imports a module this fork changed.
 - `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
   `src/main/persistence/profile-state/profile-state-streaming-validation.test.ts` ("cannot add
   rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
-  assume; neither file is imported by anything this fork touches.
+  assume; neither file is imported by anything this fork touches. **Both are closed, and the second
+  diagnosis was wrong about the cause (2026-10-29).** The rowid case did fail on SQLite 3.54's refusal
+  to add a `rowid` alias by `ALTER TABLE … ADD COLUMN` — that part held — but the upgrade came in with a
+  Node release every machine took, so the fix was to update the test, not to allowlist it; upstream
+  #34661 (`e5f1eef466`) rebuilt it to shadow the aliases through `CREATE TABLE`. The undefined-bindings
+  case was the same story with a different ending: #34661 deleted it, because Node 26.10 binds an
+  explicit `undefined` as NULL, so the contract it asserted no longer existed. Neither was something
+  "the bundled SQLite" did to this fork alone, and that is what made the first one dangerous: a dead
+  entry can never be reported stale.
 - `src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
   output", the PTY/subprocess class recorded above.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
@@ -678,6 +801,9 @@ What it deliberately does not do:
   cache is keyed `(HEAD, allowlist hash)` under `.git/orca-gate/`, which is what stops a re-run on an
   unchanged revision from proving anything.
 - A missing or unreadable report, a run with no tests, and a timeout all fail closed.
+- It does not, on its own, report a _dead_ entry — one naming a case that no longer exists — because
+  staleness comes only from an entry that matched a failure. `tests/tools/unit-gate.test.mjs` closes
+  that statically instead, so the blind spot is checked at PR time rather than by the next full run.
 
 The first reconciled run (2026-10-21, `1a64dbe2f6`) found 29 failing cases: 24 allowlisted across nine
 files, and two files that are red on their own and so are deliberately **not** listed —
@@ -886,10 +1012,11 @@ could not split.
 It is fork-local: upstream keeps `pnpm lint`'s exit code and CI is unchanged.
 `tests/tools/lint-gate.test.mjs` covers the chain reader, the per-step failure split and the
 classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: the whole chain is
-~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is empty
-today — the four repairs above make all 32 steps green — and it is the place a future red on the base
-branch gets recorded with its evidence instead of being re-derived by hand. This file stays the
-evidence and the JSON the assertion, as with the unit red set.
+~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is now
+**empty**: its two entries were fixed in the tree on 2026-10-29 rather than allowlisted (see
+`local(lint)` below). It is the place a future red on the base branch gets recorded with its evidence
+instead of being re-derived by hand.
+This file stays the evidence and the JSON the assertion, as with the unit red set.
 
 ### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
 
@@ -977,7 +1104,8 @@ The full unit suite moved off the PR boundary. Requiring it per branch is what p
 invocations and 45 runs over four minutes across 47 sessions between 2026-10-21 and 10-24 — 26.9 h of
 summed tool wall clock, a median of 28 minutes a run, and one session that spent 10.3 h of a 20.5 h
 span inside it. That measurement, per-turn transcript data from `~/.pi/agent/sessions`, is the evidence
-for the change; `AGENTS.md` § Verification tiers is the resulting rule.
+for the change; `~/Code/orca/AGENTS.md` § Verification tiers — the cross-worktree file, not this repo's
+`AGENTS.md` — is the resulting rule.
 
 What replaced it:
 
@@ -999,11 +1127,14 @@ Two claims this change rests on were measured rather than assumed, after review 
 `build:packages` takes 1.0 s, so the 21.2 h of `pnpm tc` is the node/cli/web projects and queue wait,
 not a build-cache opportunity; and the 15–19 min runs that looked like cold setup in a new worktree were
 the `orca-queue` lock, not compilation. A third claim survived a bad retraction of my own: review doubted
-that the shim's `VITEST_MAX_WORKERS=2` cap did anything, grepping this repo finds no reader (true — the
+that the shim's `VITEST_MAX_WORKERS` cap did anything, grepping this repo finds no reader (true — the
 reader is Vitest's `resolveConfig`, which assigns `resolved.maxWorkers` from that variable), so the cap
-is real and the export stays. It is narrower than it first looked: the fork's custom `node-runtime` pool
-never reads `maxWorkers`, and `orca-queue node local/gate-unit.mjs` bypasses the shim entirely, so the
-gate's own full run is uncapped — deliberately, since the queue makes it the only heavy run on the box.
+is real and the export stays. Two corrections to how that was first written down: the cap is **4**, not
+2 (`~/.local/bin/pnpm` and the shell profile both export it), and `orca-queue node local/gate-unit.mjs`
+**is** capped by it — `local/unit-suite-run.mjs:110-111` prints `gate-unit: VITEST_MAX_WORKERS=<n>`.
+The gate is
+serialised by the queue, not uncapped. One part of the original claim survives: the fork's custom
+`node-runtime` pool never reads `maxWorkers` itself.
 
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
@@ -1017,10 +1148,12 @@ switch call. `tab-session-history-switch.ts` and three test files import from th
 
 ### `local(renderer)`: the fork's styling and transient state are not upstream's files
 
-Both of the fork's renderer stylesheets are **byte-identical to upstream's** — `assets/main.css` and
-`assets/rich-markdown-editor.css`. Take upstream's side on any conflict in either; the fork has no lines
-there. The 157 fork lines that used to live in them moved to two colocated files, verbatim except one
-comment that pointed "further down this file":
+Both of the fork's renderer stylesheets were **byte-identical to upstream's** at the 2026-10-21 base.
+`assets/rich-markdown-editor.css` still is — take upstream's side on any conflict there. `assets/main.css`
+is **not** any more: it carries one fork comment hunk (the `.orca-diff-comment-add-btn` note about a
+collapsed review thread owning the gutter slot), which is a comment only, so it is safe to take either
+side but not byte-identical. The 157 fork lines that used to live in them moved to two colocated files,
+verbatim except one comment that pointed "further down this file":
 
 - `components/pr-comment-inline/pr-comment-thread.css` — the `.orca-pr-comment-*` block, imported by
   `PRCommentThreadCard.tsx`, the way upstream imports `AgentKanbanBoard.tsx`'s own stylesheet.
@@ -1111,7 +1244,7 @@ same transition was blocked from the detail pane and the ad-hoc board and attemp
 
 Converged on the fork's shape, as one collector on all three surfaces:
 
-- `src/shared/jira-transition-fields.ts` — `JiraTransitionRequirement` has **no `unsupported` kind**.
+- `src/shared/jira/jira-transition-fields.ts` — `JiraTransitionRequirement` has **no `unsupported` kind**.
   `requiredTransitionFields` skips a field whose `currentValue` is set (the `hasDefaultValue`
   exclusion's sibling), exempting `resolution` and `comment` because a workflow can demand those be set
   on the transition even when a value exists. The classifier returns the remaining fields to render and
@@ -1122,7 +1255,7 @@ Converged on the fork's shape, as one collector on all three surfaces:
   Cloud's Team field holds an object no control can seed, and deciding "filled" from the draft alone
   asks for a field the issue already has. Best effort: a failed read leaves every field asked for, and
   an auth failure is rethrown so a dead token cannot read as "these fields are empty".
-- `src/shared/jira-transition-fields.ts` — `rejectedTransitionFieldKeys` lets a rejection undo a skip.
+- `src/shared/jira/jira-transition-fields.ts` — `rejectedTransitionFieldKeys` lets a rejection undo a skip.
   A stale value, or a validator that demands the field be set on this transition, comes back as
   `fieldErrors` naming the field; every surface reopens the form with that field asked for rather than
   printing a sentence the user cannot act on. `classifyTransitionRequirements` takes the forced keys as
@@ -1195,7 +1328,7 @@ The general fix from the issue, taken as written:
   those lists before the existing value read, which only drafts a component as the id Jira accepts once
   the list can match it. The edit form now offers the three system fields too — nothing else in the
   detail view writes them — while `labels`, `summary` and every other system field stay excluded.
-- `src/renderer/src/components/task-page-jira-create-fields.ts` — the array branch submits `{id}` per
+- `src/renderer/src/components/task-page/jira/task-page-jira-create-fields.ts` — the array branch submits `{id}` per
   entry (by name when the project list does not name it) for these three keys only, so Team and labels,
   which really are string arrays, are untouched.
 
@@ -1255,6 +1388,18 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   `-shm` behind, which hid it. Probe: writer in WAL mode, `close()`, `new DatabaseSync(p, { readOnly: true })`
   — Node 26.11.1 opens it, bun 1.4.3 opens it, bun 1.4.4 throws `unable to open database file`. The same
   HEAD passes all five files under bun 1.4.3. Product code runs on Electron's Node, not this path.
+  **All seven are closed (2026-10-29), and none of them by a test fix.** The three topology files were
+  already green: upstream #33533 (`a886dcd1fe9`, merged with the 10-28 sync) added
+  `terminal-topology-profile-fixture` to the harness list `config/scripts/vitest-sqlite-runtime-scan.mjs`
+  keys on, so `getNodeRuntimeInclude()` had been routing them to the Node project all along. The other
+  two — `tests/e2e/helpers/persisted-profile-state.unit.test.ts` and
+  `src/main/ai-vault-search/session-search-indexer.test.ts` — reach `node:sqlite` through modules the
+  scan does not follow, so they really were running under Bun; both are now listed in
+  `NODE_RUNTIME_INCLUDE` with the reason, and both pass (3/3 and 42/42) where they failed 2/3 and 1/42.
+  `vitest-node-runtime-boundary.test.ts` pins the two entries, because nothing else would notice their
+  removal. The hazard the audit named is the real reason this mattered: the entries' `match`,
+  `Unable to read profile state database`, is exactly what a genuine profile-state open regression
+  throws, so the allowlist could not have seen one.
 - **`verify-cli-bin`, `macos-path-semantics`** — new upstream case; the child's `process.cwd()` reports
   `/private/var/…` against the unresolved `os.tmpdir()` the case compares.
 - **`reclaim-worktree-generated-files`, `host-toolchain`** — new upstream file. The script recovers from
@@ -1287,7 +1432,7 @@ The committed revision, `7811f60dd6`:
 Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted, 0 unexpected); 1 flaky re-run passed; 0 unhandled error headline(s); 2575 s
 ```
 
-### `local(lint)`: upstream's `max-lines` budget is enforced again, with 8 exemptions
+### `local(lint)`: upstream's `max-lines` budget is enforced again, with 24 exemptions
 
 **Reversed 2026-10-27, with the measurement that reversed it.** This section used to record the cap as
 `"off"` in the four overrides that carried 300/400/600/800. That worked and cost more than it saved:
@@ -1297,16 +1442,18 @@ over-budget file), and the ratchet script — whose whole job is to freeze who m
 becomes inert. So the fork was paying four changed lines in a file upstream owns _and_ a red gate, to
 avoid an exemption list.
 
-The exemption list turned out to be short. With upstream's rule restored, **nine files** exceeded
-budget: eight upstream-owned, over by 1, 3, 3, 9, 20, 23, 31 and 34 lines, and the fork's own
-`local/sync/conflicts.mjs` at 682. The fork's file was split (`local/sync/lib/conflict-report.mjs`,
-leaving 568); the eight upstream files each carry one `eslint-disable max-lines -- Why:` line naming
-what the fork adds, with a matching `config/max-lines-baseline.txt` row. Splitting an _upstream_ file to
+The exemption list turned out to be longer than the first pass measured. With upstream's rule restored,
+**24 rows** stand in `config/max-lines-baseline.txt`, four of them upstream's own; the other 20 are the
+fork's, each carrying one `eslint-disable max-lines -- Why:` line naming what the fork adds. The fork's
+own `local/sync/conflicts.mjs` is inside the same budget rather than exempted: the `local(lint)` pass
+split it (`local/sync/lib/conflict-report.mjs`), and it currently sits at 578 counted lines. Splitting
+an _upstream_ file to
 fit the budget would be the eviction this section exists to stop — a permanent hunk on every sync.
 
-So: upstream's rule, upstream's ratchet, upstream's baseline, 12 grandfathered entries of which four are
-upstream's own. `.oxlintrc.json` is byte-identical to `0571e45107` again, both upstream tests pass, and
-the ratchet reports `OK — 12 grandfathered entr(y/ies)`. What this does **not** do is undo the evictions
+So: upstream's rule, upstream's ratchet, upstream's baseline, **24 grandfathered entries**, four of
+them upstream's own (`git show origin/main:config/max-lines-baseline.txt` has exactly those four).
+`.oxlintrc.json` is byte-identical to `0571e45107` again, both upstream tests pass, and the ratchet
+reports OK. What this does **not** do is undo the evictions
 already made; restoring the evicted blocks is § 5.2, and this is what makes it possible.
 
 `.oxlintrc.json` is therefore no longer a file this fork edits — which removes it from the hot-file list
@@ -1685,67 +1832,73 @@ The `orca-runtime` pair above is the other two.
 
 Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
 test fix that will conflict once, benignly, when upstream makes the same change — the same trade
-upstream itself made in #33540. **The class is now empty**: 40 entries at the 2026-10-26 baseline, 17
-today, and all 17 are `host-toolchain` (8) and `sqlite-binding` (9) — a different machine's different bun
-and SQLite, which is not something this fork can fix in a test. The `host-toolchain` entries that were
-bash 3.2 rather than bun or SQLite are gone with the bash install recorded above.
+upstream itself made in #33540. **The `sqlite-binding` class is now empty too**: 40 entries at the
+2026-10-26 baseline, 17 after that repair, and **8 today, all `host-toolchain`** — the dev-rebuild
+timeouts (6), the bun `fs.rm` on a read-only directory (1) and one facade case (1). The nine
+`sqlite-binding` entries went on 2026-10-29: seven because the suites were re-seated or re-routed into
+the Node project (`a886dcd1fe9` for the four topology cases, and `2ecae9a7470` for the three the
+import scan had never classified), two because upstream #34661 (`e5f1eef466`) deleted or rebuilt the
+cases they named. The `host-toolchain` entries that were bash 3.2 rather than
+bun or SQLite are gone with the bash install recorded above.
 
-### `local(lint)`: two flaky-test-pattern reds inherited from #198
+**The manifest can now notice its own dead entries.** `local/gate-unit.mjs` derives staleness only
+from an entry that _matched a failure_, so an entry naming a test upstream deleted is structurally
+invisible: it sits in the file for ever and no run will ever derive it, because deriving it needs a
+failure it can no longer produce. `tests/tools/unit-gate.test.mjs` therefore checks every entry's title
+against its own file, statically, at PR time — a Vitest full name is the `describe` chain and the
+case title joined by single spaces, so `titleExistsInSource` in `local/unit-gate-judgement.mjs`
+rebuilds that shape from the file's title literals (treating an `it.each` substitution as a
+wildcard). It found the one dead entry this section used to describe and no other.
 
-`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` fails
-`check:flaky-test-pattern-ratchet` on two files that commit merged, and on nothing else:
+### `local(lint)`: the two #198 flaky-test-pattern reds, fixed in the tree and pruned
+
+`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` failed
+`lint:ast-grep-gates` on two files that commit merged, and on nothing else. That step is where these
+live now: the 2026-10-28 sync folded upstream's `check:flaky-test-pattern-ratchet` into
+`lint:ast-grep-gates`, and `local/lint-known-red.json` followed the rename. The red itself did not
+change.
 
 ```
 test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details.test.tsx: 1 flaky-test finding(s), baseline allows 0.
 test-no-wall-clock:src/renderer/src/components/github/check-details-cache.test.ts: 4 flaky-test finding(s), baseline allows 0.
 ```
 
-Both are static ast-grep findings, so they are deterministic, not flaky-that-time: neither file was
-touched by the branch that ran the gate, and both arrive through the base commit. Recording them is
-the `local(lint)` mechanism's reason for existing — the alternative was a branch either fixing another
-branch's fresh tests or quietly not running the gate.
+Both are static ast-grep findings, so they are deterministic rather than flaky-that-time, and both
+arrive through `941acb70e0` — the fork's own work, not a foreign red. They were allowlisted for one
+release line and are now fixed where the ratchet asked for them, so both entries are gone:
 
-`local/lint-known-red.json` carries one narrow entry per file (the `match` names the rule and the
-path, so a _new_ finding in either file still fails the gate). The fix belongs to whoever owns the
-checks-panel work: a wall-clock read and a real-time wait in a test are what
-`config/scripts/check-flaky-test-pattern-ratchet.mjs` exists to catch, and both want fake timers or a
-fixed timestamp, not a suppression. **Pruning wins**: when that lands, delete both entries and this
-section in the same commit.
+- `check-details-cache.test.ts` pins the clock with `vi.useFakeTimers()` + `vi.setSystemTime()`. That
+  is what the four `Date.now()` reads needed: `checkDetailsNeedRefresh` compares a payload's `readAt`
+  against the wall clock, so the TTL cases were really asking how fast the machine ran them.
+- `checks-list-expanded-details.test.tsx` drives `useDelayedFlag`'s 200 ms deferral with
+  `vi.advanceTimersByTimeAsync(250)` instead of sleeping 250 real milliseconds to catch a label a fast
+  machine never shows. The case went from a real quarter-second wait to milliseconds.
 
-### `local(lint)`: the bare `oxlint` step is red on the base branch
+**The claim that stood here was false, which is the argument for fixing rather than allowlisting.** It
+said the entries' `match` named the rule and the path, "so a _new_ finding in either file still fails
+the gate". It does not. The ratchet prints one line per rule and file — `<rule>:<path>: N flaky-test
+finding(s), baseline allows M.` — and the regex is anchored on the rule and the path alone, so a fifth
+`Date.now()` in `check-details-cache.test.ts` would have printed the same line and been masked. A
+`match` narrows an entry to one file; it does not pin the count, so it cannot notice new findings in
+an allowlisted file.
 
-`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `0f65cb537e` fails the
-bare `oxlint` step on six lines, none of them on a file the branch touched:
+### `local(lint)`: a base-branch typecheck red, repaired rather than recorded
 
-```
-src/renderer/src/components/right-sidebar/checks-panel/check-run-details.tsx:423:2: error eslint(max-lines): File has too many lines (402). help: Maximum allowed is 400.
-docs/site/src/lib/docs-og-image.tsx:102:12: warning next(no-img-element): Using `<img>` …
-docs/site/src/components/docs/SearchDialog.tsx:225:9: warning jsx-a11y(prefer-tag-over-role): …
-docs/site/src/components/docs/prose.tsx:51:12: warning next(no-img-element): …
-docs/site/src/components/AutoplayClip.tsx:70:10: warning next(no-img-element): …
-docs/site/src/components/AutoplayClip.tsx:85:8: warning next(no-img-element): …
-```
+A rebase onto `5793b0a125` turned up a **typecheck** red, which is not something `local/lint` can record:
+#205 added a required `onBoardUnavailable` prop to the Jira board and updated most of its call sites,
+but not `src/renderer/src/components/task-page/jira/Board.silentRefresh.test.tsx`, so `pnpm tc` failed on
+two of its renders. Repaired here — two lines in that test — rather than left as a red no gate can
+classify, the same shape as the two base reds repaired in #177. It is a two-line hunk on an upstream
+file, so it will conflict benignly when upstream makes the same change.
 
-The `max-lines` error arrives with `c7c216aae8` (#203), which grew a checks-panel component past 400
-lines; the five `docs/site` warnings arrive with `6aba202d5e` (the OSS docs site, which is not even
-inside `pnpm lint`'s upstream scope on the machines that only build the app). Both are the base
-branch's, and the fix belongs to whoever owns each surface — shrinking #203's component, and either
-`next/image` or a suppression in the docs site.
-
-**This is the one entry that has to be whole-step.** `pnpm lint` runs `oxlint` directly, and its
-output is `file:line:col: warning rule(…): …`, which `extractFailureLines` does not recognise — so
-the step yields no failure line and `classifyRun` falls back to its last output line, which no
-`match` can narrow. The consequence, stated plainly: this entry also allows a _new_ oxlint failure
-anywhere in the repo. The changed-lines gate (`pnpm run check:code-quality:changed`, which runs in CI
-on every PR) still fails a new finding on a changed line, so the masking is bounded to pre-existing
-files. **Pruning wins**: when both commits repair their lines, delete the entry and this section.
-
-The same rebase onto `5793b0a125` turned up one **typecheck** red, which is not something `local/lint`
-can record: #205 added a required `onBoardUnavailable` prop to the Jira board and updated most of its
-call sites, but not `src/renderer/src/components/task-page/jira/Board.silentRefresh.test.tsx`, so
-`pnpm tc` failed on two of its renders. Repaired here — two lines in that test — rather than left as a
-red no gate can classify, the same shape as the two base reds repaired in #177. It is a two-line
-hunk on an upstream file, so it will conflict benignly when upstream makes the same change.
+A second red in the same era is gone and must not be reintroduced: the bare `oxlint` step carried a
+whole-step `lint-known-red.json` entry covering six lines (one `max-lines` error from #203 and five
+`docs/site` warnings from `6aba202d5e`). `d96a57ffc6` recorded it as stale on the 2026-10-28 sync and
+pruned it, and that commit's own note in `local/lint-known-red.json` says so — but the section describing
+it stayed behind, saying of itself "delete the entry and this section". Both are gone now.
+`local/lint-known-red.json` is empty as of 2026-10-29: both entries it held under `lint:ast-grep-gates`
+were fixed in the tree with fake timers rather than allowlisted, so nothing in the file covers a whole
+step — or any step at all. The file keeps its note and its mechanism for the next base-branch red.
 
 ## Syncing with upstream
 
@@ -1979,7 +2132,8 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
 
   - **The ephemeral-VM grouping is upstream's, and the fork's four modules stay flat.**
     `src/main/ephemeral-vm-recipe-runner.ts` (a three-line barrel over shared modules) is deleted as
-    upstream deleted it; the fork's extend/context-menu/lock/reclaim modules stay where they are
+    upstream deleted it; the live `src/shared/ephemeral-vm-recipe-runner.ts` is upstream's own module and
+    is not a fork file; the fork's extend/context-menu/lock/reclaim modules stay where they are
     because they are fork-only and never collide. Every fork importer followed the moves
     (`./ephemeral-vm-runtime-service` → `./ephemeral-vm/runtime-service`, and five more).
   - **Jira's register file is upstream's per-module split plus the fork's three additions.**
@@ -2181,6 +2335,30 @@ same failure means the secret is missing entirely, because an empty `token` does
 the built-in one — so a missing or lapsed credential is a config error, never a repeat of the
 permissions rejection. Set a fresh PAT as the repository secret and nothing else changes.
 
+**What that PAT is allowed to do is wider than the job needs (audit #221 C3).** The secret belongs to
+`nplez1`, which is the `exempt` bypass actor on the only ruleset protecting `refs/heads/nplez1/main`,
+so the same credential the mirror holds for tags could push, force-push or delete the release line.
+It is also handed to `actions/checkout`, which persists it in `.git/config` for the whole job, and no
+tag ruleset exists — so "an existing tag is never moved" depended only on the absence of `--force`.
+
+Three parts, of which only the third is in the tree:
+
+1. **Operational fix, not applied here: a non-bypass identity.** A machine user or a GitHub App whose
+   token holds Contents and Workflows write on this repository and nothing else. A sync cannot create
+   an account or rotate a secret, so this stays a named follow-up rather than a patch.
+2. **Operational fix, not applied here: a `refs/tags/v*` ruleset** with `update` and `deletion` rules.
+   `gh api repos/nplez1/orca/rulesets` currently returns one branch ruleset and nothing for tags;
+   creating one is repository state, and the fork's `v*-np.*` updater tags are only ever created, so
+   the rules would not block a release.
+3. **In the tree: the guarantee is checked, not inherited.** `actions/checkout` is SHA-pinned, and
+   `.github/scripts/fork-tag-mirror-guard.sh` compares this checkout's `refs/tags/v*` — what the push
+   sends — against the fork's, fails the job when a name already exists at another commit, and prints
+   the refspecs for the tags that are genuinely new. The push is then
+   `git push --atomic origin $refspecs`: no `--force`, no `--mirror`, and no `--tags`, because `--tags`
+   would also send the fork's own `mobile-ios-v*` / `mobile-android-v*` tags, which start App Store and
+   Play builds. `tests/tools/fork-tag-mirror-guard.test.mjs` runs the guard against scratch
+   repositories and fails if any of those flags returns to the push.
+
 **Verified 2026-10-16:** with the secret set and the change merged (`077e5e06`), a dispatched run
 went green in 1m18s and mirrored `v1.4.223`, `v1.4.224` and `v1.4.227` — the first successful run
 since 2026-10-08, and `v1.4.224` is the highest tag that suite pins.
@@ -2202,7 +2380,7 @@ would leave the workflow listed and re-enabled at the first `workflow_dispatch` 
 file. A disabled workflow keeps receiving file updates from sync and stays off until someone turns
 it back on — which is what a fork wants, and why this is documented here instead of patched.
 
-**Live on purpose — these three must stay enabled:**
+**Live on purpose — these must stay enabled:**
 
 - `fork-release.yml` — `workflow_dispatch` only; the feed the patched updater points at.
 - `fork-upstream-tags.yml` — the daily `v*` tag mirror (see above).
@@ -2210,21 +2388,81 @@ it back on — which is what a fork wants, and why this is documented here inste
   2026-10-08, from before it was disabled in the fleet sweep and re-enabled on 10-24; the first
   scheduled run after that (10-26) wedged, which is why the absence below starts at 10-08 rather than
   at 10-24. This is the backstop the
-  PR gates gave up (`AGENTS.md` § Verification tiers). It is in `local/check-actions-enablement.mjs`
+  PR gates gave up (`~/Code/orca/AGENTS.md` § Verification tiers — the cross-worktree file). It is in `local/check-actions-enablement.mjs`
   `REQUIRED`, not `ALLOWED_INERT`: it has a `schedule`, so "disabled" is drift and should be reported
-  as `MISSING`, not silently tolerated. Billing is ~50 min a night because five shards bill
-  concurrently — ~1,500 min/month against the account's ~10,000, which is the accepted cost. Check the
-  real figure with `gh api repos/nplez1/orca/actions/workflows` and the run history before adding any
-  further lane; the whole fleet being on is what burned nearly the full month in a few days.
+  as `MISSING`, not silently tolerated.
+- `fork-pr-gates.yml` — the cheap PR lane, new on 2026-10-29 (see the cost note below).
+- `fork-ci-health.yml` — the daily check that runs `local/ci-health-report.mjs`, which is what keeps a
+  silently disabled lane from staying silent. Also `REQUIRED`, for the same reason.
 
-**Also left enabled, and inert without a manual dispatch:** `zcode-account-contract.yml`,
-`unit-module-cache-benchmark.yml`, `windows-native-preparation-benchmark.yml`, and the three
-`cloud-operate-relay-*` flags/watchers. `ci-cache-warmup-platform-jobs.yml` is `workflow_call`-only,
-so it runs only when `ci-cache-warmup.yml` does — and that one is disabled.
+**Also left enabled, and inert without a manual dispatch:** everything in
+`local/check-actions-enablement.mjs`'s `ALLOWED_INERT` — `zcode-account-contract.yml`,
+`unit-module-cache-benchmark.yml`, `windows-native-preparation-benchmark.yml`,
+`qualified-orcad-template.yml`, `layout-owner-e2e.yml`, `dev-channel-win-publish.yml` and
+`ci-cache-warmup-platform-jobs.yml`. The last is `workflow_call`-only, so it runs only when
+`ci-cache-warmup.yml` does — and that one is disabled. An earlier revision of this list named three
+`cloud-operate-relay-*` flags/watchers; no such workflow exists (`.github/workflows/` holds 75 `.yml`
+files plus `issue-os-labeler.yaml`, and the list of live ones is what `gh api
+repos/nplez1/orca/actions/workflows` returns).
 
 Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
 `e2e.yml`, `mobile.yml` and `fork-main-gates.yml`. `fork-main-tests.yml` is the exception above: it is
 live, and the section below is why its being live was not the same as its running.
+
+#### The cost premise was wrong, and the PR lane that follows from it (audit #221 C2)
+
+This section said the fleet being fully on "burned nearly the full month in a few days", and put the
+nightly at "~50 minutes a night" against a monthly allowance. **Both claims were wrong, and the ledger
+they supported was wrong with them.** Standard runners bill **nothing** on a public repository, which
+this one is. Measured on 2026-10-29, per run, from
+`gh api repos/nplez1/orca/actions/runs/<id>/timing`:
+
+| run           | what it ran                                  | billable ms                     |
+| ------------- | -------------------------------------------- | ------------------------------- |
+| `40797794635` | nightly, 7 jobs, all five shards green       | `UBUNTU: 0`                     |
+| `40863045535` | nightly, 7 jobs, shard 5 red                 | `UBUNTU: 0`                     |
+| `40695040714` | a full release, macOS + Windows + Linux legs | `MACOS: 0 UBUNTU: 0 WINDOWS: 0` |
+
+So there is no minutes budget to spend and no `~10,000` to spend it from. Account billing totals could
+not be read (the token has no `user` scope), but the per-run timing API is the stronger measurement for
+this question: it is what the billable-minutes meter reads.
+
+**The decision, since the reason `pr.yml` was disabled does not hold:** `pr.yml` stays
+`disabled_manually`, but not for cost. It is upstream's whole fleet in one file — package, e2e,
+relay, cross-version-wire, mobile web, Windows probes — which arrives with every sync, spends 40+
+minutes per PR to re-tread a branch that just ran the same suites locally, and would put a dozen
+unfamiliar checks on every PR. The cheapest useful lane is the fork's own, and that is now
+`fork-pr-gates.yml`: `pull_request` plus `workflow_dispatch`, running `pnpm tc` and
+`pnpm run check:code-quality:changed` — the two classes that reached this line unnoticed and are
+enforceable on any branch today. It is deliberately not the unit selection: `ci-unit-selection.mjs`
+computes a reverse-import closure that one changed file turns into ~3,000 of 13,064 test files, which
+is a shard planner, not a PR lane. The unit suite stays on `fork-main-tests.yml` nightly and now also
+gates a release (`fork-release.yml`).
+
+**Why not repo-wide `pnpm lint`, measured on `nplez1/main` at 2026-10-29:** it reports "2 of 36 lint
+step(s) failed" — `oxlint` is red for `src/cli/handlers/vm.ts` (336 counted lines against a limit of
+300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. That is exactly the debt
+`fork-main-gates.yml` was written to surface — and it too is `disabled_manually`, so nothing reports it
+today, which is the second half of audit #221 C4. A required check that is red on its own base teaches
+everyone to ignore red — the PR #57 failure shape — so the lane judges the pull request's **changed
+lines** with the rule set the repository already enforces on a diff, and repo-wide `pnpm lint` becomes
+the third gate here once the release line is green.
+
+**To make it a required check**, once it has run at least once on a PR (GitHub will not offer a check
+name that has never reported):
+
+```bash
+ruleset=$(mktemp -t orca-ruleset)          # unique per agent: /tmp is shared
+gh api repos/nplez1/orca/rulesets/23697698 >"$ruleset"
+# add {"type":"required_status_checks","parameters":{"required_status_checks":[
+#   {"context":"fork-pr-gates: typecheck"},{"context":"fork-pr-gates: changed lines"}]}}
+# to .rules[], then PUT the whole object back with -X PUT
+```
+
+The contexts are the job `name:` values, spelled in full because a bare `typecheck` or `lint` could be
+satisfied by any other workflow with a job of that name. The ruleset is repository state a sync cannot
+carry, like the enablement itself, so this paragraph is the record of the intent rather than a patch.
+`fork-ci-health.yml` reports the lane going missing; it does not police the ruleset.
 
 **A sweep is never complete, and the first one wasn't.** Nine workflows survived it on 2026-10-19 —
 eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-switch-e2e`,
@@ -2233,6 +2471,23 @@ eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-swit
 — the WSL orcad lane, triggered because both touched `src/main/pi/**`, a path in its filter. So
 after any sync that adds workflows, re-run the listing above rather than assuming the sweep still
 covers the tree.
+
+**The sweep is now also the response to a push that activates a workflow (audit #221 C5).** Disabling a
+workflow does not stop a run that is already going, which is why the 2026-10-28T13:17Z mirror push
+could start "Unit transform cache producer" and leave it wedged for 12 hours: nobody swept, and a sweep
+that only disabled would not have stopped it either. Two things changed:
+
+- `local/check-actions-enablement.mjs --fix` cancels the queued and in-progress runs of everything it
+  disables. It also disables an allowed-inert entry that has gained a `schedule`, `push` or
+  `pull_request` trigger, because "disabled is also fine" is what allowed-inert means.
+- `local/sync/push-upstream-mirror.mjs` is the mirror push and that sweep in one command, so the two
+  cannot be separated. It refuses to push when a remote is missing, when `upstream/main` was not
+  fetched, or when it is run from a checkout other than the one it lives in — the push would otherwise
+  target one repository while the sweep targeted another.
+
+What neither fixes: a run started by the push itself, before the sweep reaches it. That window is
+seconds now instead of unlimited, and it is closed properly only by not mirroring upstream `main` at
+all, which upstream-bound branches still need.
 
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
@@ -2282,10 +2537,15 @@ The contract details worth not rediscovering:
 #### Baking an image (what actually makes a fresh machine fast)
 
 Bake the **shared native-deps cache**, not the relay bundle. A relay install dir is keyed on the JS
-bundle hash, so it moves on every commit to `src/relay/`; the compiled dependencies are deliberately
-keyed on something stabler — `~/.orca-remote/native/<relayPlatform>-<depsHash>/node_modules`, keyed on
-the pinned dep versions plus patch bytes, symlinked into every relay dir, immutable once
+bundle hash, so it moves on every commit to the relay's own source tree; the compiled dependencies are
+deliberately keyed on something stabler — `~/.orca-remote/native/<relayPlatform>-<depsHash>/node_modules`,
+keyed on the pinned dep versions plus patch bytes, symlinked into every relay dir, immutable once
 `.deps-complete` is written last after a probe on that host loaded both addons.
+
+Read this section as background: upstream **deleted the SSH relay server** at `2b4b60a87ea` ("delete the
+SSH relay server, its build assets and tests", #27215), so the flat `src/relay/` tree no longer exists and
+the per-platform `out/relay` directories it described are gone. What remains is the bridge under
+`src/main/ssh/legacy-relay/`, which is host-side.
 
 That is the artifact worth baking, and it survives Orca updates. `node-pty@1.1.0` ships no Linux
 prebuild, so without it a fresh guest pays a `node-gyp` source build on first connect — the dominant
@@ -2404,8 +2664,11 @@ one in exactly the places a user looks to tell them apart.
 `src/shared/app-display-name.ts` is now the single source:
 
 - `APP_DISPLAY_NAME` = `Orca NP` — the packaged name and the base of every dev label.
-- `APP_DEV_DISPLAY_NAME` = `Orca NP Dev` — drives `app.setName`, so it must stay constant across
-  branches or each worktree mints a new macOS safeStorage Keychain item.
+- `APP_DEV_DISPLAY_NAME` = `Orca NP Dev` — the dev/E2E label. It was meant to drive `app.setName`,
+  but it does not: `src/main/startup/dev-instance-identity.ts:5` has its own literal
+  `BASE_APP_NAME = 'Orca NP'` and builds the dev name from it, and `APP_DEV_DISPLAY_NAME` is read only
+  by `system-tray.ts`. The constant property is what matters either way — a per-worktree dev name would
+  mint a new macOS safeStorage Keychain item per branch — so the two literals must be renamed together.
 
 TS readers: `src/main/startup/dev-instance-identity.ts`, plus the display slots in `system-tray.ts`,
 `createMainWindow.ts`, `main-window-close-lifecycle.ts`, `dashboard-popout-window.ts`,
@@ -2436,3 +2699,90 @@ Deliberately unchanged, and why each is not a copy to collapse:
   so their English is a catalog value rather than an inline literal. The non-dev attention tooltip now
   reuses the existing `tray.activityWaitingSuffix` key, which drops one `'Orca'` literal without
   touching a catalog; the remaining "Open Orca" menu label is left to the translations.
+
+#### The names one install owns below the bundle id (2026-10-29, fork issue #211)
+
+The rename above held at the bundle id and the userData path and failed at every level below it: a
+second install was still reachable through shared install directories, shared package payload paths,
+shared CLI profiles and shared supervisor and guest registrations. Each is independently reachable, so
+each now carries the identity, and each is pinned by a test rather than by a comment:
+
+| Piece                                                   | Value                                                                      | Pinned by                                                          |
+| ------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| package `name` (NSIS install dir, `*-updater` cache)    | `orca-np`                                                                  | `config/scripts/electron-builder-np-config.test.mjs`               |
+| `linux.executableName` (desktop entry, icons, mime xml) | `orca-np`                                                                  | same file                                                          |
+| Linux CLI profile                                       | `~/.config/orca-np`                                                        | `src/cli/runtime/metadata.test.ts`                                 |
+| agent-hook entry matcher                                | `.orca-np` only                                                            | `src/main/agent-hooks/managed-command-matcher-legacy-home.test.ts` |
+| launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `src/cli/runtime/serve-service-unit.test.ts`                       |
+| WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl-cli-installer.test.ts`                           |
+| `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts`           |
+| dev profile fallback                                    | `orca-np-dev`                                                              | `src/cli/runtime/launch-user-data-path.test.ts`                    |
+| `serve service install` default command                 | `orca-np`                                                                  | `src/cli/handlers/serve-service.test.ts`                           |
+| serve park/ack coordination root                        | `Application Support/orca-np`                                              | `src/shared/serve-bundle-coordination.test.ts`                     |
+
+Three couplings that only show up in the built artifact:
+
+- **`extraMetadata` is spread, not replaced.** A dev-channel build stages its `version` there, so the
+  overlay writes `{ ...release.extraMetadata, name }`; overwriting the object ships the wrong version.
+- **`resources/linux/bin/orca-ide` now searches for `orca-np` first.** The in-bundle CLI launcher keeps
+  upstream's file name (pinned by `LINUX_CLI_COMMAND_NAME`), but the executable beside it is this
+  build's, and `src/main/cli/packaged-cli-assets.test.ts` runs the script against both layouts.
+- **`src/shared/appimage-cache-identity.ts` recognises both executable names.** An AppImage generation
+  cached by an earlier build still runs as `orca-ide`, so keying the cache layout on one name would
+  drop its lease and its update handoff.
+
+Two upgrade costs, both accepted deliberately rather than migrated:
+
+- **The `BROWSER` command did not change on macOS or Linux, and did not need to.** There the basename
+  of the resolved launcher is `orca` — this build's own bundled launcher and its own Linux shim
+  (created only so a bare `orca` reaches us instead of GNOME's screen reader), both ahead of anything
+  else on the pane's PATH. What changed is that the value is now derived from the launcher the pane
+  actually has; Windows (previously `orca`) and dev/WSL follow their own names.
+- **macOS Keychain and Linux libsecret identity move with the package name.** Electron fixes the
+  safeStorage service name before `ready` from the bundled `package.json`'s `name`, which is why
+  `main-process-preflight.ts` renames only dev builds pre-ready. Renaming the package therefore moves
+  the macOS Keychain item from `orca Safe Storage` to `orca-np Safe Storage`. That is also the bug being
+  fixed — with `name: orca`, this build and an official install shared one Keychain item — but the cost
+  is real: an install that predates this change cannot decrypt what it stored (provider credentials,
+  plugin secrets, browser cookies) and has to sign in again. No migration is attempted; copying the
+  other item would mean reading another install's key.
+
+What is deliberately left alone, because either side of the pair is indistinguishable:
+
+- **`~/.orca` agent-hook entries.** The matcher sweeps them when they cannot be an official install's:
+  an unresolved `${HOME}` template or another host's home (remote registrations, Codex's frozen
+  command form). Those remote forms are swept because a remote `.orca` path may be either install's
+  and the command alone cannot tell them apart. A resolved `.orca` path in this user's home is swept
+  only when `hasOfficialOrcaProfile()` finds no official profile directory — otherwise it is that
+  install's. Grok's owner directories are read from both installs; only this build's is pruned, and
+  only a live process in the other one holds the removal open.
+- **A Muse pointer to a pre-rename hooks file.** `managed_hooks_path` naming
+  `~/.orca/agent-hooks/muse-hooks.json` — on the local machine or an SSH host — is reported as "a
+  pre-rename or official Orca registration" and left alone, because an official install writes the
+  same pointer. Registration stays blocked until the user clears or repoints `managed_hooks_path`.
+- **A `~/Library/Application Support/orca` profile holding nothing but `bundle-coordination`.** That
+  tree is the only thing builds before the coordination-root move ever wrote there, so the probe treats
+  such a profile as absent and the legacy sweep still runs; anything else in the directory is the
+  official app's. Two residual risks, both recorded rather than guessed at:
+  - An official install that only ever ran a supervised serve with a pinned `ORCA_USER_DATA_PATH`
+    leaves exactly that same one-entry profile, so its local `~/.orca` hook entries would be swept.
+    Reading the park tree's `supervisors/*.json` to tell the two apart is the fix if it is ever
+    observed; the sweep only ever deletes entries that look like this build's own.
+  - A `.DS_Store` (or any other second entry) in that directory makes an Orca-NP-only Mac read as an
+    official install, so its `~/.orca` leftovers are not swept. That is the safe direction.
+- **A pre-rename `serve` unit and a pre-rename WSL registration.** Both were written under upstream's
+  names with upstream's marker, exactly like the official app's, so neither can be removed or adopted
+  safely. The launchd _label_ is still recognised, which is what lets an upgrade park the supervisor
+  an older build started; that supervisor keeps running until it is booted out by hand, because the
+  new unit is deliberately a different label. A `~/.local/bin/orca-ide` launcher is left in place too:
+  re-registering the WSL CLI creates `orca-np` beside it rather than replacing it.
+- **A pre-rename park/ack tree.** `Application Support/orca-np` is a new coordination root; a
+  supervisor started by an older build registered under `Application Support/orca` and will not be
+  parked by this one. Parking fails towards "the old supervisor keeps running", never towards a
+  half-installed bundle.
+- **Existing Windows installs do not migrate.** The NSIS installer reads `InstallLocation` from
+  `HKCU\Software\<appId GUID>`, and the appId is unchanged, so an install made before the package
+  rename keeps updating in place under `%LOCALAPPDATA%\Programs\orca` — beside the official app's
+  default directory, which is the collision this fix removes. Only a fresh install lands in
+  `Programs\orca-np`. Uninstalling the old copy (or clearing its `InstallLocation` value) is a manual
+  step, and the release notes for the first build carrying this say so.

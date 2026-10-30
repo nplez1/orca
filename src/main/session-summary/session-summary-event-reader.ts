@@ -3,10 +3,12 @@
 // Local sessions and SSH sessions end in the same parser over the same event list —
 // the only difference is whether the bytes are opened here or fetched first. Paired
 // Orca hosts never reach this: they fold their own sessions in place.
-import type { SessionSummarySourceEvent } from './session-summary-fold'
 import type { RemoteTranscriptFetch } from './session-summary-remote-transcript'
 import { REMOTE_TRANSCRIPT_MAX_BYTES } from './session-summary-remote-transcript'
-import type { SessionSummarySessionIdentity } from './session-summary-transcript-source'
+import type {
+  SessionSummaryEventRead,
+  SessionSummarySessionIdentity
+} from './session-summary-transcript-source'
 import {
   readSessionSummaryEventsFromFile,
   readSessionSummaryTranscriptEvents,
@@ -28,10 +30,11 @@ export function createSessionSummaryEventReader(
   identity: SessionSummarySessionIdentity
   host: SessionSummaryTranscriptHost
   signal: AbortSignal
-}) => Promise<SessionSummarySourceEvent[] | null> {
-  return async ({ identity, host, signal }) => {
+  fromEventIndex?: number
+}) => Promise<SessionSummaryEventRead | null> {
+  return async ({ identity, host, signal, fromEventIndex }) => {
     if (host.kind === 'local') {
-      return readSessionSummaryTranscriptEvents({ identity, signal })
+      return readSessionSummaryTranscriptEvents({ identity, signal, fromEventIndex })
     }
     // Nothing is read on a host we cannot name; the pane says why instead.
     if (host.kind !== 'ssh') {
@@ -61,7 +64,8 @@ export function createSessionSummaryEventReader(
       return await readSessionSummaryEventsFromFile({
         filePath: fetched.path,
         parser,
-        signal
+        signal,
+        fromEventIndex
       })
     } finally {
       void fetched.dispose()

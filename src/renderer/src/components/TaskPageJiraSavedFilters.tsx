@@ -200,7 +200,7 @@ export function TaskPageJiraSavedFilters({
           </Command>
           <div className="border-t border-border/50 p-1">
             {filterLimitReached ? (
-              <p className="px-2 py-1 text-[11px] text-muted-foreground">
+              <p className="px-2 py-1 text-2xs text-muted-foreground">
                 {translate(
                   'auto.components.TaskPageJiraSavedFilters.bae9bd87bf',
                   'You can save up to {{value0}} filters.',
