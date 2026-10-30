@@ -9,6 +9,78 @@
       "firstSeen": "2026-10-27",
       "evidence": "Failed on Linux three times: run 40485647652 (scheduled, nplez1/main @7c53c12a17) and run 40517494613 (dispatch, nplez1/main @ddc2a7827f), both with DaemonConnectionLostError: Disconnected out of disconnectOnly() at the test's own line 292, and again in run 40675428994 (scheduled 2026-10-28, nplez1/main @7b86cb08), where local/check-unit-shard-verdict.mjs absorbed it as an already-triaged red. Passed in every run since: 40695078222 (dispatch, nplez1/main @d96a57ffc6 — shard 3 green; that run failed only shard 1's cooldown assertion), 40701735011 (dispatch, nplez1/main @1776dcc575, all five shards) and 40797794635 (dispatch, nplez1/main @fdd5850d0f, all five shards), the last two also reporting it as a prunable entry. It is intermittent rather than deterministic — earlier pass: 40540799557 on branch nplez1/Fork-Opt-P2 @e2f7f28789. Passes 3/3 on this Mac too, so it is not a Mac allowlist entry either. Every file in the stack is upstream-owned with zero fork hunks: daemon-pty-event-subscriptions.ts, daemon/client.ts, daemon-client-pending-requests.ts, daemon-pty-adapter.ts and the test itself. Not fixable inside the fork without divergence, which costs more at the next sync than the red costs now.",
       "exit": "Remove when upstream serialises finishDisconnectOnly against in-flight requests, or when this test passes on Linux in five consecutive scheduled nights. Two would be too weak on this history: three failures in seven observations make a chance double-pass about 1 in 3 with nothing fixed, and every pass so far is a dispatch. Seen so far, in order: failed(scheduled), failed(dispatch), passed(dispatch), failed(scheduled), passed(dispatch), passed(dispatch), passed(dispatch)."
+    },
+    {
+      "file": "src/main/minimax/minimax-api-key-store.test.ts",
+      "test": "minimax-api-key-store reports a transient read failure as unreadable, not undecryptable, and retries next read",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
+    },
+    {
+      "file": "src/main/minimax/minimax-api-key-store.test.ts",
+      "test": "minimax-api-key-store clears the cached key and removes the file",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
+    },
+    {
+      "file": "src/main/deepseek/deepseek-api-key-store.test.ts",
+      "test": "deepseek-api-key-store clears the cached key and removes the file",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
+    },
+    {
+      "file": "src/main/fireworks/fireworks-credentials-store.test.ts",
+      "test": "fireworks-credentials-store clears the cached payload and removes the file",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
+    },
+    {
+      "file": "src/main/zcode/zcode-plan-api-key-store.test.ts",
+      "test": "zcode-plan-api-key-store removes a rejected plaintext replacement when restoring the previous key fails",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
+    },
+    {
+      "file": "src/main/zcode/zcode-plan-api-key-store.test.ts",
+      "test": "zcode-plan-api-key-store restores the previous envelope when a plaintext replacement cannot be restricted",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
+    },
+    {
+      "file": "src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts",
+      "test": "confines filesystem persistence in accounts and usage to named profile surfaces",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
+    },
+    {
+      "file": "src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts",
+      "test": "lets only the usage fetch start an exchange, and only the exchange write its result",
+      "class": "credential-store-safe-storage",
+      "owner": "environment",
+      "firstSeen": "2026-10-30",
+      "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
+      "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time."
     }
   ],
   "prunedSince": []
