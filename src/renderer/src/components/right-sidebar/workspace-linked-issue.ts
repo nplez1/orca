@@ -15,6 +15,9 @@ export type WorkspaceLinkedIssue =
       identifier: string
       url: string | null
       title: string | null
+      /** The repo the attachment named, when one did. Absent means "the workspace's own
+       *  repo", which is the only thing a bare number slot can say. */
+      repoId?: string | null
     }
   | {
       provider: 'linear'
@@ -152,10 +155,15 @@ export type IssuePaneIssue = {
   sourceContext: TaskSourceContext | null
 }
 
-function issuePaneIssueKey(issue: SupportedWorkspaceLinkedIssue): string {
-  // Why provider + identifier and nothing else: that is the pair `findWorkspaceIssueAttachment`
-  // matches on, and a scope field one source fills and another omits would list the same issue twice.
+function issuePaneIssueIdentity(issue: SupportedWorkspaceLinkedIssue): string {
   return `${issue.provider}:${issue.identifier.toLowerCase()}`
+}
+
+/** Two issues are the same issue when their provider and identifier agree *and* they name the same
+ *  repo: a GitHub number is unique per repo, so `#12` in two repos is two issues. */
+function issuePaneIssueKey(issue: SupportedWorkspaceLinkedIssue): string {
+  const repo = issue.provider === 'github' && issue.repoId ? [issue.repoId] : []
+  return [issuePaneIssueIdentity(issue), ...repo].join(':')
 }
 
 /** The pane-renderable issue an attachment describes, or null for the providers
@@ -174,7 +182,8 @@ export function linkedIssueFromAttachment(
         number: item.number,
         identifier: `#${item.number}`,
         url: item.url || null,
-        title: item.title || null
+        title: item.title || null,
+        repoId: item.repoId ?? null
       }
     case 'linear':
       return {
@@ -238,11 +247,13 @@ export function resolveIssuePaneIssues(
     }
   }
   if (activeIssue) {
-    const key = issuePaneIssueKey(activeIssue)
-    // Why a synthesized entry: the active issue's own slot can name it before `linkedItems` carries it.
+    const identity = issuePaneIssueIdentity(activeIssue)
+    // Why matched by identity rather than by key: the slot names a bare number, so its entry carries
+    // no repo. The attachment is the one that knows which repo's issue this is.
+    // Why a synthesized entry otherwise: the slot can name an issue before `linkedItems` carries it.
     push(
-      attached.find((entry) => entry.key === key) ?? {
-        key,
+      attached.find((entry) => issuePaneIssueIdentity(entry.issue) === identity) ?? {
+        key: issuePaneIssueKey(activeIssue),
         issue: activeIssue,
         sourceContext: null
       }
@@ -258,21 +269,26 @@ export function resolveIssuePaneIssues(
  *  rather than every issue the workspace has slots for. */
 export function findWorkspaceIssueAttachment(
   worktree: LinkedIssueSource | null | undefined,
-  issue: Pick<SupportedWorkspaceLinkedIssue, 'provider' | 'identifier'>
+  issue: Pick<SupportedWorkspaceLinkedIssue, 'provider' | 'identifier'> & { repoId?: string | null }
 ): WorkspaceAttachment | null {
   if (!worktree) {
     return null
   }
+  const matches = getWorkspaceAttachments(worktree).filter((item) => {
+    if (item.type !== 'issue' || item.provider !== issue.provider) {
+      return false
+    }
+    const identifier = item.identifier ?? item.linearIdentifier ?? item.jiraIdentifier
+    return issue.provider === 'github'
+      ? `#${item.number}` === issue.identifier
+      : identifier?.toLowerCase() === issue.identifier.toLowerCase()
+  })
+  // Why the repo: the same number exists in another repo as a different issue, so an unscoped match
+  // would unlink the one the user is not looking at.
   return (
-    getWorkspaceAttachments(worktree).find((item) => {
-      if (item.type !== 'issue' || item.provider !== issue.provider) {
-        return false
-      }
-      const identifier = item.identifier ?? item.linearIdentifier ?? item.jiraIdentifier
-      return issue.provider === 'github'
-        ? `#${item.number}` === issue.identifier
-        : identifier?.toLowerCase() === issue.identifier.toLowerCase()
-    }) ?? null
+    (issue.repoId ? matches.find((item) => item.repoId === issue.repoId) : undefined) ??
+    matches[0] ??
+    null
   )
 }
 

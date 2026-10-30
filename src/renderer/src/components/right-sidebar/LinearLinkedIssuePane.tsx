@@ -100,6 +100,7 @@ export function LinearLinkedIssuePane({
 
   return (
     <LinearLinkedIssueDetail
+      linkedIssue={linkedIssue}
       issue={issue}
       sourceContext={sourceContext}
       refreshing={refreshing}
@@ -110,22 +111,23 @@ export function LinearLinkedIssuePane({
 }
 
 function LinearLinkedIssueDetail({
+  linkedIssue,
   issue,
   sourceContext,
   refreshing,
   onRefresh,
   issueSwitcher
 }: {
+  linkedIssue: LinearLinked
   issue: LinearIssue
   sourceContext: TaskSourceContext
   refreshing: boolean
   onRefresh: () => void
   issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
-  const linkActions = useLinkedIssuePaneActions({
-    provider: 'linear',
-    identifier: issue.identifier
-  })
+  // Why the linked identifier and not the fetched one: Linear can return a moved issue under a new
+  // identifier, and an action has to address the attachment the workspace actually stored.
+  const linkActions = useLinkedIssuePaneActions(linkedIssue)
   const providerSettings: RuntimeLinearSettings = sourceContext
   const requestKey = `${sourceContext.hostId}:${issue.workspaceId ?? 'selected'}:${issue.id}`
   const detail = useLinearIssueWorkspaceDetail({ issue, providerSettings, requestKey })

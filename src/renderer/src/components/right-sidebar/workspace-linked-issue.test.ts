@@ -331,3 +331,55 @@ describe('findWorkspaceIssueAttachment', () => {
     ).toMatchObject({ provider: 'jira', jiraIdentifier: 'PROJ-7' })
   })
 })
+
+describe('issues that name their own repo', () => {
+  it('keeps the repo the attachment recorded', () => {
+    const issues = resolveIssuePaneIssues(
+      source({ linkedItems: [{ ...githubIssue(7), repoId: 'repo-b' }] })
+    )
+
+    expect(issues.map((entry) => entry.issue)).toEqual([
+      expect.objectContaining({ provider: 'github', number: 7, repoId: 'repo-b' })
+    ])
+  })
+
+  it('lists the same number in two repos as two issues', () => {
+    // A GitHub number is unique per repo, so collapsing these would hide one of them entirely.
+    const issues = resolveIssuePaneIssues(
+      source({
+        linkedItems: [
+          { ...githubIssue(7), repoId: 'repo-a' },
+          { ...githubIssue(7), repoId: 'repo-b' }
+        ]
+      })
+    )
+
+    expect(issues.map((entry) => entry.key)).toEqual(['github:#7:repo-a', 'github:#7:repo-b'])
+  })
+
+  it("takes the active slot's repo from its own attachment", () => {
+    const issues = resolveIssuePaneIssues(
+      source({ linkedIssue: 7, linkedItems: [{ ...githubIssue(7), repoId: 'repo-b' }] })
+    )
+
+    expect(issues).toHaveLength(1)
+    expect(issues[0]?.issue).toMatchObject({ number: 7, repoId: 'repo-b' })
+  })
+
+  it('unlinks the attachment in the repo that was shown', () => {
+    const worktree = source({
+      linkedItems: [
+        { ...githubIssue(7), repoId: 'repo-a' },
+        { ...githubIssue(7), repoId: 'repo-b' }
+      ]
+    })
+
+    expect(
+      findWorkspaceIssueAttachment(worktree, {
+        provider: 'github',
+        identifier: '#7',
+        repoId: 'repo-b'
+      })
+    ).toMatchObject({ repoId: 'repo-b' })
+  })
+})

@@ -52,8 +52,27 @@ vi.mock('./JiraLinkedIssuePane', () => ({
   }
 }))
 vi.mock('./LinearLinkedIssuePane', () => ({
-  LinearLinkedIssuePane: ({ sourceContext }: { sourceContext: TaskSourceContext }) => (
-    <output data-testid="linear-source">{JSON.stringify(sourceContext)}</output>
+  LinearLinkedIssuePane: ({
+    sourceContext,
+    issueSwitcher
+  }: {
+    sourceContext: TaskSourceContext
+    issueSwitcher?: {
+      options: readonly { key: string }[]
+      onSelectIssue: (key: string) => void
+    }
+  }) => (
+    <>
+      <output data-testid="linear-source">{JSON.stringify(sourceContext)}</output>
+      {issueSwitcher && issueSwitcher.options.length > 1 ? (
+        <button
+          type="button"
+          onClick={() => issueSwitcher.onSelectIssue(issueSwitcher.options[1]?.key ?? '')}
+        >
+          select-second-linear
+        </button>
+      ) : null}
+    </>
   )
 }))
 
@@ -261,5 +280,37 @@ describe('IssuePane issue selection', () => {
 
     expect(screen.getByTestId('github-issue').textContent).toBe('#12')
     expect(screen.queryByText('select-second')).toBeNull()
+  })
+
+  it("routes the picked issue's reads through that issue's own account", () => {
+    // The workspace's source is the fallback for a link that predates attachments; an attachment
+    // that recorded another host has to win, or the pane reads one server's account for another
+    // server's issue.
+    const otherHost: TaskSourceContext = {
+      kind: 'task-source',
+      provider: 'linear',
+      projectId: 'linear-project',
+      hostId: 'runtime:other-host'
+    }
+    mocks.worktree = worktree({
+      linkedWorkItem: linearWorkItem('LIN-1'),
+      linkedItems: [
+        { provider: 'linear', type: 'issue', number: 0, identifier: 'LIN-1' },
+        {
+          provider: 'linear',
+          type: 'issue',
+          number: 0,
+          identifier: 'LIN-2',
+          taskSourceContext: otherHost
+        }
+      ]
+    })
+    render(<IssuePane />)
+
+    expect(sourceShown('linear-source')).toMatchObject({ hostId: 'runtime:workspace-host' })
+
+    fireEvent.click(screen.getByText('select-second-linear'))
+
+    expect(sourceShown('linear-source')).toMatchObject({ hostId: 'runtime:other-host' })
   })
 })

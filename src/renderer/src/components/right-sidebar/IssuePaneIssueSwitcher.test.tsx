@@ -36,7 +36,12 @@ function renderSwitcher(
       <IssuePaneIssueSwitcher
         provider="github"
         identifier="#12"
-        openUrl={overrides.openUrl ?? 'https://github.invalid/acme/orca/issues/12'}
+        // Why hasOwn: an explicit null is the case this helper has to be able to name.
+        openUrl={
+          Object.hasOwn(overrides, 'openUrl')
+            ? (overrides.openUrl ?? null)
+            : 'https://github.invalid/acme/orca/issues/12'
+        }
         onOpenIssue={overrides.onOpenIssue}
         switcher={switcher}
       />

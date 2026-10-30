@@ -64,11 +64,13 @@ export function GithubLinkedIssuePane({
   sourceContext: TaskSourceContext | null
   issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
-  const repo = useAppStore((s) => findLinkedIssueRepo(s.repos, worktree, linkedIssue.number))
+  const repo = useAppStore((s) =>
+    findLinkedIssueRepo(s.repos, worktree, linkedIssue.number, linkedIssue.repoId)
+  )
   // Why a distinct state: the link names a repo this device does not have, which is a setup
   // problem, not a failed request — retrying the same read cannot fix it.
   const repoIsOffDevice = useAppStore((s) =>
-    linkedIssueRepoIsOffDevice(s.repos, worktree, linkedIssue.number)
+    linkedIssueRepoIsOffDevice(s.repos, worktree, linkedIssue.number, linkedIssue.repoId)
   )
   const scopedSourceContext = repo ? readSourceContext(sourceContext, repo.id) : null
   const linkActions = useLinkedIssuePaneActions(linkedIssue)
