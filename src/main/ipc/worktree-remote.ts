@@ -1628,6 +1628,7 @@ async function performLocalWorktreeCreate(
       displayNameRequest.kind,
       { requestedName: effectiveRequestedName, sanitizedName: effectiveSanitizedName }
     ),
+    branchNameWasGenerated: args.nameWasGenerated === true && !args.branchNameOverride,
     ...(sparseDirectories.length > 0
       ? {
           sparseDirectories,

@@ -398,6 +398,16 @@ blank first shell activates a background workspace. **Do not** drop the `provisi
 when the guard is next touched, and keep the automation test's
 `expect(runtime.createTerminal).not.toHaveBeenCalled()`.
 
+**Typed workspace labels name their own branch.** Upstream `9608420517b` (#32919) added
+`src/main/worktree-create-branch-seed.ts`, which swapped a typed workspace label for a random
+creature branch on the theory that first-work renaming would replace it later; both create paths
+(`worktree-remote.ts`, `runtime-local-worktree-create-candidate.ts`) now fall through to
+`effectiveSanitizedName`, and the module is gone (PR #251). **Do not** re-apply the seed when
+resolving that conflict: on this machine first-work renaming never fires, so the placeholder is
+permanent. A blank name still gets a creature name for both, and the worktree meta carries
+`branchNameWasGenerated` so a typed creature word (`nautilus`) is not renamed out from under the user
+while a generated one still is.
+
 **Open (found by the sync's review):** the same double-setup shape survives for an automation create
 that _does_ carry a startup command — the spawner stages setup and
 `provisionManagedWorktreeTerminals` runs it again with `hasStartupTerminal: false`

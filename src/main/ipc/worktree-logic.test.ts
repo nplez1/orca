@@ -64,6 +64,13 @@ describe('sanitizeWorktreeName', () => {
     expect(sanitizeWorktreeName('a..b...c')).toBe('a.b.c')
   })
 
+  it('rewrites a .lock suffix, which git rejects in a ref even though the characters are safe', () => {
+    expect(sanitizeWorktreeName('foo.lock')).toBe('foo-lock')
+    // git only rejects the lowercase suffix.
+    expect(sanitizeWorktreeName('add.FOO.LOCK')).toBe('add.FOO.LOCK')
+    expect(sanitizeWorktreeName('lock')).toBe('lock')
+  })
+
   it('preserves non-ASCII letters and numbers', () => {
     expect(sanitizeWorktreeName('中文')).toBe('中文')
     expect(sanitizeWorktreeName('日本語 テスト')).toBe('日本語-テスト')

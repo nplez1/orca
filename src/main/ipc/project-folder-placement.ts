@@ -53,6 +53,9 @@ export function sanitizeWorktreeName(input: string): string {
     // sequences can't reach git.
     .replace(/\.{2,}/g, '.')
     .replace(/^[.-]+|[.-]+$/g, '')
+    // Why: git check-ref-format rejects a ref ending in lowercase `.lock` (`.LOCK` is accepted), so a
+    // label like `foo.lock` would pass every other rule and still fail at branch creation.
+    .replace(/\.lock$/, '-lock')
 
   if (!sanitized && containsEmoji(input)) {
     return 'workspace'

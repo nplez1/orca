@@ -66,7 +66,11 @@ export function firstWorkRenameDeps(
     canRenameOrcaCreatedBranch: (worktreeId) => {
       const meta = store.getWorktreeMeta(worktreeId)
       // A creature-like name alone cannot prove Orca owns the branch.
-      return !!meta?.orcaCreationSource && meta.preserveBranchOnDelete !== true
+      return (
+        !!meta?.orcaCreationSource &&
+        meta.preserveBranchOnDelete !== true &&
+        meta.branchNameWasGenerated !== false
+      )
     },
     setDisplayName: (worktreeId, displayName) => {
       rememberBranchRenameFailureOutput(worktreeId, null)
