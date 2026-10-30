@@ -58,7 +58,7 @@ const transforms = {
       name: 'locale-catalog-test-assets',
       enforce: 'pre' as const,
       load(id: string) {
-        if (/\/i18n\/locales\/[A-Za-z-]+\.json\?url$/.test(id)) {
+        if (/\/i18n\/(?:locales|fork)\/[A-Za-z-]+\.json\?url$/.test(id)) {
           const catalog = readFileSync(id.slice(0, -4)).toString('base64')
           return `export default ${JSON.stringify(`data:application/json;base64,${catalog}`)}`
         }

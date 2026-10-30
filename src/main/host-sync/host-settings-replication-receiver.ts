@@ -7,6 +7,7 @@ import {
   type HostSettingsSyncState
 } from '../../shared/host-settings-replication'
 import type { HostSettingsCredentialRegistry } from './host-settings-credential-port'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 /**
  * Whether this host may apply a payload as it stands.
@@ -49,8 +50,18 @@ export function applyHostSettingsPayload(input: {
   payload: HostSettingsReplicationPayload
   registry: HostSettingsCredentialRegistry
   now: number
+  /**
+   * Credential ids this host holds *because replication put them here*.
+   *
+   * Why the receiver needs it: a value the host holds that replication never wrote is the user's own,
+   * entered on this machine — and overwriting it with the main's value makes the id a replicated
+   * holding, so the main's later revocation deletes a credential the host's owner supplied. Only the
+   * host knows which of its own values came from a push, so `onlyIfEmpty` cannot express this.
+   */
+  replicatedIds?: readonly string[]
 }): { report: HostSettingsApplyReport; state: HostSettingsSyncState } {
   const { payload, registry, now } = input
+  const replicated = new Set(input.replicatedIds ?? [])
   const outcomes: Record<string, HostSettingsApplyOutcome> = {}
 
   for (const credential of payload.upserts) {
@@ -59,7 +70,18 @@ export function applyHostSettingsPayload(input: {
       outcomes[credential.id] = 'refusedUnknownKind'
       continue
     }
-    if (credential.onlyIfEmpty && port.protectionOf(credential.id) !== null) {
+    const heldHere = port.protectionOf(credential.id) !== null
+    if (credential.onlyIfEmpty && heldHere) {
+      outcomes[credential.id] = 'keptHostValue'
+      continue
+    }
+    // Why kept rather than replaced: this is the host's own value, and taking it over would both
+    // switch the account this machine uses and hand the main the right to delete it.
+    //
+    // Known limit: a value the user re-enters here for an id replication already owns is still replaced,
+    // because the local save paths do not clear the replicated claim. Fixing that needs the stores to
+    // report their own writes, which is why this guard is the record and not the value.
+    if (heldHere && !replicated.has(credential.id)) {
       outcomes[credential.id] = 'keptHostValue'
       continue
     }
@@ -76,7 +98,11 @@ export function applyHostSettingsPayload(input: {
       // partway through (a malformed payload, a full disk) may already have written the value, and one
       // throwing credential must not stop the rest of the payload from being applied — nor abort the
       // whole RPC, which the main would read as "unreachable" and leave the ledger with nothing.
-      console.warn(`[orca] Could not apply replicated credential ${credential.id}`, error)
+      recordSwallowedFailure(
+        'orca',
+        error,
+        `could not apply replicated credential ${credential.id}`
+      )
       outcomes[credential.id] = 'applyFailed'
       continue
     }
@@ -91,7 +117,11 @@ export function applyHostSettingsPayload(input: {
         // Why `applyFailed` and not a refusal: the weaker copy is still on disk, so neither side may
         // treat this as "the host does not hold it" — a refusal would take it out of both the host's
         // record and the main's ledger, and nothing would ever clean it up.
-        console.warn(`[orca] Could not withdraw downgraded credential ${credential.id}`, error)
+        recordSwallowedFailure(
+          'orca',
+          error,
+          `could not withdraw downgraded credential ${credential.id}`
+        )
         outcomes[credential.id] = 'applyFailed'
         continue
       }
@@ -113,7 +143,7 @@ export function applyHostSettingsPayload(input: {
     try {
       port.remove(id)
     } catch (error) {
-      console.warn(`[orca] Could not remove replicated credential ${id}`, error)
+      recordSwallowedFailure('orca', error, `could not remove replicated credential ${id}`)
       outcomes[id] = 'removalUnverified'
       continue
     }

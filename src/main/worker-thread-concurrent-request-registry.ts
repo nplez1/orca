@@ -101,9 +101,13 @@ export class WorkerThreadConcurrentRequestRegistry<
       clearTimeout(call.timer)
     }
     call.timer = setTimeout(() => {
-      if (this.calls.delete(call.request.id)) {
-        this.options.onTimeout(new Error(this.options.describeTimeout(call.timeoutMs)))
+      if (!this.calls.delete(call.request.id)) {
+        return
       }
+      const error = new Error(this.options.describeTimeout(call.timeoutMs))
+      // Settle before notifying: `onTimeout` fails the calls still registered, which this one is not.
+      this.settle(call, () => call.reject(error))
+      this.options.onTimeout(error)
     }, call.timeoutMs)
     call.timer.unref?.()
   }

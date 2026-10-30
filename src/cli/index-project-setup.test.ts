@@ -48,8 +48,24 @@ import {
   hostTargetStatusFixture,
   legacyProjectSetup,
   ORCA_PROJECT,
-  PROJECT_LIST_FIXTURE
+  PROJECT_LIST_FIXTURE,
+  setupLayoutFixture
 } from './index-project-setup-test-fixtures'
+
+const SETUP_UPDATE_FLAGS = ['project', 'setup-update', '--setup', 'setup-gpu']
+
+const SETUP_CREATE_FLAGS = [
+  'project',
+  'setup-create',
+  '--project',
+  'github:stablyai/orca',
+  '--host',
+  'runtime:gpu',
+  '--setup-id',
+  'setup-gpu'
+]
+
+const GPU_SETUP_ROW = { id: 'setup-gpu', hostId: 'runtime:gpu', displayName: 'Orca' }
 
 describe('orca cli worktree awareness', () => {
   const priorExitCode = process.exitCode
@@ -673,36 +689,12 @@ describe('orca cli worktree awareness', () => {
     pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
     queueFixtures(
       callMock,
-      okFixture('req_project_setup_update_layout', {
-        result: {
-          project: { ...ORCA_PROJECT, sourceRepoIds: [] },
-          setup: {
-            id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
-            hostId: 'runtime:gpu',
-            repoId: '',
-            path: '/srv/orca',
-            displayName: 'Orca',
-            setupState: 'ready',
-            setupMethod: 'provisioned',
-            createdAt: 1,
-            updatedAt: 2
-          }
-        }
-      })
+      setupLayoutFixture('req_layout_applied', GPU_SETUP_ROW, 'project-folder')
     )
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
-      [
-        'project',
-        'setup-update',
-        '--setup',
-        'setup-gpu',
-        '--worktree-layout',
-        'project-folder',
-        '--json'
-      ],
+      [...SETUP_UPDATE_FLAGS, '--worktree-layout', 'project-folder', '--json'],
       '/tmp/repo'
     )
 
@@ -715,6 +707,43 @@ describe('orca cli worktree awareness', () => {
         updates: expect.objectContaining({ worktreeLayoutMode: 'project-folder' })
       })
     )
+    expect(process.exitCode).toBeUndefined()
+  })
+
+  it.each([
+    // Fork hosts before this field applied the setting without echoing it; upstream strips the
+    // key. Neither is a mismatch, so the command says what it cannot confirm and exits 0.
+    ['no mode, as a host that cannot confirm', undefined, 'did not confirm', undefined],
+    ['another mode', 'repo-nested', 'it kept repo-nested', 1]
+  ])('reports an answer carrying %s', async (_case, mode, expected, exitCode) => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
+    queueFixtures(callMock, setupLayoutFixture('req_layout_answer', GPU_SETUP_ROW, mode))
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main([...SETUP_UPDATE_FLAGS, '--worktree-layout', 'flat', '--json'], '/tmp/repo')
+
+    const printed = [...errSpy.mock.calls, ...logSpy.mock.calls].flat().join('\n')
+    expect(printed).toContain(expected)
+    expect(process.exitCode).toBe(exitCode)
+  })
+
+  it('confirms --worktree-layout on setup-create too', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
+    queueFixtures(
+      callMock,
+      PROJECT_LIST_FIXTURE,
+      setupLayoutFixture('req_create_layout', GPU_SETUP_ROW, 'flat')
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main([...SETUP_CREATE_FLAGS, '--worktree-layout', 'flat', '--json'], '/tmp/repo')
+
+    expect(callMock).toHaveBeenCalledWith(
+      'projectHostSetup.create',
+      expect.objectContaining({ worktreeLayoutMode: 'flat' })
+    )
+    expect(process.exitCode).toBeUndefined()
   })
 
   it('rejects an unknown --worktree-layout before contacting any runtime', async () => {

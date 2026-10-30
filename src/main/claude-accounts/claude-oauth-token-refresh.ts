@@ -11,6 +11,15 @@ import {
   writeClaudeOAuthCredentialRotation,
   type ClaudeOAuthCredentialTarget
 } from './claude-oauth-credential-store'
+import {
+  composeRefreshedFields,
+  forgetPendingRotation,
+  pendingRotation,
+  rememberPendingRotation,
+  setPendingRotationBusyProbe
+} from './claude-oauth-pending-rotations'
+
+export { flushPendingClaudeOAuthRotations } from './claude-oauth-pending-rotations'
 
 // Why these constants: the public Claude Code OAuth client, verified against the installed CLI
 // (2.1.302). Orca is the holder of the credential it refreshes, so it also persists the rotation.
@@ -45,8 +54,6 @@ type TokenEndpointResponse = {
 
 /** The oauth fields an exchange sets, kept apart so a retry can land on a store that moved on. */
 type RefreshedTokenFields = Record<string, unknown>
-/** A rotation the store refused to take, kept so the next exchange does not replay a spent token. */
-type UnsavedRotation = { spentStoreToken: string; fields: RefreshedTokenFields }
 
 /** A token this store's last exchange minted, and when it did. */
 type MintedToken = { accessToken: string; mintedAt: number }
@@ -56,8 +63,10 @@ const MINT_REFUSAL_WINDOW_MS = 15 * 60 * 1000
 
 const inFlight = new Map<string, Promise<ClaudeOAuthRefreshOutcome>>()
 const rejectedRefreshTokens = new Set<string>()
-const unsavedRotations = new Map<string, UnsavedRotation>()
 const mintedTokens = new Map<string, MintedToken>()
+// Why registered here: the pending-rotation queue must not write a key while this module's exchange
+// owns it, and this module is the only place that knows an exchange is running.
+setPendingRotationBusyProbe((key) => inFlight.has(key))
 
 /**
  * Merge a token-endpoint response into the stored blob, keeping every field the caller already
@@ -129,11 +138,11 @@ async function exchangeClaudeOAuthToken(
   // Why re-read: a Claude run may have rotated the login since the usage poll started, and that
   // newer token is the one the endpoint will accept.
   let stored = await readClaudeOAuthCredential(target)
-  if (await retryUnsavedRotation(key, target)) {
+  if (await retryUnsavedRotation(key)) {
     stored = await readClaudeOAuthCredential(target)
   }
   const storeRaw = stored.status === 'found' ? stored.raw : null
-  const pending = unsavedRotations.get(key)
+  const pending = pendingRotation(key)
   const base = pending && storeRaw ? applyRefreshedFields(storeRaw, pending.fields) : storeRaw
   if (!base) {
     return { status: 'unavailable' }
@@ -210,32 +219,42 @@ async function exchangeClaudeOAuthToken(
   if (written === 'failed') {
     // Why keep it: the old refresh token is spent server-side, so forgetting the replacement
     // would leave the store holding a token no endpoint will accept.
-    unsavedRotations.set(key, { spentStoreToken, fields })
+    rememberPendingRotation(key, { target, spentStoreToken, fields })
     console.warn('[claude-oauth-refresh] could not persist the rotated credential')
   } else {
-    unsavedRotations.delete(key)
+    forgetPendingRotation(key)
   }
   mintedTokens.set(key, { accessToken: merged.accessToken, mintedAt: Date.now() })
   return { status: 'refreshed', accessToken: merged.accessToken, exchanged: true }
 }
 
-async function retryUnsavedRotation(
-  key: string,
-  target: ClaudeOAuthCredentialTarget
-): Promise<boolean> {
-  const pending = unsavedRotations.get(key)
-  if (!pending) {
+async function retryUnsavedRotation(key: string): Promise<boolean> {
+  if (!pendingRotation(key)) {
     return false
   }
-  const outcome = await writeClaudeOAuthCredentialRotation(
-    target,
-    pending.spentStoreToken,
-    (current, format) => applyRefreshedFields(current, pending.fields, format)
-  )
+  return flushPendingClaudeOAuthRotationsForKey(key)
+}
+
+/** Write one pending rotation back; it is forgotten only once the store took it. */
+async function flushPendingClaudeOAuthRotationsForKey(key: string): Promise<boolean> {
+  const rotation = pendingRotation(key)
+  if (!rotation) {
+    return false
+  }
+  let outcome: Awaited<ReturnType<typeof writeClaudeOAuthCredentialRotation>>
+  try {
+    outcome = await writeClaudeOAuthCredentialRotation(
+      rotation.target,
+      rotation.spentStoreToken,
+      (current, format) => applyRefreshedFields(current, rotation.fields, format)
+    )
+  } catch {
+    return false
+  }
   if (outcome === 'failed') {
     return false
   }
-  unsavedRotations.delete(key)
+  forgetPendingRotation(key)
   return outcome === 'written'
 }
 
@@ -264,24 +283,6 @@ async function readTokenResponse(response: Response): Promise<Record<string, unk
 
 function isStaleMint(minted: MintedToken): boolean {
   return Date.now() - minted.mintedAt > MINT_REFUSAL_WINDOW_MS
-}
-
-/**
- * The newest answer, over the rotation that is still waiting to be saved.
- *
- * A response that does not rotate the refresh token leaves the pending one in place, because the
- * store still holds the token it replaced. A rotation without an expiry drops the pending expiry,
- * which described a token that no longer exists.
- */
-function composeRefreshedFields(
-  pending: RefreshedTokenFields,
-  merged: RefreshedTokenFields
-): RefreshedTokenFields {
-  const fields: RefreshedTokenFields = { ...pending, ...merged }
-  if ('refreshToken' in merged && !('refreshTokenExpiresAt' in merged)) {
-    delete fields.refreshTokenExpiresAt
-  }
-  return fields
 }
 
 function rememberRejectedGrant(refreshToken: string): ClaudeOAuthRefreshOutcome {

@@ -8,6 +8,7 @@ import { resolveOrchestrationMigrationStartVersion } from './orchestration-schem
 import { createRootDispatch } from './db/root-dispatch-test-fixture'
 import { dropDerivedDeliverySchema } from './db/schema/derived-delivery-test-fixture'
 import { SCHEMA_VERSION } from './db/contract-constants'
+import { OrchestrationSchemaNewerThanBuildError } from './db/schema/migrate'
 
 describe('OrchestrationDb version-skew migration', () => {
   let db: OrchestrationDb | undefined
@@ -191,6 +192,28 @@ describe('OrchestrationDb version-skew migration', () => {
     expect(raw.pragma('user_version', { simple: true })).toBe(20)
 
     raw.close()
+  })
+
+  it('refuses a database written by a future binary instead of migrating over it', () => {
+    const dbPath = createLegacySchemaClaimingVersion(SCHEMA_VERSION + 1)
+    const raw = new Database(dbPath)
+    const tablesBefore = raw
+      .prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'")
+      .get()
+    raw.close()
+
+    expect(() => new OrchestrationDb(dbPath)).toThrow(OrchestrationSchemaNewerThanBuildError)
+
+    const after = new Database(dbPath)
+    try {
+      expect(after.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION + 1)
+      // No table was created, migrated, reconciled or backfilled: the refusal comes before all of it.
+      expect(
+        after.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get()
+      ).toEqual(tablesBefore)
+    } finally {
+      after.close()
+    }
   })
 
   it('repairs recovery columns missing from a partially-upgraded v32 schema', () => {

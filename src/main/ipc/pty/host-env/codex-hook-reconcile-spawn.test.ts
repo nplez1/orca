@@ -26,8 +26,7 @@ vi.mock('../../../pi/titlebar-extension-service', () => ({
 vi.mock('../../../cli/orca-cli-child-path', () => ({ prependOrcaCliDirToChildPath: () => {} }))
 vi.mock('../../../cli/wsl-managed-cli', () => ({
   getManagedWslCliDir: () => undefined,
-  getManagedWslCliLauncherName: () => 'orca-np',
-  getWslCliCommandName: () => 'orca-ide'
+  getManagedWslCliLauncherName: () => 'orca-np'
 }))
 vi.mock('../../../codex/codex-hook-reconcile', () => ({
   scheduleCodexHookReconcile: fixture.scheduleCodexHookReconcile

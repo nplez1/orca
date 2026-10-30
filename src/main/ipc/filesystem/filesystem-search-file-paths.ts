@@ -21,6 +21,7 @@ import {
 } from '../../../shared/ripgrep-process-availability'
 import { resolveBundledRipgrepWslRouting } from '../../ripgrep/bundled-ripgrep-wsl-routing'
 import { resolveAuthorizedPath } from './filesystem-auth'
+import { isFolderProjectRoot } from '../folder-project-root'
 import { getLocalGitOptionsForRegisteredWorktree } from '../local-worktree-runtime-options'
 import { scanRipgrepPaths } from '../quick-open-rg-path-scan'
 import { bundledRipgrepUnavailableError } from '../../ripgrep/bundled-ripgrep-path'
@@ -83,7 +84,8 @@ export async function searchQuickOpenFilePaths(
     searchRoot: '.',
     followSymlinks: args.followSymlinks,
     excludePathPrefixes,
-    forceSlashSeparator: sep === '\\'
+    forceSlashSeparator: sep === '\\',
+    isFolderProject: isFolderProjectRoot(store, rootPath, authorizedRootPath)
   })
   // Both option spellings select the pass: the runtime RPC sends `includeIgnored` (upstream), the
   // fingerprinted name-filter request sends `includeIgnoredFiles` (fork).
@@ -198,7 +200,8 @@ export async function collectQuickOpenPaths(
   const { primary, ignoredPass } = buildRgArgsForQuickOpen({
     searchRoot: '.',
     excludePathPrefixes,
-    forceSlashSeparator: sep === '\\'
+    forceSlashSeparator: sep === '\\',
+    isFolderProject: isFolderProjectRoot(store, rootPath, authorizedRootPath)
   })
   const maxPaths = args.maxPaths ?? Number.POSITIVE_INFINITY
   const paths: string[] = []

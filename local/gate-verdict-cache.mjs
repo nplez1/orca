@@ -15,6 +15,9 @@ import { join, isAbsolute, resolve } from 'node:path'
  */
 export const GATE_INPUT_PATHS = [
   'local/gate-unit.mjs',
+  'local/unit-gate-judgement.mjs',
+  'local/unit-lane-files.mjs',
+  'local/unit-suite-run.mjs',
   'local/gate-flake-coupling.mjs',
   'local/gate-verdict-cache.mjs',
   'local/check-unit-shard-verdict.mjs',

@@ -12,7 +12,11 @@ import {
   initSessionParseCachePersistence,
   resetSessionParseCachePersistenceForTests
 } from './session-parse-cache-persistence'
-import { SessionParseCacheDatabase } from './session-parse-cache-database'
+import {
+  SESSION_PARSE_CACHE_SCHEMA_VERSION,
+  SESSION_PARSE_PARSER_VERSION,
+  SessionParseCacheDatabase
+} from './session-parse-cache-database'
 import { scanAiVaultSessions } from './session-scanner'
 import {
   createSessionParseStats,
@@ -372,9 +376,9 @@ describe('session parse cache persistence', () => {
     await writeFile(
       cacheFile,
       JSON.stringify({
-        // 6 is the last JSON schema a fork build wrote; only that one is admitted, because this
-        // directory is Orca NP's own and no other build ever wrote the file.
-        schemaVersion: 6,
+        // Only the schema this build writes is admitted: an older row keeps an older parser's
+        // semantics, and mtime + size never re-derive a finished transcript.
+        schemaVersion: SESSION_PARSE_CACHE_SCHEMA_VERSION,
         appVersion: 'old',
         entries: [[transcript, legacyRow]]
       })
@@ -395,9 +399,9 @@ describe('session parse cache persistence', () => {
   })
 
   // 4 carries the `<current_datetime>` prefix as a Copilot title; 5 carries `subagent: null`, which
-  // would put every sub-agent transcript at top level. Both are superseded fork schemas, not ones a
-  // current build should replay, and the database's own version number means something else.
-  it.each([4, 5])('discards an old JSON file from retired schema %i', async (schemaVersion) => {
+  // would put every sub-agent transcript at top level. 6 predates the re-reads 7 and 8 introduced, so
+  // replaying it into a schema-8 database would pin pre-fix rows for every cached transcript.
+  it.each([4, 5, 6])('discards an old JSON file from retired schema %i', async (schemaVersion) => {
     const root = await makeTempDir()
     const cacheFile = join(root, 'session-parse-cache.json')
     const transcript = await writeTranscript(root)
@@ -423,6 +427,63 @@ describe('session parse cache persistence', () => {
     simulateRestart(cacheFile)
     expect((await parse(transcript)).fullParses).toBe(1)
     expect(existsSync(cacheFile)).toBe(false)
+  })
+
+  // A row is matched on path + mtime + size, so a finished transcript never looks stale again: without
+  // a parser version, a parser fix reaches only transcripts that change afterwards.
+  it('drops cached rows when the parser version moves on', async () => {
+    const root = await makeTempDir()
+    const cacheFile = join(root, 'session-parse-cache.json')
+    const transcript = await writeTranscript(root)
+    initSessionParseCachePersistence({ filePath: cacheFile, appVersion: APP_VERSION })
+    expect((await parse(transcript)).fullParses).toBe(1)
+    await flushSessionParseCachePersist()
+    expect(databaseRows(cacheFile)).toHaveLength(1)
+
+    const db = new SyncDatabase(join(root, 'session-parse-cache.sqlite'))
+    db.prepare("UPDATE meta SET value = ? WHERE key = 'parser_version'").run(
+      String(SESSION_PARSE_PARSER_VERSION - 1)
+    )
+    db.close()
+
+    simulateRestart(cacheFile)
+    expect(await parse(transcript)).toMatchObject({ fullParses: 1, reused: 0 })
+    await flushSessionParseCachePersist()
+    expect(databaseRows(cacheFile)).toHaveLength(1)
+  })
+
+  // Why: this build's older parser output would be trusted by the newer build on the next upgrade, since
+  // the stamp it reads would still be its own, and a finished transcript never re-derives.
+  it('reads, but does not extend, a cache a newer parser wrote', async () => {
+    const root = await makeTempDir()
+    const cacheFile = join(root, 'session-parse-cache.json')
+    const transcript = await writeTranscript(root)
+    initSessionParseCachePersistence({ filePath: cacheFile, appVersion: APP_VERSION })
+    expect((await parse(transcript)).fullParses).toBe(1)
+    await flushSessionParseCachePersist()
+
+    const databasePath = join(root, 'session-parse-cache.sqlite')
+    const newerStamp = String(SESSION_PARSE_PARSER_VERSION + 1)
+    const db = new SyncDatabase(databasePath)
+    db.prepare("UPDATE meta SET value = ? WHERE key = 'parser_version'").run(newerStamp)
+    db.close()
+
+    simulateRestart(cacheFile)
+    // The newer build's row is still served, so this build does not re-parse what it can read.
+    expect(await parse(transcript)).toMatchObject({ fullParses: 0, reused: 1 })
+    await parse(await writeTranscript(root, 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'))
+    await flushSessionParseCachePersist()
+
+    const after = new SyncDatabase(databasePath)
+    try {
+      // Only the newer build's row: this build read it and added nothing of its own.
+      expect(after.prepare('SELECT count(*) AS n FROM rows').get()?.n).toBe(1)
+      expect(
+        after.prepare("SELECT value FROM meta WHERE key = 'parser_version'").get()?.value
+      ).toBe(newerStamp)
+    } finally {
+      after.close()
+    }
   })
 
   it('rebuilds a corrupt database instead of failing the scan', async () => {

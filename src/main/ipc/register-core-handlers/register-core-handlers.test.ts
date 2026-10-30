@@ -16,7 +16,7 @@ const {
   registerDeveloperPermissionHandlersMock,
   registerComputerUsePermissionHandlersMock,
   registerSettingsHandlersMock,
-  registerUiHangDiagnosticsHandlersMock,
+  registerForkHandlersMock,
   registerKeybindingHandlersMock,
   registerTelemetryHandlersMock,
   registerDiagnosticsHandlersMock,
@@ -35,14 +35,10 @@ const {
   registerOrcaProfileHandlersMock,
   registerCodexAccountHandlersMock,
   registerAgentHookHandlersMock,
-  registerSessionSummaryHandlersMock,
   registerClaudeAccountHandlersMock,
   registerOpenCodeGoCredentialsHandlersMock,
   registerMiniMaxCredentialsHandlersMock,
   registerZcodePlanCredentialsHandlersMock,
-  registerDeepSeekCredentialsHandlersMock,
-  registerFireworksCredentialsHandlersMock,
-  registerCopilotCredentialsHandlersMock,
   registerGrokAccountHandlersMock,
   registerCursorAccountHandlersMock,
   registerClipboardHandlersMock,
@@ -58,7 +54,6 @@ const {
   registerJiraHandlersMock,
   registerJiraIssueSummaryGenerationHandlersMock,
   registerBitbucketHandlersMock,
-  registerJenkinsHandlersMock,
   registerGitLabHandlersMock,
   registerHostedReviewHandlersMock,
   registerExportHandlersMock,
@@ -91,7 +86,7 @@ const {
   registerDeveloperPermissionHandlersMock: vi.fn(),
   registerComputerUsePermissionHandlersMock: vi.fn(),
   registerSettingsHandlersMock: vi.fn(),
-  registerUiHangDiagnosticsHandlersMock: vi.fn(),
+  registerForkHandlersMock: vi.fn(),
   registerKeybindingHandlersMock: vi.fn(),
   registerTelemetryHandlersMock: vi.fn(),
   registerDiagnosticsHandlersMock: vi.fn(),
@@ -110,14 +105,10 @@ const {
   registerOrcaProfileHandlersMock: vi.fn(),
   registerCodexAccountHandlersMock: vi.fn(),
   registerAgentHookHandlersMock: vi.fn(),
-  registerSessionSummaryHandlersMock: vi.fn(),
   registerClaudeAccountHandlersMock: vi.fn(),
   registerOpenCodeGoCredentialsHandlersMock: vi.fn(),
   registerMiniMaxCredentialsHandlersMock: vi.fn(),
   registerZcodePlanCredentialsHandlersMock: vi.fn(),
-  registerDeepSeekCredentialsHandlersMock: vi.fn(),
-  registerFireworksCredentialsHandlersMock: vi.fn(),
-  registerCopilotCredentialsHandlersMock: vi.fn(),
   registerGrokAccountHandlersMock: vi.fn(),
   registerCursorAccountHandlersMock: vi.fn(),
   registerClipboardHandlersMock: vi.fn(),
@@ -133,7 +124,6 @@ const {
   registerJiraHandlersMock: vi.fn(),
   registerJiraIssueSummaryGenerationHandlersMock: vi.fn(),
   registerBitbucketHandlersMock: vi.fn(),
-  registerJenkinsHandlersMock: vi.fn(),
   registerGitLabHandlersMock: vi.fn(),
   registerHostedReviewHandlersMock: vi.fn(),
   registerExportHandlersMock: vi.fn(),
@@ -240,8 +230,8 @@ vi.mock('../settings', () => ({
   registerSettingsHandlers: registerSettingsHandlersMock
 }))
 
-vi.mock('../ui-hang-diagnostics', () => ({
-  registerUiHangDiagnosticsHandlers: registerUiHangDiagnosticsHandlersMock
+vi.mock('../register-fork-handlers', () => ({
+  registerForkHandlers: registerForkHandlersMock
 }))
 
 vi.mock('../skills', () => ({
@@ -358,10 +348,6 @@ vi.mock('../agent-hooks', () => ({
   registerAgentHookHandlers: registerAgentHookHandlersMock
 }))
 
-vi.mock('../session-summary', () => ({
-  registerSessionSummaryHandlers: registerSessionSummaryHandlersMock
-}))
-
 vi.mock('../claude-accounts', () => ({
   registerClaudeAccountHandlers: registerClaudeAccountHandlersMock
 }))
@@ -376,18 +362,6 @@ vi.mock('../minimax-credentials', () => ({
 
 vi.mock('../zcode-plan-credentials', () => ({
   registerZcodePlanCredentialsHandlers: registerZcodePlanCredentialsHandlersMock
-}))
-
-vi.mock('../deepseek-credentials', () => ({
-  registerDeepSeekCredentialsHandlers: registerDeepSeekCredentialsHandlersMock
-}))
-
-vi.mock('../fireworks-credentials', () => ({
-  registerFireworksCredentialsHandlers: registerFireworksCredentialsHandlersMock
-}))
-
-vi.mock('../copilot-credentials', () => ({
-  registerCopilotCredentialsHandlers: registerCopilotCredentialsHandlersMock
 }))
 
 vi.mock('../grok-accounts', () => ({
@@ -440,10 +414,6 @@ vi.mock('../bitbucket', () => ({
   registerBitbucketHandlers: registerBitbucketHandlersMock
 }))
 
-vi.mock('../jenkins', () => ({
-  registerJenkinsHandlers: registerJenkinsHandlersMock
-}))
-
 vi.mock('../gitlab', () => ({
   registerGitLabHandlers: registerGitLabHandlersMock
 }))
@@ -490,7 +460,7 @@ describe('registerCoreHandlers', () => {
     registerDeveloperPermissionHandlersMock.mockReset()
     registerComputerUsePermissionHandlersMock.mockReset()
     registerSettingsHandlersMock.mockReset()
-    registerUiHangDiagnosticsHandlersMock.mockReset()
+    registerForkHandlersMock.mockReset()
     registerKeybindingHandlersMock.mockReset()
     registerTelemetryHandlersMock.mockReset()
     registerDiagnosticsHandlersMock.mockReset()
@@ -508,14 +478,10 @@ describe('registerCoreHandlers', () => {
     registerOrcaProfileHandlersMock.mockReset()
     registerCodexAccountHandlersMock.mockReset()
     registerAgentHookHandlersMock.mockReset()
-    registerSessionSummaryHandlersMock.mockReset()
     registerClaudeAccountHandlersMock.mockReset()
     registerOpenCodeGoCredentialsHandlersMock.mockReset()
     registerMiniMaxCredentialsHandlersMock.mockReset()
     registerZcodePlanCredentialsHandlersMock.mockReset()
-    registerDeepSeekCredentialsHandlersMock.mockReset()
-    registerFireworksCredentialsHandlersMock.mockReset()
-    registerCopilotCredentialsHandlersMock.mockReset()
     registerClipboardHandlersMock.mockReset()
     setTrustedClipboardRendererWebContentsIdMock.mockReset()
     registerUpdaterHandlersMock.mockReset()
@@ -537,7 +503,6 @@ describe('registerCoreHandlers', () => {
     registerSpeechHandlersMock.mockReset()
     registerSkillsHandlersMock.mockReset()
     registerSkillDeleteIpcHandlersMock.mockReset()
-    registerJenkinsHandlersMock.mockReset()
     registerWorkspaceSpaceHandlersMock.mockReset()
     registerWorkspacePortHandlersMock.mockReset()
     registerLocalhostWorktreeLabelHandlersMock.mockReset()
@@ -622,15 +587,13 @@ describe('registerCoreHandlers', () => {
     expect(registerCodexConfigSyncHandlersMock).toHaveBeenCalledWith(
       codexAccounts.runtimeHomeService
     )
-    expect(registerSessionSummaryHandlersMock).toHaveBeenCalled()
+    expect(registerForkHandlersMock).toHaveBeenCalledWith({ store, rateLimits })
     expect(registerPetHandlersMock).toHaveBeenCalled()
     expect(registerClaudeAccountHandlersMock).toHaveBeenCalledWith(claudeAccounts)
     expect(registerOpenCodeGoCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerMiniMaxCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerZcodePlanCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
-    expect(registerDeepSeekCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
-    expect(registerFireworksCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
-    expect(registerCopilotCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
+    expect(registerForkHandlersMock).toHaveBeenCalledWith({ store, rateLimits })
     expect(registerGrokAccountHandlersMock).toHaveBeenCalled()
     expect(registerCursorAccountHandlersMock).toHaveBeenCalled()
     expect(registerRateLimitHandlersMock).toHaveBeenCalledWith(rateLimits, codexAccounts)
@@ -651,7 +614,6 @@ describe('registerCoreHandlers', () => {
     expect(registerWorkspaceSpaceWindowHandlersMock).toHaveBeenCalledWith(store)
     expect(registerTerminalPreviewHandlersMock).toHaveBeenCalledWith(runtime)
     expect(registerSettingsHandlersMock).toHaveBeenCalledWith(store, agentAwakeService)
-    expect(registerUiHangDiagnosticsHandlersMock).toHaveBeenCalledWith(store)
     expect(registerSkillsHandlersMock).toHaveBeenCalledWith(store, runtime)
     expect(registerSkillDeleteIpcHandlersMock).toHaveBeenCalledWith(store, runtime)
     expect(registerWorkspaceSpaceHandlersMock).toHaveBeenCalledWith(store)

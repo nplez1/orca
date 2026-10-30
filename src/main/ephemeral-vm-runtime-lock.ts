@@ -13,6 +13,9 @@
  * A caller that finds the runtime busy queues behind the holder and then runs, because the holder may
  * have changed the record the decision was going to be made from. Every caller re-reads inside the
  * lock for the same reason.
+ *
+ * Why there is also a non-waiting form: the sweep walks every runtime on a timer, so a sweep that
+ * queues behind one holder stops reclaiming every other runtime for as long as that holder runs.
  */
 const inFlightByRuntimeId = new Map<string, Promise<unknown>>()
 
@@ -42,6 +45,31 @@ export function withEphemeralVmRuntimeLock<T>(
     () => release(runtimeId, promise)
   )
   return promise
+}
+
+/**
+ * Acquire the lock only if it is free, reporting that it was busy instead of queueing behind the
+ * holder.
+ *
+ * Why the sweep needs this: a holder may be an extend hook waiting on a network that never answers,
+ * and a sweep that waits for it leaves `sweeping` set with no runtime reclaimed until the app restarts.
+ * The skip costs one sweep interval, and the next pass sees the record the holder left behind.
+ */
+export function tryWithEphemeralVmRuntimeLock<T>(
+  runtimeId: string,
+  run: () => Promise<T>
+): { ran: false } | { ran: true; promise: Promise<T> } {
+  // Check and set in one synchronous step, so two callers cannot both read the lock as free.
+  if (inFlightByRuntimeId.has(runtimeId)) {
+    return { ran: false }
+  }
+  const promise = run()
+  inFlightByRuntimeId.set(runtimeId, promise)
+  promise.then(
+    () => release(runtimeId, promise),
+    () => release(runtimeId, promise)
+  )
+  return { ran: true, promise }
 }
 
 /** Test seam: a leaked lock between cases would make the next case queue behind a dead promise. */

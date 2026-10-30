@@ -1,4 +1,5 @@
 import { applyClaudeAgentViewEnv } from './claude-agent-view'
+import { basename } from 'node:path'
 import { resolveTerminalInlineImagesEnabled } from '../../../../shared/terminal-inline-images-settings'
 import { resolveSetupAgentSequenceLaunchCommand } from '../../../../shared/setup-agent-sequencing'
 import {
@@ -13,11 +14,8 @@ import { wslHookRelayManager } from '../../../agent-hooks/wsl-hook-relay-manager
 import { wslInteropHealthMonitor } from '../../../wsl/wsl-interop-health'
 import { piTitlebarExtensionService } from '../../../pi/titlebar-extension-service'
 import { prependOrcaCliDirToChildPath } from '../../../cli/orca-cli-child-path'
-import {
-  getManagedWslCliDir,
-  getManagedWslCliLauncherName,
-  getWslCliCommandName
-} from '../../../cli/wsl-managed-cli'
+import { CLI_COMMAND_NAME } from '../../../cli/cli-install-constants'
+import { getManagedWslCliDir, getManagedWslCliLauncherName } from '../../../cli/wsl-managed-cli'
 import { stripLegacyTerminalShimEnv } from '../../../pty/legacy-terminal-shim-dir'
 import { mergePersistedWindowsPath } from '../../../pty/windows-environment-path'
 import { resolveCodexShellLaunchPreflightCommand } from '../../../pty/codex-shell-launch-preflight'
@@ -326,7 +324,12 @@ export function buildPtyHostEnv(
     baseEnv.BROWSER === undefined &&
     process.env.BROWSER === undefined
   ) {
-    const cliCommand = opts.isWsl ? getWslCliCommandName(opts.isPackaged) : 'orca'
+    // Why the basename of ORCA_CLI_COMMAND: BROWSER is word-split by its consumers (xdg-open,
+    // sensible-browser), so the bundle path this resolves from would break on the space in
+    // "Orca NP.app" — while the PTY PATH is already prepended with that launcher's directory.
+    // Why not a bare `orca`: on Linux that is GNOME's screen reader and elsewhere an official
+    // install's CLI, so a URL opened from a pane would never reach this app.
+    const cliCommand = basename(baseEnv.ORCA_CLI_COMMAND ?? CLI_COMMAND_NAME)
     baseEnv.BROWSER = `${cliCommand} open-url --url %s`
   }
   // Browser-relayed and SSH-managed headless hosts both have viewers on another machine.

@@ -5,6 +5,7 @@ import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import { SessionSummaryStore } from './session-summary-store'
 import { SessionSummaryService, type SessionSummaryStatusEntry } from './session-summary-service'
 import type { SessionFoldBrain, SessionSummarySourceEvent } from './session-summary-fold'
+import { resetSessionSummaryFoldSlotsForTests } from './session-summary-fold-slots'
 import type { SessionSummaryTranscriptHost } from './session-summary-transcript-host'
 
 function events(count: number): SessionSummarySourceEvent[] {
@@ -43,6 +44,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  // A fold whose model call never settles would hold a process-wide slot for the rest of the file.
+  resetSessionSummaryFoldSlotsForTests()
 })
 
 type Harness = {
@@ -85,7 +88,10 @@ function harness(
   }
   const service = new SessionSummaryService({
     store,
-    readEvents: async () => currentEvents,
+    readEvents: async ({ fromEventIndex }) =>
+      currentEvents
+        ? { events: currentEvents.slice(fromEventIndex), totalEvents: currentEvents.length }
+        : null,
     getAgentStatusEntry: () => currentEntry,
     createBrain: () => brain,
     now: () => 1000
@@ -118,7 +124,9 @@ describe('SessionSummaryService', () => {
     const ready = updates.find((u) => u.status === 'ready')
     expect(ready?.ledger?.foldedThrough).toBe(5)
     expect(ready?.facts?.messageCount).toBe(5)
-    // Persisted: a fresh store over the same file resumes at foldedThrough.
+    // Persisted: a fresh store over the same file resumes at foldedThrough. `set` is debounced, so a
+    // reopen inside the window sees it only after the queued write is flushed.
+    store.flush()
     const reloaded = new SessionSummaryStore(path)
     expect(reloaded.get('tab:leaf')?.ledger.foldedThrough).toBe(5)
   })
@@ -351,9 +359,11 @@ describe('SessionSummaryService host routing', () => {
     const updates: SessionSummarySnapshot[] = []
     const service = new SessionSummaryService({
       store: args.store,
-      readEvents: async ({ host }) => {
+      readEvents: async ({ host, fromEventIndex }) => {
         hostReads.push({ host })
         return args.events
+          ? { events: args.events.slice(fromEventIndex), totalEvents: args.events.length }
+          : null
       },
       getAgentStatusEntry: () => currentEntry,
       createBrain: () => ({
@@ -432,6 +442,7 @@ describe('SessionSummaryService host routing', () => {
     const h = hostHarness({ store, events: events(2) })
     h.service.open({ paneKey: 'tab:leaf', executionHostId: 'local' })
 
+    await waitFor(() => h.hostReads.length > 0)
     expect(h.hostReads[0]?.host).toEqual({ kind: 'local' })
   })
 
@@ -442,6 +453,7 @@ describe('SessionSummaryService host routing', () => {
     const h = hostHarness({ store, events: events(2) })
     h.service.open({ paneKey: 'tab:leaf', executionHostId: 'ssh:other-target' })
 
+    await waitFor(() => h.hostReads.length > 0)
     expect(h.hostReads[0]?.host.kind).toBe('ssh')
   })
 

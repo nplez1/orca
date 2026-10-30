@@ -9,11 +9,65 @@
 //   import-only         every side is import declarations only                    -> three-way union
 // A token or comment crossing a hunk edge on any side refuses the hunk: its meaning lives outside it.
 // Everything else is unproven, and a file is written only when every hunk in it is proven.
+//
+// Comments are not always noise. A directive comment (`@vitest-environment`, `@ts-expect-error`,
+// `eslint-disable`, `/// <reference>`, a JSDoc type in a JS file) *is* code: dropping one changes a test
+// environment or turns a suppressed error into a real one. Those comments are signature tokens, so a
+// hunk whose directives differ on one side is unproven however little code it changes.
 import { createHash } from 'node:crypto'
 import { parseConflictHunks } from './conflict-classify.mjs'
 import { isJsDoc, parseSource, scriptKindFor, ts } from './ts-source.mjs'
 
 export const PROOF_TIERS = ['upstream-unchanged', 'fork-unchanged', 'identity-only', 'import-only']
+
+// A comment that changes what a compiler, a linter or a test runner does. Prose is not here: a hunk
+// where upstream only reworded a sentence is still `upstream-unchanged`.
+const DIRECTIVE_COMMENT = [
+  /@vitest-environment(?:-options)?\b/,
+  /@ts-expect-error\b/,
+  /@ts-ignore\b/,
+  /@ts-nocheck\b/,
+  /@ts-check\b/,
+  /@jsx(?:ImportSource|Frag)?\b/,
+  /@__PURE__\b/,
+  /\b(?:eslint|oxlint)-(?:disable|enable)(?:-next-line|-line)?\b/,
+  /\bast-grep-ignore\b/,
+  /\bprettier-ignore\b/,
+  /\boxfmt-ignore\b/,
+  /\bbiome-ignore\b/,
+  /\bv8 ignore\b/,
+  /^\s*\/\/\/\s*<reference\b/
+]
+// `@param {T}`, `@type {T}` and friends only typecheck in JS, so they are tokens only for a JS file.
+const JSDOC_TYPE =
+  /@(?:param|arg|argument|type|returns?|typedef|property|prop|template|callback|this)\b[^\n]*\{/
+const JS_EXTENSIONS = /\.(?:[cm]?js|jsx)$/
+
+/**
+ * Comments that carry a directive, as comparable tokens. `comments` is `commentRanges`' map.
+ *
+ * A comment that merely OVERLAPS the region counts: a hunk inside a `/** … *\/` block (or a multi-line
+ * `eslint-disable` block) starts after the comment does, and skipping those made the directive invisible
+ * exactly when the change was to the directive itself. A comment that crosses an edge rather than
+ * enclosing the region is refused earlier, so overlap here cannot smuggle one in.
+ */
+export function directiveTokens({ comments, text, range, jsDocTypes = false }) {
+  const [start, end] = range
+  const tokens = []
+  for (const [from, to] of comments) {
+    if (to <= start || from >= end) {
+      continue
+    }
+    const raw = text.slice(from, to)
+    const isDoc = /^\s*\/\*\*/.test(raw)
+    if (DIRECTIVE_COMMENT.some((pattern) => pattern.test(raw))) {
+      tokens.push(raw)
+    } else if (isDoc && jsDocTypes && JSDOC_TYPE.test(raw)) {
+      tokens.push(raw)
+    }
+  }
+  return tokens.sort()
+}
 
 // Fork literal -> upstream literal, longest first (LOCAL-PATCHES.md `local(identity)`).
 export const IDENTITY_PAIRS = [
@@ -145,6 +199,10 @@ export function commentRanges(sf) {
   const jsxTexts = []
   const visit = (node) => {
     if (isJsDoc(node)) {
+      // The parser attaches a JSDoc block as a NODE (often of the end-of-file token, for one that trails
+      // the last statement), so it is never reached as trivia and skipping it lost the directive it may
+      // carry. Its own range is the comment.
+      ranges.set(node.pos, node.end)
       return
     }
     const children = node.getChildren(sf)
@@ -345,6 +403,12 @@ export function proveHunk(hunk, trees, index) {
   for (const name of ['base', 'ours', 'theirs']) {
     const { sf, ranges, comments } = trees[name]
     sides[name] = { sf, range: ranges[index], ...regionNodes(sf, ranges[index]) }
+    sides[name].directives = directiveTokens({
+      comments,
+      text: sf.text,
+      range: sides[name].range,
+      jsDocTypes: trees.jsDocTypes
+    })
     if (sides[name].straddles) {
       return unproven(`the hunk edge splits a token on the ${name} side`)
     }
@@ -357,7 +421,8 @@ export function proveHunk(hunk, trees, index) {
   if (edges.size > 1) {
     return unproven('the hunk sits inside a comment on some sides only')
   }
-  const sig = (name) => signature(sides[name].entries, sides[name].sf)
+  const sig = (name) =>
+    [signature(sides[name].entries, sides[name].sf), ...sides[name].directives].join('\n\u0000\n')
   if (sig('theirs') === sig('base')) {
     return {
       tier: 'upstream-unchanged',
@@ -373,6 +438,15 @@ export function proveHunk(hunk, trees, index) {
       reason: 'the fork changed only comments or whitespace here',
       resolution: hunk.theirs
     }
+  }
+  // Any side whose directives differ from base's refuses the hunk, whichever side added or removed one.
+  const directiveGap = ['base', 'ours', 'theirs'].find(
+    (name) => sides[name].directives.join('\n') !== sides.base.directives.join('\n')
+  )
+  if (directiveGap) {
+    return unproven(
+      `the ${directiveGap} side's directive comments differ from base's: a directive is code, so this hunk needs a reviewer`
+    )
   }
   const map = identityMap(sides.base, sides.ours)
   const rebranded = map ? reapplyIdentity(sides.theirs, sides.base, map) : null
@@ -417,7 +491,8 @@ export function proveFile({ path, status = null, merged = null }) {
   const hunks = parseConflictHunks(merged)
   let trees = null
   if (scriptKindFor(path) !== null) {
-    trees = {}
+    // An object, so the two fields below travel with the three per-side trees.
+    trees = { jsDocTypes: JS_EXTENSIONS.test(path) }
     for (const side of ['base', 'ours', 'theirs']) {
       const rebuilt = reconstruct(merged, hunks, side)
       const parsed = parseSource(path, rebuilt.text)

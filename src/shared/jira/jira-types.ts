@@ -318,4 +318,7 @@ export type JiraMutationResult =
       // instead of showing one flattened string. Absent on transport failures.
       fieldErrors?: JiraFieldErrors
       errorMessages?: string[]
+      // Why: the deadline fired, so the host may still commit. A caller must re-read
+      // the issue instead of rolling its optimistic patch back as a failure.
+      timedOut?: boolean
     }

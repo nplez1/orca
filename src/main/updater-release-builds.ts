@@ -112,11 +112,12 @@ function readAssetNames(assets: unknown): string[] {
 }
 
 function parseReleaseEntry(
-  entry: GitHubReleaseEntry,
+  entry: GitHubReleaseEntry | null,
   repo: string,
-  platform: NodeJS.Platform
+  platform: NodeJS.Platform,
+  arch: NodeJS.Architecture
 ): ReleaseBuild | null {
-  if (typeof entry.tag_name !== 'string' || entry.draft === true) {
+  if (!entry || typeof entry.tag_name !== 'string' || entry.draft === true) {
     return null
   }
   const tag = entry.tag_name
@@ -125,9 +126,10 @@ function parseReleaseEntry(
   if (!isValidVersion(version) || !channel) {
     return null
   }
-  // Platform release legs publish independently; offer only artifacts that actually exist.
+  // Platform release legs publish independently; offer only artifacts that actually exist for
+  // this architecture.
   const assetNames = readAssetNames(entry.assets)
-  if (!hasInstallableArtifactForPlatform(platform, assetNames)) {
+  if (!hasInstallableArtifactForPlatform(platform, assetNames, arch)) {
     return null
   }
   const installerAsset = findInstallerAssetName(platform, assetNames)
@@ -148,10 +150,12 @@ function parseReleaseEntry(
   }
 }
 
-// REST exposes older builds the short Atom feed omits; use only for explicit picker requests.
+// The picker wants every published build, which the resolver's newest-first page of releases does not
+// give it. Both read the same REST endpoint, so both spend the same per-IP quota.
 export async function listReleaseBuilds(
   channel: ReleaseChannel,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  arch: NodeJS.Architecture = process.arch
 ): Promise<ReleaseBuild[]> {
   const repo = getReleaseRepoForChannel(channel)
   // Skip a known-exhausted token bucket and try the separate per-IP quota.
@@ -183,7 +187,7 @@ export async function listReleaseBuilds(
     throw new Error(`Could not read the ${channel} release list.`)
   }
   const builds = payload
-    .map((entry) => parseReleaseEntry(entry as GitHubReleaseEntry, repo, platform))
+    .map((entry) => parseReleaseEntry(entry, repo, platform, arch))
     .filter((build): build is ReleaseBuild => build !== null)
     .filter((build) => build.channel === channel)
   return sortReleaseBuildsNewestFirst(builds)

@@ -101,12 +101,17 @@ export type JiraApi = {
     issueTypeId: string
     siteId?: string
   }) => Promise<JiraCreateField[]>
-  listEditFields: (args: { key: string; siteId?: string }) => Promise<JiraEditableField[]>
-  listPriorities: (args?: { siteId?: string }) => Promise<JiraPriority[]>
+  listEditFields: (args: {
+    key: string
+    siteId?: string
+    strict?: boolean
+  }) => Promise<JiraEditableField[]>
+  listPriorities: (args?: { siteId?: string; strict?: boolean }) => Promise<JiraPriority[]>
   listAssignableUsers: (args: {
     key: string
     query?: string
     siteId?: string
+    strict?: boolean
   }) => Promise<JiraUser[]>
   listAssignableUsersForProject: (args: {
     projectIdOrKey: string

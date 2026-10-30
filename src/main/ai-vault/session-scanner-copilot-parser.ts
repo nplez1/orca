@@ -1,5 +1,6 @@
 import { openTranscriptReadStream } from '../native-chat/wsl-transcript-fs-access'
 import { createInterface } from 'node:readline'
+import { basename, dirname, extname } from 'node:path'
 import type { AiVaultSession } from '../../shared/ai-vault-types'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import type {
@@ -33,10 +34,11 @@ type ParserSessionOptions = {
 export async function parseCopilotSessionFile(
   file: FileWithMtime,
   platform: NodeJS.Platform = process.platform,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
   const lines = createInterface({
-    input: openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan'),
+    input: openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan', signal),
     crlfDelay: Infinity
   })
   return parseCopilotSessionLines({ file, lines, platform, messages })
@@ -112,11 +114,22 @@ export function createCopilotSessionResumeState(
     createAccumulator({
       agent: 'copilot',
       file,
-      sessionId: sessionIdFromFileName(file.path),
+      sessionId: copilotSessionIdFromPath(file.path),
       messages
     }),
     consumeCopilotRecordLine
   )
+}
+
+/**
+ * Copilot stores one directory per session — `<session-state>/<sessionId>/events.jsonl` — so the
+ * file name is a constant and the directory is the identity. Falling back to the file name filed
+ * every such session under the literal id `events`, i.e. one row for all of them.
+ */
+function copilotSessionIdFromPath(filePath: string): string {
+  return basename(filePath, extname(filePath)) === 'events'
+    ? basename(dirname(filePath))
+    : sessionIdFromFileName(filePath)
 }
 
 async function parseCopilotSessionLines(args: {

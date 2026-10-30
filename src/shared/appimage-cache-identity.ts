@@ -5,7 +5,12 @@ import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { APPIMAGE_NODE_RUNTIME_SEGMENTS } from './appimage-node-runtime'
 
 const CACHE_KEY_PATTERN = /^[0-9a-f]{24}$/u
-const LINUX_EXECUTABLE_NAME = 'orca-ide'
+/**
+ * Names the packaged Linux executable can carry inside a generation. `orca-np` is this fork's
+ * (`linux.executableName` in electron-builder.np.config.cjs); `orca-ide` is what a cached generation
+ * from an earlier build runs as, and upstream's own packages keep.
+ */
+const LINUX_EXECUTABLE_NAMES: readonly string[] = ['orca-np', 'orca-ide']
 // Version the namespace so older pruners cannot delete generations a newer build still runs; rollback reopens only the old namespace's risk.
 const NAMESPACE_KEY_VERSION = 'generation-lease-v1'
 /** Beside a namespace's generations; not a cache key, so pruning skips it. */
@@ -40,10 +45,10 @@ export type AppImageGenerationLocation = {
   rootPath: string
 }
 
-/** The generation root an executable runs from: its `orca-ide`, or its bundled Node (the daemon). */
+/** The generation root an executable runs from: its `orca-np`, or its bundled Node (the daemon). */
 function generationRootOfExecutable(execPath: string): string | null {
   const resolved = resolve(execPath)
-  if (basename(resolved) === LINUX_EXECUTABLE_NAME) {
+  if (LINUX_EXECUTABLE_NAMES.includes(basename(resolved))) {
     return dirname(resolved)
   }
   const nodeSuffix = join('resources', ...APPIMAGE_NODE_RUNTIME_SEGMENTS)

@@ -42,7 +42,10 @@ export function collectCases(report) {
         passes.push({ file: path, test })
       }
     }
-    if (!sawFailedCase && file.status === 'failed') {
+    // Why the message on its own: an afterAll or teardown error is not the failure a named entry
+    // accounts for, so absorbing the row must not absorb this red beside it — the rule
+    // `check-unit-shard-verdict.mjs` already applies to a shard.
+    if (file.status === 'failed' && (file.message || !sawFailedCase)) {
       failures.push({
         file: path,
         test: '(suite)',
@@ -186,13 +189,26 @@ export function rerunReportsFor(report, files) {
  * entry, a failing `beforeAll` reports its cases as skipped. Only a pass waives a failure, and a
  * pass does not waive one the same report also failed or a hook broke under.
  */
-export function reproducedFailures(failures, rerun) {
+export function reproducedFailures(
+  failures,
+  rerun,
+  { known = new Set(), fileCovered = false } = {}
+) {
   if (!rerun.complete) {
     return failures
   }
   return failures.filter((failure) => {
     if (failure.test === '(suite)') {
-      return !rerun.filePassed
+      // Why not `filePassed`: a file that holds an allowlisted always-red test fails in isolation too,
+      // so that would make a one-off teardown error unwaivable for ever.
+      if (rerun.failures.has('(suite)')) {
+        return true
+      }
+      // Why the re-run's other failures as well: the suite row replaces the named cases in the full
+      // run, so a test that only appears in isolation was never judged against the allowlist. Waiving
+      // the row would pass a real red nobody read. A file-level entry covers every case, so there the
+      // named failures are known and the row alone is what is being waived.
+      return fileCovered ? false : [...rerun.failures].some((test) => !known.has(test))
     }
     return (
       !rerun.passes.has(failure.test) ||
@@ -235,10 +251,159 @@ export function collectedQuarantinedFiles(report, quarantined) {
     .filter((file) => set.has(file))
 }
 
+// What Vitest substitutes into an `it.each` title: printf tokens (including a literal `%%`), `$name`
+// off a table row, and a template literal's own interpolations.
+const SUBSTITUTION = /(%[$#%sdifjoOp]|\$\{[^}]*\}|\$[A-Za-z_][\w.]*)/
+const MODIFIERS_WITH_ARGUMENTS = new Set(['each', 'for', 'runIf', 'skipIf'])
+// Why the suffix: the repo also names its case tables `itRunsUnixShell.each(...)`, `testEach(...)`.
+const TITLE_CALLER = /\b(?:describe|it|test|suite)[\w$]*/g
+const NEVER_RUNS = new Set(['skip', 'todo'])
+const RELATIVE_SPECIFIER = /(['"`])((?:\.{1,2}\/)[^'"`\n]*)\1/g
+
+/**
+ * The relative modules a test file pulls its cases in from, so a title can be found where it is
+ * written rather than only in the file the entry names: `orca-runtime.test.ts` does `await
+ * import('./orca-runtime-tests/x.spec')`. Callers read those files; this function stays pure.
+ */
+export function importedCaseSpecifiers(source) {
+  return [
+    ...new Set(
+      [...source.matchAll(RELATIVE_SPECIFIER)]
+        .map((match) => match[2])
+        .filter((specifier) => specifier.includes('.spec'))
+    )
+  ]
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** A source title as a pattern: the parts Vitest fills in become wildcards. */
+function titlePattern(text) {
+  return text
+    .split(SUBSTITUTION)
+    .map((part, index) => (index % 2 === 1 ? '[\\s\\S]*?' : escapeRegExp(part)))
+    .join('')
+}
+
+function skipSpace(source, index) {
+  while (index < source.length && /\s/.test(source[index])) {
+    index++
+  }
+  return index
+}
+
+function closeOf(source, open) {
+  let depth = 0
+  for (let index = open; index < source.length; index++) {
+    const char = source[index]
+    if (char === '(') {
+      depth++
+    } else if (char === ')') {
+      depth--
+      if (depth === 0) {
+        return index
+      }
+    }
+  }
+  return -1
+}
+
+function readLiteral(source, index) {
+  const quote = source[index]
+  if (quote !== "'" && quote !== '"' && quote !== '`') {
+    return null
+  }
+  let text = ''
+  for (let scan = index + 1; scan < source.length; scan++) {
+    const char = source[scan]
+    if (char === '\\') {
+      text += source[scan + 1] ?? ''
+      scan++
+    } else if (char === quote) {
+      return { text, end: scan + 1 }
+    } else {
+      text += char
+    }
+  }
+  return null
+}
+
+/** The title strings the file gives a `describe` and each test, in source order. */
+function collectTitles(source) {
+  const describes = []
+  const tests = []
+  for (const caller of source.matchAll(TITLE_CALLER)) {
+    let index = skipSpace(source, caller.index + caller[0].length)
+    let runs = true
+    while (source[index] === '.') {
+      index = skipSpace(source, index + 1)
+      const name = /^[\w$]+/.exec(source.slice(index))?.[0] ?? ''
+      index = skipSpace(source, index + name.length)
+      // Why: a skipped or todo case never fails, so its title cannot be a known red.
+      if (NEVER_RUNS.has(name)) {
+        runs = false
+      }
+      if (source[index] === '<') {
+        const end = source.indexOf('>', index)
+        index = skipSpace(source, end === -1 ? index : end + 1)
+      }
+      // Why: `it.concurrent(` takes no arguments of its own, `.each(table)(` does.
+      if (MODIFIERS_WITH_ARGUMENTS.has(name) && source[index] === '(') {
+        const close = closeOf(source, index)
+        index = skipSpace(source, close === -1 ? index : close + 1)
+      }
+    }
+    if (!runs || source[index] !== '(') {
+      continue
+    }
+    const literal = readLiteral(source, skipSpace(source, index + 1))
+    if (literal) {
+      ;(caller[0].startsWith('describe') ? describes : tests).push(literal.text)
+    }
+  }
+  return { describes, tests }
+}
+
+/**
+ * Whether the file can still produce `title` as a Vitest full name, which is its `describe` chain and
+ * its own title joined by single spaces.
+ *
+ * Why this exists: `gate-unit.mjs` derives staleness only from entries that matched a failure, so an
+ * entry whose test was deleted is structurally invisible — it sits in the manifest for ever, and the
+ * run that would disprove it costs 25 minutes. A static check catches the same rot at PR time.
+ *
+ * It over-approximates on purpose: the cost of a false "still there" is that rot hides until the next
+ * full run, while the cost of a false "dead" is a live entry deleted. `source` may therefore be the
+ * file plus the `.spec` modules it imports, and two shapes still count as present when they are not:
+ * a title surviving only in a comment, and one behind a callee the scan cannot resolve, such as
+ * `(cond ? it : it.skip)('title')`.
+ */
+export function titleExistsInSource(title, source) {
+  const { describes, tests } = collectTitles(source)
+  const chain = describes.length > 0 ? `(?:${describes.map(titlePattern).join('|')}) ` : null
+  return tests.some((text) => {
+    const own = titlePattern(text)
+    if (new RegExp(`^${own}$`).test(title)) {
+      return true
+    }
+    // Why 1..4: describe blocks nest, and a deeper chain is the only shape left to allow.
+    return chain !== null && new RegExp(`^(?:${chain}){1,4}${own}$`).test(title)
+  })
+}
+
 /**
  * Vitest exits non-zero for a failing test, so its status alone proves nothing — it proves something
- * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which fails a shard that
- * failed without the tolerated teardown race.
+ * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which explains a failed
+ * shard with the known reds it absorbed, the tolerated teardown race, or a real failure.
+ *
+ * Why the failure count still counts, though #210 G2 asked to stop accepting it: a full run on this
+ * machine always ends non-zero, because 17 allowlisted tests are red here (AGENTS.md's own sample
+ * verdict line says "11 failed, all in unit-known-red.json"). Accepting only *unexpected* failures
+ * therefore fails every gate run, which is not a gate — it is an outage. What G2 was describing is a
+ * report that does not describe the run at all, and that is what the missing-file check above is for:
+ * a crash or a narrowed include leaves files out of the report, which now fails by name.
  */
 export function unexplainedSuiteExit({ outcome, status, failedCount, unhandledCount }) {
   if (outcome !== 'complete') {
@@ -248,6 +413,28 @@ export function unexplainedSuiteExit({ outcome, status, failedCount, unhandledCo
     return null
   }
   return `the suite exited ${status === null ? 'without a status' : status} and neither the report nor the log explains it; failing closed`
+}
+
+/**
+ * Files the run was supposed to collect and the report never mentions.
+ *
+ * Why: the report is the whole evidence base, so a narrowed include, a project that silently dropped
+ * out or a worker that died between files leaves a report over whatever ran — which reads green. The
+ * missing set is printed, so the failure names the files instead of "something is off".
+ */
+export function missingReportedFiles(report, expected) {
+  const reported = new Set((report?.testResults ?? []).map((file) => repoPath(file.name)))
+  return [...expected].filter((file) => !reported.has(file)).sort()
+}
+
+/** The problem a missing file set is, worded once so the gate and its test say the same thing. */
+export function reportFileSetProblem(report, expected, limit = 12) {
+  const missing = missingReportedFiles(report, expected)
+  if (missing.length === 0) {
+    return null
+  }
+  const more = missing.length > limit ? ` …and ${missing.length - limit} more` : ''
+  return `the report does not name ${missing.length} file(s) the lane should have run: ${missing.slice(0, limit).join(', ')}${more}`
 }
 
 /** Vitest prints its own count; a mismatch means the log shape moved, so the verdict fails closed. */

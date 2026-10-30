@@ -14,7 +14,7 @@ import { runProcessSync } from '@orca/process-host'
 import type { Repo } from '../../shared/repo-types'
 import { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
 
-vi.mock('../ipc/filesystem-auth', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))
+vi.mock('../ipc/filesystem/filesystem-auth', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))
 vi.mock('../worktree-root-preparation', () => ({ prepareLocalWorktreeRootForRepo: vi.fn() }))
 
 let root: string
@@ -37,12 +37,18 @@ async function makeCheckout(path: string): Promise<void> {
 }
 
 function makeController(options: {
-  repo: { id: string; path: string; displayName: string; worktreeBasePath?: string }
+  repo: {
+    id: string
+    path: string
+    displayName: string
+    worktreeBasePath?: string
+    kind?: 'git' | 'folder'
+  }
   hasRelocationStore?: boolean
   hasLiveSessions?: boolean
   truncateList?: boolean
 }): RuntimeRepositoryRelocationController {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the controller reads only id, path and displayName off this row.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the controller reads only id, path, kind and displayName off this row.
   const repo = { badgeColor: '#000000', addedAt: 1, ...options.repo } as Repo
   const store = {
     getSettings: () => ({
@@ -223,6 +229,50 @@ describe('RuntimeRepositoryRelocationController', () => {
     await expect(controller.relocate('name:homelab', { dryRun: true })).resolves.toEqual({
       repoId: 'r1',
       decision: 'unknown-default-branch'
+    })
+  })
+
+  it("refuses a folder project inside a checkout whose branch is the parent's", async () => {
+    // The folder sits inside a real checkout whose branch is `develop`, which is exactly the answer
+    // that would be wrong to take: it is the parent's, not this project's. The probe count itself is
+    // pinned in runtime-repository-relocation-host-routing.test.ts, which mocks the resolver.
+    const parent = join(root, 'Code')
+    await makeCheckout(parent)
+    git(parent, 'symbolic-ref', 'HEAD', 'refs/heads/develop')
+    const folder = join(parent, 'notes')
+    await mkdir(folder, { recursive: true })
+    const controller = makeController({
+      repo: {
+        id: 'r1',
+        path: folder,
+        displayName: 'notes',
+        worktreeBasePath: join(root, 'ws', 'notes'),
+        kind: 'folder'
+      }
+    })
+
+    await expect(controller.relocate('name:notes', { dryRun: true })).resolves.toEqual({
+      repoId: 'r1',
+      decision: 'not-a-git-repo'
+    })
+  })
+
+  it('still names the folder from the branch of a checkout it would move', async () => {
+    const checkout = join(root, 'Code', 'homelab')
+    const container = join(root, 'ws', 'homelab')
+    await makeCheckout(checkout)
+    const controller = makeController({
+      repo: { id: 'r1', path: checkout, displayName: 'homelab', worktreeBasePath: container }
+    })
+
+    await expect(controller.relocate('name:homelab', { dryRun: true })).resolves.toEqual({
+      repoId: 'r1',
+      decision: 'ready',
+      plan: {
+        containerPath: container,
+        targetPath: join(container, 'main'),
+        defaultBranchName: 'main'
+      }
     })
   })
 })

@@ -1,5 +1,6 @@
 import { resolveOrchestrationMigrationStartVersion } from '../../orchestration-schema-version-skew'
 import { SCHEMA_VERSION } from '../contract-constants'
+import type Database from '../../../../sqlite/sync-database'
 import type { OrchestrationDb } from '../orchestration-db'
 import { applySchemaMigrationsV13ToV30 } from './migrate-v13-v30'
 import { applySchemaMigrationsV2ToV12 } from './migrate-v2-v12'
@@ -17,7 +18,34 @@ import { migrateV43 } from './migrate-v43'
 import { DROP_REMOVED_WORK_TRIGGERS_SQL } from '../reset/removed-orchestration-work-store'
 
 // CREATE TABLE IF NOT EXISTS won't alter existing tables; migrate atomically before bumping user_version.
+
+/**
+ * A database written by a newer build. Refused rather than migrated: the older build cannot know the
+ * newer schema's tables, so running backfills, reconciliations and trigger creation against them
+ * would write through assumptions it cannot check, and the newer build would inherit the damage.
+ */
+export class OrchestrationSchemaNewerThanBuildError extends Error {
+  constructor(
+    readonly storedVersion: number,
+    readonly buildVersion: number
+  ) {
+    super(
+      `Orchestration database has schema ${storedVersion}, newer than this build's ${buildVersion}`
+    )
+    this.name = 'OrchestrationSchemaNewerThanBuildError'
+  }
+}
+
+export function assertOrchestrationSchemaNotNewer(db: Database.Database): void {
+  const storedVersion = Number(db.pragma('user_version', { simple: true }) ?? 0)
+  if (storedVersion > SCHEMA_VERSION) {
+    db.close()
+    throw new OrchestrationSchemaNewerThanBuildError(storedVersion, SCHEMA_VERSION)
+  }
+}
+
 export function migrate(this: OrchestrationDb): void {
+  assertOrchestrationSchemaNotNewer(this.db)
   const storedVersion = this.db.pragma('user_version', { simple: true }) as number
   const current = resolveOrchestrationMigrationStartVersion(this.db, storedVersion, SCHEMA_VERSION)
   if (current >= SCHEMA_VERSION) {

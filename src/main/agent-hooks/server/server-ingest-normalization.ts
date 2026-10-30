@@ -11,6 +11,34 @@ import type { NormalizedLocalHook } from './server-types'
 import { AgentHookServerTmuxStatus } from './server-tmux-status'
 import { getClaudeObservedConfigDirs } from '../../claude-accounts/claude-profile-installed-router'
 
+/** The row's arrival stamp, when this process still holds a row for the pane. */
+export function statusRowReceivedAt(row: unknown): number | undefined {
+  if (!row || typeof row !== 'object' || !('receivedAt' in row)) {
+    return undefined
+  }
+  return typeof row.receivedAt === 'number' ? row.receivedAt : undefined
+}
+
+/**
+ * Whether a replay drained while hooks are live is newer than the row the pane held when the drain
+ * started.
+ *
+ * Why the drain-start watermark and not the live row: applying a replay stamps its own row, so a
+ * drain of two records for one pane would drop the second one — and a `Stop` spooled right behind a
+ * prompt is exactly the pair a brief stall produces. Within one drain the per-pane file is in write
+ * order, so only the pre-drain state has to be compared against.
+ *
+ * Why this is a rule and not an inline comparison: the spool stamp is whole seconds, so a record
+ * written alongside a live arrival looks older than it is. Treating that as stale costs one replay,
+ * bounded by the next event; applying it would move the pane backwards.
+ */
+export function spoolReplayIsNewer(
+  record: SpoolRecord,
+  rowReceivedAt: number | undefined
+): boolean {
+  return rowReceivedAt === undefined || record.receivedAt > rowReceivedAt
+}
+
 export abstract class AgentHookServerIngestNormalization extends AgentHookServerTmuxStatus {
   protected setClaudeBackgroundEvidence(
     paneKey: string,
@@ -124,6 +152,18 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
     // Whole-second spool timestamps prove pre-exit ownership only with a full second of separation.
     if (exit && record.receivedAt + 1000 <= exit.at) {
       return
+    }
+    // Why only on the timer drain (the record says so): the startup replay runs before the listener
+    // binds, so every spooled record predates any live event and the exit-second rule above already
+    // settles it. A drain that runs while hooks are live must not apply a record the pane has already
+    // moved past — a timed-out prompt that a later Stop superseded would otherwise flip the pane back
+    // to "working". The watermark is the row stamp the drain captured before it applied anything.
+    if (record.requireNewerThanRow === true) {
+      const watermark =
+        typeof record.replayRowReceivedAt === 'number' ? record.replayRowReceivedAt : undefined
+      if (!spoolReplayIsNewer(record, watermark)) {
+        return
+      }
     }
     const replay = { ...normalized.event, isReplay: true as const }
     const statusDisposition = this.getAgentStatusDisposition(replay.paneKey, {

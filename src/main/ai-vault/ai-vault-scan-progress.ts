@@ -98,6 +98,24 @@ export function noteAiVaultScanReading(signal: AbortSignal | undefined): void {
   reporter?.workChanged()
 }
 
+/** Records the transcript a parser is reading; call the returned release when it finishes. */
+export function noteAiVaultScanReadingFile(
+  signal: AbortSignal | undefined,
+  agent: AiVaultAgent,
+  path: string
+): () => void {
+  const reporter = signal ? reporters.get(signal) : undefined
+  if (!reporter) {
+    return () => undefined
+  }
+  const release = reporter.tally.beginReadingFile(agent, path)
+  reporter.workChanged()
+  return () => {
+    release()
+    reporter.workChanged()
+  }
+}
+
 export function aiVaultScanWorkload(signal: AbortSignal | undefined) {
   return tallyFor(signal)?.workload
 }

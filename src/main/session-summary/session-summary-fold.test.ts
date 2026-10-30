@@ -9,6 +9,7 @@ import {
   type SessionFoldBrain,
   type SessionSummarySourceEvent
 } from './session-summary-fold'
+import { SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY } from './session-summary-fold-slots'
 
 function events(count: number): SessionSummarySourceEvent[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -172,6 +173,63 @@ describe('foldSessionSummaryEvents', () => {
         signal: controller.signal
       })
     ).rejects.toThrow()
+  })
+
+  it('bounds how many chunk extracts run at once', async () => {
+    // Why: each extract spawns an agent CLI, and a 2,000-message session is 50+ chunks at once.
+    let inFlight = 0
+    let peak = 0
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith('You write short progress reports')) {
+          return JSON.stringify({ since: 'since text', full: 'full text' })
+        }
+        inFlight += 1
+        peak = Math.max(peak, inFlight)
+        await new Promise((resolve) => setTimeout(resolve, 1))
+        inFlight -= 1
+        return JSON.stringify({ done: ['chunk'] })
+      }
+    }
+
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(400),
+      signal: new AbortController().signal
+    })
+
+    expect(result.totalChunks).toBeGreaterThan(SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
+    expect(peak).toBeGreaterThan(1)
+    expect(peak).toBeLessThanOrEqual(SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
+  })
+
+  it('aborts sibling chunk extracts when one chunk fails', async () => {
+    const siblingSignals: AbortSignal[] = []
+    let calls = 0
+    const brain: SessionFoldBrain = {
+      complete: async ({ signal }) => {
+        calls += 1
+        if (calls === 1) {
+          throw new Error('extract failed')
+        }
+        siblingSignals.push(signal)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return JSON.stringify({ done: ['late'] })
+      }
+    }
+
+    await expect(
+      foldSessionSummaryEvents({
+        brain,
+        ledger: emptySessionSummaryLedger(),
+        events: events(400),
+        signal: new AbortController().signal
+      })
+    ).rejects.toThrow('extract failed')
+
+    expect(siblingSignals.length).toBeGreaterThan(0)
+    expect(siblingSignals.every((signal) => signal.aborted)).toBe(true)
   })
 })
 

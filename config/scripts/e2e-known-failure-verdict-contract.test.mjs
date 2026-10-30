@@ -34,8 +34,10 @@ describe('known-failure verdict wiring', () => {
     expect(verdict.if).toBe(
       "${{ github.repository != 'stablyai/orca' && steps.run-e2e.outcome != 'skipped' }}"
     )
+    // Why the outcome argument: the verdict reads the report, and a report alone cannot tell an empty
+    // shard or a Playwright exit with no spec behind it apart from a green run (#210 G7).
     expect(verdict.run).toBe(
-      'node local/check-e2e-known-failure-titles.mjs ci-shards/results.json local/e2e-known-failure-titles.json'
+      'node local/check-e2e-known-failure-titles.mjs ci-shards/results.json local/e2e-known-failure-titles.json ${{ steps.run-e2e.outcome }}'
     )
     // The one report both the verdict and upstream's failure summary read.
     const summary = step('Summarize E2E failures')

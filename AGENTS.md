@@ -115,7 +115,8 @@ Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2
 ```
 
 Gate 1 is **diff-scope dependent**, because the full unit suite moved off the PR boundary and onto the
-nightly `fork-main-tests.yml` lane plus the release gate (`AGENTS.md` § Verification tiers). The script
+nightly `fork-main-tests.yml` lane plus the release gate (`~/Code/orca/AGENTS.md` § Verification tiers —
+the cross-worktree file; this repo's `AGENTS.md` has no such section). The script
 requires a cached unit-gate PASS for this exact revision (`orca-queue node local/gate-unit.mjs` writes
 one per revision) only when a changed path is a **global input** — `package.json`, the lockfiles,
 `config/**`, a root `tsconfig*.json`, `src/packages/**`, `src/shared/**`, or anything outside the
@@ -124,10 +125,11 @@ targeted tests, and the script prints `gate 1 not required` instead of demanding
 on the last 40 commits, 15 touched `src/shared` or `src/packages`, so roughly a third of changes still
 carry the full gate — the third with the blast radius.
 
-`--waive-gate <1|2>:<reason>` records a deliberate exception, prints it, and expects the PR body to
-state it. Gate 1 is fork-local either way, so an upstream PR carries no verdict for it and always needs
-an explicit `--waive-gate 1:"upstream PR, gated by upstream CI"`. `--dry-run` reports a refusal instead
-of aborting, so the decision can be inspected before the ~20-minute run.
+`--waive-gate <1|2>:<reason>` records a deliberate exception and writes `Gate <n> waived: <reason>`
+into the PR body, because a waiver a reader cannot find is not recorded. Gate 1 is fork-local either
+way, so an upstream PR carries no verdict for it and always needs an explicit
+`--waive-gate 1:"upstream PR, gated by upstream CI"`. `--dry-run` reports a refusal instead of
+aborting, so the decision can be inspected before the ~20-minute run.
 
 Why the ancestry check matters: the two branches called `main` are different lines. A head cut from
 `main` and opened against `nplez1/main` looks like a small diff locally but carries every fork-only
@@ -142,15 +144,19 @@ patch as a reversion — that is where the ~300k-line PRs came from.
 - [`BRANCHES.md`](./BRANCHES.md) — why each branch exists, what blocks it, dependency order. Read before
   any PR or branch work. It records what the script cannot know; if the two disagree, the script is right.
 - [`LOCAL-PATCHES.md`](./LOCAL-PATCHES.md) — the fork-only patch series.
-- A `local(...)` commit is refused on every branch except `nplez1/main` (`.husky/commit-msg`). If it
-  fires, switch branches — do not bypass it.
+- A `local(...)` commit is refused on any branch that does **not** descend from `nplez1/main`
+  (`.husky/commit-msg`). The test is ancestry, not the branch name: every fork PR branch carries
+  `nplez1/main` in its history and is allowed, `nplez1/main` itself is allowed, and an upstream-bound
+  branch cut from `origin/main` is refused. If it fires, switch branches — do not bypass it.
 - Fork PR branches are cut from `nplez1/main`; upstream-bound branches from `origin/main`.
 - Chained branches rebase **parent-first**. Force-push with `--force-with-lease origin <branch>`.
 
 ## Verify
 
 - Typecheck `pnpm tc` (`tc:node` / `tc:cli` / `tc:web`) · tests `pnpm test <path>`
-- Changed-lines gate CI enforces: `pnpm run check:code-quality:changed`
+- Changed-lines gate: `pnpm run check:code-quality:changed` — the fork's `pr.yml` runs it as step
+  `changed-code-quality`, but that workflow is `disabled_manually` here, so on this fork it runs only
+  when an agent runs it
 - Lint `pnpm exec oxlint` · format `pnpm format`
 - **Always pass an explicit `timeout`** for typecheck, test, or lint: the harness default is below
   their real cost and causes repeated timeouts and restarts. The unit is per-harness — pi's Bash tool

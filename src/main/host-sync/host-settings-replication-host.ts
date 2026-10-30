@@ -5,7 +5,10 @@ import {
   type HostSettingsSyncState
 } from '../../shared/host-settings-replication'
 import { HOST_SETTINGS_CREDENTIAL_REGISTRY } from './host-settings-credential-ports'
-import type { HostSettingsCredentialRegistry } from './host-settings-credential-port'
+import type {
+  HostSettingsCredentialPort,
+  HostSettingsCredentialRegistry
+} from './host-settings-credential-port'
 import {
   createInMemoryHostSettingsReplicationHoldings,
   EMPTY_HOST_SETTINGS_REPLICATION_RECORD,
@@ -76,6 +79,12 @@ export function resetHostSettingsReplication(): void {
  * one could send a removal list and delete credentials the first configured. The pin is taken from the
  * first snapshot — the push that establishes the relationship — and an owner/local caller (no
  * fingerprint) is always allowed, because that is the user at this machine.
+ *
+ * Why the pin is NOT a trust boundary: a refused caller can send a snapshot instead of a delta, which is
+ * accepted while the pin is unverifiable and, in doing so, deletes every credential replication owns and
+ * re-pins the host to that caller. See docs/reference/host-settings-replication.md § "What the pin does
+ * not do". It refuses an accidental second writer, not a malicious paired desktop — pairing already
+ * implies command execution on this host, so nothing here can be the boundary.
  */
 export function applyHostSettingsReplication(
   payload: HostSettingsIncomingPayload,
@@ -85,25 +94,46 @@ export function applyHostSettingsReplication(
     holdings?: HostSettingsReplicationHoldings
     /** From the RPC context: which paired caller this is, when the transport could name one. */
     callerFingerprint?: string
+    /** From the RPC context: the paired device row, which survives a re-pair of that device. */
+    callerDeviceId?: string
+    /** From the RPC context: whether a pairing row this host recorded still exists. */
+    isPairedDeviceAlive?: (deviceId: string) => boolean
   } = {}
 ): HostSettingsReplicationApplyResult {
   const holdings = options.holdings ?? defaultHoldings
   const record = holdings.read()
-  const { callerFingerprint } = options
+  const { callerFingerprint, callerDeviceId } = options
 
-  if (
-    callerFingerprint !== undefined &&
+  // Why removing the pairing is the escape hatch: every pairing mints a fresh device row and token, so
+  // a re-pair of the same laptop is indistinguishable from another machine by both identities. What the
+  // host can check is whether the row its pin names is still there — and the user can remove that row
+  // on this host, which is explicit and visible rather than a silent takeover by whoever reconnects.
+  //
+  // Why an unrecorded row also frees the pin: a record written by a build before this one has no device
+  // id, so nothing can be verified; the next snapshot stamps one, and the pin is enforced from then on.
+  const pinVerified =
     record.mainFingerprint !== null &&
-    record.mainFingerprint !== callerFingerprint &&
-    // Why a snapshot may replace the pin: the fingerprint is derived from the pairing token, and every
-    // new pairing offer mints a fresh one — so re-pairing the same laptop, or replacing it, changes the
-    // fingerprint. Refusing that forever left a host nothing could ever configure again, silently, which
-    // is worse than the problem the pin solves. A snapshot is the push that establishes a relationship;
-    // a *delta* from a different caller is still refused, so a second paired client cannot delete what
-    // the first configured merely by syncing.
-    payload.baseRevision !== null
-  ) {
-    return { decision: 'refusedNotTheMain' }
+    record.mainDeviceId !== null &&
+    (options.isPairedDeviceAlive?.(record.mainDeviceId) ?? true)
+
+  const isPinnedCaller =
+    callerFingerprint !== undefined && record.mainFingerprint === callerFingerprint
+
+  if (callerFingerprint !== undefined && record.mainFingerprint !== null && !isPinnedCaller) {
+    // Why a delta is always refused: a delta cannot establish a relationship in the first place, so the
+    // only thing it can do here is delete what the pinned machine put on this host.
+    if (payload.baseRevision !== null) {
+      return { decision: 'refusedNotTheMain' }
+    }
+    if (pinVerified) {
+      console.warn(
+        '[host-settings] refused a snapshot from a different paired machine; remove the stale pairing on this host to hand it over'
+      )
+      return { decision: 'refusedNotTheMain' }
+    }
+    // Why this branch is the honest limit of the pin: an unverifiable pin admits the snapshot, which
+    // clears what replication owns and stamps this caller as the new main. It is deliberate — a host
+    // whose pairing row is gone has no other way to be adopted — and it is not a security boundary.
   }
 
   const decision = decideHostSettingsPayload(record.revision, payload)
@@ -150,6 +180,9 @@ export function applyHostSettingsReplication(
         ? contractPayload
         : { ...contractPayload, removals: [...contractPayload.removals, ...stranded] },
     registry,
+    // Why the record rather than the payload: it is the only list of what replication put here, and a
+    // value on the host that is not in it is the user's own — see `applyHostSettingsPayload`.
+    replicatedIds: [...record.ids, ...recoverReplicatedIds(registry, contractPayload, record)],
     now: options.now ?? Date.now()
   })
 
@@ -188,15 +221,21 @@ export function applyHostSettingsReplication(
       )
   )
 
+  const establishesAuthority = contractPayload.baseRevision === null
   holdings.write({
     ids: [...stillHeld],
     revision: contractPayload.revision,
     syncedAt: state.kind === 'neverSynced' || state.kind === 'failed' ? null : state.syncedAt,
     // Why the pin follows a snapshot: see the refusal above. A delta never moves it.
-    mainFingerprint:
-      contractPayload.baseRevision === null && callerFingerprint !== undefined
-        ? callerFingerprint
-        : record.mainFingerprint
+    mainFingerprint: !establishesAuthority ? record.mainFingerprint : (callerFingerprint ?? null),
+    // Why the local owner clears the pin: a caller with no fingerprint is the user at this machine, so
+    // configuring the host here is how they take it back from a desktop that has since gone away — the
+    // one escape hatch left when the pinned device no longer exists to re-pair.
+    mainDeviceId: !establishesAuthority
+      ? record.mainDeviceId
+      : callerFingerprint === undefined
+        ? null
+        : (callerDeviceId ?? record.mainDeviceId)
   })
 
   lastState = state
@@ -204,3 +243,43 @@ export function applyHostSettingsReplication(
 }
 
 export { EMPTY_HOST_SETTINGS_REPLICATION_RECORD }
+
+/**
+ * Ids this host already holds with the main's exact value, when the holdings record says it never synced.
+ *
+ * Why: a corrupt or unwritten holdings file makes every value on the host look like the user's own, so
+ * the host keeps a credential the main can no longer rotate or revoke — silently and for good. An
+ * identical value is the one piece of evidence that this is replication's copy rather than the user's.
+ */
+function recoverReplicatedIds(
+  registry: HostSettingsCredentialRegistry,
+  payload: HostSettingsReplicationPayload,
+  record: { ids: readonly string[]; revision: number | null }
+): string[] {
+  if (record.ids.length > 0 || record.revision !== null) {
+    return []
+  }
+  const heldById = new Map<string, string>()
+  const listed = new Set<HostSettingsCredentialPort>()
+  const recovered: string[] = []
+  for (const credential of payload.upserts) {
+    const port = registry.forCredentialId(credential.id)
+    if (!port || port.kind !== credential.kind) {
+      continue
+    }
+    if (!listed.has(port)) {
+      listed.add(port)
+      try {
+        for (const held of port.list()) {
+          heldById.set(held.id, held.payload)
+        }
+      } catch {
+        // A family this host cannot read proves nothing either way, which is the safe answer here.
+      }
+    }
+    if (heldById.get(credential.id) === credential.payload) {
+      recovered.push(credential.id)
+    }
+  }
+  return recovered
+}

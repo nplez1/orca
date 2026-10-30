@@ -131,8 +131,12 @@ export class RuntimeJiraCommands {
   }
 
   /** Fields this user can edit on an existing issue, with the current values. */
-  jiraListEditFields(key: string, siteId?: string): ReturnType<typeof listEditFields> {
-    return listEditFields(key, siteId)
+  jiraListEditFields(
+    key: string,
+    siteId?: string,
+    strict = false
+  ): ReturnType<typeof listEditFields> {
+    return listEditFields(key, siteId, strict)
   }
 
   jiraUpdateIssue(

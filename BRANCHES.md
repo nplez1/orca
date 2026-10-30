@@ -59,8 +59,10 @@ Before that, on **2026-10-18** — `nplez1/main` merged upstream main @ `fc24ac3
 the release line from `12545ad17e` (merge `db746c211b`, rollback tag
 `archive/pre-sync-12545ad17e`). 89 conflicted paths, and the convergence was three seams rather than
 one product line: the **AI Vault parse cache moved onto upstream's SQLite database** (the fork's
-JSON snapshot serializer is deleted, and the one-shot legacy importer accepts the last JSON schema
-each line shipped, 4 and 6, so a fork install keeps its cache), the **sidebar row model became
+JSON snapshot serializer is deleted, and the one-shot legacy importer admitted schema 6 only — the
+last schema the fork's own writer produced, since upstream's JSON schemas never appeared in Orca NP's
+directory; issue #214 narrowed it again to the current schema, 8, because a replayed row keeps the
+older parser's semantics for a transcript that never changes again), the **sidebar row model became
 upstream's object plan with its shared modules moved into `src/shared/sidebar-list/`** (the fork's
 `mergeSameBranchRows` is unchanged and runs on the rendered rows), and **`setupScriptLaunchMode` was
 deleted outright**, leaving the fork's `new-tab` behaviour as the only shape. See
@@ -108,8 +110,10 @@ depends on, and what is blocking it.** If the two disagree, the script is right.
   refuses the mismatch instead of letting review find it.
 - Upstream-bound PR branches are cut from `origin/main`, **never** from `nplez1/main`. That is
   what makes it impossible for a fork-only patch to leak into an upstream-bound PR.
-- A `local(...)` commit is refused on every branch except `nplez1/main` (`.husky/commit-msg`). If it
-  fires, switch branches — do not bypass it.
+- A `local(...)` commit is refused on any branch that does **not** descend from `nplez1/main`
+  (`.husky/commit-msg`). The test is ancestry, not the branch name: every fork PR branch carries
+  `nplez1/main` in its history and is allowed, `nplez1/main` itself is allowed, and an upstream-bound
+  branch cut from `origin/main` is refused. If it fires, switch branches — do not bypass it.
 - A fork-only patch may only touch files that no PR branch owns. `package.json` and the
   rebuild-and-relaunch script are the current examples; see [LOCAL-PATCHES.md](./LOCAL-PATCHES.md).
 - One commit per topic on a PR branch, message in the repo's conventional style, and the branch must

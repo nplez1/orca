@@ -15,9 +15,9 @@ import { gitExecFileAsync } from './git/runner'
 import { runProcessSync } from '@orca/process-host'
 import { getRepoMainWorktreeId } from '../shared/worktree/id'
 import {
-  isSameVolume,
   planPrimaryCheckoutRelocation,
   relocatePrimaryCheckout,
+  volumeRelationBetween,
   type RelocationDependencies
 } from './project-folder-relocation'
 
@@ -40,7 +40,7 @@ function realDeps(overrides: Partial<RelocationDependencies> = {}): RelocationDe
     pathExists: async (path) => existsSync(path),
     // The production rule, not a copy of it: a local reimplementation is how the original
     // fixtures came to hide a broken volume check.
-    isSameVolume: (from, to) => isSameVolume(from, to),
+    volumeRelation: (from, to) => volumeRelationBetween(from, to),
     hasLiveSessions: async () => false,
     makeDirectory: async (path) => {
       await mkdir(path, { recursive: true })
@@ -161,6 +161,14 @@ describe('relocating a primary checkout with linked worktrees', () => {
       cwd: join(container, 'wip-one')
     })
     expect(afterRepair.code, afterRepair.stderr).toBe(0)
+  })
+
+  it('refuses the volume question for a path it cannot read, instead of claiming another volume', async () => {
+    // The real implementation, not a mock: a path that cannot be stat'ed is what produced the old
+    // "the destination is on a different volume" misreport.
+    await expect(
+      volumeRelationBetween(join(root, 'missing-checkout'), join(root, 'orca', 'workspaces'))
+    ).resolves.toBe('unreadable')
   })
 
   it('creates the container it is moving into', async () => {

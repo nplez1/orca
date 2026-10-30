@@ -14,7 +14,7 @@ import {
   rememberCurrentRunCoordinatorHandles
 } from './runs/run-coordinator-mail-routing'
 import { createTables } from './schema/create-tables'
-import { migrate } from './schema/migrate'
+import { assertOrchestrationSchemaNotNewer, migrate } from './schema/migrate'
 import { backfillStructuredWorkerOrcaSessionIds } from './schema/structured-worker-orca-session-backfill'
 import { reconcileSettledWorkerDispatches } from './worker-dispatch/worker-dispatch-settlement'
 
@@ -34,6 +34,8 @@ class OrchestrationDbCore {
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('synchronous = NORMAL')
     this.db.pragma('busy_timeout = 5000')
+    // Before any DDL: a newer build owns this schema, and creating its missing tables would be a write.
+    assertOrchestrationSchemaNotNewer(this.db)
     createTables.call(this as unknown as OrchestrationDb)
     // Read before migrate, which drops the capture triggers it may need to rebuild around.
     const removedWorkCaptureWasIntact = isRemovedWorkCaptureIntact(this.db)

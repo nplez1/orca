@@ -422,6 +422,7 @@
     "minimizeNotice": {
       "body": "Orca 仍在系统托盘中运行"
     },
+    "activityWaiting": "Orca - 活动等待中",
     "activityWaitingSuffix": "等待活动"
   },
   "worktreeJumpPalette": {
@@ -503,6 +504,7 @@
       "df1d56bf87": "工作区界面遇到错误。",
       "9e0b441a91": "切换右侧边栏",
       "e81217c1b7": "隐藏应用名称",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "应用菜单",
       "caea5b51b9": "立即重启",
       "0a9e810705": "重新启动之前不会保存更改。您以前的选项卡在磁盘上是安全的。",
@@ -635,6 +637,7 @@
           }
         },
         "worktrees": {
+          "e50495aae6": "强制删除分支",
           "14bc053a47": "本地 {{value0}} 未刷新",
           "localBaseRefRefreshFailedForWorktree": "“{{value1}}”的本地 {{value0}} 未刷新",
           "903b51c2ed": "从 {{value0}} 创建工作区，但 Orca 无法快进本地 {{value1}}。{{value2}}",
@@ -656,6 +659,11 @@
           "localBaseRefRefreshTurnedOffDescription": "可在设置 › {{value0}} 中重新开启。",
           "localBaseRefRefreshTurnOffFailed": "无法关闭 {{value0}}",
           "0216895fb5": "删除分支失败",
+          "5366d13eec": "工作区已删除，分支已保留",
+          "2e17f825d4": "工作树已删除，分支已保留",
+          "78e08cd877": "Git 无法安全删除分支\"{{value0}}\"，因此 Orca 将其保留以避免丢失本地提交。",
+          "3b57982bf6": "删除工作区\"{{value1}}\"后，Git 无法安全删除分支\"{{value0}}\"，因此 Orca 将其保留以避免丢失本地提交。",
+          "81f13f48d2": "删除工作树\"{{value1}}\"后，Git 无法安全删除分支\"{{value0}}\"，因此 Orca 将其保留以避免丢失本地提交。",
           "runtimeScopeForbiddenTitle": "此连接具有受限（移动端）访问权限",
           "runtimeScopeForbiddenDescription": "移动端范围的配对无法使用工作区。请通过设置 → 远程 Orca 服务器 → 分享此 Orca 服务器中的浏览器访问链接重新连接。",
           "createdWithoutParentNesting": "已创建，但未嵌套在“{{value0}}”下",
@@ -1077,15 +1085,6 @@
           }
         }
       },
-      "jira": {
-        "issue": {
-          "workspace": {
-            "open": {
-              "failed": "无法打开关联到该议题的工作区。"
-            }
-          }
-        }
-      },
       "linear": {
         "usage": {
           "examples": {
@@ -1378,6 +1377,7 @@
         "cd50cec5d7": "通过 Orca 协调多个编码智能体。",
         "58a868e8e4": "编排",
         "7c79d3b7bf": "可选",
+        "b1c2f8b0ac": "Claude、Codex、Gemini、OpenCode Go、MiniMax 和 Grok 的可选账户切换与使用量设置。",
         "f70ac54d38": "AI 提供商账户",
         "4121f7a0a2": "管理 AI 智能体、设置默认值并自定义命令。",
         "b49abbd2f7": "智能体",
@@ -1519,6 +1519,8 @@
         "28986b3747": "已启动 AI 智能体处理失败的检查。",
         "1690fd7f4a": "没有需要修复的失败检查。",
         "9e7c221b8d": "无法重新运行检查",
+        "e463ec935f": "检查请求重新运行",
+        "ddafe851e1": "检查请求重新运行",
         "0bbdc673c1": "刷新检查失败",
         "e7007aa1d8": "如果没有仓库路径，则无法刷新检查。",
         "675bc0d638": "取消",
@@ -1714,7 +1716,6 @@
         "b0b92666c9": "评论",
         "a585fd204e": "添加 Jira 评论...",
         "2441be6f9f": "启动工作区",
-        "showWorkspace": "显示工作区",
         "9178090e26": "还没有评论。",
         "5cd09beaf9": "重试",
         "9a980b06b9": "评论",
@@ -1992,6 +1993,8 @@
         "98583589c6": "无法为失败的检查启动 AI 智能体：{{value0}}",
         "51c65c0265": "没有需要修复的失败检查。",
         "788a782bb0": "无法重新运行检查",
+        "18f2af42ac": "检查请求重新运行",
+        "5963a6a852": "检查请求重新运行",
         "246b2c6456": "刷新检查失败",
         "c057f2fcb0": "如果没有仓库路径，则无法刷新检查。",
         "6591b1fa82": "取消",
@@ -2397,8 +2400,6 @@
         "linearModeHasWorktreeTooltip": "已关联 Orca 工作区的 Linear 工单",
         "linearEmptyHasWorktree": "还没有关联到 Orca 工作区的 Linear 工单。从 Linear 议题开始工作后会显示在这里。",
         "linearOpenAttachedWorkspace": "打开关联到 {{value0}} 的工作区",
-        "jiraOpenAttachedWorkspace": "打开关联到 {{value0}} 的工作区",
-        "jiraShowWorkspace": "显示工作区",
         "linearWorktreesColumn": "工作区",
         "jiraSortAscending": "升序",
         "jiraSortDescending": "降序",
@@ -3689,6 +3690,7 @@
             "bbcd9b7b85": "折叠工作区",
             "c4a8968bdd": "扩大工作区",
             "b10695d6ce": "终止会话",
+            "288a4dd177": "Orca",
             "53dd5560ae": "折叠 Orca",
             "e419d27083": "展开 Orca",
             "41ae4fa725": "正在结束…",
@@ -4327,6 +4329,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "输出",
               "5d66fdd7c2": "输入",
               "7080aeaebb": "推理",
@@ -6358,6 +6361,7 @@
           "d676c41fc6": "从本地 Gemini CLI 安装中提取 OAuth 凭据以通过 Google 认证。这将使用颁发给 Gemini CLI 应用的凭据，而非 Orca。若 Google 更新 CLI，可能会失效。请自行承担风险。",
           "0c7f915b01": "使用 Gemini CLI 凭据",
           "973741a871": "保留现有的 Gemini CLI 会话可用。Gemini 凭据不会让您登录 Antigravity。",
+          "0c64dc2a64": "Gemini CLI（旧版）",
           "db209ee572": "移除",
           "8a0f870153": "重新验证",
           "3d245ef7d9": "Codex 报告此登录已过时",
@@ -6935,7 +6939,12 @@
             "title": "智能体仪表盘",
             "description": "用于监控跨工作树的智能体的看板，支持窗口内或弹出窗口显示。",
             "copy": "在左侧边栏添加智能体仪表盘入口。监控需要你处理、正在工作或已完成的智能体，并可选择显示空闲智能体。",
-            "toggleLabel": "切换智能体仪表盘"
+            "toggleLabel": "切换智能体仪表盘",
+            "modeLabel": "打开方式",
+            "modeCopy": "将仪表盘显示为侧边栏旁的窗口内看板，或单独的弹出窗口。",
+            "modeAriaLabel": "智能体仪表盘打开模式",
+            "modeInWindow": "窗口内",
+            "modePopout": "弹出窗口"
           },
           "browserExtensions": {
             "copy": "为本地浏览器配置文件添加“设置 › 浏览器 › 扩展程序”。",
@@ -7070,10 +7079,6 @@
           "5734db82af": "删除工作区之前显示确认对话框。",
           "4fbf910ded": "在以仓库命名的子文件夹内创建工作区。",
           "ba3480642f": "嵌套工作区",
-          "f9b2070017": "Workspace Layout",
-          "0cda18153c": "Where each project's main checkout and its workspaces are created.",
-          "b266f3f40e": "One folder per project",
-          "9285cedcf2": "Flat",
           "a246f5ce6f": "创建工作区文件夹的根目录。",
           "5567191a6e": "浏览",
           "0e9fc0eadc": "工作区目录",
@@ -9109,6 +9114,7 @@
               "dashboard": "仪表盘",
               "agent": "智能体",
               "kanban": "看板",
+              "popout": "弹出",
               "board": "木板",
               "inWindow": "窗口内",
               "worktrees": "工作树"
@@ -12147,6 +12153,8 @@
             "f316a8ca2b": "未选择未解决的评论。",
             "d00ebdc402": "使用 AI 解决 {{value0}} 评论",
             "5eb2163b6b": "启动 agent 前请检查提示词。提示词送达后，Orca 会解决选中的主机讨论串，并回复无法解决的评论。",
+            "f273f2271c": "已启动智能体。已标记 {{value0}} 个为已解决，回复 {{value1}} 个，跳过 {{value2}} 个，失败 {{value3}} 个。{{value4}}",
+            "aa95b81a3a": "已启动智能体。已标记 {{value0}} 个为已解决，回复 {{value1}} 个，跳过 {{value2}} 个，失败 {{value3}} 个。",
             "495b2f8c4b": "已启动智能体，但无法解决或回复选中的评论。",
             "review": {
               "auto_retry": "Orca 将在 {{time}} 重试。",
@@ -12158,6 +12166,7 @@
               "branch": "Sync Branch"
             },
             "7e4b2a19c0": "无法确定要回复的 GitHub PR。",
+            "430f1a62d4": "无法在主机上解决选中的讨论串。",
             "updateReactionFailed": "无法更新反应。",
             "gitlabMoreActions": "更多 MR 动作",
             "gitlabLinkAnother": "链接另一个 MR"
@@ -13675,6 +13684,7 @@
           "1b5e182e9f": "欢迎使用 Orca",
           "4db04f2f57": "/",
           "adaa0aa627": "前往入门步骤 {{value0}}：{{value1}}",
+          "a249f81538": "Orca",
           "277ba45540": "Orca 入门引导",
           "97c42cda00": "安装 GitHub CLI 以：",
           "ae3b00ca82": "设置 GitHub 任务",
@@ -13977,7 +13987,8 @@
             "4a40af029b": "智能体时间",
             "00a6903322": "已启动智能体",
             "c0e2e9dcd9": "欢迎回来",
-            "af761a0c0d": "设置"
+            "af761a0c0d": "设置",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "发送",
@@ -15473,6 +15484,7 @@
             "88fea8e84e": "不发送",
             "50b00dc327": "复制详情",
             "6d3ebe216a": "诊断文本",
+            "835037edc9": "Orca",
             "8e24fe4f75": "已发送错误报告。",
             "8b8473c544": "已复制错误报告。",
             "765591798d": "正在检查错误报告...",
@@ -18714,7 +18726,9 @@
       "agentOptional": "智能体 [可选]",
       "createDescription": "选择项目和工作区名称。如果想启动智能体，请选择一个。"
     },
-    "JiraIssueWorkspace": {},
+    "JiraIssueWorkspace": {
+      "pendingChange": "另一个议题更改正在进行中。"
+    },
     "jiraProjectPicker": {
       "search": "搜索 Jira 项目",
       "empty": "未找到项目。",
@@ -18787,7 +18801,10 @@
     }
   },
   "dashboardPopout": {
-    "recoverableError": {},
+    "recoverableError": {
+      "title": "Orca 看板遇到错误。",
+      "description": "看板未能完成渲染。请重试以重新挂载，或重新打开。"
+    },
     "bucket": {
       "attention": "需要你",
       "working": "工作中",
@@ -19970,6 +19987,7 @@
       "count": "{{count}} 个关联到 {{key}} 的工作区",
       "startAnother": "启动新工作区",
       "empty": "将 Jira 议题关联到工作区，或选择其他视图。",
+      "openFailed": "无法打开关联到此 Jira 议题的工作区。",
       "mode": "有工作区",
       "search": "搜索关联的议题",
       "single": "1 个关联到 {{key}} 的工作区"
@@ -19996,6 +20014,8 @@
       "loadError": "无法加载状态更改。",
       "retry": "重试",
       "loading": "正在加载状态更改…",
+      "completeInJira": "在 Jira 中完成“{{name}}”",
+      "unsupported": "Jira 需要 Orca 目前无法收集的字段：{{fields}}。",
       "chooseResolution": "选择解决结果",
       "comment": "评论",
       "back": "返回",

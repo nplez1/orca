@@ -1,7 +1,9 @@
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
 import type { JenkinsServerProfile } from '../../shared/jenkins-servers'
+import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 import {
   getJenkinsServerTokenProtection,
+  hasJenkinsServerToken,
   listJenkinsServers,
   normalizeStoredServer,
   readJenkinsServerToken,
@@ -43,20 +45,36 @@ function decode(payload: string): JenkinsServerReplicationPayload | null {
 }
 
 export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
+  // Why one read per server, as the Jira adapter does: `list()` and `unreadableIds()` must not disagree
+  // about a token, or a server lands in neither list and the sender puts it in the removal list.
+  function readServerToken(
+    serverId: string
+  ):
+    | { kind: 'absent' }
+    | { kind: 'unreadable' }
+    | { kind: 'token'; token: string; protection: SecretAtRestProtection | null } {
+    if (!hasJenkinsServerToken(serverId)) {
+      return { kind: 'absent' }
+    }
+    let token: string | null
+    try {
+      token = readJenkinsServerToken(serverId)
+    } catch {
+      return { kind: 'unreadable' }
+    }
+    if (token === null) {
+      return { kind: 'unreadable' }
+    }
+    return { kind: 'token', token, protection: getJenkinsServerTokenProtection(serverId) }
+  }
+
   return {
     kind: HOST_SETTINGS_JENKINS_KIND,
     canSeal: canSealReplicatedCredential,
     unreadableIds: () => {
       const unreadable: string[] = []
       for (const server of listJenkinsServers()) {
-        if (getJenkinsServerTokenProtection(server.id) === null) {
-          continue
-        }
-        try {
-          if (readJenkinsServerToken(server.id) === null) {
-            unreadable.push(`${HOST_SETTINGS_JENKINS_KIND}:${server.id}`)
-          }
-        } catch {
+        if (readServerToken(server.id).kind === 'unreadable') {
           unreadable.push(`${HOST_SETTINGS_JENKINS_KIND}:${server.id}`)
         }
       }
@@ -64,33 +82,37 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
     },
     protectionOf: (id) => {
       const serverId = serverIdOf(id)
-      return serverId === null ? null : getJenkinsServerTokenProtection(serverId)
+      if (serverId === null) {
+        return null
+      }
+      const read = readServerToken(serverId)
+      // Why plaintext rather than null: see the Jira adapter — null claims this host holds nothing, and
+      // that is what turns an unreadable token into a removal reported as verified. Why not `sealed` for a
+      // classification that failed: overstating it records a plaintext copy as sealed.
+      return read.kind === 'absent'
+        ? null
+        : read.kind === 'unreadable'
+          ? 'plaintext'
+          : (read.protection ?? 'plaintext')
     },
     list: () => {
       const credentials: ReplicatedHostCredential[] = []
       for (const server of listJenkinsServers()) {
-        const protection = getJenkinsServerTokenProtection(server.id)
-        if (protection === null) {
-          continue
-        }
-        let token: string | null
-        try {
-          token = readJenkinsServerToken(server.id)
-        } catch {
-          // Why skipped: a token this host cannot decrypt is one it cannot send, and it must not stop
-          // the other servers from replicating — the same rule the Jira adapter follows.
-          continue
-        }
-        if (token === null) {
+        const read = readServerToken(server.id)
+        if (read.kind !== 'token') {
           continue
         }
         credentials.push({
           id: `${HOST_SETTINGS_JENKINS_KIND}:${server.id}`,
           kind: HOST_SETTINGS_JENKINS_KIND,
           label: `Jenkins ${server.label || server.baseUrl}`,
-          protection,
+          // Why sealed when the classification failed: see the Jira adapter.
+          protection: read.protection ?? 'sealed',
           onlyIfEmpty: false,
-          payload: JSON.stringify({ server, token } satisfies JenkinsServerReplicationPayload)
+          payload: JSON.stringify({
+            server,
+            token: read.token
+          } satisfies JenkinsServerReplicationPayload)
         })
       }
       return credentials

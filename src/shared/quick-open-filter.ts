@@ -148,6 +148,7 @@ export type RgArgsOptions = {
   excludePathPrefixes: readonly string[]
   /** On Windows rg emits `\\`-separated paths; pass true to force `/` output. */
   forceSlashSeparator: boolean
+  isFolderProject?: boolean
 }
 
 export type RgArgs = {
@@ -162,6 +163,7 @@ export type RgArgs = {
 export function buildRgArgsForQuickOpen(opts: RgArgsOptions): RgArgs {
   const followArgs = opts.followSymlinks ? ['--follow'] : []
   const sepArgs = opts.forceSlashSeparator ? ['--path-separator', '/'] : []
+  const parentIgnoreArgs = opts.isFolderProject ? ['--no-ignore-parent'] : []
   const hiddenDirGlobs = buildHiddenDirExcludeGlobs()
   const excludeGlobs: string[] = []
   for (const prefix of opts.excludePathPrefixes) {
@@ -175,6 +177,7 @@ export function buildRgArgsForQuickOpen(opts: RgArgsOptions): RgArgs {
     '--no-config',
     '--null',
     '--hidden',
+    ...parentIgnoreArgs,
     ...followArgs,
     ...sepArgs,
     ...hiddenDirGlobs,
@@ -189,6 +192,7 @@ export function buildRgArgsForQuickOpen(opts: RgArgsOptions): RgArgs {
     '--null',
     '--hidden',
     '--no-ignore-vcs',
+    ...parentIgnoreArgs,
     ...followArgs,
     ...sepArgs,
     ...hiddenDirGlobs,

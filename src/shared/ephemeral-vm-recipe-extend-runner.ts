@@ -42,6 +42,8 @@ export type EphemeralVmRecipeExtendResult =
       stderr: string
       exitCode: number | null
       signal: NodeJS.Signals | null
+      /** Set when the caller's signal stopped the hook (deadline or cancel) before it answered. */
+      aborted?: true
       recipeResult?: EphemeralVmRecipeResult
     }
 
@@ -83,7 +85,12 @@ export async function runEphemeralVmRecipeExtend(
     return {
       ok: false,
       context: args.context,
-      error: `Extend exited with code ${processResult.exitCode ?? 'unknown'}.`,
+      // Why the abort case is folded in here rather than checked first: a hook that was killed reports no
+      // code, but one that finished and printed a result was not killed — even if the caller's deadline
+      // landed microseconds later, and throwing that answer away would discard a granted extension.
+      error: processResult.aborted
+        ? 'Extend was stopped before it reported a result.'
+        : `Extend exited with code ${processResult.exitCode ?? 'unknown'}.`,
       ...processResult
     }
   }

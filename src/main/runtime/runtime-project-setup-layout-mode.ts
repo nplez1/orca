@@ -51,13 +51,49 @@ export function applyProjectSetupWorktreeLayoutMode(
   return true
 }
 
-/** Applies the host-level mode a setup payload carries, and drops it from the payload. */
+/** Checks this host can write the mode at all, and drops it from a setup payload.
+ *
+ *  Applying it is a separate step, `applyAndReportWorktreeLayoutMode`, run only once the setup
+ *  write succeeded: the mode is host-wide, so a rejected project or setup must not have flipped
+ *  every project's placement on this host first. */
 export function takeWorktreeLayoutMode<T extends { worktreeLayoutMode?: WorktreeLayoutMode }>(
   deps: ProjectSetupLayoutModeDeps,
   payload: T
 ): Omit<T, 'worktreeLayoutMode'> {
-  applyProjectSetupWorktreeLayoutMode(deps, payload.worktreeLayoutMode)
+  if (payload.worktreeLayoutMode) {
+    const store = deps.getStore()
+    if (!store?.updateSettings || !store.getSettings) {
+      throw new Error('runtime_unavailable')
+    }
+  }
   const { worktreeLayoutMode: _mode, ...rest } = payload
   void _mode
   return rest
+}
+
+/** Applies the host-level mode a setup write carried, and adds the mode now in effect to the
+ *  result, so the caller can prove the write landed instead of taking an exit code for one.
+ *
+ *  Only a call that carried a mode carries one back: an unrelated setup edit is not a placement
+ *  read. A host that cannot report the mode — a build from before the field — answers without it. */
+export function applyAndReportWorktreeLayoutMode<T extends object>(
+  deps: ProjectSetupLayoutModeDeps,
+  requested: WorktreeLayoutMode | undefined,
+  result: T
+): T & { worktreeLayoutMode?: WorktreeLayoutMode } {
+  if (!requested) {
+    return result
+  }
+  try {
+    applyProjectSetupWorktreeLayoutMode(deps, requested)
+  } catch (error) {
+    // Why named: by now the setup write has landed, so "runtime_unavailable" alone would read as
+    // if nothing had happened. `may not` because only the settings write itself is atomic here:
+    // a refresh that throws after it leaves the mode stored.
+    throw new Error(
+      `The project setup was written, but the host-wide layout mode may not have been applied: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+  const settings = deps.getStore()?.getSettings?.()
+  return settings ? { ...result, worktreeLayoutMode: resolveWorktreeLayoutMode(settings) } : result
 }

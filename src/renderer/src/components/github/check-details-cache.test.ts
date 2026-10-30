@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
 import { PR_CHECKS_CACHE_TTL_MS } from '@/store/github/cache-identity'
 import {
@@ -35,6 +35,18 @@ const details = (
   text: null,
   annotations: [],
   jobs: []
+})
+
+// Why a fixed clock: `checkDetailsNeedRefresh` compares a payload's `readAt` against the wall clock,
+// so a real `Date.now()` made the TTL cases depend on how fast the machine ran them.
+const NOW = new Date('2026-06-16T12:00:00Z')
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(NOW)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 const entry = (

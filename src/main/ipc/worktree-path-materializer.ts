@@ -17,6 +17,7 @@ import {
   type WorktreeMaterializeMode
 } from './worktree-path-publisher'
 import { targetExists } from './worktree-materialization-staging'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { getSafeRelativePath } from '../git/worktree-symlink-detection'
 
 const APFS_PATH_MATERIALIZATION_CONCURRENCY = 4
@@ -114,7 +115,12 @@ export async function materializeWorktreePaths(
           measuredBytes = verdict.bytes
         }
       } catch (error) {
-        console.error(`[worktree-symlinks] Failed to prepare "${safePath.rel}" (${source}):`, error)
+        recordSwallowedFailure(
+          'worktree-symlinks',
+          error,
+          `failed to prepare "${safePath.rel}" (${source})`,
+          'error'
+        )
         return { failedPath: safePath.rel }
       }
     }
@@ -136,7 +142,7 @@ export async function materializeWorktreePaths(
       }
     } catch (error) {
       if (error instanceof WorktreeCopyBudgetFallbackError) {
-        console.warn(`[worktree-symlinks] Skipping "${safePath.rel}": ${error.message}`)
+        recordSwallowedFailure('worktree-symlinks', error, `skipping "${safePath.rel}"`)
         return { skipped: { path: safePath.rel, reason: 'bytes' } }
       }
       if (
@@ -149,9 +155,11 @@ export async function materializeWorktreePaths(
         )
         return {}
       }
-      console.error(
-        `[worktree-symlinks] Failed to materialize "${safePath.rel}" (${source} -> ${target}):`,
-        error
+      recordSwallowedFailure(
+        'worktree-symlinks',
+        error,
+        `failed to materialize "${safePath.rel}" (${source} -> ${target})`,
+        'error'
       )
       return { failedPath: safePath.rel }
     }

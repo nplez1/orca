@@ -1,6 +1,8 @@
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
 import type { JiraSite } from '../../shared/jira/jira-types'
+import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 import {
+  assertSiteFileWritable,
   deleteToken,
   getSiteFile,
   getSiteTokenProtection,
@@ -45,6 +47,38 @@ function decode(payload: string): JiraSiteReplicationPayload | null {
 }
 
 export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
+  /**
+   * One site's token, classified once so the two callers that read it cannot disagree.
+   *
+   * Why a shared read: `list()` skips what it cannot classify and `unreadableIds()` skips what it can
+   * read, so a site that one sees as readable and the other as not lands in neither list — and the
+   * sender then puts it in the removal list. That is the read failure this port exists to report.
+   *
+   * Why the classification can be null here and the two callers then disagree on purpose: what this host
+   * sends the main must not understate protection (a host that cannot seal would accept a downgrade), and
+   * what this host claims about itself must not overstate it (a plaintext copy would be recorded as sealed).
+   */
+  function readSiteToken(
+    siteId: string
+  ):
+    | { kind: 'absent' }
+    | { kind: 'unreadable' }
+    | { kind: 'token'; token: string; protection: SecretAtRestProtection | null } {
+    if (!hasStoredToken(siteId)) {
+      return { kind: 'absent' }
+    }
+    let token: string | null
+    try {
+      token = readToken(siteId)
+    } catch {
+      return { kind: 'unreadable' }
+    }
+    if (token === null) {
+      return { kind: 'unreadable' }
+    }
+    return { kind: 'token', token, protection: getSiteTokenProtection(siteId) }
+  }
+
   return {
     kind: HOST_SETTINGS_JIRA_KIND,
     // Why always true: a Jira token lands in the same safeStorage-backed store as the provider keys,
@@ -53,14 +87,7 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
     unreadableIds: () => {
       const unreadable: string[] = []
       for (const site of getSiteFile().sites) {
-        if (!hasStoredToken(site.id) || getSiteTokenProtection(site.id) === null) {
-          continue
-        }
-        try {
-          if (readToken(site.id) === null) {
-            unreadable.push(`${HOST_SETTINGS_JIRA_KIND}:${site.id}`)
-          }
-        } catch {
+        if (readSiteToken(site.id).kind === 'unreadable') {
           unreadable.push(`${HOST_SETTINGS_JIRA_KIND}:${site.id}`)
         }
       }
@@ -68,33 +95,34 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
     },
     protectionOf: (id) => {
       const siteId = siteIdOf(id)
-      return siteId !== null && hasStoredToken(siteId) ? getSiteTokenProtection(siteId) : null
+      if (siteId === null) {
+        return null
+      }
+      const read = readSiteToken(siteId)
+      // Why plaintext rather than null for a present token that cannot be read: null means "this host
+      // holds nothing", which is how a failed read becomes a removal the receiver reports as verified.
+      return read.kind === 'absent'
+        ? null
+        : read.kind === 'unreadable'
+          ? 'plaintext'
+          : (read.protection ?? 'plaintext')
     },
     list: () => {
       const credentials: ReplicatedHostCredential[] = []
       for (const site of getSiteFile().sites) {
-        const protection = getSiteTokenProtection(site.id)
-        if (protection === null) {
-          continue
-        }
-        let token: string | null
-        try {
-          token = readToken(site.id)
-        } catch {
-          // Why skipped: a token this host cannot decrypt is one it cannot send, and it must not stop
-          // the other sites from replicating.
-          continue
-        }
-        if (token === null) {
+        const read = readSiteToken(site.id)
+        if (read.kind !== 'token') {
           continue
         }
         credentials.push({
           id: `${HOST_SETTINGS_JIRA_KIND}:${site.id}`,
           kind: HOST_SETTINGS_JIRA_KIND,
           label: `Jira ${site.displayName || site.siteUrl}`,
-          protection,
+          // Why sealed when the classification failed: understating protection is what would let a host
+          // that cannot seal accept this value as plaintext.
+          protection: read.protection ?? 'sealed',
           onlyIfEmpty: false,
-          payload: JSON.stringify({ site, token } satisfies JiraSiteReplicationPayload)
+          payload: JSON.stringify({ site, token: read.token } satisfies JiraSiteReplicationPayload)
         })
       }
       return credentials
@@ -110,6 +138,9 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
       if (credential.id !== `${HOST_SETTINGS_JIRA_KIND}:${decoded.site.id}`) {
         throw new Error('Jira site payload does not match the credential it arrived as')
       }
+      // Why before the token: a sites file this build cannot read would otherwise collect a token for a
+      // site that can never be written down, which is the orphan R4 names.
+      assertSiteFileWritable()
       saveToken(decoded.site.id, decoded.token)
       // Why merge rather than replace: the file also records which site this host is looking at, and
       // a replicated site list must not move that.
@@ -124,6 +155,9 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
       if (siteId === null) {
         return
       }
+      // Why before the deletion: an unreadable file cannot show this site is gone, so removing the token
+      // would leave the record pointing at nothing.
+      assertSiteFileWritable()
       deleteToken(siteId)
       const file = getSiteFile()
       writeSiteFile({ ...file, sites: file.sites.filter((site) => site.id !== siteId) })

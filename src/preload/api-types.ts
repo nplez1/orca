@@ -2,10 +2,7 @@ import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
   CodexConfigSyncApi,
-  CopilotCredentialsApi,
   CursorAccountsApi,
-  DeepSeekCredentialsApi,
-  FireworksCredentialsApi,
   GrokAccountsApi,
   MinimaxCredentialsApi,
   ZcodePlanCredentialsApi
@@ -13,7 +10,6 @@ import type {
 import type { HooksApi } from './api/agent-hook-api'
 import type { SkillsApi } from './api/agent-skill-api'
 import type { AgentAwakeApi, AgentStatusApi } from './api/agent-status-api'
-import type { SessionSummaryApi } from './api/session-summary-api'
 import type {
   ClaudeUsageApi,
   CodexUsageApi,
@@ -32,6 +28,7 @@ import type { DocPreviewApi } from './api/doc-preview-api'
 import type { EmulatorApi } from './api/emulator-api'
 import type { EphemeralVmApi } from './api/ephemeral-vm-api'
 import type { ExportApi, FilesystemApi } from './api/filesystem-api'
+import type { ForkPreloadApi } from './api/fork-preload-api'
 import type { GitInspectionApi } from './api/git-inspection-api'
 import type { GitOperationApi } from './api/git-operation-api'
 import type { GithubAccountApi } from './api/github-account-api'
@@ -39,7 +36,6 @@ import type { GithubPullRequestApi } from './api/github-pull-request-api'
 import type { GithubWorkItemApi } from './api/github-work-item-api'
 import type { GitLabApi } from './api/gitlab-api'
 import type { BitbucketApi, HostedReviewApi } from './api/hosted-review-api'
-import type { JenkinsApi } from './api/jenkins-api'
 import type { JiraApi } from './api/jira-api'
 import type { LinearApi } from './api/linear-api'
 import type { MobileApi } from './api/mobile-api'
@@ -67,7 +63,6 @@ import type { PlainSshTerminalApi } from './api/plain-ssh-terminal-bridge'
 import type { LegacyRelayBridgeApi } from './api/legacy-relay-bridge-api'
 import type { DiagnosticsApi, MemoryApi, StatsApi, TelemetryApi } from './api/telemetry-api'
 import type { UiCommandEventApi } from './api/ui-command-event-api'
-import type { UiHangDiagnosticsApi } from './api/ui-hang-diagnostics-api'
 import type { UiWindowApi } from './api/ui-window-api'
 import type { UpdaterApi } from './api/updater-api'
 import type { WorkspaceCleanupApi, WorkspaceSpaceApi } from './api/workspace-cleanup-api'
@@ -102,12 +97,10 @@ export type PreloadApi = {
   bitbucket: BitbucketApi
   linear: LinearApi
   jira: JiraApi
-  jenkins: JenkinsApi
   starNag: StarNagApi
   telemetryTrack: TelemetryApi['telemetryTrack']
   telemetrySetOptIn: TelemetryApi['telemetrySetOptIn']
   diagnostics: DiagnosticsApi
-  uiHangDiagnostics: UiHangDiagnosticsApi
   telemetryGetConsentState: TelemetryApi['telemetryGetConsentState']
   telemetryAcknowledgeBanner: TelemetryApi['telemetryAcknowledgeBanner']
   settings: SettingsApi
@@ -158,9 +151,6 @@ export type PreloadApi = {
   }
   minimaxCredentials: MinimaxCredentialsApi
   zcodePlanCredentials: ZcodePlanCredentialsApi
-  deepseekCredentials: DeepSeekCredentialsApi
-  fireworksCredentials: FireworksCredentialsApi
-  copilotCredentials: CopilotCredentialsApi
   grokAccounts: GrokAccountsApi
   cursorAccounts: CursorAccountsApi
   ssh: SshApi
@@ -175,10 +165,9 @@ export type PreloadApi = {
   gitBash: RuntimeApi['gitBash']
   plugins: PluginsApi
   agentStatus: AgentStatusApi
-  sessionSummary: SessionSummaryApi
   mobile: MobileApi
   speech: SpeechApi
-}
+} & ForkPreloadApi
 
 export type {
   ClaudeUsageApi,

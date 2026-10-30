@@ -5,7 +5,8 @@ import { RuntimeClientError } from '../runtime-client'
 import { parseOrcaYaml } from '../../shared/orca-yaml'
 import {
   getEphemeralVmRecipeResultProjectRoot,
-  type EphemeralVmRecipeDoctorCheck
+  type EphemeralVmRecipeDoctorCheck,
+  type EphemeralVmRecipeResult
 } from '../../shared/ephemeral-vm-recipes'
 import { getEphemeralVmRecipeResultWarnings } from '../../shared/ephemeral-vm-recipe-diagnostics'
 // Why: import directly from the doctor module (not the barrel) — it uses Node
@@ -13,18 +14,22 @@ import { getEphemeralVmRecipeResultWarnings } from '../../shared/ephemeral-vm-re
 import { doctorEphemeralVmRecipe } from '../../shared/ephemeral-vm-recipe-doctor'
 import {
   runEphemeralVmRecipeCleanup,
-  runEphemeralVmRecipeStart
+  runEphemeralVmRecipeStart,
+  type EphemeralVmRecipeContext
 } from '../../shared/ephemeral-vm-recipe-runner'
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import {
+  describeSensitiveExtendResult,
   extendEphemeralVmRecipeFromFile,
-  formatExtendEphemeralVmRecipeResult
+  formatExtendEphemeralVmRecipeResult,
+  writeEphemeralVmRecipeResultFile
 } from '../vm-recipe-extend'
 import {
   buildProvisionFailureRemediation,
   capTranscriptStream,
   formatDoctorResult,
   type DoctorResult,
+  type ProvisionStageTranscript,
   type ProvisionTranscript
 } from '../vm-recipe-doctor-format'
 
@@ -42,27 +47,65 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
     if (!requestedLifetime) {
       throw new RuntimeClientError('invalid_argument', 'Missing --lifetime.')
     }
-    const repoPath = getStringFlag(flags, 'repo-path') ?? cwd
-    const recipe = loadRecipe(repoPath, recipeId)
-    const result = recipe
-      ? await extendEphemeralVmRecipeFromFile({
-          repoPath,
-          recipe,
-          recipeResultPath: resolve(cwd, recipeResultPath),
-          requestedLifetime
-        })
-      : {
-          recipeId,
-          repoPath,
-          ok: false as const,
-          error: `Recipe "${recipeId}" was not found in environmentRecipes.`
-        }
-    if (json) {
-      console.log(JSON.stringify(result, null, 2))
-    } else {
-      console.log(formatExtendEphemeralVmRecipeResult(result))
+    // Why parsed here rather than in the runner: a non-numeric value is an argument error, and the
+    // command must not start a hook it cannot bound. A bare `--timeout-ms` arrives as a boolean, which
+    // is refused rather than silently replaced by the default.
+    const timeoutFlag = flags.get('timeout-ms')
+    if (timeoutFlag === true) {
+      throw new RuntimeClientError('invalid_argument', 'Missing value for --timeout-ms.')
     }
-    if (!result.ok) {
+    const timeoutMs =
+      typeof timeoutFlag === 'string' && timeoutFlag.length > 0 ? Number(timeoutFlag) : undefined
+    // Why resolve against the invocation cwd: over the SSH bridge ORCA_CLI_CWD is the remote
+    // caller's directory, so a relative path has to mean what it means on that side. Resolving
+    // straight from `process.cwd()` put `--repo-path ./repo` and `--recipe-result ./r.json` in
+    // two different places for the same invocation.
+    const repoPath = resolve(cwd, getStringFlag(flags, 'repo-path') ?? '.')
+    const loaded = loadRecipe(repoPath, recipeId)
+    const result =
+      'recipe' in loaded
+        ? await extendEphemeralVmRecipeFromFile({
+            repoPath,
+            recipe: loaded.recipe,
+            recipeResultPath: resolve(cwd, recipeResultPath),
+            requestedLifetime,
+            ...(timeoutMs === undefined ? {} : { timeoutMs })
+          })
+        : { recipeId, repoPath, ok: false as const, error: loaded.error }
+    const writeResultPath = getStringFlag(flags, 'write-result')
+    const resultPath = writeResultPath ? resolve(cwd, writeResultPath) : null
+    const write =
+      resultPath && result.ok && result.recipeResult
+        ? writeEphemeralVmRecipeResultFile(resultPath, result.recipeResult)
+        : null
+    if (write && !write.written) {
+      // Why still report the result: the hook has already moved the lease, so this output is the
+      // only place the deadline that now exists can be read.
+      console.error(`warning: could not write ${resultPath}: ${write.error}`)
+    } else if (write && !write.restricted) {
+      console.error(
+        `warning: wrote ${resultPath}, but could not restrict its permissions to this user`
+      )
+    }
+    if (json) {
+      const sensitive = describeSensitiveExtendResult(result)
+      if (sensitive) {
+        console.error(`warning: ${sensitive}`)
+      }
+      console.log(JSON.stringify(result, null, 2))
+    } else if (result.ok) {
+      console.log(
+        formatExtendEphemeralVmRecipeResult(
+          result,
+          write?.written ? { resultPath: write.path } : {}
+        )
+      )
+    } else {
+      // Why stderr: a failure is not this command's output, and `> result.json` must not
+      // capture an error a destroy hook would then try to parse.
+      console.error(formatExtendEphemeralVmRecipeResult(result))
+    }
+    if (!result.ok || (write && !write.written)) {
       process.exitCode = 1
     }
   },
@@ -71,7 +114,7 @@ export const VM_HANDLERS: Record<string, CommandHandler> = {
     if (!recipeId) {
       throw new RuntimeClientError('invalid_argument', 'Missing recipe id.')
     }
-    const repoPath = getStringFlag(flags, 'repo-path') ?? cwd
+    const repoPath = resolve(cwd, getStringFlag(flags, 'repo-path') ?? '.')
     const shouldProvision = flags.get('provision') === true || flags.get('connect') === true
     const result = shouldProvision
       ? await doctorRecipeWithProvision(repoPath, recipeId)
@@ -152,35 +195,51 @@ async function doctorRecipeWithProvision(
     }
   }
 
-  const recipe = loadRecipe(repoPath, recipeId)
-  if (!recipe) {
+  const loaded = loadRecipe(repoPath, recipeId)
+  if ('error' in loaded) {
     return baseline
   }
+  const recipe = loaded.recipe
 
   const start = await runEphemeralVmRecipeStart({ repoPath, recipe })
   if (!start.ok) {
-    return {
-      ...baseline,
-      ok: false,
-      checks: [
-        ...baseline.checks,
-        {
-          id: 'recipe.provision',
-          status: 'fail',
-          message: start.error,
-          remediation: buildProvisionFailureRemediation(start.stderr, start.stdout)
-        }
-      ],
-      provisionTranscript: {
-        provision: {
-          exitCode: start.exitCode,
-          signal: start.signal,
-          stdout: capTranscriptStream(start.stdout),
-          stderr: capTranscriptStream(start.stderr),
-          parseError: start.error
-        }
+    const provisionTranscript: ProvisionTranscript = {
+      provision: {
+        exitCode: start.exitCode,
+        signal: start.signal,
+        stdout: capTranscriptStream(start.stdout),
+        stderr: capTranscriptStream(start.stderr),
+        parseError: start.error
       }
     }
+    // Why cleanup on this path too: `recipeResult` present means the machine exists. Returning without
+    // destroy left it running with nobody holding its resource id, which is what made a checkout-mode
+    // mismatch a paid-for leak rather than a failed self-test.
+    const cleanup = start.recipeResult
+      ? await runDoctorCleanup({
+          repoPath,
+          recipe,
+          context: start.context,
+          recipeResult: start.recipeResult
+        })
+      : null
+    if (cleanup?.stage) {
+      provisionTranscript.destroy = cleanup.stage
+    }
+    const checks: EphemeralVmRecipeDoctorCheck[] = [
+      ...baseline.checks,
+      {
+        id: 'recipe.provision',
+        status: 'fail',
+        message: start.error,
+        // Why the wording follows the outcome: the run that failed to produce a usable result may still
+        // have bought a machine, and saying "released" when destroy was skipped or failed would tell the
+        // reader the opposite of what the transcript below shows.
+        remediation: buildFailedProvisionRemediation(start, cleanup)
+      },
+      ...(cleanup ? [cleanup.check] : [])
+    ]
+    return { ...baseline, ok: false, checks, provisionTranscript }
   }
 
   const checks: EphemeralVmRecipeDoctorCheck[] = [
@@ -205,33 +264,13 @@ async function doctorRecipeWithProvision(
     })
   }
 
-  const cleanup = await runEphemeralVmRecipeCleanup({
+  const cleanup = await runDoctorCleanup({
     repoPath,
     recipe,
     context: start.context,
     recipeResult: start.result
   })
-  if (cleanup.skipped) {
-    checks.push({
-      id: 'recipe.destroy.run',
-      status: 'warn',
-      message: 'Destroy was skipped because destroy is disabled or missing.',
-      remediation: 'Destroy any provider resources created by the doctor run manually.'
-    })
-  } else if (cleanup.ok) {
-    checks.push({
-      id: 'recipe.destroy.run',
-      status: 'pass',
-      message: 'Destroy action ran successfully after provisioning.'
-    })
-  } else {
-    checks.push({
-      id: 'recipe.destroy.run',
-      status: 'fail',
-      message: cleanup.error ?? 'Destroy action failed after provisioning.',
-      remediation: 'Destroy provider resources manually, then fix the destroy action.'
-    })
-  }
+  checks.push(cleanup.check)
 
   // Retain both stages for diagnosis even when creation succeeds and teardown fails.
   const provisionTranscript: ProvisionTranscript = {
@@ -241,16 +280,7 @@ async function doctorRecipeWithProvision(
       stdout: capTranscriptStream(start.stdout),
       stderr: capTranscriptStream(start.stderr)
     },
-    ...(cleanup.skipped
-      ? {}
-      : {
-          destroy: {
-            exitCode: cleanup.exitCode,
-            signal: cleanup.signal,
-            stdout: capTranscriptStream(cleanup.stdout),
-            stderr: capTranscriptStream(cleanup.stderr)
-          }
-        })
+    ...(cleanup.stage ? { destroy: cleanup.stage } : {})
   }
 
   return {
@@ -261,9 +291,95 @@ async function doctorRecipeWithProvision(
   }
 }
 
-function loadRecipe(repoPath: string, recipeId: string): OrcaVmRecipe | null {
-  const hooks = parseOrcaYaml(readTextFile(join(repoPath, 'orca.yaml')))
-  return hooks?.environmentRecipes?.find((entry) => entry.id === recipeId) ?? null
+function loadRecipe(
+  repoPath: string,
+  recipeId: string
+): { recipe: OrcaVmRecipe } | { error: string } {
+  const yamlPath = join(repoPath, 'orca.yaml')
+  // Why structured rather than a raw throw: a missing orca.yaml is an answer the caller can act
+  // on, and ENOENT from a stack trace is not. `doctor` already reports it as a check.
+  if (!existsSync(yamlPath)) {
+    return { error: `No orca.yaml found at ${yamlPath}.` }
+  }
+  let hooks: ReturnType<typeof parseOrcaYaml>
+  try {
+    hooks = parseOrcaYaml(readTextFile(yamlPath))
+  } catch (error) {
+    return {
+      error: `orca.yaml at ${yamlPath} could not be read: ${error instanceof Error ? error.message : String(error)}`
+    }
+  }
+  const recipe = hooks?.environmentRecipes?.find((entry) => entry.id === recipeId)
+  return recipe
+    ? { recipe }
+    : { error: `Recipe "${recipeId}" was not found in environmentRecipes.` }
+}
+
+/**
+ * What to tell the reader after a create that reported a failure.
+ *
+ * Why the machine's fate is part of the message: a result that could not be used still means a machine
+ * was allocated, so the report has to say whether the destroy that followed actually released it.
+ */
+function buildFailedProvisionRemediation(
+  start: { stdout: string; stderr: string },
+  cleanup: { check: EphemeralVmRecipeDoctorCheck } | null
+): string {
+  const base = buildProvisionFailureRemediation(start.stderr, start.stdout)
+  if (!cleanup) {
+    return base
+  }
+  if (cleanup.check.status === 'pass') {
+    return `${base} A machine was created; the destroy action below released it.`
+  }
+  return `${base} A machine was created and the destroy action did not release it — destroy it by hand.`
+}
+
+/**
+ * Run the destroy hook for a machine a doctor provisioning run created, and report it as a check.
+ *
+ * Why shared by both paths: a create that reports a problem may still have allocated the machine, so
+ * the two outcomes need the same teardown and the same words about what is left running.
+ */
+async function runDoctorCleanup(args: {
+  repoPath: string
+  recipe: OrcaVmRecipe
+  context: EphemeralVmRecipeContext
+  recipeResult: EphemeralVmRecipeResult
+}): Promise<{ check: EphemeralVmRecipeDoctorCheck; stage: ProvisionStageTranscript | null }> {
+  const cleanup = await runEphemeralVmRecipeCleanup(args)
+  if (cleanup.skipped) {
+    return {
+      check: {
+        id: 'recipe.destroy.run',
+        status: 'warn',
+        message: 'Destroy was skipped because destroy is disabled or missing.',
+        remediation: 'Destroy any provider resources created by the doctor run manually.'
+      },
+      stage: null
+    }
+  }
+  const stage: ProvisionStageTranscript = {
+    exitCode: cleanup.exitCode,
+    signal: cleanup.signal,
+    stdout: capTranscriptStream(cleanup.stdout),
+    stderr: capTranscriptStream(cleanup.stderr)
+  }
+  return {
+    check: cleanup.ok
+      ? {
+          id: 'recipe.destroy.run',
+          status: 'pass',
+          message: 'Destroy action ran successfully after provisioning.'
+        }
+      : {
+          id: 'recipe.destroy.run',
+          status: 'fail',
+          message: cleanup.error ?? 'Destroy action failed after provisioning.',
+          remediation: 'Destroy provider resources manually, then fix the destroy action.'
+        },
+    stage
+  }
 }
 
 function getStringFlag(flags: Map<string, string | boolean>, name: string): string | null {

@@ -1,7 +1,11 @@
 import { existsSync } from 'node:fs'
 import type { AiVaultSession } from '../../shared/ai-vault-types'
+import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import SyncDatabase from '../sqlite/sync-database'
-import { removeVersionedCacheDatabase } from '../sqlite/versioned-cache-database'
+import {
+  CacheDatabaseNewerThanBuildError,
+  removeVersionedCacheDatabase
+} from '../sqlite/versioned-cache-database'
 
 /**
  * The fork's list and metadata-search tier, beside upstream's `sessions` table
@@ -147,34 +151,54 @@ export function prepareSessionListSchema(path: string): void {
     return
   }
   let disposition: 'keep' | 'discard' = 'keep'
+  let newerVersion: string | null = null
   let db: SyncDatabase | null = null
   try {
     db = new SyncDatabase(path)
     db.pragma('busy_timeout = 5000')
-    disposition = migrateOrJudge(db)
+    const judged = migrateOrJudge(db)
+    disposition = judged.disposition
+    newerVersion = judged.newerVersion
   } catch (error) {
-    console.warn(
-      '[ai-vault-search] list schema check skipped:',
-      error instanceof Error ? error.message : String(error)
-    )
+    recordSwallowedFailure('ai-vault-search', error, 'list schema check skipped')
   } finally {
     db?.close()
   }
   if (disposition === 'discard') {
     removeVersionedCacheDatabase(path)
   }
+  // Why refuse rather than discard: a newer build wrote these columns, and rebuilding would delete the
+  // index it is still using on every downgrade — a full rescan each time, for nothing.
+  if (newerVersion !== null) {
+    throw new CacheDatabaseNewerThanBuildError(
+      path,
+      newerVersion,
+      String(SESSION_LIST_SCHEMA_VERSION)
+    )
+  }
 }
 
-function migrateOrJudge(db: SyncDatabase): 'keep' | 'discard' {
+function migrateOrJudge(db: SyncDatabase): {
+  disposition: 'keep' | 'discard'
+  newerVersion: string | null
+} {
+  const verdict = (disposition: 'keep' | 'discard', newerVersion: string | null = null) => ({
+    disposition,
+    newerVersion
+  })
   if (!hasTable(db, 'meta')) {
-    return 'keep'
+    return verdict('keep')
   }
   const listVersion = readMeta(db, SESSION_LIST_SCHEMA_KEY)
   if (listVersion === String(SESSION_LIST_SCHEMA_VERSION)) {
-    return 'keep'
+    return verdict('keep')
+  }
+  const numericListVersion = Number(listVersion)
+  if (listVersion !== undefined && numericListVersion > SESSION_LIST_SCHEMA_VERSION) {
+    return verdict('keep', listVersion)
   }
   if (listVersion !== undefined || !isMergedLegacyLayout(db)) {
-    return 'discard'
+    return verdict('discard')
   }
   // IMMEDIATE so a second process opening the same file waits, then re-checks.
   db.exec('BEGIN IMMEDIATE')
@@ -187,7 +211,7 @@ function migrateOrJudge(db: SyncDatabase): 'keep' | 'discard' {
     db.exec('ROLLBACK')
     throw error
   }
-  return 'keep'
+  return verdict('keep')
 }
 
 function isMergedLegacyLayout(db: SyncDatabase): boolean {

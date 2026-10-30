@@ -45,21 +45,29 @@ export async function jiraListAssignableUsers(
   settings: RuntimeJiraSettings,
   key: string,
   query?: string,
-  siteId?: string | null
+  siteId?: string | null,
+  strict = false
 ): Promise<JiraUser[]> {
-  return jiraListAssignableUsersForTarget(getJiraRuntimeTarget(settings), key, query, siteId)
+  return jiraListAssignableUsersForTarget(
+    getJiraRuntimeTarget(settings),
+    key,
+    query,
+    siteId,
+    strict
+  )
 }
 
 export async function jiraListAssignableUsersForTarget(
   target: RuntimeClientTarget,
   key: string,
   query?: string,
-  siteId?: string | null
+  siteId?: string | null,
+  strict = false
 ): Promise<JiraUser[]> {
   if (!isRuntimeProviderSearchQueryWithinLimit(query)) {
     return []
   }
-  const args = { key, query, siteId: siteId ?? undefined }
+  const args = { key, query, siteId: siteId ?? undefined, ...(strict ? { strict: true } : {}) }
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraUser[]>(target, 'jira.listAssignableUsers', args, { timeoutMs: 30_000 })
     : window.api.jira.listAssignableUsers(args)

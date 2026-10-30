@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { DEV_APP_DATA_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getPlatformUserDataPath } from './metadata'
 import { getMacOpenArgs } from './launch'
 import { pinLaunchUserDataPath, resolveLaunchUserDataPath } from './launch-user-data-path'
@@ -15,10 +16,14 @@ describe('resolveLaunchUserDataPath', () => {
     ).toBe(resolve('rel/profile'))
   })
 
+  // Why the dev app's real directory: configure-process.ts pins dev userData to
+  // DEV_APP_DATA_DIRECTORY_NAME, so a literal `orca-dev` here launched a profile the app never uses.
   it("falls back to the dev app's own profile for a dev executable", () => {
-    expect(resolveLaunchUserDataPath({ ORCA_APP_EXECUTABLE_NEEDS_APP_ROOT: '1' })).toBe(
-      resolve(join(getPlatformUserDataPath(), '..', 'orca-dev'))
+    const devProfile = resolveLaunchUserDataPath({ ORCA_APP_EXECUTABLE_NEEDS_APP_ROOT: '1' })
+    expect(devProfile).toBe(
+      resolve(join(getPlatformUserDataPath(), '..', DEV_APP_DATA_DIRECTORY_NAME))
     )
+    expect(devProfile).not.toContain('orca-dev')
   })
 
   it('ignores ORCA_DEV_USER_DATA_PATH for a packaged executable', () => {

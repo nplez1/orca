@@ -9,48 +9,10 @@ import {
   runEphemeralVmRecipeCleanup,
   runEphemeralVmRecipeResume,
   runEphemeralVmRecipeSuspend,
-  runEphemeralVmRecipeStart,
-  type EphemeralVmRecipeContext,
-  type EphemeralVmRecipeStartFailure,
-  type EphemeralVmRecipeStartSuccess
+  type EphemeralVmRecipeContext
 } from '../../shared/ephemeral-vm-recipe-runner'
-import { cleanupFailedEphemeralVmStart } from './failed-start-cleanup'
-import {
-  persistProvisionedEphemeralVmRuntime,
-  prepareEphemeralVmCompatibilityPersistence
-} from './runtime-provisioning-persistence'
 import { getProvisionedRootResumeIntegrityError } from './resume-integrity'
 import { runControlledEphemeralVmRuntimeCleanup } from './runtime-cleanup-control'
-
-export type ProvisionEphemeralVmRuntimeArgs = {
-  userDataPath: string
-  repoPath: string
-  recipe: OrcaVmRecipe
-  repoId?: string
-  projectId?: string
-  workspaceId?: string
-  workspaceName?: string
-  repoUrl?: string
-  branch?: string
-  ref?: string
-  expectedRefHead?: string
-  orcaVersion?: string
-  now?: number
-  signal?: AbortSignal
-  onStdout?: (chunk: string) => void
-  onStderr?: (chunk: string) => void
-}
-
-export type ProvisionEphemeralVmRuntimeResult =
-  | {
-      ok: true
-      start: EphemeralVmRecipeStartSuccess
-      runtime: EphemeralVmRuntimeRecord
-    }
-  | {
-      ok: false
-      start: EphemeralVmRecipeStartFailure
-    }
 
 export type CleanupEphemeralVmRuntimeArgs = {
   userDataPath: string
@@ -98,43 +60,6 @@ export type ResumeEphemeralVmRuntimeResult =
       runtime: EphemeralVmRuntimeRecord
       error: string
     }
-
-export async function provisionEphemeralVmRuntime(
-  args: ProvisionEphemeralVmRuntimeArgs
-): Promise<ProvisionEphemeralVmRuntimeResult> {
-  const compatibility = prepareEphemeralVmCompatibilityPersistence(args)
-  const start = await runEphemeralVmRecipeStart({
-    repoPath: args.repoPath,
-    recipe: args.recipe,
-    context: {
-      projectId: args.projectId,
-      workspaceId: args.workspaceId,
-      workspaceName: args.workspaceName,
-      repoUrl: args.repoUrl,
-      branch: args.branch,
-      ref: args.ref,
-      expectedRefHead: args.expectedRefHead,
-      orcaVersion: args.orcaVersion,
-      ...(compatibility ? { instanceId: compatibility.instanceId } : {})
-    },
-    signal: args.signal,
-    onStdout: args.onStdout,
-    onStderr: args.onStderr
-  })
-  if (!start.ok) {
-    if (start.recipeResult) {
-      await cleanupFailedEphemeralVmStart(args, {
-        context: start.context,
-        recipeResult: start.recipeResult
-      })
-    }
-    return { ok: false, start }
-  }
-
-  const runtime = await persistProvisionedEphemeralVmRuntime(args, start, compatibility)
-
-  return { ok: true, start, runtime }
-}
 
 export function cleanupEphemeralVmRuntime(
   args: CleanupEphemeralVmRuntimeArgs

@@ -21,6 +21,7 @@ import {
   type AiVaultServicePendingCall,
   type AiVaultServiceReadyWaiter
 } from './session-scanner-service-client-state'
+import { describeAiVaultServiceFault } from './session-scanner-service-fault-description'
 import {
   noteAiVaultServiceScanProgress,
   sendAiVaultServiceCall,
@@ -277,9 +278,10 @@ export class AiVaultScannerServiceClient {
     }
     this.child = null
     stopAiVaultServiceChild(child, retire)
+    const fault = describeAiVaultServiceFault(error, this.active.values())
     if (this.readyWaiter) {
       clearTimeout(this.readyWaiter.timer)
-      this.readyWaiter.reject(error)
+      this.readyWaiter.reject(fault)
       this.readyWaiter = null
     }
     // Record the respawn decision before settling calls that may retry.
@@ -287,9 +289,9 @@ export class AiVaultScannerServiceClient {
     const active = [...this.active.values()]
     this.active.clear()
     for (const call of active) {
-      this.retryStartOrReject(call, error)
+      this.retryStartOrReject(call, fault)
     }
-    this.invalidations.rejectAll(error)
+    this.invalidations.rejectAll(fault)
   }
 
   private scheduleIdleIfNeeded(): void {

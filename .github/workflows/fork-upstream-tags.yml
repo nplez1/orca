@@ -25,6 +25,18 @@ name: Mirror upstream release tags
 # `v*`-is-inert note above is now the only guard; and it expires, so rotate it before the job
 # starts failing at checkout. Until the secret exists at all, `token` is empty and checkout stops
 # at "Input required and not supplied: token" rather than falling back to the built-in token.
+#
+# Why this job cannot move a tag, stated as a check and not as a property of its command line: the PAT
+# belongs to `nplez1`, which is the `exempt` bypass actor on the only ruleset protecting
+# `refs/heads/nplez1/main`, and no tag ruleset exists — so nothing server-side would stop a moved
+# `v*` tag, and before 2026-10-29 "an existing tag is never moved" rested entirely on the absence of
+# `--force` in this file. `.github/scripts/fork-tag-mirror-guard.sh` reads both remotes and fails the
+# job when a tag it would send already exists at another commit.
+#
+# What would remove the risk rather than guard it: a `refs/tags/v*` ruleset with `update` and
+# `deletion` rules, and a PAT from an identity that is not a ruleset bypass actor (a machine user, or
+# a GitHub App). Both are account and repository state that a sync cannot carry, so they are recorded
+# in LOCAL-PATCHES.md § local(ci) as the operational fix; this file does what the tree can do.
 on:
   schedule:
     # Off the hour, to stay off the release-train cron pile-up.
@@ -44,7 +56,7 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
           token: ${{ secrets.FORK_TAG_MIRROR_TOKEN }}
@@ -55,6 +67,18 @@ jobs:
           git remote add upstream https://github.com/stablyai/orca.git
           # Tag refspec only: the mirror must never fetch or touch a branch.
           git fetch --no-tags upstream '+refs/tags/v*:refs/tags/v*'
-          # No --force: an existing tag is never moved, so this only adds.
-          git push origin --tags
+          # Refuse before the push: a tag this fork already publishes must never be moved. The guard
+          # prints the refspecs to send, so the push carries only tags it has read — not every local
+          # tag, which is what `--tags` would have sent and what could start a mobile release build.
+          if ! refspecs="$(bash .github/scripts/fork-tag-mirror-guard.sh origin)"; then
+            echo '::error::the tag mirror refused to run; see the guard output above'
+            exit 1
+          fi
+          if [ -z "$refspecs" ]; then
+            echo 'every v* tag upstream publishes is already here; nothing to mirror'
+            exit 0
+          fi
+          # Unquoted on purpose: one refspec per word, and git ref names cannot contain whitespace.
+          # No --force (this only adds) and --atomic (a half-applied mirror is not a mirror).
+          git push --atomic origin $refspecs
           printf 'mirrored tags now include: %s\n' "$(git tag -l 'v*' | sort -V | tail -1)"

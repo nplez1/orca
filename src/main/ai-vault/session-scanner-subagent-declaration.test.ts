@@ -19,6 +19,14 @@ describe('subagentAgentTypeFromSessionName', () => {
     expect(subagentAgentTypeFromSessionName('Investigate usage tracking')).toBeNull()
     expect(subagentAgentTypeFromSessionName('Notes#1234')).toBeNull()
     expect(subagentAgentTypeFromSessionName('Notes#123456789')).toBeNull()
+    // Ordinary names that are 8 characters of the same alphabet: `issue-42` is not hex, and
+    // `20261028` is a calendar date rather than a UUID-derived id.
+    expect(subagentAgentTypeFromSessionName('fix login#issue-42')).toBeNull()
+    expect(subagentAgentTypeFromSessionName('release#20261028')).toBeNull()
+    // Still indistinguishable from an id: a bare 8-digit suffix is the one shape the marker cannot
+    // tell apart, so this case stays classified (and is hidden by the nesting rule when its parent
+    // is not in the list — the residual the name check cannot close on its own).
+    expect(subagentAgentTypeFromSessionName('deploy#12345678')).toBe('deploy')
     expect(subagentAgentTypeFromSessionName('')).toBeNull()
     expect(subagentAgentTypeFromSessionName(undefined)).toBeNull()
     expect(subagentAgentTypeFromSessionName({ name: 'Explore#06356862' })).toBeNull()

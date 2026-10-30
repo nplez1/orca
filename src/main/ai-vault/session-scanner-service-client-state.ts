@@ -275,6 +275,8 @@ export type AiVaultServicePendingCall = {
   sent: boolean
   startRetried: boolean
   scanListener?: AiVaultServiceScanListener
+  /** Last transcripts the child reported parsing; names the file(s) when the child dies mid-parse. */
+  readingFiles?: { agent: string; path: string }[]
 }
 
 export type AiVaultServiceReadyWaiter = {

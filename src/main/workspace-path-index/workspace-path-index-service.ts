@@ -19,6 +19,7 @@ export class WorkspacePathIndexService extends WorkspacePathIndexServiceDelta {
     this.disposed = true
     this.searcher.dispose()
     this.buildLane.dispose()
+    this.retention.dispose()
     for (const entry of this.entries.values()) {
       this.disposeEntry(entry)
     }

@@ -7,7 +7,12 @@
  * does. Upstream's own runs never call this: `.github/workflows/e2e.yml` guards it on
  * `github.repository` and leaves Playwright's exit code in charge there.
  *
- * Usage: node local/check-e2e-known-failure-titles.mjs REPORT.json TITLES.json
+ * The run step's outcome is an input, not a detail: the report can be empty (a Playwright that never
+ * collected anything, a shard that died before writing) and a non-zero exit can have no spec behind
+ * it. Both fail closed here, the way `check-unit-shard-verdict.mjs` judges a shard.
+ *
+ * Usage: node local/check-e2e-known-failure-titles.mjs REPORT.json TITLES.json OUTCOME
+ *         (OUTCOME is the run step's `outcome`: success or failure)
  */
 import { readFileSync } from 'node:fs'
 
@@ -133,6 +138,38 @@ export function titleKeys(manifest) {
   return new Map(manifest.titles.map((entry) => [`${entry.file} › ${entry.title}`, entry]))
 }
 
+/**
+ * The verdict, apart from printing and exiting, so the exit composition is testable.
+ *
+ * Why the outcome and the spec count: no unexpected failure and no `report.errors` used to be enough
+ * to pass, which accepted a zero-spec report and a Playwright exit that no spec explained. Both are
+ * the shape of a run that proved nothing, so both fail closed.
+ */
+export function decideE2eVerdict({ known, outcomes, outcome }) {
+  const problems = []
+  if (outcomes.seen.size === 0) {
+    problems.push('the report holds no specs, so the run cannot be judged green')
+  }
+  if (outcome !== 'success' && outcome !== 'failure') {
+    problems.push(`unknown test-step outcome "${outcome}"`)
+  }
+  const judged = judge(known, outcomes)
+  for (const message of outcomes.globalErrors) {
+    problems.push(`the report carried a global error: ${String(message).split('\n')[0]}`)
+  }
+  for (const [key, detail] of judged.unexpected) {
+    problems.push(
+      `unexpected E2E failure (not in e2e-known-failure-titles.json): ${key} — ${detail}`
+    )
+  }
+  // Why: a known failure explains the non-zero exit, which is the whole point of this lane. Nothing
+  // in the report explaining it is the case a green verdict used to cover.
+  if (outcome === 'failure' && outcomes.failures.size === 0 && outcomes.globalErrors.length === 0) {
+    problems.push('the run failed and neither the report nor a recorded failure explains it')
+  }
+  return { ...judged, problems, ok: problems.length === 0 }
+}
+
 function readJson(path) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'))
@@ -142,18 +179,22 @@ function readJson(path) {
 }
 
 function main() {
-  const [reportPath, titlesPath] = process.argv.slice(2)
-  if (!reportPath || !titlesPath) {
-    console.error('usage: check-e2e-known-failure-titles.mjs REPORT.json TITLES.json')
+  const [reportPath, titlesPath, outcome] = process.argv.slice(2)
+  if (!reportPath || !titlesPath || outcome === undefined) {
+    console.error(
+      'usage: check-e2e-known-failure-titles.mjs REPORT.json TITLES.json OUTCOME (success|failure)'
+    )
     process.exit(2)
   }
   const known = titleKeys(readJson(titlesPath))
   const outcomes = collectOutcomes(readJson(reportPath))
-  const { knownByKey, unexpected, quarantined, stale } = judge(known, outcomes)
+  const verdict = decideE2eVerdict({ known, outcomes, outcome })
+  const { knownByKey, unexpected, quarantined, stale } = verdict
 
   console.log(
-    `E2E verdict: ${outcomes.seen.size} spec(s) in this report, ${outcomes.failures.size} failing, ` +
-      `${quarantined.length} known, ${unexpected.length} unexpected, ${stale.length} stale entry(ies) in ${titlesPath}`
+    `E2E verdict (run step: ${outcome}): ${outcomes.seen.size} spec(s) in this report, ` +
+      `${outcomes.failures.size} failing, ${quarantined.length} known, ${unexpected.length} unexpected, ` +
+      `${stale.length} stale entry(ies) in ${titlesPath}`
   )
   for (const [key, detail] of quarantined) {
     const entry = knownByKey.get(key)
@@ -169,15 +210,10 @@ function main() {
       `::notice::recorded failure passed in this shard (intermittent), prune only once it stops failing: ${key}`
     )
   }
-  for (const message of outcomes.globalErrors) {
-    console.log(`::error::E2E report carried a global error: ${message.split('\n')[0]}`)
+  for (const problem of verdict.problems) {
+    console.log(`::error::${problem}`)
   }
-  for (const [key, detail] of unexpected) {
-    console.log(
-      `::error::unexpected E2E failure (not in e2e-known-failure-titles.json): ${key} — ${detail}`
-    )
-  }
-  if (unexpected.length > 0 || outcomes.globalErrors.length > 0) {
+  if (!verdict.ok) {
     process.exit(1)
   }
 }

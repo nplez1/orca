@@ -277,9 +277,10 @@ export async function jiraListCreateFields(
 
 export async function jiraListPriorities(
   settings: RuntimeJiraSettings,
-  siteId?: string | null
+  siteId?: string | null,
+  strict = false
 ): Promise<JiraPriority[]> {
-  return jiraListPrioritiesForTarget(getJiraRuntimeTarget(settings), siteId)
+  return jiraListPrioritiesForTarget(getJiraRuntimeTarget(settings), siteId, strict)
 }
 
 /**
@@ -289,9 +290,10 @@ export async function jiraListPriorities(
 export async function jiraListEditFields(
   settings: RuntimeJiraSettings,
   key: string,
-  siteId?: string | null
+  siteId?: string | null,
+  strict = false
 ): Promise<JiraEditableField[]> {
-  return jiraListEditFieldsForTarget(getJiraRuntimeTarget(settings), key, siteId)
+  return jiraListEditFieldsForTarget(getJiraRuntimeTarget(settings), key, siteId, strict)
 }
 
 /** Lists users assignable to an existing issue, via the active runtime. */

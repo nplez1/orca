@@ -42,6 +42,7 @@ import {
   closeTranscriptHandle,
   openTranscriptReadStream,
   readTranscriptSlice,
+  TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES,
   wslGatedLstat,
   openTranscriptFile,
   readTranscriptFile,
@@ -57,7 +58,11 @@ import {
 } from './wsl-transcript-fs-gate'
 
 function fakeHandle() {
-  return { read: vi.fn(), close: vi.fn(async () => {}) }
+  return {
+    read: vi.fn(),
+    close: vi.fn(async () => {}),
+    stat: vi.fn(async () => ({ size: 0, isFile: () => true }))
+  }
 }
 
 beforeEach(() => {
@@ -97,7 +102,9 @@ describe('transcript filesystem accessor off WSL UNC', () => {
     expect(mocks.runTask).not.toHaveBeenCalled()
     expect(mocks.stat).toHaveBeenCalledWith(path)
     expect(mocks.readdir).toHaveBeenCalledWith(path, { withFileTypes: true })
-    expect(mocks.readFile).toHaveBeenCalledWith(path, 'utf-8')
+    // A local whole-file read is bounded through the handle, so it never takes the remote reader.
+    expect(mocks.readFile).not.toHaveBeenCalledWith(path, 'utf-8')
+    expect(handle.read).toHaveBeenCalled()
     expect(mocks.open).toHaveBeenCalledWith(path, 'r')
     expect(stream).toBe('raw-stream')
     expect(mocks.createReadStream).toHaveBeenCalledWith(path, {
@@ -138,8 +145,18 @@ describe('transcript filesystem accessor on WSL UNC', () => {
       'stat',
       'lstat',
       'readdir',
+      // The whole-file read probes the size first, so an oversized file is refused before its text
+      // is materialized in this process.
+      'stat',
       'readfile'
     ])
+  })
+
+  it('refuses a WSL file past the whole-file ceiling before reading it', async () => {
+    mocks.stat.mockResolvedValue({ size: TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES + 1 })
+
+    await expect(wslGatedReadFile(UNC_PATH, 'utf-8', 'scan')).rejects.toThrow(/too large/i)
+    expect(mocks.readFile).not.toHaveBeenCalled()
   })
 
   it('opts positional reads and opens out of coalescing', async () => {

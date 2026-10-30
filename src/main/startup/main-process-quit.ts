@@ -83,17 +83,8 @@ function installBeforeQuitHandler(): void {
     }
     state.isQuitting = true
     flushUnsavedCloudSessions()
-    state.desktopRelayService?.fenceAndCloseNow()
-    desktopConnectorCloud()?.fence()
-    state.runtimeRpc?.setMobileRelayPairingProvider(null)
-    state.unsubscribeAgentAwakeStatusChanges?.()
-    state.unsubscribeAgentAwakeStatusChanges = null
-    state.agentAwakeService?.dispose()
-    state.agentAwakeService = null
     // Beforeunload may veto; wait for ref locks now but uninstall only after committed quit. isQuitting already blocks new attempts.
     state.repoMaintenanceShutdown = awaitPackedRefsLockRelease()
-    // Delay PTY cleanup until scrollback capture; exit events otherwise unmount the renderer callbacks.
-    state.rateLimits?.stop()
     // History GC is idempotent and rescheduled next launch; a vetoed quit costs only a deferred sweep.
     cancelHistoryGc()
   })
@@ -111,6 +102,18 @@ function installWillQuitHandler(): void {
     }
     // Include pane grids still inside their write burst in final save.
     const paneGridFlush = state.runtime?.flushPaneGrids() ?? null
+    // Why here and not before-quit: a renderer close guard can still veto, and stopping these there
+    // left the app open with no agent-awake service and no rate-limit polling (A6). will-quit is past
+    // every veto.
+    state.desktopRelayService?.fenceAndCloseNow()
+    desktopConnectorCloud()?.fence()
+    state.runtimeRpc?.setMobileRelayPairingProvider(null)
+    state.unsubscribeAgentAwakeStatusChanges?.()
+    state.unsubscribeAgentAwakeStatusChanges = null
+    state.agentAwakeService?.dispose()
+    state.agentAwakeService = null
+    // Delay PTY cleanup until scrollback capture; exit events otherwise unmount the renderer callbacks.
+    state.rateLimits?.stop()
     // A renderer can veto before-quit; push must survive until quit is committed.
     state.desktopPushService?.stop()
     state.unsubscribeSystemResumeBroadcast?.()
@@ -194,6 +197,17 @@ function installWillQuitHandler(): void {
     // Local SSH browser routes own loopback listeners and ssh -N -D children that must not outlive the app (P2-4).
     const localSshRouteShutdown = import('../browser/local-ssh-browser-route')
       .then((routes) => routes.closeAllLocalSshBrowserRoutes())
+      .catch(() => {})
+    // A Claude OAuth exchange spends the old refresh token server-side, so a rotation the keychain
+    // refused is the only copy of a working login (#212). Why guarded and not awaited: the startup flush
+    // has already hydrated the queue, so this is one in-memory check unless something is really waiting,
+    // and quit must not wait on a keychain prompt.
+    void import('../claude-accounts/claude-oauth-pending-rotations')
+      .then((rotations) =>
+        rotations.hasPendingClaudeOAuthRotations()
+          ? rotations.flushPendingClaudeOAuthRotations()
+          : undefined
+      )
       .catch(() => {})
     browserManager.setBrowserGuestStateChangedListener(null)
     const emulatorShutdown =

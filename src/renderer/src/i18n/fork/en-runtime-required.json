@@ -11,6 +11,16 @@
       }
     }
   },
+  "jira": {
+    "issue": {
+      "assignableUsersError": "Failed to load the people assignable to this issue.",
+      "editFieldsError": "Failed to load the fields you can edit on this issue.",
+      "prioritiesError": "Failed to load the priorities this issue can be set to.",
+      "sprintAssignmentError": "Failed to load this issue’s sprint.",
+      "transitionsError": "Failed to load status changes.",
+      "writeTimedOut": "Jira did not answer in time, so this change may not have been saved. Reload the issue."
+    }
+  },
   "notifications": {
     "startupRegistration": {
       "title": "Orca is ready to notify you"

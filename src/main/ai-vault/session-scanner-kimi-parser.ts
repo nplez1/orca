@@ -1,6 +1,7 @@
 import { openTranscriptReadStream, wslGatedReadFile } from '../native-chat/wsl-transcript-fs-access'
 import { WslTranscriptFsError } from '../native-chat/wsl-transcript-fs-gate'
 import { createInterface } from 'node:readline'
+import { NodeFileReadTooLargeError } from '../../shared/node-bounded-file-reader'
 import type { AiVaultSession } from '../../shared/ai-vault-types'
 import { createAccumulator, finalizeSession, updateTimeline } from './session-scanner-accumulator'
 import { addSessionContent, addSessionText } from './session-scanner-messages'
@@ -25,14 +26,18 @@ import {
 export async function parseKimiSessionFile(
   file: FileWithMtime,
   platform: NodeJS.Platform = process.platform,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
   let stateRecord: Record<string, unknown> | null
   try {
-    stateRecord = asRecord(
-      JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan')) as unknown
-    )
+    const raw: unknown = JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal))
+    stateRecord = asRecord(raw)
   } catch (error) {
+    // An oversized state file is a fact about the session, not an absent one.
+    if (error instanceof NodeFileReadTooLargeError) {
+      throw error
+    }
     // Propagate WSL refusal so an unreachable state file is not cached as no session.
     if (error instanceof WslTranscriptFsError) {
       throw error

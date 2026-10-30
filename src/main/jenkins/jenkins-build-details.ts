@@ -13,6 +13,7 @@ import {
 } from '../../shared/jenkins-payload'
 import { jenkinsGetJson, type JenkinsRequestFailure } from './jenkins-request'
 import { findJenkinsServerForUrl, readJenkinsServerToken } from './jenkins-server-store'
+import { isPubliclyRoutableUrl } from './jenkins-unconfigured-host-scope'
 
 /**
  * Read one Jenkins build as provider-neutral check details.
@@ -218,6 +219,14 @@ export async function getJenkinsBuildDetails(args: {
       // A keychain denial is an auth problem the user can act on, not an unreachable server.
       return fail('unauthorized', location.serverUrl, errorMessage(error))
     }
+  } else if (!(await isPubliclyRoutableUrl(location.buildUrl))) {
+    // Why refuse instead of guessing: the URL is posted as a commit status by anyone who can push,
+    // so a blind GET at a host that only resolves inside this network is a probe, not a lookup.
+    return fail(
+      'not-configured',
+      location.serverUrl,
+      'No server is configured for this host, and it is not publicly routable'
+    )
   }
 
   const request = {
@@ -225,6 +234,9 @@ export async function getJenkinsBuildDetails(args: {
     apiToken,
     configured: server !== null,
     serverBaseUrl: server?.baseUrl ?? null,
+    // Only an unconfigured host needs its redirects refused: a configured one is already bounded by
+    // its own prefix, and its builds legitimately hop inside it.
+    ...(server === null ? { refuseRedirects: true } : {}),
     ...(args.signal ? { signal: args.signal } : {})
   }
   const buildResponse = await jenkinsGetJson({

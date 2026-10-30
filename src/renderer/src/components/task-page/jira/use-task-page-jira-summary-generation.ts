@@ -10,6 +10,7 @@ import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-t
 import type { JiraIssueSummaryGenerationRequest } from '../../../../../shared/jira/jira-issue-summary-generation'
 import { getTaskSourceCacheScope } from '../../../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import type { TaskPageJiraIssueCreationModel } from './use-task-page-jira-issue-creation'
 
 type SummaryGenerationModel = Pick<
@@ -183,13 +184,13 @@ export function useTaskPageJiraSummaryGeneration<T extends SummaryGenerationMode
       if (nonce === generationNonceRef.current) {
         setGenerationError({
           draftKey,
-          message:
-            error instanceof Error
-              ? error.message
-              : translate(
-                  'components.jiraIssueTitleField.failed',
-                  'Failed to generate a summary from the description.'
-                )
+          message: extractIpcErrorMessage(
+            error,
+            translate(
+              'components.jiraIssueTitleField.failed',
+              'Failed to generate a summary from the description.'
+            )
+          )
         })
       }
     } finally {

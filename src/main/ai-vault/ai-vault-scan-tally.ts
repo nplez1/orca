@@ -12,6 +12,7 @@ type AgentTally = {
 export class AiVaultScanTally {
   private readonly agents = new Map<AiVaultAgent, AgentTally>()
   private stage: AiVaultScanWork['stage'] = 'finding'
+  private readonly readingFiles = new Map<string, AiVaultAgent>()
   readonly workload = new AiVaultScanWorkload()
 
   openSource(agent: AiVaultAgent): () => void {
@@ -47,6 +48,14 @@ export class AiVaultScanTally {
     this.stage = 'reading'
   }
 
+  /** Returns the release to call when that parse finishes; concurrency means several at once. */
+  beginReadingFile(agent: AiVaultAgent, path: string): () => void {
+    this.readingFiles.set(path, agent)
+    return () => {
+      this.readingFiles.delete(path)
+    }
+  }
+
   snapshot(): AiVaultScanWork {
     const agents: AiVaultScanWork['agents'] = []
     for (const agent of AI_VAULT_AGENTS) {
@@ -72,10 +81,12 @@ export class AiVaultScanTally {
     }
     // Fixed provider order prevents rows jumping as discovery finishes.
     agents.sort((a, b) => AI_VAULT_AGENTS.indexOf(a.agent) - AI_VAULT_AGENTS.indexOf(b.agent))
+    const readingFiles = [...this.readingFiles].map(([path, agent]) => ({ agent, path }))
     return {
       stage: this.stage,
       agents,
-      read: this.stage === 'reading' ? this.workload.total() : { done: 0, total: 0 }
+      read: this.stage === 'reading' ? this.workload.total() : { done: 0, total: 0 },
+      ...(this.stage === 'reading' && readingFiles.length > 0 ? { readingFiles } : {})
     }
   }
 

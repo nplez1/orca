@@ -71,7 +71,8 @@ a conflict for you.
 node local/sync/pre-sync.mjs [--prepare] [--json] [--skip-typecheck]
 node local/sync/conflicts.mjs [--summary|--json|--verify]
 node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no working tree touched
-node local/sync/post-sync.mjs [--json] [--skip-typecheck]
+node local/sync/post-sync.mjs [--json] [--skip-typecheck] [--waive <id>:<reason>]
+node local/sync/fork-symbols.mjs [--json]               # also a post-sync row; run it alone to see why
 node local/sync/identity-sweep.mjs [--json|--fix]
 ```
 
@@ -238,7 +239,31 @@ node local/sync/post-sync.mjs
 
 That runs the integration checks in one pass: conflict markers, the fork identity sweep, the
 derived catalogs (regenerate + both localization verifiers), the builder config loading, the five
-update-feed references still naming `nplez1/orca`, the lost-content diff, and `pnpm tc`.
+update-feed references still naming `nplez1/orca`, the lost-content diff, the exported surface of every
+fork-only module the sync deleted, the names the fork added to a surviving file that the merged file no
+longer declares (the `fork-symbols.mjs` scan, run here as the `fork-symbol-survival` row), fork-added
+references that resolve to nothing at HEAD, and `pnpm tc`.
+
+It also refuses to measure the wrong sync. The pre-sync tip and the recorded new base are checked against
+HEAD — on a merge they have to be its first and second parents — so a state file or backup ref left by an
+earlier sync fails the run instead of scanning its range and reporting clean. A clean run deletes the
+state file; `--prepare` re-points a stale backup after archiving where it used to be.
+
+A row reported `N/A` is **not** a pass: the run exits non-zero unless `--waive <id>:<reason>` records the
+exception, and the waiver is printed in the report, in `--json` and in the verdict line.
+
+The fork-comment ratchet measures against the **new** merge base, so a sync can move its numbers in
+either direction and the next `gate-lint` run says so. Treat that red as part of the sync, not as a
+follow-up:
+
+```bash
+node local/check-upstream-file-comments.mjs          # what moved, per file
+node local/check-upstream-file-comments.mjs --prune  # it shrank: lock the lower number in
+node local/check-upstream-file-comments.mjs --init --accept "<what the sync added and why>"
+```
+
+The baseline change belongs in the sync's own commit, with the reason, so the next reader can tell
+fork growth from a re-measurement.
 
 A merge can also re-enable workflows **at the repository**, which no tree diff shows: new upstream
 workflows arrive enabled and an edited file comes back on even though the fork had disabled it. Sweep
@@ -301,9 +326,16 @@ Then the gates that no script can judge:
 
 ## Step 4 — push
 
+The upstream mirror goes first, and its sweep is part of the same command: a workflow file new to that
+push arrives active, so the sweep has to follow immediately (see `local/sync/push-upstream-mirror.mjs`
+for why this is one step and not two). The release line's own push is the third place new workflow
+files can land — this repository's default branch is `nplez1/main`, so a `schedule` there fires without
+any push at all.
+
 ```bash
-git push origin upstream/main:main          # the upstream mirror; only upstream-bound branches are cut from it
-git push origin nplez1/main                 # a merge line fast-forwards; no force needed
+node local/sync/push-upstream-mirror.mjs   # push origin upstream/main:main, then sweep the fleet
+git push origin nplez1/main                # the sync result; a merge line fast-forwards, no force needed
+node local/check-actions-enablement.mjs    # the release line can deliver new workflow files too
 ```
 
 A rebased patch series or feature branch still needs `--force-with-lease`. Keep

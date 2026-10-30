@@ -73,6 +73,14 @@ async function flushMicrotasks(): Promise<void> {
   }
 }
 
+function quickOpenStore(scope: {
+  getFolderWorkspaces?: () => { folderPath: string }[]
+  getRepos?: () => { path: string; kind: 'git' }[]
+}): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the listing touches only getFolderWorkspaces and getRepos on this stub. fork-comment-ok: AGENTS.md mandates a SAFETY note on every assertion
+  return scope as unknown as Store
+}
+
 function isIgnoredRgPass(args: string[]): boolean {
   return args.includes('--no-ignore-vcs')
 }
@@ -195,6 +203,48 @@ describe('filesystem-list-files', () => {
     expect(spawnMock.mock.calls[0]?.[0]).toBe(BUNDLED_RG)
     expect(bundledRipgrepCommandMock).toHaveBeenCalledWith({ wsl: false })
     expect(spawnMock.mock.calls[0]?.[1]).not.toContain('--version')
+  })
+
+  it('asks ripgrep to keep the enclosing checkout ignore rules out for a folder workspace root', async () => {
+    const source = createMockProcess()
+    const broad = createMockProcess()
+    spawnMock.mockImplementation((_command, args: string[]) =>
+      isIgnoredRgPass(args) ? broad : source
+    )
+    const folderStore = quickOpenStore({
+      getFolderWorkspaces: () => [{ folderPath: '/mock/root' }]
+    })
+
+    const listing = listQuickOpenFiles('/mock/root', folderStore)
+    source.stdout?.emit('data', 'notes.md\0debug.log\0')
+    source.emit('close', 0, null)
+    await flushMicrotasks()
+    broad.stdout?.emit('data', 'notes.md\0debug.log\0')
+    broad.emit('close', 0, null)
+    await flushMicrotasks()
+
+    await expect(listing).resolves.toEqual(['notes.md', 'debug.log'])
+    expect(spawnMock.mock.calls[0]?.[1]).toContain('--no-ignore-parent')
+  })
+
+  it('keeps the enclosing checkout ignore rules for a git worktree root', async () => {
+    const source = createMockProcess()
+    const broad = createMockProcess()
+    spawnMock.mockImplementation((_command, args: string[]) =>
+      isIgnoredRgPass(args) ? broad : source
+    )
+    const gitStore = quickOpenStore({ getRepos: () => [{ path: '/mock/root', kind: 'git' }] })
+
+    const listing = listQuickOpenFiles('/mock/root', gitStore)
+    source.stdout?.emit('data', 'notes.md\0')
+    source.emit('close', 0, null)
+    await flushMicrotasks()
+    broad.stdout?.emit('data', 'notes.md\0')
+    broad.emit('close', 0, null)
+    await flushMicrotasks()
+
+    await expect(listing).resolves.toEqual(['notes.md'])
+    expect(spawnMock.mock.calls[0]?.[1]).not.toContain('--no-ignore-parent')
   })
 
   it('keeps source files first when only a serialized byte budget is provided', async () => {

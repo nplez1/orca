@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { resolveTerminalOrchestrationCliCommand } from './cli-command'
 
 describe('resolveTerminalOrchestrationCliCommand', () => {
-  it('uses orca-ide for a pane recorded as WSL', () => {
+  it('uses this build’s guest command for a pane recorded as WSL', () => {
     expect(
       resolveTerminalOrchestrationCliCommand({
         connectionId: null,
         isWsl: true,
         worktreeId: 'repo::C:\\repo'
       })
-    ).toBe('orca-ide')
+    ).toBe('orca-np')
   })
 
   it('uses project runtime and WSL paths when restored pane metadata is unavailable', () => {
@@ -30,14 +30,14 @@ describe('resolveTerminalOrchestrationCliCommand', () => {
           }
         }
       })
-    ).toBe('orca-ide')
+    ).toBe('orca-np')
     expect(
       resolveTerminalOrchestrationCliCommand({
         connectionId: null,
         isWsl: null,
         worktreeId: 'repo::\\\\wsl.localhost\\Ubuntu\\home\\alice\\repo'
       })
-    ).toBe('orca-ide')
+    ).toBe('orca-np')
   })
 
   it('preserves native and SSH bare-orca commands', () => {

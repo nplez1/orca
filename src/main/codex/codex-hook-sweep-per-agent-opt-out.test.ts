@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import type * as Os from 'node:os'
 import { join } from 'node:path'
-import { wrapPosixHookCommand } from '../agent-hooks/installer-utils'
+import { getSharedManagedScriptPath, wrapPosixHookCommand } from '../agent-hooks/installer-utils'
 import { setupCodexHookHomes } from './hook-service-test-harness'
 
 const { getPathMock, homedirMock } = vi.hoisted(() => ({
@@ -29,9 +29,9 @@ import { CodexHookService } from './hook-service'
 const homes = setupCodexHookHomes(homedirMock, getPathMock)
 
 function orcaEntryCommand(): string {
-  const scriptPath = join(
-    homes.userDataDir,
-    'agent-hooks',
+  // Why the shared managed path and not the profile: the matcher now anchors on this build's home
+  // directory, so an entry naming any other location is a user hook.
+  const scriptPath = getSharedManagedScriptPath(
     process.platform === 'win32' ? 'codex-hook.cmd' : 'codex-hook.sh'
   )
   return process.platform === 'win32' ? scriptPath : wrapPosixHookCommand(scriptPath)

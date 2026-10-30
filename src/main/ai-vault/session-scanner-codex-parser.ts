@@ -46,10 +46,11 @@ export async function parseCodexSessionFile(
   platform: NodeJS.Platform = process.platform,
   codexHome: string | null = null,
   executionHostId?: ExecutionHostId,
-  messages?: TranscriptMessageSink
+  messages?: TranscriptMessageSink,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
   const lines = createInterface({
-    input: openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan'),
+    input: openTranscriptReadStream(file.path, { encoding: 'utf-8' }, 'scan', signal),
     crlfDelay: Infinity
   })
 

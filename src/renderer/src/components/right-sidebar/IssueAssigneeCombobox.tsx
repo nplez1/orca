@@ -85,6 +85,9 @@ export function IssueAssigneeCombobox({
   onUnassign,
   pending = false,
   disabled = false,
+  /** The roster read's failure, shown in place of "No people found" while the query is
+   *  empty: an empty roster and a refused read must not read the same. */
+  rosterError = null,
   maxDefault = DEFAULT_LIST_LIMIT
 }: {
   label: string
@@ -98,6 +101,7 @@ export function IssueAssigneeCombobox({
   onUnassign?: () => void
   pending?: boolean
   disabled?: boolean
+  rosterError?: string | null
   maxDefault?: number
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
@@ -182,6 +186,9 @@ export function IssueAssigneeCombobox({
   )
   const loading = searching || pending
   const showEmpty = visible.length === 0 && !searching
+  // Why only when the query is empty: a typed query has its own search, whose failure is
+  // the search's to report — the roster read is only what answers the bare list.
+  const emptyRosterError = showEmpty && query.trim().length === 0 ? rosterError : null
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -236,6 +243,8 @@ export function IssueAssigneeCombobox({
                 <LoaderCircle className="size-3 animate-spin" />
                 {translate('auto.components.right.sidebar.IssueAssignee.searching', 'Searching…')}
               </div>
+            ) : emptyRosterError ? (
+              <p className="px-2 py-1.5 text-xs text-destructive">{emptyRosterError}</p>
             ) : showEmpty ? (
               <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
                 {translate(

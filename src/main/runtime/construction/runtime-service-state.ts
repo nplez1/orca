@@ -230,6 +230,8 @@ export abstract class OrcaRuntimeWithStopRequestedPtyIds extends OrcaRuntimeWith
   })
 
   protected _orchestrationDb: OrchestrationDb | null = null
+  /** The refusal from a schema this build is too old for, remembered so it is not retried per caller. */
+  protected _orchestrationDbRefusal: unknown = null
 
   protected readonly orchestrationMailboxOwner = new OrchestrationMailboxOwner({
     getDb: () => this._orchestrationDb,

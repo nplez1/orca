@@ -98,7 +98,9 @@ describe('Jira project metadata IPC registration', () => {
     await handler('jira:listProjects')(undefined, { siteId: '  ' })
     expect(mocks.listProjects).toHaveBeenLastCalledWith(undefined)
     await handler('jira:listPriorities')(undefined, { siteId: ' site-1 ' })
-    expect(mocks.listPriorities).toHaveBeenCalledWith('site-1')
+    expect(mocks.listPriorities).toHaveBeenCalledWith('site-1', false)
+    await handler('jira:listPriorities')(undefined, { siteId: ' site-1 ', strict: true })
+    expect(mocks.listPriorities).toHaveBeenLastCalledWith('site-1', true)
   })
 
   it('preserves invalid project and issue type sentinels', async () => {

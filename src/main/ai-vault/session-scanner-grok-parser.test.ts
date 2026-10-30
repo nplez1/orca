@@ -1,9 +1,12 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { withFullFirstUserPromptCapture } from './session-scanner-first-user-prompt-capture'
+import { TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES } from '../native-chat/wsl-transcript-fs-access'
 import { parseGrokSessionFile } from './session-scanner-grok-parser'
+import { parseSessionCandidate } from './session-scanner-candidate-parse'
+import { createSessionParseStats } from './session-scanner-parse-cache'
 import type { TranscriptMessage } from './session-transcript-consumers'
 
 let tempRoots: string[] = []
@@ -165,5 +168,51 @@ describe('AI Vault Grok session parser', () => {
     expect(session?.firstUserPrompt).toBe(realAsk)
     expect(session?.firstUserPrompt).not.toContain('user_info')
     expect(session?.firstUserPrompt).not.toContain('OS Version')
+  })
+
+  it('refuses a summary over the whole-file limit instead of parsing it', async () => {
+    // Why: this parser read the whole file into the 384 MB scanner child with no size check, so one
+    // oversized summary with inline images took the History list down with it.
+    const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-grok-oversized-'))
+    tempRoots.push(root)
+    const summaryPath = join(root, 'summary.json')
+    // Sparse on purpose: the cap reads the size, so the payload never has to exist.
+    const handle = await open(summaryPath, 'w')
+    await handle.truncate(TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES + 1)
+    await handle.close()
+
+    await expect(
+      parseGrokSessionFile(
+        { path: summaryPath, mtimeMs: Date.now(), modifiedAt: new Date().toISOString() },
+        'linux'
+      )
+    ).rejects.toThrow(/too large/i)
+  })
+
+  it('reports an oversized session file as its own scan issue', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-grok-issue-'))
+    tempRoots.push(root)
+    const summaryPath = join(root, 'summary.json')
+    const handle = await open(summaryPath, 'w')
+    await handle.truncate(TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES + 1)
+    await handle.close()
+
+    const result = await parseSessionCandidate(
+      {
+        agent: 'grok',
+        file: { path: summaryPath, mtimeMs: Date.now(), modifiedAt: new Date().toISOString() },
+        codexHome: null
+      },
+      {
+        platform: 'linux',
+        executionHostId: 'local',
+        parseStats: createSessionParseStats(),
+        listed: true
+      }
+    )
+
+    expect(result.session).toBeNull()
+    expect(result.issue?.path).toBe(summaryPath)
+    expect(result.issue?.message).toMatch(/too large/i)
   })
 })

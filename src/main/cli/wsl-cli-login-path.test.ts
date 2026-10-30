@@ -36,7 +36,7 @@ describe('WslCliInstaller login-PATH lanes', () => {
   it('reports PATH unknown rather than "not on PATH" without the login PATH', async () => {
     const launcher = _internals.buildWslLauncher(
       launcherPath,
-      '/home/alice/.local/share/orca/orca-wsl-bridge.ps1'
+      '/home/alice/.local/share/orca-np/orca-wsl-bridge.ps1'
     )
     runWslProcessMock.mockImplementation(async (spec: { script: string; loginPath: string }) => ({
       environmentResolved: spec.loginPath !== 'preferred',

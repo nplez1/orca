@@ -1,9 +1,11 @@
 /**
- * Which host the relocation plan asks for the default branch.
+ * Which host the relocation plan asks for the default branch — and which plans ask at all.
  *
  * The branch name decides the folder the checkout moves into, so resolving it on the wrong machine
  * names a folder from this machine's checkout — or from nothing at all. A row may name its SSH host
- * only as `executionHostId: 'ssh:<target>'`, which a raw `connectionId` read answers as local.
+ * only as `ssh:<target>`, which a raw `connectionId` read answers as local, so the read is routed
+ * through the resolver rather than the raw field. A row that is not on this machine is refused before
+ * any host is asked: there is nothing to move, so there is no folder to name.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../shared/repo-types'
@@ -62,13 +64,14 @@ beforeEach(() => {
 })
 
 describe('the host a relocation plan reads the default branch from', () => {
-  it('uses the SSH target a row names only as ssh:<target>', async () => {
-    await makeController(makeRepo({ id: 'repo-1', executionHostId: 'ssh:peer' })).relocate(
-      'repo-1',
-      { dryRun: true }
-    )
+  it('refuses a row that names its host only as ssh:<target> without reading a branch', async () => {
+    await expect(
+      makeController(makeRepo({ id: 'repo-1', executionHostId: 'ssh:peer' })).relocate('repo-1', {
+        dryRun: true
+      })
+    ).resolves.toEqual({ repoId: 'repo-1', decision: 'remote-host' })
 
-    expect(branchReads.calls).toEqual([['/code/example', 'peer']])
+    expect(branchReads.calls).toEqual([])
   })
 
   it('leaves a local row on this machine', async () => {
@@ -77,11 +80,46 @@ describe('the host a relocation plan reads the default branch from', () => {
     expect(branchReads.calls).toEqual([['/code/example', null]])
   })
 
-  it('still reads the legacy connectionId of a row that carries no host id', async () => {
-    await makeController(makeRepo({ id: 'repo-1', connectionId: 'peer' })).relocate('repo-1', {
-      dryRun: true
-    })
+  it('refuses a row whose only host evidence is a legacy connectionId', async () => {
+    await expect(
+      makeController(makeRepo({ id: 'repo-1', connectionId: 'peer' })).relocate('repo-1', {
+        dryRun: true
+      })
+    ).resolves.toEqual({ repoId: 'repo-1', decision: 'remote-host' })
+
+    expect(branchReads.calls).toEqual([])
+  })
+
+  it('routes the read through a stale connectionId beside a local host id', async () => {
+    await makeController(
+      makeRepo({ id: 'repo-1', executionHostId: 'local', connectionId: 'peer' })
+    ).relocate('repo-1', { dryRun: true })
 
     expect(branchReads.calls).toEqual([['/code/example', 'peer']])
+  })
+
+  it('refuses a folder project without reading a branch from any host', async () => {
+    await expect(
+      makeController(makeRepo({ id: 'repo-1', kind: 'folder' })).relocate('repo-1', {
+        dryRun: true
+      })
+    ).resolves.toEqual({ repoId: 'repo-1', decision: 'not-a-git-repo' })
+
+    expect(branchReads.calls).toEqual([])
+  })
+
+  it('refuses a checkout already in its folder without reading a branch', async () => {
+    await expect(
+      makeController(
+        makeRepo({
+          id: 'repo-1',
+          // The container is `<worktreeBasePath>/<displayName>`, so this checkout is already in it.
+          path: '/ws/example/Example/main',
+          worktreeBasePath: '/ws/example'
+        })
+      ).relocate('repo-1', { dryRun: true })
+    ).resolves.toEqual({ repoId: 'repo-1', decision: 'already-in-container' })
+
+    expect(branchReads.calls).toEqual([])
   })
 })

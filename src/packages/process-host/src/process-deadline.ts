@@ -40,9 +40,11 @@ export function scheduleDeadlineKill(params: {
   isSettled: () => boolean
   hasExited: () => boolean
   kill: (overrunMs: number) => void
+  /** Injected so a test can make the deadline late without stalling the thread. */
+  now?: () => number
 }): { cancel: () => void } {
-  const { deadlineMs, isSettled, hasExited, kill } = params
-  const deadlineAt = performance.now()
+  const { deadlineMs, isSettled, hasExited, kill, now = () => performance.now() } = params
+  const deadlineAt = now()
   let decide: ReturnType<typeof setTimeout> | undefined
   let drain: ReturnType<typeof setTimeout> | undefined
   const killAfterDrain = (overrunMs: number): void => {
@@ -59,7 +61,7 @@ export function scheduleDeadlineKill(params: {
     drain.unref?.()
   }
   const timer = setTimeout(() => {
-    const overrunMs = performance.now() - deadlineAt - deadlineMs
+    const overrunMs = now() - deadlineAt - deadlineMs
     if (overrunMs < BLOCKED_DEADLINE_OVERRUN_MS && !hasExited()) {
       kill(overrunMs)
       return

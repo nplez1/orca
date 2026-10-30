@@ -244,7 +244,7 @@ export function JiraTransitionFieldsForm({
           onValueChange={(value) => setDrafts((previous) => ({ ...previous, [field.key]: value }))}
         />
         {fieldErrors[field.key] ? (
-          <p role="alert" className="text-[11px] text-destructive">
+          <p role="alert" className="text-2xs text-destructive">
             {fieldErrors[field.key]}
           </p>
         ) : null}
@@ -279,7 +279,7 @@ export function JiraTransitionFieldsForm({
             </SelectContent>
           </Select>
           {fieldErrors[requirement.resolution.key] ? (
-            <p role="alert" className="text-[11px] text-destructive">
+            <p role="alert" className="text-2xs text-destructive">
               {fieldErrors[requirement.resolution.key]}
             </p>
           ) : null}

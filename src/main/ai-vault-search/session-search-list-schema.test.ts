@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { removeTree } from '../../shared/windows-transient-lock-removal'
 import SyncDatabase from '../sqlite/sync-database'
+import { CacheDatabaseNewerThanBuildError } from '../sqlite/versioned-cache-database'
 import { listIndexedSessions } from './session-search-list'
 import { SESSION_LIST_SCHEMA_VERSION } from './session-search-list-schema'
 import { deleteExpiredSearchFiles } from './session-search-retention-delete'
@@ -223,6 +224,29 @@ it.each([
   }
 })
 
+it('refuses, rather than discards, an index whose list tier a newer build wrote', async () => {
+  const path = await tempDatabasePath()
+  const newer = openSessionSearchDatabase(path)
+  newer.prepare("INSERT INTO files(path, byte_offset, mtime_ms) VALUES ('a', 1, 1)").run()
+  newer
+    .prepare("UPDATE meta SET value = ? WHERE key = 'session_list_schema_version'")
+    .run(String(SESSION_LIST_SCHEMA_VERSION + 1))
+  newer.close()
+
+  // Why refuse: rebuilding would delete an index the newer build is still using, on every downgrade.
+  expect(() => openSessionSearchDatabase(path)).toThrow(CacheDatabaseNewerThanBuildError)
+
+  const unchanged = new SyncDatabase(path)
+  try {
+    expect(unchanged.prepare('SELECT count(*) AS n FROM files').get()?.n).toBe(1)
+    expect(meta(unchanged, 'session_list_schema_version')).toBe(
+      String(SESSION_LIST_SCHEMA_VERSION + 1)
+    )
+  } finally {
+    unchanged.close()
+  }
+})
+
 it('reclaims a session’s list rows when upstream’s retention purge deletes it', async () => {
   const db = openSessionSearchDatabase(await tempDatabasePath())
   try {
@@ -296,7 +320,7 @@ it.each([
     const reopened = openSessionSearchDatabase(path)
     expect(warn).toHaveBeenCalledWith(
       '[ai-vault-search] list schema check skipped:',
-      'database is locked'
+      expect.objectContaining({ message: 'database is locked' })
     )
     try {
       expect(count(reopened, 'sessions')).toBe(0)

@@ -13,6 +13,10 @@ import { JIRA_AGILE_API } from './jira-agile-api'
 import { issueUrl, toBodyText } from './jira-issue-mapping'
 import { markdownCommentBody } from './jira-comment-body'
 import type { JiraRecord } from './jira-record-pages'
+import {
+  JIRA_WRITE_FETCH_TIMEOUT_MS,
+  JIRA_WRITE_TIMEOUT_MESSAGE
+} from '../../shared/jira/jira-write-deadline'
 
 /** Cloud uses accountId; Server/DC uses username, stored in mapUser's accountId slot. */
 export function userFieldRef(site: JiraSite, id: string | null): JiraRecord {
@@ -81,6 +85,12 @@ function describeUpdateFailure(error: unknown): JiraMutationResult {
   return { ok: false, error: error instanceof Error ? error.message : 'Failed to update issue.' }
 }
 
+/** The deadline's own abort, which says the write may still land: a plain failure
+ *  would make the caller roll back a field Jira may have just saved. */
+function isWriteDeadlineAbort(error: unknown, signal: AbortSignal): boolean {
+  return signal.aborted || (error instanceof Error && error.name === 'AbortError')
+}
+
 /** Creates an issue, shaping the customFields keys named by `userFieldKeys`. */
 export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreateIssueResult> {
   const entry = getClients(args.siteId)[0]
@@ -143,6 +153,9 @@ export async function updateIssue(
     return { ok: false, error: 'Pass labels or labelOperations, not both.' }
   }
   await acquire()
+  // Why: a hung connection (a VPN switch, a stalled proxy) otherwise holds this
+  // request slot and the issue's mutation queue for the rest of the session.
+  const writeSignal = AbortSignal.timeout(JIRA_WRITE_FETCH_TIMEOUT_MS)
   try {
     const fields: JiraRecord = {}
     if (updates.title !== undefined) {
@@ -170,6 +183,7 @@ export async function updateIssue(
     if (Object.keys(fields).length > 0 || labelOperations.length > 0) {
       await jiraRequest(entry, issueBase, {
         method: 'PUT',
+        signal: writeSignal,
         body: JSON.stringify({
           fields,
           ...(labelOperations.length ? { update: { labels: labelOperations } } : {})
@@ -180,6 +194,7 @@ export async function updateIssue(
       const assigneeBody = userFieldRef(entry.site, updates.assigneeAccountId)
       await jiraRequest(entry, `${issueBase}/assignee`, {
         method: 'PUT',
+        signal: writeSignal,
         body: JSON.stringify(assigneeBody)
       })
     }
@@ -204,6 +219,7 @@ export async function updateIssue(
       }
       await jiraRequest(entry, `${issueBase}/transitions`, {
         method: 'POST',
+        signal: writeSignal,
         body: JSON.stringify(transitionBody)
       })
     }
@@ -217,6 +233,7 @@ export async function updateIssue(
           : `${JIRA_AGILE_API}/backlog/issue`,
         {
           method: 'POST',
+          signal: writeSignal,
           body: JSON.stringify({ issues: [key] })
         }
       )
@@ -226,6 +243,9 @@ export async function updateIssue(
     if (isAuthError(error)) {
       clearToken(entry.site.id)
       throw error
+    }
+    if (isWriteDeadlineAbort(error, writeSignal)) {
+      return { ok: false, error: JIRA_WRITE_TIMEOUT_MESSAGE, timedOut: true }
     }
     return describeUpdateFailure(error)
   } finally {

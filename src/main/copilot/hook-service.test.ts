@@ -51,14 +51,19 @@ function readConfig(): Record<string, unknown> {
   return JSON.parse(readFileSync(join(copilotHome, 'hooks', 'orca.json'), 'utf-8'))
 }
 
+// Why the pre-rename home directory and not an arbitrary path: the matcher now anchors on this
+// build's own home, so only a `~/.orca` registration is one this build wrote and may sweep.
 function makeStaleManagedHookDefinition(): Record<string, unknown> {
   if (process.platform === 'win32') {
     return {
       type: 'command',
-      powershell: 'powershell.exe -File C:/old/agent-hooks/copilot-hook.ps1'
+      powershell: `powershell.exe -File ${join(tmpDir, '.orca', 'agent-hooks', 'copilot-hook.ps1')}`
     }
   }
-  return { type: 'command', bash: '/bin/sh "/old/agent-hooks/copilot-hook.sh"' }
+  return {
+    type: 'command',
+    bash: `/bin/sh "${join(tmpDir, '.orca', 'agent-hooks', 'copilot-hook.sh')}"`
+  }
 }
 
 describe('CopilotHookService', () => {

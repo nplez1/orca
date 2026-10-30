@@ -1,6 +1,5 @@
 import type { CliInstallStatus } from '../../shared/cli-install-types'
 import {
-  buildManagedLegacyRemoveCommand,
   buildRegistrationLockPrelude,
   buildSafeReplaceGuard,
   buildWslBridgeScript,
@@ -14,14 +13,12 @@ import { quotePosixShellDoubleQuotedApostrophe } from '../../shared/shell-argume
 
 const MANAGED_MARKER = getWslLauncherMarker()
 const BRIDGE_MANAGED_MARKER = getWslBridgeMarker()
-const LEGACY_WSL_COMMAND_NAME = 'orca'
 
 export function buildWslCliInstallCommand(
   status: CliInstallStatus & { commandPath: string; launcherPath: string }
 ): string {
   const bridgePath = getBridgePathFromCommandPath(status.commandPath)
   const commandDirectory = getPosixDirname(status.commandPath)
-  const legacyCommandPath = `${commandDirectory}/${LEGACY_WSL_COMMAND_NAME}`
   return [
     // Runs under sh; Ubuntu 20.04 dash lacks pipefail, and no pipeline here needs it.
     'set -eu',
@@ -30,7 +27,6 @@ export function buildWslCliInstallCommand(
     buildRegistrationLockPrelude(status.commandPath),
     `command_tmp=${quotePosixShellDoubleQuotedApostrophe(`${status.commandPath}.tmp`)}.$$`,
     `bridge_path=${quotePosixShellDoubleQuotedApostrophe(bridgePath)}`,
-    `legacy_command_path=${quotePosixShellDoubleQuotedApostrophe(legacyCommandPath)}`,
     'bridge_tmp="${bridge_path}.tmp.$$"',
     'bridge_backup="${bridge_tmp}.backup"',
     'bridge_had_original=0',
@@ -64,7 +60,6 @@ export function buildWslCliInstallCommand(
     `mv -f "$command_tmp" ${quotePosixShellDoubleQuotedApostrophe(status.commandPath)}`,
     'committed=1',
     'rm -f "$bridge_backup"',
-    buildManagedLegacyRemoveCommand('"$legacy_command_path"'),
     'trap - EXIT'
   ].join('\n')
 }
