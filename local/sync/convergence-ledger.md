@@ -2262,3 +2262,45 @@ already covers; `strict` on `listPriorities` is still forwarded-and-pinned at
 
 **Do not:** restore a retired suite to carry one case. Re-home it into a surviving suite, as the
 2026-10-28 entry did for three.
+
+### 2026-10-30 release gate: two gates green, and the two run-level headlines classified
+
+**Gate lines.** `Unit gate @9383ffade4 (clean): PASS — 142215 passed; 18 failed (18 allowlisted, 0
+unexpected); 0 flaky re-run passed; 0 unhandled error headline(s)`. `lint gate: PASS — 44 green, 0
+failing: 0 known red, 0 new`. `pnpm tc` clean on the same revision.
+
+The gate took 116 unexpected failures to 0, in five rounds. What the rounds found is worth keeping,
+because none of it was a marker and the typecheck saw only one of them:
+
+- **`update-worktree-meta.ts` wrote the state update before the save, not after it.** The "dismiss
+  error" path therefore cleared the error on click and unmounted the dialog it lived in, so the
+  button could never show a pending state — and the file's own rule, "a failed save must leave the
+  error visible", was broken. Upstream runs the save first. **Restored to save-then-set.**
+- **The fork's path-search scheduler is one-at-a-time**: it aborts a running search and dispatches
+  the replacement only once that search's promise settles. A test written against upstream's
+  scheduler-less version (a promise that never settles) therefore never saw the replacement. The
+  fixture now rejects on abort, as the real client does.
+- **Bun on macOS does not report EPIPE for a small write to a closed stdin; Node does.** The
+  pipe-close case asserts that error, production runs on Electron's Node, so the suite joins
+  `NODE_RUNTIME_INCLUDE` with that reason rather than being weakened.
+- **A compat re-export counted as a synchronous git launch.** `git-exec-file.ts` re-exported
+  `gitExecFileSync` for #176; `runner.ts` imports the helper directly, so nothing lost it.
+- **Two sync fs probes identical to upstream's**, in a fork-only ratchet and both memoized, got
+  baseline rows rather than a divergence in upstream code.
+- **Five fork sites formatted dates and counts in the OS locale** instead of the UI language; they
+  use `uiDateTimeFormat` / `getIntlLocale()` now.
+- **The mobile admin-bypass confirm copy** was the last English-only literal in `PRActionsSection`;
+  it has keys in the mobile catalog.
+
+**Classified:** the two remaining run-level headlines are third-party and machine-bound, not repo
+reds — monaco-editor's own `CancellationError` from disposing the editor, and the browser-mode dev
+server refusing to serve Monaco's TypeScript worker because this machine's pnpm store sits at
+`/Volumes/Storage/.pnpm-store`, outside the project directories it may read. Both name no repository
+file, and the run that carried them had 0 unexpected test failures. See
+`local/unit-known-red.json` § `unhandledErrors`.
+
+**Machine prerequisites, both load-bearing and both now recorded outside any worktree**
+(`~/Code/orca/AGENTS.md`): `bash` 5.3 must be **first** on PATH (the old pin only appended, so a
+parent process's earlier append left `/bin/bash` 3.2 ahead of it and ~14 `.mjs` suites failed on
+`set -u` empty-array expansion), and `mobile/` needs its own `pnpm install --frozen-lockfile`
+(24 bundle tests fail on `Could not resolve "expo-localization"` otherwise). Neither is repo state.
