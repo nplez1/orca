@@ -133,6 +133,21 @@ export function capPrRefreshStates(
   return capped
 }
 
+export function clearStalePRRefreshError(
+  states: Record<string, PRRefreshState>,
+  cacheKey: string,
+  requestStartedAt: number
+): Record<string, PRRefreshState> | null {
+  const state = states[cacheKey]
+  const supersededByThisLookup = state?.status === 'error' && state.updatedAt <= requestStartedAt
+  if (!supersededByThisLookup) {
+    return null
+  }
+  const next = { ...states }
+  delete next[cacheKey]
+  return next
+}
+
 export function capPrRefreshSequences(
   sequences: Record<string, number>,
   maxEntries?: number
