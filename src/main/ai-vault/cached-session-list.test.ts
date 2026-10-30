@@ -67,7 +67,7 @@ function deferredScan(): { resolve: (value: AiVaultListResult) => void } {
       const value = await pending
       // Why a tally first: `finish` publishes nothing for a scan that reported no work, so a bare
       // finish here would test the index-only path instead of the progress row.
-      progress?.work({ agents: ['claude'], read: { done: 1, total: 1 } })
+      progress?.work({ stage: 'reading', agents: [], read: { done: 1, total: 1 } })
       progress?.finish(null)
       return value
     }
