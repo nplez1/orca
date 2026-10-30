@@ -692,6 +692,16 @@ describe('runtime label-only creation through first work', () => {
       branch: 'cli-exact'
     },
     {
+      // A generated name with an explicit branch is still the user's branch, not Orca's to rename.
+      request: {
+        name: 'generated-override',
+        nameWasGenerated: true,
+        branchNameOverride: 'feature/exact'
+      },
+      enabled: true,
+      branch: 'feature/exact'
+    },
+    {
       request: { name: 'typed-label' },
       enabled: true,
       branch: 'typed-label'
@@ -707,6 +717,24 @@ describe('runtime label-only creation through first work', () => {
         displayName: request.name,
         displayNameMode: 'fixed'
       })
+      // Only a name Orca generated without a branch override is Orca's to rename.
+      expect(writtenMeta[0]?.branchNameWasGenerated).toBe(false)
     }
   )
+
+  it('still renames a generated creature branch whose meta predates the flag', async () => {
+    useRealBranchSelection()
+    const generated = labelOnlyCreateCases.find((row) => row.request.nameWasGenerated === true)
+    if (!generated) {
+      throw new Error('the create table needs a generated-name row')
+    }
+    const { worktree } = await createWorktree(generated.request, undefined, undefined, {}, true)
+    expect(writtenMeta[0]?.branchNameWasGenerated).toBe(true)
+    // Workspaces created before the flag existed must keep the rename they always had.
+    const legacyMeta = { ...writtenMeta[0] }
+    delete legacyMeta.branchNameWasGenerated
+    const outcome = await renameCreatedWorktreeOnFirstWork(worktree, legacyMeta, mocks.git)
+    expect(outcome.renamed).toBe(true)
+    expect(outcome.worktree.branch).toBe('refs/heads/fix-auth')
+  })
 })

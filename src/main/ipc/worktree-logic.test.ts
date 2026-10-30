@@ -64,11 +64,10 @@ describe('sanitizeWorktreeName', () => {
     expect(sanitizeWorktreeName('a..b...c')).toBe('a.b.c')
   })
 
-  it('rewrites a .lock suffix, which git rejects in a ref even though the characters are safe', () => {
-    expect(sanitizeWorktreeName('foo.lock')).toBe('foo-lock')
-    // git only rejects the lowercase suffix.
+  it('keeps a .lock suffix, which only a ref rejects, not a directory', () => {
+    // Branch construction rewrites this (see computeBranchName); the folder keeps the name.
+    expect(sanitizeWorktreeName('foo.lock')).toBe('foo.lock')
     expect(sanitizeWorktreeName('add.FOO.LOCK')).toBe('add.FOO.LOCK')
-    expect(sanitizeWorktreeName('lock')).toBe('lock')
   })
 
   it('preserves non-ASCII letters and numbers', () => {
@@ -283,6 +282,17 @@ describe('computeBranchName', () => {
     expect(
       computeBranchName('feature', { branchPrefix: 'custom', branchPrefixCustom: 'team/' }, null)
     ).toBe('team/feature')
+  })
+
+  it('rewrites a .lock leaf, which git rejects in a ref', () => {
+    expect(computeBranchName('foo.lock', { branchPrefix: 'none' }, null)).toBe('foo-lock')
+    expect(computeBranchName('foo.lock', { branchPrefix: 'git-username' }, 'jdoe')).toBe(
+      'jdoe/foo-lock'
+    )
+    // git only rejects the lowercase suffix.
+    expect(computeBranchName('foo.LOCK', { branchPrefix: 'none' }, null)).toBe('foo.LOCK')
+    // A suffixed leaf does not end in .lock, so it needs no rewrite.
+    expect(computeBranchName('foo.lock-2', { branchPrefix: 'none' }, null)).toBe('foo.lock-2')
   })
 
   it('normalizes a trailing slash on a git username prefix', () => {

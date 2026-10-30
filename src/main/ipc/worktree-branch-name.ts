@@ -15,13 +15,19 @@ export function getConfiguredBranchPrefix(
   return raw ? normalizeBranchPrefix(raw) || null : null
 }
 
+/** git check-ref-format rejects a ref ending in lowercase `.lock` (`.LOCK` is accepted); folders keep the name. */
+function toRefLeaf(leaf: string): string {
+  return leaf.replace(/\.lock$/, '-lock')
+}
+
 export function computeBranchName(
   sanitizedName: string,
   settings: Parameters<typeof selectBranchPrefixInput>[0],
   gitUsername: string | null
 ): string {
   const prefix = getConfiguredBranchPrefix(settings, gitUsername)
-  return prefix ? `${prefix}/${sanitizedName}` : sanitizedName
+  const leaf = toRefLeaf(sanitizedName)
+  return prefix ? `${prefix}/${leaf}` : leaf
 }
 
 /** Validate prefix settings early so creation errors identify configuration rather than opaque Git failures. */
@@ -31,15 +37,16 @@ export function computeValidatedBranchName(
   gitUsername: string | null
 ): string {
   const prefix = getConfiguredBranchPrefix(settings, gitUsername)
+  const leaf = toRefLeaf(sanitizedName)
   if (prefix === null) {
-    return sanitizedName
+    return leaf
   }
   if (getBranchPrefixIssue(prefix) !== null) {
     // Git username lookup can return error payloads; skip invalid derived prefixes but reject custom ones.
     if (settings.branchPrefix === 'git-username') {
-      return sanitizedName
+      return leaf
     }
     assertBranchPrefixValid(prefix)
   }
-  return `${prefix}/${sanitizedName}`
+  return `${prefix}/${leaf}`
 }
