@@ -185,9 +185,9 @@ describe('ensure-native-runtime', () => {
     }
   )
 
-  it.skipIf(process.platform === 'win32')(
-    'fails fast on a node-pty from another store instead of retrying a rebuild that cannot help',
-    () => {
+  it.skipIf(process.platform === 'win32').each(['', '--force'])(
+    'fails fast on a node-pty from another store instead of retrying a rebuild that cannot help%s',
+    (forceFlag) => {
       const projectDir = mkTempProject()
 
       try {
@@ -200,24 +200,92 @@ describe('ensure-native-runtime', () => {
         writeUnpatchedNodePtyLoader(projectDir, { declaredStore: '/elsewhere/.pnpm-store/v11' })
         writeFakeNodeGyp(projectDir)
 
-        const result = spawnSync(process.execPath, [scriptPath, '--runtime=node'], {
-          cwd: projectDir,
-          encoding: 'utf8',
-          env: envForNativeFixture(projectDir, {
-            ORCA_NATIVE_TEST_LOG: logPath,
-            ORCA_NATIVE_TEST_MARKER: markerPath
-          })
-        })
+        const result = spawnSync(
+          process.execPath,
+          [scriptPath, '--runtime=node', ...(forceFlag ? [forceFlag] : [])],
+          {
+            cwd: projectDir,
+            encoding: 'utf8',
+            env: envForNativeFixture(projectDir, {
+              ORCA_NATIVE_TEST_LOG: logPath,
+              ORCA_NATIVE_TEST_MARKER: markerPath
+            })
+          }
+        )
 
         expect(result.status, result.stderr).toBe(1)
         expect(result.stderr).toContain("is not Orca's patched copy")
         expect(result.stderr).toContain(`never looks in the build/orca-napi-${process.platform}-`)
+        expect(result.stderr).toContain('different pnpm store')
         expect(result.stderr).toContain("--store-dir '/elsewhere/.pnpm-store/v11'")
         expect(result.stderr).not.toContain('Native modules still do not load')
         expect(existsSync(logPath) ? readFileSync(logPath, 'utf8') : '').not.toContain(
           'node-gyp rebuild'
         )
         expect(existsSync(markerPath)).toBe(false)
+      } finally {
+        rmSync(projectDir, { recursive: true, force: true })
+      }
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'drops the store remedy when node_modules records no readable store',
+    () => {
+      const projectDir = mkTempProject()
+
+      try {
+        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+        writeLoadableNativeModules(projectDir)
+        writeNodePtyPatchFile(projectDir)
+        writePatchedNodePtyBuildArtifacts(projectDir)
+        writeUnpatchedNodePtyLoader(projectDir)
+        writeFileSync(join(projectDir, 'node_modules', '.modules.yaml'), '{ not json')
+
+        const result = spawnSync(process.execPath, [scriptPath, '--runtime=node'], {
+          cwd: projectDir,
+          encoding: 'utf8',
+          env: envForNativeFixture(projectDir, {
+            ORCA_NATIVE_TEST_LOG: join(projectDir, 'native-runtime.log'),
+            ORCA_NATIVE_TEST_MARKER: join(projectDir, 'rebuilt.marker')
+          })
+        })
+
+        expect(result.status, result.stderr).toBe(1)
+        expect(result.stderr).toContain("pnpm did not apply Orca's node-pty patch")
+        expect(result.stderr).not.toContain('--store-dir')
+      } finally {
+        rmSync(projectDir, { recursive: true, force: true })
+      }
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'leaves a checkout without the node-pty patch file alone',
+    () => {
+      const projectDir = mkTempProject()
+
+      try {
+        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+        const logPath = join(projectDir, 'native-runtime.log')
+        writeLoadableNativeModules(projectDir)
+        writeUnpatchedNodePtyLoader(projectDir)
+        writeFakeNodeGyp(projectDir)
+
+        const result = spawnSync(process.execPath, [scriptPath, '--runtime=node'], {
+          cwd: projectDir,
+          encoding: 'utf8',
+          env: envForNativeFixture(projectDir, {
+            ORCA_NATIVE_TEST_LOG: logPath,
+            ORCA_NATIVE_TEST_MARKER: join(projectDir, 'rebuilt.marker')
+          })
+        })
+
+        expect(result.status, result.stderr).toBe(0)
+        expect(result.stderr).not.toContain("is not Orca's patched copy")
+        expect(existsSync(logPath) ? readFileSync(logPath, 'utf8') : '').not.toContain(
+          'node-gyp rebuild'
+        )
       } finally {
         rmSync(projectDir, { recursive: true, force: true })
       }

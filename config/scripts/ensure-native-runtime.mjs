@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
-import { basename, dirname, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import {
   ensureWindowsProcessTreeCommandLinePatch,
   inspectWindowsProcessTreeAddon,
@@ -36,6 +36,7 @@ const scriptPath = import.meta.filename
 const projectDir = resolve(import.meta.dirname, '../..')
 const runtime = readRuntimeArg()
 // Why: `pnpm rebuild:node` must rebuild even a loadable node-pty; a shared slot still reuses its usable entry.
+// An unpatched loader cannot reach any slot, so it fails before this is consulted.
 const forceRebuild = process.argv.includes('--force')
 
 const NATIVE_MODULES = [
@@ -391,15 +392,28 @@ function describeUnpatchedNodePtyLoader() {
   }
 
   const slot = nativeBuildEntryName('node-pty')
+  const nodePtyDir = dirname(dirname(utilsPath))
   const declaredStore = readDeclaredPnpmStoreDir()
-  const storeArg = declaredStore ? ` --store-dir '${declaredStore}'` : ''
+  const foreignStore = declaredStore !== null && !isInsideDir(declaredStore, nodePtyDir)
   return (
-    `the installed node-pty at ${dirname(dirname(utilsPath))} is not Orca's patched copy: its ` +
-    `lib/utils.js never looks in the build/${slot} slot, so it can only load an upstream prebuild ` +
-    `and Orca's patch is inactive. Rebuilding cannot repoint it. A pnpm install most likely ran ` +
-    `against a different store; reinstall from the worktree root with ` +
-    `pnpm install --frozen-lockfile --force${storeArg}.`
+    `the installed node-pty at ${nodePtyDir} is not Orca's patched copy: its lib/utils.js never ` +
+    `looks in the build/${slot} slot, so it can only load an upstream prebuild and Orca's patch is ` +
+    `inactive. Rebuilding cannot repoint it: ${
+      foreignStore
+        ? `it resolves from a different pnpm store than node_modules declares (${declaredStore})`
+        : `pnpm did not apply Orca's node-pty patch, so this install predates it or patches were skipped`
+    }. Reinstall with pnpm install --frozen-lockfile --force${foreignStore ? quotedStoreArg(declaredStore) : ''}.`
   )
+}
+
+// cmd.exe passes POSIX single quotes through literally, so the printed command must quote per platform.
+function quotedStoreArg(storeDir) {
+  return process.platform === 'win32' ? ` --store-dir "${storeDir}"` : ` --store-dir '${storeDir}'`
+}
+
+function isInsideDir(parent, child) {
+  const rel = relative(parent, child)
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
 function readDeclaredPnpmStoreDir() {
