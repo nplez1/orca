@@ -32,6 +32,8 @@ export type WorktreeMeta = {
   displayName: string
   /** True when a user-authored label must survive branch changes. */
   displayNameIsPinned?: boolean
+  /** True when Orca generated the name this branch was built from, so first-work naming may replace it. */
+  branchNameWasGenerated?: boolean
   comment: string
   linkedIssue: number | null
   linkedPR: number | null

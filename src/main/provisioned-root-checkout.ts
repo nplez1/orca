@@ -129,6 +129,7 @@ export function buildProvisionedRootMeta(
     ephemeralVmCheckoutMode: 'provisioned-root',
     displayName: displayNameMeta.displayName ?? args.name,
     ...displayNameMeta,
+    branchNameWasGenerated: args.nameWasGenerated === true && !args.branchNameOverride,
     lastActivityAt: now,
     createdAt: now,
     orcaCreatedAt: now,

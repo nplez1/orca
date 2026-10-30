@@ -64,6 +64,12 @@ describe('sanitizeWorktreeName', () => {
     expect(sanitizeWorktreeName('a..b...c')).toBe('a.b.c')
   })
 
+  it('keeps a .lock suffix, which only a ref rejects, not a directory', () => {
+    // Branch construction rewrites this (see computeBranchName); the folder keeps the name.
+    expect(sanitizeWorktreeName('foo.lock')).toBe('foo.lock')
+    expect(sanitizeWorktreeName('add.FOO.LOCK')).toBe('add.FOO.LOCK')
+  })
+
   it('preserves non-ASCII letters and numbers', () => {
     expect(sanitizeWorktreeName('中文')).toBe('中文')
     expect(sanitizeWorktreeName('日本語 テスト')).toBe('日本語-テスト')
@@ -278,6 +284,17 @@ describe('computeBranchName', () => {
     ).toBe('team/feature')
   })
 
+  it('rewrites a .lock leaf, which git rejects in a ref', () => {
+    expect(computeBranchName('foo.lock', { branchPrefix: 'none' }, null)).toBe('foo-lock')
+    expect(computeBranchName('foo.lock', { branchPrefix: 'git-username' }, 'jdoe')).toBe(
+      'jdoe/foo-lock'
+    )
+    // Any case: `foo.LOCK` collides with `foo`'s loose-ref lock file on a case-insensitive filesystem.
+    expect(computeBranchName('foo.LOCK', { branchPrefix: 'none' }, null)).toBe('foo-lock')
+    // A suffixed leaf does not end in .lock, so it needs no rewrite.
+    expect(computeBranchName('foo.lock-2', { branchPrefix: 'none' }, null)).toBe('foo.lock-2')
+  })
+
   it('normalizes a trailing slash on a git username prefix', () => {
     expect(computeBranchName('feature', { branchPrefix: 'git-username' }, 'jdoe/')).toBe(
       'jdoe/feature'
@@ -306,6 +323,21 @@ describe('getConfiguredBranchPrefix', () => {
 })
 
 describe('computeValidatedBranchName', () => {
+  it('rewrites a .lock leaf on the create path', () => {
+    expect(computeValidatedBranchName('foo.lock', { branchPrefix: 'none' }, null)).toBe('foo-lock')
+    expect(computeValidatedBranchName('foo.LOCK', { branchPrefix: 'none' }, null)).toBe('foo-lock')
+    expect(
+      computeValidatedBranchName(
+        'foo.lock',
+        { branchPrefix: 'custom', branchPrefixCustom: 'team' },
+        null
+      )
+    ).toBe('team/foo-lock')
+    expect(computeValidatedBranchName('foo.lock', { branchPrefix: 'git-username' }, 'jdoe')).toBe(
+      'jdoe/foo-lock'
+    )
+  })
+
   it('returns the computed branch name when the prefix is valid', () => {
     expect(
       computeValidatedBranchName(
