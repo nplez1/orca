@@ -30,6 +30,10 @@ const NODE_RUNTIME_INCLUDE = [
   // LOCAL(nplez1): imports the profile-state modules directly rather than one of the harnesses the
   // import scan keys on, so it ran under Bun and failed on the WAL reopen.
   'tests/e2e/helpers/persisted-profile-state.unit.test.ts',
+  // LOCAL(nplez1): the pipe-close case asserts that a write to a closed stdin surfaces EPIPE, and
+  // Bun on macOS reports no error for a small write to a dead pipe where Node does. Production runs
+  // on Electron's Node, so the Node runtime is the one that describes it.
+  'src/main/text-generation/source-control-wsl-prompt.test.ts',
   'src/main/ai-vault/session-scanner-unlimited-dedup.test.ts',
   // The parse cache persists through node:sqlite.
   'src/main/ai-vault/session-parse-cache-antigravity-upgrade.test.ts',

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getIntlLocale } from '@/i18n/i18n'
 import type { WorkspacePathSearchFenceIdentity } from '../../../../shared/workspace-path-search-contract'
 import {
   createCompleteWorkspacePathSearchResponse,
@@ -32,7 +33,7 @@ describe('FileExplorerNameFilterTruncationNotice', () => {
     })
 
     expect(element?.props.children).toBe(
-      `Showing the first ${(5_000).toLocaleString()} of ${(182_311).toLocaleString()} matches — add more of the name to narrow it down`
+      `Showing the first ${(5_000).toLocaleString(getIntlLocale())} of ${(182_311).toLocaleString(getIntlLocale())} matches — add more of the name to narrow it down`
     )
   })
 

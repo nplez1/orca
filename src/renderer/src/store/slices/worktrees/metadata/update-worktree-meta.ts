@@ -203,15 +203,15 @@ export function createUpdateWorktreeMeta(
       ? await settleWorktreeRename({ state: get(), worktreeId, plan: renamePlan, writePrimary })
       : null
     try {
-      if (deferUpdate) {
-        set(buildUpdate)
-      }
       if (rename?.primaryError) {
         throw rename.primaryError.reason
       }
       // Why only outside a rename: the settlement already started and awaited the caller's write.
       if (!rename) {
         await writePrimary()
+      }
+      if (deferUpdate) {
+        set(buildUpdate)
       }
       refreshHostedReviewAfterMetaUpdate({
         state: get(),

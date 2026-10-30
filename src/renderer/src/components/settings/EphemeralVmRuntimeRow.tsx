@@ -6,6 +6,7 @@ import { formatEphemeralVmCountdown } from '../../../../shared/ephemeral-vm-life
 import { useSecondTickNow } from '@/components/sidebar/prompt-cache-countdown-clock'
 import { resolveEphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
 import { translate } from '@/i18n/i18n'
+import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
 import { ephemeralVmCleanupErrorText } from '@/lib/ephemeral-vm-error-copy'
 import { cn } from '@/lib/utils'
 import { Button } from '../ui/button'
@@ -16,16 +17,14 @@ import {
   DropdownMenuTrigger
 } from '../ui/dropdown-menu'
 
-// Why the OS locale rather than the UI language: a numeric date shape following the OS region is
-// the convention everywhere else in Orca. The deadline itself is provider-reported, never inferred.
-const leaseDeadlineFormatter = new Intl.DateTimeFormat(undefined, {
+const LEASE_DEADLINE_OPTIONS: Intl.DateTimeFormatOptions = {
   dateStyle: 'medium',
   timeStyle: 'short'
-})
+}
 
 /** The provider's own instant, for the row's deadline line and the extension confirmation. */
 export function formatEphemeralVmLeaseDeadline(releaseAtMs: number): string {
-  return leaseDeadlineFormatter.format(new Date(releaseAtMs))
+  return uiDateTimeFormat(LEASE_DEADLINE_OPTIONS).format(new Date(releaseAtMs))
 }
 
 /**

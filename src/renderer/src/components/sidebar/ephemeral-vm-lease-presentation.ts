@@ -1,18 +1,16 @@
 import type { EphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
 import { isReleasedEphemeralVmRuntime } from '@/hooks/useEphemeralVmRuntimes'
+import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
 import { formatEphemeralVmRemaining } from '../../../../shared/ephemeral-vm-lifetime'
 
 /** Inside the last hour of a lease is when the chip earns its destructive tone. */
 export const EPHEMERAL_VM_LEASE_WARNING_MS = 60 * 60 * 1000
 
-const deadlineFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short'
-})
+const DEADLINE_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' }
 
 /** The provider's own instant, for a tooltip or a toast about a lease. */
 export function formatEphemeralVmDeadline(releaseAtMs: number): string {
-  return deadlineFormatter.format(new Date(releaseAtMs))
+  return uiDateTimeFormat(DEADLINE_OPTIONS).format(new Date(releaseAtMs))
 }
 
 export { isReleasedEphemeralVmRuntime }

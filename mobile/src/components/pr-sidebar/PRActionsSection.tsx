@@ -105,10 +105,15 @@ export function PRActionsSection({
     if (confirm?.kind === 'merge') {
       return adminBypassRequired
         ? {
-            title: 'Bypass branch protection?',
-            message:
-              'This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.',
-            confirmLabel: 'Merge anyway'
+            title: t(
+              'pullRequest.prActionsSection.adminBypassConfirmTitle',
+              'Bypass branch protection?'
+            ),
+            message: t(
+              'pullRequest.prActionsSection.adminBypassConfirmMessage',
+              'This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.'
+            ),
+            confirmLabel: t('pullRequest.prActionsSection.adminBypassConfirmLabel', 'Merge anyway')
           }
         : {
             title: t('pullRequest.prActionsSection.mergeConfirmTitle', 'Merge pull request?'),

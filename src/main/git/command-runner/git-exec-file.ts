@@ -297,5 +297,3 @@ export function gitExecFileAsyncBuffer(
     runUnlessGitCwdKnownMissing(options, () => gitExecFileAsyncBufferInSpan(args, options))
   )
 }
-
-export { gitExecFileSync } from './git-exec-file-sync'

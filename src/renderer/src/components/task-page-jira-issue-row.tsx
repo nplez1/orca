@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { translate } from '@/i18n/i18n'
+import { getIntlLocale, translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { JiraIssueRowContextMenu } from './JiraIssueRowContextMenu'
 import { buildJiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
@@ -233,7 +233,7 @@ export function JiraIssueRow({
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
-                {new Date(issue.updatedAt).toLocaleString()}
+                {new Date(issue.updatedAt).toLocaleString(getIntlLocale())}
               </TooltipContent>
             </Tooltip>
 

@@ -1,6 +1,6 @@
 import React from 'react'
 import type { WorkspacePathSearchResponse } from '../../../../shared/workspace-path-search-contract'
-import { translate } from '@/i18n/i18n'
+import { getIntlLocale, translate } from '@/i18n/i18n'
 
 /** Why: bounded or provisional pages must not read as complete workspace answers. */
 export function FileExplorerNameFilterTruncationNotice({
@@ -126,7 +126,10 @@ export function FileExplorerNameFilterTruncationNotice({
       {translate(
         'auto.components.right.sidebar.FileExplorer.filterShowingFirstMatches',
         'Showing the first {{value0}} of {{value1}} matches — add more of the name to narrow it down',
-        { value0: shownCount.toLocaleString(), value1: totalCount.toLocaleString() }
+        {
+          value0: shownCount.toLocaleString(getIntlLocale()),
+          value1: totalCount.toLocaleString(getIntlLocale())
+        }
       )}
     </p>
   )

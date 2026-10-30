@@ -58,7 +58,14 @@ it('keeps a settled inventory through metadata updates', async () => {
 it('keeps an in-flight query through metadata updates but replaces it for changed exclusions', async () => {
   vi.useFakeTimers()
   seedRemoteWorktree()
-  searchRuntimeFilePathsMock.mockReturnValue(new Promise(() => {}))
+  // Why reject on abort: the real RPC client does, and the fork's scheduler dispatches a
+  // replacement only after the aborted active search settles.
+  searchRuntimeFilePathsMock.mockImplementation(
+    (_context: unknown, args: { signal?: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        args.signal?.addEventListener('abort', () => reject(args.signal?.reason))
+      })
+  )
   try {
     await renderProbe({ enabled: true, states: [], query: 'target', worktreeId: 'wt-remote' })
     await act(async () => vi.advanceTimersByTimeAsync(120))

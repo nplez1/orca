@@ -41,6 +41,7 @@ vi.mock('lucide-react', async () =>
 )
 
 vi.mock('@/i18n/i18n', () => ({
+  getIntlLocale: () => 'en-US',
   translate: (_key: string, fallback: string, options?: Record<string, string>) =>
     Object.entries(options ?? {}).reduce(
       (text, [name, value]) => text.split(`{{${name}}}`).join(value),

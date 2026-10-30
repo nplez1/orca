@@ -79,7 +79,6 @@ src/main/memory/collector.ts
 src/main/native-chat/wsl-transcript-fs-process-slot.ts
 src/main/native-chat/wsl-transcript-fs-process-spawn.ts
 src/main/network/macos-system-resolver-health.ts
-src/main/network/macos-tailscale-dns-diagnostic.ts
 src/main/plugins/workers/plugin-host-process.ts
 src/main/plugins/catalog/plugin-private-marketplace-ssh-shim.cjs
 src/main/ports/port-scan-command-execution.ts
