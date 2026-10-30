@@ -82,3 +82,22 @@ describe('linkedIssueRepoIsOffDevice', () => {
     expect(linkedIssueRepoIsOffDevice([], worktree(), 97)).toBe(false)
   })
 })
+
+describe('an attachment that names its own repo', () => {
+  // The Issue pane can show any issue the workspace has attached, and an attachment records the
+  // repo it came from. Without it a picked GitHub issue is read from the workspace repo: a folder
+  // workspace has a synthetic repo id and shows nothing, and a fork answers with an unrelated issue
+  // of the same number.
+  it('wins over both the work item and the workspace', () => {
+    expect(linkedIssueRepoId(worktree({ linkedWorkItem: item }), 12, 'repo-source')).toBe(
+      'repo-source'
+    )
+    expect(findLinkedIssueRepo(repos, worktree(), 12, 'repo-source')?.path).toBe('/tmp/source')
+    expect(linkedIssueRepoIsOffDevice([repos[0]], worktree(), 12, 'repo-source')).toBe(true)
+  })
+
+  it('leaves the work-item rule in place when the attachment names none', () => {
+    expect(linkedIssueRepoId(worktree({ linkedWorkItem: item }), 97, null)).toBe('repo-source')
+    expect(linkedIssueRepoId(worktree(), 97, null)).toBe('repo-remote')
+  })
+})

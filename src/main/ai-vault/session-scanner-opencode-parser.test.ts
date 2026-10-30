@@ -12,6 +12,9 @@ import type { TranscriptMessage } from './session-transcript-consumers'
 
 let tempDirs: string[] = []
 
+// Why fixed: the parser only carries a file's mtime through, so the wall clock dates the fixture.
+const FIXTURE_MTIME_MS = 1_777_634_000_000
+
 afterEach(async () => {
   await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })))
   tempDirs = []
@@ -109,7 +112,7 @@ describe('parseOpenCodeSessionFile', () => {
     await mkdir(messageDir, { recursive: true })
 
     const path = join(sessionDir, 'ses_corrupt.json')
-    const mtimeMs = Date.now()
+    const mtimeMs = FIXTURE_MTIME_MS
     await writeFile(
       path,
       JSON.stringify({
@@ -147,7 +150,7 @@ describe('parseOpenCodeSessionFile', () => {
     await mkdir(messageDir, { recursive: true })
 
     const path = join(sessionDir, 'ses_order.json')
-    const mtimeMs = Date.now()
+    const mtimeMs = FIXTURE_MTIME_MS
     await writeFile(path, JSON.stringify({ id: 'ses_order', directory: '/tmp/opencode' }))
     // File names sort the opposite way from the transcript's creation order.
     await writeFile(join(messageDir, 'msg_a.json'), userMessage('Later turn', 1_777_634_002_000))
@@ -181,7 +184,7 @@ describe('parseOpenCodeSessionFile timestamp drift', () => {
     await mkdir(messageDir, { recursive: true })
 
     const path = join(sessionDir, 'ses_nanos.json')
-    const mtimeMs = Date.now()
+    const mtimeMs = FIXTURE_MTIME_MS
     await writeFile(
       path,
       JSON.stringify({

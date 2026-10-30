@@ -32,6 +32,7 @@
 0 src/renderer/src/components/use-task-page-jira-list-effects.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 0 src/renderer/src/components/use-worktree-jump-palette-task-url.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 0 src/renderer/src/hooks/useIssueMetadata.ts # fork has 0 where upstream allows 4; lowered by a fork prune
+1 src/renderer/src/lib/contextual-http-link.ts # transitive reader: openHttpLink reads the Link Routing preference, and the caller names the workspace the link opens into (link-routing work, 2026-10-29)
 0 src/renderer/src/lib/linear-issue-url-lookup.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 0 src/renderer/src/runtime/runtime-jira-client.ts # fork has 0 where upstream allows 17; lowered by a fork prune
 0 src/renderer/src/runtime/runtime-jira-summary-client.ts # fork has 0 where upstream allows 2; lowered by a fork prune

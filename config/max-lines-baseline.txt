@@ -3,12 +3,12 @@
 # split the oversized file instead.
 # Regenerate/prune: pnpm check:max-lines-ratchet --prune   (removes stale entries only)
 inline config/scripts/verify-localization-catalog.mjs
+inline src/cli/handlers/vm.ts
 inline src/main/agent-hooks/server/server-lifecycle.ts
 inline src/main/ai-vault/runtime-session-scanner.ts
 inline src/main/claude/hook-settings.ts
 inline src/main/ipc/ai-vault.ts
 inline src/main/ipc/filesystem/watchers/filesystem-watcher-wsl.ts
-inline src/main/ipc/register-core-handlers/register-core-handlers.ts
 inline src/main/ipc/settings.test.ts
 inline src/main/ipc/worktree-remote.ts
 inline src/main/ssh/connection/ssh-connection.ts

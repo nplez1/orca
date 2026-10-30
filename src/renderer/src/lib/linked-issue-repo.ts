@@ -23,7 +23,15 @@ type LinkedIssueWorktree = Pick<Worktree, 'repoId' | 'linkedWorkItem'>
  * that item's repo is not this number's repo, and a number chosen through the link editor
  * comes from the workspace repo, which is where the fallback reads it.
  */
-export function linkedIssueRepoId(worktree: LinkedIssueWorktree, issueNumber: number): string {
+export function linkedIssueRepoId(
+  worktree: LinkedIssueWorktree,
+  issueNumber: number,
+  /** The repo an attachment named, for a link that is not the worktree's active issue. */
+  attachmentRepoId?: string | null
+): string {
+  if (attachmentRepoId) {
+    return attachmentRepoId
+  }
   const item = worktree.linkedWorkItem
   if (item?.provider !== 'github' || item.type !== 'issue' || item.number !== issueNumber) {
     return worktree.repoId
@@ -43,9 +51,14 @@ export function findLinkedIssueRepo(
    *  states that may not carry the slice, and an absent list names no repo. */
   repos: readonly Repo[] | undefined,
   worktree: LinkedIssueWorktree,
-  issueNumber: number
+  issueNumber: number,
+  attachmentRepoId?: string | null
 ): Repo | null {
-  return getGitHubRepoLookupIndex(repos).findById(linkedIssueRepoId(worktree, issueNumber)) ?? null
+  return (
+    getGitHubRepoLookupIndex(repos).findById(
+      linkedIssueRepoId(worktree, issueNumber, attachmentRepoId)
+    ) ?? null
+  )
 }
 
 /**
@@ -56,9 +69,10 @@ export function findLinkedIssueRepo(
 export function linkedIssueRepoIsOffDevice(
   repos: readonly Repo[] | undefined,
   worktree: LinkedIssueWorktree,
-  issueNumber: number
+  issueNumber: number,
+  attachmentRepoId?: string | null
 ): boolean {
-  const repoId = linkedIssueRepoId(worktree, issueNumber)
+  const repoId = linkedIssueRepoId(worktree, issueNumber, attachmentRepoId)
   // An absent slice is not evidence about where the issue lives; the workspace-repo case
   // keeps its existing "no row, nothing to show" behaviour.
   return repoId !== worktree.repoId && !getGitHubRepoLookupIndex(repos).findById(repoId)

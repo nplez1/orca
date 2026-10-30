@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useActiveWorktree, useRepoById } from '@/store/selectors'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -11,7 +11,7 @@ import { GithubLinkedIssuePane } from './GithubLinkedIssuePane'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { JiraLinkedIssuePane } from './JiraLinkedIssuePane'
 import { LinearLinkedIssuePane } from './LinearLinkedIssuePane'
-import { resolveIssuePaneLinkedIssue } from './workspace-linked-issue'
+import { resolveIssuePaneIssues } from './workspace-linked-issue'
 
 /**
  * The account a linked issue of `provider` lives on. Why the sidebar's own resolver and not a
@@ -42,7 +42,18 @@ function linkedIssueOwnerSource(
 export default function IssuePane(): React.JSX.Element {
   const worktree = useActiveWorktree()
   const repo = useRepoById(worktree?.repoId ?? null)
-  const linkedIssue = resolveIssuePaneLinkedIssue(worktree)
+  // Why a view selection rather than the workspace's own link: the active issue is a single
+  // compatibility slot per provider, so promoting one to active across providers clears the sibling
+  // link instead of reordering them. Selecting here decides what this pane reads and nothing else.
+  const [selection, setSelection] = useState<{ worktreeId: string; key: string } | null>(null)
+  // Why derived rather than stored: the resolved list is built fresh per store write, and a
+  // selection whose issue was unlinked (or whose workspace changed) has to fall back to the
+  // workspace's own active issue — which the resolver puts first.
+  const issues = resolveIssuePaneIssues(worktree)
+  const selectedIssue =
+    (selection && worktree?.id === selection.worktreeId
+      ? issues.find((entry) => entry.key === selection.key)
+      : undefined) ?? issues[0]
   // Why a task source per provider rather than one bare target: the store's read scope, the cache
   // keys it writes, and every child that takes a source all key on it, so a single source keeps the
   // pane's reads and writes on one host. Why the workspace's own account and not the Active Server:
@@ -56,12 +67,31 @@ export default function IssuePane(): React.JSX.Element {
     }),
     [repo, worktree]
   )
+  // Why the issue's own source first: an attached issue records the account it was attached from,
+  // and the shown issue is not always the workspace's active one. The workspace's source is the
+  // fallback for a link that predates attachments.
+  const selectedSource = selectedIssue?.sourceContext ?? null
   // Why held by value: the row above is replaced by routine store writes (a PTY bind bumps
   // `lastActivityAt`), and the panes refetch on their source's identity.
-  const jiraSource = useStableTaskSource(ownerSources.jira)
-  const linearSource = useStableTaskSource(ownerSources.linear)
+  const jiraSource = useStableTaskSource(
+    selectedIssue?.issue.provider === 'jira'
+      ? (selectedSource ?? ownerSources.jira)
+      : ownerSources.jira
+  )
+  const linearSource = useStableTaskSource(
+    selectedIssue?.issue.provider === 'linear'
+      ? (selectedSource ?? ownerSources.linear)
+      : ownerSources.linear
+  )
+  // Why nullable here: a GitHub link can carry no source at all, and a fabricated one would route
+  // the read at another account.
+  const githubSource = useStableTaskSource(
+    selectedIssue?.issue.provider === 'github'
+      ? (selectedSource ?? worktree?.linkedTaskSourceContext ?? null)
+      : (worktree?.linkedTaskSourceContext ?? null)
+  )
 
-  if (!worktree || !linkedIssue) {
+  if (!worktree || !selectedIssue) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <IssuePaneMessage kind="none" />
@@ -69,32 +99,50 @@ export default function IssuePane(): React.JSX.Element {
     )
   }
 
-  // Why: key by workspace + issue so switching workspaces (or re-linking)
-  // remounts the provider body instead of carrying the previous issue's
-  // fetched state into the new one — the panel itself stays mounted.
-  const paneKey = `${worktree.id}:${linkedIssue.provider}:${linkedIssue.identifier}`
+  const issue = selectedIssue.issue
+  // Why: key by workspace + issue so switching workspaces, re-linking, or picking
+  // another issue remounts the provider body instead of carrying the previous
+  // issue's fetched state into the new one — the panel itself stays mounted.
+  const paneKey = `${worktree.id}:${selectedIssue.key}`
+  const issueSwitcher = {
+    options: issues.map((entry) => ({
+      key: entry.key,
+      provider: entry.issue.provider,
+      identifier: entry.issue.identifier,
+      title: entry.issue.title
+    })),
+    selectedKey: selectedIssue.key,
+    onSelectIssue: (key: string) => setSelection({ worktreeId: worktree.id, key })
+  }
 
-  switch (linkedIssue.provider) {
+  switch (issue.provider) {
     case 'github':
       return (
         <GithubLinkedIssuePane
           key={paneKey}
           worktree={worktree}
-          linkedIssue={linkedIssue}
-          sourceContext={worktree.linkedTaskSourceContext ?? null}
+          linkedIssue={issue}
+          sourceContext={githubSource}
+          issueSwitcher={issueSwitcher}
         />
       )
     case 'linear':
       return (
         <LinearLinkedIssuePane
           key={paneKey}
-          linkedIssue={linkedIssue}
+          linkedIssue={issue}
           sourceContext={linearSource}
+          issueSwitcher={issueSwitcher}
         />
       )
     case 'jira':
       return (
-        <JiraLinkedIssuePane key={paneKey} linkedIssue={linkedIssue} sourceContext={jiraSource} />
+        <JiraLinkedIssuePane
+          key={paneKey}
+          linkedIssue={issue}
+          sourceContext={jiraSource}
+          issueSwitcher={issueSwitcher}
+        />
       )
   }
 }

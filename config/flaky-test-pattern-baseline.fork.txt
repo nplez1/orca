@@ -2,18 +2,14 @@
 # A row here replaces that file's row for the same rule:path; 0 withdraws upstream's allowance.
 # Only keys whose count differs from upstream belong here; every row says why.
 # Prune writes this file, never the upstream one: pnpm check:flaky-test-pattern-ratchet --prune
-0 test-no-polling-loop:src/main/ipc/filesystem-watcher-real.test.ts # path is gone from the fork tree (moved or deleted by the fork); upstream still lists it
-0 test-no-real-time-wait:src/main/ipc/filesystem-watcher-local-events.test.ts # path is gone from the fork tree (moved or deleted by the fork); upstream still lists it
-0 test-no-real-time-wait:src/main/ipc/filesystem-watcher-local-unsubscribe.test.ts # path is gone from the fork tree (moved or deleted by the fork); upstream still lists it
-0 test-no-real-time-wait:src/main/ipc/filesystem-watcher-real.test.ts # path is gone from the fork tree (moved or deleted by the fork); upstream still lists it
-1 test-no-real-time-wait:src/packages/process-host/src/process-deadline.test.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 0 test-no-real-time-wait:src/renderer/src/components/dashboard-popout/useDashboardSnapshot.test.tsx # path is gone from the fork tree (moved or deleted by the fork); upstream still lists it
 1 test-no-real-time-wait:src/shared/workspace-path-memory-measurement.test.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 1 test-no-real-time-wait:tests/e2e/agent-tab-focus-retention.spec.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
-6 test-no-real-time-wait:tests/e2e/orchestration-idle-mail-delivery.spec.ts # fork has 6 where upstream allows 7; lowered by a fork prune
+0 test-no-wall-clock:src/main/ai-vault/session-scanner-copilot-parser.test.ts
+0 test-no-wall-clock:src/main/ai-vault/session-scanner-grok-parser.test.ts
+0 test-no-wall-clock:src/main/ai-vault/session-scanner-opencode-parser.test.ts
 1 test-no-wall-clock:src/main/github/pr-refresh-gh-account-binding.test.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 0 test-no-wall-clock:src/main/ipc/ai-vault.test.ts # fork has 0 where upstream allows 1; lowered by a fork prune
-0 test-no-wall-clock:src/main/ipc/filesystem-watcher-real.test.ts # path is gone from the fork tree (moved or deleted by the fork); upstream still lists it
 2 test-no-wall-clock:src/main/ipc/worktrees/listing/persisted-worktree-scan-cache.test.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 1 test-no-wall-clock:src/renderer/src/components/jira-sprint-picker.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 2 test-no-wall-clock:src/renderer/src/components/right-sidebar/LinearLinkedIssuePane.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
@@ -23,4 +19,3 @@
 0 test-no-wall-clock:src/renderer/src/lib/worktree-activation-emptied-workspace-reseed.test.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 1 test-no-wall-clock:src/shared/agent-hook-listener-descendant-lifecycle.test.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 1 test-no-wall-clock:src/shared/agent-hook-listener/nested-pi-session-guard.test.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
-0 test-timeout-needs-reason:src/main/ipc/filesystem-watcher-lifecycle-model.test.ts # path is gone from the fork tree (moved or deleted by the fork); upstream still lists it

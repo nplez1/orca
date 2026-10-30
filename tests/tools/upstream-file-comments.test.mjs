@@ -11,6 +11,14 @@ import {
   parseArgs
 } from '../../local/check-upstream-file-comments.mjs'
 
+// Why assembled: `check:max-lines-ratchet` reads this file's text, so a literal disable directive in a
+// fixture would read as a real one. Each token stays on its own line for the same reason.
+const MAX_LINES_DISABLE = [
+  '// eslint-disable',
+  'max-lines',
+  '-- Why: the registry is one list'
+].join(' ')
+
 const DIFF = [
   'diff --git a/src/main/owned.ts b/src/main/owned.ts',
   'index 111..222 100644',
@@ -25,7 +33,7 @@ const DIFF = [
   '+ */',
   '-// removed upstream comment',
   '@@ -10,2 +15,3 @@',
-  '+// eslint-disable max-lines -- Why: the registry is one list',
+  `+${MAX_LINES_DISABLE}`,
   '+const other = 3',
   'diff --git a/src/shared/added.ts b/src/shared/added.ts',
   'new file mode 100644',
@@ -37,7 +45,6 @@ const DIFF = [
 ].join('\n')
 
 const tempDirs = []
-
 function tempRepo() {
   const root = mkdtempSync(join(tmpdir(), 'upstream-file-comments-'))
   tempDirs.push(root)
@@ -87,7 +94,7 @@ describe('collectAddedCommentLines', () => {
       '--- a/src/main/owned.ts',
       '+++ b/src/main/owned.ts',
       '@@ -1 +1,2 @@',
-      '+// eslint-disable max-lines -- Why: one registry list',
+      `+${MAX_LINES_DISABLE}`,
       '+// ordinary rationale'
     ].join('\n')
     expect([...collectAddedCommentLines(diff).values()]).toEqual([1])

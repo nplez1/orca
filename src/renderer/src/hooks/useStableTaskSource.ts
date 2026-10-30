@@ -12,7 +12,10 @@ import {
  * them to a loader. The comparison is the task-source contract's own, so two sources that route and
  * cache identically are treated as one.
  */
-export function useStableTaskSource(source: TaskSourceContext): TaskSourceContext {
+export function useStableTaskSource(source: TaskSourceContext): TaskSourceContext
+/** For a link that may carry no source at all: null stays null instead of becoming a source. */
+export function useStableTaskSource(source: TaskSourceContext | null): TaskSourceContext | null
+export function useStableTaskSource(source: TaskSourceContext | null): TaskSourceContext | null {
   const held = useRef(source)
   if (!areTaskSourceContextsEqual(held.current, source)) {
     held.current = source

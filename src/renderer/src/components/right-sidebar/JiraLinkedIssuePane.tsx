@@ -22,6 +22,7 @@ import { translate } from '@/i18n/i18n'
 import { IssueAssigneeCombobox, type IssueAssigneeOption } from './IssueAssigneeCombobox'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
+import type { IssuePaneIssueSwitcherProps } from './IssuePaneIssueSwitcher'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 import { JiraEditFieldsRow } from './JiraEditFieldsRow'
@@ -58,16 +59,18 @@ function jiraCommentView(comment: JiraComment): IssueCommentView {
  *  the narrow sidebar, reusing the Task view's Jira hydration hook. */
 export function JiraLinkedIssuePane({
   linkedIssue,
-  sourceContext
+  sourceContext,
+  issueSwitcher
 }: {
   linkedIssue: JiraLinked
   /** The issue's provider account: the host the workspace's creation-time task came from, else the
    *  workspace's own host. Never the Active Server, so one source drives every read, write and
    *  cache patch this pane owns. */
   sourceContext: TaskSourceContext
+  issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
   const viewerAccountId = useAppStore((s) => s.jiraStatus.viewer?.accountId ?? null)
-  const linkActions = useLinkedIssuePaneActions()
+  const linkActions = useLinkedIssuePaneActions(linkedIssue)
   const providerSettings: RuntimeJiraSettings = sourceContext
   const detail = useJiraIssueWorkspaceDetail({
     issue: null,
@@ -102,6 +105,7 @@ export function JiraLinkedIssuePane({
         onUnlinkIssue={linkActions.unlinkIssue}
         onLinkAnotherIssue={linkActions.linkAnotherIssue}
         linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
+        issueSwitcher={issueSwitcher}
         onTitleCommit={
           displayed ? (title) => void detail.mutateIssue('title', { title }, { title }) : undefined
         }

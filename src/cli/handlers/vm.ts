@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's VM handler plus the fork's recipe-doctor and extend
+   entry points. Splitting an upstream file costs a hunk on every sync (LOCAL-PATCHES.md § local(lint)). */
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { CommandHandler } from '../dispatch'

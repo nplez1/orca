@@ -186,7 +186,9 @@ describe('foldSessionSummaryEvents', () => {
         }
         inFlight += 1
         peak = Math.max(peak, inFlight)
-        await new Promise((resolve) => setTimeout(resolve, 1))
+        // Why a zero-delay yield: this fake brain has to stay in flight across an await for the
+        // limiter's peak to be observable, and a real delay would make the test the clock's problem.
+        await new Promise((resolve) => setTimeout(resolve, 0))
         inFlight -= 1
         return JSON.stringify({ done: ['chunk'] })
       }
@@ -214,7 +216,9 @@ describe('foldSessionSummaryEvents', () => {
           throw new Error('extract failed')
         }
         siblingSignals.push(signal)
-        await new Promise((resolve) => setTimeout(resolve, 20))
+        // Why a zero-delay yield: the sibling only has to still be awaiting something when the
+        // first call's failure lands; a real delay adds nothing but wall-clock dependence.
+        await new Promise((resolve) => setTimeout(resolve, 0))
         return JSON.stringify({ done: ['late'] })
       }
     }

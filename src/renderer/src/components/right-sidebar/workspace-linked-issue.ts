@@ -1,4 +1,6 @@
-import type { Worktree } from '../../../../shared/worktree/types'
+import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
+import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments'
 
 /** The issue a workspace is linked to, normalized across providers.
  *
@@ -13,6 +15,9 @@ export type WorkspaceLinkedIssue =
       identifier: string
       url: string | null
       title: string | null
+      /** The repo the attachment named, when one did. Absent means "the workspace's own
+       *  repo", which is the only thing a bare number slot can say. */
+      repoId?: string | null
     }
   | {
       provider: 'linear'
@@ -48,6 +53,7 @@ type LinkedIssueSource = Pick<
   | 'linkedLinearIssueOrganizationUrlKey'
   | 'linkedGitLabIssue'
   | 'linkedWorkItem'
+  | 'linkedItems'
 >
 
 function linkedJiraIssueIdentifier(item: NonNullable<Worktree['linkedWorkItem']>): string {
@@ -139,17 +145,157 @@ export function resolveWorkspaceLinkedIssue(
   }
 }
 
+/** One issue the pane can show, with the account its own attachment recorded. */
+export type IssuePaneIssue = {
+  /** Identity within one workspace: what a selection holds and what the pane is
+   *  keyed on. Attachment keys move when a title, URL or source is filled in, so
+   *  selecting on one would drop the selection on the next refresh. */
+  key: string
+  issue: SupportedWorkspaceLinkedIssue
+  sourceContext: TaskSourceContext | null
+}
+
+function issuePaneIssueIdentity(issue: SupportedWorkspaceLinkedIssue): string {
+  return `${issue.provider}:${issue.identifier.toLowerCase()}`
+}
+
+/** Two issues are the same issue when their provider and identifier agree *and* they name the same
+ *  repo: a GitHub number is unique per repo, so `#12` in two repos is two issues. */
+function issuePaneIssueKey(issue: SupportedWorkspaceLinkedIssue): string {
+  const repo = issue.provider === 'github' && issue.repoId ? [issue.repoId] : []
+  return [issuePaneIssueIdentity(issue), ...repo].join(':')
+}
+
+/** The pane-renderable issue an attachment describes, or null for the providers
+ *  this pane has no detail body for (a GitLab issue, a cross-provider PR). */
+export function linkedIssueFromAttachment(
+  item: WorkspaceAttachment
+): SupportedWorkspaceLinkedIssue | null {
+  if (item.type !== 'issue') {
+    return null
+  }
+  const identifier = item.identifier ?? item.linearIdentifier ?? item.jiraIdentifier
+  switch (item.provider) {
+    case 'github':
+      return {
+        provider: 'github',
+        number: item.number,
+        identifier: `#${item.number}`,
+        url: item.url || null,
+        title: item.title || null,
+        repoId: item.repoId ?? null
+      }
+    case 'linear':
+      return {
+        provider: 'linear',
+        identifier: identifier ?? String(item.number),
+        workspaceId: item.linearWorkspaceId ?? null,
+        organizationUrlKey: item.linearOrganizationUrlKey ?? null,
+        url: item.url || null,
+        title: item.title || null
+      }
+    case 'jira':
+      return {
+        provider: 'jira',
+        key: identifier ?? String(item.number),
+        identifier: identifier ?? String(item.number),
+        url: item.url || null,
+        title: item.title || null
+      }
+    // The pane has no detail body for these, so an attachment of one is not selectable here.
+    case 'gitlab':
+    case 'bitbucket':
+    case 'azure-devops':
+    case 'gitea':
+      return null
+  }
+}
+
+/** Every issue the pane can show for this workspace, the workspace's own active
+ *  issue first.
+ *
+ *  A workspace keeps all of its attachments in `linkedItems` and selects one
+ *  active issue per provider through the compatibility slots, so the list is the
+ *  slots' issue plus the attachments — the same union the sidebar card lists.
+ *  The active issue leads because it is the default view, and because the activity
+ *  bar reads its provider. */
+export function resolveIssuePaneIssues(
+  worktree: LinkedIssueSource | null | undefined
+): IssuePaneIssue[] {
+  if (!worktree) {
+    return []
+  }
+  const attached: IssuePaneIssue[] = []
+  for (const item of getWorkspaceAttachments(worktree)) {
+    const issue = linkedIssueFromAttachment(item)
+    if (issue) {
+      attached.push({
+        key: issuePaneIssueKey(issue),
+        issue,
+        sourceContext: item.taskSourceContext ?? null
+      })
+    }
+  }
+  const active = resolveWorkspaceLinkedIssue(worktree)
+  const activeIssue = active && active.provider !== 'gitlab' ? active : null
+  const entries: IssuePaneIssue[] = []
+  const seen = new Set<string>()
+  const push = (entry: IssuePaneIssue): void => {
+    if (!seen.has(entry.key)) {
+      seen.add(entry.key)
+      entries.push(entry)
+    }
+  }
+  if (activeIssue) {
+    const identity = issuePaneIssueIdentity(activeIssue)
+    // Why matched by identity rather than by key: the slot names a bare number, so its entry carries
+    // no repo. The attachment is the one that knows which repo's issue this is.
+    // Why a synthesized entry otherwise: the slot can name an issue before `linkedItems` carries it.
+    push(
+      attached.find((entry) => issuePaneIssueIdentity(entry.issue) === identity) ?? {
+        key: issuePaneIssueKey(activeIssue),
+        issue: activeIssue,
+        sourceContext: null
+      }
+    )
+  }
+  for (const entry of attached) {
+    push(entry)
+  }
+  return entries
+}
+
+/** The attachment a shown issue came from, so an action can address that issue
+ *  rather than every issue the workspace has slots for. */
+export function findWorkspaceIssueAttachment(
+  worktree: LinkedIssueSource | null | undefined,
+  issue: Pick<SupportedWorkspaceLinkedIssue, 'provider' | 'identifier'> & { repoId?: string | null }
+): WorkspaceAttachment | null {
+  if (!worktree) {
+    return null
+  }
+  const matches = getWorkspaceAttachments(worktree).filter((item) => {
+    if (item.type !== 'issue' || item.provider !== issue.provider) {
+      return false
+    }
+    const identifier = item.identifier ?? item.linearIdentifier ?? item.jiraIdentifier
+    return issue.provider === 'github'
+      ? `#${item.number}` === issue.identifier
+      : identifier?.toLowerCase() === issue.identifier.toLowerCase()
+  })
+  // Why the repo: the same number exists in another repo as a different issue, so an unscoped match
+  // would unlink the one the user is not looking at.
+  return (
+    (issue.repoId ? matches.find((item) => item.repoId === issue.repoId) : undefined) ??
+    matches[0] ??
+    null
+  )
+}
+
 /** The linked issue when the pane can render it, else null. This is what the
  *  activity bar gates the Issue tab on. */
 export function resolveIssuePaneLinkedIssue(
   worktree: LinkedIssueSource | null | undefined
 ): SupportedWorkspaceLinkedIssue | null {
-  if (!worktree) {
-    return null
-  }
-  const linked = resolveWorkspaceLinkedIssue(worktree)
-  if (!linked || linked.provider === 'gitlab') {
-    return null
-  }
-  return linked
+  return resolveIssuePaneIssues(worktree)[0]?.issue ?? null
 }
