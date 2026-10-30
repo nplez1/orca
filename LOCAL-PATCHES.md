@@ -700,6 +700,40 @@ producing a command with no deadline), and the `## Opening a PR` example derives
 Scope: same as `local(skills)` — a fresh worktree cut from `nplez1/main` carries it; a worktree
 branched before this commit does not.
 
+### `local(test)`: the 2026-10-29 box — repaired in the tree, and the eight that are recorded
+
+A new machine (18-core, 128 GB, macOS) red the full unit gate at base revision `ef46e09b03`:
+136248 passed, 80 failed. The allowlist declared six entries and this box needed more, so the run was
+classified before anything was recorded.
+
+**Repaired, not recorded.** Twenty-one failures were the machine: four from a shell hook writing
+to stderr on every zsh start (two suites assert empty shell output), fourteen from macOS `/bin/bash`
+3.2 against CI's bash 5.x (`mapfile`, `${arr[@]}` under `set -u`) and three from browsers Playwright
+had not downloaded. The remaining twelve were fork-local drift that no allowlist entry may cover,
+because each is deterministic on any machine: a `vi.mock('electron')` factory that never learned
+`ipcMain.on` (added by #234) and a coordinator mock that never learned `reportQuitCancelled` (added
+by audit-216); `.github/scripts/fork-release-ref-guard.sh` using `${var,,}`, which is bash 4 syntax
+in a script the suite runs with an unqualified `bash`; `fork-pr-gates.yml` missing from
+`ci-closed-pr-caches.yml`'s cleanup targets; upstream's draft-PR invariant, which the fork's
+`fork-pr-gates.yml` deliberately does not follow; three `copilot-1-0-105` transcripts the fork added
+to a shared fixture directory without baseline rows; and a settings suite that reconciled the real
+`~/.claude` because it left `agent-view-service` unmocked — the write guard was right, the test was
+wrong.
+
+**Recorded.** Two classes, sixteen entries:
+
+- `fork-home-migration-mock` (6) — `local(identity)` added the pre-rename home adoption, and
+  `resolveLegacyHomeStoreIn` (`src/main/home-directory-migration.ts:114`) reads its adoption marker on
+  every `getApiKeyPath()`, before the key file. The four credential-store suites queue reads with
+  `mockReturnValueOnce`, so the marker read spends the one-shot; the store then decodes `undefined`
+  and `encrypted-api-key-file-store.ts:167` wraps it as "could not be decrypted". That message sent
+  the first diagnosis to Keychain, which was wrong. The fix couples product and test — memoise the
+  resolved path per store instance, or make those mocks path-aware — so it belongs in its own change.
+- `fork-credentials-ratchet` (2) — `src/main/claude-accounts/claude-oauth-pending-rotations.ts`
+  (`afbf7860833`, `e09393fec57`) has no `fsAllowances` row for its `rmSync` and no
+  `CREDENTIAL_ROTATION_OWNERS` row for its rotation write. The ratchet is working; granting it here
+  would approve an unreviewed persistence surface.
+
 ### `local(test)`: five more environment-bound reds, recorded from the np.37 full run
 
 The full suite on this machine (macOS, external volume, other agents' runs contending) leaves 26

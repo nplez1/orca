@@ -13,7 +13,8 @@ vi.mock('./terminal/window-close-running-work', () => ({
   assessWindowCloseRunningWork: assessWindowCloseRunningWorkMock
 }))
 vi.mock('./window-close-request-coordinator', () => ({
-  runWithWindowCloseCheckpointScope: (fn: () => unknown) => fn()
+  runWithWindowCloseCheckpointScope: (fn: () => unknown) => fn(),
+  reportQuitCancelled: vi.fn()
 }))
 vi.mock('@/lib/shutdown-checkpoint-failure-toast', () => ({
   showShutdownCheckpointFailureToast: vi.fn()

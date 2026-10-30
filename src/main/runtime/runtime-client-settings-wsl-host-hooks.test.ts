@@ -17,6 +17,11 @@ vi.mock('../agent-hooks/managed-agent-hook-controls', () => ({
 vi.mock('../ipc/wsl-guest-windows-drive-path', () => ({
   isWslHostOrcadProcess: mocks.wslHost
 }))
+// The real service reconciles ~/.claude from app state; these cases only assert the mocked hook
+// controls, and the write guard rightly refuses a real agent-home write.
+vi.mock('../claude/agent-view-service', () => ({
+  getClaudeAgentViewService: () => ({ reconcile: async () => {} })
+}))
 
 function controller(): RuntimeClientSettingsController {
   let settings = createGlobalSettingsFixture({ agentStatusHooksEnabled: true })

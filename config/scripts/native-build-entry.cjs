@@ -8,6 +8,8 @@ const { join, relative, isAbsolute } = require('node:path')
 // Publish immutable build/<entry> per ABI atomically; patched node-pty/windows-process-tree loaders must compute same names (parity test).
 
 const ENTRY_PREFIX = 'orca-'
+// The patched loaders probe this slot before upstream's build/Release; an upstream copy lacks it entirely.
+const NODE_PTY_LOADER_BUILD_ENTRY_MARKER = `build/${ENTRY_PREFIX}napi-`
 
 const NATIVE_BUILD_PACKAGES = {
   // Both use N-API: same platform/arch binary loads in Node and Electron.
@@ -48,6 +50,10 @@ function nodePtyNativeModuleName(platform = process.platform, osRelease = releas
 
 function isNativeBuildEntryName(name) {
   return name.startsWith(ENTRY_PREFIX)
+}
+
+function nodePtyLoaderUsesBuildEntry(source) {
+  return typeof source === 'string' && source.includes(NODE_PTY_LOADER_BUILD_ENTRY_MARKER)
 }
 
 const TRANSIENT_NATIVE_BUILD_ENTRY_FILTER = [`!build/${ENTRY_PREFIX}*.{staging,unusable}-*{,/**/*}`]
@@ -104,6 +110,7 @@ function isSourceBuildDir(nativeDir) {
 
 module.exports = {
   NATIVE_BUILD_PACKAGES,
+  NODE_PTY_LOADER_BUILD_ENTRY_MARKER,
   TRANSIENT_NATIVE_BUILD_ENTRY_FILTER,
   isNativeBuildEntryName,
   isSharedNativePackage,
@@ -113,6 +120,7 @@ module.exports = {
   nativeBuildEntryDir,
   nativeBuildEntryName,
   nodePtyBuildArtifactPaths,
+  nodePtyLoaderUsesBuildEntry,
   nodePtyNativeModuleName,
   resolveNativePackageDir
 }

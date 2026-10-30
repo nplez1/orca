@@ -6,9 +6,9 @@ import { compileAggregateExpression } from './pr-aggregate-gate-context.mjs'
 const workflows = readdirSync('.github/workflows').flatMap((file) => {
   const workflow = parse(readFileSync(`.github/workflows/${file}`, 'utf8'))
   // The LoC reporter updates PR metadata rather than running CI.
-  return Object.hasOwn(workflow.on ?? {}, 'pull_request') && file !== 'pr-test-loc.yml'
-    ? [{ file, workflow }]
-    : []
+  // fork-pr-gates.yml runs on drafts by fork policy; upstream's draft invariant is not the fork's.
+  const notCi = file === 'pr-test-loc.yml' || file === 'fork-pr-gates.yml'
+  return Object.hasOwn(workflow.on ?? {}, 'pull_request') && !notCi ? [{ file, workflow }] : []
 })
 
 function admitted(condition, draft, needs = {}, eventName = 'pull_request') {
