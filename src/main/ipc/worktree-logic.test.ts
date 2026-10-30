@@ -289,8 +289,8 @@ describe('computeBranchName', () => {
     expect(computeBranchName('foo.lock', { branchPrefix: 'git-username' }, 'jdoe')).toBe(
       'jdoe/foo-lock'
     )
-    // git only rejects the lowercase suffix.
-    expect(computeBranchName('foo.LOCK', { branchPrefix: 'none' }, null)).toBe('foo.LOCK')
+    // Any case: `foo.LOCK` collides with `foo`'s loose-ref lock file on a case-insensitive filesystem.
+    expect(computeBranchName('foo.LOCK', { branchPrefix: 'none' }, null)).toBe('foo-lock')
     // A suffixed leaf does not end in .lock, so it needs no rewrite.
     expect(computeBranchName('foo.lock-2', { branchPrefix: 'none' }, null)).toBe('foo.lock-2')
   })
@@ -323,6 +323,21 @@ describe('getConfiguredBranchPrefix', () => {
 })
 
 describe('computeValidatedBranchName', () => {
+  it('rewrites a .lock leaf on the create path', () => {
+    expect(computeValidatedBranchName('foo.lock', { branchPrefix: 'none' }, null)).toBe('foo-lock')
+    expect(computeValidatedBranchName('foo.LOCK', { branchPrefix: 'none' }, null)).toBe('foo-lock')
+    expect(
+      computeValidatedBranchName(
+        'foo.lock',
+        { branchPrefix: 'custom', branchPrefixCustom: 'team' },
+        null
+      )
+    ).toBe('team/foo-lock')
+    expect(computeValidatedBranchName('foo.lock', { branchPrefix: 'git-username' }, 'jdoe')).toBe(
+      'jdoe/foo-lock'
+    )
+  })
+
   it('returns the computed branch name when the prefix is valid', () => {
     expect(
       computeValidatedBranchName(

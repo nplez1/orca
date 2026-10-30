@@ -15,9 +15,9 @@ export function getConfiguredBranchPrefix(
   return raw ? normalizeBranchPrefix(raw) || null : null
 }
 
-/** git check-ref-format rejects a ref ending in lowercase `.lock` (`.LOCK` is accepted); folders keep the name. */
+/** git rejects a `.lock` ref suffix, and `foo.LOCK` shares a loose-ref filename with `foo`'s lock on a case-insensitive filesystem. Folders keep the name. */
 function toRefLeaf(leaf: string): string {
-  return leaf.replace(/\.lock$/, '-lock')
+  return leaf.replace(/\.lock$/i, '-lock')
 }
 
 export function computeBranchName(
