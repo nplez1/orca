@@ -52,7 +52,8 @@ describe('Grok background work that outlives a cancel', () => {
       'pre_tool_use: working',
       'stop_cancelled: working',
       'idle_prompt: working',
-      'child session_end: working monitoring',
+      // LOCAL(nplez1): plain `working`, not `monitoring` — see LOCAL-PATCHES.md.
+      'child session_end: working',
       // Grok's own follow-up turn once the subagent finished.
       'user_prompt_submit: working',
       'pre_tool_use: working'
@@ -67,7 +68,8 @@ describe('Grok background work that outlives a cancel', () => {
       'pre_tool_use: working',
       'post_tool_use: working',
       'pre_tool_use: working',
-      'stop_cancelled: working monitoring',
+      // LOCAL(nplez1): plain `working`, not `monitoring` — see LOCAL-PATCHES.md.
+      'stop_cancelled: working',
       'task_complete: done interrupted',
       'idle_prompt: done interrupted'
     ])

@@ -11,9 +11,7 @@
         "ShortcutsPane": {
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
-        "sshHostServer": {
-          "runtimeNoexec": "Bu ana makine ~/.orca-np-remote dizininden program çalıştırmaya izin vermediği için Orca sunucusunu burada başlatamıyor. Bu genellikle ev klasörünün noexec ile bağlandığı anlamına gelir. Ana makinenin yöneticisinden burada program çalıştırılmasına izin vermesini isteyin, ardından yeniden bağlanın."
-        }
+        "sshHostServer": {}
       }
     },
     "hooks": {

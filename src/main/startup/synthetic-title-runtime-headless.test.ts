@@ -43,7 +43,7 @@ beforeEach(() => {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the producer reads only these two members of the runtime.
   mainProcessState.runtime = {
     ingestSyntheticTitleFrame: hooks.ingest,
-    getTrackedPtyTitle: () => null,
+    getTrackedPtyTitle: hooks.trackedTitle,
     getTrackedVisiblePtyTitle: hooks.trackedTitle
   } as unknown as typeof mainProcessState.runtime
 })

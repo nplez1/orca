@@ -24,9 +24,7 @@
         "ShortcutsPane": {
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
-        "sshHostServer": {
-          "runtimeNoexec": "Cet hôte n'autorise pas l'exécution de programmes à partir de ~/.orca-np-remote, donc Orca ne peut pas y démarrer son serveur. Cela signifie généralement que le dossier personnel est monté avec noexec. Demandez à l’administrateur de l’hôte d’autoriser l’exécution de programmes là-bas, puis reconnectez-vous."
-        }
+        "sshHostServer": {}
       }
     },
     "hooks": {

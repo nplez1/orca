@@ -24,9 +24,7 @@
         "ShortcutsPane": {
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
-        "sshHostServer": {
-          "runtimeNoexec": "此主机不允许执行 ~/.orca-np-remote 中的程序，因此 Orca 无法在那里启动服务器。这通常是因为主目录以 noexec 选项挂载。请联系主机管理员，允许在该目录中执行程序，然后重新连接。"
-        }
+        "sshHostServer": {}
       }
     },
     "hooks": {

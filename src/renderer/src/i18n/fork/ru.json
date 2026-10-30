@@ -11,9 +11,7 @@
         "ShortcutsPane": {
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
-        "sshHostServer": {
-          "runtimeNoexec": "На этом сервере запрещён запуск программ из ~/.orca-np-remote, поэтому сервер Orca не может запуститься. Обычно домашняя папка смонтирована с noexec. Попросите администратора разрешить запуск программ из неё и подключитесь снова."
-        }
+        "sshHostServer": {}
       }
     },
     "hooks": {
