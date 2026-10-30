@@ -33,6 +33,7 @@ export type ChecksPanelPollingInput = Pick<
     | 'pollIntervalRef'
     | 'prevChecksRef'
     | 'repo'
+    | 'retractStalePRRefreshError'
     | 'setChecks'
     | 'setChecksError'
     | 'setChecksLoading'
@@ -87,8 +88,10 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         setChecks,
         setChecksError,
         pollIntervalRef,
-        prevChecksRef
+        prevChecksRef,
+        retractStalePRRefreshError
       } = modelRef.current
+      const readStartedAt = Date.now()
       const checksPending = hasUnfinishedChecks(checks)
       const targetPRNumber = prNumberOverride ?? prNumber
       if (!repo || !targetPRNumber) {
@@ -124,6 +127,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
           return
         }
         setChecks(result)
+        retractStalePRRefreshError(prCacheKey, readStartedAt)
 
         // Unchanged details back off; a changed result restores the selected cadence.
         const signature = policyRef.current.accept(result)

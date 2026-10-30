@@ -107,9 +107,10 @@ export function setGitHubPRResultCaches(
     prCache: state.prCache,
     hostedReviewCache: state.hostedReviewCache
   })
-  const retractedRefreshStates = args.requestStartedAt
-    ? clearStalePRRefreshError(state.prRefreshStates, args.prCacheKey, args.requestStartedAt)
-    : null
+  const retractedRefreshStates =
+    args.requestStartedAt !== undefined
+      ? clearStalePRRefreshError(state.prRefreshStates, args.prCacheKey, args.requestStartedAt)
+      : null
   return {
     ...(next.prCache === state.prCache ? {} : { prCache: next.prCache }),
     ...(next.hostedReviewCache === state.hostedReviewCache

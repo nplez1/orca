@@ -151,6 +151,7 @@ export type GitHubSlice = {
     token: PRRefreshStateClearToken,
     now?: number
   ) => void
+  retractStalePRRefreshError: (cacheKey: string, requestStartedAt: number) => void
   /** SWR: returns cached work items immediately (null if none) and fires a background refresh when stale. */
   getCachedWorkItems: (
     repoId: string,

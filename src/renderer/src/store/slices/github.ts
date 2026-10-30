@@ -3,6 +3,7 @@ import type { AppState } from '../types'
 import type { GitHubSlice as GitHubSliceContract } from '../github/slice-types'
 import {
   ACTIVE_PR_REFRESH_STATUSES,
+  clearStalePRRefreshError,
   getEffectiveGitHubPRRefreshState,
   isExpiredActivePRRefreshState
 } from '../github/pr-refresh-state'
@@ -76,6 +77,13 @@ export const createGitHubSlice: StateCreator<AppState, [], [], GitHubSlice> = (
       delete nextStates[cacheKey]
       return { prRefreshStates: nextStates }
     })
+  },
+
+  retractStalePRRefreshError: (cacheKey, requestStartedAt) => {
+    const nextStates = clearStalePRRefreshError(get().prRefreshStates, cacheKey, requestStartedAt)
+    if (nextStates) {
+      set({ prRefreshStates: nextStates })
+    }
   },
 
   ...createProjectActions(set, get),

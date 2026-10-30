@@ -53,6 +53,7 @@ export function useChecksPanelControllerState() {
   const fetchPRForBranch = useAppStore((s) => s.fetchPRForBranch)
   const fetchHostedReviewForBranch = useAppStore((s) => s.fetchHostedReviewForBranch)
   const expireGitHubPRRefreshState = useAppStore((s) => s.expireGitHubPRRefreshState)
+  const retractStalePRRefreshError = useAppStore((s) => s.retractStalePRRefreshError)
   const getHostedReviewCreationEligibility = useAppStore(
     (s) => s.getHostedReviewCreationEligibility
   )
@@ -265,6 +266,7 @@ export function useChecksPanelControllerState() {
     fetchPRForBranch,
     fetchHostedReviewForBranch,
     expireGitHubPRRefreshState,
+    retractStalePRRefreshError,
     getHostedReviewCreationEligibility,
     createHostedReview,
     createStackedHostedReview,
