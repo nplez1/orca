@@ -1,6 +1,5 @@
 /* eslint-disable max-lines */
 
-import { selectWorktreeCreateBranchSeed } from '../worktree-create-branch-seed'
 import { worktreeCreateGit } from '../git/worktree-create-git-executor'
 import { getStoredRepoExecutionHostId } from '../repo-execution-host'
 import type { BrowserWindow } from 'electron'
@@ -1069,7 +1068,6 @@ async function performLocalWorktreeCreate(
       : {})
   })
 
-  const branchSeed = selectWorktreeCreateBranchSeed(args, settings.autoRenameBranchFromWork)
   const requestedName = args.name
   const sanitizedName = sanitizeWorktreeName(args.name)
   const displayNameRequest = resolveWorktreeCreateDisplayNameRequest(
@@ -1306,7 +1304,7 @@ async function performLocalWorktreeCreate(
               // Why: an exact branch keeps its name; only the worktree directory may take the suffix.
               args.exactBranchName ? 1 : suffix
             ),
-        branchSeed ? getWorktreeCreateCandidate(branchSeed, suffix) : effectiveSanitizedName,
+        effectiveSanitizedName,
         settings,
         username,
         localWorktreeGitOptions

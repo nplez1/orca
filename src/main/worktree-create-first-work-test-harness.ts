@@ -1,4 +1,4 @@
-import { expect, vi, type Mock } from 'vitest'
+import { vi, type Mock } from 'vitest'
 import type { CreateWorktreeArgs } from '../shared/worktree/create-types'
 import type { Worktree } from '../shared/worktree/types'
 import type { WorktreeMeta } from '../shared/worktree/meta-types'
@@ -17,14 +17,27 @@ export const labelOnlyCreateRequests: Pick<
 >[] = [
   { name: '認証を修正', displayName: '認証を修正', displayNameKind: 'user' },
   { name: 'fix-authentication', displayNameKind: 'user' },
+  // The dialog's own input: a label with a slash and a space must reach the branch sanitized.
+  {
+    name: 'Branch/Workspace Naming',
+    displayName: 'Branch/Workspace Naming',
+    displayNameKind: 'user'
+  },
   { name: 'nautilus', nameWasGenerated: true }
 ]
+
+export type FirstWorkRenameOutcome = {
+  /** Post-attempt worktree, merged with whatever meta the rename wrote. */
+  worktree: Worktree
+  /** False when the branch was not a creature seed, so first-work naming left it alone. */
+  renamed: boolean
+}
 
 export async function renameCreatedWorktreeOnFirstWork(
   worktree: Worktree,
   initialMeta: Partial<WorktreeMeta>,
   gitMock: Mock
-): Promise<Worktree> {
+): Promise<FirstWorkRenameOutcome> {
   resetFirstWorkBranchRenameState()
   let meta: WorktreeMeta = {
     displayName: '',
@@ -78,7 +91,9 @@ export async function renameCreatedWorktreeOnFirstWork(
     }
   )
   await maybeAutoRenameBranchOnFirstWork(workingEvent({ worktreeId: worktree.id }), deps)
-  expect(notifyBranchRenamed).toHaveBeenCalledWith(worktree.repoId)
-  expect(branch).toBe('fix-auth')
-  return mergeWorktree(worktree.repoId, { ...worktree, branch: `refs/heads/${branch}` }, meta)
+  const renamed = notifyBranchRenamed.mock.calls.length > 0
+  return {
+    worktree: mergeWorktree(worktree.repoId, { ...worktree, branch: `refs/heads/${branch}` }, meta),
+    renamed
+  }
 }

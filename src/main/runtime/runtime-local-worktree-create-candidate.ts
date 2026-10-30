@@ -1,4 +1,3 @@
-import { selectWorktreeCreateBranchSeed } from '../worktree-create-branch-seed'
 import type { Repo } from '../../shared/repo-types'
 import type { WorktreeLayoutMode } from '../../shared/orca-workspace-layout'
 import { WorktreeCreateCollisionError } from '../../shared/new-workspace/worktree-create-collision'
@@ -59,7 +58,6 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     worktreeLayoutMode?: WorktreeLayoutMode
     branchPrefix: string
     branchPrefixCustom?: string
-    autoRenameBranchFromWork?: boolean
   }
   worktreePathSettings: ReturnType<typeof getWorktreePathSettings>
   workspaceRoot: string
@@ -74,10 +72,6 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     // invent one from the worktree name.
     throw new Error('An exact-branch create needs the branch it must keep.')
   }
-  const branchSeed = selectWorktreeCreateBranchSeed(
-    args.request,
-    args.settings.autoRenameBranchFromWork
-  )
   const sanitizedName = sanitizeWorktreeName(args.request.name)
   // Why: the branch→PR probes are gh calls; run them as the repo's pinned account, not the
   // ambient login the caller may not have threaded through.
@@ -177,7 +171,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
           // Why: an exact branch keeps its name; only the worktree directory may take the suffix.
           args.request.exactBranchName ? 1 : suffix
         ),
-      branchSeed ? getWorktreeCreateCandidate(branchSeed, suffix) : effectiveSanitizedName,
+      effectiveSanitizedName,
       args.settings,
       args.username,
       args.localWorktreeGitOptions
