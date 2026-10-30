@@ -2090,3 +2090,175 @@ is a restored TTL case, and the clock is the subject under test. Three jenkins s
 which a stubbed `node:os` would not exercise.
 
 **Do not:** use the ignore for a test that merely found mocking inconvenient.
+
+## 2026-10-30 sync (upstream `a903985082`, 906 commits)
+
+Merge base `f173998203`, pre-sync tip `16f49e00cf`, rollback tag `archive/pre-sync-16f49e00cf`, merge
+commit `985687d2004`. **184 conflicted paths, 340 hunks** — `both-rewrote 98, union 57,
+rename-replay 10, duplicate-tail 8, modify/delete 8, duplicate-members 2, add/add 1`. Tiers: 38 paths
+proved mechanically by `conflicts.mjs --apply-proven`, 8 deletions settled, 138 paths resolved in five
+disjoint area batches, and the 11 sidebar `.txt` goldens regenerated from the resolved row model.
+
+### The PR conversation parser: the fork's review verdicts ride in upstream's extraction
+
+**Paths:** `src/main/github/client/fetch/pr-conversation-response.ts`,
+`src/main/github/client/fetch/get-pr-comments.ts`
+
+**Decision.** Upstream extracted the GraphQL/REST conversation parse into
+`pr-conversation-response.ts` and kept only body-carrying reviews. The fork's
+`includeReviewVerdicts` stays and is threaded through both paths: `commentSchema` reads `state`,
+`mapGraphQLReview` sets `reviewState`, and the keep-rule is the shared
+`isReportableReviewSubmission` — a review submitted with no body is a verdict the Checks panel must
+show and an empty card everywhere else.
+
+**Why.** A resolution that keeps the option and drops the mapping is worse than either side: the flag
+is accepted, ignored, and the two fork tests that pin a bodyless `APPROVED` summary go red with no
+marker pointing at the cause.
+
+**Do not:** make the option a no-op again because upstream's shape is simpler. The asymmetry is the
+feature.
+
+### The update feed's redirect is derived, not a second escaped literal
+
+**Paths:** `src/main/updater-prerelease-feed.ts`, `src/main/updater-release-targets.ts`,
+`local/sync/lib/post-sync-checks.mjs`
+
+**Decision.** The `releases/latest` redirect check builds its tag prefix from `RELEASES_REPO` instead
+of matching `/nplez1\/orca/releases/tag/` by hand, and `FEED_FILES` names
+`src/main/updater-release-targets.ts` — the one declaration every feed URL reads. A feed file may now
+satisfy the check through a checked constant rather than carrying its own copy of the slug.
+
+**Why.** An escaped literal is invisible to the fixed-string grep the check runs, so the fork's
+identity rested on a copy nobody was asserting. This is the same failure the 2026-10-28 entry records
+in a different costume.
+
+**Do not:** restore a literal to make the grep happy. Add the declaration to `FEED_FILES` instead.
+
+### Worktree first-work naming: upstream implemented #251, and the fork's flag is what still differs
+
+**Paths:** `src/main/ipc/worktree-remote.ts`, `src/main/runtime/runtime-local-worktree-create-candidate.ts`,
+`src/main/worktree-create-first-work-test-harness.ts`, `src/main/ipc/worktrees-create-label-only-first-work.test.ts`,
+`src/main/runtime/runtime-local-worktree-create.test.ts`
+
+**Decision.** Upstream's `f5a4a7218ab` ("use a typed workspace name as its branch again") implements
+the same typed-name-owns-its-branch behaviour as the fork's PR #251, and both sides deleted
+`worktree-create-branch-seed.ts`. The merged tree takes upstream's shape and keeps the fork's
+fixtures (`labelOnlyCreateCases`, `FirstWorkRenameOutcome`) plus upstream's
+`generatedNameCreateRequest`, which upstream's own new tests import.
+
+**Why.** The piece that still distinguishes the two lines is the fork's `branchNameWasGenerated` meta
+flag (`first-work-rename-runtime.ts`, `worktree-remote.ts:1667`): it keeps a _typed_ creature word
+from being renamed while a _generated_ one still is. Upstream never grew that, so a plain
+take-theirs would have silently started renaming typed names.
+
+**Do not:** treat the shared behaviour as a reason to drop `labelOnlyCreateCases`. Its typed-creature
+and generated-creature rows are exactly the two cases that still differ.
+
+### Status labels, synthetic titles and copilot rules: three unions that dropped code with no marker
+
+**Paths:** `src/renderer/src/lib/worktree-status.ts`,
+`src/main/runtime/terminal/output/terminal-transient-facts.ts`,
+`src/main/runtime/agent-state-rules/agent-state-rules-catalog.ts`
+
+**Decision.** `STATUS_LABELS` keeps all ten getters (upstream's nine plus the fork's `setup`).
+`getTrackedPtyTitle` exists once — upstream's raw variant, whose declared consumer is upstream's
+synthetic-title producer — and the fork's display variant stays as the protected
+`getTrackedDisplayTitleForPty`. `RAW_BUNDLED_AGENT_STATE_RULE_FILES` keeps `copilot`, upstream never
+had that file, so upstream's lazy-parse refactor had nothing to delete.
+
+**Why.** Each of these merged with no conflict marker: a `Record<WorktreeStatus, string>` missing
+eight keys, a duplicate class method, and a rule file nobody imports. The typecheck caught the first
+two and the identity/ratchet checks caught neither for copilot.
+
+**Do not:** fold `copilot` into `unknown-pane`. It is the fork's own rules for that agent.
+
+### Local agent inventory: the fork's `isolated` flag survives the extraction
+
+**Paths:** `src/renderer/src/store/slices/local-agent-inventory-refresh.ts`,
+`local-detected-agent-store-state.ts`
+
+**Decision.** `refreshLocalAgentInventory` treats `options.isolated === true` as isolation in addition
+to the floating-terminal worktree id, and `LocalAgentRefreshOptions` declares `isolated?: boolean`
+while `refreshDetectedAgents` accepts the fork's positional boolean or upstream's options bag.
+
+**Why.** Upstream's extraction derived isolation only from `FLOATING_TERMINAL_WORKTREE_ID`, so a
+per-workspace enable re-read would blank or flash the shared `detectedAgentIds`. The merged suite
+still pins that behaviour.
+
+**Do not:** drop the positional form — `agent-enablement-redetection.ts` still passes `true`.
+
+### Host-sync disposition: thirteen upstream settings classified, one marker reasoned
+
+**Paths:** `src/main/orca-profiles/host-sync-settings-disposition.ts`
+
+**Decision.** `browserDefaultProfileIdByHostId`, `codexShareHistoryAcrossAccounts`,
+`nativeChatLinkPreviews`, the three `pluginAppTheme*` ids, `pluginDismissedFileTypes`,
+`pluginFileTypeSuggestions`, `pluginIconTheme`, `pluginUpdatePolicy`, `terminalPluginPalettes`,
+`themeBeforePlugin` and `pluginSystemDefaultedOn` are all `replicated`.
+
+**Why.** They are preferences and per-host selections the user made, which is what the map's
+`replicated` arm is for; `pluginSystemDefaultedOn` is a one-shot default marker and follows
+`autoRenameBranchFromWorkDefaultedOn` rather than the `…Migrated…` hostLocal pattern, because a host
+that has not seen the default must not be told it already fired.
+
+**Do not:** mark a preference `hostLocal` to shrink the replicated set. This map is
+`satisfies Record<keyof GlobalSettings, …>`, so a new upstream setting fails the typecheck until it is
+classified — that is the point.
+
+### Max-lines: twenty-two ownership exemptions, and the five that should still be split
+
+**Paths:** `config/max-lines-baseline.txt` and the 22 files named under the 2026-10-30 rows
+
+**Decision.** Every one is upstream-owned and sat at the 300/400/600/800 budget before the fork's
+delta rode inside it; each carries an inline `eslint-disable max-lines -- Why:` naming its overage
+and a baseline row. The overages run 1–93 code lines.
+
+**Why.** Same rule as the 2026-10-28 entry: splitting an upstream file costs a permanent hunk on every
+later sync, and the fork's additions here are small. The five largest —
+`worktree-title-derived-agent-rows.test.ts` (+91), `pty-spawn-env-terminal-basics.test.ts` (+93),
+`fs-bridge.ts` (+39), `worktree-agent-activity-summary.ts` (+35), `session-search-store.ts` (+35) —
+are recorded as split candidates because their overage is a fork block rather than a few lines.
+
+**Do not:** add a row for a fork-owned file. Those split.
+
+### `fork-symbols.mjs` followed one return and called a name lost
+
+**Paths:** `local/sync/lib/fork-symbols.mjs`
+
+**Decision.** `exposedObjectLiterals` follows **every** top-level `return` in a function body, not
+only a lone one.
+
+**Why.** A guard plus a fallback return exposes the same literal on both paths.
+`describeUpdateFailure`'s `ok`/`error` were reported as lost while both were declared, which is the
+shape that would let a real loss hide behind a false one next time.
+
+### Fork-comment ratchet re-baselined to 5962
+
+**Paths:** `local/upstream-file-comments-baseline.json`
+
+**Decision.** `--init --accept`, reason recorded in the run output: four upstream-owned files became
+fork-modified in this merge and carry fork rationale that has no fork-owned home yet
+(`git-exec-file-sync.ts` add/add login-shell env, `task-page-jira-item-source-context.ts` after the
+move under `task-page/jira/`, and the two worktree first-work test surfaces), plus three comment lines
+from this sync's own repairs.
+
+**Do not:** accept growth again without naming which files caused it.
+
+### Deletions this sync settled
+
+**Paths:** the 8 modify/delete entries
+
+**Decision.** Four renderer paths (`AgentDashboardDrawer.tsx`, `useDashboardPopoutBridge.ts` and its
+test, `popout.tsx`) follow the existing dashboard-delivery decision; the manifest entries had only
+reverted to `pending-decision` because upstream's blobs moved. Four are upstream test retirements:
+`ipc/jira/project-metadata-registration.test.ts`,
+`runtime-client-settings-wsl-host-hooks.test.ts`,
+`ipc/worktrees-create-first-work-rename.test.ts` (superseded, above) and
+`task-page-jira-item-source-context.test.ts` (deleted with the move; the matcher keeps its own suite).
+
+**Why.** Retirement wins where the fork's whole delta was drift repair or an assertion another layer
+already covers; `strict` on `listPriorities` is still forwarded-and-pinned at
+`src/main/runtime/rpc/methods/jira.test.ts:170-178`.
+
+**Do not:** restore a retired suite to carry one case. Re-home it into a surviving suite, as the
+2026-10-28 entry did for three.

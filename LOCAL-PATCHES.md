@@ -2003,6 +2003,66 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-10-30 — merge of upstream `a903985082` (906 commits) into the release line, from
+  `16f49e00cf`** (merge base `f173998203`, rollback tag `archive/pre-sync-16f49e00cf`, merge commit
+  `985687d2004`, then `a7a778bc197`, `69d7a35c4a`). **184 conflicted paths, 340 hunks** —
+  `both-rewrote 98, union 57, rename-replay 10, duplicate-tail 8, modify/delete 8,
+  duplicate-members 2, add/add 1`. Decisions are in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-30 sync"; the
+  ones a reviewer will want first:
+
+  - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **38 of 184 paths** outright
+    (55 import-only three-way unions, 6 upstream- or fork-unchanged whole hunks, 1 identity-only).
+    **8 modify/delete** entries were settled: four renderer dashboard-popout paths per the owner's
+    2026-10-26 product decision, and four upstream test retirements — including
+    `worktrees-create-first-work-rename.test.ts`, whose behaviour upstream's `f5a4a7218ab`
+    implemented itself. The remaining **138 paths** were resolved in 5 disjoint area batches bound to
+    the ledger, then the 11 sidebar `.txt` goldens were **regenerated** from the resolved row model
+    rather than merged.
+  - **Upstream extracted the PR conversation parser and dropped the fork's review verdicts with it.**
+    `get-pr-comments.ts` kept the fork's `includeReviewVerdicts` option but the new
+    `pr-conversation-response.ts` mapped no `state`, so a bodyless approval reached the Checks panel
+    as nothing. The field, `mapGraphQLReview` and the shared `isReportableReviewSubmission` keep-rule
+    are re-homed there for the GraphQL **and** REST paths.
+  - **The update feed's redirect regex was an escaped literal a fixed-string grep cannot see.**
+    `updater-prerelease-feed.ts` matched `/nplez1\/orca/releases/tag/` by hand while the rest of the
+    file reads `RELEASES_REPO`; it now derives the prefix, and `FEED_FILES` in
+    `local/sync/lib/post-sync-checks.mjs` names `src/main/updater-release-targets.ts`, the one
+    declaration every feed URL reads. A feed file may now satisfy the check **through** a checked
+    constant instead of carrying a second copy of the slug.
+  - **Three union resolutions dropped code with no conflict marker.** `worktree-status.ts` kept two
+    of ten `STATUS_LABELS` getters (every activity label but `inactive`/`setup` read `undefined`);
+    `terminal-transient-facts.ts` ended up with **two** `getTrackedPtyTitle` declarations, one from
+    each side; `agent-state-rules-catalog.ts` lost the fork's `copilot` rule file, which upstream
+    never had, to upstream's lazy-parse refactor.
+  - **`local-agent-inventory-refresh.ts`** (upstream's extraction) derived isolation only from the
+    floating terminal, dropping the fork's `options.isolated`; a per-workspace enable re-read would
+    have blanked the shared detected list.
+  - **Max-lines: 22 upstream-owned files sit at the oxlint budget and the fork's delta pushed each
+    over it** (1–93 code lines). Per the ownership rule in § "`local(lint)`" every one carries an
+    inline `eslint-disable max-lines` naming its overage plus a baseline row, which is the same
+    exemption the 2026-10-28 entry records: splitting an upstream file costs a permanent hunk on
+    every later sync. **Named follow-up, not silently exempted:** the five heaviest —
+    `worktree-title-derived-agent-rows.test.ts` (+91), `pty-spawn-env-terminal-basics.test.ts` (+93),
+    `fs-bridge.ts` (+39), `worktree-agent-activity-summary.ts` (+35) and
+    `session-search-store.ts` (+35) — are the ones to split when a sync leaves room, because their
+    overage is a fork block rather than a few lines.
+  - **13 settings upstream added were unclassified in the host-sync disposition map.** All 13 are
+    `replicated` (preferences and per-host selections), matching
+    `autoRenameBranchFromWorkDefaultedOn` and `browserProfileScope`; `pluginSystemDefaultedOn` is
+    replicated like upstream's other one-shot default markers.
+  - **`fork-symbols.mjs` reported a loss that was not one.** It followed a function's returned object
+    literal only when the function had exactly one `return`, so `describeUpdateFailure`'s guard plus
+    fallback hid `ok`/`error` and the scan called them lost. It now follows every top-level return.
+  - **Fork-comment ratchet re-baselined to 5962** (`--init --accept`, reason recorded): four
+    upstream-owned files that this merge made fork-modified carry fork rationale with no fork-owned
+    home yet, plus 3 comment lines from this sync's own repairs.
+  - **Localization**: 24 orphan keys removed from each of the ten locales (the deleted dashboard
+    popout and four reworded strings), 26 stale tombstones removed from each fork overlay, the two
+    #169 ack toasts the fork rewords retired from every locale so they fall back to the fork's English
+    overlay, `subagentSession` collapsed to one base key with `defaultValue_one`, and the dead
+    `taskPageJiraBoard.changeStatusFailed` string dropped.
+
 - **2026-10-28 — merge of upstream `f173998203` (838 commits) into the release line, from
   `7b86cb0846`** (merge base `0571e45107`, rollback tag `archive/pre-sync-7b86cb0846`, merge commit
   `2fadfe371b`, then `6491bd5e25`, `029137ad95`). **431 conflicted paths, 621 hunks** —
@@ -2152,62 +2212,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   upstream's `--experimental.recordDependencies=false`. The tagged revision is past the gated one:
   `1b848feba6` changes only tests, e2e specs and two lint inputs (no product source), and the
   docs-only sync record follows it, so the unit verdict does not cover `1b848feba6`'s test edits.
-
-- **2026-10-22 — merge of upstream `57b5082404` (268 commits) into the release line, from
-  `c67d40f97b`** (merge base `bbc8303b47`, rollback tag `archive/pre-sync-c67d40f97b`, merge commit
-  `05b4768249`). **52 conflicted paths** — `union 22, both-rewrote 20, modify/delete 5,
-  duplicate-members 2, rename-replay 2, duplicate-tail 1`. Upstream's delta is a reorganising sync
-  rather than a product wave: `src/main/ephemeral-vm/` and `src/main/ipc/jira/` groupings,
-  `jira/attachments/`, the mobile chat helpers renamed page → scroll, the `task-page/gitlab/` group,
-  an off-by-default `experimentalConnectors` flag and a Brazilian Portuguese locale. No patch in the
-  series needed a behavioural change; the cost was renames with no conflict marker. Decisions are in
-  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-22 sync"; the ones
-  a reviewer will want first:
-
-  - **The ephemeral-VM grouping is upstream's, and the fork's four modules stay flat.**
-    `src/main/ephemeral-vm-recipe-runner.ts` (a three-line barrel over shared modules) is deleted as
-    upstream deleted it; the live `src/shared/ephemeral-vm-recipe-runner.ts` is upstream's own module and
-    is not a fork file; the fork's extend/context-menu/lock/reclaim modules stay where they are
-    because they are fork-only and never collide. Every fork importer followed the moves
-    (`./ephemeral-vm-runtime-service` → `./ephemeral-vm/runtime-service`, and five more).
-  - **Jira's register file is upstream's per-module split plus the fork's three additions.**
-    `registerJiraBoardHandlers()`, the `jira:listEditFields` handler and the second `normalizeIssueUpdate`
-    narrower ride on `ipc/jira/register-handlers.ts`; the fork's `jira-rendered-html.ts` followed the
-    `jira/attachments/` renames with no conflict to point at it.
-  - **`queueWorkspaceDelete` lands inside the fork's extracted `worktree.rm`.** Upstream routes the
-    delete through the workspace lifecycle queue; the fork had extracted the method for max-lines.
-    Both stay, and `deleteRemoteBranch` rides through the `run` callback rather than a sixth
-    `RemovalFlag` — while the lifecycle delete **key** is widened with it, so a retry that asks for
-    the other remote-branch choice cannot join the pending delete's reply. On the renderer side, `confirmedDiscards` is computed inside
-    `useDeleteWorktreeDialogActions` from an `unsavedTargets` argument.
-  - **The agent-hook guards stay and carry upstream's `incomingProcess`.** `isInheritedPaneOwnerEvent`
-    gained the parameter and forwards it to `resolveAgentStatusIdentity`; `readAgentProcessIdentity`
-    is upstream's `readHookAgentProcess(source, record.agentProcess)`.
-  - **The popout window stays deleted.** Upstream's three fixes to `dashboard-popout-window*` and
-    `useDashboardPopoutBridge` are taken as deletions, per the dashboard decision above.
-  - **`en.json` was unioned, then regenerated.** 15 conflicting leaves: 8 kept the fork's text (the
-    `~/.orca-np` paths, the floating-workspace copy, the dashboard description, the Jira-aware
-    issue-link copy, the provider list), 7 took upstream's. `sync:localization-catalog` added the 8
-    keys the merged source needs. **Found here:** `jira.board.noTransition` carried two different
-    sentences, so the placeholder-less one is now `jira.board.noTransitionSelected` — that file is
-    also the red-flag scan's one "modified, upstream never touched it" entry.
-  - **Two max-lines splits and a re-pruned ratchet.** `orcad-entry.ts` yielded
-    `orcad-secret-store-bootstrap.ts`; the pi harness yielded `agent-status-extension-test-env.ts`.
-    The focus-read baseline was pruned against upstream's removal of the runtime Jira/Linear reads
-    (1161 → 718) and the fork's two documented transitive readers were restored with their causes.
-  - **Four merge breaks with no conflict marker**, all now fixed and each named by `pnpm tc`: the
-    test store lost `createWorktreeSetupRunnerSlice` under upstream's `withEditorBufferRecords`
-    wrapper, the browser new-tab caller missed the review hook's new required `issueRepo` /
-    `issueRepoIsOffDevice`, the two disposition tables needed three new fields classified
-    (`experimentalConnectors` replicated, the Portuguese migration marker host-local, the closed-pane
-    session field host-local), and a test mocked the SSH filesystem provider upstream deleted.
-  - **Three upstream renames are acknowledged in `expected-deletions.json`** (mobile page → scroll,
-    the task-page GitLab loading hook), and the two entries whose deletions left the range are pruned;
-    `TaskPageGitLabLoadingModel` has no importer in the merged tree, which is why its absence is not a
-    loss.
-
-Entries from 2026-10-21 back to 2026-09-16 — 25 of them — are in
-[local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md).
 
 ### `local(ci)`: release workflow
 
