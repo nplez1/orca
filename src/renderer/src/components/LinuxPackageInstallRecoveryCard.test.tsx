@@ -125,7 +125,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
-      shell: { openUrl },
+      shell: { openUrl, openUrlInSystemBrowser: openUrl },
       ui: { writeClipboardText },
       updater: {
         getLinuxPackageInstallInstructions: getInstructions,

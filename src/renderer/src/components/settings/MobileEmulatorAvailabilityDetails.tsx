@@ -141,7 +141,7 @@ export function MobileEmulatorAvailabilityDetails({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => void window.api.shell.openUrl(ANDROID_STUDIO_URL)}
+                  onClick={() => void window.api.shell.openUrlInSystemBrowser(ANDROID_STUDIO_URL)}
                 >
                   {translate(
                     'auto.components.settings.MobileEmulatorSdkStatus.b94ff260e6',

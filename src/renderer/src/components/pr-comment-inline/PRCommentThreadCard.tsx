@@ -220,6 +220,7 @@ export function PRCommentThreadCard({
                   'auto.components.pr.comment.inline.PRCommentThreadCard.e2be68390f',
                   'Open on GitHub'
                 )}
+                data-link-url={comment.url}
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()

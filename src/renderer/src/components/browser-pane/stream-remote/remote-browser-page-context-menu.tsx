@@ -198,7 +198,7 @@ export function RemoteBrowserPageContextMenu({
               onClick={() => {
                 const targetUrl = normalizeExternalBrowserUrl(contextMenu.linkUrl!)
                 if (targetUrl) {
-                  void window.api.shell.openUrl(targetUrl)
+                  void window.api.shell.openUrlInSystemBrowser(targetUrl)
                 }
                 onDismiss()
               }}
@@ -267,7 +267,7 @@ export function RemoteBrowserPageContextMenu({
           onClick={() => {
             const targetUrl = normalizeExternalBrowserUrl(contextMenu.pageUrl)
             if (targetUrl) {
-              void window.api.shell.openUrl(targetUrl)
+              void window.api.shell.openUrlInSystemBrowser(targetUrl)
             }
             onDismiss()
           }}

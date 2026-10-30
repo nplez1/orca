@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 const handlers = vi.hoisted(() => new Map<string, (...args: unknown[]) => Promise<unknown>>())
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: (name: string, fn: (...args: unknown[]) => Promise<unknown>) => handlers.set(name, fn)
+    handle: (name: string, fn: (...args: unknown[]) => Promise<unknown>) => handlers.set(name, fn),
+    on: () => undefined
   },
   shell: {},
   dialog: {}

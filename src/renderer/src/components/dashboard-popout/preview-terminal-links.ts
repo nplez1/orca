@@ -15,7 +15,7 @@ export function installPreviewTerminalLinks(terminal: Terminal): void {
           return
         }
         event.preventDefault()
-        void window.api.shell.openUrl(uri).catch(() => undefined)
+        void window.api.shell.openUrlInSystemBrowser(uri).catch(() => undefined)
         terminal.clearSelection()
       },
       { urlRegex: TERMINAL_HTTP_URL_REGEX }

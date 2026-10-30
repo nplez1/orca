@@ -178,7 +178,8 @@ function reportHttpLinkBrowserOpenFailure(error: unknown): void {
 
 async function openSystemHttpLink(url: string): Promise<void> {
   try {
-    await window.api.shell.openUrl(url)
+    // Why the explicit variant: `openUrl` relays back into this router, which would loop.
+    await window.api.shell.openUrlInSystemBrowser(url)
   } catch {
     reportHttpLinkBrowserOpenFailure(null)
   }

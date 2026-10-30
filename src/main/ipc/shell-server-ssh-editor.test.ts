@@ -8,7 +8,7 @@ const { handleMock, resolveCliCommandMock, spawnMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  ipcMain: { handle: handleMock },
+  ipcMain: { handle: handleMock, on: vi.fn() },
   shell: { showItemInFolder: vi.fn(), openExternal: vi.fn(), openPath: vi.fn() },
   dialog: { showOpenDialog: vi.fn() }
 }))

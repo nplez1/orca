@@ -193,7 +193,7 @@ export type GlobalSettings = GlobalSettingsBase & {
   nodeDistMirrorUrl?: string
   /** Why: corporate TLS-intercepting proxies can break HTTP/2 downloads; opt-in Chromium process-wide HTTP/1.1 switch. */
   electronHttp1CompatibilityMode?: boolean
-  /** Opt-in in-app browsing (isolated guest surface); default keeps links opening in the system browser. */
+  /** Default link destination: Orca's in-app browser, or the system browser. */
   openLinksInApp: boolean
   /** Worktree-scoped localhost hostnames to distinguish tabs; opt-in since a non-localhost host can break apps binding cookies/sessions to localhost. */
   localhostWorktreeLabelsEnabled?: boolean

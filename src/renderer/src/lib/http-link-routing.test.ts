@@ -8,6 +8,7 @@ import {
   registerWorkspaceHttpLinkBrowserOpener,
   resolveLocalhostHttpLinkDisplayUrl
 } from './http-link-routing'
+import { openContextualHttpLink } from './contextual-http-link'
 
 import type { ExecutionHostId } from '../../../shared/execution-host'
 
@@ -77,7 +78,10 @@ beforeEach(() => {
     dispatchEvent: dispatchEventMock,
     api: {
       shell: {
-        openUrl: openUrlMock
+        // One mock for both: these cases assert the system-browser destination, and the router
+        // has exactly one of them. A dedicated case below separates the two channels.
+        openUrl: openUrlMock,
+        openUrlInSystemBrowser: openUrlMock
       },
       localhostWorktreeLabels: {
         register: registerLocalhostLabelMock
@@ -777,5 +781,74 @@ describe('openHttpLink modifier routing', () => {
 
     expect(openUrlMock).toHaveBeenCalledWith('https://example.com/')
     expect(createBrowserTabMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('openContextualHttpLink', () => {
+  it('routes a surface-less link into the active workspace browser', () => {
+    registerWorkspaceHttpLinkBrowserOpener(null)
+    storeState.settings = { openLinksInApp: true }
+    storeState.activeWorktreeId = 'wt-active'
+
+    openContextualHttpLink('https://example.com/docs', { worktreeId: storeState.activeWorktreeId })
+
+    expect(createBrowserTabMock).toHaveBeenCalledWith('wt-active', 'https://example.com/docs', {
+      activate: true
+    })
+    expect(openUrlMock).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the system browser when no workspace is active', () => {
+    storeState.settings = { openLinksInApp: true }
+    storeState.activeWorktreeId = null
+
+    openContextualHttpLink('https://example.com/docs', { worktreeId: storeState.activeWorktreeId })
+
+    expect(openUrlMock).toHaveBeenCalledWith('https://example.com/docs')
+    expect(createBrowserTabMock).not.toHaveBeenCalled()
+  })
+
+  it('honors the setting when the user keeps links external', () => {
+    storeState.settings = { openLinksInApp: false }
+    storeState.activeWorktreeId = 'wt-active'
+
+    openContextualHttpLink('https://example.com/docs', { worktreeId: storeState.activeWorktreeId })
+
+    expect(openUrlMock).toHaveBeenCalledWith('https://example.com/docs')
+    expect(createBrowserTabMock).not.toHaveBeenCalled()
+  })
+
+  it('opens a forced destination regardless of the setting', () => {
+    registerWorkspaceHttpLinkBrowserOpener(null)
+    storeState.settings = { openLinksInApp: false, openLinksInAppModifierInverts: true }
+    storeState.activeWorktreeId = 'wt-active'
+
+    openContextualHttpLink('https://example.com/docs', {
+      worktreeId: storeState.activeWorktreeId,
+      forceDestination: 'orca'
+    })
+
+    expect(createBrowserTabMock).toHaveBeenCalledWith('wt-active', 'https://example.com/docs', {
+      activate: true
+    })
+  })
+
+  // Why: `openUrl` relays back into this router, so the system branch must use the explicit channel.
+  it('uses the system-browser channel, not the relaying one', async () => {
+    const relaying = vi.fn()
+    const systemOnly = vi.fn()
+    storeState.activeWorktreeId = null
+    vi.stubGlobal('window', {
+      dispatchEvent: dispatchEventMock,
+      api: {
+        shell: { openUrl: relaying, openUrlInSystemBrowser: systemOnly },
+        localhostWorktreeLabels: { register: registerLocalhostLabelMock }
+      }
+    })
+
+    openHttpLink('https://example.com/docs', { worktreeId: null })
+
+    await vi.waitFor(() => expect(systemOnly).toHaveBeenCalledWith('https://example.com/docs'))
+    expect(relaying).not.toHaveBeenCalled()
   })
 })

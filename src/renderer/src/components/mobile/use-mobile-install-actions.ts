@@ -16,11 +16,11 @@ export function useMobileInstallActions(
   const mountedRef = useMountedRef()
 
   const openInstallUrl = useCallback((): void => {
-    void window.api.shell.openUrl(getInstallCopy(platform, iosChannel).url)
+    void window.api.shell.openUrlInSystemBrowser(getInstallCopy(platform, iosChannel).url)
   }, [iosChannel, platform])
 
   const openAndroidInstallGuide = useCallback((): void => {
-    void window.api.shell.openUrl(ANDROID_INSTALL_GUIDE_URL)
+    void window.api.shell.openUrlInSystemBrowser(ANDROID_INSTALL_GUIDE_URL)
   }, [])
 
   const copyInstallUrl = useCallback(async (): Promise<void> => {

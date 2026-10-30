@@ -7,6 +7,7 @@ import { BrowserWebAuthnAccountDialog } from './components/browser-webauthn-acco
 import { BrowserExtensionInstallDialog } from './components/browser-extension-install-dialog'
 import { BrowserPagePrompts } from './components/browser-pane/browser-page-prompts'
 import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-preference-dialog'
+import { AppLinkContextMenu } from './components/link-actions/AppLinkContextMenu'
 import { SkillFreshnessNudge } from './components/skills/SkillFreshnessNudge'
 import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
 import RunningTerminalCloseDialog from './components/terminal-pane/RunningTerminalCloseDialog'
@@ -41,6 +42,7 @@ import { SpaceWindowStatePublisher } from './components/workspace-space/SpaceWin
 import { useUiHangDiagnostics } from './lib/ui-hang-diagnostics/use-ui-hang-diagnostics'
 import { PlainSshTerminalPanels } from './components/plain-ssh-terminal/PlainSshTerminalPanels'
 import { installActiveWorktreeRemovalSuccessor } from './lib/active-worktree-removal-successor'
+import { useContextualLinkRouter } from './app-shell/use-contextual-link-router'
 
 function App(): React.JSX.Element {
   const layout = useAppChromeLayout()
@@ -62,6 +64,7 @@ function App(): React.JSX.Element {
   useUiHangDiagnostics()
   useAgentTabFocusOverlayClose()
   useGlobalKeybindings({ layout, floatingWorkspace })
+  useContextualLinkRouter()
   // App owns active-selection removal; the Space window only mirrors selection.
   useEffect(() => installActiveWorktreeRemovalSuccessor(), [])
 
@@ -114,6 +117,7 @@ function App(): React.JSX.Element {
             />
             <BrowserWebAuthnAccountDialog />
             <BrowserExtensionInstallDialog />
+            <AppLinkContextMenu />
           </LinkRoutingPreferenceDialogProvider>
         </ConfirmationDialogProvider>
         {createPortal(

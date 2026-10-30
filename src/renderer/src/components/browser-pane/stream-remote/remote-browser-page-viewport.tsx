@@ -169,7 +169,7 @@ export function RemoteBrowserPageViewport({
             active: isActive,
             loading: browserTab.loading
           }}
-          onOpenExternal={(url) => void window.api.shell.openUrl(url)}
+          onOpenExternal={(url) => void window.api.shell.openUrlInSystemBrowser(url)}
           certificateFailure={remoteCertificateTrustSupported ? certificateFailure : null}
           expectedBrowserPageId={
             remotePageHandle?.environmentId === activeRuntimeEnvironmentId

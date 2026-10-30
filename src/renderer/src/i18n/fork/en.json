@@ -238,6 +238,26 @@
           }
         }
       },
+      "link": {
+        "actions": {
+          "copied": "Copied",
+          "copyLink": "Copy Link",
+          "openInOrcaBrowser": "Open in Orca Browser",
+          "openInSystemBrowser": "Open in System Browser"
+        },
+        "routing": {
+          "preference": {
+            "dialog": {
+              "badge": "Links",
+              "description": "Use Orca's browser for links anywhere in the app, or keep your system browser.",
+              "keep": {
+                "title": "Keep links in Orca's browser?"
+              },
+              "title": "Open links in Orca's browser?"
+            }
+          }
+        }
+      },
       "mobile": {
         "slides": {
           "HomeSlide": {
@@ -417,6 +437,16 @@
           "title": "Session History Search"
         },
         "BrowserDefaultZoomSetting": {},
+        "BrowserLinkRoutingBackgroundSetting": {
+          "description": "Links join the browser without taking focus from where you clicked."
+        },
+        "BrowserLinkRoutingSetting": {
+          "description": "Open http(s) links in Orca's built-in browser — from anywhere in the app. {{shortcut}} always uses your system browser.",
+          "descriptionBase": "Open http(s) links in Orca's built-in browser — from anywhere in the app.",
+          "destinationAriaLabel": "Default link destination",
+          "inAppOption": "In-App Browser",
+          "systemOption": "System Browser"
+        },
         "BrowserTerminalLinkActionsSetting": {},
         "EphemeralVmRuntimesSection": {
           "extendLifetime": "Extend lifetime",

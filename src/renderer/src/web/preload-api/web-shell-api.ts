@@ -31,6 +31,13 @@ export function createShellApi(): NonNullable<Partial<PreloadApi>['shell']> {
     openInFileManager: () => Promise.resolve(openResult),
     openInExternalEditor: () => Promise.resolve(openResult),
     openUrl: (url) => Promise.resolve(window.open(url, '_blank', 'noopener,noreferrer') as never),
+    // The web build has no in-app browser, so both destinations are the browser tab.
+    openUrlInSystemBrowser: (url) => {
+      window.open(url, '_blank', 'noopener,noreferrer')
+      return Promise.resolve()
+    },
+    onContextualLinkRequested: () => () => {},
+    markContextualLinkRouterReady: () => {},
     openFilePath: () => Promise.resolve(false),
     openFileUri: (uri) =>
       Promise.resolve(window.open(uri, '_blank', 'noopener,noreferrer') as never),

@@ -37,7 +37,7 @@ export function MobileSettingsPane(): React.JSX.Element {
             )}{' '}
             <button
               type="button"
-              onClick={() => void window.api.shell.openUrl(ORCA_IOS_APP_STORE_URL)}
+              onClick={() => void window.api.shell.openUrlInSystemBrowser(ORCA_IOS_APP_STORE_URL)}
               className="cursor-pointer underline underline-offset-2 hover:text-foreground"
             >
               {translate('auto.components.settings.MobileSettingsPane.b5a2ed83ff', 'App Store')}
@@ -46,7 +46,7 @@ export function MobileSettingsPane(): React.JSX.Element {
             <button
               type="button"
               // Link the pinned release APK until Android distribution moves to Google Play.
-              onClick={() => void window.api.shell.openUrl(ORCA_ANDROID_APK_URL)}
+              onClick={() => void window.api.shell.openUrlInSystemBrowser(ORCA_ANDROID_APK_URL)}
               className="cursor-pointer underline underline-offset-2 hover:text-foreground"
             >
               {translate(

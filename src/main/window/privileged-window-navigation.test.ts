@@ -5,20 +5,38 @@ vi.mock('electron', () => ({
   shell: { openExternal: (url: string) => openExternal(url) }
 }))
 
+import { markContextualLinkRouterReady } from './contextual-link-relay'
 import { installPrivilegedWindowNavigationPolicy } from './privileged-window-navigation'
 
 describe('privileged window navigation policy', () => {
-  function createFixture(currentUrl: string) {
+  function createFixture(currentUrl: string, options: { routesLinks?: boolean } = {}) {
     const handlers = new Map<string, (...args: unknown[]) => void>()
+    const popupHandlers: ((details: { url: string }) => unknown)[] = []
     const contents = {
+      id: 1,
       getURL: () => currentUrl,
-      setWindowOpenHandler: vi.fn(),
+      isDestroyed: () => false,
+      send: vi.fn(),
+      setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => unknown) => {
+        popupHandlers.push(handler)
+      }),
       on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
         handlers.set(event, handler)
       })
     }
+    if (options.routesLinks) {
+      markContextualLinkRouterReady(contents)
+    }
     installPrivilegedWindowNavigationPolicy(contents as never)
     return {
+      contents,
+      windowOpen(url: string) {
+        const handler = popupHandlers[0]
+        if (!handler) {
+          throw new Error('no window-open handler was registered')
+        }
+        return handler({ url })
+      },
       willNavigate(url: string) {
         const event = { preventDefault: vi.fn() }
         const handler = handlers.get('will-navigate')
@@ -28,6 +46,18 @@ describe('privileged window navigation policy', () => {
         }
         handler(event, url)
         return event
+      },
+      fire(event: string, ...args: unknown[]) {
+        const handler = handlers.get(event)
+        if (!handler) {
+          throw new Error(`no ${event} handler was registered`)
+        }
+        handler(...args)
+      },
+      subscribedEvents(): string[] {
+        return contents.on.mock.calls
+          .map((call: unknown[]) => String(call[0]))
+          .sort((left, right) => left.localeCompare(right))
       }
     }
   }
@@ -90,5 +120,108 @@ describe('privileged window navigation policy', () => {
 
     expect(event.preventDefault).toHaveBeenCalled()
     expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  // The window owns the link-routing preference, so main must hand web links over instead of
+  // opening the OS browser behind the user's back.
+  it('relays an external navigation to the window router instead of the OS browser', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    const event = fixture.willNavigate('https://example.com/')
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(fixture.contents.send).toHaveBeenCalledWith(
+      'link:openContextual',
+      'https://example.com/'
+    )
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('relays a popup request to the window router', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    expect(fixture.windowOpen('https://example.com/')).toEqual({ action: 'deny' })
+    expect(fixture.contents.send).toHaveBeenCalledWith(
+      'link:openContextual',
+      'https://example.com/'
+    )
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('still opens the OS browser when the window announces no router', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html'
+    )
+
+    expect(fixture.windowOpen('https://example.com/')).toEqual({ action: 'deny' })
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/')
+    expect(fixture.contents.send).not.toHaveBeenCalled()
+  })
+
+  // Chromium emits did-start-navigation before the throttle that emits will-navigate, so clearing
+  // readiness there would disarm the relay for the handler that cancels this very navigation.
+  // Pinning the exact listener set makes the next lifecycle listener argue its ordering.
+  it('clears readiness only once a navigation commits', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    expect(fixture.subscribedEvents()).toEqual([
+      'did-navigate',
+      'render-process-gone',
+      'will-navigate'
+    ])
+
+    const event = fixture.willNavigate('https://example.com/')
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(fixture.contents.send).toHaveBeenCalledWith(
+      'link:openContextual',
+      'https://example.com/'
+    )
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('opens the OS browser after a committed navigation until the window re-announces', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    fixture.fire('did-navigate', {}, 'file:///next-document.html', 200, 'OK')
+    expect(fixture.windowOpen('https://example.com/')).toEqual({ action: 'deny' })
+
+    expect(fixture.contents.send).not.toHaveBeenCalled()
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/')
+
+    // The new document announces itself from its mount effect; relaying resumes.
+    markContextualLinkRouterReady(fixture.contents)
+    fixture.windowOpen('https://example.com/two')
+
+    expect(fixture.contents.send).toHaveBeenLastCalledWith(
+      'link:openContextual',
+      'https://example.com/two'
+    )
+    expect(openExternal).toHaveBeenCalledTimes(1)
+  })
+
+  it('forgets the router when the renderer dies', () => {
+    const fixture = createFixture(
+      'file:///Applications/Orca.app/Contents/Resources/app.asar/out/renderer/index.html',
+      { routesLinks: true }
+    )
+
+    fixture.fire('render-process-gone', {}, { reason: 'crashed' })
+    fixture.windowOpen('https://example.com/')
+
+    expect(fixture.contents.send).not.toHaveBeenCalled()
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/')
   })
 })

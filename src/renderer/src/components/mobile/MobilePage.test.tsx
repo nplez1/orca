@@ -171,7 +171,7 @@ describe('MobilePage pairing connection mode', () => {
           listDevices: vi.fn().mockResolvedValue({ devices: [] }),
           listNetworkInterfaces
         },
-        shell: { openUrl: vi.fn() },
+        shell: { openUrl: vi.fn(), openUrlInSystemBrowser: vi.fn() },
         ui: { writeClipboardText: vi.fn().mockResolvedValue(undefined) }
       }
     })
@@ -193,7 +193,9 @@ describe('MobilePage pairing connection mode', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Android install guide' }))
 
-    expect(window.api.shell.openUrl).toHaveBeenCalledWith('https://www.onorca.dev/docs/android-apk')
+    expect(window.api.shell.openUrlInSystemBrowser).toHaveBeenCalledWith(
+      'https://www.onorca.dev/docs/android-apk'
+    )
   })
 
   it('defaults signed-in pairing to Anywhere and remints when same-network is selected', async () => {

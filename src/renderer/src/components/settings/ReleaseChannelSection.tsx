@@ -159,7 +159,7 @@ export function ReleaseChannelSection(): React.JSX.Element {
 
   const handleDownloadInstaller = (build: ReleaseBuild): void => {
     // Fall back to release assets when installer naming is unexpected.
-    void window.api.shell.openUrl(build.installerUrl ?? build.releaseUrl)
+    void window.api.shell.openUrlInSystemBrowser(build.installerUrl ?? build.releaseUrl)
   }
 
   return (

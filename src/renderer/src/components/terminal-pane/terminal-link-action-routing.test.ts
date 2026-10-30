@@ -48,7 +48,7 @@ function actionContext(request = vi.fn()): TerminalLinkActionContext {
 
 beforeEach(() => {
   vi.stubGlobal('navigator', { userAgent: 'Macintosh' })
-  vi.stubGlobal('window', { api: { shell: { openUrl } } })
+  vi.stubGlobal('window', { api: { shell: { openUrl, openUrlInSystemBrowser: openUrl } } })
   registerHttpLinkStoreAccessor(() => ({
     settings: { openLinksInApp: false },
     setActiveWorktree,

@@ -107,7 +107,11 @@ async function expectOrcaOwnedMouseOutcome(
 
 async function openLegacyDisabledLinkSettings(orcaPage: Page): Promise<void> {
   await orcaPage.evaluate(() => {
-    void window.__store?.getState().updateSettings({ terminalLinkActionPopoverEnabled: false })
+    // Why pin routing off: these cases assert the system-browser handoff, and links now
+    // default to Orca's in-app browser.
+    void window.__store
+      ?.getState()
+      .updateSettings({ terminalLinkActionPopoverEnabled: false, openLinksInApp: false })
   })
   await expect
     .poll(() =>

@@ -39,7 +39,7 @@ describe('framed overlay terminal HTTP links', () => {
   ])('hovers and cold-opens the full URL over a changing $name gutter', async ({ gutters }) => {
     const { terminal, linksAt } = await terminalWithRows(overlayRows(gutters))
     const openUrl = vi.fn()
-    vi.stubGlobal('window', { api: { shell: { openUrl } } })
+    vi.stubGlobal('window', { api: { shell: { openUrl, openUrlInSystemBrowser: openUrl } } })
     registerHttpLinkStoreAccessor(() => ({
       settings: { openLinksInApp: false },
       setActiveWorktree: vi.fn(),
