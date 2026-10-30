@@ -1,35 +1,21 @@
 import { spawnSync } from 'node:child_process'
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync
-} from 'node:fs'
-import { tmpdir } from 'node:os'
-import { createRequire } from 'node:module'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, parse } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { runProcessSync } from '@orca/process-host'
 import { DEFAULT_MAX_OUTPUT_BYTES } from '@orca/process-host/process-spec'
 import { resolveCliCommand } from '../../src/shared/node-cli-command-resolution.ts'
 import { removeTreeSync } from '../../src/shared/windows-transient-lock-removal.ts'
+import {
+  envForNativeFixture,
+  mkTempProject,
+  writeFakeNodeGyp
+} from './ensure-native-runtime-fixture.mjs'
 import { resolvePnpmCliInvocation } from './pnpm-cli-invocation.mjs'
-import { copyScriptWithLocalModules } from './script-module-dependencies.mjs'
 import {
   nodeGypRebuildInvocation,
   nodeGypRebuildTimeoutMs
 } from './windows-process-tree-gyp-rebuild.mjs'
-
-const sourceScriptPath = fileURLToPath(new URL('./ensure-native-runtime.mjs', import.meta.url))
-// Fixture import walk misses createRequire CJS edges; name siblings explicitly or temp project cannot load.
-const REQUIRED_CJS_SIBLINGS = [
-  'node-pty-job-ownership.cjs',
-  'windows-process-tree-creation-time.cjs'
-]
 
 describe('ensure-native-runtime', () => {
   it('rechecks Node native modules in fresh child processes after rebuilding', () => {
@@ -270,47 +256,6 @@ describe('ensure-native-runtime', () => {
   })
 })
 
-function mkTempProject() {
-  const projectDir = mkdtempSync(join(tmpdir(), 'orca-native-runtime-'))
-  // Copy walked windows-process-tree-gyp-rebuild dependency or every case fails before its intended check.
-  copyScriptWithLocalModules(sourceScriptPath, join(projectDir, 'config', 'scripts'))
-  const processPackage = join(projectDir, 'node_modules', '@orca', 'process-host')
-  mkdirSync(processPackage, { recursive: true })
-  writeFileSync(
-    join(processPackage, 'package.json'),
-    JSON.stringify({ name: '@orca/process-host', type: 'module', exports: './index.mjs' })
-  )
-  writeFileSync(
-    join(processPackage, 'index.mjs'),
-    `import { appendFileSync } from 'node:fs'
-import { runProcessSync as run } from ${JSON.stringify(pathToFileURL(createRequire(import.meta.url).resolve('@orca/process-host')).href)}
-export function runProcessSync(options) {
-  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-gyp timeout=\${options.timeoutMs}\\n\`)
-  return run(options)
-}
-`
-  )
-  for (const name of REQUIRED_CJS_SIBLINGS) {
-    copyFileSync(
-      fileURLToPath(new URL(`./${name}`, import.meta.url)),
-      join(projectDir, 'config', 'scripts', name)
-    )
-  }
-  return projectDir
-}
-
-function envForNativeFixture(projectDir, extraEnv) {
-  // An inherited tracking preference would mask the Windows default under test.
-  const inherited = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'trackfileaccess')
-  )
-  return {
-    ...inherited,
-    ...extraEnv,
-    npm_config_node_gyp: join(projectDir, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js')
-  }
-}
-
 function writeFakeNativeModules(projectDir, { windowsRegistryRequiresMarker = false } = {}) {
   const nodePtyDir = join(projectDir, 'node_modules', 'node-pty')
   mkdirSync(join(nodePtyDir, 'lib'), { recursive: true })
@@ -327,6 +272,13 @@ function writeFakeNativeModules(projectDir, { windowsRegistryRequiresMarker = fa
     `
 const { appendFileSync, existsSync } = require('node:fs')
 
+// Orca's patch probes the per-ABI slot before upstream's dirs.
+const orcaDirs = [
+  'build/orca-napi-' + process.platform + '-' + process.arch,
+  'build/Release',
+  'prebuilds/' + process.platform + '-' + process.arch
+]
+
 exports.loadNativeModule = function loadNativeModule(nativeName) {
   const markerExists = existsSync(process.env.ORCA_NATIVE_TEST_MARKER)
   appendFileSync(
@@ -337,7 +289,7 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
     throw new Error('ABI mismatch sentinel')
   }
   return {
-    dir: '../build/Release/',
+    dir: '../' + orcaDirs[1] + '/',
     module: {
       listJobProcessIds() {},
       terminateJob() {},
@@ -373,28 +325,7 @@ function writeLoadableNativeModules(projectDir, { nativeDir = null } = {}) {
   writeFileSync(join(nodePtyDir, 'scripts', 'post-install.js'), '')
 
   writeFileSync(join(nodePtyDir, 'index.js'), 'module.exports = {}\n')
-  writeFileSync(
-    join(nodePtyDir, 'lib', 'utils.js'),
-    `
-const { appendFileSync, existsSync } = require('node:fs')
-
-exports.loadNativeModule = function loadNativeModule(nativeName) {
-  const rebuilt = existsSync(process.env.ORCA_NATIVE_TEST_MARKER)
-  const dir = ${JSON.stringify(nativeDir)} ??
-    (rebuilt ? '../build/Release/' : '../prebuilds/' + process.platform + '-' + process.arch + '/')
-  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-pty load \${nativeName} dir=\${dir}\\n\`)
-  return {
-    dir,
-    module: {
-      listJobProcessIds: () => [],
-      terminateJob: () => true,
-      assignCurrentProcessToJob: () => true,
-      assignCurrentProcessToStrictJob: () => true
-    }
-  }
-}
-`
-  )
+  writeFileSync(join(nodePtyDir, 'lib', 'utils.js'), patchedLoaderSource(nativeDir))
   writeFakeWindowsRegistry(projectDir)
 }
 
@@ -431,6 +362,35 @@ function writeNodePtyPatchFile(projectDir) {
   writeFileSync(join(projectDir, 'config', 'patches', 'node-pty@1.1.0.patch'), 'patch marker\n')
 }
 
+// Stands in for node-pty/lib/utils.js after Orca's patch: the per-ABI slot is tried first.
+function patchedLoaderSource(nativeDir) {
+  return `
+const { appendFileSync, existsSync } = require('node:fs')
+
+const orcaDirs = [
+  'build/orca-napi-' + process.platform + '-' + process.arch,
+  'build/Release',
+  'prebuilds/' + process.platform + '-' + process.arch
+]
+
+exports.loadNativeModule = function loadNativeModule(nativeName) {
+  const rebuilt = existsSync(process.env.ORCA_NATIVE_TEST_MARKER)
+  const dir = ${JSON.stringify(nativeDir)} ??
+    (rebuilt ? '../' + orcaDirs[1] + '/' : '../' + orcaDirs[2] + '/')
+  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-pty load \${nativeName} dir=\${dir}\\n\`)
+  return {
+    dir,
+    module: {
+      listJobProcessIds: () => [],
+      terminateJob: () => true,
+      assignCurrentProcessToJob: () => true,
+      assignCurrentProcessToStrictJob: () => true
+    }
+  }
+}
+`
+}
+
 function writePatchedNodePtyBuildArtifacts(projectDir) {
   const buildDir = join(projectDir, 'node_modules', 'node-pty', 'build', 'Release')
   mkdirSync(buildDir, { recursive: true })
@@ -445,28 +405,4 @@ function writePatchedNodePtyBuildArtifacts(projectDir) {
   if (process.platform === 'darwin') {
     writeFileSync(join(buildDir, 'spawn-helper'), '')
   }
-}
-
-function writeFakeNodeGyp(projectDir) {
-  const toolDir = join(projectDir, 'node_modules', 'node-gyp', 'bin')
-  mkdirSync(toolDir, { recursive: true })
-  writeFileSync(
-    join(toolDir, 'node-gyp.js'),
-    `
-const { appendFileSync, writeFileSync, writeSync } = require('node:fs')
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-gyp \${process.argv.slice(2).join(' ')}\\n\`)
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`cwd=\${process.cwd()}\\n\`)
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`cxxflags=\${process.env.CXXFLAGS || ''}\\n\`)
-appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`trackFileAccess=\${process.env.TrackFileAccess ?? ''}\\n\`)
-if (process.env.ORCA_NATIVE_TEST_VERBOSE_OUTPUT_BYTES) {
-  const output = Buffer.alloc(Number(process.env.ORCA_NATIVE_TEST_VERBOSE_OUTPUT_BYTES), 'x')
-  for (let offset = 0; offset < output.length;) {
-    offset += writeSync(1, output.subarray(offset))
-  }
-  writeSync(1, 'node-gyp stdout complete\\n')
-  writeSync(2, 'node-gyp stderr complete\\n')
-}
-writeFileSync(process.env.ORCA_NATIVE_TEST_MARKER, 'rebuilt')
-`
-  )
 }

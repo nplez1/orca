@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
-import { basename, dirname, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import {
   ensureWindowsProcessTreeCommandLinePatch,
   inspectWindowsProcessTreeAddon,
@@ -16,8 +16,11 @@ import { runProcessSync } from '@orca/process-host'
 import { describeProcessFailure } from './process-failure-message.mjs'
 import {
   isSharedNativePackage,
+  isSharedPackageDir,
   isSourceBuildDir,
+  nativeBuildEntryName,
   nodePtyBuildArtifactPaths,
+  nodePtyLoaderUsesBuildEntry,
   nodePtyNativeModuleName,
   resolveNativePackageDir
 } from './native-build-entry.cjs'
@@ -34,6 +37,7 @@ const scriptPath = import.meta.filename
 const projectDir = resolve(import.meta.dirname, '../..')
 const runtime = readRuntimeArg()
 // Why: `pnpm rebuild:node` must rebuild even a loadable node-pty; a shared slot still reuses its usable entry.
+// An unpatched loader cannot reach any slot, so it fails before this is consulted.
 const forceRebuild = process.argv.includes('--force')
 
 const NATIVE_MODULES = [
@@ -80,6 +84,13 @@ function readRuntimeArg() {
 }
 
 function ensureNodeRuntime() {
+  const unpatchedNodePtyLoader = describeUnpatchedNodePtyLoader()
+  if (unpatchedNodePtyLoader) {
+    // Why: no rebuild reaches this file, so the retry below would only restate the failure.
+    console.error(`[native-runtime] ${unpatchedNodePtyLoader}`)
+    process.exit(1)
+  }
+
   const initial = runNodeCheck()
   const patchedNodePtyRebuildReason = getPatchedNodePtyRebuildReason()
   if (initial.ok && !patchedNodePtyRebuildReason && !forceRebuild) {
@@ -124,6 +135,13 @@ function verifyNodeRuntimeAfterRebuild() {
 }
 
 function ensureElectronRuntime() {
+  const unpatchedNodePtyLoader = describeUnpatchedNodePtyLoader()
+  if (unpatchedNodePtyLoader) {
+    // Node and Electron both dead-end here: a shared rebuild publishes a slot this loader never probes.
+    console.error(`[native-runtime] ${unpatchedNodePtyLoader}`)
+    process.exit(1)
+  }
+
   const initial = runElectronCheck()
   const patchedNodePtyRebuildReason = getPatchedNodePtyRebuildReason()
   if (initial.ok && !patchedNodePtyRebuildReason) {
@@ -361,6 +379,76 @@ function requiresPatchedNodePtySourceBuild() {
   }
 
   return existsSync(resolve(projectDir, 'node_modules', 'node-pty'))
+}
+
+/** A node-pty installed from another pnpm store resolves to prebuilds no rebuild can replace. */
+function describeUnpatchedNodePtyLoader() {
+  if (!requiresPatchedNodePtySourceBuild()) {
+    return null
+  }
+
+  let utilsPath
+  let utilsSource
+  try {
+    utilsPath = require.resolve('node-pty/lib/utils')
+    utilsSource = readFileSync(utilsPath, 'utf8')
+  } catch {
+    return null
+  }
+  if (nodePtyLoaderUsesBuildEntry(utilsSource)) {
+    return null
+  }
+
+  const slot = nativeBuildEntryName('node-pty')
+  const nodePtyDir = dirname(dirname(utilsPath))
+  const declaredStore = readDeclaredPnpmStoreDir()
+  const foreignStore = describeForeignStore(nodePtyDir, declaredStore)
+  return (
+    `the installed node-pty at ${nodePtyDir} is not Orca's patched copy: its lib/utils.js never ` +
+    `looks in the build/${slot} slot, so it can only load an upstream prebuild and Orca's patch is ` +
+    `inactive. Rebuilding cannot repoint it: ${
+      foreignStore
+        ? `it resolves from a different pnpm store than node_modules declares (${declaredStore})`
+        : `pnpm did not apply Orca's node-pty patch, so this install predates it or patches were skipped`
+    }. Reinstall from the worktree root with pnpm install --frozen-lockfile --force${
+      foreignStore ? quotedStoreArg(declaredStore) : ''
+    }.`
+  )
+}
+
+/** Only a shared copy outside the recorded store is cured by --store-dir; a project-local one is not. */
+function describeForeignStore(nodePtyDir, declaredStore) {
+  if (declaredStore === null || !isSharedPackageDir(nodePtyDir, projectDir)) {
+    return null
+  }
+  let storeDir = declaredStore
+  try {
+    storeDir = realpathSync(declaredStore)
+  } catch {
+    // An unreachable store cannot contain the copy either way.
+  }
+  return isInsideDir(storeDir, nodePtyDir) ? null : declaredStore
+}
+
+// cmd.exe passes POSIX single quotes through literally, so the printed command must quote per platform.
+function quotedStoreArg(storeDir) {
+  return process.platform === 'win32' ? ` --store-dir "${storeDir}"` : ` --store-dir '${storeDir}'`
+}
+
+function isInsideDir(parent, child) {
+  const rel = relative(parent, child)
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+function readDeclaredPnpmStoreDir() {
+  try {
+    const modules = JSON.parse(
+      readFileSync(resolve(projectDir, 'node_modules', '.modules.yaml'), 'utf8')
+    )
+    return typeof modules.storeDir === 'string' ? modules.storeDir : null
+  } catch {
+    return null
+  }
 }
 
 function rebuildNodeRuntimeModules(moduleNames) {
