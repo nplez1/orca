@@ -17,7 +17,9 @@ import { describeProcessFailure } from './process-failure-message.mjs'
 import {
   isSharedNativePackage,
   isSourceBuildDir,
+  nativeBuildEntryName,
   nodePtyBuildArtifactPaths,
+  nodePtyLoaderUsesBuildEntry,
   nodePtyNativeModuleName,
   resolveNativePackageDir
 } from './native-build-entry.cjs'
@@ -80,6 +82,13 @@ function readRuntimeArg() {
 }
 
 function ensureNodeRuntime() {
+  const unpatchedNodePtyLoader = describeUnpatchedNodePtyLoader()
+  if (unpatchedNodePtyLoader) {
+    // Why: no rebuild reaches this file, so the retry below would only restate the failure.
+    console.error(`[native-runtime] ${unpatchedNodePtyLoader}`)
+    process.exit(1)
+  }
+
   const initial = runNodeCheck()
   const patchedNodePtyRebuildReason = getPatchedNodePtyRebuildReason()
   if (initial.ok && !patchedNodePtyRebuildReason && !forceRebuild) {
@@ -361,6 +370,47 @@ function requiresPatchedNodePtySourceBuild() {
   }
 
   return existsSync(resolve(projectDir, 'node_modules', 'node-pty'))
+}
+
+/** A node-pty installed from another pnpm store resolves to prebuilds no rebuild can replace. */
+function describeUnpatchedNodePtyLoader() {
+  if (!requiresPatchedNodePtySourceBuild()) {
+    return null
+  }
+
+  let utilsPath
+  let utilsSource
+  try {
+    utilsPath = require.resolve('node-pty/lib/utils')
+    utilsSource = readFileSync(utilsPath, 'utf8')
+  } catch {
+    return null
+  }
+  if (nodePtyLoaderUsesBuildEntry(utilsSource)) {
+    return null
+  }
+
+  const slot = nativeBuildEntryName('node-pty')
+  const declaredStore = readDeclaredPnpmStoreDir()
+  const storeArg = declaredStore ? ` --store-dir '${declaredStore}'` : ''
+  return (
+    `the installed node-pty at ${dirname(dirname(utilsPath))} is not Orca's patched copy: its ` +
+    `lib/utils.js never looks in the build/${slot} slot, so it can only load an upstream prebuild ` +
+    `and Orca's patch is inactive. Rebuilding cannot repoint it. A pnpm install most likely ran ` +
+    `against a different store; reinstall from the worktree root with ` +
+    `pnpm install --frozen-lockfile --force${storeArg}.`
+  )
+}
+
+function readDeclaredPnpmStoreDir() {
+  try {
+    const modules = JSON.parse(
+      readFileSync(resolve(projectDir, 'node_modules', '.modules.yaml'), 'utf8')
+    )
+    return typeof modules.storeDir === 'string' ? modules.storeDir : null
+  } catch {
+    return null
+  }
 }
 
 function rebuildNodeRuntimeModules(moduleNames) {

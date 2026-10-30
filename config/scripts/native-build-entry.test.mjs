@@ -6,11 +6,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
 const {
+  NODE_PTY_LOADER_BUILD_ENTRY_MARKER,
   isNativeBuildEntryName,
   isSharedPackageDir,
   isSourceBuildDir,
   loadedNativeBuildDir,
   nativeBuildEntryName,
+  nodePtyLoaderUsesBuildEntry,
   nodePtyNativeModuleName
 } = require('./native-build-entry.cjs')
 const { adoptPackagedNativeBuildEntries } = require('../packaged-native-build-entries.cjs')
@@ -88,6 +90,29 @@ describe('nativeBuildEntryName', () => {
       expect(path.posix.dirname(path.posix.normalize(resolved))).toBe(
         `/pkg/build/${nativeBuildEntryName('@vscode/windows-process-tree', { platform: 'win32', arch })}`
       )
+    }
+  })
+})
+
+describe('nodePtyLoaderUsesBuildEntry', () => {
+  it('reads an upstream loader as unpatched and the patch as patched', () => {
+    expect(nodePtyLoaderUsesBuildEntry("var dirs = ['build/Release', 'prebuilds/' + arch];")).toBe(
+      false
+    )
+    expect(nodePtyLoaderUsesBuildEntry(undefined)).toBe(false)
+    expect(nodePtyLoaderUsesBuildEntry(addedPatchLine('node-pty@1.1.0.patch', /dirs = \[/))).toBe(
+      true
+    )
+  })
+
+  it('finds the marker on every patch line that adds a loader dir list', () => {
+    const lines = readFileSync(path.join(PATCHES, 'node-pty@1.1.0.patch'), 'utf8')
+      .split('\n')
+      .filter((line) => line.startsWith('+') && /dirs = \[/.test(line))
+    // lib/utils.js and src/utils.ts are both loaders the patch must repoint.
+    expect(lines).toHaveLength(2)
+    for (const line of lines) {
+      expect(line).toContain(NODE_PTY_LOADER_BUILD_ENTRY_MARKER)
     }
   })
 })

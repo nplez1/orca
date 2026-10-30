@@ -186,6 +186,45 @@ describe('ensure-native-runtime', () => {
   )
 
   it.skipIf(process.platform === 'win32')(
+    'fails fast on a node-pty from another store instead of retrying a rebuild that cannot help',
+    () => {
+      const projectDir = mkTempProject()
+
+      try {
+        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+        const logPath = join(projectDir, 'native-runtime.log')
+        const markerPath = join(projectDir, 'rebuilt.marker')
+        writeLoadableNativeModules(projectDir)
+        writeNodePtyPatchFile(projectDir)
+        writePatchedNodePtyBuildArtifacts(projectDir)
+        writeUnpatchedNodePtyLoader(projectDir, { declaredStore: '/elsewhere/.pnpm-store/v11' })
+        writeFakeNodeGyp(projectDir)
+
+        const result = spawnSync(process.execPath, [scriptPath, '--runtime=node'], {
+          cwd: projectDir,
+          encoding: 'utf8',
+          env: envForNativeFixture(projectDir, {
+            ORCA_NATIVE_TEST_LOG: logPath,
+            ORCA_NATIVE_TEST_MARKER: markerPath
+          })
+        })
+
+        expect(result.status, result.stderr).toBe(1)
+        expect(result.stderr).toContain("is not Orca's patched copy")
+        expect(result.stderr).toContain(`never looks in the build/orca-napi-${process.platform}-`)
+        expect(result.stderr).toContain("--store-dir '/elsewhere/.pnpm-store/v11'")
+        expect(result.stderr).not.toContain('Native modules still do not load')
+        expect(existsSync(logPath) ? readFileSync(logPath, 'utf8') : '').not.toContain(
+          'node-gyp rebuild'
+        )
+        expect(existsSync(markerPath)).toBe(false)
+      } finally {
+        rmSync(projectDir, { recursive: true, force: true })
+      }
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
     'keeps the fast path when the platform-specific patched artifacts exist',
     () => {
       const projectDir = mkTempProject()
@@ -327,6 +366,13 @@ function writeFakeNativeModules(projectDir, { windowsRegistryRequiresMarker = fa
     `
 const { appendFileSync, existsSync } = require('node:fs')
 
+// Orca's patch probes the per-ABI slot before upstream's dirs.
+const orcaDirs = [
+  'build/orca-napi-' + process.platform + '-' + process.arch,
+  'build/Release',
+  'prebuilds/' + process.platform + '-' + process.arch
+]
+
 exports.loadNativeModule = function loadNativeModule(nativeName) {
   const markerExists = existsSync(process.env.ORCA_NATIVE_TEST_MARKER)
   appendFileSync(
@@ -337,7 +383,7 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
     throw new Error('ABI mismatch sentinel')
   }
   return {
-    dir: '../build/Release/',
+    dir: '../' + orcaDirs[1] + '/',
     module: {
       listJobProcessIds() {},
       terminateJob() {},
@@ -373,28 +419,7 @@ function writeLoadableNativeModules(projectDir, { nativeDir = null } = {}) {
   writeFileSync(join(nodePtyDir, 'scripts', 'post-install.js'), '')
 
   writeFileSync(join(nodePtyDir, 'index.js'), 'module.exports = {}\n')
-  writeFileSync(
-    join(nodePtyDir, 'lib', 'utils.js'),
-    `
-const { appendFileSync, existsSync } = require('node:fs')
-
-exports.loadNativeModule = function loadNativeModule(nativeName) {
-  const rebuilt = existsSync(process.env.ORCA_NATIVE_TEST_MARKER)
-  const dir = ${JSON.stringify(nativeDir)} ??
-    (rebuilt ? '../build/Release/' : '../prebuilds/' + process.platform + '-' + process.arch + '/')
-  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-pty load \${nativeName} dir=\${dir}\\n\`)
-  return {
-    dir,
-    module: {
-      listJobProcessIds: () => [],
-      terminateJob: () => true,
-      assignCurrentProcessToJob: () => true,
-      assignCurrentProcessToStrictJob: () => true
-    }
-  }
-}
-`
-  )
+  writeFileSync(join(nodePtyDir, 'lib', 'utils.js'), patchedLoaderSource(nativeDir))
   writeFakeWindowsRegistry(projectDir)
 }
 
@@ -429,6 +454,66 @@ function writeFakeWindowsRegistry(projectDir, { requiresMarker = false } = {}) {
 function writeNodePtyPatchFile(projectDir) {
   mkdirSync(join(projectDir, 'config', 'patches'), { recursive: true })
   writeFileSync(join(projectDir, 'config', 'patches', 'node-pty@1.1.0.patch'), 'patch marker\n')
+}
+
+// Stands in for node-pty/lib/utils.js after Orca's patch: the per-ABI slot is tried first.
+function patchedLoaderSource(nativeDir) {
+  return `
+const { appendFileSync, existsSync } = require('node:fs')
+
+const orcaDirs = [
+  'build/orca-napi-' + process.platform + '-' + process.arch,
+  'build/Release',
+  'prebuilds/' + process.platform + '-' + process.arch
+]
+
+exports.loadNativeModule = function loadNativeModule(nativeName) {
+  const rebuilt = existsSync(process.env.ORCA_NATIVE_TEST_MARKER)
+  const dir = ${JSON.stringify(nativeDir)} ??
+    (rebuilt ? '../' + orcaDirs[1] + '/' : '../' + orcaDirs[2] + '/')
+  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-pty load \${nativeName} dir=\${dir}\\n\`)
+  return {
+    dir,
+    module: {
+      listJobProcessIds: () => [],
+      terminateJob: () => true,
+      assignCurrentProcessToJob: () => true,
+      assignCurrentProcessToStrictJob: () => true
+    }
+  }
+}
+`
+}
+
+// An upstream copy: no per-ABI slot lookup, so Orca's patch can never be active.
+function writeUnpatchedNodePtyLoader(projectDir, { declaredStore = null } = {}) {
+  const nodePtyDir = join(projectDir, 'node_modules', 'node-pty')
+  writeFileSync(
+    join(nodePtyDir, 'lib', 'utils.js'),
+    `
+const { appendFileSync } = require('node:fs')
+
+exports.loadNativeModule = function loadNativeModule(nativeName) {
+  const dir = '../prebuilds/' + process.platform + '-' + process.arch + '/'
+  appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-pty load \${nativeName} dir=\${dir}\\n\`)
+  return {
+    dir,
+    module: {
+      listJobProcessIds: () => [],
+      terminateJob: () => true,
+      assignCurrentProcessToJob: () => true,
+      assignCurrentProcessToStrictJob: () => true
+    }
+  }
+}
+`
+  )
+  if (declaredStore) {
+    writeFileSync(
+      join(projectDir, 'node_modules', '.modules.yaml'),
+      JSON.stringify({ storeDir: declaredStore }, null, 2)
+    )
+  }
 }
 
 function writePatchedNodePtyBuildArtifacts(projectDir) {
