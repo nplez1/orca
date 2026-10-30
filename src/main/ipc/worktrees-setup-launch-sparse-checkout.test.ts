@@ -14,7 +14,11 @@ import type { WorktreeRuntimeStub } from './worktrees-test-runtime-stub'
 
 function expectHostSetupSpawn(runtime: WorktreeRuntimeStub, worktreeId: string): void {
   expect(runtime.createTerminal).toHaveBeenCalledTimes(2)
-  expect(runtime.createTerminal).toHaveBeenNthCalledWith(1, `id:${worktreeId}`, { activate: true })
+  // LOCAL(nplez1): the host marks these launches as a user act (upstream E9) alongside activate.
+  expect(runtime.createTerminal).toHaveBeenNthCalledWith(1, `id:${worktreeId}`, {
+    activate: true,
+    wslUserAct: true
+  })
   expect(runtime.createTerminal).toHaveBeenNthCalledWith(
     2,
     `id:${worktreeId}`,

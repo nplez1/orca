@@ -763,7 +763,8 @@ describe('runtime worktree naming through first work', () => {
     )
     expect(worktree).toMatchObject({ branch: 'refs/heads/nautilus', displayNameMode: 'automatic' })
     const renamed = await renameCreatedWorktreeOnFirstWork(worktree, writtenMeta[0], mocks.git)
-    expect(renamed).toMatchObject({
+    // LOCAL(nplez1): the fork's first-work rename returns the outcome, not the bare worktree.
+    expect(renamed.worktree).toMatchObject({
       branch: 'refs/heads/fix-auth',
       displayName: 'Fix auth',
       displayNameMode: 'fixed'
@@ -786,7 +787,10 @@ describe('runtime worktree naming through first work', () => {
     const { worktree } = await createWorktree(request, undefined, undefined, {}, true)
     expect(writtenMeta[0]).toMatchObject({ orcaCreationSource: 'runtime' })
     const renamed = await renameCreatedWorktreeOnFirstWork(worktree, writtenMeta[0], mocks.git)
-    expect(renamed).toMatchObject({ branch: 'refs/heads/fix-auth', displayName: 'Fix auth' })
+    expect(renamed.worktree).toMatchObject({
+      branch: 'refs/heads/fix-auth',
+      displayName: 'Fix auth'
+    })
   })
 
   it.each([

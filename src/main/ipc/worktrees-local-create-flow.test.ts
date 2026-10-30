@@ -651,7 +651,7 @@ describe('registerWorktreeHandlers', () => {
     expect(runtimeStub.createTerminal).toHaveBeenNthCalledWith(
       1,
       'id:repo-1::/workspace/improve-dashboard',
-      { activate: true }
+      { activate: true, wslUserAct: true }
     )
     expect(runtimeStub.createTerminal).toHaveBeenNthCalledWith(
       2,

@@ -535,8 +535,13 @@ it('opens a link from Orca UI as a browser tab in the active workspace', async (
 })
 
 it('opens a link from Orca UI in the system browser when the workspace browser cannot open pages', () => {
+  // LOCAL(nplez1): #234 sends the system path through the explicit variant, because `openUrl`
+  // relays back into this router.
   const openUrl = vi.fn(() => Promise.resolve())
-  vi.stubGlobal('window', { ...window, api: { ...window.api, shell: { openUrl } } })
+  vi.stubGlobal('window', {
+    ...window,
+    api: { ...window.api, shell: { openUrlInSystemBrowser: openUrl } }
+  })
   // A paired web client without browser streaming has no in-app browser.
   vi.stubGlobal('__ORCA_WEB_CLIENT__', true)
 
@@ -548,7 +553,11 @@ it('opens a link from Orca UI in the system browser when the workspace browser c
 
 it('opens a link from Orca UI in the system browser on the escape modifier click', () => {
   const openUrl = vi.fn(() => Promise.resolve())
-  vi.stubGlobal('window', { ...window, api: { ...window.api, shell: { openUrl } } })
+  // LOCAL(nplez1): the escape path also uses the explicit system variant (#234).
+  vi.stubGlobal('window', {
+    ...window,
+    api: { ...window.api, shell: { openUrlInSystemBrowser: openUrl } }
+  })
 
   // Shift plus both platform keys reads as the escape modifier on every OS.
   openAppHttpLink(URL_TO_OPEN, { event: { shiftKey: true, metaKey: true, ctrlKey: true } })

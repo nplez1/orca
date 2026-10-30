@@ -138,7 +138,9 @@ function installWindowApi(): void {
         restart: mocks.appRestart
       },
       shell: {
-        openUrl: mocks.shellOpenUrl
+        openUrl: mocks.shellOpenUrl,
+        // LOCAL(nplez1): #234 sends the fallback system path through the explicit variant.
+        openUrlInSystemBrowser: mocks.shellOpenUrl
       },
       updater: {
         check: mocks.updaterCheck

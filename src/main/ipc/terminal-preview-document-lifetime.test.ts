@@ -12,8 +12,7 @@ vi.mock('electron', () => ({
       handlers.set(channel, handler)
   }
 }))
-vi.mock('../window/dashboard-popout-window', () => ({ isDashboardPopoutRenderer: () => true }))
-vi.mock('./ui', () => ({ isTrustedUIRenderer: () => false }))
+vi.mock('./ui', () => ({ isTrustedUIRenderer: () => true }))
 
 import { registerTerminalPreviewHandlers } from './terminal-preview'
 

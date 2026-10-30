@@ -62,8 +62,12 @@ function deferredScan(): { resolve: (value: AiVaultListResult) => void } {
     resolveFn = resolve
   })
   scanAiVaultSessionsInService.mockImplementationOnce(
-    async (_options, _signal, progress?: LocalAiVaultScanProgressHandle) => {
+    // Why four: upstream added the `request` options bag between the signal and the handle.
+    async (_options, _signal, _request, progress?: LocalAiVaultScanProgressHandle) => {
       const value = await pending
+      // Why a tally first: `finish` publishes nothing for a scan that reported no work, so a bare
+      // finish here would test the index-only path instead of the progress row.
+      progress?.work({ agents: ['claude'], read: { done: 1, total: 1 } })
       progress?.finish(null)
       return value
     }
