@@ -13,7 +13,7 @@ const { handleMock, openPathMock, realpathMock, showItemInFolderMock, statMock }
 )
 
 vi.mock('electron', () => ({
-  ipcMain: { handle: handleMock },
+  ipcMain: { handle: handleMock, on: vi.fn() },
   shell: { showItemInFolder: showItemInFolderMock, openExternal: vi.fn(), openPath: openPathMock },
   dialog: { showOpenDialog: vi.fn() }
 }))

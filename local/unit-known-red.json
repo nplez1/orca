@@ -35,9 +35,9 @@
   "observedRun": {
     "kind": "full",
     "revision": "ef2897da2b",
-    "subject": "the first full gate after the 2026-10-25 merge of upstream 0571e45107 (556 commits)",
-    "failingRecords": 155,
-    "allowlisted": 40,
+    "subject": "the 2026-10-29 reconciliation: eight fork-local classes added after the base gate on this machine red 80 records",
+    "failingRecords": 163,
+    "allowlisted": 48,
     "upstreamQuarantined": 0,
     "fixed": 115,
     "repairedCases": [
@@ -619,7 +619,7 @@
     ],
     "unexpected": 0,
     "unhandledErrorHeadlines": 0,
-    "note": "Reconciliation of the ef2897da2b run: 31 failures were already recorded, 9 are the environment-bound reds this change records, and every other failure was repaired in the tree (or, for mobile/, by installing its workspace). Its 7 unhandled-error headlines are explained in LOCAL-PATCHES.md (2026-10-25 sync) and do not recur once the gate runs with upstream's lane setting for recordDependencies. The verdict for the revision that ships is recorded in LOCAL-PATCHES.md."
+    "note": "Reconciliation of the ef2897da2b run, extended on 2026-10-29 without a new observed run: the eight added entries are the fork-home-migration-mock and fork-credentials-ratchet classes, which reproduce deterministically. Because the manifest keeps allowlisted = entries + prunedSince and failingRecords = its parts, both totals moved with the entries rather than being re-derived from a fresh count; the per-class evidence is in each entry and in LOCAL-PATCHES.md."
   },
   "unhandledErrors": [
     {
@@ -694,6 +694,70 @@
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream file, byte-identical to 0571e45107. The script recovers only from EACCES/EPERM; under bun on macOS (1.4.3 and 1.4.4 both probed) fs.rm on a 0o555 directory fails with ENOTEMPTY instead, where Node reports EACCES, so the in-process case cannot recover and its afterEach then also fails ENOTEMPTY. The CLI cases, which spawn Node, pass.",
       "flaky": false,
       "match": "Some generated directories could not be removed"
+    },
+    {
+      "file": "src/main/minimax/minimax-api-key-store.test.ts",
+      "test": "clears the cached key and removes the file",
+      "class": "fork-home-migration-mock",
+      "owner": "fork",
+      "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/minimax/minimax-api-key-store.test.ts",
+      "test": "reports a transient read failure as unreadable, not undecryptable, and retries next read",
+      "class": "fork-home-migration-mock",
+      "owner": "fork",
+      "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/deepseek/deepseek-api-key-store.test.ts",
+      "test": "clears the cached key and removes the file",
+      "class": "fork-home-migration-mock",
+      "owner": "fork",
+      "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/fireworks/fireworks-credentials-store.test.ts",
+      "test": "clears the cached payload and removes the file",
+      "class": "fork-home-migration-mock",
+      "owner": "fork",
+      "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/zcode/zcode-plan-api-key-store.test.ts",
+      "test": "restores the previous envelope when a plaintext replacement cannot be restricted",
+      "class": "fork-home-migration-mock",
+      "owner": "fork",
+      "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/zcode/zcode-plan-api-key-store.test.ts",
+      "test": "removes a rejected plaintext replacement when restoring the previous key fails",
+      "class": "fork-home-migration-mock",
+      "owner": "fork",
+      "evidence": "Fork patch local(identity) added the pre-rename home adoption: resolveLegacyHomeStoreIn (src/main/home-directory-migration.ts:114) reads the adoption marker on every getApiKeyPath(), before the key file. These cases drive the store through encrypted-api-key-file-store.ts:36 and queue their reads with mockReturnValueOnce, so the marker read spends the one-shot: the store then reads undefined, and encrypted-api-key-file-store.ts:167 wraps the decode failure as \"could not be decrypted\". Env-independent and deterministic. Intended fix: memoise the resolved path per store instance, or make these mocks path-aware; both change product+test together, so it is not part of the node-pty work.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts",
+      "test": "confines filesystem persistence in accounts and usage to named profile surfaces",
+      "class": "fork-credentials-ratchet",
+      "owner": "fork",
+      "evidence": "Fork file src/main/claude-accounts/claude-oauth-pending-rotations.ts (added by afbf7860833, e09393fec57) uses rmSync without an fsAllowances row and calls writeClaudeOAuthCredentialRotation without a CREDENTIAL_ROTATION_OWNERS row in the ratchet test (src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts:33,132). The ratchet is doing its job: the pending-rotation write path needs review before it is declared, so allowing it here would approve unreviewed persistence.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts",
+      "test": "lets only the usage fetch start an exchange, and only the exchange write its result",
+      "class": "fork-credentials-ratchet",
+      "owner": "fork",
+      "evidence": "Fork file src/main/claude-accounts/claude-oauth-pending-rotations.ts (added by afbf7860833, e09393fec57) uses rmSync without an fsAllowances row and calls writeClaudeOAuthCredentialRotation without a CREDENTIAL_ROTATION_OWNERS row in the ratchet test (src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts:33,132). The ratchet is doing its job: the pending-rotation write path needs review before it is declared, so allowing it here would approve unreviewed persistence.",
+      "flaky": false
     }
   ],
   "prunedSince": [

@@ -55,7 +55,13 @@ if ! target="$(gh release view "$tag" --repo "$repo" --json targetCommitish --jq
   exit 1
 fi
 
-if [ "${target,,}" = "${sha,,}" ]; then
+# Why not ${var,,}: macOS /bin/bash is 3.2, and tests/tools/fork-release-guard.test.mjs runs
+# this script with an unqualified `bash`.
+lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+if [ "$(lower "$target")" = "$(lower "$sha")" ]; then
   echo "$tag already exists at $sha; uploading into it"
   exit 0
 fi

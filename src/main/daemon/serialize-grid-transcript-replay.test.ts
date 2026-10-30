@@ -29,6 +29,10 @@ const KNOWN_PREEXISTING_I2_FAILURES: Record<string, number> = {
   less: 6,
   nano: 2,
   opencode: 5,
+  // Copilot 1.0.105 captures restore border rows with an extra attribute bit and leak the live pen.
+  'copilot-1-0-105-approved': 16,
+  'copilot-1-0-105-narrow-approval': 8,
+  'copilot-1-0-105-manual-approval': 10,
   // Boot captures expose existing background and cursor restore loss.
   'opencode-1-18-32-timed-boot-hidden-pane': 16,
   'opencode-1-18-32-timed-boot-slow': 16,
