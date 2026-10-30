@@ -627,9 +627,9 @@ export async function main(
         ([key]) => getCatalogEntry(catalog, key) === undefined
       )
       const added = applyMissingEnglishEntries(catalog, missing)
-      await (forkOverlay
-        ? writeMissingEnglishEntriesForSurface(root, surface, entries)
-        : fs.writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8'))
+      // Always the overlay: upstream's en.json stays upstream's bytes, and a surface with no
+      // overlay directory yet gets one created here rather than having upstream's file rewritten.
+      await writeMissingEnglishEntriesForSurface(root, surface, entries)
       catalogKeys = new Set(flattenCatalogKeys(catalog))
       console.log(`Added ${added} missing localization key(s) to en.json.`)
     } else {

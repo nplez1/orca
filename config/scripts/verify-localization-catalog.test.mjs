@@ -199,10 +199,14 @@ describe('verify-localization-catalog', () => {
     }
     await expect(verifyLocalizationCatalog(root, { fix: true })).resolves.toBe(0)
 
+    // LOCAL(nplez1): upstream's en.json keeps its bytes; the new English entries land in the fork
+    // overlay, which every reader merges on top.
     expect(readJson(path.join(localesDir, 'en.json'))).toEqual({
+      auto: { example: { selected: '{{count}} selected' } }
+    })
+    expect(readJson(path.join(root, FORK_EN_CATALOG_RELATIVE_PATH))).toEqual({
       auto: {
         example: {
-          selected: '{{count}} selected',
           files_one: 'One file',
           files_other: '{{count}} files'
         }
