@@ -23,6 +23,7 @@ import {
 import { ensureAutoUpdaterConfigured } from '../window/attach-main-window-services'
 import { focusExistingMainWindow, safelyRevealWindow } from '../window/focus-existing-window'
 import { mainProcessState as state } from './main-process-state'
+import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'
 import { getWorkspaceSpaceWindow } from '../window/workspace-space-window'
 import { markUserQuitWindowClose } from '../window/user-quit-window-close'
 import { loadMainWindow } from '../window/createMainWindow'
@@ -265,7 +266,9 @@ export function createSystemTrayDeferred(
 
 function resolveMenuTargetRenderer(targetWindow?: BrowserWindow | null): WebContents | undefined {
   const invokingWindow = targetWindow && !targetWindow.isDestroyed() ? targetWindow : undefined
-  const isCompanion = invokingWindow && invokingWindow === getWorkspaceSpaceWindow()
+  const isCompanion =
+    invokingWindow &&
+    (invokingWindow === getDashboardPopoutWindow() || invokingWindow === getWorkspaceSpaceWindow())
   if (invokingWindow && !isCompanion && !isNativeBrowserPopupWindow(invokingWindow)) {
     return invokingWindow.webContents
   }

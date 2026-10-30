@@ -174,7 +174,8 @@ it('carries the selected raw group and typed choices through the phone request t
       agent: 'claude-agent-teams',
       raw: '--model opus',
       applied: {},
-      command: "orca-ide claude-teams '--model' 'opus'"
+      // LOCAL(nplez1): the launcher this build publishes is `orca-np`, not upstream's `orca-ide`.
+      command: "orca-np claude-teams '--model' 'opus'"
     }
   )
   for (const agentId of [null, 'custom'] as const) {
