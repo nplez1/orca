@@ -734,6 +734,84 @@ wrong.
   `CREDENTIAL_ROTATION_OWNERS` row for its rotation write. The ratchet is working; granting it here
   would approve an unreviewed persistence surface.
 
+### `local(test)`: the 2026-10-31 sweep — every recorded class closed, all eighteen entries gone
+
+All eighteen entries in `local/unit-known-red.json` were repaired rather than re-justified, and the
+manifest's `entries` is empty again. Nothing here weakens a ratchet, and three of the six classes
+turned out to be recorded with the wrong cause — a suppressed red is also an unexamined one, which
+is what this sweep cost to find out.
+
+- **`fork-home-migration-mock` (6) — closed, and the entry's first proposed fix would have been a
+  bug.** The mechanism the entry recorded was right: the fork's pre-rename adoption
+  (`resolveLegacyHomeStoreIn`, `src/main/home-directory-migration.ts:114`) reads its adoption marker
+  inside `getApiKeyPath()`, so the marker read spends the `mockReturnValueOnce` queued for the key
+  file. The fix is the entry's _second_ option and not the first: the four suites now mock
+  `../home-directory-migration`'s `adoptLegacyHomeStore` — the store's path is not what these units
+  test, and `home-directory-migration.test.ts` already covers the adoption — and each suite pins the
+  migrated file name in its no-file case, so the fork's wiring is still asserted. Memoising the
+  resolved path per store instance would have broken a documented contract: a failed adoption
+  deliberately records no marker so the _next_ read retries it (`home-directory-migration.ts:164`,
+  the `kind: 'failed'` branch), and a per-instance memo kills that retry.
+- **The same eight cases were allowlisted on the Linux nightly as `credential-store-safe-storage`,
+  which is the proof they were never this machine's.** `local/nightly-linux-known-red.json` carried
+  them with the evidence "they fail identically here, so the class is the credential store's
+  safeStorage/keychain behaviour" — but a one-shot mock spent by an adoption-marker read is
+  deterministic on any host with no keychain involved at all. Its own `exit` condition was "remove
+  when this family is mocked off safeStorage"; all eight leave that manifest with this change, and
+  the `macos`/`linux` pair agreeing was the signal that should have sent someone to the tree sooner.
+- **`fork-credentials-ratchet` (2) — closed by declaring the surface, after reading it.**
+  `flushPendingRotation` writes back a rotation the store refused _through_
+  `writeClaudeOAuthCredentialRotation`, under the store's own compare-and-set on `spentStoreToken`,
+  and returns early while an exchange for that key is in flight, so it is an owner of that one write
+  rather than a second writer of credentials. Its `rmSync` deletes its own sealed queue once the last
+  rotation is written back and nothing else. `fsAllowances` gains the one primitive and
+  `CREDENTIAL_ROTATION_OWNERS` gains `PENDING_ROTATION_OWNER`. No comment records this in the file:
+  it is an upstream-owned file and `check-upstream-file-comments` counts the lines.
+- **`host-pnpm-shim` (1) — closed on the machine, not in the tree.** The case proves that a bare
+  `pnpm exec node-gyp` cannot find node-gyp with `PATH` emptied, and asserts pnpm's own
+  `Command "node-gyp" not found`. This machine's `~/.local/bin/pnpm` guardrail resolved the real
+  pnpm with bare `ls`/`sort`/`tail`, so an emptied `PATH` killed the shim first (`exit 127`) and
+  pnpm's answer never appeared. The shim now uses `/bin/ls`, `/usr/bin/sort` and `/usr/bin/tail`.
+  Nothing in the repo changed, so this entry was never writable as one of the fork's own reds: a
+  wrapper that breaks under a restricted `PATH` is machine infrastructure failing, and the allowlist
+  was hiding it. The entry had no `LOCAL-PATCHES.md` evidence line at all, which is how it survived.
+- **`mobile-font-repaint` (1) — closed as a premise guard, and the entry's "real render finding"
+  claim was wrong.** `config/scripts/mobile-web-app/mobile-web-app-terminal-font-render.test.mjs`
+  asserts that a stalled web font leaves tofu on screen and that the glyph repaints when the font
+  arrives. This host has `~/Library/Fonts/NerdFonts/Symbols/SymbolsNerdFontMono-Regular.ttf`
+  installed, and the terminal stack names that same family
+  (`mobile/src/terminal/document/text-scaling.ts:44`), so the _fallback_ already draws the identical
+  outline and the two frames are byte-identical — correct behaviour with nothing to repaint, not a
+  repaint defect. The case now captures the folder glyph and an unassigned codepoint (U+0378, tofu
+  everywhere) and skips with that reason when the two frames differ, so the premise is checked where
+  it is observable. Verified both ways against the same fixture: with the family present the frames
+  differ (skip), with the stack's system family removed they are identical (runs for real).
+- **`host-toolchain` (8) — closed, and the entry was wrong about the cause in every case.** The
+  class was recorded as "the CLI/dev-rebuild harness times out or reads a stale dist file under
+  load", i.e. this machine being slow. Nothing times out and no child exits non-zero: the failures
+  are macOS path spelling, the class this ledger already closed twice (`05fd6bd8e0`, `8be888db9f`).
+  `os.tmpdir()` is `/var/folders/…`, `realpath` is `/private/var/folders/…`, and fsevents reports the
+  resolved spelling while the paths the code registers keep the unresolved one. Three sites:
+  - `config/scripts/process-host-dev-rebuild.test.ts:32` and
+    `config/scripts/main-entry-facade.test.ts:10` built their fixture root from raw `tmpdir()`, so
+    every registered watch path and the child's own `__dirname` disagreed. Both now realpath the
+    `mkdtemp` result, the idiom 11 other files in this tree already use.
+  - `config/build-plugins/process-host-dev-rebuild.ts:87` created its private watch-signal directory
+    the same way and registered the signal file with `addWatchFile`, so on macOS a **newly created**
+    source file never triggered a rebuild at all — editing an existing one did. That is a product
+    bug, not a harness one: it is why only the three cases that create a file failed. Fixed the same
+    way, and it is upstream-worthy on its own.
+  - `config/scripts/reclaim-worktree-generated-files.mjs:204` recovered only from `EACCES`/`EPERM`.
+    `pnpm test` runs vitest under Bun, and Bun's `fs.rm` on a `0o555` directory raises `ENOTEMPTY`
+    where Node raises `EACCES`, so the in-process case could not recover while the CLI cases (which
+    spawn Node) passed. Measured on bun 1.4.4 against node 24.22.1. `ENOTEMPTY` is now in the
+    recoverable set; the existing `descend` and `sameDirectory` guards still rethrow a genuine
+    concurrent write.
+
+  None of the three is fork-introduced or quarantined by `UNIT_EXCLUDE`, and CI is green on them for
+  the reason the class name got wrong: on Linux `/tmp` is not a symlink and removing a `0o555`
+  directory gives `EACCES`, so the nightly lane never had the shape to fail.
+
 ### `local(test)`: five more environment-bound reds, recorded from the np.37 full run
 
 The full suite on this machine (macOS, external volume, other agents' runs contending) leaves 26
