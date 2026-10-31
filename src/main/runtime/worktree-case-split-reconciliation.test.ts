@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultWorkspaceSession } from '../../shared/constants'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
 import type { HostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
@@ -6,6 +6,7 @@ import type { WorktreeMeta } from '../../shared/worktree/meta-types'
 import type { TerminalTab } from '../../shared/terminal-tab-types'
 import {
   reconcileWorktreeCaseSplits,
+  resetWorktreeCaseSplitRefusalsForTests,
   type FileIdentity,
   type WorktreeCaseSplitInput
 } from './worktree-case-split-reconciliation'
@@ -58,6 +59,16 @@ function createHarness(initial: Record<string, WorktreeMeta>, session?: Workspac
     }),
     removeWorktreeMeta: vi.fn((target: HostWorktreeTarget) => {
       delete metaById[target.id]
+      // Production drops the removed id's session state, which is why the move is all-or-nothing.
+      const dropped: WorkspaceSessionState = {
+        ...currentSession,
+        tabsByWorktree: Object.fromEntries(
+          Object.entries(currentSession.tabsByWorktree).filter(([key]) => key !== target.id)
+        ),
+        activeWorktreeId:
+          currentSession.activeWorktreeId === target.id ? null : currentSession.activeWorktreeId
+      }
+      currentSession = dropped
     }),
     getWorkspaceSession: () => currentSession,
     setWorkspaceSession: vi.fn((next: WorkspaceSessionState) => {
@@ -98,6 +109,8 @@ const listedRecord = meta({
 })
 
 describe('reconcileWorktreeCaseSplits', () => {
+  beforeEach(() => resetWorktreeCaseSplitRefusalsForTests())
+
   it('merges a split pair into the listed id, keeping the create fields and links', async () => {
     const harness = createHarness({ [SURVIVOR]: listedRecord, [SIBLING]: createRecord })
     const log = vi.fn()
@@ -196,15 +209,73 @@ describe('reconcileWorktreeCaseSplits', () => {
     expect(harness.store.setWorktreeMeta).not.toHaveBeenCalled()
   })
 
-  it('moves the twin tabs only where the survivor has none of its own', async () => {
+  it('keeps the twin record when the survivor already owns its own tab set', async () => {
     const session: WorkspaceSessionState = {
       ...getDefaultWorkspaceSession(),
       activeWorktreeId: SIBLING,
       tabsByWorktree: {
         [SURVIVOR]: [tab('survivor-tab', SURVIVOR)],
         [SIBLING]: [tab('sibling-tab', SIBLING)]
-      },
+      }
+    }
+    const harness = createHarness({ [SURVIVOR]: listedRecord, [SIBLING]: createRecord }, session)
+    const log = vi.fn()
+    const notify = vi.fn()
+
+    await reconcileWorktreeCaseSplits(harness.input(), {
+      store: harness.store,
+      statIdentity: sharedInode,
+      log,
+      notifyWorktreeRenamed: notify
+    })
+
+    const next = harness.session()
+    // Why: the removal drops the twin's session state, so a partial move would delete its tabs.
+    expect(next.tabsByWorktree[SURVIVOR]).toEqual([tab('survivor-tab', SURVIVOR)])
+    expect(next.tabsByWorktree[SIBLING]).toEqual([tab('sibling-tab', SIBLING)])
+    expect(harness.store.removeWorktreeMeta).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('kept the twin record'))
+    // The metadata still lands, which is what the visible row shows.
+    expect(harness.store.setWorktreeMeta).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        displayName: 'Fork CI health: attention',
+        displayNameIsPinned: true
+      })
+    )
+  })
+
+  it('moves a twin-owned session to the survivor, notifies, then removes the twin', async () => {
+    const session: WorkspaceSessionState = {
+      ...getDefaultWorkspaceSession(),
+      activeWorktreeId: SIBLING,
+      tabsByWorktree: { [SIBLING]: [tab('sibling-tab', SIBLING)] },
       activeTabIdByWorktree: { [SIBLING]: 'sibling-tab' }
+    }
+    const harness = createHarness({ [SURVIVOR]: listedRecord, [SIBLING]: createRecord }, session)
+    const notify = vi.fn()
+
+    await reconcileWorktreeCaseSplits(harness.input(), {
+      store: harness.store,
+      statIdentity: sharedInode,
+      notifyWorktreeRenamed: notify
+    })
+
+    const next = harness.session()
+    expect(next.tabsByWorktree[SURVIVOR]).toEqual([tab('sibling-tab', SURVIVOR)])
+    expect(next.tabsByWorktree[SIBLING]).toBeUndefined()
+    expect(next.activeWorktreeId).toBe(SURVIVOR)
+    expect(notify).toHaveBeenCalledWith(REPO, SIBLING, SURVIVOR)
+    expect(harness.store.removeWorktreeMeta).toHaveBeenCalledWith(
+      expect.objectContaining({ id: SIBLING })
+    )
+  })
+
+  it('keeps the twin when there is no way to re-key the renderer', async () => {
+    const session: WorkspaceSessionState = {
+      ...getDefaultWorkspaceSession(),
+      tabsByWorktree: { [SIBLING]: [tab('sibling-tab', SIBLING)] }
     }
     const harness = createHarness({ [SURVIVOR]: listedRecord, [SIBLING]: createRecord }, session)
     const log = vi.fn()
@@ -215,11 +286,23 @@ describe('reconcileWorktreeCaseSplits', () => {
       log
     })
 
-    const next = harness.session()
-    expect(next.tabsByWorktree[SURVIVOR]).toEqual([tab('survivor-tab', SURVIVOR)])
-    expect(next.tabsByWorktree[SIBLING]).toEqual([tab('sibling-tab', SIBLING)])
-    expect(next.activeTabIdByWorktree).toEqual({ [SURVIVOR]: 'sibling-tab' })
-    expect(next.activeWorktreeId).toBe(SURVIVOR)
-    expect(log).toHaveBeenCalledWith(expect.stringContaining('already owns tabsByWorktree'))
+    expect(harness.session().tabsByWorktree[SIBLING]).toHaveLength(1)
+    expect(harness.store.removeWorktreeMeta).not.toHaveBeenCalled()
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('no renderer notification'))
+  })
+
+  it('stops re-statting a pair it can never prove', async () => {
+    const harness = createHarness({ [SURVIVOR]: listedRecord, [SIBLING]: createRecord })
+    const statIdentity = vi.fn(async (path: string) => ({
+      dev: 1n,
+      ino: path === SURVIVOR_PATH ? 1n : 2n
+    }))
+    const deps = { store: harness.store, statIdentity }
+
+    await reconcileWorktreeCaseSplits(harness.input(), deps)
+    await reconcileWorktreeCaseSplits(harness.input(), deps)
+
+    expect(statIdentity).toHaveBeenCalledTimes(2)
+    expect(harness.store.removeWorktreeMeta).not.toHaveBeenCalled()
   })
 })

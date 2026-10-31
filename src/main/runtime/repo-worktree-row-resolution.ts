@@ -69,6 +69,8 @@ export type RepoWorktreeRowDeps = {
   ) => Promise<RuntimeWorktreeScanResult>
   /** Folder workspaces are stamped from runtime-owned identity helpers, so the caller supplies them. */
   listFolderWorkspaces: (repo: Repo, repoOwnerCount: number) => Worktree[]
+  /** Optional: a healed id must re-key the renderer before the twin record is removed. */
+  notifyWorktreeRenamed?: (repoId: string, oldWorktreeId: string, newWorktreeId: string) => void
 }
 
 /** Publish last-known persisted rows on unreachable/stalled scans, matching disconnected SSH listing behavior. */
@@ -111,7 +113,7 @@ export type RepoWorktreeRowsScan = { ok: boolean; worktrees: GitWorktreeInfo[] }
 
 /** The scan half of `resolveRepoWorktreeRows`: slow, and the only part that awaits. */
 export async function scanRepoWorktreeRows(
-  deps: Pick<RepoWorktreeRowDeps, 'store' | 'scanRepo'>,
+  deps: Pick<RepoWorktreeRowDeps, 'store' | 'scanRepo' | 'notifyWorktreeRenamed'>,
   repo: Repo,
   projectRuntimeByRepoId: ReadonlyMap<string, ProjectExecutionRuntimeResolution>,
   repoOwnerCount = deps.store.getRepos().filter((candidate) => candidate.id === repo.id).length
@@ -128,7 +130,7 @@ export async function scanRepoWorktreeRows(
   const gitWorktrees = preserveFolderUpgradeWorktreePath(repo, scan.worktrees)
   if (scan.ok) {
     pruneLineageForMissingRepoWorktrees(store, repo, gitWorktrees)
-    await reconcileListedWorktreeCaseSplits(store, repo, gitWorktrees)
+    await reconcileListedWorktreeCaseSplits(store, repo, gitWorktrees, deps.notifyWorktreeRenamed)
   }
   return { ok: scan.ok, worktrees: gitWorktrees }
 }

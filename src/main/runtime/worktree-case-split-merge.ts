@@ -124,48 +124,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-export type SessionRekeyResult = {
-  session: WorkspaceSessionState
-  changed: boolean
-  /** Session fields where the survivor already had an entry, so the twin's entry stayed put. */
-  keptFields: string[]
-}
-
-/** Move the twin's session entries to the survivor without ever replacing one the survivor owns. */
-export function rekeySessionWithoutOverwrite(
-  current: WorkspaceSessionState,
-  siblingId: string,
-  survivorId: string
-): SessionRekeyResult {
-  const session = structuredClone(current)
-  const keyPairs: [string, string][] = [
-    [siblingId, survivorId],
-    [worktreeWorkspaceKey(siblingId), worktreeWorkspaceKey(survivorId)]
-  ]
-  const held: { field: string; key: string; value: unknown }[] = []
+/** True when this session already holds state for the worktree under either of its keys. */
+export function sessionOwnsWorktree(session: WorkspaceSessionState, worktreeId: string): boolean {
+  const keys = [worktreeId, worktreeWorkspaceKey(worktreeId)]
   for (const field of OWNER_KEYED_SESSION_FIELDS) {
     const record: unknown = Reflect.get(session, field)
     if (!isRecord(record)) {
       continue
     }
-    for (const [siblingKey, survivorKey] of keyPairs) {
-      if (siblingKey in record && survivorKey in record) {
-        held.push({ field, key: siblingKey, value: record[siblingKey] })
-        delete record[siblingKey]
-      }
+    if (keys.some((key) => key in record)) {
+      return true
     }
   }
-  const state = { ...getDefaultPersistedState(''), workspaceSession: session }
-  const changed = migrateWorktreeIdentity(state, siblingId, survivorId)
-  for (const { field, key, value } of held) {
-    const record: unknown = Reflect.get(state.workspaceSession, field)
-    if (isRecord(record)) {
-      record[key] = value
-    }
+  return false
+}
+
+export type SessionMoveResult = {
+  session: WorkspaceSessionState
+  moved: boolean
+}
+
+/**
+ * Move the twin's session to the survivor as one unit, and only onto an owner that has none.
+ *
+ * Why all-or-nothing: the owner-keyed fields describe one tab set across several collections, so
+ * moving them piecemeal leaves a survivor whose active tab is not in its own tab list — and the
+ * twin's record removal deletes whatever was left behind under its id.
+ */
+export function moveSessionToSurvivor(
+  current: WorkspaceSessionState,
+  siblingId: string,
+  survivorId: string
+): SessionMoveResult {
+  if (!sessionOwnsWorktree(current, siblingId) || sessionOwnsWorktree(current, survivorId)) {
+    return { session: current, moved: false }
   }
-  return {
-    session: state.workspaceSession,
-    changed,
-    keptFields: [...new Set(held.map((entry) => entry.field))]
-  }
+  const state = { ...getDefaultPersistedState(''), workspaceSession: structuredClone(current) }
+  const moved = migrateWorktreeIdentity(state, siblingId, survivorId)
+  return { session: state.workspaceSession, moved }
 }
