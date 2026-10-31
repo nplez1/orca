@@ -79,6 +79,11 @@ function isSameProbedRepo(snapshot: Repo, current: Repo | undefined): current is
   )
 }
 
+/** A record written before `remoteKeys` existed cannot link the fork's own repository until it is re-probed. */
+function isLegacySingleRemoteIdentity(identity: Repo['gitRemoteIdentity']): boolean {
+  return !!identity && !identity.remoteKeys?.length
+}
+
 function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentity']): boolean {
   const existing = current.gitRemoteIdentity
   if (!existing) {
@@ -86,7 +91,7 @@ function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentit
     return !(probed === null && existing === null)
   }
   // Missing identities permit access; retain resolved identities when probes find nothing.
-  return !!probed && probed.canonicalKey !== existing.canonicalKey
+  return !!probed && (probed.canonicalKey !== existing.canonicalKey || isLegacySingleRemoteIdentity(existing))
 }
 
 function getAutomaticGitHubIconRefresh(
@@ -206,6 +211,11 @@ async function enrichRepoGitRemoteIdentity(store: RepoIdentityStore, repo: Repo)
 }
 
 function isIdentityRefreshDue(repo: Repo, now: number): boolean {
+  // A record written before every remote was kept is upgraded by the first sweep that has budget,
+  // so a fork can link its own repository without waiting out the refresh interval.
+  if (isLegacySingleRemoteIdentity(repo.gitRemoteIdentity)) {
+    return true
+  }
   const locationKey = getRepoLocationKey(repo)
   const dueAt = probeRetryAfterByLocation.get(locationKey)
   if (dueAt === undefined) {

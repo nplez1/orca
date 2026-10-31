@@ -4,6 +4,26 @@ export type GitRemoteIdentity = {
   canonicalKey: string
   remoteName: string
   remoteUrl: string
+  /**
+   * Canonical key of every configured fetch remote, primary first.
+   *
+   * Why: a fork keeps its own repository on `origin` and its parent on `upstream`, and this record's
+   * single `canonicalKey` names only one of them. Links to the other — the fork's issues, which are
+   * the ones a fork's user actually files — then read as another repository's. Absent on records
+   * written before this field existed; readers fall back to `canonicalKey`.
+   */
+  remoteKeys?: readonly string[]
+}
+
+/** Every remote identity this repo carries: the primary key alone when the record predates `remoteKeys`. */
+export function gitRemoteIdentityKeys(
+  identity: Pick<GitRemoteIdentity, 'canonicalKey'> & { remoteKeys?: readonly string[] } | null | undefined
+): readonly string[] {
+  if (!identity) {
+    return []
+  }
+  const keys = (identity.remoteKeys ?? []).filter((key) => key.length > 0)
+  return keys.length > 0 ? keys : [identity.canonicalKey]
 }
 
 export type GitRemoteKeyParts = {
@@ -132,7 +152,9 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
     ? {
         canonicalKey: selected.canonicalKey,
         remoteName: selected.name,
-        remoteUrl: selected.url
+        remoteUrl: selected.url,
+        // Publish every remote so a fork's own repository stays linkable from this repo.
+        remoteKeys: [...new Set(entries.map((entry) => entry.canonicalKey))]
       }
     : null
 }

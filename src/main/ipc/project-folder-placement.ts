@@ -5,6 +5,7 @@
  * Split out of worktree-logic so placement can grow without that module's other half — public
  * API, ids, removal diagnostics — competing for the same size budget.
  */
+import { readdirSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
 import {
@@ -134,6 +135,37 @@ export function resolveProjectFolderName(
   const pathOps = getRuntimePathOps(repo.path, repo.path)
   const checkoutName = pathOps.basename(repo.path).replace(/\.git$/, '')
   return sanitizeProjectFolderName(checkoutName) ?? 'project'
+}
+
+/**
+ * Spelling of the directory already living under `parentDir` that `name` refers to.
+ *
+ * Why: on a case-insensitive volume `git worktree add <root>/Orca/x` and the checkout's own
+ * `git rev-parse --show-toplevel` (`<root>/orca/x`) spell one folder two ways. Worktree ids are
+ * that path string, so the divergence splits one workspace into two records: the create's
+ * metadata (display name, linked task, tabs) lands on the id the sidebar never lists, and the
+ * row it does list shows the branch with no links and no agent. Reusing the on-disk leaf keeps
+ * create and listing on one id.
+ */
+export function adoptExistingDirectoryName(parentDir: string, name: string): string {
+  if (!name) {
+    return name
+  }
+  // A repo-relative base resolves against this process's cwd, which is not the folder it names.
+  if (!isWindowsAbsolutePathLike(parentDir) && !posix.isAbsolute(parentDir)) {
+    return name
+  }
+  try {
+    const folded = name.toLowerCase()
+    for (const entry of readdirSync(parentDir, { withFileTypes: true })) {
+      if (entry.name.toLowerCase() === folded && (entry.isDirectory() || entry.isSymbolicLink())) {
+        return entry.name
+      }
+    }
+  } catch {
+    // Missing, unreadable, or not a local filesystem: the requested spelling is the only one left.
+  }
+  return name
 }
 
 function sanitizeProjectFolderName(value: string | null | undefined): string | null {

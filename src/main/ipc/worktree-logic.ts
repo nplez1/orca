@@ -11,6 +11,7 @@ import { isWindowsAbsolutePathLike, resolveRuntimePath } from '../../shared/cros
 import { isWslUncPath, resolveWslRepoWorktreeBasePath } from '../../shared/wsl-paths'
 import { getWslHome, getWslHomeAsync, parseWslPath } from '../wsl'
 import {
+  adoptExistingDirectoryName,
   getRuntimePathOps,
   projectContainerRoot,
   resolveProjectFolderName
@@ -237,7 +238,12 @@ export function getWorktreePathSettings(
     worktreeLayoutMode,
     ...(isProjectFolderLayout(worktreeLayoutMode)
       ? {
-          projectFolderName: resolveProjectFolderName(repo),
+          // Why the on-disk leaf when one exists: a container spelled `Orca` over a folder spelled
+          // `orca` gives git two paths for one worktree, and every worktree id is that path.
+          projectFolderName: adoptExistingDirectoryName(
+            getEffectiveWorktreeBasePath(repo, settings),
+            resolveProjectFolderName(repo)
+          ),
           // Why a relative root counts as repo-scoped: it resolves against this repo's own path,
           // so it is this project's folder in effect. Treating only `worktreeBasePath` as
           // repo-scoped made `workspaceDir: '..'` nest a folder inside the container it already
