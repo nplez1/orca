@@ -8,6 +8,9 @@ import {
   withResolvedCmdJGitHubPreview
 } from './worktree-palette-task-url-match'
 
+const LINEAR_ISSUE_URL =
+  'https://linear.app/stably/issue/STA-4052/agent-terminals-disappearing-randomly'
+
 function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
   return {
     id: 'wt-1',
@@ -85,11 +88,7 @@ describe('parseCmdJTaskSourceUrl', () => {
   })
 
   it('parses Linear, GitLab, and Jira URLs', () => {
-    expect(
-      parseCmdJTaskSourceUrl(
-        'https://linear.app/stably/issue/STA-4052/agent-terminals-disappearing-randomly'
-      )
-    ).toEqual({
+    expect(parseCmdJTaskSourceUrl(LINEAR_ISSUE_URL)).toEqual({
       provider: 'linear',
       intent: { identifier: 'STA-4052', organizationUrlKey: 'stably' }
     })
@@ -628,9 +627,7 @@ describe('matchWorktreePaletteTaskUrl', () => {
   })
 
   it('matches a Linear issue URL and rejects a different organization', () => {
-    const intent = parseCmdJTaskSourceUrl(
-      'https://linear.app/stably/issue/STA-4052/agent-terminals-disappearing-randomly'
-    )
+    const intent = parseCmdJTaskSourceUrl(LINEAR_ISSUE_URL)
 
     expect(
       matchWorktreePaletteTaskUrl({
@@ -839,7 +836,7 @@ describe('getCmdJTaskUrlCreatePreview', () => {
 
 describe('fork identity keys in the palette matcher', () => {
   it('matches a fork’s own URL once the key set is known', () => {
-    // Why: `deriveGitRemoteIdentity` prefers upstream, so the fork's issues only resolve through
+    // fork-comment-ok: fork-only — `deriveGitRemoteIdentity` prefers upstream, so the fork's issues only resolve through
     // the extra keys — without them a fork's own bare-iid task never matched its workspace.
     const forkRepo: Repo = {
       ...gitHubRepo('github.com/stablyai/orca'),

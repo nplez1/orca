@@ -73,6 +73,7 @@ describe('deriveGitRemoteIdentity', () => {
   )
 
   it('keeps a fork’s own repository alongside the parent it prefers', () => {
+    // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
     // Why: the canonical key is the fork parent, but a fork's issues live on origin — dropping it
     // makes the user's own issues read as another repository's when they attach one.
     expect(

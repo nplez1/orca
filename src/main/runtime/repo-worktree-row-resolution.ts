@@ -69,6 +69,7 @@ export type RepoWorktreeRowDeps = {
   ) => Promise<RuntimeWorktreeScanResult>
   /** Folder workspaces are stamped from runtime-owned identity helpers, so the caller supplies them. */
   listFolderWorkspaces: (repo: Repo, repoOwnerCount: number) => Worktree[]
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   /** Optional: a healed id must re-key the renderer before the twin record is removed. */
   notifyWorktreeRenamed?: (repoId: string, oldWorktreeId: string, newWorktreeId: string) => void
 }
@@ -117,6 +118,7 @@ export async function scanRepoWorktreeRows(
   repo: Repo,
   projectRuntimeByRepoId: ReadonlyMap<string, ProjectExecutionRuntimeResolution>,
   repoOwnerCount = deps.store.getRepos().filter((candidate) => candidate.id === repo.id).length,
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   /** Rows the caller already read; a healthy scan must not read persisted metadata twice. */
   metaById?: Readonly<Record<string, WorktreeMeta>>
 ): Promise<RepoWorktreeRowsScan> {

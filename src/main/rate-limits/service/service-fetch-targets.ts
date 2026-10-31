@@ -189,6 +189,7 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     return process.platform !== 'win32'
   }
 
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   // Why: a disabled provider must not read the credential store at all, so the
   // empty config is returned before the injected resolver (and its disk read) runs.
   protected resolveOpenCodeGoConfig(): OpenCodeGoResolvedConfig {

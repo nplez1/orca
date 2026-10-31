@@ -1,5 +1,7 @@
 'use client'
 
+// oxlint-disable jsx-a11y/prefer-tag-over-role -- fork-comment-ok: an overlay modal that keeps its own focus trap; a native <dialog> changes focus and backdrop semantics
+
 import { useDocsSearch } from 'fumadocs-core/search/client'
 import { GitBranch, MessageCircle, Search, X } from 'lucide-react'
 import Link from 'next/link'

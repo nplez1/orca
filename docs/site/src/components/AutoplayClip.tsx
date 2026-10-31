@@ -67,6 +67,7 @@ export function AutoplayClip({
   if (fill) {
     return (
       <>
+        {/* oxlint-disable-next-line next/no-img-element -- fork-comment-ok: non-DOM or build-time-unknown dimensions, so next/image cannot size it */}
         <img
           ref={posterRef}
           src={posterSrc}
@@ -82,6 +83,7 @@ export function AutoplayClip({
 
   return (
     <span className={cn('relative block overflow-hidden', wrapperClassName)}>
+      {/* oxlint-disable-next-line next/no-img-element -- fork-comment-ok: non-DOM or build-time-unknown dimensions, so next/image cannot size it */}
       <img
         ref={posterRef}
         src={posterSrc}

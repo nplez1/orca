@@ -79,6 +79,7 @@ function isSameProbedRepo(snapshot: Repo, current: Repo | undefined): current is
   )
 }
 
+// fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
 /** A record written before `remoteKeys` existed cannot link the fork's own repository until it is re-probed. */
 function isLegacySingleRemoteIdentity(identity: Repo['gitRemoteIdentity']): boolean {
   return !!identity && !identity.remoteKeys?.length
@@ -97,11 +98,13 @@ function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentit
   if (probed.canonicalKey !== existing.canonicalKey) {
     return true
   }
+  // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
   // A record from an older build, or a repo whose remotes were forked/renamed since, carries a
   // stale key set: the fork's own repository must become linkable without re-adding the repo.
   return !haveSameRemoteKeys(existing.remoteKeys, probed.remoteKeys)
 }
 
+// fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
 /** Order-insensitive: `remote -v` order follows git config, which a user can reorder freely. */
 function haveSameRemoteKeys(
   left: readonly string[] | undefined,
@@ -231,6 +234,7 @@ async function enrichRepoGitRemoteIdentity(store: RepoIdentityStore, repo: Repo)
 function isIdentityRefreshDue(repo: Repo, now: number): boolean {
   const locationKey = getRepoLocationKey(repo)
   const dueAt = probeRetryAfterByLocation.get(locationKey)
+  // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
   // A record written before every remote was kept is upgraded by the first sweep with budget, so a
   // fork can link its own repository without waiting out the startup delay. An existing deadline
   // still applies: a probe that just failed must not take a refresh slot on every later sweep.

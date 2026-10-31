@@ -48,6 +48,7 @@ export function ImagePlaceholder({ caption, src }: { caption: string; src?: stri
         {src.endsWith('.gif') ? (
           <AutoplayClip src={src} alt={caption} fill={false} />
         ) : (
+          // oxlint-disable-next-line next/no-img-element -- fork-comment-ok: non-DOM or build-time-unknown dimensions, so next/image cannot size it
           <img src={src} alt={caption} loading="lazy" decoding="async" className="block w-full" />
         )}
         <figcaption className="px-4 py-2 text-xs text-muted-foreground">{caption}</figcaption>

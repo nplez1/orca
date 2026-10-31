@@ -16,6 +16,7 @@ import {
 } from './usage-credential-host'
 import type { UsageHostSettings, UsageHostSettingsModel } from './use-usage-host-settings'
 
+// fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
 /** MiniMax runs two consoles; the saved endpoint picks which one a key is created in. */
 export function getMiniMaxConsoleUrl(settings: UsageHostSettings | null): string {
   return settings?.minimaxEndpoint === 'cn'

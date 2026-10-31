@@ -193,6 +193,7 @@ export abstract class RuntimeWorkspaceCatalog extends OrcaRuntimeWithReadKittyFi
         this.listRepoWorktreesForListing(repo, projectRuntimeByRepoId),
       listFolderWorkspaces: (repo, repoOwnerCount) =>
         listRuntimeFolderWorkspaces(store, repo, repoOwnerCount),
+      // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
       // Why: a healed workspace id must reach the renderer before the twin record is removed,
       // or its next session write re-creates the twin's tabs under an id that no longer exists.
       notifyWorktreeRenamed: (repoId, oldWorktreeId, newWorktreeId) =>

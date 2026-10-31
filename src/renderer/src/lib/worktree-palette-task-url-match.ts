@@ -97,7 +97,7 @@ function githubRemoteKeyParts(slug: RepoSlug): GitRemoteKeyParts {
 function remoteIdentityMatchesGitHubSlug(repo: Repo, slug: RepoSlug): boolean | 'unknown' {
   const identity = repo.gitRemoteIdentity
   const target = githubRemoteKeyParts(slug)
-  // Every remote counts: a fork's own issues live on origin while the primary key names its parent.
+  // fork-comment-ok: fork-only behaviour — Every remote counts: a fork's own issues live on origin while the primary key names its parent.
   const identityKeys = gitRemoteIdentityKeys(identity)
   if (identityKeys.length === 0) {
     return 'unknown'
@@ -116,12 +116,11 @@ function remoteIdentityMatchesGitHubSlug(repo: Repo, slug: RepoSlug): boolean | 
       permissive = true
     }
   }
-  // An unexpanded SSH host alias is unknown evidence, not a mismatch.
+  // fork-comment-ok: fork-only behaviour — an unexpanded SSH host alias is unknown evidence, not a mismatch.
   if (permissive) {
     return 'unknown'
   }
-  // A record that predates the key set hides a fork's origin behind upstream, so its mismatch is
-  // not authoritative yet; the identity probe fills the key set in shortly.
+  // fork-comment-ok: fork-only — a pre-key-set record hides a fork's origin behind upstream, so its mismatch is not authoritative until the probe fills the keys in.
   return identity?.remoteName === 'upstream' && !identity.remoteKeys?.length ? 'unknown' : false
 }
 
@@ -220,14 +219,11 @@ function worktreeMatchesGitHubUrl(
   const attachments = getWorkspaceAttachments(worktree).filter((item) => item.provider === 'github')
   const attachmentMatch = attachments.some((item) => {
     const itemUrl = item.url ? parseGitHubIssueOrPRLink(item.url) : null
-    if (itemUrl) {
-      return githubLinksEqual(itemUrl, link)
-    }
-    return (
-      item.type === link.type &&
-      item.number === link.number &&
-      repoMatchesGitHubSlug(repo, link.slug) !== false
-    )
+    return itemUrl
+      ? githubLinksEqual(itemUrl, link)
+      : item.type === link.type &&
+          item.number === link.number &&
+          repoMatchesGitHubSlug(repo, link.slug) !== false
   })
   const reviewUrl = review?.url ? parseGitHubIssueOrPRLink(review.url) : null
   const legacyItem = worktree.linkedWorkItem
@@ -255,9 +251,8 @@ function worktreeMatchesLinearUrl(worktree: Worktree, intent: LinearIssueUrlInte
     if (!identifier || linkedIdentifier !== identifier) {
       return false
     }
-    const org = (item.linearOrganizationUrlKey ?? linkedUrl?.organizationUrlKey)
-      ?.trim()
-      .toLowerCase()
+    const orgKey = item.linearOrganizationUrlKey ?? linkedUrl?.organizationUrlKey
+    const org = orgKey?.trim().toLowerCase()
     return !org || org === intent.organizationUrlKey.toLowerCase()
   })
 }

@@ -85,6 +85,7 @@ export function worktreeMatchesGitHubNumber(
     if (!item.url) {
       return true
     }
+    // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
     // A fork attaches its own issues, which live on a remote other than the primary one.
     const remoteKeys = gitRemoteIdentityKeys(repo?.gitRemoteIdentity)
     const scope = normalizeGitRemoteUrl(getWorkspaceAttachmentUrlScope(item))

@@ -22,6 +22,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
     saveCopilotCredentials,
     clearCopilotCredentials
   } = model
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   // Why: a credential sourced from the GitHub CLI has nothing stored to replace or
   // forget, so every stored-token affordance keys off the source, not `configured`.
   const tokenStored = copilotCredentialSource === 'stored'

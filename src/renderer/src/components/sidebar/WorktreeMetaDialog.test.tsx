@@ -394,6 +394,7 @@ describe('workspace linked work editor', () => {
     ])
   })
   it('accepts an issue from the fork’s own repository when the parent is the primary remote', async () => {
+    // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
     // Why: a fork's issues live on origin while `canonicalKey` names upstream, so comparing the
     // one primary key told every fork user their own issue belonged to another repository.
     openDialog()

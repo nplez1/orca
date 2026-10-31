@@ -2,7 +2,10 @@ import type { HostedReviewProvider } from '../../../../shared/hosted-review'
 import type { WorkspaceAttachmentMutation } from '../../../../shared/workspace-attachment-mutation'
 import { translate } from '@/i18n/i18n'
 import type { Repo } from '../../../../shared/repo-types'
-import { gitRemoteIdentityKeys, normalizeGitRemoteUrl } from '../../../../shared/git-remote-identity'
+import {
+  gitRemoteIdentityKeys,
+  normalizeGitRemoteUrl
+} from '../../../../shared/git-remote-identity'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import {
@@ -248,6 +251,7 @@ export function isWorkspaceRepositoryAttachment(
   if (!item.url) {
     return true
   }
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   // Every remote counts: a fork's own issues live on `origin` while `canonicalKey` names its parent.
   const remoteKeys = gitRemoteIdentityKeys(repo?.gitRemoteIdentity)
   if (remoteKeys.length === 0) {

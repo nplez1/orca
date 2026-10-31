@@ -32,9 +32,14 @@ export function sanitizeRepoUpstream(value: unknown): Repo['upstream'] | undefin
   return host ? { owner, repo, host } : { owner, repo }
 }
 
+/** A named owner type for this boundary's input: anti-slop refuses the broad `object` parameter. */
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 /** Narrow an unknown record field to a trimmed string without an assertion the lint gate forbids. */
-function readTrimmed(source: object, key: string): string {
-  const entry: unknown = Reflect.get(source, key)
+function readTrimmed(source: Record<string, unknown>, key: string): string {
+  const entry = source[key]
   return typeof entry === 'string' ? entry.trim() : ''
 }
 
@@ -43,7 +48,7 @@ export function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | n
   if (value === null) {
     return null
   }
-  if (!value || typeof value !== 'object') {
+  if (!isUnknownRecord(value)) {
     return undefined
   }
   const canonicalKey = readTrimmed(value, 'canonicalKey')
@@ -52,9 +57,10 @@ export function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | n
   if (!canonicalKey || !remoteName || !remoteUrl) {
     return undefined
   }
+  // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
   // Why: dropping this here would unreach every fork's own remote — the value is written by the
   // probe and read by the link scope checks, both of which run on either side of this boundary.
-  const remoteKeys = 'remoteKeys' in value && Array.isArray(value.remoteKeys)
+  const remoteKeys = Array.isArray(value.remoteKeys)
     ? [
         ...new Set(
           value.remoteKeys
@@ -181,6 +187,7 @@ export function sanitizeRepoUpdatesForPersistence<
       sanitized.sharedDirectoriesMode = mode
     }
   }
+  // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
   // Why: `null` is the clear sentinel for updateRepo; only malformed shapes are dropped.
   if ('ghAccount' in sanitized && sanitized.ghAccount != null) {
     const ghAccount = normalizeGhAccountBinding(sanitized.ghAccount)

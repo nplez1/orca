@@ -44,6 +44,7 @@ function gitLabLinksEqual(left: GitLabIssueOrMRLink, right: GitLabIssueOrMRLink)
 /** Tri-state: `'unknown'` (no identity, or an unexpanded SSH host alias) stays permissive. */
 function repoMatchesGitLabSlug(repo: Repo | undefined, slug: ProjectSlug): boolean | 'unknown' {
   const target = gitLabProjectKeyParts(slug)
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   // Every remote counts: a fork's own issues live on origin while the primary key names its parent.
   const identityKeys = gitRemoteIdentityKeys(repo?.gitRemoteIdentity)
   if (identityKeys.length === 0) {
@@ -63,6 +64,7 @@ function repoMatchesGitLabSlug(repo: Repo | undefined, slug: ProjectSlug): boole
       permissive = true
     }
   }
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   // An unexpanded SSH host alias is unknown evidence, not a mismatch.
   return permissive ? 'unknown' : false
 }

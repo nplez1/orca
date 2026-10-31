@@ -95,6 +95,7 @@ const movedIdentity: GitRemoteIdentity = {
   remoteKeys: ['git.company.test/platform/sample-app']
 }
 
+// fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
 /** A fork keeps its parent on upstream and its own repository on origin. */
 const forkIdentity: GitRemoteIdentity = {
   canonicalKey: 'github.com/stablyai/orca',
@@ -103,6 +104,7 @@ const forkIdentity: GitRemoteIdentity = {
   remoteKeys: ['github.com/stablyai/orca', 'github.com/nplez1/orca']
 }
 
+// fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
 /** The shape an older build persisted: one key, so the fork's own remote is unknown. */
 const legacyForkIdentity: GitRemoteIdentity = {
   canonicalKey: 'github.com/stablyai/orca',
@@ -481,6 +483,7 @@ describe('enrichMissingRepoGitRemoteIdentities', () => {
     const repo = makeRepo({ gitRemoteIdentity: legacyForkIdentity })
     const store = makeStore(repo)
 
+    // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
     // No startup delay: a record from an older build must gain its other remote promptly.
     await sweep(store)
 
@@ -526,7 +529,8 @@ describe('enrichMissingRepoGitRemoteIdentities', () => {
     ).toHaveLength(1)
   })
 
-  it('bounds re-probes per sweep so a large repo list drains gradually', async () => {    vi.useFakeTimers()
+  it('bounds re-probes per sweep so a large repo list drains gradually', async () => {
+    vi.useFakeTimers()
     vi.setSystemTime(1_000)
     vi.mocked(probeGitRemoteIdentity).mockResolvedValue(resolvedProbe)
     const repos = Array.from({ length: 6 }, (_unused, index) =>

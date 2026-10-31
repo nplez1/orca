@@ -98,6 +98,7 @@ export async function createDocsOgImage({ title, url }: { title: string; url: st
             background: ogColors.secondary
           }}
         >
+          {/* oxlint-disable-next-line next/no-img-element -- fork-comment-ok: non-DOM or build-time-unknown dimensions, so next/image cannot size it */}
           <img src={logoSrc} width={32} height={20} alt="" />
         </div>
 

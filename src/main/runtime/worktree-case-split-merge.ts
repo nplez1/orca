@@ -116,9 +116,9 @@ export function planWorktreeCaseSplitMerge(
   return updates
 }
 
-const OWNER_KEYED_SESSION_FIELDS = Object.entries(WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND)
-  .filter(([, kind]) => kind.startsWith('owner-keyed'))
-  .map(([field]) => field)
+const OWNER_KEYED_SESSION_FIELDS = (
+  Object.keys(WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND) as (keyof WorkspaceSessionState)[]
+).filter((field) => WORKSPACE_SESSION_WORKTREE_REFERENCE_KIND[field].startsWith('owner-keyed'))
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -128,7 +128,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function sessionOwnsWorktree(session: WorkspaceSessionState, worktreeId: string): boolean {
   const keys = [worktreeId, worktreeWorkspaceKey(worktreeId)]
   for (const field of OWNER_KEYED_SESSION_FIELDS) {
-    const record: unknown = Reflect.get(session, field)
+    const record: unknown = session[field]
     if (!isRecord(record)) {
       continue
     }

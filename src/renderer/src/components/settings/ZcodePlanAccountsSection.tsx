@@ -47,6 +47,7 @@ function siteLabel(site: ZcodePlanSite): string {
   return translate('auto.components.settings.ZcodePlanAccountsSection.site.zai', 'Z.AI (z.ai)')
 }
 
+// fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
 /** The plan site whose console the header links to; a saved site wins, and only the
  *  local desktop may assume Z.AI for a plan with nothing saved yet. */
 export function resolveZcodePlanSite(

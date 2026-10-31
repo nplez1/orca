@@ -34,6 +34,7 @@ type WorktreePathSettings = Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDi
    *  placement, so any caller that cannot resolve the runtime is unaffected. */
   wslMirrorDistro?: string
 }
+// fork-comment-ok: fork-only placement rule; the why must sit above the code a sync rewrites.
 /** Settings a root can be resolved from. The layout fields stay optional here because a bare
  *  root resolution (no repo in hand) legitimately reads as legacy. */
 type WorkspaceRootSettings = {
@@ -102,6 +103,7 @@ function computeWorktreePathFromWorkspaceRoot(
   layoutMode: WorktreeLayoutMode
 ): string {
   const pathOps = getRuntimePathOps(repoPath, workspaceRoot)
+  // fork-comment-ok: fork-only placement rule; the why must sit above the code a sync rewrites.
   // Why: only repo-nested adds a segment below the root. project-folder already folded its
   // per-project container into the root, so its worktrees join directly — the flat expression.
   if (layoutMode === 'repo-nested') {

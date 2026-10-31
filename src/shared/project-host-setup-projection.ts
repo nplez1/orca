@@ -79,6 +79,7 @@ function getProjectGitRemoteIdentity(
   if (!canonicalKey || !remoteName || !remoteUrl) {
     return null
   }
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
   // Carry every remote: a fork's own repository is not the primary one, and a reader here that
   // lost it would refuse that fork's issues the same way the pre-fix link check did.
   const remoteKeys = identity?.remoteKeys?.filter((key) => key.length > 0)

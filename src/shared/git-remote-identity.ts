@@ -4,6 +4,7 @@ export type GitRemoteIdentity = {
   canonicalKey: string
   remoteName: string
   remoteUrl: string
+  // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
   /**
    * Canonical key of every configured fetch remote, primary first.
    *
@@ -15,9 +16,13 @@ export type GitRemoteIdentity = {
   remoteKeys?: readonly string[]
 }
 
+// fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
 /** Every remote identity this repo carries: the primary key alone when the record predates `remoteKeys`. */
 export function gitRemoteIdentityKeys(
-  identity: Pick<GitRemoteIdentity, 'canonicalKey'> & { remoteKeys?: readonly string[] } | null | undefined
+  identity:
+    | (Pick<GitRemoteIdentity, 'canonicalKey'> & { remoteKeys?: readonly string[] })
+    | null
+    | undefined
 ): readonly string[] {
   if (!identity) {
     return []
@@ -153,6 +158,7 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
         canonicalKey: selected.canonicalKey,
         remoteName: selected.name,
         remoteUrl: selected.url,
+        // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
         // Publish every remote so a fork's own repository stays linkable from this repo.
         remoteKeys: [...new Set(entries.map((entry) => entry.canonicalKey))]
       }
