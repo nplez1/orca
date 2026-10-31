@@ -21,7 +21,7 @@ afterAll(async () => {
 const openTerminal = (options) => fixture.openTerminal(options)
 
 describeRender('terminal font startup and late painting', () => {
-  it('opens on a stalled font and replaces cached fallback glyphs when it finally arrives', async () => {
+  it('opens on a stalled font and replaces cached fallback glyphs when it finally arrives', async (context) => {
     let releaseFont = () => {}
     const fontGate = new Promise((resolve) => {
       releaseFont = resolve
@@ -39,14 +39,19 @@ describeRender('terminal font startup and late painting', () => {
         await page.evaluate(() => document.fonts.check('13px "Orca Nerd Font Symbols"', '\ue0b0'))
       ).toBe(false)
       await openProbeTerminal(page)
-      await page.evaluate(() =>
-        globalThis.__orcaTerminalProbe.write('\x1b[?25l\x1b[2J\x1b[H\uf07b')
-      )
       const screen = page.locator('.xterm-screen')
+      const writeGlyph = async (glyph) => {
+        await page.evaluate(
+          (value) => globalThis.__orcaTerminalProbe.write(`\x1b[?25l\x1b[2J\x1b[H${value}`),
+          glyph
+        )
+        await page.evaluate(
+          () =>
+            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        )
+      }
+      await writeGlyph('\uf07b')
       expect(await screen.locator('canvas').count()).toBeGreaterThan(0)
-      await page.evaluate(
-        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-      )
       const box = await screen.boundingBox()
       expect(box).toBeTruthy()
       const clip = { x: box.x, y: box.y, width: 20, height: 20 }
@@ -60,6 +65,13 @@ describeRender('terminal font startup and late painting', () => {
         return Buffer.from(data, 'base64')
       }
       const before = await capture()
+      await writeGlyph('\u0378')
+      const unassignedGlyph = await capture()
+      context.skip(
+        !unassignedGlyph.equals(before),
+        'a system font already draws U+F07B (U+0378 is tofu), so the stalled frame has no fallback glyph to repaint'
+      )
+      await writeGlyph('\uf07b')
       releaseFont()
       await page.waitForFunction(
         () => document.fonts.check('13px "Orca Nerd Font Symbols"', '\ue0b0'),

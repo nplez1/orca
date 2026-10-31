@@ -3,7 +3,7 @@
   "base": "a9039850822850cd0e00ce805ffb394bed6d1762",
   "perFileThreshold": 5,
   "accepted": "2026-10-30 sync, unit-gate round: the repair comments say where each corrected resolution lives — the Node-runtime include reason for the EPIPE case (vitest-node-runtime-files.mjs, +3), and four upstream test files where a stale expectation needed a note explaining the fork's rule (macos-computer-use-permissions +2, runtime-local-worktree-create +1, ssh-connection-store +5, and the earlier per-case why lines).",
-  "total": 6010,
+  "total": 6008,
   "files": {
     ".github/workflows/e2e.yml": 13,
     ".github/workflows/pr.yml": 7,
