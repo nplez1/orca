@@ -54,8 +54,8 @@
 5 src/renderer/src/store/slices/browser/browser-page-focus-actions.ts
 2 src/renderer/src/store/slices/browser/browser-page-state-actions.ts
 1 src/renderer/src/store/slices/browser/browser-tab-actions.ts
-5 src/renderer/src/store/slices/browser/browser-tab-open-view.ts # extracted from browser-tab-actions.ts
 4 src/renderer/src/store/slices/browser/browser-tab-focus-actions.ts
+5 src/renderer/src/store/slices/browser/browser-tab-open-view.ts
 2 src/renderer/src/store/slices/browser/create-browser-slice.ts
 9 src/renderer/src/store/slices/editor/actions/check-run-details-actions.ts
 7 src/renderer/src/store/slices/editor/actions/close-file-action.ts
@@ -82,7 +82,7 @@
 4 src/renderer/src/store/slices/tab-group-state.ts
 1 src/renderer/src/store/slices/tabs-hydration.ts
 4 src/renderer/src/store/slices/tabs/create-tabs-slice.ts
-17 src/renderer/src/store/slices/tabs/tabs-close-actions.ts
+9 src/renderer/src/store/slices/tabs/tabs-close-actions.ts
 14 src/renderer/src/store/slices/tabs/tabs-create-actions.ts
 23 src/renderer/src/store/slices/tabs/tabs-drag-preview-actions.ts
 11 src/renderer/src/store/slices/tabs/tabs-drop-actions.ts
