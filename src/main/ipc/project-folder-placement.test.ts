@@ -1,4 +1,6 @@
-import { posix } from 'node:path'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, posix } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   computeWorktreePath,
@@ -178,5 +180,57 @@ describe('project-folder layout', () => {
         workspaceDir: '/workspaces'
       })
     ).toBe(posix.join('/workspaces', 'feature'))
+  })
+})
+
+describe('project-folder container casing', () => {
+  const withBaseDir = (run: (baseDir: string) => void): void => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'orca-placement-'))
+    try {
+      run(baseDir)
+    } finally {
+      rmSync(baseDir, { recursive: true, force: true })
+    }
+  }
+
+  it('reuses the on-disk spelling of an existing container', () => {
+    withBaseDir((baseDir) => {
+      // Why: `Orca` over an existing `orca` gives git one worktree two path strings — the create
+      // writes metadata under one and the sidebar lists the other.
+      mkdirSync(join(baseDir, 'orca'))
+      const repo = { path: '/projects/orca/main', displayName: 'Orca' }
+      const pathSettings = getWorktreePathSettings(repo, {
+        nestWorkspaces: true,
+        workspaceDir: baseDir,
+        worktreeLayoutMode: 'project-folder'
+      })
+      expect(computeWorktreePath('feature', repo.path, pathSettings)).toBe(
+        join(baseDir, 'orca', 'feature')
+      )
+    })
+  })
+
+  it('keeps the display-name spelling when no container exists yet', () => {
+    withBaseDir((baseDir) => {
+      const repo = { path: '/projects/orca/main', displayName: 'Orca' }
+      const pathSettings = getWorktreePathSettings(repo, {
+        nestWorkspaces: true,
+        workspaceDir: baseDir,
+        worktreeLayoutMode: 'project-folder'
+      })
+      expect(computeWorktreePath('feature', repo.path, pathSettings)).toBe(
+        join(baseDir, 'Orca', 'feature')
+      )
+    })
+  })
+
+  it('leaves a WSL mirror container to the distro, whose filesystem is case-sensitive', () => {
+    const repo = { path: '\\\\wsl.localhost\\Ubuntu\\home\\me\\orca\\main', displayName: 'Orca' }
+    const pathSettings = getWorktreePathSettings(
+      repo,
+      { nestWorkspaces: true, workspaceDir: 'C:\\Users\\me\\orca\\workspaces', worktreeLayoutMode: 'project-folder' },
+      'Ubuntu'
+    )
+    expect(pathSettings.projectFolderName).toBe('Orca')
   })
 })

@@ -79,6 +79,11 @@ function isSameProbedRepo(snapshot: Repo, current: Repo | undefined): current is
   )
 }
 
+/** A record written before `remoteKeys` existed cannot link the fork's own repository until it is re-probed. */
+function isLegacySingleRemoteIdentity(identity: Repo['gitRemoteIdentity']): boolean {
+  return !!identity && !identity.remoteKeys?.length
+}
+
 function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentity']): boolean {
   const existing = current.gitRemoteIdentity
   if (!existing) {
@@ -86,7 +91,25 @@ function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentit
     return !(probed === null && existing === null)
   }
   // Missing identities permit access; retain resolved identities when probes find nothing.
-  return !!probed && probed.canonicalKey !== existing.canonicalKey
+  if (!probed) {
+    return false
+  }
+  if (probed.canonicalKey !== existing.canonicalKey) {
+    return true
+  }
+  // A record from an older build, or a repo whose remotes were forked/renamed since, carries a
+  // stale key set: the fork's own repository must become linkable without re-adding the repo.
+  return !haveSameRemoteKeys(existing.remoteKeys, probed.remoteKeys)
+}
+
+/** Order-insensitive: `remote -v` order follows git config, which a user can reorder freely. */
+function haveSameRemoteKeys(
+  left: readonly string[] | undefined,
+  right: readonly string[] | undefined
+): boolean {
+  const leftKeys = new Set(left ?? [])
+  const rightKeys = new Set(right ?? [])
+  return leftKeys.size === rightKeys.size && [...leftKeys].every((key) => rightKeys.has(key))
 }
 
 function getAutomaticGitHubIconRefresh(
@@ -208,6 +231,12 @@ async function enrichRepoGitRemoteIdentity(store: RepoIdentityStore, repo: Repo)
 function isIdentityRefreshDue(repo: Repo, now: number): boolean {
   const locationKey = getRepoLocationKey(repo)
   const dueAt = probeRetryAfterByLocation.get(locationKey)
+  // A record written before every remote was kept is upgraded by the first sweep with budget, so a
+  // fork can link its own repository without waiting out the startup delay. An existing deadline
+  // still applies: a probe that just failed must not take a refresh slot on every later sweep.
+  if (isLegacySingleRemoteIdentity(repo.gitRemoteIdentity)) {
+    return dueAt === undefined || dueAt <= now
+  }
   if (dueAt === undefined) {
     probeRetryAfterByLocation.set(locationKey, now + RESOLVED_IDENTITY_REFRESH_STARTUP_DELAY_MS)
     return false

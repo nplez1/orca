@@ -393,6 +393,42 @@ describe('workspace linked work editor', () => {
       expect.objectContaining({ number: 4 })
     ])
   })
+  it('accepts an issue from the fork’s own repository when the parent is the primary remote', async () => {
+    // Why: a fork's issues live on origin while `canonicalKey` names upstream, so comparing the
+    // one primary key told every fork user their own issue belonged to another repository.
+    openDialog()
+    act(() =>
+      useAppStore.setState({
+        repos: [
+          {
+            id: 'repo',
+            path: '/repo',
+            displayName: 'orca',
+            badgeColor: '',
+            addedAt: 1,
+            upstream: { owner: 'stablyai', repo: 'orca' },
+            gitRemoteIdentity: {
+              canonicalKey: 'github.com/stablyai/orca',
+              remoteName: 'upstream',
+              remoteUrl: 'https://github.com/stablyai/orca.git',
+              remoteKeys: ['github.com/stablyai/orca', 'github.com/nplez1/orca']
+            }
+          }
+        ]
+      })
+    )
+    await add('https://github.com/nplez1/orca/issues/255')
+    expect(
+      screen.queryByText(
+        'This issue belongs to another repository. Add issues from this workspace’s repository.'
+      )
+    ).toBeNull()
+    expect(screen.getByText('Issue #255')).toBeTruthy()
+    await save()
+    expect(updateWorktreeMeta.mock.calls[0]?.[1].linkedItems).toEqual([
+      expect.objectContaining({ provider: 'github', type: 'issue', number: 255 })
+    ])
+  })
   it('blocks known foreign issue URLs with an explanation', () => {
     openDialog()
     fireEvent.change(input(), {

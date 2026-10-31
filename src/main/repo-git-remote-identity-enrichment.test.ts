@@ -36,7 +36,8 @@ type RepoIdentityStore = {
 const remoteIdentity: GitRemoteIdentity = {
   canonicalKey: 'git.company.test/team/sample-app',
   remoteName: 'origin',
-  remoteUrl: 'git@git.company.test:team/sample-app.git'
+  remoteUrl: 'git@git.company.test:team/sample-app.git',
+  remoteKeys: ['git.company.test/team/sample-app']
 }
 
 const resolvedProbe: GitRemoteIdentityProbe = { status: 'resolved', identity: remoteIdentity }
@@ -90,7 +91,23 @@ const REFRESH_TTL_MS = 6 * 60 * 60 * 1000
 const movedIdentity: GitRemoteIdentity = {
   canonicalKey: 'git.company.test/platform/sample-app',
   remoteName: 'upstream',
-  remoteUrl: 'git@git.company.test:platform/sample-app.git'
+  remoteUrl: 'git@git.company.test:platform/sample-app.git',
+  remoteKeys: ['git.company.test/platform/sample-app']
+}
+
+/** A fork keeps its parent on upstream and its own repository on origin. */
+const forkIdentity: GitRemoteIdentity = {
+  canonicalKey: 'github.com/stablyai/orca',
+  remoteName: 'upstream',
+  remoteUrl: 'https://github.com/stablyai/orca.git',
+  remoteKeys: ['github.com/stablyai/orca', 'github.com/nplez1/orca']
+}
+
+/** The shape an older build persisted: one key, so the fork's own remote is unknown. */
+const legacyForkIdentity: GitRemoteIdentity = {
+  canonicalKey: 'github.com/stablyai/orca',
+  remoteName: 'upstream',
+  remoteUrl: 'https://github.com/stablyai/orca.git'
 }
 
 async function drainEnrichmentSweep(): Promise<void> {
@@ -454,8 +471,62 @@ describe('enrichMissingRepoGitRemoteIdentities', () => {
     expect(repo.gitRemoteIdentity).toEqual(remoteIdentity)
   })
 
-  it('bounds re-probes per sweep so a large repo list drains gradually', async () => {
+  it('upgrades a single-remote record on the first sweep so a fork can link its own repository', async () => {
     vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    vi.mocked(probeGitRemoteIdentity).mockResolvedValue({
+      status: 'resolved',
+      identity: forkIdentity
+    })
+    const repo = makeRepo({ gitRemoteIdentity: legacyForkIdentity })
+    const store = makeStore(repo)
+
+    // No startup delay: a record from an older build must gain its other remote promptly.
+    await sweep(store)
+
+    expect(probeGitRemoteIdentity).toHaveBeenCalledTimes(1)
+    expect(store.updateRepo).toHaveBeenCalledWith(repoTarget('repo-1', 'local'), {
+      gitRemoteIdentity: forkIdentity
+    })
+  })
+
+  it('writes a changed key set even when the primary remote stays the same', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    // Why: forking an existing clone of the parent adds origin later — the primary key does not move.
+    vi.mocked(probeGitRemoteIdentity).mockResolvedValue({
+      status: 'resolved',
+      identity: forkIdentity
+    })
+    const repo = makeRepo({ gitRemoteIdentity: legacyForkIdentity })
+    const store = makeStore(repo)
+
+    await sweep(store)
+
+    expect(store.updateRepo).toHaveBeenCalledWith(repoTarget('repo-1', 'local'), {
+      gitRemoteIdentity: forkIdentity
+    })
+  })
+
+  it('stops spending refresh slots on a legacy record whose probe keeps failing', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    vi.mocked(probeGitRemoteIdentity).mockResolvedValue({ status: 'unavailable' })
+    const legacy = makeRepo({ id: 'legacy', gitRemoteIdentity: legacyForkIdentity })
+    const other = makeRepo({ id: 'other', path: '/workspace/other' })
+    const store = makeStore(legacy, other)
+
+    await sweep(store)
+    await sweep(store)
+    await sweep(store)
+
+    // The failed probe backs the legacy record off instead of claiming a slot on every sweep.
+    expect(
+      vi.mocked(probeGitRemoteIdentity).mock.calls.filter((call) => call[0] === legacy.path)
+    ).toHaveLength(1)
+  })
+
+  it('bounds re-probes per sweep so a large repo list drains gradually', async () => {    vi.useFakeTimers()
     vi.setSystemTime(1_000)
     vi.mocked(probeGitRemoteIdentity).mockResolvedValue(resolvedProbe)
     const repos = Array.from({ length: 6 }, (_unused, index) =>

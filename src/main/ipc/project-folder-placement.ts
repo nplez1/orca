@@ -5,6 +5,7 @@
  * Split out of worktree-logic so placement can grow without that module's other half — public
  * API, ids, removal diagnostics — competing for the same size budget.
  */
+import { readdirSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
 import {
@@ -134,6 +135,75 @@ export function resolveProjectFolderName(
   const pathOps = getRuntimePathOps(repo.path, repo.path)
   const checkoutName = pathOps.basename(repo.path).replace(/\.git$/, '')
   return sanitizeProjectFolderName(checkoutName) ?? 'project'
+}
+
+/**
+ * Spelling of the directory already living under `parentDir` that `name` refers to.
+ *
+ * Why: on a case-insensitive volume `git worktree add <root>/Orca/x` and the checkout's own
+ * `git rev-parse --show-toplevel` (`<root>/orca/x`) spell one folder two ways. Worktree ids are
+ * that path string, so the divergence splits one workspace into two records: the create's
+ * metadata (display name, linked task, tabs) lands on the id the sidebar never lists, and the
+ * row it does list shows the branch with no links and no agent. Reusing the on-disk leaf keeps
+ * create and listing on one id.
+ */
+export function adoptExistingDirectoryName(parentDir: string, name: string): string {
+  if (!name) {
+    return name
+  }
+  // A repo-relative base resolves against this process's cwd, which is not the folder it names, and
+  // a WSL/SSH base is not on this filesystem at all — reading either would mean the wrong folder or
+  // a stopped distro booted by the sweep.
+  if (!isLocalAbsoluteDirectory(parentDir)) {
+    return name
+  }
+  try {
+    const folders = readdirSync(parentDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+      .map((entry) => entry.name)
+    return chooseExistingDirectoryName(folders, name)
+  } catch {
+    // Missing, unreadable, or not a local filesystem: the requested spelling is the only one left.
+  }
+  return name
+}
+
+/**
+ * The spelling to use for `name` among `folderNames`.
+ *
+ * An exact match wins, and a folded pair that is not exact is ambiguous — two such entries mean the
+ * filesystem is case-sensitive, where they are two folders and guessing one would move every
+ * existing worktree's container out from under it.
+ */
+export function chooseExistingDirectoryName(
+  folderNames: Iterable<string>,
+  name: string
+): string {
+  if (!name) {
+    return name
+  }
+  const folded = name.toLowerCase()
+  let foldedMatch: string | null = null
+  let foldedMatches = 0
+  for (const folderName of folderNames) {
+    if (folderName === name) {
+      return name
+    }
+    if (folderName.toLowerCase() !== folded) {
+      continue
+    }
+    foldedMatch = folderName
+    foldedMatches += 1
+  }
+  return foldedMatches === 1 && foldedMatch ? foldedMatch : name
+}
+
+/** `\\\\wsl.localhost\\…`, `//wsl.localhost/…` and `\\\\server\\share` are other filesystems' folders. */
+function isLocalAbsoluteDirectory(targetPath: string): boolean {
+  // Both separators: this repo stores normalized forward-slash forms of UNC paths too.
+  return isWindowsAbsolutePathLike(targetPath)
+    ? !/^[\\/]{2}/.test(targetPath)
+    : posix.isAbsolute(targetPath)
 }
 
 function sanitizeProjectFolderName(value: string | null | undefined): string | null {

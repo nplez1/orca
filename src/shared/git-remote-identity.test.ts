@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { normalizeGitHubRemoteHost } from './git-remote-host-alias'
 import {
   deriveGitRemoteIdentity,
+  gitRemoteIdentityKeys,
   matchGitRemoteKeyParts,
   normalizeGitRemoteUrl,
   splitGitRemoteKey
@@ -65,10 +66,41 @@ describe('deriveGitRemoteIdentity', () => {
       ).toEqual({
         canonicalKey: 'github.com/stablyai/orca',
         remoteName: 'origin',
-        remoteUrl: 'https://github.com/stablyai/orca.git'
+        remoteUrl: 'https://github.com/stablyai/orca.git',
+        remoteKeys: ['github.com/stablyai/orca', 'github.com/AmoabaKelvin/orca']
       })
     }
   )
+
+  it('keeps a fork’s own repository alongside the parent it prefers', () => {
+    // Why: the canonical key is the fork parent, but a fork's issues live on origin — dropping it
+    // makes the user's own issues read as another repository's when they attach one.
+    expect(
+      deriveGitRemoteIdentity(
+        [
+          'origin\tgit@github.com:nplez1/orca.git (fetch)',
+          'origin\tgit@github.com:nplez1/orca.git (push)',
+          'upstream\thttps://github.com/stablyai/orca.git (fetch)',
+          'upstream\thttps://github.com/stablyai/orca.git (push)'
+        ].join('\n')
+      )
+    ).toEqual({
+      canonicalKey: 'github.com/stablyai/orca',
+      remoteName: 'upstream',
+      remoteUrl: 'https://github.com/stablyai/orca.git',
+      remoteKeys: ['github.com/stablyai/orca', 'github.com/nplez1/orca']
+    })
+    expect(
+      gitRemoteIdentityKeys({
+        canonicalKey: 'github.com/stablyai/orca',
+        remoteKeys: ['github.com/stablyai/orca', 'github.com/nplez1/orca']
+      })
+    ).toEqual(['github.com/stablyai/orca', 'github.com/nplez1/orca'])
+    expect(gitRemoteIdentityKeys({ canonicalKey: 'github.com/acme/repo' })).toEqual([
+      'github.com/acme/repo'
+    ])
+    expect(gitRemoteIdentityKeys(null)).toEqual([])
+  })
 
   it('prefers upstream, then origin, then the first named remote', () => {
     expect(
@@ -83,7 +115,8 @@ describe('deriveGitRemoteIdentity', () => {
     ).toEqual({
       canonicalKey: 'git.company.test/team/sample-app',
       remoteName: 'upstream',
-      remoteUrl: 'https://git.company.test/team/sample-app.git'
+      remoteUrl: 'https://git.company.test/team/sample-app.git',
+      remoteKeys: ['git.company.test/team/sample-app', 'git.company.test/forks/sample-app']
     })
 
     expect(

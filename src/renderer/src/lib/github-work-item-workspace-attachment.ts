@@ -1,5 +1,5 @@
 import type { Repo } from '../../../shared/repo-types'
-import { normalizeGitRemoteUrl } from '../../../shared/git-remote-identity'
+import { gitRemoteIdentityKeys, normalizeGitRemoteUrl } from '../../../shared/git-remote-identity'
 import { getWorkspaceAttachmentUrlScope } from '../../../shared/workspace-attachment-normalization'
 import { parseGitHubIssueOrPRLink } from '../../../shared/github/links'
 import { githubRepoIdentityKey } from '../../../shared/github/repository-identity-key'
@@ -85,9 +85,9 @@ export function worktreeMatchesGitHubNumber(
     if (!item.url) {
       return true
     }
-    const remoteKey = repo?.gitRemoteIdentity?.canonicalKey
-    return Boolean(
-      remoteKey && normalizeGitRemoteUrl(getWorkspaceAttachmentUrlScope(item)) === remoteKey
-    )
+    // A fork attaches its own issues, which live on a remote other than the primary one.
+    const remoteKeys = gitRemoteIdentityKeys(repo?.gitRemoteIdentity)
+    const scope = normalizeGitRemoteUrl(getWorkspaceAttachmentUrlScope(item))
+    return Boolean(scope && remoteKeys.includes(scope))
   })
 }

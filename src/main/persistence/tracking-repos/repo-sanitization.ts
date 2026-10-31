@@ -32,6 +32,12 @@ export function sanitizeRepoUpstream(value: unknown): Repo['upstream'] | undefin
   return host ? { owner, repo, host } : { owner, repo }
 }
 
+/** Narrow an unknown record field to a trimmed string without an assertion the lint gate forbids. */
+function readTrimmed(source: object, key: string): string {
+  const entry: unknown = Reflect.get(source, key)
+  return typeof entry === 'string' ? entry.trim() : ''
+}
+
 export function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | null | undefined {
   // Null means resolved with no usable remote; absence means identity probing is pending.
   if (value === null) {
@@ -40,18 +46,30 @@ export function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | n
   if (!value || typeof value !== 'object') {
     return undefined
   }
-  const candidate = value as {
-    canonicalKey?: unknown
-    remoteName?: unknown
-    remoteUrl?: unknown
+  const canonicalKey = readTrimmed(value, 'canonicalKey')
+  const remoteName = readTrimmed(value, 'remoteName')
+  const remoteUrl = readTrimmed(value, 'remoteUrl')
+  if (!canonicalKey || !remoteName || !remoteUrl) {
+    return undefined
   }
-  const canonicalKey =
-    typeof candidate.canonicalKey === 'string' ? candidate.canonicalKey.trim() : ''
-  const remoteName = typeof candidate.remoteName === 'string' ? candidate.remoteName.trim() : ''
-  const remoteUrl = typeof candidate.remoteUrl === 'string' ? candidate.remoteUrl.trim() : ''
-  return canonicalKey && remoteName && remoteUrl
-    ? { canonicalKey, remoteName, remoteUrl }
-    : undefined
+  // Why: dropping this here would unreach every fork's own remote — the value is written by the
+  // probe and read by the link scope checks, both of which run on either side of this boundary.
+  const remoteKeys = 'remoteKeys' in value && Array.isArray(value.remoteKeys)
+    ? [
+        ...new Set(
+          value.remoteKeys
+            .filter((key): key is string => typeof key === 'string')
+            .map((key) => key.trim())
+            .filter((key) => key.length > 0)
+        )
+      ]
+    : []
+  return {
+    canonicalKey,
+    remoteName,
+    remoteUrl,
+    ...(remoteKeys.length > 0 ? { remoteKeys } : {})
+  }
 }
 
 export function sanitizeRepoProjectHostSetupMethod(
