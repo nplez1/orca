@@ -151,21 +151,58 @@ export function adoptExistingDirectoryName(parentDir: string, name: string): str
   if (!name) {
     return name
   }
-  // A repo-relative base resolves against this process's cwd, which is not the folder it names.
-  if (!isWindowsAbsolutePathLike(parentDir) && !posix.isAbsolute(parentDir)) {
+  // A repo-relative base resolves against this process's cwd, which is not the folder it names, and
+  // a WSL/SSH base is not on this filesystem at all — reading either would mean the wrong folder or
+  // a stopped distro booted by the sweep.
+  if (!isLocalAbsoluteDirectory(parentDir)) {
     return name
   }
   try {
-    const folded = name.toLowerCase()
-    for (const entry of readdirSync(parentDir, { withFileTypes: true })) {
-      if (entry.name.toLowerCase() === folded && (entry.isDirectory() || entry.isSymbolicLink())) {
-        return entry.name
-      }
-    }
+    const folders = readdirSync(parentDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+      .map((entry) => entry.name)
+    return chooseExistingDirectoryName(folders, name)
   } catch {
     // Missing, unreadable, or not a local filesystem: the requested spelling is the only one left.
   }
   return name
+}
+
+/**
+ * The spelling to use for `name` among `folderNames`.
+ *
+ * An exact match wins, and a folded pair that is not exact is ambiguous — two such entries mean the
+ * filesystem is case-sensitive, where they are two folders and guessing one would move every
+ * existing worktree's container out from under it.
+ */
+export function chooseExistingDirectoryName(
+  folderNames: Iterable<string>,
+  name: string
+): string {
+  if (!name) {
+    return name
+  }
+  const folded = name.toLowerCase()
+  let foldedMatch: string | null = null
+  let foldedMatches = 0
+  for (const folderName of folderNames) {
+    if (folderName === name) {
+      return name
+    }
+    if (folderName.toLowerCase() !== folded) {
+      continue
+    }
+    foldedMatch = folderName
+    foldedMatches += 1
+  }
+  return foldedMatches === 1 && foldedMatch ? foldedMatch : name
+}
+
+/** `\\\\wsl.localhost\\…` and `\\\\server\\share` are other machines' (or other filesystems') folders. */
+function isLocalAbsoluteDirectory(targetPath: string): boolean {
+  return isWindowsAbsolutePathLike(targetPath)
+    ? !targetPath.startsWith('\\\\')
+    : posix.isAbsolute(targetPath)
 }
 
 function sanitizeProjectFolderName(value: string | null | undefined): string | null {

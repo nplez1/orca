@@ -223,4 +223,14 @@ describe('project-folder container casing', () => {
       )
     })
   })
+
+  it('leaves a WSL mirror container to the distro, whose filesystem is case-sensitive', () => {
+    const repo = { path: '\\\\wsl.localhost\\Ubuntu\\home\\me\\orca\\main', displayName: 'Orca' }
+    const pathSettings = getWorktreePathSettings(
+      repo,
+      { nestWorkspaces: true, workspaceDir: 'C:\\Users\\me\\orca\\workspaces', worktreeLayoutMode: 'project-folder' },
+      'Ubuntu'
+    )
+    expect(pathSettings.projectFolderName).toBe('Orca')
+  })
 })

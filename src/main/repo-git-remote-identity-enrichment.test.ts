@@ -490,8 +490,43 @@ describe('enrichMissingRepoGitRemoteIdentities', () => {
     })
   })
 
-  it('bounds re-probes per sweep so a large repo list drains gradually', async () => {
+  it('writes a changed key set even when the primary remote stays the same', async () => {
     vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    // Why: forking an existing clone of the parent adds origin later — the primary key does not move.
+    vi.mocked(probeGitRemoteIdentity).mockResolvedValue({
+      status: 'resolved',
+      identity: forkIdentity
+    })
+    const repo = makeRepo({ gitRemoteIdentity: legacyForkIdentity })
+    const store = makeStore(repo)
+
+    await sweep(store)
+
+    expect(store.updateRepo).toHaveBeenCalledWith(repoTarget('repo-1', 'local'), {
+      gitRemoteIdentity: forkIdentity
+    })
+  })
+
+  it('stops spending refresh slots on a legacy record whose probe keeps failing', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    vi.mocked(probeGitRemoteIdentity).mockResolvedValue({ status: 'unavailable' })
+    const legacy = makeRepo({ id: 'legacy', gitRemoteIdentity: legacyForkIdentity })
+    const other = makeRepo({ id: 'other', path: '/workspace/other' })
+    const store = makeStore(legacy, other)
+
+    await sweep(store)
+    await sweep(store)
+    await sweep(store)
+
+    // The failed probe backs the legacy record off instead of claiming a slot on every sweep.
+    expect(
+      vi.mocked(probeGitRemoteIdentity).mock.calls.filter((call) => call[0] === legacy.path)
+    ).toHaveLength(1)
+  })
+
+  it('bounds re-probes per sweep so a large repo list drains gradually', async () => {    vi.useFakeTimers()
     vi.setSystemTime(1_000)
     vi.mocked(probeGitRemoteIdentity).mockResolvedValue(resolvedProbe)
     const repos = Array.from({ length: 6 }, (_unused, index) =>

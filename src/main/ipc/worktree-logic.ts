@@ -240,10 +240,14 @@ export function getWorktreePathSettings(
       ? {
           // Why the on-disk leaf when one exists: a container spelled `Orca` over a folder spelled
           // `orca` gives git two paths for one worktree, and every worktree id is that path.
-          projectFolderName: adoptExistingDirectoryName(
-            getEffectiveWorktreeBasePath(repo, settings),
-            resolveProjectFolderName(repo)
-          ),
+          // Why not with a WSL mirror: that container lives under the distro's home, so the desktop
+          // base's spelling says nothing about it — and ext4 is case-sensitive.
+          projectFolderName: wslMirrorDistro
+            ? resolveProjectFolderName(repo)
+            : adoptExistingDirectoryName(
+                getEffectiveWorktreeBasePath(repo, settings),
+                resolveProjectFolderName(repo)
+              ),
           // Why a relative root counts as repo-scoped: it resolves against this repo's own path,
           // so it is this project's folder in effect. Treating only `worktreeBasePath` as
           // repo-scoped made `workspaceDir: '..'` nest a folder inside the container it already
