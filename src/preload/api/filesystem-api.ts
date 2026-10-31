@@ -2,7 +2,7 @@ import type { PathExistenceResult } from '../../shared/path-existence-batch'
 import type { RuntimeFileReadChunkResult } from '../../shared/runtime-types'
 import type { SearchOptions, SearchResult } from '../../shared/code-search-types'
 import type { PdfExportResult } from '../../shared/pdf-export-failure-copy'
-import type { WorkspacePathSearchApi } from './workspace-path-search-bridge'
+import type { WorkspacePathSearchApi } from './workspace-path-search-api-types'
 import type {
   DirEntry,
   FsChangedPayload,
@@ -49,7 +49,7 @@ export type ExportApi = {
 }
 
 export type FilesystemApi = {
-  fs: {
+  fs: WorkspacePathSearchApi & {
     getPathForFile?: (file: File) => string
     prepareDroppedPaths: (args: PrepareDroppedPathsRequest) => Promise<PreparedDroppedPaths>
     readFileChunk: (args: {
@@ -248,7 +248,7 @@ export type FilesystemApi = {
     watchWorktree: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     unwatchWorktree: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     onFsChanged: (callback: (payload: FsChangedPayload) => void) => () => void
-  } & WorkspacePathSearchApi
+  }
   notebook: {
     listPythonEnvironments: (args: {
       filePath: string

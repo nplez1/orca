@@ -218,8 +218,10 @@ strings, its rewording of upstream's copy, and — the awkward one — the keys 
 orphans all live in `src/renderer/src/i18n/fork/`:
 
 - `fork/en.json` holds the added and reworded English strings. `locales/en.json` is upstream's.
-- `fork/<lang>.json` holds the same for es/fr/ja/ko/pt/ru/tr/zh/zh-Hant, merged over upstream's file
-  by `loadForkLocaleOverlay` at read time.
+- `fork/<lang>.json` holds the same for de/es/fr/ja/ko/pt/ru/tr/zh/zh-Hant, merged over upstream's file
+  by `loadForkLocaleOverlay` at read time. Every overlay file must be listed in `FORK_LOCALE_URLS`;
+  `tests/tools/i18n-catalog-overlay-parity.test.mjs` fails if one on disk is not, because an overlay
+  nobody loads is a translation the app never serves.
 - A **`null` leaf is a tombstone**: the fork dropped a feature, extraction then finds no source
   reference for upstream's key, and `verify:localization-extraction` fails on any key no source
   references — so before the overlay existed, deleting the feature _forced_ deleting upstream's
@@ -245,6 +247,29 @@ string that needs main-process copy belongs in `src/main`'s own catalog, not in 
 Tests that pin the mechanism: `config/scripts/fork-english-catalog.test.mjs`,
 `src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the overlay-fetch-failure path),
 `tests/tools/i18n-catalog-overlay-parity.test.mjs`.
+
+**Orphaned keys are tombstoned, never deleted (2026-10-31).** The section above described the rule;
+this is the first commit that applies it to the keys a dropped feature orphans. 27 upstream keys the
+fork's own feature work stopped referencing were being _deleted_ from `locales/*.json`, which meant 11
+locale files — the twelve highest-churn paths in the tree, 525–1036 upstream commits per 90 days —
+conflicted on every sync for 354 deleted lines. They are tombstones in `fork/<lang>.json` now, and
+`locales/*.json` is byte-identical to upstream again. The rule for the next sync: when
+`verify:localization-extraction` reports a key no source references, tombstone it in the overlay.
+
+Two measured facts about what the overlay actually serves, both checked 2026-10-31:
+
+- **`de` had never been wired.** `fork/de.json` existed but was absent from `FORK_LOCALE_URLS`, so the
+  German runtime catalog was upstream's file with _no_ overlay. Wiring it changes two strings for
+  German users — the local-runtime key-storage note and the ShortcutsPane path, both from `~/.orca` to
+  `~/.orca-np` — and lets a pre-existing tombstone (`settings.AccountsPane.0c64dc2a64`) take effect for
+  the first time. Both are the fork identity behaving as intended; they are recorded here because they
+  are user-visible and arrived inside a commit that reads as bookkeeping. The other ten locales were
+  already wired and are unchanged.
+- **`fork/en.json` tombstones are verifier-only.** English runtime strings are the code's inline
+  defaults plus `fork/en-runtime-required.json`; the full `fork/en.json` is the source the verifiers
+  merge over `locales/en.json`, and `i18n.ts` never loads it. So an English tombstone removes a key
+  from the verifier's catalog without touching the shipped bundle — harmless for an orphan nothing
+  references, and _not_ a way to drop a live English string.
 
 ### `local(dev)`: rebuild-and-relaunch helper
 
