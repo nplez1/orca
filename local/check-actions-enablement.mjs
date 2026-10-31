@@ -29,7 +29,8 @@ const REPO = 'nplez1/orca'
 const ROOT = resolve(import.meta.dirname, '..')
 
 // Must stay enabled: the release build, the daily v* tag mirror, the nightly full unit suite, the
-// cheap PR lane, and the daily health check that watches the other four.
+// cheap PR lane, the daily health check that watches the other four, and the lanes enabled on
+// 2026-10-31 after the cost premise was measured to be zero (LOCAL-PATCHES.md § local(ci)).
 export const REQUIRED = [
   '.github/workflows/fork-release.yml',
   '.github/workflows/fork-upstream-tags.yml',
@@ -44,7 +45,22 @@ export const REQUIRED = [
   '.github/workflows/fork-pr-gates.yml',
   // Why: this is the check that watches the health checks. An unwatched watchdog is exactly the
   // failure `LOCAL-PATCHES.md` § local(ci) records, so a disabled one is drift, not a preference.
-  '.github/workflows/fork-ci-health.yml'
+  '.github/workflows/fork-ci-health.yml',
+  // Why: the only lane that runs repo-wide oxlint, max-lines, localization catalogs and `pnpm tc` on
+  // the release line. It was off from 2026-10-08 to 2026-10-31 and nothing reported that, which is the
+  // gap this entry closes.
+  '.github/workflows/fork-main-gates.yml',
+  // Why: supply-chain audit, path-gated to lockfile/Cargo/patches changes, so it costs nothing on an
+  // ordinary PR and covers the one class of change a unit lane cannot see.
+  '.github/workflows/dependency-security.yml',
+  // Why: mobile parity and the headless server path are first-class in `AGENTS.md`, and no PR lane here
+  // covered either. Its `push: [main]` leg targets the upstream mirror branch, so it runs there too.
+  '.github/workflows/mobile.yml',
+  '.github/workflows/node-server-tests.yml',
+  // Why: auto-update correctness, ~7 min of macOS across six observed PR runs.
+  '.github/workflows/macos-updater-tests.yml',
+  // Why: perf regression contract on PRs and nightly, 21 of 24 observed runs green.
+  '.github/workflows/performance-contracts.yml'
 ]
 
 // Inert without a manual dispatch or a caller — active is fine, disabled is also fine.

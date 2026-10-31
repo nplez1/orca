@@ -2540,6 +2540,69 @@ What neither fixes: a run started by the push itself, before the sweep reaches i
 seconds now instead of unlimited, and it is closed properly only by not mirroring upstream `main` at
 all, which upstream-bound branches still need.
 
+#### Six lanes enabled on 2026-10-31 (audit #221 C4 follow-up)
+
+The premise is settled above: standard runners bill nothing on a public repository, so enablement is a
+review-attention decision, not a cost one. Measured over the 40.1 days to 2026-10-31, the pre-existing
+fleet spent 8,291 billable-equivalent minutes (Windows ×2, macOS ×10) — `fork-release` 73%, the nightly
+26%, the two PR lanes 1% — and the API reports $0 against all of it. These six add roughly 1,000
+equivalent minutes a month, still $0.
+
+| lane                        | triggers                                    | why it is on                                                             |
+| --------------------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
+| `fork-main-gates.yml`       | schedule, push `nplez1/main`, dispatch      | repo-wide oxlint, max-lines, localization, `pnpm tc` on the release line |
+| `dependency-security.yml`   | `pull_request` (path-gated), call, dispatch | supply-chain audit; lockfile/Cargo/patches changes only                  |
+| `mobile.yml`                | `pull_request`, push `main`                 | mobile parity is first-class and no PR lane covered it                   |
+| `node-server-tests.yml`     | `pull_request`, call, schedule, dispatch    | headless/remote server path                                              |
+| `macos-updater-tests.yml`   | `pull_request`, dispatch                    | auto-update correctness, ~7 min of macOS in six runs                     |
+| `performance-contracts.yml` | schedule, `pull_request`, dispatch          | perf regression contract, 21 of 24 runs green                            |
+
+**The ordering is the load-bearing part.** `local/sync/push-upstream-mirror.mjs` is the mirror push and
+`check-actions-enablement --fix` in one command, so a lane that is active but not on the list is disabled
+by the next sync. That is what "GitHub auto-disabled a bunch of stuff" turned out to be: the census is
+`67 disabled_manually`, and it has never contained a `disabled_inactivity` (GitHub's inactivity rule
+needs 60 days without repository activity, and this repo pushes daily) or a `disabled_fork`. The sweep
+is the only mechanism, so the six went into `REQUIRED` in the same change that enabled them — otherwise
+the next mirror push would have undone it.
+
+**`fork-main-gates.yml` had been off since 2026-10-08**, when it went red three runs running, which left
+23 days in which nothing ran repo-wide oxlint, max-lines, the localization catalogs or `pnpm tc` on the
+release line. The red it was disabled for (`src/cli/handlers/vm.ts`, 336 counted lines against 300) was
+cleared by `8bcd16e`. At `86fb0b33` the whole step set is green: oxlint 0 errors over 40,242 files,
+max-lines ratchet OK with 46 grandfathers, `audit:anti-slop` clean, `check-upstream-identity-literals` 0
+findings, `pnpm tc` exit 0. It gains `timeout-minutes: 40` — it had none, so a hung `pnpm tc` would hold
+its ref's concurrency slot the way the 2026-10-26 nightly queued for 17.5 h — and **keeps
+`cancel-in-progress: false`**: flipping it would let each merge replace a running gate with a `cancelled`
+conclusion, which is how that 10-26 run hid four red shards.
+
+Two hazards are accepted knowingly, recorded here so the next reader does not rediscover them.
+`node-server-tests.yml`'s `fast_runners` defaults to **true** for `workflow_dispatch` and `workflow_call`,
+so a manual dispatch puts its jobs on `blacksmith-*` labels this fork does not provision; `pull_request`
+and `schedule` events pass no input and stay on GitHub-hosted runners. And `mobile.yml`'s `push` leg
+targets `branches: [main]`, the upstream mirror branch rather than `nplez1/main`, so that leg re-tests
+upstream's own code; the PR leg is the useful half.
+
+**Still off, and why.** `pr.yml` and `unit-tests.yml`: upstream's whole fleet in one 1,400-line file,
+20 jobs, six without a timeout, `ubuntu-slim` and `blacksmith-*` labels, and it calls the red
+`e2e.yml`. `unit-tests.yml` is `workflow_call`-only and already runs whenever `fork-main-tests.yml` calls
+it — which is the proof that a _disabled_ reusable workflow still executes, and why enabling that file
+would be a no-op. `e2e.yml` (25 of 27 runs red, no `concurrency`), `terminal-perf` (16/18),
+`node-next-compat` (11/11), `terminal-ime-e2e` (4/18, no `concurrency`). The `windows-*` and `wsl-*`
+lanes need signing secrets and runners this fork lacks. The publishing set the fork does not use:
+`homebrew-bump`, `readme-downloads-badge`, `hourly-mac-build`, `daily-mac-build`, `release-javascript*`,
+`mobile-*-release`, `cloud-*`, `pullfrog`, `docs.yml`.
+
+**Not yet covered, stated so it is not mistaken for done.** `REQUIRED` fails when a lane is _disabled_;
+nothing fails when an enabled lane sits _red_ or sits _queued_, except the nightly via
+`check-nightly-liveness.mjs`. Three of the six have schedules, and GitHub mails a scheduled failure to
+whoever last edited its cron line — an upstream author, for the upstream-owned ones. The cheap closure
+is a queued-run check (`actions/runs?status=queued`, fail past one hour) in `fork-ci-health.yml`, which
+catches every hang source including the `blacksmith-*` default above.
+
+Reviewed by Opus 5.5, high, one round on the plan packet: it confirmed both premises and corrected two
+items that landed here — `cancel-in-progress` stays `false`, and `fast_runners` defaults to true rather
+than false, which the first draft had backwards.
+
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries
