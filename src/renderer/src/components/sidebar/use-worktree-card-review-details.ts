@@ -9,8 +9,8 @@ import { findLinkedIssueRepo, linkedIssueRepoIsOffDevice } from '@/lib/linked-is
 import { getGitHubPRCacheKey } from '../../../../shared/github/github-cache-key'
 import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache-identity'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
-import { hostedReviewInfoFromGitHubPRInfo } from '../../../../shared/hosted-review-github'
-import type { HostedReviewInfo } from '../../../../shared/hosted-review'
+import { selectWorkspaceReviewState } from '@/components/right-sidebar/checks-panel-review'
+import { isStaleMergedGitHubReviewForHead } from '@/store/slices/hosted-review-cache-state'
 import { isFolderRepo } from '../../../../shared/repo-kind'
 import { areTaskSourceContextsEqual } from '../../../../shared/task-source-context'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
@@ -137,8 +137,6 @@ export function useWorktreeCardReviewDetails({
       : undefined
   )
 
-  const hostedReview: HostedReviewInfo | null | undefined =
-    hostedReviewEntry !== undefined ? hostedReviewEntry.data : undefined
   const linkedGitHubPR = worktree.linkedPR ?? null
   const linkedGitLabMR = worktree.linkedGitLabMR ?? null
   const linkedBitbucketPR = worktree.linkedBitbucketPR ?? null
@@ -157,7 +155,6 @@ export function useWorktreeCardReviewDetails({
     linkedGiteaPR !== null
   // Why: a newer hosted-review miss trusts the merged-PR cache only when the stored head proves it still describes the current commit.
   const cachedBranchPR = prCacheEntry?.data
-  const cachedBranchPRFetchedAt = prCacheEntry?.fetchedAt
   const cachedMergedBranchPRMatchesCurrentHead = isCachedMergedBranchPRCurrentForWorktree(
     cachedBranchPR,
     worktree
@@ -169,37 +166,43 @@ export function useWorktreeCardReviewDetails({
     (cachedBranchPR.state !== 'merged' || cachedMergedBranchPRMatchesCurrentHead)
       ? cachedBranchPR.number
       : null
-  const cachedBranchPRCanDriveDisplay =
-    cachedBranchPR?.state !== 'merged' || cachedMergedBranchPRMatchesCurrentHead
-  const hostedReviewMatchesHeadMatchedCachedMergedPR =
-    cachedMergedBranchPRMatchesCurrentHead &&
+  // Why: the Checks pane resolves GitHub and GitLab reviews through this shared selector, so a stale
+  // hosted-review copy can no longer outrank the PR cache and leave the card describing a state the
+  // pane denies. Bitbucket/Azure/Gitea reviews have no Checks-pane counterpart, so the card keeps
+  // showing them itself.
+  const hostedReviewData = isStaleMergedGitHubReviewForHead(hostedReviewEntry, worktree.head)
+    ? null
+    : (hostedReviewEntry?.data ?? null)
+  const sharedReviewState = selectWorkspaceReviewState({
+    prEntry: prCacheEntry,
+    hostedEntry: hostedReviewEntry,
+    currentHeadOid: worktree.head,
+    linkedPR: linkedGitHubPR,
+    suppressedGitHubPR: worktree.suppressedGitHubPR ?? null,
+    linkedGitLabMR,
+    linkedBitbucketPR,
+    linkedAzureDevOpsPR,
+    linkedGiteaPR
+  })
+  const reviewState =
+    hostedReviewData !== null &&
+    hostedReviewData.provider !== 'github' &&
+    hostedReviewData.provider !== 'gitlab'
+      ? hostedReviewData
+      : sharedReviewState
+  // Provenance still decides whether a discovered review may name this workspace; the selector
+  // supplies its state. A PR-cache answer is this branch's own lookup, so it needs no hint key.
+  const reviewStateIsBranchGitHubPR =
+    reviewState !== null &&
+    reviewState.provider === 'github' &&
     cachedBranchPR !== null &&
     cachedBranchPR !== undefined &&
-    hostedReview?.provider === 'github' &&
-    hostedReview.number === cachedBranchPR.number
-  const useCachedBranchReview =
-    cachedBranchPR !== undefined &&
-    cachedBranchPR !== null &&
-    !hasNonGitHubLinkedReview &&
-    cachedBranchPRCanDriveDisplay &&
-    (hostedReview === undefined ||
-      (cachedMergedBranchPRMatchesCurrentHead && !hostedReviewMatchesHeadMatchedCachedMergedPR) ||
-      (hostedReview === null &&
-        ((cachedBranchPRFetchedAt !== undefined &&
-          cachedBranchPRFetchedAt > (hostedReviewEntry?.fetchedAt ?? 0)) ||
-          cachedMergedBranchPRMatchesCurrentHead)))
-  const cachedBranchReview = useCachedBranchReview
-    ? hostedReviewInfoFromGitHubPRInfo(cachedBranchPR)
-    : hostedReview
-  // Why: branch provenance does not supersede the head-ownership gate for merged PRs.
-  const branchLookupGitHubPRNumber =
-    hostedReview?.provider === 'github' &&
-    hostedReview.state === 'merged' &&
-    !isCachedMergedBranchPRCurrentForWorktree(hostedReview, worktree)
-      ? null
-      : hostedReviewEntry?.branchLookupGitHubPRNumber
+    reviewState.number === cachedBranchPR.number
+  const branchLookupGitHubPRNumber = reviewStateIsBranchGitHubPR
+    ? reviewState.number
+    : hostedReviewEntry?.branchLookupGitHubPRNumber
   const prDisplay = getWorktreeCardPrDisplay(
-    cachedBranchReview,
+    reviewState,
     linkedGitHubPR,
     linkedGitLabMR,
     linkedBitbucketPR,
@@ -207,7 +210,7 @@ export function useWorktreeCardReviewDetails({
     linkedGiteaPR,
     {
       reviewHintKey:
-        (useCachedBranchReview || cachedMergedBranchPRMatchesCurrentHead) && !hasLinkedReview
+        reviewStateIsBranchGitHubPR && !hasLinkedReview
           ? ''
           : hostedReviewEntry?.linkedReviewHintKey,
       branchLookupGitHubPRNumber,

@@ -232,6 +232,24 @@ describe('visible hosted review refresh targets', () => {
     )
   })
 
+  it('keeps asking the hosted lookup for a remote branch with no GitHub evidence', async () => {
+    const owner: Repo = { ...repo, executionHostId: 'runtime:owner-server' }
+    const store = setup(owner)
+    runtimeEnvironmentCall.mockResolvedValue({ id: 'review', ok: true, result: review })
+    // An early GitHub refresh can leave an empty PR answer behind; that must not take this lane
+    // away from the hosted lookup, which is the only call that discovers a non-GitHub review.
+    store.setState({
+      prCache: {
+        [`runtime:owner-server::${prKey}`]: { data: null, fetchedAt: Date.now() }
+      }
+    })
+
+    expect(await targets(store)[0].refresh()).toBe(true)
+    expect(runtimeEnvironmentCall).toHaveBeenCalledWith(
+      expect.objectContaining({ selector: 'owner-server', method: 'hostedReview.forBranch' })
+    )
+  })
+
   it('excludes folders, bare, archived, detached, missing and disconnected SSH workspaces', () => {
     const store = setup()
     store.setState({ repos: [{ ...repo, kind: 'folder' }] })
@@ -312,9 +330,9 @@ describe('visible hosted review refresh targets', () => {
         ['draft', 'pending', 120_000],
         ['closed', 'failure', 900_000],
         ['merged', 'pending', 60_000],
-        ['merged', 'success', null],
-        ['merged', 'failure', null],
-        ['merged', 'neutral', null]
+        ['merged', 'success', 900_000],
+        ['merged', 'failure', 900_000],
+        ['merged', 'neutral', 900_000]
       ] as const) {
         store.setState({
           hostedReviewCache: {
@@ -355,6 +373,30 @@ describe('visible hosted review refresh targets', () => {
     scheduler.dispose()
     unsubscribe()
     log.mockRestore()
+  })
+
+  it('paces a GitHub branch from the PR cache the icon renders, not a stale hosted copy', () => {
+    const store = setup({ ...repo, executionHostId: 'runtime:owner-server' })
+    const scopedHostedKey = `runtime:owner-server::${hostedKey}`
+    const scopedPRKey = `runtime:owner-server::${prKey}`
+    store.setState({
+      // The hosted copy was refreshed last and still says open; the PR cache — the entry both the
+      // Checks pane and the workspace glyph render — already knows the review merged.
+      hostedReviewCache: {
+        [scopedHostedKey]: {
+          data: { ...review, provider: 'github', state: 'open', status: 'success' },
+          fetchedAt: Date.now()
+        }
+      },
+      prCache: {
+        [scopedPRKey]: {
+          data: makePR({ state: 'merged', checksStatus: 'success' }),
+          fetchedAt: Date.now() - 60_000
+        }
+      }
+    })
+
+    expect(targets(store)[0].intervalMs).toBe(900_000)
   })
 
   it('ignores unrelated store writes and includes every projection input', () => {
@@ -408,7 +450,7 @@ describe('visible hosted review refresh targets', () => {
         }
       }
     })
-    expect(targets(store)[0]).toMatchObject({ fetchedAt: null, intervalMs: null })
+    expect(targets(store)[0]).toMatchObject({ fetchedAt: null, intervalMs: 900_000 })
   })
 
   it('discovers a changed runtime HEAD from persisted metadata without a recorded request HEAD', () => {
@@ -421,7 +463,7 @@ describe('visible hosted review refresh targets', () => {
         }
       }
     })
-    expect(targets(store)[0]).toMatchObject({ fetchedAt: null, intervalMs: null })
+    expect(targets(store)[0]).toMatchObject({ fetchedAt: null, intervalMs: 900_000 })
     store.setState({
       prCache: {
         [`runtime:owner-server::${prKey}`]: {
@@ -431,7 +473,7 @@ describe('visible hosted review refresh targets', () => {
         }
       }
     })
-    expect(targets(store)[0]).toMatchObject({ fetchedAt: Date.now(), intervalMs: null })
+    expect(targets(store)[0]).toMatchObject({ fetchedAt: Date.now(), intervalMs: 900_000 })
   })
 
   it.each([
@@ -448,7 +490,7 @@ describe('visible hosted review refresh targets', () => {
         }
       }
     })
-    expect(targets(store)[0]).toMatchObject({ fetchedAt: Date.now(), intervalMs: null })
+    expect(targets(store)[0]).toMatchObject({ fetchedAt: Date.now(), intervalMs: 900_000 })
   })
 
   it('includes only connected SSH branches and preserves their host scope', async () => {
