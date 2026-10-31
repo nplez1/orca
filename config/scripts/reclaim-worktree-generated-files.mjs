@@ -201,7 +201,7 @@ export async function reclaimWorktreeGeneratedFiles({
           await rm(path, { recursive: true, force: true })
         } catch (error) {
           if (
-            !['EACCES', 'EPERM'].includes(error.code) ||
+            !['EACCES', 'EPERM', 'ENOTEMPTY'].includes(error.code) ||
             !(await descend(worktree, parts)) ||
             !sameDirectory(original, await info(path))
           ) {
