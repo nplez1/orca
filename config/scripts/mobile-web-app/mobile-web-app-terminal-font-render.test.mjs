@@ -67,10 +67,6 @@ describeRender('terminal font startup and late painting', () => {
       const before = await capture()
       await writeGlyph('\u0378')
       const unassignedGlyph = await capture()
-      context.skip(
-        !unassignedGlyph.equals(before),
-        'a system font already draws U+F07B (U+0378 is tofu), so the stalled frame has no fallback glyph to repaint'
-      )
       await writeGlyph('\uf07b')
       releaseFont()
       await page.waitForFunction(
@@ -82,6 +78,10 @@ describeRender('terminal font startup and late painting', () => {
         () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       )
       const after = await capture()
+      context.skip(
+        !unassignedGlyph.equals(before) && after.equals(before),
+        'a system font already draws U+F07B and the loaded font changes nothing, so there is no fallback glyph to repaint'
+      )
       expect(after.equals(before), 'the folder glyph must repaint after the font arrives').toBe(
         false
       )

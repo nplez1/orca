@@ -87,7 +87,7 @@
       "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
       "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time.",
       "commit": "8c05817aaf",
-      "reason": "not environment bound: the one-shot fs mock was spent by the fork's adoption-marker read, which is deterministic on any host, and the family now mocks ../home-directory-migration instead. Its own exit condition named this fix, and all eight left local/unit-known-red.json in the same change (LOCAL-PATCHES.md § local(test): the 2026-10-31 sweep)"
+      "reason": "not environment bound: both are deterministic source scans, and the two violations they found were declared in the ratchet itself (fsAllowances rmSync, CREDENTIAL_ROTATION_OWNERS PENDING_ROTATION_OWNER) rather than affected by any keychain. Its own exit condition named this fix, and both left local/unit-known-red.json in the same change (LOCAL-PATCHES.md § local(test): the 2026-10-31 sweep)"
     },
     {
       "file": "src/main/claude-accounts/claude-credential-persistence-ratchet.test.ts",
@@ -98,7 +98,7 @@
       "evidence": "Same tests are already in local/unit-known-red.json as this Mac's environment reds, and they fail identically here, so the class is the credential store's safeStorage/keychain behaviour rather than a code path either line differs on. Observed on ubuntu-24.04-arm in run 41050311873 (dispatch, nplez1/main @985687d2): shard 2 minimax, shard 3 deepseek+fireworks, shard 5 zcode+claude-credential-persistence-ratchet. No commits touched src/main/minimax, src/main/zcode, src/main/deepseek, src/main/fireworks or src/main/claude-accounts in the 2026-10-30 merge, so the red is not the sync's.",
       "exit": "Remove when the runner has a usable OS keychain, or when this family is mocked off safeStorage; each of the eight tests also leaves local/unit-known-red.json at the same time.",
       "commit": "8c05817aaf",
-      "reason": "not environment bound: the one-shot fs mock was spent by the fork's adoption-marker read, which is deterministic on any host, and the family now mocks ../home-directory-migration instead. Its own exit condition named this fix, and all eight left local/unit-known-red.json in the same change (LOCAL-PATCHES.md § local(test): the 2026-10-31 sweep)"
+      "reason": "not environment bound: both are deterministic source scans, and the two violations they found were declared in the ratchet itself (fsAllowances rmSync, CREDENTIAL_ROTATION_OWNERS PENDING_ROTATION_OWNER) rather than affected by any keychain. Its own exit condition named this fix, and both left local/unit-known-red.json in the same change (LOCAL-PATCHES.md § local(test): the 2026-10-31 sweep)"
     }
   ],
   "unhandledErrors": [

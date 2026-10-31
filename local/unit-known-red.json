@@ -987,7 +987,7 @@
       "test": "ensure-native-runtime finds the installed node-gyp entry from an addon without build tools on PATH",
       "class": "host-pnpm-shim",
       "commit": "8c05817aaf",
-      "reason": "the machine's ~/.local/bin/pnpm guardrail resolves the real pnpm with absolute /bin/ls, /usr/bin/sort and /usr/bin/tail, so an emptied PATH no longer kills the shim before pnpm answers (LOCAL-PATCHES.md § local(test): the 2026-10-31 sweep)"
+      "reason": "machine state only, no tree fix: the ~/.local/bin/pnpm guardrail resolves the real pnpm with absolute /bin/ls, /usr/bin/sort and /usr/bin/tail, so an emptied PATH no longer kills the shim before pnpm answers. The commit here is the one that carried the manifest change (LOCAL-PATCHES.md § local(test): the 2026-10-31 sweep)"
     },
     {
       "file": "config/scripts/mobile-web-app/mobile-web-app-terminal-font-render.test.mjs",

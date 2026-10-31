@@ -115,6 +115,7 @@ async function containsNestedRepository(root) {
 }
 
 async function makeDirectoriesWritable(root) {
+  let changedMode = false
   const pending = [root]
   while (pending.length) {
     const path = pending.pop()
@@ -125,6 +126,7 @@ async function makeDirectoriesWritable(root) {
     // Package files can be hardlinked into a shared store; only change directory permissions.
     if (process.getuid && current.uid === process.getuid() && !(current.mode & 0o200)) {
       await chmod(path, current.mode | 0o200)
+      changedMode = true
     }
     for (const entry of await readdir(path, { withFileTypes: true })) {
       if (entry.isDirectory()) {
@@ -132,6 +134,7 @@ async function makeDirectoriesWritable(root) {
       }
     }
   }
+  return changedMode
 }
 
 export async function reclaimWorktreeGeneratedFiles({
@@ -207,7 +210,10 @@ export async function reclaimWorktreeGeneratedFiles({
           ) {
             throw error
           }
-          await makeDirectoriesWritable(path)
+          const changedMode = await makeDirectoriesWritable(path)
+          if (!changedMode && error.code === 'ENOTEMPTY') {
+            throw error
+          }
           await rm(path, { recursive: true, force: true })
         }
       }
