@@ -259,12 +259,23 @@ conflicted on every sync for 354 deleted lines. They are tombstones in `fork/<la
 Two measured facts about what the overlay actually serves, both checked 2026-10-31:
 
 - **`de` had never been wired.** `fork/de.json` existed but was absent from `FORK_LOCALE_URLS`, so the
-  German runtime catalog was upstream's file with _no_ overlay. Wiring it changes two strings for
-  German users — the local-runtime key-storage note and the ShortcutsPane path, both from `~/.orca` to
-  `~/.orca-np` — and lets a pre-existing tombstone (`settings.AccountsPane.0c64dc2a64`) take effect for
-  the first time. Both are the fork identity behaving as intended; they are recorded here because they
-  are user-visible and arrived inside a commit that reads as bookkeeping. The other ten locales were
-  already wired and are unchanged.
+  German runtime catalog was upstream's file with _no_ overlay. Wiring it changes exactly three leaves
+  for German users, which is the whole measured delta on the runtime path (`locales/<lang>.json` plus
+  the overlay only where `FORK_LOCALE_URLS` lists the language), before `52695fbc41e` vs after:
+
+  ```
+  settings.OpenAiTranscriptionKeyDialog.d246b2bdb3
+    ~/.orca are stored …        ->  ~/.orca-np are stored …
+  settings.ShortcutsPane.d8c988dab4
+    ~/.orca/keybindings.json    ->  ~/.orca-np/keybindings.json
+  settings.AccountsPane.0c64dc2a64
+    <upstream string>           ->  removed (its tombstone in fork/de.json applies for the first time)
+  ```
+
+  All three are the fork identity behaving as intended. They are recorded because they are
+  user-visible and arrived inside a commit that reads as bookkeeping. The other nine non-English
+  locales were already wired and are unchanged; `en` is unchanged for the reason in the next bullet.
+
 - **`fork/en.json` tombstones are verifier-only.** English runtime strings are the code's inline
   defaults plus `fork/en-runtime-required.json`; the full `fork/en.json` is the source the verifiers
   merge over `locales/en.json`, and `i18n.ts` never loads it. So an English tombstone removes a key
