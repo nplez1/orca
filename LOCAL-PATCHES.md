@@ -292,9 +292,26 @@ request cannot drive a login picker.
   which is false on win32 — so Windows keeps exactly upstream's behaviour until someone measures the
   probe there. That flag now means what it says; `allowPtyFallback` stays unused.
 - **Inactive previews never probe.** One CLI start per saved account, per switcher open, is not a
-  price worth paying for rows nobody is looking at, so `service-inactive-accounts.ts` no longer passes
-  the supplement and previews read the endpoint as before.
+  price worth paying for rows nobody is looking at. That holds because
+  `fetchInactiveClaudeAccountUsage` builds its own options instead of forwarding them, so the
+  service's stale `allowUsagePanelSupplement: true` never reaches the probe — and
+  `fork/claude-inactive-account-usage.test.ts` fails if a future edit starts forwarding it. No hunk
+  in `service-inactive-accounts.ts` was needed for this; the upstream file is untouched.
 - **`usageMetadata.source` is `'cli'`**, a value `shared/rate-limit-types.ts` already carries.
+
+**Freshness, measured 2026-10-31 21:53Z.** The doubt worth answering is whether the CLI serves a
+cache: its payload carries the server's own `as_of`, and the SDK notes `model_scoped` is absent from
+cached answers. Against a healthy endpoint in the same minute the numbers agree exactly — endpoint
+`five_hour 10.0 / seven_day 7.0` at `as_of 21:53:18Z`; probe `five_hour 10 / seven_day 7` at
+`as_of 21:53:23Z` — so the probe is a live read, not a replay. During the 429 window the probe still
+carried a current `as_of` (`20:31:50Z` at 20:31Z).
+
+**Isolation, and what it does not do.** The probe passes `settingSources: []`, `strictMcpConfig: true`
+(no saved MCP server may start for a usage read) and `persistSession: false` (no session or transcript
+is left behind), so the only process it can create is the CLI itself. It does not walk Orca's own
+child close ladder (`claude-agent-sdk-process-spawn.ts` warns about kills outside it): the child is
+ended by `session.close()` and, failing that, the SDK's abort. With strict MCP config there is no
+grandchild to reap, which is what makes that acceptable here rather than in a chat session.
 
 **Cost of the probe, stated so it is not a surprise.** A warm start answers in ~0.3–0.5 s and spends
 no tokens; the 15-minute cadence is upstream's, not a new timer. It does write the account's
@@ -306,8 +323,10 @@ a captured 2.1.316 reply; `fork/claude-cli-usage-probe.test.ts` pins command/cwd
 and the "no payload is not a reading" rule; `fork/claude-active-usage-fetch-probe.test.ts` pins
 probe-first (the endpoint is never called), the open `Retry-After` (the endpoint is not called but the
 fetch still reports the wait), the WSL/`usageError`/opt-out cases; `fork/service-claude-usage-probe.test.ts`
-pins that a `Retry-After` no longer freezes a lane on activation _or_ on the timer. The upstream
-suites that described the endpoint-only platform (win32) now say so through
+pins that a `Retry-After` no longer freezes a lane on activation _or_ on the timer, and that the next
+fetch still receives the open wait (a user refresh receives `null`) — both plumbing hunks fail if
+dropped; `fork/claude-inactive-account-usage.test.ts` pins that a saved-account preview never probes.
+The upstream suites that described the endpoint-only platform (win32) now say so through
 `EndpointOnlyClaudeService`, which is the one behaviour split worth reading twice.
 
 ### `local(usage)`: Claude's spend cap is upstream's, Codex's stays ours

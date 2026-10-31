@@ -73,20 +73,26 @@ async function runUsageControlViaSdk(
   if (request.signal?.aborted) {
     deadline.abort()
   }
-  const session = query({
-    prompt: pendingSessionInput,
-    options: {
-      pathToClaudeCodeExecutable: request.command,
-      cwd: request.cwd,
-      env: request.env,
-      // Isolate the probe from a workspace's hooks, plugins and statusline.
-      settingSources: [],
-      permissionMode: 'plan',
-      spawnClaudeCodeProcess: spawner.spawn,
-      abortController: deadline
-    }
-  })
+  // Why: the session is created inside the guarded block so a failed start still clears the
+  // deadline and the cycle's abort listener.
+  let session: Query | null = null
   try {
+    session = query({
+      prompt: pendingSessionInput,
+      options: {
+        pathToClaudeCodeExecutable: request.command,
+        cwd: request.cwd,
+        env: request.env,
+        // Isolate the probe from a workspace's hooks, plugins and statusline.
+        settingSources: [],
+        // A probe must never start a saved MCP server, and it leaves no session behind.
+        strictMcpConfig: true,
+        persistSession: false,
+        permissionMode: 'plan',
+        spawnClaudeCodeProcess: spawner.spawn,
+        abortController: deadline
+      }
+    })
     const send = claudeQueryControlRequester(session)
     if (!send) {
       throw new ClaudeControlRequestError('get_usage', 'this Claude CLI exposes no control request')
@@ -100,8 +106,13 @@ async function runUsageControlViaSdk(
   } finally {
     clearTimeout(timer)
     request.signal?.removeEventListener('abort', forwardAbort)
-    // Why both: close() ends the session cleanly, abort() reaps a CLI that stopped reading stdin.
-    session.close()
+    // Why guarded: close() ends the session cleanly and abort() reaps a CLI that stopped reading
+    // stdin, and neither may replace a good reading by throwing out of the cleanup.
+    try {
+      session?.close()
+    } catch {
+      // A session that already died has nothing left to close.
+    }
     deadline.abort()
   }
 }
@@ -153,6 +164,17 @@ export async function probeClaudeUsage(
   }
 }
 
+// The mapping runs outside probeClaudeUsage's try, so an unforeseen payload shape must not escape
+// into the poll that would then lose its endpoint fallback.
+function mapClaudeCliUsageResponseSafely(response: unknown): ProviderRateLimits | null {
+  try {
+    return mapClaudeCliUsageResponse(response)
+  } catch (error) {
+    console.debug('[rate-limits] claude CLI usage payload was not readable:', error)
+    return null
+  }
+}
+
 /** Probe the CLI and map what it reports, or null when this account cannot be read that way. */
 export async function readClaudeUsageFromCli(
   input: { envPatch?: ClaudeEnvPatch; signal?: AbortSignal } = {},
@@ -165,7 +187,7 @@ export async function readClaudeUsageFromCli(
     }
     return null
   }
-  const mapped = mapClaudeCliUsageResponse(outcome.response)
+  const mapped = mapClaudeCliUsageResponseSafely(outcome.response)
   if (!mapped) {
     console.debug('[rate-limits] claude CLI usage probe reported no plan limits')
   }

@@ -57,10 +57,10 @@ function cliReading(usedPercent: number): ProviderRateLimits {
   }
 }
 
-function rateLimited(now = Date.now()): ProviderRateLimits {
+function rateLimited(retryAtMs = Date.now() + 60 * 60 * 1000): ProviderRateLimits {
   return {
     ...errorProvider('claude', 'Claude usage is rate limited right now.'),
-    usageMetadata: { failureKind: 'rate-limited', retryAtMs: now + 60 * 60 * 1000 }
+    usageMetadata: { failureKind: 'rate-limited', retryAtMs }
   }
 }
 
@@ -102,15 +102,17 @@ describe('Claude usage polling', () => {
     }
   })
 
-  it('asks the fetch for the probe and the open Retry-After together', async () => {
+  it('hands the open endpoint Retry-After to the next fetch instead of to the lane', async () => {
     vi.useFakeTimers()
     try {
+      const retryAtMs = Date.now() + 40 * 60 * 1000
       vi.mocked(fetchClaudeRateLimits)
-        .mockResolvedValueOnce(rateLimited())
+        .mockResolvedValueOnce(rateLimited(retryAtMs))
         .mockResolvedValue(cliReading(12))
 
       const service = new RateLimitService()
-      service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
+      const window = new FakeRateLimitWindow()
+      service.attach(asRateLimitWindow(window))
       service.start({ fetchImmediately: false })
       await vi.advanceTimersByTimeAsync(1000)
 
@@ -119,6 +121,38 @@ describe('Claude usage polling', () => {
           allowUsagePanelSupplement: true,
           usageEndpointRetryAtMs: null
         })
+      )
+
+      window.emit('focus')
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Why the second call: with the probe in play the fetch must still be told the wait is open,
+      // so a probe that cannot answer does not spend the request the endpoint refused.
+      expect(vi.mocked(fetchClaudeRateLimits).mock.calls[1]?.[0]).toEqual(
+        expect.objectContaining({ usageEndpointRetryAtMs: retryAtMs })
+      )
+
+      service.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clears that wait for a user refresh, the one call allowed to ask the endpoint', async () => {
+    vi.useFakeTimers()
+    try {
+      const retryAtMs = Date.now() + 40 * 60 * 1000
+      vi.mocked(fetchClaudeRateLimits)
+        .mockResolvedValueOnce(rateLimited(retryAtMs))
+        .mockResolvedValue(cliReading(12))
+
+      const service = new RateLimitService()
+      await service.refresh()
+      expect(service.getState().claude?.usageMetadata?.retryAtMs).toBe(retryAtMs)
+
+      await service.refresh()
+      expect(vi.mocked(fetchClaudeRateLimits).mock.calls[1]?.[0]).toEqual(
+        expect.objectContaining({ usageEndpointRetryAtMs: null })
       )
 
       service.stop()

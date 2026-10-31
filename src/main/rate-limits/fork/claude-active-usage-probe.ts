@@ -31,15 +31,21 @@ export async function readActiveClaudeUsageFromProbe(
     },
     deps
   )
-  return reading
-    ? {
-        ...reading,
-        usageMetadata: {
-          ...reading.usageMetadata,
-          authProvenance: authPreparation?.provenance ?? 'system'
-        }
-      }
-    : null
+  if (!reading) {
+    return null
+  }
+  // Why keep it: the endpoint's wait is still the endpoint's, and carrying it means a probe that
+  // fails inside that window cannot spend the request the endpoint asked Orca to hold.
+  const openRetryAtMs = options.usageEndpointRetryAtMs
+  const retryAtMs = openRetryAtMs && openRetryAtMs > Date.now() ? openRetryAtMs : null
+  return {
+    ...reading,
+    usageMetadata: {
+      ...reading.usageMetadata,
+      ...(retryAtMs ? { retryAtMs } : {}),
+      authProvenance: authPreparation?.provenance ?? 'system'
+    }
+  }
 }
 
 /**
@@ -53,7 +59,8 @@ export function claudeUsageEndpointGatedResult(
   return makeClaudeUsageResult('error', 'Claude usage is rate limited right now.', {
     ...metadata,
     failureKind: 'rate-limited',
-    attemptedSources: ['oauth'],
+    // The CLI is what this cycle tried; the endpoint was held by its own Retry-After.
+    attemptedSources: ['cli'],
     retryAtMs
   })
 }

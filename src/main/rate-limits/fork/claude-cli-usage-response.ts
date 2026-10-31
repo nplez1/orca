@@ -53,7 +53,8 @@ function timestamp(value: unknown): string | number | undefined {
 // Why: the CLI reports the per-model window twice (server `limits[]` and the SDK's `model_scoped`)
 // and older builds report only one, so both are read the way the OAuth reply is.
 function mapFableWeeklyWindow(rateLimits: CliRateLimits): RateLimitWindow | null {
-  for (const limit of rateLimits.limits ?? []) {
+  // Why guard: a malformed array must degrade to "no reading", never throw out of the poll.
+  for (const limit of Array.isArray(rateLimits.limits) ? rateLimits.limits : []) {
     const model = record(limit?.scope?.model)
     const used = percent(limit?.percent)
     if (
@@ -67,7 +68,7 @@ function mapFableWeeklyWindow(rateLimits: CliRateLimits): RateLimitWindow | null
       )
     }
   }
-  for (const scoped of rateLimits.model_scoped ?? []) {
+  for (const scoped of Array.isArray(rateLimits.model_scoped) ? rateLimits.model_scoped : []) {
     const used = percent(scoped?.utilization)
     if (used !== null && text(scoped?.display_name)?.toLowerCase() === FABLE_MODEL_NAME) {
       return mapClaudeUsageWindow(

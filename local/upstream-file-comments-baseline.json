@@ -3,7 +3,7 @@
   "base": "a9039850822850cd0e00ce805ffb394bed6d1762",
   "perFileThreshold": 5,
   "accepted": "local(usage): the CLI usage probe inverts the endpoint Retry-After contract, so four lines name which suite pins the win32 endpoint-only pacing and why inactive previews never probe; without them the next reader restores the freeze.",
-  "total": 6014,
+  "total": 6013,
   "files": {
     ".github/workflows/e2e.yml": 13,
     ".github/workflows/pr.yml": 7,
