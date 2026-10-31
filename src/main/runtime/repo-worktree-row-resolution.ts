@@ -30,6 +30,7 @@ import { pruneLineageForMissingRepoWorktrees } from '../worktree-lineage-pruning
 import { getRepoOwnedWorktreeMeta } from '../worktree-metadata-ownership'
 import { resolveLocalProjectRuntimesForRepos } from '../project-runtime-git-options'
 import type { RuntimeWorktreeScanResult } from './repo-worktree-resolution-scan'
+import { reconcileListedWorktreeCaseSplits } from './worktree-case-split-reconciliation'
 
 type RepoWorktreeRowStore = Pick<
   RuntimeStore,
@@ -45,7 +46,8 @@ type RepoWorktreeRowStore = Pick<
   | 'getAllWorktreeLineage'
   | 'getAllWorkspaceLineage'
   | 'removeWorktreeLineage'
->
+> &
+  Partial<Pick<RuntimeStore, 'removeWorktreeMeta' | 'getWorkspaceSession' | 'setWorkspaceSession'>>
 
 /** Bound each repo independently for mobile startup; fingerprint probes derive their smaller budget from this shared constant. */
 export const RESOLVED_WORKTREE_REPO_TIMEOUT_MS = 5000
@@ -126,6 +128,7 @@ export async function scanRepoWorktreeRows(
   const gitWorktrees = preserveFolderUpgradeWorktreePath(repo, scan.worktrees)
   if (scan.ok) {
     pruneLineageForMissingRepoWorktrees(store, repo, gitWorktrees)
+    await reconcileListedWorktreeCaseSplits(store, repo, gitWorktrees)
   }
   return { ok: scan.ok, worktrees: gitWorktrees }
 }
