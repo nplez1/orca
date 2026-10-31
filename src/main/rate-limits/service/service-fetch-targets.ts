@@ -268,6 +268,9 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
   }
 
   protected resolveZcodePlanConfig(): ZcodePlanResolvedConfig {
+    if (this.isUsageProviderDisabled('zcode')) {
+      return { config: { site: 'zai', apiKey: '' }, error: null }
+    }
     try {
       return {
         config: this.zcodePlanConfigResolver?.() ?? { site: 'zai', apiKey: '' },

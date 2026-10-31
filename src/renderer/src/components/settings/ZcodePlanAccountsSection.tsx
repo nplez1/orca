@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import { isWebClientLocation } from '@/lib/web-client-location'
-import { ExternalLink, Loader2, Lock, LockOpen, RefreshCw, ShieldCheck } from 'lucide-react'
-import { AgentIcon } from '@/lib/agent-catalog'
+import { Loader2, Lock, LockOpen, RefreshCw, ShieldCheck } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import {
-  ZCODE_PLAN_SITE_CONSOLE_URLS,
-  type ZcodePlanSite
-} from '../../../../shared/zcode-plan-sites'
+import type { ZcodePlanSite } from '../../../../shared/zcode-plan-sites'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '../../store'
 import { useNow } from '../../hooks/use-now'
@@ -51,6 +47,18 @@ function siteLabel(site: ZcodePlanSite): string {
   return translate('auto.components.settings.ZcodePlanAccountsSection.site.zai', 'Z.AI (z.ai)')
 }
 
+/** The plan site whose console the header links to; a saved site wins, and only the
+ *  local desktop may assume Z.AI for a plan with nothing saved yet. */
+export function resolveZcodePlanSite(
+  usageSettings: UsageHostSettingsModel,
+  host: UsageCredentialHost
+): ZcodePlanSite | undefined {
+  return (
+    usageSettings.settings?.zcodePlanSite ??
+    (!isWebClientLocation() && host.label === null ? 'zai' : undefined)
+  )
+}
+
 export function ZcodePlanAccountsSection({
   host,
   usageSettings
@@ -71,14 +79,12 @@ export function ZcodePlanAccountsSection({
   const webClient = isWebClientLocation()
   const credentialEditable = !webClient && access === 'ready'
   const accessNotice = usageCredentialAccessNotice(host, access)
-  const site =
-    usageSettings.settings?.zcodePlanSite ?? (!webClient && hostLabel === null ? 'zai' : undefined)
+  const site = resolveZcodePlanSite(usageSettings, host)
   const siteEditable = credentialEditable && usageSettings.settings !== null
   const unreadableNotice = usageCredentialUnreadableNotice(host, status?.apiKeyUnreadable)
   const keyEditable =
     credentialEditable && !usageCredentialSealedElsewhere(host, status?.apiKeyUnreadable)
   const detailsUnavailable = webClient || status?.detailsUnavailable === true
-  const consoleUrl = site ? ZCODE_PLAN_SITE_CONSOLE_URLS[site] : undefined
   const apiKeyConfigured = status?.apiKeyConfigured === true
 
   const handleSiteChange = (value: string): void => {
@@ -103,39 +109,7 @@ export function ZcodePlanAccountsSection({
   const staleUsageError = usage?.status === 'error' ? (usage.error ?? null) : null
 
   return (
-    <section id="accounts-zcode" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <AgentIcon agent="zcode" size={16} />
-            {translate(
-              'auto.components.settings.ZcodePlanAccountsSection.title',
-              'GLM Coding Plan'
-            )}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.ZcodePlanAccountsSection.subtitle',
-              'Track Z.AI or Zhipu (BigModel) GLM Coding Plan usage in the status bar. Save the plan API key here — no ZCode CLI setup needed.'
-            )}
-          </p>
-        </div>
-        {consoleUrl ? (
-          <a
-            href={consoleUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            {translate(
-              'auto.components.settings.ZcodePlanAccountsSection.consoleLink',
-              'Get API key'
-            )}
-            <ExternalLink className="size-3" />
-          </a>
-        ) : null}
-      </div>
-
+    <>
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
@@ -405,6 +379,6 @@ export function ZcodePlanAccountsSection({
           </div>
         </SearchableSetting>
       ) : null}
-    </section>
+    </>
   )
 }

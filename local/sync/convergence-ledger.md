@@ -1541,16 +1541,19 @@ pane shows. The fork's model-driven half is **deleted** — `accounts-pane-minim
 `accounts-pane-credential-sections.ts` (which now serves DeepSeek, Fireworks and Copilot only).
 `miniMaxRateLimits` stays on `AccountsPaneSectionModel` because the component takes it as a prop.
 
-The fork's **per-provider enable switch** (`gateUsageProvider`) has no upstream equivalent and wraps
-upstream's _component_ sections as well as the model-driven ones — MiniMax, Grok and Cursor. Zcode
-stays ungated: it has no Settings switch to turn off.
+The fork's **per-provider enable switch** has no upstream equivalent. It is registry-driven since
+2026-10-31: `provider-accounts-sections.tsx` lists every provider once (id, icon, title, description,
+search entries, body renderer) and `ProviderAccountsSection.tsx` renders that entry's header with the
+switch leading the row, so a provider cannot reach the pane without one. `kimi`, `antigravity` and
+`zcode` joined `USAGE_PROVIDER_IDS`, and main's cycle gates all three.
 
 **Why:** upstream's component is the newer design and is strictly better at the host question (a
 paired host's credential lives on that host). Duplicating it as a model section would mean two
 surfaces writing one credential, which this ledger already forbids elsewhere.
 
-**Do not:** re-add a MiniMax model section, or add a gated section without `gateUsageProvider` — the
-`AccountsPane.test.tsx` enable-switch and switched-off-notice cases pin both.
+**Do not:** re-add a MiniMax model section, or render a provider section outside
+`PROVIDER_ACCOUNTS_SECTIONS` — `provider-accounts-sections.test.ts` holds the registry against
+`USAGE_PROVIDER_IDS`, and `AccountsPane.test.tsx` pins the per-provider switch and off notice.
 
 ### The new-tab focus handoff: the fork's hook carries upstream's synchronous chat focus
 

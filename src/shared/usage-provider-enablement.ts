@@ -1,3 +1,5 @@
+import type { ProviderRateLimits } from './rate-limit-types'
+
 /**
  * Which usage providers the user switched off.
  *
@@ -7,23 +9,34 @@
  * enabled set — keeps "enabled" the default for every provider a profile predates.
  *
  * Provider ids match `ProviderRateLimits['provider']` so the set can be handed
- * straight to the rate-limit service. `kimi` and `antigravity` are deliberately
- * absent: they have no provider section in Settings and no standalone switch.
+ * straight to the rate-limit service. Every provider the status bar can meter is
+ * listed here and every entry has a switch in Settings' AI Provider Accounts;
+ * `provider-accounts-sections.test.ts` holds the two in step.
  */
 export const USAGE_PROVIDER_IDS = [
   'claude',
   'codex',
   'gemini',
+  'antigravity',
   'opencode-go',
+  'kimi',
   'minimax',
   'deepseek',
   'fireworks',
   'copilot',
   'grok',
-  'cursor'
+  'cursor',
+  'zcode'
 ] as const
 
 export type DisableableUsageProviderId = (typeof USAGE_PROVIDER_IDS)[number]
+
+// Why: a metered provider missing from this list would ship with a status-bar meter and
+// no way to switch it off — the shape of the bug this set exists to prevent.
+type MissingSwitchableProvider = Exclude<ProviderRateLimits['provider'], DisableableUsageProviderId>
+const everyMeteredProviderIsSwitchable: [MissingSwitchableProvider] extends [never] ? true : never =
+  true
+void everyMeteredProviderIsSwitchable
 
 const USAGE_PROVIDER_ID_SET: ReadonlySet<string> = new Set(USAGE_PROVIDER_IDS)
 

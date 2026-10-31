@@ -1,10 +1,9 @@
-import { ExternalLink, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import { Label } from '../ui/label'
-import { MiniMaxIcon } from '../status-bar/icons'
 import { SearchableSetting } from './SearchableSetting'
 import { DebouncedSettingsTextInput } from './DebouncedSettingsTextInput'
 import { MiniMaxCredentials, miniMaxStorageHelp } from './accounts-pane-minimax-credentials'
@@ -15,7 +14,14 @@ import {
   usageCredentialStoredLabel,
   type UsageCredentialHost
 } from './usage-credential-host'
-import type { UsageHostSettingsModel } from './use-usage-host-settings'
+import type { UsageHostSettings, UsageHostSettingsModel } from './use-usage-host-settings'
+
+/** MiniMax runs two consoles; the saved endpoint picks which one a key is created in. */
+export function getMiniMaxConsoleUrl(settings: UsageHostSettings | null): string {
+  return settings?.minimaxEndpoint === 'cn'
+    ? 'https://platform.minimaxi.com/console/usage'
+    : 'https://platform.minimax.io/console/usage'
+}
 
 export function MiniMaxAccountsSection({
   host,
@@ -32,10 +38,7 @@ export function MiniMaxAccountsSection({
   const credentials = useMiniMaxCredentials(host.owner)
   const { miniMaxConfigured, miniMaxApiKeyConfigured, miniMaxCredentialBusy } = credentials
   const settings = usageSettings.settings
-  const consoleUrl =
-    settings?.minimaxEndpoint === 'cn'
-      ? 'https://platform.minimaxi.com/console/usage'
-      : 'https://platform.minimax.io/console/usage'
+  const consoleUrl = getMiniMaxConsoleUrl(settings)
   const configured = miniMaxConfigured || miniMaxApiKeyConfigured
   const accessNotice = usageCredentialAccessNotice(host, credentials.access)
   const settingsUnavailable = settings === null
@@ -47,31 +50,7 @@ export function MiniMaxAccountsSection({
     void usageSettings.update({ minimaxEndpoint: value })
   }
   return (
-    <section id="accounts-minimax" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <MiniMaxIcon size={16} />
-            {translate('auto.components.settings.AccountsPane.5d63bbfbec', 'MiniMax')}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.AccountsPane.usageTracking',
-              'Configure MiniMax usage tracking for your account.'
-            )}
-          </p>
-        </div>
-        <a
-          href={consoleUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {translate('auto.components.settings.AccountsPane.0d8e77bc40', 'Open console')}
-          <ExternalLink className="size-3" />
-        </a>
-      </div>
-
+    <>
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
@@ -217,6 +196,6 @@ export function MiniMaxAccountsSection({
           />
         </SearchableSetting>
       </div>
-    </section>
+    </>
   )
 }

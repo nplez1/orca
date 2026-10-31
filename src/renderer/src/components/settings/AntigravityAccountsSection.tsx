@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import { AgentIcon } from '@/lib/agent-catalog'
 import { callAntigravityAccounts } from '@/runtime/runtime-antigravity-accounts-client'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { useManagedRuntimeInstall } from '@/runtime/use-managed-runtime-install'
@@ -147,18 +146,7 @@ export function AntigravityAccountsSection({
   }
 
   return (
-    <section id="accounts-antigravity" className="space-y-4 scroll-mt-6">
-      <div className="space-y-1">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <AgentIcon agent="antigravity" size={16} />
-          {translate('accounts.antigravity.title', 'Antigravity')}
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {translate('accounts.antigravity.scope', 'Manage the native agy account on {{host}}.', {
-            host: label
-          })}
-        </p>
-      </div>
+    <>
       <p className="text-xs text-muted-foreground">
         {translate(
           'accounts.antigravity.signIn',
@@ -331,6 +319,6 @@ export function AntigravityAccountsSection({
           />
         </div>
       ) : null}
-    </section>
+    </>
   )
 }

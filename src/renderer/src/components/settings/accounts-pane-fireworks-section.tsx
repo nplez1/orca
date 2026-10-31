@@ -1,6 +1,5 @@
-import { ExternalLink, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
+import { Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FireworksIcon } from '../status-bar/fork-usage-providers'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -8,8 +7,6 @@ import { Label } from '../ui/label'
 import { SearchableSetting } from './SearchableSetting'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import { translate } from '@/i18n/i18n'
-
-const FIREWORKS_CONSOLE_URL = 'https://app.fireworks.ai/settings/users/api-keys'
 
 export function renderFireworksAccountsSection(model: AccountsPaneSectionModel): React.JSX.Element {
   const {
@@ -23,37 +20,7 @@ export function renderFireworksAccountsSection(model: AccountsPaneSectionModel):
     clearFireworksCredentials
   } = model
   return (
-    <section key="fireworks" id="accounts-fireworks" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <FireworksIcon size={16} />
-            {translate(
-              'auto.components.settings.accounts.pane.fireworks.section.51bcc16ae3',
-              'Fireworks.ai'
-            )}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.accounts.pane.fireworks.section.5f31aaba69',
-              'Configure Fireworks.ai usage tracking for your account.'
-            )}
-          </p>
-        </div>
-        <a
-          href={FIREWORKS_CONSOLE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {translate(
-            'auto.components.settings.accounts.pane.fireworks.section.d8c675f9f0',
-            'Open console'
-          )}
-          <ExternalLink className="size-3" />
-        </a>
-      </div>
-
+    <>
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
@@ -221,6 +188,6 @@ export function renderFireworksAccountsSection(model: AccountsPaneSectionModel):
           )}
         </p>
       </SearchableSetting>
-    </section>
+    </>
   )
 }

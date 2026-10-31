@@ -12,6 +12,7 @@ import { useAppStore } from '../../store'
 import { AccountsPane } from './AccountsPane'
 import { resolveSettingsHostScope } from './settings-host-scope'
 import { renderClaudeAccountsSection } from './accounts-pane-claude-section'
+import { getProviderAccountsSections } from './provider-accounts-sections'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 
 function renderPane(
@@ -234,22 +235,14 @@ describe('AccountsPane', () => {
   it('renders a per-provider enable switch for every provider section', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 
-    for (const provider of [
-      'Claude',
-      'Codex',
-      // The switch label key follows the source copy ("Gemini"); the fork's
-      // "Gemini CLI (legacy)" heading lives on its own key (aa4de4475b).
-      'Gemini',
-      'OpenCode Go',
-      'MiniMax',
-      'DeepSeek',
-      'Fireworks.ai',
-      'GitHub Copilot',
-      'Grok (xAI)',
-      'Cursor'
-    ]) {
-      expect(markup).toContain(`aria-label="Let Orca query ${provider}"`)
+    const providers = getProviderAccountsSections()
+    for (const provider of providers) {
+      expect(markup).toContain(`id="accounts-${provider.id}"`)
+      expect(markup).toContain(`id="usage-provider-enabled-${provider.id}"`)
+      expect(markup).toContain(`aria-label="Let Orca query ${provider.title}"`)
     }
+    // Provider switches only: Gemini's legacy-OAuth toggle is a body switch, not a header one.
+    expect(markup.match(/id="usage-provider-enabled-/g)).toHaveLength(providers.length)
   })
 
   it('suppresses a switched-off provider and shows the off notice', () => {
@@ -259,10 +252,13 @@ describe('AccountsPane', () => {
     })
 
     expect(markup).toContain('Cursor is off.')
-    expect(markup).toContain('Gemini is off.')
+    expect(markup).toContain('Gemini CLI (legacy) is off.')
     // The provider's own controls are gone while it is switched off.
     expect(markup).not.toContain('No Cursor sign-in found on this computer')
     expect(markup).not.toContain('Use Gemini CLI credentials')
+    // The header survives the switch-off, so the provider stays findable and re-enableable.
+    expect(markup).toContain('id="accounts-cursor"')
+    expect(markup).toContain('id="usage-provider-enabled-cursor"')
     // A provider left enabled keeps its controls.
     expect(markup).toContain('id="accounts-copilot"')
   })

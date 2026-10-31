@@ -14,22 +14,7 @@ import {
   getProviderAccountsOwnerKey,
   watchProviderAccounts
 } from '@/runtime/runtime-provider-accounts-client'
-import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
-import {
-  getAccountsCodexSearchEntries,
-  getAccountsCopilotSearchEntries,
-  getAccountsDeepSeekSearchEntries,
-  getAccountsFireworksSearchEntries,
-  getAccountsGeminiSearchEntries,
-  getAccountsCursorSearchEntries,
-  getAccountsGrokSearchEntries,
-  getAccountsAntigravitySearchEntries,
-  getAccountsLocationSearchEntries,
-  getAccountsMiniMaxSearchEntries,
-  getAccountsOpencodeSearchEntries,
-  getAccountsPaneSearchEntries,
-  getAccountsZcodePlanSearchEntries
-} from './accounts-search'
+import { getAccountsLocationSearchEntries, getAccountsPaneSearchEntries } from './accounts-search'
 import { getRemoteAccountsPaneScope } from './provider-account-scope'
 import { ProviderHostScopeControl } from './ProviderHostScopeControl'
 import { SettingsSectionStack } from './SettingsSectionStack'
@@ -41,13 +26,14 @@ import {
   providerAccountIsActiveInView,
   providerAccountMatchesView
 } from './provider-account-visibility'
-import { useUsageProviderGating } from './accounts-pane-usage-gating'
-import { GrokAccountsSection } from './GrokAccountsSection'
-import { AntigravityAccountsSection } from './AntigravityAccountsSection'
+import { useUsageProviderEnablement } from './use-usage-provider-enablement'
+import {
+  getProviderAccountsSections,
+  type ProviderAccountsSectionContext
+} from './provider-accounts-sections'
+import { ProviderAccountsSection } from './ProviderAccountsSection'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
-import { CursorAccountsSection } from './CursorAccountsSection'
-import { ZcodePlanAccountsSection } from './ZcodePlanAccountsSection'
 import type {
   AccountsPaneProps,
   AccountsPaneSectionModel,
@@ -66,18 +52,8 @@ import {
   createCodexAccountActionRunner
 } from './accounts-pane-account-actions'
 import { renderAccountsLocationSection } from './accounts-pane-location-section'
-import { renderClaudeAccountsSection } from './accounts-pane-claude-section'
-import { renderCodexAccountsSection } from './accounts-pane-codex-section'
-import {
-  renderGeminiAccountsSection,
-  renderOpenCodeAccountsSection
-} from './accounts-pane-provider-setting-sections'
-import { MiniMaxAccountsSection } from './MiniMaxAccountsSection'
 import { useUsageHostSettings } from './use-usage-host-settings'
 import { ManagedDataAccountsSection } from './ManagedDataAccountsSection'
-import { renderDeepSeekAccountsSection } from './accounts-pane-deepseek-section'
-import { renderFireworksAccountsSection } from './accounts-pane-fireworks-section'
-import { renderCopilotAccountsSection } from './accounts-pane-copilot-section'
 import { useAccountsPaneCredentialSections } from './accounts-pane-credential-sections'
 import { renderAccountsRemovalDialogs } from './accounts-pane-removal-dialogs'
 
@@ -335,11 +311,20 @@ export function AccountsPane({
     ...credentialSections.fireworks,
     ...credentialSections.copilot
   }
-  const { gateUsageProvider } = useUsageProviderGating({
+  const setUsageProviderEnabled = useUsageProviderEnablement({
     disabledUsageProviders: settings.disabledUsageProviders ?? [],
     updateSettings,
     recordFeatureInteraction
   })
+  const disabledUsageProviders = settings.disabledUsageProviders ?? []
+  const providerContext: ProviderAccountsSectionContext = {
+    model,
+    accountOwner,
+    accountOwnerKey,
+    accountOwnerPlatform,
+    usageCredentialHost,
+    usageHostSettings
+  }
   const visibleSections = [
     !searchQuery || /opencode|devin|account/i.test(searchQuery) ? (
       <div key={accountOwnerKey} className="space-y-8">
@@ -353,61 +338,26 @@ export function AccountsPane({
     matchesSettingsSearch(searchQuery, getAccountsLocationSearchEntries())
       ? renderAccountsLocationSection(model)
       : null,
-    matchesSettingsSearch(searchQuery, getAccountsClaudeSearchEntries())
-      ? gateUsageProvider('claude', renderClaudeAccountsSection(model))
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsCodexSearchEntries())
-      ? gateUsageProvider('codex', renderCodexAccountsSection(model))
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsGeminiSearchEntries())
-      ? gateUsageProvider('gemini', renderGeminiAccountsSection(model))
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsAntigravitySearchEntries()) ? (
-      <AntigravityAccountsSection
-        key={`antigravity:${accountOwnerKey}:${accountRuntime.runtime}:${accountRuntime.wslDistro ?? ''}`}
-        owner={accountOwner}
-        target={{ runtime: accountRuntime.runtime, wslDistro: accountRuntime.wslDistro }}
-        label={accountRuntimeSentenceLabel}
-        ownerPlatform={accountOwnerPlatform}
-      />
-    ) : null,
-    matchesSettingsSearch(searchQuery, getAccountsOpencodeSearchEntries())
-      ? gateUsageProvider('opencode-go', renderOpenCodeAccountsSection(model))
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsMiniMaxSearchEntries())
-      ? gateUsageProvider(
-          'minimax',
-          <MiniMaxAccountsSection
-            key={`minimax:${accountOwnerKey}`}
-            host={usageCredentialHost}
-            usageSettings={usageHostSettings}
-            miniMaxRateLimits={isRemoteAccountScope ? null : miniMaxRateLimits}
-            recordFeatureInteraction={recordFeatureInteraction}
-          />
-        )
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsDeepSeekSearchEntries())
-      ? gateUsageProvider('deepseek', renderDeepSeekAccountsSection(model))
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsFireworksSearchEntries())
-      ? gateUsageProvider('fireworks', renderFireworksAccountsSection(model))
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsCopilotSearchEntries())
-      ? gateUsageProvider('copilot', renderCopilotAccountsSection(model))
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsGrokSearchEntries())
-      ? gateUsageProvider('grok', <GrokAccountsSection key="grok" />)
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsCursorSearchEntries())
-      ? gateUsageProvider('cursor', <CursorAccountsSection key="cursor" />)
-      : null,
-    matchesSettingsSearch(searchQuery, getAccountsZcodePlanSearchEntries()) ? (
-      <ZcodePlanAccountsSection
-        key={`zcode:${accountOwnerKey}`}
-        host={usageCredentialHost}
-        usageSettings={usageHostSettings}
-      />
-    ) : null
+    ...getProviderAccountsSections().map((provider) =>
+      matchesSettingsSearch(searchQuery, provider.searchEntries()) ? (
+        <ProviderAccountsSection
+          key={provider.id}
+          providerId={provider.id}
+          title={provider.title}
+          description={
+            typeof provider.description === 'function'
+              ? provider.description(providerContext)
+              : provider.description
+          }
+          Icon={provider.Icon}
+          headerAction={provider.headerAction?.(providerContext)}
+          enabled={!disabledUsageProviders.includes(provider.id)}
+          onEnabledChange={(enabled) => setUsageProviderEnabled(provider.id, enabled)}
+        >
+          {provider.renderBody?.(providerContext)}
+        </ProviderAccountsSection>
+      ) : null
+    )
   ].filter(Boolean)
 
   return (

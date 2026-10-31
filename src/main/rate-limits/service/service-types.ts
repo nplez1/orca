@@ -133,13 +133,16 @@ export const USAGE_PROVIDER_STATE_KEYS: Record<
   claude: 'claude',
   codex: 'codex',
   gemini: 'gemini',
+  antigravity: 'antigravity',
   'opencode-go': 'opencodeGo',
+  kimi: 'kimi',
   minimax: 'minimax',
   deepseek: 'deepseek',
   fireworks: 'fireworks',
   copilot: 'copilot',
   grok: 'grok',
-  cursor: 'cursor'
+  cursor: 'cursor',
+  zcode: 'zcode'
 }
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {

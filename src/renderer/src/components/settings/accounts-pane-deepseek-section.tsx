@@ -1,6 +1,5 @@
-import { ExternalLink, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
+import { Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DeepSeekIcon } from '../status-bar/fork-usage-providers'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -8,8 +7,6 @@ import { Label } from '../ui/label'
 import { SearchableSetting } from './SearchableSetting'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import { translate } from '@/i18n/i18n'
-
-const DEEPSEEK_CONSOLE_URL = 'https://platform.deepseek.com/usage'
 
 export function renderDeepSeekAccountsSection(model: AccountsPaneSectionModel): React.JSX.Element {
   const {
@@ -21,37 +18,7 @@ export function renderDeepSeekAccountsSection(model: AccountsPaneSectionModel): 
     clearDeepSeekApiKey
   } = model
   return (
-    <section key="deepseek" id="accounts-deepseek" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <DeepSeekIcon size={16} />
-            {translate(
-              'auto.components.settings.accounts.pane.deepseek.section.28c8b91c5d',
-              'DeepSeek'
-            )}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.accounts.pane.deepseek.section.53ce175669',
-              'Configure DeepSeek usage tracking for your account.'
-            )}
-          </p>
-        </div>
-        <a
-          href={DEEPSEEK_CONSOLE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {translate(
-            'auto.components.settings.accounts.pane.deepseek.section.47e631f32d',
-            'Open console'
-          )}
-          <ExternalLink className="size-3" />
-        </a>
-      </div>
-
+    <>
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
@@ -177,6 +144,6 @@ export function renderDeepSeekAccountsSection(model: AccountsPaneSectionModel): 
           )}
         </p>
       </SearchableSetting>
-    </section>
+    </>
   )
 }
