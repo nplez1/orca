@@ -198,10 +198,11 @@ export function chooseExistingDirectoryName(
   return foldedMatches === 1 && foldedMatch ? foldedMatch : name
 }
 
-/** `\\\\wsl.localhost\\…` and `\\\\server\\share` are other machines' (or other filesystems') folders. */
+/** `\\\\wsl.localhost\\…`, `//wsl.localhost/…` and `\\\\server\\share` are other filesystems' folders. */
 function isLocalAbsoluteDirectory(targetPath: string): boolean {
+  // Both separators: this repo stores normalized forward-slash forms of UNC paths too.
   return isWindowsAbsolutePathLike(targetPath)
-    ? !targetPath.startsWith('\\\\')
+    ? !/^[\\/]{2}/.test(targetPath)
     : posix.isAbsolute(targetPath)
 }
 

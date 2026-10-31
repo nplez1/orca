@@ -76,7 +76,18 @@ function getProjectGitRemoteIdentity(
     typeof identity?.canonicalKey === 'string' ? identity.canonicalKey.trim() : ''
   const remoteName = typeof identity?.remoteName === 'string' ? identity.remoteName.trim() : ''
   const remoteUrl = typeof identity?.remoteUrl === 'string' ? identity.remoteUrl.trim() : ''
-  return canonicalKey && remoteName && remoteUrl ? { canonicalKey, remoteName, remoteUrl } : null
+  if (!canonicalKey || !remoteName || !remoteUrl) {
+    return null
+  }
+  // Carry every remote: a fork's own repository is not the primary one, and a reader here that
+  // lost it would refuse that fork's issues the same way the pre-fix link check did.
+  const remoteKeys = identity?.remoteKeys?.filter((key) => key.length > 0)
+  return {
+    canonicalKey,
+    remoteName,
+    remoteUrl,
+    ...(remoteKeys && remoteKeys.length > 0 ? { remoteKeys } : {})
+  }
 }
 
 /** Limit gh setup prompts to GitHub-backed projects proven by remote, explicit upstream or generated GitHub avatar. */
