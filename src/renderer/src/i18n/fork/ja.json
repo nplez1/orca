@@ -24,7 +24,78 @@
         "ShortcutsPane": {
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
-        "sshHostServer": {}
+        "sshHostServer": {},
+        "ExperimentalPane": {
+          "agentDashboard": {
+            "modeLabel": null,
+            "modeCopy": null,
+            "modeAriaLabel": null,
+            "modeInWindow": null,
+            "modePopout": null
+          }
+        },
+        "experimental": {
+          "search": {
+            "agentDashboard": {
+              "popout": null
+            }
+          }
+        }
+      },
+      "GitHubItemDialog": {
+        "e463ec935f": null,
+        "ddafe851e1": null
+      },
+      "PullRequestPage": {
+        "18f2af42ac": null,
+        "5963a6a852": null
+      },
+      "status": {
+        "bar": {
+          "ResourceUsageStatusSegment": {
+            "288a4dd177": null
+          }
+        }
+      },
+      "stats": {
+        "share": {
+          "card": {
+            "utils": {
+              "19f4b4dc75": null
+            }
+          }
+        }
+      },
+      "right": {
+        "sidebar": {
+          "ChecksPanel": {
+            "f273f2271c": null,
+            "aa95b81a3a": null,
+            "430f1a62d4": null
+          }
+        }
+      },
+      "onboarding": {
+        "OnboardingFlow": {
+          "a249f81538": null
+        }
+      },
+      "mobile": {
+        "slides": {
+          "HomeSlide": {
+            "5d94e8ddcc": null
+          }
+        }
+      },
+      "crash": {
+        "report": {
+          "CrashReportDialog": {
+            "835037edc9": null
+          }
+        }
+      },
+      "taskPageJiraBoard": {
+        "changeStatusFailed": null
       }
     },
     "hooks": {
@@ -54,6 +125,32 @@
           "e50495aae6": null
         }
       }
+    },
+    "App": {
+      "5096cbbc86": null
+    }
+  },
+  "tray": {
+    "activityWaiting": null
+  },
+  "components": {
+    "JiraIssueWorkspace": {
+      "pendingChange": null
+    }
+  },
+  "dashboardPopout": {
+    "recoverableError": {
+      "title": null,
+      "description": null
+    }
+  },
+  "jira": {
+    "workspace": {
+      "openFailed": null
+    },
+    "transitions": {
+      "completeInJira": null,
+      "unsupported": null
     }
   }
 }

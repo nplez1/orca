@@ -547,6 +547,7 @@
     "minimizeNotice": {
       "body": "Orca sigue ejecutándose en la bandeja del sistema"
     },
+    "activityWaiting": "Orca: actividad en espera",
     "activityWaitingSuffix": "activity waiting"
   },
   "worktreeJumpPalette": {
@@ -630,6 +631,7 @@
       "df1d56bf87": "La vista del espacio de trabajo tuvo un error.",
       "9e0b441a91": "Alternar barra lateral derecha",
       "e81217c1b7": "Ocultar nombre de la aplicación",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "Menú de aplicaciones",
       "caea5b51b9": "Reiniciar ahora",
       "0a9e810705": "Hasta que reinicies, los cambios no se guardarán. Tus pestañas anteriores siguen guardadas en disco.",
@@ -1651,6 +1653,8 @@
         "28986b3747": "Se inició un agente de IA para los checks fallidos.",
         "1690fd7f4a": "No hay checks fallidos que arreglar.",
         "9e7c221b8d": "No se pudieron volver a ejecutar los checks",
+        "e463ec935f": "Se solicitó volver a ejecutar los checks",
+        "ddafe851e1": "Se solicitó volver a ejecutar el check",
         "0bbdc673c1": "No se pudieron actualizar los checks",
         "e7007aa1d8": "No se pueden actualizar los checks sin una ruta al repositorio.",
         "675bc0d638": "Cancelar",
@@ -2155,6 +2159,8 @@
         "98583589c6": "No se pudo iniciar un agente de IA para los checks fallidos: {{value0}}",
         "51c65c0265": "No hay checks fallidos que arreglar.",
         "788a782bb0": "No se pudieron volver a ejecutar los checks",
+        "18f2af42ac": "Se solicitó volver a ejecutar los checks",
+        "5963a6a852": "Se solicitó volver a ejecutar el check",
         "246b2c6456": "No se pudieron actualizar los checks",
         "c057f2fcb0": "No se pueden actualizar los checks sin una ruta al repositorio.",
         "6591b1fa82": "Cancelar",
@@ -3983,6 +3989,7 @@
             "bbcd9b7b85": "Contraer espacio de trabajo",
             "c4a8968bdd": "Expandir espacio de trabajo",
             "b10695d6ce": "Terminar sesión",
+            "288a4dd177": "Orca",
             "53dd5560ae": "Contraer Orca",
             "e419d27083": "Expandir Orca",
             "41ae4fa725": "Terminando…",
@@ -4744,6 +4751,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "salida",
               "5d66fdd7c2": "entrada",
               "7080aeaebb": "Razonamiento",
@@ -7543,7 +7551,12 @@
             "title": "Panel de agentes",
             "description": "Tablero Kanban para monitorear agentes en diferentes worktrees, en ventana o como ventana emergente.",
             "copy": "Agrega una entrada del Panel de agentes a la barra lateral izquierda. Monitorea agentes que requieren tu atención, están trabajando o han terminado, con agentes inactivos opcionales.",
-            "toggleLabel": "Alternar Panel de agentes"
+            "toggleLabel": "Alternar Panel de agentes",
+            "modeLabel": "Abrir como",
+            "modeCopy": "Muestra el tablero como un panel en ventana junto a la barra lateral o como una ventana emergente separada.",
+            "modeAriaLabel": "Modo de apertura del Panel de agentes",
+            "modeInWindow": "En ventana",
+            "modePopout": "Ventana emergente"
           },
           "browserExtensions": {
             "copy": "Añade Ajustes › Navegador › Extensiones para los perfiles de navegador locales.",
@@ -9717,6 +9730,7 @@
               "dashboard": "panel",
               "agent": "agente",
               "kanban": "Kanban",
+              "popout": "ventana emergente",
               "board": "junta",
               "inWindow": "en la ventana",
               "worktrees": "árboles de trabajo"
@@ -12997,6 +13011,8 @@
             "f316a8ca2b": "No hay comentarios sin resolver seleccionados.",
             "d00ebdc402": "Resolver comentarios de {{value0}} con IA",
             "5eb2163b6b": "Revisa el prompt antes de iniciar un agente. Una vez entregado el prompt, Orca resuelve los hilos seleccionados en el host y responde a los comentarios que no puede resolver.",
+            "f273f2271c": "Agente iniciado. Marcados como resueltos: {{value0}}; respondidos: {{value1}}; omitidos: {{value2}}; con error: {{value3}}.{{value4}}",
+            "aa95b81a3a": "Agente iniciado. Marcados como resueltos: {{value0}}; respondidos: {{value1}}; omitidos: {{value2}}; con error: {{value3}}.",
             "495b2f8c4b": "Agente iniciado, pero no se pudieron resolver ni responder los comentarios seleccionados.",
             "review": {
               "auto_retry": "Orca reintentará a las {{time}}.",
@@ -13008,6 +13024,7 @@
               "branch": "Sync Branch"
             },
             "7e4b2a19c0": "No se pudo resolver el PR de GitHub para responder.",
+            "430f1a62d4": "No se pudo resolver el hilo seleccionado en el host.",
             "updateReactionFailed": "No se pudo actualizar la reacción.",
             "gitlabMoreActions": "Más acciones de MR",
             "gitlabLinkAnother": "Vincular otro MR",
@@ -14642,6 +14659,7 @@
         "OnboardingFlow": {
           "1b5e182e9f": "Bienvenido a Orca",
           "adaa0aa627": "Vaya al paso de incorporación {{value0}}: {{value1}}",
+          "a249f81538": "Orca",
           "277ba45540": "Incorporación de Orca",
           "97c42cda00": "Instale la CLI de GitHub para:",
           "ae3b00ca82": "Configurar tareas de GitHub",
@@ -14934,7 +14952,8 @@
             "4a40af029b": "Tiempo de agentes",
             "00a6903322": "Agentes iniciados",
             "c0e2e9dcd9": "Bienvenido de nuevo",
-            "af761a0c0d": "Ajustes"
+            "af761a0c0d": "Ajustes",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "Enviar",
@@ -16561,6 +16580,7 @@
             "88fea8e84e": "No enviar",
             "50b00dc327": "Copiar detalles",
             "6d3ebe216a": "Texto de diagnóstico",
+            "835037edc9": "Orca",
             "8e24fe4f75": "Informe de fallo enviado.",
             "8b8473c544": "Se copió el informe de fallos.",
             "765591798d": "Comprobando informes de fallos...",
@@ -18555,6 +18575,9 @@
         "checksPassingOfTotal_other": "Verificaciones superadas: {{passing}} de {{count}}",
         "checksPassingOfTotal_many": "Verificaciones superadas: {{passing}} de {{count}}"
       },
+      "taskPageJiraBoard": {
+        "changeStatusFailed": "No se pudo cambiar el estado."
+      },
       "jiraIssue": {
         "loadStatusChangesFailed": "No se pudieron cargar los cambios de estado.",
         "loadCommentsFailed": "No se pudieron cargar los comentarios."
@@ -20169,6 +20192,9 @@
       "agentOptional": "Agente [Opcional]",
       "createDescription": "Elige el proyecto y el nombre del espacio de trabajo. Selecciona un agente si quieres iniciar uno."
     },
+    "JiraIssueWorkspace": {
+      "pendingChange": "Ya hay otro cambio de incidencia en curso."
+    },
     "jiraProjectPicker": {
       "search": "Buscar proyectos de Jira",
       "empty": "No se encontraron proyectos.",
@@ -20241,6 +20267,10 @@
     }
   },
   "dashboardPopout": {
+    "recoverableError": {
+      "title": "El panel Orca encontró un error.",
+      "description": "El tablero no pudo terminar de mostrarse. Reintenta la carga o vuelve a abrirlo."
+    },
     "bucket": {
       "attention": "Needs You",
       "working": "Working",
@@ -22112,6 +22142,7 @@
     "workspace": {
       "startAnother": "Iniciar un espacio de trabajo nuevo",
       "empty": "Vincula una incidencia de Jira a un espacio de trabajo o elige otra vista.",
+      "openFailed": "No se pudo abrir el espacio de trabajo vinculado a esta incidencia de Jira.",
       "mode": "Con espacio de trabajo",
       "search": "Buscar incidencias vinculadas",
       "linkedCount_one": "{{count}} espacio de trabajo vinculado a {{key}}",
@@ -22140,6 +22171,8 @@
       "loadError": "No se pudieron cargar los cambios de estado.",
       "retry": "Reintentar",
       "loading": "Cargando cambios de estado…",
+      "completeInJira": "Completa “{{name}}” en Jira",
+      "unsupported": "Jira requiere campos que Orca aún no puede recopilar: {{fields}}.",
       "chooseResolution": "Elige una resolución",
       "comment": "Comentario",
       "back": "Atrás",

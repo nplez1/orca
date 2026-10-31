@@ -985,6 +985,7 @@
     "minimizeNotice": {
       "body": "Orca läuft weiterhin im Infobereich"
     },
+    "activityWaiting": "Orca - Ausstehende Aktivität",
     "activityWaitingSuffix": "ausstehende Aktivität"
   },
   "worktreeJumpPalette": {
@@ -1067,6 +1068,7 @@
       "df1d56bf87": "In der Arbeitsbereichs-Shell ist ein Fehler aufgetreten.",
       "9e0b441a91": "Rechte Seitenleiste ein-/ausblenden",
       "e81217c1b7": "App-Namen ausblenden",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "Anwendungsmenü",
       "caea5b51b9": "Jetzt neu starten",
       "0a9e810705": "Änderungen werden erst nach einem Neustart gespeichert. Die bisherigen Tabs sind sicher auf dem Datenträger gespeichert.",
@@ -2074,6 +2076,8 @@
         "28986b3747": "Ein KI-Agent für die fehlgeschlagenen Checks wurde gestartet.",
         "1690fd7f4a": "Keine fehlgeschlagenen Checks zu beheben.",
         "9e7c221b8d": "Checks konnten nicht erneut ausgeführt werden",
+        "e463ec935f": "Erneute Ausführung der Checks angefordert",
+        "ddafe851e1": "Erneute Ausführung des Checks angefordert",
         "0bbdc673c1": "Checks konnten nicht aktualisiert werden",
         "e7007aa1d8": "Ohne Repository-Pfad können die Checks nicht aktualisiert werden.",
         "675bc0d638": "Abbrechen",
@@ -2578,6 +2582,8 @@
         "98583589c6": "Für die fehlgeschlagenen Checks konnte kein KI-Agent gestartet werden: {{value0}}",
         "51c65c0265": "Keine fehlgeschlagenen Checks zu beheben.",
         "788a782bb0": "Checks konnten nicht erneut ausgeführt werden",
+        "18f2af42ac": "Erneute Ausführung der Checks angefordert",
+        "5963a6a852": "Erneute Ausführung des Checks angefordert",
         "246b2c6456": "Checks konnten nicht aktualisiert werden",
         "c057f2fcb0": "Ohne Repository-Pfad können die Checks nicht aktualisiert werden.",
         "6591b1fa82": "Abbrechen",
@@ -4439,6 +4445,7 @@
             "bbcd9b7b85": "Arbeitsbereich einklappen",
             "c4a8968bdd": "Arbeitsbereich ausklappen",
             "b10695d6ce": "Sitzung zwangsweise beenden",
+            "288a4dd177": "Orca",
             "53dd5560ae": "Orca einklappen",
             "e419d27083": "Orca ausklappen",
             "41ae4fa725": "Wird zwangsweise beendet…",
@@ -5164,6 +5171,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "Ausgabe",
               "5d66fdd7c2": "Eingabe",
               "7080aeaebb": "Denkprozess",
@@ -7886,7 +7894,12 @@
             "title": "Agenten-Dashboard",
             "description": "Kanban-Board zur Überwachung von Agenten über mehrere Worktrees hinweg, im Fenster oder als separates Fenster.",
             "copy": "Fügt der linken Seitenleiste einen Eintrag „Agenten-Dashboard“ hinzu. Ermöglicht die Überwachung von Agenten, die Aufmerksamkeit benötigen, arbeiten oder fertig sind, optional auch von inaktiven Agenten.",
-            "toggleLabel": "Agenten-Dashboard umschalten"
+            "toggleLabel": "Agenten-Dashboard umschalten",
+            "modeLabel": "Öffnen als",
+            "modeCopy": "Das Dashboard als Board im Fenster neben der Seitenleiste oder in einem separaten Fenster anzeigen.",
+            "modeAriaLabel": "Öffnungsmodus des Agenten-Dashboards",
+            "modeInWindow": "Im Fenster",
+            "modePopout": "Separates Fenster"
           },
           "browserExtensions": {
             "copy": "Fügt Einstellungen › Browser › Erweiterungen für lokale Browserprofile hinzu.",
@@ -10103,6 +10116,7 @@
               "dashboard": "Dashboard",
               "agent": "Agent",
               "kanban": "Kanban",
+              "popout": "separates Fenster",
               "board": "Board",
               "inWindow": "im Fenster",
               "worktrees": "Worktrees"
@@ -13170,6 +13184,8 @@
             "f316a8ca2b": "Keine offenen Kommentare ausgewählt.",
             "d00ebdc402": "{{value0}} Kommentare mit KI erledigen",
             "5eb2163b6b": "Vor dem Start eines Agenten den Prompt prüfen. Nach der Übermittlung des Prompts markiert Orca die ausgewählten Threads auf der Plattform als erledigt und antwortet auf Kommentare, die es nicht erledigen kann.",
+            "f273f2271c": "Agent gestartet. {{value0}} als erledigt markiert, auf {{value1}} geantwortet, {{value2}} übersprungen, {{value3}} fehlgeschlagen.{{value4}}",
+            "aa95b81a3a": "Agent gestartet. {{value0}} als erledigt markiert, auf {{value1}} geantwortet, {{value2}} übersprungen, {{value3}} fehlgeschlagen.",
             "495b2f8c4b": "Der Agent wurde gestartet, aber die ausgewählten Kommentare konnten weder als erledigt markiert noch beantwortet werden.",
             "review": {
               "auto_retry": "Orca versucht es um {{time}} erneut.",
@@ -13181,6 +13197,7 @@
               "branch": "Branch synchronisieren"
             },
             "7e4b2a19c0": "Der GitHub-PR zum Antworten konnte nicht ermittelt werden.",
+            "430f1a62d4": "Der ausgewählte Thread auf der Plattform konnte nicht als erledigt markiert werden.",
             "updateReactionFailed": "Die Reaktion konnte nicht aktualisiert werden.",
             "gitlabMoreActions": "Weitere MR-Aktionen",
             "gitlabLinkAnother": "Weiteren MR verknüpfen",
@@ -14781,6 +14798,7 @@
         "OnboardingFlow": {
           "1b5e182e9f": "Willkommen bei Orca",
           "adaa0aa627": "Zu Einrichtungsschritt {{value0}} wechseln: {{value1}}",
+          "a249f81538": "Orca",
           "277ba45540": "Orca-Einrichtung",
           "97c42cda00": "Die GitHub CLI für folgende Funktionen installieren:",
           "ae3b00ca82": "GitHub-Aufgaben einrichten",
@@ -15073,7 +15091,8 @@
             "4a40af029b": "Agentenzeit",
             "00a6903322": "Gestartete Agenten",
             "c0e2e9dcd9": "Willkommen zurück",
-            "af761a0c0d": "Einstellungen"
+            "af761a0c0d": "Einstellungen",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "Senden",
@@ -16676,6 +16695,7 @@
             "88fea8e84e": "Nicht senden",
             "50b00dc327": "Details kopieren",
             "6d3ebe216a": "Diagnosetext",
+            "835037edc9": "Orca",
             "8e24fe4f75": "Absturzbericht gesendet.",
             "8b8473c544": "Absturzbericht kopiert.",
             "765591798d": "Es wird nach Absturzberichten gesucht…",
@@ -18584,6 +18604,9 @@
         "checksPassingOfTotal_one": "{{passing}} von {{count}} Check erfolgreich",
         "checksPassingOfTotal_other": "{{passing}} von {{count}} Checks erfolgreich"
       },
+      "taskPageJiraBoard": {
+        "changeStatusFailed": "Status konnte nicht geändert werden."
+      },
       "jiraIssue": {
         "loadStatusChangesFailed": "Statusänderungen konnten nicht geladen werden.",
         "loadCommentsFailed": "Kommentare konnten nicht geladen werden."
@@ -20142,6 +20165,9 @@
       "agentOptional": "Agent [optional]",
       "createDescription": "Projekt und Namen des Arbeitsbereichs auswählen. Optional einen Agenten zum Starten auswählen."
     },
+    "JiraIssueWorkspace": {
+      "pendingChange": "Eine weitere Issue-Änderung ist in Bearbeitung."
+    },
     "jiraProjectPicker": {
       "search": "Jira-Projekte suchen",
       "empty": "Keine Projekte gefunden.",
@@ -20214,6 +20240,10 @@
     }
   },
   "dashboardPopout": {
+    "recoverableError": {
+      "title": "Im Orca-Dashboard ist ein Fehler aufgetreten.",
+      "description": "Das Dashboard konnte nicht vollständig dargestellt werden. Erneut versuchen, um es neu aufzubauen, oder erneut öffnen."
+    },
     "bucket": {
       "attention": "Aktion erforderlich",
       "working": "In Arbeit",
@@ -21518,6 +21548,7 @@
     "workspace": {
       "startAnother": "Neuen Arbeitsbereich starten",
       "empty": "Ein Jira-Issue mit einem Arbeitsbereich verknüpfen oder eine andere Ansicht auswählen.",
+      "openFailed": "Der mit diesem Jira-Issue verknüpfte Arbeitsbereich konnte nicht geöffnet werden.",
       "mode": "Mit Arbeitsbereich",
       "search": "Verknüpfte Issues suchen",
       "linkedCount_one": "{{count}} Arbeitsbereich mit {{key}} verknüpft",
@@ -21562,6 +21593,8 @@
       "loadError": "Statusänderungen konnten nicht geladen werden.",
       "retry": "Erneut versuchen",
       "loading": "Statusänderungen werden geladen…",
+      "completeInJira": "„{{name}}“ in Jira abschließen",
+      "unsupported": "Jira erfordert Felder, die Orca noch nicht erfassen kann: {{fields}}.",
       "chooseResolution": "Lösung auswählen",
       "comment": "Kommentar",
       "back": "Zurück",
