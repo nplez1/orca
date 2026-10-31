@@ -116,7 +116,9 @@ export async function scanRepoWorktreeRows(
   deps: Pick<RepoWorktreeRowDeps, 'store' | 'scanRepo' | 'notifyWorktreeRenamed'>,
   repo: Repo,
   projectRuntimeByRepoId: ReadonlyMap<string, ProjectExecutionRuntimeResolution>,
-  repoOwnerCount = deps.store.getRepos().filter((candidate) => candidate.id === repo.id).length
+  repoOwnerCount = deps.store.getRepos().filter((candidate) => candidate.id === repo.id).length,
+  /** Rows the caller already read; a healthy scan must not read persisted metadata twice. */
+  metaById?: Readonly<Record<string, WorktreeMeta>>
 ): Promise<RepoWorktreeRowsScan> {
   const { store } = deps
   // Absorb rejection before withTimeout: rejection preserves shipped empty results, but timeout restores last-known rows.
@@ -130,7 +132,13 @@ export async function scanRepoWorktreeRows(
   const gitWorktrees = preserveFolderUpgradeWorktreePath(repo, scan.worktrees)
   if (scan.ok) {
     pruneLineageForMissingRepoWorktrees(store, repo, gitWorktrees)
-    await reconcileListedWorktreeCaseSplits(store, repo, gitWorktrees, deps.notifyWorktreeRenamed)
+    await reconcileListedWorktreeCaseSplits(
+      store,
+      repo,
+      gitWorktrees,
+      deps.notifyWorktreeRenamed,
+      metaById
+    )
   }
   return { ok: scan.ok, worktrees: gitWorktrees }
 }
@@ -225,7 +233,7 @@ export async function resolveRepoWorktreeRows(
 ): Promise<RepoWorktreeRow[]> {
   const scan = isFolderRepo(repo)
     ? null
-    : await scanRepoWorktreeRows(deps, repo, projectRuntimeByRepoId, repoOwnerCount)
+    : await scanRepoWorktreeRows(deps, repo, projectRuntimeByRepoId, repoOwnerCount, metaById)
   return joinRepoWorktreeRows(deps, repo, scan, metaById, repoOwnerCount)
 }
 

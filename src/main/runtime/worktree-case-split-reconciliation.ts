@@ -232,18 +232,22 @@ export async function reconcileWorktreeCaseSplits(
 
 /** Listing hook: local checkouts only, since the inode proof needs this machine's filesystem. */
 export async function reconcileListedWorktreeCaseSplits(
-  store: WorktreeCaseSplitStore & Pick<RuntimeStore, 'getAllWorktreeMeta'>,
+  store: WorktreeCaseSplitStore,
   repo: Pick<Repo, 'id' | 'connectionId' | 'executionHostId'>,
   listed: readonly { path: string; branch: string }[],
-  notifyWorktreeRenamed?: (repoId: string, oldWorktreeId: string, newWorktreeId: string) => void
+  notifyWorktreeRenamed: ((repoId: string, oldWorktreeId: string, newWorktreeId: string) => void) | undefined,
+  /** The caller's already-read rows: a healthy scan must not read persisted metadata twice. */
+  metaById: Readonly<Record<string, WorktreeMeta>> | undefined
 ): Promise<void> {
   const hostId = getRepoExecutionHostId(repo)
-  if (hostId !== LOCAL_EXECUTION_HOST_ID) {
+  // Without the caller's rows there is nothing to detect against, and reading them here would add
+  // a metadata read to every scan of every repo.
+  if (hostId !== LOCAL_EXECUTION_HOST_ID || !metaById) {
     return
   }
   try {
     await reconcileWorktreeCaseSplits(
-      { repoId: repo.id, hostId, listed, metaById: store.getAllWorktreeMeta() ?? {} },
+      { repoId: repo.id, hostId, listed, metaById },
       { store, ...(notifyWorktreeRenamed ? { notifyWorktreeRenamed } : {}) }
     )
   } catch (error) {
