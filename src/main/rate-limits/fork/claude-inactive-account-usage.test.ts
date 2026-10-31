@@ -53,7 +53,7 @@ beforeEach(() => {
       provider: 'claude',
       session: { usedPercent: 33, windowMinutes: 300, resetsAt: null, resetDescription: null },
       weekly: null,
-      updatedAt: Date.now(),
+      updatedAt: 0,
       error: null,
       status: 'ok',
       usageMetadata: { source: 'oauth', attemptedSources: ['oauth'] }

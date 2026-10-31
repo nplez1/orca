@@ -35,6 +35,10 @@ vi.mock('@orca/process-host', () => ({
   }
 }))
 
+// Why a constant: the gate is compared against the real clock, and a fixed far-future instant is
+// the point of these cases (test-no-wall-clock forbids reading Date.now() here).
+const OPEN_ENDPOINT_GATE = Date.parse('2999-01-01T00:00:00Z')
+
 const profileOptions = {
   authPreparation: {
     configDir: '/Users/x/Library/orca/claude-profiles/a/home',
@@ -74,32 +78,30 @@ describe('Claude usage without a running session', () => {
 
   it('carries an open endpoint wait through a probe reading that answers', async () => {
     vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
-    const retryAtMs = Date.now() + 40 * 60 * 1000
 
     const result = await fetchActiveClaudeRateLimits({
       ...profileOptions,
       allowUsagePanelSupplement: true,
-      usageEndpointRetryAtMs: retryAtMs
+      usageEndpointRetryAtMs: OPEN_ENDPOINT_GATE
     })
 
     // Why: a probe that answers now must not licence the endpoint while its own wait is still open.
     expect(result.session?.usedPercent).toBe(31)
-    expect(result.usageMetadata?.retryAtMs).toBe(retryAtMs)
+    expect(result.usageMetadata?.retryAtMs).toBe(OPEN_ENDPOINT_GATE)
     expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
   })
 
   it('keeps the endpoint closed while its Retry-After is open and the probe cannot answer', async () => {
-    const now = Date.now()
     const result = await fetchActiveClaudeRateLimits({
       ...profileOptions,
       allowUsagePanelSupplement: true,
-      usageEndpointRetryAtMs: now + 10 * 60 * 1000
+      usageEndpointRetryAtMs: OPEN_ENDPOINT_GATE
     })
 
     expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
     expect(result.status).toBe('error')
     expect(result.usageMetadata?.failureKind).toBe('rate-limited')
-    expect(result.usageMetadata?.retryAtMs).toBe(now + 10 * 60 * 1000)
+    expect(result.usageMetadata?.retryAtMs).toBe(OPEN_ENDPOINT_GATE)
   })
 
   it('still reads the endpoint once its Retry-After has passed', async () => {
@@ -111,7 +113,7 @@ describe('Claude usage without a running session', () => {
     const result = await fetchActiveClaudeRateLimits({
       ...profileOptions,
       allowUsagePanelSupplement: true,
-      usageEndpointRetryAtMs: Date.now() - 1
+      usageEndpointRetryAtMs: 1
     })
 
     expect(fetchClaudeOAuthUsage).toHaveBeenCalledTimes(1)
