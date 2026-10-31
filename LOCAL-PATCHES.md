@@ -757,9 +757,10 @@ cause — a suppressed red is also an unexamined one, which is what this sweep c
   which is what showed they were never this machine's.** `local/nightly-linux-known-red.json` carried
   them with the evidence "they fail identically here, so the class is the credential store's
   safeStorage/keychain behaviour" — but the eight are six spent one-shot mocks and two deterministic
-  source scans, neither of which involves a keychain on any host. Its own `exit` condition was
-  "remove when this family is mocked off safeStorage"; all eight leave that manifest with this
-  change, and
+  source scans, neither of which involves a keychain on any host. The class's `exit` condition was
+  "remove when this family is mocked off safeStorage" — which is what the six store cases got, while
+  the two ratchet cases were closed by declaring the surface instead — and all eight leave that
+  manifest with this change, and
   the `macos`/`linux` pair agreeing was the signal that should have sent someone to the tree sooner.
 - **`fork-credentials-ratchet` (2) — closed by declaring the surface, after reading it.**
   `flushPendingRotation` writes back a rotation the store refused _through_
@@ -793,11 +794,21 @@ cause — a suppressed red is also an unexamined one, which is what this sweep c
   outline and the two frames are byte-identical — correct behaviour with nothing to repaint, not a
   repaint defect. The case now captures the folder glyph, an unassigned codepoint (U+0378, tofu
   everywhere) and the post-load frame, and skips only when both signals say there was nothing to
-  repaint: the stalled frame already drew a real glyph **and** the loaded font changed nothing. A host
-  whose system fallback draws U+F07B but is visibly replaced by the web font still runs the
-  assertion, so the guard cannot swallow a real repaint failure. Verified both ways against the same
-  fixture: with the family present the frames are identical (skip), with the stack's system family
-  removed they differ (runs for real).
+  repaint: the stalled frame already drew a real glyph **and** the loaded font changed nothing.
+  Verified both ways against the same fixture: with the system family present the frames are
+  identical (skip), with it removed from the stack they differ (runs for real).
+
+  **The guard's residual gap, stated rather than hidden:** on a host whose system fallback draws
+  U+F07B with an outline the web font would _not_ have produced — the nerd font is installed at a
+  different version, or another symbol font (Font Awesome also maps U+F07B) supplies it — a _broken_
+  repaint also leaves the two frames identical, and the case skips instead of failing. Nothing
+  distinguishes "the same family was already drawing it" from "a different family drew it and was
+  never replaced" without a second page whose font loads normally, which is what a real closure of
+  this hole needs. Linux CI is unaffected: there the stalled frame is tofu, so the assertion runs.
+  This is a narrower hole than the allowlist entry it replaces, which suppressed the case on every
+  host and reported a real failure as a known red — but it is a hole, and the entry's claim of a
+  "real render finding" is withdrawn rather than relocated.
+
 - **`host-toolchain` (8) — closed; six of the eight were mis-attributed to timeouts and stale dist
   reads.** The class was recorded as "the CLI/dev-rebuild harness times out or reads a stale dist
   file under load", i.e. this machine being slow. Nothing times out and no child exits non-zero: the
