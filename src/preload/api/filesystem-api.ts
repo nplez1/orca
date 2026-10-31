@@ -2,19 +2,7 @@ import type { PathExistenceResult } from '../../shared/path-existence-batch'
 import type { RuntimeFileReadChunkResult } from '../../shared/runtime-types'
 import type { SearchOptions, SearchResult } from '../../shared/code-search-types'
 import type { PdfExportResult } from '../../shared/pdf-export-failure-copy'
-import type { FilePathSearchResult } from '../../shared/file-path-search-result'
-import type { PathSearchMode } from '../../shared/quick-open-path-search'
-import type {
-  WorkspacePathSearchCorrelationId,
-  WorkspacePathSearchDiagnosticsSummary,
-  WorkspacePathSearchInstrumentationEvent
-} from '../../shared/workspace-path-search-instrumentation'
-
-type WorkspacePathSearchInstrumentationExportRecord = {
-  correlationId: WorkspacePathSearchCorrelationId
-  workspaceIdentityHash: string
-  events: readonly WorkspacePathSearchInstrumentationEvent[]
-}
+import type { WorkspacePathSearchApi } from './workspace-path-search-bridge'
 import type {
   DirEntry,
   FsChangedPayload,
@@ -225,31 +213,6 @@ export type FilesystemApi = {
       followSymlinks?: boolean
       nameFilter?: string
     }) => Promise<string[]>
-    searchFilePaths: (args: {
-      rootPath: string
-      connectionId?: string
-      excludePaths?: string[]
-      requestToken?: string
-      query: string
-      limit?: number
-      mode?: PathSearchMode
-      includeIgnoredFiles?: boolean
-      includeDotfiles?: boolean
-      correlationId?: WorkspacePathSearchCorrelationId
-      consumerId?: string
-      consumerSequence?: number
-    }) => Promise<FilePathSearchResult>
-    acquireQuickOpenPathInventoryLease: (args: {
-      rootPath: string
-      includeIgnoredFiles: boolean
-      correlationId?: WorkspacePathSearchCorrelationId
-    }) => Promise<{ leaseId: string | null }>
-    releaseQuickOpenPathInventoryLease: (args: { leaseId: string }) => Promise<void>
-    /** Available only in development builds for explicit performance-artifact export. */
-    exportWorkspacePathSearchInstrumentation: () => Promise<
-      WorkspacePathSearchInstrumentationExportRecord[]
-    >
-    getWorkspacePathSearchDiagnosticsSummary: () => Promise<WorkspacePathSearchDiagnosticsSummary>
     cancelListFiles: (args: { requestToken: string }) => Promise<void>
     cancelSearch: (args: { requestToken: string }) => Promise<void>
     search: (
@@ -285,7 +248,7 @@ export type FilesystemApi = {
     watchWorktree: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     unwatchWorktree: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     onFsChanged: (callback: (payload: FsChangedPayload) => void) => () => void
-  }
+  } & WorkspacePathSearchApi
   notebook: {
     listPythonEnvironments: (args: {
       filePath: string
