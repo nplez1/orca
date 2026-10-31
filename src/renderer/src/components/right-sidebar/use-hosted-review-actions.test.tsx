@@ -18,6 +18,10 @@ const runtimeRpcMocks = vi.hoisted(() => ({
   runtimeEnvironmentSupportsCapability: vi.fn()
 }))
 
+const postMergeMocks = vi.hoisted(() => ({ startPostMergeReviewRefresh: vi.fn() }))
+
+vi.mock('@/components/github/post-merge-review-refresh', () => postMergeMocks)
+
 vi.mock('@/components/confirmation-dialog-context', () => ({
   useConfirmationDialog: () => confirmationMocks.confirm
 }))
@@ -106,6 +110,7 @@ describe('useHostedReviewActions', () => {
     runtimeRpcMocks.callRuntimeRpc.mockReset().mockResolvedValue({ ok: true })
     runtimeRpcMocks.assertRuntimeEnvironmentCapability.mockReset().mockResolvedValue(undefined)
     runtimeRpcMocks.runtimeEnvironmentSupportsCapability.mockReset().mockResolvedValue(true)
+    postMergeMocks.startPostMergeReviewRefresh.mockReset()
     latest = null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only window.api shim
     ;(window as any).api = {
@@ -181,6 +186,25 @@ describe('useHostedReviewActions', () => {
     )
     expect(window.api.gh.mergePR).not.toHaveBeenCalled()
     expect(onRefreshReview).toHaveBeenCalledTimes(1)
+    // Why: the merge is already on GitHub; only the cached review state is behind, and the
+    // workspace glyph the user is watching reads that cache.
+    expect(postMergeMocks.startPostMergeReviewRefresh).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      repoId: 'repo-1',
+      prNumber: 1015
+    })
+  })
+
+  it('does not start a post-merge refresh when the merge is refused', async () => {
+    vi.mocked(window.api.gh.mergePR).mockResolvedValue({ ok: false, error: 'merge blocked' })
+    await renderHook(makeRepo())
+
+    await act(async () => {
+      await latest?.handleMerge('squash')
+    })
+
+    expect(latest?.actionError).toBeTruthy()
+    expect(postMergeMocks.startPostMergeReviewRefresh).not.toHaveBeenCalled()
   })
 
   it('keeps non-runtime GitHub PR merges on desktop IPC', async () => {

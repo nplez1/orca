@@ -29,6 +29,7 @@ import { LoaderCircle, GitMerge, ChevronDown, ExternalLink } from 'lucide-react'
 import type { TaskPageGitHubWorkItemMutationRunner } from '../linear/task-page-linear-jira-list-model'
 import { resolveTaskPullRequestRepo } from './task-page-github-review-model'
 import { openAppHttpLink } from '@/lib/app-http-link-open'
+import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
 export function PRMergeCell({
   item,
   repo,
@@ -97,7 +98,7 @@ export function PRMergeCell({
     }
     setMerging(true)
     try {
-      await workItemMutation.run({
+      const outcome = await workItemMutation.run({
         item,
         intent: {
           type: 'merge'
@@ -141,6 +142,15 @@ export function PRMergeCell({
               })
         }
       })
+      if (outcome === 'confirmed') {
+        // Why: the merge is on the provider already; only the cached review state is behind, and
+        // the workspace glyph is what the user is looking at right now.
+        startPostMergeReviewRefresh({
+          repoPath: repo.path,
+          repoId: repo.id,
+          prNumber: item.number
+        })
+      }
     } finally {
       setMerging(false)
     }

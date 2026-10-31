@@ -18,6 +18,7 @@ import { buildGitHubPRStackMergeConfirmation } from './github-pr-stack-confirmat
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import { useReadyHostedReviewAction } from './use-ready-hosted-review-action'
 import { codeHostErrorText } from '@/lib/code-host-error-copy'
+import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
 
 export type HostedReviewActionInfo = Pick<
   HostedReviewInfo,
@@ -133,6 +134,13 @@ export function useHostedReviewActions({
         if (!result.ok) {
           setActionError(codeHostErrorText(result))
         } else {
+          // Why: the merge is on the provider already; only the cached review state is behind, and
+          // this glyph is what the user is looking at right now.
+          startPostMergeReviewRefresh({
+            repoPath: repo.path,
+            repoId: repo.id,
+            prNumber: review.number
+          })
           await onRefreshReview()
         }
       } catch (err) {
