@@ -8,6 +8,9 @@
         "ShortcutsPane": {
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
+        "AccountsPane": {
+          "0c64dc2a64": null
+        },
         "sshHostServer": {}
       }
     }

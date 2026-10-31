@@ -1,6 +1,5 @@
-import { Check, Copy, ExternalLink, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
+import { Check, Copy, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { CopilotIcon } from '../status-bar/fork-usage-providers'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -8,9 +7,6 @@ import { Label } from '../ui/label'
 import { SearchableSetting } from './SearchableSetting'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import { translate } from '@/i18n/i18n'
-
-// Why: enterprise billing is a fine-grained permission, so the classic-token page cannot mint one.
-const GITHUB_FINE_GRAINED_TOKENS_URL = 'https://github.com/settings/tokens?type=beta'
 
 export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): React.JSX.Element {
   const {
@@ -32,37 +28,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
   const usingGithubCli = copilotCredentialSource === 'github-cli'
   const credentialMissing = copilotCredentialSource === 'none'
   return (
-    <section key="copilot" id="accounts-copilot" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <CopilotIcon size={16} />
-            {translate(
-              'auto.components.settings.accounts.pane.copilot.section.dc3eaf8d70',
-              'GitHub Copilot'
-            )}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.accounts.pane.copilot.section.ed307672cd',
-              'Configure GitHub Copilot usage tracking for your account.'
-            )}
-          </p>
-        </div>
-        <a
-          href={GITHUB_FINE_GRAINED_TOKENS_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {translate(
-            'auto.components.settings.accounts.pane.copilot.section.f8bb20c24c',
-            'Open console'
-          )}
-          <ExternalLink className="size-3" />
-        </a>
-      </div>
-
+    <>
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
@@ -292,6 +258,6 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
           ) : null}
         </p>
       </SearchableSetting>
-    </section>
+    </>
   )
 }

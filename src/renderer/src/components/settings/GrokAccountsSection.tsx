@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
-import { AgentIcon } from '@/lib/agent-catalog'
+import { Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '../../store'
@@ -8,8 +7,6 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import type { GrokAccountStatus } from '../../../../shared/rate-limit-types'
 import { SearchableSetting } from './SearchableSetting'
-import { openAppHttpLinkFromAnchor } from '@/lib/app-http-link-open'
-const GROK_CLI_DOCS_URL = 'https://docs.x.ai/build/overview'
 
 export function GrokAccountsSection(): React.JSX.Element {
   const refreshGrokRateLimits = useAppStore((s) => s.refreshGrokRateLimits)
@@ -63,32 +60,7 @@ export function GrokAccountsSection(): React.JSX.Element {
       : null
 
   return (
-    <section id="accounts-grok" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <AgentIcon agent="grok" size={16} />
-            {translate('auto.components.settings.GrokAccountsSection.a1b2c3d4e5', 'Grok (xAI)')}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.GrokAccountsSection.f6e5d4c3b2',
-              'Shows weekly credit usage from your Grok CLI sign-in (session file ~/.grok/auth.json).'
-            )}
-          </p>
-        </div>
-        <a
-          href={GROK_CLI_DOCS_URL}
-          target="_blank"
-          onClick={openAppHttpLinkFromAnchor}
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {translate('auto.components.settings.GrokAccountsSection.0d8e77bc40', 'Grok CLI docs')}
-          <ExternalLink className="size-3" />
-        </a>
-      </div>
-
+    <>
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
@@ -216,6 +188,6 @@ export function GrokAccountsSection(): React.JSX.Element {
           <p className="text-xs text-muted-foreground">{unavailableReason}</p>
         </SearchableSetting>
       ) : null}
-    </section>
+    </>
   )
 }

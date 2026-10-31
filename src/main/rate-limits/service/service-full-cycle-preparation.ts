@@ -106,6 +106,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxGeneration = this.syncMiniMaxFetchGeneration(currentMiniMaxConfigHash)
 
     const antigravityFetchAllowed =
+      !disabled.has('antigravity') &&
       (this.antigravityUsageEnabledResolver?.() ?? true) &&
       (options?.force || !this.shouldSkipAutomatedFetch('antigravity', previousState.antigravity))
 
@@ -150,9 +151,11 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         )
 
     const zcodeResultPromise = trackSettledProviderResult(
-      zcodePlanConfigResult.error
-        ? Promise.resolve(this.getZcodePlanCredentialError(zcodePlanConfigResult.error))
-        : fetchZcodeRateLimits({ signal, planCredential: zcodePlanCredential })
+      disabled.has('zcode')
+        ? Promise.resolve(this.disabledUsageProviderSnapshot('zcode'))
+        : zcodePlanConfigResult.error
+          ? Promise.resolve(this.getZcodePlanCredentialError(zcodePlanConfigResult.error))
+          : fetchZcodeRateLimits({ signal, planCredential: zcodePlanCredential })
     )
 
     // Hidden meters avoid the CLI spawn; the separate promise keeps other providers responsive.
@@ -217,7 +220,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
               networkProxySettings: this.networkProxySettingsResolver?.(),
               signal
             }),
-        this.fetchKimiWithResolvedHome(),
+        disabled.has('kimi')
+          ? Promise.resolve(this.disabledUsageProviderSnapshot('kimi'))
+          : this.fetchKimiWithResolvedHome(),
         miniMaxConfigResult.error
           ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
           : fetchMiniMaxRateLimits({

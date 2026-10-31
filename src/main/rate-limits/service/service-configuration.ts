@@ -162,8 +162,7 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
       // Why: the cookie lives on the filesystem, not GlobalSettings; surface its presence so the renderer keeps the MiniMax bar across reloads.
       minimaxCookieConfigured: disabled.has('minimax') ? false : hasMiniMaxSessionCookie(),
       minimaxApiKeyConfigured: disabled.has('minimax') ? false : hasMiniMaxApiKey(),
-      // Why: zcode has no switch-off entry in Settings, so its presence flag stays ungated.
-      zcodePlanApiKeyConfigured: hasZcodePlanApiKey(),
+      zcodePlanApiKeyConfigured: disabled.has('zcode') ? false : hasZcodePlanApiKey(),
       opencodeGoApiKeyConfigured: disabled.has('opencode-go')
         ? false
         : this.openCodeGoApiKeyConfigured,

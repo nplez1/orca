@@ -86,14 +86,8 @@ export function hasUsageProviderSettings(
   }
   // Why: a switched-off provider's durable setup must not count, or the status
   // bar keeps a pending bar for a provider the user explicitly disabled.
-  return (
-    USAGE_PROVIDER_IDS.some((providerId) =>
-      hasUsageProviderSettingsForProvider(providerId, settings)
-    ) ||
-    // Not in USAGE_PROVIDER_IDS: antigravity and zcode have no Settings switch,
-    // but their durable setup still counts as a configured provider.
-    hasUsageProviderSettingsForProvider('antigravity', settings) ||
-    hasUsageProviderSettingsForProvider('zcode', settings)
+  return USAGE_PROVIDER_IDS.some((providerId) =>
+    hasUsageProviderSettingsForProvider(providerId, settings)
   )
 }
 

@@ -153,6 +153,32 @@ export const getAccountsOpencodeSearchEntries = createLocalizedCatalog(() => [
   }
 ])
 
+export const getAccountsKimiSearchEntries = createLocalizedCatalog(() => [
+  {
+    title: translate('auto.components.settings.ProviderAccountsSection.kimiTitle', 'Kimi'),
+    description: translate(
+      'auto.components.settings.ProviderAccountsSection.kimiDescription',
+      'Usage comes from the Kimi Code sign-in already on this computer; there is nothing to set up here.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('auto.components.settings.accounts.search.kimi.kwKimi', 'kimi'),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.kimi.kwMoonshot',
+        'moonshot'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.kimi.kwKimiCode',
+        'kimi code'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.e949b08ffb',
+        'rate limit'
+      ),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.86edc96bc9', 'status bar')
+    ]
+  }
+])
+
 export const getAccountsMiniMaxSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.accounts.search.733f9e2a93', 'MiniMax Usage'),
@@ -335,6 +361,7 @@ export const getAccountsPaneSearchEntries = createLocalizedCatalog((): SettingsS
   ...getAccountsCodexSearchEntries(),
   ...getAccountsGeminiSearchEntries(),
   ...getAccountsOpencodeSearchEntries(),
+  ...getAccountsKimiSearchEntries(),
   ...getAccountsMiniMaxSearchEntries(),
   ...getAccountsDeepSeekSearchEntries(),
   ...getAccountsFireworksSearchEntries(),

@@ -39,7 +39,9 @@ export function disabledUsageProviderSnapshot(
     session: null,
     weekly: null,
     ...(provider === 'opencode-go' ? { monthly: null } : {}),
-    ...(provider === 'gemini' || provider === 'cursor' ? { buckets: [] } : {}),
+    ...(provider === 'gemini' || provider === 'cursor' || provider === 'antigravity'
+      ? { buckets: [] }
+      : {}),
     ...(provider === 'deepseek' || provider === 'fireworks' ? { credits: null } : {}),
     ...(provider === 'copilot' ? { monthly: null, allowance: null } : {}),
     updatedAt: Date.now(),

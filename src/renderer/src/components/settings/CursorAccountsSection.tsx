@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ExternalLink, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
-import { AgentIcon } from '@/lib/agent-catalog'
+import { Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '../../store'
@@ -8,9 +7,7 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import type { CursorAccountStatus } from '../../../../shared/rate-limit-types'
 import { SearchableSetting } from './SearchableSetting'
-import { openAppHttpLinkFromAnchor } from '@/lib/app-http-link-open'
 
-const CURSOR_USAGE_DASHBOARD_URL = 'https://cursor.com/dashboard/spending'
 const SEARCH_KEYWORDS = ['cursor', 'usage', 'plan', 'spend', 'billing', 'rate limit']
 
 function credentialSourceLabel(source: CursorAccountStatus['credentialSource']): string | null {
@@ -102,35 +99,7 @@ export function CursorAccountsSection(): React.JSX.Element {
       : null
 
   return (
-    <section id="accounts-cursor" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <AgentIcon agent="cursor" size={16} />
-            {translate('auto.components.settings.CursorAccountsSection.title', 'Cursor')}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.CursorAccountsSection.subtitle',
-              'Shows your Cursor plan usage from the sign-in already on this computer. Orca only reads it — it never changes your Cursor login.'
-            )}
-          </p>
-        </div>
-        <a
-          href={CURSOR_USAGE_DASHBOARD_URL}
-          target="_blank"
-          onClick={openAppHttpLinkFromAnchor}
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {translate(
-            'auto.components.settings.CursorAccountsSection.dashboardLink',
-            'Cursor dashboard'
-          )}
-          <ExternalLink className="size-3" />
-        </a>
-      </div>
-
+    <>
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
@@ -273,6 +242,6 @@ export function CursorAccountsSection(): React.JSX.Element {
           <p className="text-xs text-muted-foreground">{unavailableReason}</p>
         </SearchableSetting>
       ) : null}
-    </section>
+    </>
   )
 }

@@ -420,7 +420,7 @@
       },
       "settings": {
         "AccountsPane": {
-          "0c64dc2a64": "Gemini",
+          "0c64dc2a64": null,
           "aa4de4475b": "Gemini CLI (legacy)"
         },
         "AdvancedPane": {
@@ -659,7 +659,12 @@
             "ca8cf669e2": "usage",
             "d3b18e19e2": "Configure Fireworks.ai usage tracking with an API key and an optional account ID override.",
             "d9d1e324dc": "Configure DeepSeek usage tracking with an API key. DeepSeek publishes only the account balance, not usage or cost history.",
-            "f23a201868": "Fireworks.ai Usage"
+            "f23a201868": "Fireworks.ai Usage",
+            "kimi": {
+              "kwKimi": "kimi",
+              "kwMoonshot": "moonshot",
+              "kwKimiCode": "kimi code"
+            }
           }
         },
         "advanced": {
@@ -718,6 +723,11 @@
               "search": {}
             }
           }
+        },
+        "ProviderAccountsSection": {
+          "off": "Off",
+          "kimiTitle": "Kimi",
+          "kimiDescription": "Usage comes from the Kimi Code sign-in already on this computer; there is nothing to set up here."
         }
       },
       "sidebar": {

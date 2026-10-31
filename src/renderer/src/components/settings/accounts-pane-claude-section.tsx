@@ -5,7 +5,6 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { ButtonGroup } from '../ui/button-group'
 import { Label } from '../ui/label'
-import { ClaudeIcon } from '../status-bar/icons'
 import { SearchableSetting } from './SearchableSetting'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
 import {
@@ -75,20 +74,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
       )
     )
   return (
-    <section key="claude-accounts" id="accounts-claude" className="space-y-4 scroll-mt-6">
-      <div className="space-y-1">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <ClaudeIcon size={16} />
-          {translate('auto.components.settings.AccountsPane.26ef4b55be', 'Claude')}
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {translate(
-            'auto.components.settings.AccountsPane.72b36ea174',
-            'Optional. Orca can use your normal Claude login; add accounts only if you want quick switching without moving chat sessions.'
-          )}
-        </p>
-      </div>
-
+    <>
       <SearchableSetting
         title={translate('auto.components.settings.AccountsPane.8bbfd74556', 'Claude Accounts')}
         description={translate(
@@ -386,6 +372,6 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
       {isRemoteAccountScope ? null : (
         <ClaudeRunningSessionSwitchSetting settings={settings} updateSettings={updateSettings} />
       )}
-    </section>
+    </>
   )
 }

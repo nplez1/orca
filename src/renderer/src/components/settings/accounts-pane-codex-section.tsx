@@ -4,7 +4,6 @@ import { selectCodexProviderAccount } from '@/runtime/runtime-provider-accounts-
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
-import { OpenAIIcon } from '../status-bar/icons'
 import { CodexLoginLinkNotice } from './CodexLoginLinkNotice'
 import { SearchableSetting } from './SearchableSetting'
 import { getAccountsCodexSearchEntries } from './accounts-search'
@@ -41,31 +40,19 @@ export function renderCodexAccountsSection(model: AccountsPaneSectionModel): Rea
     wslCapabilitiesLoading
   } = model
   return (
-    <section key="codex-accounts" id="accounts-codex" className="space-y-4 scroll-mt-6">
-      <div className="space-y-1">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <OpenAIIcon size={16} />
-          {translate('auto.components.settings.AccountsPane.ef91cfa06b', 'Codex')}
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {translate(
-            'auto.components.settings.AccountsPane.cedfab35ab',
-            'Optional. Orca can use your normal Codex login; add accounts only if you want quick switching in Orca.'
-          )}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {isRemoteAccountScope
-            ? translate(
-                'auto.components.settings.AccountsPane.remoteScopeAuthContext',
-                'Each account keeps its own sign-in context on {{value0}}.',
-                { value0: accountRuntimeSentenceLabel }
-              )
-            : translate(
-                'auto.components.settings.AccountsPane.340d6f7a85',
-                'Each account keeps its own local sign-in context in Orca. Account auth stays on this device.'
-              )}
-        </p>
-      </div>
+    <>
+      <p className="text-xs text-muted-foreground">
+        {isRemoteAccountScope
+          ? translate(
+              'auto.components.settings.AccountsPane.remoteScopeAuthContext',
+              'Each account keeps its own sign-in context on {{value0}}.',
+              { value0: accountRuntimeSentenceLabel }
+            )
+          : translate(
+              'auto.components.settings.AccountsPane.340d6f7a85',
+              'Each account keeps its own local sign-in context in Orca. Account auth stays on this device.'
+            )}
+      </p>
 
       <SearchableSetting
         title={translate('auto.components.settings.AccountsPane.3180536c7a', 'Codex Accounts')}
@@ -295,6 +282,6 @@ export function renderCodexAccountsSection(model: AccountsPaneSectionModel): Rea
           )}
         </div>
       </SearchableSetting>
-    </section>
+    </>
   )
 }
