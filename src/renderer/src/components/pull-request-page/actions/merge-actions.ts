@@ -21,6 +21,7 @@ import { translate } from '@/i18n/i18n'
 import type { GitHubPRMergeStatePresentation } from '@/components/github-pr-merge-state'
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import { codeHostErrorText } from '@/lib/code-host-error-copy'
+import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
 
 export async function changePullRequestState(args: {
   canMutateState: boolean
@@ -181,6 +182,13 @@ export async function mergePullRequest(args: {
       return
     }
     args.applyStatePatch('merged')
+    // Why: the workspace glyph and the Checks pane still hold the pre-merge review until the cache
+    // says merged, so ask again quickly instead of waiting out the ordinary cadence.
+    startPostMergeReviewRefresh({
+      repoPath: args.repoPath ?? '',
+      repoId: args.repoId ?? args.item.repoId,
+      prNumber: args.item.number
+    })
     if (args.mergeTarget.kind === 'environment') {
       notifyWorkItemDetailsMutation(
         {

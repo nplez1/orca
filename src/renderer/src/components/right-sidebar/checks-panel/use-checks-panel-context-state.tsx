@@ -6,7 +6,7 @@ import { getGitHubPRCacheKey } from '../../../../../shared/github/github-cache-k
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
 import { isStaleMergedGitHubReviewForHead } from '@/store/slices/hosted-review-cache-state'
 import { selectReviewCacheEntry } from '../review-cache-entry-selection'
-import { selectChecksPanelReview, type ChecksPanelReview } from '../checks-panel-review'
+import { selectWorkspaceReviewState, type ChecksPanelReview } from '../checks-panel-review'
 import { isGitLabChecksPanelReview } from './gitlab-review-client'
 import { clearPendingPRCommentAiAck } from '../pr-comments-ai-launch-ack'
 import {
@@ -200,9 +200,10 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     ? null
     : (prCacheEntry?.data ?? null)
   const prCachedHasPR = prCacheEntry ? pr !== null : null
-  const hostedReview = useAppStore((s) =>
-    hostedReviewCacheKey ? (s.hostedReviewCache[hostedReviewCacheKey]?.data ?? null) : null
+  const hostedReviewEntry = useAppStore((s) =>
+    hostedReviewCacheKey ? s.hostedReviewCache[hostedReviewCacheKey] : undefined
   )
+  const hostedReview = hostedReviewEntry?.data ?? null
   const linkedReviewNumber =
     activeWorktree?.linkedPR ??
     activeWorktree?.linkedGitLabMR ??
@@ -218,9 +219,10 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   const linkedBitbucketPR = activeWorktree?.linkedBitbucketPR ?? null
   const linkedAzureDevOpsPR = activeWorktree?.linkedAzureDevOpsPR ?? null
   const linkedGiteaPR = activeWorktree?.linkedGiteaPR ?? null
-  const activeReview: ChecksPanelReview | null = selectChecksPanelReview({
-    hostedReview,
-    pr,
+  const activeReview: ChecksPanelReview | null = selectWorkspaceReviewState({
+    prEntry: prCacheEntry,
+    hostedEntry: hostedReviewEntry,
+    currentHeadOid: activeWorktree?.head,
     linkedPR,
     suppressedGitHubPR,
     linkedGitLabMR,

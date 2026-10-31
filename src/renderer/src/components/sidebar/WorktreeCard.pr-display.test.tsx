@@ -825,7 +825,9 @@ describe('WorktreeCard linked PR display', () => {
     expect(markup).not.toContain('Linked PR #6340')
   })
 
-  it('does not resurrect an older PR cache entry after a newer hosted-review miss', async () => {
+  // The Checks pane renders the PR cache for GitHub branches, so a hosted-review miss — however
+  // new — must not hide the answer the pane shows. Clearing a stale PR cache is the PR cache's job.
+  it('keeps the PR cache answer the Checks pane renders past a newer hosted-review miss', async () => {
     settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: false }
     worktreeCardProperties = ['pr']
     hostedReviewCache = {
@@ -855,10 +857,10 @@ describe('WorktreeCard linked PR display', () => {
       />
     )
 
-    expect(markup).not.toContain('Linked PR #6340')
+    expect(markup).toContain('Linked PR #6340')
   })
 
-  it('does not resurrect PR cache on the same millisecond as a hosted-review miss', async () => {
+  it('keeps the PR cache answer when a hosted-review miss shares its timestamp', async () => {
     settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: false }
     worktreeCardProperties = ['pr']
     hostedReviewCache = {
@@ -888,6 +890,6 @@ describe('WorktreeCard linked PR display', () => {
       />
     )
 
-    expect(markup).not.toContain('Linked PR #6340')
+    expect(markup).toContain('Linked PR #6340')
   })
 })

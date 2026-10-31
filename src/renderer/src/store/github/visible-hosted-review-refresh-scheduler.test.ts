@@ -365,4 +365,18 @@ describe('failed discovery retains branch admission', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(refresh).toHaveBeenCalledTimes(2)
   })
+
+  it('reconciles a settled merged review on a slow cadence instead of never asking again', async () => {
+    const refresh = vi.fn(async () => true)
+    setup([target({ fetchedAt: 1_000_000, intervalMs: 900_000, refresh })])
+    expect(refresh).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(899_999)
+    expect(refresh).not.toHaveBeenCalled()
+    // Why: a merge answer that never gets re-asked pins whichever state it last said, which is how
+    // a workspace icon came to disagree with the Checks pane until the app restarted.
+    await vi.advanceTimersByTimeAsync(1)
+    expect(refresh).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(900_000)
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
 })

@@ -9,7 +9,10 @@ import {
   getSettingsFocusedExecutionHostId,
   parseExecutionHostId
 } from '../../../../shared/execution-host'
-import { reviewRefreshIntervalMs } from '../../../../shared/review-refresh-policy'
+import {
+  CLOSED_REVIEW_REFRESH_INTERVAL_MS,
+  reviewRefreshIntervalMs
+} from '../../../../shared/review-refresh-policy'
 import {
   buildPRRefreshCandidate,
   getWorktreeLookupIndex,
@@ -142,10 +145,13 @@ export function getVisibleHostedReviewRefreshTargets(
     if (knownGitHub && !runtime) {
       continue
     }
-    const usePR =
-      knownGitHub &&
-      prEntry !== undefined &&
-      prEntry.fetchedAt >= (hostedEntry?.fetchedAt ?? -Infinity)
+    // Why: a GitHub branch is refreshed through the PR cache — the same entry the Checks pane and
+    // the sidebar glyph render — so its cadence follows that entry rather than a newer hosted-review
+    // copy that may still describe the previous state. Any other branch keeps the hosted answer,
+    // which is what discovers a non-GitHub review.
+    const usePR = knownGitHub
+      ? prEntry !== undefined
+      : prEntry !== undefined && prEntry.fetchedAt >= (hostedEntry?.fetchedAt ?? -Infinity)
     const review = usePR ? prEntry.data : hostedEntry?.data
     const fetchedAt = usePR ? prEntry.fetchedAt : (hostedEntry?.fetchedAt ?? null)
     const target: VisibleHostedReviewRefreshTarget = {
@@ -159,12 +165,16 @@ export function getVisibleHostedReviewRefreshTargets(
           ? null
           : fetchedAt,
       selected,
-      intervalMs: reviewRefreshIntervalMs({
-        state: review?.state,
-        checksStatus: usePR ? prEntry.data?.checksStatus : hostedEntry?.data?.status,
-        hasReview: review ? true : fetchedAt !== null ? false : null,
-        selected
-      }),
+      // Why: a settled merge stops the checks poller, but this lane still owns a glyph the user
+      // reads as current state. Never asking again pins whatever it last said, so a settled merge
+      // keeps reconciling on the closed-review cadence instead.
+      intervalMs:
+        reviewRefreshIntervalMs({
+          state: review?.state,
+          checksStatus: usePR ? prEntry.data?.checksStatus : hostedEntry?.data?.status,
+          hasReview: review ? true : fetchedAt !== null ? false : null,
+          selected
+        }) ?? CLOSED_REVIEW_REFRESH_INTERVAL_MS,
       refresh: async (force = true) => {
         const before = getState()
         const beforeFetchedAt = knownGitHub

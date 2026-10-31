@@ -12,6 +12,7 @@ import {
   getGitHubRuntimeRepoId
 } from '@/lib/github-source-runtime-context'
 import { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
+import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import { resolveGitHubPRMergeMethods } from '../../../../../shared/github/pull-request-merge-methods'
 import type { GitHubPRMergeMethod } from '../../../../../shared/github/pull-request-types'
@@ -227,6 +228,13 @@ export function PRActionsPanel({
         sourceContext
       })
       applyStatePatch('merged')
+      // Why: the workspace glyph and the Checks pane still hold the pre-merge review until the cache
+      // says merged, so ask again quickly instead of waiting out the ordinary cadence.
+      startPostMergeReviewRefresh({
+        repoPath: repoPath ?? '',
+        repoId: repoId ?? item.repoId,
+        prNumber: item.number
+      })
       if (mergeTarget.kind === 'environment') {
         notifyWorkItemDetailsMutation(
           {
