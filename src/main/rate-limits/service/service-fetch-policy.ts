@@ -18,6 +18,7 @@ import {
 } from '../claude-usage-window'
 import { readUserClaudeConfigDir } from '../../claude-accounts/claude-profile-paths'
 import { getClaudeProfileRouter } from '../../claude-accounts/claude-profile-installed-router'
+import { retryAfterBlocksProviderLane } from '../fork/claude-active-usage-probe'
 
 export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchTargets {
   protected getMiniMaxCredentialError(message: string): ProviderRateLimits {
@@ -81,7 +82,16 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     provider: ActiveRateLimitProvider,
     limits: ProviderRateLimits | null
   ): boolean {
-    return (provider === 'claude' || provider === 'antigravity') && this.isRetryAfterActive(limits)
+    return (
+      (provider === 'claude' || provider === 'antigravity') &&
+      this.isRetryAfterActive(limits) &&
+      !this.canRefreshThroughRetryAfter(provider)
+    )
+  }
+
+  // fork-comment-ok: the CLI probe answers without the endpoint, so its Retry-After cannot stop the lane.
+  protected canRefreshThroughRetryAfter(provider: ActiveRateLimitProvider): boolean {
+    return !retryAfterBlocksProviderLane(provider, this.shouldAllowClaudeUsagePanelSupplement())
   }
 
   protected resolveClaudeFetchApply(

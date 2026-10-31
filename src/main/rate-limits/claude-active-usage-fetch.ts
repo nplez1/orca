@@ -14,6 +14,10 @@ import { OAuthUsageError } from './claude-oauth-usage-error'
 import type { ClaudeRateLimitFetchOptions } from './claude-usage-fetch-options'
 import { abortedClaudeRateLimitResult, makeClaudeUsageResult } from './claude-usage-result'
 import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../shared/claude-profile-routing'
+import {
+  claudeUsageEndpointGatedResult,
+  readActiveClaudeUsageFromProbe
+} from './fork/claude-active-usage-probe'
 
 const SIGN_IN_AGAIN = 'Sign in again to use this account.'
 
@@ -33,6 +37,14 @@ export async function fetchActiveClaudeRateLimits(
         usageError === CLAUDE_PROFILE_MISSING_MESSAGE ? 'missing-credentials' : 'usage-unavailable',
       attemptedSources: []
     })
+  }
+  if (options?.signal?.aborted) {
+    return abortedClaudeRateLimitResult()
+  }
+  // fork-comment-ok: the plan reading the endpoint's rate limit cannot take away (local(usage)).
+  const probed = await readActiveClaudeUsageFromProbe(options)
+  if (probed) {
+    return probed
   }
   if (options?.signal?.aborted) {
     return abortedClaudeRateLimitResult()
@@ -74,6 +86,10 @@ export async function fetchActiveClaudeRateLimits(
       attemptedSources: []
     })
   }
+  const gatedRetryAtMs = endpointRetryAtMs(options)
+  if (gatedRetryAtMs !== null) {
+    return claudeUsageEndpointGatedResult(metadata, gatedRetryAtMs)
+  }
   // Why: a stored refresh token is the login; exchange it before asking for a sign-in.
   const outcome = await refreshStoredClaudeLogin(credentials, null)
   if (options?.signal?.aborted) {
@@ -93,6 +109,10 @@ async function readClaudeUsage(
   options: ClaudeRateLimitFetchOptions | undefined,
   refreshedAlready = false
 ): Promise<ProviderRateLimits> {
+  const gatedRetryAtMs = endpointRetryAtMs(options)
+  if (gatedRetryAtMs !== null) {
+    return claudeUsageEndpointGatedResult(metadata, gatedRetryAtMs)
+  }
   try {
     return await fetchClaudeOAuthUsage(token, options?.signal)
   } catch (error) {
@@ -113,6 +133,12 @@ async function readClaudeUsage(
     }
     return readClaudeUsage(outcome.accessToken, credentials, metadata, options, outcome.exchanged)
   }
+}
+
+function endpointRetryAtMs(options: ClaudeRateLimitFetchOptions | undefined): number | null {
+  // fork-comment-ok: an open Retry-After gates the endpoint request only, never the CLI probe.
+  const retryAtMs = options?.usageEndpointRetryAtMs
+  return retryAtMs && retryAtMs > Date.now() ? retryAtMs : null
 }
 
 function refreshStoredClaudeLogin(

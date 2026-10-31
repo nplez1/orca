@@ -25,6 +25,13 @@ class ObservedRateLimitService extends RateLimitService {
   }
 }
 
+// Why: a platform without the CLI usage probe (win32) is paced by the endpoint's own Retry-After.
+class EndpointOnlyClaudeService extends ObservedRateLimitService {
+  protected override canRefreshThroughRetryAfter(): boolean {
+    return false
+  }
+}
+
 const profileRouter = vi.hoisted((): { userConfigDir?: string } => ({}))
 vi.mock('../claude-accounts/claude-profile-installed-router', () => ({
   getClaudeProfileRouter: () =>
@@ -231,7 +238,7 @@ describe('RateLimitService', () => {
         }))
       mockFreshBackgroundProviderFetches()
 
-      const service = new RateLimitService()
+      const service = new EndpointOnlyClaudeService()
       service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
       service.start({ fetchImmediately: false })
       await vi.advanceTimersByTimeAsync(1000)
@@ -265,7 +272,7 @@ describe('RateLimitService', () => {
       }))
       mockFreshBackgroundProviderFetches()
 
-      const service = new RateLimitService()
+      const service = new EndpointOnlyClaudeService()
       service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
       service.start({ fetchImmediately: false })
       await vi.advanceTimersByTimeAsync(1000)
@@ -547,7 +554,7 @@ describe('RateLimitService', () => {
         .mockImplementationOnce(() => parkedClaudeFetch.promise)
         .mockImplementation(async () => okProvider('claude', 8))
       mockFreshBackgroundProviderFetches()
-      const service = new ObservedRateLimitService()
+      const service = new EndpointOnlyClaudeService()
       const window = new FakeRateLimitWindow()
       service.attach(asRateLimitWindow(window))
       const activate = async () => {

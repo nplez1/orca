@@ -104,6 +104,13 @@ vi.mock('../minimax/minimax-cookie-store', () => ({
   hasMiniMaxSessionCookie: vi.fn(() => false)
 }))
 
+// Why: a platform without the CLI usage probe (win32) is paced by the endpoint's own Retry-After.
+class EndpointOnlyClaudeService extends RateLimitService {
+  protected override canRefreshThroughRetryAfter(): boolean {
+    return false
+  }
+}
+
 describe('RateLimitService', () => {
   beforeEach(() => {
     resetRateLimitProviderMocks()
@@ -404,7 +411,7 @@ describe('RateLimitService', () => {
         .mockImplementation(async () => okProvider('claude', 18))
       mockFreshBackgroundProviderFetches()
 
-      const service = new RateLimitService()
+      const service = new EndpointOnlyClaudeService()
       const window = new FakeRateLimitWindow()
       service.attach(asRateLimitWindow(window))
       service.start({ fetchImmediately: false })

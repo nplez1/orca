@@ -243,7 +243,7 @@ describe('RateLimitService', () => {
     }
   })
 
-  it('allows usage-panel Fable supplements for inactive Claude account previews', async () => {
+  it('previews inactive Claude accounts over the endpoint, never by spawning their CLI', async () => {
     const service = new RateLimitService()
     const account = { id: 'account-1' }
     service.setInactiveClaudeAccountsResolver(() => [account])
@@ -251,12 +251,14 @@ describe('RateLimitService', () => {
 
     await service.fetchInactiveClaudeAccountsOnOpen()
 
+    // Why: one CLI probe per saved account would start a process for every row in the switcher.
     expect(fetchManagedAccountUsage).toHaveBeenCalledWith(
       account,
-      expect.objectContaining({
-        allowUsagePanelSupplement: true,
-        signal: expect.any(AbortSignal)
-      })
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(fetchManagedAccountUsage).toHaveBeenCalledWith(
+      account,
+      expect.not.objectContaining({ allowUsagePanelSupplement: expect.anything() })
     )
   })
 

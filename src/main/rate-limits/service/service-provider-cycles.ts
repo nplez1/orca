@@ -119,6 +119,9 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
       authPreparation: claudeAuthPreparation,
       allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
       allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+      usageEndpointRetryAtMs: options?.force
+        ? null
+        : (previousState.claude?.usageMetadata?.retryAtMs ?? null),
       networkProxySettings: this.networkProxySettingsResolver?.(),
       signal
     }).catch((err): ProviderRateLimits => ({

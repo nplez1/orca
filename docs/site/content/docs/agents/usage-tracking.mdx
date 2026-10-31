@@ -16,13 +16,13 @@ Orca fetches usage for Claude Code, Codex, Gemini, OpenCode Go, Kimi Code, MiniM
 
 Orca asks each provider for your usage over the network, using the login that agent already has or a key or session cookie you add in Orca Settings.
 
-For Claude, Orca requests `https://api.anthropic.com/api/oauth/usage` with the token from your existing Claude Code login; it does not ask for extra credentials. Triggers include:
+For Claude, the active account's plan usage comes from the Claude CLI's own `/usage` data, read over its control protocol without sending a message: no tokens, no quota, no conversation. That read also works while Anthropic's usage endpoint is rate limiting Orca, and it refreshes the stored Claude login when needed. Orca falls back to requesting `https://api.anthropic.com/api/oauth/usage` with the token from your existing Claude Code login (no extra credentials) when the CLI cannot answer — an API-key login, a WSL account, or Windows. Triggers include:
 
 - Once the Orca window is active after startup, then about every 15 minutes while it stays visible and focused.
 - Bringing the window back to the front when the last check is more than 5 minutes old (sooner after a failed check).
 - Switching the active Claude account or the runtime it runs in.
 - Refreshing usage from the **Usage** popover or a Settings control that refreshes all usage, or changing OpenCode Go, MiniMax, or GLM Coding Plan usage credentials or settings. These refresh every provider, Claude included.
-- Expanding the account list in the status bar's Claude account switcher, which fetches your other saved Claude accounts. The list opens expanded when an account needs sign-in.
+- Expanding the account list in the status bar's Claude account switcher, which fetches your other saved Claude accounts over the endpoint only, so one saved account cannot start a process. The list opens expanded when an account needs sign-in.
 - Orca Mobile or the web client connecting to this host or refreshing usage, which also fetches your other saved Claude accounts.
 
 ## Multi-account accounting

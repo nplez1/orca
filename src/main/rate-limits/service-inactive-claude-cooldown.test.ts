@@ -44,6 +44,9 @@ vi.mock('./claude-pty', () => ({
     throw new Error('Usage fixture must not launch Claude')
   })
 }))
+vi.mock('./fork/claude-cli-usage-probe', () => ({
+  readClaudeUsageFromCli: vi.fn(async () => null)
+}))
 // Why also the raw Keychain reader: a 401 starts a token exchange, which re-reads the item; this
 // fixture's item is a stand-in on disk and must never reach the real `security` binary.
 vi.mock('../macos-keychain/generic-password', () => ({

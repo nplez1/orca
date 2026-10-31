@@ -106,7 +106,7 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
       // Failed startup reads remain eligible for provider-throttled activation recovery.
       if (limits.status === 'error') {
         // Respect server Retry-After rather than spending budget and prolonging 429s.
-        if (this.isRetryAfterActive(limits)) {
+        if (this.isRetryAfterActive(limits) && !this.canRefreshThroughRetryAfter(provider)) {
           continue
         }
         const lastRetryAt = this.lastActiveFailureRetryAtByProvider[provider]

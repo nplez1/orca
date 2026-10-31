@@ -252,6 +252,64 @@ Tests that pin the mechanism: `config/scripts/fork-english-catalog.test.mjs`,
 `config/scripts/rebuild-and-relaunch-installed-macos-arm64.sh`: build locally and install over the
 running app. Convenience only — not for upstream.
 
+### `local(usage)`: Claude usage is read from the CLI, not only from a rate-limited endpoint
+
+Anchor: `src/main/rate-limits/fork/claude-cli-usage-probe.ts`,
+`src/main/rate-limits/fork/claude-cli-usage-response.ts`,
+`src/main/rate-limits/fork/claude-active-usage-probe.ts`,
+`src/main/rate-limits/claude-active-usage-fetch.ts` (one probe-first hunk),
+`src/main/rate-limits/service/service-fetch-policy.ts`,
+`src/main/rate-limits/service/service-polling.ts`,
+`src/main/rate-limits/service/service-provider-cycles.ts`,
+`src/main/rate-limits/service/service-full-cycle-preparation.ts`,
+`src/main/rate-limits/service/service-inactive-accounts.ts`.
+
+**The symptom.** Claude usage sat still unless a Claude session ran and posted a statusline receipt.
+The cause is upstream's single source: `GET /api/oauth/usage` with the stored token. Measured on this
+machine 2026-10-31, that endpoint answers **429 with `retry-after: 3600`** for the logged-in account;
+`claude-agent-sdk-control-requests.ts` no longer carries the `get_usage` control request either, so
+`/usage` in a session was the only live path, and `claude-statusline-rate-limits.ts` says so in
+passing ("avoiding usage-endpoint polling that 429s under Orca"). A `Retry-After` then froze the
+_whole Claude lane_ for an hour: `shouldSkipAutomatedFetch` and the activation plan both refused to
+refresh a provider whose only cure was the endpoint that had just refused it.
+
+**What the fork does.** Runs the CLI the account already has and asks its own control protocol for
+the `/usage` panel data — `get_usage` with `skip_behaviors: true`, over Orca's usual SDK spawn hook,
+with `settingSources: []` so a workspace's hooks, plugins and statusline cannot run. Measured on this
+machine: **278 ms**, `session 7% / weekly 7% / Fable 0%`, `total_cost_usd: 0`, no transcript, no
+orphan process, and it works while the endpoint 429s. Upstream's removed hidden-PTY fallback is not
+what this is: no PTY, no typed `/usage`, no "y" to a trust prompt, no browser sign-in — a control
+request cannot drive a login picker.
+
+- **Probe first, endpoint second.** `fetchActiveClaudeRateLimits` reads the probe before it reads
+  credentials, so a healthy account never asks the endpoint at all. The endpoint stays as the
+  fallback for an API-key login, a WSL account (the login lives in the guest), Windows, and any CLI
+  that answers nothing.
+- **`Retry-After` gates the request, never the lane.** `usageEndpointRetryAtMs` carries an open
+  `Retry-After` into the fetch, which then refuses to call the endpoint without freezing the provider
+  that has a second way to answer. A user refresh still passes (`options.force`).
+- **Off by one platform.** The probe rides upstream's existing `allowUsagePanelSupplement` flag,
+  which is false on win32 — so Windows keeps exactly upstream's behaviour until someone measures the
+  probe there. That flag now means what it says; `allowPtyFallback` stays unused.
+- **Inactive previews never probe.** One CLI start per saved account, per switcher open, is not a
+  price worth paying for rows nobody is looking at, so `service-inactive-accounts.ts` no longer passes
+  the supplement and previews read the endpoint as before.
+- **`usageMetadata.source` is `'cli'`**, a value `shared/rate-limit-types.ts` already carries.
+
+**Cost of the probe, stated so it is not a surprise.** A warm start answers in ~0.3–0.5 s and spends
+no tokens; the 15-minute cadence is upstream's, not a new timer. It does write the account's
+`.claude.json` (Claude Code's own bookkeeping, with its rotating `.claude.json.backup.*`), which is
+the same write a session start makes.
+
+**Tests that hold the line.** `fork/claude-cli-usage-response.test.ts` pins the payload mapping against
+a captured 2.1.316 reply; `fork/claude-cli-usage-probe.test.ts` pins command/cwd/env, the abort paths
+and the "no payload is not a reading" rule; `fork/claude-active-usage-fetch-probe.test.ts` pins
+probe-first (the endpoint is never called), the open `Retry-After` (the endpoint is not called but the
+fetch still reports the wait), the WSL/`usageError`/opt-out cases; `fork/service-claude-usage-probe.test.ts`
+pins that a `Retry-After` no longer freezes a lane on activation _or_ on the timer. The upstream
+suites that described the endpoint-only platform (win32) now say so through
+`EndpointOnlyClaudeService`, which is the one behaviour split worth reading twice.
+
 ### `local(usage)`: Claude's spend cap is upstream's, Codex's stays ours
 
 Anchor: `src/main/rate-limits/claude-oauth-usage-request.ts`,
