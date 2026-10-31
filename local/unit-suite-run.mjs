@@ -15,17 +15,30 @@ const UNIT_LANE_ENV = { ORCA_BALANCE_UNIT_SHARDS: '1' }
  *  reported as `EnvironmentTeardownError: Cannot load …` against the next file (LOCAL-PATCHES.md,
  *  2026-10-25 sync). Narrower than setting `CI`, which other suites read for their own behaviour. */
 const UNIT_LANE_ARGS = ['--experimental.recordDependencies=false']
+/** Why: an agent session inherits the app's own WSL gate state, and `isWslHostsServing` trusts an
+ *  inherited value over the gate env. The store's fail-closed cases then invert and their three tests
+ *  red — reproduced in isolation, green with this var cleared. A verdict must not depend on which
+ *  shell started the gate, so the suite runs in a neutral gate. */
+const INHERITED_APP_ENV = ['ORCA_WSL_HOSTS_GATE_STATE', 'ORCA_INTERNAL_WSL_HOSTS']
 /** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
 const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
 const RUN_VITEST = join(ROOT, 'config', 'scripts', 'run-vitest.mjs')
+
+function childEnv(env) {
+  // Why the merge rather than a bare env: PATH and the Bun pin have to survive the overlay.
+  const merged = env ? { ...process.env, ...env } : { ...process.env }
+  for (const name of INHERITED_APP_ENV) {
+    delete merged[name]
+  }
+  return merged
+}
 
 function runStep(label, program, args, logFd, timeoutMs, env) {
   process.stderr.write(`gate-unit: ${label}\n`)
   const started = Date.now()
   const result = spawnSync(program, args, {
     cwd: ROOT,
-    // Why the merge rather than a bare env: PATH and the Bun pin have to survive the overlay.
-    env: env ? { ...process.env, ...env } : process.env,
+    env: childEnv(env),
     stdio: ['ignore', logFd, logFd],
     timeout: timeoutMs,
     killSignal: 'SIGKILL'
