@@ -836,3 +836,33 @@ describe('getCmdJTaskUrlCreatePreview', () => {
     expect(withResolvedCmdJGitHubPreview(preview, null, true).loading).toBe(true)
   })
 })
+
+describe('fork identity keys in the palette matcher', () => {
+  it('matches a fork’s own URL once the key set is known', () => {
+    // Why: `deriveGitRemoteIdentity` prefers upstream, so the fork's issues only resolve through
+    // the extra keys — without them a fork's own bare-iid task never matched its workspace.
+    const forkRepo: Repo = {
+      ...gitHubRepo('github.com/stablyai/orca'),
+      gitRemoteIdentity: {
+        canonicalKey: 'github.com/stablyai/orca',
+        remoteName: 'upstream',
+        remoteUrl: 'git@github.com:stablyai/orca.git',
+        remoteKeys: ['github.com/stablyai/orca', 'github.com/nplez1/orca']
+      }
+    }
+    expect(
+      matchWorktreePaletteTaskUrl({
+        worktree: makeWorktree({ linkedPR: 255 }),
+        intent: parseCmdJTaskSourceUrl('https://github.com/nplez1/orca/pull/255')!,
+        repo: forkRepo
+      })
+    ).toMatchObject({ matchedFields: ['pr'] })
+    expect(
+      matchWorktreePaletteTaskUrl({
+        worktree: makeWorktree({ linkedPR: 255 }),
+        intent: parseCmdJTaskSourceUrl('https://github.com/other/orca/pull/255')!,
+        repo: forkRepo
+      })
+    ).toBeNull()
+  })
+})

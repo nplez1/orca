@@ -1,5 +1,6 @@
 import { foldComparableGitLabHost } from '../../../shared/git-remote-host-alias'
 import {
+  gitRemoteIdentityKeys,
   matchGitRemoteKeyParts,
   splitGitRemoteKey,
   type GitRemoteKeyParts
@@ -42,15 +43,28 @@ function gitLabLinksEqual(left: GitLabIssueOrMRLink, right: GitLabIssueOrMRLink)
 
 /** Tri-state: `'unknown'` (no identity, or an unexpanded SSH host alias) stays permissive. */
 function repoMatchesGitLabSlug(repo: Repo | undefined, slug: ProjectSlug): boolean | 'unknown' {
-  const identityParts = splitGitRemoteKey(
-    repo?.gitRemoteIdentity?.canonicalKey,
-    foldComparableGitLabHost
-  )
-  if (!identityParts) {
+  const target = gitLabProjectKeyParts(slug)
+  // Every remote counts: a fork's own issues live on origin while the primary key names its parent.
+  const identityKeys = gitRemoteIdentityKeys(repo?.gitRemoteIdentity)
+  if (identityKeys.length === 0) {
     return 'unknown'
   }
-  // Resolved identities re-probe after ~6h TTL, so project mismatches are authoritative. Accepted gap: only one remote is kept; preferred upstream hides a fork’s origin and rejects its bare-iid matches.
-  return matchGitRemoteKeyParts(identityParts, gitLabProjectKeyParts(slug))
+  let permissive = false
+  for (const identityKey of identityKeys) {
+    const identityParts = splitGitRemoteKey(identityKey, foldComparableGitLabHost)
+    if (!identityParts) {
+      continue
+    }
+    const verdict = matchGitRemoteKeyParts(identityParts, target)
+    if (verdict === true) {
+      return true
+    }
+    if (verdict === 'unknown') {
+      permissive = true
+    }
+  }
+  // An unexpanded SSH host alias is unknown evidence, not a mismatch.
+  return permissive ? 'unknown' : false
 }
 
 export function worktreeMatchesGitLabUrl(

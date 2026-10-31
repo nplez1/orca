@@ -1,5 +1,6 @@
 import { foldComparableGitHubHost } from '../../../shared/git-remote-host-alias'
 import {
+  gitRemoteIdentityKeys,
   matchGitRemoteKeyParts,
   splitGitRemoteKey,
   type GitRemoteKeyParts
@@ -95,16 +96,33 @@ function githubRemoteKeyParts(slug: RepoSlug): GitRemoteKeyParts {
 
 function remoteIdentityMatchesGitHubSlug(repo: Repo, slug: RepoSlug): boolean | 'unknown' {
   const identity = repo.gitRemoteIdentity
-  const identityParts = splitGitRemoteKey(identity?.canonicalKey, foldComparableGitHubHost)
-  if (!identityParts) {
+  const target = githubRemoteKeyParts(slug)
+  // Every remote counts: a fork's own issues live on origin while the primary key names its parent.
+  const identityKeys = gitRemoteIdentityKeys(identity)
+  if (identityKeys.length === 0) {
     return 'unknown'
   }
-  const verdict = matchGitRemoteKeyParts(identityParts, githubRemoteKeyParts(slug))
-  if (verdict !== false) {
-    return verdict
+  let permissive = false
+  for (const identityKey of identityKeys) {
+    const identityParts = splitGitRemoteKey(identityKey, foldComparableGitHubHost)
+    if (!identityParts) {
+      continue
+    }
+    const verdict = matchGitRemoteKeyParts(identityParts, target)
+    if (verdict === true) {
+      return true
+    }
+    if (verdict === 'unknown') {
+      permissive = true
+    }
   }
-  // Single-remote identity can hide a fork’s origin behind upstream; remain permissive for fork URLs. GitLab makes the opposite trade (STA-4450); alignment needs a separate change.
-  return identity?.remoteName === 'upstream' ? 'unknown' : false
+  // An unexpanded SSH host alias is unknown evidence, not a mismatch.
+  if (permissive) {
+    return 'unknown'
+  }
+  // A record that predates the key set hides a fork's origin behind upstream, so its mismatch is
+  // not authoritative yet; the identity probe fills the key set in shortly.
+  return identity?.remoteName === 'upstream' && !identity.remoteKeys?.length ? 'unknown' : false
 }
 
 /** Tri-state: `'unknown'` stays permissive for forks and host aliases. */
