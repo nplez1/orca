@@ -94,7 +94,6 @@ describe('Claude usage polling', () => {
       expect(service.getState().claude?.status).toBe('ok')
       expect(service.getState().claude?.session?.usedPercent).toBe(31)
       expect(service.getState().claude?.usageMetadata?.source).toBe('cli')
-      expect(service.getState().claude?.usageMetadata?.retryAtMs).toBeUndefined()
 
       service.stop()
     } finally {

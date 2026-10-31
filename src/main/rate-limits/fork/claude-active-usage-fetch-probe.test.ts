@@ -72,6 +72,22 @@ describe('Claude usage without a running session', () => {
     expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
   })
 
+  it('carries an open endpoint wait through a probe reading that answers', async () => {
+    vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
+    const retryAtMs = Date.now() + 40 * 60 * 1000
+
+    const result = await fetchActiveClaudeRateLimits({
+      ...profileOptions,
+      allowUsagePanelSupplement: true,
+      usageEndpointRetryAtMs: retryAtMs
+    })
+
+    // Why: a probe that answers now must not licence the endpoint while its own wait is still open.
+    expect(result.session?.usedPercent).toBe(31)
+    expect(result.usageMetadata?.retryAtMs).toBe(retryAtMs)
+    expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
+  })
+
   it('keeps the endpoint closed while its Retry-After is open and the probe cannot answer', async () => {
     const now = Date.now()
     const result = await fetchActiveClaudeRateLimits({
