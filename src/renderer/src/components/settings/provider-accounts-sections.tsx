@@ -3,6 +3,7 @@ import type { DisableableUsageProviderId } from '../../../../shared/usage-provid
 import { ZCODE_PLAN_SITE_CONSOLE_URLS } from '../../../../shared/zcode-plan-sites'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { translate } from '@/i18n/i18n'
+import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { AgentIcon } from '@/lib/agent-catalog'
 import {
   ClaudeIcon,
@@ -61,8 +62,12 @@ export type ProviderAccountsSectionContext = {
  * One entry per provider in AI Provider Accounts. The pane walks this list instead
  * of enumerating sections by hand, so the header, the usage switch and the
  * search-filtered mount arrive together: a provider cannot be added here without
- * getting a switch, and `provider-account-sections.test.ts` holds this list and
+ * getting a switch, and `provider-accounts-sections.test.ts` holds this list and
  * `USAGE_PROVIDER_IDS` to the same set.
+ *
+ * Localized per read, not per import: the titles and descriptions are the header
+ * copy and the switch's accessible name, so a language change with no reload must
+ * retranslate them.
  */
 export type ProviderAccountsSectionEntry = {
   id: DisableableUsageProviderId
@@ -90,245 +95,250 @@ const AntigravityIcon: ProviderAccountsIcon = ({ size }) => (
 )
 const ZcodeIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="zcode" size={size} />
 
-export const PROVIDER_ACCOUNTS_SECTIONS: readonly ProviderAccountsSectionEntry[] = [
-  {
-    id: 'claude',
-    title: translate('auto.components.settings.AccountsPane.26ef4b55be', 'Claude'),
-    description: translate(
-      'auto.components.settings.AccountsPane.72b36ea174',
-      'Optional. Orca can use your normal Claude login; add accounts only if you want quick switching without moving chat sessions.'
-    ),
-    Icon: ClaudeIcon,
-    searchEntries: getAccountsClaudeSearchEntries,
-    renderBody: ({ model }) => renderClaudeAccountsSection(model)
-  },
-  {
-    id: 'codex',
-    title: translate('auto.components.settings.AccountsPane.ef91cfa06b', 'Codex'),
-    description: translate(
-      'auto.components.settings.AccountsPane.cedfab35ab',
-      'Optional. Orca can use your normal Codex login; add accounts only if you want quick switching in Orca.'
-    ),
-    Icon: OpenAIIcon,
-    searchEntries: getAccountsCodexSearchEntries,
-    renderBody: ({ model }) => renderCodexAccountsSection(model)
-  },
-  {
-    id: 'gemini',
-    title: translate('auto.components.settings.AccountsPane.aa4de4475b', 'Gemini CLI (legacy)'),
-    description: translate(
-      'auto.components.settings.AccountsPane.973741a871',
-      'Keep existing Gemini CLI sessions available. Gemini credentials do not sign you into Antigravity.'
-    ),
-    Icon: GeminiIcon,
-    searchEntries: getAccountsGeminiSearchEntries,
-    renderBody: ({ model }) => renderGeminiAccountsSection(model)
-  },
-  {
-    id: 'antigravity',
-    title: translate('accounts.antigravity.title', 'Antigravity'),
-    description: ({ model }) =>
-      translate('accounts.antigravity.scope', 'Manage the native agy account on {{host}}.', {
-        host: model.accountRuntimeSentenceLabel
-      }),
-    Icon: AntigravityIcon,
-    searchEntries: getAccountsAntigravitySearchEntries,
-    renderBody: ({ model, accountOwner, accountOwnerKey, accountOwnerPlatform }) => (
-      <AntigravityAccountsSection
-        key={`antigravity:${accountOwnerKey}:${model.accountRuntime.runtime}:${model.accountRuntime.wslDistro ?? ''}`}
-        owner={accountOwner}
-        target={{
-          runtime: model.accountRuntime.runtime,
-          wslDistro: model.accountRuntime.wslDistro
-        }}
-        label={model.accountRuntimeSentenceLabel}
-        ownerPlatform={accountOwnerPlatform}
-      />
-    )
-  },
-  {
-    id: 'opencode-go',
-    title: translate('auto.components.settings.AccountsPane.4ac10b4d08', 'OpenCode Go'),
-    description: translate(
-      'auto.components.settings.AccountsPane.ea631977b5',
-      'Configure OpenCode Go provider settings.'
-    ),
-    Icon: OpenCodeGoIcon,
-    searchEntries: getAccountsOpencodeSearchEntries,
-    renderBody: ({ model }) => renderOpenCodeAccountsSection(model)
-  },
-  {
-    id: 'kimi',
-    title: translate('auto.components.settings.ProviderAccountsSection.kimiTitle', 'Kimi'),
-    // Why: Kimi has no pane credentials — its sign-in lives in Kimi Code's own home.
-    description: translate(
-      'auto.components.settings.ProviderAccountsSection.kimiDescription',
-      'Usage comes from the Kimi Code sign-in already on this computer; there is nothing to set up here.'
-    ),
-    Icon: KimiIcon,
-    searchEntries: getAccountsKimiSearchEntries
-  },
-  {
-    id: 'minimax',
-    title: translate('auto.components.settings.AccountsPane.5d63bbfbec', 'MiniMax'),
-    description: translate(
-      'auto.components.settings.AccountsPane.usageTracking',
-      'Configure MiniMax usage tracking for your account.'
-    ),
-    Icon: MiniMaxIcon,
-    searchEntries: getAccountsMiniMaxSearchEntries,
-    headerAction: ({ usageHostSettings }) => (
-      <ProviderHeaderLink
-        href={getMiniMaxConsoleUrl(usageHostSettings.settings)}
-        label={translate('auto.components.settings.AccountsPane.0d8e77bc40', 'Open console')}
-      />
-    ),
-    renderBody: ({ model, accountOwnerKey, usageCredentialHost, usageHostSettings }) => (
-      <MiniMaxAccountsSection
-        key={`minimax:${accountOwnerKey}`}
-        host={usageCredentialHost}
-        usageSettings={usageHostSettings}
-        miniMaxRateLimits={model.isRemoteAccountScope ? null : model.miniMaxRateLimits}
-        recordFeatureInteraction={model.recordFeatureInteraction}
-      />
-    )
-  },
-  {
-    id: 'deepseek',
-    title: translate(
-      'auto.components.settings.accounts.pane.deepseek.section.28c8b91c5d',
-      'DeepSeek'
-    ),
-    description: translate(
-      'auto.components.settings.accounts.pane.deepseek.section.53ce175669',
-      'Configure DeepSeek usage tracking for your account.'
-    ),
-    Icon: DeepSeekIcon,
-    searchEntries: getAccountsDeepSeekSearchEntries,
-    headerAction: () => (
-      <ProviderHeaderLink
-        href={DEEPSEEK_CONSOLE_URL}
-        label={translate(
-          'auto.components.settings.accounts.pane.deepseek.section.47e631f32d',
-          'Open console'
-        )}
-      />
-    ),
-    renderBody: ({ model }) => renderDeepSeekAccountsSection(model)
-  },
-  {
-    id: 'fireworks',
-    title: translate(
-      'auto.components.settings.accounts.pane.fireworks.section.51bcc16ae3',
-      'Fireworks.ai'
-    ),
-    description: translate(
-      'auto.components.settings.accounts.pane.fireworks.section.5f31aaba69',
-      'Configure Fireworks.ai usage tracking for your account.'
-    ),
-    Icon: FireworksIcon,
-    searchEntries: getAccountsFireworksSearchEntries,
-    headerAction: () => (
-      <ProviderHeaderLink
-        href={FIREWORKS_CONSOLE_URL}
-        label={translate(
-          'auto.components.settings.accounts.pane.fireworks.section.d8c675f9f0',
-          'Open console'
-        )}
-      />
-    ),
-    renderBody: ({ model }) => renderFireworksAccountsSection(model)
-  },
-  {
-    id: 'copilot',
-    title: translate(
-      'auto.components.settings.accounts.pane.copilot.section.dc3eaf8d70',
-      'GitHub Copilot'
-    ),
-    description: translate(
-      'auto.components.settings.accounts.pane.copilot.section.ed307672cd',
-      'Configure GitHub Copilot usage tracking for your account.'
-    ),
-    Icon: CopilotIcon,
-    searchEntries: getAccountsCopilotSearchEntries,
-    headerAction: () => (
-      <ProviderHeaderLink
-        href={COPILOT_TOKENS_URL}
-        label={translate(
-          'auto.components.settings.accounts.pane.copilot.section.f8bb20c24c',
-          'Open console'
-        )}
-      />
-    ),
-    renderBody: ({ model }) => renderCopilotAccountsSection(model)
-  },
-  {
-    id: 'grok',
-    title: translate('auto.components.settings.GrokAccountsSection.a1b2c3d4e5', 'Grok (xAI)'),
-    description: translate(
-      'auto.components.settings.GrokAccountsSection.f6e5d4c3b2',
-      'Shows weekly credit usage from your Grok CLI sign-in (session file ~/.grok/auth.json).'
-    ),
-    Icon: GrokIcon,
-    searchEntries: getAccountsGrokSearchEntries,
-    headerAction: () => (
-      <ProviderHeaderLink
-        href={GROK_CLI_DOCS_URL}
-        label={translate(
-          'auto.components.settings.GrokAccountsSection.0d8e77bc40',
-          'Grok CLI docs'
-        )}
-      />
-    ),
-    renderBody: () => <GrokAccountsSection key="grok" />
-  },
-  {
-    id: 'cursor',
-    title: translate('auto.components.settings.CursorAccountsSection.title', 'Cursor'),
-    description: translate(
-      'auto.components.settings.CursorAccountsSection.subtitle',
-      'Shows your Cursor plan usage from the sign-in already on this computer. Orca only reads it — it never changes your Cursor login.'
-    ),
-    Icon: CursorIcon,
-    searchEntries: getAccountsCursorSearchEntries,
-    headerAction: () => (
-      <ProviderHeaderLink
-        href={CURSOR_USAGE_DASHBOARD_URL}
-        label={translate(
-          'auto.components.settings.CursorAccountsSection.dashboardLink',
-          'Cursor dashboard'
-        )}
-      />
-    ),
-    renderBody: () => <CursorAccountsSection key="cursor" />
-  },
-  {
-    id: 'zcode',
-    title: translate('auto.components.settings.ZcodePlanAccountsSection.title', 'GLM Coding Plan'),
-    description: translate(
-      'auto.components.settings.ZcodePlanAccountsSection.subtitle',
-      'Track Z.AI or Zhipu (BigModel) GLM Coding Plan usage in the status bar. Save the plan API key here — no ZCode CLI setup needed.'
-    ),
-    Icon: ZcodeIcon,
-    searchEntries: getAccountsZcodePlanSearchEntries,
-    headerAction: ({ usageCredentialHost, usageHostSettings }) => {
-      const site = resolveZcodePlanSite(usageHostSettings, usageCredentialHost)
-      return site ? (
+export const getProviderAccountsSections = createLocalizedCatalog(
+  (): ProviderAccountsSectionEntry[] => [
+    {
+      id: 'claude',
+      title: translate('auto.components.settings.AccountsPane.26ef4b55be', 'Claude'),
+      description: translate(
+        'auto.components.settings.AccountsPane.72b36ea174',
+        'Optional. Orca can use your normal Claude login; add accounts only if you want quick switching without moving chat sessions.'
+      ),
+      Icon: ClaudeIcon,
+      searchEntries: getAccountsClaudeSearchEntries,
+      renderBody: ({ model }) => renderClaudeAccountsSection(model)
+    },
+    {
+      id: 'codex',
+      title: translate('auto.components.settings.AccountsPane.ef91cfa06b', 'Codex'),
+      description: translate(
+        'auto.components.settings.AccountsPane.cedfab35ab',
+        'Optional. Orca can use your normal Codex login; add accounts only if you want quick switching in Orca.'
+      ),
+      Icon: OpenAIIcon,
+      searchEntries: getAccountsCodexSearchEntries,
+      renderBody: ({ model }) => renderCodexAccountsSection(model)
+    },
+    {
+      id: 'gemini',
+      title: translate('auto.components.settings.AccountsPane.aa4de4475b', 'Gemini CLI (legacy)'),
+      description: translate(
+        'auto.components.settings.AccountsPane.973741a871',
+        'Keep existing Gemini CLI sessions available. Gemini credentials do not sign you into Antigravity.'
+      ),
+      Icon: GeminiIcon,
+      searchEntries: getAccountsGeminiSearchEntries,
+      renderBody: ({ model }) => renderGeminiAccountsSection(model)
+    },
+    {
+      id: 'antigravity',
+      title: translate('accounts.antigravity.title', 'Antigravity'),
+      description: ({ model }) =>
+        translate('accounts.antigravity.scope', 'Manage the native agy account on {{host}}.', {
+          host: model.accountRuntimeSentenceLabel
+        }),
+      Icon: AntigravityIcon,
+      searchEntries: getAccountsAntigravitySearchEntries,
+      renderBody: ({ model, accountOwner, accountOwnerKey, accountOwnerPlatform }) => (
+        <AntigravityAccountsSection
+          key={`antigravity:${accountOwnerKey}:${model.accountRuntime.runtime}:${model.accountRuntime.wslDistro ?? ''}`}
+          owner={accountOwner}
+          target={{
+            runtime: model.accountRuntime.runtime,
+            wslDistro: model.accountRuntime.wslDistro
+          }}
+          label={model.accountRuntimeSentenceLabel}
+          ownerPlatform={accountOwnerPlatform}
+        />
+      )
+    },
+    {
+      id: 'opencode-go',
+      title: translate('auto.components.settings.AccountsPane.4ac10b4d08', 'OpenCode Go'),
+      description: translate(
+        'auto.components.settings.AccountsPane.ea631977b5',
+        'Configure OpenCode Go provider settings.'
+      ),
+      Icon: OpenCodeGoIcon,
+      searchEntries: getAccountsOpencodeSearchEntries,
+      renderBody: ({ model }) => renderOpenCodeAccountsSection(model)
+    },
+    {
+      id: 'kimi',
+      title: translate('auto.components.settings.ProviderAccountsSection.kimiTitle', 'Kimi'),
+      // Why: Kimi has no pane credentials — its sign-in lives in Kimi Code's own home.
+      description: translate(
+        'auto.components.settings.ProviderAccountsSection.kimiDescription',
+        'Usage comes from the Kimi Code sign-in already on this computer; there is nothing to set up here.'
+      ),
+      Icon: KimiIcon,
+      searchEntries: getAccountsKimiSearchEntries
+    },
+    {
+      id: 'minimax',
+      title: translate('auto.components.settings.AccountsPane.5d63bbfbec', 'MiniMax'),
+      description: translate(
+        'auto.components.settings.AccountsPane.usageTracking',
+        'Configure MiniMax usage tracking for your account.'
+      ),
+      Icon: MiniMaxIcon,
+      searchEntries: getAccountsMiniMaxSearchEntries,
+      headerAction: ({ usageHostSettings }) => (
         <ProviderHeaderLink
-          href={ZCODE_PLAN_SITE_CONSOLE_URLS[site]}
+          href={getMiniMaxConsoleUrl(usageHostSettings.settings)}
+          label={translate('auto.components.settings.AccountsPane.0d8e77bc40', 'Open console')}
+        />
+      ),
+      renderBody: ({ model, accountOwnerKey, usageCredentialHost, usageHostSettings }) => (
+        <MiniMaxAccountsSection
+          key={`minimax:${accountOwnerKey}`}
+          host={usageCredentialHost}
+          usageSettings={usageHostSettings}
+          miniMaxRateLimits={model.isRemoteAccountScope ? null : model.miniMaxRateLimits}
+          recordFeatureInteraction={model.recordFeatureInteraction}
+        />
+      )
+    },
+    {
+      id: 'deepseek',
+      title: translate(
+        'auto.components.settings.accounts.pane.deepseek.section.28c8b91c5d',
+        'DeepSeek'
+      ),
+      description: translate(
+        'auto.components.settings.accounts.pane.deepseek.section.53ce175669',
+        'Configure DeepSeek usage tracking for your account.'
+      ),
+      Icon: DeepSeekIcon,
+      searchEntries: getAccountsDeepSeekSearchEntries,
+      headerAction: () => (
+        <ProviderHeaderLink
+          href={DEEPSEEK_CONSOLE_URL}
           label={translate(
-            'auto.components.settings.ZcodePlanAccountsSection.consoleLink',
-            'Get API key'
+            'auto.components.settings.accounts.pane.deepseek.section.47e631f32d',
+            'Open console'
           )}
         />
-      ) : null
+      ),
+      renderBody: ({ model }) => renderDeepSeekAccountsSection(model)
     },
-    renderBody: ({ accountOwnerKey, usageCredentialHost, usageHostSettings }) => (
-      <ZcodePlanAccountsSection
-        key={`zcode:${accountOwnerKey}`}
-        host={usageCredentialHost}
-        usageSettings={usageHostSettings}
-      />
-    )
-  }
-]
+    {
+      id: 'fireworks',
+      title: translate(
+        'auto.components.settings.accounts.pane.fireworks.section.51bcc16ae3',
+        'Fireworks.ai'
+      ),
+      description: translate(
+        'auto.components.settings.accounts.pane.fireworks.section.5f31aaba69',
+        'Configure Fireworks.ai usage tracking for your account.'
+      ),
+      Icon: FireworksIcon,
+      searchEntries: getAccountsFireworksSearchEntries,
+      headerAction: () => (
+        <ProviderHeaderLink
+          href={FIREWORKS_CONSOLE_URL}
+          label={translate(
+            'auto.components.settings.accounts.pane.fireworks.section.d8c675f9f0',
+            'Open console'
+          )}
+        />
+      ),
+      renderBody: ({ model }) => renderFireworksAccountsSection(model)
+    },
+    {
+      id: 'copilot',
+      title: translate(
+        'auto.components.settings.accounts.pane.copilot.section.dc3eaf8d70',
+        'GitHub Copilot'
+      ),
+      description: translate(
+        'auto.components.settings.accounts.pane.copilot.section.ed307672cd',
+        'Configure GitHub Copilot usage tracking for your account.'
+      ),
+      Icon: CopilotIcon,
+      searchEntries: getAccountsCopilotSearchEntries,
+      headerAction: () => (
+        <ProviderHeaderLink
+          href={COPILOT_TOKENS_URL}
+          label={translate(
+            'auto.components.settings.accounts.pane.copilot.section.f8bb20c24c',
+            'Open console'
+          )}
+        />
+      ),
+      renderBody: ({ model }) => renderCopilotAccountsSection(model)
+    },
+    {
+      id: 'grok',
+      title: translate('auto.components.settings.GrokAccountsSection.a1b2c3d4e5', 'Grok (xAI)'),
+      description: translate(
+        'auto.components.settings.GrokAccountsSection.f6e5d4c3b2',
+        'Shows weekly credit usage from your Grok CLI sign-in (session file ~/.grok/auth.json).'
+      ),
+      Icon: GrokIcon,
+      searchEntries: getAccountsGrokSearchEntries,
+      headerAction: () => (
+        <ProviderHeaderLink
+          href={GROK_CLI_DOCS_URL}
+          label={translate(
+            'auto.components.settings.GrokAccountsSection.0d8e77bc40',
+            'Grok CLI docs'
+          )}
+        />
+      ),
+      renderBody: () => <GrokAccountsSection key="grok" />
+    },
+    {
+      id: 'cursor',
+      title: translate('auto.components.settings.CursorAccountsSection.title', 'Cursor'),
+      description: translate(
+        'auto.components.settings.CursorAccountsSection.subtitle',
+        'Shows your Cursor plan usage from the sign-in already on this computer. Orca only reads it — it never changes your Cursor login.'
+      ),
+      Icon: CursorIcon,
+      searchEntries: getAccountsCursorSearchEntries,
+      headerAction: () => (
+        <ProviderHeaderLink
+          href={CURSOR_USAGE_DASHBOARD_URL}
+          label={translate(
+            'auto.components.settings.CursorAccountsSection.dashboardLink',
+            'Cursor dashboard'
+          )}
+        />
+      ),
+      renderBody: () => <CursorAccountsSection key="cursor" />
+    },
+    {
+      id: 'zcode',
+      title: translate(
+        'auto.components.settings.ZcodePlanAccountsSection.title',
+        'GLM Coding Plan'
+      ),
+      description: translate(
+        'auto.components.settings.ZcodePlanAccountsSection.subtitle',
+        'Track Z.AI or Zhipu (BigModel) GLM Coding Plan usage in the status bar. Save the plan API key here — no ZCode CLI setup needed.'
+      ),
+      Icon: ZcodeIcon,
+      searchEntries: getAccountsZcodePlanSearchEntries,
+      headerAction: ({ usageCredentialHost, usageHostSettings }) => {
+        const site = resolveZcodePlanSite(usageHostSettings, usageCredentialHost)
+        return site ? (
+          <ProviderHeaderLink
+            href={ZCODE_PLAN_SITE_CONSOLE_URLS[site]}
+            label={translate(
+              'auto.components.settings.ZcodePlanAccountsSection.consoleLink',
+              'Get API key'
+            )}
+          />
+        ) : null
+      },
+      renderBody: ({ accountOwnerKey, usageCredentialHost, usageHostSettings }) => (
+        <ZcodePlanAccountsSection
+          key={`zcode:${accountOwnerKey}`}
+          host={usageCredentialHost}
+          usageSettings={usageHostSettings}
+        />
+      )
+    }
+  ]
+)

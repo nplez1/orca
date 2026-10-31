@@ -8,6 +8,7 @@ import { fetchKimiRateLimits } from './kimi-fetcher'
 import { fetchMiniMaxRateLimits } from './minimax/minimax-fetcher'
 import { fetchGrokRateLimits } from './grok-fetcher'
 import { fetchZcodeRateLimits } from './zcode-usage-fetcher'
+import { fetchAntigravityRateLimits } from './antigravity-usage-fetcher'
 import { readGrokAuthSession } from './grok-auth'
 import { fetchCursorRateLimits } from './cursor-fetcher'
 import { readCursorAuthSession } from './cursor-auth'
@@ -747,5 +748,50 @@ describe('disabled usage providers', () => {
 
     expect(fetchOpenCodeGoUsage).not.toHaveBeenCalled()
     expect(service.getState().opencodeGo).toBeNull()
+  })
+
+  it('never resolves a Kimi home or reads its credentials when Kimi is switched off', async () => {
+    // fork-comment-ok: resolving the home probes wsl.exe and the home holds the sign-in, so the gate must land before the resolver.
+    const kimiHomeResolver = vi.fn(async () => ({
+      runtime: 'wsl' as const,
+      wslDistro: 'Ubuntu',
+      path: '\\\\wsl.localhost\\Ubuntu\\home\\neil\\.kimi-code'
+    }))
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'kimi'
+    })
+    service.setKimiHomeResolver(kimiHomeResolver)
+
+    await service.refresh()
+
+    expect(kimiHomeResolver).not.toHaveBeenCalled()
+    expect(fetchKimiRateLimits).not.toHaveBeenCalled()
+    expect(service.getState().kimi).toBeNull()
+  })
+
+  it('never reads the GLM plan key or polls it when GLM Coding Plan is switched off', async () => {
+    // fork-comment-ok: the plan key lives in the encrypted store, so a disabled GLM must return from its config resolver.
+    const zcodePlanConfigResolver = vi.fn(() => ({ apiKey: 'plan-key', site: 'zai' as const }))
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'zcode'
+    })
+    service.setZcodePlanConfigResolver(zcodePlanConfigResolver)
+
+    await service.refresh()
+
+    expect(zcodePlanConfigResolver).not.toHaveBeenCalled()
+    expect(fetchZcodeRateLimits).not.toHaveBeenCalled()
+    expect(service.getState().zcodePlanApiKeyConfigured).toBe(false)
+  })
+
+  it('never spawns the agy usage probe when Antigravity is switched off', async () => {
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'antigravity'
+    })
+
+    await service.refresh()
+
+    expect(fetchAntigravityRateLimits).not.toHaveBeenCalled()
+    expect(service.getState().antigravity).toBeNull()
   })
 })

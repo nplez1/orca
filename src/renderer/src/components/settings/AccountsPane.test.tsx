@@ -12,7 +12,7 @@ import { useAppStore } from '../../store'
 import { AccountsPane } from './AccountsPane'
 import { resolveSettingsHostScope } from './settings-host-scope'
 import { renderClaudeAccountsSection } from './accounts-pane-claude-section'
-import { PROVIDER_ACCOUNTS_SECTIONS } from './provider-accounts-sections'
+import { getProviderAccountsSections } from './provider-accounts-sections'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 
 function renderPane(
@@ -235,15 +235,14 @@ describe('AccountsPane', () => {
   it('renders a per-provider enable switch for every provider section', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 
-    for (const provider of PROVIDER_ACCOUNTS_SECTIONS) {
+    const providers = getProviderAccountsSections()
+    for (const provider of providers) {
       expect(markup).toContain(`id="accounts-${provider.id}"`)
       expect(markup).toContain(`id="usage-provider-enabled-${provider.id}"`)
       expect(markup).toContain(`aria-label="Let Orca query ${provider.title}"`)
     }
     // Provider switches only: Gemini's legacy-OAuth toggle is a body switch, not a header one.
-    expect(markup.match(/id="usage-provider-enabled-/g)).toHaveLength(
-      PROVIDER_ACCOUNTS_SECTIONS.length
-    )
+    expect(markup.match(/id="usage-provider-enabled-/g)).toHaveLength(providers.length)
   })
 
   it('suppresses a switched-off provider and shows the off notice', () => {

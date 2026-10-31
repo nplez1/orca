@@ -28,7 +28,7 @@ import {
 } from './provider-account-visibility'
 import { useUsageProviderEnablement } from './use-usage-provider-enablement'
 import {
-  PROVIDER_ACCOUNTS_SECTIONS,
+  getProviderAccountsSections,
   type ProviderAccountsSectionContext
 } from './provider-accounts-sections'
 import { ProviderAccountsSection } from './ProviderAccountsSection'
@@ -338,7 +338,7 @@ export function AccountsPane({
     matchesSettingsSearch(searchQuery, getAccountsLocationSearchEntries())
       ? renderAccountsLocationSection(model)
       : null,
-    ...PROVIDER_ACCOUNTS_SECTIONS.map((provider) =>
+    ...getProviderAccountsSections().map((provider) =>
       matchesSettingsSearch(searchQuery, provider.searchEntries()) ? (
         <ProviderAccountsSection
           key={provider.id}
