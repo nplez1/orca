@@ -2570,10 +2570,11 @@ the next mirror push would have undone it.
 release line. The red it was disabled for (`src/cli/handlers/vm.ts`, 336 counted lines against 300) was
 cleared by `8bcd16e`. At `86fb0b33` the whole step set is green: oxlint 0 errors over 40,242 files,
 max-lines ratchet OK with 46 grandfathers, `audit:anti-slop` clean, `check-upstream-identity-literals` 0
-findings, `pnpm tc` exit 0. It gains `timeout-minutes: 40` — it had none, so a hung `pnpm tc` would hold
-its ref's concurrency slot the way the 2026-10-26 nightly queued for 17.5 h — and **keeps
-`cancel-in-progress: false`**: flipping it would let each merge replace a running gate with a `cancelled`
-conclusion, which is how that 10-26 run hid four red shards.
+findings, `pnpm tc` exit 0. It gains `timeout-minutes: 40`, which bounds a hung `pnpm tc` at 40 min
+instead of the default 360 — but not the 2026-10-26 class: that job never started, and a timeout counts
+only once a runner picks the job up. It **keeps `cancel-in-progress: false`** for the other half of that
+incident: the run was cancelled after ~17.5 h and the cancel rewrote the run conclusion to `cancelled`,
+hiding four red shards. A merge must not be able to do that to a running gate.
 
 Two hazards are accepted knowingly, recorded here so the next reader does not rediscover them.
 `node-server-tests.yml`'s `fast_runners` defaults to **true** for `workflow_dispatch` and `workflow_call`,
@@ -2598,6 +2599,12 @@ nothing fails when an enabled lane sits _red_ or sits _queued_, except the night
 whoever last edited its cron line — an upstream author, for the upstream-owned ones. The cheap closure
 is a queued-run check (`actions/runs?status=queued`, fail past one hour) in `fork-ci-health.yml`, which
 catches every hang source including the `blacksmith-*` default above.
+
+Two more gaps in the same guard, both reachable by a sync rather than by anyone here. Trigger validation
+runs only against `ALLOWED_INERT`, so an enabled upstream-owned file can silently gain a `schedule`,
+`push` or `pull_request` trigger — or a `blacksmith-*` label inside a `runs-on` expression, which no scan
+looks at today. And nothing rejects `pull_request_target` in an active file; `ci-closed-pr-caches.yml`
+uses it and must stay off, so a future sync is one paste away from bringing it in unwatched.
 
 Reviewed by Opus 5.5, high, one round on the plan packet: it confirmed both premises and corrected two
 items that landed here — `cancel-in-progress` stays `false`, and `fast_runners` defaults to true rather

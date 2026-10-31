@@ -29,7 +29,7 @@ const REPO = 'nplez1/orca'
 const ROOT = resolve(import.meta.dirname, '..')
 
 // Must stay enabled: the release build, the daily v* tag mirror, the nightly full unit suite, the
-// cheap PR lane, the daily health check that watches the other four, and the lanes enabled on
+// cheap PR lane, the daily health check that watches the rest, and the lanes enabled on
 // 2026-10-31 after the cost premise was measured to be zero (LOCAL-PATCHES.md § local(ci)).
 export const REQUIRED = [
   '.github/workflows/fork-release.yml',
@@ -53,9 +53,12 @@ export const REQUIRED = [
   // Why: supply-chain audit, path-gated to lockfile/Cargo/patches changes, so it costs nothing on an
   // ordinary PR and covers the one class of change a unit lane cannot see.
   '.github/workflows/dependency-security.yml',
-  // Why: mobile parity and the headless server path are first-class in `AGENTS.md`, and no PR lane here
-  // covered either. Its `push: [main]` leg targets the upstream mirror branch, so it runs there too.
+  // Why: mobile parity is first-class in `AGENTS.md` and no PR lane here covered it. Its `push: [main]`
+  // leg targets the upstream mirror branch, so that leg only re-tests upstream's own code.
   '.github/workflows/mobile.yml',
+  // Why: the headless/remote server path is first-class too. Its `fast_runners` input defaults to true
+  // for dispatch and call, so a manual dispatch lands on `blacksmith-*` labels this fork lacks; PR and
+  // schedule events pass no input and stay on hosted runners.
   '.github/workflows/node-server-tests.yml',
   // Why: auto-update correctness, ~7 min of macOS across six observed PR runs.
   '.github/workflows/macos-updater-tests.yml',
