@@ -256,6 +256,7 @@ describe('detectRepoIcon', () => {
     ).resolves.toEqual({
       gitRemoteIdentity: {
         canonicalKey: 'github.com/stablyai/orca',
+        remoteKeys: ['github.com/stablyai/orca', 'github.com/tmchow/orca'],
         remoteName: 'upstream',
         remoteUrl: 'git@github.com:stablyai/orca.git'
       },
@@ -287,6 +288,7 @@ describe('detectRepoIcon', () => {
     ).resolves.toEqual({
       gitRemoteIdentity: {
         canonicalKey: 'github.com/upstream-org/rocket',
+        remoteKeys: ['github.com/upstream-org/rocket', 'github.com/acme/rocket-pro'],
         remoteName: 'upstream',
         remoteUrl: 'git@github.com:upstream-org/rocket.git'
       },

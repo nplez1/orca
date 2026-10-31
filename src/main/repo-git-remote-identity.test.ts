@@ -7,6 +7,7 @@ vi.mock('./git/runner', () => ({ gitExecFileAsync: vi.fn() }))
 const gitlabRemote = 'origin\tgit@gitlab.example.com:team/orca.git (fetch)\n'
 const gitlabIdentity = {
   canonicalKey: 'gitlab.example.com/team/orca',
+  remoteKeys: ['gitlab.example.com/team/orca'],
   remoteName: 'origin',
   remoteUrl: 'git@gitlab.example.com:team/orca.git'
 }
