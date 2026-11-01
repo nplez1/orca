@@ -178,6 +178,20 @@ describe('findWorkspaceReviewAttachment', () => {
     ).toEqual(expect.objectContaining({ provider: 'gitlab', type: 'mr', number: 42 }))
   })
 
+  it('ignores an issue that shares the review number', () => {
+    // Why: a GitLab issue and an MR have separate number spaces, so both can be attached here.
+    // Why no urls: an attachment without one matches on provider and number alone, which is the
+    // case where a type filter is the only thing that can tell the two apart.
+    const shared = makeWorktree([
+      makeReview({ type: 'issue', provider: 'gitlab', number: 42, url: undefined }),
+      makeReview({ type: 'mr', provider: 'gitlab', number: 42, url: undefined })
+    ])
+
+    expect(
+      findWorkspaceReviewAttachment(shared, { provider: 'gitlab', number: 42, url: '' })
+    ).toEqual(expect.objectContaining({ type: 'mr' }))
+  })
+
   it('answers null for a review the workspace does not hold', () => {
     expect(
       findWorkspaceReviewAttachment(worktree, { provider: 'github', number: 404, url: '' })

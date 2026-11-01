@@ -17,6 +17,7 @@ vi.mock('@/store/slices/hosted-review-card-refresh', async (importOriginal) => {
   }
 })
 
+import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
 import { useChecksPanelManualRefresh } from './use-checks-panel-manual-refresh'
 import { makeWorkspaceReviewSelection } from '../workspace-review-selection.test-fixture'
@@ -244,6 +245,35 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     // Why: the branch path would refresh the workspace's own review, which is not on screen.
     expect(input.fetchPRForBranch).not.toHaveBeenCalled()
     expect(input.fetchGitLabDetails).not.toHaveBeenCalled()
+  })
+
+  it('drops the rows when the review switched while the read was in flight', async () => {
+    const setChecks = vi.fn()
+    const setComments = vi.fn()
+    const input = makePickedInput({
+      // Why a real comparison: a stub that always answers true cannot tell the guard from its absence.
+      isCurrentAsyncResult: (key) => input.asyncResultKeyRef.current === key,
+      setChecks,
+      setComments
+    })
+    input.fetchPRChecks = vi.fn(async () => {
+      // The user picks another review while this read is in flight.
+      input.asyncResultKeyRef.current = 'cache::main::12'
+      const staleCheck: PRCheckDetail = {
+        name: 'stale',
+        status: 'completed',
+        conclusion: 'success',
+        url: null
+      }
+      return [staleCheck]
+    })
+    const { result } = renderHook(() => useChecksPanelManualRefresh(input))
+
+    await act(async () => result.current.handleRefresh())
+
+    expect(input.refreshSelectedReview).toHaveBeenCalledTimes(1)
+    expect(setChecks).not.toHaveBeenCalled()
+    expect(setComments).not.toHaveBeenCalled()
   })
 
   it('reads a picked merge request through the GitLab details path, never through GitHub checks', async () => {

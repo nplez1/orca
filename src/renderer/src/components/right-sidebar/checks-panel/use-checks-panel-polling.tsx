@@ -144,7 +144,11 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
           return
         }
         setChecks(result)
-        retractStalePRRefreshError(prCacheKey, readStartedAt)
+        // Why only for the workspace's own review: that error belongs to this branch's PR, and a
+        // successful read of another PR says nothing about it.
+        if (!showsPickedReview) {
+          retractStalePRRefreshError(prCacheKey, readStartedAt)
+        }
 
         // Unchanged details back off; a changed result restores the selected cadence.
         const signature = policyRef.current.accept(result)

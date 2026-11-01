@@ -14,6 +14,10 @@ import type { WorktreeGitIdentityDisplay } from '../../../../../../shared/worktr
 import { HostedReviewHeaderLink, HostedReviewIcon } from '../review/hosted-review-header-chrome'
 import { WorkspaceReviewSwitcher } from '../../WorkspaceReviewSwitcher'
 import type { WorkspaceReviewSelection } from '../../use-workspace-review-selection'
+import {
+  isWorkspaceReviewProvider,
+  workspaceReviewSelectionKey
+} from '../../workspace-review-selection'
 import { SourceControlBranchContextRow } from './branch-context-row'
 import { shouldShowSourceControlBranchContextChrome } from './branch-context-stats'
 import { SourceControlHeaderOverflowMenu } from './header-overflow-menu'
@@ -60,6 +64,9 @@ function HostedReviewToolbarLink({
   onOpenHostedReviewInChecks: () => void
   compact?: boolean
 }): React.JSX.Element {
+  const shownReviewKey = isWorkspaceReviewProvider(review.provider)
+    ? workspaceReviewSelectionKey(review.provider, review.number)
+    : null
   return (
     <div
       className={cn(
@@ -74,7 +81,9 @@ function HostedReviewToolbarLink({
       />
       <WorkspaceReviewSwitcher
         entries={reviewSelection.entries}
-        selectedKey={reviewSelection.selected?.key ?? null}
+        // Why the review rather than the stored pick: while a picked review is still loading the
+        // header shows the workspace's own, and the checked row has to agree with the header.
+        selectedKey={shownReviewKey}
         onSelectReview={reviewSelection.selectReview}
       />
     </div>

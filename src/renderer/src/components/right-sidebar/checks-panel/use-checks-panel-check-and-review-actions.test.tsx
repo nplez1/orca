@@ -432,7 +432,7 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
     )
   })
 
-  it('falls back to the slot when the shown review has no row behind it', () => {
+  it('does nothing when no review is shown', () => {
     const input = makeInput({ activeReview: null })
     const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
 

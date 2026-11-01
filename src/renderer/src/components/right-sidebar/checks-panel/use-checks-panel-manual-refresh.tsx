@@ -113,15 +113,21 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
           return
         }
         const pickedPRNumber = refreshedReview?.number ?? pickedReview.number
-        // Why the refreshed key: the review may have moved its head, and the pane's current result
-        // key then names the old one, which would discard the rows fetched here.
-        asyncResultKeyRef.current = checksPanelAsyncResultKey(
+        // Why the refreshed key held locally: the review may have moved its head, so the pane's
+        // current result key names the old one and would discard the rows fetched here. It is
+        // compared as a local because `isCurrentAsyncResult` reads the ref — checking the ref
+        // against itself always passes, which is how a switch mid-flight would write this review's
+        // rows under the next one.
+        const pickedRequestKey = checksPanelAsyncResultKey(
           prCacheKey,
           branch,
           pickedPRNumber,
           pr?.prRepo,
           headSha
         )
+        asyncResultKeyRef.current = pickedRequestKey
+        const isCurrentPickRequest = (): boolean =>
+          isCurrentRequest() && isCurrentAsyncResult(pickedRequestKey)
         setChecksLoading(true)
         setCommentsLoading(true)
         const [refreshedChecks, refreshedComments] = await Promise.all([
@@ -139,7 +145,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
             headSha
           })
         ])
-        if (!isCurrentRequest() || !isCurrentAsyncResult(asyncResultKeyRef.current)) {
+        if (!isCurrentPickRequest()) {
           return
         }
         setChecks(refreshedChecks)
@@ -149,6 +155,8 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         // provider failure for the review it could read.
         console.warn('Failed to refresh the selected review:', error)
       } finally {
+        // Why the same check: a switch mid-flight owns the loading flags now, and clearing them
+        // here would blank the review the user just moved to.
         if (isCurrentRequest()) {
           setChecksLoading(false)
           setCommentsLoading(false)
@@ -480,8 +488,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     pollIntervalRef,
     refreshInFlightRef,
     reviewSelection,
-    pickedReview,
-    fetchGitLabDetails
+    pickedReview
   ])
   return { handleRefresh }
 }

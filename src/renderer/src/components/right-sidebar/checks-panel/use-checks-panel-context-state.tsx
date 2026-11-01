@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { useNow } from '@/hooks/use-now'
 import { isFolderRepo } from '../../../../../shared/repo-kind'
@@ -266,14 +266,24 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   const shownReviewKey = showsPickedReview
     ? `${activeReview?.provider}:${activeReview?.number}`
     : ''
+  const previousShownReviewKeyRef = useRef(shownReviewKey)
   useEffect(() => {
+    // Why the previous key: this must fire on a switch, not on mount, or the first paint of an
+    // ordinary single-review workspace would raise loading flags nothing may clear.
+    if (previousShownReviewKeyRef.current === shownReviewKey) {
+      return
+    }
+    previousShownReviewKeyRef.current = shownReviewKey
     // Why: rows on screen belong to the review that was showing when they were fetched, so keeping
     // them while the new read is in flight would put another review's checks under this header.
-    // Why the loading flags: clearing alone flashes the "no checks configured" empty state.
     setChecks([])
     setComments([])
-    setChecksLoading(true)
-    setCommentsLoading(true)
+    // Why only for a pick: its read raises the flags for itself. The branch path owns them for its
+    // own review, and raising them for a review with no PR number would leave a spinner behind.
+    if (shownReviewKey) {
+      setChecksLoading(true)
+      setCommentsLoading(true)
+    }
   }, [shownReviewKey, setChecks, setChecksLoading, setComments, setCommentsLoading])
 
   useEffect(() => {

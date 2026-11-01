@@ -5,7 +5,11 @@ import { openGitHubPRLinkModal } from '../github-pr-link-modal'
 import { getWorkspaceAttachments } from '../../../../../shared/workspace-attachments'
 import { getWorkspaceAttachmentKey } from '../../../../../shared/workspace-attachment-normalization'
 import { buildWorkspaceAttachmentEdits } from '../../sidebar/worktree-attachment-editing'
-import { findWorkspaceReviewAttachment } from '../workspace-review-selection'
+import {
+  findWorkspaceReviewAttachment,
+  isWorkspaceReviewProvider,
+  workspaceReviewSelectionKey
+} from '../workspace-review-selection'
 import type { ChecksPanelCheckAndReviewActionsInput } from './check-and-review-action-dependencies'
 import { useUnlinkGitHubPullRequest } from './use-unlink-github-pull-request'
 
@@ -28,6 +32,7 @@ export function useChecksPanelReviewLinkActions(
     repo,
     repoConnectionId,
     runtimeEnvironmentId,
+    showsPickedReview,
     suppressedGitHubPR,
     updateWorktreeMeta
   } = model
@@ -68,21 +73,31 @@ export function useChecksPanelReviewLinkActions(
     // the only path that removes a review the branch lookup discovered, because a slot-only clear
     // would let that lookup attach it again.
     const shownAttachment = findWorkspaceReviewAttachment(activeWorktree, activeReview)
-    if (shownAttachment) {
+    if (shownAttachment && isWorkspaceReviewProvider(shownAttachment.provider)) {
       const initial = getWorkspaceAttachments(activeWorktree)
       const removedKey = getWorkspaceAttachmentKey(shownAttachment)
       const draft = initial.filter((entry) => getWorkspaceAttachmentKey(entry) !== removedKey)
-      // Why the suppression: the same tombstone the sidebar's row unlink writes, so a GitHub review
-      // the branch lookup still resolves does not come straight back.
-      selectWorkspaceReview(activeWorktreeId, null)
+      // Why only for the workspace's own review: `suppressedGitHubPR` is one slot, so writing a
+      // pick's number over the tombstone of a branch PR the user already unlinked would let that
+      // PR come straight back. A pick is not what the branch lookup resolves anyway.
+      const suppressGitHubPR =
+        !showsPickedReview && shownAttachment.provider === 'github' ? shownAttachment.number : null
+      // Why conditional: the shown review may be another pane's pick, and unlinking this one must
+      // not drop that pick.
+      const storedReviewKey =
+        useAppStore.getState().workspaceReviewSelectionByWorktree[activeWorktreeId]
+      if (
+        storedReviewKey ===
+        workspaceReviewSelectionKey(shownAttachment.provider, shownAttachment.number)
+      ) {
+        selectWorkspaceReview(activeWorktreeId, null)
+      }
       void (async () => {
         const result = await updateWorktreeMeta(
           activeWorktreeId,
           {
             ...buildWorkspaceAttachmentEdits({ initial, draft }),
-            ...(shownAttachment.provider === 'github'
-              ? { suppressedGitHubPR: shownAttachment.number }
-              : {})
+            ...(suppressGitHubPR === null ? {} : { suppressedGitHubPR: suppressGitHubPR })
           },
           { executionHostId: activeWorktree.hostId }
         )
@@ -110,6 +125,7 @@ export function useChecksPanelReviewLinkActions(
     activeWorktreeId,
     linkedGitLabMR,
     selectWorkspaceReview,
+    showsPickedReview,
     unlinkGitHubPullRequest,
     updateWorktreeMeta
   ])

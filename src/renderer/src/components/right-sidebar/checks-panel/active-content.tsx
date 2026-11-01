@@ -17,6 +17,7 @@ import { PRCommentsList } from './comments-list'
 import { openAnnotationLocation } from '@/components/editor/check-annotation-open'
 import { translate } from '@/i18n/i18n'
 import {
+  findWorkspaceReviewAttachment,
   isChecksPaneReviewProvider,
   isWorkspaceReviewProvider,
   workspaceReviewSelectionKey
@@ -122,9 +123,11 @@ export function ChecksPanelActiveContent({
       : null
   const reviewSwitcher = {
     entries: renderableReviewEntries,
+    // Why null rather than the first row: when the shown review is not one this pane lists, checking
+    // a row would name a review the header is not describing.
     selectedKey: renderableReviewEntries.some((entry) => entry.key === shownReviewKey)
       ? shownReviewKey
-      : (renderableReviewEntries[0]?.key ?? null),
+      : null,
     onSelectReview: reviewSelection.selectReview
   }
   const openCommentInCode = usePRCommentCodeNavigation({
@@ -149,6 +152,11 @@ export function ChecksPanelActiveContent({
     return null
   }
   const reviewShortLabel = activeReview.provider === 'gitlab' ? 'MR' : 'PR'
+  // Why not unconditional: a GitLab MR the branch lookup discovered has no row and no slot, so its
+  // unlink would do nothing. GitHub has the suppression tombstone as its fallback.
+  const canUnlinkReview =
+    activeReview.provider === 'github' ||
+    findWorkspaceReviewAttachment(activeWorktree, activeReview) !== null
   const shouldShowReviewTriageStrip =
     activeConflictReview !== null || getBrokenChecks(checks).length > 0
   const hostedReviewModifierHintDestination = resolveChecksPanelHostedReviewModifierDestination(
@@ -170,9 +178,7 @@ export function ChecksPanelActiveContent({
         <ChecksPanelReviewHeader
           review={activeReview}
           isRefreshing={isRefreshing}
-          // Why always: the unlink path removes the shown review's own attachment, so every review
-          // this pane can render has something to unlink.
-          canUnlinkReview
+          canUnlinkReview={canUnlinkReview}
           modifierHintDestination={hostedReviewModifierHintDestination}
           onRefresh={() => void handleRefresh()}
           onOpenReview={handleOpenPR}

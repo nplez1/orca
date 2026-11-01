@@ -32,8 +32,9 @@ export type WorkspaceReviewSwitcherProps = {
  *
  *  It is a sibling of the pane's own review link rather than a replacement for it: the link keeps
  *  the pane's primary action (open the review), and the chevron only changes what the pane reads.
- *  Both panes render this, and they share one selection, so the two can never disagree about which
- *  review is shown. */
+ *  Both panes render it and share one stored selection. Each still decides what it can render — the
+ *  Checks pane has no body for some providers — so a pane lists only the reviews it would show, and
+ *  checks the one it is showing. */
 export function WorkspaceReviewSwitcher({
   entries,
   selectedKey,

@@ -14,6 +14,7 @@ export type ChecksPanelCheckAndReviewActionsInput = Pick<
   | 'suppressedGitHubPR'
   | 'pr'
   | 'prCacheKey'
+  | 'showsPickedReview'
 > &
   Pick<
     ChecksPanelControllerState,
