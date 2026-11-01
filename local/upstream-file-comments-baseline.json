@@ -2,8 +2,8 @@
   "note": "Fork comments in upstream-owned files (LOCAL-PATCHES.md). Frozen per-file maxima at or above 5 lines plus the frozen total; both may only shrink. Regenerate with `node local/check-upstream-file-comments.mjs --init`.",
   "base": "a9039850822850cd0e00ce805ffb394bed6d1762",
   "perFileThreshold": 5,
-  "accepted": "the six renderer files #258 added comments to: its review-refresh work needs rationale next to the code it explains, and the alternative was holding a landed PR to re-baseline. Same treatment #257 got in f7ab81b13b5, and the same ticket as the marker sweep LOCAL-PATCHES.md § Rules hands to the comment-hunk ratchet",
-  "total": 6055,
+  "accepted": "local(usage)'s four fork lines in the rate-limits path, on top of main's #262 re-baseline (6055) which already recorded #258's renderer comments; my own local(lint) commit from before that merge is superseded here.",
+  "total": 6058,
   "files": {
     ".github/workflows/e2e.yml": 13,
     ".github/workflows/pr.yml": 7,

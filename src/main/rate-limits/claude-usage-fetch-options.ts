@@ -5,6 +5,8 @@ export type ClaudeRateLimitFetchOptions = {
   authPreparation?: ClaudeRuntimeAuthPreparation
   allowPtyFallback?: boolean
   allowUsagePanelSupplement?: boolean
+  /** Open Retry-After on the usage endpoint: the probe may answer, the endpoint must not be asked. */
+  usageEndpointRetryAtMs?: number | null
   networkProxySettings?: NetworkProxySettings
   signal?: AbortSignal
 }
