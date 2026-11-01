@@ -220,6 +220,68 @@ jobs:
     expect(runnerLabelsOf(text)).toEqual(['blacksmith-4vcpu-ubuntu-2404'])
   })
 
+  it('finds a label in a matrix list, which selects runners without the key `runs-on`', () => {
+    const text = `on: workflow_call
+jobs:
+  warm:
+    strategy:
+      matrix:
+        runner: [blacksmith-4vcpu-ubuntu-2404, ubuntu-24.04]
+    runs-on: \${{ matrix.runner }}
+`
+
+    expect(runnerLabelsOf(text)).toEqual(['blacksmith-4vcpu-ubuntu-2404'])
+  })
+
+  it('finds a label a caller passes through with:, which is how the 2026-10-28 wedge happened', () => {
+    const text = `on: workflow_call
+jobs:
+  unit:
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      runner: blacksmith-8vcpu-ubuntu-2404
+`
+
+    expect(runnerLabelsOf(text)).toEqual(['blacksmith-8vcpu-ubuntu-2404'])
+  })
+
+  it('follows a call chain more than one hop, so a label two calls down is still judged', () => {
+    const first = '.github/workflows/fork-main-tests.yml'
+    const second = '.github/workflows/some-hub.yml'
+    const third = '.github/workflows/some-callee.yml'
+    const verdict = judge(
+      [active(first)],
+      {
+        [first]: { triggers: EXPECTED_TRIGGERS[first], runnerLabels: [], callees: [second] },
+        [second]: { triggers: ['workflow_call'], runnerLabels: [], callees: [third] },
+        [third]: { triggers: ['workflow_call'], runnerLabels: ['blacksmith-8vcpu-ubuntu-2404'] }
+      },
+      { required: [first], allowedInert: [], expected: { [first]: EXPECTED_TRIGGERS[first] } }
+    )
+
+    expect(verdict.unapprovedRunners).toEqual([
+      { path: third, labels: ['blacksmith-8vcpu-ubuntu-2404'], reachedFrom: first }
+    ])
+  })
+
+  it('reports a callee it cannot read, rather than treating it as label-free', () => {
+    const caller = '.github/workflows/fork-release.yml'
+    const callee = '.github/workflows/some-gone.yml'
+    const verdict = judge(
+      [active(caller)],
+      {
+        [caller]: { triggers: EXPECTED_TRIGGERS[caller], runnerLabels: [], callees: [callee] },
+        [callee]: { error: 'not in this checkout' }
+      },
+      { required: [caller], allowedInert: [], expected: { [caller]: EXPECTED_TRIGGERS[caller] } }
+    )
+
+    expect(verdict.unreadable).toEqual([
+      { path: callee, reason: `reached from ${caller}: not in this checkout` }
+    ])
+    expect(verdict.ok).toBe(false)
+  })
+
   it('finds a label inside a runs-on expression, not only a literal one', () => {
     const text = `on: pull_request
 jobs:
@@ -230,13 +292,21 @@ jobs:
     expect(runnerLabelsOf(text)).toEqual(['blacksmith-8vcpu-ubuntu-2404'])
   })
 
-  it('covers every label this tree can reach, so the table cannot fall behind the files', () => {
+  it('covers the tree in both directions, so neither the table nor the scan can drift', () => {
     const facts = readFacts(Object.keys(EXPECTED_TRIGGERS))
 
     for (const [path, entry] of Object.entries(facts)) {
       const accepted = ACCEPTED_RUNNER_LABELS[path]?.labels ?? []
       for (const label of entry.runnerLabels ?? []) {
         expect(accepted, `${path} names ${label}`).toContain(label)
+      }
+    }
+    // The other way: a table entry whose file yields no labels is dead weight, which is exactly how a
+    // key-restricted scan went blind to matrix lists without a test noticing.
+    for (const [path, entry] of Object.entries(ACCEPTED_RUNNER_LABELS)) {
+      const found = facts[path]?.runnerLabels ?? []
+      for (const label of entry.labels) {
+        expect(found, `${path} should name ${label}`).toContain(label)
       }
     }
   })

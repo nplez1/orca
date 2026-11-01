@@ -130,21 +130,31 @@ const hours = (value) => `${value >= 10 ? Math.round(value) : Math.round(value *
 export function describeVerdict(verdict) {
   const { waited, inFlight, limitH, oldestHours } = verdict
   const lookedAt = verdict.lookedAt ?? 0
+  const candidates = verdict.candidates ?? lookedAt
   if (waited.length === 0) {
     return (
       `queued runs: PASS — nothing waiting past ${limitH}h across ${inFlight} in-flight run(s), ` +
-      `jobs read for ${lookedAt}`
+      `jobs read for ${lookedAt} of ${candidates} past the limit`
     )
   }
   const lines = [
     `queued runs: ATTENTION — ${waited.length} waiting past ${limitH}h (oldest ${hours(oldestHours)})`
   ]
+  const tagOf = (entry) => {
+    if (entry.where === 'ghost') {
+      return 'NO JOBS'
+    }
+    return entry.status === 'pending'
+      ? 'PENDING'
+      : entry.status === 'waiting'
+        ? 'WAITING'
+        : 'QUEUED '
+  }
   for (const entry of waited) {
     const labels = entry.labels.length > 0 ? ` [${entry.labels.join(',')}]` : ''
     const what =
       entry.where === 'job' ? `${entry.runName} / ${entry.jobName}${labels}` : entry.runName
-    const tag = entry.where === 'ghost' ? 'NO JOBS' : 'QUEUED '
-    lines.push(`  ${tag} ${hours(entry.ageHours).padStart(5)}  ${what} — ${entry.url}`)
+    lines.push(`  ${tagOf(entry)} ${hours(entry.ageHours).padStart(5)}  ${what} — ${entry.url}`)
   }
   if (waited.some((entry) => entry.where === 'ghost')) {
     lines.push(
@@ -172,7 +182,7 @@ export function describeVerdict(verdict) {
       '  CONCURRENCY: `pending` means another run is holding the group — cancel that run to release it.'
     )
   }
-  lines.push(`  jobs read for ${lookedAt} of ${inFlight} in-flight run(s)`)
+  lines.push(`  jobs read for ${lookedAt} of ${candidates} run(s) past the ${limitH}h limit`)
   return lines.join('\n')
 }
 
@@ -220,7 +230,7 @@ function fetchJobsByRun(runs, now = Date.now()) {
     jobsByRun[run.id] =
       gh(['api', `/repos/${REPO}/actions/runs/${run.id}/jobs?per_page=100`]).jobs ?? []
   }
-  return jobsByRun
+  return { jobsByRun, candidates: candidates.length }
 }
 
 function main() {
@@ -228,7 +238,12 @@ function main() {
   let verdict
   try {
     const runs = fetchRuns()
-    verdict = judgeQueue({ runs, jobsByRun: fetchJobsByRun(runs) })
+    const jobs = fetchJobsByRun(runs)
+    verdict = {
+      ...judgeQueue({ runs, jobsByRun: jobs.jobsByRun }),
+      candidates: jobs.candidates,
+      lookedAt: Object.keys(jobs.jobsByRun).length
+    }
   } catch (error) {
     console.error(`queued runs: cannot tell — ${firstLine(error)}`)
     process.exit(2)

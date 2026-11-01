@@ -2812,10 +2812,12 @@ incident behind it:
 - **A runner this fork does not provision.** `timeout-minutes` cannot bound this: the timeout starts
   when a runner picks the job up, so a job on a `blacksmith-*` label waits for GitHub's 24 h queue
   limit — the 17.5 h `relay_integration` wait on 2026-10-26 and the 12 h cache producer on 10-28. The
-  scan follows `uses: ./.github/workflows/*.yml` edges, because a called workflow runs whether or not
-  it is enabled, and it reads only `runs-on` values and input `default`s, so a label that is merely
-  compared in a `run:` block is not a finding. `ACCEPTED_RUNNER_LABELS` names the exact labels three
-  files may use, each with a reason: `node-server-tests` (behind `fast_runners`, true only for dispatch
+  scan follows `uses: ./.github/workflows/*.yml` edges transitively, because a called workflow runs
+  whether or not it is enabled, and it reads every value except the ones that cannot select a runner
+  (`run`, `if`, names and prose) — so a matrix list and a caller's `with:` are read, while
+  `unit-tests.yml`'s byte-comparison of an 8-vcpu label inside a `run:` block is not. A callee that
+  cannot be read is reported rather than treated as label-free. `ACCEPTED_RUNNER_LABELS` names the exact
+  labels each file may use, with a reason: `node-server-tests` (behind `fast_runners`, true only for dispatch
   and call), `ci-cache-warmup-platform-jobs` (call-only, both callers disabled), and `unit-tests` (the
   `runner` input default, which both active callers override). `e2e.yml` is there for the same reason
   and is reached only through dispatch-only lanes. A new label in any of them still fails, so the

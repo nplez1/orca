@@ -211,15 +211,30 @@ export function triggersOf(text) {
 }
 
 /**
- * Every `blacksmith-*` label a file would actually request — from a `runs-on` value or an input
- * `default`, and not from a string comparison in a `run:` block or an `if:`, which is how
- * `unit-tests.yml` mentions an 8-vcpu label without ever asking for one.
+ * Keys whose strings are a command or prose, never a runner selector. Everything else is scanned,
+ * because a label reaches a runner from more places than `runs-on`: a matrix list (`matrix: { runner:
+ * [...] }`) and a caller's `with: { runner: … }` both select one, and the 2026-10-28 incident was a
+ * `with:`. Excluding `run:` and `if:` is what keeps `unit-tests.yml`'s byte-comparison of an 8-vcpu
+ * label from reading as a request for one.
  */
+const NO_LABEL_KEYS = new Set([
+  'run',
+  'if',
+  'name',
+  'description',
+  'comment',
+  'shell',
+  'working-directory',
+  'uses',
+  'id'
+])
+
+/** Every `blacksmith-*` label a file could actually ask for. */
 export function runnerLabelsOf(text) {
   const labels = new Set()
   const visit = (node, key) => {
     if (typeof node === 'string') {
-      if (key === 'runs-on' || key === 'default') {
+      if (!NO_LABEL_KEYS.has(key)) {
         for (const match of node.match(NON_PROVISIONED) ?? []) {
           labels.add(match)
         }
@@ -338,22 +353,39 @@ export function judgeEnablement(
     }
   }
 
-  // Runner labels are read for the active files *and* everything they call, because a called workflow
-  // runs regardless of its own state and can carry the label an active lane inherits.
+  // Runner labels are read for the active files *and* everything they reach, transitively: a called
+  // workflow runs regardless of its own state, so a label two calls down is as live as the caller's.
   const reachable = new Map()
+  const queue = []
   for (const workflow of active) {
-    if (!allowed.has(workflow.path)) {
-      continue
-    }
-    reachable.set(workflow.path, workflow.path)
-    for (const callee of facts[workflow.path]?.callees ?? []) {
-      if (!reachable.has(callee)) {
-        reachable.set(callee, workflow.path)
-      }
+    if (allowed.has(workflow.path)) {
+      reachable.set(workflow.path, workflow.path)
+      queue.push(workflow.path)
     }
   }
+  while (queue.length > 0) {
+    const from = queue.shift()
+    for (const callee of facts[from]?.callees ?? []) {
+      if (reachable.has(callee) || callee === from) {
+        continue
+      }
+      reachable.set(callee, reachable.get(from) ?? from)
+      queue.push(callee)
+    }
+  }
+  const reportedUnreadable = new Set(unreadable.map((entry) => entry.path))
   for (const [path, reachedFrom] of reachable) {
-    const labels = facts[path]?.runnerLabels ?? []
+    const entry = facts[path]
+    if (entry?.error !== undefined) {
+      // A callee that cannot be read is not "no labels": it is an unproven file that an active lane
+      // reaches, which is the same problem an unreadable active file is.
+      if (!reportedUnreadable.has(path)) {
+        unreadable.push({ path, reason: `reached from ${reachedFrom}: ${entry.error}` })
+        reportedUnreadable.add(path)
+      }
+      continue
+    }
+    const labels = entry?.runnerLabels ?? []
     const accepted = acceptedRunners[path]?.labels ?? []
     const extra = labels.filter((label) => !accepted.includes(label))
     if (extra.length > 0) {
@@ -590,7 +622,25 @@ function report(verdict, fix) {
           'update EXPECTED_TRIGGERS and record it in LOCAL-PATCHES.md § local(ci)'
       )
     }
-    if (verdict.unapprovedRunners.length > 0 || verdict.forbiddenTriggers.length > 0) {
+    // Suppressed for a file the sweep is already disabling: the useful decision is about what the
+    // caller may reach, not about a file that is about to be off either way.
+    const handled = new Set(verdict.disableTargets.map((target) => target.path))
+    const viaCallee = verdict.unapprovedRunners.filter(
+      (entry) => !handled.has(entry.path) && entry.reachedFrom !== entry.path
+    )
+    const unhandledOwn = [
+      ...verdict.unapprovedRunners.filter(
+        (entry) => !handled.has(entry.path) && entry.reachedFrom === entry.path
+      ),
+      ...verdict.forbiddenTriggers.filter((entry) => !handled.has(entry.path))
+    ]
+    for (const entry of viaCallee) {
+      console.log(
+        `  decide   whether ${entry.reachedFrom} may call a workflow that asks for ${entry.labels.join(', ')}: ` +
+          'a callee runs whatever its own enablement state is, so the caller is the decision'
+      )
+    }
+    if (unhandledOwn.length > 0) {
       console.log(
         '  this one is not auto-fixed: decide whether the file may be active at all, and record the ' +
           'decision in LOCAL-PATCHES.md § local(ci)'

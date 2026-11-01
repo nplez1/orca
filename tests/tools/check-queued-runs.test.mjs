@@ -147,7 +147,10 @@ describe('the remedy, which is not always a runner', () => {
     const pending = run({ status: 'pending', created_at: hoursAgo(5) })
     const verdict = judge([pending], { [pending.id]: [] })
 
-    expect(describeVerdict(verdict)).toContain('CONCURRENCY')
+    const text = describeVerdict(verdict)
+    expect(text).toContain('CONCURRENCY')
+    // The row is tagged for what it is waiting on, not lumped in as a runner queue.
+    expect(text).toContain('PENDING')
   })
 
   it('does not blame a runner label for a queued run that has one', () => {
