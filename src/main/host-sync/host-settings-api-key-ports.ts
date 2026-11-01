@@ -6,6 +6,13 @@ import {
   saveDeepSeekApiKey
 } from '../deepseek/deepseek-api-key-store'
 import {
+  clearDeepInfraApiKey,
+  getDeepInfraApiKeyProtection,
+  hasDeepInfraApiKey,
+  readDeepInfraApiKey,
+  saveDeepInfraApiKey
+} from '../deepinfra/deepinfra-api-key-store'
+import {
   clearMiniMaxApiKey,
   getMiniMaxApiKeyProtection,
   hasMiniMaxApiKey,
@@ -60,6 +67,19 @@ export const HOST_SETTINGS_API_KEY_PORTS: HostSettingsCredentialPort[] = [
       save: saveDeepSeekApiKey,
       clear: clearDeepSeekApiKey,
       protection: getDeepSeekApiKeyProtection
+    }
+  }),
+  createHostSettingsApiKeyPort({
+    kind: 'api-key:deepinfra',
+    id: 'api-key:deepinfra',
+    label: 'DeepInfra API key',
+    canSeal,
+    store: {
+      has: hasDeepInfraApiKey,
+      read: readDeepInfraApiKey,
+      save: saveDeepInfraApiKey,
+      clear: clearDeepInfraApiKey,
+      protection: getDeepInfraApiKeyProtection
     }
   }),
   createHostSettingsApiKeyPort({

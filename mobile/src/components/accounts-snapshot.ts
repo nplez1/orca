@@ -44,6 +44,7 @@ export const ProviderRateLimitsSchema = z
       'cursor',
       'deepseek',
       'fireworks',
+      'deepinfra',
       'copilot'
     ]),
     session: RateLimitWindowSchema.nullable(),

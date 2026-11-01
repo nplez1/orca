@@ -58,6 +58,10 @@ vi.mock('./fireworks/fireworks-fetcher', () => ({
   fetchFireworksRateLimits: vi.fn()
 }))
 
+vi.mock('./deepinfra/deepinfra-fetcher', () => ({
+  fetchDeepInfraRateLimits: vi.fn()
+}))
+
 // Why: the Copilot provider probes the gh CLI during a fetch cycle. Without these two
 // mocks every service suite would spawn real gh subprocesses, which is both slow and
 // non-deterministic for the generation/invalidation races these suites assert.
@@ -94,6 +98,9 @@ vi.mock('../minimax/minimax-cookie-store', () => ({
 
 vi.mock('../deepseek/deepseek-api-key-store', () => ({
   hasDeepSeekApiKey: vi.fn(() => false)
+}))
+vi.mock('../deepinfra/deepinfra-api-key-store', () => ({
+  hasDeepInfraApiKey: vi.fn(() => false)
 }))
 
 vi.mock('../fireworks/fireworks-credentials-store', () => ({

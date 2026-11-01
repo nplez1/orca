@@ -2,8 +2,8 @@ import type { MoneyAmount } from './money-amount'
 
 /**
  * A money-denominated usage readout for providers that expose no percentage
- * quota. DeepSeek publishes only an account balance and Fireworks only rated
- * spend, so neither can be expressed as a `RateLimitWindow.usedPercent`.
+ * quota. DeepSeek and DeepInfra publish only an account balance and Fireworks
+ * only rated spend, so none can be expressed as a `RateLimitWindow.usedPercent`.
  */
 export type ProviderCreditsKind = 'balance' | 'spend'
 
@@ -11,7 +11,7 @@ export type ProviderCreditsKind = 'balance' | 'spend'
 export type ProviderCreditsPeriod = 'current-month' | 'last-30-days'
 
 /** Breakdown bucket. A key rather than a label so the renderer owns wording. */
-export type ProviderCreditsItemKey = 'granted' | 'topped-up' | 'spent-this-month'
+export type ProviderCreditsItemKey = 'granted' | 'topped-up' | 'spent-this-month' | 'unbilled'
 
 export type ProviderCreditsItem = {
   key: ProviderCreditsItemKey

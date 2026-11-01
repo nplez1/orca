@@ -8,6 +8,7 @@ import { fetchKimiRateLimits } from './kimi-fetcher'
 import { fetchMiniMaxRateLimits } from './minimax/minimax-fetcher'
 import { fetchDeepSeekRateLimits } from './deepseek/deepseek-fetcher'
 import { fetchFireworksRateLimits } from './fireworks/fireworks-fetcher'
+import { fetchDeepInfraRateLimits } from './deepinfra/deepinfra-fetcher'
 import { fetchCopilotRateLimits } from './copilot/copilot-fetcher'
 import { fetchGrokRateLimits } from './grok-fetcher'
 import { readGrokAuthSession } from './grok-auth'
@@ -19,6 +20,7 @@ import { fetchAntigravityRateLimits } from './antigravity-usage-fetcher'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { hasDeepSeekApiKey } from '../deepseek/deepseek-api-key-store'
 import { hasFireworksCredentials } from '../fireworks/fireworks-credentials-store'
+import { hasDeepInfraApiKey } from '../deepinfra/deepinfra-api-key-store'
 
 export type Deferred<T> = {
   promise: Promise<T>
@@ -121,6 +123,9 @@ export function mockFreshBackgroundProviderFetches(): void {
   vi.mocked(fetchFireworksRateLimits).mockImplementation(async () =>
     unavailableProvider('fireworks')
   )
+  vi.mocked(fetchDeepInfraRateLimits).mockImplementation(async () =>
+    unavailableProvider('deepinfra')
+  )
   vi.mocked(fetchCopilotRateLimits).mockImplementation(async () => unavailableProvider('copilot'))
   vi.mocked(fetchGrokRateLimits).mockImplementation(async () => unavailableProvider('grok'))
   vi.mocked(fetchCursorRateLimits).mockImplementation(async () => unavailableProvider('cursor'))
@@ -143,6 +148,7 @@ function unmockedProviderModules(): string[] {
     ['./minimax/minimax-fetcher', fetchMiniMaxRateLimits],
     ['./deepseek/deepseek-fetcher', fetchDeepSeekRateLimits],
     ['./fireworks/fireworks-fetcher', fetchFireworksRateLimits],
+    ['./deepinfra/deepinfra-fetcher', fetchDeepInfraRateLimits],
     ['./copilot/copilot-fetcher', fetchCopilotRateLimits],
     ['./grok-fetcher', fetchGrokRateLimits],
     ['./grok-auth', readGrokAuthSession],
@@ -153,7 +159,8 @@ function unmockedProviderModules(): string[] {
     ['./antigravity-usage-fetcher', fetchAntigravityRateLimits],
     ['../minimax/minimax-cookie-store', hasMiniMaxSessionCookie],
     ['../deepseek/deepseek-api-key-store', hasDeepSeekApiKey],
-    ['../fireworks/fireworks-credentials-store', hasFireworksCredentials]
+    ['../fireworks/fireworks-credentials-store', hasFireworksCredentials],
+    ['../deepinfra/deepinfra-api-key-store', hasDeepInfraApiKey]
   ]
   return modules
     .filter(([, imported]) => !vi.isMockFunction(imported))
@@ -180,6 +187,7 @@ export function resetRateLimitProviderMocks(): void {
   // Why: no API key is configured in these suites, so the credential flags must read false or the new providers report a spurious "configured" state.
   vi.mocked(fetchDeepSeekRateLimits).mockResolvedValue(unavailableProvider('deepseek'))
   vi.mocked(fetchFireworksRateLimits).mockResolvedValue(unavailableProvider('fireworks'))
+  vi.mocked(fetchDeepInfraRateLimits).mockResolvedValue(unavailableProvider('deepinfra'))
   vi.mocked(fetchCopilotRateLimits).mockResolvedValue(unavailableProvider('copilot'))
   vi.mocked(fetchGrokRateLimits).mockResolvedValue({
     provider: 'grok',
@@ -195,6 +203,7 @@ export function resetRateLimitProviderMocks(): void {
   vi.mocked(hasMiniMaxSessionCookie).mockReturnValue(false)
   vi.mocked(hasDeepSeekApiKey).mockReturnValue(false)
   vi.mocked(hasFireworksCredentials).mockReturnValue(false)
+  vi.mocked(hasDeepInfraApiKey).mockReturnValue(false)
   vi.mocked(readGrokAuthSession).mockReturnValue({ status: 'missing' })
   vi.mocked(readCursorAuthSession).mockResolvedValue({ status: 'missing' })
 }

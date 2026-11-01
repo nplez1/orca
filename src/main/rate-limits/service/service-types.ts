@@ -100,6 +100,15 @@ export type DeepSeekResolvedConfig = {
   error: string | null
 }
 
+export type DeepInfraRateLimitConfig = {
+  apiKey: string
+}
+
+export type DeepInfraResolvedConfig = {
+  config: DeepInfraRateLimitConfig
+  error: string | null
+}
+
 export type FireworksRateLimitConfig = {
   apiKey: string
   /** User-supplied account ID; when set it wins over Fireworks' own discovery. */
@@ -139,6 +148,7 @@ export const USAGE_PROVIDER_STATE_KEYS: Record<
   minimax: 'minimax',
   deepseek: 'deepseek',
   fireworks: 'fireworks',
+  deepinfra: 'deepinfra',
   copilot: 'copilot',
   grok: 'grok',
   cursor: 'cursor',
@@ -229,6 +239,7 @@ export type InternalRateLimitState = {
   zcode: ProviderRateLimits | null
   deepseek: ProviderRateLimits | null
   fireworks: ProviderRateLimits | null
+  deepinfra: ProviderRateLimits | null
   copilot: ProviderRateLimits | null
 }
 

@@ -18,6 +18,7 @@ import {
   type AntigravityUsageEnabledResolver,
   type ZcodePlanRateLimitConfig,
   type DeepSeekRateLimitConfig,
+  type DeepInfraRateLimitConfig,
   type FireworksRateLimitConfig,
   type CopilotRateLimitConfig,
   type GeminiCliOAuthEnabledResolver,
@@ -42,7 +43,9 @@ export function disabledUsageProviderSnapshot(
     ...(provider === 'gemini' || provider === 'cursor' || provider === 'antigravity'
       ? { buckets: [] }
       : {}),
-    ...(provider === 'deepseek' || provider === 'fireworks' ? { credits: null } : {}),
+    ...(provider === 'deepseek' || provider === 'fireworks' || provider === 'deepinfra'
+      ? { credits: null }
+      : {}),
     ...(provider === 'copilot' ? { monthly: null, allowance: null } : {}),
     updatedAt: Date.now(),
     error: null,
@@ -64,6 +67,7 @@ export abstract class RateLimitServiceState {
     zcode: null,
     deepseek: null,
     fireworks: null,
+    deepinfra: null,
     copilot: null
   }
   // Grok's auth-file probe runs per fetch cycle, gated with the provider's disabled state.
@@ -88,6 +92,7 @@ export abstract class RateLimitServiceState {
     zcode: 0,
     deepseek: 0,
     fireworks: 0,
+    deepinfra: 0,
     copilot: 0
   }
   // Failures increase activation backoff; success/unavailable resets it.
@@ -104,6 +109,7 @@ export abstract class RateLimitServiceState {
     zcode: 0,
     deepseek: 0,
     fireworks: 0,
+    deepinfra: 0,
     copilot: 0
   }
   protected mainWindow: BrowserWindow | null = null
@@ -126,6 +132,7 @@ export abstract class RateLimitServiceState {
   protected zcodeFetchGeneration = 0
   protected deepseekFetchGeneration = 0
   protected fireworksFetchGeneration = 0
+  protected deepinfraFetchGeneration = 0
   protected copilotFetchGeneration = 0
   protected antigravityFetchGeneration = 0
   protected lastOpencodeConfigHash = ''
@@ -134,6 +141,7 @@ export abstract class RateLimitServiceState {
   // Why: API keys live on disk, not in settings, so a paste is only observable as a config-hash change between cycles.
   protected lastDeepSeekConfigHash = ''
   protected lastFireworksConfigHash = ''
+  protected lastDeepInfraConfigHash = ''
   protected lastCopilotConfigHash = ''
   protected codexHomePathResolver: CodexHomePathResolver | null = null
   protected codexFetchTarget: NormalizedCodexAccountSelectionTarget = {
@@ -153,6 +161,7 @@ export abstract class RateLimitServiceState {
   protected zcodePlanConfigResolver: (() => ZcodePlanRateLimitConfig) | null = null
   protected deepSeekConfigResolver: (() => DeepSeekRateLimitConfig) | null = null
   protected fireworksConfigResolver: (() => FireworksRateLimitConfig) | null = null
+  protected deepInfraConfigResolver: (() => DeepInfraRateLimitConfig) | null = null
   protected copilotConfigResolver: (() => CopilotRateLimitConfig) | null = null
   protected geminiCliOAuthEnabledResolver: GeminiCliOAuthEnabledResolver | null = null
   protected antigravityUsageEnabledResolver: AntigravityUsageEnabledResolver | null = null

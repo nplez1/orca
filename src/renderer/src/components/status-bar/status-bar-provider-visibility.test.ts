@@ -78,6 +78,7 @@ function usageSettings(overrides: Partial<UsageProviderSettings> = {}): UsagePro
     zcodePlanApiKeyConfigured: false,
     deepseekApiKeyConfigured: false,
     fireworksApiKeyConfigured: false,
+    deepinfraApiKeyConfigured: false,
     copilotTokenConfigured: false,
     ...overrides
   }
@@ -289,6 +290,19 @@ describe('credits-only providers', () => {
     expect(
       getVisibleUsageProvider('fireworks', null, usageSettings({ fireworksApiKeyConfigured: true }))
     ).toMatchObject({ provider: 'fireworks', status: 'fetching', credits: null })
+    expect(
+      getVisibleUsageProvider('deepinfra', null, usageSettings({ deepinfraApiKeyConfigured: true }))
+    ).toMatchObject({ provider: 'deepinfra', status: 'fetching', credits: null })
+  })
+
+  it('surfaces a live DeepInfra balance as a configured reading', () => {
+    expect(
+      getVisibleUsageProvider(
+        'deepinfra',
+        provider('ok', { provider: 'deepinfra', credits: deepseekCredits }),
+        usageSettings({ deepinfraApiKeyConfigured: true })
+      )
+    ).toMatchObject({ provider: 'deepinfra', status: 'ok', credits: deepseekCredits })
   })
 
   it('shows a pending Copilot row from its durable credential flag alone', () => {
@@ -320,6 +334,7 @@ describe('credits-only providers', () => {
           cursor: provider('unavailable', { provider: 'cursor' }),
           deepseek: provider('ok', { provider: 'deepseek', credits: deepseekCredits }),
           fireworks: provider('unavailable', { provider: 'fireworks' }),
+          deepinfra: provider('unavailable', { provider: 'deepinfra' }),
           copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings()
@@ -518,6 +533,7 @@ describe('isUsageEmptyState', () => {
           cursor: undefined,
           deepseek: undefined,
           fireworks: undefined,
+          deepinfra: undefined,
           copilot: undefined
         },
         usageSettings()
@@ -541,6 +557,7 @@ describe('isUsageEmptyState', () => {
           zcode: provider('unavailable', { provider: 'zcode' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
           fireworks: provider('unavailable', { provider: 'fireworks' }),
+          deepinfra: provider('unavailable', { provider: 'deepinfra' }),
           copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings()
@@ -564,6 +581,7 @@ describe('isUsageEmptyState', () => {
           zcode: provider('unavailable', { provider: 'zcode' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
           fireworks: provider('unavailable', { provider: 'fireworks' }),
+          deepinfra: provider('unavailable', { provider: 'deepinfra' }),
           copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings({
@@ -600,6 +618,7 @@ describe('isUsageEmptyState', () => {
       zcode: provider('unavailable', { provider: 'zcode' }),
       deepseek: provider('unavailable', { provider: 'deepseek' }),
       fireworks: provider('unavailable', { provider: 'fireworks' }),
+      deepinfra: provider('unavailable', { provider: 'deepinfra' }),
       copilot: provider('unavailable', { provider: 'copilot' })
     }
     expect(isUsageEmptyState(settledProviders, usageSettings())).toBe(true)
@@ -623,6 +642,7 @@ describe('isUsageEmptyState', () => {
           zcode: provider('unavailable', { provider: 'zcode' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
           fireworks: provider('unavailable', { provider: 'fireworks' }),
+          deepinfra: provider('unavailable', { provider: 'deepinfra' }),
           copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings({ antigravityUsageConfigured: true })
@@ -646,6 +666,7 @@ describe('isUsageEmptyState', () => {
           zcode: provider('unavailable', { provider: 'zcode' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
           fireworks: provider('unavailable', { provider: 'fireworks' }),
+          deepinfra: provider('unavailable', { provider: 'deepinfra' }),
           copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings()
@@ -697,6 +718,7 @@ describe('disabled usage providers', () => {
       cursor: provider('unavailable', { provider: 'cursor' }),
       deepseek: provider('unavailable', { provider: 'deepseek' }),
       fireworks: provider('unavailable', { provider: 'fireworks' }),
+      deepinfra: provider('unavailable', { provider: 'deepinfra' }),
       copilot: provider('unavailable', { provider: 'copilot' })
     }
     expect(isUsageEmptyState(settled, usageSettings())).toBe(false)

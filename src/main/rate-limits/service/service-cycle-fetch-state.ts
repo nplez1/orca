@@ -69,6 +69,18 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceFe
     return { generation: this.copilotFetchGeneration, changed }
   }
 
+  protected syncDeepInfraFetchGeneration(fingerprint: string): {
+    generation: number
+    changed: boolean
+  } {
+    const changed = fingerprint !== this.lastDeepInfraConfigHash
+    if (changed) {
+      this.lastDeepInfraConfigHash = fingerprint
+      this.deepinfraFetchGeneration += 1
+    }
+    return { generation: this.deepinfraFetchGeneration, changed }
+  }
+
   /** Mark every provider as fetching while its previous data stays visible, so the
    *  meters do not blink empty for the length of a cycle.
    *
@@ -81,7 +93,7 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceFe
     codexStateBeforeFetch: ProviderRateLimits | null
     antigravityUsageEnabled: boolean
     changed: Record<
-      'opencodeGo' | 'minimax' | 'deepseek' | 'fireworks' | 'copilot' | 'zcode',
+      'opencodeGo' | 'minimax' | 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot' | 'zcode',
       boolean
     >
   }): void {
@@ -116,6 +128,9 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceFe
       fireworks: changed.fireworks
         ? this.withFetchingStatus(null, 'fireworks')
         : this.withFetchingStatus(previousState.fireworks, 'fireworks'),
+      deepinfra: changed.deepinfra
+        ? this.withFetchingStatus(null, 'deepinfra')
+        : this.withFetchingStatus(previousState.deepinfra, 'deepinfra'),
       copilot: changed.copilot
         ? this.withFetchingStatus(null, 'copilot')
         : this.withFetchingStatus(previousState.copilot, 'copilot'),

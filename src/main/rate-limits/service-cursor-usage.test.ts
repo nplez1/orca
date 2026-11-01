@@ -34,6 +34,7 @@ vi.mock('./cursor-auth', () => ({ readCursorAuthSession: vi.fn() }))
 // Why: upstream's other providers ride the shared harness, which resets each of their mocks.
 vi.mock('./deepseek/deepseek-fetcher', () => ({ fetchDeepSeekRateLimits: vi.fn() }))
 vi.mock('./fireworks/fireworks-fetcher', () => ({ fetchFireworksRateLimits: vi.fn() }))
+vi.mock('./deepinfra/deepinfra-fetcher', () => ({ fetchDeepInfraRateLimits: vi.fn() }))
 vi.mock('./copilot/copilot-fetcher', () => ({ fetchCopilotRateLimits: vi.fn() }))
 vi.mock('./copilot/copilot-gh-credentials', () => ({
   resolveGhCopilotCredentials: vi.fn(async () => ({ status: 'gh-missing' })),
@@ -42,6 +43,9 @@ vi.mock('./copilot/copilot-gh-credentials', () => ({
   getCachedCopilotGhCredentials: vi.fn(() => null)
 }))
 vi.mock('../deepseek/deepseek-api-key-store', () => ({ hasDeepSeekApiKey: vi.fn(() => false) }))
+vi.mock('../deepinfra/deepinfra-api-key-store', () => ({
+  hasDeepInfraApiKey: vi.fn(() => false)
+}))
 vi.mock('../fireworks/fireworks-credentials-store', () => ({
   hasFireworksCredentials: vi.fn(() => false)
 }))

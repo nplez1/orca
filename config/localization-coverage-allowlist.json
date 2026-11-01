@@ -135,6 +135,13 @@
   {
     "filePath": "src/renderer/src/components/status-bar/fork-usage-providers.tsx",
     "kind": "object-property:label",
+    "text": "DeepInfra",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/status-bar/fork-usage-providers.tsx",
+    "kind": "object-property:label",
     "text": "GitHub Copilot",
     "dynamic": false,
     "count": 1

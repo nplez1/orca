@@ -218,6 +218,29 @@ export function getProviderUsageStatusBarToggleEntries(): StatusBarToggleSearchE
       )
     },
     {
+      id: 'deepinfra',
+      title: translate('settings.appearance.search.deepinfraTitle', 'DeepInfra Balance'),
+      description: translate(
+        'settings.appearance.search.deepinfraDescription',
+        'Show your remaining DeepInfra credit balance in the status bar.'
+      ),
+      keywords: [
+        ...translateSearchKeyword(
+          'auto.components.settings.appearance.search.896eb53fd4',
+          'status bar'
+        ),
+        ...translateSearchKeyword('settings.appearance.search.deepinfraKeyword', 'deepinfra'),
+        ...translateSearchKeyword('auto.components.settings.appearance.search.00a028f25f', 'usage'),
+        ...translateSearchKeyword('settings.appearance.search.balanceKeyword', 'balance'),
+        ...translateSearchKeyword('settings.appearance.search.creditsKeyword', 'credits'),
+        ...translateSearchKeyword('settings.appearance.search.usdKeyword', 'usd')
+      ],
+      toggleDescription: translate(
+        'settings.appearance.statusBar.deepinfraToggleDescription',
+        'Show DeepInfra credit balance in the status bar.'
+      )
+    },
+    {
       id: 'copilot',
       title: translate('settings.appearance.search.copilotTitle', 'GitHub Copilot Usage'),
       description: translate(

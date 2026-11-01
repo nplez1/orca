@@ -321,6 +321,23 @@ export const getAccountsDeepSeekSearchEntries = createLocalizedCatalog(() => [
   }
 ])
 
+export const getAccountsDeepInfraSearchEntries = createLocalizedCatalog(() => [
+  {
+    title: translate('auto.components.settings.accounts.search.a0995731bd', 'DeepInfra Usage'),
+    description: translate(
+      'auto.components.settings.accounts.search.19a4d6e725',
+      'Configure DeepInfra usage tracking with an API key. DeepInfra publishes only the account balance, not usage history.'
+    ),
+    keywords: [
+      translate('auto.components.settings.accounts.search.2d16811a7f', 'deepinfra'),
+      translate('auto.components.settings.accounts.search.54714130c4', 'api key'),
+      translate('auto.components.settings.accounts.search.c0a759aceb', 'balance'),
+      translate('auto.components.settings.accounts.search.ca8cf669e2', 'usage'),
+      translate('auto.components.settings.accounts.search.aef1562679', 'credits')
+    ]
+  }
+])
+
 export const getAccountsFireworksSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.accounts.search.f23a201868', 'Fireworks.ai Usage'),
@@ -364,6 +381,7 @@ export const getAccountsPaneSearchEntries = createLocalizedCatalog((): SettingsS
   ...getAccountsKimiSearchEntries(),
   ...getAccountsMiniMaxSearchEntries(),
   ...getAccountsDeepSeekSearchEntries(),
+  ...getAccountsDeepInfraSearchEntries(),
   ...getAccountsFireworksSearchEntries(),
   ...getAccountsCopilotSearchEntries(),
   ...getAccountsGrokSearchEntries(),

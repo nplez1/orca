@@ -51,6 +51,7 @@ const USAGE_PROVIDER_IDS: Record<UsageProviderKey, ProviderRateLimits['provider'
   zcode: 'zcode',
   deepseek: 'deepseek',
   fireworks: 'fireworks',
+  deepinfra: 'deepinfra',
   copilot: 'copilot'
 }
 

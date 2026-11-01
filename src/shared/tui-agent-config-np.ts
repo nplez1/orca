@@ -4,8 +4,7 @@ import type { TuiAgentConfigSource } from './tui-agent-config-types'
 
 // Why: Orca NP's own entries over upstream's table, so upstream table edits still merge in place.
 // `satisfies` rather than an annotation: the literal values must satisfy the config source type without
-// widening it. The key type does not survive `Object.entries` below — that widens to `string`, which only
-// compiles because this project's tsconfig leaves `noImplicitAny` off.
+// widening it. `withForkTuiAgentOverrides` reads it through a string-keyed copy for the same reason.
 const FORK_TUI_AGENT_OVERRIDES = {
   'claude-agent-teams': {
     detectCmd: 'orca-np',
@@ -24,9 +23,12 @@ const FORK_TUI_AGENT_OVERRIDES = {
 export function withForkTuiAgentOverrides(
   source: Record<TuiAgent, TuiAgentConfigSource>
 ): Record<TuiAgent, TuiAgentConfigSource> {
-  const merged = { ...source }
+  // Why the string-keyed working copy: `Object.entries` widens the override keys to `string`,
+  // and the strict mobile typecheck refuses to index `Record<TuiAgent, …>` with one. A string
+  // index signature is assignable back to the narrow record, so no assertion is needed.
+  const merged: Record<string, TuiAgentConfigSource> = { ...source }
   for (const [agent, override] of Object.entries(FORK_TUI_AGENT_OVERRIDES)) {
-    merged[agent] = { ...source[agent], ...override }
+    merged[agent] = { ...merged[agent], ...override }
   }
   return merged
 }

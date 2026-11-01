@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   registerSessionSummaryHandlers: vi.fn(),
   registerUiHangDiagnosticsHandlers: vi.fn(),
   registerDeepSeekCredentialsHandlers: vi.fn(),
+  registerDeepInfraCredentialsHandlers: vi.fn(),
   registerFireworksCredentialsHandlers: vi.fn(),
   registerCopilotCredentialsHandlers: vi.fn()
 }))
@@ -22,6 +23,9 @@ vi.mock('./ui-hang-diagnostics', () => ({
 }))
 vi.mock('./deepseek-credentials', () => ({
   registerDeepSeekCredentialsHandlers: mocks.registerDeepSeekCredentialsHandlers
+}))
+vi.mock('./deepinfra-credentials', () => ({
+  registerDeepInfraCredentialsHandlers: mocks.registerDeepInfraCredentialsHandlers
 }))
 vi.mock('./fireworks-credentials', () => ({
   registerFireworksCredentialsHandlers: mocks.registerFireworksCredentialsHandlers
@@ -46,6 +50,7 @@ describe('registerForkHandlers', () => {
     expect(mocks.registerJenkinsHandlers).toHaveBeenCalledOnce()
     expect(mocks.registerUiHangDiagnosticsHandlers).toHaveBeenCalledWith(store)
     expect(mocks.registerDeepSeekCredentialsHandlers).toHaveBeenCalledWith(null)
+    expect(mocks.registerDeepInfraCredentialsHandlers).toHaveBeenCalledWith(null)
     expect(mocks.registerFireworksCredentialsHandlers).toHaveBeenCalledWith(null)
     expect(mocks.registerCopilotCredentialsHandlers).toHaveBeenCalledWith(null)
   })
@@ -61,6 +66,7 @@ describe('registerForkHandlers', () => {
     registerForkHandlers({ store, rateLimits: null })
 
     expect(mocks.registerDeepSeekCredentialsHandlers).toHaveBeenCalledWith(null)
+    expect(mocks.registerDeepInfraCredentialsHandlers).toHaveBeenCalledWith(null)
     expect(mocks.registerFireworksCredentialsHandlers).toHaveBeenCalledWith(null)
     expect(mocks.registerCopilotCredentialsHandlers).toHaveBeenCalledWith(null)
   })

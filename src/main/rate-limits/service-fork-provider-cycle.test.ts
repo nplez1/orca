@@ -49,6 +49,10 @@ vi.mock('./fireworks/fireworks-fetcher', () => ({
   fetchFireworksRateLimits: vi.fn()
 }))
 
+vi.mock('./deepinfra/deepinfra-fetcher', () => ({
+  fetchDeepInfraRateLimits: vi.fn()
+}))
+
 vi.mock('./copilot/copilot-fetcher', () => ({
   fetchCopilotRateLimits: vi.fn()
 }))
@@ -62,6 +66,9 @@ vi.mock('./copilot/copilot-gh-credentials', () => ({
 
 vi.mock('../deepseek/deepseek-api-key-store', () => ({
   hasDeepSeekApiKey: vi.fn(() => false)
+}))
+vi.mock('../deepinfra/deepinfra-api-key-store', () => ({
+  hasDeepInfraApiKey: vi.fn(() => false)
 }))
 
 vi.mock('../fireworks/fireworks-credentials-store', () => ({

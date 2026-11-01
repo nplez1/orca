@@ -86,6 +86,14 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     })
   }
 
+  invalidateDeepInfraCredentialState(): void {
+    this.deepinfraFetchGeneration += 1
+    this.updateState({
+      ...this.state,
+      deepinfra: this.withFetchingStatus(null, 'deepinfra')
+    })
+  }
+
   invalidateCopilotCredentialState(): void {
     this.copilotFetchGeneration += 1
     this.updateState({

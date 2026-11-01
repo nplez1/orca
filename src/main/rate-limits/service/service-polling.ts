@@ -79,6 +79,7 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
       zcode: this.state.zcode,
       deepseek: this.state.deepseek,
       fireworks: this.state.fireworks,
+      deepinfra: this.state.deepinfra,
       copilot: this.state.copilot
     }
     return Object.entries(byProvider).map(([provider, limits]) => ({

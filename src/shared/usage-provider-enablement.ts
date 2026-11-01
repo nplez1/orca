@@ -23,6 +23,7 @@ export const USAGE_PROVIDER_IDS = [
   'minimax',
   'deepseek',
   'fireworks',
+  'deepinfra',
   'copilot',
   'grok',
   'cursor',

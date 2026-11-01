@@ -56,6 +56,7 @@ function recordStatusBarToggleInteraction(
     id === 'minimax' ||
     id === 'deepseek' ||
     id === 'fireworks' ||
+    id === 'deepinfra' ||
     id === 'copilot' ||
     id === 'grok' ||
     id === 'cursor'

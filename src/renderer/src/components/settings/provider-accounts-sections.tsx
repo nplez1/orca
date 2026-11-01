@@ -12,7 +12,12 @@ import {
   OpenAIIcon,
   OpenCodeGoIcon
 } from '../status-bar/icons'
-import { CopilotIcon, DeepSeekIcon, FireworksIcon } from '../status-bar/fork-usage-providers'
+import {
+  CopilotIcon,
+  DeepInfraIcon,
+  DeepSeekIcon,
+  FireworksIcon
+} from '../status-bar/fork-usage-providers'
 import type { SettingsSearchEntry } from './settings-search'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import type { ProviderAccountsIcon } from './ProviderAccountsSection'
@@ -22,6 +27,7 @@ import {
   getAccountsCodexSearchEntries,
   getAccountsCopilotSearchEntries,
   getAccountsCursorSearchEntries,
+  getAccountsDeepInfraSearchEntries,
   getAccountsDeepSeekSearchEntries,
   getAccountsFireworksSearchEntries,
   getAccountsGeminiSearchEntries,
@@ -43,6 +49,7 @@ import {
 import { AntigravityAccountsSection } from './AntigravityAccountsSection'
 import { MiniMaxAccountsSection, getMiniMaxConsoleUrl } from './MiniMaxAccountsSection'
 import { renderDeepSeekAccountsSection } from './accounts-pane-deepseek-section'
+import { renderDeepInfraAccountsSection } from './accounts-pane-deepinfra-section'
 import { renderFireworksAccountsSection } from './accounts-pane-fireworks-section'
 import { renderCopilotAccountsSection } from './accounts-pane-copilot-section'
 import { GrokAccountsSection } from './GrokAccountsSection'
@@ -82,6 +89,7 @@ export type ProviderAccountsSectionEntry = {
 }
 
 const DEEPSEEK_CONSOLE_URL = 'https://platform.deepseek.com/usage'
+const DEEPINFRA_CONSOLE_URL = 'https://deepinfra.com/dash/billing'
 const FIREWORKS_CONSOLE_URL = 'https://app.fireworks.ai/settings/users/api-keys'
 const COPILOT_TOKENS_URL = 'https://github.com/settings/tokens?type=beta'
 const GROK_CLI_DOCS_URL = 'https://docs.x.ai/build/overview'
@@ -221,6 +229,29 @@ export const getProviderAccountsSections = createLocalizedCatalog(
         />
       ),
       renderBody: ({ model }) => renderDeepSeekAccountsSection(model)
+    },
+    {
+      id: 'deepinfra',
+      title: translate(
+        'auto.components.settings.provider.accounts.sections.6e1589baaa',
+        'DeepInfra'
+      ),
+      description: translate(
+        'auto.components.settings.provider.accounts.sections.03b0e64fb2',
+        'Configure DeepInfra usage tracking for your account.'
+      ),
+      Icon: DeepInfraIcon,
+      searchEntries: getAccountsDeepInfraSearchEntries,
+      headerAction: () => (
+        <ProviderHeaderLink
+          href={DEEPINFRA_CONSOLE_URL}
+          label={translate(
+            'auto.components.settings.provider.accounts.sections.cd68b9654d',
+            'Open console'
+          )}
+        />
+      ),
+      renderBody: ({ model }) => renderDeepInfraAccountsSection(model)
     },
     {
       id: 'fireworks',

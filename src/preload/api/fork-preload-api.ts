@@ -1,9 +1,11 @@
 import type {
   CopilotCredentialsApi,
+  DeepInfraCredentialsApi,
   DeepSeekCredentialsApi,
   FireworksCredentialsApi
 } from './agent-account-api'
 import { copilotCredentialsApi } from './copilot-credentials-bridge'
+import { deepinfraCredentialsApi } from './deepinfra-credentials-bridge'
 import { deepseekCredentialsApi } from './deepseek-credentials-bridge'
 import { fireworksCredentialsApi } from './fireworks-credentials-bridge'
 import type { JenkinsApi } from './jenkins-api'
@@ -23,6 +25,7 @@ export type ForkPreloadApi = {
   uiHangDiagnostics: UiHangDiagnosticsApi
   sessionSummary: SessionSummaryApi
   deepseekCredentials: DeepSeekCredentialsApi
+  deepinfraCredentials: DeepInfraCredentialsApi
   fireworksCredentials: FireworksCredentialsApi
   copilotCredentials: CopilotCredentialsApi
 }
@@ -32,6 +35,7 @@ export const forkPreloadApi: ForkPreloadApi = {
   uiHangDiagnostics: uiHangDiagnosticsApi,
   sessionSummary: sessionSummaryApi,
   deepseekCredentials: deepseekCredentialsApi,
+  deepinfraCredentials: deepinfraCredentialsApi,
   fireworksCredentials: fireworksCredentialsApi,
   copilotCredentials: copilotCredentialsApi
 }

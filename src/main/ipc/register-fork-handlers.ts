@@ -1,6 +1,7 @@
 import type { Store } from '../persistence/loading-store/store'
 import type { RateLimitService } from '../rate-limits/service'
 import { registerCopilotCredentialsHandlers } from './copilot-credentials'
+import { registerDeepInfraCredentialsHandlers } from './deepinfra-credentials'
 import { registerDeepSeekCredentialsHandlers } from './deepseek-credentials'
 import { registerFireworksCredentialsHandlers } from './fireworks-credentials'
 import { registerJenkinsHandlers } from './jenkins'
@@ -26,6 +27,7 @@ export function registerForkHandlers({
   registerSessionSummaryHandlers(() => store.getSettings())
   registerUiHangDiagnosticsHandlers(store)
   registerDeepSeekCredentialsHandlers(rateLimits)
+  registerDeepInfraCredentialsHandlers(rateLimits)
   registerFireworksCredentialsHandlers(rateLimits)
   registerCopilotCredentialsHandlers(rateLimits)
 }
