@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AgentSessionProcessIdentity } from '../../../../shared/agent-session-record'
 import {
   PROCESS_START_TIME_TOLERANCE_MS,
+  darwinStartTimePsEnvironment,
+  parseUtcLstart,
   probeAgentSessionProcessIdentities,
   probeAgentSessionProcessIdentity,
   probeAgentSessionReservation,
@@ -197,6 +199,24 @@ describe('owner identity probe', () => {
       )
     } else {
       expect(observed).toBeNull()
+    }
+  })
+
+  // The hour a DST fall-back repeats: read as local, the later occurrence lands an hour early, which
+  // is how this went unnoticed until the one hour a year it fires.
+  it('parses a UTC lstart without applying the local zone', () => {
+    expect(parseUtcLstart('Sun Nov  1 01:37:04 2026')).toBe(Date.UTC(2026, 10, 1, 1, 37, 4))
+    expect(parseUtcLstart('  Sun Nov  1 01:37:04 2026  ')).toBe(Date.UTC(2026, 10, 1, 1, 37, 4))
+  })
+
+  // Both halves have to agree: a UTC printer read back as local is off by the whole zone offset.
+  it('asks ps for lstart in the zone the parser reads', () => {
+    const env = darwinStartTimePsEnvironment()
+
+    expect(env.TZ).toBe('UTC')
+    // Why gated: psLocaleEnvironment pins the locale on darwin only, and this helper never runs elsewhere.
+    if (process.platform === 'darwin') {
+      expect(env.LC_ALL).toBe('en_US.UTF-8')
     }
   })
 })
