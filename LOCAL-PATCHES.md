@@ -1325,15 +1325,17 @@ What the deleted comments guarded, kept here because each is a trap a later edit
   checks/comment body for; check the row the header is actually showing (a pick whose lookup has not
   answered is listed but not shown); a pick's unlink needs a row to remove; and the AI triage strip is
   hidden for a pick, because those actions start an agent in _this_ worktree.
-- **The switch effect and the tab-entry refresh are a pick's only re-reads, and no test drives
-  either.** Nothing under `right-sidebar/**` renders `useChecksPanelContextState` or
+- **The switch effect and the tab-entry refresh have no test driving either.** Nothing under
+  `right-sidebar/**` renders `useChecksPanelContextState` or
   `useChecksPanelEntryRefreshAndTitleActions`, so this bullet is their guard.
   - `use-checks-panel-context-state.tsx`, the effect keyed on the shown review: it must fire on a
-    _change_, not on mount (`previousShownReviewKeyRef`), or an ordinary single-review workspace's
-    first paint raises loading flags nothing clears; it clears the previous review's rows, because
-    rows on screen belong to the review that was showing when they were fetched; and it raises the
-    loading flags only for a pick, because the branch path owns them for its own review and raising
-    them for a review with no PR number leaves a spinner behind.
+    _change_, not on mount (`previousShownReviewKeyRef`), because a remount while the pick's cache
+    entry is already warm resolves a pick on the first render, and without the guard that first paint
+    clears rows and raises loading flags with no switch and no read in flight — those flags are
+    otherwise written only by a manual refresh, so nothing would clear them; it clears the previous
+    review's rows, because rows on screen belong to the review that was showing when they were
+    fetched; and it raises the loading flags only for a pick, because the branch path owns them for
+    its own review and raising them for a review with no PR number leaves a spinner behind.
   - `use-checks-panel-entry-refresh-and-title-actions.tsx`: tab entry — the pane's only periodic
     re-read of review metadata — and the post-mutation refresh both go to the pick first, and a picked
     MR also re-reads `fetchGitLabDetails` because its rows come from its own pipelines and threads.
