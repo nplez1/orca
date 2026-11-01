@@ -7,7 +7,6 @@ import { getWorkspaceAttachmentKey } from '../../../../../shared/workspace-attac
 import { buildWorkspaceAttachmentEdits } from '../../sidebar/worktree-attachment-editing'
 import {
   findWorkspaceReviewAttachment,
-  isWorkspaceReviewProvider,
   workspaceReviewSelectionKey
 } from '../workspace-review-selection'
 import type { ChecksPanelCheckAndReviewActionsInput } from './check-and-review-action-dependencies'
@@ -73,7 +72,7 @@ export function useChecksPanelReviewLinkActions(
     // the only path that removes a review the branch lookup discovered, because a slot-only clear
     // would let that lookup attach it again.
     const shownAttachment = findWorkspaceReviewAttachment(activeWorktree, activeReview)
-    if (shownAttachment && isWorkspaceReviewProvider(shownAttachment.provider)) {
+    if (shownAttachment) {
       const initial = getWorkspaceAttachments(activeWorktree)
       const removedKey = getWorkspaceAttachmentKey(shownAttachment)
       const draft = initial.filter((entry) => getWorkspaceAttachmentKey(entry) !== removedKey)
@@ -105,6 +104,11 @@ export function useChecksPanelReviewLinkActions(
           toast.error(result.error)
         }
       })()
+      return
+    }
+    // Why not the slot path for a pick: it addresses the workspace's own review, so a pick whose row
+    // no longer matches would tombstone a number that is not the one on screen.
+    if (showsPickedReview) {
       return
     }
     if (activeReview.provider === 'github') {

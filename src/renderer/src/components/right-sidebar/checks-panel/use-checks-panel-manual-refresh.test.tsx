@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import { act, cleanup, renderHook } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useAppStore } from '@/store'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as HostedReviewCardRefresh from '@/store/slices/hosted-review-card-refresh'
 
 const refresh = vi.hoisted(() => ({ calls: [] as string[] }))
@@ -142,6 +143,20 @@ const pickedPR: PRInfo = {
 }
 
 describe('useChecksPanelManualRefresh for a picked review', () => {
+  const WORKTREE_ID = 'worktree-1'
+  const PICKED_KEY = 'github:9'
+  const PICKED_REVIEW = {
+    provider: 'github' as const,
+    number: 9,
+    title: 'Parent change',
+    state: 'open' as const,
+    url: 'https://github.com/acme/orca/pull/9',
+    status: 'success' as const,
+    updatedAt: '2026-05-17T00:00:00.000Z',
+    mergeable: 'MERGEABLE' as const,
+    headSha: 'picked-head'
+  }
+
   function makePickedInput(overrides: Partial<RefreshInput> = {}): RefreshInput & {
     refreshSelectedReview: RefreshInput['reviewSelection']['refreshSelectedReview']
   } {
@@ -149,7 +164,7 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     const input: RefreshInput = {
       activeConnectionId: null,
       activeGitLabReview: null,
-      activeWorktreeId: null,
+      activeWorktreeId: WORKTREE_ID,
       activeWorktreePath: null,
       activeWorktreePushTarget: null,
       asyncResultKeyRef: { current: 'cache::main::9' },
@@ -171,7 +186,7 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
         return null
       }),
       gitStatusSnapshot: null,
-      isCurrentAsyncResult: () => true,
+      isCurrentAsyncResult: (key) => input.asyncResultKeyRef.current === key,
       isFolder: false,
       isGitLabReviewContext: false,
       linkedAzureDevOpsPR: null,
@@ -193,17 +208,7 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
       repo: { id: 'repo-1', path: '/workspace/repo' } as NonNullable<RefreshInput['repo']>,
       reviewSelection: makeWorkspaceReviewSelection({
         isWorkspaceReview: false,
-        selectedReview: {
-          provider: 'github',
-          number: 9,
-          title: 'Parent change',
-          state: 'open',
-          url: 'https://github.com/acme/orca/pull/9',
-          status: 'success',
-          updatedAt: '2026-05-17T00:00:00.000Z',
-          mergeable: 'MERGEABLE',
-          headSha: 'picked-head'
-        },
+        selectedReview: PICKED_REVIEW,
         refreshSelectedReview
       }),
       setChecks: vi.fn(),
@@ -219,6 +224,16 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     }
     return { ...input, refreshSelectedReview }
   }
+
+  beforeEach(() => {
+    useAppStore.setState({
+      workspaceReviewSelectionByWorktree: { [WORKTREE_ID]: PICKED_KEY }
+    })
+  })
+
+  afterEach(() => {
+    useAppStore.setState({ workspaceReviewSelectionByWorktree: {} })
+  })
 
   it('re-reads the pick and never sends this worktree branch to GitHub', async () => {
     const input = makePickedInput()
@@ -247,18 +262,13 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     expect(input.fetchGitLabDetails).not.toHaveBeenCalled()
   })
 
-  it('drops the rows when the review switched while the read was in flight', async () => {
+  it('drops the rows when the review switched while the checks read was in flight', async () => {
     const setChecks = vi.fn()
     const setComments = vi.fn()
-    const input = makePickedInput({
-      // Why a real comparison: a stub that always answers true cannot tell the guard from its absence.
-      isCurrentAsyncResult: (key) => input.asyncResultKeyRef.current === key,
-      setChecks,
-      setComments
-    })
+    const input = makePickedInput({ setChecks, setComments })
     input.fetchPRChecks = vi.fn(async () => {
       // The user picks another review while this read is in flight.
-      input.asyncResultKeyRef.current = 'cache::main::12'
+      input.asyncResultKeyRef.current = 'a-different-review'
       const staleCheck: PRCheckDetail = {
         name: 'stale',
         status: 'completed',
@@ -276,6 +286,41 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     expect(setComments).not.toHaveBeenCalled()
   })
 
+  it('abandons the read when the review switched while the pick itself was being refreshed', async () => {
+    const setChecks = vi.fn()
+    const setComments = vi.fn()
+    const setChecksLoading = vi.fn()
+    const setCommentsLoading = vi.fn()
+    const input = makePickedInput({
+      reviewSelection: makeWorkspaceReviewSelection({
+        isWorkspaceReview: false,
+        selectedReview: PICKED_REVIEW,
+        refreshSelectedReview: async () => {
+          // The switch lands inside the provider round-trip, before any key is claimed.
+          useAppStore.setState({ workspaceReviewSelectionByWorktree: {} })
+          return null
+        }
+      }),
+      setChecks,
+      setComments,
+      setChecksLoading,
+      setCommentsLoading
+    })
+    const { result } = renderHook(() => useChecksPanelManualRefresh(input))
+
+    await act(async () => result.current.handleRefresh())
+
+    // Why: claiming the result key for a review the header no longer shows is what put the old
+    // pick's rows under the new review, and discarded the new review's own in-flight read.
+    expect(input.fetchPRChecks).not.toHaveBeenCalled()
+    expect(input.fetchPRComments).not.toHaveBeenCalled()
+    expect(setChecks).not.toHaveBeenCalled()
+    expect(setComments).not.toHaveBeenCalled()
+    // Why not: the loading flags belong to the review the user moved to.
+    expect(setChecksLoading).not.toHaveBeenCalled()
+    expect(setCommentsLoading).not.toHaveBeenCalled()
+  })
+
   it('reads a picked merge request through the GitLab details path, never through GitHub checks', async () => {
     const gitLabReview = {
       provider: 'gitlab' as const,
@@ -288,6 +333,9 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
       mergeable: 'MERGEABLE' as const,
       headSha: 'mr-head'
     }
+    useAppStore.setState({
+      workspaceReviewSelectionByWorktree: { [WORKTREE_ID]: 'gitlab:7' }
+    })
     const input = makePickedInput({
       activeGitLabReview: gitLabReview,
       isGitLabReviewContext: true,

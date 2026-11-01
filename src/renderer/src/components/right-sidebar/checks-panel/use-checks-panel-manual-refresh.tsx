@@ -14,6 +14,10 @@ import {
 } from '../checks-panel-git-status-snapshot'
 
 import { checksPanelAsyncResultKey } from '../checks-panel-async-result-key'
+import {
+  isWorkspaceReviewProvider,
+  workspaceReviewSelectionKey
+} from '../workspace-review-selection'
 import { recordChecksPanelPRRefreshBreadcrumb } from '../checks-panel-pr-refresh-breadcrumb'
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
 import type { ChecksPanelManualRefreshInput } from './manual-refresh-dependencies'
@@ -71,6 +75,14 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
   // Why the pick rather than the selection's flag: the pane only renders a pick it can render, and
   // every branch below has to agree with what the header shows.
   const pickedReview = showsPickedReview ? reviewSelection.selectedReview : null
+  // Why the stored selection rather than the result key or a render-time ref: a refresh awaits a
+  // provider round-trip and the user can switch inside it, and the result key cannot tell a switch
+  // from this review's own head moving (which the refresh itself causes). The store is the
+  // authoritative answer to "which review is selected", and it changes synchronously.
+  const pickedReviewKey =
+    pickedReview && isWorkspaceReviewProvider(pickedReview.provider)
+      ? workspaceReviewSelectionKey(pickedReview.provider, pickedReview.number)
+      : null
   const handleRefresh = useCallback(async () => {
     if (!repo || !branch) {
       return
@@ -94,9 +106,20 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     // Why before the git-status probe: a picked review is not this branch's PR, so the branch path
     // below would refresh, and then re-read checks for, a review the user is not looking at.
     if (pickedReview) {
+      // Why the stored key: a switch does not change `refreshRequestKeyRef`, and the pane rewrites
+      // the result key when the refreshed review lands with a new head, so that key cannot tell "the
+      // user moved to another review" from "this review's head moved". The selection can.
+      const isPickStillShown = (): boolean =>
+        pickedReviewKey !== null &&
+        activeWorktreeId !== null &&
+        useAppStore.getState().workspaceReviewSelectionByWorktree[activeWorktreeId] ===
+          pickedReviewKey
+      const isCurrentPickRequest = (): boolean => isCurrentRequest() && isPickStillShown()
       try {
         const refreshedReview = await reviewSelection.refreshSelectedReview()
-        if (!isCurrentRequest()) {
+        // Why after the await: the review read is a provider round-trip, and a switch during it must
+        // not claim the result key or write rows the header no longer describes.
+        if (!isCurrentPickRequest()) {
           return
         }
         // The review carries the head this refresh read, so checks key on the commit that was just
@@ -108,7 +131,8 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
           await fetchGitLabDetails({
             mrNumberOverride: refreshedReview?.number ?? activeGitLabReview?.number ?? null,
             headShaOverride: headSha ?? null,
-            commitAsCurrent: true
+            commitAsCurrent: true,
+            isRequestCurrent: isCurrentPickRequest
           })
           return
         }
@@ -126,8 +150,6 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
           headSha
         )
         asyncResultKeyRef.current = pickedRequestKey
-        const isCurrentPickRequest = (): boolean =>
-          isCurrentRequest() && isCurrentAsyncResult(pickedRequestKey)
         setChecksLoading(true)
         setCommentsLoading(true)
         const [refreshedChecks, refreshedComments] = await Promise.all([
@@ -145,7 +167,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
             headSha
           })
         ])
-        if (!isCurrentPickRequest()) {
+        if (!isCurrentPickRequest() || !isCurrentAsyncResult(pickedRequestKey)) {
           return
         }
         setChecks(refreshedChecks)
@@ -155,11 +177,14 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         // provider failure for the review it could read.
         console.warn('Failed to refresh the selected review:', error)
       } finally {
-        // Why the same check: a switch mid-flight owns the loading flags now, and clearing them
-        // here would blank the review the user just moved to.
-        if (isCurrentRequest()) {
+        // Why the pick check on the flags only: after a switch they belong to the review the user
+        // moved to, and clearing them here would blank it. The refresh latch is this request's own,
+        // so it is released either way.
+        if (isCurrentPickRequest()) {
           setChecksLoading(false)
           setCommentsLoading(false)
+        }
+        if (isCurrentRequest()) {
           refreshInFlightRef.current = false
           setIsRefreshing(false)
         }
@@ -488,7 +513,8 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     pollIntervalRef,
     refreshInFlightRef,
     reviewSelection,
-    pickedReview
+    pickedReview,
+    pickedReviewKey
   ])
   return { handleRefresh }
 }

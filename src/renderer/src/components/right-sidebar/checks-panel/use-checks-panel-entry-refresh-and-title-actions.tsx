@@ -293,7 +293,6 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     linkedBitbucketPR,
     linkedGiteaPR,
     linkedGitLabMR,
-    fetchGitLabDetails,
     linkedPR,
     repo,
     reviewSelection,

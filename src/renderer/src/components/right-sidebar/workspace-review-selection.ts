@@ -179,16 +179,16 @@ export function hasMultipleWorkspaceReviews(
 export function findWorkspaceReviewAttachment(
   worktree: ReviewAttachmentSource | null | undefined,
   review: Pick<WorkspaceActiveReview, 'provider' | 'number' | 'url'> | null | undefined
-): WorkspaceAttachment | null {
+): WorkspaceReviewAttachment | null {
   if (!worktree || !review) {
     return null
   }
   // Why the review filter: a GitLab issue and an MR have separate number spaces, so `#42` and `!42`
   // can both be attached to one workspace and an unfiltered match could remove the issue instead.
   return (
-    getWorkspaceAttachments(worktree).find(
-      (item) => isWorkspaceReviewAttachment(item) && attachmentMatchesReview(item, review)
-    ) ?? null
+    getWorkspaceAttachments(worktree)
+      .filter(isWorkspaceReviewAttachment)
+      .find((item) => attachmentMatchesReview(item, review)) ?? null
   )
 }
 

@@ -432,6 +432,106 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
     )
   })
 
+  it('removes only the review row when an issue shares its number', () => {
+    // Why no urls: an attachment without one matches on provider and number alone, so only the
+    // attachment key's type component keeps the issue out of the removal.
+    const sharedNumber: WorkspaceAttachment[] = [
+      { provider: 'gitlab', type: 'issue', number: 7 },
+      { provider: 'gitlab', type: 'mr', number: 7 }
+    ]
+    const input = makeInput(
+      {
+        activeReview: {
+          provider: 'gitlab',
+          number: 7,
+          title: 'Parent change',
+          state: 'open',
+          url: 'https://gitlab.invalid/acme/orca/-/merge_requests/7',
+          status: 'success',
+          updatedAt: '2026-05-17T00:00:00.000Z',
+          mergeable: 'MERGEABLE'
+        }
+      },
+      sharedNumber
+    )
+    const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
+
+    act(() => result.current.handleUnlinkReview())
+
+    // The issue survives and MR !7 is gone; the workspace's own MR !42 was never in the draft.
+    expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
+      input.activeWorktreeId,
+      expect.objectContaining({
+        linkedItems: [
+          expect.objectContaining({ type: 'issue', number: 7 }),
+          expect.objectContaining({ type: 'mr', number: 42 })
+        ]
+      }),
+      { executionHostId: 'ssh:ssh-1' }
+    )
+  })
+
+  it('writes no tombstone for a pick, so an earlier unlink of the branch PR still holds', () => {
+    const pickedAttachment: WorkspaceAttachment = {
+      provider: 'github',
+      type: 'pr',
+      number: 9,
+      title: 'Parent change',
+      url: 'https://github.com/acme/orca/pull/9'
+    }
+    const input = makeInput(
+      {
+        activeReview: {
+          provider: 'github',
+          number: 9,
+          title: 'Parent change',
+          state: 'open',
+          url: 'https://github.com/acme/orca/pull/9',
+          status: 'success',
+          updatedAt: '2026-05-17T00:00:00.000Z',
+          mergeable: 'MERGEABLE'
+        },
+        // Why: `suppressedGitHubPR` is one slot, so a pick's number written here would replace the
+        // tombstone of a branch PR the user already unlinked and let that PR come back.
+        showsPickedReview: true,
+        suppressedGitHubPR: 12
+      },
+      [pickedAttachment]
+    )
+    const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
+
+    act(() => result.current.handleUnlinkReview())
+
+    expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
+      input.activeWorktreeId,
+      expect.not.objectContaining({ suppressedGitHubPR: expect.anything() }),
+      { executionHostId: 'ssh:ssh-1' }
+    )
+  })
+
+  it('leaves the workspace link alone when a pick has no row to remove', () => {
+    const input = makeInput({
+      activeReview: {
+        provider: 'github',
+        number: 9,
+        title: 'Parent change',
+        state: 'open',
+        url: 'https://github.com/acme/orca/pull/9',
+        status: 'success',
+        updatedAt: '2026-05-17T00:00:00.000Z',
+        mergeable: 'MERGEABLE'
+      },
+      showsPickedReview: true
+    })
+    const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
+
+    act(() => result.current.handleUnlinkReview())
+
+    // Why: the branch slot path addresses the workspace's own review, so falling into it for a pick
+    // would unlink a review that is not on screen.
+    expect(input.updateWorktreeMeta).not.toHaveBeenCalled()
+  })
+
   it('does nothing when no review is shown', () => {
     const input = makeInput({ activeReview: null })
     const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))

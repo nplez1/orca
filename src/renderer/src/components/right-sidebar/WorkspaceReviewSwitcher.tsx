@@ -22,7 +22,8 @@ export type WorkspaceReviewSwitcherProps = {
   /** The reviews to list. A pane passes only the ones it can render, so a row it lists is a row it
    *  can show; fewer than two means there is nothing to switch between and the control is absent. */
   entries: readonly WorkspaceReviewSelectionEntry[]
-  /** The entry the pane is showing, or the one it would fall back to. */
+  /** The entry the pane is showing. Null when the pane is showing a review it does not list, so no
+   *  row claims to be checked. */
   selectedKey: string | null
   onSelectReview: (key: string) => void
   className?: string

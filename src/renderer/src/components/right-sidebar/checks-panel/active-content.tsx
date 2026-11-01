@@ -154,9 +154,12 @@ export function ChecksPanelActiveContent({
   const reviewShortLabel = activeReview.provider === 'gitlab' ? 'MR' : 'PR'
   // Why not unconditional: a GitLab MR the branch lookup discovered has no row and no slot, so its
   // unlink would do nothing. GitHub has the suppression tombstone as its fallback.
-  const canUnlinkReview =
-    activeReview.provider === 'github' ||
-    findWorkspaceReviewAttachment(activeWorktree, activeReview) !== null
+  // Why the row is required for a pick: its unlink removes that row, so without one there is
+  // nothing to remove and the action would be a no-op behind an enabled control.
+  const shownReviewRow = findWorkspaceReviewAttachment(activeWorktree, activeReview)
+  const canUnlinkReview = showsPickedReview
+    ? shownReviewRow !== null
+    : activeReview.provider === 'github' || shownReviewRow !== null
   const shouldShowReviewTriageStrip =
     activeConflictReview !== null || getBrokenChecks(checks).length > 0
   const hostedReviewModifierHintDestination = resolveChecksPanelHostedReviewModifierDestination(
