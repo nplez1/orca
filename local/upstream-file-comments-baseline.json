@@ -3,7 +3,7 @@
   "base": "a9039850822850cd0e00ce805ffb394bed6d1762",
   "perFileThreshold": 5,
   "accepted": "local(usage)'s four fork lines in the rate-limits path, on top of main's #262 re-baseline (6055) which already recorded #258's renderer comments; my own local(lint) commit from before that merge is superseded here.",
-  "total": 6058,
+  "total": 6051,
   "files": {
     ".github/workflows/e2e.yml": 13,
     ".github/workflows/pr.yml": 7,
@@ -47,7 +47,7 @@
     "src/main/ai-vault-search/session-search-scope-paths.ts": 7,
     "src/main/ai-vault-search/session-search-store.ts": 25,
     "src/main/ai-vault/ai-vault-scan-progress-flow.test.ts": 6,
-    "src/main/ai-vault/cached-session-list.ts": 15,
+    "src/main/ai-vault/cached-session-list.ts": 10,
     "src/main/ai-vault/runtime-session-scanner.test.ts": 5,
     "src/main/ai-vault/runtime-session-scanner.ts": 22,
     "src/main/ai-vault/session-list-fingerprint.ts": 9,
