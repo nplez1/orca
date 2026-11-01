@@ -28,6 +28,7 @@ vi.mock('../antigravity-usage-fetcher', () => ({ fetchAntigravityRateLimits: vi.
 vi.mock('../minimax/minimax-fetcher', () => ({ fetchMiniMaxRateLimits: vi.fn() }))
 vi.mock('../deepseek/deepseek-fetcher', () => ({ fetchDeepSeekRateLimits: vi.fn() }))
 vi.mock('../fireworks/fireworks-fetcher', () => ({ fetchFireworksRateLimits: vi.fn() }))
+vi.mock('../deepinfra/deepinfra-fetcher', () => ({ fetchDeepInfraRateLimits: vi.fn() }))
 vi.mock('../copilot/copilot-fetcher', () => ({ fetchCopilotRateLimits: vi.fn() }))
 vi.mock('../copilot/copilot-gh-credentials', () => ({
   resolveGhCopilotCredentials: vi.fn(async () => ({ status: 'gh-missing' })),

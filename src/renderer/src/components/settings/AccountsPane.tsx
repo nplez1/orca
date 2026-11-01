@@ -308,6 +308,7 @@ export function AccountsPane({
     recordOpenCodeSettingEdit,
     miniMaxRateLimits,
     ...credentialSections.deepSeek,
+    ...credentialSections.deepInfra,
     ...credentialSections.fireworks,
     ...credentialSections.copilot
   }

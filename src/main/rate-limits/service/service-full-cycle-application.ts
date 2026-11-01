@@ -144,7 +144,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       zcodeResultPromise,
       antigravityResultPromise
     ])
-    const { deepseek, fireworks, copilot } = await applyForkProviderCycle(forkProviderCycle)
+    const { deepseek, fireworks, deepinfra, copilot } =
+      await applyForkProviderCycle(forkProviderCycle)
     if (signal.aborted) {
       return
     }
@@ -182,6 +183,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       forkProviderCycle.deepSeek.generation === this.deepseekFetchGeneration
     const shouldApplyFireworks =
       forkProviderCycle.fireworks.generation === this.fireworksFetchGeneration
+    const shouldApplyDeepInfra =
+      forkProviderCycle.deepInfra.generation === this.deepinfraFetchGeneration
     const shouldApplyCopilot = forkProviderCycle.copilot.generation === this.copilotFetchGeneration
     this.trackActiveFailureStreak('grok', grok)
     this.trackActiveFailureStreak('cursor', cursor)
@@ -196,6 +199,9 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     }
     if (shouldApplyFireworks) {
       this.trackActiveFailureStreak('fireworks', fireworks)
+    }
+    if (shouldApplyDeepInfra) {
+      this.trackActiveFailureStreak('deepinfra', deepinfra)
     }
     if (shouldApplyCopilot) {
       this.trackActiveFailureStreak('copilot', copilot)
@@ -224,6 +230,11 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
           ? fireworks
           : this.applyStalePolicy(fireworks, previousState.fireworks)
         : this.state.fireworks,
+      deepinfra: shouldApplyDeepInfra
+        ? forkProviderCycle.deepInfra.configChanged
+          ? deepinfra
+          : this.applyStalePolicy(deepinfra, previousState.deepinfra)
+        : this.state.deepinfra,
       copilot: shouldApplyCopilot
         ? forkProviderCycle.copilot.configChanged
           ? copilot

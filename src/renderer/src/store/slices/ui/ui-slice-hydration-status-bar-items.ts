@@ -9,6 +9,7 @@ const DEFAULT_ON_ANTIGRAVITY_STATUS_BAR_ITEM: StatusBarItem = 'antigravity'
 const DEFAULT_ON_GROK_STATUS_BAR_ITEM: StatusBarItem = 'grok'
 const DEFAULT_ON_DEEPSEEK_STATUS_BAR_ITEM: StatusBarItem = 'deepseek'
 const DEFAULT_ON_FIREWORKS_STATUS_BAR_ITEM: StatusBarItem = 'fireworks'
+const DEFAULT_ON_DEEPINFRA_STATUS_BAR_ITEM: StatusBarItem = 'deepinfra'
 const DEFAULT_ON_CURSOR_STATUS_BAR_ITEM: StatusBarItem = 'cursor'
 const DEFAULT_ON_ZCODE_STATUS_BAR_ITEM: StatusBarItem = 'zcode'
 const DEFAULT_ON_COPILOT_STATUS_BAR_ITEM: StatusBarItem = 'copilot'
@@ -23,6 +24,7 @@ export function hydrateStatusBarItems(ui: PersistedUIState): StatusBarItem[] {
     ['_grokStatusBarDefaultAdded', DEFAULT_ON_GROK_STATUS_BAR_ITEM],
     ['_deepseekStatusBarDefaultAdded', DEFAULT_ON_DEEPSEEK_STATUS_BAR_ITEM],
     ['_fireworksStatusBarDefaultAdded', DEFAULT_ON_FIREWORKS_STATUS_BAR_ITEM],
+    ['_deepinfraStatusBarDefaultAdded', DEFAULT_ON_DEEPINFRA_STATUS_BAR_ITEM],
     ['_cursorStatusBarDefaultAdded', DEFAULT_ON_CURSOR_STATUS_BAR_ITEM],
     ['_zcodeStatusBarDefaultAdded', DEFAULT_ON_ZCODE_STATUS_BAR_ITEM],
     ['_copilotStatusBarDefaultAdded', DEFAULT_ON_COPILOT_STATUS_BAR_ITEM]

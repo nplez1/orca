@@ -77,11 +77,13 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       resolveConfigs: () => ({
         deepSeek: this.resolveDeepSeekConfig(),
         fireworks: this.resolveFireworksConfig(),
+        deepInfra: this.resolveDeepInfraConfig(),
         copilot: this.resolveCopilotConfig()
       }),
       syncGenerations: (fingerprints) => ({
         deepSeek: this.syncDeepSeekFetchGeneration(fingerprints.deepSeek),
         fireworks: this.syncFireworksFetchGeneration(fingerprints.fireworks),
+        deepInfra: this.syncDeepInfraFetchGeneration(fingerprints.deepInfra),
         copilot: this.syncCopilotFetchGeneration(fingerprints.copilot)
       }),
       apiKeyCredentialError: (provider, message) => this.getApiKeyCredentialError(provider, message)
@@ -135,6 +137,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         minimax: miniMaxConfigChanged,
         deepseek: forkProviderCycle.deepSeek.configChanged,
         fireworks: forkProviderCycle.fireworks.configChanged,
+        deepinfra: forkProviderCycle.deepInfra.configChanged,
         copilot: forkProviderCycle.copilot.configChanged,
         zcode: zcodeConfigChanged
       }

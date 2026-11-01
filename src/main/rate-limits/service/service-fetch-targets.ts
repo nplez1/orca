@@ -9,6 +9,7 @@ import {
   type ZcodePlanResolvedConfig,
   type OpenCodeGoResolvedConfig,
   type DeepSeekResolvedConfig,
+  type DeepInfraResolvedConfig,
   type FireworksResolvedConfig,
   type CopilotResolvedConfig,
   type NormalizedCodexAccountSelectionTarget,
@@ -18,6 +19,7 @@ import {
   toErrorMessage
 } from './service-types'
 import type { CodexRateLimitResetOutcome } from '../../../shared/rate-limit-types'
+import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import { ApiKeyFileUnreadableError } from '../../credentials/api-key-file-unreadable-error'
 
 const CODEX_RESET_REFRESH_RETRIES = 3
@@ -283,42 +285,48 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveDeepSeekConfig(): DeepSeekResolvedConfig {
-    if (this.isUsageProviderDisabled('deepseek')) {
-      return { config: { apiKey: '' }, error: null }
+  // Why one helper: every fork API-key provider resolves the same way — a switched-off provider
+  // yields its empty config, and an unreadable key file becomes that provider's own error so it
+  // cannot abort a sibling's refresh. Four copies of that shape is what pushed this file over its
+  // line cap; the per-provider methods below are the named entry points.
+  protected resolveApiKeyProviderConfig<Config>(
+    provider: DisableableUsageProviderId,
+    resolver: (() => Config) | null,
+    fallback: Config
+  ): { config: Config; error: string | null } {
+    if (this.isUsageProviderDisabled(provider)) {
+      return { config: fallback, error: null }
     }
     try {
-      return { config: this.deepSeekConfigResolver?.() ?? { apiKey: '' }, error: null }
+      return { config: resolver?.() ?? fallback, error: null }
     } catch (error) {
-      return { config: { apiKey: '' }, error: toErrorMessage(error) }
+      return { config: fallback, error: toErrorMessage(error) }
     }
+  }
+
+  protected resolveDeepSeekConfig(): DeepSeekResolvedConfig {
+    return this.resolveApiKeyProviderConfig('deepseek', this.deepSeekConfigResolver, {
+      apiKey: ''
+    })
   }
 
   protected resolveFireworksConfig(): FireworksResolvedConfig {
-    if (this.isUsageProviderDisabled('fireworks')) {
-      return { config: { apiKey: '', accountIdOverride: null }, error: null }
-    }
-    try {
-      return {
-        config: this.fireworksConfigResolver?.() ?? { apiKey: '', accountIdOverride: null },
-        error: null
-      }
-    } catch (error) {
-      return { config: { apiKey: '', accountIdOverride: null }, error: toErrorMessage(error) }
-    }
+    return this.resolveApiKeyProviderConfig('fireworks', this.fireworksConfigResolver, {
+      apiKey: '',
+      accountIdOverride: null
+    })
+  }
+
+  protected resolveDeepInfraConfig(): DeepInfraResolvedConfig {
+    return this.resolveApiKeyProviderConfig('deepinfra', this.deepInfraConfigResolver, {
+      apiKey: ''
+    })
   }
 
   protected resolveCopilotConfig(): CopilotResolvedConfig {
-    if (this.isUsageProviderDisabled('copilot')) {
-      return { config: { token: '', enterpriseSlug: '' }, error: null }
-    }
-    try {
-      return {
-        config: this.copilotConfigResolver?.() ?? { token: '', enterpriseSlug: '' },
-        error: null
-      }
-    } catch (error) {
-      return { config: { token: '', enterpriseSlug: '' }, error: toErrorMessage(error) }
-    }
+    return this.resolveApiKeyProviderConfig('copilot', this.copilotConfigResolver, {
+      token: '',
+      enterpriseSlug: ''
+    })
   }
 }

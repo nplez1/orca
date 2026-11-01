@@ -176,6 +176,7 @@ export const UI_STATE_GLOBAL_FIELDS = [
   '_antigravityStatusBarDefaultAdded',
   '_copilotStatusBarDefaultAdded',
   '_cursorStatusBarDefaultAdded',
+  '_deepinfraStatusBarDefaultAdded',
   '_deepseekStatusBarDefaultAdded',
   '_expandedWorktreeCardPropertiesDefaulted',
   '_explorerDisplayRootMigrated',

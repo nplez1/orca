@@ -1,4 +1,5 @@
 import { fetchDeepSeekRateLimits } from '../deepseek/deepseek-fetcher'
+import { fetchDeepInfraRateLimits } from '../deepinfra/deepinfra-fetcher'
 import { fetchFireworksRateLimits } from '../fireworks/fireworks-fetcher'
 import { fetchCopilotRateLimits } from '../copilot/copilot-fetcher'
 import { readCopilotGhCredentialsForCycle } from '../copilot/copilot-gh-credentials'
@@ -12,6 +13,7 @@ import { disabledUsageProviderSnapshot } from '../service/service-state'
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import type {
   CopilotResolvedConfig,
+  DeepInfraResolvedConfig,
   DeepSeekResolvedConfig,
   FireworksResolvedConfig,
   ProviderRateLimits
@@ -25,12 +27,14 @@ export type ForkProviderGenerationStamp = {
 export type ForkProviderCycleResolvedConfigs = {
   deepSeek: DeepSeekResolvedConfig
   fireworks: FireworksResolvedConfig
+  deepInfra: DeepInfraResolvedConfig
   copilot: CopilotResolvedConfig
 }
 
 export type ForkProviderCycleGenerations = {
   deepSeek: ForkProviderGenerationStamp
   fireworks: ForkProviderGenerationStamp
+  deepInfra: ForkProviderGenerationStamp
   copilot: ForkProviderGenerationStamp
 }
 
@@ -40,10 +44,11 @@ export type ForkProviderCycleInput = {
   syncGenerations: (fingerprints: {
     deepSeek: string
     fireworks: string
+    deepInfra: string
     copilot: string
   }) => ForkProviderCycleGenerations
   apiKeyCredentialError: (
-    provider: 'deepseek' | 'fireworks' | 'copilot',
+    provider: 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot',
     message: string
   ) => ProviderRateLimits
 }
@@ -57,17 +62,19 @@ export type ForkProviderCycleSlot = {
 export type ForkProviderCyclePrepared = {
   deepSeek: ForkProviderCycleSlot
   fireworks: ForkProviderCycleSlot
+  deepInfra: ForkProviderCycleSlot
   copilot: ForkProviderCycleSlot
 }
 
 export type ForkProviderCycleSettled = {
   deepseek: ProviderRateLimits
   fireworks: ProviderRateLimits
+  deepinfra: ProviderRateLimits
   copilot: ProviderRateLimits
 }
 
 function trackForkProviderFetch(
-  provider: 'deepseek' | 'fireworks' | 'copilot',
+  provider: 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot',
   disabled: ReadonlySet<DisableableUsageProviderId>,
   load: () => Promise<ProviderRateLimits>
 ): Promise<SettledProviderResult> {
@@ -76,7 +83,7 @@ function trackForkProviderFetch(
   )
 }
 
-/** Resolves the fork's three API-key providers onto the sibling lane: credential
+/** Resolves the fork's four API-key providers onto the sibling lane: credential
  *  resolution and generation stamps at prepare time, one settled promise each so
  *  the positional tuple stays upstream's. A disabled provider never reaches its
  *  fetch or its gh probe. */
@@ -90,6 +97,7 @@ export function prepareForkProviderCycle(input: ForkProviderCycleInput): ForkPro
   const generations = input.syncGenerations({
     deepSeek: `${configs.deepSeek.config.apiKey}|${configs.deepSeek.error ?? ''}`,
     fireworks: `${configs.fireworks.config.apiKey}|${configs.fireworks.config.accountIdOverride ?? ''}|${configs.fireworks.error ?? ''}`,
+    deepInfra: `${configs.deepInfra.config.apiKey}|${configs.deepInfra.error ?? ''}`,
     copilot: copilotCredentials.configHash
   })
   return {
@@ -114,6 +122,15 @@ export function prepareForkProviderCycle(input: ForkProviderCycleInput): ForkPro
             })
       )
     },
+    deepInfra: {
+      configChanged: generations.deepInfra.changed,
+      generation: generations.deepInfra.generation,
+      resultPromise: trackForkProviderFetch('deepinfra', disabled, () =>
+        configs.deepInfra.error
+          ? Promise.resolve(input.apiKeyCredentialError('deepinfra', configs.deepInfra.error))
+          : fetchDeepInfraRateLimits({ apiKey: configs.deepInfra.config.apiKey })
+      )
+    },
     copilot: {
       configChanged: generations.copilot.changed,
       generation: generations.copilot.generation,
@@ -130,18 +147,20 @@ export function prepareForkProviderCycle(input: ForkProviderCycleInput): ForkPro
   }
 }
 
-/** Collapses the fork's three settled sibling promises into publishable snapshots. */
+/** Collapses the fork's four settled sibling promises into publishable snapshots. */
 export async function applyForkProviderCycle(
   prepared: ForkProviderCyclePrepared
 ): Promise<ForkProviderCycleSettled> {
-  const [deepSeek, fireworks, copilot] = await Promise.all([
+  const [deepSeek, fireworks, deepInfra, copilot] = await Promise.all([
     prepared.deepSeek.resultPromise,
     prepared.fireworks.resultPromise,
+    prepared.deepInfra.resultPromise,
     prepared.copilot.resultPromise
   ])
   return {
     deepseek: settleSiblingProviderResult('deepseek', deepSeek),
     fireworks: settleSiblingProviderResult('fireworks', fireworks),
+    deepinfra: settleSiblingProviderResult('deepinfra', deepInfra),
     copilot: settleSiblingProviderResult('copilot', copilot)
   }
 }

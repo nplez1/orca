@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
-import { CopilotIcon, DeepSeekIcon, FireworksIcon } from './fork-usage-providers'
+import { CopilotIcon, DeepInfraIcon, DeepSeekIcon, FireworksIcon } from './fork-usage-providers'
 import { translate } from '@/i18n/i18n'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import type { StatusBarController } from './use-status-bar-controller'
@@ -141,6 +141,16 @@ export function StatusBarVisibilityMenu({
         >
           <FireworksIcon size={14} />
           {translate('settings.appearance.statusBar.fireworksLabel', 'Fireworks.ai Spend')}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={statusBarItems.includes('deepinfra')}
+          onCheckedChange={() => {
+            recordFeatureInteraction('usage-tracking')
+            toggleStatusBarItem('deepinfra')
+          }}
+        >
+          <DeepInfraIcon size={14} />
+          {translate('settings.appearance.statusBar.deepinfraLabel', 'DeepInfra Balance')}
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={statusBarItems.includes('copilot')}

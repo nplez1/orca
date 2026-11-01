@@ -123,6 +123,15 @@ export type DeepSeekCredentialSectionModel = {
   clearDeepSeekApiKey: () => Promise<void>
 }
 
+export type DeepInfraCredentialSectionModel = {
+  deepInfraApiKeyDraft: string
+  setDeepInfraApiKeyDraft: Dispatch<SetStateAction<string>>
+  deepInfraApiKeyConfigured: boolean
+  deepInfraCredentialBusy: boolean
+  saveDeepInfraApiKey: () => Promise<void>
+  clearDeepInfraApiKey: () => Promise<void>
+}
+
 export type FireworksCredentialSectionModel = {
   fireworksApiKeyDraft: string
   setFireworksApiKeyDraft: Dispatch<SetStateAction<string>>
@@ -155,5 +164,6 @@ export type CopilotCredentialSectionModel = {
 }
 
 export type AccountsPaneCredentialSectionModel = DeepSeekCredentialSectionModel &
+  DeepInfraCredentialSectionModel &
   FireworksCredentialSectionModel &
   CopilotCredentialSectionModel

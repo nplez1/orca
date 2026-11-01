@@ -3,6 +3,7 @@ import { hasMiniMaxSessionCookie } from '../../minimax/minimax-cookie-store'
 import { hasMiniMaxApiKey } from '../../minimax/minimax-api-key-store'
 import { hasZcodePlanApiKey } from '../../zcode/zcode-plan-api-key-store'
 import { hasDeepSeekApiKey } from '../../deepseek/deepseek-api-key-store'
+import { hasDeepInfraApiKey } from '../../deepinfra/deepinfra-api-key-store'
 import { hasFireworksCredentials } from '../../fireworks/fireworks-credentials-store'
 import { hasCopilotCredentials } from '../../copilot-credentials/copilot-credentials-store'
 import { getCachedCopilotGhCredentials } from '../copilot/copilot-gh-credentials'
@@ -18,6 +19,7 @@ import {
   type AntigravityUsageEnabledResolver,
   type ZcodePlanRateLimitConfig,
   type DeepSeekRateLimitConfig,
+  type DeepInfraRateLimitConfig,
   type FireworksRateLimitConfig,
   type CopilotRateLimitConfig,
   type GeminiCliOAuthEnabledResolver,
@@ -72,6 +74,10 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
 
   setFireworksConfigResolver(resolver: () => FireworksRateLimitConfig): void {
     this.fireworksConfigResolver = resolver
+  }
+
+  setDeepInfraConfigResolver(resolver: () => DeepInfraRateLimitConfig): void {
+    this.deepInfraConfigResolver = resolver
   }
 
   setCopilotConfigResolver(resolver: () => CopilotRateLimitConfig): void {
@@ -169,6 +175,7 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
       // Why: these credentials live on disk, so main is the only place that can tell the renderer a provider is set up before its first fetch lands.
       deepseekApiKeyConfigured: disabled.has('deepseek') ? false : hasDeepSeekApiKey(),
       fireworksApiKeyConfigured: disabled.has('fireworks') ? false : hasFireworksCredentials(),
+      deepinfraApiKeyConfigured: disabled.has('deepinfra') ? false : hasDeepInfraApiKey(),
       copilotTokenConfigured: disabled.has('copilot')
         ? false
         : hasCopilotCredentials() || getCachedCopilotGhCredentials()?.status === 'ok',

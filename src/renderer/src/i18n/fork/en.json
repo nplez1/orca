@@ -649,6 +649,27 @@
                 "fb3c265f9d": "Stored locally",
                 "fd8437b974": "Create a key in your Fireworks.ai account and paste it here. Orca refreshes rated spend for the current billing period, in US dollars."
               }
+            },
+            "deepinfra": {
+              "actions": {
+                "c63453203e": "DeepInfra API key is required.",
+                "0db9f838a9": "DeepInfra API key saved.",
+                "ecab36fd1d": "DeepInfra credential update failed."
+              },
+              "section": {
+                "0a66e44378": "Stored locally",
+                "55811fed23": "Credentials not set",
+                "6ac1f27caa": "Stored locally in the Orca encrypted credential store and sent to DeepInfra only to refresh your balance.",
+                "9238a0ca54": "DeepInfra API key",
+                "76987731d3": "Paste the API key from your DeepInfra account for local balance fetching.",
+                "5c5b925371": "Saved",
+                "130bde22a6": "Not saved",
+                "e5d69f6d65": "Paste your DeepInfra API key",
+                "e93b4fbf52": "Replace",
+                "be46f681d0": "Save",
+                "03dc995e2f": "Forget key",
+                "c0c86aa3d1": "Create a key in your DeepInfra account and paste it here. Orca reads your remaining credit balance, in US dollars, from the same billing summary the DeepInfra dashboard shows."
+              }
             }
           },
           "search": {
@@ -668,7 +689,10 @@
               "kwKimi": "kimi",
               "kwMoonshot": "moonshot",
               "kwKimiCode": "kimi code"
-            }
+            },
+            "a0995731bd": "DeepInfra Usage",
+            "19a4d6e725": "Configure DeepInfra usage tracking with an API key. DeepInfra publishes only the account balance, not usage history.",
+            "2d16811a7f": "deepinfra"
           }
         },
         "advanced": {
@@ -732,6 +756,15 @@
           "off": "Off",
           "kimiTitle": "Kimi",
           "kimiDescription": "Usage comes from the Kimi Code sign-in already on this computer; there is nothing to set up here."
+        },
+        "provider": {
+          "accounts": {
+            "sections": {
+              "6e1589baaa": "DeepInfra",
+              "03b0e64fb2": "Configure DeepInfra usage tracking for your account.",
+              "cd68b9654d": "Open console"
+            }
+          }
         }
       },
       "sidebar": {
@@ -845,7 +878,8 @@
             "item": {
               "granted": "Granted",
               "spentThisMonth": "Spent this month",
-              "toppedUp": "Topped up"
+              "toppedUp": "Topped up",
+              "unbilled": "Unbilled usage"
             },
             "period": {
               "currentMonth": "this month",
@@ -923,8 +957,15 @@
       },
       "useComposerState": {},
       "useIpcEvents": {},
-      "useSettingsNavigationMetadata": {
-        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, Fireworks.ai, and GitHub Copilot."
+      "useSettingsNavigationMetadata": {},
+      "settings": {
+        "navigation": {
+          "capability": {
+            "sections": {
+              "f5a3a654ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, DeepInfra, Fireworks.ai, and GitHub Copilot."
+            }
+          }
+        }
       }
     },
     "lib": {
@@ -1247,7 +1288,11 @@
         "fireworksTitle": "Fireworks.ai Spend",
         "githubKeyword": "github",
         "spendKeyword": "spend",
-        "tokenKeyword": "token"
+        "tokenKeyword": "token",
+        "deepinfraTitle": "DeepInfra Balance",
+        "deepinfraDescription": "Show your remaining DeepInfra credit balance in the status bar.",
+        "deepinfraKeyword": "deepinfra",
+        "usdKeyword": "usd"
       },
       "statusBar": {
         "copilotLabel": "GitHub Copilot Usage",
@@ -1255,7 +1300,9 @@
         "deepseekLabel": "DeepSeek Balance",
         "deepseekToggleDescription": "Show DeepSeek account balance in the status bar.",
         "fireworksLabel": "Fireworks.ai Spend",
-        "fireworksToggleDescription": "Show Fireworks.ai rated spend in the status bar."
+        "fireworksToggleDescription": "Show Fireworks.ai rated spend in the status bar.",
+        "deepinfraLabel": "DeepInfra Balance",
+        "deepinfraToggleDescription": "Show DeepInfra credit balance in the status bar."
       }
     },
     "sessionSummaryAi": {

@@ -45,6 +45,7 @@ export function getStatusBarUsageProjection({
     zcode,
     deepseek,
     fireworks,
+    deepinfra,
     copilot
   } = rateLimits
 
@@ -65,6 +66,7 @@ export function getStatusBarUsageProjection({
     cursorAuthConfigured: rateLimits.cursorAuthConfigured,
     deepseekApiKeyConfigured: rateLimits.deepseekApiKeyConfigured,
     fireworksApiKeyConfigured: rateLimits.fireworksApiKeyConfigured,
+    deepinfraApiKeyConfigured: rateLimits.deepinfraApiKeyConfigured,
     copilotTokenConfigured: rateLimits.copilotTokenConfigured,
     zcodePlanApiKeyConfigured: rateLimits.zcodePlanApiKeyConfigured
   }
@@ -103,10 +105,13 @@ export function getStatusBarUsageProjection({
   // PATH detection gate would hide them forever.
   const visibleDeepSeek = getVisibleUsageProvider('deepseek', deepseek, usageSettings)
   const visibleFireworks = getVisibleUsageProvider('fireworks', fireworks, usageSettings)
+  // Why: DeepInfra is an API-key provider too — no CLI on PATH, so no detection gate.
+  const visibleDeepInfra = getVisibleUsageProvider('deepinfra', deepinfra, usageSettings)
   // Why: Copilot is a token provider too — no CLI on PATH, so no detection gate.
   const visibleCopilot = getVisibleUsageProvider('copilot', copilot, usageSettings)
   const showDeepSeek = visibleDeepSeek !== null && statusBarItems.includes('deepseek')
   const showFireworks = visibleFireworks !== null && statusBarItems.includes('fireworks')
+  const showDeepInfra = visibleDeepInfra !== null && statusBarItems.includes('deepinfra')
   const showCopilot = visibleCopilot !== null && statusBarItems.includes('copilot')
   const showGrok =
     visibleGrok !== null &&
@@ -138,6 +143,7 @@ export function getStatusBarUsageProjection({
     showZcode ||
     showDeepSeek ||
     showFireworks ||
+    showDeepInfra ||
     showCopilot
   // Why: include Settings so durable managed accounts count — a configured user isn't shown the empty state while snapshots hydrate.
   const isEmptyUsageState = isUsageEmptyState(
@@ -154,6 +160,7 @@ export function getStatusBarUsageProjection({
       zcode,
       deepseek,
       fireworks,
+      deepinfra,
       copilot
     },
     usageSettings
@@ -173,6 +180,7 @@ export function getStatusBarUsageProjection({
     zcode?.status === 'fetching' ||
     deepseek?.status === 'fetching' ||
     fireworks?.status === 'fetching' ||
+    deepinfra?.status === 'fetching' ||
     copilot?.status === 'fetching'
 
   // Why: the roster must contain only status items the user left visible;
@@ -190,6 +198,7 @@ export function getStatusBarUsageProjection({
     showZcode ? visibleZcode : null,
     showDeepSeek ? visibleDeepSeek : null,
     showFireworks ? visibleFireworks : null,
+    showDeepInfra ? visibleDeepInfra : null,
     showCopilot ? visibleCopilot : null
   ]
     .filter((p): p is ProviderRateLimits => p !== null)

@@ -142,6 +142,7 @@ describe('createUISlice hydratePersistedUI', () => {
       'grok',
       'deepseek',
       'fireworks',
+      'deepinfra',
       'cursor',
       'zcode',
       'copilot'
@@ -157,6 +158,7 @@ describe('createUISlice hydratePersistedUI', () => {
         'grok',
         'deepseek',
         'fireworks',
+        'deepinfra',
         'cursor',
         'zcode',
         'copilot'
@@ -168,6 +170,7 @@ describe('createUISlice hydratePersistedUI', () => {
       _grokStatusBarDefaultAdded: true,
       _deepseekStatusBarDefaultAdded: true,
       _fireworksStatusBarDefaultAdded: true,
+      _deepinfraStatusBarDefaultAdded: true,
       _cursorStatusBarDefaultAdded: true,
       _zcodeStatusBarDefaultAdded: true,
       _copilotStatusBarDefaultAdded: true
@@ -189,6 +192,7 @@ describe('createUISlice hydratePersistedUI', () => {
         _grokStatusBarDefaultAdded: true,
         _deepseekStatusBarDefaultAdded: true,
         _fireworksStatusBarDefaultAdded: true,
+        _deepinfraStatusBarDefaultAdded: true,
         _cursorStatusBarDefaultAdded: true,
         _zcodeStatusBarDefaultAdded: true,
         _copilotStatusBarDefaultAdded: true

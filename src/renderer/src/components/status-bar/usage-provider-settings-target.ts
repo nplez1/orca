@@ -23,6 +23,8 @@ export function getUsageProviderAccountsSectionId(
       return 'accounts-deepseek'
     case 'fireworks':
       return 'accounts-fireworks'
+    case 'deepinfra':
+      return 'accounts-deepinfra'
     case 'copilot':
       return 'accounts-copilot'
     case 'antigravity':

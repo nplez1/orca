@@ -69,6 +69,9 @@ export function formatCreditsItemLabel(key: ProviderCreditsItemKey): string {
       'Spent this month'
     )
   }
+  if (key === 'unbilled') {
+    return translate('auto.components.status.bar.providerCredits.item.unbilled', 'Unbilled usage')
+  }
   // Why: an unknown token from a newer main must not render as a blank row.
   return key
 }

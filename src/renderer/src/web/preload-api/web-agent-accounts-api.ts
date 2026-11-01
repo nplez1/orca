@@ -92,6 +92,20 @@ export function createDeepSeekCredentialsApi(): NonNullable<
   }
 }
 
+export function createDeepInfraCredentialsApi(): NonNullable<
+  Partial<PreloadApi>['deepinfraCredentials']
+> {
+  const notConfigured = { configured: false, apiKeyConfigured: false }
+  const unsupportedError = new Error(
+    'DeepInfra API key storage is only available in the desktop app.'
+  )
+  return {
+    getStatus: () => Promise.resolve(notConfigured),
+    saveApiKey: () => Promise.reject(unsupportedError),
+    clearApiKey: () => Promise.resolve(notConfigured)
+  }
+}
+
 export function createFireworksCredentialsApi(): NonNullable<
   Partial<PreloadApi>['fireworksCredentials']
 > {

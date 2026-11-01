@@ -102,6 +102,7 @@ export type ProviderRateLimits = {
     | 'zcode'
     | 'deepseek'
     | 'fireworks'
+    | 'deepinfra'
     | 'copilot'
   /** 5-hour session window, null if not available. */
   session: RateLimitWindow | null
@@ -115,7 +116,7 @@ export type ProviderRateLimits = {
   extraUsage?: ExtraUsageBalance | null
   /**
    * Money-denominated readout for API-key providers that publish no quota
-   * window at all (DeepSeek balance, Fireworks rated spend).
+   * window at all (DeepSeek and DeepInfra balances, Fireworks rated spend).
    */
   credits?: ProviderCredits | null
   /**
@@ -201,6 +202,7 @@ export type RateLimitState = {
   zcode: ProviderRateLimits | null
   deepseek: ProviderRateLimits | null
   fireworks: ProviderRateLimits | null
+  deepinfra: ProviderRateLimits | null
   copilot: ProviderRateLimits | null
   /**
    * True when a MiniMax session cookie is persisted on disk. The cookie lives
@@ -221,6 +223,8 @@ export type RateLimitState = {
   deepseekApiKeyConfigured: boolean
   /** True when Fireworks credentials (API key, optional account ID) are persisted on disk. */
   fireworksApiKeyConfigured: boolean
+  /** True when a DeepInfra API key is persisted on disk; main derives it each poll and never exposes the key. */
+  deepinfraApiKeyConfigured: boolean
   /**
    * True when a GitHub token plus enterprise slug are persisted on disk. Copilot
    * usage comes from GitHub's billing API, which needs a token with enterprise

@@ -20,6 +20,7 @@ import { createAccountRuntimeTargetSettingsSync } from './rate-limits/account-ru
 import { normalizeCodexRuntimeSelection } from './codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from './claude-accounts/runtime-selection'
 import { readDeepSeekApiKey } from './deepseek/deepseek-api-key-store'
+import { readDeepInfraApiKey } from './deepinfra/deepinfra-api-key-store'
 import { readFireworksCredentials } from './fireworks/fireworks-credentials-store'
 import { readCopilotCredentials } from './copilot-credentials/copilot-credentials-store'
 import { refreshCopilotGhCredentials } from './rate-limits/copilot/copilot-gh-credentials'
@@ -159,6 +160,7 @@ export function createProviderAccountServices(
     apiKey: readZcodePlanApiKey() ?? ''
   }))
   rateLimits.setDeepSeekConfigResolver(() => ({ apiKey: readDeepSeekApiKey() ?? '' }))
+  rateLimits.setDeepInfraConfigResolver(() => ({ apiKey: readDeepInfraApiKey() ?? '' }))
   // Why: readFireworksCredentials throws on an undecryptable file, and letting it
   // throw records a Fireworks-only credential error instead of a silent keyless poll.
   rateLimits.setFireworksConfigResolver(() => {

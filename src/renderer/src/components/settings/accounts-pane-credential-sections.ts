@@ -3,22 +3,25 @@ import type { FeatureInteractionId } from '../../../../shared/feature-interactio
 import type {
   CopilotCredentialSectionModel,
   CopilotCredentialSource,
+  DeepInfraCredentialSectionModel,
   DeepSeekCredentialSectionModel,
   FireworksCredentialSectionModel
 } from './accounts-pane-types'
 import { createCopilotCredentialActions } from './accounts-pane-copilot-actions'
+import { createDeepInfraCredentialActions } from './accounts-pane-deepinfra-actions'
 import { createDeepSeekCredentialActions } from './accounts-pane-deepseek-actions'
 import { createFireworksCredentialActions } from './accounts-pane-fireworks-actions'
 
 export type AccountsPaneCredentialSections = {
   deepSeek: DeepSeekCredentialSectionModel
+  deepInfra: DeepInfraCredentialSectionModel
   fireworks: FireworksCredentialSectionModel
   copilot: CopilotCredentialSectionModel
 }
 
 type RecordFeatureInteraction = (featureId: FeatureInteractionId) => void
 
-// Why: the three bridge-backed credential sections share one shape — masked
+// Why: the four bridge-backed credential sections share one shape — masked
 // draft, configured flag, busy flag, save/clear over the preload bridge, and a
 // mount-time status refresh. Owning that state here keeps AccountsPane composing
 // sections instead of growing past its max-lines budget.
@@ -26,9 +29,46 @@ export function useAccountsPaneCredentialSections(
   recordFeatureInteraction: RecordFeatureInteraction
 ): AccountsPaneCredentialSections {
   const deepSeek = useDeepSeekCredentials(recordFeatureInteraction)
+  const deepInfra = useDeepInfraCredentials(recordFeatureInteraction)
   const fireworks = useFireworksCredentials(recordFeatureInteraction)
   const copilot = useCopilotCredentials(recordFeatureInteraction)
-  return { deepSeek, fireworks, copilot }
+  return { deepSeek, deepInfra, fireworks, copilot }
+}
+
+function useDeepInfraCredentials(
+  recordFeatureInteraction: RecordFeatureInteraction
+): DeepInfraCredentialSectionModel {
+  const [deepInfraApiKeyDraft, setDeepInfraApiKeyDraft] = useState('')
+  const [deepInfraApiKeyConfigured, setDeepInfraApiKeyConfigured] = useState(false)
+  const [deepInfraCredentialBusy, setDeepInfraCredentialBusy] = useState(false)
+  const { saveDeepInfraApiKey, clearDeepInfraApiKey } = createDeepInfraCredentialActions({
+    deepInfraApiKeyDraft,
+    setDeepInfraApiKeyDraft,
+    setDeepInfraApiKeyConfigured,
+    setDeepInfraCredentialBusy,
+    recordFeatureInteraction
+  })
+
+  useEffect(() => {
+    const refresh = async (): Promise<void> => {
+      try {
+        const status = await window.api.deepinfraCredentials.getStatus()
+        setDeepInfraApiKeyConfigured(status.apiKeyConfigured)
+      } catch (error) {
+        console.error('Failed to load DeepInfra credential status:', error)
+      }
+    }
+    void refresh()
+  }, [])
+
+  return {
+    deepInfraApiKeyDraft,
+    setDeepInfraApiKeyDraft,
+    deepInfraApiKeyConfigured,
+    deepInfraCredentialBusy,
+    saveDeepInfraApiKey,
+    clearDeepInfraApiKey
+  }
 }
 
 function useDeepSeekCredentials(

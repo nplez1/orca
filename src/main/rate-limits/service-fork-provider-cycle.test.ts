@@ -49,6 +49,10 @@ vi.mock('./fireworks/fireworks-fetcher', () => ({
   fetchFireworksRateLimits: vi.fn()
 }))
 
+vi.mock('./deepinfra/deepinfra-fetcher', () => ({
+  fetchDeepInfraRateLimits: vi.fn()
+}))
+
 vi.mock('./copilot/copilot-fetcher', () => ({
   fetchCopilotRateLimits: vi.fn()
 }))
