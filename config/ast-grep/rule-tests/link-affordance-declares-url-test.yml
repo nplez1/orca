@@ -26,7 +26,14 @@ invalid:
       Open
     </button>
   - <Button variant="ghost" onClick={() => openAppHttpLink(url)}>Open</Button>
+  # The self-closing branch of the rule, which the opening-tag cases above never reach.
+  - <Button variant="ghost" onClick={() => openAppHttpLink(url)} />
   - |
     <span onClick={() => void window.api.shell.openUrl(url)}>
       Open
     </span>
+  # An anchor without href carries no address of its own, so the declaration is still required.
+  - |
+    <a onClick={() => openAppHttpLink(url)}>
+      Open
+    </a>

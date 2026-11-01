@@ -37,16 +37,25 @@ function contextMenuLinkUrl(event: MouseEvent): { url: string; origin: HTMLEleme
   if (isEditableTarget(event.target)) {
     return null
   }
-  // The anchor is the most specific claim, so it wins over a row that declares one link.
   const anchor = event.target.closest('a[href]')
   const href = webUrl(anchor?.getAttribute('href'))
+  const declared = event.target.closest<HTMLElement>('[data-link-url]')
+  const declaredUrl = webUrl(declared?.dataset.linkUrl)
   if (anchor instanceof HTMLAnchorElement && href) {
     return { url: href, origin: anchor }
   }
+  // A non-web anchor the declaration wraps is the innermost claim: a mailto inside a row that opens
+  // a web page keeps the browser's own menu rather than borrowing the row's address.
+  if (
+    anchor instanceof HTMLAnchorElement &&
+    declared &&
+    declared !== anchor &&
+    declared.contains(anchor)
+  ) {
+    return null
+  }
   // Every other affordance opts in with data-link-url: a button-styled link, an icon button, or a
   // row whose whole surface opens one address.
-  const declared = event.target.closest<HTMLElement>('[data-link-url]')
-  const declaredUrl = webUrl(declared?.dataset.linkUrl)
   return declared && declaredUrl ? { url: declaredUrl, origin: declared } : null
 }
 

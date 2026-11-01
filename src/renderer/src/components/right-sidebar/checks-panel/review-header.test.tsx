@@ -16,7 +16,7 @@ const review: HostedReviewInfo = {
   url: 'https://github.com/orca/app/pull/42',
   status: 'success',
   updatedAt: '2026-10-29T00:00:00Z',
-  mergeable: 'mergeable'
+  mergeable: 'MERGEABLE'
 }
 
 function renderHeader(): void {

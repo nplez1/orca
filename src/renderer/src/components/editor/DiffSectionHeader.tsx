@@ -13,6 +13,7 @@ export function DiffSectionHeader({
   onToggle,
   onOpenSection,
   openSectionTitle,
+  openSectionUrl,
   onOpenPreview,
   trailingContent
 }: {
@@ -24,6 +25,8 @@ export function DiffSectionHeader({
   onToggle: () => void
   onOpenSection: (event: MouseEvent) => void
   openSectionTitle: string
+  /** Set when the section's open action is a web link rather than an editor jump. */
+  openSectionUrl?: string
   onOpenPreview?: (event: MouseEvent) => void
   trailingContent?: ReactNode
 }): ReactElement {
@@ -104,6 +107,7 @@ export function DiffSectionHeader({
           // Keep open-file visible for touch, matching preview.
           type="button"
           className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+          data-link-url={openSectionUrl}
           onClick={(event) => {
             event.stopPropagation()
             onOpenSection(event)

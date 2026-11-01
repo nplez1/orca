@@ -17,6 +17,8 @@ export type JiraIssueWorkspaceAction = {
   label: string
   icon: LucideIcon
   action: () => void
+  /** Set when the action opens this address, so the app's link menu can offer it too. */
+  url?: string
 }
 
 const LOCAL_IMAGE_TARGET: RuntimeClientTarget = { kind: 'local' }
@@ -193,6 +195,7 @@ export function JiraIssueWorkspaceContent({
                 <TooltipTrigger asChild>
                   <button
                     type="button"
+                    data-link-url={item.url}
                     onClick={item.action}
                     className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
                   >

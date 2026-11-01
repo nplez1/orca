@@ -43,6 +43,7 @@ export function PRFilesCombinedDiffBody({
   retrySection,
   toggleSection,
   openFilesOnGitHub,
+  openFilesOnGitHubUrl,
   renderViewedCheckbox,
   handleAddLineComment,
   setSectionHeights,
@@ -77,6 +78,7 @@ export function PRFilesCombinedDiffBody({
   retrySection: (index: number) => void
   toggleSection: (index: number) => void
   openFilesOnGitHub: () => void
+  openFilesOnGitHubUrl: string
   renderViewedCheckbox: (section: DiffSection) => React.ReactNode
   handleAddLineComment: (
     section: DiffSection,
@@ -146,6 +148,7 @@ export function PRFilesCombinedDiffBody({
                     retrySection={retrySection}
                     toggleSection={toggleSection}
                     openSection={openFilesOnGitHub}
+                    openSectionUrl={openFilesOnGitHubUrl}
                     openSectionTitle={translate(
                       'auto.components.GitHubItemDialog.85a2b66f54',
                       'Open files on GitHub'

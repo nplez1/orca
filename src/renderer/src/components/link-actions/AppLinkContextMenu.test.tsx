@@ -273,4 +273,28 @@ describe('AppLinkContextMenu link resolution', () => {
 
     expect(screen.queryByTestId('link-context-menu')).toBeNull()
   })
+
+  // A mailto link inside a row that opens a web page is still a mail link: it keeps the native menu.
+  it('leaves a non-web anchor inside a declared row to the browser default menu', () => {
+    rightClickOn(
+      <div data-link-url="https://example.com/row">
+        <a href="mailto:dev@example.com">mail</a>
+      </div>,
+      'mail'
+    )
+
+    expect(screen.queryByTestId('link-context-menu')).toBeNull()
+  })
+
+  it('trims a padded declared address', () => {
+    rightClickOn(
+      <button type="button" data-testid="target" data-link-url="  https://example.com/padded  ">
+        Padded
+      </button>
+    )
+
+    fireEvent.click(menuItem('Copy Link'))
+
+    expect(mocks.writeClipboardText).toHaveBeenCalledWith('https://example.com/padded')
+  })
 })

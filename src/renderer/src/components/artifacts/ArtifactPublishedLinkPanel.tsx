@@ -88,6 +88,7 @@ export function ArtifactPublishedLinkPanel({
               variant="ghost"
               size="icon-xs"
               className="text-muted-foreground hover:text-foreground"
+              data-link-url={shareUrl}
               onClick={() => openArtifactInBrowser(shareUrl)}
               aria-label={translate(
                 'auto.components.artifacts.ArtifactPublishedLinkPanel.openLink',

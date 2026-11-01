@@ -1,6 +1,10 @@
 # A web link opened from Orca's own UI carries one right-click menu (in-app / system / copy), and the
 # root menu finds the address through data-link-url. An element that opens a link without declaring
 # it is a link whose menu never appears - how the Checks-panel PR id shipped with no menu at all.
+#
+# Scope: an inline onClick that calls one of the openers below. A handler passed by reference -
+# `onClick={onOpenReview}` or `onClick={item.action}` - reaches the opener one call deep, so the rule
+# cannot see it: check those by hand when you touch a link affordance and declare the address there.
 id: link-affordance-declares-url
 language: tsx
 severity: error
@@ -21,7 +25,7 @@ rule:
               - has: { kind: property_identifier, regex: '^onClick$' }
               - has:
                   kind: jsx_expression
-                  regex: 'openAppHttpLink\(|openContextualHttpLink\(|openOwnedHttpLink\(|shell\.openUrl\('
+                  regex: 'openAppHttpLink\(|openContextualHttpLink\(|openOwnedHttpLink\(|openArtifactInBrowser\(|shell\.openUrl\('
         - not:
             has:
               kind: jsx_attribute
@@ -50,7 +54,7 @@ rule:
               - has: { kind: property_identifier, regex: '^onClick$' }
               - has:
                   kind: jsx_expression
-                  regex: 'openAppHttpLink\(|openContextualHttpLink\(|openOwnedHttpLink\(|shell\.openUrl\('
+                  regex: 'openAppHttpLink\(|openContextualHttpLink\(|openOwnedHttpLink\(|openArtifactInBrowser\(|shell\.openUrl\('
         - not:
             has:
               kind: jsx_attribute
