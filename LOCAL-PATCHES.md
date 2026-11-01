@@ -2794,6 +2794,57 @@ Reviewed by Opus 5.5, high, one round on the plan packet: it confirmed both prem
 items that landed here — `cancel-in-progress` stays `false`, and `fast_runners` defaults to true rather
 than false, which the first draft had backwards.
 
+#### The guards the sweep was missing (2026-11-01)
+
+The sweep could only answer "is it disabled". Three failures it could not see, each with a real
+incident behind it:
+
+- **A lane whose `on:` keys changed.** Trigger validation covered `ALLOWED_INERT` only, so the eleven
+  required lanes were unguarded: a sync could add `schedule` or `pull_request` to any of them and the
+  check passed. `EXPECTED_TRIGGERS` now pins the exact keys for all 18 enabled files. **Changing a
+  trigger is therefore a two-file change** — the workflow and the pin — which is the point: it makes
+  the change visible in review. A mismatch on a required lane is reported and **left enabled**; only an
+  allowed-inert one is disabled by `--fix`. Otherwise a sync could edit `fork-ci-health.yml`'s triggers
+  and the sweep would turn off the watchdog that reports it.
+- **`pull_request_target`, and `workflow_run` with it.** Both run with a write token against code from
+  a fork. `ci-closed-pr-caches.yml` uses the first and must stay off, and nothing stopped a sync
+  bringing either in.
+- **A runner this fork does not provision.** `timeout-minutes` cannot bound this: the timeout starts
+  when a runner picks the job up, so a job on a `blacksmith-*` label waits for GitHub's 24 h queue
+  limit — the 17.5 h `relay_integration` wait on 2026-10-26 and the 12 h cache producer on 10-28. The
+  scan follows `uses: ./.github/workflows/*.yml` edges transitively, because a called workflow runs
+  whether or not it is enabled, and it reads every value except the ones that cannot select a runner
+  (`run`, `if`, names and prose) — so a matrix list and a caller's `with:` are read, while
+  `unit-tests.yml`'s byte-comparison of an 8-vcpu label inside a `run:` block is not. A callee that
+  cannot be read is reported rather than treated as label-free. `ACCEPTED_RUNNER_LABELS` names the exact
+  labels each file may use, with a reason: `node-server-tests` (behind `fast_runners`, true only for dispatch
+  and call), `ci-cache-warmup-platform-jobs` (call-only, both callers disabled), and `unit-tests` (the
+  `runner` input default, which both active callers override). `e2e.yml` is there for the same reason
+  and is reached only through dispatch-only lanes. A new label in any of them still fails, so the
+  exception cannot cover a job added later — the scan found the last two only because it looks through
+  the call edge.
+
+`local/check-queued-runs.mjs` is the runtime half, a third check in `fork-ci-health`. It reports a run
+stuck in a waiting status **and** a job queued inside a run that reads `in_progress`, because that is how
+both incidents actually looked — a run-level status check would have missed them. The remedy differs by
+status and only one of them is a runner: `queued`/`requested` is a label, `waiting` is an environment
+protection rule that has not approved the job, and `pending` is another run holding the concurrency
+group. Its limits are deliberate: a one-hour threshold, three pages (recent, `queued`, `in_progress`),
+and job lookups for the ten oldest in-flight runs past the threshold — oldest first, because the API's
+newest-first order would cut exactly the run the check exists for. The line it prints says how many
+runs' jobs it actually read.
+
+**It found a real one on its first run.** Run `37640199177` ("Fork release", attempt 2, 2026-10-07) has
+been `queued` for 593 h with **zero jobs**. GitHub refuses every API remedy — `cancel` answers
+"completed", `force-cancel` answers "not queued yet", `DELETE` is 403 for this token — so it needs a
+manual delete in the Actions UI, and until then the daily health check is red on it. That class is
+reported as `NO JOBS` rather than `QUEUED` precisely because the fix is not a runner.
+
+**Repository setting, not a patch:** fork-PR approval moved from `first_time_contributors` to
+`all_external_contributors` (`PUT /repos/nplez1/orca/actions/permissions/fork-pr-contributor-approval`).
+Default workflow permissions were already `read`, so a fork PR's token cannot write; requiring approval
+is now the only way a public fork's code reaches these runners, including the macOS and Windows lanes.
+
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries

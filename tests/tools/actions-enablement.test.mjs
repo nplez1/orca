@@ -3,12 +3,12 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   ALLOWED_INERT,
-  INERT_TRIGGERS,
+  EXPECTED_TRIGGERS,
   applyFixes,
   REQUIRED,
   cancellableRuns,
   judgeEnablement,
-  readTriggers,
+  readFacts,
   residualProblems,
   triggersOf,
   workflowListArgs,
@@ -19,13 +19,18 @@ const REPO_ROOT = new URL('../../', import.meta.url).pathname
 const active = (path, name = path) => ({ id: 1, path, state: 'active', name })
 const disabled = (path) => ({ id: 2, path, state: 'disabled_manually', name: path })
 
-/** A repository where every allowed entry is active and inert, which is the healthy shape. */
+/** A repository where every allowed entry is active with its pinned triggers, which is the healthy shape. */
 const healthy = () => ({
   workflows: [
     ...REQUIRED.map((path) => active(path)),
     ...ALLOWED_INERT.map((path) => active(path))
   ],
-  triggers: Object.fromEntries(ALLOWED_INERT.map((path) => [path, ['workflow_dispatch']]))
+  facts: Object.fromEntries(
+    [...REQUIRED, ...ALLOWED_INERT].map((path) => [
+      path,
+      { triggers: EXPECTED_TRIGGERS[path], runnerLabels: [], callees: [] }
+    ])
+  )
 })
 
 describe('workflow triggers', () => {
@@ -78,15 +83,19 @@ describe('judging enablement', () => {
 
   it('fails an allowed-inert entry that gained a trigger no human starts', () => {
     const state = healthy()
-    state.triggers['.github/workflows/layout-owner-e2e.yml'] = ['workflow_dispatch', 'pull_request']
+    state.facts['.github/workflows/layout-owner-e2e.yml'] = {
+      triggers: ['workflow_dispatch', 'pull_request'],
+      runnerLabels: [],
+      callees: []
+    }
 
     const verdict = judgeEnablement(state)
 
     expect(verdict.ok).toBe(false)
-    expect(verdict.overTriggered).toEqual([
+    expect(verdict.triggerDrift).toEqual([
       {
         path: '.github/workflows/layout-owner-e2e.yml',
-        triggers: ['pull_request'],
+        expected: ['workflow_dispatch'],
         all: ['workflow_dispatch', 'pull_request']
       }
     ])
@@ -98,7 +107,7 @@ describe('judging enablement', () => {
 
   it('fails an allowed-inert entry with no trigger facts at all, rather than assuming inert', () => {
     const state = healthy()
-    delete state.triggers['.github/workflows/zcode-account-contract.yml']
+    delete state.facts['.github/workflows/zcode-account-contract.yml']
 
     const verdict = judgeEnablement(state)
 
@@ -106,21 +115,25 @@ describe('judging enablement', () => {
     expect(verdict.unreadable).toEqual([
       {
         path: '.github/workflows/zcode-account-contract.yml',
-        reason: 'triggers not supplied, so "inert" is unproven'
+        reason: 'not read, so its triggers are unproven'
       }
     ])
   })
 
   it('accepts a called workflow, which only a caller can start', () => {
     const state = healthy()
-    state.triggers['.github/workflows/qualified-orcad-template.yml'] = ['workflow_call']
+    state.facts['.github/workflows/qualified-orcad-template.yml'] = {
+      triggers: ['workflow_call'],
+      runnerLabels: [],
+      callees: []
+    }
 
     expect(judgeEnablement(state).ok).toBe(true)
   })
 
   it('fails an allowed-inert entry whose triggers cannot be read, rather than assuming inert', () => {
     const state = healthy()
-    state.triggers['.github/workflows/zcode-account-contract.yml'] = {
+    state.facts['.github/workflows/zcode-account-contract.yml'] = {
       error: 'not in this checkout'
     }
 
@@ -209,12 +222,16 @@ describe('the live list against this checkout', () => {
   })
 
   it('every allowed-inert workflow is inert in this tree', () => {
-    const triggers = readTriggers(ALLOWED_INERT, REPO_ROOT)
+    const facts = readFacts(ALLOWED_INERT, REPO_ROOT)
+    const inert = new Set(['workflow_dispatch', 'workflow_call'])
 
-    for (const [path, facts] of Object.entries(triggers)) {
-      expect(Array.isArray(facts), `${path}: ${facts.error}`).toBe(true)
-      for (const trigger of facts) {
-        expect(INERT_TRIGGERS.has(trigger), `${path} fires on ${trigger}`).toBe(true)
+    // Only the requested paths: readFacts also returns the callees it followed, and a callee's own
+    // triggers say nothing about whether this entry is inert.
+    for (const path of ALLOWED_INERT) {
+      const entry = facts[path]
+      expect(Array.isArray(entry.triggers), `${path}: ${entry.error}`).toBe(true)
+      for (const trigger of entry.triggers) {
+        expect(inert.has(trigger), `${path} fires on ${trigger}`).toBe(true)
       }
     }
   })

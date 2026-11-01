@@ -1,16 +1,18 @@
 name: Fork CI health
 
-# Why: the fork's two health checks — `local/check-actions-enablement.mjs` (nothing enabled that
-# should not be, nothing required disabled) and `local/check-nightly-liveness.mjs` (the nightly
-# backstop is running, and green) — existed and were run by nobody. `rg` found them only in docs and a
-# test. The cost was concrete: a cache sweep stayed active from about 2026-10-25 undetected until
+# Why: the fork's health checks — `local/check-actions-enablement.mjs` (nothing enabled that should
+# not be, nothing required disabled, no trigger or runner label that drifted), `local/check-nightly-liveness.mjs`
+# (the nightly backstop is running, and green) and `local/check-queued-runs.mjs` (nothing is waiting for
+# a runner that will never pick it up) — existed and were run by nobody. `rg` found them only in docs and
+# a test. The cost was concrete: a cache sweep stayed active from about 2026-10-25 undetected until
 # 10-28, after it had deleted 9.39 GB of `nplez1/main` caches, and a nightly issue sat open while the
-# last three runs were failure, success, success.
+# last three runs were failure, success, success. The queued-run check is the one that bounds what
+# `timeout-minutes` cannot: a label nothing provisions waits for the 24 h queue limit, not its timeout.
 #
 # Daily rather than on every push: the state it reads (workflow enablement, the last few scheduled
-# runs) changes on a day's timescale, and a check that costs nothing still costs attention when it
-# fires every hour. `local/ci-health-report.mjs` owns the reporting: one issue, updated in place,
-# closed when both checks are clean again.
+# runs, the queue) changes on a day's timescale, and a check that costs nothing still costs attention
+# when it fires every hour. `local/ci-health-report.mjs` owns the reporting: one issue, updated in
+# place, closed when the checks are all clean again.
 #
 # Why it can afford `issues: write`: it owns exactly one issue, and the token is scoped to this
 # repository. `actions: read` is what the liveness check needs to read run history.
@@ -46,7 +48,7 @@ jobs:
         with:
           native-runtime: none
 
-      - name: Run both health checks and report
+      - name: Run the health checks and report
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node local/ci-health-report.mjs
