@@ -276,7 +276,6 @@ export function selectBrowserLinkDestination(
       intent?.workspaceId === worktreeId && matchesHost(intent.hostId)
         ? tabsById.get(intent.sourceTabId)
         : undefined
-    // Why the source group: a link opens as a sibling tab where it was clicked, never as a new split.
     const sourceGroupId =
       source && (source.executionHostId ?? null) === intent?.hostId ? source.groupId : undefined
     groupId =

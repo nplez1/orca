@@ -23,7 +23,7 @@ export type HttpLinkBrowserTabState = Partial<
   createBrowserTab: (
     worktreeId: string,
     url: string,
-    opts: Pick<CreateBrowserTabOptions, 'activate' | 'targetGroupId' | 'split'>
+    opts: Pick<CreateBrowserTabOptions, 'activate' | 'targetGroupId'>
   ) => Pick<BrowserWorkspace, 'activePageId'> | undefined
 }
 
@@ -32,7 +32,6 @@ export type HttpLinkBrowserRequestFields = Pick<
   'targetGroupId' | 'focusOnCreate' | 'selectWorktree'
 >
 
-/** Use the visible browser, else a new tab in the clicked pane's group; a split would shrink the terminal/agent the link came from. */
 export function resolveHttpLinkBrowserPlacement(
   state: Omit<HttpLinkBrowserTabState, 'createBrowserTab'>,
   worktreeId: string

@@ -283,6 +283,9 @@ describe('browser link placement and exact page activation', () => {
       URL_TO_OPEN
     )
     expect(state.activeGroupIdByWorktree[WORKSPACE]).toBe('c')
+    expect(state.groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'a')?.activeTabId).toBe(
+      'source'
+    )
   })
 
   it('uses the selected matching wrapper, then active page, instead of recency', async () => {

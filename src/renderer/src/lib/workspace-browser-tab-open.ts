@@ -27,7 +27,6 @@ import {
 } from '../../../shared/execution-host'
 import type { SearchEngine } from '../../../shared/browser-url'
 import type { BrowserClientHostPlacementPreference } from '../../../shared/browser-client-host-placement'
-import type { TabSplitTarget } from '@/store/slices/tabs/tabs-slice-contract'
 import {
   getClientCreationActionPolicy,
   type ClientCreationActionAvailability
@@ -49,8 +48,6 @@ export type OpenWorkspaceBrowserTabRequest = {
   linkContext?: BrowserLinkOpenContext
   onLinkOutcome?: (outcome: BrowserOpenOutcome) => void
   targetGroupId?: string
-  /** Opens the tab in a new split beside this group instead of targetGroupId. */
-  split?: TabSplitTarget
   /** Client-local unified tab id of the source; a source-following open omits targetGroupId. */
   afterTabId?: string
   url: string
@@ -89,7 +86,6 @@ async function createClientBrowserTab(
       executionHostId: ownerHostId,
       ...resolveNewBrowserTabProfile(state, request.workspaceId, hostId),
       targetGroupId: request.targetGroupId,
-      ...(request.split ? { split: request.split } : {}),
       ...(request.afterTabId ? { afterTabId: request.afterTabId } : {}),
       title: presentation.title
     })

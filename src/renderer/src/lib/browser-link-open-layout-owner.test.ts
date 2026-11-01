@@ -168,6 +168,9 @@ it('admits a background HTTP page only after main materializes it without activa
   expect(await opening).toMatchObject({ status: 'opened' })
   expect(isBrowserPageMountAdmitted(pageId)).toBe(true)
   expect(store.getState().activeGroupIdByWorktree[WORKSPACE]).toBe('c')
+  expect(
+    store.getState().groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'a')?.activeTabId
+  ).toBe('source')
   expect(requestBrowserFocus).not.toHaveBeenCalled()
 })
 
@@ -217,6 +220,9 @@ it.each(['workspace', 'view', 'view-return'] as const)(
     expect(state.activeWorktreeId).toBe(selected.activeWorktreeId)
     expect(state.activeView).toBe(selected.activeView)
     expect(state.activeGroupIdByWorktree[WORKSPACE]).toBe('c')
+    expect(state.groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'a')?.activeTabId).toBe(
+      'source'
+    )
     expect(state.groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'b')?.activeTabId).toBe(
       'terminal-b'
     )
