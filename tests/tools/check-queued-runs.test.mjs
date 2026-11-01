@@ -128,3 +128,45 @@ describe('the verdict line', () => {
     expect(describeVerdict(verdict)).toContain('oldest 9h')
   })
 })
+
+describe('the remedy, which is not always a runner', () => {
+  it('sends a `waiting` job to the protection rule, not to a runner label', () => {
+    const waiting = run()
+    const verdict = judge([waiting], {
+      [waiting.id]: [
+        { name: 'awaiting approval', status: 'waiting', started_at: null, created_at: hoursAgo(3) }
+      ]
+    })
+
+    const text = describeVerdict(verdict)
+    expect(text).toContain('ENVIRONMENT')
+    expect(text).not.toContain('RUNNER:')
+  })
+
+  it('names the concurrency group when a run is pending behind another', () => {
+    const pending = run({ status: 'pending', created_at: hoursAgo(5) })
+    const verdict = judge([pending], { [pending.id]: [] })
+
+    expect(describeVerdict(verdict)).toContain('CONCURRENCY')
+  })
+
+  it('does not blame a runner label for a queued run that has one', () => {
+    const queued = run({ status: 'queued', created_at: hoursAgo(6) })
+    const verdict = judge([queued], {
+      [queued.id]: [{ name: 'job', status: 'queued', started_at: null }]
+    })
+
+    expect(describeVerdict(verdict)).toContain('RUNNER:')
+  })
+})
+
+describe('the age of a re-run', () => {
+  it('is counted from the current attempt, not from when the run was first created', () => {
+    const rerun = run({ created_at: hoursAgo(200), run_started_at: hoursAgo(2) })
+    const verdict = judge([rerun], {
+      [rerun.id]: [{ name: 'cold', status: 'queued', started_at: null }]
+    })
+
+    expect(verdict.waited[0].ageHours).toBeCloseTo(2, 5)
+  })
+})

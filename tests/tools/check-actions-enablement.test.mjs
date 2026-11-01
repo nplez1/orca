@@ -24,7 +24,7 @@ describe('the pinned trigger table', () => {
     expect([...REQUIRED, ...ALLOWED_INERT].sort()).toEqual(Object.keys(EXPECTED_TRIGGERS).sort())
   })
 
-  it('matches the files in this checkout, so a sync fails the PR rather than the next morning', () => {
+  it('matches the files in this checkout, so drift is named the same day, not at the next release', () => {
     const facts = readFacts(Object.keys(EXPECTED_TRIGGERS))
 
     for (const [path, pinned] of Object.entries(EXPECTED_TRIGGERS)) {
@@ -40,14 +40,33 @@ describe('the pinned trigger table', () => {
 })
 
 describe('a lane that grew a trigger', () => {
-  it('reports the pin it broke and becomes a disable target', () => {
-    const path = '.github/workflows/fork-pr-gates.yml'
-    const verdict = judge([active(path)], factsFor(path, ['pull_request', 'push']))
+  it('reports a required lane but leaves it enabled, so the sweep cannot disarm the watchdog', () => {
+    const path = '.github/workflows/fork-ci-health.yml'
+    const verdict = judge([active(path)], factsFor(path, ['schedule', 'push']), {
+      required: [path],
+      allowedInert: [],
+      expected: { [path]: ['schedule', 'workflow_dispatch'] }
+    })
 
     expect(verdict.ok).toBe(false)
     expect(verdict.triggerDrift).toEqual([
-      { path, expected: EXPECTED_TRIGGERS[path], all: ['pull_request', 'push'] }
+      { path, expected: ['schedule', 'workflow_dispatch'], all: ['schedule', 'push'] }
     ])
+    expect(verdict.requiredTriggerDrift.map((entry) => entry.path)).toEqual([path])
+    expect(verdict.disableTargets).toEqual([])
+    // And it stays outstanding under --fix, so the sweep cannot report itself clean.
+    expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
+  })
+
+  it('disables a lane that is allowed to be inert, because disabled is fine for one', () => {
+    const path = '.github/workflows/layout-owner-e2e.yml'
+    const verdict = judge([active(path)], factsFor(path, ['workflow_dispatch', 'pull_request']), {
+      required: [],
+      allowedInert: [path],
+      expected: { [path]: ['workflow_dispatch'] }
+    })
+
+    expect(verdict.requiredTriggerDrift).toEqual([])
     expect(verdict.disableTargets.map((target) => target.path)).toEqual([path])
   })
 
@@ -81,41 +100,124 @@ describe('triggers and runners that must never reach an active file', () => {
     const path = '.github/workflows/ci-closed-pr-caches.yml'
     const verdict = judge([active(path)], factsFor(path, ['pull_request_target']), {
       required: [path],
-      allowedInert: []
+      allowedInert: [],
+      expected: { [path]: ['pull_request_target'] }
     })
 
-    expect(verdict.pullRequestTarget).toEqual([{ path }])
+    expect(verdict.forbiddenTriggers).toEqual([{ path, triggers: ['pull_request_target'] }])
     expect(verdict.ok).toBe(false)
   })
 
+  it('rejects workflow_run too, which also runs with a write token on fork events', () => {
+    const path = '.github/workflows/some-followup.yml'
+    const verdict = judge([active(path)], factsFor(path, ['workflow_run']), {
+      required: [path],
+      allowedInert: [],
+      expected: { [path]: ['workflow_run'] }
+    })
+
+    expect(verdict.forbiddenTriggers).toEqual([{ path, triggers: ['workflow_run'] }])
+  })
+
   it('rejects a blacksmith label on a file that is not recorded as accepting one', () => {
-    const path = '.github/workflows/unit-tests.yml'
+    const path = '.github/workflows/unit-module-cache.yml'
     const verdict = judge(
       [active(path)],
       { [path]: { triggers: ['workflow_call'], runnerLabels: ['blacksmith-4vcpu-ubuntu-2404'] } },
       { required: [path], allowedInert: [], expected: { [path]: ['workflow_call'] } }
     )
 
-    expect(verdict.unapprovedRunners).toEqual([{ path, labels: ['blacksmith-4vcpu-ubuntu-2404'] }])
+    expect(verdict.unapprovedRunners).toEqual([
+      { path, labels: ['blacksmith-4vcpu-ubuntu-2404'], reachedFrom: path }
+    ])
   })
 
-  it('accepts the two recorded exceptions', () => {
-    const paths = Object.keys(ACCEPTED_RUNNER_LABELS)
-    const workflows = paths.map((path) => active(path))
+  it('accepts the recorded exceptions, and only for the labels they record', () => {
+    // The table also carries callees that are not themselves active (`e2e.yml`), so this test drives
+    // only the ones a repository state can hold active.
+    const paths = Object.keys(ACCEPTED_RUNNER_LABELS).filter((path) =>
+      Object.hasOwn(EXPECTED_TRIGGERS, path)
+    )
     const facts = Object.fromEntries(
       paths.map((path) => [
         path,
-        { triggers: EXPECTED_TRIGGERS[path], runnerLabels: ['blacksmith-4vcpu-ubuntu-2404'] }
+        { triggers: EXPECTED_TRIGGERS[path], runnerLabels: ACCEPTED_RUNNER_LABELS[path].labels }
       ])
     )
-    const verdict = judge(workflows, facts, {
-      required: paths,
-      allowedInert: [],
-      expected: Object.fromEntries(paths.map((path) => [path, EXPECTED_TRIGGERS[path]]))
-    })
+    const verdict = judge(
+      paths.map((path) => active(path)),
+      facts,
+      {
+        required: paths,
+        allowedInert: [],
+        expected: Object.fromEntries(paths.map((path) => [path, EXPECTED_TRIGGERS[path]]))
+      }
+    )
 
     expect(verdict.unapprovedRunners).toEqual([])
     expect(verdict.ok).toBe(true)
+  })
+
+  it('fails a new label in an excepted file, so the exception cannot cover a job added later', () => {
+    const path = '.github/workflows/node-server-tests.yml'
+    const accepted = ACCEPTED_RUNNER_LABELS[path].labels
+    const verdict = judge(
+      [active(path)],
+      {
+        [path]: {
+          triggers: EXPECTED_TRIGGERS[path],
+          runnerLabels: [...accepted, 'blacksmith-16vcpu-ubuntu-2404']
+        }
+      },
+      { required: [path], allowedInert: [], expected: { [path]: EXPECTED_TRIGGERS[path] } }
+    )
+
+    expect(verdict.unapprovedRunners).toEqual([
+      { path, labels: ['blacksmith-16vcpu-ubuntu-2404'], reachedFrom: path }
+    ])
+  })
+
+  it('reports a label a callee would request, naming the active lane that reaches it', () => {
+    const caller = '.github/workflows/fork-release.yml'
+    const callee = '.github/workflows/some-callee.yml'
+    const verdict = judge(
+      [active(caller)],
+      {
+        [caller]: { triggers: EXPECTED_TRIGGERS[caller], runnerLabels: [], callees: [callee] },
+        [callee]: { triggers: ['workflow_call'], runnerLabels: ['blacksmith-8vcpu-ubuntu-2404'] }
+      },
+      { required: [caller], allowedInert: [], expected: { [caller]: EXPECTED_TRIGGERS[caller] } }
+    )
+
+    expect(verdict.unapprovedRunners).toEqual([
+      { path: callee, labels: ['blacksmith-8vcpu-ubuntu-2404'], reachedFrom: caller }
+    ])
+  })
+
+  it('ignores a label that is only compared or echoed, which is how unit-tests.yml mentions one', () => {
+    const text = `on: workflow_call
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "== blacksmith-8vcpu-ubuntu-2404"
+`
+
+    expect(runnerLabelsOf(text)).toEqual([])
+  })
+
+  it('finds a label in an input default, which is the one unit-tests.yml really asks for', () => {
+    const text = `on:
+  workflow_call:
+    inputs:
+      runner:
+        default: blacksmith-4vcpu-ubuntu-2404
+jobs:
+  test:
+    runs-on: \${{ inputs.runner }}
+`
+
+    expect(runnerLabelsOf(text)).toEqual(['blacksmith-4vcpu-ubuntu-2404'])
   })
 
   it('finds a label inside a runs-on expression, not only a literal one', () => {
@@ -126,6 +228,17 @@ jobs:
 `
 
     expect(runnerLabelsOf(text)).toEqual(['blacksmith-8vcpu-ubuntu-2404'])
+  })
+
+  it('covers every label this tree can reach, so the table cannot fall behind the files', () => {
+    const facts = readFacts(Object.keys(EXPECTED_TRIGGERS))
+
+    for (const [path, entry] of Object.entries(facts)) {
+      const accepted = ACCEPTED_RUNNER_LABELS[path]?.labels ?? []
+      for (const label of entry.runnerLabels ?? []) {
+        expect(accepted, `${path} names ${label}`).toContain(label)
+      }
+    }
   })
 })
 
@@ -184,7 +297,7 @@ describe('the rest of the verdict', () => {
     })
 
     expect(verdict.drift).toHaveLength(1)
-    expect(verdict.pullRequestTarget).toEqual([])
+    expect(verdict.forbiddenTriggers).toEqual([])
     expect(verdict.unpinned).toEqual([])
   })
 })

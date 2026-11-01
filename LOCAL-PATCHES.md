@@ -2801,24 +2801,36 @@ incident behind it:
 
 - **A lane whose `on:` keys changed.** Trigger validation covered `ALLOWED_INERT` only, so the eleven
   required lanes were unguarded: a sync could add `schedule` or `pull_request` to any of them and the
-  check passed. `EXPECTED_TRIGGERS` now pins the exact keys for all 18 enabled files, and a mismatch is
-  reported and disabled by `--fix` until someone looks. **Changing a trigger is therefore a two-file
-  change** — the workflow and the pin — which is the point: it makes the change visible in review.
-- **`pull_request_target` on an active file.** It runs with a write token against code from a fork.
-  `ci-closed-pr-caches.yml` uses it and must stay off, and nothing stopped a sync bringing it in.
+  check passed. `EXPECTED_TRIGGERS` now pins the exact keys for all 18 enabled files. **Changing a
+  trigger is therefore a two-file change** — the workflow and the pin — which is the point: it makes
+  the change visible in review. A mismatch on a required lane is reported and **left enabled**; only an
+  allowed-inert one is disabled by `--fix`. Otherwise a sync could edit `fork-ci-health.yml`'s triggers
+  and the sweep would turn off the watchdog that reports it.
+- **`pull_request_target`, and `workflow_run` with it.** Both run with a write token against code from
+  a fork. `ci-closed-pr-caches.yml` uses the first and must stay off, and nothing stopped a sync
+  bringing either in.
 - **A runner this fork does not provision.** `timeout-minutes` cannot bound this: the timeout starts
   when a runner picks the job up, so a job on a `blacksmith-*` label waits for GitHub's 24 h queue
-  limit — the 17.5 h `relay_integration` wait on 2026-10-26 and the 12 h cache producer on 10-28. Any
-  active file naming `blacksmith-*` now fails unless it is in `ACCEPTED_RUNNER_LABELS`, which holds
-  exactly two: `node-server-tests` (behind `fast_runners`, true only for dispatch and call) and
-  `ci-cache-warmup-platform-jobs` (call-only, with both of its callers disabled). Both are dormant for
-  automatic triggers; a third would not be.
+  limit — the 17.5 h `relay_integration` wait on 2026-10-26 and the 12 h cache producer on 10-28. The
+  scan follows `uses: ./.github/workflows/*.yml` edges, because a called workflow runs whether or not
+  it is enabled, and it reads only `runs-on` values and input `default`s, so a label that is merely
+  compared in a `run:` block is not a finding. `ACCEPTED_RUNNER_LABELS` names the exact labels three
+  files may use, each with a reason: `node-server-tests` (behind `fast_runners`, true only for dispatch
+  and call), `ci-cache-warmup-platform-jobs` (call-only, both callers disabled), and `unit-tests` (the
+  `runner` input default, which both active callers override). `e2e.yml` is there for the same reason
+  and is reached only through dispatch-only lanes. A new label in any of them still fails, so the
+  exception cannot cover a job added later — the scan found the last two only because it looks through
+  the call edge.
 
 `local/check-queued-runs.mjs` is the runtime half, a third check in `fork-ci-health`. It reports a run
-stuck in `queued` **and** a job queued inside a run that reads `in_progress`, because that is how both
-incidents actually looked — a run-level status check would have missed them. Its limits are deliberate:
-a one-hour threshold, the last 100 runs plus the queued page, and job lookups for the first 10 in-flight
-runs (`gh` calls are the budget).
+stuck in a waiting status **and** a job queued inside a run that reads `in_progress`, because that is how
+both incidents actually looked — a run-level status check would have missed them. The remedy differs by
+status and only one of them is a runner: `queued`/`requested` is a label, `waiting` is an environment
+protection rule that has not approved the job, and `pending` is another run holding the concurrency
+group. Its limits are deliberate: a one-hour threshold, three pages (recent, `queued`, `in_progress`),
+and job lookups for the ten oldest in-flight runs past the threshold — oldest first, because the API's
+newest-first order would cut exactly the run the check exists for. The line it prints says how many
+runs' jobs it actually read.
 
 **It found a real one on its first run.** Run `37640199177` ("Fork release", attempt 2, 2026-10-07) has
 been `queued` for 593 h with **zero jobs**. GitHub refuses every API remedy — `cancel` answers
