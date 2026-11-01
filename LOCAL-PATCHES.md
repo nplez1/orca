@@ -1293,24 +1293,30 @@ are fork tooling text, not upstream's.
 
 ### `local(lint)`: #267's review-switcher comments removed, and its three transitive focus reads recorded
 
-#267 (`bc4afd9703`) added 118 fork comment lines across 12 files upstream owns under
-`src/renderer/src/components/right-sidebar/**`, taking the fork-comment ratchet from 6051 to 6180
-(6169 once #266 removed #268's 11), and `check:focus-read-ratchet` gained three files at 1 read each.
-All 118 were removed rather than marked: every one was prose above upstream's code explaining a
-fork decision, and the fork's own modules (`workspace-review-selection.ts`,
+#267 (`bc4afd9703`) added fork comments to 12 files upstream owns under
+`src/renderer/src/components/right-sidebar/**`, and `check:focus-read-ratchet` gained three files at
+1 read each. All of the comments were removed rather than marked: every one was prose above upstream's
+code explaining a fork decision, and the fork's own modules (`workspace-review-selection.ts`,
 `use-workspace-review-selection.ts`, `WorkspaceReviewSwitcher.tsx`) state the same design without a
-hunk to resolve on every sync. The total is back to exactly 6051 with 0 stale entries, so no
-re-baseline was needed.
+hunk to resolve on every sync. The comment ratchet counts **118** of those lines — the diff deletes
+**120**, because two are continuation lines inside a JSX block comment that the ratchet's line rule
+does not count — and it measured **6062** at #267's parent, not 6051: #268's 11 lines were already in
+the tree, and #266 removed them afterwards, which is the 6169 this branch carried before the fix. The
+total is back to exactly 6051 with 0 stale entries, so no re-baseline was needed.
 
 What the deleted comments guarded, kept here because each is a trap a later edit can fall into:
 
-- **The pick is display-only.** Push target, PR creation, compare base and the provider hint keep
-  resolving through the workspace's own review (`hostedReview`); only the header's copy moves. A
-  picked review that reached those would retarget a push.
+- **In Source Control the pick is display-only; in Checks it is operational.** Push target, PR
+  creation, compare base and the provider hint keep resolving through the workspace's own review
+  (`hostedReview`), and only the header's copy (`displayedReview`) moves — a picked review that reached
+  those would retarget a push. The Checks pane is the other way round: `HostedReviewActions` gets the
+  shown review, and a mutation's refresh goes to the pick first, so pointing those back at
+  `hostedReview` would act on a review that is not on screen.
 - **Never write `suppressedGitHubPR` for a pick.** It is one tombstone slot, so a pick's number would
-  replace the tombstone of a branch PR the user already unlinked and let that PR come back. Write it
-  only when the shown review is the workspace's own, and omit the key rather than sending `null` —
-  `objectContaining` does not match `null`, so a test written that way cannot see the clear.
+  replace the tombstone of a branch PR the user already unlinked and let that PR come back; write it
+  only when the shown review is the workspace's own. Omit the key rather than sending `null`, for two
+  separate reasons: `null` is a write that clears the tombstone, and a negated `objectContaining`
+  assertion still passes on it, so that test shape cannot see the clear.
 - **Unlink removes the shown review's row, not the workspace's slot**, and clears the stored selection
   only when the pick is the row being removed. A slot-only clear leaves the row in `linkedItems`, so
   the review returns on the next read; for a pick it would also unlink the review that is not on
@@ -1319,13 +1325,33 @@ What the deleted comments guarded, kept here because each is a trap a later edit
   checks/comment body for; check the row the header is actually showing (a pick whose lookup has not
   answered is listed but not shown); a pick's unlink needs a row to remove; and the AI triage strip is
   hidden for a pick, because those actions start an agent in _this_ worktree.
-- **A refresh's switch test is the store selection**, not `refreshRequestKeyRef` and not the result
-  key: neither can tell a user switching reviews from this review's own head moving, which the refresh
-  itself causes. Loading flags are cleared only while the pick is still shown, or a switch would blank
-  the review the user moved to; the refresh latch is released either way.
-- **A picked MR never goes through GitHub checks**, and a picked review's reads pass no branch: the
-  branch argument is what the store writes a PR's check status onto, and this branch's cached PR is a
-  different review.
+- **The switch effect and the tab-entry refresh are a pick's only re-reads, and no test drives
+  either.** Nothing under `right-sidebar/**` renders `useChecksPanelContextState` or
+  `useChecksPanelEntryRefreshAndTitleActions`, so this bullet is their guard.
+  - `use-checks-panel-context-state.tsx`, the effect keyed on the shown review: it must fire on a
+    _change_, not on mount (`previousShownReviewKeyRef`), or an ordinary single-review workspace's
+    first paint raises loading flags nothing clears; it clears the previous review's rows, because
+    rows on screen belong to the review that was showing when they were fetched; and it raises the
+    loading flags only for a pick, because the branch path owns them for its own review and raising
+    them for a review with no PR number leaves a spinner behind.
+  - `use-checks-panel-entry-refresh-and-title-actions.tsx`: tab entry — the pane's only periodic
+    re-read of review metadata — and the post-mutation refresh both go to the pick first, and a picked
+    MR also re-reads `fetchGitLabDetails` because its rows come from its own pipelines and threads.
+    The branch path below names a different review, so falling through leaves the review the user just
+    changed (title, merge, a resolved thread) stale.
+- **A refresh's switch test is the store selection.** `refreshRequestKeyRef` is per-request, so a
+  switch does not change it and `isCurrentRequest()` cannot see one at all; the result key cannot tell
+  a switch from this review's own head moving, which the refresh itself causes. The store changes
+  synchronously, so it is the only answer. Two clauses go with it, both pinned by
+  `use-checks-panel-manual-refresh.test.tsx`: check the pick again after the awaited review read and
+  before claiming `asyncResultKeyRef`, and compare the refreshed `pickedRequestKey` as a local, because
+  `isCurrentAsyncResult` reads the ref and comparing the ref with itself always passes. Loading flags
+  are cleared only while the pick is still shown, or a switch would blank the review the user moved to;
+  the refresh latch is released either way.
+- **A picked MR never goes through GitHub checks**, a picked review's reads pass no branch — the branch
+  argument is what the store writes a PR's check status onto, and this branch's cached PR is a
+  different review — and a pick's successful read must not `retractStalePRRefreshError`, whose error
+  belongs to this branch's PR.
 
 The three focus-read rows in `config/focus-setting-read-baseline.fork.txt` are the same shape as the
 2026-10-16 `use-linked-issue-pane-actions.ts` one. `use-workspace-review-selection.ts` computes its
