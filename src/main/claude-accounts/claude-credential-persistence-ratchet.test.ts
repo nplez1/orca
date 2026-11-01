@@ -40,6 +40,7 @@ const fsAllowances: Record<string, readonly string[]> = {
   ],
   // Stores Claude config folder paths only.
   'claude-accounts/claude-observed-config-dirs.ts': ['writeFileAtomically'],
+  'claude-accounts/claude-oauth-pending-rotations.ts': ['rmSync'],
   'claude-accounts/claude-profile-paths.ts': ['mkdirSync', 'writeFileAtomically'],
   'claude-accounts/claude-profile-router.ts': ['mkdirSync', 'rmSync', 'writeFileAtomically'],
   'claude-accounts/claude-account-folder.ts': ['rmSync', 'rmdirSync', 'unlinkSync'],
@@ -110,6 +111,7 @@ const KEYCHAIN_DELETE_OWNER = 'main/claude-accounts/claude-account-folder.ts'
 const TOKEN_REFRESH_OWNER = 'main/claude-accounts/claude-oauth-token-refresh.ts'
 /** The one file that writes a rotated login back to the item or file it came from. */
 const CREDENTIAL_STORE_OWNER = 'main/claude-accounts/claude-oauth-credential-store.ts'
+const PENDING_ROTATION_OWNER = 'main/claude-accounts/claude-oauth-pending-rotations.ts'
 /** The store's only Keychain writes: the shared helper, and the routine that applies it. */
 const CREDENTIAL_STORE_KEYCHAIN_WRITES = new Set(['writeKeychainPassword', 'writeKeychainRotation'])
 /** The runner defines these three and nothing else; a fourth helper is a review. */
@@ -129,7 +131,11 @@ const CREDENTIAL_EXCHANGE_OWNERS = new Set([
   'main/rate-limits/claude-active-usage-fetch.ts',
   TOKEN_REFRESH_OWNER
 ])
-const CREDENTIAL_ROTATION_OWNERS = new Set([TOKEN_REFRESH_OWNER, CREDENTIAL_STORE_OWNER])
+const CREDENTIAL_ROTATION_OWNERS = new Set([
+  TOKEN_REFRESH_OWNER,
+  CREDENTIAL_STORE_OWNER,
+  PENDING_ROTATION_OWNER
+])
 
 /** Follow aliases of credential file paths. */
 function credentialFileNames(text: string): Set<string> {

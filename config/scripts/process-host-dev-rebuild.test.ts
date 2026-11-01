@@ -3,6 +3,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync
@@ -29,7 +30,7 @@ afterEach(async () => {
 })
 
 function fixture(): { root: string; packageDir: string; main: string } {
-  const root = mkdtempSync(join(tmpdir(), 'orca-process-host-dev-'))
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'orca-process-host-dev-')))
   temporaryRoots.push(root)
   const packageDir = join(root, 'src', 'packages', 'process-host')
   const sourceDir = join(packageDir, 'src')

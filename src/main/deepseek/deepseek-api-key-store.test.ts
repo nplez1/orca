@@ -14,6 +14,12 @@ const rmSyncMock = vi.fn()
 const hardenExistingSecureFileMock = vi.fn()
 const writeSecureFileMock = vi.fn()
 const homedirMock = vi.fn(() => '/home/test')
+const adoptLegacyHomeStoreMock = vi.hoisted(() =>
+  vi.fn((fileName: string) => `/home/test/.orca-np/${fileName}`)
+)
+vi.mock('../home-directory-migration', () => ({
+  adoptLegacyHomeStore: adoptLegacyHomeStoreMock
+}))
 
 vi.mock('node:fs', () => ({
   existsSync: existsSyncMock,
@@ -48,6 +54,7 @@ async function loadStore(): Promise<typeof DeepSeekApiKeyStore> {
 
 describe('deepseek-api-key-store', () => {
   beforeEach(() => {
+    adoptLegacyHomeStoreMock.mockClear()
     existsSyncMock.mockReset()
     readFileSyncMock.mockReset()
     rmSyncMock.mockReset()
@@ -71,6 +78,7 @@ describe('deepseek-api-key-store', () => {
     const store = await loadStore()
     expect(store.hasDeepSeekApiKey()).toBe(false)
     expect(hardenExistingSecureFileMock).not.toHaveBeenCalled()
+    expect(adoptLegacyHomeStoreMock).toHaveBeenCalledWith('deepseek-api-key.enc')
   })
 
   it('hardens the key file when checking status for an existing key', async () => {
@@ -222,8 +230,6 @@ describe('deepseek-api-key-store', () => {
   })
 
   it('clears the cached key and removes the file', async () => {
-    // Why per-path: the store also consults its pre-rename location, so a single
-    // one-shot `true` would be spent before the read it was meant for.
     let filePresent = true
     existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
     readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))

@@ -14,6 +14,12 @@ const rmSyncMock = vi.fn()
 const hardenExistingSecureFileMock = vi.fn()
 const writeSecureFileMock = vi.fn()
 const homedirMock = vi.fn(() => '/home/test')
+const adoptLegacyHomeStoreMock = vi.hoisted(() =>
+  vi.fn((fileName: string) => `/home/test/.orca-np/${fileName}`)
+)
+vi.mock('../home-directory-migration', () => ({
+  adoptLegacyHomeStore: adoptLegacyHomeStoreMock
+}))
 
 vi.mock('node:fs', () => ({
   existsSync: existsSyncMock,
@@ -45,6 +51,7 @@ async function loadStore(): Promise<typeof ZcodePlanApiKeyStore> {
 
 describe('zcode-plan-api-key-store', () => {
   beforeEach(() => {
+    adoptLegacyHomeStoreMock.mockClear()
     existsSyncMock.mockReset()
     readFileSyncMock.mockReset()
     rmSyncMock.mockReset()
@@ -67,6 +74,7 @@ describe('zcode-plan-api-key-store', () => {
 
     expect(store.hasZcodePlanApiKey()).toBe(false)
     expect(store.readZcodePlanApiKey()).toBeNull()
+    expect(adoptLegacyHomeStoreMock).toHaveBeenCalledWith('zcode-plan-api-key.enc')
   })
 
   it('saves an encrypted envelope and reads it back through the cache', async () => {
