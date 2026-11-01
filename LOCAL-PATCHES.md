@@ -1272,6 +1272,25 @@ classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: th
 instead of being re-derived by hand.
 This file stays the evidence and the JSON the assertion, as with the unit red set.
 
+### `local(lint)`: two `fork-comment-ok` markers, and why they are not comments to delete
+
+`src/main/runtime/agent-session/ownership/agent-session-process-identity-probe.ts` carries two of the
+tree's markers. The comments are #268's; #266 added the markers when it removed that branch's other 14
+fork comment lines to bring the total back to its 6051 baseline, and kept these two:
+
+- above `darwinStartTimePsEnvironment` — `lstart` is local wall clock, the hour a US fall-back repeats
+  resolves to the earlier offset, and a start time read there is an hour early. Measured 2026-11-01:
+  a process started at 01:37 PST parsed to 08:37Z instead of 09:37Z. `readProcessStartTimeMs` decides
+  whether an agent-session owner or a spawned provider process is still the same process, so the error
+  is an hour of misidentification twice a year.
+- above `parseUtcLstart` — the parser has to read the same zone the printer was asked for; splitting
+  one from the other is the bug, and nothing at the call site shows the pairing.
+
+Both reasons are invisible in the code they guard, and both are exactly the kind of note a later
+cleanup deletes on its way to reintroducing the defect, which is why they stay above upstream's code
+rather than in this ledger. If #268 is ever offered upstream, drop both markers from that patch — they
+are fork tooling text, not upstream's.
+
 ### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
 
 `local/unit-known-red.json` had drifted into the two shapes its own note warns against: every entry was
