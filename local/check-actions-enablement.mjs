@@ -175,9 +175,11 @@ export const ACCEPTED_RUNNER_LABELS = {
 /**
  * Runner families this fork does not provision, as patterns rather than one vendor's prefix. A job
  * asking for any of them waits for a runner that will never claim it, which `timeout-minutes` cannot
- * bound. **This is a deny-list, not an allow-list**: a typo such as `ubunut-latest`, or a vendor nobody
- * has added here yet, still passes. Allowing only `ubuntu-*`/`windows-*`/`macos-*` without a larger
- * suffix would be stricter and is the change to make if this ever misses something real. The larger-runner suffixes are here because those bill even on a public repository, so they
+ * bound. **This is a deny-list, not an allow-list**: a typo such as `ubunut-latest`, or a vendor
+ * nobody has added here yet, still passes. It also cannot tell a label from prose that names one — a
+ * `with: body:` note saying "never use self-hosted runners" reads as a request. Allowing only
+ * `ubuntu-*`/`windows-*`/`macos-*` without a larger suffix would be stricter, and is the change to make
+ * if this ever misses something real. The larger-runner suffixes are here because those bill even on a public repository, so they
  * are a cost decision as well as a queue one; `self-hosted` is here because on a public fork it is the
  * shortest path from a fork PR to someone's machine.
  */

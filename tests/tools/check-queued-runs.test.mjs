@@ -288,6 +288,27 @@ describe('a zero-job run that cannot be cleared', () => {
     }
   })
 
+  it('keeps an acknowledged ghost distinguishable from a real finding on a red day', () => {
+    const ghost = ghostRun()
+    const stuck = run({ id: 90, created_at: hoursAgo(5), run_started_at: hoursAgo(5) })
+    const verdict = judgeQueue(
+      {
+        runs: [ghost, stuck],
+        jobsByRun: {
+          [ghost.id]: [],
+          [stuck.id]: [RELAY_JOB_AS_IT_WAITED]
+        },
+        knownGhosts: new Set([ghost.id])
+      },
+      { now: NOW }
+    )
+
+    const text = describeVerdict(verdict)
+    expect(text).toContain('ATTENTION — 1 waiting')
+    expect(text).toContain('ACKED')
+    expect(text).toContain('not counted above')
+  })
+
   it('ships a manifest whose entry matches the run it documents', () => {
     const ids = readKnownGhosts()
 

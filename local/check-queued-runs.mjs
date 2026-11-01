@@ -147,8 +147,8 @@ export function judgeQueue(
       // run: a job gated on `needs:` gets its record created when it becomes *eligible*, not at run
       // start (shards created 10:35:26 against a run created 10:34:18; the release chain's shards
       // 1m11s after start). So a dependency wait does not read as a queue wait. What this does report
-      // after an hour is a job held by an environment rule or a job-level `concurrency:`, and the
-      // remedy line says so rather than blaming a runner label.
+      // after an hour is, besides a runner wait, a job held by an environment rule or a job-level
+      // `concurrency:`, and the remedy line says so rather than blaming a runner label.
       if (job.runner_name || job.runner_id) {
         continue
       }
@@ -217,8 +217,8 @@ export function describeVerdict(verdict) {
         `  manifest  ${KNOWN_GHOSTS} is unreadable (${verdict.manifestError}); nothing is acknowledged`
       ]
     : []
-  const rowOf = (entry) =>
-    `  ${tagOf(entry)} ${hours(entry.ageHours).padStart(5)}  ${
+  const rowOf = (entry, tag = tagOf(entry)) =>
+    `  ${tag} ${hours(entry.ageHours).padStart(5)}  ${
       entry.where === 'job'
         ? `${entry.runName} / ${entry.jobName}${entry.labels.length > 0 ? ` [${entry.labels.join(',')}]` : ''}`
         : entry.runName
@@ -230,7 +230,7 @@ export function describeVerdict(verdict) {
       ...manifestLine
     ]
     for (const entry of acknowledged) {
-      lines.push(rowOf(entry))
+      lines.push(rowOf(entry, 'ACKED  '))
     }
     if (acknowledged.length > 0) {
       lines.push(
@@ -249,10 +249,16 @@ export function describeVerdict(verdict) {
   for (const entry of waited) {
     lines.push(rowOf(entry))
   }
-  // Still shown while something else is red: an acknowledged ghost stays visible, it just does not
-  // count as the reason.
+  // Still shown while something else is red, under its own tag: an acknowledged ghost stays visible, it
+  // just is not one of the rows the header counted.
   for (const entry of acknowledged) {
-    lines.push(rowOf(entry))
+    lines.push(rowOf(entry, 'ACKED  '))
+  }
+  if (acknowledged.length > 0) {
+    lines.push(
+      `  acknowledged: ${acknowledged.length} listed in ${KNOWN_GHOSTS} and not counted above; ` +
+        'deleting those runs in the Actions UI is what clears them'
+    )
   }
   if (waited.some((entry) => entry.where === 'ghost')) {
     lines.push(
