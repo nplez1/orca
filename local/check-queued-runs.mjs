@@ -11,7 +11,7 @@
  * `cancelled` conclusion.
  *
  * Hence the two things a run-level status cannot show: a run that is still `queued`, and a *job* that
- * is `queued` inside a run that reads `in_progress`.
+ * is waiting inside a run that reads `in_progress`.
  *
  *   node local/check-queued-runs.mjs            report
  *   node local/check-queued-runs.mjs --json     the same facts as JSON
@@ -20,12 +20,22 @@
  * "Cannot tell" is not a pass — a missing `gh` must never read as a healthy queue.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const REPO = 'nplez1/orca'
 const HOUR = 60 * 60 * 1000
+const ROOT = resolve(import.meta.dirname, '..')
+
+/**
+ * A run that is waiting with no jobs at all is a GitHub-side record: no cancel reaches it, so it cannot
+ * be cleared by anything except a delete in the UI. Left as a plain finding it holds this check red
+ * forever, and `ci-health-report` *updates* one issue in place — an edit nobody is notified about — so a
+ * new red from any check would land silently behind it. Listed here, it is reported as acknowledged and
+ * does not redden the check; anything not listed still does.
+ */
+export const KNOWN_GHOSTS = 'local/queued-known-ghosts.json'
 
 /** A job or run in any of these states has not been handed a runner yet. */
 export const WAITING_STATUSES = new Set(['queued', 'requested', 'waiting', 'pending'])
@@ -49,7 +59,7 @@ export const WAIT_LIMIT_H = 1
 export const RUN_LOOKUPS = 10
 
 const firstLine = (error) =>
-  String(error.stderr ?? error.message ?? error)
+  String(error.stderr ?? error.message ?? error ?? '')
     .split('\n')[0]
     .trim()
 
@@ -60,6 +70,23 @@ export function waitedHours(since, now) {
 }
 
 /**
+ * The run ids this check has been told to acknowledge, or `{ error }` when the file cannot be read.
+ * A missing file is not an error — it means nothing has been acknowledged yet.
+ */
+export function readKnownGhosts(file = join(ROOT, KNOWN_GHOSTS)) {
+  if (!existsSync(file)) {
+    return new Set()
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'))
+    const entries = Array.isArray(parsed?.ghosts) ? parsed.ghosts : []
+    return new Set(entries.map((entry) => entry.runId).filter((id) => Number.isInteger(id)))
+  } catch (error) {
+    return { error: firstLine(error) }
+  }
+}
+
+/**
  * Judge the queue from runs and jobs already fetched, so the decision is testable without a network.
  *
  * `jobsByRun` maps a run id to its jobs. A run that is itself waiting is reported once at run level and
@@ -67,10 +94,12 @@ export function waitedHours(since, now) {
  * problems.
  */
 export function judgeQueue(
-  { runs = [], jobsByRun = {} },
+  { runs = [], jobsByRun = {}, knownGhosts = new Set() },
   { now = Date.now(), limitH = WAIT_LIMIT_H } = {}
 ) {
   const waited = []
+  const acknowledged = []
+  const awaitingDelete = new Set(knownGhosts)
   let inFlight = 0
   for (const run of runs) {
     const status = String(run.status ?? '')
@@ -78,19 +107,18 @@ export function judgeQueue(
       continue
     }
     inFlight++
-    // `run_started_at` is the current attempt's start: a re-run of a week-old run is not a week-old
-    // wait. It is null while nothing has started, and then the run's creation is the queue start.
+    // `run_started_at` is the current attempt's start, so a re-run of a week-old run is not a week-old
+    // wait. It can be absent, which is the only case the creation time stands in for.
     const queuedSince = run.run_started_at ?? run.created_at
     const runAge = waitedHours(queuedSince, now)
     if (WAITING_STATUSES.has(status) && runAge !== null && runAge > limitH) {
-      // Why the jobs are read here: a run waiting with jobs on a label is a provisioning problem, and
-      // one waiting with no jobs is a GitHub-side record that no cancel reaches. Only the first is
-      // fixed by cancelling, so the two must not share a remedy line. Only a runner-queued run can be
-      // the second kind — `pending` and `waiting` legitimately have jobs.
       const jobs = jobsByRun[run.id]
       const emptyJobs = Object.hasOwn(jobsByRun, run.id) && (jobs ?? []).length === 0
-      waited.push({
-        where: emptyJobs && WAIT_REASON[status] === 'runner' ? 'ghost' : 'run',
+      // Only a runner-queued run can be the zero-job kind: `pending` and `waiting` legitimately have
+      // jobs, and their remedy is not a runner.
+      const ghost = emptyJobs && WAIT_REASON[status] === 'runner'
+      const entry = {
+        where: ghost ? 'ghost' : 'run',
         status,
         runId: run.id,
         runName: run.name,
@@ -98,14 +126,26 @@ export function judgeQueue(
         labels: [],
         ageHours: runAge,
         url: run.html_url
-      })
+      }
+      if (ghost && awaitingDelete.has(run.id)) {
+        awaitingDelete.delete(run.id)
+        acknowledged.push(entry)
+      } else {
+        waited.push(entry)
+      }
       continue
     }
     for (const job of jobsByRun[run.id] ?? []) {
-      if (job.started_at || !WAITING_STATUSES.has(String(job.status ?? ''))) {
+      if (!WAITING_STATUSES.has(String(job.status ?? ''))) {
         continue
       }
-      const jobAge = waitedHours(job.created_at ?? queuedSince, now)
+      // Why not `started_at`: GitHub sets it when the job is *queued*, so it is not evidence that a
+      // runner picked the job up. The 2026-10-26 relay job carried `started_at` set, `runner_name: ""`
+      // and `runner_id: 0`, and waited 17.5 h — a check gated on `started_at` sees none of that.
+      if (job.runner_name || job.runner_id) {
+        continue
+      }
+      const jobAge = waitedHours(job.created_at ?? job.started_at ?? queuedSince, now)
       if (jobAge === null || jobAge <= limitH) {
         continue
       }
@@ -122,24 +162,39 @@ export function judgeQueue(
     }
   }
   const oldestHours = waited.reduce((worst, entry) => Math.max(worst, entry.ageHours), null)
-  return { waited, inFlight, oldestHours, limitH, lookedAt: Object.keys(jobsByRun).length }
+  return {
+    waited,
+    acknowledged,
+    // An entry that no longer describes a ghost is reported so it can be pruned; it is not a failure,
+    // because deleting the run in the UI is the outcome this file exists to allow.
+    staleAcknowledged: [...awaitingDelete],
+    inFlight,
+    oldestHours,
+    limitH,
+    lookedAt: Object.keys(jobsByRun).length
+  }
 }
 
 const hours = (value) => `${value >= 10 ? Math.round(value) : Math.round(value * 10) / 10}h`
 
+/** A manifest entry that no longer describes a ghost is pruned by hand; it is not a failure. */
+const staleLines = (runIds) =>
+  runIds.map(
+    (runId) => `  remove   ${runId} from ${KNOWN_GHOSTS}: it is no longer a waiting zero-job run`
+  )
+
 export function describeVerdict(verdict) {
-  const { waited, inFlight, limitH, oldestHours } = verdict
+  const {
+    waited,
+    acknowledged = [],
+    staleAcknowledged = [],
+    inFlight,
+    limitH,
+    oldestHours
+  } = verdict
   const lookedAt = verdict.lookedAt ?? 0
   const candidates = verdict.candidates ?? lookedAt
-  if (waited.length === 0) {
-    return (
-      `queued runs: PASS — nothing waiting past ${limitH}h across ${inFlight} in-flight run(s), ` +
-      `jobs read for ${lookedAt} of ${candidates} past the limit`
-    )
-  }
-  const lines = [
-    `queued runs: ATTENTION — ${waited.length} waiting past ${limitH}h (oldest ${hours(oldestHours)})`
-  ]
+  const footer = `jobs read for ${lookedAt} of ${candidates} run(s) past the ${limitH}h limit`
   const tagOf = (entry) => {
     if (entry.where === 'ghost') {
       return 'NO JOBS'
@@ -150,16 +205,40 @@ export function describeVerdict(verdict) {
         ? 'WAITING'
         : 'QUEUED '
   }
+  const rowOf = (entry) =>
+    `  ${tagOf(entry)} ${hours(entry.ageHours).padStart(5)}  ${
+      entry.where === 'job'
+        ? `${entry.runName} / ${entry.jobName}${entry.labels.length > 0 ? ` [${entry.labels.join(',')}]` : ''}`
+        : entry.runName
+    } — ${entry.url}`
+
+  if (waited.length === 0) {
+    const lines = [
+      `queued runs: PASS — nothing waiting past ${limitH}h across ${inFlight} in-flight run(s), ${footer}`
+    ]
+    for (const entry of acknowledged) {
+      lines.push(rowOf(entry))
+    }
+    if (acknowledged.length > 0) {
+      lines.push(
+        `  acknowledged: listed in ${KNOWN_GHOSTS}. No API call can cancel or delete these; deleting ` +
+          'the run in the Actions UI is what clears them, and nothing else reddens this check meanwhile.'
+      )
+    }
+    lines.push(...staleLines(staleAcknowledged))
+    return lines.join('\n')
+  }
+
+  const lines = [
+    `queued runs: ATTENTION — ${waited.length} waiting past ${limitH}h (oldest ${hours(oldestHours)})`
+  ]
   for (const entry of waited) {
-    const labels = entry.labels.length > 0 ? ` [${entry.labels.join(',')}]` : ''
-    const what =
-      entry.where === 'job' ? `${entry.runName} / ${entry.jobName}${labels}` : entry.runName
-    lines.push(`  ${tagOf(entry)} ${hours(entry.ageHours).padStart(5)}  ${what} — ${entry.url}`)
+    lines.push(rowOf(entry))
   }
   if (waited.some((entry) => entry.where === 'ghost')) {
     lines.push(
       '  NO JOBS: a run queued with no jobs at all is a record GitHub will not cancel or force-cancel; ' +
-        'delete it in the Actions UI. Its id is in the line above.'
+        `delete it in the Actions UI, and list it in ${KNOWN_GHOSTS} if it cannot be cleared soon.`
     )
   }
   const reasons = new Set(
@@ -182,7 +261,8 @@ export function describeVerdict(verdict) {
       '  CONCURRENCY: `pending` means another run is holding the group — cancel that run to release it.'
     )
   }
-  lines.push(`  jobs read for ${lookedAt} of ${candidates} run(s) past the ${limitH}h limit`)
+  lines.push(`  ${footer}`)
+  lines.push(...staleLines(staleAcknowledged))
   return lines.join('\n')
 }
 
@@ -191,18 +271,25 @@ function gh(args) {
 }
 
 /**
- * Recent runs, the queued set and the in-progress set, deduped: a busy day can push an old waiting run
- * past the first page, and a job queued inside a long `in_progress` run is the shape of both incidents.
+ * Recent runs, plus one page per waiting status: a busy day can push an old waiting run past the first
+ * page, and a job queued inside a long `in_progress` run is the shape of both incidents.
  */
 function fetchRuns() {
-  const pages = [
-    gh(['api', `/repos/${REPO}/actions/runs?per_page=100`]).workflow_runs ?? [],
-    gh(['api', `/repos/${REPO}/actions/runs?status=queued&per_page=100`]).workflow_runs ?? [],
-    gh(['api', `/repos/${REPO}/actions/runs?status=in_progress&per_page=100`]).workflow_runs ?? []
+  const filters = [
+    '',
+    '&status=queued',
+    '&status=in_progress',
+    '&status=waiting',
+    '&status=pending',
+    '&status=requested'
   ]
   const byId = new Map()
-  for (const run of pages.flat()) {
-    byId.set(run.id, run)
+  for (const filter of filters) {
+    const page =
+      gh(['api', `/repos/${REPO}/actions/runs?per_page=100${filter}`]).workflow_runs ?? []
+    for (const run of page) {
+      byId.set(run.id, run)
+    }
   }
   return [...byId.values()]
 }
@@ -235,12 +322,17 @@ function fetchJobsByRun(runs, now = Date.now()) {
 
 function main() {
   const json = process.argv.includes('--json')
+  const knownGhosts = readKnownGhosts()
+  if (!(knownGhosts instanceof Set)) {
+    console.error(`queued runs: cannot tell — ${KNOWN_GHOSTS} is unreadable: ${knownGhosts.error}`)
+    process.exit(2)
+  }
   let verdict
   try {
     const runs = fetchRuns()
     const jobs = fetchJobsByRun(runs)
     verdict = {
-      ...judgeQueue({ runs, jobsByRun: jobs.jobsByRun }),
+      ...judgeQueue({ runs, jobsByRun: jobs.jobsByRun, knownGhosts }),
       candidates: jobs.candidates,
       lookedAt: Object.keys(jobs.jobsByRun).length
     }

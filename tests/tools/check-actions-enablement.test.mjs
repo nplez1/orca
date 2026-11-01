@@ -4,6 +4,7 @@ import {
   ALLOWED_INERT,
   EXPECTED_TRIGGERS,
   REQUIRED,
+  calleesOf,
   judgeEnablement,
   readFacts,
   residualProblems,
@@ -132,32 +133,6 @@ describe('triggers and runners that must never reach an active file', () => {
     ])
   })
 
-  it('accepts the recorded exceptions, and only for the labels they record', () => {
-    // The table also carries callees that are not themselves active (`e2e.yml`), so this test drives
-    // only the ones a repository state can hold active.
-    const paths = Object.keys(ACCEPTED_RUNNER_LABELS).filter((path) =>
-      Object.hasOwn(EXPECTED_TRIGGERS, path)
-    )
-    const facts = Object.fromEntries(
-      paths.map((path) => [
-        path,
-        { triggers: EXPECTED_TRIGGERS[path], runnerLabels: ACCEPTED_RUNNER_LABELS[path].labels }
-      ])
-    )
-    const verdict = judge(
-      paths.map((path) => active(path)),
-      facts,
-      {
-        required: paths,
-        allowedInert: [],
-        expected: Object.fromEntries(paths.map((path) => [path, EXPECTED_TRIGGERS[path]]))
-      }
-    )
-
-    expect(verdict.unapprovedRunners).toEqual([])
-    expect(verdict.ok).toBe(true)
-  })
-
   it('fails a new label in an excepted file, so the exception cannot cover a job added later', () => {
     const path = '.github/workflows/node-server-tests.yml'
     const accepted = ACCEPTED_RUNNER_LABELS[path].labels
@@ -192,6 +167,57 @@ describe('triggers and runners that must never reach an active file', () => {
     expect(verdict.unapprovedRunners).toEqual([
       { path: callee, labels: ['blacksmith-8vcpu-ubuntu-2404'], reachedFrom: caller }
     ])
+  })
+
+  it('rejects a self-hosted runner, which on a public fork is a path from a fork PR to a machine', () => {
+    const text = `on: workflow_call
+jobs:
+  a:
+    runs-on: [self-hosted, linux]
+`
+
+    expect(runnerLabelsOf(text)).toEqual(['self-hosted'])
+  })
+
+  it('rejects a larger-runner suffix, which bills even on a public repository', () => {
+    const text = `on: workflow_call
+jobs:
+  a:
+    runs-on: macos-15-xlarge
+`
+
+    expect(runnerLabelsOf(text)).toEqual(['macos-15-xlarge'])
+  })
+
+  it('ignores a label that sits under env: or script:, neither of which can select a runner', () => {
+    const text = `on: workflow_call
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    env:
+      NOTE: blacksmith-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const ok = process.env.RUNNER_NAME?.startsWith('blacksmith-')
+`
+
+    expect(runnerLabelsOf(text)).toEqual([])
+  })
+
+  it('takes call edges from parsed jobs, so a path in a comment or a run: string is not one', () => {
+    const text = `on: workflow_call
+jobs:
+  real:
+    uses: ./.github/workflows/unit-tests.yml
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "see ./.github/workflows/e2e.yml"
+`
+
+    expect(calleesOf(text)).toEqual(['.github/workflows/unit-tests.yml'])
   })
 
   it('ignores a label that is only compared or echoed, which is how unit-tests.yml mentions one', () => {

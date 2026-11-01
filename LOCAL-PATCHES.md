@@ -2881,6 +2881,43 @@ reported as `NO JOBS` rather than `QUEUED` precisely because the fix is not a ru
 Default workflow permissions were already `read`, so a fork PR's token cannot write; requiring approval
 is now the only way a public fork's code reaches these runners, including the macOS and Windows lanes.
 
+#### The review after the merge found the watchdog could not fire (2026-11-01)
+
+A fresh review of the merged revision checked the code against the real REST payloads, which the tests
+had not. The job half of `check-queued-runs` was gated on `job.started_at`, and **GitHub sets
+`started_at` when the job is queued, not when a runner claims it**. The 2026-10-26 relay job, captured
+from `gh api`:
+
+```
+status: completed  conclusion: cancelled
+started_at:   2026-10-26T10:35:26Z
+completed_at: 2026-10-27T04:02:39Z   (17.5 h later)
+runner_name: ""    runner_id: 0
+```
+
+So every real queued job was skipped and the check could not report either incident it was written for.
+It passed 85 tests because every fixture had `started_at: null` — a shape the API never returns. Three
+changes, and the test built from that payload rather than from an idea of the payload:
+
+- **Judge a job by `status`, and use an empty `runner_name`/`runner_id: 0` as the "no runner" signal**,
+  with the age from `created_at`. A job that has a runner is skipped.
+- **`local/queued-known-ghosts.json`.** A zero-job run cannot be cancelled or deleted through the API,
+  and `ci-health-report` _updates_ one issue in place — an edit nobody is notified about. Left as a red
+  finding it would hold the check red forever and swallow the next real finding silently. Listed
+  entries are reported as acknowledged and do not redden the check; anything unlisted still does, and
+  an entry that stops matching is reported for pruning.
+- **The scanner denies families, not one vendor**: `blacksmith-*`, `self-hosted`, `depot-*`,
+  `namespace-*`, `buildjet-*`, `ubicloud-*`, and the larger-runner suffixes. `self-hosted` matters most
+  on a public fork, and a larger runner bills even on a public repository. Exclusions are inherited, so
+  a label under `env:` or a github-script `script:` body is prose rather than a request; call edges come
+  from parsed `jobs.*.uses`, not from a text match.
+
+**Deferred, recorded so a later reader does not assume them done.** Nothing checks that every caller of
+a workflow with an accepted input default (`unit-tests.yml`'s `runner`) actually passes it, so a new
+caller that omits the input would pass statically — the run-status check catches the wedged result in
+production instead. The mirror push evaluates upstream's copy of each file, which this scan never
+reads. `/jobs` is read one page.
+
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries

@@ -20,12 +20,12 @@
  *   contract for those;
  * - it rejects `pull_request_target` and `workflow_run` on any active file, because both run with a
  *   write token against code from a fork, and `ci-closed-pr-caches.yml` must stay off;
- * - it rejects a `blacksmith-*` runner label this fork does not provision — in any file an active
- *   workflow can reach, including through `uses: ./.github/workflows/*.yml`. Enablement state does not
- *   stop a called workflow from running, so scanning only the active files would miss exactly where
- *   the 2026-10-26 incident was: `unit-tests.yml`'s `runner` input defaults to
- *   `blacksmith-4vcpu-ubuntu-2404`. A label on such a runner queues until GitHub's 24 h limit, and
- *   `timeout-minutes` does not bound it;
+ * - it rejects a runner family this fork does not provision — `blacksmith-*`, `self-hosted`, another
+ *   vendor's prefix, or a larger-runner suffix — in any file an active workflow can reach, including
+ *   through `uses: ./.github/workflows/*.yml`. Enablement state does not stop a called workflow from
+ *   running, so scanning only the active files would miss exactly where the 2026-10-26 incident was:
+ *   `unit-tests.yml`'s `runner` input defaults to `blacksmith-4vcpu-ubuntu-2404`. A job on such a
+ *   runner queues until GitHub's 24 h limit, and `timeout-minutes` does not bound it;
  * - it pages through the workflow list so a 101st file is not invisible, and `--fix` cancels the
  *   queued and in-progress runs of whatever it disables, because disabling a workflow does not stop a
  *   run that is already going.
@@ -172,8 +172,30 @@ export const ACCEPTED_RUNNER_LABELS = {
   }
 }
 
-/** This fork provisions no runner from these families; a job asking for one waits for nobody. */
-const NON_PROVISIONED = /blacksmith-[a-z0-9.-]+/g
+/**
+ * Runner families this fork does not provision, as patterns rather than one vendor's prefix. A job
+ * asking for any of them waits for a runner that will never claim it, which `timeout-minutes` cannot
+ * bound. The larger-runner suffixes are here because those bill even on a public repository, so they
+ * are a cost decision as well as a queue one; `self-hosted` is here because on a public fork it is the
+ * shortest path from a fork PR to someone's machine.
+ */
+const UNPROVISIONED = [
+  /blacksmith-[a-z0-9.-]+/g,
+  /buildjet-[a-z0-9.-]+/g,
+  /depot-[a-z0-9.-]+/g,
+  /namespace-[a-z0-9.-]+/g,
+  /ubicloud-[a-z0-9.-]+/g,
+  /self-hosted/g,
+  /[a-z0-9._-]+-(?:large|xlarge|2xlarge|4xlarge|8xlarge)\b/g
+]
+
+function unprovisionedIn(value) {
+  const found = []
+  for (const pattern of UNPROVISIONED) {
+    found.push(...(value.match(pattern) ?? []))
+  }
+  return found
+}
 
 /** Triggers that run with a write token against a fork's code. Never acceptable on an active file. */
 const FORBIDDEN_TRIGGERS = new Set(['pull_request_target', 'workflow_run'])
@@ -219,7 +241,9 @@ export function triggersOf(text) {
  */
 const NO_LABEL_KEYS = new Set([
   'run',
+  'script',
   'if',
+  'env',
   'name',
   'description',
   'comment',
@@ -232,10 +256,14 @@ const NO_LABEL_KEYS = new Set([
 /** Every `blacksmith-*` label a file could actually ask for. */
 export function runnerLabelsOf(text) {
   const labels = new Set()
-  const visit = (node, key) => {
+  // Why the exclusion is inherited rather than decided per key: `env: { NOTE: blacksmith-… }` and
+  // `with: { script: … }` put the value under a key of its own, so a nearest-key test would read both
+  // as runner requests. Anything under `run`, `script`, `if`, `env`, `name` or prose is prose.
+  const visit = (node, key, excluded) => {
+    const skip = excluded || NO_LABEL_KEYS.has(key)
     if (typeof node === 'string') {
-      if (!NO_LABEL_KEYS.has(key)) {
-        for (const match of node.match(NON_PROVISIONED) ?? []) {
+      if (!skip) {
+        for (const match of unprovisionedIn(node)) {
           labels.add(match)
         }
       }
@@ -243,17 +271,17 @@ export function runnerLabelsOf(text) {
     }
     if (Array.isArray(node)) {
       for (const item of node) {
-        visit(item, key)
+        visit(item, key, skip)
       }
       return
     }
     if (node !== null && typeof node === 'object') {
       for (const [childKey, value] of Object.entries(node)) {
-        visit(value, childKey)
+        visit(value, childKey, skip)
       }
     }
   }
-  visit(parse(text), '')
+  visit(parse(text), '', false)
   return [...labels].sort()
 }
 
@@ -262,8 +290,20 @@ export function runnerLabelsOf(text) {
  * whether or not it is enabled, so its runner labels are as live as the caller's.
  */
 export function calleesOf(text) {
-  const found = String(text).matchAll(/\.\/\.github\/workflows\/([\w.-]+\.ya?ml)/g)
-  return [...new Set([...found].map((match) => `.github/workflows/${match[1]}`))].sort()
+  const doc = parse(text)
+  const jobs = doc !== null && typeof doc === 'object' ? (doc.jobs ?? {}) : {}
+  const found = new Set()
+  for (const job of Object.values(jobs)) {
+    // Parsed rather than matched in the text: a comment or a `run:` string that mentions a workflow
+    // path is not a call edge, and a hand-scan of the tree found 37 textual matches where the real
+    // edges are fewer.
+    const uses = typeof job?.uses === 'string' ? job.uses.trim() : ''
+    const match = /^\.\/\.github\/workflows\/([\w.-]+\.ya?ml)$/.exec(uses)
+    if (match) {
+      found.add(`.github/workflows/${match[1]}`)
+    }
+  }
+  return [...found].sort()
 }
 
 /** `gh api --paginate --slurp` yields one object per page; the workflow list is what we want. */
