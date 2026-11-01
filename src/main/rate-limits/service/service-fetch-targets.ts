@@ -285,10 +285,6 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  // Why one helper: every fork API-key provider resolves the same way — a switched-off provider
-  // yields its empty config, and an unreadable key file becomes that provider's own error so it
-  // cannot abort a sibling's refresh. Four copies of that shape is what pushed this file over its
-  // line cap; the per-provider methods below are the named entry points.
   protected resolveApiKeyProviderConfig<Config>(
     provider: DisableableUsageProviderId,
     resolver: (() => Config) | null,

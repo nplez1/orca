@@ -296,8 +296,6 @@ describe('credits-only providers', () => {
   })
 
   it('surfaces a live DeepInfra balance as a configured reading', () => {
-    // Why: nothing else asserts that an `ok` DeepInfra snapshot reaches the bar, so
-    // dropping its projection would hide a funded account without a failing test.
     expect(
       getVisibleUsageProvider(
         'deepinfra',

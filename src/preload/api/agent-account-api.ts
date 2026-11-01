@@ -97,8 +97,6 @@ export type DeepSeekCredentialsApi = {
 }
 
 export type DeepInfraCredentialsApi = {
-  // Why: the key lives in main's encrypted store, so the renderer only ever
-  // learns whether one is present.
   getStatus: () => Promise<{ configured: boolean; apiKeyConfigured: boolean }>
   saveApiKey: (key: string) => Promise<{ apiKeyConfigured: boolean }>
   clearApiKey: () => Promise<{ apiKeyConfigured: boolean }>

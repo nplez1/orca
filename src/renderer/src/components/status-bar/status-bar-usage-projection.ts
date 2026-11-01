@@ -105,7 +105,6 @@ export function getStatusBarUsageProjection({
   // PATH detection gate would hide them forever.
   const visibleDeepSeek = getVisibleUsageProvider('deepseek', deepseek, usageSettings)
   const visibleFireworks = getVisibleUsageProvider('fireworks', fireworks, usageSettings)
-  // Why: DeepInfra is an API-key provider too — no CLI on PATH, so no detection gate.
   const visibleDeepInfra = getVisibleUsageProvider('deepinfra', deepinfra, usageSettings)
   // Why: Copilot is a token provider too — no CLI on PATH, so no detection gate.
   const visibleCopilot = getVisibleUsageProvider('copilot', copilot, usageSettings)

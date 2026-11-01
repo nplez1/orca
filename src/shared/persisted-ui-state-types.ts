@@ -146,7 +146,6 @@ export type PersistedUIState = {
   _deepseekStatusBarDefaultAdded?: boolean
   /** One-shot migration flag for adding the default-on Fireworks.ai status item. */
   _fireworksStatusBarDefaultAdded?: boolean
-  /** One-shot migration flag for adding the default-on DeepInfra status item. */
   _deepinfraStatusBarDefaultAdded?: boolean
   /** One-shot migration flag for adding the default-on GitHub Copilot status item. */
   _copilotStatusBarDefaultAdded?: boolean

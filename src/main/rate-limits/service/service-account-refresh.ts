@@ -88,7 +88,6 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
 
   invalidateDeepInfraCredentialState(): void {
     this.deepinfraFetchGeneration += 1
-    // Why: a saved/cleared key can race an in-flight fetch; drop the visible snapshot before any old-key result returns.
     this.updateState({
       ...this.state,
       deepinfra: this.withFetchingStatus(null, 'deepinfra')
