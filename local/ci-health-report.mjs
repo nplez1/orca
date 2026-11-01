@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 /**
- * Run the fork's two health checks and report them in one place.
+ * Run the fork's health checks and report them in one place.
  *
- * Both checks existed and neither ran anywhere: `local/check-actions-enablement.mjs` (nothing enabled
- * that should not be, nothing REQUIRED disabled) and `local/check-nightly-liveness.mjs` (the nightly
- * backstop is actually running and actually green). A check a human has to remember to run is a
- * comment, and the cost showed: a cache sweep stayed active from about 2026-10-25 and was found on
+ * The first two existed and neither ran anywhere: `local/check-actions-enablement.mjs` (nothing
+ * enabled that should not be, nothing REQUIRED disabled) and `local/check-nightly-liveness.mjs` (the
+ * nightly backstop is actually running and actually green). A check a human has to remember to run is
+ * a comment, and the cost showed: a cache sweep stayed active from about 2026-10-25 and was found on
  * 10-28, after it had deleted 9.39 GB of `nplez1/main` caches, and one nightly issue sat open while
  * the last three runs were failure, success, success.
  *
- * `.github/workflows/fork-ci-health.yml` runs this daily. It opens one issue while either check is
- * unhappy, updates that same issue on every later run, and closes it when both are clean — so the
- * signal is a durable record with a state, not a log line nobody reads.
+ * `local/check-queued-runs.mjs` is the third, and it covers what `timeout-minutes` cannot: a job whose
+ * runner label nothing provisions waits for GitHub's 24 h limit rather than its own timeout, and the
+ * run it sits in still reads `in_progress`. That is the 2026-10-26 `relay_integration` wait (17.5 h)
+ * and the 2026-10-28 cache producer (12 h).
+ *
+ * `.github/workflows/fork-ci-health.yml` runs this daily. It opens one issue while any check is
+ * unhappy, updates that same issue on every later run, and closes it when all of them are clean — so
+ * the signal is a durable record with a state, not a log line nobody reads.
  *
  *   node local/ci-health-report.mjs               run both checks, open/update/close the issue
  *   node local/ci-health-report.mjs --dry-run     print the verdict and the action it would take
@@ -30,7 +35,8 @@ const REPO = 'nplez1/orca'
 /** The checks, in the order the issue body lists them. */
 export const CHECKS = [
   { name: 'check-actions-enablement', script: 'local/check-actions-enablement.mjs' },
-  { name: 'check-nightly-liveness', script: 'local/check-nightly-liveness.mjs' }
+  { name: 'check-nightly-liveness', script: 'local/check-nightly-liveness.mjs' },
+  { name: 'check-queued-runs', script: 'local/check-queued-runs.mjs' }
 ]
 
 /** One title, so every run finds the same issue instead of filing a new one each day. */
@@ -67,8 +73,8 @@ export function judgeHealth(checks, { runUrl = null } = {}) {
   const ok = failed.length === 0
   const lines = [
     MARKER,
-    'Opened by `.github/workflows/fork-ci-health.yml`, which runs the two fork health checks daily',
-    'and updates this one issue. Closed automatically when both are clean again.',
+    'Opened by `.github/workflows/fork-ci-health.yml`, which runs the fork health checks daily',
+    'and updates this one issue. Closed automatically when they are all clean again.',
     '',
     '| check | result |',
     '|---|---|',

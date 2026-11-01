@@ -11,13 +11,23 @@
  *   node local/check-actions-enablement.mjs --fix    disable everything that drifted, and stop the
  *                                                   runs it had already started
  *
- * Three things this does beyond comparing names, because a name is not what spends the minutes: it
- * reads each allowed-inert file's `on:` keys and fails when one gained a trigger that fires without a
- * human (`schedule`, `push`, `pull_request`); it pages through the workflow list so a 101st file is
- * not invisible; and `--fix` cancels the queued and in-progress runs of whatever it disables, because
- * disabling a workflow does not stop a run that is already going — that is how "Unit transform cache
- * producer" wedged for 12 hours on 2026-10-28. Exit codes: 0 clean, 1 drift or an unverifiable entry,
- * 2 cannot reach the API — "cannot tell" is never a pass.
+ * Four things this does beyond comparing names, because a name is not what spends the minutes:
+ *
+ * - it pins each enabled file's `on:` keys, so a sync that adds `schedule`, `push` or
+ *   `pull_request` to a lane is reported rather than inherited (2026-10-31: this used to cover only
+ *   the allowed-inert files, which left the eleven required ones unguarded);
+ * - it rejects `pull_request_target` on any active file, because that is the trigger that runs with a
+ *   write token on code from a fork, and `ci-closed-pr-caches.yml` must stay off;
+ * - it rejects a `blacksmith-*` runner label on any active file not recorded in
+ *   `ACCEPTED_RUNNER_LABELS`. This fork provisions no Blacksmith runner, so such a job queues until
+ *   GitHub's 24 h limit — the 17.5 h and 12 h incidents of 2026-10-26/28, and `timeout-minutes` does
+ *   not bound it;
+ * - it pages through the workflow list so a 101st file is not invisible, and `--fix` cancels the
+ *   queued and in-progress runs of whatever it disables, because disabling a workflow does not stop a
+ *   run that is already going.
+ *
+ * Exit codes: 0 clean, 1 drift or an unverifiable entry, 2 cannot reach the API — "cannot tell" is
+ * never a pass.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -66,7 +76,8 @@ export const REQUIRED = [
   '.github/workflows/performance-contracts.yml'
 ]
 
-// Inert without a manual dispatch or a caller — active is fine, disabled is also fine.
+// Inert without a manual dispatch or a caller — active is fine, and so is disabled. Their pinned
+// triggers below are the same claim, spelled out.
 export const ALLOWED_INERT = [
   '.github/workflows/zcode-account-contract.yml',
   '.github/workflows/unit-module-cache-benchmark.yml',
@@ -77,8 +88,60 @@ export const ALLOWED_INERT = [
   '.github/workflows/dev-channel-win-publish.yml'
 ]
 
-/** Inert means nothing fires it but a human dispatch or a caller. */
-export const INERT_TRIGGERS = new Set(['workflow_dispatch', 'workflow_call'])
+/**
+ * The exact `on:` keys every enabled file is allowed to have, as data rather than as a rule, because a
+ * rule cannot tell "this lane grew a schedule" from "this lane always had one". A sync that edits a
+ * trigger fails here instead of quietly adding work; a deliberate change updates this table in the
+ * same commit, which is what makes the change visible in review.
+ *
+ * An enabled file with no entry is reported too: pinning is the guard, not an optional extra.
+ */
+export const EXPECTED_TRIGGERS = {
+  '.github/workflows/fork-release.yml': ['workflow_dispatch'],
+  '.github/workflows/fork-upstream-tags.yml': ['schedule', 'workflow_dispatch'],
+  '.github/workflows/fork-main-tests.yml': ['schedule', 'workflow_dispatch'],
+  '.github/workflows/fork-pr-gates.yml': ['pull_request', 'workflow_dispatch'],
+  '.github/workflows/fork-ci-health.yml': ['schedule', 'workflow_dispatch'],
+  '.github/workflows/fork-main-gates.yml': ['schedule', 'workflow_dispatch', 'push'],
+  '.github/workflows/dependency-security.yml': [
+    'pull_request',
+    'workflow_call',
+    'workflow_dispatch'
+  ],
+  '.github/workflows/mobile.yml': ['pull_request', 'push'],
+  '.github/workflows/node-server-tests.yml': [
+    'pull_request',
+    'workflow_dispatch',
+    'workflow_call',
+    'schedule'
+  ],
+  '.github/workflows/macos-updater-tests.yml': ['pull_request', 'workflow_dispatch'],
+  '.github/workflows/performance-contracts.yml': ['schedule', 'workflow_dispatch', 'pull_request'],
+  '.github/workflows/zcode-account-contract.yml': ['workflow_dispatch'],
+  '.github/workflows/unit-module-cache-benchmark.yml': ['workflow_dispatch'],
+  '.github/workflows/windows-native-preparation-benchmark.yml': ['workflow_dispatch'],
+  '.github/workflows/ci-cache-warmup-platform-jobs.yml': ['workflow_call'],
+  '.github/workflows/qualified-orcad-template.yml': ['workflow_call'],
+  '.github/workflows/layout-owner-e2e.yml': ['workflow_dispatch'],
+  '.github/workflows/dev-channel-win-publish.yml': ['workflow_call']
+}
+
+/**
+ * Active files that do name a runner this fork does not provision, each with the reason it is still
+ * enabled. Anything not here fails the check, so a sync cannot add one silently.
+ */
+export const ACCEPTED_RUNNER_LABELS = {
+  '.github/workflows/node-server-tests.yml':
+    'blacksmith-* sits behind `fast_runners`, true only for dispatch and call; PR and schedule events pass no input',
+  '.github/workflows/ci-cache-warmup-platform-jobs.yml':
+    'dispatch-and-call only, and both of its callers are disabled, so it is dormant until someone starts it'
+}
+
+/** This fork provisions no runner from these families; a job asking for one waits for nobody. */
+const NON_PROVISIONED = /blacksmith-[a-z0-9.-]+/g
+
+/** A trigger that runs with a write token against a fork's code. Never acceptable on an active file. */
+const FORBIDDEN_TRIGGER = 'pull_request_target'
 
 /** Run states that would still execute, i.e. that `--fix` has to cancel rather than wait out. */
 export const CANCELLABLE_STATUSES = new Set([
@@ -91,7 +154,7 @@ export const CANCELLABLE_STATUSES = new Set([
 
 /**
  * The `on:` keys of a workflow file. Handles the three shapes GitHub accepts — `on: push`,
- * `on: [push, pull_request]`, and the `on: { push: … }` map — and the YAML-1.1 reading of `on:`
+ * `on: [push, pull_request]`, and `on: { push: … }` — and the YAML-1.1 reading of `on:`
  * as the boolean `true`, which is what a libYAML-backed parser hands back.
  */
 export function triggersOf(text) {
@@ -112,6 +175,18 @@ export function triggersOf(text) {
   return typeof on === 'object' ? Object.keys(on) : []
 }
 
+/**
+ * Every `blacksmith-*` label a file's jobs name, found in the serialised job map so a label inside a
+ * `runs-on` expression is caught as readily as a literal one.
+ */
+export function runnerLabelsOf(text) {
+  const doc = parse(text)
+  if (doc === null || typeof doc !== 'object') {
+    return []
+  }
+  return [...new Set(JSON.stringify(doc.jobs ?? {}).match(NON_PROVISIONED) ?? [])].sort()
+}
+
 /** `gh api --paginate --slurp` yields one object per page; the workflow list is what we want. */
 export function workflowsFromPages(pages) {
   return pages.flatMap((page) => page?.workflows ?? [])
@@ -128,14 +203,25 @@ export function cancellableRuns(runs) {
     .map((run) => run.databaseId)
 }
 
+const sameTriggers = (left, right) =>
+  left.length === right.length &&
+  left.every((key) => right.includes(key)) &&
+  right.every((key) => left.includes(key))
+
 /**
  * Judge enablement from already-fetched data, so the decision is testable without a network.
- * `triggers` maps a workflow path to its `on:` keys, or to `{ error }` when the file could not be
- * read — a missing entry is reported too, never treated as "inert, presumably".
+ *
+ * `facts` maps a workflow path to `{ triggers, runnerLabels }`, or to `{ error }` when the file could
+ * not be read — a missing entry is reported too, never treated as "inert, presumably".
  */
 export function judgeEnablement(
-  { workflows, triggers = {} },
-  { required = REQUIRED, allowedInert = ALLOWED_INERT } = {}
+  { workflows, facts = {} },
+  {
+    required = REQUIRED,
+    allowedInert = ALLOWED_INERT,
+    expected = EXPECTED_TRIGGERS,
+    acceptedRunners = ACCEPTED_RUNNER_LABELS
+  } = {}
 ) {
   const allowed = new Set([...required, ...allowedInert])
   const byPath = new Map(workflows.map((workflow) => [workflow.path, workflow]))
@@ -145,51 +231,84 @@ export function judgeEnablement(
     .map((path) => ({ path, workflow: byPath.get(path) }))
     .filter(({ workflow }) => !workflow || workflow.state !== 'active')
     .map(({ path, workflow }) => ({ path, state: workflow ? workflow.state : 'absent' }))
-  const stale = allowedInert
+  const stale = Object.keys(expected)
     .filter((path) => !byPath.has(path))
     .map((path) => ({ path, reason: 'no workflow file by that path on the repository' }))
 
-  const overTriggered = []
+  const triggerDrift = []
+  const unpinned = []
+  const unapprovedRunners = []
+  const pullRequestTarget = []
   const unreadable = []
-  for (const path of allowedInert) {
-    const facts = triggers[path]
-    if (facts === undefined) {
-      unreadable.push({ path, reason: 'triggers not supplied, so "inert" is unproven' })
+  for (const workflow of active) {
+    // A file that is active without being allowed is already a disable target; checking its triggers
+    // or labels too would report one problem as three.
+    if (!allowed.has(workflow.path)) {
       continue
     }
-    if (!Array.isArray(facts)) {
-      unreadable.push({ path, reason: facts.error })
+    const entry = facts[workflow.path]
+    if (entry === undefined) {
+      unreadable.push({ path: workflow.path, reason: 'not read, so its triggers are unproven' })
       continue
     }
-    const extra = facts.filter((trigger) => !INERT_TRIGGERS.has(trigger))
-    if (extra.length > 0) {
-      overTriggered.push({ path, triggers: extra, all: facts })
+    if (!Array.isArray(entry.triggers)) {
+      unreadable.push({ path: workflow.path, reason: entry.error ?? 'unreadable' })
+      continue
+    }
+    if (entry.triggers.includes(FORBIDDEN_TRIGGER)) {
+      pullRequestTarget.push({ path: workflow.path })
+    }
+    const labels = entry.runnerLabels ?? []
+    if (labels.length > 0 && !Object.hasOwn(acceptedRunners, workflow.path)) {
+      unapprovedRunners.push({ path: workflow.path, labels })
+    }
+    const pinned = expected[workflow.path]
+    if (pinned === undefined) {
+      unpinned.push({ path: workflow.path, all: entry.triggers })
+      continue
+    }
+    if (!sameTriggers(entry.triggers, pinned)) {
+      triggerDrift.push({ path: workflow.path, expected: pinned, all: entry.triggers })
     }
   }
 
-  // Everything `--fix` is allowed to turn off. An allowed-inert entry that fires on its own is
-  // disabled too: "disabled is also fine" is the entry's own contract.
+  // Everything `--fix` is allowed to turn off. A lane whose trigger shape changed is stopped until a
+  // human looks, because the shape is what decides whether it spends minutes on every PR.
   const disableTargets = [
-    ...drift.map((w) => ({
-      path: w.path,
-      id: w.id,
+    ...drift.map((entry) => ({
+      path: entry.path,
+      id: entry.id,
       why: "active but not on the fork's live list"
     })),
-    ...overTriggered.map((o) => ({
-      path: o.path,
-      id: byPath.get(o.path)?.id ?? null,
-      why: `allowed-inert, but it fires on ${o.triggers.join(', ')}`
+    ...triggerDrift.map((entry) => ({
+      path: entry.path,
+      id: byPath.get(entry.path)?.id ?? null,
+      why: 'its triggers changed shape'
+    })),
+    ...unpinned.map((entry) => ({
+      path: entry.path,
+      id: byPath.get(entry.path)?.id ?? null,
+      why: 'active with no pinned triggers'
     }))
   ]
 
-  const problems = disableTargets.length + missing.length + stale.length + unreadable.length
+  const problems =
+    disableTargets.length +
+    missing.length +
+    stale.length +
+    unreadable.length +
+    unapprovedRunners.length +
+    pullRequestTarget.length
   return {
     total: workflows.length,
     activeCount: active.length,
     drift,
     missing,
     stale,
-    overTriggered,
+    triggerDrift,
+    unpinned,
+    unapprovedRunners,
+    pullRequestTarget,
     unreadable,
     disableTargets,
     ok: problems === 0
@@ -207,29 +326,37 @@ export function residualProblems({ verdict, fix = false, disabled = [], failed =
     handled.delete(path)
   }
   const outstanding = verdict.disableTargets.filter((target) => !handled.has(target.path)).length
-  return outstanding + verdict.missing.length + verdict.stale.length + verdict.unreadable.length
+  return (
+    outstanding +
+    verdict.missing.length +
+    verdict.stale.length +
+    verdict.unreadable.length +
+    verdict.unapprovedRunners.length +
+    verdict.pullRequestTarget.length
+  )
 }
 
 function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
 }
 
-/** Read the `on:` keys of the allowlisted files in this checkout, so the claim is the tree's. */
-export function readTriggers(paths, root = ROOT) {
-  const triggers = {}
+/** Read the pinned facts from this checkout, so the claim is the tree's and not the API's. */
+export function readFacts(paths, root = ROOT) {
+  const facts = {}
   for (const path of paths) {
     const file = join(root, path)
     if (!existsSync(file)) {
-      triggers[path] = { error: 'not in this checkout' }
+      facts[path] = { error: 'not in this checkout' }
       continue
     }
     try {
-      triggers[path] = triggersOf(readFileSync(file, 'utf8'))
+      const text = readFileSync(file, 'utf8')
+      facts[path] = { triggers: triggersOf(text), runnerLabels: runnerLabelsOf(text) }
     } catch (error) {
-      triggers[path] = { error: firstLine(error) }
+      facts[path] = { error: firstLine(error) }
     }
   }
-  return triggers
+  return facts
 }
 
 function firstLine(error) {
@@ -314,16 +441,28 @@ function report(verdict, fix) {
     console.log(`  MISSING  required but ${m.state}: ${m.path}`)
   }
   for (const s of verdict.stale) {
-    console.log(`  STALE    allowed-inert entry with ${s.reason}: ${s.path}`)
+    console.log(`  STALE    pinned entry with ${s.reason}: ${s.path}`)
   }
-  for (const o of verdict.overTriggered) {
+  for (const t of verdict.triggerDrift) {
     console.log(
-      `  TRIGGER  allowed-inert but fires on ${o.triggers.join(', ')} ` +
-        `(on: ${o.all.join(', ')}): ${o.path}`
+      `  TRIGGER  pinned [${t.expected.join(', ')}] but the file fires on [${t.all.join(', ')}]: ${t.path}`
+    )
+  }
+  for (const u of verdict.unpinned) {
+    console.log(`  UNPINNED active but no triggers pinned, so its shape is unproven: ${u.path}`)
+  }
+  for (const u of verdict.unapprovedRunners) {
+    console.log(
+      `  RUNNER   names a runner this fork does not provision: ${u.path} (${u.labels.join(', ')})`
+    )
+  }
+  for (const p of verdict.pullRequestTarget) {
+    console.log(
+      `  TARGET   active with ${FORBIDDEN_TRIGGER}, which runs with a write token: ${p.path}`
     )
   }
   for (const u of verdict.unreadable) {
-    console.log(`  UNKNOWN  cannot read the triggers of ${u.path}: ${u.reason}`)
+    console.log(`  UNKNOWN  cannot read the workflow: ${u.path}: ${u.reason}`)
   }
 
   const { disabled, failed } = applyFixes(verdict, fix)
@@ -332,10 +471,20 @@ function report(verdict, fix) {
     if (verdict.disableTargets.length > 0 && !fix) {
       console.log('  fix: node local/check-actions-enablement.mjs --fix')
     }
-    if (verdict.overTriggered.length > 0 || verdict.stale.length > 0) {
+    if (
+      verdict.triggerDrift.length > 0 ||
+      verdict.unpinned.length > 0 ||
+      verdict.stale.length > 0
+    ) {
       console.log(
-        '  a file listed as allowed-inert has become a real lane, or no longer exists: ' +
-          'decide whether it belongs on the live list, and record it in LOCAL-PATCHES.md § local(ci)'
+        '  a workflow changed the triggers it fires on, or no longer exists: if that is intended, ' +
+          'update EXPECTED_TRIGGERS and record it in LOCAL-PATCHES.md § local(ci)'
+      )
+    }
+    if (verdict.unapprovedRunners.length > 0 || verdict.pullRequestTarget.length > 0) {
+      console.log(
+        '  this one is not auto-fixed: decide whether the file may be active at all, and record the ' +
+          'decision in LOCAL-PATCHES.md § local(ci)'
       )
     }
     for (const path of failed) {
@@ -362,7 +511,7 @@ function main() {
 
   const verdict = judgeEnablement({
     workflows,
-    triggers: readTriggers(ALLOWED_INERT, ROOT)
+    facts: readFacts(Object.keys(EXPECTED_TRIGGERS), ROOT)
   })
   if (report(verdict, fix) > 0) {
     process.exit(1)

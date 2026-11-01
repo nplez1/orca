@@ -2794,6 +2794,43 @@ Reviewed by Opus 5.5, high, one round on the plan packet: it confirmed both prem
 items that landed here — `cancel-in-progress` stays `false`, and `fast_runners` defaults to true rather
 than false, which the first draft had backwards.
 
+#### The guards the sweep was missing (2026-11-01)
+
+The sweep could only answer "is it disabled". Three failures it could not see, each with a real
+incident behind it:
+
+- **A lane whose `on:` keys changed.** Trigger validation covered `ALLOWED_INERT` only, so the eleven
+  required lanes were unguarded: a sync could add `schedule` or `pull_request` to any of them and the
+  check passed. `EXPECTED_TRIGGERS` now pins the exact keys for all 18 enabled files, and a mismatch is
+  reported and disabled by `--fix` until someone looks. **Changing a trigger is therefore a two-file
+  change** — the workflow and the pin — which is the point: it makes the change visible in review.
+- **`pull_request_target` on an active file.** It runs with a write token against code from a fork.
+  `ci-closed-pr-caches.yml` uses it and must stay off, and nothing stopped a sync bringing it in.
+- **A runner this fork does not provision.** `timeout-minutes` cannot bound this: the timeout starts
+  when a runner picks the job up, so a job on a `blacksmith-*` label waits for GitHub's 24 h queue
+  limit — the 17.5 h `relay_integration` wait on 2026-10-26 and the 12 h cache producer on 10-28. Any
+  active file naming `blacksmith-*` now fails unless it is in `ACCEPTED_RUNNER_LABELS`, which holds
+  exactly two: `node-server-tests` (behind `fast_runners`, true only for dispatch and call) and
+  `ci-cache-warmup-platform-jobs` (call-only, with both of its callers disabled). Both are dormant for
+  automatic triggers; a third would not be.
+
+`local/check-queued-runs.mjs` is the runtime half, a third check in `fork-ci-health`. It reports a run
+stuck in `queued` **and** a job queued inside a run that reads `in_progress`, because that is how both
+incidents actually looked — a run-level status check would have missed them. Its limits are deliberate:
+a one-hour threshold, the last 100 runs plus the queued page, and job lookups for the first 10 in-flight
+runs (`gh` calls are the budget).
+
+**It found a real one on its first run.** Run `37640199177` ("Fork release", attempt 2, 2026-10-07) has
+been `queued` for 593 h with **zero jobs**. GitHub refuses every API remedy — `cancel` answers
+"completed", `force-cancel` answers "not queued yet", `DELETE` is 403 for this token — so it needs a
+manual delete in the Actions UI, and until then the daily health check is red on it. That class is
+reported as `NO JOBS` rather than `QUEUED` precisely because the fix is not a runner.
+
+**Repository setting, not a patch:** fork-PR approval moved from `first_time_contributors` to
+`all_external_contributors` (`PUT /repos/nplez1/orca/actions/permissions/fork-pr-contributor-approval`).
+Default workflow permissions were already `read`, so a fork PR's token cannot write; requiring approval
+is now the only way a public fork's code reaches these runners, including the macOS and Windows lanes.
+
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries
