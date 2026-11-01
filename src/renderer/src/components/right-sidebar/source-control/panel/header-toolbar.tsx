@@ -12,6 +12,12 @@ import { PrimaryActionTooltip } from '../../source-control-primary-action-toolti
 import { translate } from '@/i18n/i18n'
 import type { WorktreeGitIdentityDisplay } from '../../../../../../shared/worktree/git-identity-display'
 import { HostedReviewHeaderLink, HostedReviewIcon } from '../review/hosted-review-header-chrome'
+import { WorkspaceReviewSwitcher } from '../../WorkspaceReviewSwitcher'
+import type { WorkspaceReviewSelection } from '../../use-workspace-review-selection'
+import {
+  isWorkspaceReviewProvider,
+  workspaceReviewSelectionKey
+} from '../../workspace-review-selection'
 import { SourceControlBranchContextRow } from './branch-context-row'
 import { shouldShowSourceControlBranchContextChrome } from './branch-context-stats'
 import { SourceControlHeaderOverflowMenu } from './header-overflow-menu'
@@ -22,7 +28,10 @@ type SourceControlHeaderToolbarProps = {
   onFilterQueryChange: (value: string) => void
   onFilterExpandedChange: (expanded: boolean) => void
   visibleCreatePrHeaderAction: PrimaryAction | null
-  hostedReview: HostedReviewInfo | null
+  /** The review the header describes. It is the workspace's own review until the user picks
+   *  another from the workspace's reviews; commits and pushes keep resolving through that one. */
+  displayedReview: HostedReviewInfo | null
+  reviewSelection: WorkspaceReviewSelection
   isCreatePrIntentInFlight: boolean
   isCreatingPr: boolean
   onCreatePrHeaderClick: () => void
@@ -46,13 +55,18 @@ type SourceControlHeaderToolbarProps = {
 
 function HostedReviewToolbarLink({
   review,
+  reviewSelection,
   onOpenHostedReviewInChecks,
   compact
 }: {
   review: HostedReviewInfo
+  reviewSelection: WorkspaceReviewSelection
   onOpenHostedReviewInChecks: () => void
   compact?: boolean
 }): React.JSX.Element {
+  const shownReviewKey = isWorkspaceReviewProvider(review.provider)
+    ? workspaceReviewSelectionKey(review.provider, review.number)
+    : null
   return (
     <div
       className={cn(
@@ -64,6 +78,13 @@ function HostedReviewToolbarLink({
       <HostedReviewHeaderLink
         review={review}
         onOpenHostedReviewInChecks={onOpenHostedReviewInChecks}
+      />
+      <WorkspaceReviewSwitcher
+        entries={reviewSelection.entries}
+        // Why the review rather than the stored pick: while a picked review is still loading the
+        // header shows the workspace's own, and the checked row has to agree with the header.
+        selectedKey={shownReviewKey}
+        onSelectReview={reviewSelection.selectReview}
       />
     </div>
   )
@@ -144,7 +165,8 @@ export function SourceControlHeaderToolbar({
   onFilterQueryChange,
   onFilterExpandedChange,
   visibleCreatePrHeaderAction,
-  hostedReview,
+  displayedReview,
+  reviewSelection,
   isCreatePrIntentInFlight,
   isCreatingPr,
   onCreatePrHeaderClick,
@@ -214,9 +236,10 @@ export function SourceControlHeaderToolbar({
       >
         {showCollapsedToolbar ? (
           <>
-            {hostedReview ? (
+            {displayedReview ? (
               <HostedReviewToolbarLink
-                review={hostedReview}
+                review={displayedReview}
+                reviewSelection={reviewSelection}
                 onOpenHostedReviewInChecks={onOpenHostedReviewInChecks}
               />
             ) : suppressedGitHubPRNumber !== null ? (
@@ -234,7 +257,8 @@ export function SourceControlHeaderToolbar({
             ) : (
               <span className="min-w-0 flex-1" aria-hidden="true" />
             )}
-            {(visibleCreatePrHeaderAction || suppressedGitHubPRNumber !== null) && !hostedReview ? (
+            {(visibleCreatePrHeaderAction || suppressedGitHubPRNumber !== null) &&
+            !displayedReview ? (
               // Pin filter/overflow right without stretching Create PR.
               <span className="min-w-0 flex-1" aria-hidden="true" />
             ) : null}

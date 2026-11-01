@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PRComment } from '../../../../../shared/github/comment-types'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
 import type { ChecksPanelEmptyContentModel } from './empty-content-props'
+import { makeWorkspaceReviewSelection } from '../workspace-review-selection.test-fixture'
 
 vi.mock('../HostedReviewActions', () => ({ default: () => null }))
 vi.mock('../SourceControlAgentActionDialog', () => ({ SourceControlAgentActionDialog: () => null }))
@@ -172,6 +173,8 @@ describe('checks panel concrete content', () => {
       prRefreshState: undefined,
       repo: null,
       refreshHostedReviewAfterMutation: vi.fn(),
+      reviewSelection: makeWorkspaceReviewSelection(),
+      showsPickedReview: false,
       resolveCommentsWithAIDisabledReason: undefined,
       saveLaunchActionDefault: vi.fn(),
       setAgentComposerState: vi.fn(),

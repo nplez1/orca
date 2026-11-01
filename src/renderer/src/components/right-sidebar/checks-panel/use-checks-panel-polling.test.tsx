@@ -295,6 +295,23 @@ describe('useChecksPanelPolling live behavior', () => {
     expect(wakes()).toEqual([true, undefined, true])
   })
 
+  it('reads a picked review without passing this worktree branch', async () => {
+    const model = createModel({ prNumber: 9, showsPickedReview: true })
+    const hook = renderHook(({ input }) => useChecksPanelPolling(input), {
+      initialProps: { input: model }
+    })
+
+    await act(async () => poller.run?.())
+
+    // Why no branch: it is what the store writes a PR's check status onto, and this branch's cached
+    // PR is a different review.
+    expect(vi.mocked(model.fetchPRChecks).mock.calls[0]?.[2]).toBeUndefined()
+    // Why not retracted: that refresh error belongs to this branch's PR, and a successful read of
+    // another review says nothing about it.
+    expect(model.retractStalePRRefreshError).not.toHaveBeenCalled()
+    hook.unmount()
+  })
+
   it('polls GitLab MR details in the background after the opening read (E9)', async () => {
     const model = createModel({
       activeGitLabReview: {

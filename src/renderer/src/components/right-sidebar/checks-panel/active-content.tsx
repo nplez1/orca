@@ -16,6 +16,12 @@ import { ChecksList } from './checks-list'
 import { PRCommentsList } from './comments-list'
 import { openAnnotationLocation } from '@/components/editor/check-annotation-open'
 import { translate } from '@/i18n/i18n'
+import {
+  findWorkspaceReviewAttachment,
+  isChecksPaneReviewProvider,
+  isWorkspaceReviewProvider,
+  workspaceReviewSelectionKey
+} from '../workspace-review-selection'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
 import { useWorktreePRCommentInline } from '../../pr-comment-inline/worktree-pr-comment-inline'
 import { usePRCommentCodeNavigation } from '../../pr-comment-inline/pr-comment-code-navigation'
@@ -76,17 +82,18 @@ export function ChecksPanelActiveContent({
     isFixingChecksWithAI,
     isRefreshing,
     isResolvingConflictsWithAI,
-    linkedGitLabMR,
     pendingCommentResolutionRef,
     pr,
     prRefreshState,
     refreshHostedReviewAfterMutation,
     repo,
     resolveCommentsWithAIDisabledReason,
+    reviewSelection,
     saveLaunchActionDefault,
     setAgentComposerState,
     setChecksPanelContentRef,
     settings,
+    showsPickedReview,
     sourceControlAiActionsVisible,
     stateRequestKey,
     titleDraft,
@@ -102,6 +109,27 @@ export function ChecksPanelActiveContent({
   const commentsInlineEnabled = prCommentInline.enabled
   const inlineMismatch =
     prCommentInline.blocker?.kind === 'head-mismatch' ? prCommentInline.blocker : null
+  // Why filtered: this pane has no checks or comment body for a Bitbucket, Gitea or Azure DevOps
+  // review, so listing one would offer a switch that leaves the header on a different review than
+  // the one the row claims is checked.
+  const renderableReviewEntries = reviewSelection.entries.filter((entry) =>
+    isChecksPaneReviewProvider(entry.provider)
+  )
+  // Why the shown review rather than the stored pick: a pick whose lookup has not answered yet is
+  // listed but not shown, and checking its row would name a review the header is not describing.
+  const shownReviewKey =
+    activeReview && isWorkspaceReviewProvider(activeReview.provider)
+      ? workspaceReviewSelectionKey(activeReview.provider, activeReview.number)
+      : null
+  const reviewSwitcher = {
+    entries: renderableReviewEntries,
+    // Why null rather than the first row: when the shown review is not one this pane lists, checking
+    // a row would name a review the header is not describing.
+    selectedKey: renderableReviewEntries.some((entry) => entry.key === shownReviewKey)
+      ? shownReviewKey
+      : null,
+    onSelectReview: reviewSelection.selectReview
+  }
   const openCommentInCode = usePRCommentCodeNavigation({
     worktreeId: activeWorktreeId,
     worktreePath: activeWorktreePath,
@@ -124,6 +152,14 @@ export function ChecksPanelActiveContent({
     return null
   }
   const reviewShortLabel = activeReview.provider === 'gitlab' ? 'MR' : 'PR'
+  // Why not unconditional: a GitLab MR the branch lookup discovered has no row and no slot, so its
+  // unlink would do nothing. GitHub has the suppression tombstone as its fallback.
+  // Why the row is required for a pick: its unlink removes that row, so without one there is
+  // nothing to remove and the action would be a no-op behind an enabled control.
+  const shownReviewRow = findWorkspaceReviewAttachment(activeWorktree, activeReview)
+  const canUnlinkReview = showsPickedReview
+    ? shownReviewRow !== null
+    : activeReview.provider === 'github' || shownReviewRow !== null
   const shouldShowReviewTriageStrip =
     activeConflictReview !== null || getBrokenChecks(checks).length > 0
   const hostedReviewModifierHintDestination = resolveChecksPanelHostedReviewModifierDestination(
@@ -145,12 +181,13 @@ export function ChecksPanelActiveContent({
         <ChecksPanelReviewHeader
           review={activeReview}
           isRefreshing={isRefreshing}
-          canUnlinkReview={activeReview.provider === 'github' ? true : linkedGitLabMR !== null}
+          canUnlinkReview={canUnlinkReview}
           modifierHintDestination={hostedReviewModifierHintDestination}
           onRefresh={() => void handleRefresh()}
           onOpenReview={handleOpenPR}
           onUnlinkReview={handleUnlinkReview}
           onLinkAnotherReview={handleLinkAnotherReview}
+          reviewSwitcher={reviewSwitcher}
         />
 
         {detachedHeadDisplay && <DetachedHeadBadge display={detachedHeadDisplay} side="bottom" />}
@@ -223,7 +260,10 @@ export function ChecksPanelActiveContent({
         )}
       </div>
 
-      {shouldShowReviewTriageStrip && sourceControlAiActionsVisible && (
+      {/* Why not for a picked review: these actions start an agent in *this* worktree, so on
+          another branch's review they would fix its checks or resolve its conflicts by committing
+          to this branch. */}
+      {shouldShowReviewTriageStrip && sourceControlAiActionsVisible && !showsPickedReview && (
         <PRTriageStrip
           review={activeConflictReview ?? activeReview}
           reviewKind={reviewShortLabel}

@@ -21,7 +21,12 @@ function hasUnfinishedChecks(checks: readonly PRCheckDetail[]): boolean {
 
 export type ChecksPanelPollingInput = Pick<
   ChecksPanelContextState,
-  'activeGitLabReview' | 'hostedReviewCacheKey' | 'pr' | 'prCacheKey' | 'prNumber'
+  | 'activeGitLabReview'
+  | 'hostedReviewCacheKey'
+  | 'pr'
+  | 'prCacheKey'
+  | 'prNumber'
+  | 'showsPickedReview'
 > &
   Pick<
     ChecksPanelControllerState,
@@ -97,7 +102,8 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         setChecksError,
         pollIntervalRef,
         prevChecksRef,
-        retractStalePRRefreshError
+        retractStalePRRefreshError,
+        showsPickedReview
       } = modelRef.current
       const readStartedAt = Date.now()
       const checksPending = hasUnfinishedChecks(checks)
@@ -121,7 +127,9 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         const result = await fetchPRChecks(
           repo.path,
           targetPRNumber,
-          branch,
+          // Why no branch for a picked review: the branch argument makes the store write this PR's
+          // check status onto *this* branch's cached PR, which is a different review entirely.
+          showsPickedReview ? undefined : branch,
           pr?.headSha,
           pr?.prRepo,
           {
@@ -136,7 +144,11 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
           return
         }
         setChecks(result)
-        retractStalePRRefreshError(prCacheKey, readStartedAt)
+        // Why only for the workspace's own review: that error belongs to this branch's PR, and a
+        // successful read of another PR says nothing about it.
+        if (!showsPickedReview) {
+          retractStalePRRefreshError(prCacheKey, readStartedAt)
+        }
 
         // Unchanged details back off; a changed result restores the selected cadence.
         const signature = policyRef.current.accept(result)

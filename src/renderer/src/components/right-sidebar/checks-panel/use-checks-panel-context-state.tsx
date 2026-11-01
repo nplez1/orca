@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { useNow } from '@/hooks/use-now'
 import { isFolderRepo } from '../../../../../shared/repo-kind'
@@ -7,7 +7,8 @@ import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-iden
 import { isStaleMergedGitHubReviewForHead } from '@/store/slices/hosted-review-cache-state'
 import { selectReviewCacheEntry } from '../review-cache-entry-selection'
 import { selectWorkspaceReviewState, type ChecksPanelReview } from '../checks-panel-review'
-import { isGitLabChecksPanelReview } from './gitlab-review-client'
+import { useWorkspaceReviewSelection } from '../use-workspace-review-selection'
+import { resolveChecksPanelShownReview } from './shown-review'
 import { clearPendingPRCommentAiAck } from '../pr-comments-ai-launch-ack'
 import {
   buildGitHubPRRefreshStateClearToken,
@@ -28,6 +29,7 @@ type ChecksPanelContextStateInput = Pick<
   | 'commentResolutionLaunchAcceptedRef'
   | 'conflictSummaryRefreshKeyRef'
   | 'createPrInFlightRef'
+  | 'isPanelVisible'
   | 'panelContextKey'
   | 'panelContextKeyRef'
   | 'pendingCommentResolutionRef'
@@ -71,6 +73,7 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     commentResolutionLaunchAcceptedRef,
     conflictSummaryRefreshKeyRef,
     createPrInFlightRef,
+    isPanelVisible,
     panelContextKey,
     panelContextKeyRef,
     pendingCommentResolutionRef,
@@ -196,10 +199,15 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   }
   // Background refresh replaces the whole cache map; subscribe only to this repo/branch entry.
   const prCacheEntry = useAppStore((s) => selectReviewCacheEntry(s.prCache, prCacheKey || null))
-  const pr: PRInfo | null = isStaleMergedGitHubReviewForHead(prCacheEntry, activeWorktree?.head)
+  // Why named for the branch: this is the review the workspace's own branch resolves to, which is
+  // only the shown one until the user picks another from the switcher.
+  const branchPR: PRInfo | null = isStaleMergedGitHubReviewForHead(
+    prCacheEntry,
+    activeWorktree?.head
+  )
     ? null
     : (prCacheEntry?.data ?? null)
-  const prCachedHasPR = prCacheEntry ? pr !== null : null
+  const prCachedHasPR = prCacheEntry ? branchPR !== null : null
   const hostedReviewEntry = useAppStore((s) =>
     hostedReviewCacheKey ? s.hostedReviewCache[hostedReviewCacheKey] : undefined
   )
@@ -214,12 +222,12 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   // Branch lookup loses fork/deleted-head PRs; prefer known review numbers from metadata/cache.
   const linkedPR = activeWorktree?.linkedPR ?? null
   const suppressedGitHubPR = activeWorktree?.suppressedGitHubPR ?? null
-  const fallbackGitHubPRNumber = linkedPR == null ? (pr?.number ?? null) : null
+  const fallbackGitHubPRNumber = linkedPR == null ? (branchPR?.number ?? null) : null
   const linkedGitLabMR = activeWorktree?.linkedGitLabMR ?? null
   const linkedBitbucketPR = activeWorktree?.linkedBitbucketPR ?? null
   const linkedAzureDevOpsPR = activeWorktree?.linkedAzureDevOpsPR ?? null
   const linkedGiteaPR = activeWorktree?.linkedGiteaPR ?? null
-  const activeReview: ChecksPanelReview | null = selectWorkspaceReviewState({
+  const workspaceReview: ChecksPanelReview | null = selectWorkspaceReviewState({
     prEntry: prCacheEntry,
     hostedEntry: hostedReviewEntry,
     currentHeadOid: activeWorktree?.head,
@@ -230,8 +238,19 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     linkedAzureDevOpsPR,
     linkedGiteaPR
   })
-  const activeGitLabReview = isGitLabChecksPanelReview(activeReview) ? activeReview : null
-  const isGitLabReviewContext = Boolean(activeGitLabReview || linkedGitLabMR !== null)
+  const reviewSelection = useWorkspaceReviewSelection({
+    activeReview: workspaceReview,
+    isVisible: isPanelVisible,
+    repo: repo ?? undefined,
+    worktree: activeWorktree
+  })
+  const { activeReview, pr, showsPickedReview, activeGitLabReview, isGitLabReviewContext } =
+    resolveChecksPanelShownReview({
+      branchPR,
+      linkedGitLabMR,
+      selection: reviewSelection,
+      workspaceReview
+    })
   const activeConflictReview = activeReview?.mergeable === 'CONFLICTING' ? activeReview : null
   const prRefreshState = useAppStore((s) =>
     prCacheKey
@@ -242,6 +261,30 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     prCacheKey ? s.prRefreshStates[prCacheKey] : undefined
   )
   const prNumber = pr?.number ?? null
+  // Why the provider and number rather than the review object: the review is rebuilt on every cache
+  // write, and only a switch to a different review should drop the rows below.
+  const shownReviewKey = showsPickedReview
+    ? `${activeReview?.provider}:${activeReview?.number}`
+    : ''
+  const previousShownReviewKeyRef = useRef(shownReviewKey)
+  useEffect(() => {
+    // Why the previous key: this must fire on a switch, not on mount, or the first paint of an
+    // ordinary single-review workspace would raise loading flags nothing may clear.
+    if (previousShownReviewKeyRef.current === shownReviewKey) {
+      return
+    }
+    previousShownReviewKeyRef.current = shownReviewKey
+    // Why: rows on screen belong to the review that was showing when they were fetched, so keeping
+    // them while the new read is in flight would put another review's checks under this header.
+    setChecks([])
+    setComments([])
+    // Why only for a pick: its read raises the flags for itself. The branch path owns them for its
+    // own review, and raising them for a review with no PR number would leave a spinner behind.
+    if (shownReviewKey) {
+      setChecksLoading(true)
+      setCommentsLoading(true)
+    }
+  }, [shownReviewKey, setChecks, setChecksLoading, setComments, setCommentsLoading])
 
   useEffect(() => {
     const expiryAt = getGitHubPRRefreshStateExpiryAt(rawPRRefreshState)
@@ -346,7 +389,9 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     activeConflictReview,
     prRefreshState,
     rawPRRefreshState,
-    prNumber
+    prNumber,
+    reviewSelection,
+    showsPickedReview
   }
 }
 

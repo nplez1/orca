@@ -21,6 +21,7 @@ export function SourceControlPanelReady(props: SourceControlPanelReadyProps) {
     diffCommentsCopied,
     diffCommentsExpanded,
     diffCommentsForActive,
+    displayedReview,
     filterExpanded,
     filterQuery,
     gitIdentityDisplay,
@@ -32,7 +33,6 @@ export function SourceControlPanelReady(props: SourceControlPanelReadyProps) {
     handleRelinkSuppressedGitHubPR,
     handleSourceControlKeyDown,
     handleToggleSourceControlViewMode,
-    hostedReview,
     isCreatePrIntentInFlight,
     isCreatingPr,
     isExecutingBulk,
@@ -40,6 +40,7 @@ export function SourceControlPanelReady(props: SourceControlPanelReadyProps) {
     openHostedReviewInChecks,
     prGenerating,
     refreshBranchCompare,
+    reviewSelection,
     selectedKeys,
     setBaseRefDialogOpen,
     setDiffCommentsExpanded,
@@ -67,7 +68,8 @@ export function SourceControlPanelReady(props: SourceControlPanelReadyProps) {
           onFilterQueryChange={setFilterQuery}
           onFilterExpandedChange={setFilterExpanded}
           visibleCreatePrHeaderAction={visibleCreatePrHeaderAction}
-          hostedReview={hostedReview}
+          displayedReview={displayedReview}
+          reviewSelection={reviewSelection}
           isCreatePrIntentInFlight={isCreatePrIntentInFlight}
           isCreatingPr={isCreatingPr || prGenerating}
           onCreatePrHeaderClick={handleCreatePrHeaderClick}

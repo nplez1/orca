@@ -1,5 +1,14 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
+import { toast } from 'sonner'
+import { useAppStore } from '@/store'
 import { openGitHubPRLinkModal } from '../github-pr-link-modal'
+import { getWorkspaceAttachments } from '../../../../../shared/workspace-attachments'
+import { getWorkspaceAttachmentKey } from '../../../../../shared/workspace-attachment-normalization'
+import { buildWorkspaceAttachmentEdits } from '../../sidebar/worktree-attachment-editing'
+import {
+  findWorkspaceReviewAttachment,
+  workspaceReviewSelectionKey
+} from '../workspace-review-selection'
 import type { ChecksPanelCheckAndReviewActionsInput } from './check-and-review-action-dependencies'
 import { useUnlinkGitHubPullRequest } from './use-unlink-github-pull-request'
 
@@ -22,6 +31,7 @@ export function useChecksPanelReviewLinkActions(
     repo,
     repoConnectionId,
     runtimeEnvironmentId,
+    showsPickedReview,
     suppressedGitHubPR,
     updateWorktreeMeta
   } = model
@@ -37,6 +47,7 @@ export function useChecksPanelReviewLinkActions(
     runtimeEnvironmentId,
     localExecutionScope
   ])
+  const selectWorkspaceReview = useAppStore((s) => s.selectWorkspaceReview)
   const reviewLinkScopeKeyRef = useRef(reviewLinkScopeKey)
   const reviewLinkActionGenerationRef = useRef(0)
   useLayoutEffect(() => {
@@ -56,6 +67,50 @@ export function useChecksPanelReviewLinkActions(
       return
     }
     reviewLinkActionGenerationRef.current += 1
+    // Why the shown review's own row rather than the workspace's slot: with a switcher, clearing the
+    // slot would unlink the review the user is not looking at and leave the one they are. It is also
+    // the only path that removes a review the branch lookup discovered, because a slot-only clear
+    // would let that lookup attach it again.
+    const shownAttachment = findWorkspaceReviewAttachment(activeWorktree, activeReview)
+    if (shownAttachment) {
+      const initial = getWorkspaceAttachments(activeWorktree)
+      const removedKey = getWorkspaceAttachmentKey(shownAttachment)
+      const draft = initial.filter((entry) => getWorkspaceAttachmentKey(entry) !== removedKey)
+      // Why only for the workspace's own review: `suppressedGitHubPR` is one slot, so writing a
+      // pick's number over the tombstone of a branch PR the user already unlinked would let that
+      // PR come straight back. A pick is not what the branch lookup resolves anyway.
+      const suppressGitHubPR =
+        !showsPickedReview && shownAttachment.provider === 'github' ? shownAttachment.number : null
+      // Why conditional: the shown review may be another pane's pick, and unlinking this one must
+      // not drop that pick.
+      const storedReviewKey =
+        useAppStore.getState().workspaceReviewSelectionByWorktree[activeWorktreeId]
+      if (
+        storedReviewKey ===
+        workspaceReviewSelectionKey(shownAttachment.provider, shownAttachment.number)
+      ) {
+        selectWorkspaceReview(activeWorktreeId, null)
+      }
+      void (async () => {
+        const result = await updateWorktreeMeta(
+          activeWorktreeId,
+          {
+            ...buildWorkspaceAttachmentEdits({ initial, draft }),
+            ...(suppressGitHubPR === null ? {} : { suppressedGitHubPR: suppressGitHubPR })
+          },
+          { executionHostId: activeWorktree.hostId }
+        )
+        if (!result.ok) {
+          toast.error(result.error)
+        }
+      })()
+      return
+    }
+    // Why not the slot path for a pick: it addresses the workspace's own review, so a pick whose row
+    // no longer matches would tombstone a number that is not the one on screen.
+    if (showsPickedReview) {
+      return
+    }
     if (activeReview.provider === 'github') {
       void unlinkGitHubPullRequest()
       return
@@ -73,6 +128,8 @@ export function useChecksPanelReviewLinkActions(
     activeWorktree,
     activeWorktreeId,
     linkedGitLabMR,
+    selectWorkspaceReview,
+    showsPickedReview,
     unlinkGitHubPullRequest,
     updateWorktreeMeta
   ])

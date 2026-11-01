@@ -96,6 +96,7 @@ function resetState(overrides: Partial<Record<string, unknown>> = {}): void {
   vi.clearAllMocks()
   mocks.activeRepo.kind = 'git'
   mocks.state = {
+    workspaceReviewSelectionByWorktree: {},
     activeWorktreeId: mocks.activeWorktree.id,
     activeGroupIdByWorktree: { [mocks.activeWorktree.id]: 'group-1' },
     groupsByWorktree: { [mocks.activeWorktree.id]: [{ id: 'group-1', activeTabId: null }] },
