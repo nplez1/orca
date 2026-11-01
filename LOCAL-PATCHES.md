@@ -2881,6 +2881,57 @@ reported as `NO JOBS` rather than `QUEUED` precisely because the fix is not a ru
 Default workflow permissions were already `read`, so a fork PR's token cannot write; requiring approval
 is now the only way a public fork's code reaches these runners, including the macOS and Windows lanes.
 
+#### The review after the merge found the watchdog could not fire (2026-11-01)
+
+A fresh review of the merged revision checked the code against the real REST payloads, which the tests
+had not. The job half of `check-queued-runs` was gated on `job.started_at`, and **GitHub sets
+`started_at` when the job is queued, not when a runner claims it**. The 2026-10-26 relay job, captured
+from `gh api`:
+
+```
+status: completed  conclusion: cancelled
+started_at:   2026-10-26T10:35:26Z
+completed_at: 2026-10-27T04:02:39Z   (17.5 h later)
+runner_name: ""    runner_id: 0
+```
+
+So every real queued job was skipped and the check could not report either incident it was written for.
+It passed 85 tests because every fixture had `started_at: null` — a shape the API never returns. Three
+changes, and the test built from that payload rather than from an idea of the payload:
+
+- **Judge a job by `status`, and use an empty `runner_name`/`runner_id: 0` as the "no runner" signal**,
+  with the age from `created_at`. A job that has a runner is skipped.
+- **`local/queued-known-ghosts.json`.** A zero-job run cannot be cancelled or deleted through the API,
+  and `ci-health-report` _updates_ one issue in place — an edit nobody is notified about. Left as a red
+  finding it would hold the check red forever and swallow the next real finding silently. Listed
+  entries are reported as acknowledged and do not redden the check; anything unlisted still does, and
+  an entry that stops matching is reported for pruning. An unreadable manifest does not abort the
+  check: an entry can only _relax_ a finding, so continuing with none acknowledged fails safe — the
+  listed ghost goes red instead of a real wait hiding behind an exit 2 that names the wrong cause.
+- **The scanner denies families, not one vendor**: `blacksmith-*`, `self-hosted`, `depot-*`,
+  `namespace-*`, `buildjet-*`, `ubicloud-*`, `warp-*`, `cirrus-*`, `arc-*`, the macOS size suffixes and
+  the `-Ncore`/`-N-cores` spellings GitHub uses for Linux and Windows larger runners. `self-hosted`
+  matters most on a public fork, and a larger runner bills even on a public repository. Matching is
+  case-insensitive and anchored on a word boundary, so `concurrency.group: deploy-self-hosted-now` is
+  prose. Exclusions are inherited, so anything under `env:` or a github-script `script:` body is prose
+  too; call edges come from parsed `jobs.*.uses`, not from a text match.
+- **`created_at` is the right age for a job, measured rather than assumed.** A job gated on `needs:`
+  gets its record created when it becomes _eligible_, not at run start — on run `40308443374` the plan
+  job started at 10:34:21 and its shards were created at 10:35:26, and a release run's shards were
+  created 1m11s after it began. So a dependency wait cannot read as a queue wait. What the check does
+  report after an hour is a job held by an environment rule or a job-level `concurrency:`, and it says
+  so in its remedy line instead of blaming a runner.
+
+**Known limit of that guard: it is a deny-list, not an allow-list.** A typo (`ubunut-latest`) or a
+vendor nobody has added still passes. Allowing only `ubuntu-*`/`windows-*`/`macos-*` without a larger
+suffix would be strictly stronger, and is the change to make if this ever misses something real.
+
+**Deferred, recorded so a later reader does not assume them done.** Nothing checks that every caller of
+a workflow with an accepted input default (`unit-tests.yml`'s `runner`) actually passes it, so a new
+caller that omits the input would pass statically — the run-status check catches the wedged result in
+production instead. The mirror push evaluates upstream's copy of each file, which this scan never
+reads. `/jobs` is read one page.
+
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries

@@ -1,8 +1,10 @@
+import { rmSync, writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   WAIT_LIMIT_H,
   describeVerdict,
   judgeQueue,
+  readKnownGhosts,
   waitedHours
 } from '../../local/check-queued-runs.mjs'
 
@@ -171,5 +173,146 @@ describe('the age of a re-run', () => {
     })
 
     expect(verdict.waited[0].ageHours).toBeCloseTo(2, 5)
+  })
+})
+
+// Captured with `gh api /repos/nplez1/orca/actions/runs/40308443374/jobs` on 2026-11-01, with the
+// status it carried while it was waiting. This is the payload that proved the first version of this
+// check could never fire: `started_at` is set on a job that no runner ever claimed.
+const RELAY_JOB_AS_IT_WAITED = {
+  name: 'test / relay integration node 24',
+  status: 'queued',
+  started_at: hoursAgo(17.5),
+  created_at: hoursAgo(17.5),
+  runner_name: '',
+  runner_id: 0
+}
+
+describe('a job that was queued, measured against the real payload', () => {
+  it('reports the 2026-10-26 relay job, whose started_at is set with no runner behind it', () => {
+    const stuck = run({ id: 9, created_at: hoursAgo(18), run_started_at: hoursAgo(18) })
+    const verdict = judge([stuck], { [stuck.id]: [RELAY_JOB_AS_IT_WAITED] })
+
+    expect(verdict.waited).toHaveLength(1)
+    expect(verdict.waited[0]).toMatchObject({
+      where: 'job',
+      jobName: 'test / relay integration node 24'
+    })
+    expect(Math.round(verdict.waited[0].ageHours)).toBe(18)
+  })
+
+  it('does not report a queued job that already has a runner assigned', () => {
+    const assigned = {
+      ...RELAY_JOB_AS_IT_WAITED,
+      runner_name: 'GitHub Actions 1000004517',
+      runner_id: 12
+    }
+    const running = run()
+    const verdict = judge([running], { [running.id]: [assigned] })
+
+    expect(verdict.waited).toEqual([])
+  })
+
+  it('ignores a job that is already running, whatever its runner fields say', () => {
+    const running = run()
+    const verdict = judge([running], {
+      [running.id]: [
+        { name: 'shard', status: 'in_progress', started_at: hoursAgo(4), created_at: hoursAgo(4) }
+      ]
+    })
+
+    expect(verdict.waited).toEqual([])
+  })
+})
+
+describe('a job whose dependencies have not finished', () => {
+  it('is not reported, because its record is only created when it becomes eligible', () => {
+    // Measured on run 40308443374: the plan job started at 10:34:21 and the shards that need it were
+    // created at 10:35:26 — created_at tracks eligibility, not the run's start, so an old run with a
+    // freshly eligible job is not a queue wait.
+    const longRun = run({ created_at: hoursAgo(6), run_started_at: hoursAgo(6) })
+    const justEligible = {
+      name: 'build',
+      status: 'queued',
+      created_at: hoursAgo(0.2),
+      started_at: hoursAgo(0.2),
+      runner_name: '',
+      runner_id: 0
+    }
+    const verdict = judge([longRun], { [longRun.id]: [justEligible] })
+
+    expect(verdict.waited).toEqual([])
+  })
+})
+
+describe('a zero-job run that cannot be cleared', () => {
+  const ghostRun = () => run({ id: 77, status: 'queued', created_at: hoursAgo(593) })
+
+  it('is acknowledged rather than reported when its id is listed', () => {
+    const ghost = ghostRun()
+    const verdict = judgeQueue(
+      { runs: [ghost], jobsByRun: { [ghost.id]: [] }, knownGhosts: new Set([ghost.id]) },
+      { now: NOW }
+    )
+
+    expect(verdict.waited).toEqual([])
+    expect(verdict.acknowledged).toHaveLength(1)
+    expect(verdict.staleAcknowledged).toEqual([])
+
+    const text = describeVerdict(verdict)
+    expect(text).toContain('PASS')
+    expect(text).toContain('acknowledged')
+    expect(text).toContain('delete')
+  })
+
+  it('still reports a zero-job run that is not listed', () => {
+    const ghost = ghostRun()
+    const verdict = judgeQueue(
+      { runs: [ghost], jobsByRun: { [ghost.id]: [] }, knownGhosts: new Set([999]) },
+      { now: NOW }
+    )
+
+    expect(verdict.waited[0].where).toBe('ghost')
+    expect(verdict.staleAcknowledged).toEqual([999])
+    expect(describeVerdict(verdict)).toContain('remove   999')
+  })
+
+  it('reads a missing manifest as nothing acknowledged, and a broken one as unreadable', () => {
+    expect(readKnownGhosts('/nonexistent/queued-known-ghosts.json')).toEqual(new Set())
+    const broken = new URL('./queued-known-ghosts.broken.json', import.meta.url).pathname
+    writeFileSync(broken, '{ not json')
+    try {
+      expect(readKnownGhosts(broken)).toHaveProperty('error')
+    } finally {
+      rmSync(broken)
+    }
+  })
+
+  it('keeps an acknowledged ghost distinguishable from a real finding on a red day', () => {
+    const ghost = ghostRun()
+    const stuck = run({ id: 90, created_at: hoursAgo(5), run_started_at: hoursAgo(5) })
+    const verdict = judgeQueue(
+      {
+        runs: [ghost, stuck],
+        jobsByRun: {
+          [ghost.id]: [],
+          [stuck.id]: [RELAY_JOB_AS_IT_WAITED]
+        },
+        knownGhosts: new Set([ghost.id])
+      },
+      { now: NOW }
+    )
+
+    const text = describeVerdict(verdict)
+    expect(text).toContain('ATTENTION — 1 waiting')
+    expect(text).toContain('ACKED')
+    expect(text).toContain('not counted above')
+  })
+
+  it('ships a manifest whose entry matches the run it documents', () => {
+    const ids = readKnownGhosts()
+
+    expect(ids).toBeInstanceOf(Set)
+    expect([...ids]).toContain(37640199177)
   })
 })

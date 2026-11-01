@@ -1,0 +1,13 @@
+{
+  "ghosts": [
+    {
+      "runId": 37640199177,
+      "name": "Fork release",
+      "status": "queued",
+      "createdAt": "2026-10-07T14:51:14Z",
+      "reason": "queued with zero jobs since 2026-10-07; `gh run cancel` answers \"Cannot cancel a workflow run that is completed\", force-cancel answers 409 \"not queued yet\", and DELETE returns 403. Only a delete in the Actions UI clears it.",
+      "evidence": "https://github.com/nplez1/orca/actions/runs/37640199177",
+      "recorded": "2026-11-01"
+    }
+  ]
+}
