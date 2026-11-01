@@ -63,7 +63,7 @@ it.each([
   ['ssh:detected-owner', false],
   ['ssh:detected-owner', true]
 ] as const)(
-  'opens a detected-only workspace preview beside its retained source on %s (selected twin: %s)',
+  'opens a detected-only workspace preview in its source group on %s (selected twin: %s)',
   async (host, selectedTwin) => {
     store.setState((state) => ({
       repos: state.repos.map((repo) => ({
@@ -127,13 +127,16 @@ it.each([
           }
     )
     // The preview joins the clicked pane's own group as a sibling tab and takes it over.
-    expect(outcome.result.groupId).toBe('a')
+    const browserTab = store
+      .getState()
+      .unifiedTabsByWorktree[WORKSPACE]?.find((tab) => tab.contentType === 'browser')
+    const sourceGroup = store
+      .getState()
+      .groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'a')
+    expect(browserTab?.groupId).toBe('a')
     expect(store.getState().activeGroupIdByWorktree[WORKSPACE]).toBe('a')
-    expect(
-      store
-        .getState()
-        .unifiedTabsByWorktree[WORKSPACE]?.find((tab) => tab.contentType === 'browser')?.groupId
-    ).toBe('a')
+    expect(sourceGroup?.activeTabId).toBe(browserTab?.id)
+    expect(sourceGroup?.tabOrder).toContain('source')
   }
 )
 
@@ -324,11 +327,14 @@ it('a folder workspace uses its own layout and activates its browser without Git
     })
   )
   // The link came from the chat tab in 'left', so the preview joins that group and the split stands.
-  expect(store.getState().activeGroupIdByWorktree[folder]).toBe('left')
-  expect(
-    store.getState().unifiedTabsByWorktree[folder]?.find((tab) => tab.contentType === 'browser')
-      ?.groupId
-  ).toBe('left')
+  const browserTab = store
+    .getState()
+    .unifiedTabsByWorktree[folder]?.find((tab) => tab.contentType === 'browser')
+  const leftGroup = store.getState().groupsByWorktree[folder]?.find((group) => group.id === 'left')
+  expect(browserTab?.groupId).toBe('left')
+  // Activates its browser: the left group shows the page, with the chat tab still beside it.
+  expect(leftGroup?.activeTabId).toBe(browserTab?.id)
+  expect(leftGroup?.tabOrder).toContain('chat')
   expect(store.getState().layoutByWorktree[folder]).toMatchObject({
     type: 'split',
     first: { type: 'leaf', groupId: 'left' },

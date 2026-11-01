@@ -22,7 +22,7 @@ const PROCESS_START_TIME_TIMEOUT_MS = 5_000
 
 /** `lstart` is local wall clock, and the hour a DST fall-back repeats parses an hour early: read it
  * in UTC so a start time is one instant. `runPsInProcess` formats its own rows for the same zone. */
-function darwinStartTimePsEnvironment(): NodeJS.ProcessEnv {
+export function darwinStartTimePsEnvironment(): NodeJS.ProcessEnv {
   return { ...(psLocaleEnvironment() ?? process.env), TZ: 'UTC' }
 }
 
