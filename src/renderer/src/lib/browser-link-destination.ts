@@ -11,7 +11,6 @@ import type { ExecutionHostId } from '../../../shared/execution-host'
 import { normalizeBrowserNavigationUrl, redactKagiSessionToken } from '../../../shared/browser-url'
 import { browserPageDocLocationsEqual } from '../../../shared/browser-page-doc-location'
 import { findVisibleBrowserLinkTarget } from './visible-browser-link-target'
-import type { TabSplitTarget } from '@/store/slices/tabs/tabs-slice-contract'
 import { isLiveLinkOpenGroup, liveLinkOpenGroupIds, type LinkOpenIntent } from './link-open-intent'
 import { runtimeEnvironmentIdOrLocalUnlessTwin } from './worktree-runtime-owner'
 
@@ -190,9 +189,7 @@ export function selectBrowserLinkDestination(
   state: AppState,
   destination: BrowserLinkDestination,
   intent: LinkOpenIntent | null
-):
-  | { status: 'ready'; groupId?: string; split?: TabSplitTarget; match: BrowserOpenResult | null }
-  | { status: 'refused' } {
+): { status: 'ready'; groupId?: string; match: BrowserOpenResult | null } | { status: 'refused' } {
   const { worktreeId, executionHostId } = destination
   const groups = state.groupsByWorktree[worktreeId] ?? []
   const matchesHost = createBrowserLinkHostMatcher(state, worktreeId, executionHostId)
@@ -280,21 +277,13 @@ export function selectBrowserLinkDestination(
         ? tabsById.get(intent.sourceTabId)
         : undefined
     const sourceGroupId =
-      source &&
-      (source.executionHostId ?? null) === intent?.hostId &&
-      liveGroups.has(source.groupId)
-        ? source.groupId
+      source && (source.executionHostId ?? null) === intent?.hostId ? source.groupId : undefined
+    groupId =
+      sourceGroupId && liveGroups.has(sourceGroupId)
+        ? sourceGroupId
         : focusedGroupId && liveGroups.has(focusedGroupId)
           ? focusedGroupId
           : [...liveGroups][0]
-    if (sourceGroupId && groups.find((group) => group.id === sourceGroupId)?.activeTabId) {
-      return {
-        status: 'ready',
-        split: { sourceGroupId, splitDirection: 'right', activate: false },
-        match: null
-      }
-    }
-    groupId = sourceGroupId
   }
   const group = groups.find((item) => item.id === groupId)
   const ids = group ? [group.activeTabId, ...group.tabOrder] : []

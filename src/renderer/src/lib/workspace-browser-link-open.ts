@@ -3,7 +3,6 @@ import { createBrowserLinkHostMatcher } from './browser-link-owner'
 import { resolveBrowserLinkSession } from './browser-link-session'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import type { TabSplitTarget } from '@/store/slices/tabs/tabs-slice-contract'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import { toRuntimeExecutionHostId } from '../../../shared/execution-host'
 import type { OpenWorkspaceBrowserTabRequest } from './workspace-browser-tab-open'
@@ -91,7 +90,7 @@ export async function openClientWorkspaceBrowserLink(
 export function prepareRuntimeBrowserLink(
   request: OpenWorkspaceBrowserTabRequest,
   destination: BrowserLinkDestination
-): { status: 'create'; groupId?: string; split?: TabSplitTarget } | BrowserOpenOutcome {
+): { status: 'create'; groupId?: string } | BrowserOpenOutcome {
   const context = request.linkContext
   if (!context) {
     return { status: 'create', groupId: request.targetGroupId }
@@ -105,12 +104,8 @@ export function prepareRuntimeBrowserLink(
     return selection
   }
   if (
-    !browserLinkCommitIsValid(
-      state,
-      destination,
-      context,
-      selection.groupId ?? selection.split?.sourceGroupId,
-      (current) => ownsBrowserRoute(current, request, destination)
+    !browserLinkCommitIsValid(state, destination, context, selection.groupId, (current) =>
+      ownsBrowserRoute(current, request, destination)
     )
   ) {
     return { status: 'refused' }
@@ -141,7 +136,7 @@ export function prepareRuntimeBrowserLink(
   if (context.linkIntent?.targetGroupId) {
     return { status: 'unsupported' }
   }
-  return { status: 'create', groupId: selection.groupId, split: selection.split }
+  return { status: 'create', groupId: selection.groupId }
 }
 
 export function materializedBrowserLinkOutcome(

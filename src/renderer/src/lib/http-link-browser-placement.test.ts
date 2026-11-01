@@ -45,7 +45,7 @@ describe('resolveHttpLinkBrowserPlacement', () => {
     ).toEqual({ targetGroupId: 'right' })
   })
 
-  it('ignores a browser hidden behind another tab and splits beside the source instead', () => {
+  it('ignores a browser hidden behind another tab and joins the source group as a tab', () => {
     const editor = { id: 'editor', contentType: 'editor' } as const
     expect(
       resolveHttpLinkBrowserPlacement(
@@ -56,17 +56,6 @@ describe('resolveHttpLinkBrowserPlacement', () => {
         }),
         WT
       )
-    ).toEqual({
-      split: { sourceGroupId: 'left', splitDirection: 'right', activate: false }
-    })
-  })
-
-  it('fills an empty source pane rather than splitting beside it', () => {
-    expect(
-      resolveHttpLinkBrowserPlacement(
-        state({ rightActiveTabId: '', activeGroupId: 'right', tabs: [terminal] }),
-        WT
-      )
-    ).toEqual({ targetGroupId: 'right' })
+    ).toEqual({ targetGroupId: 'left' })
   })
 })
