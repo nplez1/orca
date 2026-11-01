@@ -21,6 +21,13 @@ const MENU_ITEM_CLASS =
   'relative flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-0.5 text-[12px] leading-5 font-medium outline-none select-none hover:bg-black/8 focus:bg-black/8 disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-white/14 dark:focus:bg-white/14'
 
 /** Web links only: file:, blob:, and in-app routes keep the browser's own context menu. */
+function webUrl(value: string | null | undefined): string | null {
+  // Only authored absolute web URLs: a relative href resolves against the dev-server origin, and
+  // any other scheme belongs to the browser's own menu.
+  const trimmed = value?.trim()
+  return trimmed && /^https?:\/\//i.test(trimmed) ? trimmed : null
+}
+
 function contextMenuLinkUrl(event: MouseEvent): { url: string; origin: HTMLElement } | null {
   if (!(event.target instanceof Element)) {
     return null
@@ -30,22 +37,26 @@ function contextMenuLinkUrl(event: MouseEvent): { url: string; origin: HTMLEleme
   if (isEditableTarget(event.target)) {
     return null
   }
-  const rawHref = event.target.closest('a[href]')?.getAttribute('href') ?? null
-  if (rawHref !== null) {
-    // Only authored absolute web URLs: a relative href resolves against the dev-server origin,
-    // and an anchor with any other scheme keeps the browser's own menu.
-    if (!/^https?:\/\//i.test(rawHref)) {
-      return null
-    }
-    const anchor = event.target.closest('a[href]')
-    return anchor instanceof HTMLAnchorElement ? { url: rawHref, origin: anchor } : null
-  }
-  // Non-anchor affordances opt in with data-link-url, so a button-styled link gets the same menu.
+  const anchor = event.target.closest('a[href]')
+  const href = webUrl(anchor?.getAttribute('href'))
   const declared = event.target.closest<HTMLElement>('[data-link-url]')
-  const declaredUrl = declared?.dataset.linkUrl
-  return declared && declaredUrl && /^https?:\/\//i.test(declaredUrl)
-    ? { url: declaredUrl, origin: declared }
-    : null
+  const declaredUrl = webUrl(declared?.dataset.linkUrl)
+  const anchorClaim =
+    anchor instanceof HTMLAnchorElement && href ? { url: href, origin: anchor } : null
+  const declaredClaim = declared && declaredUrl ? { url: declaredUrl, origin: declared } : null
+  if (anchorClaim && declaredClaim && anchor && declared !== anchor) {
+    // Both are ancestors of the target, so one contains the other: the innermost claim wins.
+    return anchor.contains(declared) ? declaredClaim : anchorClaim
+  }
+  if (anchorClaim) {
+    return anchorClaim
+  }
+  // A non-web anchor above the declaration still owns the gesture: a mailto in a row that opens a
+  // web page keeps the browser's own menu rather than borrowing the row's address.
+  if (anchor && declared && declared !== anchor && declared.contains(anchor)) {
+    return null
+  }
+  return declaredClaim
 }
 
 /**

@@ -84,6 +84,7 @@ export function GitHubRow(props: { compact?: boolean } = {}): React.JSX.Element 
             <Button
               variant="outline"
               size="sm"
+              data-link-url="https://cli.github.com"
               onClick={(event) => openAppHttpLink('https://cli.github.com', { event })}
             >
               <ExternalLink className="size-3.5" />

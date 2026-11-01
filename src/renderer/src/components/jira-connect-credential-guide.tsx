@@ -39,6 +39,7 @@ export function JiraConnectCredentialGuide({
               <button
                 type="button"
                 className="text-primary underline-offset-2 hover:underline"
+                data-link-url="https://id.atlassian.com/manage-profile/security/api-tokens"
                 onClick={() =>
                   window.api.shell.openUrl(
                     'https://id.atlassian.com/manage-profile/security/api-tokens'

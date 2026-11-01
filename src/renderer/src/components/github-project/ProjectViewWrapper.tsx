@@ -108,14 +108,18 @@ function ProjectViewBody({
     return <ProjectTableSkeleton />
   }
   if (error) {
+    const viewUrl = table
+      ? `${table.project.url}/views/${table.selectedView.number ?? ''}`
+      : undefined
     return (
       <ProjectViewErrorState
         error={error.error}
         totalCount={error.totalCount}
         host={activeProject.host}
+        openInGitHubUrl={viewUrl}
         onOpenInGitHub={() => {
-          if (table) {
-            openAppHttpLink(`${table.project.url}/views/${table.selectedView.number ?? ''}`)
+          if (viewUrl) {
+            openAppHttpLink(viewUrl)
           }
         }}
       />

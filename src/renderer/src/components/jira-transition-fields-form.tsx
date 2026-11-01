@@ -315,6 +315,7 @@ export function JiraTransitionFieldsForm({
               size="sm"
               className="-my-1 shrink-0"
               disabled={pending}
+              data-link-url={issueUrl}
               onClick={() => void window.api.shell.openUrl(issueUrl)}
             >
               <ExternalLink className="size-3" />

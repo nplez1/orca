@@ -253,9 +253,10 @@ export function PRFilesCombinedDiffViewer({
     [sectionIndexByKey, setActiveTreeSectionKey, toggleSection, virtualizer]
   )
 
+  const filesOnGitHubUrl = `${prUrl.replace(/\/$/, '')}/files`
   const openFilesOnGitHub = useCallback(() => {
-    openAppHttpLink(`${prUrl.replace(/\/$/, '')}/files`)
-  }, [prUrl])
+    openAppHttpLink(filesOnGitHubUrl)
+  }, [filesOnGitHubUrl])
 
   const handleAddLineComment = useCallback(
     async (
@@ -367,6 +368,7 @@ export function PRFilesCombinedDiffViewer({
                     retrySection={retrySection}
                     toggleSection={toggleSection}
                     openSection={openFilesOnGitHub}
+                    openSectionUrl={filesOnGitHubUrl}
                     openSectionTitle={translate(
                       'auto.components.GitHubItemDialog.85a2b66f54',
                       'Open files on GitHub'

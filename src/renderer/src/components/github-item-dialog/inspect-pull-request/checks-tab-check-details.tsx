@@ -247,6 +247,7 @@ export function ChecksTabCheckDetails({
                 variant="ghost"
                 size="xs"
                 className="h-7 gap-1 px-2 text-[11px]"
+                data-link-url={openUrl}
                 onClick={(event) => openAppHttpLink(openUrl, { event })}
               >
                 {translate(

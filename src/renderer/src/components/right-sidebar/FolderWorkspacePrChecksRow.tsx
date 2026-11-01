@@ -104,6 +104,7 @@ export function FolderWorkspacePrChecksRow({
             <TooltipTrigger asChild>
               <button
                 type="button"
+                data-link-url={row.reviewUrl}
                 className="rounded p-1 text-muted-foreground opacity-80 hover:bg-accent hover:text-foreground group-hover:opacity-100"
                 aria-label={openExternalLabel}
                 onClick={(event) => {

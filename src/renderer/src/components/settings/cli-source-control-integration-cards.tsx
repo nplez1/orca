@@ -126,6 +126,7 @@ export function GitHubIntegrationCard(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
+                  data-link-url="https://cli.github.com"
                   onClick={(event) => openAppHttpLink('https://cli.github.com', { event })}
                 >
                   <ExternalLink className="size-3.5 mr-1.5" />
@@ -161,6 +162,7 @@ export function GitHubIntegrationCard(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
+                  data-link-url="https://cli.github.com/manual/gh_auth_login"
                   onClick={(event) =>
                     openAppHttpLink('https://cli.github.com/manual/gh_auth_login', { event })
                   }
@@ -247,6 +249,7 @@ export function GitLabIntegrationCard(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
+                  data-link-url="https://gitlab.com/gitlab-org/cli#installation"
                   onClick={(event) =>
                     openAppHttpLink('https://gitlab.com/gitlab-org/cli#installation', { event })
                   }
@@ -284,6 +287,7 @@ export function GitLabIntegrationCard(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
+                  data-link-url="https://gitlab.com/gitlab-org/cli/-/blob/main/docs/source/auth/login.md"
                   onClick={(event) =>
                     openAppHttpLink(
                       'https://gitlab.com/gitlab-org/cli/-/blob/main/docs/source/auth/login.md',

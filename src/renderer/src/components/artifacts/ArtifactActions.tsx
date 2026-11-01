@@ -37,6 +37,7 @@ export function ArtifactActions({
             variant="ghost"
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
+            data-link-url={item.shareUrl}
             onClick={() => openArtifactInBrowser(item.shareUrl)}
             aria-label={translate('auto.components.artifacts.openInBrowser', 'Open in browser')}
           >

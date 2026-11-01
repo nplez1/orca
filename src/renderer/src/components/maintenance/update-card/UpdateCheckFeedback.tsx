@@ -27,6 +27,7 @@ export function UpdateCheckFeedback({
           <button
             type="button"
             className="text-xs text-muted-foreground underline hover:text-foreground mt-0.5"
+            data-link-url={action.url}
             onClick={(event) => openAppHttpLink(action.url, { event })}
           >
             {action.label}

@@ -24,6 +24,7 @@ export type DiffSectionItemProps = {
   toggleSection: (index: number) => void
   openSection: (index: number) => void
   openSectionTitle: string
+  openSectionUrl?: string
   onOpenPreview?: (section: DiffSection, index: number) => void
   renderHeaderTrailingContent?: (section: DiffSection, index: number) => ReactNode
   onAddLineComment?: (

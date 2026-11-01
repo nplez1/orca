@@ -79,6 +79,7 @@ export function RelatedFeatures(props: {
           <li key={tile.id}>
             <button
               type="button"
+              data-link-url={tile.docsUrl}
               onClick={(event) => {
                 track('feature_wall_docs_clicked', {
                   group_id: workflow.id,

@@ -69,7 +69,6 @@ it('the visible button opens in its owning chat’s group even while another gro
   showVisual()
   fireEvent.click(screen.getByRole('button', { name: 'Open in new tab' }))
   const state = useAppStore.getState()
-  // The page joins the chat's own group as a sibling tab and takes that group over.
   const browserTab = wrapperForActiveBrowser()
   const sourceGroup = state.groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'a')
   expect(browserTab?.groupId).toBe('a')

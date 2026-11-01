@@ -200,6 +200,7 @@ export function SlugDialogBody({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
+                data-link-url={url}
                 onClick={(event) => openAppHttpLink(url, { event })}
                 aria-label={translate(
                   'auto.components.github.project.slug.dialog.SlugDialogBody.69caf40ae8',

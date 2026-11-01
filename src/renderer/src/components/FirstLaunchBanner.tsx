@@ -85,6 +85,7 @@ export function FirstLaunchBanner({
           <button
             type="button"
             className="underline underline-offset-2 hover:text-foreground"
+            data-link-url={PRIVACY_URL}
             onClick={(event) => openAppHttpLink(PRIVACY_URL, { event })}
           >
             {translate('auto.components.FirstLaunchBanner.d1deebb050', 'Privacy policy')}

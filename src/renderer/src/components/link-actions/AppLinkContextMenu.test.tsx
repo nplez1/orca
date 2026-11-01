@@ -228,4 +228,91 @@ describe('AppLinkContextMenu link resolution', () => {
       forceDestination: 'system'
     })
   })
+
+  // A declared link outranks the in-app route its row wraps, which would otherwise win by proximity.
+  it('prefers a declared link over a wrapping non-web anchor', () => {
+    rightClickOn(
+      <a href="/settings">
+        <button type="button" data-testid="target" data-link-url="https://example.com/issue/9">
+          Issue 9
+        </button>
+      </a>
+    )
+
+    fireEvent.click(menuItem('Open in Orca Browser'))
+
+    expect(mocks.openContextualHttpLink).toHaveBeenCalledWith('https://example.com/issue/9', {
+      worktreeId: 'wt-1',
+      forceDestination: 'orca'
+    })
+  })
+
+  // The innermost claim is the most specific one, so a nested anchor still names its own address.
+  it('prefers a nested web anchor over the row that declares a link', () => {
+    rightClickOn(
+      <div data-link-url="https://example.com/row">
+        <a href="https://example.com/nested">nested</a>
+      </div>,
+      'nested'
+    )
+
+    fireEvent.click(menuItem('Open in System Browser'))
+
+    expect(mocks.openContextualHttpLink).toHaveBeenCalledWith('https://example.com/nested', {
+      worktreeId: 'wt-1',
+      forceDestination: 'system'
+    })
+  })
+
+  // The same rule the other way round: the declaration is inside the anchor, so it is the claim.
+  it('prefers a declared link nested inside a web anchor', () => {
+    rightClickOn(
+      <a href="https://example.com/outer">
+        <button type="button" data-testid="target" data-link-url="https://example.com/inner">
+          Inner
+        </button>
+      </a>
+    )
+
+    fireEvent.click(menuItem('Open in System Browser'))
+
+    expect(mocks.openContextualHttpLink).toHaveBeenCalledWith('https://example.com/inner', {
+      worktreeId: 'wt-1',
+      forceDestination: 'system'
+    })
+  })
+
+  it('ignores a declared value that is not a web address', () => {
+    rightClickOn(
+      <button type="button" data-testid="target" data-link-url="file:///tmp/notes.md">
+        Notes
+      </button>
+    )
+
+    expect(screen.queryByTestId('link-context-menu')).toBeNull()
+  })
+
+  // A mailto link inside a row that opens a web page is still a mail link: it keeps the native menu.
+  it('leaves a non-web anchor inside a declared row to the browser default menu', () => {
+    rightClickOn(
+      <div data-link-url="https://example.com/row">
+        <a href="mailto:dev@example.com">mail</a>
+      </div>,
+      'mail'
+    )
+
+    expect(screen.queryByTestId('link-context-menu')).toBeNull()
+  })
+
+  it('trims a padded declared address', () => {
+    rightClickOn(
+      <button type="button" data-testid="target" data-link-url="  https://example.com/padded  ">
+        Padded
+      </button>
+    )
+
+    fireEvent.click(menuItem('Copy Link'))
+
+    expect(mocks.writeClipboardText).toHaveBeenCalledWith('https://example.com/padded')
+  })
 })
