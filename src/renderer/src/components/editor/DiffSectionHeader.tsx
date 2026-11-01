@@ -25,7 +25,6 @@ export function DiffSectionHeader({
   onToggle: () => void
   onOpenSection: (event: MouseEvent) => void
   openSectionTitle: string
-  /** Set when the section's open action is a web link rather than an editor jump. */
   openSectionUrl?: string
   onOpenPreview?: (event: MouseEvent) => void
   trailingContent?: ReactNode

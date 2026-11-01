@@ -126,7 +126,6 @@ it.each([
             }
           }
     )
-    // The preview joins the clicked pane's own group as a sibling tab and takes it over.
     const browserTab = store
       .getState()
       .unifiedTabsByWorktree[WORKSPACE]?.find((tab) => tab.contentType === 'browser')
@@ -326,13 +325,11 @@ it('a folder workspace uses its own layout and activates its browser without Git
       result: expect.objectContaining({ worktreeId: folder })
     })
   )
-  // The link came from the chat tab in 'left', so the preview joins that group and the split stands.
   const browserTab = store
     .getState()
     .unifiedTabsByWorktree[folder]?.find((tab) => tab.contentType === 'browser')
   const leftGroup = store.getState().groupsByWorktree[folder]?.find((group) => group.id === 'left')
   expect(browserTab?.groupId).toBe('left')
-  // Activates its browser: the left group shows the page, with the chat tab still beside it.
   expect(leftGroup?.activeTabId).toBe(browserTab?.id)
   expect(leftGroup?.tabOrder).toContain('chat')
   expect(store.getState().layoutByWorktree[folder]).toMatchObject({

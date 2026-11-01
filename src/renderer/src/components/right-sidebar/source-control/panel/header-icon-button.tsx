@@ -14,7 +14,6 @@ export function SourceControlHeaderIconButton({
   label: string
   onClick: () => void
   disabled?: boolean
-  /** Set when the action opens this address, so the app's link menu can offer it too. */
   'data-link-url'?: string
 }): React.JSX.Element {
   return (

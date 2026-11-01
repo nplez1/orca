@@ -150,7 +150,6 @@ export function ProjectViewErrorState({
   totalCount?: number
   host?: string
   onOpenInGitHub: () => void
-  /** The address the button opens, so the app's link menu can offer it too. */
   openInGitHubUrl?: string
 }): React.JSX.Element {
   if (error.type === 'auth_required' || error.type === 'scope_missing') {

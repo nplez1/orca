@@ -17,7 +17,6 @@ export type JiraIssueWorkspaceAction = {
   label: string
   icon: LucideIcon
   action: () => void
-  /** Set when the action opens this address, so the app's link menu can offer it too. */
   url?: string
 }
 

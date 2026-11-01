@@ -24,7 +24,6 @@ export type DiffSectionItemProps = {
   toggleSection: (index: number) => void
   openSection: (index: number) => void
   openSectionTitle: string
-  /** Set when openSection is a web link (the PR files view) rather than an editor jump. */
   openSectionUrl?: string
   onOpenPreview?: (section: DiffSection, index: number) => void
   renderHeaderTrailingContent?: (section: DiffSection, index: number) => ReactNode
