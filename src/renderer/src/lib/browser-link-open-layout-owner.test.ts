@@ -125,11 +125,8 @@ it.each([
 
     const pending = layoutApplyTestTransport.sentOfType('openBrowserTab')[0]!
     const targetGroupId = pending.groupId
-    if (explicit) {
-      expect(targetGroupId).toBe('a')
-    } else {
-      expect(pending.split).toMatchObject({ besideGroupId: 'a', direction: 'right' })
-    }
+    expect(targetGroupId).toBe('a')
+    expect(pending.split).toBeUndefined()
     layoutApplyTestTransport.answerWith('apply')
     layoutApplyTestTransport.answerPending()
     await main.settle()

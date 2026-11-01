@@ -146,7 +146,7 @@ describe('runtime link opens through staging and materialization', () => {
     ).toMatchObject({ remotePageId: 'actual-host-page', environmentId: ENV })
   })
 
-  it('creates a client split beside the source when no browser is visible', async () => {
+  it('stages a new tab in the source group when no browser is visible', async () => {
     useAppStore.setState((state) => ({
       groupsByWorktree: {
         [WT]: state.groupsByWorktree[WT]!.map((group) => ({
@@ -175,13 +175,15 @@ describe('runtime link opens through staging and materialization', () => {
     expect(pendingCreates).toHaveLength(1)
     const provisional = pendingCreates[0]!.params.page!
     const staged = wrapperForRemotePage(provisional)!
-    expect([G1, G2]).not.toContain(staged.groupId)
+    expect(staged.groupId).toBe(G1)
+    expect(pendingCreates[0]!.params.targetGroupId).toBe(G1)
     expect(useAppStore.getState().layoutByWorktree[WT]).toMatchObject({
-      first: { type: 'split', first: { groupId: G1 }, second: { groupId: staged.groupId } }
+      first: { type: 'leaf', groupId: G1 },
+      second: { type: 'leaf', groupId: G2 }
     })
-    pendingCreates[0]!.resolve('split-host-page')
-    expect(await creating).toMatchObject({ status: 'opened', result: { groupId: staged.groupId } })
-    expect(wrapperForRemotePage('split-host-page')?.groupId).toBe(staged.groupId)
+    pendingCreates[0]!.resolve('sibling-host-page')
+    expect(await creating).toMatchObject({ status: 'opened', result: { groupId: G1 } })
+    expect(wrapperForRemotePage('sibling-host-page')?.groupId).toBe(G1)
   })
 
   it('refuses new explicit creation before staging when strict peer placement is unproven', async () => {
