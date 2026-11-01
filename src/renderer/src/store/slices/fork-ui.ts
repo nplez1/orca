@@ -33,6 +33,17 @@ export type ForkUiSlice = {
    */
   prCommentInlineDisplayById: Record<string, PRCommentInlineDisplay>
   setPRCommentInlineDisplay: (commentId: string, display: PRCommentInlineDisplay | null) => void
+  /**
+   * Which of a workspace's reviews the Checks and Source Control panes describe, keyed by worktree.
+   *
+   * A workspace can hold several review attachments while its compatibility slots name only one
+   * active review, and switching the shown one must not move that slot: the slot is what push-target
+   * and PR-creation safety resolve through, so pointing it at another branch's review would retarget
+   * a push. Session-only, and shared between both panes so they cannot disagree about which review
+   * is selected.
+   */
+  workspaceReviewSelectionByWorktree: Record<string, string>
+  selectWorkspaceReview: (worktreeId: string, reviewKey: string | null) => void
 }
 
 export const createForkUiSlice: StateCreator<AppState, [], [], ForkUiSlice> = (set) => ({
@@ -52,5 +63,18 @@ export const createForkUiSlice: StateCreator<AppState, [], [], ForkUiSlice> = (s
         next[commentId] = display
       }
       return { prCommentInlineDisplayById: next }
+    }),
+  workspaceReviewSelectionByWorktree: {},
+  selectWorkspaceReview: (worktreeId, reviewKey) =>
+    set((state) => {
+      const next = { ...state.workspaceReviewSelectionByWorktree }
+      // Why: null drops the choice so the panes fall back to the workspace's own review instead of
+      // pinning a review the user unlinked.
+      if (reviewKey === null) {
+        delete next[worktreeId]
+      } else {
+        next[worktreeId] = reviewKey
+      }
+      return { workspaceReviewSelectionByWorktree: next }
     })
 })

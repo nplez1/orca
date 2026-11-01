@@ -377,6 +377,10 @@
             "unlinkIssueDescription": "Orca will hide {{value0}} from this workspace. The issue on {{value1}} won’t be changed."
           },
           "SourceControlAgentActionDialogForm": {},
+          "WorkspaceReviewSwitcher": {
+            "switchReview": "Switch pull request",
+            "untitledReview": "Untitled review"
+          },
           "checks": {
             "panel": {
               "comment": {

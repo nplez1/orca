@@ -57,6 +57,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     refreshInFlightRef,
     refreshRequestKeyRef,
     repo,
+    reviewSelection,
     setChecks,
     setChecksLoading,
     setComments,
@@ -66,6 +67,11 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     setIsRefreshing,
     updateWorktreeGitIdentity
   } = model
+  // Why derived rather than read off `prNumber`: a picked GitLab review has no GitHub PR number,
+  // and this path only runs for a GitHub review the pane could not get from the branch cache.
+  const pickedReviewNumber = reviewSelection.isWorkspaceReview
+    ? null
+    : (reviewSelection.selectedReview?.number ?? null)
   const handleRefresh = useCallback(async () => {
     if (!repo || !branch) {
       return
@@ -85,10 +91,62 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     const refreshRequestKey = `${activeWorktreeId ?? ''}::${prCacheKey}::${branch}::${Date.now()}::${Math.random()}`
     refreshRequestKeyRef.current = refreshRequestKey
     const isCurrentRequest = (): boolean => refreshRequestKeyRef.current === refreshRequestKey
+    setIsRefreshing(true)
+    // Why before the git-status probe: a picked review is not this branch's PR, so the branch path
+    // below would refresh, and then re-read checks for, a review the user is not looking at.
+    if (!reviewSelection.isWorkspaceReview && pickedReviewNumber !== null) {
+      const requestKey = checksPanelAsyncResultKey(
+        prCacheKey,
+        branch,
+        pickedReviewNumber,
+        pr?.prRepo,
+        pr?.headSha
+      )
+      try {
+        const refreshedReview = await reviewSelection.refreshSelectedReview()
+        if (!isCurrentRequest()) {
+          return
+        }
+        // The review carries the head this refresh read, so checks key on the commit that was just
+        // fetched rather than the one the closure captured before the refresh.
+        const headSha = refreshedReview?.headSha ?? pr?.headSha
+        setChecksLoading(true)
+        setCommentsLoading(true)
+        const [refreshedChecks, refreshedComments] = await Promise.all([
+          fetchPRChecks(repo.path, pickedReviewNumber, branch, headSha, pr?.prRepo, {
+            force: true,
+            repoId: repo.id,
+            wakeWslDistro: true
+          }),
+          fetchPRComments(repo.path, pickedReviewNumber, {
+            force: true,
+            repoId: repo.id,
+            prRepo: pr?.prRepo,
+            headSha
+          })
+        ])
+        if (!isCurrentRequest() || !isCurrentAsyncResult(requestKey)) {
+          return
+        }
+        setChecks(refreshedChecks)
+        setComments(refreshedComments)
+      } catch (error) {
+        // Why swallowed: the shown rows stay, and the pane's own error surface already reports a
+        // provider failure for the review it could read.
+        console.warn('Failed to refresh the selected review:', error)
+      } finally {
+        if (isCurrentRequest()) {
+          setChecksLoading(false)
+          setCommentsLoading(false)
+          refreshInFlightRef.current = false
+          setIsRefreshing(false)
+        }
+      }
+      return
+    }
     const refreshStartedAt = Date.now()
     const refreshProvider = isGitLabReviewContext ? 'gitlab' : 'github'
     let refreshOutcome = 'started'
-    setIsRefreshing(true)
     recordChecksPanelPRRefreshBreadcrumb({
       event: 'start',
       provider: refreshProvider,
@@ -406,7 +464,9 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     setComments,
     setGitStatusSnapshot,
     pollIntervalRef,
-    refreshInFlightRef
+    refreshInFlightRef,
+    reviewSelection,
+    pickedReviewNumber
   ])
   return { handleRefresh }
 }

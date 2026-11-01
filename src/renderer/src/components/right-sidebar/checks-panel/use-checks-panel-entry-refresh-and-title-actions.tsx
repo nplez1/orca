@@ -29,6 +29,7 @@ type ChecksPanelEntryRefreshAndTitleActionsInput = Pick<
   | 'pr'
   | 'prCacheKey'
   | 'prNumber'
+  | 'reviewSelection'
 > &
   Pick<
     ChecksPanelControllerState,
@@ -90,6 +91,7 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     prNumber,
     prevChecksRef,
     repo,
+    reviewSelection,
     setEditingTitle,
     setTitleDraft,
     setTitleSaving,
@@ -204,6 +206,12 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     if (!repo || !branch) {
       return
     }
+    // Why before the branch path: a picked review is not this branch's review, so re-reading the
+    // branch would leave the review the user just changed (title, merge, a resolved thread) stale.
+    if (!reviewSelection.isWorkspaceReview) {
+      await reviewSelection.refreshSelectedReview()
+      return
+    }
     if (activeReview?.provider === 'gitlab') {
       const refreshedReview = await refreshHostedReviewCard(fetchHostedReviewForBranch, {
         repoPath: repo.path,
@@ -259,7 +267,8 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     linkedGiteaPR,
     linkedGitLabMR,
     linkedPR,
-    repo
+    repo,
+    reviewSelection
   ])
 
   const handleStartEdit = useCallback(() => {

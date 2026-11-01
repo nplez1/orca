@@ -14,6 +14,8 @@ import {
 } from '../../terminal-pane/terminal-link-open-hints'
 import type { ChecksPanelReview } from '../checks-panel-review'
 import type { ChecksPanelHostedReviewModifierDestination } from '../checks-panel-hosted-review-click-routing'
+import { WorkspaceReviewSwitcher } from '../WorkspaceReviewSwitcher'
+import type { WorkspaceReviewSelection } from '../use-workspace-review-selection'
 import { translate } from '@/i18n/i18n'
 import { PullRequestIcon, prStateColor } from './check-presentation'
 import { HostedReviewUnlinkMenuItem } from '@/components/HostedReviewUnlinkMenuItem'
@@ -27,6 +29,9 @@ type ChecksPanelReviewHeaderProps = {
   onOpenReview: (event: React.MouseEvent<HTMLButtonElement>) => void
   onUnlinkReview: () => void
   onLinkAnotherReview: () => void
+  /** Present when the workspace holds more than one review: the number becomes a split control that
+   *  keeps opening the review and adds review selection. */
+  reviewSwitcher?: WorkspaceReviewSelection
 }
 
 export function ChecksPanelReviewHeader({
@@ -37,7 +42,8 @@ export function ChecksPanelReviewHeader({
   onRefresh,
   onOpenReview,
   onUnlinkReview,
-  onLinkAnotherReview
+  onLinkAnotherReview,
+  reviewSwitcher
 }: ChecksPanelReviewHeaderProps): React.JSX.Element {
   const reviewNumberLabel = review.provider === 'gitlab' ? `!${review.number}` : `#${review.number}`
   const ReviewIcon = review.provider === 'gitlab' ? GitMerge : PullRequestIcon
@@ -70,6 +76,7 @@ export function ChecksPanelReviewHeader({
       >
         {reviewNumberLabel}
       </button>
+      {reviewSwitcher ? <WorkspaceReviewSwitcher selection={reviewSwitcher} /> : null}
       <span
         className={cn(
           'text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border',

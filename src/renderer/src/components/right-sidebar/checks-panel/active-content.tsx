@@ -83,6 +83,7 @@ export function ChecksPanelActiveContent({
     refreshHostedReviewAfterMutation,
     repo,
     resolveCommentsWithAIDisabledReason,
+    reviewSelection,
     saveLaunchActionDefault,
     setAgentComposerState,
     setChecksPanelContentRef,
@@ -151,6 +152,7 @@ export function ChecksPanelActiveContent({
           onOpenReview={handleOpenPR}
           onUnlinkReview={handleUnlinkReview}
           onLinkAnotherReview={handleLinkAnotherReview}
+          reviewSwitcher={reviewSelection}
         />
 
         {detachedHeadDisplay && <DetachedHeadBadge display={detachedHeadDisplay} side="bottom" />}

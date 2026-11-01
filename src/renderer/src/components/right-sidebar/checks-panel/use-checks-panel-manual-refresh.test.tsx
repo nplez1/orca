@@ -18,6 +18,7 @@ vi.mock('@/store/slices/hosted-review-card-refresh', async (importOriginal) => {
 })
 
 import { useChecksPanelManualRefresh } from './use-checks-panel-manual-refresh'
+import { makeWorkspaceReviewSelection } from '../workspace-review-selection.test-fixture'
 
 type RefreshInput = Parameters<typeof useChecksPanelManualRefresh>[0]
 
@@ -86,6 +87,7 @@ describe('useChecksPanelManualRefresh ordering', () => {
       refreshInFlightRef: { current: false },
       refreshRequestKeyRef: { current: '' },
       repo: { id: 'repo-1', path: '/workspace/repo' } as NonNullable<RefreshInput['repo']>,
+      reviewSelection: makeWorkspaceReviewSelection(),
       setChecks: vi.fn(),
       setChecksLoading,
       setComments: vi.fn(),

@@ -7,6 +7,7 @@ import type { GitBranchLineTotal } from '../../../../shared/git-status-types'
 import type { HostedReviewInfo } from '../../../../shared/hosted-review'
 import type { WorktreeGitIdentityDisplay } from '../../../../shared/worktree/git-identity-display'
 import type { PrimaryAction } from './source-control-primary-action'
+import { makeWorkspaceReviewSelection } from './workspace-review-selection.test-fixture'
 
 vi.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -56,7 +57,8 @@ function renderToolbar(options?: {
           ? CREATE_PR_ACTION
           : options.visibleCreatePrHeaderAction
       }
-      hostedReview={options?.hostedReview ?? null}
+      displayedReview={options?.hostedReview ?? null}
+      reviewSelection={makeWorkspaceReviewSelection()}
       isCreatePrIntentInFlight={false}
       isCreatingPr={false}
       onCreatePrHeaderClick={vi.fn()}

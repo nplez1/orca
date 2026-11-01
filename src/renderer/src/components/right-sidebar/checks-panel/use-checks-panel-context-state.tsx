@@ -7,6 +7,9 @@ import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-iden
 import { isStaleMergedGitHubReviewForHead } from '@/store/slices/hosted-review-cache-state'
 import { selectReviewCacheEntry } from '../review-cache-entry-selection'
 import { selectWorkspaceReviewState, type ChecksPanelReview } from '../checks-panel-review'
+import { gitHubPRInfoFromHostedReview } from '../hosted-review-to-pr-info'
+import { useWorkspaceReviewSelection } from '../use-workspace-review-selection'
+import { isChecksPaneReviewProvider, pickShownReview } from '../workspace-review-selection'
 import { isGitLabChecksPanelReview } from './gitlab-review-client'
 import { clearPendingPRCommentAiAck } from '../pr-comments-ai-launch-ack'
 import {
@@ -28,6 +31,7 @@ type ChecksPanelContextStateInput = Pick<
   | 'commentResolutionLaunchAcceptedRef'
   | 'conflictSummaryRefreshKeyRef'
   | 'createPrInFlightRef'
+  | 'isPanelVisible'
   | 'panelContextKey'
   | 'panelContextKeyRef'
   | 'pendingCommentResolutionRef'
@@ -71,6 +75,7 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     commentResolutionLaunchAcceptedRef,
     conflictSummaryRefreshKeyRef,
     createPrInFlightRef,
+    isPanelVisible,
     panelContextKey,
     panelContextKeyRef,
     pendingCommentResolutionRef,
@@ -196,10 +201,15 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   }
   // Background refresh replaces the whole cache map; subscribe only to this repo/branch entry.
   const prCacheEntry = useAppStore((s) => selectReviewCacheEntry(s.prCache, prCacheKey || null))
-  const pr: PRInfo | null = isStaleMergedGitHubReviewForHead(prCacheEntry, activeWorktree?.head)
+  // Why named for the branch: this is the review the workspace's own branch resolves to, which is
+  // only the shown one until the user picks another from the switcher.
+  const branchPR: PRInfo | null = isStaleMergedGitHubReviewForHead(
+    prCacheEntry,
+    activeWorktree?.head
+  )
     ? null
     : (prCacheEntry?.data ?? null)
-  const prCachedHasPR = prCacheEntry ? pr !== null : null
+  const prCachedHasPR = prCacheEntry ? branchPR !== null : null
   const hostedReviewEntry = useAppStore((s) =>
     hostedReviewCacheKey ? s.hostedReviewCache[hostedReviewCacheKey] : undefined
   )
@@ -214,12 +224,12 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   // Branch lookup loses fork/deleted-head PRs; prefer known review numbers from metadata/cache.
   const linkedPR = activeWorktree?.linkedPR ?? null
   const suppressedGitHubPR = activeWorktree?.suppressedGitHubPR ?? null
-  const fallbackGitHubPRNumber = linkedPR == null ? (pr?.number ?? null) : null
+  const fallbackGitHubPRNumber = linkedPR == null ? (branchPR?.number ?? null) : null
   const linkedGitLabMR = activeWorktree?.linkedGitLabMR ?? null
   const linkedBitbucketPR = activeWorktree?.linkedBitbucketPR ?? null
   const linkedAzureDevOpsPR = activeWorktree?.linkedAzureDevOpsPR ?? null
   const linkedGiteaPR = activeWorktree?.linkedGiteaPR ?? null
-  const activeReview: ChecksPanelReview | null = selectWorkspaceReviewState({
+  const workspaceReview: ChecksPanelReview | null = selectWorkspaceReviewState({
     prEntry: prCacheEntry,
     hostedEntry: hostedReviewEntry,
     currentHeadOid: activeWorktree?.head,
@@ -230,8 +240,27 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     linkedAzureDevOpsPR,
     linkedGiteaPR
   })
+  const reviewSelection = useWorkspaceReviewSelection({
+    activeReview: workspaceReview,
+    isVisible: isPanelVisible,
+    repo: repo ?? undefined,
+    worktree: activeWorktree
+  })
+  // Why only GitHub and GitLab: those are the providers this pane can render checks and comments
+  // for, so a picked review from another provider leaves the workspace's own review on screen
+  // rather than blanking a pane that has nothing to show for it.
+  const pickedReview = pickShownReview(reviewSelection, isChecksPaneReviewProvider)
+  const activeReview: ChecksPanelReview | null = pickedReview ?? workspaceReview
+  // Why derived from the review rather than left to the branch cache: a picked review is not this
+  // branch's PR, so `prCache` has nothing for it. The mapping is a faithful rename of the same
+  // fields, which keeps checks, comments and the head-sha freshness gate keyed on the shown PR.
+  const pr: PRInfo | null = pickedReview ? gitHubPRInfoFromHostedReview(pickedReview) : branchPR
   const activeGitLabReview = isGitLabChecksPanelReview(activeReview) ? activeReview : null
-  const isGitLabReviewContext = Boolean(activeGitLabReview || linkedGitLabMR !== null)
+  // Why gated on the workspace's own review: a picked GitHub review must not read as a GitLab
+  // context just because this workspace also holds a GitLab MR.
+  const isGitLabReviewContext = Boolean(
+    activeGitLabReview || (reviewSelection.isWorkspaceReview && linkedGitLabMR !== null)
+  )
   const activeConflictReview = activeReview?.mergeable === 'CONFLICTING' ? activeReview : null
   const prRefreshState = useAppStore((s) =>
     prCacheKey
@@ -242,6 +271,15 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     prCacheKey ? s.prRefreshStates[prCacheKey] : undefined
   )
   const prNumber = pr?.number ?? null
+  // Why the provider and number rather than the review object: the review is rebuilt on every cache
+  // write, and only a switch to a different review should drop the rows below.
+  const shownReviewKey = pickedReview ? `${pickedReview.provider}:${pickedReview.number}` : ''
+  useEffect(() => {
+    // Why: rows on screen belong to the review that was showing when they were fetched, so keeping
+    // them while the new read is in flight would put another review's checks under this header.
+    setChecks([])
+    setComments([])
+  }, [shownReviewKey, setChecks, setComments])
 
   useEffect(() => {
     const expiryAt = getGitHubPRRefreshStateExpiryAt(rawPRRefreshState)
@@ -346,7 +384,8 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     activeConflictReview,
     prRefreshState,
     rawPRRefreshState,
-    prNumber
+    prNumber,
+    reviewSelection
   }
 }
 
