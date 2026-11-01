@@ -175,18 +175,20 @@ export const ACCEPTED_RUNNER_LABELS = {
 /**
  * Runner families this fork does not provision, as patterns rather than one vendor's prefix. A job
  * asking for any of them waits for a runner that will never claim it, which `timeout-minutes` cannot
- * bound. The larger-runner suffixes are here because those bill even on a public repository, so they
+ * bound. **This is a deny-list, not an allow-list**: a typo such as `ubunut-latest`, or a vendor nobody
+ * has added here yet, still passes. Allowing only `ubuntu-*`/`windows-*`/`macos-*` without a larger
+ * suffix would be stricter and is the change to make if this ever misses something real. The larger-runner suffixes are here because those bill even on a public repository, so they
  * are a cost decision as well as a queue one; `self-hosted` is here because on a public fork it is the
  * shortest path from a fork PR to someone's machine.
  */
 const UNPROVISIONED = [
-  /blacksmith-[a-z0-9.-]+/g,
-  /buildjet-[a-z0-9.-]+/g,
-  /depot-[a-z0-9.-]+/g,
-  /namespace-[a-z0-9.-]+/g,
-  /ubicloud-[a-z0-9.-]+/g,
-  /self-hosted/g,
-  /[a-z0-9._-]+-(?:large|xlarge|2xlarge|4xlarge|8xlarge)\b/g
+  // Third-party runner services. Case-insensitive because GitHub treats labels that way.
+  /(?<![\w.-])(?:blacksmith|buildjet|depot|namespace|ubicloud|warp|cirrus|arc)-[a-z0-9.-]+/gi,
+  /(?<![\w.-])self-hosted\b/gi,
+  // Larger GitHub runners: billed even on a public repository. The macOS names end in a size word and
+  // the Linux/Windows ones end in a core count, in two spellings.
+  /(?<![\w.-])[a-z0-9._-]+-(?:large|xlarge|2xlarge|4xlarge|8xlarge)\b/gi,
+  /(?<![\w.-])[a-z0-9._-]+-\d+(?:-cores?|core)\b/gi
 ]
 
 function unprovisionedIn(value) {

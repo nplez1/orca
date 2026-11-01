@@ -2905,12 +2905,26 @@ changes, and the test built from that payload rather than from an idea of the pa
   and `ci-health-report` _updates_ one issue in place — an edit nobody is notified about. Left as a red
   finding it would hold the check red forever and swallow the next real finding silently. Listed
   entries are reported as acknowledged and do not redden the check; anything unlisted still does, and
-  an entry that stops matching is reported for pruning.
+  an entry that stops matching is reported for pruning. An unreadable manifest does not abort the
+  check: an entry can only _relax_ a finding, so continuing with none acknowledged fails safe — the
+  listed ghost goes red instead of a real wait hiding behind an exit 2 that names the wrong cause.
 - **The scanner denies families, not one vendor**: `blacksmith-*`, `self-hosted`, `depot-*`,
-  `namespace-*`, `buildjet-*`, `ubicloud-*`, and the larger-runner suffixes. `self-hosted` matters most
-  on a public fork, and a larger runner bills even on a public repository. Exclusions are inherited, so
-  a label under `env:` or a github-script `script:` body is prose rather than a request; call edges come
-  from parsed `jobs.*.uses`, not from a text match.
+  `namespace-*`, `buildjet-*`, `ubicloud-*`, `warp-*`, `cirrus-*`, `arc-*`, the macOS size suffixes and
+  the `-Ncore`/`-N-cores` spellings GitHub uses for Linux and Windows larger runners. `self-hosted`
+  matters most on a public fork, and a larger runner bills even on a public repository. Matching is
+  case-insensitive and anchored on a word boundary, so `concurrency.group: deploy-self-hosted-now` is
+  prose. Exclusions are inherited, so anything under `env:` or a github-script `script:` body is prose
+  too; call edges come from parsed `jobs.*.uses`, not from a text match.
+- **`created_at` is the right age for a job, measured rather than assumed.** A job gated on `needs:`
+  gets its record created when it becomes _eligible_, not at run start — on run `40308443374` the plan
+  job started at 10:34:21 and its shards were created at 10:35:26, and a release run's shards were
+  created 1m11s after it began. So a dependency wait cannot read as a queue wait. What the check does
+  report after an hour is a job held by an environment rule or a job-level `concurrency:`, and it says
+  so in its remedy line instead of blaming a runner.
+
+**Known limit of that guard: it is a deny-list, not an allow-list.** A typo (`ubunut-latest`) or a
+vendor nobody has added still passes. Allowing only `ubuntu-*`/`windows-*`/`macos-*` without a larger
+suffix would be strictly stronger, and is the change to make if this ever misses something real.
 
 **Deferred, recorded so a later reader does not assume them done.** Nothing checks that every caller of
 a workflow with an accepted input default (`unit-tests.yml`'s `runner`) actually passes it, so a new

@@ -142,6 +142,13 @@ export function judgeQueue(
       // Why not `started_at`: GitHub sets it when the job is *queued*, so it is not evidence that a
       // runner picked the job up. The 2026-10-26 relay job carried `started_at` set, `runner_name: ""`
       // and `runner_id: 0`, and waited 17.5 h — a check gated on `started_at` sees none of that.
+      //
+      // Why `created_at` is still the right age, measured 2026-11-01 on run 40308443374 and a release
+      // run: a job gated on `needs:` gets its record created when it becomes *eligible*, not at run
+      // start (shards created 10:35:26 against a run created 10:34:18; the release chain's shards
+      // 1m11s after start). So a dependency wait does not read as a queue wait. What this does report
+      // after an hour is a job held by an environment rule or a job-level `concurrency:`, and the
+      // remedy line says so rather than blaming a runner label.
       if (job.runner_name || job.runner_id) {
         continue
       }
@@ -205,6 +212,11 @@ export function describeVerdict(verdict) {
         ? 'WAITING'
         : 'QUEUED '
   }
+  const manifestLine = verdict.manifestError
+    ? [
+        `  manifest  ${KNOWN_GHOSTS} is unreadable (${verdict.manifestError}); nothing is acknowledged`
+      ]
+    : []
   const rowOf = (entry) =>
     `  ${tagOf(entry)} ${hours(entry.ageHours).padStart(5)}  ${
       entry.where === 'job'
@@ -214,7 +226,8 @@ export function describeVerdict(verdict) {
 
   if (waited.length === 0) {
     const lines = [
-      `queued runs: PASS — nothing waiting past ${limitH}h across ${inFlight} in-flight run(s), ${footer}`
+      `queued runs: PASS — nothing waiting past ${limitH}h across ${inFlight} in-flight run(s), ${footer}`,
+      ...manifestLine
     ]
     for (const entry of acknowledged) {
       lines.push(rowOf(entry))
@@ -230,9 +243,15 @@ export function describeVerdict(verdict) {
   }
 
   const lines = [
-    `queued runs: ATTENTION — ${waited.length} waiting past ${limitH}h (oldest ${hours(oldestHours)})`
+    `queued runs: ATTENTION — ${waited.length} waiting past ${limitH}h (oldest ${hours(oldestHours)})`,
+    ...manifestLine
   ]
   for (const entry of waited) {
+    lines.push(rowOf(entry))
+  }
+  // Still shown while something else is red: an acknowledged ghost stays visible, it just does not
+  // count as the reason.
+  for (const entry of acknowledged) {
     lines.push(rowOf(entry))
   }
   if (waited.some((entry) => entry.where === 'ghost')) {
@@ -322,11 +341,12 @@ function fetchJobsByRun(runs, now = Date.now()) {
 
 function main() {
   const json = process.argv.includes('--json')
-  const knownGhosts = readKnownGhosts()
-  if (!(knownGhosts instanceof Set)) {
-    console.error(`queued runs: cannot tell — ${KNOWN_GHOSTS} is unreadable: ${knownGhosts.error}`)
-    process.exit(2)
-  }
+  // Why the queue is judged anyway when the manifest is unreadable: a manifest entry can only *relax* a
+  // finding, so continuing with none acknowledged fails safe — a listed ghost goes red rather than a
+  // real wait disappearing behind an exit 2 that names the wrong cause.
+  const read = readKnownGhosts()
+  const knownGhosts = read instanceof Set ? read : new Set()
+  const manifestError = read instanceof Set ? null : read.error
   let verdict
   try {
     const runs = fetchRuns()
@@ -334,7 +354,8 @@ function main() {
     verdict = {
       ...judgeQueue({ runs, jobsByRun: jobs.jobsByRun, knownGhosts }),
       candidates: jobs.candidates,
-      lookedAt: Object.keys(jobs.jobsByRun).length
+      lookedAt: Object.keys(jobs.jobsByRun).length,
+      manifestError
     }
   } catch (error) {
     console.error(`queued runs: cannot tell — ${firstLine(error)}`)

@@ -225,6 +225,26 @@ describe('a job that was queued, measured against the real payload', () => {
   })
 })
 
+describe('a job whose dependencies have not finished', () => {
+  it('is not reported, because its record is only created when it becomes eligible', () => {
+    // Measured on run 40308443374: the plan job started at 10:34:21 and the shards that need it were
+    // created at 10:35:26 — created_at tracks eligibility, not the run's start, so an old run with a
+    // freshly eligible job is not a queue wait.
+    const longRun = run({ created_at: hoursAgo(6), run_started_at: hoursAgo(6) })
+    const justEligible = {
+      name: 'build',
+      status: 'queued',
+      created_at: hoursAgo(0.2),
+      started_at: hoursAgo(0.2),
+      runner_name: '',
+      runner_id: 0
+    }
+    const verdict = judge([longRun], { [longRun.id]: [justEligible] })
+
+    expect(verdict.waited).toEqual([])
+  })
+})
+
 describe('a zero-job run that cannot be cleared', () => {
   const ghostRun = () => run({ id: 77, status: 'queued', created_at: hoursAgo(593) })
 

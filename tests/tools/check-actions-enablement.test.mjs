@@ -189,6 +189,35 @@ jobs:
     expect(runnerLabelsOf(text)).toEqual(['macos-15-xlarge'])
   })
 
+  it('catches the larger-runner spellings GitHub uses for Linux and Windows', () => {
+    const text = `on: workflow_call
+jobs:
+  a:
+    runs-on: windows-latest-8-cores
+  b:
+    runs-on: ubuntu-22.04-16core
+`
+
+    expect(runnerLabelsOf(text)).toEqual(['ubuntu-22.04-16core', 'windows-latest-8-cores'])
+  })
+
+  it('matches a label family whatever its case, as GitHub does', () => {
+    expect(runnerLabelsOf('jobs:\n  a:\n    runs-on: Self-Hosted\n')).toEqual(['Self-Hosted'])
+  })
+
+  it('does not read prose as a label request', () => {
+    const text = `concurrency:
+  group: deploy-self-hosted-now
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo depot-ubuntu
+`
+
+    expect(runnerLabelsOf(text)).toEqual([])
+  })
+
   it('ignores a label that sits under env: or script:, neither of which can select a runner', () => {
     const text = `on: workflow_call
 jobs:
