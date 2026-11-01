@@ -39,6 +39,9 @@ vi.mock('../copilot/copilot-gh-credentials', () => ({
 vi.mock('../../../main/deepseek/deepseek-api-key-store', () => ({
   hasDeepSeekApiKey: vi.fn(() => false)
 }))
+vi.mock('../../../main/deepinfra/deepinfra-api-key-store', () => ({
+  hasDeepInfraApiKey: vi.fn(() => false)
+}))
 vi.mock('../../../main/fireworks/fireworks-credentials-store', () => ({
   hasFireworksCredentials: vi.fn(() => false)
 }))

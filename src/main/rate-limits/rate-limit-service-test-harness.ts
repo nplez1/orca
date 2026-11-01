@@ -20,6 +20,7 @@ import { fetchAntigravityRateLimits } from './antigravity-usage-fetcher'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { hasDeepSeekApiKey } from '../deepseek/deepseek-api-key-store'
 import { hasFireworksCredentials } from '../fireworks/fireworks-credentials-store'
+import { hasDeepInfraApiKey } from '../deepinfra/deepinfra-api-key-store'
 
 export type Deferred<T> = {
   promise: Promise<T>
@@ -158,7 +159,8 @@ function unmockedProviderModules(): string[] {
     ['./antigravity-usage-fetcher', fetchAntigravityRateLimits],
     ['../minimax/minimax-cookie-store', hasMiniMaxSessionCookie],
     ['../deepseek/deepseek-api-key-store', hasDeepSeekApiKey],
-    ['../fireworks/fireworks-credentials-store', hasFireworksCredentials]
+    ['../fireworks/fireworks-credentials-store', hasFireworksCredentials],
+    ['../deepinfra/deepinfra-api-key-store', hasDeepInfraApiKey]
   ]
   return modules
     .filter(([, imported]) => !vi.isMockFunction(imported))
@@ -201,6 +203,7 @@ export function resetRateLimitProviderMocks(): void {
   vi.mocked(hasMiniMaxSessionCookie).mockReturnValue(false)
   vi.mocked(hasDeepSeekApiKey).mockReturnValue(false)
   vi.mocked(hasFireworksCredentials).mockReturnValue(false)
+  vi.mocked(hasDeepInfraApiKey).mockReturnValue(false)
   vi.mocked(readGrokAuthSession).mockReturnValue({ status: 'missing' })
   vi.mocked(readCursorAuthSession).mockResolvedValue({ status: 'missing' })
 }

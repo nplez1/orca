@@ -290,6 +290,21 @@ describe('credits-only providers', () => {
     expect(
       getVisibleUsageProvider('fireworks', null, usageSettings({ fireworksApiKeyConfigured: true }))
     ).toMatchObject({ provider: 'fireworks', status: 'fetching', credits: null })
+    expect(
+      getVisibleUsageProvider('deepinfra', null, usageSettings({ deepinfraApiKeyConfigured: true }))
+    ).toMatchObject({ provider: 'deepinfra', status: 'fetching', credits: null })
+  })
+
+  it('surfaces a live DeepInfra balance as a configured reading', () => {
+    // Why: nothing else asserts that an `ok` DeepInfra snapshot reaches the bar, so
+    // dropping its projection would hide a funded account without a failing test.
+    expect(
+      getVisibleUsageProvider(
+        'deepinfra',
+        provider('ok', { provider: 'deepinfra', credits: deepseekCredits }),
+        usageSettings({ deepinfraApiKeyConfigured: true })
+      )
+    ).toMatchObject({ provider: 'deepinfra', status: 'ok', credits: deepseekCredits })
   })
 
   it('shows a pending Copilot row from its durable credential flag alone', () => {

@@ -125,8 +125,19 @@ describe('fetchDeepInfraRateLimits', () => {
     expect(result.credits?.available).toBe(false)
   })
 
-  it('reads absent amounts as zero, which is what a fresh account answers', async () => {
+  it('reports an all-absent payload as a parse failure, not a confident $0.00', async () => {
+    // Why: this API answers plain JSON, which writes a zero as 0 rather than omitting
+    // it, so neither amount present means the shape changed.
     netFetchMock.mockResolvedValueOnce(makeResponse({}))
+
+    const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata?.failureKind).toBe('parse')
+  })
+
+  it('reads an explicit zero balance as zero, which is what a fresh account answers', async () => {
+    netFetchMock.mockResolvedValueOnce(makeResponse({ stripe_balance: 0, recent: 0 }))
 
     const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
 
@@ -134,6 +145,37 @@ describe('fetchDeepInfraRateLimits', () => {
     expect(result.credits?.amount).toEqual({ currencyCode: 'USD', units: '0', nanos: 0 })
     // Why no item: zero unbilled usage has nothing to break out.
     expect(result.credits?.items).toEqual([])
+    // Why not available: a prepaid account at zero credit cannot fund calls.
+    expect(result.credits?.available).toBe(false)
+  })
+
+  it('keeps an invoice-billed account spendable at about zero', async () => {
+    // Why: only a prepaid ('balance') account stops working at zero credit, so an
+    // invoice-billed one must not show the "cannot fund further calls" warning.
+    netFetchMock.mockResolvedValueOnce(
+      makeResponse({ stripe_balance: 0, recent: 0.5, billing_type: 'invoice' })
+    )
+
+    const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
+
+    expect(result.status).toBe('ok')
+    // Why '0' with negative nanos: a sub-unit debit carries its sign in nanos alone.
+    expect(result.credits?.amount).toEqual({ currencyCode: 'USD', units: '0', nanos: -500_000_000 })
+    expect(result.credits?.available).toBe(true)
+  })
+
+  it('rounds once over the summed amount, so it cannot sit a cent off the dashboard', async () => {
+    // -20.004 credit and 0.005 unbilled is 19.999 left, which the dashboard shows as $20.00.
+    // Rounding each field to cents first would answer $19.99.
+    netFetchMock.mockResolvedValueOnce(makeResponse({ stripe_balance: -20.004, recent: 0.005 }))
+
+    const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
+
+    expect(result.credits?.amount).toEqual({
+      currencyCode: 'USD',
+      units: '19',
+      nanos: 999_000_000
+    })
   })
 
   it('reports a rejected key as a credential failure', async () => {

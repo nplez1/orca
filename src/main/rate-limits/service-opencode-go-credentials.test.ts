@@ -85,6 +85,9 @@ vi.mock('../minimax/minimax-cookie-store', () => ({
 vi.mock('../deepseek/deepseek-api-key-store', () => ({
   hasDeepSeekApiKey: vi.fn(() => false)
 }))
+vi.mock('../deepinfra/deepinfra-api-key-store', () => ({
+  hasDeepInfraApiKey: vi.fn(() => false)
+}))
 
 vi.mock('../fireworks/fireworks-credentials-store', () => ({
   hasFireworksCredentials: vi.fn(() => false)
