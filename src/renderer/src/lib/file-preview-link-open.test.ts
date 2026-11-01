@@ -105,7 +105,7 @@ it.each([
     )
     expect(outcome).toMatchObject({
       status: 'opened',
-      result: { worktreeId: WORKSPACE, executionHostId: host }
+      result: { worktreeId: WORKSPACE, executionHostId: host, groupId: 'a' }
     })
     if (outcome.status !== 'opened') {
       throw new Error('Expected a detected-only workspace preview')

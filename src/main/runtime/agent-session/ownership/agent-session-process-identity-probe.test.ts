@@ -214,7 +214,10 @@ describe('owner identity probe', () => {
     const env = darwinStartTimePsEnvironment()
 
     expect(env.TZ).toBe('UTC')
-    expect(env.LC_ALL).toBe('en_US.UTF-8')
+    // Why gated: psLocaleEnvironment pins the locale on darwin only, and this helper never runs elsewhere.
+    if (process.platform === 'darwin') {
+      expect(env.LC_ALL).toBe('en_US.UTF-8')
+    }
   })
 })
 
