@@ -170,25 +170,21 @@ export function hasMultipleWorkspaceReviews(
   return entries.length > 1
 }
 
-/** The attachment behind the review a pane is showing, when the switcher picked it.
+/** The attachment that carries a shown review, when the workspace holds one.
  *
- *  Null means the shown review is the workspace's own: either nothing is stored for this workspace,
- *  or the stored key no longer names a review it holds. Callers use this to act on the review the
- *  user is looking at — unlinking, for one — instead of the workspace's own slot. */
-export function findPickedReviewAttachment(
+ *  `getWorkspaceAttachments` unions `linkedItems` with the legacy slots, so this answers for a
+ *  review only a slot names as well as for one the user attached. A caller that unlinks uses it to
+ *  remove the row that produced the review, instead of clearing a slot that would leave the row —
+ *  or, for a review the branch lookup discovered, leave the review itself — in place. */
+export function findWorkspaceReviewAttachment(
   worktree: ReviewAttachmentSource | null | undefined,
-  active: WorkspaceActiveReview | null | undefined,
-  storedKey: string | null | undefined
+  review: Pick<WorkspaceActiveReview, 'provider' | 'number' | 'url'> | null | undefined
 ): WorkspaceAttachment | null {
-  if (!worktree || !active || !isWorkspaceReviewProvider(active.provider)) {
-    return null
-  }
-  if (storedKey !== workspaceReviewSelectionKey(active.provider, active.number)) {
+  if (!worktree || !review) {
     return null
   }
   return (
-    resolveWorkspaceReviewSelection(worktree, active).find((entry) => entry.key === storedKey)
-      ?.attachment ?? null
+    getWorkspaceAttachments(worktree).find((item) => attachmentMatchesReview(item, review)) ?? null
   )
 }
 

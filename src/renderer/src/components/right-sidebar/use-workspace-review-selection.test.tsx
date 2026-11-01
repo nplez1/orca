@@ -142,6 +142,18 @@ describe('useWorkspaceReviewSelection', () => {
     expect(store.fetchHostedReviewForBranch).not.toHaveBeenCalled()
   })
 
+  it('never writes the shared selection on its own, even when the pick is this pane default', () => {
+    // Why: the two panes resolve their default review from different async sources, so a stored key
+    // that is the default in one is a pick in the other. Clearing here would let one pane wipe the
+    // other's pick, which is the disagreement the shared selection exists to prevent.
+    store.selections = { 'worktree-1': 'github:12' }
+
+    const { result } = renderSelection()
+
+    expect(result.current.isWorkspaceReview).toBe(true)
+    expect(store.selectWorkspaceReview).not.toHaveBeenCalled()
+  })
+
   it('hides a pick whose lookup has not answered yet, so the pane keeps the workspace review', () => {
     store.selections = { 'worktree-1': 'github:9' }
 

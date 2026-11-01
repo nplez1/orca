@@ -43,6 +43,7 @@ export function createModel(overrides: Partial<PollingInput> = {}): PollingInput
     setChecksError: vi.fn(),
     setChecksLoading: vi.fn(),
     setComments: vi.fn(),
+    showsPickedReview: false,
     setCommentsError: vi.fn(),
     setCommentsLoading: vi.fn(),
     gitLabProjectRefRef: { current: null },

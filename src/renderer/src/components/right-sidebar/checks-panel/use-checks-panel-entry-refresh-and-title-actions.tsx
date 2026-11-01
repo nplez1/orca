@@ -30,6 +30,7 @@ type ChecksPanelEntryRefreshAndTitleActionsInput = Pick<
   | 'prCacheKey'
   | 'prNumber'
   | 'reviewSelection'
+  | 'showsPickedReview'
 > &
   Pick<
     ChecksPanelControllerState,
@@ -95,6 +96,7 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     setEditingTitle,
     setTitleDraft,
     setTitleSaving,
+    showsPickedReview,
     titleDraft,
     titleInputFocusTimerRef,
     titleInputRef
@@ -102,6 +104,18 @@ export function useChecksPanelEntryRefreshAndTitleActions(
   const handleEntryRefresh = useCallback(
     (options: { refreshChecks: boolean; refreshComments: boolean }) => {
       if (!repo || !branch || !activeWorktreeId) {
+        return
+      }
+      // Why the pick first: entering the tab is this pane's only periodic re-read of review metadata,
+      // and the branch refresh below names the branch's own review, not the one on screen.
+      if (showsPickedReview) {
+        void reviewSelection.refreshSelectedReview().catch(() => {})
+        if (options.refreshChecks) {
+          void fetchChecks({ force: true, wakeWslDistro: true })
+        }
+        if (options.refreshComments) {
+          void fetchComments({ force: true })
+        }
         return
       }
       // Tab entry is automatic: preserve rate-limit guards and force only panes already known stale.
@@ -148,7 +162,9 @@ export function useChecksPanelEntryRefreshAndTitleActions(
       linkedGiteaPR,
       linkedGitLabMR,
       linkedPR,
-      repo
+      repo,
+      reviewSelection,
+      showsPickedReview
     ]
   )
 
@@ -208,7 +224,9 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     }
     // Why before the branch path: a picked review is not this branch's review, so re-reading the
     // branch would leave the review the user just changed (title, merge, a resolved thread) stale.
-    if (!reviewSelection.isWorkspaceReview) {
+    // Why the pick rather than the selection's flag: this is the review the header shows, and an
+    // unrenderable or still-loading pick is not one of them.
+    if (showsPickedReview) {
       await reviewSelection.refreshSelectedReview()
       return
     }
@@ -268,7 +286,8 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     linkedGitLabMR,
     linkedPR,
     repo,
-    reviewSelection
+    reviewSelection,
+    showsPickedReview
   ])
 
   const handleStartEdit = useCallback(() => {

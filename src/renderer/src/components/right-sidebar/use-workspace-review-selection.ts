@@ -96,6 +96,10 @@ export function useWorkspaceReviewSelection({
   }, [worktree, activeProvider, activeNumber, activeTitle, activeUrl])
 
   const selected = findWorkspaceReviewSelection(entries, storedKey)
+  // Why this is per-pane and stays that way: `entries[0]` is the review *this* pane would show with
+  // no pick, and the two panes resolve it from different async sources, so the same stored key can
+  // be the default in one and a pick in the other for a commit or two. It is therefore a render
+  // decision only — nothing writes the store from it, or one pane would drop the other's pick.
   const isWorkspaceReview = selected !== null && selected.key === entries[0]?.key
 
   // Why the runtime revision: the request key folds in the provider runtime, so a reconnected
@@ -146,16 +150,6 @@ export function useWorkspaceReviewSelection({
     void lookUpSelectedReview(false).catch(() => {})
   }, [isVisible, lookUpSelectedReview, needsLookup])
 
-  // Why clear here: a stored key that stops naming a non-default review — the workspace's own review
-  // became the pick, or the review was unlinked — would otherwise leave the key pointing at a review
-  // the pane no longer treats as a pick, and readers of the raw key (the unlink path) would disagree
-  // with the pane about which review is shown.
-  useEffect(() => {
-    if (worktreeId && storedKey !== undefined && isWorkspaceReview) {
-      selectWorkspaceReview(worktreeId, null)
-    }
-  }, [isWorkspaceReview, selectWorkspaceReview, storedKey, worktreeId])
-
   const selectReview = useCallback(
     (key: string): void => {
       if (!worktreeId) {
@@ -173,13 +167,18 @@ export function useWorkspaceReviewSelection({
     [lookUpSelectedReview]
   )
 
-  return {
-    entries,
-    selected,
-    isWorkspaceReview,
-    hasMultiple: hasMultipleWorkspaceReviews(entries),
-    selectedReview: isWorkspaceReview ? null : (cacheEntry?.data ?? null),
-    selectReview,
-    refreshSelectedReview
-  }
+  // Why memoized: panes put this object in callback dependency lists, so a fresh object per render
+  // would rebuild those callbacks — and every prop built on them — on each store write.
+  return useMemo(
+    () => ({
+      entries,
+      selected,
+      isWorkspaceReview,
+      hasMultiple: hasMultipleWorkspaceReviews(entries),
+      selectedReview: isWorkspaceReview ? null : (cacheEntry?.data ?? null),
+      selectReview,
+      refreshSelectedReview
+    }),
+    [cacheEntry?.data, entries, isWorkspaceReview, refreshSelectedReview, selectReview, selected]
+  )
 }

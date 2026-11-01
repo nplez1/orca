@@ -7,6 +7,7 @@ import type { GitBranchLineTotal } from '../../../../shared/git-status-types'
 import type { HostedReviewInfo } from '../../../../shared/hosted-review'
 import type { WorktreeGitIdentityDisplay } from '../../../../shared/worktree/git-identity-display'
 import type { PrimaryAction } from './source-control-primary-action'
+import type { WorkspaceReviewSelection } from './use-workspace-review-selection'
 import { makeWorkspaceReviewSelection } from './workspace-review-selection.test-fixture'
 
 vi.mock('@/components/ui/tooltip', () => ({
@@ -44,6 +45,7 @@ function renderToolbar(options?: {
   branchLineTotal?: GitBranchLineTotal | null
   visibleCreatePrHeaderAction?: PrimaryAction | null
   hostedReview?: HostedReviewInfo | null
+  reviewSelection?: WorkspaceReviewSelection
   suppressedGitHubPRNumber?: number | null
 }): string {
   return renderToStaticMarkup(
@@ -58,7 +60,7 @@ function renderToolbar(options?: {
           : options.visibleCreatePrHeaderAction
       }
       displayedReview={options?.hostedReview ?? null}
-      reviewSelection={makeWorkspaceReviewSelection()}
+      reviewSelection={options?.reviewSelection ?? makeWorkspaceReviewSelection()}
       isCreatePrIntentInFlight={false}
       isCreatingPr={false}
       onCreatePrHeaderClick={vi.fn()}
@@ -84,6 +86,65 @@ function renderToolbar(options?: {
     />
   )
 }
+
+describe('SourceControlHeaderToolbar review switching', () => {
+  const PICKED_REVIEW: HostedReviewInfo = {
+    provider: 'github',
+    number: 9,
+    title: 'Parent change',
+    state: 'open',
+    url: 'https://github.com/acme/orca/pull/9',
+    status: 'success',
+    updatedAt: '2026-05-17T00:00:00.000Z',
+    mergeable: 'MERGEABLE'
+  }
+  const twoReviews = makeWorkspaceReviewSelection({
+    isWorkspaceReview: false,
+    selected: {
+      key: 'github:9',
+      provider: 'github',
+      number: 9,
+      title: 'Parent change',
+      url: PICKED_REVIEW.url,
+      attachment: null
+    },
+    entries: [
+      {
+        key: 'github:12',
+        provider: 'github',
+        number: 12,
+        title: 'Add the thing',
+        url: 'https://github.com/acme/orca/pull/12',
+        attachment: null
+      },
+      {
+        key: 'github:9',
+        provider: 'github',
+        number: 9,
+        title: 'Parent change',
+        url: PICKED_REVIEW.url,
+        attachment: null
+      }
+    ]
+  })
+
+  it('links the review the switcher picked, not the workspace one', () => {
+    const markup = renderToolbar({
+      hostedReview: PICKED_REVIEW,
+      reviewSelection: twoReviews
+    })
+
+    expect(markup).toContain('PR #9')
+    expect(markup).not.toContain('PR #12')
+    expect(markup).toContain('workspace-review-switcher')
+  })
+
+  it('shows no switcher when the workspace holds one review', () => {
+    const markup = renderToolbar()
+
+    expect(markup).not.toContain('workspace-review-switcher')
+  })
+})
 
 describe('SourceControlHeaderToolbar branch identity', () => {
   it('shows the relink recovery instead of blank chrome for a matched unlinked PR', () => {

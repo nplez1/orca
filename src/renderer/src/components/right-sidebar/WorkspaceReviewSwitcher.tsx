@@ -10,13 +10,22 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { WorkspaceReviewSelectionEntry } from './workspace-review-selection'
-import type { WorkspaceReviewSelection } from './use-workspace-review-selection'
 
 /** What a review is called in the switcher: `PR #12` on GitHub and `MR !12` on GitLab. */
 export function workspaceReviewLabel(
   entry: Pick<WorkspaceReviewSelectionEntry, 'provider' | 'number'>
 ): string {
   return entry.provider === 'gitlab' ? `MR !${entry.number}` : `PR #${entry.number}`
+}
+
+export type WorkspaceReviewSwitcherProps = {
+  /** The reviews to list. A pane passes only the ones it can render, so a row it lists is a row it
+   *  can show; fewer than two means there is nothing to switch between and the control is absent. */
+  entries: readonly WorkspaceReviewSelectionEntry[]
+  /** The entry the pane is showing, or the one it would fall back to. */
+  selectedKey: string | null
+  onSelectReview: (key: string) => void
+  className?: string
 }
 
 /** The chevron that picks which of a workspace's reviews a pane describes.
@@ -26,17 +35,16 @@ export function workspaceReviewLabel(
  *  Both panes render this, and they share one selection, so the two can never disagree about which
  *  review is shown. */
 export function WorkspaceReviewSwitcher({
-  selection,
+  entries,
+  selectedKey,
+  onSelectReview,
   className
-}: {
-  selection: WorkspaceReviewSelection
-  className?: string
-}): React.JSX.Element | null {
+}: WorkspaceReviewSwitcherProps): React.JSX.Element | null {
   const switchLabel = translate(
     'auto.components.right.sidebar.WorkspaceReviewSwitcher.switchReview',
     'Switch pull request'
   )
-  if (!selection.hasMultiple) {
+  if (entries.length < 2) {
     return null
   }
   return (
@@ -62,11 +70,8 @@ export function WorkspaceReviewSwitcher({
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuRadioGroup
-          value={selection.selected?.key ?? ''}
-          onValueChange={selection.selectReview}
-        >
-          {selection.entries.map((entry) => (
+        <DropdownMenuRadioGroup value={selectedKey ?? ''} onValueChange={onSelectReview}>
+          {entries.map((entry) => (
             <DropdownMenuRadioItem key={entry.key} value={entry.key} className="my-0.5 items-start">
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="truncate font-mono text-2xs text-foreground">

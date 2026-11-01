@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
 import {
-  findPickedReviewAttachment,
+  findWorkspaceReviewAttachment,
   findWorkspaceReviewSelection,
   isChecksPaneReviewProvider,
   pickShownReview,
@@ -9,8 +9,11 @@ import {
   workspaceReviewSelectionKey
 } from './workspace-review-selection'
 
-function makeWorktree(linkedItems: WorkspaceAttachment[]): Pick<Worktree, 'linkedItems'> {
-  return { linkedItems }
+function makeWorktree(
+  linkedItems: WorkspaceAttachment[],
+  slots: Partial<Worktree> = {}
+): Pick<Worktree, 'linkedItems'> & Partial<Worktree> {
+  return { linkedItems, ...slots }
 }
 
 function makeReview(overrides: Partial<WorkspaceAttachment> = {}): WorkspaceAttachment {
@@ -144,46 +147,42 @@ describe('pickShownReview', () => {
   })
 })
 
-describe('findPickedReviewAttachment', () => {
+describe('findWorkspaceReviewAttachment', () => {
   const picked = makeReview({
     number: 9,
     title: 'Parent change',
     url: 'https://github.com/acme/orca/pull/9'
   })
   const worktree = makeWorktree([makeReview(), picked])
-  const pickedReview = { provider: 'github' as const, number: 9, title: 'Parent change', url: '' }
+  const pickedReview = {
+    provider: 'github' as const,
+    number: 9,
+    title: 'Parent change',
+    url: 'https://github.com/acme/orca/pull/9'
+  }
 
-  it('names the attachment of the review the switcher picked', () => {
-    expect(findPickedReviewAttachment(worktree, pickedReview, 'github:9')).toEqual(picked)
+  it('names the attachment that carries the shown review', () => {
+    expect(findWorkspaceReviewAttachment(worktree, pickedReview)).toEqual(picked)
   })
 
-  it('answers null when nothing is stored for the workspace', () => {
-    expect(findPickedReviewAttachment(worktree, ACTIVE, null)).toBeNull()
-    expect(findPickedReviewAttachment(worktree, ACTIVE, undefined)).toBeNull()
-  })
-
-  it('answers null for a stored key that no longer names a review the workspace holds', () => {
-    expect(findPickedReviewAttachment(worktree, pickedReview, 'github:404')).toBeNull()
-    expect(findPickedReviewAttachment(worktree, pickedReview, null)).toBeNull()
-  })
-
-  it('names the attachment once the workspace review became the stored key, which the pane clears', () => {
-    // Why this shape is reachable at all: the stored key can name what has since become the
-    // workspace's own review, and the pane's selection hook clears it on the next commit. Reading
-    // the key before that clear still names the review the user is looking at, which is the answer
-    // an unlink wants.
-    expect(findPickedReviewAttachment(worktree, ACTIVE, 'github:12')).toEqual(
-      worktree.linkedItems?.[0]
-    )
-  })
-
-  it('answers null for a review the workspace holds no attachment for', () => {
+  it('answers for a review the workspace holds only through a compatibility slot', () => {
+    // Why this matters: the unlink path has to reach a slot-named review too, or clearing the slot
+    // is the only edit available and a branch-discovered review comes straight back.
+    const slotOnly = makeWorktree([], { linkedGitLabMR: 42 })
     expect(
-      findPickedReviewAttachment(
-        makeWorktree([]),
-        { provider: 'github', number: 9, title: 'Parent change', url: '' },
-        'github:9'
-      )
+      findWorkspaceReviewAttachment(slotOnly, {
+        provider: 'gitlab',
+        number: 42,
+        url: 'https://gitlab.example.com/group/repo/-/merge_requests/42'
+      })
+    ).toEqual(expect.objectContaining({ provider: 'gitlab', type: 'mr', number: 42 }))
+  })
+
+  it('answers null for a review the workspace does not hold', () => {
+    expect(
+      findWorkspaceReviewAttachment(worktree, { provider: 'github', number: 404, url: '' })
     ).toBeNull()
+    expect(findWorkspaceReviewAttachment(worktree, null)).toBeNull()
+    expect(findWorkspaceReviewAttachment(null, pickedReview)).toBeNull()
   })
 })

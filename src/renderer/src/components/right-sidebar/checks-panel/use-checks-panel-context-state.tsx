@@ -7,10 +7,8 @@ import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-iden
 import { isStaleMergedGitHubReviewForHead } from '@/store/slices/hosted-review-cache-state'
 import { selectReviewCacheEntry } from '../review-cache-entry-selection'
 import { selectWorkspaceReviewState, type ChecksPanelReview } from '../checks-panel-review'
-import { gitHubPRInfoFromHostedReview } from '../hosted-review-to-pr-info'
 import { useWorkspaceReviewSelection } from '../use-workspace-review-selection'
-import { isChecksPaneReviewProvider, pickShownReview } from '../workspace-review-selection'
-import { isGitLabChecksPanelReview } from './gitlab-review-client'
+import { resolveChecksPanelShownReview } from './shown-review'
 import { clearPendingPRCommentAiAck } from '../pr-comments-ai-launch-ack'
 import {
   buildGitHubPRRefreshStateClearToken,
@@ -246,21 +244,13 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     repo: repo ?? undefined,
     worktree: activeWorktree
   })
-  // Why only GitHub and GitLab: those are the providers this pane can render checks and comments
-  // for, so a picked review from another provider leaves the workspace's own review on screen
-  // rather than blanking a pane that has nothing to show for it.
-  const pickedReview = pickShownReview(reviewSelection, isChecksPaneReviewProvider)
-  const activeReview: ChecksPanelReview | null = pickedReview ?? workspaceReview
-  // Why derived from the review rather than left to the branch cache: a picked review is not this
-  // branch's PR, so `prCache` has nothing for it. The mapping is a faithful rename of the same
-  // fields, which keeps checks, comments and the head-sha freshness gate keyed on the shown PR.
-  const pr: PRInfo | null = pickedReview ? gitHubPRInfoFromHostedReview(pickedReview) : branchPR
-  const activeGitLabReview = isGitLabChecksPanelReview(activeReview) ? activeReview : null
-  // Why gated on the workspace's own review: a picked GitHub review must not read as a GitLab
-  // context just because this workspace also holds a GitLab MR.
-  const isGitLabReviewContext = Boolean(
-    activeGitLabReview || (reviewSelection.isWorkspaceReview && linkedGitLabMR !== null)
-  )
+  const { activeReview, pr, showsPickedReview, activeGitLabReview, isGitLabReviewContext } =
+    resolveChecksPanelShownReview({
+      branchPR,
+      linkedGitLabMR,
+      selection: reviewSelection,
+      workspaceReview
+    })
   const activeConflictReview = activeReview?.mergeable === 'CONFLICTING' ? activeReview : null
   const prRefreshState = useAppStore((s) =>
     prCacheKey
@@ -273,13 +263,18 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   const prNumber = pr?.number ?? null
   // Why the provider and number rather than the review object: the review is rebuilt on every cache
   // write, and only a switch to a different review should drop the rows below.
-  const shownReviewKey = pickedReview ? `${pickedReview.provider}:${pickedReview.number}` : ''
+  const shownReviewKey = showsPickedReview
+    ? `${activeReview?.provider}:${activeReview?.number}`
+    : ''
   useEffect(() => {
     // Why: rows on screen belong to the review that was showing when they were fetched, so keeping
     // them while the new read is in flight would put another review's checks under this header.
+    // Why the loading flags: clearing alone flashes the "no checks configured" empty state.
     setChecks([])
     setComments([])
-  }, [shownReviewKey, setChecks, setComments])
+    setChecksLoading(true)
+    setCommentsLoading(true)
+  }, [shownReviewKey, setChecks, setChecksLoading, setComments, setCommentsLoading])
 
   useEffect(() => {
     const expiryAt = getGitHubPRRefreshStateExpiryAt(rawPRRefreshState)
@@ -385,7 +380,8 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     prRefreshState,
     rawPRRefreshState,
     prNumber,
-    reviewSelection
+    reviewSelection,
+    showsPickedReview
   }
 }
 

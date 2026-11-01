@@ -53,6 +53,7 @@ export type ChecksPanelActiveContentModel = Pick<
     | 'pr'
     | 'prRefreshState'
     | 'reviewSelection'
+    | 'showsPickedReview'
     | 'setChecksPanelContentRef'
   > &
   Pick<

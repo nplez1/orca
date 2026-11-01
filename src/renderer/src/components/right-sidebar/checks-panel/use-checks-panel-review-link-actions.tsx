@@ -1,10 +1,11 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { openGitHubPRLinkModal } from '../github-pr-link-modal'
 import { getWorkspaceAttachments } from '../../../../../shared/workspace-attachments'
 import { getWorkspaceAttachmentKey } from '../../../../../shared/workspace-attachment-normalization'
 import { buildWorkspaceAttachmentEdits } from '../../sidebar/worktree-attachment-editing'
-import { findPickedReviewAttachment } from '../workspace-review-selection'
+import { findWorkspaceReviewAttachment } from '../workspace-review-selection'
 import type { ChecksPanelCheckAndReviewActionsInput } from './check-and-review-action-dependencies'
 import { useUnlinkGitHubPullRequest } from './use-unlink-github-pull-request'
 
@@ -42,13 +43,6 @@ export function useChecksPanelReviewLinkActions(
     runtimeEnvironmentId,
     localExecutionScope
   ])
-  // Why the stored key rather than a resolved list: unlinking is the only action here that has to
-  // know whether the shown review is the workspace's own, and the key alone answers it — a key that
-  // names the shown review means the switcher picked it, and a missing or stale key means it did
-  // not. Reading it here keeps this hook off the panes' selection plumbing.
-  const storedReviewKey = useAppStore((s) =>
-    activeWorktreeId ? s.workspaceReviewSelectionByWorktree[activeWorktreeId] : undefined
-  )
   const selectWorkspaceReview = useAppStore((s) => s.selectWorkspaceReview)
   const reviewLinkScopeKeyRef = useRef(reviewLinkScopeKey)
   const reviewLinkActionGenerationRef = useRef(0)
@@ -69,24 +63,33 @@ export function useChecksPanelReviewLinkActions(
       return
     }
     reviewLinkActionGenerationRef.current += 1
-    // Why the shown review rather than the workspace's slot: once the switcher can show a second
-    // review, unlinking through the slot would remove the one the user is not looking at and leave
-    // the one they are.
-    const pickedAttachment = findPickedReviewAttachment(
-      activeWorktree,
-      activeReview,
-      storedReviewKey
-    )
-    if (pickedAttachment) {
+    // Why the shown review's own row rather than the workspace's slot: with a switcher, clearing the
+    // slot would unlink the review the user is not looking at and leave the one they are. It is also
+    // the only path that removes a review the branch lookup discovered, because a slot-only clear
+    // would let that lookup attach it again.
+    const shownAttachment = findWorkspaceReviewAttachment(activeWorktree, activeReview)
+    if (shownAttachment) {
       const initial = getWorkspaceAttachments(activeWorktree)
-      const removedKey = getWorkspaceAttachmentKey(pickedAttachment)
+      const removedKey = getWorkspaceAttachmentKey(shownAttachment)
       const draft = initial.filter((entry) => getWorkspaceAttachmentKey(entry) !== removedKey)
-      // Why no suppression: a picked review is one the branch lookup did not return, so nothing
-      // will re-attach it and suppressing its number would only mask a later real link.
+      // Why the suppression: the same tombstone the sidebar's row unlink writes, so a GitHub review
+      // the branch lookup still resolves does not come straight back.
       selectWorkspaceReview(activeWorktreeId, null)
-      void updateWorktreeMeta(activeWorktreeId, buildWorkspaceAttachmentEdits({ initial, draft }), {
-        executionHostId: activeWorktree.hostId
-      })
+      void (async () => {
+        const result = await updateWorktreeMeta(
+          activeWorktreeId,
+          {
+            ...buildWorkspaceAttachmentEdits({ initial, draft }),
+            ...(shownAttachment.provider === 'github'
+              ? { suppressedGitHubPR: shownAttachment.number }
+              : {})
+          },
+          { executionHostId: activeWorktree.hostId }
+        )
+        if (!result.ok) {
+          toast.error(result.error)
+        }
+      })()
       return
     }
     if (activeReview.provider === 'github') {
@@ -107,7 +110,6 @@ export function useChecksPanelReviewLinkActions(
     activeWorktreeId,
     linkedGitLabMR,
     selectWorkspaceReview,
-    storedReviewKey,
     unlinkGitHubPullRequest,
     updateWorktreeMeta
   ])

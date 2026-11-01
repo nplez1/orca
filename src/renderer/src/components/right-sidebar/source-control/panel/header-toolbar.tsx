@@ -72,7 +72,11 @@ function HostedReviewToolbarLink({
         review={review}
         onOpenHostedReviewInChecks={onOpenHostedReviewInChecks}
       />
-      <WorkspaceReviewSwitcher selection={reviewSelection} />
+      <WorkspaceReviewSwitcher
+        entries={reviewSelection.entries}
+        selectedKey={reviewSelection.selected?.key ?? null}
+        onSelectReview={reviewSelection.selectReview}
+      />
     </div>
   )
 }

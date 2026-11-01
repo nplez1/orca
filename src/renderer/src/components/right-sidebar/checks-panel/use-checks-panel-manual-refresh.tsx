@@ -65,13 +65,12 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     setEligibilityRefreshNonce,
     setGitStatusSnapshot,
     setIsRefreshing,
+    showsPickedReview,
     updateWorktreeGitIdentity
   } = model
-  // Why derived rather than read off `prNumber`: a picked GitLab review has no GitHub PR number,
-  // and this path only runs for a GitHub review the pane could not get from the branch cache.
-  const pickedReviewNumber = reviewSelection.isWorkspaceReview
-    ? null
-    : (reviewSelection.selectedReview?.number ?? null)
+  // Why the pick rather than the selection's flag: the pane only renders a pick it can render, and
+  // every branch below has to agree with what the header shows.
+  const pickedReview = showsPickedReview ? reviewSelection.selectedReview : null
   const handleRefresh = useCallback(async () => {
     if (!repo || !branch) {
       return
@@ -94,14 +93,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     setIsRefreshing(true)
     // Why before the git-status probe: a picked review is not this branch's PR, so the branch path
     // below would refresh, and then re-read checks for, a review the user is not looking at.
-    if (!reviewSelection.isWorkspaceReview && pickedReviewNumber !== null) {
-      const requestKey = checksPanelAsyncResultKey(
-        prCacheKey,
-        branch,
-        pickedReviewNumber,
-        pr?.prRepo,
-        pr?.headSha
-      )
+    if (pickedReview) {
       try {
         const refreshedReview = await reviewSelection.refreshSelectedReview()
         if (!isCurrentRequest()) {
@@ -109,23 +101,45 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         }
         // The review carries the head this refresh read, so checks key on the commit that was just
         // fetched rather than the one the closure captured before the refresh.
-        const headSha = refreshedReview?.headSha ?? pr?.headSha
+        const headSha = refreshedReview?.headSha ?? pickedReview.headSha
+        if (refreshedReview?.provider === 'gitlab' || activeGitLabReview) {
+          // Why the GitLab details path: an MR's rows come from the MR's pipelines and comments,
+          // not from GitHub checks, and its number is not a GitHub PR number.
+          await fetchGitLabDetails({
+            mrNumberOverride: refreshedReview?.number ?? activeGitLabReview?.number ?? null,
+            headShaOverride: headSha ?? null,
+            commitAsCurrent: true
+          })
+          return
+        }
+        const pickedPRNumber = refreshedReview?.number ?? pickedReview.number
+        // Why the refreshed key: the review may have moved its head, and the pane's current result
+        // key then names the old one, which would discard the rows fetched here.
+        asyncResultKeyRef.current = checksPanelAsyncResultKey(
+          prCacheKey,
+          branch,
+          pickedPRNumber,
+          pr?.prRepo,
+          headSha
+        )
         setChecksLoading(true)
         setCommentsLoading(true)
         const [refreshedChecks, refreshedComments] = await Promise.all([
-          fetchPRChecks(repo.path, pickedReviewNumber, branch, headSha, pr?.prRepo, {
+          // Why no branch: it is what the store writes this PR's check status onto, and this
+          // branch's cached PR is a different review.
+          fetchPRChecks(repo.path, pickedPRNumber, undefined, headSha, pr?.prRepo, {
             force: true,
             repoId: repo.id,
             wakeWslDistro: true
           }),
-          fetchPRComments(repo.path, pickedReviewNumber, {
+          fetchPRComments(repo.path, pickedPRNumber, {
             force: true,
             repoId: repo.id,
             prRepo: pr?.prRepo,
             headSha
           })
         ])
-        if (!isCurrentRequest() || !isCurrentAsyncResult(requestKey)) {
+        if (!isCurrentRequest() || !isCurrentAsyncResult(asyncResultKeyRef.current)) {
           return
         }
         setChecks(refreshedChecks)
@@ -466,7 +480,8 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     pollIntervalRef,
     refreshInFlightRef,
     reviewSelection,
-    pickedReviewNumber
+    pickedReview,
+    fetchGitLabDetails
   ])
   return { handleRefresh }
 }

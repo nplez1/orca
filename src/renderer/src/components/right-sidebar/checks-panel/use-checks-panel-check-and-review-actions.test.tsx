@@ -2,6 +2,7 @@
 
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WorkspaceAttachment } from '../../../../../shared/worktree/types'
 import type { ChecksPanelCheckAndReviewActionsInput } from './check-and-review-action-dependencies'
 import { useChecksPanelCheckAndReviewActions } from './use-checks-panel-check-and-review-actions'
 
@@ -124,7 +125,7 @@ describe('useChecksPanelCheckAndReviewActions', () => {
   })
 })
 
-function makeInput(overrides: Partial<Input> = {}): Input {
+function makeInput(overrides: Partial<Input> = {}, linkedItems: WorkspaceAttachment[] = []): Input {
   const worktree = {
     id: 'repo-1::/workspace/repo',
     repoId: 'repo-1',
@@ -135,7 +136,8 @@ function makeInput(overrides: Partial<Input> = {}): Input {
     linkedGitLabMR: 42,
     linkedPR: null,
     suppressedGitHubPR: null,
-    comment: ''
+    comment: '',
+    linkedItems
   }
   return {
     activeReview: {
@@ -188,21 +190,26 @@ function makeInput(overrides: Partial<Input> = {}): Input {
     setIsFixingChecksWithAI: vi.fn(),
     sourceControlAiActionsVisible: false,
     stateRequestKey: 'state',
-    updateWorktreeMeta: vi.fn(),
+    updateWorktreeMeta: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides
   } as Input
 }
 
 describe('useChecksPanelCheckAndReviewActions GitLab links', () => {
-  it('unlinks the displayed MR through its provider slot', () => {
+  it('unlinks the displayed MR by removing its row, which clears the slot behind it', () => {
     const input = makeInput()
     const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
 
     act(() => result.current.handleUnlinkReview())
 
+    // Why the row rather than `{ linkedGitLabMR: null }`: a slot-only clear leaves the row in
+    // `linkedItems`, so the review comes back on the next read. The slot follows the row.
     expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
       input.activeWorktreeId,
-      { linkedGitLabMR: null },
+      {
+        linkedItemsBase: [expect.objectContaining({ provider: 'gitlab', number: 42 })],
+        linkedItems: []
+      },
       { executionHostId: 'ssh:ssh-1' }
     )
   })
@@ -384,5 +391,55 @@ describe('useChecksPanelCheckAndReviewActions AI details diagnostics', () => {
     ])
     expect(mocks.startFixChecksAgent).toHaveBeenCalledOnce()
     expect(JSON.stringify(mocks.startFixChecksAgent.mock.calls)).not.toContain('SYNTHETIC_SECRET')
+  })
+})
+
+describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
+  it('unlinks the row that carries the shown review, and tombstones it so it cannot come back', () => {
+    const pickedAttachment: WorkspaceAttachment = {
+      provider: 'github',
+      type: 'pr',
+      number: 9,
+      title: 'Parent change',
+      url: 'https://github.com/acme/orca/pull/9'
+    }
+    const input = makeInput(
+      {
+        activeReview: {
+          provider: 'github',
+          number: 9,
+          title: 'Parent change',
+          state: 'open',
+          url: 'https://github.com/acme/orca/pull/9',
+          status: 'success',
+          updatedAt: '2026-05-17T00:00:00.000Z',
+          mergeable: 'MERGEABLE'
+        }
+      },
+      [pickedAttachment]
+    )
+    const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
+
+    act(() => result.current.handleUnlinkReview())
+
+    expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
+      input.activeWorktreeId,
+      expect.objectContaining({
+        suppressedGitHubPR: 9,
+        linkedItems: [expect.objectContaining({ provider: 'gitlab', number: 42 })]
+      }),
+      { executionHostId: 'ssh:ssh-1' }
+    )
+  })
+
+  it('falls back to the slot when the shown review has no row behind it', () => {
+    const input = makeInput({ activeReview: null })
+    const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
+
+    act(() => result.current.handleUnlinkReview())
+
+    // Why nothing happens: with no shown review there is nothing to unlink, and clearing a slot
+    // blindly is how the wrong review gets removed.
+    expect(input.updateWorktreeMeta).not.toHaveBeenCalled()
   })
 })

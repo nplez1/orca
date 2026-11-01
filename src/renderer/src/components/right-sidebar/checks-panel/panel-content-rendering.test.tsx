@@ -174,6 +174,7 @@ describe('checks panel concrete content', () => {
       repo: null,
       refreshHostedReviewAfterMutation: vi.fn(),
       reviewSelection: makeWorkspaceReviewSelection(),
+      showsPickedReview: false,
       resolveCommentsWithAIDisabledReason: undefined,
       saveLaunchActionDefault: vi.fn(),
       setAgentComposerState: vi.fn(),
