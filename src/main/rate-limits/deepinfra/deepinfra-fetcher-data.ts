@@ -103,12 +103,13 @@ function toNanos(value: unknown): number | null {
 }
 
 /**
- * A prepaid account is the one that stops working at zero credit. `billing_type`
- * names it `'balance'`, which is the only value seen from the live API; an absent
- * or unfamiliar one is treated as prepaid so an exhausted account still surfaces.
+ * Only an explicit `'balance'` billing type is known to be prepaid, and a prepaid
+ * account is the one that stops working at zero credit. An absent or unfamiliar
+ * type therefore claims nothing: this API has only ever answered `'balance'`, and
+ * asserting exhaustion on a guess would put a false warning in the tooltip.
  */
 function isPrepaid(payload: DeepInfraChecklist): boolean {
-  return payload.billing_type == null || payload.billing_type === 'balance'
+  return payload.billing_type === 'balance'
 }
 
 /**
@@ -141,7 +142,9 @@ export function buildDeepInfraCredits(payload: DeepInfraChecklist): ProviderCred
   }
   const items: ProviderCreditsItem[] = []
   const unbilled = moneyFromNanos(recentNanos)
-  if (unbilled && recentNanos !== 0) {
+  // Why the half-cent floor: a sub-cent `recent` renders as "Unbilled usage $0.00",
+  // which is a line of noise rather than a breakdown.
+  if (unbilled && Math.abs(recentNanos) >= NANOS_PER_UNIT / 200) {
     items.push({ key: 'unbilled', amount: unbilled })
   }
   // Why billing_type: only a prepaid account stops working at zero credit. An

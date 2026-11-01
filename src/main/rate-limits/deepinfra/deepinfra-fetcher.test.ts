@@ -101,7 +101,7 @@ describe('fetchDeepInfraRateLimits', () => {
 
   it('marks the account exhausted but keeps the reading visible', async () => {
     netFetchMock.mockResolvedValueOnce(
-      makeResponse({ stripe_balance: 0, recent: 1.25, suspended: false })
+      makeResponse({ stripe_balance: 0, recent: 1.25, suspended: false, billing_type: 'balance' })
     )
 
     const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
@@ -137,7 +137,9 @@ describe('fetchDeepInfraRateLimits', () => {
   })
 
   it('reads an explicit zero balance as zero, which is what a fresh account answers', async () => {
-    netFetchMock.mockResolvedValueOnce(makeResponse({ stripe_balance: 0, recent: 0 }))
+    netFetchMock.mockResolvedValueOnce(
+      makeResponse({ stripe_balance: 0, recent: 0, billing_type: 'balance' })
+    )
 
     const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
 
@@ -152,6 +154,7 @@ describe('fetchDeepInfraRateLimits', () => {
   it('keeps an invoice-billed account spendable at about zero', async () => {
     // Why: only a prepaid ('balance') account stops working at zero credit, so an
     // invoice-billed one must not show the "cannot fund further calls" warning.
+    // `'invoice'` is assumed for the postpaid case, not observed from the live API.
     netFetchMock.mockResolvedValueOnce(
       makeResponse({ stripe_balance: 0, recent: 0.5, billing_type: 'invoice' })
     )
@@ -162,6 +165,33 @@ describe('fetchDeepInfraRateLimits', () => {
     // Why '0' with negative nanos: a sub-unit debit carries its sign in nanos alone.
     expect(result.credits?.amount).toEqual({ currencyCode: 'USD', units: '0', nanos: -500_000_000 })
     expect(result.credits?.available).toBe(true)
+  })
+
+  it('claims nothing about exhaustion for a billing type it does not recognize', async () => {
+    netFetchMock.mockResolvedValueOnce(
+      makeResponse({ stripe_balance: 0, recent: 2.5, billing_type: 'prepaid' })
+    )
+
+    const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
+
+    expect(result.credits?.amount).toEqual({
+      currencyCode: 'USD',
+      units: '-2',
+      nanos: -500_000_000
+    })
+    // Why: a negative balance still shows, but "cannot fund further calls" is only
+    // asserted for the one billing type known to be prepaid.
+    expect(result.credits?.available).toBe(true)
+  })
+
+  it('drops an unbilled line that would only render as $0.00', async () => {
+    netFetchMock.mockResolvedValueOnce(
+      makeResponse({ stripe_balance: -20, recent: 0.004, billing_type: 'balance' })
+    )
+
+    const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
+
+    expect(result.credits?.items).toEqual([])
   })
 
   it('rounds once over the summed amount, so it cannot sit a cent off the dashboard', async () => {
