@@ -900,6 +900,9 @@
         "newTerminal": "New terminal",
         "terminalShortcut": "New terminal tab",
         "title": "ORCA"
+      },
+      "taskPageJiraBoard": {
+        "changeStatusFailed": null
       }
     },
     "hooks": {

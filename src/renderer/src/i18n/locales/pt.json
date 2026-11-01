@@ -590,6 +590,7 @@
     "minimizeNotice": {
       "body": "O Orca continua em execução na bandeja do sistema"
     },
+    "activityWaiting": "Orca - atividade em espera",
     "activityWaitingSuffix": "atividade em espera"
   },
   "dashboard": {
@@ -916,6 +917,10 @@
     "taskSearchRetry": "Tentar novamente"
   },
   "dashboardPopout": {
+    "recoverableError": {
+      "title": "O painel do Orca encontrou um erro.",
+      "description": "O painel não conseguiu concluir a renderização. Tente novamente para remontá-lo, ou reabra-o."
+    },
     "bucket": {
       "attention": "Precisa de Você",
       "working": "Em Andamento",
@@ -1692,6 +1697,7 @@
       "df1d56bf87": "A visualização do espaço de trabalho encontrou um erro.",
       "9e0b441a91": "Alternar barra lateral direita",
       "e81217c1b7": "Ocultar Nome do Aplicativo",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "Menu do aplicativo",
       "caea5b51b9": "Reiniciar agora",
       "0a9e810705": "As alterações não serão salvas até reiniciar. Suas abas anteriores estão salvas no disco.",
@@ -2779,6 +2785,7 @@
         "OnboardingFlow": {
           "1b5e182e9f": "Bem-vindo ao Orca",
           "adaa0aa627": "Ir para a etapa {{value0}} da introdução: {{value1}}",
+          "a249f81538": "Orca",
           "277ba45540": "Introdução do Orca",
           "97c42cda00": "Instale a CLI do GitHub para:",
           "ae3b00ca82": "Configurar tarefas do GitHub",
@@ -2935,6 +2942,7 @@
             "bbcd9b7b85": "Recolher espaço de trabalho",
             "c4a8968bdd": "Expandir espaço de trabalho",
             "b10695d6ce": "Encerrar sessão",
+            "288a4dd177": "Orca",
             "53dd5560ae": "Recolher Orca",
             "e419d27083": "Expandir Orca",
             "41ae4fa725": "Encerrando…",
@@ -5113,6 +5121,7 @@
               "dashboard": "painel",
               "agent": "agente",
               "kanban": "kanban",
+              "popout": "janela separada",
               "board": "quadro",
               "inWindow": "na própria janela",
               "worktrees": "worktrees"
@@ -5612,7 +5621,12 @@
             "title": "Painel de Agentes",
             "description": "Quadro kanban para monitorar agentes entre worktrees, na própria janela ou em uma janela separada.",
             "copy": "Adiciona uma entrada Painel de Agentes à barra lateral esquerda. Monitore agentes que precisam de você, estão trabalhando ou concluíram, com agentes ociosos opcionais.",
-            "toggleLabel": "Alternar Painel de Agentes"
+            "toggleLabel": "Alternar Painel de Agentes",
+            "modeLabel": "Abrir como",
+            "modeCopy": "Mostre o painel como um quadro na própria janela ao lado da barra lateral ou em uma janela separada.",
+            "modeAriaLabel": "Modo de abertura do Painel de Agentes",
+            "modeInWindow": "Na própria janela",
+            "modePopout": "Janela separada"
           },
           "browserExtensions": {
             "copy": "Adiciona Configurações › Navegador › Extensões para perfis de navegador locais.",
@@ -10338,6 +10352,8 @@
             "f316a8ca2b": "Nenhum comentário não resolvido selecionado.",
             "d00ebdc402": "Resolver {{value0}} Comentários Com IA",
             "5eb2163b6b": "Revise o prompt antes de iniciar um agente. Depois que o prompt for entregue, o Orca resolve as threads do host selecionadas e responde aos comentários que não conseguir resolver.",
+            "f273f2271c": "Agente iniciado. Marcados {{value0}} como resolvidos, respondidos {{value1}}, ignorados {{value2}}, falharam {{value3}}.{{value4}}",
+            "aa95b81a3a": "Agente iniciado. Marcados {{value0}} como resolvidos, respondidos {{value1}}, ignorados {{value2}}, falharam {{value3}}.",
             "495b2f8c4b": "Agente iniciado, mas não foi possível resolver ou responder os comentários selecionados.",
             "review": {
               "auto_retry": "O Orca vai tentar novamente às {{time}}.",
@@ -10349,6 +10365,7 @@
               "branch": "Sincronizar Branch"
             },
             "7e4b2a19c0": "Não foi possível resolver o PR do GitHub para responder.",
+            "430f1a62d4": "Não foi possível resolver a thread selecionada no host.",
             "updateReactionFailed": "Falha ao atualizar a reação.",
             "gitlabMoreActions": "Mais ações de MR",
             "gitlabLinkAnother": "Vincular outro MR",
@@ -15414,6 +15431,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "saída",
               "5d66fdd7c2": "entrada",
               "7080aeaebb": "Raciocínio",
@@ -15847,6 +15865,8 @@
         "28986b3747": "Foi iniciado um agente de IA para as verificações com falha.",
         "1690fd7f4a": "Nenhuma verificação com falha para corrigir.",
         "9e7c221b8d": "Falha ao executar as verificações novamente",
+        "e463ec935f": "Novas execuções de verificação solicitadas",
+        "ddafe851e1": "Nova execução de verificação solicitada",
         "0bbdc673c1": "Falha ao atualizar as verificações",
         "e7007aa1d8": "Não é possível atualizar as verificações sem um caminho de repositório.",
         "675bc0d638": "Cancelar",
@@ -16376,7 +16396,8 @@
             "4a40af029b": "Tempo de agente",
             "00a6903322": "Agentes iniciados",
             "c0e2e9dcd9": "Bem-vindo de volta",
-            "af761a0c0d": "Configurações"
+            "af761a0c0d": "Configurações",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "Enviar",
@@ -16624,6 +16645,8 @@
         "98583589c6": "Falha ao iniciar um agente de IA para as verificações com falha: {{value0}}",
         "51c65c0265": "Nenhuma verificação com falha para corrigir.",
         "788a782bb0": "Falha ao executar as verificações novamente",
+        "18f2af42ac": "Novas execuções de verificação solicitadas",
+        "5963a6a852": "Nova execução de verificação solicitada",
         "246b2c6456": "Falha ao atualizar as verificações",
         "c057f2fcb0": "Não é possível atualizar as verificações sem um caminho de repositório.",
         "6591b1fa82": "Cancelar",
@@ -18627,6 +18650,7 @@
             "88fea8e84e": "Não Enviar",
             "50b00dc327": "Copiar Detalhes",
             "6d3ebe216a": "Texto de diagnóstico",
+            "835037edc9": "Orca",
             "8e24fe4f75": "Relatório de falha enviado.",
             "8b8473c544": "Relatório de falha copiado.",
             "765591798d": "Verificando relatórios de falha...",
@@ -19641,6 +19665,9 @@
         "checksPassingOfTotal_one": "Verificações bem-sucedidas: {{passing}} de {{count}}",
         "checksPassingOfTotal_other": "Verificações bem-sucedidas: {{passing}} de {{count}}",
         "checksPassingOfTotal_many": "Verificações bem-sucedidas: {{passing}} de {{count}}"
+      },
+      "taskPageJiraBoard": {
+        "changeStatusFailed": "Falha ao alterar o status."
       },
       "jiraIssue": {
         "loadStatusChangesFailed": "Falha ao carregar as alterações de status.",
@@ -21151,6 +21178,9 @@
       "agentOptional": "Agente [Opcional]",
       "createDescription": "Escolha o projeto e o nome do espaço de trabalho. Selecione um agente se quiser iniciar um."
     },
+    "JiraIssueWorkspace": {
+      "pendingChange": "Outra alteração de issue está em andamento."
+    },
     "jiraProjectPicker": {
       "search": "Buscar projetos do Jira",
       "empty": "Nenhum projeto encontrado.",
@@ -21939,6 +21969,7 @@
     "workspace": {
       "startAnother": "Iniciar novo espaço de trabalho",
       "empty": "Vincule uma issue do Jira a um espaço de trabalho ou escolha outra visualização.",
+      "openFailed": "Não foi possível abrir o espaço de trabalho vinculado a esta issue do Jira.",
       "mode": "Tem espaço de trabalho",
       "search": "Buscar issues vinculadas",
       "linkedCount_one": "{{count}} espaço de trabalho vinculado a {{key}}",
@@ -21984,6 +22015,8 @@
       "loadError": "Não foi possível carregar as alterações de status.",
       "retry": "Tentar novamente",
       "loading": "Carregando alterações de status…",
+      "completeInJira": "Concluir “{{name}}” no Jira",
+      "unsupported": "O Jira exige campos que o Orca ainda não consegue coletar: {{fields}}.",
       "chooseResolution": "Escolha uma resolução",
       "comment": "Comentário",
       "back": "Voltar",

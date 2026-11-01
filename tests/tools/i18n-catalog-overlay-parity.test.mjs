@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { mergeCatalogs } from '../../config/scripts/fork-english-catalog.mjs'
-import { mergeLocaleOverlay } from '../../src/renderer/src/i18n/fork-catalog-overlay'
+import {
+  mergeLocaleOverlay,
+  FORK_OVERLAY_LANGUAGES
+} from '../../src/renderer/src/i18n/fork-catalog-overlay'
+
+// Every `i18n/fork/<locale>.json` must be listed by the runtime map: an overlay nobody loads is a
+// translation the app never serves, and `de` sat in that state until it was found by hand.
+const OVERLAY_FILES = Object.keys(import.meta.glob('../../src/renderer/src/i18n/fork/*.json')).map(
+  (path) => path.slice(path.lastIndexOf('/') + 1, -'.json'.length)
+)
+const ENGLISH_OVERLAYS = new Set(['en', 'en-runtime-required'])
 
 // Two files implement the overlay rule: the verifiers read through the Node one, the app through the
 // renderer one, and they cannot share a module across the TS/mjs boundary. Parity is asserted rather
@@ -19,6 +29,11 @@ const CASES = [
 ]
 
 describe('overlay merge parity', () => {
+  it('wires every locale overlay file into the runtime map', () => {
+    const onDisk = OVERLAY_FILES.filter((locale) => !ENGLISH_OVERLAYS.has(locale)).sort()
+    expect([...FORK_OVERLAY_LANGUAGES].sort()).toEqual(onDisk)
+  })
+
   it.each(CASES.map(([base, overlay], index) => ({ index, base, overlay })))(
     'case $index merges the same way in both implementations',
     ({ base, overlay }) => {

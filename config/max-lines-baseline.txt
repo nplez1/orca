@@ -26,7 +26,6 @@ inline src/main/ssh/connection/ssh-connection-store.ts
 inline src/main/ssh/connection/ssh-connection.ts
 inline src/main/ssh/ssh-channel-multiplexer.ts
 inline src/packages/process-host/src/run-process.ts
-inline src/preload/api/fs-bridge.ts
 inline src/renderer/src/components/activity/activity-thread-hover-card.tsx
 inline src/renderer/src/components/editor/CheckRunDetailsPanel.tsx
 inline src/renderer/src/components/right-sidebar/checks-panel/check-run-details.tsx
@@ -41,7 +40,6 @@ inline src/renderer/src/components/tab-bar/QuickLaunchButton.tsx
 inline src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.ts
 inline src/renderer/src/lib/worktree-creation-flow-execute.ts
 inline src/renderer/src/store/slices/worktrees/create/create-worktree.ts
-inline src/renderer/src/web/preload-api/web-filesystem-api.ts
 inline src/shared/agent-hook-listener.ts
 inline src/shared/agent-hook-listener/listener-state.ts
 inline src/shared/agent-hook-listener/providers/codex-state.ts

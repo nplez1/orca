@@ -543,6 +543,7 @@
     "minimizeNotice": {
       "body": "Orca 仍在系统托盘中运行"
     },
+    "activityWaiting": "Orca - 活动等待中",
     "activityWaitingSuffix": "等待活动"
   },
   "worktreeJumpPalette": {
@@ -624,6 +625,7 @@
       "df1d56bf87": "工作区界面遇到错误。",
       "9e0b441a91": "切换右侧边栏",
       "e81217c1b7": "隐藏应用名称",
+      "5096cbbc86": "Orca",
       "8b0b8eb54f": "应用菜单",
       "caea5b51b9": "立即重启",
       "0a9e810705": "重新启动之前不会保存更改。您以前的选项卡在磁盘上是安全的。",
@@ -1627,6 +1629,8 @@
         "28986b3747": "已启动 AI 智能体处理失败的检查。",
         "1690fd7f4a": "没有需要修复的失败检查。",
         "9e7c221b8d": "无法重新运行检查",
+        "e463ec935f": "检查请求重新运行",
+        "ddafe851e1": "检查请求重新运行",
         "0bbdc673c1": "刷新检查失败",
         "e7007aa1d8": "如果没有仓库路径，则无法刷新检查。",
         "675bc0d638": "取消",
@@ -2123,6 +2127,8 @@
         "98583589c6": "无法为失败的检查启动 AI 智能体：{{value0}}",
         "51c65c0265": "没有需要修复的失败检查。",
         "788a782bb0": "无法重新运行检查",
+        "18f2af42ac": "检查请求重新运行",
+        "5963a6a852": "检查请求重新运行",
         "246b2c6456": "刷新检查失败",
         "c057f2fcb0": "如果没有仓库路径，则无法刷新检查。",
         "6591b1fa82": "取消",
@@ -3911,6 +3917,7 @@
             "bbcd9b7b85": "折叠工作区",
             "c4a8968bdd": "扩大工作区",
             "b10695d6ce": "终止会话",
+            "288a4dd177": "Orca",
             "53dd5560ae": "折叠 Orca",
             "e419d27083": "展开 Orca",
             "41ae4fa725": "正在结束…",
@@ -4608,6 +4615,7 @@
         "share": {
           "card": {
             "utils": {
+              "19f4b4dc75": "github.com/stablyai/orca",
               "d864fc5f98": "输出",
               "5d66fdd7c2": "输入",
               "7080aeaebb": "推理",
@@ -7252,7 +7260,12 @@
             "title": "智能体仪表盘",
             "description": "用于监控跨工作树的智能体的看板，支持窗口内或弹出窗口显示。",
             "copy": "在左侧边栏添加智能体仪表盘入口。监控需要你处理、正在工作或已完成的智能体，并可选择显示空闲智能体。",
-            "toggleLabel": "切换智能体仪表盘"
+            "toggleLabel": "切换智能体仪表盘",
+            "modeLabel": "打开方式",
+            "modeCopy": "将仪表盘显示为侧边栏旁的窗口内看板，或单独的弹出窗口。",
+            "modeAriaLabel": "智能体仪表盘打开模式",
+            "modeInWindow": "窗口内",
+            "modePopout": "弹出窗口"
           },
           "browserExtensions": {
             "copy": "为本地浏览器配置文件添加“设置 › 浏览器 › 扩展程序”。",
@@ -9424,6 +9437,7 @@
               "dashboard": "仪表盘",
               "agent": "智能体",
               "kanban": "看板",
+              "popout": "弹出",
               "board": "木板",
               "inWindow": "窗口内",
               "worktrees": "工作树"
@@ -12692,6 +12706,8 @@
             "f316a8ca2b": "未选择未解决的评论。",
             "d00ebdc402": "使用 AI 解决 {{value0}} 评论",
             "5eb2163b6b": "启动 agent 前请检查提示词。提示词送达后，Orca 会解决选中的主机讨论串，并回复无法解决的评论。",
+            "f273f2271c": "已启动智能体。已标记 {{value0}} 个为已解决，回复 {{value1}} 个，跳过 {{value2}} 个，失败 {{value3}} 个。{{value4}}",
+            "aa95b81a3a": "已启动智能体。已标记 {{value0}} 个为已解决，回复 {{value1}} 个，跳过 {{value2}} 个，失败 {{value3}} 个。",
             "495b2f8c4b": "已启动智能体，但无法解决或回复选中的评论。",
             "review": {
               "auto_retry": "Orca 将在 {{time}} 重试。",
@@ -12703,6 +12719,7 @@
               "branch": "Sync Branch"
             },
             "7e4b2a19c0": "无法确定要回复的 GitHub PR。",
+            "430f1a62d4": "无法在主机上解决选中的讨论串。",
             "updateReactionFailed": "无法更新反应。",
             "gitlabMoreActions": "更多 MR 动作",
             "gitlabLinkAnother": "链接另一个 MR",
@@ -14269,6 +14286,7 @@
         "OnboardingFlow": {
           "1b5e182e9f": "欢迎使用 Orca",
           "adaa0aa627": "前往入门步骤 {{value0}}：{{value1}}",
+          "a249f81538": "Orca",
           "277ba45540": "Orca 入门引导",
           "97c42cda00": "安装 GitHub CLI 以：",
           "ae3b00ca82": "设置 GitHub 任务",
@@ -14561,7 +14579,8 @@
             "4a40af029b": "智能体时间",
             "00a6903322": "已启动智能体",
             "c0e2e9dcd9": "欢迎回来",
-            "af761a0c0d": "设置"
+            "af761a0c0d": "设置",
+            "5d94e8ddcc": "Orca"
           },
           "TerminalSlide": {
             "0bb39f8fe6": "发送",
@@ -16154,6 +16173,7 @@
             "88fea8e84e": "不发送",
             "50b00dc327": "复制详情",
             "6d3ebe216a": "诊断文本",
+            "835037edc9": "Orca",
             "8e24fe4f75": "已发送错误报告。",
             "8b8473c544": "已复制错误报告。",
             "765591798d": "正在检查错误报告...",
@@ -18083,6 +18103,9 @@
         "allChecksPassing": "所有检查均通过",
         "checksPassingOfTotal_other": "{{count}} 项检查中有 {{passing}} 项通过"
       },
+      "taskPageJiraBoard": {
+        "changeStatusFailed": "更改状态失败。"
+      },
       "jiraIssue": {
         "loadStatusChangesFailed": "加载状态变更失败。",
         "loadCommentsFailed": "加载评论失败。"
@@ -19586,6 +19609,9 @@
       "agentOptional": "智能体 [可选]",
       "createDescription": "选择项目和工作区名称。如果想启动智能体，请选择一个。"
     },
+    "JiraIssueWorkspace": {
+      "pendingChange": "另一个议题更改正在进行中。"
+    },
     "jiraProjectPicker": {
       "search": "搜索 Jira 项目",
       "empty": "未找到项目。",
@@ -19658,6 +19684,10 @@
     }
   },
   "dashboardPopout": {
+    "recoverableError": {
+      "title": "Orca 看板遇到错误。",
+      "description": "看板未能完成渲染。请重试以重新挂载，或重新打开。"
+    },
     "bucket": {
       "attention": "需要你",
       "working": "工作中",
@@ -21319,6 +21349,7 @@
     "workspace": {
       "startAnother": "启动新工作区",
       "empty": "将 Jira 议题关联到工作区，或选择其他视图。",
+      "openFailed": "无法打开关联到此 Jira 议题的工作区。",
       "mode": "有工作区",
       "search": "搜索关联的议题",
       "linkedCount_other": "{{count}} 个工作区已关联到 {{key}}"
@@ -21345,6 +21376,8 @@
       "loadError": "无法加载状态更改。",
       "retry": "重试",
       "loading": "正在加载状态更改…",
+      "completeInJira": "在 Jira 中完成“{{name}}”",
+      "unsupported": "Jira 需要 Orca 目前无法收集的字段：{{fields}}。",
       "chooseResolution": "选择解决结果",
       "comment": "评论",
       "back": "返回",

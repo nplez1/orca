@@ -1,4 +1,5 @@
 import { withTimeout } from '../../../shared/promise-timeout-fallback'
+import forkDeCatalogUrl from './fork/de.json?url'
 import forkEsCatalogUrl from './fork/es.json?url'
 import forkFrCatalogUrl from './fork/fr.json?url'
 import forkJaCatalogUrl from './fork/ja.json?url'
@@ -19,6 +20,7 @@ import forkZhHantCatalogUrl from './fork/zh-Hant.json?url'
  * `tests/tools/i18n-catalog-overlay-parity.test.mjs` keeps the two in step.
  */
 const FORK_LOCALE_URLS: Record<string, string> = {
+  de: forkDeCatalogUrl,
   es: forkEsCatalogUrl,
   fr: forkFrCatalogUrl,
   ja: forkJaCatalogUrl,
@@ -29,6 +31,9 @@ const FORK_LOCALE_URLS: Record<string, string> = {
   zh: forkZhCatalogUrl,
   'zh-Hant': forkZhHantCatalogUrl
 }
+
+/** Wired by `FORK_LOCALE_URLS`; a fork overlay file no language lists is a catalog the app never reads. */
+export const FORK_OVERLAY_LANGUAGES: readonly string[] = Object.keys(FORK_LOCALE_URLS)
 
 const FORK_OVERLAY_TIMEOUT_MS = 2000
 

@@ -28,6 +28,7 @@ import { managedOpenCodeAccountDataDirs } from '../opencode/opencode-managed-acc
 import { prepareOpenCodeWslReaders } from './opencode-wsl-runtime-preparation'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { AiVaultScanCoordinator } from './ai-vault-scan-coordinator'
+import { localCacheHit } from './ai-vault-local-cache-hit'
 import {
   attachAiVaultScopeCwdAliases,
   resolveAiVaultScopeRealPaths
@@ -126,33 +127,6 @@ async function resolveLocalAiVaultScanRoots(): Promise<{
 /** Resume validation must use the same extra Codex homes that discovery lists. */
 export function configuredAdditionalCodexHomePaths(): readonly string[] {
   return sources.getAdditionalCodexHomePaths?.() ?? []
-}
-
-// An unbounded list holds every scope at every depth, but it is stored without one, so
-// a scoped request rides on it rather than re-reading the same rows.
-function localCacheHit(
-  cached: CachedAiVaultList | null,
-  key: string,
-  unboundedKey: string | null,
-  depth: AiVaultSessionDepth,
-  scopePaths: readonly string[] | undefined,
-  now: number
-): CachedAiVaultList | null {
-  if (!cached || cached.expiresAt <= now) {
-    return null
-  }
-  // Why the unbounded bypass: an unbounded scan holds every scope at every depth, so a scoped
-  // bounded request is answered from it rather than re-read (the renderer's result cache is the
-  // one place that must keep the requested depth, because it stores the truncated answer).
-  if (cached.depth !== 'unlimited' && !aiVaultCachedDepthServes(cached.depth, depth, scopePaths)) {
-    return null
-  }
-  if (cached.key === key) {
-    return cached
-  }
-  return unboundedKey !== null && cached.depth === 'unlimited' && cached.key === unboundedKey
-    ? cached
-    : null
 }
 
 export async function listAiVaultSessions(
