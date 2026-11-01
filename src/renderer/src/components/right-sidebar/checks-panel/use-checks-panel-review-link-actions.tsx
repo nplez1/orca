@@ -67,22 +67,13 @@ export function useChecksPanelReviewLinkActions(
       return
     }
     reviewLinkActionGenerationRef.current += 1
-    // Why the shown review's own row rather than the workspace's slot: with a switcher, clearing the
-    // slot would unlink the review the user is not looking at and leave the one they are. It is also
-    // the only path that removes a review the branch lookup discovered, because a slot-only clear
-    // would let that lookup attach it again.
     const shownAttachment = findWorkspaceReviewAttachment(activeWorktree, activeReview)
     if (shownAttachment) {
       const initial = getWorkspaceAttachments(activeWorktree)
       const removedKey = getWorkspaceAttachmentKey(shownAttachment)
       const draft = initial.filter((entry) => getWorkspaceAttachmentKey(entry) !== removedKey)
-      // Why only for the workspace's own review: `suppressedGitHubPR` is one slot, so writing a
-      // pick's number over the tombstone of a branch PR the user already unlinked would let that
-      // PR come straight back. A pick is not what the branch lookup resolves anyway.
       const suppressGitHubPR =
         !showsPickedReview && shownAttachment.provider === 'github' ? shownAttachment.number : null
-      // Why conditional: the shown review may be another pane's pick, and unlinking this one must
-      // not drop that pick.
       const storedReviewKey =
         useAppStore.getState().workspaceReviewSelectionByWorktree[activeWorktreeId]
       if (
@@ -106,8 +97,6 @@ export function useChecksPanelReviewLinkActions(
       })()
       return
     }
-    // Why not the slot path for a pick: it addresses the workspace's own review, so a pick whose row
-    // no longer matches would tombstone a number that is not the one on screen.
     if (showsPickedReview) {
       return
     }

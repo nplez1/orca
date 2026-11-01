@@ -202,8 +202,6 @@ describe('useChecksPanelCheckAndReviewActions GitLab links', () => {
 
     act(() => result.current.handleUnlinkReview())
 
-    // Why the row rather than `{ linkedGitLabMR: null }`: a slot-only clear leaves the row in
-    // `linkedItems`, so the review comes back on the next read. The slot follows the row.
     expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
       input.activeWorktreeId,
       {
@@ -215,8 +213,6 @@ describe('useChecksPanelCheckAndReviewActions GitLab links', () => {
   })
 
   it('removes only the review row when an issue shares its number', () => {
-    // Why no urls: an attachment without one matches on provider and number alone, so only the
-    // attachment key's type component keeps the issue out of the removal.
     const sharedNumber: WorkspaceAttachment[] = [
       { provider: 'gitlab', type: 'issue', number: 7 },
       { provider: 'gitlab', type: 'mr', number: 7 }
@@ -240,7 +236,6 @@ describe('useChecksPanelCheckAndReviewActions GitLab links', () => {
 
     act(() => result.current.handleUnlinkReview())
 
-    // The issue survives and MR !7 is gone; the workspace's own MR !42 stays, as it was not removed.
     expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
       input.activeWorktreeId,
       expect.objectContaining({
@@ -491,8 +486,6 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
           updatedAt: '2026-05-17T00:00:00.000Z',
           mergeable: 'MERGEABLE'
         },
-        // Why: `suppressedGitHubPR` is one slot, so a pick's number written here would replace the
-        // tombstone of a branch PR the user already unlinked and let that PR come back.
         showsPickedReview: true,
         suppressedGitHubPR: 12
       },
@@ -502,8 +495,6 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
 
     act(() => result.current.handleUnlinkReview())
 
-    // Why the key's absence rather than a negated match: `objectContaining` does not match `null`,
-    // so a write of `suppressedGitHubPR: null` would clear the tombstone and still pass that form.
     const [, edits] = vi.mocked(input.updateWorktreeMeta).mock.calls[0] ?? []
     expect(edits).toBeDefined()
     expect(Object.hasOwn(edits ?? {}, 'suppressedGitHubPR')).toBe(false)
@@ -527,8 +518,6 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
 
     act(() => result.current.handleUnlinkReview())
 
-    // Why: the branch slot path addresses the workspace's own review, so falling into it for a pick
-    // would unlink a review that is not on screen.
     expect(input.updateWorktreeMeta).not.toHaveBeenCalled()
   })
 
@@ -538,8 +527,6 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
 
     act(() => result.current.handleUnlinkReview())
 
-    // Why nothing happens: with no shown review there is nothing to unlink, and clearing a slot
-    // blindly is how the wrong review gets removed.
     expect(input.updateWorktreeMeta).not.toHaveBeenCalled()
   })
 })

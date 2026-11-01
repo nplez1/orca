@@ -199,8 +199,6 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
   }
   // Background refresh replaces the whole cache map; subscribe only to this repo/branch entry.
   const prCacheEntry = useAppStore((s) => selectReviewCacheEntry(s.prCache, prCacheKey || null))
-  // Why named for the branch: this is the review the workspace's own branch resolves to, which is
-  // only the shown one until the user picks another from the switcher.
   const branchPR: PRInfo | null = isStaleMergedGitHubReviewForHead(
     prCacheEntry,
     activeWorktree?.head
@@ -261,25 +259,17 @@ export function useChecksPanelContextState(model: ChecksPanelContextStateInput) 
     prCacheKey ? s.prRefreshStates[prCacheKey] : undefined
   )
   const prNumber = pr?.number ?? null
-  // Why the provider and number rather than the review object: the review is rebuilt on every cache
-  // write, and only a switch to a different review should drop the rows below.
   const shownReviewKey = showsPickedReview
     ? `${activeReview?.provider}:${activeReview?.number}`
     : ''
   const previousShownReviewKeyRef = useRef(shownReviewKey)
   useEffect(() => {
-    // Why the previous key: this must fire on a switch, not on mount, or the first paint of an
-    // ordinary single-review workspace would raise loading flags nothing may clear.
     if (previousShownReviewKeyRef.current === shownReviewKey) {
       return
     }
     previousShownReviewKeyRef.current = shownReviewKey
-    // Why: rows on screen belong to the review that was showing when they were fetched, so keeping
-    // them while the new read is in flight would put another review's checks under this header.
     setChecks([])
     setComments([])
-    // Why only for a pick: its read raises the flags for itself. The branch path owns them for its
-    // own review, and raising them for a review with no PR number would leave a spinner behind.
     if (shownReviewKey) {
       setChecksLoading(true)
       setCommentsLoading(true)

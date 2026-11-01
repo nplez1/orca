@@ -127,8 +127,6 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         const result = await fetchPRChecks(
           repo.path,
           targetPRNumber,
-          // Why no branch for a picked review: the branch argument makes the store write this PR's
-          // check status onto *this* branch's cached PR, which is a different review entirely.
           showsPickedReview ? undefined : branch,
           pr?.headSha,
           pr?.prRepo,
@@ -144,8 +142,6 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
           return
         }
         setChecks(result)
-        // Why only for the workspace's own review: that error belongs to this branch's PR, and a
-        // successful read of another PR says nothing about it.
         if (!showsPickedReview) {
           retractStalePRRefreshError(prCacheKey, readStartedAt)
         }

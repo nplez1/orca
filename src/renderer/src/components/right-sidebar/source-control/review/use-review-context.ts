@@ -51,17 +51,12 @@ export function useSourceControlReviewContext(panelState: SourceControlPanelStat
     hostedReviewCreation,
     hostedReviewCreationProviderHintRef
   } = hostedReviewState
-  // Why the review context owns this: the header, its link and the review the pane describes are
-  // one surface, and the pick is shared with the Checks pane so the two cannot disagree.
   const reviewSelection = useWorkspaceReviewSelection({
     activeReview: hostedReview,
     isVisible: isBranchVisible,
     repo: activeRepo ?? undefined,
     worktree: activeWorktree
   })
-  // Why only the display copy moves: push targets, PR creation and the provider hint all resolve
-  // through `hostedReview`, which is this workspace's own review. Pointing any of them at another
-  // branch's review would retarget a push, so the pick stays a header-level view.
   const displayedReview = reviewSelection.isWorkspaceReview
     ? hostedReview
     : (reviewSelection.selectedReview ?? hostedReview)

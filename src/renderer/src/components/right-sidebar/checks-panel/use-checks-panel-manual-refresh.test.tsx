@@ -242,8 +242,6 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     await act(async () => result.current.handleRefresh())
 
     expect(input.refreshSelectedReview).toHaveBeenCalledTimes(1)
-    // Why no branch: the branch argument is what the store writes a PR's check status onto, and
-    // this branch's cached PR is a different review.
     expect(input.fetchPRChecks).toHaveBeenCalledWith(
       '/workspace/repo',
       9,
@@ -257,7 +255,6 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
       9,
       expect.objectContaining({ force: true, headSha: 'picked-head' })
     )
-    // Why: the branch path would refresh the workspace's own review, which is not on screen.
     expect(input.fetchPRForBranch).not.toHaveBeenCalled()
     expect(input.fetchGitLabDetails).not.toHaveBeenCalled()
   })
@@ -267,7 +264,6 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     const setComments = vi.fn()
     const input = makePickedInput({ setChecks, setComments })
     input.fetchPRChecks = vi.fn(async () => {
-      // The user picks another review while this read is in flight.
       input.asyncResultKeyRef.current = 'a-different-review'
       const staleCheck: PRCheckDetail = {
         name: 'stale',
@@ -296,7 +292,6 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
         isWorkspaceReview: false,
         selectedReview: PICKED_REVIEW,
         refreshSelectedReview: async () => {
-          // The switch lands inside the provider round-trip, before any key is claimed.
           useAppStore.setState({ workspaceReviewSelectionByWorktree: {} })
           return null
         }
@@ -310,20 +305,13 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
 
     await act(async () => result.current.handleRefresh())
 
-    // Why: claiming the result key for a review the header no longer shows is what put the old
-    // pick's rows under the new review, and discarded the new review's own in-flight read.
     expect(input.fetchPRChecks).not.toHaveBeenCalled()
     expect(input.fetchPRComments).not.toHaveBeenCalled()
     expect(setChecks).not.toHaveBeenCalled()
     expect(setComments).not.toHaveBeenCalled()
-    // Why not: the loading flags belong to the review the user moved to.
     expect(setChecksLoading).not.toHaveBeenCalled()
     expect(setCommentsLoading).not.toHaveBeenCalled()
-    // Why: the result key was never claimed for the abandoned review, so the new review's own read
-    // keeps its identity.
     expect(input.asyncResultKeyRef.current).toBe('cache::main::9')
-    // Why: the refresh latch is this request's own, so a switch must still release it or Refresh
-    // stays disabled for good.
     expect(input.refreshInFlightRef.current).toBe(false)
     expect(input.setIsRefreshing).toHaveBeenLastCalledWith(false)
   })
@@ -333,7 +321,6 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     const setComments = vi.fn()
     const input = makePickedInput({ setChecks, setComments })
     input.fetchPRChecks = vi.fn(async () => {
-      // The switch lands after the key was claimed, so the post-read pick check has to catch it.
       useAppStore.setState({ workspaceReviewSelectionByWorktree: {} })
       const staleCheck: PRCheckDetail = {
         name: 'stale',
@@ -382,8 +369,6 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
 
     await act(async () => result.current.handleRefresh())
 
-    // Why: an MR number is not a GitHub PR number, so a GitHub call here would report another
-    // repository's PR #7 under this MR's header.
     expect(input.fetchPRChecks).not.toHaveBeenCalled()
     expect(input.fetchPRComments).not.toHaveBeenCalled()
     expect(input.fetchGitLabDetails).toHaveBeenCalledWith(

@@ -28,8 +28,6 @@ type SourceControlHeaderToolbarProps = {
   onFilterQueryChange: (value: string) => void
   onFilterExpandedChange: (expanded: boolean) => void
   visibleCreatePrHeaderAction: PrimaryAction | null
-  /** The review the header describes. It is the workspace's own review until the user picks
-   *  another from the workspace's reviews; commits and pushes keep resolving through that one. */
   displayedReview: HostedReviewInfo | null
   reviewSelection: WorkspaceReviewSelection
   isCreatePrIntentInFlight: boolean
@@ -81,8 +79,6 @@ function HostedReviewToolbarLink({
       />
       <WorkspaceReviewSwitcher
         entries={reviewSelection.entries}
-        // Why the review rather than the stored pick: while a picked review is still loading the
-        // header shows the workspace's own, and the checked row has to agree with the header.
         selectedKey={shownReviewKey}
         onSelectReview={reviewSelection.selectReview}
       />

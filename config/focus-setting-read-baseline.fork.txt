@@ -15,7 +15,10 @@
 0 src/renderer/src/components/linear-item-drawer-edit-section.tsx # fork has 0 where upstream allows 1; lowered by a fork prune
 2 src/renderer/src/components/new-workspace/use-linear-source-connection.ts # fork has 2 where upstream allows 4; lowered by a fork prune
 0 src/renderer/src/components/new-workspace/use-smart-workspace-secondary-searches.ts # fork has 0 where upstream allows 1; lowered by a fork prune
+1 src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-context-state.tsx # transitive reader: calls useWorkspaceReviewSelection, whose only reader is the cache key in use-workspace-review-selection.ts; the pane routes checks, comments and review reads by the shown review's own number
+1 src/renderer/src/components/right-sidebar/source-control/review/use-review-context.ts # transitive reader: calls useWorkspaceReviewSelection, whose only reader is the cache key in use-workspace-review-selection.ts; pushes and PR creation still resolve through the workspace's own review
 1 src/renderer/src/components/right-sidebar/use-linked-issue-pane-actions.ts # transitive reader: openHttpLink reads the setting for Link Routing, which is not a Jira/Linear surface (2026-10-16 owner-routing migration)
+1 src/renderer/src/components/right-sidebar/use-workspace-review-selection.ts # transitive reader: getWorkspaceReferenceRuntimeVersion folds getProviderRuntimeContextKey(null) into the hosted-review cache key, and null is this app rather than the focused host. Reusing the sidebar card's key is the point, so this is not routing
 1 src/renderer/src/components/settings/JiraBoardSettings.tsx # settings scope: the default Jira board is a global setting, so the pane's board list belongs to the focused host's Jira account, and the memo keys on that host id alone (2026-10-16 owner-routing migration)
 0 src/renderer/src/components/sidebar/workspace-board-task-status-sync.ts # fork has 0 where upstream allows 3; lowered by a fork prune
 8 src/renderer/src/components/task-page/TaskPage.tsx # fork has 8 where upstream allows 9; lowered by a fork prune
