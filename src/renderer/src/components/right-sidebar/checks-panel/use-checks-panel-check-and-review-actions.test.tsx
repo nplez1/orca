@@ -214,6 +214,45 @@ describe('useChecksPanelCheckAndReviewActions GitLab links', () => {
     )
   })
 
+  it('removes only the review row when an issue shares its number', () => {
+    // Why no urls: an attachment without one matches on provider and number alone, so only the
+    // attachment key's type component keeps the issue out of the removal.
+    const sharedNumber: WorkspaceAttachment[] = [
+      { provider: 'gitlab', type: 'issue', number: 7 },
+      { provider: 'gitlab', type: 'mr', number: 7 }
+    ]
+    const input = makeInput(
+      {
+        activeReview: {
+          provider: 'gitlab',
+          number: 7,
+          title: 'Parent change',
+          state: 'open',
+          url: 'https://gitlab.invalid/acme/orca/-/merge_requests/7',
+          status: 'success',
+          updatedAt: '2026-05-17T00:00:00.000Z',
+          mergeable: 'MERGEABLE'
+        }
+      },
+      sharedNumber
+    )
+    const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
+
+    act(() => result.current.handleUnlinkReview())
+
+    // The issue survives and MR !7 is gone; the workspace's own MR !42 stays, as it was not removed.
+    expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
+      input.activeWorktreeId,
+      expect.objectContaining({
+        linkedItems: [
+          expect.objectContaining({ type: 'issue', number: 7 }),
+          expect.objectContaining({ type: 'mr', number: 42 })
+        ]
+      }),
+      { executionHostId: 'ssh:ssh-1' }
+    )
+  })
+
   it('refreshes a replacement MR on the captured owner and leaves details to the poller', async () => {
     const fetchHostedReviewForBranch = vi.fn().mockResolvedValue({
       provider: 'gitlab',
@@ -432,45 +471,6 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
     )
   })
 
-  it('removes only the review row when an issue shares its number', () => {
-    // Why no urls: an attachment without one matches on provider and number alone, so only the
-    // attachment key's type component keeps the issue out of the removal.
-    const sharedNumber: WorkspaceAttachment[] = [
-      { provider: 'gitlab', type: 'issue', number: 7 },
-      { provider: 'gitlab', type: 'mr', number: 7 }
-    ]
-    const input = makeInput(
-      {
-        activeReview: {
-          provider: 'gitlab',
-          number: 7,
-          title: 'Parent change',
-          state: 'open',
-          url: 'https://gitlab.invalid/acme/orca/-/merge_requests/7',
-          status: 'success',
-          updatedAt: '2026-05-17T00:00:00.000Z',
-          mergeable: 'MERGEABLE'
-        }
-      },
-      sharedNumber
-    )
-    const { result } = renderHook(() => useChecksPanelCheckAndReviewActions(input))
-
-    act(() => result.current.handleUnlinkReview())
-
-    // The issue survives and MR !7 is gone; the workspace's own MR !42 was never in the draft.
-    expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
-      input.activeWorktreeId,
-      expect.objectContaining({
-        linkedItems: [
-          expect.objectContaining({ type: 'issue', number: 7 }),
-          expect.objectContaining({ type: 'mr', number: 42 })
-        ]
-      }),
-      { executionHostId: 'ssh:ssh-1' }
-    )
-  })
-
   it('writes no tombstone for a pick, so an earlier unlink of the branch PR still holds', () => {
     const pickedAttachment: WorkspaceAttachment = {
       provider: 'github',
@@ -502,11 +502,11 @@ describe('useChecksPanelCheckAndReviewActions with a picked review', () => {
 
     act(() => result.current.handleUnlinkReview())
 
-    expect(input.updateWorktreeMeta).toHaveBeenCalledWith(
-      input.activeWorktreeId,
-      expect.not.objectContaining({ suppressedGitHubPR: expect.anything() }),
-      { executionHostId: 'ssh:ssh-1' }
-    )
+    // Why the key's absence rather than a negated match: `objectContaining` does not match `null`,
+    // so a write of `suppressedGitHubPR: null` would clear the tombstone and still pass that form.
+    const [, edits] = vi.mocked(input.updateWorktreeMeta).mock.calls[0] ?? []
+    expect(edits).toBeDefined()
+    expect(Object.hasOwn(edits ?? {}, 'suppressedGitHubPR')).toBe(false)
   })
 
   it('leaves the workspace link alone when a pick has no row to remove', () => {

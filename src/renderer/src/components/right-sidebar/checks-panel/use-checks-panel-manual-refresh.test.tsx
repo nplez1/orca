@@ -319,6 +319,37 @@ describe('useChecksPanelManualRefresh for a picked review', () => {
     // Why not: the loading flags belong to the review the user moved to.
     expect(setChecksLoading).not.toHaveBeenCalled()
     expect(setCommentsLoading).not.toHaveBeenCalled()
+    // Why: the result key was never claimed for the abandoned review, so the new review's own read
+    // keeps its identity.
+    expect(input.asyncResultKeyRef.current).toBe('cache::main::9')
+    // Why: the refresh latch is this request's own, so a switch must still release it or Refresh
+    // stays disabled for good.
+    expect(input.refreshInFlightRef.current).toBe(false)
+    expect(input.setIsRefreshing).toHaveBeenLastCalledWith(false)
+  })
+
+  it('drops the rows when the review switched after the result key was claimed', async () => {
+    const setChecks = vi.fn()
+    const setComments = vi.fn()
+    const input = makePickedInput({ setChecks, setComments })
+    input.fetchPRChecks = vi.fn(async () => {
+      // The switch lands after the key was claimed, so the post-read pick check has to catch it.
+      useAppStore.setState({ workspaceReviewSelectionByWorktree: {} })
+      const staleCheck: PRCheckDetail = {
+        name: 'stale',
+        status: 'completed',
+        conclusion: 'success',
+        url: null
+      }
+      return [staleCheck]
+    })
+    const { result } = renderHook(() => useChecksPanelManualRefresh(input))
+
+    await act(async () => result.current.handleRefresh())
+
+    expect(input.refreshSelectedReview).toHaveBeenCalledTimes(1)
+    expect(setChecks).not.toHaveBeenCalled()
+    expect(setComments).not.toHaveBeenCalled()
   })
 
   it('reads a picked merge request through the GitLab details path, never through GitHub checks', async () => {
