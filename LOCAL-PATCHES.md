@@ -1291,6 +1291,50 @@ cleanup deletes on its way to reintroducing the defect, which is why they stay a
 rather than in this ledger. If #268 is ever offered upstream, drop both markers from that patch — they
 are fork tooling text, not upstream's.
 
+### `local(lint)`: #267's review-switcher comments removed, and its three transitive focus reads recorded
+
+#267 (`bc4afd9703`) added 118 fork comment lines across 12 files upstream owns under
+`src/renderer/src/components/right-sidebar/**`, taking the fork-comment ratchet from 6051 to 6180
+(6169 once #266 removed #268's 11), and `check:focus-read-ratchet` gained three files at 1 read each.
+All 118 were removed rather than marked: every one was prose above upstream's code explaining a
+fork decision, and the fork's own modules (`workspace-review-selection.ts`,
+`use-workspace-review-selection.ts`, `WorkspaceReviewSwitcher.tsx`) state the same design without a
+hunk to resolve on every sync. The total is back to exactly 6051 with 0 stale entries, so no
+re-baseline was needed.
+
+What the deleted comments guarded, kept here because each is a trap a later edit can fall into:
+
+- **The pick is display-only.** Push target, PR creation, compare base and the provider hint keep
+  resolving through the workspace's own review (`hostedReview`); only the header's copy moves. A
+  picked review that reached those would retarget a push.
+- **Never write `suppressedGitHubPR` for a pick.** It is one tombstone slot, so a pick's number would
+  replace the tombstone of a branch PR the user already unlinked and let that PR come back. Write it
+  only when the shown review is the workspace's own, and omit the key rather than sending `null` —
+  `objectContaining` does not match `null`, so a test written that way cannot see the clear.
+- **Unlink removes the shown review's row, not the workspace's slot**, and clears the stored selection
+  only when the pick is the row being removed. A slot-only clear leaves the row in `linkedItems`, so
+  the review returns on the next read; for a pick it would also unlink the review that is not on
+  screen. A pick with no row does nothing rather than falling into the slot path.
+- **Checks-pane rows follow what it renders, not what is stored.** List only providers the pane has a
+  checks/comment body for; check the row the header is actually showing (a pick whose lookup has not
+  answered is listed but not shown); a pick's unlink needs a row to remove; and the AI triage strip is
+  hidden for a pick, because those actions start an agent in _this_ worktree.
+- **A refresh's switch test is the store selection**, not `refreshRequestKeyRef` and not the result
+  key: neither can tell a user switching reviews from this review's own head moving, which the refresh
+  itself causes. Loading flags are cleared only while the pick is still shown, or a switch would blank
+  the review the user moved to; the refresh latch is released either way.
+- **A picked MR never goes through GitHub checks**, and a picked review's reads pass no branch: the
+  branch argument is what the store writes a PR's check status onto, and this branch's cached PR is a
+  different review.
+
+The three focus-read rows in `config/focus-setting-read-baseline.fork.txt` are the same shape as the
+2026-10-16 `use-linked-issue-pane-actions.ts` one. `use-workspace-review-selection.ts` computes its
+hosted-review request key through `getWorkspaceReferenceRuntimeVersion`, which folds
+`getProviderRuntimeContextKey(null)` in — `null` is this app, not the focused host — and the fork
+reuses the sidebar card's request key on purpose so a switch does not overwrite the branch's entry.
+The ratchet counts the transitive call in that file and in the two panes that call the hook, so the
+rows record it; restructuring reviewed code to dodge a regex would be the worse trade.
+
 ### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
 
 `local/unit-known-red.json` had drifted into the two shapes its own note warns against: every entry was

@@ -106,12 +106,9 @@ export function useChecksPanelEntryRefreshAndTitleActions(
       if (!repo || !branch || !activeWorktreeId) {
         return
       }
-      // Why the pick first: entering the tab is this pane's only periodic re-read of review metadata,
-      // and the branch refresh below names the branch's own review, not the one on screen.
       if (showsPickedReview) {
         void reviewSelection.refreshSelectedReview().catch(() => {})
         if (activeGitLabReview) {
-          // Why: an MR's rows come from its own pipelines and threads, so nothing else re-reads them.
           void fetchGitLabDetails({ commitAsCurrent: true })
         }
         if (options.refreshChecks) {
@@ -226,15 +223,9 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     if (!repo || !branch) {
       return
     }
-    // Why before the branch path: a picked review is not this branch's review, so re-reading the
-    // branch would leave the review the user just changed (title, merge, a resolved thread) stale.
-    // Why the pick rather than the selection's flag: this is the review the header shows, and an
-    // unrenderable or still-loading pick is not one of them.
     if (showsPickedReview) {
       await reviewSelection.refreshSelectedReview()
       if (activeGitLabReview) {
-        // Why: the MR's own rows have to be re-read too, or a thread resolved here stays resolved
-        // only in the provider until the next poll.
         await fetchGitLabDetails({ commitAsCurrent: true })
       }
       return

@@ -31,8 +31,6 @@ type ChecksPanelReviewHeaderProps = {
   onOpenReview: (event: React.MouseEvent<HTMLButtonElement>) => void
   onUnlinkReview: () => void
   onLinkAnotherReview: () => void
-  /** The workspace's other reviews, when there are any the pane can render: the number then becomes
-   *  a split control that keeps opening the review and adds review selection. */
   reviewSwitcher?: WorkspaceReviewSwitcherProps
 }
 
