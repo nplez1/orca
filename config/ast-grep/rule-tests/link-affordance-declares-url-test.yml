@@ -15,11 +15,6 @@ valid:
     <button role="menuitem" onClick={() => openAppHttpLink(url)}>
       Open
     </button>
-  # The system browser only: an in-app destination here would be wrong.
-  - |
-    <Button onClick={() => void window.api.shell.openUrlInSystemBrowser(url)}>
-      Download
-    </Button>
 invalid:
   - |
     <button type="button" onClick={(event) => openAppHttpLink(url, { event })}>
@@ -37,3 +32,8 @@ invalid:
     <a onClick={() => openAppHttpLink(url)}>
       Open
     </a>
+  # The wrapper the artifact surfaces use; the rule's regex names it explicitly.
+  - |
+    <Button onClick={() => openArtifactInBrowser(shareUrl)}>
+      Open
+    </Button>

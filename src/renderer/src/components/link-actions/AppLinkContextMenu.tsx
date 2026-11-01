@@ -41,22 +41,22 @@ function contextMenuLinkUrl(event: MouseEvent): { url: string; origin: HTMLEleme
   const href = webUrl(anchor?.getAttribute('href'))
   const declared = event.target.closest<HTMLElement>('[data-link-url]')
   const declaredUrl = webUrl(declared?.dataset.linkUrl)
-  if (anchor instanceof HTMLAnchorElement && href) {
-    return { url: href, origin: anchor }
+  const anchorClaim =
+    anchor instanceof HTMLAnchorElement && href ? { url: href, origin: anchor } : null
+  const declaredClaim = declared && declaredUrl ? { url: declaredUrl, origin: declared } : null
+  if (anchorClaim && declaredClaim && anchor && declared !== anchor) {
+    // Both are ancestors of the target, so one contains the other: the innermost claim wins.
+    return anchor.contains(declared) ? declaredClaim : anchorClaim
   }
-  // A non-web anchor the declaration wraps is the innermost claim: a mailto inside a row that opens
-  // a web page keeps the browser's own menu rather than borrowing the row's address.
-  if (
-    anchor instanceof HTMLAnchorElement &&
-    declared &&
-    declared !== anchor &&
-    declared.contains(anchor)
-  ) {
+  if (anchorClaim) {
+    return anchorClaim
+  }
+  // A non-web anchor above the declaration still owns the gesture: a mailto in a row that opens a
+  // web page keeps the browser's own menu rather than borrowing the row's address.
+  if (anchor && declared && declared !== anchor && declared.contains(anchor)) {
     return null
   }
-  // Every other affordance opts in with data-link-url: a button-styled link, an icon button, or a
-  // row whose whole surface opens one address.
-  return declared && declaredUrl ? { url: declaredUrl, origin: declared } : null
+  return declaredClaim
 }
 
 /**

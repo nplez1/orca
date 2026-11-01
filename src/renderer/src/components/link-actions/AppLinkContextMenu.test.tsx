@@ -264,6 +264,24 @@ describe('AppLinkContextMenu link resolution', () => {
     })
   })
 
+  // The same rule the other way round: the declaration is inside the anchor, so it is the claim.
+  it('prefers a declared link nested inside a web anchor', () => {
+    rightClickOn(
+      <a href="https://example.com/outer">
+        <button type="button" data-testid="target" data-link-url="https://example.com/inner">
+          Inner
+        </button>
+      </a>
+    )
+
+    fireEvent.click(menuItem('Open in System Browser'))
+
+    expect(mocks.openContextualHttpLink).toHaveBeenCalledWith('https://example.com/inner', {
+      worktreeId: 'wt-1',
+      forceDestination: 'system'
+    })
+  })
+
   it('ignores a declared value that is not a web address', () => {
     rightClickOn(
       <button type="button" data-testid="target" data-link-url="file:///tmp/notes.md">
