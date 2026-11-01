@@ -149,6 +149,7 @@ export function LinearCustomViewTableContent({
                   <Button
                     variant="ghost"
                     size="icon-xs"
+                    data-link-url={view.url}
                     onClick={(event) => {
                       event.stopPropagation()
                       onOpenView(view)

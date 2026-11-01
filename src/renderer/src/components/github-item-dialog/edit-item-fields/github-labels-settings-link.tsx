@@ -21,6 +21,7 @@ export function GitHubLabelsSettingsLink({
     <div className={cn(separated && 'mt-1 border-t border-border/60 pt-1')}>
       <button
         type="button"
+        data-link-url={url}
         onClick={(event) => {
           onOpen?.()
           openAppHttpLink(url, { event })

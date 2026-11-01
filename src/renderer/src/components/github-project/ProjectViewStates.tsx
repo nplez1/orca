@@ -124,6 +124,7 @@ function ProjectViewTab({
             type="button"
             size="xs"
             variant="outline"
+            data-link-url={ORCA_FEATURE_REQUEST_URL}
             onClick={(event) => openAppHttpLink(ORCA_FEATURE_REQUEST_URL, { event })}
           >
             {translate(
@@ -142,12 +143,14 @@ export function ProjectViewErrorState({
   error,
   totalCount,
   host,
-  onOpenInGitHub
+  onOpenInGitHub,
+  openInGitHubUrl
 }: {
   error: GitHubProjectViewError
   totalCount?: number
   host?: string
   onOpenInGitHub: () => void
+  openInGitHubUrl?: string
 }): React.JSX.Element {
   if (error.type === 'auth_required' || error.type === 'scope_missing') {
     return (
@@ -156,7 +159,7 @@ export function ProjectViewErrorState({
           error={error as GitHubProjectViewError & { type: 'auth_required' | 'scope_missing' }}
           host={host}
         />
-        <OpenInGitHubButton onClick={onOpenInGitHub} />
+        <OpenInGitHubButton onClick={onOpenInGitHub} linkUrl={openInGitHubUrl} />
       </div>
     )
   }
@@ -169,7 +172,7 @@ export function ProjectViewErrorState({
   return (
     <div className="flex flex-1 flex-col items-start gap-3 p-6 text-sm">
       <div className="text-muted-foreground">{copy}</div>
-      <OpenInGitHubButton onClick={onOpenInGitHub} />
+      <OpenInGitHubButton onClick={onOpenInGitHub} linkUrl={openInGitHubUrl} />
     </div>
   )
 }
@@ -182,9 +185,15 @@ function formatUnknownLayout(layout: string): string {
   return base ? base.charAt(0).toUpperCase() + base.slice(1) : layout
 }
 
-function OpenInGitHubButton({ onClick }: { onClick: () => void }): React.JSX.Element {
+function OpenInGitHubButton({
+  onClick,
+  linkUrl
+}: {
+  onClick: () => void
+  linkUrl?: string
+}): React.JSX.Element {
   return (
-    <Button size="sm" variant="outline" onClick={onClick}>
+    <Button size="sm" variant="outline" data-link-url={linkUrl} onClick={onClick}>
       <ExternalLink className="mr-1 size-3.5" />
       {translate('auto.components.github.project.ProjectViewWrapper.23b87ba9f7', 'Open in GitHub')}
     </Button>

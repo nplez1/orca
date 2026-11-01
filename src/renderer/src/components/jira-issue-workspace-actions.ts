@@ -50,6 +50,7 @@ export function getJiraIssueWorkspaceActions(issue: JiraIssue): JiraIssueWorkspa
       key: 'open-in-jira',
       label: translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira'),
       icon: ExternalLink,
+      url: issue.url,
       action: () => openAppHttpLink(issue.url)
     },
     {

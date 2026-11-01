@@ -258,9 +258,10 @@ function PRFilesCombinedDiffSections({
     [sectionIndexByKey, toggleSection, virtualizer]
   )
 
+  const filesOnGitHubUrl = `${prUrl.replace(/\/$/, '')}/files`
   const openFilesOnGitHub = useCallback(() => {
-    openAppHttpLink(`${prUrl.replace(/\/$/, '')}/files`)
-  }, [prUrl])
+    openAppHttpLink(filesOnGitHubUrl)
+  }, [filesOnGitHubUrl])
 
   const handleAddLineComment = useCallback(
     async (
@@ -343,6 +344,7 @@ function PRFilesCombinedDiffSections({
       retrySection={retrySection}
       toggleSection={toggleSection}
       openFilesOnGitHub={openFilesOnGitHub}
+      openFilesOnGitHubUrl={filesOnGitHubUrl}
       renderViewedCheckbox={renderViewedCheckbox}
       handleAddLineComment={handleAddLineComment}
       getCommentableLineNumbers={getCommentableLineNumbers}

@@ -219,6 +219,7 @@ export function JiraIssueTransitionControl({
               <Button
                 variant="secondary"
                 size="sm"
+                data-link-url={issue.url}
                 onClick={(event) => openAppHttpLink(issue.url, { event })}
               >
                 <ExternalLink className="size-3" />

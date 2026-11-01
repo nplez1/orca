@@ -138,6 +138,7 @@ export function TaskPageGitLabItemList({
                 </Tooltip>
                 <button
                   type="button"
+                  data-link-url={item.url}
                   onClick={(e) => {
                     e.stopPropagation()
                     openAppHttpLink(item.url, { event: e })

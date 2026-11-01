@@ -121,6 +121,7 @@ export function renderSmartWorkspaceNameInput(
                 variant="ghost"
                 size="icon-xs"
                 tabIndex={-1}
+                data-link-url={selectedSource.url}
                 onClick={openSelectedSource}
                 className="size-6 shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
                 aria-label={translate(

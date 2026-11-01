@@ -122,6 +122,7 @@ export default function ProjectRow({
             <TooltipTrigger asChild>
               <button
                 type="button"
+                data-link-url={row.content.url}
                 onClick={onOpenInBrowser}
                 aria-label={translate(
                   'auto.components.github.project.ProjectRow.e12be8b4d4',

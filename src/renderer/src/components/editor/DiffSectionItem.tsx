@@ -38,6 +38,7 @@ export function DiffSectionItem({
   toggleSection,
   openSection,
   openSectionTitle,
+  openSectionUrl,
   onOpenPreview,
   renderHeaderTrailingContent,
   onAddLineComment,
@@ -321,6 +322,7 @@ export function DiffSectionItem({
           openSection(index)
         }}
         openSectionTitle={openSectionTitle}
+        openSectionUrl={openSectionUrl}
         onOpenPreview={
           onOpenPreview
             ? () => {

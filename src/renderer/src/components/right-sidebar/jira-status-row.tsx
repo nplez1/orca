@@ -207,6 +207,7 @@ export function JiraStatusRow({
                 variant="ghost"
                 size="sm"
                 className="-my-1 shrink-0"
+                data-link-url={issue.url}
                 onClick={() => void window.api.shell.openUrl(issue.url)}
               >
                 {translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}

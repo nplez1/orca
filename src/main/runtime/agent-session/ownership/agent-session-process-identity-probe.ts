@@ -20,12 +20,14 @@ export const PROCESS_START_TIME_TOLERANCE_MS = 2_000
 
 const PROCESS_START_TIME_TIMEOUT_MS = 5_000
 
+// fork-comment-ok: the DST ambiguity is invisible in the code; without it the zone pin gets simplified away.
 /** `lstart` is local wall clock, and the hour a DST fall-back repeats parses an hour early: read it
  * in UTC so a start time is one instant. `runPsInProcess` formats its own rows for the same zone. */
 export function darwinStartTimePsEnvironment(): NodeJS.ProcessEnv {
   return { ...(psLocaleEnvironment() ?? process.env), TZ: 'UTC' }
 }
 
+// fork-comment-ok: same reason — the pairing with the printer above is not visible at the call site.
 /** The lstart text above is UTC, and `Date.parse` reads a zone-less string as local. */
 export function parseUtcLstart(text: string): number {
   return Date.parse(`${text.trim()} UTC`)

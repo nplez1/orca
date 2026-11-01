@@ -344,6 +344,7 @@ export function GhAuthErrorHelp({
           {docsUrl ? (
             <button
               type="button"
+              data-link-url={docsUrl}
               onClick={(event) => openAppHttpLink(docsUrl, { event })}
               className="inline-flex items-center gap-1 rounded border border-amber-500/30 px-1.5 py-0.5 text-[11px] hover:bg-amber-500/20"
             >
@@ -385,6 +386,7 @@ export function GhAuthErrorHelp({
           <Button
             size="sm"
             variant="outline"
+            data-link-url={docsUrl}
             onClick={(event) => openAppHttpLink(docsUrl, { event })}
           >
             <ExternalLink className="mr-1 size-3.5" />{' '}

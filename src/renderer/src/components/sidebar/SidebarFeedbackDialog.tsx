@@ -277,6 +277,7 @@ export function SidebarFeedbackDialog({
               variant="outline"
               size="sm"
               className="h-8 text-xs"
+              data-link-url={GITHUB_ISSUES_URL}
               onClick={(event) => openAppHttpLink(GITHUB_ISSUES_URL, { event })}
             >
               <Github className="size-3.5" />
@@ -291,6 +292,7 @@ export function SidebarFeedbackDialog({
               variant="outline"
               size="sm"
               className="h-8 text-xs"
+              data-link-url={DISCORD_URL}
               onClick={(event) => openAppHttpLink(DISCORD_URL, { event })}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" className="size-3.5 fill-current">
@@ -307,6 +309,7 @@ export function SidebarFeedbackDialog({
               variant="outline"
               size="sm"
               className="h-8 text-xs"
+              data-link-url={X_URL}
               onClick={(event) => openAppHttpLink(X_URL, { event })}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" className="size-3.5 fill-current">

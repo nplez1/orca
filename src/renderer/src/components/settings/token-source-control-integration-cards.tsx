@@ -102,6 +102,11 @@ export function AzureDevOpsIntegrationCard(): React.JSX.Element {
             <Button
               variant="outline"
               size="sm"
+              data-link-url={
+                status === 'not-configured'
+                  ? 'https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate'
+                  : 'https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-requests'
+              }
               onClick={(event) =>
                 openAppHttpLink(
                   status === 'not-configured'
@@ -217,6 +222,7 @@ export function GiteaIntegrationCard(): React.JSX.Element {
             <Button
               variant="outline"
               size="sm"
+              data-link-url="https://docs.gitea.com/next/development/api-usage"
               onClick={(event) =>
                 openAppHttpLink('https://docs.gitea.com/next/development/api-usage', { event })
               }

@@ -114,6 +114,7 @@ export function TaskPageGitHubModeControls({
             type="button"
             variant="outline"
             size="icon-sm"
+            data-link-url={selectedGitHubRepoExternalLink?.url}
             onClick={(event) => {
               if (!selectedGitHubRepoExternalLink?.url) {
                 return

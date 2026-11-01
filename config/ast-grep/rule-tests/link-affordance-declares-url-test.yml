@@ -1,0 +1,39 @@
+id: link-affordance-declares-url
+valid:
+  - |
+    <button type="button" data-link-url={url} onClick={(event) => openAppHttpLink(url, { event })}>
+      Open
+    </button>
+  # An anchor already carries its own address.
+  - |
+    <a href={url} onClick={(event) => openAppHttpLinkFromAnchor(event)}>
+      Open
+    </a>
+  # A dropdown row and the browser's own page menu own the gesture they sit in.
+  - <DropdownMenuItem onSelect={() => openAppHttpLink(url)}>Open</DropdownMenuItem>
+  - |
+    <button role="menuitem" onClick={() => openAppHttpLink(url)}>
+      Open
+    </button>
+invalid:
+  - |
+    <button type="button" onClick={(event) => openAppHttpLink(url, { event })}>
+      Open
+    </button>
+  - <Button variant="ghost" onClick={() => openAppHttpLink(url)}>Open</Button>
+  # The self-closing branch of the rule, which the opening-tag cases above never reach.
+  - <Button variant="ghost" onClick={() => openAppHttpLink(url)} />
+  - |
+    <span onClick={() => void window.api.shell.openUrl(url)}>
+      Open
+    </span>
+  # An anchor without href carries no address of its own, so the declaration is still required.
+  - |
+    <a onClick={() => openAppHttpLink(url)}>
+      Open
+    </a>
+  # The wrapper the artifact surfaces use; the rule's regex names it explicitly.
+  - |
+    <Button onClick={() => openArtifactInBrowser(shareUrl)}>
+      Open
+    </Button>
