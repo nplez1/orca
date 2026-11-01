@@ -267,6 +267,7 @@ export function JiraIssueRow({
               <Button
                 variant="ghost"
                 size="icon-xs"
+                data-link-url={issue.url}
                 onClick={(event) => {
                   event.stopPropagation()
                   openAppHttpLink(issue.url, { event })

@@ -351,6 +351,7 @@ export function BitbucketCredentialsDialog({
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                data-link-url={API_TOKEN_DOCS_URL}
                 onClick={() => window.api.shell.openUrl(API_TOKEN_DOCS_URL)}
               >
                 <ExternalLink className="size-3" />

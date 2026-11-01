@@ -55,6 +55,7 @@ export function TaskPageLinearCustomViewProjects({
           <Button
             variant="outline"
             size="xs"
+            data-link-url={selectedLinearCustomView!.url}
             onClick={(event) => openAppHttpLink(selectedLinearCustomView!.url!, { event })}
             className="gap-1 border-border/50 bg-background/70"
           >

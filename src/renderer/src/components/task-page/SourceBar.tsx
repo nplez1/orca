@@ -176,6 +176,7 @@ export function TaskPageSourceBar({
                   type="button"
                   variant="outline"
                   size="icon-sm"
+                  data-link-url={selectedLinearTeamForExternalLink?.url}
                   onClick={(event) => {
                     if (!selectedLinearTeamForExternalLink?.url) {
                       return

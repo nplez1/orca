@@ -248,6 +248,7 @@ export function PipelineJobRow({
               type="button"
               variant="ghost"
               size="icon-xs"
+              data-link-url={job.webUrl}
               onClick={(event) => openAppHttpLink(job.webUrl, { event })}
               title={translate('auto.components.GitLabItemDialog.032ae1312b', 'Open job in GitLab')}
             >

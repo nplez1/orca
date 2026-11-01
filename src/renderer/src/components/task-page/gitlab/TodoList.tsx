@@ -62,6 +62,7 @@ export function TaskPageGitLabTodoList({
               role="button"
               tabIndex={0}
               key={todo.id}
+              data-link-url={todo.targetUrl}
               onClick={(event) => openAppHttpLink(todo.targetUrl, { event })}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {

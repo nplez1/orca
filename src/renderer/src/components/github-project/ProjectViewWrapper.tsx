@@ -113,6 +113,9 @@ function ProjectViewBody({
         error={error.error}
         totalCount={error.totalCount}
         host={activeProject.host}
+        openInGitHubUrl={
+          table ? `${table.project.url}/views/${table.selectedView.number ?? ''}` : undefined
+        }
         onOpenInGitHub={() => {
           if (table) {
             openAppHttpLink(`${table.project.url}/views/${table.selectedView.number ?? ''}`)

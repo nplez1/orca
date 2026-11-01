@@ -1,0 +1,32 @@
+id: link-affordance-declares-url
+valid:
+  - |
+    <button type="button" data-link-url={url} onClick={(event) => openAppHttpLink(url, { event })}>
+      Open
+    </button>
+  # An anchor already carries its own address.
+  - |
+    <a href={url} onClick={(event) => openAppHttpLinkFromAnchor(event)}>
+      Open
+    </a>
+  # A dropdown row and the browser's own page menu own the gesture they sit in.
+  - <DropdownMenuItem onSelect={() => openAppHttpLink(url)}>Open</DropdownMenuItem>
+  - |
+    <button role="menuitem" onClick={() => openAppHttpLink(url)}>
+      Open
+    </button>
+  # The system browser only: an in-app destination here would be wrong.
+  - |
+    <Button onClick={() => void window.api.shell.openUrlInSystemBrowser(url)}>
+      Download
+    </Button>
+invalid:
+  - |
+    <button type="button" onClick={(event) => openAppHttpLink(url, { event })}>
+      Open
+    </button>
+  - <Button variant="ghost" onClick={() => openAppHttpLink(url)}>Open</Button>
+  - |
+    <span onClick={() => void window.api.shell.openUrl(url)}>
+      Open
+    </span>

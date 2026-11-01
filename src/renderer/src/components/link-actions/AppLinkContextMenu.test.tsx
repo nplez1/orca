@@ -228,4 +228,49 @@ describe('AppLinkContextMenu link resolution', () => {
       forceDestination: 'system'
     })
   })
+
+  // A declared link outranks the in-app route its row wraps, which would otherwise win by proximity.
+  it('prefers a declared link over a wrapping non-web anchor', () => {
+    rightClickOn(
+      <a href="/settings">
+        <button type="button" data-testid="target" data-link-url="https://example.com/issue/9">
+          Issue 9
+        </button>
+      </a>
+    )
+
+    fireEvent.click(menuItem('Open in Orca Browser'))
+
+    expect(mocks.openContextualHttpLink).toHaveBeenCalledWith('https://example.com/issue/9', {
+      worktreeId: 'wt-1',
+      forceDestination: 'orca'
+    })
+  })
+
+  // The innermost claim is the most specific one, so a nested anchor still names its own address.
+  it('prefers a nested web anchor over the row that declares a link', () => {
+    rightClickOn(
+      <div data-link-url="https://example.com/row">
+        <a href="https://example.com/nested">nested</a>
+      </div>,
+      'nested'
+    )
+
+    fireEvent.click(menuItem('Open in System Browser'))
+
+    expect(mocks.openContextualHttpLink).toHaveBeenCalledWith('https://example.com/nested', {
+      worktreeId: 'wt-1',
+      forceDestination: 'system'
+    })
+  })
+
+  it('ignores a declared value that is not a web address', () => {
+    rightClickOn(
+      <button type="button" data-testid="target" data-link-url="file:///tmp/notes.md">
+        Notes
+      </button>
+    )
+
+    expect(screen.queryByTestId('link-context-menu')).toBeNull()
+  })
 })

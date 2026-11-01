@@ -7,12 +7,15 @@ export function SourceControlHeaderIconButton({
   icon: Icon,
   label,
   onClick,
-  disabled
+  disabled,
+  'data-link-url': linkUrl
 }: {
   icon: LucideIcon
   label: string
   onClick: () => void
   disabled?: boolean
+  /** Set when the action opens this address, so the app's link menu can offer it too. */
+  'data-link-url'?: string
 }): React.JSX.Element {
   return (
     <Tooltip>
@@ -23,6 +26,7 @@ export function SourceControlHeaderIconButton({
           size="icon-xs"
           className="text-muted-foreground hover:text-foreground"
           aria-label={label}
+          data-link-url={linkUrl}
           onClick={onClick}
           disabled={disabled}
         >

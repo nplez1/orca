@@ -226,6 +226,7 @@ export function LinearProjectTableContent({
                   <Button
                     variant="ghost"
                     size="icon-xs"
+                    data-link-url={project.url}
                     onClick={(event) => {
                       event.stopPropagation()
                       onOpenProject(project)

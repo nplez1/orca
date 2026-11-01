@@ -77,6 +77,7 @@ function PreflightBanner({
             <p className="text-xs leading-snug text-muted-foreground">{issue.description}</p>
             <button
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline cursor-pointer"
+              data-link-url={issue.fixUrl}
               onClick={(event) => openAppHttpLink(issue.fixUrl, { event })}
             >
               {issue.fixLabel}

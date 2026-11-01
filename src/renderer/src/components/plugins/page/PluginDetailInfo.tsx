@@ -42,6 +42,7 @@ function RepositoryLink({ url }: { url: string | null }) {
       variant="link"
       size="xs"
       className="-ml-2"
+      data-link-url={url}
       onClick={(event) => openAppHttpLink(url, { event })}
     >
       {translate('auto.components.settings.PluginDetailPage.repository', 'Repository')}
