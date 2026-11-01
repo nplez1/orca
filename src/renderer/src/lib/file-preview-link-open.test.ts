@@ -126,10 +126,14 @@ it.each([
             }
           }
     )
-    expect(store.getState().activeGroupIdByWorktree[WORKSPACE]).toBe(outcome.result.groupId)
+    // The preview joins the clicked pane's own group as a sibling tab and takes it over.
+    expect(outcome.result.groupId).toBe('a')
+    expect(store.getState().activeGroupIdByWorktree[WORKSPACE]).toBe('a')
     expect(
-      store.getState().groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'a')?.activeTabId
-    ).toBe('source')
+      store
+        .getState()
+        .unifiedTabsByWorktree[WORKSPACE]?.find((tab) => tab.contentType === 'browser')?.groupId
+    ).toBe('a')
   }
 )
 
@@ -319,9 +323,16 @@ it('a folder workspace uses its own layout and activates its browser without Git
       result: expect.objectContaining({ worktreeId: folder })
     })
   )
-  expect(['left', 'right']).not.toContain(store.getState().activeGroupIdByWorktree[folder])
+  // The link came from the chat tab in 'left', so the preview joins that group and the split stands.
+  expect(store.getState().activeGroupIdByWorktree[folder]).toBe('left')
+  expect(
+    store.getState().unifiedTabsByWorktree[folder]?.find((tab) => tab.contentType === 'browser')
+      ?.groupId
+  ).toBe('left')
   expect(store.getState().layoutByWorktree[folder]).toMatchObject({
-    first: { type: 'split', first: { groupId: 'left' } }
+    type: 'split',
+    first: { type: 'leaf', groupId: 'left' },
+    second: { type: 'leaf', groupId: 'right' }
   })
 })
 

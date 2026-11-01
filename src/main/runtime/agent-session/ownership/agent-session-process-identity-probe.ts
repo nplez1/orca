@@ -20,6 +20,17 @@ export const PROCESS_START_TIME_TOLERANCE_MS = 2_000
 
 const PROCESS_START_TIME_TIMEOUT_MS = 5_000
 
+/** `lstart` is local wall clock, and the hour a DST fall-back repeats parses an hour early: read it
+ * in UTC so a start time is one instant. `runPsInProcess` formats its own rows for the same zone. */
+function darwinStartTimePsEnvironment(): NodeJS.ProcessEnv {
+  return { ...(psLocaleEnvironment() ?? process.env), TZ: 'UTC' }
+}
+
+/** The lstart text above is UTC, and `Date.parse` reads a zone-less string as local. */
+export function parseUtcLstart(text: string): number {
+  return Date.parse(`${text.trim()} UTC`)
+}
+
 export type AgentSessionProcessProbeDeps = {
   /** ESRCH means gone; EPERM means present but owned by another user. */
   isPidPresent?: (pid: number) => boolean
@@ -61,14 +72,14 @@ async function readLinuxProcessStartTimeMs(pid: number): Promise<number | null> 
 async function readDarwinProcessStartTimeMs(pid: number): Promise<number | null> {
   try {
     const args = ['-o', 'lstart=', '-p', String(pid)]
-    const env = psLocaleEnvironment()
+    const env = darwinStartTimePsEnvironment()
     const result =
       (await runPsInProcess(args, { env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS })) ??
       (await runProcess({ program: 'ps', args, env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS }))
     if (result.timedOut || result.code !== 0) {
       return null
     }
-    const parsed = Date.parse(result.stdout.trim())
+    const parsed = parseUtcLstart(result.stdout)
     return Number.isFinite(parsed) ? parsed : null
   } catch {
     return null
@@ -84,7 +95,7 @@ async function readDarwinProcessStartTimesMs(
   }
   try {
     const args = ['-o', 'pid=,lstart=', '-p', pids.join(',')]
-    const env = psLocaleEnvironment()
+    const env = darwinStartTimePsEnvironment()
     const result =
       (await runPsInProcess(args, { env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS })) ??
       (await runProcess({ program: 'ps', args, env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS }))
@@ -97,7 +108,7 @@ async function readDarwinProcessStartTimesMs(
         continue
       }
       const pid = Number(match[1])
-      const parsed = Date.parse(match[2])
+      const parsed = parseUtcLstart(match[2])
       if (Number.isSafeInteger(pid) && Number.isFinite(parsed)) {
         observed.set(pid, parsed)
       }

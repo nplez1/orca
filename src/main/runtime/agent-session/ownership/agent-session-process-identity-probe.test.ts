@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AgentSessionProcessIdentity } from '../../../../shared/agent-session-record'
 import {
   PROCESS_START_TIME_TOLERANCE_MS,
+  parseUtcLstart,
   probeAgentSessionProcessIdentities,
   probeAgentSessionProcessIdentity,
   probeAgentSessionReservation,
@@ -198,6 +199,13 @@ describe('owner identity probe', () => {
     } else {
       expect(observed).toBeNull()
     }
+  })
+
+  // The hour a DST fall-back repeats: read as local, the later occurrence lands an hour early, which
+  // is how this went unnoticed until the one hour a year it fires.
+  it('reads an lstart the repeated DST hour names as UTC', () => {
+    expect(parseUtcLstart('Sun Nov  1 01:37:04 2026')).toBe(Date.UTC(2026, 10, 1, 1, 37, 4))
+    expect(parseUtcLstart('  Sun Nov  1 01:37:04 2026  ')).toBe(Date.UTC(2026, 10, 1, 1, 37, 4))
   })
 })
 

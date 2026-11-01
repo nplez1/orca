@@ -65,19 +65,18 @@ function wrapperForActiveBrowser() {
   )
 }
 
-it('the visible button opens beside its owning chat even while another group has focus', () => {
+it('the visible button opens in its owning chat’s group even while another group has focus', () => {
   showVisual()
   fireEvent.click(screen.getByRole('button', { name: 'Open in new tab' }))
-  const groupId = wrapperForActiveBrowser()?.groupId
-  expect(groupId).toBeTruthy()
-  expect(['a', 'b', 'c']).not.toContain(groupId)
-  expect(useAppStore.getState().layoutByWorktree[WORKSPACE]).toMatchObject({
-    first: { type: 'split', first: { groupId: 'a' }, second: { groupId } }
+  const state = useAppStore.getState()
+  // The page joins the chat's own group as a sibling tab and takes that group over.
+  expect(wrapperForActiveBrowser()?.groupId).toBe('a')
+  expect(state.activeGroupIdByWorktree[WORKSPACE]).toBe('a')
+  expect(state.groupsByWorktree[WORKSPACE]).toHaveLength(3)
+  expect(state.layoutByWorktree[WORKSPACE]).toMatchObject({
+    first: { type: 'leaf', groupId: 'a' },
+    second: { first: { type: 'leaf', groupId: 'b' }, second: { type: 'leaf', groupId: 'c' } }
   })
-  expect(
-    useAppStore.getState().groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'a')
-      ?.activeTabId
-  ).toBe('source')
   expect(screen.getByRole('button', { name: 'Open in new tab' })).toBeTruthy()
 })
 
