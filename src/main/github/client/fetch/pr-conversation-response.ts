@@ -192,9 +192,7 @@ export function parseRestPRComments(
   return z
     .array(restCommentSchema)
     .parse(JSON.parse(stdout))
-    .filter((c) =>
-      reviews ? reviewIsReportable(c, options?.includeReviewVerdicts) : true
-    )
+    .filter((c) => (reviews ? reviewIsReportable(c, options?.includeReviewVerdicts) : true))
     .map((c) => ({
       id: c.id,
       author: c.user?.login ?? 'ghost',

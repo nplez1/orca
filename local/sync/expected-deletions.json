@@ -210,6 +210,13 @@
       "status": "expected-deletion",
       "supersededBy": "upstream `loadLocaleCatalog` in the same file",
       "reason": "The fork's own catalog fetcher; upstream's rewritten bootstrap fetches the same catalog and the fork overlay now rides inside `loadLocaleCatalog`, so the two would be two fetchers for one catalog. Nothing in the merged tree references it. evidence: convergence-ledger.md Localization catalogs"
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION.orchestrationChatErrorEscalationEnabled",
+      "status": "expected-deletion",
+      "supersededBy": "upstream retired the setting itself in this sync",
+      "reason": "Upstream removed `orchestrationChatErrorEscalationEnabled` from GlobalSettings (it survives only as `_retiredHeartbeatsEnabled` in terminal-settings-migrations.ts), so the disposition table cannot carry a key the settings type no longer declares. Removing the row is the correct convergence, not a lost fork capability. The same sync also retired `experimentalNativeChat` and `orchestrationHeartbeatIntervalMinutes`, removed for the same reason. evidence: src/main/persistence/applying-settings/terminal-settings-migrations.ts"
     }
   ]
 }

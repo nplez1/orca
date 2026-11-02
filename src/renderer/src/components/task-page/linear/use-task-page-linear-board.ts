@@ -135,17 +135,13 @@ export function useTaskPageLinearBoard(model: TaskPageLinearListProjectionModel)
           color: workflowState.color
         }
         const scope = getLinearSourceScope(providerSettings)
-        const result = await writeLinearIssue(
-          issue,
-          { state: nextState },
-          providerSettings,
-          () =>
-            linearUpdateIssue(
-              providerSettings,
-              issue.id,
-              { stateId: workflowState.id },
-              issue.workspaceId
-            )
+        const result = await writeLinearIssue(issue, { state: nextState }, providerSettings, () =>
+          linearUpdateIssue(
+            providerSettings,
+            issue.id,
+            { stateId: workflowState.id },
+            issue.workspaceId
+          )
         )
         if (result.ok === false) {
           toast.error(
