@@ -7,6 +7,7 @@ import type {
 import type { Repo } from '../../../../shared/repo-types'
 import { runtimeTargetForOwnerEnvironment } from '../../runtime/runtime-client-target'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import { hasUniqueIndexedRepositoryHost } from '@/lib/repository-owner-index'
 import { getGitHubRepoLookupIndex } from '../slices/github-repo-lookup-index'
 import {
   LOCAL_EXECUTION_HOST_ID,
@@ -112,9 +113,27 @@ export function getRefreshAliasExecutionHostId(alias: GitHubPRRefreshAlias): str
 export function findRepoForGitHubOwner(
   state: Partial<Pick<AppState, 'repos'>>,
   repoId: string | undefined,
-  repoPath: string
+  repoPath: string,
+  executionHostId?: string
 ): Repo | undefined {
-  return state.repos
-    ? getGitHubRepoLookupIndex(state.repos).findByIdOrPath(repoId, repoPath)
+  const lookup = getGitHubRepoLookupIndex(state.repos)
+  if (!executionHostId) {
+    return lookup.findByIdOrPath(repoId, repoPath)
+  }
+  const ownerHostId = normalizeExecutionHostId(executionHostId)
+  const repo = ownerHostId
+    ? ((repoId ? lookup.findByIdOnHost(repoId, ownerHostId) : undefined) ??
+      lookup.findByPathOnHost(repoPath, ownerHostId))
     : undefined
+  if (
+    !ownerHostId ||
+    !repo ||
+    (repoId && repo.id !== repoId) ||
+    !hasUniqueIndexedRepositoryHost(state.repos, repo.id, ownerHostId)
+  ) {
+    throw new Error(
+      'The repository is no longer available on its owning host. Reconnect and retry.'
+    )
+  }
+  return repo
 }

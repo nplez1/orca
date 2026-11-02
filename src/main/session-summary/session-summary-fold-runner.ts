@@ -5,7 +5,7 @@
 // extract, or a write. Nothing is applied on failure, and completed chunk extracts are
 // kept so a retry resumes instead of restarting.
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
-import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import type { AgentType } from '../../shared/agent-status-types'
 import type {
   SessionSummarySessionRef,

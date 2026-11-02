@@ -248,6 +248,7 @@ describe('web AI Vault preload API', () => {
         scopePaths: ['/srv/app']
       })
     ).resolves.toEqual(scanResult)
+    await globals.window.api.aiVault.listSessions({ executionHostScope: 'all', unlimited: true })
     expect(runtimeCalls).toEqual([
       {
         method: 'aiVault.listSessions',
@@ -260,6 +261,10 @@ describe('web AI Vault preload API', () => {
           offset: 0,
           executionHostId: 'runtime:web-env-1'
         }
+      },
+      {
+        method: 'aiVault.listSessions',
+        params: { unlimited: true, executionHostId: 'runtime:web-env-1' }
       }
     ])
   })

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 14-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import type { Store } from '../../persistence'
+import type { Store } from '../../persistence/loading-store/store'
 import type { SshRepoReadoption, SshTarget } from '../../../shared/ssh-types'
 import { isAutoImportedSshTarget } from '../../../shared/ssh-target-visibility'
 import { RUNTIME_OWNED_SSH_TARGET_ID_PREFIX } from '../../../shared/execution-host'

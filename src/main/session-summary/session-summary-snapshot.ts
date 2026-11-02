@@ -3,7 +3,7 @@
 // The summary is a materialized view: cheap status facts are always available (no fold,
 // no transcript read), and the ledger section is whatever the last fold produced.
 import type { AgentStatusState, AgentType } from '../../shared/agent-status-types'
-import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import type {
   SessionSummaryFacts,
   SessionSummaryLedger,

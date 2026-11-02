@@ -1,3 +1,4 @@
+import { selectWslHostsServing } from '../../use-wsl-hosts-enabled'
 import { useCallback, useMemo, useState } from 'react'
 import { shallow } from 'zustand/shallow'
 import { persistedUIValuesEqual } from '../../../../../../shared/persisted-ui-equality'
@@ -57,7 +58,7 @@ function createSidebarHostOptionsSelector() {
       state.runtimeEnvironments,
       hostLabelOverrides,
       state.wslHostStatuses,
-      settings?.experimentalWslHosts === true,
+      selectWslHostsServing(state),
       state.wslHostServerFiles === 'missing'
     ]
     if (shallow(inputs, nextInputs)) {
@@ -73,7 +74,7 @@ function createSidebarHostOptionsSelector() {
       runtimeStatusByEnvironmentId: state.runtimeStatusByEnvironmentId,
       hostLabelOverrides,
       wslHostStatuses: state.wslHostStatuses,
-      wslHostsEnabled: settings?.experimentalWslHosts === true,
+      wslHostsEnabled: selectWslHostsServing(state),
       wslHostServerFilesMissing: state.wslHostServerFiles === 'missing'
     })
     if (!persistedUIValuesEqual(result.map(sidebarHostSemantics), next.map(sidebarHostSemantics))) {

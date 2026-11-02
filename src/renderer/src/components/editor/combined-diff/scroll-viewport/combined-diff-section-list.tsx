@@ -42,7 +42,6 @@ export function CombinedDiffSectionList({
   setScrollContainerRef,
   setSectionHeights,
   setSections,
-  settings,
   sideBySide,
   skippedConflictNotice,
   toggleSection,
@@ -72,7 +71,6 @@ export function CombinedDiffSectionList({
   setScrollContainerRef: (node: HTMLDivElement | null) => void
   setSectionHeights: React.Dispatch<React.SetStateAction<Record<number, number>>>
   setSections: React.Dispatch<React.SetStateAction<DiffSection[]>>
-  settings: DiffSectionItemProps['settings']
   sideBySide: boolean
   skippedConflictNotice: React.ReactNode
   toggleSection: (index: number) => void
@@ -120,7 +118,6 @@ export function CombinedDiffSectionList({
                   isBranchMode={isBranchMode}
                   sideBySide={sideBySide}
                   isDark={isDark}
-                  settings={settings}
                   sectionHeight={sectionHeights[virtualItem.index]}
                   worktreeId={file.worktreeId}
                   loadSection={loadSection}

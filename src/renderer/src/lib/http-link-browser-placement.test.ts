@@ -58,4 +58,13 @@ describe('resolveHttpLinkBrowserPlacement', () => {
       )
     ).toEqual({ targetGroupId: 'left' })
   })
+
+  it('fills an empty source pane rather than splitting beside it', () => {
+    expect(
+      resolveHttpLinkBrowserPlacement(
+        state({ rightActiveTabId: '', activeGroupId: 'right', tabs: [terminal] }),
+        WT
+      )
+    ).toEqual({ targetGroupId: 'right' })
+  })
 })

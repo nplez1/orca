@@ -82,6 +82,7 @@ export function ChecksPanelActiveContent({
     isFixingChecksWithAI,
     isRefreshing,
     isResolvingConflictsWithAI,
+    manualRefreshError,
     pendingCommentResolutionRef,
     pr,
     prRefreshState,
@@ -155,15 +156,19 @@ export function ChecksPanelActiveContent({
     settings,
     Boolean(activeWorktreeId)
   )
+  // A classified GitHub failure says more than a manual one, so it wins; one banner either way.
+  const refreshError =
+    (activeReview.provider === 'github' && prRefreshState?.status === 'error'
+      ? getChecksPanelRefreshErrorBannerLine(prRefreshState.errorType)
+      : null) ?? manualRefreshError
   return (
     <div ref={setChecksPanelContentRef} className="flex-1 overflow-auto scrollbar-sleek">
-      {/* Show background GitHub failures above cached PR data so outages cannot look like a healthy panel. */}
-      {activeReview?.provider === 'github' && prRefreshState?.status === 'error' ? (
+      {refreshError ? (
         <div
           role="alert"
           className="border-b border-border/50 bg-destructive/10 px-3 py-2 text-xs text-destructive"
         >
-          {getChecksPanelRefreshErrorBannerLine(prRefreshState.errorType)}
+          {refreshError}
         </div>
       ) : null}
       <div className="px-3 py-3 border-b border-border space-y-2.5">
@@ -278,7 +283,7 @@ export function ChecksPanelActiveContent({
       {!(activeConflictReview && checks.length === 0 && !checksLoading) && (
         <ChecksList
           checks={checks}
-          checksError={checksError}
+          checksError={manualRefreshError ? null : checksError}
           checksLoading={checksLoading}
           checkDetailsContextKey={stateRequestKey}
           onLoadCheckDetails={handleLoadCheckDetails}
@@ -288,7 +293,7 @@ export function ChecksPanelActiveContent({
       )}
       <PRCommentsList
         comments={comments}
-        commentsError={commentsError}
+        commentsError={manualRefreshError ? null : commentsError}
         commentsLoading={commentsLoading}
         reviewKind={reviewShortLabel}
         commentsDisabled={!canTargetPRComments}

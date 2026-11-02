@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import { searchQuickOpenFilePaths } from './filesystem/filesystem-search-file-paths'
 
 /** This suite is the only one that needs a real ripgrep binary; skip it where there isn't one. */

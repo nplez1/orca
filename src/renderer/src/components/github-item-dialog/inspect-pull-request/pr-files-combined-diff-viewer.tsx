@@ -3,13 +3,13 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { buildPRCommentInlineFromComments } from '@/components/pr-comment-inline/worktree-pr-comment-inline'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
+import { useAppStore } from '@/store'
 import { useCombinedDiffSectionIndexMap } from '../../editor/combined-diff/resolve-changes/use-combined-diff-section-index-map'
 import { handleCombinedDiffFileTreeNavigation } from '../../editor/combined-diff/browse-files/combined-diff-file-tree-navigation'
 import { getDiffSectionRowEstimatedHeight } from '@/components/editor/diff-section-layout'
 import type { DiffSection } from '@/components/editor/diff-section-types'
 import { getCombinedDiffBranchEntriesInTreeOrder } from '../../editor/combined-diff/browse-files/combined-diff-file-tree-filter'
 import type { CombinedDiffFileTreeEntry } from '../../editor/combined-diff/resolve-changes/combined-diff-section-identity'
-import { useAppStore } from '@/store'
 import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
 import type { GitBranchChangeEntry } from '../../../../../shared/git-diff-compare-types'
 import { isPRFileViewed } from '@/components/github/pr-file-content-size'
@@ -92,7 +92,6 @@ function PRFilesCombinedDiffSections({
   fileTreeCollapsed,
   setFileTreeCollapsed
 }: PRFilesCombinedDiffSectionsProps): React.JSX.Element {
-  const settings = useAppStore((s) => s.settings)
   const isDark = useDocumentDarkTheme()
   // The keyed mount fixes this file set; state preserves its identity without a render-time ref cache.
   const [entries] = useState<GitBranchChangeEntry[]>(() =>
@@ -337,7 +336,6 @@ function PRFilesCombinedDiffSections({
       virtualizer={virtualizer}
       sections={sections}
       isDark={isDark}
-      settings={settings}
       sectionHeights={sectionHeights}
       prCommentReview={prCommentReview}
       loadSection={loadSection}

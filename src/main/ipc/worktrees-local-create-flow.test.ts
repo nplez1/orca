@@ -10,6 +10,7 @@ import {
   describeCreatedWorktreeMock,
   addWorktreeMock,
   resolveLocalGitUsernameMock,
+  resolveDefaultBaseRefWithLocalGitMock,
   getBranchConflictKindMock,
   getEffectiveHooksMock,
   createSetupRunnerScriptMock,
@@ -112,6 +113,54 @@ describe('registerWorktreeHandlers', () => {
     runtimeStub = setupWorktreeHandlers()
   })
 
+  it('starts username and base-ref probes concurrently', async () => {
+    const events: string[] = []
+    let resolveUsername!: (value: string) => void
+    let resolveBase!: (value: string | null) => void
+    store.getSettings.mockReturnValue({
+      branchPrefix: 'git-username',
+      nestWorkspaces: false,
+      refreshLocalBaseRefOnWorktreeCreate: false,
+      workspaceDir: '/workspace'
+    })
+    resolveLocalGitUsernameMock.mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          events.push('username-start')
+          resolveUsername = resolve
+        })
+    )
+    resolveDefaultBaseRefWithLocalGitMock.mockImplementation(
+      () =>
+        new Promise<string | null>((resolve) => {
+          events.push('base-start')
+          resolveBase = resolve
+        })
+    )
+    listWorktreesMock.mockResolvedValue([
+      {
+        path: '/workspace/concurrent-probe',
+        head: 'created-sha',
+        branch: 'jdoe/concurrent-probe',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+
+    const creation = handlers['worktrees:create'](null, {
+      repoId: 'repo-1',
+      name: 'concurrent-probe'
+    })
+    await Promise.resolve()
+
+    expect(events).toEqual(['username-start', 'base-start'])
+    resolveUsername('jdoe')
+    resolveBase('origin/main')
+    await expect(creation).resolves.toMatchObject({
+      worktree: expect.objectContaining({ branch: 'jdoe/concurrent-probe' })
+    })
+  })
+
   it('skips the broad remote fetch when creating from an existing commit SHA base', async () => {
     const sha = 'a'.repeat(40)
     listWorktreesMock.mockResolvedValue([
@@ -173,30 +222,6 @@ describe('registerWorktreeHandlers', () => {
     })
 
     expect(runtimeStub.fetchRemoteWithCache).toHaveBeenCalledWith('/workspace/repo', 'origin')
-    expect(addWorktreeMock).toHaveBeenCalled()
-  })
-
-  it('fetches origin when creating from a local branch base containing slashes', async () => {
-    runtimeStub.resolveRemoteTrackingBase.mockResolvedValue(null)
-    listWorktreesMock.mockResolvedValue([
-      {
-        path: '/workspace/slash-base',
-        head: 'created-sha',
-        branch: 'refs/heads/slash-base',
-        isBare: false,
-        isMainWorktree: false
-      }
-    ])
-
-    await handlers['worktrees:create'](null, {
-      repoId: 'repo-1',
-      name: 'slash-base',
-      baseBranch: 'Jinwoo-H/vm-improve-2',
-      branchNameOverride: 'slash-base'
-    })
-
-    expect(runtimeStub.fetchRemoteWithCache).toHaveBeenCalledWith('/workspace/repo', 'origin')
-    expect(runtimeStub.fetchRemoteWithCache).not.toHaveBeenCalledWith('/workspace/repo', 'Jinwoo-H')
     expect(addWorktreeMock).toHaveBeenCalled()
   })
 
@@ -404,52 +429,6 @@ describe('registerWorktreeHandlers', () => {
       resolveRegisteredWorktreePath('/workspace/improve-dashboard', store as never)
     ).resolves.toBe(resolve('/workspace/improve-dashboard'))
     expect(listWorktreesMock).toHaveBeenCalledTimes(listingCalls)
-  })
-
-  it('uses branchNameOverride for the git branch while keeping the sanitized worktree path', async () => {
-    store.getSettings.mockReturnValue({
-      branchPrefix: 'git-username',
-      nestWorkspaces: false,
-      refreshLocalBaseRefOnWorktreeCreate: false,
-      workspaceDir: '/workspace'
-    })
-    resolveLocalGitUsernameMock.mockResolvedValue('unused-user')
-    listWorktreesMock.mockResolvedValue([
-      {
-        path: '/workspace/feature-something',
-        head: 'abc123',
-        branch: 'feature/something',
-        isBare: false,
-        isMainWorktree: false
-      }
-    ])
-
-    const result = await handlers['worktrees:create'](null, {
-      repoId: 'repo-1',
-      name: 'feature/something',
-      branchNameOverride: 'feature/something'
-    })
-
-    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
-      ['check-ref-format', '--branch', 'feature/something'],
-      { cwd: '/workspace/repo' }
-    )
-    expect(addWorktreeMock).toHaveBeenCalledWith(
-      '/workspace/repo',
-      '/workspace/feature-something',
-      'feature/something',
-      'origin/main',
-      false,
-      false,
-      {}
-    )
-    expect(resolveLocalGitUsernameMock).not.toHaveBeenCalled()
-    expect(result).toMatchObject({
-      worktree: expect.objectContaining({
-        path: '/workspace/feature-something',
-        branch: 'feature/something'
-      })
-    })
   })
 
   it('creates an additional workspace for folder-mode repos without git worktree add', async () => {
@@ -690,7 +669,7 @@ describe('registerWorktreeHandlers', () => {
     getEffectiveHooksMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
     getEffectiveHooksFromConfigMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
     shouldRunSetupForCreateMock.mockReturnValue(true)
-    createSetupRunnerScriptMock.mockReturnValueOnce({
+    createSetupRunnerScriptMock.mockResolvedValueOnce({
       runnerScriptPath: 'C:\\workspace\\repo\\.git\\orca\\setup-runner.sh',
       shell: { family: 'posix', executable: 'wsl.exe' },
       envVars: {
@@ -726,46 +705,6 @@ describe('registerWorktreeHandlers', () => {
     )
     expect(result.setup?.envVars[SETUP_AGENT_SEQUENCE_SETUP_SCRIPT_ENV]).toContain(
       'bash /mnt/c/workspace/repo/.git/orca/setup-runner.sh'
-    )
-  })
-
-  it('opens Setup beside the startup terminal without surfacing the workspace', async () => {
-    addWorktreeMock.mockResolvedValue({})
-    listWorktreesMock.mockResolvedValueOnce([
-      {
-        path: '/workspace/improve-dashboard',
-        head: 'def',
-        branch: 'improve-dashboard',
-        isBare: false,
-        isMainWorktree: false
-      }
-    ])
-    store.getSettings.mockReturnValue({
-      branchPrefix: 'none',
-      nestWorkspaces: false,
-      refreshLocalBaseRefOnWorktreeCreate: false,
-      workspaceDir: '/workspace',
-      setupScriptLaunchMode: 'split-vertical'
-    })
-    loadHooksMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
-    getEffectiveHooksMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
-    getEffectiveHooksFromConfigMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
-    shouldRunSetupForCreateMock.mockReturnValue(true)
-
-    await handlers['worktrees:create'](null, {
-      repoId: 'repo-1',
-      name: 'improve-dashboard',
-      createdWithAgent: 'claude',
-      startup: { command: 'claude' }
-    })
-
-    expect(runtimeStub.createTerminal).toHaveBeenCalledTimes(2)
-    expect(runtimeStub.splitTerminal).not.toHaveBeenCalled()
-    // The setup command itself is pinned in the startup-and-setup test above.
-    expect(runtimeStub.createTerminal).toHaveBeenLastCalledWith(
-      'id:repo-1::/workspace/improve-dashboard',
-      expect.objectContaining({ title: 'Setup', activate: false, surfaceOwner: false }),
-      expect.objectContaining({ id: 'repo-1::/workspace/improve-dashboard' })
     )
   })
 

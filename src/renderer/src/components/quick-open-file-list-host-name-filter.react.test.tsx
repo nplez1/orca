@@ -132,16 +132,6 @@ async function flushEffects(): Promise<void> {
   })
 }
 
-async function waitForListRuntimeFilesCall(): Promise<void> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await flushEffects()
-    if (listRuntimeFilesMock.mock.calls.length > 0) {
-      return
-    }
-  }
-  throw new Error('listRuntimeFiles was not called')
-}
-
 async function renderProbe(args: ProbeProps): Promise<Root> {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -152,6 +142,16 @@ async function renderProbe(args: ProbeProps): Promise<Root> {
   })
   await flushEffects()
   return root
+}
+
+async function waitForListRuntimeFilesCall(): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await flushEffects()
+    if (listRuntimeFilesMock.mock.calls.length > 0) {
+      return
+    }
+  }
+  throw new Error('listRuntimeFiles was not called')
 }
 
 /** Types a query into an already-mounted probe. */

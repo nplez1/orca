@@ -604,7 +604,8 @@ describe('createGitHubSlice.fetchPRForBranch', () => {
       linkedGitLabMR: null,
       linkedGiteaPR: null,
       repoId,
-      repoPath
+      repoPath,
+      reportReadOutcome: true
     })
     expect(store.getState().hostedReviewCache[hostedReviewCacheKey]).toEqual({
       data: gitlabReview,

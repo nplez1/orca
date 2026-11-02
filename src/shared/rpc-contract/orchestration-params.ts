@@ -135,6 +135,8 @@ export const AskParams = z
     resume: OptionalString,
     options: OptionalString,
     timeoutMs: OptionalFiniteNumber,
+    /** false records a new question and returns at once; omitted keeps the older waiting form. */
+    wait: OptionalBoolean,
     from: OptionalString,
     run: OptionalString,
     compatibilityCliCommand: z.enum(COMPATIBILITY_CLI_COMMANDS).optional(),

@@ -44,7 +44,7 @@ vi.mock('@/hooks/useDetectedAgents', () => ({
   useDetectedAgents: vi.fn(() => ({ detectedIds: harness.detectedIds }))
 }))
 
-vi.mock('@/lib/structured-agent-session-launch', () => ({
+vi.mock('@/lib/agent-session/launch/structured-agent-session-launch-status', () => ({
   useStructuredAgentLaunchStatus: vi.fn(() => harness.structuredLaunchStatus)
 }))
 

@@ -28,7 +28,7 @@ export abstract class UpdaterWindowBinding extends UpdaterState {
 
   /** The bound window while it is still alive, so native UI is never parented to a destroyed one. */
   protected liveMainWindow(): BrowserWindow | null {
-    const target = this.mainWindowRef
+    const target = this.mainWindowRef ?? this.getMainWindow()
     return target && !target.isDestroyed() ? target : null
   }
 

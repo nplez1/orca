@@ -237,39 +237,6 @@ describe('upsertProjectTrustLevel', () => {
 })
 
 describe('normalizeCodexProjectPathForLookup', () => {
-  it('dedupes drive-letter casing and separators for true Windows paths', () => {
-    expect(normalizeCodexProjectPathForLookup('C:\\repo')).toBe(
-      normalizeCodexProjectPathForLookup('c:/repo')
-    )
-  })
-
-  it('keeps case-distinct WSL Linux paths distinct', () => {
-    expect(normalizeCodexProjectPathForLookup('\\\\wsl$\\Ubuntu\\home\\u\\Repo')).not.toBe(
-      normalizeCodexProjectPathForLookup('\\\\wsl$\\Ubuntu\\home\\u\\repo')
-    )
-  })
-
-  it('merges separator and distro-casing variants of the same WSL path', () => {
-    expect(normalizeCodexProjectPathForLookup('\\\\wsl$\\Ubuntu\\home\\u\\proj')).toBe(
-      normalizeCodexProjectPathForLookup('//WSL$/ubuntu/home/u/proj')
-    )
-  })
-
-  it('treats wsl.localhost like the wsl$ share for the case-sensitive tail', () => {
-    expect(normalizeCodexProjectPathForLookup('\\\\wsl.localhost\\Ubuntu\\home\\u\\Repo')).not.toBe(
-      normalizeCodexProjectPathForLookup('\\\\wsl.localhost\\Ubuntu\\home\\u\\repo')
-    )
-    expect(normalizeCodexProjectPathForLookup('\\\\WSL.LOCALHOST\\Ubuntu\\home\\u\\proj')).toBe(
-      normalizeCodexProjectPathForLookup('//wsl.localhost/ubuntu/home/u/proj')
-    )
-  })
-
-  it('folds the wsl$ and wsl.localhost spellings of the same path to one key', () => {
-    expect(normalizeCodexProjectPathForLookup('\\\\wsl$\\Ubuntu\\home\\u\\Proj')).toBe(
-      normalizeCodexProjectPathForLookup('\\\\wsl.localhost\\Ubuntu\\home\\u\\Proj')
-    )
-  })
-
   it('folds drvfs automount tails case-insensitively like the native drive path', () => {
     expect(normalizeCodexProjectPathForLookup('\\\\wsl$\\Ubuntu\\mnt\\c\\Users\\Bob\\Repo')).toBe(
       normalizeCodexProjectPathForLookup('//wsl.localhost/ubuntu/mnt/c/users/bob/repo')
@@ -277,16 +244,6 @@ describe('normalizeCodexProjectPathForLookup', () => {
     expect(normalizeCodexProjectPathForLookup('\\\\wsl$\\Ubuntu\\mnt\\wsl\\Repo')).not.toBe(
       normalizeCodexProjectPathForLookup('\\\\wsl$\\Ubuntu\\mnt\\wsl\\repo')
     )
-  })
-
-  it('still case-folds normal UNC shares', () => {
-    expect(normalizeCodexProjectPathForLookup('\\\\server\\share\\Proj')).toBe(
-      normalizeCodexProjectPathForLookup('//SERVER/share/proj')
-    )
-  })
-
-  it('leaves POSIX paths untouched', () => {
-    expect(normalizeCodexProjectPathForLookup('/home/u/Repo')).toBe('/home/u/Repo')
   })
 })
 

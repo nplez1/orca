@@ -113,7 +113,8 @@ type AgentKanbanBoardProps = {
   onRevealAgent: (args: AgentRevealArgs) => void
   /** When provided, renders a close control in the header. */
   onClose?: () => void
-  /** Header controls rendered before the close button. */
+  onBrowserForeground?: () => void
+  /** In-window settings controls; the pop-out renderer has no store to drive them. */
   headerActions?: React.ReactNode
 }
 
@@ -124,6 +125,7 @@ export function AgentKanbanBoard({
   onAckAgent,
   onRevealAgent,
   onClose,
+  onBrowserForeground,
   headerActions
 }: AgentKanbanBoardProps): React.JSX.Element {
   const visibleBuckets = useMemo(
@@ -288,6 +290,7 @@ export function AgentKanbanBoard({
           card={dialogCard}
           onOpenChange={handleDialogOpenChange}
           onReveal={onRevealAgent}
+          onBrowserForeground={onBrowserForeground}
         />
       </div>
     </TooltipProvider>

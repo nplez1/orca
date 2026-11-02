@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s disabled-provider filter threads through both snapshot paths, and splitting costs a permanent sync hunk. */
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import { hasAppEnvironment } from '../../shared/app-environment'
 import { getManagedDataAccountService } from '../managed-data-accounts/service'
@@ -23,7 +24,11 @@ import type {
 import type { CodexRateLimitResetOutcome, RateLimitState } from '../../shared/rate-limit-types'
 import type { CodexResetCreditExpectedScope } from '../../shared/codex-reset-credit-scope'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
-import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
+import {
+  getClaudeSelectionTargetForAccount,
+  getSelectedClaudeAccountIdForTarget,
+  type ClaudeAccountSelectionTarget
+} from '../claude-accounts/runtime-selection'
 import type { DisableableUsageProviderId } from '../../shared/usage-provider-enablement'
 import {
   hostAccountsManagedByDesktopMessage,
@@ -31,6 +36,7 @@ import {
 } from '../../shared/host-account-launch-env'
 import type { HostClaudeProfileRefresh } from './host-claude-profile-refresh'
 import { HostAccountLaunchEnvState } from './host-account-launch-env-state'
+import type { RuntimeNotifier } from './runtime-notifier-contract'
 
 export type RuntimeAccountServices = {
   claudeAccounts: ClaudeAccountService
@@ -70,11 +76,15 @@ export type CodexRateLimitResetRpcResult = {
     }
 )
 
+type ClaudeSelectionNotifier = Pick<RuntimeNotifier, 'claudeAccountSelected'>
+
 export class RuntimeAccountController {
   private services: RuntimeAccountServices | null = null
   private commitMessageAgentEnvironment: CommitMessageAgentEnvironmentResolvers | null = null
   private disabledUsageProviders: DisabledUsageProvidersResolver | null = null
   private readonly hostAccounts = new HostAccountLaunchEnvState(() => this.services !== null)
+
+  constructor(private readonly getNotifier: () => ClaudeSelectionNotifier | null = () => null) {}
 
   setServices(
     services: RuntimeAccountServices,
@@ -134,11 +144,14 @@ export class RuntimeAccountController {
     return this.listAccountsWithRateLimits(this.requireServices().rateLimits.getState())
   }
 
-  private listAccountsWithRateLimits(rateLimits: RateLimitState): AccountsSnapshot {
+  private listAccountsWithRateLimits(
+    rateLimits: RateLimitState,
+    data: Pick<AccountsSnapshot, 'opencode' | 'devin'> = this.dataAccountsSnapshot()
+  ): AccountsSnapshot {
     const { claudeAccounts, codexAccounts } = this.requireServices()
     const disabled = this.disabledUsageProviders?.()
     return {
-      ...this.dataAccountsSnapshot(),
+      ...data,
       claude:
         disabled?.has('claude') === true
           ? emptyClaudeAccountsState()
@@ -147,6 +160,28 @@ export class RuntimeAccountController {
         disabled?.has('codex') === true ? emptyCodexAccountsState() : codexAccounts.listAccounts(),
       rateLimits
     }
+  }
+
+  getStreamSnapshot(): AccountsSnapshot {
+    return this.listAccountsWithRateLimits(
+      this.requireServices().rateLimits.getState(),
+      this.streamDataAccountsSnapshot()
+    )
+  }
+
+  private streamDataAccountsSnapshot(): Pick<AccountsSnapshot, 'opencode' | 'devin'> {
+    const snapshot: Pick<AccountsSnapshot, 'opencode' | 'devin'> = {}
+    if (hasAppEnvironment()) {
+      const service = getManagedDataAccountService()
+      for (const provider of ['opencode', 'devin'] as const) {
+        try {
+          snapshot[provider] = service.list(provider)
+        } catch {
+          // Optional unavailable evidence must not swallow another provider's committed change.
+        }
+      }
+    }
+    return snapshot
   }
 
   dataAccountsSnapshot(): Pick<AccountsSnapshot, 'opencode' | 'devin'> {
@@ -197,8 +232,27 @@ export class RuntimeAccountController {
     ])
   }
 
-  selectClaude(accountId: string | null): Promise<ClaudeRateLimitAccountsState> {
-    return this.requireServices().claudeAccounts.selectAccount(accountId)
+  /** Desktop switches go through IPC and handle their own sessions; this path tells the window. */
+  async selectClaude(
+    accountId: string | null,
+    options: { movesRunningSessions?: true } = {}
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const { claudeAccounts } = this.requireServices()
+    if (options.movesRunningSessions) {
+      return claudeAccounts.selectAccount(accountId)
+    }
+    const before = claudeAccounts.listAccounts()
+    const after = await claudeAccounts.selectAccount(accountId)
+    const account = before.accounts.find((candidate) => candidate.id === accountId)
+    const target: ClaudeAccountSelectionTarget = account
+      ? getClaudeSelectionTargetForAccount(account)
+      : { runtime: 'host' }
+    this.getNotifier()?.claudeAccountSelected?.({
+      target,
+      before: { state: before, accountId: selectedClaudeAccountId(before, target) },
+      after: { state: after, accountId: selectedClaudeAccountId(after, target) }
+    })
+    return after
   }
 
   selectCodex(accountId: string | null): Promise<CodexRateLimitAccountsState> {
@@ -278,10 +332,10 @@ export class RuntimeAccountController {
   onChanged(listener: (snapshot: AccountsSnapshot) => void): () => void {
     const services = this.requireServices()
     const unsubscribeData = hasAppEnvironment()
-      ? getManagedDataAccountService().onChanged(() => listener(this.getSnapshot()))
+      ? getManagedDataAccountService().onChanged(() => listener(this.getStreamSnapshot()))
       : () => {}
     const unsubscribeUsage = services.rateLimits.onStateChange((rateLimits) => {
-      listener(this.listAccountsWithRateLimits(rateLimits))
+      listener(this.listAccountsWithRateLimits(rateLimits, this.streamDataAccountsSnapshot()))
     })
     return () => {
       unsubscribeData()
@@ -299,4 +353,17 @@ export class RuntimeAccountController {
     }
     return this.services
   }
+}
+
+function selectedClaudeAccountId(
+  state: ClaudeRateLimitAccountsState,
+  target: ClaudeAccountSelectionTarget
+): string | null {
+  return getSelectedClaudeAccountIdForTarget(
+    {
+      activeClaudeManagedAccountId: state.activeAccountId,
+      activeClaudeManagedAccountIdsByRuntime: state.activeAccountIdsByRuntime
+    },
+    target
+  )
 }

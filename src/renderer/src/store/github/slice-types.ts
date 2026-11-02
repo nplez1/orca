@@ -66,6 +66,7 @@ export type GitHubSlice = {
       fallbackPRNumber?: number | null
       fallbackPRSource?: GitHubPRFallbackSource | null
       reason?: GitHubPRRefreshReason
+      userRefresh?: boolean
     }
   ) => Promise<PRInfo | null>
   fetchIssue: (
@@ -83,6 +84,7 @@ export type GitHubSlice = {
       throwOnError?: boolean
       /** Refresh or a check action: a user act that may start a stopped WSL distro. */
       wakeWslDistro?: boolean
+      userRefresh?: boolean
     }
   ) => Promise<PRCheckDetail[]>
   fetchPRCheckDetails: (
@@ -101,7 +103,11 @@ export type GitHubSlice = {
     prNumber: number,
     // Why: headSha is recorded alongside the comments so inline rendering can tell whether the
     // cached line numbers were computed for the head commit that is actually checked out.
-    options?: RepoScopedFetchOptions & { prRepo?: GitHubOwnerRepo | null; headSha?: string }
+    options?: RepoScopedFetchOptions & {
+      prRepo?: GitHubOwnerRepo | null
+      headSha?: string
+      userRefresh?: boolean
+    }
   ) => Promise<PRComment[]>
   addPRConversationComment: (
     repoPath: string,
@@ -138,12 +144,13 @@ export type GitHubSlice = {
   ) => Promise<boolean>
   initGitHubCache: () => Promise<void>
   refreshAllGitHub: () => void
-  refreshGitHubForWorktree: (worktreeId: string) => void
+  refreshGitHubForWorktree: (worktreeId: string, executionHostId?: string) => void
   refreshGitHubForWorktreeIfStale: (worktreeId: string) => void
   enqueueGitHubPRRefresh: (
     worktreeId: string,
     reason: GitHubPRRefreshReason,
-    priority?: number
+    priority?: number,
+    executionHostId?: string
   ) => void
   reportVisibleGitHubPRRefreshCandidates: (
     worktreeIds: string[],

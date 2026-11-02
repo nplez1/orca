@@ -4,7 +4,7 @@ import type { AgentStatusState, AgentType } from './agent-status-types'
 import {
   normalizeAgentProviderSession,
   type AgentProviderSessionMetadata
-} from './agent-session-resume'
+} from './agent-session/lifecycle/agent-session-resume'
 import type { ResolvedSourceControlAiGenerationParams } from './source-control-ai'
 
 export const SESSION_SUMMARY_TIMELINE_KINDS = [

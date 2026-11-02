@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import type * as FsPromises from 'node:fs/promises'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runProcessSync } from '@orca/process-host'
-import { runCodexAppServerSession } from './codex/codex-app-server-session'
+import { runCodexAppServerSession } from './codex/app-server/codex-app-server-session'
 
 const testState = {
   fakeHomeDir: '',

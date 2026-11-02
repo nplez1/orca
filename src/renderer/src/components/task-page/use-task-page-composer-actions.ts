@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
-import type { TaskPageJiraListEffectsModel } from '../use-task-page-jira-list-effects'
+import type { TaskPageJiraListEffectsModel } from './jira/use-task-page-jira-list-effects'
 import type { LinearIssue } from '../../../../shared/linear/issue-types'
 import type { LinearWorkspaceSelection } from '../../../../shared/linear/workspace-types'
 import type { JiraIssue } from '../../../../shared/jira/jira-types'

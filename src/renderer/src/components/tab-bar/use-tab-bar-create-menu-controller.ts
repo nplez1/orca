@@ -1,18 +1,16 @@
 import type { TabBarCreateMenuController as SharedTabBarCreateMenuController } from './tab-bar-create-menu-contract'
-import { useAgentLaunchPickerInventory } from '../agent/use-agent-launch-picker-inventory'
+import { useAgentLaunchPickerInventorySource } from '../agent/use-agent-launch-picker-inventory'
 import type { AgentPickerEntry } from '../../../../shared/agent-launch-picker'
 import { useEffect, useMemo, useState } from 'react'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { launchDefaultAgentInNewTab } from './launch-default-agent-in-new-tab'
 import { useNewTabMenuFocusHandoff } from './new-tab-menu-focus-handoff'
 import type { WindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
-import { useAppStore } from '../../store'
 import { useTabAgentMenuLaunch } from './QuickLaunchButton'
 import { requestNativeChatComposerFocus } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
 import { useNewTabAgentMenuRows } from './use-new-tab-agent-menu-rows'
 import type { AgentDetectionTarget } from '@/hooks/useDetectedAgents'
 import type { TabAgentLaunchOption } from './tab-agent-launch-options'
-import { buildAgentPickerLaunchOptions } from './tab-agent-launch-options'
 import { buildTabCreateMenuOptions, type TabCreateMenuOption } from './tab-create-menu-options'
 import { resolveWindowsShellLaunchTarget } from './windows-shell-launch'
 import { buildWindowsShellMenuEntries } from './tab-bar-windows-shell-options'
@@ -85,14 +83,13 @@ export function useTabBarCreateMenuController({
     { wakeOnOpen: true }
   )
   const [selectedPickerAgent, selectPickerAgent] = useState<AgentPickerEntry['agent']>()
-  const agentPickerEntries = useAgentLaunchPickerInventory(
+  // Why: subscribed inside the open menu only; catalog reads landing here would re-render the tab bar.
+  const agentPickerInventory = useAgentLaunchPickerInventorySource(
     worktreeId,
     agentMenu,
     newTabMenuOpen && showAgentLaunchItems,
     selectedPickerAgent
   )
-  const commandOverrides = useAppStore((state) => state.settings?.agentCmdOverrides)
-  const agentLaunchOptions = buildAgentPickerLaunchOptions(agentPickerEntries, commandOverrides)
   const {
     queueNewActiveTerminalFocusAfterNewTabMenuClose,
     queueTerminalTabFocusAfterNewTabMenuClose,
@@ -220,8 +217,7 @@ export function useTabBarCreateMenuController({
   }, [newTabMenuOpen])
   return {
     agentMenu,
-    agentLaunchOptions,
-    agentPickerEntries,
+    agentPickerInventory,
     selectPickerAgent,
     launchAgentRow,
     newTabMenuOpen,

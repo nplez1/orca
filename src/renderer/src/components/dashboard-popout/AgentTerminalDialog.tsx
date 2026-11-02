@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { SquareArrowOutUpRight, XIcon } from 'lucide-react'
 import { AgentTypeIcon } from '@/lib/agent-type-icon'
 import { formatAgentTypeLabel } from '@/lib/agent-status'
@@ -25,6 +25,7 @@ type AgentTerminalDialogProps = {
   onOpenChange: (open: boolean) => void
   /** Pop-outs reveal through IPC; in-window hosts activate the pane locally. */
   onReveal: (args: AgentRevealArgs) => void
+  onBrowserForeground?: () => void
 }
 
 type AgentTerminalFrameProps = Omit<AgentTerminalDialogProps, 'card'> & {
@@ -38,7 +39,8 @@ function AgentTerminalFrame({
   title,
   previewClassName,
   onOpenChange,
-  onReveal
+  onReveal,
+  onBrowserForeground
 }: AgentTerminalFrameProps): React.JSX.Element {
   const reveal = (): void => {
     onReveal(dashboardCardRevealArgs(card))
@@ -71,6 +73,24 @@ function AgentTerminalFrame({
         <AgentTerminalPreview
           ptyId={card.ptyId}
           terminalInput={card.terminalInput ?? null}
+          linkSource={
+            onBrowserForeground
+              ? {
+                  worktreeId: card.worktreeId,
+                  executionHostId: card.executionHostId,
+                  tabId: card.tabId,
+                  ptyId: card.ptyId
+                }
+              : undefined
+          }
+          onBrowserForeground={
+            onBrowserForeground
+              ? () => {
+                  onOpenChange(false)
+                  onBrowserForeground()
+                }
+              : undefined
+          }
           className={previewClassName}
           onRequestClose={() => onOpenChange(false)}
         />
@@ -93,13 +113,31 @@ function AgentTerminalFrame({
 export function AgentTerminalDialog({
   card,
   onOpenChange,
-  onReveal
+  onReveal,
+  onBrowserForeground
 }: AgentTerminalDialogProps): React.JSX.Element {
+  const focusHandoff = useRef(false)
+  const changeOpen = (open: boolean): void => {
+    focusHandoff.current = false
+    onOpenChange(open)
+  }
+  const handoff = onBrowserForeground
+    ? () => {
+        focusHandoff.current = true
+        onBrowserForeground()
+      }
+    : undefined
   return (
-    <Dialog open={card !== null} onOpenChange={onOpenChange}>
+    <Dialog open={card !== null} onOpenChange={changeOpen}>
       {card ? (
         <DialogContent
           aria-describedby={undefined}
+          onCloseAutoFocus={(event) => {
+            if (focusHandoff.current) {
+              event.preventDefault()
+            }
+            focusHandoff.current = false
+          }}
           // Override max-width at the same breakpoint as DialogContent’s sm:max-w-lg default.
           className="flex w-[calc(100vw-40px)] max-w-none flex-col gap-0 p-0 sm:max-w-none"
           // Place the close control in the compact header; the default absolute offsets assume dialog padding.
@@ -124,8 +162,9 @@ export function AgentTerminalDialog({
                 {card.worktreeName}
               </DialogTitle>
             }
-            onOpenChange={onOpenChange}
+            onOpenChange={changeOpen}
             onReveal={onReveal}
+            onBrowserForeground={handoff}
           />
         </DialogContent>
       ) : null}
@@ -137,6 +176,7 @@ export function AgentTerminalPanel({
   card,
   onOpenChange,
   onReveal,
+  onBrowserForeground,
   className
 }: Omit<AgentTerminalDialogProps, 'card'> & {
   card: DashboardCard
@@ -178,6 +218,7 @@ export function AgentTerminalPanel({
         previewClassName="h-auto min-h-0 flex-1"
         onOpenChange={onOpenChange}
         onReveal={onReveal}
+        onBrowserForeground={onBrowserForeground}
       />
     </section>
   )

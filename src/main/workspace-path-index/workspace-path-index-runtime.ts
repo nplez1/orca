@@ -11,7 +11,7 @@ import type {
   WorkspacePathSearchCorrelationId,
   WorkspacePathSearchInstrumentationEvent
 } from '../../shared/workspace-path-search-instrumentation'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import {
   createDefaultWorkspacePathIndexWorker,
   WorkspacePathIndexWorkerClient

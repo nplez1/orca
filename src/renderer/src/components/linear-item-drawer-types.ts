@@ -21,7 +21,6 @@ export type LinearEditState = {
 export type LinearIssueEditSectionProps = {
   issue: LinearIssue
   editState: LinearEditState
-  onEditStateChange: (patch: Partial<LinearEditState>) => void
   layout?: 'chips' | 'properties'
   /** Owner-routed source for this issue's reads and writes. Decided by the rendering surface so
    *  an edit can never land on whichever server is focused. */

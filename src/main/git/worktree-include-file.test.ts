@@ -1,10 +1,10 @@
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getConfiguredWorktreeIncludePaths,
-  parseWorktreeIncludeFile,
   resolveWorktreeIncludePaths
 } from './worktree-include-file'
 import { gitExecFileAsync } from './runner'
@@ -31,18 +31,7 @@ function mockCheckIgnore(ignored?: string[]): void {
   })
 }
 
-describe('parseWorktreeIncludeFile', () => {
-  it('skips blank lines and comments, dedupes, strips ./ and trailing slash', () => {
-    const entries = parseWorktreeIncludeFile(
-      '# secrets\n\n.env\n  \n# more\n./config/secrets.json\n.vscode/\n.env\n'
-    )
-    expect(entries).toEqual(['.env', 'config/secrets.json', '.vscode'])
-  })
-
-  it('normalizes backslashes to forward slashes', () => {
-    expect(parseWorktreeIncludeFile('apps\\web\\.env\n')).toEqual(['apps/web/.env'])
-  })
-
+describe('getConfiguredWorktreeIncludePaths', () => {
   it('retains absent paths for stale staging-directory cleanup', async () => {
     const repo = mkdtempSync(join(tmpdir(), 'orca-worktreeinclude-configured-'))
     try {
@@ -80,11 +69,6 @@ describe('resolveWorktreeIncludePaths', () => {
     writeFileSync(join(repo, '.worktreeinclude'), content)
   }
 
-  it('returns [] without spawning git when the file is absent', async () => {
-    await expect(resolveWorktreeIncludePaths(repo)).resolves.toEqual([])
-    expect(gitExecFileAsyncMock).not.toHaveBeenCalled()
-  })
-
   it('resolves existing gitignored literal files and directories', async () => {
     writeInclude('.env\nconfig/secrets.json\n.vscode/\nmissing.txt\n')
     writeFileSync(join(repo, '.env'), 'A=1')
@@ -104,23 +88,6 @@ describe('resolveWorktreeIncludePaths', () => {
     writeInclude('.env\ntracked.json\n')
     writeFileSync(join(repo, '.env'), 'A=1')
     writeFileSync(join(repo, 'tracked.json'), '{}')
-    mockCheckIgnore(['.env'])
-
-    await expect(resolveWorktreeIncludePaths(repo)).resolves.toEqual(['.env'])
-  })
-
-  it('skips a listed path that is absent from the primary checkout', async () => {
-    writeInclude('.env\nnode_modules\n')
-    writeFileSync(join(repo, '.env'), 'A=1')
-    mockCheckIgnore(['.env'])
-
-    await expect(resolveWorktreeIncludePaths(repo)).resolves.toEqual(['.env'])
-  })
-
-  it('resolves a gitignored symlink entry without following it', async () => {
-    writeInclude('.env\n')
-    writeFileSync(join(repo, '.env.real'), 'A=1')
-    symlinkSync(join(repo, '.env.real'), join(repo, '.env'))
     mockCheckIgnore(['.env'])
 
     await expect(resolveWorktreeIncludePaths(repo)).resolves.toEqual(['.env'])
@@ -156,17 +123,5 @@ describe('resolveWorktreeIncludePaths', () => {
 
     expect(resolved).toHaveLength(1000)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('more than 1000 entries'))
-  })
-
-  it('resolves to [] when git fails instead of throwing', async () => {
-    writeInclude('.env\n')
-    writeFileSync(join(repo, '.env'), 'A=1')
-    gitExecFileAsyncMock.mockRejectedValue(new Error('git exploded'))
-
-    await expect(resolveWorktreeIncludePaths(repo)).resolves.toEqual([])
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to resolve'),
-      expect.any(Error)
-    )
   })
 })

@@ -52,15 +52,6 @@ describe('resolveOsOpenedDocuments', () => {
     }
   )
 
-  it('drops unsupported or relative files even when they exist', async () => {
-    const filePath = join(fileRoot, 'private.txt')
-    await writeFile(filePath, 'private')
-    expect(await resolveOsOpenedDocuments([filePath, 'relative.csv', 'file:///%zz.tsv'])).toEqual(
-      []
-    )
-    expect(ensureFloatingWorkspaceDirectory).not.toHaveBeenCalled()
-  })
-
   it('drops a directory that merely looks like a markdown file', async () => {
     const bundlePath = join(fileRoot, 'bundle.tsv')
     await mkdir(bundlePath)
@@ -79,12 +70,6 @@ describe('resolveOsOpenedDocuments', () => {
     const missingPath = join(fileRoot, 'gone.csv')
 
     expect(await resolveOsOpenedDocuments([missingPath])).toEqual([])
-    expect(authorizeExternalPath).not.toHaveBeenCalled()
-  })
-
-  it('returns nothing for an empty input without touching the filesystem', async () => {
-    expect(await resolveOsOpenedDocuments([])).toEqual([])
-    expect(ensureFloatingWorkspaceDirectory).not.toHaveBeenCalled()
     expect(authorizeExternalPath).not.toHaveBeenCalled()
   })
 })

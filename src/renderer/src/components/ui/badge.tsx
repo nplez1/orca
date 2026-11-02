@@ -20,7 +20,7 @@ const badgeVariants = cva(
         link: 'text-primary underline-offset-4 [a&]:hover:underline',
         /** Workspace execution-host context, quieter and squarer than status chips. */
         hostContext:
-          'h-4 rounded border-border bg-accent px-1.5 text-[10px] leading-none text-muted-foreground dark:border-border/50 dark:bg-accent/80',
+          'h-4 rounded border-border bg-[var(--host-badge,var(--accent))] px-1.5 text-[10px] leading-none text-[var(--host-badge-foreground,var(--muted-foreground))] dark:border-border/50 dark:bg-[var(--host-badge,color-mix(in_oklab,var(--accent)_80%,transparent))]',
         /** Status tones for the compact meta pill shown beside a workspace's review details.
          *  Sizing lives in the variant (like `hostContext`) because a state pill may not be
          *  repainted by hand — its colour is the one signal a reader trusts without reading

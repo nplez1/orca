@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 10-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import { AgentLaunchPickerMenu } from '@/components/agent/AgentLaunchPickerMenu'
+import { SubscribedAgentLaunchPickerMenu } from '@/components/agent/AgentLaunchPickerMenu'
 import {
   agentPickerLaunchInputs,
   type AgentPickerEntry,
@@ -22,6 +22,8 @@ import {
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
 import { useAppStore } from '@/store'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
+import { useAgentMenuShortcutLabels } from './agent-menu-shortcut-labels'
+import type { AgentPickerInventorySource } from '../agent/use-agent-launch-picker-inventory'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import { translate } from '@/i18n/i18n'
@@ -176,14 +178,14 @@ export function ProjectedAgentMenuItems({
   disabled = false,
   model,
   runLaunch,
-  pickerEntries,
+  pickerInventory,
   onSelectPickerAgent,
   hidePickerSearch
 }: {
   disabled?: boolean
   model: NewTabAgentMenuModel
   runLaunch: (row: NewTabAgentMenuRow, draft?: AgentPickerDraft) => void
-  pickerEntries?: AgentPickerEntry[]
+  pickerInventory?: AgentPickerInventorySource
   onSelectPickerAgent?: (agent: AgentPickerEntry['agent']) => void
   hidePickerSearch?: boolean
 }): React.JSX.Element {
@@ -194,6 +196,7 @@ export function ProjectedAgentMenuItems({
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const newAgentShortcut = useOptionalShortcutLabel('tab.newAgent')
+  const shortcutLabels = useAgentMenuShortcutLabels(pickerInventory ? model : undefined)
   const openAgentSettings = useCallback(() => {
     openSettingsTarget({ pane: 'agents', repoId: null })
     openSettingsPage()
@@ -259,10 +262,10 @@ export function ProjectedAgentMenuItems({
                   )}
         </DropdownMenuItem>
       ) : null}
-      {pickerEntries ? (
-        <AgentLaunchPickerMenu
-          model={model}
-          entries={pickerEntries}
+      {pickerInventory ? (
+        <SubscribedAgentLaunchPickerMenu
+          shortcutLabels={shortcutLabels}
+          inventory={pickerInventory}
           runLaunch={runLaunch}
           onSelectAgent={onSelectPickerAgent}
           hideSearch={hidePickerSearch}

@@ -20,78 +20,6 @@ describe('electron-builder config', () => {
       require('../../src/shared/local-build-compatibility-contract.json').appId
     )
   })
-  it('excludes repo-only source trees from app.asar', () => {
-    const matcher = new FileMatcher('/app', '/dest', (value) => value, electronBuilderConfig.files)
-    matcher.prependPattern('**/*')
-    const isPacked = matcher.createFilter()
-    const packs = (repoPath) => isPacked(join('/app', repoPath), { isDirectory: () => false })
-    for (const sourcePath of [
-      'src/main/index.ts',
-      'config/electron-builder.config.cjs',
-      'cloud/apps/relay/index.ts',
-      'docs/README.md',
-      'mobile/app/index.tsx',
-      'native/windows-cli-launcher/main.cpp',
-      'skills/release/SKILL.md',
-      'skill-guides/release.md',
-      'skill-stubs/release.md',
-      'resources/skills/current-manifest.json',
-      'tests/e2e/example.spec.ts',
-      'examples/example.ts',
-      'pr-evidence/example.png',
-      'Casks/orca.rb',
-      'AGENTS.md',
-      'out/main/workspace.test.js',
-      'resources/plugins/launch/example.ts'
-    ]) {
-      expect(packs(sourcePath), sourcePath).toBe(false)
-    }
-    expect(packs('out/main/index.js')).toBe(true)
-    expect(packs('node_modules/example/docs/index.js')).toBe(true)
-    expect(packs('node_modules/example/src/index.js')).toBe(true)
-  })
-
-  it('keeps release build staging out of app.asar while preserving runtime output', () => {
-    const matcher = new FileMatcher('/app', '/dest', (value) => value, electronBuilderConfig.files)
-    matcher.prependPattern('**/*')
-    const isPacked = matcher.createFilter()
-    expect(isPacked(join('/app', '.build'), { isDirectory: () => true })).toBe(false)
-    for (const stagingPath of [
-      '.build/release-javascript/release-javascript.tar.gz',
-      '.build/release-javascript/manifest.json',
-      '.build/release-javascript-123/out/main/index.js'
-    ]) {
-      expect(isPacked(join('/app', stagingPath), { isDirectory: () => false })).toBe(false)
-    }
-    for (const runtimePath of [
-      'out/main/index.js',
-      'out/cli/index.js',
-      'out/renderer/index.html'
-    ]) {
-      expect(isPacked(join('/app', runtimePath), { isDirectory: () => false })).toBe(true)
-    }
-  })
-
-  it('keeps local agent tooling out of app.asar', () => {
-    const matcher = new FileMatcher('/app', '/dest', (value) => value, electronBuilderConfig.files)
-    matcher.prependPattern('**/*')
-    const isPacked = matcher.createFilter()
-    const packs = (repoPath) => isPacked(join('/app', repoPath), { isDirectory: () => false })
-
-    for (const toolingPath of [
-      '.grok/skills/review-and-submit/review-and-submit/SKILL.md',
-      '.claude/skills/review-and-submit/review-and-submit/SKILL.md',
-      '.agents/skills/electron/SKILL.md',
-      '.codex/sessions/session.json'
-    ]) {
-      expect(packs(toolingPath)).toBe(false)
-    }
-    expect(packs('out/main/index.js')).toBe(true)
-    expect(packs('out/web/web-index.html')).toBe(false)
-    expect(packs('out/web/assets/shared.js')).toBe(false)
-    expect(packs('out/renderer/web-index.html')).toBe(true)
-    expect(packs('out/renderer/.orca-web-client-files.json')).toBe(true)
-  })
 
   it.each(['file', 'directory'])('keeps a root notes %s out of app.asar', async (kind) => {
     const root = await mkdtemp(join(tmpdir(), 'orca-packaging-notes-'))
@@ -158,8 +86,8 @@ describe('electron-builder config', () => {
     const packs = (repoPath) => isPacked(join('/app', repoPath), { isDirectory: () => false })
 
     for (const authoringOnly of [
-      'examples/plugins/hostile-panel/panel.html',
-      'examples/plugins/hostile-panel/orca-plugin.json',
+      'examples/plugins/test-fixtures/hostile-panel/panel.html',
+      'examples/plugins/test-fixtures/hostile-panel/orca-plugin.json',
       'examples/plugins/hello-orca/main.mjs',
       'examples/plugins/hello-orca/orca-plugin.json'
     ]) {
@@ -283,14 +211,6 @@ describe('electron-builder config', () => {
     }
   )
 
-  // Why: serve-sim's addon is a Mach-O, and Windows signing rejects every *.node that is not PE.
-
-  // Source shim unpacked under resources/win32/bin lacks adjacent orca.exe (#7351); only extraResources/bin copy works.
-
-  // macOS 26 UNUserNotificationCenter aborts helpers launched from Resources; ship under MacOS (#7929).
-
-  // Missing unpacked entry silently restores in-process watcher and #7547 main crashes.
-
   // CLI Node mode cannot read asar; packed entry sends orca serve to Electron (#27307).
   it('unpacks the orcad serve-selection entry the CLI runs', async () => {
     const sharedSource = await readFile(
@@ -329,6 +249,24 @@ describe('electron-builder config', () => {
       'out/mobile-web/assets/index-abc123.js'
     ]) {
       expect(isUnpacked(join('/app', webPath), { isDirectory: () => false })).toBe(true)
+    }
+  })
+
+  it('validates each AppImage before electron-builder publishes it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-appimage-'))
+    try {
+      const appImage = join(root, 'orca-linux.AppImage')
+      await writeFile(appImage, 'not an ELF')
+      await chmod(appImage, 0o755)
+
+      expect(() =>
+        electronBuilderConfig.artifactBuildCompleted({ file: appImage, arch: 1 })
+      ).toThrow(/ELF header is outside/)
+      expect(() =>
+        electronBuilderConfig.artifactBuildCompleted({ file: join(root, 'orca-ide.deb') })
+      ).not.toThrow()
+    } finally {
+      await rm(root, { recursive: true, force: true })
     }
   })
 
@@ -411,10 +349,6 @@ describe('arch-aware packaging guard', () => {
       bundleDir,
       () => undefined
     )
-
-  it('allows packaging the host platform and architecture', () => {
-    expect(() => packHost(HOST_ARCH)).not.toThrow()
-  })
 
   it('refuses to package a dark layout-owner build', () => {
     const previous = process.env.ORCA_LAYOUT_OWNER

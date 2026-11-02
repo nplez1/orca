@@ -30,6 +30,8 @@ export function RightSidebarPanelContent({
       // Why: a panel is read-only chrome; a pointer click on its background drops focus
       // to the page, so the agent tab takes it back.
       onClick={restoreAgentTabFocusAfterPanelBackgroundClick}
+      // `orca plugin shot` captures exactly this rect.
+      data-plugin-panel-surface={isPluginPanelTabKey(effectiveTab) ? effectiveTab : undefined}
     >
       <Suspense fallback={null}>
         {effectiveTab === 'explorer' && <FileExplorer />}

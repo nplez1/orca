@@ -26,7 +26,7 @@ import { countRepoTerminalsNotKnownExited } from './project-removal-impact'
 export function installOrcaRuntimeOwnedControllers(
   runtime: OrcaRuntimeWithPreservedBranchCleanup
 ): void {
-  runtime.accounts = new RuntimeAccountController()
+  runtime.accounts = new RuntimeAccountController(() => runtime.notifier)
 
   runtime.mobileSpeech = new RuntimeMobileSpeechCatalog(() => runtime.store)
 
@@ -53,6 +53,8 @@ export function installOrcaRuntimeOwnedControllers(
     // Why: a folder delete announces the same removal a worktree does, so its consumers wake.
     emitWorktreeLifecycle: (event) => runtime.emitWorktreeLifecycle(event),
     resolveFolderConnectionId: (workspace) => runtime.resolveFolderWorkspaceConnectionId(workspace),
+    acquireFileWatcherRemoval: (path, connectionId) =>
+      runtime.acquireFileWatcherRemoval(path, connectionId),
     teardownFolderWorkspacePtys: (worktreeId, connectionId) =>
       teardownFolderWorkspacePtys(
         {

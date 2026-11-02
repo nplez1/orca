@@ -13,11 +13,7 @@ import type { ResolvedWorktree } from '../runtime-worktree-path-identity'
 import { confirmRunTerminalShellAlone, readRunTerminalClientUse } from '../run-terminal-client-use'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import { RuntimePreservedBranchCleanup } from '../runtime-preserved-branch-cleanup'
-import type {
-  AgentSessionCreateOperation,
-  OrchestrationCompatibilitySshAttachmentAuthority,
-  RestoredOrchestrationAuthorityReceipt
-} from '../runtime-terminal-contracts'
+import type * as TerminalContracts from '../runtime-terminal-contracts'
 import { installOrcaRuntimeOwnedControllers } from '../orca-runtime-owned-controllers'
 import type { RuntimeRepositoryRelocationController } from '../runtime-repository-relocation-controller'
 
@@ -45,9 +41,14 @@ import type { RuntimeWorkspaceSessionController } from '../runtime-workspace-ses
 import type { RuntimeAiVaultCommands } from '../runtime-ai-vault-commands'
 import type { ClaudeAgentTeamsService } from '../claude-agent-teams-service'
 
+type SessionCreateOperation = TerminalContracts.AgentSessionCreateOperation
+
 export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTerminalDrivers {
   declare addRepo: RuntimeRepositoryCommandSurface['addRepo']
   declare cloneRepo: RuntimeRepositoryCommandSurface['cloneRepo']
+  declare acquireFileWatcherRemoval: ConstructorParameters<
+    typeof RuntimeProjectGroupController
+  >[0]['acquireFileWatcherRemoval']
   protected abstract tryGetWorkspaceSessionHostIdForWorktree(
     worktreeId: string
   ): ExecutionHostId | null
@@ -191,7 +192,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected readonly agentSessionClaimSigner!: HostBindings['agentSessionClaimSigner']
 
-  protected readonly agentSessionCreateOperations = new Map<string, AgentSessionCreateOperation>()
+  protected readonly agentSessionCreateOperations = new Map<string, SessionCreateOperation>()
 
   protected readonly agentPromptSubmissionTailByPtyId = new Map<string, Promise<void>>()
 
@@ -206,7 +207,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected readonly orchestrationCompatibilitySshAttachments = new Map<
     string,
-    OrchestrationCompatibilitySshAttachmentAuthority
+    TerminalContracts.OrchestrationCompatibilitySshAttachmentAuthority
   >()
 
   protected sshRelayRecoveryGenerationByTargetId = new Map<string, number>()
@@ -264,7 +265,7 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected restoredOrchestrationAuthorityByPtyId = new Map<
     string,
-    RestoredOrchestrationAuthorityReceipt
+    TerminalContracts.RestoredOrchestrationAuthorityReceipt
   >()
 
   protected ptyControllerInventorySequence = 0

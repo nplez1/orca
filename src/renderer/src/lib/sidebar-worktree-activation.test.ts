@@ -44,6 +44,20 @@ describe('sidebar worktree activation', () => {
     })
   })
 
+  it('preserves folder click defaults and only suppresses a requested keyboard reveal', () => {
+    activateWorktreeFromSidebar('folder:f', 'ssh:other')
+    expect(mocks.activateAndRevealFolderWorkspace).toHaveBeenLastCalledWith('f', {
+      navigationIntent: 'user-open',
+      executionHostId: 'ssh:other'
+    })
+    activateWorktreeFromSidebar('folder:f', 'ssh:other', { revealInSidebar: false })
+    expect(mocks.activateAndRevealFolderWorkspace).toHaveBeenLastCalledWith('f', {
+      navigationIntent: 'user-open',
+      executionHostId: 'ssh:other',
+      revealInSidebar: false
+    })
+  })
+
   it('returns the activation while an ephemeral runtime wake is still pending', () => {
     let resolveResume: ((value: null) => void) | undefined
     const resumeWorkspace = vi.fn(

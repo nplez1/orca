@@ -33,6 +33,7 @@ Use `npx skills add` with this build's repository and the skill name. Default ag
 | [`orca-emulator`](#orca-emulator)                   | `npx skills add https://github.com/nplez1/orca --skill orca-emulator --global`          | iOS Simulator control.                                        |
 | [`orca-emulator-android`](#orca-emulator-android)   | `npx skills add https://github.com/nplez1/orca --skill orca-emulator-android --global`  | Android emulator/device via adb.                              |
 | [`orca-per-workspace-env`](#orca-per-workspace-env) | `npx skills add https://github.com/nplez1/orca --skill orca-per-workspace-env --global` | Per-workspace environment recipes (`orca.yaml`).              |
+| [`orca-plugin-authoring`](#orca-plugin-authoring)   | `npx skills add https://github.com/nplez1/orca --skill orca-plugin-authoring --global`  | Build, debug and publish Orca plugins.                        |
 
 ## Hybrid stubs vs the live guide
 
@@ -161,6 +162,14 @@ npx skills add https://github.com/nplez1/orca --skill orca-per-workspace-env --g
 ```
 
 Use when setting up or debugging per-workspace environment recipes in `orca.yaml`. See [Ways to run Orca](/docs/ways-to-run#4-cloud-vms-per-workspace-environments).
+
+## orca-plugin-authoring
+
+```bash
+npx skills add https://github.com/nplez1/orca --skill orca-plugin-authoring --global
+```
+
+Use when an agent should make, debug, test or publish an Orca plugin: themes, syntaxes, custom editors, TSX components panels and worker commands. Load it with `orca skills get orca-plugin-authoring`; its references (components, host API, events, manifest fields, CLI) are generated from the running Orca.
 
 ## Discovery sources
 

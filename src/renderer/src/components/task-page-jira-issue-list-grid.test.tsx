@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraIssue, JiraSprint } from '../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
+import { TaskPageJiraIssueList } from './task-page/jira/task-page-jira-issue-list'
 
 vi.mock('@/i18n/i18n', () => ({
   getIntlLocale: () => 'en-US',

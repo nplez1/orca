@@ -39,12 +39,14 @@ async function wakeEphemeralVmWorkspace(worktreeId: string): Promise<void> {
 
 export function activateWorktreeFromSidebar(
   worktreeId: string,
-  executionHostId?: ExecutionHostId
+  executionHostId?: ExecutionHostId,
+  options?: { revealInSidebar?: boolean }
 ): ActivateAndRevealResult | false {
   const workspaceScope = parseWorkspaceKey(worktreeId)
   if (workspaceScope?.type === 'folder') {
     return activateAndRevealFolderWorkspace(workspaceScope.folderWorkspaceId, {
       navigationIntent: 'user-open',
+      ...options,
       ...(executionHostId ? { executionHostId } : {})
     })
   }

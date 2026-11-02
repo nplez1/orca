@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AiVaultSessionAccountHomeSchema } from '../../shared/ai-vault-session-account-home'
 import {
   AI_VAULT_AGENTS,
   AI_VAULT_LIST_SKIP_ISSUE_PATH,
@@ -47,6 +48,8 @@ const sessionPreviewMessageSchema = z.object({
 })
 
 const aiVaultSessionSchema = z.object({
+  accountHome: AiVaultSessionAccountHomeSchema,
+  accountWslDistro: z.string().nullable().optional().catch(undefined),
   id: z.string(),
   executionHostId: executionHostIdSchema,
   executionHostPlatform: nodePlatformSchema.nullable().optional(),

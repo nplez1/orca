@@ -20,7 +20,7 @@ const spies = vi.hoisted(() => ({
   sheet: vi.fn()
 }))
 
-vi.mock('@/components/task-page-jira-issue-list', () => ({
+vi.mock('./task-page-jira-issue-list', () => ({
   TaskPageJiraIssueList: (props: {
     onOpenOrStartWorkspace: unknown
     issueWorkspaceAttachmentIndex: unknown

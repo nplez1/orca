@@ -62,7 +62,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
   )
 
   const refreshCommentsAfterReplies = useCallback(async (): Promise<void> => {
-    await fetchComments({ force: true })
+    await fetchComments({ force: true, userRefresh: true })
   }, [fetchComments])
   // Why a ref: launchContext captures these callbacks at queue time; a head-churn re-render must
   // not aim the refresh at the review the panel has left — always call the latest consumer.
@@ -115,6 +115,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
                 body,
                 {
                   repoId: githubTarget.repoId,
+                  repoOwnerExecutionHostId: githubTarget.ownerHostId,
                   prRepo: githubTarget.prRepo,
                   threadId: parentThreadId,
                   path: comment.path,
@@ -157,6 +158,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
                 body,
                 {
                   repoId: githubTarget.repoId,
+                  repoOwnerExecutionHostId: githubTarget.ownerHostId,
                   prRepo: githubTarget.prRepo
                 }
               )

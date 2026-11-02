@@ -1,3 +1,4 @@
+import { retireRemovedNativeChatDraftPositions } from '@/components/native-chat/native-chat-draft-cache'
 import { retireStructuredAgentSessionReadOwner } from '@/components/native-chat/structured-agent-session-read-owner-registry'
 import type { TabsSlice, TabsSliceGet, TabsSliceSet } from './tabs-slice-contract'
 import { collapseGroupLayout } from '../../../../../shared/workspace-layout/tab-group-layout-tree'
@@ -14,7 +15,6 @@ import {
   hasStructuredAgentSessionLaunchCancellationTombstone,
   shouldRetainStructuredAgentSessionLaunchTab
 } from '@/lib/agent-session/launch/structured-agent-session-launch-registry'
-import { structuredAgentSessionTabId } from '../../../../../shared/structured-agent-session-projection'
 import { clearWebSessionFocusIntentIfMatches } from '@/runtime/web-session-focus-intent'
 import { ownsGlobalSelection } from '../../global-selection-owner'
 import {
@@ -96,7 +96,6 @@ export function createTabsCloseActions(
           // Closing still removes the tab; no host can be named to stop its chat on.
           console.warn('[structured-agent-session] close found no owning host', tab.entityId)
         }
-        get().clearNativeChatLaunchDraft(structuredAgentSessionTabId(tab.entityId))
         // The unsent draft stays: it belongs to the conversation, which can be reopened from history.
       }
       const nextActiveTabId =
@@ -119,9 +118,12 @@ export function createTabsCloseActions(
       const closeHere = (): void =>
         settleAttentionRemovedBy(set, get, () =>
           set((current) => {
-            const nextTabs = (current.unifiedTabsByWorktree[worktreeId] ?? []).filter(
-              (item) => item.id !== tabId
-            )
+            const nextTabs = (current.unifiedTabsByWorktree[worktreeId] ?? []).filter((item) => {
+              if (item.id === tabId) {
+                retireRemovedNativeChatDraftPositions([item], [])
+              }
+              return item.id !== tabId
+            })
             // Bulk closes bypass terminals.closeTab, so clear entity-keyed unread markers here too.
             const nextUnreadTerminalTabs = terminalEntityId
               ? omitRecordKeys(current.unreadTerminalTabs, [terminalEntityId])
@@ -233,7 +235,7 @@ export function createTabsCloseActions(
 /** Main opens the chat where it opens any chat this host lists: a host-kept chat comes back. */
 function reopenChatTab(worktreeId: string, sessionId: string, agent: TuiAgent): () => void {
   return () =>
-    void import('@/lib/structured-agent-session-launch-surface').then(
+    void import('@/lib/agent-session/launch/structured-agent-session-launch-surface').then(
       ({ openStructuredAgentSessionProvisionalTab }) =>
         openStructuredAgentSessionProvisionalTab({
           worktreeId,

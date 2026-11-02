@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
-import type { Store } from '../../persistence'
 import { isWorktreeSharedDirectoriesMode, type Repo } from '../../../shared/repo-types'
+import type { Store } from '../../persistence/loading-store/store'
 import type { RepoHostTarget } from '../../../shared/repo-host-identity'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import type { ExecutionHostId } from '../../../shared/execution-host'

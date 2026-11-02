@@ -5,7 +5,7 @@ import { installWindowVisibilityTimeoutPoller } from '@/lib/window-visibility-ti
 import {
   rollupReportsUnseenRun,
   type ChecksDetailPollingPolicy
-} from './checks-detail-polling-policy'
+} from '../../../../../shared/github/checks-detail-polling-policy'
 import type { ChecksPanelPollingInput, ChecksPanelPollingState } from './use-checks-panel-polling'
 
 export function useChecksDetailTimer({

@@ -1,5 +1,5 @@
 import type { AgentHookSource } from '../agent-hook-relay'
-import type { AgentProviderSessionMetadata } from '../agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../agent-session/lifecycle/agent-session-resume'
 import type { AgentHookEventPayload } from './listener-event'
 
 /** The one event that legitimately hands a pane to a different pi session.

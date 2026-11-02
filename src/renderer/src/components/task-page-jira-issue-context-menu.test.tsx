@@ -6,7 +6,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
-import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
+import { TaskPageJiraIssueList } from './task-page/jira/task-page-jira-issue-list'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 
 const openUrl = vi.fn()

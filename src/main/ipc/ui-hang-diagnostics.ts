@@ -3,7 +3,7 @@
 // both the setting and the log file, exactly like the diagnostics/telemetry lanes.
 
 import { ipcMain } from 'electron'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type { UiHangDiagnosticsStatus } from '../../shared/ui-hang-diagnostics-types'
 import {
   getUiHangDiagnosticsStatus,

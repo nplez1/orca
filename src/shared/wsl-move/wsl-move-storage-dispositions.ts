@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s WSL move dispositions ride inside upstream s table, and splitting costs a permanent sync hunk. */
 import {
   moveDisposition,
   notApplicableDisposition,
@@ -119,6 +120,7 @@ export const SQLITE_SCHEMA_FILE_DATABASES: Record<string, string> = {
     'agent-session-journal',
   'src/main/native-chat/agent-session-journal/command-receipt-schema.ts': 'agent-session-journal',
   'src/main/native-chat/agent-session-journal/journal-database-schema.ts': 'agent-session-journal',
+  'src/main/native-chat/agent-session-journal/journal-outcome-format.ts': 'agent-session-journal',
   'src/main/native-chat/agent-session-journal/journal-pi-active-branch.ts': 'pi-branch-import',
   'src/main/native-chat/agent-session-journal/queued-message-schema.ts': 'agent-session-journal',
   'src/main/persistence/profile-state/profile-state-database-schema.ts': 'profile-state',
@@ -162,6 +164,9 @@ export const SQLITE_TABLE_DISPOSITIONS: Record<string, WslMoveFieldDisposition> 
         'agent_session_attachment_claims',
         'agent_session_attachment_sweeps',
         'journal_imports',
+        'journal_outcomes',
+        'journal_outcome_epochs',
+        'journal_outcome_generations',
         'journal_repairs',
         'journal_rows',
         'journal_sessions',

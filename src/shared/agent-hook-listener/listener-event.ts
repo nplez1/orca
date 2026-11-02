@@ -1,7 +1,7 @@
 import type { AgentProcessPresence } from '../agent-process-presence'
 import type { ParsedAgentStatusPayload, TurnEndDisposition } from '../agent-status-types'
 import type { AgentHookSource } from '../agent-hook-relay'
-import type { AgentProviderSessionMetadata } from '../agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../agent-session/lifecycle/agent-session-resume'
 import type { ClaudeSettledRequest } from './claude-settled-permission-requests'
 
 /** Execution-host turn record, saved with rows but private; turnEndedAt is the public fact. */
@@ -60,6 +60,8 @@ export type AgentHookEventPayload = {
     providerSession: string
     transcriptPath: string
   }
+  /** In-process status correlation only; never a new locator, persisted field or relay field. */
+  statusAdmissionSession?: string
   /** Session identity update with no turn-state transition; refreshes durable resume metadata without a fake status row. */
   providerSessionOnly?: boolean
   /** True when this event is a relay cache replay rather than a live hook. */

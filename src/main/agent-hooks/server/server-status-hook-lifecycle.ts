@@ -83,6 +83,7 @@ export abstract class AgentHookServerStatusHookLifecycle extends AgentHookServer
       }
       this.ownerStateInitialized = true
       this.adoptHydratedScreenPromptRows()
+      this.activateClaudeHelperObservations()
     }
     this.startStatusSpoolDrainLoop()
   }

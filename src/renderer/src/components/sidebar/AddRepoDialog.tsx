@@ -25,6 +25,7 @@ import { routeAddRepoBrowse } from './add-repo-browse-authority'
 import { useAddRepoWslHostPaths } from './use-add-repo-wsl-host-paths'
 import { useAddRepoDialogModalPaths } from './use-add-repo-dialog-modal-paths'
 import { useAddRepoWindowsDriveRefusal } from './use-add-repo-windows-drive-refusal'
+import { useAddRepoWslHostOffer } from './use-add-repo-wsl-host-offer'
 
 export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps) {
   const isOpen = useAppStore((s) => (hosted ? hosted.open : s.activeModal === 'add-repo'))
@@ -166,6 +167,7 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
   })
 
   const isRuntimeEnvironmentActive = Boolean(selectedRuntimeEnvironmentId)
+  const wslHostOffer = useAddRepoWslHostOffer(isOpen, hostSelection.selectedHostId)
   const { handleBrowse, resetLocalFolderFlow, handleAddLocalPath } = useAddRepoLocalFolderFlow({
     isOpen,
     droppedLocalPath: modalPaths.droppedLocalPath,
@@ -180,7 +182,8 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
     showNestedRepoReview,
     onGitRepoReady: completeGitRepoAdd,
     setIsAdding,
-    setAddProjectBusyLabel
+    setAddProjectBusyLabel,
+    offerWslHost: wslHostOffer.offer
   })
   const {
     serverPath,
@@ -319,10 +322,7 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
         isCloning={isCloning}
         sshTargets={sshTargets}
         selectedTargetId={selectedTargetId}
-        selectedHostLabel={
-          hostSelection.hostOptions.find((host) => host.id === hostSelection.selectedHostId)
-            ?.label ?? null
-        }
+        selectedHostLabel={hostSelection.selectedHostLabel}
         remotePath={remotePath}
         remoteError={remoteError}
         isAddingRemote={isAddingRemote}
@@ -334,7 +334,7 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
         createError={createError}
         isCreating={isCreating}
         hostSelector={<AddRepoHostSelectorSlot hostSelection={hostSelection} />}
-        windowsDriveNotice={windowsDrive.notice}
+        windowsDriveNotice={windowsDrive.notice ?? wslHostOffer.notice(handleAddLocalPath)}
         actionsDisabled={!hostSelection.selectedHostId}
         browseHostKind={hostSelection.selectedParsedHost?.kind === 'local' ? 'local' : 'runtime'}
         createDefaultParent={createDefaultParent}

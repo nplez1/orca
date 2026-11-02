@@ -6,11 +6,11 @@ import { join } from 'node:path'
 import type { AgentType } from '../../shared/agent-status-types'
 import type { AiVaultAgent } from '../../shared/ai-vault-types'
 import { isAiVaultAgent } from '../../shared/ai-vault-types'
-import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import {
   resolveNativeChatTranscriptAgent,
   type NativeChatTranscriptAgent
-} from '../../shared/native-chat-agent-support'
+} from '../../shared/native-chat/native-chat-agent-support'
 import { readWholeTranscript } from '../ai-vault/session-transcript-reader'
 import {
   registerTranscriptConsumer,

@@ -5,7 +5,7 @@ import {
   getFileExplorerNameFilterTokens,
   isFileExplorerNameFilterQueryTooLarge
 } from './file-explorer-name-filter-policy'
-import { splitPathSegments } from './path-tree'
+import { splitPathSegments } from '../../../../shared/cross-platform-path'
 
 /** Keeps only the paths the pane can show inside the displayed root. */
 export function isInsideDisplayRoot(

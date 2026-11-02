@@ -1,9 +1,9 @@
+import { retainHookRootContext } from '../../../shared/agent-hook-listener/pane-provider-session'
 import { deriveCliWriterTopology } from './cli-writer-observation'
-import { transitionHookPresence } from '../../../shared/agent-hook-presence-transition'
+import { previewHookPresence } from '../../../shared/agent-hook-presence-transition'
 import {
   reconcileCodexStatusEvent,
-  markCodexLeadTurnInterrupted,
-  withPreservedCodexRootContext
+  markCodexLeadTurnInterrupted
 } from '../../../shared/agent-hook-listener/providers/codex-state'
 import {
   resolveAgentStatusIdentity,
@@ -52,19 +52,22 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     origin: AgentStatusObservationOrigin = 'hook',
     observedAt?: number,
     mutationBefore?: EnrichedAgentHookEventPayload,
-    newRun = false
+    newRun = false,
+    retireBinding = false
   ): EnrichedAgentHookEventPayload | undefined {
-    const transitioned = transitionHookPresence(
+    const rootContext = previewHookPresence(
       incoming,
-      this.state.lastStatusByPaneKey.get(incoming.paneKey)
+      this.state.lastStatusByPaneKey.get(incoming.paneKey),
+      origin === 'hook' || origin === 'launch',
+      retireBinding
     )
+    const { event: rootIdentityIncoming, statusAdmissionSession } = rootContext
+    const transitioned = rootContext.transitioned
     if (!transitioned) {
       return undefined
     }
-    const { authorityRestartId, codexRosterAuthority, ...transitionedPayload } = {
-      ...incoming,
-      ...transitioned
-    }
+    const enrichedTransition = { ...rootIdentityIncoming, ...transitioned }
+    const { authorityRestartId, codexRosterAuthority, ...transitionedPayload } = enrichedTransition
     // Why the strip: the marker beside the transcript is the durable half of this link, and a
     // transcript path on every row would ride the persisted snapshot and the renderer fanout for
     // no reader.
@@ -129,13 +132,13 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
               state: previous.payload.state,
               updatedAt: previous.receivedAt,
               restoredUnconfirmed: previous.restoredUnconfirmed,
-              agentPresence: previous.providerSessionOnly ? undefined : previous.agentPresence
+              agentPresence: previous.providerSessionOnly ? undefined : rootContext.owner
             }
           : undefined,
       incoming: terminalOwnedPayload.payload.agentType,
-      // Relay presence is the execution host's owner verdict, not the sender's identity.
+      // Relay process presence is the host's owner verdict; scoped session bytes only compare this hook.
       incomingProcess: payload.connectionId ? undefined : incoming.agentPresence?.process,
-      incomingSession: terminalOwnedPayload.providerSession?.id,
+      incomingSession: statusAdmissionSession,
       now
     })
     if (
@@ -184,23 +187,14 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
       previous?.payload,
       codexRosterAuthority
     )
-    const previousCodexRoot =
-      stateReconciledPayload.payload.agentType === 'codex' &&
-      stateReconciledPayload.toolAgentId &&
-      previous?.payload.agentType === 'codex'
-        ? previous
-        : undefined
-    const preservedProviderSession = !stateReconciledPayload.providerSession
-      ? previousCodexRoot?.providerSession
-      : undefined
-    const preservedRootModel = !stateReconciledPayload.payload.model
-      ? previousCodexRoot?.payload.model
-      : undefined
-    // Why: an SSH relay restart forgets root-only fields; child hooks must not erase durable resume/model identity.
-    const rootContextPreservingPayload = withPreservedCodexRootContext(stateReconciledPayload, {
-      providerSession: preservedProviderSession,
-      model: preservedRootModel
-    })
+    // Relay restart loses root context; child hooks must not erase persisted resume/model identity.
+    const rootContextPreservingPayload = retainHookRootContext(
+      stateReconciledPayload,
+      previous,
+      origin === 'hook',
+      !!previous && this.sameTerminalOwner(previous, stateReconciledPayload),
+      rootContext.returningProviderSession
+    )
     const identityResolvedPayload =
       identity.agentType === rootContextPreservingPayload.payload.agentType
         ? rootContextPreservingPayload

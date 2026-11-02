@@ -7,7 +7,7 @@ import { useAppStore } from '@/store'
 import type { LinearComment, LinearIssue } from '../../../../shared/linear/issue-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
-import { scopedLinearCacheKeyForSource } from '@/store/slices/linear/linear-slice-scope'
+import { observeLinearIssueRead } from '@/store/slices/linear/linear-issue-read-lifecycle'
 import { translate } from '@/i18n/i18n'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
@@ -45,32 +45,32 @@ export function LinearLinkedIssuePane({
   issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
   const fetchLinearIssue = useAppStore((s) => s.fetchLinearIssue)
-  // Why only the owner's own key: the cache is in-memory, and a reader with no source at all writes
-  // the bare `all::<id>` key through the Active Server. A Linear identifier is unique only inside its
-  // workspace, so serving such an entry could show an issue another host's account read while every
-  // write from here goes to this owner. This pane always knows its source.
-  const entry = useAppStore(
-    (s) =>
-      s.linearIssueCache[
-        scopedLinearCacheKeyForSource(sourceContext, `all::${linkedIssue.identifier}`)
-      ]
-  )
-  const issue = entry?.data ?? null
+  const [issue, setIssue] = useState<LinearIssue | null>(null)
+  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshNonce, setRefreshNonce] = useState(0)
   const linkActions = useLinkedIssuePaneActions(linkedIssue)
 
   useEffect(() => {
-    // Why: 'all' — the identifier may belong to a different Linear workspace
-    // than the one currently selected.
-    void fetchLinearIssue(linkedIssue.identifier, 'all', { sourceContext })
-  }, [fetchLinearIssue, linkedIssue.identifier, sourceContext])
+    // Why no workspaceId: the identifier may belong to a different Linear workspace than the one
+    // currently selected, and every read here is owner-routed through `sourceContext`.
+    return observeLinearIssueRead(
+      fetchLinearIssue(linkedIssue.identifier, null, { sourceContext, force: refreshNonce > 0 }),
+      () => true,
+      (_lease, view) => {
+        setIssue(view.data ?? null)
+        setLoading(view.kind === 'loading')
+        if (view.kind !== 'loading') {
+          setRefreshing(false)
+        }
+      }
+    )
+  }, [fetchLinearIssue, linkedIssue.identifier, sourceContext, refreshNonce])
 
   const refresh = useCallback((): void => {
     setRefreshing(true)
-    void fetchLinearIssue(linkedIssue.identifier, 'all', { sourceContext, force: true }).finally(
-      () => setRefreshing(false)
-    )
-  }, [fetchLinearIssue, linkedIssue.identifier, sourceContext])
+    setRefreshNonce((nonce) => nonce + 1)
+  }, [])
 
   if (!issue) {
     return (
@@ -80,7 +80,7 @@ export function LinearLinkedIssuePane({
           identifier={linkedIssue.identifier}
           title={linkedIssue.title ?? ''}
           openUrl={linkedIssue.url}
-          titleLoading={entry === undefined}
+          titleLoading={loading}
           refreshing={refreshing}
           onRefresh={refresh}
           onOpenIssue={linkActions.openIssue}
@@ -89,10 +89,10 @@ export function LinearLinkedIssuePane({
           linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
           issueSwitcher={issueSwitcher}
         />
-        {entry !== undefined && entry.data === null ? (
-          <IssuePaneMessage kind="unavailable" providerLabel="Linear" onRetry={refresh} />
-        ) : (
+        {loading ? (
           <IssuePaneMessage kind="loading" />
+        ) : (
+          <IssuePaneMessage kind="unavailable" providerLabel="Linear" onRetry={refresh} />
         )}
       </div>
     )
@@ -152,7 +152,6 @@ function LinearLinkedIssueDetail({
           <LinearIssueEditRows
             issue={detail.displayed}
             editState={detail.editState}
-            onEditStateChange={detail.handleEditStateChange}
             providerSettings={providerSettings}
             sourceContext={sourceContext}
           />
@@ -160,7 +159,6 @@ function LinearLinkedIssueDetail({
         <div className="border-t border-border/40 p-3">
           <LinearIssueTextEditor
             issue={detail.displayed}
-            onIssueChange={detail.handleIssueTextChange}
             density="drawer"
             sourceContext={sourceContext}
           />

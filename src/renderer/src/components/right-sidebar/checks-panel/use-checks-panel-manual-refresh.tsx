@@ -1,9 +1,9 @@
 /* eslint-disable max-lines -- Why: upstream's manual refresh plus the fork's carry-over of the
    refreshed PR's repo and head SHA into the acknowledgement path. */
+import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
 import { useCallback } from 'react'
 import { useAppStore } from '@/store'
 import { buildGitHubPRRefreshStateClearToken } from '@/store/github/pr-refresh-state'
-import { refreshHostedReviewCard } from '@/store/slices/hosted-review-card-refresh'
 import { getRuntimeGitStatus } from '@/runtime/runtime-git-status-client'
 import { getRuntimeGitUpstreamStatus } from '@/runtime/runtime-git-sync-client'
 import { resolveWorktreeGitCopyNow } from '@/lib/worktree-git-copy'
@@ -19,7 +19,14 @@ import {
   workspaceReviewSelectionKey
 } from '../workspace-review-selection'
 import { recordChecksPanelPRRefreshBreadcrumb } from '../checks-panel-pr-refresh-breadcrumb'
+import { getHostedReviewManualRefreshError } from '../github-refresh-error-copy'
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
+import {
+  checksPanelManualRefreshProvider,
+  refreshChecksPanelHostedReview,
+  refreshHostedReviewForClick,
+  useChecksPanelManualRefreshFailure
+} from './hosted-review-manual-refresh'
 import type { ChecksPanelManualRefreshInput } from './manual-refresh-dependencies'
 
 // The manual Refresh is a user act: it may start a stopped WSL distro (E9).
@@ -36,18 +43,13 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     expireGitHubPRRefreshState,
     fallbackGitHubPRNumber,
     fetchGitLabDetails,
-    fetchHostedReviewForBranch,
     fetchPRChecks,
     fetchPRComments,
     fetchPRForBranch,
     gitStatusSnapshot,
+    hostedReviewCacheKey,
     isCurrentAsyncResult,
     isFolder,
-    isGitLabReviewContext,
-    linkedAzureDevOpsPR,
-    linkedBitbucketPR,
-    linkedGiteaPR,
-    linkedGitLabMR,
     linkedPR,
     ownerCopyHostId,
     ownerTarget,
@@ -77,10 +79,15 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     pickedReview && isWorkspaceReviewProvider(pickedReview.provider)
       ? workspaceReviewSelectionKey(pickedReview.provider, pickedReview.number)
       : null
+  const { manualRefreshError, setManualFailure } = useChecksPanelManualRefreshFailure(
+    panelContextKey,
+    hostedReviewCacheKey
+  )
   const handleRefresh = useCallback(async () => {
     if (!repo || !branch) {
       return
     }
+    const repoOptions = { repoId: repo.id, repoOwnerExecutionHostId: getRepoExecutionHostId(repo) }
     if (refreshInFlightRef.current) {
       return
     }
@@ -95,7 +102,9 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     )
     const refreshRequestKey = `${activeWorktreeId ?? ''}::${prCacheKey}::${branch}::${Date.now()}::${Math.random()}`
     refreshRequestKeyRef.current = refreshRequestKey
-    const isCurrentRequest = (): boolean => refreshRequestKeyRef.current === refreshRequestKey
+    const isCurrentRequest = (): boolean =>
+      refreshRequestKeyRef.current === refreshRequestKey &&
+      panelContextKeyRef.current === panelContextKey
     setIsRefreshing(true)
     if (pickedReview) {
       const isPickStillShown = (): boolean =>
@@ -133,12 +142,12 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         const [refreshedChecks, refreshedComments] = await Promise.all([
           fetchPRChecks(repo.path, pickedPRNumber, undefined, headSha, pr?.prRepo, {
             force: true,
-            repoId: repo.id,
+            ...repoOptions,
             wakeWslDistro: true
           }),
           fetchPRComments(repo.path, pickedPRNumber, {
             force: true,
-            repoId: repo.id,
+            ...repoOptions,
             prRepo: pr?.prRepo,
             headSha
           })
@@ -163,7 +172,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
       return
     }
     const refreshStartedAt = Date.now()
-    const refreshProvider = isGitLabReviewContext ? 'gitlab' : 'github'
+    const refreshProvider = checksPanelManualRefreshProvider(model)
     let refreshOutcome = 'started'
     recordChecksPanelPRRefreshBreadcrumb({
       event: 'start',
@@ -255,42 +264,17 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
           console.warn('[ChecksPanel] pre-refresh git identity refresh failed', error)
         }
       }
-      if (isGitLabReviewContext) {
-        const refreshedReview = await refreshHostedReviewCard(fetchHostedReviewForBranch, {
-          repoPath: repo.path,
-          repoId: repo.id,
-          branch,
-          admissionTier: 'interactive',
-          linkedGitHubPR: linkedPR,
-          fallbackGitHubPR: fallbackGitHubPRNumber,
-          linkedGitLabMR,
-          linkedBitbucketPR,
-          linkedAzureDevOpsPR,
-          linkedGiteaPR
-        })
-        if (!isCurrentRequest()) {
-          return
-        }
-        const refreshedGitLabReview =
-          refreshedReview?.provider === 'gitlab' ? refreshedReview : activeGitLabReview
-        if (refreshedGitLabReview) {
-          await fetchGitLabDetails({
-            mrNumberOverride: refreshedGitLabReview.number,
-            headShaOverride: refreshedGitLabReview.headSha,
-            commitAsCurrent: true
-          })
-          refreshOutcome = 'review'
-        } else {
-          setChecks([])
-          setComments([])
-          refreshOutcome = 'no-review'
-        }
+      if (refreshProvider !== 'github') {
+        refreshOutcome = await refreshChecksPanelHostedReview(
+          model,
+          refreshProvider,
+          isCurrentRequest
+        )
         return
       }
       const refreshStoreState = useAppStore.getState()
-      const rawPRRefreshState = refreshStoreState.prRefreshStates[prCacheKey]
       const startedPRRefreshToken = buildGitHubPRRefreshStateClearToken(
-        rawPRRefreshState,
+        refreshStoreState.prRefreshStates[prCacheKey],
         refreshStoreState.prRefreshSequences,
         prCacheKey
       )
@@ -298,33 +282,36 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
       try {
         refreshedPR = await fetchPRForBranch(repo.path, branch, {
           force: true,
-          repoId: repo.id,
+          ...repoOptions,
           worktreeId: activeWorktreeId ?? undefined,
           linkedPRNumber: linkedPR,
           fallbackPRNumber: fallbackGitHubPRNumber,
-          reason: 'manual'
+          reason: 'manual',
+          userRefresh: true
         })
       } finally {
         if (startedPRRefreshToken) {
           expireGitHubPRRefreshState(prCacheKey, startedPRRefreshToken)
         }
       }
+      // Read this click's settlement now; the key-wide slot can belong to another read after the card read.
+      const prLookupFailed =
+        !refreshedPR && useAppStore.getState().prRefreshStates[prCacheKey]?.status === 'error'
       if (!isCurrentRequest()) {
         return
       }
-      await refreshHostedReviewCard(fetchHostedReviewForBranch, {
-        repoPath: repo.path,
-        repoId: repo.id,
+      // The PR read above owns GitHub's refresh status, checks and comments; the review card read only refreshes the card.
+      await refreshHostedReviewForClick(
+        model,
+        repo,
         branch,
-        admissionTier: 'interactive',
-        linkedGitHubPR: linkedPR,
-        fallbackGitHubPR: refreshedPR?.number ?? fallbackGitHubPRNumber,
-        linkedGitLabMR,
-        linkedBitbucketPR,
-        linkedAzureDevOpsPR,
-        linkedGiteaPR
-      })
+        refreshedPR?.number ?? fallbackGitHubPRNumber
+      ).catch(() => null)
       if (!isCurrentRequest()) {
+        return
+      }
+      if (prLookupFailed) {
+        refreshOutcome = 'error'
         return
       }
       if (refreshedPR) {
@@ -348,7 +335,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
           branch,
           refreshedPR.headSha,
           refreshedPR.prRepo,
-          { force: true, repoId: repo.id, wakeWslDistro: true }
+          { force: true, ...repoOptions, wakeWslDistro: true, userRefresh: true }
         ).then(
           (result) => {
             if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
@@ -376,9 +363,10 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         setCommentsLoading(true)
         const refreshedComments = fetchPRComments(repo.path, refreshedPR.number, {
           force: true,
-          repoId: repo.id,
+          ...repoOptions,
           prRepo: refreshedPR.prRepo,
-          headSha: refreshedPR.headSha
+          headSha: refreshedPR.headSha,
+          userRefresh: true
         }).then(
           (result) => {
             if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {
@@ -410,9 +398,12 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         setComments([])
         refreshOutcome = 'no-pr'
       }
-    } catch (error) {
+    } catch {
       refreshOutcome = 'error'
-      throw error
+      // GitHub failures surface through the PR store's own classified state, which clears itself.
+      if (isCurrentRequest() && refreshProvider !== 'github') {
+        setManualFailure(getHostedReviewManualRefreshError(refreshProvider))
+      }
     } finally {
       recordChecksPanelPRRefreshBreadcrumb({
         event: 'done',
@@ -430,6 +421,9 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         currentRequest: isCurrentRequest()
       })
       if (isCurrentRequest()) {
+        if (['review', 'no-review', 'pr', 'no-pr'].includes(refreshOutcome)) {
+          setManualFailure(null)
+        }
         refreshInFlightRef.current = false
         setIsRefreshing(false)
         // Rerun eligibility to clear resolved authentication errors even when Git state is unchanged.
@@ -437,6 +431,7 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
       }
     }
   }, [
+    model,
     repo,
     branch,
     activeConnectionId,
@@ -452,19 +447,13 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     prCacheKey,
     linkedPR,
     fallbackGitHubPRNumber,
-    fetchGitLabDetails,
-    linkedAzureDevOpsPR,
-    linkedBitbucketPR,
-    linkedGiteaPR,
-    linkedGitLabMR,
     isFolder,
-    isGitLabReviewContext,
     gitStatusSnapshot,
     panelContextKey,
     fetchPRForBranch,
     fetchPRChecks,
     fetchPRComments,
-    fetchHostedReviewForBranch,
+    fetchGitLabDetails,
     expireGitHubPRRefreshState,
     isCurrentAsyncResult,
     ownerCopyHostId,
@@ -481,13 +470,17 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
     setChecks,
     setComments,
     setGitStatusSnapshot,
+    setManualFailure,
     pollIntervalRef,
     refreshInFlightRef,
     reviewSelection,
     pickedReview,
     pickedReviewKey
   ])
-  return { handleRefresh }
+  return {
+    handleRefresh,
+    manualRefreshError
+  }
 }
 
 export type ChecksPanelRefreshState = ReturnType<typeof useChecksPanelManualRefresh>

@@ -1,3 +1,4 @@
+import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
 import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import { gitLabApiFor } from '@/runtime/gitlab-owner-api'
 import React, { useCallback, useEffect, useRef } from 'react'
@@ -124,6 +125,7 @@ export function useChecksPanelEntryRefreshAndTitleActions(
         void fetchHostedReviewForBranch(repo.path, branch, {
           force: true,
           repoId: repo.id,
+          repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
           linkedGitHubPR: linkedPR,
           fallbackGitHubPR: fallbackGitHubPRNumber,
           currentHeadOid: activeWorktree?.head ?? null,
@@ -234,14 +236,16 @@ export function useChecksPanelEntryRefreshAndTitleActions(
       const refreshedReview = await refreshHostedReviewCard(fetchHostedReviewForBranch, {
         repoPath: repo.path,
         repoId: repo.id,
+        repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
         branch,
+        userRefresh: true,
         linkedGitHubPR: linkedPR,
         fallbackGitHubPR: fallbackGitHubPRNumber,
         linkedGitLabMR,
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
         linkedGiteaPR
-      })
+      }).catch(() => null)
       const refreshedGitLabReview =
         refreshedReview?.provider === 'gitlab' ? refreshedReview : activeGitLabReview
       if (refreshedGitLabReview) {
@@ -256,21 +260,25 @@ export function useChecksPanelEntryRefreshAndTitleActions(
     const refreshedPR = await fetchPRForBranch(repo.path, branch, {
       force: true,
       repoId: repo.id,
+      repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
       worktreeId: activeWorktreeId ?? undefined,
       linkedPRNumber: linkedPR,
-      fallbackPRNumber: fallbackGitHubPRNumber
+      fallbackPRNumber: fallbackGitHubPRNumber,
+      userRefresh: true
     })
     await refreshHostedReviewCard(fetchHostedReviewForBranch, {
       repoPath: repo.path,
       repoId: repo.id,
+      repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
       branch,
+      userRefresh: true,
       linkedGitHubPR: linkedPR,
       fallbackGitHubPR: refreshedPR?.number ?? fallbackGitHubPRNumber,
       linkedGitLabMR,
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
       linkedGiteaPR
-    })
+    }).catch(() => null)
   }, [
     activeGitLabReview,
     activeReview?.provider,

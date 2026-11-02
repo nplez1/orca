@@ -1,4 +1,5 @@
 import { defineMethod } from '../core'
+import { resolveReplySnapshot } from '../content-snapshot-id'
 import { PROJECT_RUNTIME_METHODS } from './project-runtime-rpc-methods'
 import { FOLDER_WORKSPACE_METHODS } from './folder-workspace'
 import {
@@ -11,6 +12,7 @@ import {
   RepoShow
 } from '../../../../shared/rpc-contract/github-repo-target-params'
 import { hostQualifiedRepoSelector } from '../../runtime-repo-selector'
+import { repoHooksCheckIsBackground } from '../../../../shared/repo-hooks-check-wake'
 import {
   projectRepoResultVisibilityForClient,
   projectRepoVisibilityForClient
@@ -26,6 +28,7 @@ import {
   RepoCreate,
   RepoHooksCheck,
   RepoIssueCommandWrite,
+  RepoList,
   RepoPath,
   RepoRelocate,
   RepoReorder,
@@ -40,10 +43,10 @@ export const REPO_METHODS = [
   defineMethod({
     name: 'repo.list',
     permission: 'workspace',
-    params: null,
-    handler: (_params, context) => {
+    params: RepoList,
+    handler: (params, context) => {
       context.runtime.enrichMissingRepoGitRemoteIdentities?.()
-      return {
+      const reply = {
         repos: context.runtime
           .listVisibleRepos()
           .map((repo) => projectRepoVisibilityForClient(repo, context)),
@@ -51,6 +54,7 @@ export const REPO_METHODS = [
         // see for free, and a client only ever learns about it if the listing says so.
         relocationRequiredRepoIds: context.runtime.findReposRequiringRelocation?.()
       }
+      return resolveReplySnapshot(reply, params.afterSnapshotId)
     }
   }),
   ...PROJECT_RUNTIME_METHODS,
@@ -267,7 +271,7 @@ export const REPO_METHODS = [
     permission: 'workspace',
     params: RepoHooksCheck,
     handler: async (params, { runtime }) =>
-      runtime.checkRepoHooks(params.repo, { background: params.background === true })
+      runtime.checkRepoHooks(params.repo, { background: repoHooksCheckIsBackground(params) })
   }),
   defineMethod({
     name: 'repo.setupScriptImports',

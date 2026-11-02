@@ -8,7 +8,7 @@ import {
 } from '../shared/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
 import type { OrcaVmRecipe, OrcaVmRecipeContextMenuItem } from '../shared/orca-yaml-hook-types'
-import type { Store } from './persistence'
+import type { Store } from './persistence/loading-store/store'
 
 const mocks = vi.hoisted(() => ({
   getRuntimeRecipeContext: vi.fn(),

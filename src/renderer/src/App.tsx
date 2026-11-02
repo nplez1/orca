@@ -42,6 +42,7 @@ import { useWindowVisibilityEffects } from './app-shell/use-window-visibility-ef
 import { SpaceWindowStatePublisher } from './components/workspace-space/SpaceWindowStatePublisher'
 import { useUiHangDiagnostics } from './lib/ui-hang-diagnostics/use-ui-hang-diagnostics'
 import { PlainSshTerminalPanels } from './components/plain-ssh-terminal/PlainSshTerminalPanels'
+import { PluginShotReplayMount } from './components/plugins/view/PluginShotReplayMount'
 import { installActiveWorktreeRemovalSuccessor } from './lib/active-worktree-removal-successor'
 import { useContextualLinkRouter } from './app-shell/use-contextual-link-router'
 
@@ -128,6 +129,7 @@ function App(): React.JSX.Element {
           document.body
         )}
         <PlainSshTerminalPanels />
+        <PluginShotReplayMount />
       </TooltipProvider>
       <SkillFreshnessNudge />
       <WorktreeBaseFallbackDialog />

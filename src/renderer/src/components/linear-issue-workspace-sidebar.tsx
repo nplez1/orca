@@ -8,7 +8,6 @@ import { buildContainedLinkedContextBlock } from '@/lib/linked-work-item-context
 import { translate } from '@/i18n/i18n'
 import { buildLinearIssueBranchName } from '@/components/linear-issue-workspace-text'
 import type { LinearComment, LinearIssue } from '../../../shared/linear/issue-types'
-import type { LinearProjectSummary } from '../../../shared/linear/project-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
 import { copyLinearIssueText } from './linear-issue-clipboard'
@@ -130,8 +129,6 @@ export function LinearIssueWorkspaceSidebar({
   comments,
   editState,
   attachedWorkspaceLabel,
-  onEditStateChange,
-  onProjectChanged,
   onOpenAttachedWorkspace,
   providerSettings,
   sourceContext
@@ -140,8 +137,6 @@ export function LinearIssueWorkspaceSidebar({
   comments: LinearComment[]
   editState: LinearEditState
   attachedWorkspaceLabel: string | null
-  onEditStateChange: (patch: Partial<LinearEditState>) => void
-  onProjectChanged: (project: LinearProjectSummary) => void
   onOpenAttachedWorkspace: () => void
   /** Owner-routed source, resolved by the workspace so the sidebar cannot re-derive it. */
   providerSettings: RuntimeLinearSettings
@@ -152,16 +147,11 @@ export function LinearIssueWorkspaceSidebar({
       <LinearIssueEditSection
         issue={issue}
         editState={editState}
-        onEditStateChange={onEditStateChange}
         layout="properties"
         providerSettings={providerSettings}
         sourceContext={sourceContext}
       />
-      <LinearIssueProjectSelector
-        issue={issue}
-        onProjectChanged={onProjectChanged}
-        sourceContext={sourceContext}
-      />
+      <LinearIssueProjectSelector issue={issue} sourceContext={sourceContext} />
       <LinearIssueWorkspaceAttachmentCard
         label={attachedWorkspaceLabel}
         onOpen={onOpenAttachedWorkspace}

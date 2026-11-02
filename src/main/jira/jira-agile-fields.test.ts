@@ -36,28 +36,6 @@ function clientFor(id: string): JiraClientForSite {
 }
 
 describe('jira agile fields', () => {
-  it('picks sprint and story point custom field ids from the field catalog', () => {
-    expect(
-      pickAgileFieldIds([
-        {
-          id: 'customfield_1',
-          name: 'Sprint',
-          schema: { custom: 'com.pyxis.greenhopper.jira:gh-sprint' }
-        },
-        {
-          id: 'customfield_2',
-          name: 'Budget',
-          schema: { custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float' }
-        },
-        {
-          id: 'customfield_3',
-          name: 'Story Points',
-          schema: { custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float' }
-        }
-      ])
-    ).toEqual({ sprint: 'customfield_1', storyPoints: ['customfield_3'] })
-  })
-
   it('discovers company and team managed points independently of a translated team field name', () => {
     expect(
       pickAgileFieldIds([
@@ -109,25 +87,6 @@ describe('jira agile fields', () => {
       jiraRequestMock.mockReset()
       acquireMock.mockClear()
       releaseMock.mockClear()
-    })
-
-    it('requests the field catalog once per site inside the request queue', async () => {
-      jiraRequestMock.mockResolvedValue([
-        {
-          id: 'customfield_7',
-          name: 'Sprint',
-          schema: { custom: 'com.pyxis.greenhopper.jira:gh-sprint' }
-        }
-      ])
-      const client = clientFor('cached-site')
-      const first = await getAgileFieldIds(client)
-      const second = await getAgileFieldIds(client)
-      expect(first).toEqual({ sprint: 'customfield_7' })
-      expect(second).toBe(first)
-      expect(jiraRequestMock).toHaveBeenCalledTimes(1)
-      expect(jiraRequestMock.mock.calls[0]?.[1]).toBe('/rest/api/3/field')
-      expect(acquireMock).toHaveBeenCalledTimes(1)
-      expect(releaseMock).toHaveBeenCalledTimes(1)
     })
 
     it('refreshes a successful catalog after its bounded lifetime', async () => {

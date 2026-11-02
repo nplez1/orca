@@ -169,7 +169,7 @@ it.each([
     )
     expect(state.browserTabsByWorktree[WORKSPACE]).toHaveLength(1)
     expect(state.groupsByWorktree[WORKSPACE]?.find((group) => group.id === 'b')?.activeTabId).toBe(
-      'terminal-b'
+      navigation === 'unchanged' ? outcome.result.unifiedTabId : 'terminal-b'
     )
     if (navigation === 'unchanged') {
       expect(

@@ -66,6 +66,8 @@ export type PRComment = {
    *  inline review comments, which have no verdict of their own. Present on a review submission
    *  even when it has an empty body — an approval with no comment is a verdict, not noise. */
   reviewState?: GitHubReviewState
+  /** A thread root's last diff lines, ending on `line`; absent from older hosts and non-GitHub sources. */
+  diffHunk?: string
   /** True when GitHub identifies the author as a bot (REST `user.type === 'Bot'` or
    *  GraphQL `__typename === 'Bot'`). Preferred over login-string heuristics because
    *  third-party review bots (e.g. qodo-ai-reviewer, coderabbitai) don't follow a

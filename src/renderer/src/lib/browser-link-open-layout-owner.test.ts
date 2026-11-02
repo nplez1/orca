@@ -112,6 +112,7 @@ it.each([
 ] as const)(
   'waits for main to draw a %s link before reporting and activating its exact page (explicit: %s)',
   async (surface, explicit) => {
+    const groupCount = store.getState().groupsByWorktree[WORKSPACE]!.length
     const reported = vi.fn()
     const opening = open(surface, explicit).then((outcome) => {
       reported(outcome)
@@ -140,6 +141,7 @@ it.each([
     }
     const { result } = outcome
     const state = store.getState()
+    expect(state.groupsByWorktree[WORKSPACE]).toHaveLength(groupCount)
     expect(
       state.groupsByWorktree[WORKSPACE]?.find((group) => group.id === targetGroupId)?.activeTabId
     ).toBe(result.unifiedTabId)

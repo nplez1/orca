@@ -1,5 +1,5 @@
 import { sep } from 'node:path'
-import type { Store } from '../../persistence'
+import type { Store } from '../../persistence/loading-store/store'
 import type { RuntimeStore } from '../../runtime/runtime-store-contract'
 import type { WorkspacePathSearchQueryMetrics } from '../../../shared/workspace-path-search-instrumentation'
 import { hasDotfileAncestry } from '../../../shared/workspace-path-catalog'

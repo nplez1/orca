@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
-import { JiraIssueCell } from './task-page-jira-issue-cells'
+import { JiraIssueCell } from './task-page/jira/task-page-jira-issue-cells'
 
 function issue(overrides: Partial<JiraIssue> = {}): JiraIssue {
   return {

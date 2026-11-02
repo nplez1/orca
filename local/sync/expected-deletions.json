@@ -31,14 +31,6 @@
       "reason": "Needs PendingPRCommentAiAckGithubResolveTarget, PendingPRCommentAiAckGitlabTarget and the githubResolveTarget/gitlabTarget fields that #169 deliberately removed from the pending ack; it cannot compile without resurrecting that model, and a dead file is not a reason to bring a removed capability back. evidence: mergeability-plan.md 5, LOCAL-PATCHES.md local(sync)"
     },
     {
-      "path": "src/renderer/src/components/right-sidebar/pr-comment-snapshotted-thread-resolver.test.ts",
-      "commit": "9fb0aafb5e",
-      "upstreamBlob": "80a6d7b777347f8865a9edc622f62cb5f9d3dd81",
-      "class": "superseded",
-      "status": "expected-deletion",
-      "reason": "Covers the resolver above. evidence: mergeability-plan.md 5"
-    },
-    {
       "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.ts",
       "commit": "ab57bb7bbb",
       "upstreamBlob": "69606c8725925aea3d472ffc72de79e40489db56",
@@ -135,14 +127,6 @@
       "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
-      "path": "src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.test.tsx",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "4155d95c37bc4f4968b04a1a0534b162e90e2913",
-      "class": "dashboard-delivery",
-      "status": "expected-deletion",
-      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
-    },
-    {
       "path": "src/renderer/src/components/dashboard-popout/useDashboardSnapshot.ts",
       "commit": "ab57bb7bbb",
       "upstreamBlob": "ccbaf633254d332934a49cf39f7f33a7270e06f6",
@@ -207,12 +191,16 @@
       "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
-      "path": "src/renderer/src/components/sidebar/AgentDashboardSidebarHost.test.tsx",
-      "commit": "ab57bb7bbb",
-      "upstreamBlob": "1b90f264c3ec7665045ef3df5c0d94c0c86bcb5b",
-      "class": "dashboard-delivery",
+      "path": "src/renderer/src/components/dashboard-popout/dashboard-preview-link-composition.test.tsx",
+      "class": "dashboard-popout",
       "status": "expected-deletion",
-      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+      "reason": "New upstream renderer fixture for the pop-out/drawer delivery this fork rejected (convergence-ledger.md Dashboard delivery: a content-area view, not a drawer or a pop-out). It imports the deleted DashboardPopoutRoot and reads window.api.dashboard, which the deleted preload pair used to publish; nothing in the fork imports either fixture."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/dashboard-preview-popout-default-test-fixture.tsx",
+      "class": "dashboard-popout",
+      "status": "expected-deletion",
+      "reason": "New upstream renderer fixture for the pop-out/drawer delivery this fork rejected (convergence-ledger.md Dashboard delivery: a content-area view, not a drawer or a pop-out). It imports the deleted DashboardPopoutRoot and reads window.api.dashboard, which the deleted preload pair used to publish; nothing in the fork imports either fixture."
     }
   ],
   "symbols": [

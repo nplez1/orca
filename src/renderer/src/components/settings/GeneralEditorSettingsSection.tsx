@@ -23,6 +23,7 @@ import { EditorWordWrapSetting } from './EditorWordWrapSetting'
 import { EditorFontFamilySetting } from './EditorFontFamilySetting'
 import { PRCommentsInlineSetting } from './PRCommentsInlineSetting'
 import { MarkdownReviewNotesSetting } from './MarkdownReviewNotesSetting'
+import { EditorTypographySettings } from './EditorTypographySettings'
 import {
   createAutoSaveDelayDraftState,
   resolveAutoSaveDelayDraftState,
@@ -155,6 +156,10 @@ export function GeneralEditorSettingsSection({
         <div className="flex shrink-0 items-center gap-2">
           <Input
             type="number"
+            aria-label={translate(
+              'auto.components.settings.GeneralEditorSettingsSection.d6cf227ca0',
+              'Auto Save Delay'
+            )}
             min={MIN_EDITOR_AUTO_SAVE_DELAY_MS}
             max={MAX_EDITOR_AUTO_SAVE_DELAY_MS}
             step={250}
@@ -232,6 +237,8 @@ export function GeneralEditorSettingsSection({
         fontSuggestions={fontSuggestions}
         onRequestFontSuggestions={onRequestFontSuggestions}
       />
+
+      <EditorTypographySettings settings={settings} updateSettings={updateSettings} />
 
       <EditorWordWrapSetting settings={settings} updateSettings={updateSettings} />
 

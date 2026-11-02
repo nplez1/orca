@@ -28,7 +28,7 @@ vi.mock('../../claude-accounts/claude-profile-installed-router', () => ({
     })
   })
 }))
-vi.mock('../wsl/wsl-unc-access-gate', () => ({
+vi.mock('../../wsl/wsl-unc-access-gate', () => ({
   blockedWslDistroForPath: async () => null
 }))
 vi.mock('@orca/process-host', () => ({

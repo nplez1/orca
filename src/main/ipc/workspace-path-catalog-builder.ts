@@ -1,5 +1,5 @@
 import { sep } from 'node:path'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import type {
   WorkspacePathSearchCorrelationId,
   WorkspacePathSearchInstrumentationEvent

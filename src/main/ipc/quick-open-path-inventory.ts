@@ -1,4 +1,4 @@
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import {
   WORKSPACE_PATH_SEARCH_TRANSPORT_BYTE_CEILINGS,
   type WorkspacePathSearchPathSet

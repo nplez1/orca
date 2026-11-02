@@ -9,8 +9,9 @@ import {
 import type { ChecksAgentComposerState } from './panel-state-types'
 import type { ChecksPanelAiAcknowledgementState } from './use-checks-panel-ai-acknowledgement'
 import { toast } from 'sonner'
+import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import { buildResolvePullRequestConflictsPrompt } from '../SourceControl'
-import { buildPRCommentsResolutionPrompt } from '../../pr-comments-resolution-prompt'
+import { buildPRCommentsResolutionPrompt } from '../../../../../shared/github/pr-comments-resolution-prompt'
 import { parseGitHubIssueOrPRLink } from '../../../../../shared/github/links'
 import type { PRCommentGroup } from '../../../../../shared/pr-comment-groups'
 import { translate } from '@/i18n/i18n'
@@ -32,6 +33,7 @@ type ChecksPanelAiQueueInput = Pick<
     | 'settings'
     | 'asyncResultKeyRef'
     | 'activeWorktreeId'
+    | 'activeWorktree'
     | 'activeWorktreePath'
     | 'claimedCommentResolutionRef'
     | 'commentResolutionAckBusyRef'
@@ -50,6 +52,7 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
     activeConflictReview,
     activeReview,
     activeWorktreeId,
+    activeWorktree,
     activeWorktreePath,
     claimedCommentResolutionRef,
     commentResolutionAckBusyRef,
@@ -176,12 +179,20 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
       )
       return
     }
+    let ownerHostId: string
+    try {
+      ownerHostId = forgeOwnerHostIdForWorkspace(repo, activeWorktree)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+      return
+    }
     // Why: pr.prRepo can be missing while comments are still visible; fall back to the PR URL.
     const githubTargetFromPr =
       activeReview.provider === 'github' && prNumber && pr?.prRepo
         ? {
             repoPath: repo.path,
             repoId: repo.id,
+            ownerHostId,
             prNumber,
             prRepo: pr.prRepo
           }
@@ -197,6 +208,7 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
       return {
         repoPath: repo.path,
         repoId: repo.id,
+        ownerHostId,
         prNumber: link.number,
         prRepo: {
           owner: link.slug.owner,
