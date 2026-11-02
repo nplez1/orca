@@ -16,7 +16,7 @@ const { execFileMock, execFileSyncMock, readFileMock } = vi.hoisted(() => ({
       callback: (error: Error | null, result: { stdout: string; stderr: string }) => void
     ) => {
       callback(null, {
-        stdout: file === 'getconf' ? '100\n' : `${new Date(1_700_000_000_000).toString()}\n`,
+        stdout: file === 'getconf' ? '100\n' : 'Tue Nov 14 22:13:20 2023\n',
         stderr: ''
       })
     }
