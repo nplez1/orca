@@ -148,16 +148,16 @@
     {
       "name": "orca-plugin-authoring",
       "sourcePath": "skills/orca-plugin-authoring",
-      "packageDigest": "8bc40895e0655c24014699ff0f311752814b0ba6b18a8428768cb42f9b54264e",
+      "packageDigest": "9d726cd30e052783e5a7fc6c6884338bb5c99c13b94c4c1287f200c2285d8149",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 2320,
+          "size": 3337,
           "executable": false,
           "classification": "text",
-          "exactSha256": "633d9b8dd17a7406a77541633e10391d95dfe10a0c25fcd0e04d6a248ea2f597",
-          "textNormalizedSha256": "633d9b8dd17a7406a77541633e10391d95dfe10a0c25fcd0e04d6a248ea2f597",
-          "identitySha256": "633d9b8dd17a7406a77541633e10391d95dfe10a0c25fcd0e04d6a248ea2f597"
+          "exactSha256": "61e165cb07e723b1ebcff9463924f750151f123c35871b7f6b9779438ef730b1",
+          "textNormalizedSha256": "61e165cb07e723b1ebcff9463924f750151f123c35871b7f6b9779438ef730b1",
+          "identitySha256": "61e165cb07e723b1ebcff9463924f750151f123c35871b7f6b9779438ef730b1"
         }
       ]
     },

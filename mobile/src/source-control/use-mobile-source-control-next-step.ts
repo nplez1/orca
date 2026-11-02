@@ -284,7 +284,7 @@ export function useMobileSourceControlNextStep({
           message: resolveMobileAdminMergeBypassRequired(pr)
             ? t(
                 'pullRequest.prActionsSection.adminBypassConfirmMessage',
-                'Required reviews are not met. Merging anyway bypasses branch protection.'
+                'This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.'
               )
             : presentPrMerge(pr, mergeMethod).confirmMessage,
           confirmLabel: resolveMobileAdminMergeBypassRequired(pr)

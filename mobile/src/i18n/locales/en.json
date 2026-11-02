@@ -1344,7 +1344,6 @@
       "mergeConfirmTitle": "Merge pull request?",
       "adminBypassConfirmLabel": "Merge anyway",
       "adminBypassConfirmMessage": "This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.",
-      "adminBypassConfirmTitle": "Bypass branch protection?",
       "mergeButton": "Merge",
       "closeConfirmTitle": "Close pull request?",
       "closeConfirmMessage": "#{{number}} will be closed without merging.",

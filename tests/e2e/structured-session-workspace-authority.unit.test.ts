@@ -493,6 +493,7 @@ it.each([false, true])(
           localOptions: {},
           force: false,
           deleteBranch: false,
+          deleteRemoteBranch: false,
           closeWatchers: async () => {},
           preserveBranchHead: (result) => result ?? {},
           finishRemoval: () => {

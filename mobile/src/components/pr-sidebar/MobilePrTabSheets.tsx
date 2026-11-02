@@ -138,7 +138,7 @@ function PrMergeSheet({ tab }: { tab: MobilePrTab }) {
           <Text style={sheetStyles.note}>
             {t(
               'pullRequest.prActionsSection.adminBypassConfirmMessage',
-              'Required reviews are not met. Merging anyway bypasses branch protection.'
+              'This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.'
             )}
           </Text>
         ) : null}

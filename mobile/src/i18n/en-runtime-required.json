@@ -205,6 +205,9 @@
       "unresolvedThreads_one": "{{count}} unresolved thread",
       "unresolvedThreads_other": "{{count}} unresolved threads"
     },
+    "prActionsSection": {
+      "adminBypassConfirmMessage": "This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges."
+    },
     "prActionsState": {
       "mergeThrough_one": "Merge through #{{number}} · {{count}} PR",
       "mergeThrough_other": "Merge through #{{number}} · {{count}} PRs",

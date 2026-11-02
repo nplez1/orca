@@ -12,7 +12,7 @@
 0 test-no-wall-clock:src/main/ipc/ai-vault.test.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 2 test-no-wall-clock:src/main/ipc/worktrees/listing/persisted-worktree-scan-cache.test.ts # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 1 test-no-wall-clock:src/renderer/src/components/jira-sprint-picker.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
-2 test-no-wall-clock:src/renderer/src/components/right-sidebar/LinearLinkedIssuePane.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
+1 test-no-wall-clock:src/renderer/src/components/right-sidebar/LinearLinkedIssuePane.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 2 test-no-wall-clock:src/renderer/src/components/settings/EphemeralVmRuntimeRow.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 1 test-no-wall-clock:src/renderer/src/components/sidebar/EphemeralVmExtendLifetimeMenu.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
 2 test-no-wall-clock:src/renderer/src/components/sidebar/WorktreeCard.merge-marker.test.tsx # pre-existing pattern in a fork-only test, surfaced when the sync’s jira-types move brought it into the changed-file scope
