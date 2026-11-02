@@ -26,8 +26,7 @@ type WorktreePathSettings = Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDi
   /** Required, not optional: a placement path that forgot the mode would silently fall back
    *  to legacy nesting, so the type makes every call site state it. */
   worktreeLayoutMode: WorktreeLayoutMode
-  /** Container leaf for a nested layout, resolved from the repo by `getWorktreePathSettings`;
-   *  a caller that omits it falls back to the checkout's folder. */
+  // fork-comment-ok: the container leaf, resolved by `getWorktreePathSettings` for nested layouts.
   projectFolderName?: string
   /** Whether that container's base came from this repo's own `worktreeBasePath`. */
   projectFolderBaseIsRepoScoped?: boolean
@@ -263,9 +262,7 @@ export function getWorktreePathSettings(
         }
       : worktreeLayoutMode === 'repo-nested'
         ? {
-            // Why repo-nested resolves one too: a nested clone or create leaves the primary
-            // checkout at `<root>/<project>/<branch>`, so the container is the folder holding it
-            // and not the checkout's branch-named leaf.
+            // fork-comment-ok: a nested checkout's own leaf is the branch, so its container is the parent.
             projectFolderName: resolveNestedRepoContainerName(repo)
           }
         : {}),

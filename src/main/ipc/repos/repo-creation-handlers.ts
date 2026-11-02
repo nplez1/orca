@@ -46,7 +46,7 @@ function getDefaultCreateProjectParent(store: Store): string {
     'defaultWorktreeLocation',
     settings.workspaceDir ?? ''
   ).trim()
-  // Why: under a nested layout the container's parent *is* the workspace dir, so the
+  // fork-comment-ok: under a nested layout the container's parent *is* the workspace dir, so the
   // "beside the worktree tree" fallback below would place the project outside its own container.
   if (layoutNestsPrimaryCheckout(resolveWorktreeLayoutMode(settings))) {
     return configured || getDefaultWorkspaceDir(home)
@@ -74,7 +74,8 @@ async function resolveInitBranchLeaf(parentPath: string): Promise<string> {
 }
 
 /**
- * Where `repos:create` puts the checkout. The flat layout uses `<parent>/<name>`. Under a nested
+ * fork-comment-ok: nested layouts nest the checkout; flat uses `<parent>/<name>`.
+ * Where `repos:create` puts the checkout. Under a nested
  * layout the typed name becomes the project container and the checkout inside it is named for the
  * branch `git init` is about to create, so the primary checkout is a sibling of the worktrees that
  * will land in the same container.

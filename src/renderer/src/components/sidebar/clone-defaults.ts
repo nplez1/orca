@@ -11,9 +11,7 @@ export function getDefaultCloneParent(
     return ''
   }
 
-  // Why: under a nested layout the destination *is* the workspace dir — the clone path appends
-  // <project>/<branch> itself — so the parent-of-"workspaces" heuristic no longer applies and
-  // would land the checkout outside the root its worktrees are placed under.
+  // fork-comment-ok: the destination IS the workspace dir under a nested layout, not its parent.
   if (layoutNestsPrimaryCheckout(layoutMode)) {
     return workspaceDir
   }

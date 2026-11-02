@@ -531,8 +531,6 @@ describe('repos:create', () => {
     await expect(callDefaultCreateProjectParent()).resolves.toBe('/workspaces')
   })
 
-  // ── Nest Workspaces (repo-nested) layout ──────────────────────────
-
   it('nests the primary checkout inside its project folder under Nest Workspaces', async () => {
     mockStore.getSettings.mockReturnValue({
       workspaceDir: '/workspaces',
@@ -542,8 +540,7 @@ describe('repos:create', () => {
 
     const result = await callCreate({ parentPath: '/workspaces', name: 'homelab', kind: 'git' })
 
-    // Why: worktrees already land in <root>/homelab, so the checkout has to be a sibling of
-    // them instead of a folder the project's workspaces are placed beside.
+    // fork-comment-ok: the checkout joins the folder its worktrees are already placed in.
     expect(result).toHaveProperty('repo.path', join('/workspaces', 'homelab', 'main'))
     expect(result).toHaveProperty('repo.displayName', 'homelab')
     expect(mkdirMock).toHaveBeenCalledWith(join('/workspaces', 'homelab'), { recursive: true })

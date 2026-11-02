@@ -139,9 +139,7 @@ describe('web repos preload API', () => {
     ])
   })
 
-  // Why orca/workspaces: this client cannot read the host's layout, and every nested layout — which
-  // is what the app defaults to — keeps project folders under the workspace dir. The host's own
-  // handler stays authoritative; only a flat host would answer orca/projects instead.
+  // fork-comment-ok: this client cannot read the host's layout; every nested layout nests the checkout.
   it.each([
     ['/home/alice', '/home/alice/orca/workspaces'],
     ['/', '/orca/workspaces'],

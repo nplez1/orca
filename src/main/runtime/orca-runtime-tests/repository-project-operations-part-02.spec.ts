@@ -340,8 +340,6 @@ describe('OrcaRuntimeService', () => {
     try {
       const repo = await runtime.cloneRepo('https://example.com/nested.git', destination)
 
-      // Why: the layout has to hold on a paired server too, or one project's checkout and its
-      // worktrees would sit in different folders depending on which host cloned it.
       expect(repo.path).toBe(join(destination, 'nested', 'main'))
       expect(repo.displayName).toBe('nested')
     } finally {

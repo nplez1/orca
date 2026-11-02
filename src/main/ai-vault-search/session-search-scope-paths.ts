@@ -81,9 +81,7 @@ export function managedWorktreeDirectories(
     } else if (configured.has(normalizeRuntimePathForComparison(layout.path))) {
       directories.push(layout.path)
     } else if (layout.nestWorkspaces && repoName) {
-      // Why the resolved container rather than the checkout's folder: a nested clone or create puts
-      // the checkout at `<base>/<project>/<branch>`, so searching `<base>/<branch>` would miss every
-      // worktree of that project.
+      // fork-comment-ok: a nested checkout lives at `<base>/<project>/<branch>`, so search the project folder.
       directories.push(resolveRuntimePath(layout.path, repoName))
     }
   }

@@ -9,8 +9,7 @@ export type SessionSearchScopeCatalog = {
     Repo,
     'id' | 'path' | 'kind' | 'worktreeBasePath' | 'connectionId' | 'executionHostId'
   > & {
-    /** Why optional and carried here: a nested checkout's own folder is the branch, so the project
-     *  folder that holds it can only be found by name. */
+    // fork-comment-ok: a nested checkout's own folder is the branch, so its project folder is found by name.
     displayName?: Repo['displayName']
   })[]
   projects: readonly Pick<Project, 'id' | 'sourceRepoIds'>[]

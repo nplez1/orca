@@ -181,8 +181,7 @@ describe('repos:add + repos:clone', () => {
       expect.arrayContaining([clonePath]),
       expect.anything()
     )
-    // Why the project name: the container holding the checkout has to stay named after the
-    // project, or every nested clone's worktrees would land in one folder named after its branch.
+    // fork-comment-ok: the container must stay named after the project, not the branch.
     expect(mockStore.addRepo).toHaveBeenCalledWith(
       expect.objectContaining({ displayName: 'orca', path: clonePath })
     )

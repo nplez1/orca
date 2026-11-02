@@ -59,7 +59,7 @@ export function getDefaultCreateProjectParent(
   if (!trimmedHomeDir) {
     return ''
   }
-  // Why: under a nested layout a project's container lives inside the workspace dir, so the
+  // fork-comment-ok: under a nested layout a project's container lives inside the workspace dir, so the
   // default project root is <home>/orca/workspaces rather than the sibling orca/projects.
   const rootName = layoutNestsPrimaryCheckout(layoutMode) ? 'workspaces' : 'projects'
   return joinCreateProjectPath(joinCreateProjectPath(trimmedHomeDir, 'orca'), rootName)

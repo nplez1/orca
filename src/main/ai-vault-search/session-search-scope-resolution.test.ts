@@ -174,8 +174,6 @@ describe('project scope', () => {
   })
 
   it('searches the project folder of a nested checkout, not its branch folder', () => {
-    // Why: a clone or create under Nest Workspaces puts the checkout at <root>/<project>/<branch>,
-    // so the managed directory is the project folder its worktrees join.
     const resolution = resolveSessionSearchScope(
       { kind: 'project', projectKey: 'repo:nested' },
       catalog({
@@ -183,7 +181,6 @@ describe('project scope', () => {
         worktreeMeta: { 'nested::/home/me/orca/workspaces/app/one': {} }
       })
     )
-    // The checkout is inside the project folder, so it folds into the one directory.
     expect(paths(resolution)).toEqual(['/home/me/orca/workspaces/app'])
   })
 

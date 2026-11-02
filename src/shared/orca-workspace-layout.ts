@@ -1,9 +1,8 @@
 /** Where Orca places a project's workspaces.
  *
  *  - `flat` — worktrees sit directly under the root.
- *  - `repo-nested` — the historical nested default: `<root>/<container>/<name>`, where the
- *    container is the checkout's own folder — or the project folder holding it once a clone or
- *    create has nested the primary checkout at `<root>/<project>/<defaultBranch>`.
+ *  - `repo-nested` — `<root>/<container>/<name>`, the container being the checkout's folder, or the
+ *    project folder holding it. fork-comment-ok: the second shape is the fork's nesting change.
  *  - `project-folder` — one folder per project, holding the primary checkout and every
  *    worktree: `<root>/<projectFolder>/<defaultBranch>` and `<root>/<projectFolder>/<name>`.
  */
@@ -58,12 +57,7 @@ export function isProjectFolderLayout(mode: WorktreeLayoutMode): boolean {
   return mode === 'project-folder'
 }
 
-/** True when a new project's primary checkout goes inside a project folder rather than directly
- *  in the parent the user picked. Both nested layouts do it; only `flat` does not.
- *
- *  Kept apart from `layoutModeNestsWorkspaces` on purpose: that one derives the legacy boolean a
- *  downgrade still reads, while this one is a placement rule. They agree today, and a layout that
- *  nests workspaces without nesting the checkout (or the reverse) would have to split them. */
+// fork-comment-ok: placement rule; only `flat` leaves the checkout in the parent the user picked.
 export function layoutNestsPrimaryCheckout(mode: WorktreeLayoutMode): boolean {
   return mode !== 'flat'
 }

@@ -55,11 +55,9 @@ export class RuntimeRepositoryCloneController {
     if (!trimmedDestination) {
       throw new Error('Clone destination is required')
     }
-    // Why before placement: the branch probe creates the destination and runs git there, so a path
-    // this guard exists to refuse must not be created or used as a cwd first.
+    // fork-comment-ok: the branch probe below creates and enters this path, so refuse it first.
     await refuseWslHostWindowsDrivePath(trimmedDestination)
-    // Why the same placement the local handler uses: a nested layout has to nest a server-hosted
-    // clone too, or the two hosts would disagree about where a project's checkout lives.
+    // fork-comment-ok: a nested layout has to nest a server-hosted clone the way the local one does.
     const placement = await resolveCloneTargetPlacement({
       url: trimmedUrl,
       destination: trimmedDestination,
@@ -127,7 +125,7 @@ export class RuntimeRepositoryCloneController {
     }
 
     await mkdir(trimmedDestination, { recursive: true })
-    // Why: the claim below is non-recursive, so a nested layout's project folder has to exist first.
+    // fork-comment-ok: the claim below is non-recursive, so a nested project folder must exist first.
     await mkdir(dirname(clonePath), { recursive: true })
     const claimedTarget = await claimCloneTarget(clonePath)
     let proc: Awaited<ReturnType<typeof gitSpawnAfterWindowsEnvironmentReady>>
@@ -213,7 +211,7 @@ export class RuntimeRepositoryCloneController {
     const repo: Repo = {
       id: randomUUID(),
       path: clonePath,
-      // Why the project name: under a nested layout the checkout's own folder is the branch.
+      // fork-comment-ok: a nested checkout's own folder is the branch, so name the project instead.
       displayName: placement.projectName ?? getRepoName(clonePath),
       badgeColor: DEFAULT_REPO_BADGE_COLOR,
       ...(executionHostId != null ? { executionHostId } : {}),
