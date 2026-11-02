@@ -217,6 +217,69 @@
       "status": "expected-deletion",
       "supersededBy": "upstream retired the setting itself in this sync",
       "reason": "Upstream removed `orchestrationChatErrorEscalationEnabled` from GlobalSettings (it survives only as `_retiredHeartbeatsEnabled` in terminal-settings-migrations.ts), so the disposition table cannot carry a key the settings type no longer declares. Removing the row is the correct convergence, not a lost fork capability. The same sync also retired `experimentalNativeChat` and `orchestrationHeartbeatIntervalMinutes`, removed for the same reason. evidence: src/main/persistence/applying-settings/terminal-settings-migrations.ts"
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION.experimentalNativeChat",
+      "status": "expected-deletion",
+      "supersededBy": "upstream retired the setting; it survives only in terminal-settings-migrations.ts as a retirement key",
+      "reason": "Upstream retired this setting in the sync, so the disposition table cannot carry a key the settings type no longer declares; removing the row is the correct convergence. evidence: src/main/persistence/applying-settings/terminal-settings-migrations.ts"
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION.orchestrationHeartbeatsEnabled",
+      "status": "expected-deletion",
+      "supersededBy": "upstream retired the setting (`_retiredHeartbeatsEnabled` in terminal-settings-migrations.ts)",
+      "reason": "Upstream retired this setting in the sync, so the disposition table cannot carry a key the settings type no longer declares; removing the row is the correct convergence. evidence: src/main/persistence/applying-settings/terminal-settings-migrations.ts"
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION.orchestrationHeartbeatIntervalMinutes",
+      "status": "expected-deletion",
+      "supersededBy": "upstream retired the setting (`_retiredHeartbeatInterval` in terminal-settings-migrations.ts)",
+      "reason": "Upstream retired this setting in the sync, so the disposition table cannot carry a key the settings type no longer declares; removing the row is the correct convergence. evidence: src/main/persistence/applying-settings/terminal-settings-migrations.ts"
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-detail-polling-policy.ts",
+      "symbol": "STUCK_RUN_BACKOFF_MAX_MS",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/github/checks-detail-polling-policy.ts",
+      "reason": "The merge followed upstream s move of the checks-detail polling policy into src/shared/github/, so the declarations now live there with the same names. Not a lost fork capability. evidence: convergence-ledger.md Checks panel polling and review refresh"
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-detail-polling-policy.ts",
+      "symbol": "rollupReportsUnseenRun",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/github/checks-detail-polling-policy.ts",
+      "reason": "The merge followed upstream s move of the checks-detail polling policy into src/shared/github/, so the declarations now live there with the same names. Not a lost fork capability. evidence: convergence-ledger.md Checks panel polling and review refresh"
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.liveRun",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/github/checks-detail-polling-policy.ts",
+      "reason": "The merge followed upstream s move of the checks-detail polling policy into src/shared/github/, so the declarations now live there with the same names. Not a lost fork capability. evidence: convergence-ledger.md Checks panel polling and review refresh"
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.failing",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/github/checks-detail-polling-policy.ts",
+      "reason": "The merge followed upstream s move of the checks-detail polling policy into src/shared/github/, so the declarations now live there with the same names. Not a lost fork capability. evidence: convergence-ledger.md Checks panel polling and review refresh"
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.unchangedReads",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/github/checks-detail-polling-policy.ts",
+      "reason": "The merge followed upstream s move of the checks-detail polling policy into src/shared/github/, so the declarations now live there with the same names. Not a lost fork capability. evidence: convergence-ledger.md Checks panel polling and review refresh"
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/checks-detail-polling-policy.ts",
+      "symbol": "ChecksDetailPollingPolicy.signature",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/shared/github/checks-detail-polling-policy.ts",
+      "reason": "The merge followed upstream s move of the checks-detail polling policy into src/shared/github/, so the declarations now live there with the same names. Not a lost fork capability. evidence: convergence-ledger.md Checks panel polling and review refresh"
     }
   ]
 }

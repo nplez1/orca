@@ -54,10 +54,10 @@ vi.mock('./Board', () => ({ TaskPageJiraBoard: () => null }))
 vi.mock('../linear/Content', () => ({ TaskPageLinearContent: () => null }))
 // Presentation chrome the list branch renders; the test only pins the handler wiring.
 vi.mock('@/components/jira-list-columns-menu', () => ({ JiraListColumnsMenu: () => null }))
-vi.mock('@/components/task-page-jira-view-controls', () => ({
+vi.mock('./task-page-jira-view-controls', () => ({
   TaskPageJiraViewControls: () => null
 }))
-vi.mock('@/components/task-page-jira-sort-controls', () => ({
+vi.mock('./task-page-jira-sort-controls', () => ({
   TaskPageJiraSortControls: () => null
 }))
 
