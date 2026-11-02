@@ -264,7 +264,13 @@ describe('web AI Vault preload API', () => {
       },
       {
         method: 'aiVault.listSessions',
-        params: { unlimited: true, executionHostId: 'runtime:web-env-1' }
+        params: {
+          unlimited: true,
+          // Why: paging bounds the frame, not the depth, so an unlimited read drains pages too.
+          paged: true,
+          offset: 0,
+          executionHostId: 'runtime:web-env-1'
+        }
       }
     ])
   })

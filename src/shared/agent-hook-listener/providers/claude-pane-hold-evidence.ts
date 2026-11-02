@@ -59,6 +59,8 @@ export function claudePaneHasRunningChildWork(state: HookListenerState, paneKey:
 
 export type ClaudePaneStatusResolution = AgentLeadStatusResolution & {
   claudeTaskWakeupPending?: 'notification' | 'finishing-turn'
+  /** The fork reads a background shell as agent work, so the hold earns no `workingMode`; turn completion still needs upstream's monitoring verdict. */
+  claudeMonitoringEquivalentHold?: true
 }
 
 export function resolveClaudePaneStatus(
@@ -69,6 +71,10 @@ export function resolveClaudePaneStatus(
   // Tasks still owe main-agent notifications after ending; those wakeup turns keep the pane live.
   const held = claudePaneHoldEvidence(state, paneKey, lead)
   const own = lead.waitingAgentId !== undefined ? lead.stateBeforeWait : lead
+  // LOCAL(nplez1): only a plain running shell is reclassified as agent work, and upstream would have
+  // called that hold monitoring (see LOCAL-PATCHES.md § local(agents)).
+  const shellHeldAsAgentWork =
+    state.claudeRunningNonAgentTaskPaneKeys.has(paneKey) && !held.runningAgent && !held.owedAgent
   return {
     ...foldAgentLeadStatus({
       leadState: lead.state,
@@ -87,6 +93,7 @@ export function resolveClaudePaneStatus(
         hasLiveNonAgentWork: state.claudeActiveSessionCronPaneKeys.has(paneKey) || held.owedShell
       })
     }),
+    ...(shellHeldAsAgentWork ? { claudeMonitoringEquivalentHold: true as const } : {}),
     ...(held.owedAgent || held.owedShell
       ? { claudeTaskWakeupPending: 'notification' as const }
       : own?.state !== 'done' && own?.taskWakeupTurn

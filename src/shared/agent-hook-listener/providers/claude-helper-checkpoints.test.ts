@@ -416,7 +416,8 @@ it.each([
       expect(tasks.get('a123')?.settled).toBe(true)
       expect(tasks.get('shell')).toEqual({ kind: 'shell', notificationOwedAt: now })
       expect(p.row().payload.lastAssistantMessage).toBe('READY')
-      expect(p.row().payload.workingMode).toBe('monitoring')
+      // LOCAL(nplez1): a background shell is agent work here, so the held pane reads working without the badge.
+      expect(p.row().payload).toMatchObject({ state: 'working', workingMode: undefined })
       expect(p.publish).toHaveBeenCalledTimes(1)
       expect(vi.getTimerCount()).toBe(0)
     } finally {

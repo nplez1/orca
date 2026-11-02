@@ -332,7 +332,10 @@ it.each(['add', 'manage'] as const)(
       }, [target, clear, consumeSettingsNavigation])
       useLayoutEffect(() => {
         // The first possible action precedes consumption effects, even with another default host.
-        document.querySelector<HTMLButtonElement>('#accounts-claude button')?.click()
+        // Why: the provider section header's usage switch leads the section, so name the add action.
+        within(document.getElementById('accounts-claude') as HTMLElement)
+          .getByRole('button', { name: 'Add Account' })
+          .click()
       }, [])
       return (
         <>

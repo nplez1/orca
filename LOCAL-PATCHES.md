@@ -638,7 +638,12 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   running or owed agent work **or** a running non-agent child task
   (`state.claudeRunningNonAgentTaskPaneKeys`), so a background shell the agent started is agent work;
   `hasLiveNonAgentWork` is the session-cron set **plus `owedShell`**, because an owed shell is a pending
-  wake-up rather than the running shell the policy is about.
+  wake-up rather than the running shell the policy is about. The same function reports
+  `claudeMonitoringEquivalentHold` for a shell-only hold, and `claude-events.ts` reads it where upstream
+  asks `heldTurnCountsAsFinished`: upstream stamps `turnCompletedAt` for a monitoring-held turn, so the
+  fork must restate that verdict or a shell-held turn never announces its completion. Renaming the badge
+  is a display change; dropping the stamp would be a behaviour regression.
+- `src/shared/agent-hook-listener/providers/claude-events.ts` — that restatement, and nothing else.
 - `src/shared/agent-hook-listener/providers/claude-roster-state.ts` — a caller, not the anchor: it
   imports `resolveClaudePaneStatus` and applies it to roster records. **No fork hunk in this file**, so a
   conflict there is upstream's to resolve.
@@ -649,7 +654,10 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   `src/shared/claude-background-task-status.test.ts`, `src/shared/main-agent-status-parity.test.ts`
   (the Claude and Grok lane helpers plus the six shell/watcher stories),
   `src/main/agent-hooks/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
-  `server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`. The
+  `server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`, plus the four
+  upstream helper-settlement suites that assert the badge directly
+  (`claude-helper-kill.test.ts`, `claude-helper-checkpoints.test.ts`,
+  `server-claude-helper-kill.test.ts`, `server-claude-helper-recovery.test.ts`). The
   structured/native-chat lane is deliberately untouched: it still reads a watch loop as monitoring.
 
 Weigh this before keeping it: `isAgentTimeAccruing` is `state === 'working' && workingMode !== 'monitoring'`,

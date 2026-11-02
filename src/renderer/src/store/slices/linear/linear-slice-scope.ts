@@ -57,10 +57,14 @@ export function getLinearReadScope(
   settings: AppState['settings'],
   sourceContext?: TaskSourceContext | null
 ): LinearReadScope {
-  return getLinearSourceScope(sourceContext ?? defaultScopeHost(settings))
+  return getLinearSourceScope(sourceContext ?? defaultScopeHost(settings), Boolean(sourceContext))
 }
 
-export function getLinearSourceScope(source: OwnedSource): LinearReadScope {
+/**
+ * Scope for an owned source. An `OwnedSource` always names its owner, so it is explicit; only the
+ * row-less default scope a page picks up before a source is chosen follows the focused runtime.
+ */
+export function getLinearSourceScope(source: OwnedSource, explicit = true): LinearReadScope {
   const target = ownedSourceTarget(source)
   const environmentId = target.kind === 'environment' ? target.environmentId : null
   const runtimeKey = getEnvironmentRuntimeContextKey(environmentId)
@@ -70,7 +74,7 @@ export function getLinearSourceScope(source: OwnedSource): LinearReadScope {
     runtimeContextKey: runtimeKey,
     contextKey: cachePrefix ? `${runtimeKey}::${cachePrefix}` : runtimeKey,
     cachePrefix,
-    explicitSource: source.kind === 'task-source',
+    explicitSource: explicit,
     isCurrentRuntime: () => getEnvironmentRuntimeContextKey(environmentId) === runtimeKey
   }
 }

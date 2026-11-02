@@ -78,8 +78,9 @@ describe('Claude helper provider evidence', () => {
       expect(p.state.claudeLeadStateByPaneKey.get(paneKey)?.waitingAgentId).toBeUndefined()
       expect(tasks.get('a123')?.settled).toBe(true)
       expect(tasks.get('shell')).toEqual({ kind: 'shell', notificationOwedAt: now })
-      expect(p.row().payload.workingMode).toBe('monitoring')
       expect(p.row().payload.lastAssistantMessage).toBe('READY')
+      // LOCAL(nplez1): a background shell is agent work here, so the held pane reads working without the badge.
+      expect(p.row().payload).toMatchObject({ state: 'working', workingMode: undefined })
       expect(p.publish).toHaveBeenCalledTimes(1)
       expect(vi.getTimerCount()).toBe(0)
     } finally {
@@ -136,7 +137,8 @@ describe('Claude helper provider evidence', () => {
               expect(p.row().payload.subagents ?? []).toEqual([])
               expect(p.publish).toHaveBeenCalledTimes(1)
             }
-            expect(p.row().payload.workingMode).toBe('monitoring')
+            // LOCAL(nplez1): a background shell is agent work here, so the held pane reads working without the badge.
+            expect(p.row().payload).toMatchObject({ state: 'working', workingMode: undefined })
             expect(p.row().payload.lastAssistantMessage).toBe('READY')
             expect(vi.getTimerCount()).toBe(0)
           } finally {

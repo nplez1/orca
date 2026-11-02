@@ -72,7 +72,10 @@ beforeEach(() => {
     }
   )
   registerWorkspaceHttpLinkBrowserOpener(opening)
-  Object.assign(window.api, { shell: { openUrl: vi.fn(async () => {}) } })
+  // LOCAL(nplez1): #234 routes the system path through the explicit variant, because `openUrl` relays back into this router.
+  Object.assign(window.api, {
+    shell: { openUrl: vi.fn(async () => {}), openUrlInSystemBrowser: vi.fn(async () => {}) }
+  })
 })
 afterEach(() => {
   registerWorkspaceHttpLinkBrowserOpener(null)
@@ -146,14 +149,15 @@ it('does not notify browser completion for system opening and keeps unknown-owne
     forceDestination: 'system',
     onBrowserOpenComplete: complete
   })
-  expect(window.api.shell.openUrl).not.toHaveBeenCalled()
+  expect(window.api.shell.openUrlInSystemBrowser).not.toHaveBeenCalled()
   openRoutedHttpLink(URL_TO_OPEN, {
     worktreeId: WORKSPACE,
     sourceOwner: { kind: 'local' },
     forceDestination: 'system',
     onBrowserOpenComplete: complete
   })
-  expect(window.api.shell.openUrl).toHaveBeenCalledExactlyOnceWith(URL_TO_OPEN)
+  expect(window.api.shell.openUrlInSystemBrowser).toHaveBeenCalledExactlyOnceWith(URL_TO_OPEN)
+  expect(window.api.shell.openUrl).not.toHaveBeenCalled()
   expect(opening).not.toHaveBeenCalled()
   expect(complete).not.toHaveBeenCalled()
 })

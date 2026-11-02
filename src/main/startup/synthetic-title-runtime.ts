@@ -118,6 +118,30 @@ export function resumeSyntheticTitleSpinnerTimer(): void {
   ensureSyntheticTitleSpinnerTimer()
 }
 
+/** Ring the permission bell alone for an agent whose own title protocol paints the label.
+ *
+ *  Why: the extra BEL is what fires the permission notification and it is the only part of the
+ *  synthetic frame such an agent still needs — writing the label would erase its state marker
+ *  (#226). A finished turn rings nothing; completion owns its own notification. */
+function ringPermissionBellWithoutLabel(
+  paneKey: string,
+  agentState: AgentStatusState,
+  profile: SyntheticAgentTitleProfile
+): void {
+  if (profile.titleIdentityGroup !== 'pi-compatible') {
+    return
+  }
+  if (agentState !== 'blocked' && agentState !== 'waiting') {
+    return
+  }
+  const ptyId = getPtyIdForPaneKey(paneKey)
+  if (!ptyId) {
+    return
+  }
+  stopSyntheticTitleSpinner(paneKey)
+  sendSyntheticTitle(ptyId, '\x07', { force: true })
+}
+
 /** Whether the pane's own title already claims a pi state.
  *
  *  Why: the synthetic label carries no `π` marker, so writing it over pi's own title erases the very
@@ -229,5 +253,8 @@ export function driveSyntheticTitleFromHookStatus(event: {
     driveSyntheticTitleFromHook(event.paneKey, event.payload.state, profile)
   } else if (event.payload.state === 'working' && profile.synthesizeTerminalTitle !== false) {
     retractSyntheticRestTitle(event.paneKey, profile)
+  } else {
+    // Upstream #36822 opts pi out of synthesis entirely; the bell still has to ring (#226).
+    ringPermissionBellWithoutLabel(event.paneKey, event.payload.state, profile)
   }
 }

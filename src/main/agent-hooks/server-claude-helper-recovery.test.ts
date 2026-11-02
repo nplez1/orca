@@ -285,7 +285,8 @@ it.each([
     timeout: 3000,
     interval: 30
   })
-  expect(p.row()?.workingMode).toBe('monitoring')
+  // LOCAL(nplez1): a background shell is agent work here, so the held pane reads working without the badge.
+  expect(p.row()).toMatchObject({ state: 'working', workingMode: undefined })
   expect(p.row()?.mainAgent).toEqual(before.mainAgent)
   expect(p.row()?.lastAssistantMessage).toBe('READY')
   expect(p.row()?.turnEndedAt).toBe(before.turnEndedAt)
@@ -369,7 +370,7 @@ it('initialization of an already-listening desktop activates parked runtime spoo
     () => {
       expect(p.entries.size).toBe(1)
       expect(p.row()?.subagents ?? []).toEqual([])
-      expect(p.row()?.workingMode).toBe('monitoring')
+      expect(p.row()).toMatchObject({ state: 'working', workingMode: undefined })
     },
     { timeout: 3000, interval: 30 }
   )
@@ -512,7 +513,7 @@ it('a real failed bind parks without resources and explicit retry delivers its f
     timeout: 3000,
     interval: 30
   })
-  expect(p.row()?.workingMode).toBe('monitoring')
+  expect(p.row()).toMatchObject({ state: 'working', workingMode: undefined })
 })
 
 it.each(['relay-spool', 'desktop-spool'])(
@@ -588,7 +589,7 @@ it('preferred-port fallback activates the original admitted observation', async 
       timeout: 3000,
       interval: 30
     })
-    expect(p.row()?.workingMode).toBe('monitoring')
+    expect(p.row()).toMatchObject({ state: 'working', workingMode: undefined })
   } finally {
     await new Promise<void>((resolve) => busy.close(() => resolve()))
   }

@@ -202,7 +202,9 @@ describe('orca serve service', () => {
         bin
       ].join(':')
     }
-    const result = await installServeService({ command: join(bin, 'orca-ide'), dryRun: true }, d)
+    // Why orca-np and not upstream's orca-ide: this build's installed app CLI is renamed by the
+    // local(identity) patch, and the fixture provisions only that name.
+    const result = await installServeService({ command: join(bin, 'orca-np'), dryRun: true }, d)
     expect(String(result.content)).toContain(`Environment=PATH=/usr/local/bin:${bin}\n`)
   })
 

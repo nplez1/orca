@@ -115,6 +115,7 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
   setupAutoUpdater(mainWindow: BrowserWindow | null, opts?: UpdaterSetupOptions): void {
     // Keep direct-window callers compatible; desktop composition supplies the lifecycle getter.
     this.getMainWindow = opts?.getMainWindow ?? (mainWindow ? () => mainWindow : this.getMainWindow)
+    this.bindLifecycleMainWindow(opts?.getMainWindow)
     // Why keep: headless serve sets up without a window; a later window attach must not be undone.
     if (mainWindow) {
       this.bindMainWindow(mainWindow)

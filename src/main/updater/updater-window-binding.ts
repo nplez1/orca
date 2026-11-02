@@ -6,6 +6,17 @@ import { INITIAL_UPDATE_STATUS, UpdaterState } from './updater-state'
 /** Owns the main-window binding every updater send and window-parented dialog goes through. */
 export abstract class UpdaterWindowBinding extends UpdaterState {
   /**
+   * Set only when the composition root supplies a lifecycle getter, which names the window that is
+   * current now — a successor becomes current before its own updater setup runs.
+   */
+  private lifecycleMainWindow: (() => BrowserWindow | null) | null = null
+
+  /** Records the composition root's window getter; it outranks the window bound at setup. */
+  protected bindLifecycleMainWindow(getMainWindow: (() => BrowserWindow | null) | undefined): void {
+    this.lifecycleMainWindow = getMainWindow ?? null
+  }
+
+  /**
    * Binds the window updater events are sent to and replays the current status, which may have
    * landed while the previous window was already gone.
    */
@@ -26,9 +37,11 @@ export abstract class UpdaterWindowBinding extends UpdaterState {
     }
   }
 
-  /** The bound window while it is still alive, so native UI is never parented to a destroyed one. */
+  /** The current window while it is still alive, so native UI is never parented to a destroyed one. */
   protected liveMainWindow(): BrowserWindow | null {
-    const target = this.mainWindowRef ?? this.getMainWindow()
+    // Why: a lifecycle getter owns the window, so it never falls back to one the updater bound earlier
+    // — that is how a status reached a window the composition root had already replaced.
+    const target = this.lifecycleMainWindow ? this.lifecycleMainWindow() : this.mainWindowRef
     return target && !target.isDestroyed() ? target : null
   }
 

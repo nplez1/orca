@@ -271,7 +271,7 @@ describe('Claude background task status', () => {
       background_tasks: [RUNNING_SHELL]
     })
 
-    expect(wakeEnd).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    expect(wakeEnd).toMatchObject({ state: 'working', workingMode: undefined })
     expect(wakeEnd?.turnCompletedAt).toBeUndefined()
   })
 

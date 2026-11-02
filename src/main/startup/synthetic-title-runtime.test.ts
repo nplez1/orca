@@ -75,14 +75,17 @@ describe('synthetic titles over a pi state title', () => {
     expect(hooks.ingest).not.toHaveBeenCalled()
   })
 
-  it('still labels a pi pane that holds no state marker of its own', () => {
+  // Why changed: upstream #36822 opted pi out of terminal-title synthesis entirely (its titlebar
+  // extension paints idle/permission itself), so the label this case used to pin is retired; what
+  // the fork still needs from this lane is the BEL, which is the permission notification (#226).
+  it('rings the bell but writes no label over a pi pane that holds no state marker of its own', () => {
     titles.set('pty-1', '⠋ π - main')
 
     driveSyntheticTitleFromHookStatus(status('waiting', 'pi'))
 
     expect(hooks.ingest).toHaveBeenCalledTimes(1)
     expect(hooks.ingest.mock.calls[0][0]).toBe('pty-1')
-    expect(hooks.ingest.mock.calls[0][1]).toContain('Pi - action required')
+    expect(hooks.ingest.mock.calls[0][1]).toBe('\x07')
   })
 
   // Why: the guard belongs to the `pi-compatible` identity group, so another agent's label over a

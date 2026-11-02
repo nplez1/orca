@@ -1,4 +1,5 @@
 import {
+  getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID,
   normalizeExecutionHostId,
   toRuntimeExecutionHostId,
@@ -6,7 +7,6 @@ import {
 } from '../../../shared/execution-host'
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
-import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 
 /**
  * The account host a workspace's provider reads route by: the paired server that transports the
@@ -19,14 +19,12 @@ export function workspaceAccountHostId(
   repo: Pick<Repo, 'connectionId' | 'executionHostId'> | null | undefined,
   workspace: Pick<Worktree, 'hostId' | 'runtimeOwnerEnvironmentId'> | null | undefined
 ): ExecutionHostId {
-  // Why the guard only runs with a repo row: upstream's `forgeOwnerHostIdForWorkspace` rejects a
-  // repository that names a different host than the workspace, and there is nothing to compare when
-  // the row has not loaded yet. The documented precedence still applies there — the workspace row's
-  // own host (its paired server first) wins over this app.
-  const owner = repo
-    ? forgeOwnerHostIdForWorkspace(repo, workspace)
-    : workspace?.runtimeOwnerEnvironmentId
-      ? toRuntimeExecutionHostId(workspace.runtimeOwnerEnvironmentId)
-      : (workspace?.hostId ?? null)
+  // Why not upstream's `forgeOwnerHostIdForWorkspace`: its forge-owner guard throws when the repo row
+  // names another host than the workspace, and every caller here renders a card or a pane, so one
+  // stale row would crash the surface. The precedence below resolves the owner instead.
+  const serverId = workspace?.runtimeOwnerEnvironmentId?.trim()
+  const owner = serverId
+    ? toRuntimeExecutionHostId(serverId)
+    : (workspace?.hostId ?? (repo ? getRepoExecutionHostId(repo) : null))
   return normalizeExecutionHostId(owner) ?? LOCAL_EXECUTION_HOST_ID
 }

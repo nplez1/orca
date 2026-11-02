@@ -41,7 +41,8 @@ afterEach(async () => {
   }
   cleanups = []
   for (const store of stores.splice(0)) {
-    store.freezeWrites()
+    // Why awaited: a pending profile file write can land in the temp tree mid-delete (ENOTEMPTY).
+    await store.freezeWritesAsync()
   }
   vi.unstubAllEnvs()
   for (const directory of directories.splice(0)) {

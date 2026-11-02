@@ -130,7 +130,8 @@ it.each(['local', 'relay', 'spool'])(
       interval: 30
     })
     const after = p.row()!
-    expect(after.workingMode).toBe('monitoring')
+    // LOCAL(nplez1): a background shell is agent work here, so the held pane reads working without the badge.
+    expect(after).toMatchObject({ state: 'working', workingMode: undefined })
     expect(after.mainAgent).toEqual(before?.mainAgent)
     expect(after.lastAssistantMessage).toBe('READY')
     expect(after.turnEndedAt).toBe(before?.turnEndedAt)

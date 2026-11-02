@@ -17,6 +17,8 @@ import {
   formatTerminalStartFailure,
   terminalStartError
 } from '../../../../shared/terminal-start-failure'
+// LOCAL(nplez1): the fork re-points the release feed, so the report link follows it instead of upstream's slug.
+import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository'
 import { appendPaneTerminalError, terminalErrorForPane } from './terminal-error-accumulation'
 
 import {
@@ -469,7 +471,7 @@ describe('TerminalErrorToast environment footer', () => {
     expect(text).not.toContain('agent_session_exited_during_start')
     expect(view.getAllByRole('link')).toHaveLength(1)
     expect(view.getByRole('link', { name: 'file an issue' }).getAttribute('href')).toBe(
-      'https://github.com/stablyai/orca/issues'
+      `${ORCA_REPOSITORY_URL}/issues`
     )
     expect(environmentMocks.resolveFooter).toHaveBeenCalledOnce()
     expect(onDismiss).not.toHaveBeenCalled()

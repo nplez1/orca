@@ -374,7 +374,9 @@ it('returns the branch review and worktree start point from account-free refresh
   }
   const localGitOptions = { ghAccount: alice, wslDistro: undefined }
   const [refresh] = hostedReviewOptionArgs({ localGitOptions })
-  expect(refresh?.localGitExecOptions?.ghAccount).toBeUndefined()
+  // Why alice: #170 forwards the repo's pinned account so a branch→PR lookup cannot fall back to the
+  // ambient login; upstream's account-free shape is unreachable for a pinned repo in this fork.
+  expect(refresh?.localGitExecOptions?.ghAccount).toEqual(alice)
   const outcome = await getPRForBranchOutcome('/work', 'feature', null, null, null, refresh)
   expect(outcome).toMatchObject({ kind: 'found', pr: { title: 'Alice-token', number: 42 } })
   const fetched: string[] = []
