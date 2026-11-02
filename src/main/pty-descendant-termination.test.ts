@@ -203,6 +203,12 @@ describe('captureDescendantSnapshot', () => {
     expect(result?.descendants).toEqual([
       { ...row(20, 10, 20, 'Tue Jul 14 12:00:00 2026'), tpgid: 0 }
     ])
+    expect(execFileMock).toHaveBeenCalledWith(
+      'ps',
+      expect.any(Array),
+      expect.objectContaining({ env: expect.objectContaining({ TZ: 'UTC' }) }),
+      expect.any(Function)
+    )
   })
 })
 

@@ -5,10 +5,11 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SpawnedProcess } from '@orca/process-host/process-spec'
 import type { DescendantSnapshot } from '../pty-descendant-termination'
 import { createClaudeChildTreeReaper } from './claude-agent-sdk-exit-proof'
+import { parseUtcLstart } from '../../shared/ps-lstart-time'
 
 const ROOT_PID = 424242
 const ROOT_STARTED_AT = 'Mon Jan 1 00:00:00 2026'
-const ROOT_FORK_MS = Date.parse(ROOT_STARTED_AT)
+const ROOT_FORK_MS = parseUtcLstart(ROOT_STARTED_AT)
 
 function mockChild(): EventEmitter &
   Pick<SpawnedProcess, 'pid' | 'kill' | 'stdin'> & { kill: ReturnType<typeof vi.fn> } {
