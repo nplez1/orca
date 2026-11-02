@@ -18,6 +18,7 @@ import {
   resolveProjectFolderName
 } from './project-folder-placement'
 
+export { resolveNestedRepoContainerName } from './project-folder-placement'
 export { resolveProjectFolderName } from './project-folder-placement'
 export { sanitizeWorktreeName } from './project-folder-placement'
 
@@ -265,10 +266,7 @@ export function getWorktreePathSettings(
             // Why repo-nested resolves one too: a nested clone or create leaves the primary
             // checkout at `<root>/<project>/<branch>`, so the container is the folder holding it
             // and not the checkout's branch-named leaf.
-            projectFolderName: resolveNestedRepoContainerName(
-              repo,
-              resolveWorkspaceDirForRepo(repo.path, basePath)
-            )
+            projectFolderName: resolveNestedRepoContainerName(repo)
           }
         : {}),
     // Why pass it through rather than resolve here: placement has to agree

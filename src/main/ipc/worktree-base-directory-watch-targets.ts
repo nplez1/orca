@@ -94,7 +94,7 @@ async function maybeAddBaseTarget(
       pathSettings.projectFolderName ?? getRuntimePathBasename(repo.path).replace(/\.git$/, ''),
     // Why: in project-folder mode the watched root IS the per-project container, so each worktree
     // is a direct child — exactly the shape the flat matcher handles. Only repo-nested interposes a
-    // repo-named container between the root and the worktrees.
+    // container (the project folder) between the root and the worktrees.
     nestWorkspaces:
       pathSettings.nestWorkspaces && !isProjectFolderLayout(resolveWorktreeLayoutMode(pathSettings))
   }

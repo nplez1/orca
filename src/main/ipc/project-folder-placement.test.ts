@@ -278,4 +278,19 @@ describe('repo-nested container', () => {
       posix.join('/workspaces', 'orca', 'feature')
     )
   })
+
+  it('does not treat an org folder inside the workspace root as the project folder', () => {
+    // Why: a workspace root is often the code root, so `~/code/<org>/<repo>` is an ordinary import.
+    // Taking the org folder would move this repo's worktrees and collide with its siblings'.
+    const repo = { path: '/workspaces/acme/orca', displayName: 'orca' }
+    const pathSettings = getWorktreePathSettings(repo, {
+      nestWorkspaces: true,
+      workspaceDir: '/workspaces',
+      worktreeLayoutMode: 'repo-nested' as const
+    })
+    expect(pathSettings.projectFolderName).toBe('orca')
+    expect(computeWorktreePath('feature', repo.path, pathSettings)).toBe(
+      posix.join('/workspaces', 'orca', 'feature')
+    )
+  })
 })

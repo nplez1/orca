@@ -12,7 +12,7 @@ export type CloneTargetPlacement = {
   /** Path for the checkout, relative to the clone destination. Absent means the legacy
    *  spelling, where the checkout is the destination plus the URL-derived repo name. */
   relativeClonePath?: string
-  /** Name the project should be registered under, when the layout nests a container. */
+  /** Name the project should be registered under, when a nested layout creates a container. */
   projectName?: string
 }
 

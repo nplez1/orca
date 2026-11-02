@@ -59,7 +59,11 @@ export function isProjectFolderLayout(mode: WorktreeLayoutMode): boolean {
 }
 
 /** True when a new project's primary checkout goes inside a project folder rather than directly
- *  in the parent the user picked. Both nested layouts do it; only `flat` does not. */
+ *  in the parent the user picked. Both nested layouts do it; only `flat` does not.
+ *
+ *  Kept apart from `layoutModeNestsWorkspaces` on purpose: that one derives the legacy boolean a
+ *  downgrade still reads, while this one is a placement rule. They agree today, and a layout that
+ *  nests workspaces without nesting the checkout (or the reverse) would have to split them. */
 export function layoutNestsPrimaryCheckout(mode: WorktreeLayoutMode): boolean {
   return mode !== 'flat'
 }

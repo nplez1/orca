@@ -55,6 +55,9 @@ export class RuntimeRepositoryCloneController {
     if (!trimmedDestination) {
       throw new Error('Clone destination is required')
     }
+    // Why before placement: the branch probe creates the destination and runs git there, so a path
+    // this guard exists to refuse must not be created or used as a cwd first.
+    await refuseWslHostWindowsDrivePath(trimmedDestination)
     // Why the same placement the local handler uses: a nested layout has to nest a server-hosted
     // clone too, or the two hosts would disagree about where a project's checkout lives.
     const placement = await resolveCloneTargetPlacement({
@@ -67,7 +70,6 @@ export class RuntimeRepositoryCloneController {
       destination: trimmedDestination,
       relativeClonePath: placement.relativeClonePath
     })
-    await refuseWslHostWindowsDrivePath(trimmedDestination)
     const clonePathKey = getClonePathComparisonKey(clonePath)
     const previous = this.inFlightByPath.get(clonePathKey) ?? Promise.resolve()
     let release!: () => void
