@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION } from './host-sync-settings-disposition'
 import {
-  GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION,
   SETTINGS_FIELDS_HOST_LOCAL,
   SETTINGS_FIELDS_REPLICATED_ONLY_IF_EMPTY,
   SETTINGS_FIELDS_REPLICATED_TO_HOSTS
-} from './host-sync-settings-disposition'
+} from './host-sync-settings-fields'
 
 /**
  * Why the census does not spell out every membership: the table is 245 explicit lines, so a

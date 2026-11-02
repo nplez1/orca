@@ -21,7 +21,7 @@ import { useState } from 'react'
 import { workspaceFromLinearData } from '../../src/main/linear/linear-workspace-record'
 import { credentialDecryptionMessage } from '../../src/shared/integration-credential-errors'
 import { writeLinearIssue } from '@/lib/linear-issue-write'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
 import { pendingLinearIssueWrites } from '@/store/slices/linear/linear-issue-publication'
 import { PaginationBar } from '../../src/renderer/src/components/task-page/PaginationBar'
@@ -239,7 +239,7 @@ it('retains ordered linked source provenance when two hosts return the same UUID
     const result = useLinearIssueResult<LinearIssue[]>(
       'two-hosts',
       [],
-      getLinearSourceScope(defaultScopeSource(null))
+      getLinearSourceScope(defaultScopeHost(null))
     )
     // SAFETY: fixture supplies the linked loader fields.
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fixture supplies the real consumer's exercised fields and actions; unrelated full-page/provider services are intentionally absent.
@@ -390,7 +390,7 @@ it('keeps retained page two reachable after a failed refresh and a successful re
     const result = useLinearIssueResult(
       'pagination',
       rows,
-      getLinearSourceScope(defaultScopeSource(null))
+      getLinearSourceScope(defaultScopeHost(null))
     )
     const { data: items, error, setData: setLinearIssues, setError: setLinearError } = result
     const [page, setLinearIssuePage] = useState(0)
@@ -538,7 +538,7 @@ it.each([20, 200])(
       const result = useLinearIssueResult<LinearIssue[]>(
         `N${n}`,
         [],
-        getLinearSourceScope(defaultScopeSource(null))
+        getLinearSourceScope(defaultScopeHost(null))
       )
       // SAFETY: the fixture installs the actual linked hook's selected dependencies.
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fixture supplies the real consumer's exercised fields and actions; unrelated full-page/provider services are intentionally absent.
@@ -624,10 +624,10 @@ it.each([20, 200])('bounds real write-edge and read reconciliation work at Q=P=W
   }))
   const pending = rows.map(() => deferred<{ ok: boolean }>())
   const saves = rows.map((row, i) =>
-    writeLinearIssue(row, { priority: 1 }, defaultScopeSource(null), () => pending[i].promise)
+    writeLinearIssue(row, { priority: 1 }, defaultScopeHost(null), () => pending[i].promise)
   )
   const owners = pendingLinearIssueWrites.get(
-    getLinearSourceScope(defaultScopeSource(null)).contextKey
+    getLinearSourceScope(defaultScopeHost(null)).contextKey
   )!
   for (const owner of owners.values()) {
     Object.defineProperty(owner, 'organizationId', {
@@ -698,7 +698,7 @@ it.each([20, 200])('bounds real write-edge and read reconciliation work at Q=P=W
   foreignScopes = 0
   const edit = deferred<{ ok: boolean }>()
   const mutate = vi.fn(() => edit.promise)
-  const saving = writeLinearIssue(rows[0], { priority: 4 }, defaultScopeSource(null), mutate)
+  const saving = writeLinearIssue(rows[0], { priority: 4 }, defaultScopeHost(null), mutate)
   expect(mutate).toHaveBeenCalledTimes(1)
   expect(leases.every((lease) => lease.currentView().data?.[0].priority === 4)).toBe(true)
   edit.resolve({ ok: false })

@@ -57,7 +57,7 @@ export function selectWorktreeActivityStatuses(
         hasLiveDone,
         hasRetainedDone,
         hasRetainedFailed,
-        setupRunning: statusInputs.setupRunningWorktreeIds[worktreeId] === true
+        setupRunning: statusInputs.setupRunningWorktreeIds?.[worktreeId] === true
       })
     )
   }

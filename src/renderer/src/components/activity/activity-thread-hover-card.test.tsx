@@ -33,7 +33,9 @@ vi.mock('@/components/ui/hover-card', () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 function createTestThread(overrides: Partial<AgentPaneThread> = {}): AgentPaneThread {
-  const repo = makeRepo()
+  // Why the host: the worktree below lives on the m4air runtime, and upstream s forge-owner guard
+  // rejects a repo that does not name the same host.
+  const repo = { ...makeRepo(), executionHostId: 'runtime:m4air-env-id' as const }
   const worktree: Worktree = {
     ...makeWorktree(),
     displayName: 'm4air-audit',
@@ -183,7 +185,7 @@ describe('ActivityThreadHoverCard and ActivityThreadRow', () => {
         branch: 'feat/m4air-performance',
         path: '/Users/test/projects/orca/worktrees/m4air-audit',
         comment: 'Performance investigation notes',
-        hostId: 'runtime:m4air-env' as const
+        hostId: 'runtime:m4air-env-id' as const
       }
     })
 

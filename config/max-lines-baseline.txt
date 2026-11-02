@@ -19,7 +19,6 @@ inline src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts
 inline src/main/ipc/settings.test.ts
 inline src/main/ipc/worktree-remote.ts
 inline src/main/ipc/worktrees-existing-branch-checkout.test.ts
-inline src/main/orca-profiles/host-sync-settings-disposition.ts
 inline src/main/orcad/orcad-entry.ts
 inline src/main/runtime/construction/runtime-service-state.ts
 inline src/main/runtime/rpc/methods/files.ts

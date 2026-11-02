@@ -1,6 +1,7 @@
 import {
   LOCAL_EXECUTION_HOST_ID,
   normalizeExecutionHostId,
+  toRuntimeExecutionHostId,
   type ExecutionHostId
 } from '../../../shared/execution-host'
 import type { Repo } from '../../../shared/repo-types'
@@ -18,8 +19,14 @@ export function workspaceAccountHostId(
   repo: Pick<Repo, 'connectionId' | 'executionHostId'> | null | undefined,
   workspace: Pick<Worktree, 'hostId' | 'runtimeOwnerEnvironmentId'> | null | undefined
 ): ExecutionHostId {
-  return (
-    normalizeExecutionHostId(forgeOwnerHostIdForWorkspace(repo ?? {}, workspace)) ??
-    LOCAL_EXECUTION_HOST_ID
-  )
+  // Why the guard only runs with a repo row: upstream's `forgeOwnerHostIdForWorkspace` rejects a
+  // repository that names a different host than the workspace, and there is nothing to compare when
+  // the row has not loaded yet. The documented precedence still applies there — the workspace row's
+  // own host (its paired server first) wins over this app.
+  const owner = repo
+    ? forgeOwnerHostIdForWorkspace(repo, workspace)
+    : workspace?.runtimeOwnerEnvironmentId
+      ? toRuntimeExecutionHostId(workspace.runtimeOwnerEnvironmentId)
+      : (workspace?.hostId ?? null)
+  return normalizeExecutionHostId(owner) ?? LOCAL_EXECUTION_HOST_ID
 }

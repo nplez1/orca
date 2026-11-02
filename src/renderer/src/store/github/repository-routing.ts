@@ -121,8 +121,12 @@ export function findRepoForGitHubOwner(
     return lookup.findByIdOrPath(repoId, repoPath)
   }
   const ownerHostId = normalizeExecutionHostId(executionHostId)
+  // Why the path check on the id match: the id alone is not enough here — a twin can publish the
+  // same id on another path, and the caller's request path names which row it means. This is the
+  // exact (host, id, path) match `findOnHost` used before upstream split the lookup in two.
+  const byIdOnHost = ownerHostId && repoId ? lookup.findByIdOnHost(repoId, ownerHostId) : undefined
   const repo = ownerHostId
-    ? ((repoId ? lookup.findByIdOnHost(repoId, ownerHostId) : undefined) ??
+    ? ((byIdOnHost && byIdOnHost.path === repoPath ? byIdOnHost : undefined) ??
       lookup.findByPathOnHost(repoPath, ownerHostId))
     : undefined
   if (

@@ -105,7 +105,9 @@ function repo(overrides: Partial<Repo> = {}): Repo {
     badgeColor: '#000',
     addedAt: 0,
     connectionId: null,
-    executionHostId: null,
+    // Why the workspace host: the default worktree below is on it, and upstream s forge-owner guard
+    // rejects a repo that names a different host.
+    executionHostId: 'runtime:workspace-host',
     ...overrides
   }
 }
