@@ -31,6 +31,8 @@ function createController(seed: Repo[]): {
     getRepos: () => repos,
     getRepo: (id: string) => repos.find((repo) => repo.id === id),
     getAllWorktreeMeta: () => ({}),
+    // Why flat: these cases are about host dedupe, so the clone path must stay <destination>/<name>.
+    getSettings: () => ({ workspaceDir: '', nestWorkspaces: false, worktreeLayoutMode: 'flat' }),
     addRepo: (repo: Repo) => {
       repos.push(repo)
       return repo

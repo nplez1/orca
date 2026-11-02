@@ -139,10 +139,13 @@ describe('web repos preload API', () => {
     ])
   })
 
+  // Why orca/workspaces: this client cannot read the host's layout, and every nested layout — which
+  // is what the app defaults to — keeps project folders under the workspace dir. The host's own
+  // handler stays authoritative; only a flat host would answer orca/projects instead.
   it.each([
-    ['/home/alice', '/home/alice/orca/projects'],
-    ['/', '/orca/projects'],
-    ['C:\\', 'C:\\orca\\projects']
+    ['/home/alice', '/home/alice/orca/workspaces'],
+    ['/', '/orca/workspaces'],
+    ['C:\\', 'C:\\orca\\workspaces']
   ])(
     'resolves the default create-project parent from runtime host home %s',
     async (resolvedPath, expectedParent) => {
