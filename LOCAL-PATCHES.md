@@ -2327,6 +2327,48 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-11-01 — merge of upstream `0fa5dae2f9` (459 commits) into the release line, from
+  `01eac17153`** (merge base `a903985082`, rollback tag `archive/pre-sync-01eac17153`, merge commit
+  `7fea08330aa`, then `62107128f7a`, `87421079c3b`). **202 conflicted paths** —
+  `both-rewrote 101, modify/delete 56, union 37, duplicate-tail 6, duplicate-members 2`. Decisions
+  are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer
+  will want first:
+
+  - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **24 paths** outright (26
+    import-only unions, 3 fork-unchanged, 2 upstream-unchanged). **48 modify/delete** were settled by
+    the manifest: the 5 dashboard-popout / snapshotted-thread deletions the fork already asserts, and
+    **43 upstream test files** the fork accepts as deletions. The remaining **130 paths** were
+    resolved in 8 disjoint area batches bound to the ledger.
+  - **Upstream retired ~1031 test files this sync** (`test: remove low-value … suites`, ~20 commits
+    from `#36336` to `#37106`). 43 of them were files the fork had extended with its own cases. Per
+    the ledger's "Test inventories retired upstream" decision the fork takes the deletion rather than
+    re-adding the file, so **fork test coverage was lost in the files that carried it** — the review
+    picker (`use-checks-panel-manual-refresh`, `source-control-header-toolbar-identity`), the
+    keychain payload encoding (`generic-password`), Orca NP dev identity
+    (`dev-instance-identity`), Jira grouping and `repo-clone-path`. Named follow-up: re-home those
+    cases into fork-owned test files; nothing in the tree references them today, so this is coverage
+    debt, not a red.
+  - **Two `@ts-nocheck` wiring gaps no typecheck could catch.** `orca-runtime-owned-controllers.ts`
+    (fork-owned, merged clean) had lost `acquireFileWatcherRemoval` from the
+    `RuntimeProjectGroupController` deps and the notifier from `RuntimeAccountController`, so
+    worktree removal would have thrown and Claude-selection notifications would have stopped
+    silently. Both are restored to upstream's own shape.
+  - **Upstream added 17 settings and retired 3**, which the fork's host-sync disposition table is a
+    complete `Record` over — so the table was both short and stale. The 3 retired rows
+    (`experimentalNativeChat`, `orchestrationChatErrorEscalationEnabled`,
+    `orchestrationHeartbeatIntervalMinutes`) were type errors, not fork capability.
+  - **The fork's session-summary feature imported modules upstream had moved** (`agent-session-resume`,
+    `native-chat-agent-support`, `persistence`, `agent-session-provider-handle`). These are
+    rename-replay breaks: no conflict marker, and `tc` names them one file at a time.
+  - **`max-lines` went over budget in 10 upstream-owned files** once the merge's fork delta landed
+    in them; each gets one directive and one baseline row, per § `local(lint)`. The fork-owned
+    `host-sync-settings-disposition.ts` is the single fork exemption: splitting its audit table
+    reported 284 symbol relocations, so the table stays whole.
+  - **The fork-comment ratchet fell** 6051 → 5992 with 4 re-keyed entries (upstream relocated
+    `checks-detail-polling-policy.ts` to `src/shared/github/` and three `task-page-jira-*` files
+    into `task-page/jira/`) and +4 genuine lines across three files, all recorded in the baseline's
+    `accepted` field.
+
 - **2026-10-30 — merge of upstream `a903985082` (906 commits) into the release line, from
   `16f49e00cf`** (merge base `f173998203`, rollback tag `archive/pre-sync-16f49e00cf`, merge commit
   `985687d2004`, then `a7a778bc197`, `69d7a35c4a`). **184 conflicted paths, 340 hunks** —
@@ -2457,85 +2499,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   green again**: run `40701735011` on `1776dcc575` passed all five shards, the first green night since
   2026-10-08 — the 10-27/10-28 reds were `main`'s own drift plus one Linux-only assertion this sync
   repaired (a refused Claude 401 is retryable on every platform, not just darwin).
-
-- **2026-10-25 — merge of upstream `0571e45107` (556 commits) into the release line, from
-  `095cf32705`** (merge base `57b5082404`, rollback tag `archive/pre-sync-095cf32705`, merge commit
-  `281cccf5a4`, then `995f2dbc27`, `ef2897da2b`, `accb095dd6`, `7811f60dd6`, `1b848feba6`).
-  **249 conflicted paths, 367 hunks** — `both-rewrote 167, union 47, modify/delete 23,
-  duplicate-tail 8, rename-replay 2, duplicate-members 1, add/add 1` — four to five times the
-  previous two syncs (52 and 63 paths). Upstream's delta is 11,612 files (−290,038/+189,207); most of
-  the deletions are the `docs/audits/**` JSON upstream removed. Substantively it is a **mass
-  comment-terseness pass** plus regroupings — `src/main/ipc/filesystem-watcher-*` into
-  `src/main/ipc/filesystem/watchers/`, `shared/jira-*` into `shared/jira/`, several
-  `src/main/runtime/` groups — and ~50 test inventories retired. The terseness pass is why
-  `both-rewrote` dominates: upstream rewrote the comments around nearly every fork hunk. Decisions
-  are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-25 sync";
-  the ones a reviewer will want first:
-
-  - **Resolved in three tiers, and most of it by proof rather than judgement.** All 367 blocks were
-    machine-verified against their recorded base/ours/theirs before any was touched. **215 hunks
-    mechanically:** 133 where upstream never touched the region (ours), 50 where ours differed only
-    by identity tokens (theirs, and `identity-sweep` re-applies the identity), 32 import-only.
-    **85 by direct decision** — `ORCA_SKILLS_REPOSITORY_URL` stays `nplez1/orca`, the identity-aware
-    `OrcaBundleIdentity.isTrustedPeer`, `listCached`, the both-owner skill-lock acceptance, the
-    schema version below. **67 by an Opus review pass** over the both-rewrote cluster. Reuse this
-    shape at the next large sync: the proof tier is what made 249 paths tractable.
-  - **`SESSION_SEARCH_SCHEMA_VERSION` is 10.** The fork had gone 6 → 9 and upstream 6 → 8, so the
-    merged schema takes a version above every one either line has shipped (runbook trap 8), not the
-    higher of the two.
-  - **The pi compaction guard reads the fork's async lane; `isHeldByChildren()` is unchanged**
-    (`ef2897da2b`). Upstream's new test expects a finished reply's compaction not to be announced
-    while children run, and upstream fills `lifecycleState.active` from the roster lane — but this
-    fork routes the async channels to its own lane (`agent-status-async-subagent-source.ts`) and
-    keeps them out of that set. The compaction guard alone now also consults
-    `piAsyncSubagentHasLiveRuns()`. `isHeldByChildren()` also gates `postAgentEndOnce`, and the fork
-    posts `agent_end` while async children run so the host holds the pane from `subagent_runs`;
-    feeding the async lane into `onEvent` instead broke 27 fork tests that pin that separation.
-  - **Computer-use identity converges on the fork's `OrcaBundleIdentity`** (`accb095dd6`). Upstream
-    added `TrustedOrcaApplication.swift` for the same job; the fork's helper is identity-aware
-    (`com.nplez1.orca`) and `main.swift` already calls it, so upstream's unreferenced duplicate is
-    deleted with its test. Its `com.stablyai.orca` literals are also what the fork's "leaves no
-    pre-rename bundle id in any helper source" test forbids.
-  - **Derived files were regenerated, not merged.** `en.json` by a three-way JSON merge (0 true
-    conflicts; 736 fork strings kept, 245 upstream keys added, 96 dropped), then
-    `en-runtime-required.json`, `bundled-skill-guides.ts`, `focus-setting-read-baseline.txt`
-    (`--prune`, 718 → 690 reads) and `pnpm-lock.yaml`.
-  - **Ten defects the merge introduced with no conflict marker**, all fixed:
-    `emitWorktreeLifecycle` never reached the fork's extracted project-group controller
-    (`orca-runtime-owned-controllers.ts`), so `deleteFolderWorkspace` threw; `run-process-sync.ts`
-    missed `captureStderrAsBytes`; a fork-only real-git test never got upstream's worker-thread
-    child-process fixture; a filesystem test's mock path did not follow its file into
-    `ipc/filesystem/`; four suites got upstream's `orca-dev`/`.orca` back over
-    `orca-np-dev`/`.orca-np`; `markKimiWorkspaceTrusted` became async under callers that did not
-    await it; the conflict check slipped behind the merge-queue branch, so a conflicting PR on a
-    merge-queue branch was offered "Merge when ready"; `autoMergeActionWhenDirectMergeAvailable`
-    lost both call sites; a Jira user field with a fixed choice list rendered as a text box; and the
-    skill bundle manifest arrived built from upstream's skills. `995f2dbc27` separately restored nine
-    files where a repair script had rewritten `./src/main/...` inside esbuild `stdin.contents`
-    templates — cwd-relative strings, not imports.
-  - **Lost or diverged, stated plainly.** `src/shared/skill-freshness.ts` was fork-only — upstream
-    deleted the module and the renderer owns those types — and it is **now deleted too** (2026-10-27):
-    its both-owner lock-source rule had stopped being on a live path, nothing but its own test imported
-    it, so keeping it recorded a rule the app no longer applied. Six fork-only exports
-    upstream's refactors superseded are acknowledged, with their live replacements, across five paths
-    in `local/sync/expected-deletions.json`. The onboarding test lost its `nplez1` URL assertion.
-    `worktrees:listAll` went with the IPC surface upstream dropped; `listCached` stays, live in
-    `startup-worktree-cache.ts`.
-  - **Environment, not code: `origin/main` had never existed in this clone.** `gate-lint.mjs`'s
-    flaky ratchet scopes to `merge-base HEAD origin/main`, so the base fell back to a far older
-    commit and every fork-only test looked changed (28 spurious reds). `git push origin
-    upstream/main:main` created the branch, and `remote.origin.fetch` gained
-    `+refs/heads/main:refs/remotes/origin/main` and
-    `+refs/heads/upstream/*:refs/remotes/origin/upstream/*`.
-
-  Verified on `7811f60dd6`: `Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40
-  allowlisted, 0 unexpected); 1 flaky re-run passed; 0 unhandled error headline(s); 2575 s`;
-  `lint gate @7811f60dd6+dirty: PASS — 39 green, 0 failing: 0 known red, 0 new; 39 steps; 103.7 s`
-  (the dirty part became `1b848feba6`); `pnpm tc` clean on node, cli and web. Nine allowlist entries
-  were added — see § "`local(test)`: the 2026-10-25 sync's red set" — and the unit lane now runs
-  upstream's `--experimental.recordDependencies=false`. The tagged revision is past the gated one:
-  `1b848feba6` changes only tests, e2e specs and two lint inputs (no product source), and the
-  docs-only sync record follows it, so the unit verdict does not cover `1b848feba6`'s test edits.
 
 ### `local(ci)`: release workflow
 

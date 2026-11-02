@@ -2314,3 +2314,84 @@ parent process's earlier append left `/bin/bash` 3.2 ahead of it and ~14 `.mjs` 
 `local/nightly-linux-known-red.json`, and the unit lane reported no unhandled headline). All 16
 assets are present, including `latest-mac.yml`, `latest.yml` and `latest-linux.yml`, and
 `releases/latest` resolves to `v1.4.214-np.43`.
+
+---
+
+## 2026-11-01 sync (upstream `0fa5dae2f9`, 459 commits)
+
+202 conflicted paths from base `a903985082`; merge `7fea08330aa`, follow-ups `62107128f7a` and
+`87421079c3b`. Three tiers: 24 paths proved by `conflicts.mjs --apply-proven`, 48 modify/delete
+settled by `expected-deletions.json`, 130 hand-resolved in 8 area batches.
+
+### The test-audit deletion, at four times the previous scale
+
+**Paths:** every file upstream deleted under `test: remove low-value … suites` (`#36336`–`#37106`).
+
+**Decision:** the fork takes the deletion, including where it had extended the file with its own
+cases. 43 such files this sync, against 12 in the 2026-10-30 sync. This is the existing
+"Test inventories retired upstream" rule applied at scale, not a new decision.
+
+**Why:** upstream is retiring these suites deliberately and in volume; restoring any one of them is a
+permanent modify/delete conflict on every future sync, for a test upstream has decided it does not
+want.
+
+**What it cost, named:** the review picker (`use-checks-panel-manual-refresh`,
+`source-control-header-toolbar-identity`), the keychain payload encoding (`generic-password`), Orca NP
+dev identity (`dev-instance-identity`), Jira grouping, and `repo-clone-path` all lost the fork's added
+cases with their file. Nothing references the removed code today, so this is coverage debt rather
+than a red.
+
+**Do not:** re-add a deleted upstream test file to carry one fork case. Re-home the case into a
+fork-owned test file — that is the follow-up this sync owes, and it is the same instruction the
+2026-10-16 addendum already gave.
+
+### Host-settings replication is a complete `Record`, so upstream's settings churn lands here
+
+**Paths:** `src/main/orca-profiles/host-sync-settings-disposition.ts`.
+
+**Decision:** the table must cover `keyof GlobalSettings | keyof WorktreeDeletionPreferences` exactly,
+so every setting upstream adds needs a row and every setting upstream retires must lose one. This sync
+added 17 (`agentDefaultSurface`, the editor-appearance family, `windowMaterial`,
+`terminalColorOverrides*`, `pluginExternalHostGrants`, `agentLaunchChoices`,
+`wslHostOfferDismissed`, …) and removed 3 (`experimentalNativeChat`,
+`orchestrationChatErrorEscalationEnabled`, `orchestrationHeartbeatIntervalMinutes`), all retired by
+upstream and surviving only as keys in `terminal-settings-migrations.ts`.
+
+**Why the new rows were classified as they were:** the three questions in that file's own header.
+Appearance and feature flags are `replicated`; `agentLaunchChoices` is a remembered-choice map so
+`replicatedOnlyIfEmpty` (the `workspaceDirHistory` rule); `wslHostOfferDismissed` is `hostLocal`
+because copying it would suppress another host's own offer. `windowMaterial` follows
+`windowBackgroundBlur`, which is already `replicated`.
+
+**Do not:** read a retired setting's disposition row as fork capability. Removing the row is the
+convergence; the `symbols` entries in `expected-deletions.json` record why each one went.
+
+### `@ts-nocheck` is where a clean merge hides a break
+
+**Paths:** `src/main/runtime/orca-runtime-owned-controllers.ts`.
+
+**Decision:** this fork-owned file merges clean every sync and typechecks nothing, so it is the one
+place a required dependency can disappear without a red. It had lost
+`acquireFileWatcherRemoval` from the `RuntimeProjectGroupController` deps (worktree removal throws)
+and the `ClaudeSelectionNotifier` from `RuntimeAccountController` (Claude-selection notifications
+stop silently). Both are restored to upstream's own construction.
+
+**Do not:** treat a clean merge of this file as verified. After a sync, diff its constructor arguments
+against upstream's `runtime-host-services.ts`, which builds the same controllers.
+
+### Fork comments and `max-lines`: what a sync is allowed to grow
+
+**Paths:** `config/max-lines-baseline.txt`, `local/upstream-file-comments-baseline.json`.
+
+**Decision:** 10 upstream-owned files went over the line budget once the merge's fork delta landed in
+them, so each gets one `eslint-disable max-lines -- Why:` and one baseline row — § `local(lint)`'s rule
+for an upstream-owned file. The fork-comment ratchet was re-baselined with `--init --accept`, because
+four of its entries were **re-keyed, not grown**: upstream relocated `checks-detail-polling-policy.ts`
+to `src/shared/github/` and three `task-page-jira-*` files into `task-page/jira/`, carrying the same
+counts to new paths. Genuine growth was +4 lines across three files.
+
+**One deliberate exception, stated so a reviewer can disagree:** the fork-owned
+`host-sync-settings-disposition.ts` took a directive and a row instead of being split. Splitting it
+works, but the split reports 284 symbol relocations and scatters a single audit table that is read as
+a whole. The 2026-10-27 rule says a fork-owned file is split; this is the case where the split costs
+more than the cap saves.

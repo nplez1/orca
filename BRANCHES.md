@@ -1,6 +1,15 @@
 # Branch tracker
 
-Last updated **2026-10-30** — `nplez1/main` merged upstream main @ `a903985082` (906 commits) from
+Last updated **2026-11-01** — `nplez1/main` merged upstream main @ `0fa5dae2f9` (459 commits) from
+`01eac17153` (merge `7fea08330aa`, merge base `a903985082`, rollback tag
+`archive/pre-sync-01eac17153`), plus follow-ups `62107128f7a` and `87421079c3b`. **202 conflicted
+paths** — `both-rewrote 101, modify/delete 56, union 37, duplicate-tail 6, duplicate-members 2`.
+24 paths were proved mechanically, 48 modify/delete settled by the manifest (43 of them upstream test
+files the fork accepts as deletions), and the remaining 130 resolved in eight area batches. Decisions
+are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-11-01 sync", and
+the narrative in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log.
+
+Before that, on **2026-10-30** — `nplez1/main` merged upstream main @ `a903985082` (906 commits) from
 `16f49e00cf` (merge `985687d2004`, merge base `f173998203`, rollback tag
 `archive/pre-sync-16f49e00cf`). **184 conflicted paths / 340 hunks** — `both-rewrote 98, union 57,
 rename-replay 10, duplicate-tail 8, modify/delete 8, duplicate-members 2, add/add 1`. 38 paths were
