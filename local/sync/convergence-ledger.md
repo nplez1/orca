@@ -2396,3 +2396,26 @@ counts to new paths. Genuine growth was +4 lines across three files.
 works, but the split reports 284 symbol relocations and scatters a single audit table that is read as
 a whole. The 2026-10-27 rule says a fork-owned file is split; this is the case where the split costs
 more than the cap saves.
+
+### Shipped: `v1.4.214-np.45`
+
+Published from `0a2fedc0c91` by `fork-release.yml` run 41393045312, which runs the unit suite on the
+dispatched commit before any artifact leg starts. All 17 assets are present (`latest-mac.yml`,
+`latest.yml`, `latest-linux.yml`, both mac zips and dmgs, the deb/rpm, the AppImage and the Windows
+setup), and `releases/latest` resolves to this tag.
+
+Gate evidence, on the released revision:
+
+```
+Unit gate @0a2fedc0c9 (clean): PASS — 135411 passed; 0 failed; 0 unhandled error headline(s); 632 s
+lint gate @0a2fedc0c6+dirty: PASS — 45 green, 0 failing
+post-sync: PASS — 11 passed, 2 info
+```
+
+The full suite needed four passes to get there: the first run on the merged tree reported 110
+failures, all real (the fork's `unit-known-red.json` is empty, so nothing was hiding in it). The
+clusters were one root cause each rather than 110 problems — `setupRunningWorktreeIds` read without
+optional chaining (25), upstream's forge-owner guard meeting fixtures that name a host their repo did
+not (18), `workingMode: 'monitoring'` gated behind a fork policy that deliberately omits it (22),
+and upstream's `#36822` opting pi out of title synthesis while the fork's permission bell still has to
+ring (3).
