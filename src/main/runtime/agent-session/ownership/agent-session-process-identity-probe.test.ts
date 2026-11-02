@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AgentSessionProcessIdentity } from '../../../../shared/agent-session/lifecycle/agent-session-record'
 import {
   PROCESS_START_TIME_TOLERANCE_MS,
-  darwinStartTimePsEnvironment,
-  parseUtcLstart,
   probeAgentSessionProcessIdentities,
   probeAgentSessionProcessIdentity,
   probeAgentSessionReservation,
@@ -199,20 +197,6 @@ describe('owner identity probe', () => {
       )
     } else {
       expect(observed).toBeNull()
-    }
-  })
-
-  it('parses a UTC lstart without applying the local zone', () => {
-    expect(parseUtcLstart('Sun Nov  1 01:37:04 2026')).toBe(Date.UTC(2026, 10, 1, 1, 37, 4))
-    expect(parseUtcLstart('  Sun Nov  1 01:37:04 2026  ')).toBe(Date.UTC(2026, 10, 1, 1, 37, 4))
-  })
-
-  it('asks ps for lstart in the zone the parser reads', () => {
-    const env = darwinStartTimePsEnvironment()
-
-    expect(env.TZ).toBe('UTC')
-    if (process.platform === 'darwin') {
-      expect(env.LC_ALL).toBe('en_US.UTF-8')
     }
   })
 })

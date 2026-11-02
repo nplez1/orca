@@ -90,11 +90,18 @@ describe('daemon process inspection', () => {
     })
   })
 
-  it('reads the macOS start time through an async spawn', async () => {
-    const runCommand = vi.fn(async () => 'Sat Jan  1 00:00:00 2028\n')
+  it('reads the macOS start time as the UTC instant ps was asked for', async () => {
+    const runCommand = vi
+      .fn()
+      .mockResolvedValueOnce('Sat Jan  1 00:00:00 2028\n')
+      // The hour a DST fall-back repeats: a local read returns this an hour early.
+      .mockResolvedValueOnce('Sun Nov  1 01:37:04 2026\n')
 
     await expect(readMacosProcessStartedAtMs(42, { runCommand })).resolves.toBe(
-      Date.parse('Sat Jan  1 00:00:00 2028')
+      Date.UTC(2028, 0, 1)
+    )
+    await expect(readMacosProcessStartedAtMs(42, { runCommand })).resolves.toBe(
+      Date.UTC(2026, 10, 1, 1, 37, 4)
     )
     expect(runCommand).toHaveBeenCalledWith('ps', ['-p', '42', '-o', 'lstart='], 2_000)
   })

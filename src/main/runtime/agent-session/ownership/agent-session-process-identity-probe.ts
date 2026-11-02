@@ -8,7 +8,7 @@ import type {
 } from '../../../../shared/agent-session/lifecycle/agent-session-lease-adjudication'
 import type { AgentSessionProcessIdentity } from '../../../../shared/agent-session/lifecycle/agent-session-record'
 import { runProcess } from '@orca/process-host'
-import { psLocaleEnvironment } from '../../../../shared/ps-locale-environment'
+import { parseUtcLstart, psUtcEnvironment } from '../../../../shared/ps-lstart-time'
 import { runPsInProcess } from '../../../../shared/libproc-process-table'
 import {
   isWindowsProcessStartTimeAvailable,
@@ -19,19 +19,6 @@ import {
 export const PROCESS_START_TIME_TOLERANCE_MS = 2_000
 
 const PROCESS_START_TIME_TIMEOUT_MS = 5_000
-
-// fork-comment-ok: the DST ambiguity is invisible in the code; without it the zone pin gets simplified away.
-/** `lstart` is local wall clock, and the hour a DST fall-back repeats parses an hour early: read it
- * in UTC so a start time is one instant. `runPsInProcess` formats its own rows for the same zone. */
-export function darwinStartTimePsEnvironment(): NodeJS.ProcessEnv {
-  return { ...(psLocaleEnvironment() ?? process.env), TZ: 'UTC' }
-}
-
-// fork-comment-ok: same reason — the pairing with the printer above is not visible at the call site.
-/** The lstart text above is UTC, and `Date.parse` reads a zone-less string as local. */
-export function parseUtcLstart(text: string): number {
-  return Date.parse(`${text.trim()} UTC`)
-}
 
 export type AgentSessionProcessProbeDeps = {
   /** ESRCH means gone; EPERM means present but owned by another user. */
@@ -74,7 +61,7 @@ async function readLinuxProcessStartTimeMs(pid: number): Promise<number | null> 
 async function readDarwinProcessStartTimeMs(pid: number): Promise<number | null> {
   try {
     const args = ['-o', 'lstart=', '-p', String(pid)]
-    const env = darwinStartTimePsEnvironment()
+    const env = psUtcEnvironment()
     const result =
       (await runPsInProcess(args, { env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS })) ??
       (await runProcess({ program: 'ps', args, env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS }))
@@ -97,7 +84,7 @@ async function readDarwinProcessStartTimesMs(
   }
   try {
     const args = ['-o', 'pid=,lstart=', '-p', pids.join(',')]
-    const env = darwinStartTimePsEnvironment()
+    const env = psUtcEnvironment()
     const result =
       (await runPsInProcess(args, { env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS })) ??
       (await runProcess({ program: 'ps', args, env, timeoutMs: PROCESS_START_TIME_TIMEOUT_MS }))

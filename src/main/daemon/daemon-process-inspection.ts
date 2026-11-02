@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
-import { psLocaleEnvironment } from '../../shared/ps-locale-environment'
+import { parseUtcLstart, psUtcEnvironment } from '../../shared/ps-lstart-time'
 import { readPsStdoutInProcess } from '../../shared/libproc-process-table'
 import { parseLinuxBootTimeSeconds, parseLinuxProcStartTicks } from './daemon-process-start-time'
 import type {
@@ -191,7 +191,7 @@ export async function readMacosProcessStartedAtMs(
   const runCommand = dependencies.runCommand ?? runInspectionCommand
   try {
     const stdout = await runCommand('ps', ['-p', String(pid), '-o', 'lstart='], 2_000)
-    const startedAtMs = Date.parse(stdout.trim())
+    const startedAtMs = parseUtcLstart(stdout)
     return Number.isFinite(startedAtMs) ? startedAtMs : null
   } catch {
     return null
@@ -203,16 +203,15 @@ async function runInspectionCommand(
   args: string[],
   timeoutMs: number
 ): Promise<string> {
+  // lstart is local wall clock unless the zone is pinned; the in-process reader formats for the same zone.
   const inProcess =
-    file === 'ps'
-      ? await readPsStdoutInProcess(args, { env: psLocaleEnvironment(), timeoutMs })
-      : null
+    file === 'ps' ? await readPsStdoutInProcess(args, { env: psUtcEnvironment(), timeoutMs }) : null
   if (inProcess !== null) {
     return inProcess
   }
   const { stdout } = await execFileAsync(file, args, {
     encoding: 'utf8',
-    env: psLocaleEnvironment(),
+    env: psUtcEnvironment(),
     timeout: timeoutMs,
     windowsHide: true
   })
