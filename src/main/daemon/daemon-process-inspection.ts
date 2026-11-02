@@ -203,7 +203,6 @@ async function runInspectionCommand(
   args: string[],
   timeoutMs: number
 ): Promise<string> {
-  // lstart is local wall clock unless the zone is pinned; the in-process reader formats for the same zone.
   const inProcess =
     file === 'ps' ? await readPsStdoutInProcess(args, { env: psUtcEnvironment(), timeoutMs }) : null
   if (inProcess !== null) {

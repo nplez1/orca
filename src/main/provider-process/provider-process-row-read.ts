@@ -46,7 +46,7 @@ async function readPsProcessRow(pid: number): Promise<ProcessRowRead> {
   try {
     const args = ['-o', 'pid=,ppid=,pgid=,lstart=', '-p', String(pid)]
     // Stable locale makes repeated start markers comparable.
-    const env = { ...process.env, LANG: 'C', LC_ALL: 'C' }
+    const env = { ...process.env, LANG: 'C', LC_ALL: 'C', TZ: 'UTC' }
     const result =
       (await runPsInProcess(args, {
         env,

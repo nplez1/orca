@@ -1,5 +1,6 @@
 import { lstat } from 'node:fs/promises'
 import { getAppEnvironment } from '../../shared/app-environment'
+import { parseUtcLstart } from '../../shared/ps-lstart-time'
 import { captureDescendantSnapshot } from '../pty-descendant-termination'
 import { endpointIsProvenDead, probeSocketConnect } from './daemon-endpoint-probe'
 import { getPsProcessIdentityAsync } from './daemon-process-identity-query'
@@ -61,7 +62,7 @@ async function recoverJob(
   const snapshot = await captureDescendantSnapshot(job.pid)
   if (
     !snapshot?.root ||
-    Date.parse(snapshot.root.startedAt) !== identity.startedAtMs ||
+    parseUtcLstart(snapshot.root.startedAt) !== identity.startedAtMs ||
     !(await sameJob(job, userDataPath, runtimeDir)) ||
     !(await endpointWasRetired(job))
   ) {

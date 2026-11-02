@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as WindowsProcessTableModule from '../windows/windows-process-table'
 import {
   mergeProcessLivenessVerdict,
@@ -21,6 +21,9 @@ const readProcStat = async (path: string): Promise<string> =>
   path === '/proc/stat' ? 'btime 1699000000\n' : `42 (orca-daemon) S${' 0'.repeat(18)} 1000 0 0\n`
 
 describe('daemon process inspection', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
   it('falls back to ps when Linux procfs returns an empty command line', async () => {
     const readTextFile = vi.fn(async () => '')
     const runCommand = vi.fn(async () => 'node daemon-entry --socket daemon.sock')
@@ -90,21 +93,36 @@ describe('daemon process inspection', () => {
     })
   })
 
-  it('reads the macOS start time as the UTC instant ps was asked for', async () => {
-    const runCommand = vi
-      .fn()
-      .mockResolvedValueOnce('Sat Jan  1 00:00:00 2028\n')
-      // The hour a DST fall-back repeats: a local read returns this an hour early.
-      .mockResolvedValueOnce('Sun Nov  1 01:37:04 2026\n')
+  it('reads the macOS start time through an async spawn', async () => {
+    const runCommand = vi.fn(async () => 'Sat Jan  1 00:00:00 2028\n')
 
     await expect(readMacosProcessStartedAtMs(42, { runCommand })).resolves.toBe(
       Date.UTC(2028, 0, 1)
     )
+    expect(runCommand).toHaveBeenCalledWith('ps', ['-p', '42', '-o', 'lstart='], 2_000)
+  })
+
+  it('reads the repeated DST hour as the UTC instant ps was asked for', async () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles')
+    const runCommand = vi.fn(async () => 'Sun Nov  1 01:37:04 2026\n')
+
     await expect(readMacosProcessStartedAtMs(42, { runCommand })).resolves.toBe(
       Date.UTC(2026, 10, 1, 1, 37, 4)
     )
-    expect(runCommand).toHaveBeenCalledWith('ps', ['-p', '42', '-o', 'lstart='], 2_000)
   })
+
+  it.runIf(process.platform === 'darwin')(
+    'asks ps for lstart in the zone the parser reads',
+    async () => {
+      vi.stubEnv('TZ', 'America/Los_Angeles')
+      const startedAtMs = await readMacosProcessStartedAtMs(process.pid)
+      if (startedAtMs === null) {
+        throw new Error('the daemon start time could not be read')
+      }
+
+      expect(Math.abs(startedAtMs - (Date.now() - process.uptime() * 1_000))).toBeLessThan(60_000)
+    }
+  )
 
   // Keep each host runner's CLK_TCK cache isolated.
   it('scopes the CLK_TCK cache to the runner that produced it', async () => {

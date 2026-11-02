@@ -34,7 +34,7 @@ async function readFreshProcessTableOnce(
   // Stamp before ps starts so a capture-second PID cannot appear older after a clock rollover.
   const capturedAtMs = Date.now()
   // Pin lstart’s locale so delayed identity checks parse it consistently.
-  const env = { ...process.env, LANG: 'C', LC_ALL: 'C' }
+  const env = { ...process.env, LANG: 'C', LC_ALL: 'C', TZ: 'UTC' }
   // Registered now, so no native read submitted before this request serves it; a stalled one leaves ps its full timeout.
   const inProcess = await runPsInProcess(DESCENDANT_PS_ARGS, {
     env,

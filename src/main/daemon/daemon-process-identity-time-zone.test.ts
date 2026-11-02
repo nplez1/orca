@@ -29,7 +29,6 @@ it.each(['America/Los_Angeles', 'America/New_York', 'UTC'])(
     const psOptions = expect.objectContaining({ env: expect.objectContaining({ TZ: 'UTC' }) })
     expect(execFileSync).toHaveBeenCalledWith('ps', PS_ARGS, psOptions)
     expect(execFile).toHaveBeenCalledWith('ps', PS_ARGS, psOptions, expect.any(Function))
-    // The async twin must read the same zone and locale as the synchronous one.
     expect(execFile.mock.calls[0][2].env).toEqual(execFileSync.mock.calls[0][2].env)
     if (process.platform === 'darwin') {
       expect(execFile.mock.calls[0][2].env.LC_ALL).toBe('en_US.UTF-8')

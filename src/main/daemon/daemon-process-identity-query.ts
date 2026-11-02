@@ -2,8 +2,6 @@ import { execFile, execFileSync } from 'node:child_process'
 import { parseUtcLstart, psUtcEnvironment } from '../../shared/ps-lstart-time'
 
 const PS_IDENTITY_TIMEOUT_MS = 2_000
-// BSD ps formats lstart as a fixed-width 24-character timestamp.
-const LSTART_WIDTH = 24
 
 export type ProcessIdentity = {
   commandLine: string
@@ -20,9 +18,10 @@ const psIdentityArgs = (pid: number): string[] => [
 ]
 
 function parsePsProcessIdentity(output: string): ProcessIdentity {
-  const startedAtMs = parseUtcLstart(output.slice(0, LSTART_WIDTH))
+  // BSD ps formats lstart as a fixed-width 24-character timestamp.
+  const startedAtMs = parseUtcLstart(output.slice(0, 24))
   return {
-    commandLine: output.slice(LSTART_WIDTH).trim(),
+    commandLine: output.slice(24).trim(),
     startedAtMs: Number.isFinite(startedAtMs) ? startedAtMs : null
   }
 }

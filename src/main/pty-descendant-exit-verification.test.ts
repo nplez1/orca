@@ -5,8 +5,9 @@ import {
   type ProcessTableCapture,
   type ProcessTableRow
 } from './pty-descendant-termination'
+import { parseUtcLstart } from '../shared/ps-lstart-time'
 
-const CAPTURED_AT = Date.parse('Tue Jul 14 12:00:00 2026')
+const CAPTURED_AT = parseUtcLstart('Tue Jul 14 12:00:00 2026')
 const STARTED_BEFORE = 'Mon Jul 13 12:54:47 2026'
 const STARTED_DURING = 'Tue Jul 14 12:00:00 2026'
 

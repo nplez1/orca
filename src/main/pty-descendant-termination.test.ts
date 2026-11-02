@@ -20,8 +20,9 @@ import {
   terminateDescendantSnapshotWithVerdict
 } from './pty-descendant-exit-verification'
 import { excludeShellBackgroundJobs } from './pty-shell-job-preservation'
+import { parseUtcLstart } from '../shared/ps-lstart-time'
 
-const CAPTURED_AT_MS = Date.parse('Tue Jul 14 12:00:00 2026')
+const CAPTURED_AT_MS = parseUtcLstart('Tue Jul 14 12:00:00 2026')
 
 beforeEach(() => {
   execFileMock.mockReset()

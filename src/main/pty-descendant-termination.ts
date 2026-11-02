@@ -5,6 +5,7 @@ import {
   type WindowsTreeKillTarget
 } from './windows-pty-root-identity'
 import type { ProcessTableRow } from './pty-process-table-parser'
+import { parseUtcLstart } from '../shared/ps-lstart-time'
 import {
   DESCENDANT_SNAPSHOT_TIMEOUT_MS,
   readFreshProcessTable,
@@ -270,7 +271,7 @@ export function hasUnambiguousStartIdentity(row: ProcessTableRow, capturedAtMs: 
 }
 
 export function hasUnambiguousStartTime(startedAt: string, capturedAtMs: number): boolean {
-  const startedAtMs = Date.parse(startedAt)
+  const startedAtMs = parseUtcLstart(startedAt)
   if (!Number.isFinite(startedAtMs)) {
     return false
   }
