@@ -280,6 +280,48 @@
       "status": "expected-deletion",
       "supersededBy": "relocated to src/shared/github/checks-detail-polling-policy.ts",
       "reason": "The merge followed upstream s move of the checks-detail polling policy into src/shared/github/, so the declarations now live there with the same names. Not a lost fork capability. evidence: convergence-ledger.md Checks panel polling and review refresh"
+    },
+    {
+      "path": "src/shared/agent-hook-listener/providers/codex-state.ts",
+      "symbol": "withPreservedCodexRootContext",
+      "status": "expected-deletion",
+      "supersededBy": "upstream s retainHookRootContext in server-status-update.ts",
+      "reason": "Upstream s retainHookRootContext preserves the provider session and the model on a remote codex root restatement, which is what this fork helper did, and it also covers copilot/hermes/antigravity. Nothing in the merged tree calls the fork version, so keeping it would be an unused export in an upstream-owned file. evidence: convergence-ledger.md Agent-hook listener, rosters, descendant tracking"
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "SETTINGS_FIELDS_REPLICATED_TO_HOSTS",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts so the disposition table fits the max-lines cap without exempting a fork-owned file (tests/tools/max-lines-policy.test.mjs)",
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "SETTINGS_FIELDS_REPLICATED_ONLY_IF_EMPTY",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts, same split",
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "SETTINGS_FIELDS_HOST_LOCAL",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts, same split",
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+    },
+    {
+      "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
+      "symbol": "settingsFieldsWith",
+      "status": "expected-deletion",
+      "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts, same split",
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+    },
+    {
+      "path": "src/shared/agent-hook-listener/providers/codex-state.ts",
+      "symbol": "withPreservedCodexRootContext.payload",
+      "status": "expected-deletion",
+      "supersededBy": "removed with the helper it belonged to, which upstream s retainHookRootContext supersedes",
+      "reason": "The helper this member belonged to was deleted because upstream s retainHookRootContext covers the same case."
     }
   ]
 }
