@@ -313,6 +313,43 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
+  it('nests a server-hosted clone under the project folder under Nest Workspaces', async () => {
+    const spawnSpy = vi.spyOn(gitRunner, 'gitSpawnAfterWindowsEnvironmentReady')
+    const destination = await mkdtemp(join(tmpdir(), 'orca-runtime-nested-clone-'))
+    const added: Record<string, unknown>[] = []
+    const nestedStore = {
+      ...store,
+      getSettings: () => ({
+        ...store.getSettings(),
+        workspaceDir: destination,
+        nestWorkspaces: true,
+        worktreeLayoutMode: 'repo-nested' as const
+      }),
+      getRepos: () => [...added] as never,
+      addRepo: (repo: Record<string, unknown>) => added.push(repo),
+      getRepo: (id: string) => added.find((repo) => repo.id === id) as never
+    }
+    spawnSpy.mockImplementation(() => {
+      const proc = new EventEmitter() as EventEmitter & { stderr: EventEmitter }
+      proc.stderr = new EventEmitter()
+      setImmediate(() => proc.emit('close', 0, null))
+      return proc as never
+    })
+    const runtime = new OrcaRuntimeService(nestedStore)
+
+    try {
+      const repo = await runtime.cloneRepo('https://example.com/nested.git', destination)
+
+      // Why: the layout has to hold on a paired server too, or one project's checkout and its
+      // worktrees would sit in different folders depending on which host cloned it.
+      expect(repo.path).toBe(join(destination, 'nested', 'main'))
+      expect(repo.displayName).toBe('nested')
+    } finally {
+      spawnSpy.mockRestore()
+      await rm(destination, { recursive: true, force: true })
+    }
+  })
+
   it('drops a same-path negative submodule cache before runtime cloneRepo', async () => {
     const spawnSpy = vi.spyOn(gitRunner, 'gitSpawnAfterWindowsEnvironmentReady')
     const destination = await mkdtemp(join(tmpdir(), 'orca-runtime-reclone-'))

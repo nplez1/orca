@@ -14,6 +14,7 @@ import {
   adoptExistingDirectoryName,
   getRuntimePathOps,
   projectContainerRoot,
+  resolveNestedRepoContainerName,
   resolveProjectFolderName
 } from './project-folder-placement'
 
@@ -24,8 +25,8 @@ type WorktreePathSettings = Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDi
   /** Required, not optional: a placement path that forgot the mode would silently fall back
    *  to legacy nesting, so the type makes every call site state it. */
   worktreeLayoutMode: WorktreeLayoutMode
-  /** Container leaf for the 'project-folder' mode. Resolved from the repo's display name by
-   *  `getWorktreePathSettings`; a caller that omits it falls back to the checkout's folder. */
+  /** Container leaf for a nested layout, resolved from the repo by `getWorktreePathSettings`;
+   *  a caller that omits it falls back to the checkout's folder. */
   projectFolderName?: string
   /** Whether that container's base came from this repo's own `worktreeBasePath`. */
   projectFolderBaseIsRepoScoped?: boolean
@@ -92,7 +93,8 @@ export function computeWorktreePath(
     sanitizedName,
     repoPath,
     workspaceRoot ?? computeWorkspaceRoot(repoPath, settings),
-    resolveWorktreeLayoutMode(settings)
+    resolveWorktreeLayoutMode(settings),
+    settings.projectFolderName
   )
 }
 
@@ -100,14 +102,15 @@ function computeWorktreePathFromWorkspaceRoot(
   sanitizedName: string,
   repoPath: string,
   workspaceRoot: string,
-  layoutMode: WorktreeLayoutMode
+  layoutMode: WorktreeLayoutMode,
+  containerName?: string
 ): string {
   const pathOps = getRuntimePathOps(repoPath, workspaceRoot)
   // fork-comment-ok: fork-only placement rule; the why must sit above the code a sync rewrites.
   // Why: only repo-nested adds a segment below the root. project-folder already folded its
   // per-project container into the root, so its worktrees join directly — the flat expression.
   if (layoutMode === 'repo-nested') {
-    const repoName = pathOps.basename(repoPath).replace(/\.git$/, '')
+    const repoName = containerName ?? pathOps.basename(repoPath).replace(/\.git$/, '')
     return pathOps.join(workspaceRoot, repoName, sanitizedName)
   }
   return pathOps.join(workspaceRoot, sanitizedName)
@@ -123,7 +126,8 @@ export async function computeWorktreePathAsync(
     sanitizedName,
     repoPath,
     await computeWorkspaceRootAsync(repoPath, settings),
-    resolveWorktreeLayoutMode(settings)
+    resolveWorktreeLayoutMode(settings),
+    settings.projectFolderName
   )
 }
 
@@ -234,9 +238,10 @@ export function getWorktreePathSettings(
   wslMirrorDistro?: string
 ): WorktreePathSettings {
   const worktreeLayoutMode = resolveWorktreeLayoutMode(settings)
+  const basePath = getEffectiveWorktreeBasePath(repo, settings)
   return {
     nestWorkspaces: settings.nestWorkspaces,
-    workspaceDir: getEffectiveWorktreeBasePath(repo, settings),
+    workspaceDir: basePath,
     worktreeLayoutMode,
     ...(isProjectFolderLayout(worktreeLayoutMode)
       ? {
@@ -246,10 +251,7 @@ export function getWorktreePathSettings(
           // base's spelling says nothing about it — and ext4 is case-sensitive.
           projectFolderName: wslMirrorDistro
             ? resolveProjectFolderName(repo)
-            : adoptExistingDirectoryName(
-                getEffectiveWorktreeBasePath(repo, settings),
-                resolveProjectFolderName(repo)
-              ),
+            : adoptExistingDirectoryName(basePath, resolveProjectFolderName(repo)),
           // Why a relative root counts as repo-scoped: it resolves against this repo's own path,
           // so it is this project's folder in effect. Treating only `worktreeBasePath` as
           // repo-scoped made `workspaceDir: '..'` nest a folder inside the container it already
@@ -258,7 +260,17 @@ export function getWorktreePathSettings(
             hasRepoWorktreeBasePath(repo) ||
             isWorkspaceDirRelativeToRepo(repo.path, settings.workspaceDir)
         }
-      : {}),
+      : worktreeLayoutMode === 'repo-nested'
+        ? {
+            // Why repo-nested resolves one too: a nested clone or create leaves the primary
+            // checkout at `<root>/<project>/<branch>`, so the container is the folder holding it
+            // and not the checkout's branch-named leaf.
+            projectFolderName: resolveNestedRepoContainerName(
+              repo,
+              resolveWorkspaceDirForRepo(repo.path, basePath)
+            )
+          }
+        : {}),
     // Why pass it through rather than resolve here: placement has to agree
     // across create, allowed-roots and watch-targets, so the distro is
     // resolved once by the caller that owns the store and threaded down.

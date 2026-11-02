@@ -1,5 +1,5 @@
 import {
-  isProjectFolderLayout,
+  layoutNestsPrimaryCheckout,
   type WorktreeLayoutMode
 } from '../../../../shared/orca-workspace-layout'
 
@@ -11,10 +11,10 @@ export function getDefaultCloneParent(
     return ''
   }
 
-  // Why: under the project-folder layout the destination *is* the workspace dir — the clone path
-  // appends <project>/<branch> itself — so the parent-of-"workspaces" heuristic no longer applies
-  // and would land the checkout outside the worktree root.
-  if (isProjectFolderLayout(layoutMode)) {
+  // Why: under a nested layout the destination *is* the workspace dir — the clone path appends
+  // <project>/<branch> itself — so the parent-of-"workspaces" heuristic no longer applies and
+  // would land the checkout outside the root its worktrees are placed under.
+  if (layoutNestsPrimaryCheckout(layoutMode)) {
     return workspaceDir
   }
 

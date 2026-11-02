@@ -187,9 +187,11 @@ export function resetProjectGroupMocks(
 
 export function resetLocalRepoMocks(mocks: ReposIpcMocks): void {
   mocks.mockStore.getRepos.mockReset().mockReturnValue([])
+  // Why the explicit flat mode: a suite that means to pin nested placement sets its own mode, and
+  // these cases are about paths that must not move with a layout default.
   mocks.mockStore.getSettings
     .mockReset()
-    .mockReturnValue({ workspaceDir: '', nestWorkspaces: true })
+    .mockReturnValue({ workspaceDir: '', nestWorkspaces: true, worktreeLayoutMode: 'flat' })
   mocks.mockStore.addRepo.mockReset()
   mocks.mockStore.updateRepo.mockReset()
   mocks.mockStore.getProjects.mockReset().mockReturnValue([])

@@ -88,7 +88,10 @@ async function maybeAddBaseTarget(
   const pathSettings = getWorktreePathSettings(repo, settings, mirrorDistro)
   const config = {
     repoId: repo.id,
-    repoName: getRuntimePathBasename(repo.path).replace(/\.git$/, ''),
+    // Why the resolved container: a repo-nested project whose checkout sits inside its own project
+    // folder is watched one level deeper, so the matcher has to name that folder and not the branch.
+    repoName:
+      pathSettings.projectFolderName ?? getRuntimePathBasename(repo.path).replace(/\.git$/, ''),
     // Why: in project-folder mode the watched root IS the per-project container, so each worktree
     // is a direct child — exactly the shape the flat matcher handles. Only repo-nested interposes a
     // repo-named container between the root and the worktrees.

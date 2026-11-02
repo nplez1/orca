@@ -7,7 +7,7 @@
  */
 import { readdirSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
-import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
+import { isWindowsAbsolutePathLike, relativePathInsideRoot } from '../../shared/cross-platform-path'
 import {
   replaceKnownEmojiWithShortcodes,
   setEmojiShortcodeDatasetLoader
@@ -138,6 +138,33 @@ export function resolveProjectFolderName(
 }
 
 /**
+ * Container leaf for a `repo-nested` project: the folder holding the primary checkout once that
+ * checkout has been nested inside its project folder, otherwise the checkout's own folder.
+ *
+ * Why not always the checkout's folder: clone and create now put the primary checkout at
+ * `<root>/<project>/<defaultBranch>`, so its leaf is a branch name and every nested project would
+ * share one container named after that branch instead of one container per project.
+ */
+export function resolveNestedRepoContainerName(
+  repo: Pick<Repo, 'path'> & { displayName?: string | null },
+  workspaceRoot: string
+): string {
+  const pathOps = getRuntimePathOps(repo.path, workspaceRoot)
+  const checkoutLeaf = pathOps.basename(repo.path).replace(/\.git$/, '')
+  const containerDir = pathOps.dirname(repo.path)
+  const containerLeaf = pathOps.basename(containerDir)
+  if (!containerLeaf || areWorktreePathsEqual(containerLeaf, checkoutLeaf)) {
+    return checkoutLeaf
+  }
+  const relativeToRoot = relativePathInsideRoot(workspaceRoot, containerDir)
+  const insideRoot = relativeToRoot !== null && relativeToRoot !== ''
+  // Why the name too: a clone destination outside the root is allowed, and its project folder
+  // still has to be recognised — otherwise that checkout would become a container itself.
+  const namedAfterProject = areWorktreePathsEqual(containerLeaf, resolveProjectFolderName(repo))
+  return insideRoot || namedAfterProject ? containerLeaf : checkoutLeaf
+}
+
+/**
  * Spelling of the directory already living under `parentDir` that `name` refers to.
  *
  * Why: on a case-insensitive volume `git worktree add <root>/Orca/x` and the checkout's own
@@ -175,10 +202,7 @@ export function adoptExistingDirectoryName(parentDir: string, name: string): str
  * filesystem is case-sensitive, where they are two folders and guessing one would move every
  * existing worktree's container out from under it.
  */
-export function chooseExistingDirectoryName(
-  folderNames: Iterable<string>,
-  name: string
-): string {
+export function chooseExistingDirectoryName(folderNames: Iterable<string>, name: string): string {
   if (!name) {
     return name
   }

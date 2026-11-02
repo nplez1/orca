@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { refuseWslHostWindowsDrivePath } from './wsl-host-windows-drive-guard'
 import { mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../shared/constants'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../shared/execution-host'
 import type { Repo } from '../../shared/repo-types'
@@ -23,6 +24,10 @@ import type { RuntimeStore } from './runtime-store-contract'
 import { runtimeRepoIsRegistrationCandidate } from './runtime-worktree-selection'
 import { resolveClonedFolderConversion } from '../folder-repo-git-conversion'
 import { findExtraFolderWorkspaceIds } from '../folder-workspace-meta-presence'
+import {
+  resolveCloneTargetPlacement,
+  type CloneTargetPlacement
+} from '../ipc/repos/clone-target-placement'
 
 type RuntimeRepositoryCloneDependencies = {
   getStore: () => RuntimeStore | null
@@ -41,7 +46,8 @@ export class RuntimeRepositoryCloneController {
     destination: string,
     executionHostId?: ExecutionHostId | null
   ): Promise<Repo> {
-    if (!this.deps.getStore()) {
+    const store = this.deps.getStore()
+    if (!store) {
       throw new Error('runtime_unavailable')
     }
     const trimmedUrl = url.trim()
@@ -49,7 +55,18 @@ export class RuntimeRepositoryCloneController {
     if (!trimmedDestination) {
       throw new Error('Clone destination is required')
     }
-    const clonePath = deriveValidatedClonePath({ url: trimmedUrl, destination: trimmedDestination })
+    // Why the same placement the local handler uses: a nested layout has to nest a server-hosted
+    // clone too, or the two hosts would disagree about where a project's checkout lives.
+    const placement = await resolveCloneTargetPlacement({
+      url: trimmedUrl,
+      destination: trimmedDestination,
+      settings: store.getSettings()
+    })
+    const clonePath = deriveValidatedClonePath({
+      url: trimmedUrl,
+      destination: trimmedDestination,
+      relativeClonePath: placement.relativeClonePath
+    })
     await refuseWslHostWindowsDrivePath(trimmedDestination)
     const clonePathKey = getClonePathComparisonKey(clonePath)
     const previous = this.inFlightByPath.get(clonePathKey) ?? Promise.resolve()
@@ -70,7 +87,8 @@ export class RuntimeRepositoryCloneController {
           trimmedDestination,
           clonePath,
           clonePathKey,
-          executionHostId
+          executionHostId,
+          placement
         )
       )
     } finally {
@@ -86,7 +104,8 @@ export class RuntimeRepositoryCloneController {
     trimmedDestination: string,
     clonePath: string,
     clonePathKey: string,
-    executionHostId?: ExecutionHostId | null
+    executionHostId: ExecutionHostId | null | undefined,
+    placement: CloneTargetPlacement
   ): Promise<Repo> {
     const store = this.deps.getStore()
     if (!store) {
@@ -106,6 +125,8 @@ export class RuntimeRepositoryCloneController {
     }
 
     await mkdir(trimmedDestination, { recursive: true })
+    // Why: the claim below is non-recursive, so a nested layout's project folder has to exist first.
+    await mkdir(dirname(clonePath), { recursive: true })
     const claimedTarget = await claimCloneTarget(clonePath)
     let proc: Awaited<ReturnType<typeof gitSpawnAfterWindowsEnvironmentReady>>
     try {
@@ -190,7 +211,8 @@ export class RuntimeRepositoryCloneController {
     const repo: Repo = {
       id: randomUUID(),
       path: clonePath,
-      displayName: getRepoName(clonePath),
+      // Why the project name: under a nested layout the checkout's own folder is the branch.
+      displayName: placement.projectName ?? getRepoName(clonePath),
       badgeColor: DEFAULT_REPO_BADGE_COLOR,
       ...(executionHostId != null ? { executionHostId } : {}),
       ...detected,
