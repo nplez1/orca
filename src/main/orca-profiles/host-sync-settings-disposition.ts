@@ -397,10 +397,11 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   // Why replicated, like `windowBackgroundBlur`: the same window preference, not a hardware probe.
   windowMaterial: 'replicated',
   // Why replicatedOnlyIfEmpty: a remembered-choice map, so it fills a host that has none and never
-  // overwrites choices the user made there — the `workspaceDirHistory` rule.
+  // overwrites choices the user made there.
   agentLaunchChoices: 'replicatedOnlyIfEmpty',
-  // Why replicated: a consent decision the user made, like the other plugin grants.
-  pluginExternalHostGrants: 'replicated',
+  // Why hostLocal, like `pluginConsents`: it is a statement about what the user trusts *this*
+  // install's frames to reach, and the settings type itself calls it main-only.
+  pluginExternalHostGrants: 'hostLocal',
   // Why hostLocal: the offer is about *this* machine's WSL, and copying it would suppress a host's own.
   wslHostOfferDismissed: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>

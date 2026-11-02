@@ -2353,7 +2353,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     `RuntimeProjectGroupController` deps and the notifier from `RuntimeAccountController`, so
     worktree removal would have thrown and Claude-selection notifications would have stopped
     silently. Both are restored to upstream's own shape.
-  - **Upstream added 17 settings and retired 3**, which the fork's host-sync disposition table is a
+  - **Upstream added 17 settings and retired 4**, which the fork's host-sync disposition table is a
     complete `Record` over — so the table was both short and stale. The 3 retired rows
     (`experimentalNativeChat`, `orchestrationChatErrorEscalationEnabled`,
     `orchestrationHeartbeatIntervalMinutes`) were type errors, not fork capability.

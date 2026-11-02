@@ -2353,7 +2353,8 @@ fork-owned test file — that is the follow-up this sync owes, and it is the sam
 so every setting upstream adds needs a row and every setting upstream retires must lose one. This sync
 added 17 (`agentDefaultSurface`, the editor-appearance family, `windowMaterial`,
 `terminalColorOverrides*`, `pluginExternalHostGrants`, `agentLaunchChoices`,
-`wslHostOfferDismissed`, …) and removed 3 (`experimentalNativeChat`,
+`wslHostOfferDismissed`, …) and removed 4 (`experimentalNativeChat`,
+`orchestrationHeartbeatsEnabled` (superseded by `orchestrationWorkerAutoReleaseEnabled`),
 `orchestrationChatErrorEscalationEnabled`, `orchestrationHeartbeatIntervalMinutes`), all retired by
 upstream and surviving only as keys in `terminal-settings-migrations.ts`.
 

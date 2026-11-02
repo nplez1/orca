@@ -215,8 +215,8 @@
       "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
       "symbol": "GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION.orchestrationChatErrorEscalationEnabled",
       "status": "expected-deletion",
-      "supersededBy": "upstream retired the setting itself in this sync",
-      "reason": "Upstream removed `orchestrationChatErrorEscalationEnabled` from GlobalSettings (it survives only as `_retiredHeartbeatsEnabled` in terminal-settings-migrations.ts), so the disposition table cannot carry a key the settings type no longer declares. Removing the row is the correct convergence, not a lost fork capability. The same sync also retired `experimentalNativeChat` and `orchestrationHeartbeatIntervalMinutes`, removed for the same reason. evidence: src/main/persistence/applying-settings/terminal-settings-migrations.ts"
+      "supersededBy": "upstream removed the setting from GlobalSettings entirely",
+      "reason": "Upstream removed `orchestrationChatErrorEscalationEnabled` from GlobalSettings in this sync; it appears nowhere in src/ at HEAD, so the disposition table cannot carry a key the settings type no longer declares. Removing the row is the correct convergence, not a lost fork capability. (The sibling `_retiredHeartbeatsEnabled` alias in terminal-settings-migrations.ts belongs to `orchestrationHeartbeatsEnabled`, a different setting retired in the same sync.)"
     },
     {
       "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",

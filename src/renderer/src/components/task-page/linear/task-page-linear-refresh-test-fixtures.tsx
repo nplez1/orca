@@ -6,8 +6,6 @@ import { useLinearIssueResult } from '@/hooks/linear-issue-committed-state'
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
 import { defaultScopeHost } from '@/lib/default-creation-host'
 import { DrawerFields } from './task-page-linear-refresh-drawer-fixtures'
-
-export { DrawerFields }
 import type { LinearIssue } from '../../../../../shared/linear/issue-types'
 import { useStore } from 'zustand'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'

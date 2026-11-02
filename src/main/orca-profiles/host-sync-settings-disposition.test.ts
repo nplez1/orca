@@ -42,7 +42,9 @@ describe('global settings host-sync disposition census', () => {
       'localBaseRefSuggestionDismissed',
       'openLinksInAppPreferencePrompted',
       'dismissedSkillFreshnessNudges',
-      'agentsSidebarIntroShown'
+      'agentsSidebarIntroShown',
+      // Added by upstream in the 2026-11-01 sync: a remembered-choice map, not a one-shot marker.
+      'agentLaunchChoices'
     ])
   })
 

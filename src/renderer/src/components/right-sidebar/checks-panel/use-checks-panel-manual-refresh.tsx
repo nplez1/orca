@@ -143,13 +143,15 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
           fetchPRChecks(repo.path, pickedPRNumber, undefined, headSha, pr?.prRepo, {
             force: true,
             ...repoOptions,
-            wakeWslDistro: true
+            wakeWslDistro: true,
+            userRefresh: true
           }),
           fetchPRComments(repo.path, pickedPRNumber, {
             force: true,
             ...repoOptions,
             prRepo: pr?.prRepo,
-            headSha
+            headSha,
+            userRefresh: true
           })
         ])
         if (!isCurrentPickRequest() || !isCurrentAsyncResult(pickedRequestKey)) {

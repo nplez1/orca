@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { linearCreateIssue } from '@/runtime/runtime-linear-issue-mutations'
 import { useAppStore } from '@/store'
-import { defaultCreationHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 import { openAppHttpLink } from '@/lib/app-http-link-open'
 export function useTaskPageLinearIssueCreation(model: TaskPageLinearProjectCreationModel) {
   const {
@@ -33,7 +33,7 @@ export function useTaskPageLinearIssueCreation(model: TaskPageLinearProjectCreat
     settleNewLinearIssue
   } = model
   const publication = useRef<{ release: () => void } | null>(null)
-  const sourceSettings = linearTaskSourceContext ?? defaultCreationHost(settings)
+  const sourceSettings = linearTaskSourceContext ?? defaultScopeHost(settings)
   const scope = getLinearSourceScope(sourceSettings)
   const sourceKey = useAppStore(() => getLinearSourceScope(sourceSettings).contextKey)
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- Why: the full source/runtime and stable request explicitly delimit the create lifetime.

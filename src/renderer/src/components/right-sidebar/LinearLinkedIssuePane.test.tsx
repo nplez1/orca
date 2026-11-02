@@ -9,6 +9,18 @@ import type * as I18n from '@/i18n/i18n'
 import { scopedLinearCacheKeyForSource } from '@/store/slices/linear/linear-slice-scope'
 import { LinearLinkedIssuePane } from './LinearLinkedIssuePane'
 
+/** The lease `observeLinearIssueRead` expects from `fetchLinearIssue`; upstream's read lifecycle. */
+function linearRead(data: LinearIssue | null) {
+  const view = { kind: 'data' as const, data }
+  const lease = {
+    currentView: () => view,
+    subscribe: () => () => {},
+    commit: () => view,
+    waitForCurrentTerminal: async () => view,
+    release: () => {}
+  }
+  return { acquire: () => lease }
+}
 /** The store's issue cache entry `fetchLinearIssue` writes, as the pane reads it. */
 type CachedLinearIssue = { data: unknown; fetchedAt: number }
 
@@ -145,13 +157,8 @@ beforeEach(() => {
     loading: false,
     error: null
   })
-  // Both pane sources' entries, so every case starts from the cache state the pane's own
-  // `fetchLinearIssue` would leave behind.
-  for (const source of [OWNER_SOURCE, LINKED_TASK_SOURCE]) {
-    mocks.linearIssueCache[
-      scopedLinearCacheKeyForSource(source, `all::${linkedIssue.identifier}`)
-    ] = { data: issue(), fetchedAt: Date.now() }
-  }
+  // The pane reads through `observeLinearIssueRead`, so the lease is what supplies the issue.
+  mocks.fetchLinearIssue.mockImplementation(() => linearRead(issue()))
 })
 afterEach(() => {
   cleanup()
@@ -162,6 +169,24 @@ afterEach(() => {
   }
 })
 
+/**
+ * The pane's own identifier read names the handed source and searches every workspace, and no
+ * read anywhere in the pane names a different source — the Active Server is never consulted.
+ */
+function expectEveryReadRoutedThrough(source: TaskSourceContext): void {
+  const calls = mocks.fetchLinearIssue.mock.calls
+  const paneReads = calls.filter((call) => call[1] === 'all')
+  expect(paneReads.length).toBeGreaterThan(0)
+  for (const call of paneReads) {
+    expect(call[2]).toMatchObject({ sourceContext: source })
+  }
+  for (const call of calls) {
+    const named = (call[2] as { sourceContext?: unknown } | undefined)?.sourceContext
+    if (named !== undefined) {
+      expect(named).toEqual(source)
+    }
+  }
+}
 describe('LinearLinkedIssuePane owner routing', () => {
   it('fetches, hydrates and comments through the workspace owner, never the Active Server', async () => {
     renderPane(OWNER_SOURCE)
@@ -172,7 +197,9 @@ describe('LinearLinkedIssuePane owner routing', () => {
     expect(mocks.fetchLinearIssue).toHaveBeenCalledWith(linkedIssue.identifier, 'all', {
       sourceContext: OWNER_SOURCE
     })
-    expect(mocks.linearGetIssue).toHaveBeenCalledWith(OWNER_SOURCE, 'lin-1', 'workspace-1')
+    // Hydration rides the same owner-routed read as the pane, so every read names the owner and
+    // none of them falls back to the Active Server.
+    expectEveryReadRoutedThrough(OWNER_SOURCE)
     expect(mocks.linearIssueComments).toHaveBeenCalledWith(OWNER_SOURCE, 'lin-1', 'workspace-1')
 
     fireEvent.change(screen.getByPlaceholderText('Add a comment…'), {
@@ -225,7 +252,8 @@ describe('LinearLinkedIssuePane owner routing', () => {
         sourceContext: OWNER_SOURCE
       })
     )
-    expect(screen.queryByLabelText('Issue title')).toBeNull()
+    // The pane reads through its own owner's lease and never consults the shared cache, so the
+    // other account's entry cannot be painted at any point in the render.
     expect(screen.queryByDisplayValue("Another host's issue")).toBeNull()
   })
 
@@ -236,6 +264,6 @@ describe('LinearLinkedIssuePane owner routing', () => {
     expect(mocks.fetchLinearIssue).toHaveBeenCalledWith(linkedIssue.identifier, 'all', {
       sourceContext: LINKED_TASK_SOURCE
     })
-    expect(mocks.linearGetIssue).toHaveBeenCalledWith(LINKED_TASK_SOURCE, 'lin-1', 'workspace-1')
+    expectEveryReadRoutedThrough(LINKED_TASK_SOURCE)
   })
 })

@@ -12,7 +12,7 @@ import { SheetHeader } from '../nav-bar/SheetHeader'
 import { SheetPrimaryButton } from '../SheetPrimaryButton'
 import { ListGroup, ListRow } from '../list/ListGroup'
 import { ConfirmModal } from '../ConfirmModal'
-import { presentPrMerge } from './pr-actions-state'
+import { presentPrMerge, resolveMobileAdminMergeBypassRequired } from './pr-actions-state'
 import { PrCreateSheet } from './PrCreateSheet'
 import { PrReviewersSheet } from './PrReviewersSheet'
 import { livePrDetails, readyPrData, type MobilePrTab, type PrTabSheet } from './use-mobile-pr-tab'
@@ -87,6 +87,7 @@ function PrMergeSheet({ tab }: { tab: MobilePrTab }) {
   const { defaultMethod, methods } = resolveGitHubPRMergeMethods(settings)
   const [method, setMethod] = useState<GitHubPRMergeMethod>(defaultMethod)
   const [submitted, setSubmitted] = useState(false)
+  const [bypassConfirmed, setBypassConfirmed] = useState(false)
   if (!data) {
     return null
   }
@@ -94,9 +95,17 @@ function PrMergeSheet({ tab }: { tab: MobilePrTab }) {
   const base = pr.baseRefName ?? 'main'
   const merge = presentPrMerge({ ...pr, state: tab.actions.resolveState(pr.state) }, method)
   const busy = tab.actions.isBusy({ kind: 'merge' })
+  // Why the second press: an unmet review gate the viewer may waive is a merge the host will refuse
+  // without the admin flag, so the sheet names the bypass before it sends one rather than failing.
+  const adminBypassRequired = resolveMobileAdminMergeBypassRequired(pr)
+  const awaitingBypassConfirm = adminBypassRequired && !bypassConfirmed
   const run = async () => {
+    if (awaitingBypassConfirm) {
+      setBypassConfirmed(true)
+      return
+    }
     setSubmitted(true)
-    if (await tab.actions.merge(method)) {
+    if (await tab.actions.merge(method, adminBypassRequired)) {
       tab.closeSheetIf('merge')
     }
   }
@@ -125,17 +134,29 @@ function PrMergeSheet({ tab }: { tab: MobilePrTab }) {
           })}
         </ListGroup>
         {pr.stack ? <Text style={sheetStyles.note}>{merge.confirmMessage}</Text> : null}
+        {awaitingBypassConfirm ? (
+          <Text style={sheetStyles.note}>
+            {t(
+              'pullRequest.prActionsSection.adminBypassConfirmMessage',
+              'Required reviews are not met. Merging anyway bypasses branch protection.'
+            )}
+          </Text>
+        ) : null}
         {submitted && tab.actions.error ? (
           <Text style={sheetStyles.error}>{tab.actions.error}</Text>
-        ) : !merge.enabled && merge.hint ? (
+        ) : !merge.enabled && merge.hint && !adminBypassRequired ? (
           <Text style={sheetStyles.note}>{merge.hint}</Text>
         ) : null}
         <SheetPrimaryButton
           tone="merge"
           icon={GitMerge}
-          label={merge.label}
+          label={
+            awaitingBypassConfirm
+              ? t('pullRequest.prActionsSection.adminBypassConfirmLabel', 'Merge anyway')
+              : merge.label
+          }
           busy={busy}
-          disabled={!merge.enabled}
+          disabled={!merge.enabled && !adminBypassRequired}
           onPress={() => void run()}
         />
       </View>

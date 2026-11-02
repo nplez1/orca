@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useHostProtocolGates } from '../components/host-protocol-gates-context'
-import { presentPrMerge } from '../components/pr-sidebar/pr-actions-state'
+import {
+  presentPrMerge,
+  resolveMobileAdminMergeBypassRequired
+} from '../components/pr-sidebar/pr-actions-state'
 import { useMobilePrActions } from '../session/use-mobile-pr-actions'
 import { useMobilePrAiTriage, type PrAiTriageKey } from '../session/use-mobile-pr-ai-triage'
 import {
@@ -278,11 +281,18 @@ export function useMobileSourceControlNextStep({
     mergeMethod && pr
       ? {
           title: t('pullRequest.prActionsSection.mergeConfirmTitle', 'Merge pull request?'),
-          message: presentPrMerge(pr, mergeMethod).confirmMessage,
-          confirmLabel: t('pullRequest.prActionsSection.mergeButton', 'Merge'),
+          message: resolveMobileAdminMergeBypassRequired(pr)
+            ? t(
+                'pullRequest.prActionsSection.adminBypassConfirmMessage',
+                'Required reviews are not met. Merging anyway bypasses branch protection.'
+              )
+            : presentPrMerge(pr, mergeMethod).confirmMessage,
+          confirmLabel: resolveMobileAdminMergeBypassRequired(pr)
+            ? t('pullRequest.prActionsSection.adminBypassConfirmLabel', 'Merge anyway')
+            : t('pullRequest.prActionsSection.mergeButton', 'Merge'),
           onConfirm: () => {
             setMergeMethod(null)
-            actions.merge(mergeMethod)
+            actions.merge(mergeMethod, resolveMobileAdminMergeBypassRequired(pr))
           },
           onCancel: () => setMergeMethod(null)
         }

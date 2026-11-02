@@ -52,10 +52,14 @@ export function LinearLinkedIssuePane({
   const linkActions = useLinkedIssuePaneActions(linkedIssue)
 
   useEffect(() => {
-    // Why no workspaceId: the identifier may belong to a different Linear workspace than the one
-    // currently selected, and every read here is owner-routed through `sourceContext`.
+    // Why 'all': the linked identifier may belong to a different Linear workspace than the one
+    // currently selected, and only the 'all' selection searches every workspace; `null` would
+    // resolve to the selected workspace and report a cross-workspace issue as unavailable.
     return observeLinearIssueRead(
-      fetchLinearIssue(linkedIssue.identifier, null, { sourceContext, force: refreshNonce > 0 }),
+      fetchLinearIssue(linkedIssue.identifier, 'all', {
+        sourceContext,
+        ...(refreshNonce > 0 ? { force: true } : {})
+      }),
       () => true,
       (_lease, view) => {
         setIssue(view.data ?? null)

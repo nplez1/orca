@@ -114,7 +114,7 @@ type AgentKanbanBoardProps = {
   /** When provided, renders a close control in the header. */
   onClose?: () => void
   onBrowserForeground?: () => void
-  /** In-window settings controls; the pop-out renderer has no store to drive them. */
+  /** Header controls rendered before the close button. */
   headerActions?: React.ReactNode
 }
 

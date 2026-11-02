@@ -1,0 +1,119 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { installNetRequestFetchAdapter } from './updater-net-request.fixture'
+
+const originalPlatform = process.platform
+const originalArch = process.arch
+const { netFetchMock, netRequestMock } = vi.hoisted(() => ({
+  netFetchMock: vi.fn(),
+  netRequestMock: vi.fn()
+}))
+vi.mock('electron', () => ({ net: { fetch: netFetchMock, request: netRequestMock } }))
+
+// LOCAL(nplez1): the fork re-points the whole stable-fallback probe at its own repo (see
+// local(updater)); upstream's file said stablyai/orca for every URL here.
+const latestUrl = 'https://github.com/nplez1/orca/releases/latest'
+const releaseUrl = 'https://github.com/nplez1/orca/releases/download/v1.4.241'
+
+function serveLatestRelease(location = '/nplez1/orca/releases/tag/v1.4.241'): void {
+  netFetchMock.mockImplementation(async (url: string) => {
+    if (url === latestUrl) {
+      return new Response(null, { status: 302, headers: { location } })
+    }
+    if (url.endsWith('.yml')) {
+      return new Response(
+        'version: 1.4.241\nfiles:\n  - url: Orca-1.4.241-arm64-mac.zip\n    sha512: test\n'
+      )
+    }
+    return new Response(null, { status: 200 })
+  })
+}
+
+describe('latest stable release fallback', () => {
+  beforeEach(() => {
+    netFetchMock.mockReset()
+    netRequestMock.mockReset()
+    installNetRequestFetchAdapter(netRequestMock, netFetchMock)
+  })
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform })
+    Object.defineProperty(process, 'arch', { value: originalArch })
+  })
+
+  it.each([
+    { platform: 'darwin', arch: 'arm64', manifest: 'latest-mac.yml' },
+    { platform: 'win32', arch: 'x64', manifest: 'latest.yml' },
+    { platform: 'linux', arch: 'x64', manifest: 'latest-linux.yml' },
+    { platform: 'linux', arch: 'arm64', manifest: 'latest-linux-arm64.yml' }
+  ])(
+    'probes the concrete $platform/$arch release before returning its tag',
+    async ({ platform, arch, manifest }) => {
+      Object.defineProperty(process, 'platform', { value: platform })
+      Object.defineProperty(process, 'arch', { value: arch })
+      serveLatestRelease()
+      const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+
+      await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.241')
+      expect(netFetchMock).toHaveBeenCalledWith(
+        latestUrl,
+        expect.objectContaining({ method: 'HEAD', redirect: 'manual' })
+      )
+      expect(netFetchMock).toHaveBeenCalledWith(`${releaseUrl}/${manifest}`, expect.anything())
+      expect(netFetchMock).toHaveBeenCalledWith(
+        `${releaseUrl}/Orca-1.4.241-arm64-mac.zip`,
+        expect.objectContaining({ method: 'HEAD' })
+      )
+    }
+  )
+
+  it.each([
+    'https://other.example/nplez1/orca/releases/tag/v1.4.241',
+    '/other/repo/releases/tag/v1.4.241',
+    '/nplez1/orca/releases/tag/v1.4.242-rc.1',
+    '/nplez1/orca/releases/tag/mobile-android-v0.0.59',
+    '/nplez1/orca/releases/tag/%',
+    '/nplez1/orca/releases/latest'
+  ])('rejects an invalid fallback redirect %s before probing assets', async (location) => {
+    serveLatestRelease(location)
+    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
+    expect(netFetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  // LOCAL(nplez1): every release this fork publishes carries the `-np.<n>` suffix and is published as
+  // a normal release, so `releases/latest` always resolves to one of them. Rejecting prereleases
+  // outright therefore rejected the only tag this fallback can ever find here — and with the atom
+  // feed crowded out by mirrored tags, that left every installed build with no feed at all.
+  it('accepts the fork’s own -np. release line, which releases/latest resolves to', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    serveLatestRelease('/nplez1/orca/releases/tag/v1.4.214-np.41')
+    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.214-np.41')
+  })
+
+  it.each(['manifest', 'installer'])('rejects a release with a missing %s', async (missing) => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    serveLatestRelease()
+    const respond = netFetchMock.getMockImplementation()
+    netFetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith(missing === 'manifest' ? '.yml' : '.zip')) {
+        return new Response(null, { status: 404 })
+      }
+      return respond?.(url)
+    })
+    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+
+    await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
+  })
+
+  it('keeps a network failure retryable instead of returning a moving URL', async () => {
+    netFetchMock.mockRejectedValueOnce(new Error('network unavailable'))
+    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+    await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
+
+    serveLatestRelease('https://github.com/nplez1/orca/releases/tag/v1.4.241')
+    await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.241')
+  })
+})
