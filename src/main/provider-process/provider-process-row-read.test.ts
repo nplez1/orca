@@ -41,6 +41,7 @@ describe.runIf(process.platform !== 'win32')('readPosixProcessRow', () => {
       }
 
       const startedAtMs = parseUtcLstart(row.startedAt)
+      // ast-grep-ignore: test-no-wall-clock -- the real clock is the point: the assertion checks the row's start time against this process's actual uptime.
       expect(Math.abs(startedAtMs - (Date.now() - process.uptime() * 1_000))).toBeLessThan(60_000)
     }
   )

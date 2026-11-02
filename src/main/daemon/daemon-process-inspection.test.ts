@@ -120,6 +120,7 @@ describe('daemon process inspection', () => {
         throw new Error('the daemon start time could not be read')
       }
 
+      // ast-grep-ignore: test-no-wall-clock -- the real clock is the point: the assertion checks the reported start time against this process's actual uptime.
       expect(Math.abs(startedAtMs - (Date.now() - process.uptime() * 1_000))).toBeLessThan(60_000)
     }
   )
