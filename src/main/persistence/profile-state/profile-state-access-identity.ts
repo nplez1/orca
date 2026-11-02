@@ -113,7 +113,7 @@ function readProcessIdentity(pid: number): string | null {
   if (process.platform !== 'darwin') {
     return null
   }
-  const startedAtMs = getPsProcessIdentity(pid, { utc: true })?.startedAtMs
+  const startedAtMs = getPsProcessIdentity(pid)?.startedAtMs
   // Local wall times are ambiguous during daylight-saving transitions.
   return startedAtMs == null ? null : `darwin-utc-start-ms:${startedAtMs}`
 }

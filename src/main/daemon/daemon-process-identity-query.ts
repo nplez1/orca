@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process'
-import { psLocaleEnvironment } from '../../shared/ps-locale-environment'
+import { parseUtcLstart, psUtcEnvironment } from '../../shared/ps-lstart-time'
 
 const PS_IDENTITY_TIMEOUT_MS = 2_000
 
@@ -8,26 +8,32 @@ export type ProcessIdentity = {
   startedAtMs: number | null
 }
 
-function parsePsProcessIdentity(output: string, utc = false): ProcessIdentity {
+const psIdentityArgs = (pid: number): string[] => [
+  '-p',
+  String(pid),
+  '-o',
+  'lstart=',
+  '-o',
+  'command='
+]
+
+function parsePsProcessIdentity(output: string): ProcessIdentity {
   // BSD ps formats lstart as a fixed-width 24-character timestamp.
-  const startedAtMs = Date.parse(output.slice(0, 24) + (utc ? ' UTC' : ''))
+  const startedAtMs = parseUtcLstart(output.slice(0, 24))
   return {
     commandLine: output.slice(24).trim(),
     startedAtMs: Number.isFinite(startedAtMs) ? startedAtMs : null
   }
 }
 
-export function getPsProcessIdentity(
-  pid: number,
-  options?: { utc?: boolean }
-): ProcessIdentity | null {
+export function getPsProcessIdentity(pid: number): ProcessIdentity | null {
   try {
-    const output = execFileSync('ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'command='], {
+    const output = execFileSync('ps', psIdentityArgs(pid), {
       encoding: 'utf8',
-      timeout: 2_000,
-      env: options?.utc ? { ...process.env, TZ: 'UTC', LC_ALL: 'C' } : psLocaleEnvironment()
+      timeout: PS_IDENTITY_TIMEOUT_MS,
+      env: psUtcEnvironment()
     })
-    return parsePsProcessIdentity(output, options?.utc)
+    return parsePsProcessIdentity(output)
   } catch {
     return null
   }
@@ -38,10 +44,10 @@ export async function getPsProcessIdentityAsync(pid: number): Promise<ProcessIde
     const stdout = await new Promise<string>((resolve, reject) => {
       execFile(
         'ps',
-        ['-p', String(pid), '-o', 'lstart=', '-o', 'command='],
+        psIdentityArgs(pid),
         {
           encoding: 'utf8',
-          env: psLocaleEnvironment(),
+          env: psUtcEnvironment(),
           timeout: PS_IDENTITY_TIMEOUT_MS
         },
         (error, output) => {

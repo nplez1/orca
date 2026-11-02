@@ -6,12 +6,13 @@ import {
   type ProcessTableRow
 } from '../pty-descendant-termination'
 import { createClaudeChildTreeReaper } from './claude-agent-sdk-exit-proof'
+import { parseUtcLstart } from '../../shared/ps-lstart-time'
 
 const ROOT_PID = 500
 const ORCA_PGID = 400
 const ROOT_STARTED_AT = 'Thu Sep 3 18:04:50 2026'
 const WALK_SECOND = 'Thu Sep 3 18:05:04 2026'
-const WALK_MS = Date.parse(WALK_SECOND)
+const WALK_MS = parseUtcLstart(WALK_SECOND)
 const EARLIER_SECOND = 'Thu Sep 3 18:05:03 2026'
 
 /** The measured split: `s20` at :03.946 died, `s21` at :04.042 leaked. */

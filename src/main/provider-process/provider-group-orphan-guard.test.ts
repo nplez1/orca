@@ -6,6 +6,7 @@ import {
   type ProviderGroupSweepVerdict
 } from './provider-group-orphan-guard'
 import type { ProcessRowRead } from './provider-process-row-read'
+import { parseUtcLstart } from '../../shared/ps-lstart-time'
 
 const STARTED = 'Mon Oct 19 10:00:00 2026'
 const identity = { pgid: 4242, startedAt: STARTED }
@@ -144,7 +145,7 @@ describe('guardSupervisedProviderGroup', () => {
 
   it('re-reads a leader started in the read second, so a same-second reuse cannot match', async () => {
     const child = new FakeSupervisor()
-    const startedAtMs = Date.parse(STARTED)
+    const startedAtMs = parseUtcLstart(STARTED)
     const clock = { now: startedAtMs + 300 }
     const readProcessRow = vi.fn(async () => row({ ppid: 777 }))
     const sleep = vi.fn(async (ms: number) => {
@@ -168,7 +169,7 @@ describe('guardSupervisedProviderGroup', () => {
 
   it('arms nothing when a same-second replacement holds the pid once the second ends', async () => {
     const child = new FakeSupervisor()
-    const clock = { now: Date.parse(STARTED) + 300 }
+    const clock = { now: parseUtcLstart(STARTED) + 300 }
     // The first read is our leader; by the re-read its pid names a stranger with the same lstart.
     const readProcessRow = vi
       .fn<(pid: number) => Promise<ProcessRowRead>>()
@@ -219,7 +220,7 @@ describe('guardSupervisedProviderGroup', () => {
 
   it('records nothing when every read stays inside the start second', async () => {
     const child = new FakeSupervisor()
-    const now = Date.parse(STARTED) + 100
+    const now = parseUtcLstart(STARTED) + 100
     const signalGroup = vi.fn()
     const swept = new Promise((resolve) =>
       guardSupervisedProviderGroup(child, {
@@ -246,7 +247,7 @@ describe('guardSupervisedProviderGroup', () => {
         site: 'test',
         supervised: true,
         readProcessRow,
-        now: () => Date.parse(STARTED) + 100,
+        now: () => parseUtcLstart(STARTED) + 100,
         onSwept: resolve
       })
     )

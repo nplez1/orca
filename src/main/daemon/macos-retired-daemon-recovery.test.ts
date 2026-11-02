@@ -4,6 +4,7 @@ import type { DescendantTreeVerdict } from '../pty-descendant-exit-verification'
 import type { RetiredMacDaemonJob } from './macos-retired-daemon-jobs'
 import type { ProcessIdentity } from './daemon-process-identity-query'
 import type { SocketProbeOutcome } from './daemon-endpoint-probe'
+import { parseUtcLstart } from '../../shared/ps-lstart-time'
 
 const mocks = vi.hoisted(() => ({
   packaged: true,
@@ -38,7 +39,7 @@ import {
 } from './macos-retired-daemon-recovery'
 
 const startedAt = 'Mon Oct 12 16:28:32 2026'
-const identity = { commandLine: 'daemon', startedAtMs: Date.parse(startedAt) }
+const identity = { commandLine: 'daemon', startedAtMs: parseUtcLstart(startedAt) }
 const job: RetiredMacDaemonJob = {
   service: 'gui/501/profile.v45',
   protocolVersion: 45,
@@ -51,7 +52,7 @@ const snapshot: DescendantSnapshot = {
   root: { pid: job.pid, startedAt },
   rootPgid: job.pid,
   descendants: [{ pid: 88912, ppid: job.pid, pgid: 88912, startedAt }],
-  capturedAtMs: Date.parse(startedAt) + 60_000
+  capturedAtMs: parseUtcLstart(startedAt) + 60_000
 }
 const typeDescriptor = Object.getOwnPropertyDescriptor(process, 'type')
 const kill = vi.fn<typeof process.kill>()
