@@ -116,7 +116,9 @@ describe('repos:create', () => {
     removeHandlerMock.mockReset()
     mockStore.getRepos.mockReset().mockReturnValue([])
     mockStore.addRepo.mockReset()
-    mockStore.getSettings.mockReset().mockReturnValue({ workspaceDir: defaultWorkspaceDir })
+    mockStore.getSettings
+      .mockReset()
+      .mockReturnValue({ workspaceDir: defaultWorkspaceDir, worktreeLayoutMode: 'flat' })
     mockWindow.webContents.send.mockReset()
     invalidateAuthorizedRootsCacheMock.mockReset()
     prepareLocalWorktreeRootForRepoMock.mockReset().mockResolvedValue(undefined)
@@ -141,13 +143,17 @@ describe('repos:create', () => {
   })
 
   it('defaults new projects to a configured Workspace Directory', async () => {
-    mockStore.getSettings.mockReturnValue({ workspaceDir: 'J:\\PROJECTS' })
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: 'J:\\PROJECTS',
+      worktreeLayoutMode: 'flat'
+    })
     await expect(callDefaultCreateProjectParent()).resolves.toBe('J:\\PROJECTS')
   })
 
   it('prefers the local host override over the client-default workspace directory', async () => {
     mockStore.getSettings.mockReturnValue({
       workspaceDir: 'J:\\PROJECTS',
+      worktreeLayoutMode: 'flat',
       hostSettingOverrides: { local: { defaultWorktreeLocation: 'D:\\code' } }
     })
     await expect(callDefaultCreateProjectParent()).resolves.toBe('D:\\code')
@@ -156,26 +162,33 @@ describe('repos:create', () => {
   it.each([undefined, '', '   '])(
     'falls back to ~/orca/projects for a blank workspace directory: %p',
     async (workspaceDir) => {
-      mockStore.getSettings.mockReturnValue({ workspaceDir })
+      mockStore.getSettings.mockReturnValue({ workspaceDir, worktreeLayoutMode: 'flat' })
       await expect(callDefaultCreateProjectParent()).resolves.toBe(defaultProjectParent)
     }
   )
 
   // Seeded workspaceDir is not user intent; treating it as chosen nests new projects in the worktree root.
   it('ignores the seeded workspace directory that the user never changed', async () => {
-    mockStore.getSettings.mockReturnValue({ workspaceDir: defaultWorkspaceDir })
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: defaultWorkspaceDir,
+      worktreeLayoutMode: 'flat'
+    })
     await expect(callDefaultCreateProjectParent()).resolves.toBe(defaultProjectParent)
   })
 
   it('ignores the seeded workspace directory spelled with a trailing separator', async () => {
-    mockStore.getSettings.mockReturnValue({ workspaceDir: `${defaultWorkspaceDir}/` })
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: `${defaultWorkspaceDir}/`,
+      worktreeLayoutMode: 'flat'
+    })
     await expect(callDefaultCreateProjectParent()).resolves.toBe(defaultProjectParent)
   })
 
   it('ignores a Windows seeded workspace directory regardless of drive-letter case', async () => {
     homedirMock.mockReturnValue('C:\\Users\\alice')
     mockStore.getSettings.mockReturnValue({
-      workspaceDir: 'c:\\users\\alice\\orca\\workspaces'
+      workspaceDir: 'c:\\users\\alice\\orca\\workspaces',
+      worktreeLayoutMode: 'flat'
     })
     await expect(callDefaultCreateProjectParent()).resolves.toBe(
       join('C:\\Users\\alice', 'orca', 'projects')
@@ -515,6 +528,31 @@ describe('repos:create', () => {
 
     // Why not ~/orca/projects: the container lives inside the workspace dir, so the sibling
     // default would put the checkout outside the root its worktrees are placed under.
+    await expect(callDefaultCreateProjectParent()).resolves.toBe('/workspaces')
+  })
+
+  it('nests the primary checkout inside its project folder under Nest Workspaces', async () => {
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: '/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
+    })
+
+    const result = await callCreate({ parentPath: '/workspaces', name: 'homelab', kind: 'git' })
+
+    // fork-comment-ok: the checkout joins the folder its worktrees are already placed in.
+    expect(result).toHaveProperty('repo.path', join('/workspaces', 'homelab', 'main'))
+    expect(result).toHaveProperty('repo.displayName', 'homelab')
+    expect(mkdirMock).toHaveBeenCalledWith(join('/workspaces', 'homelab'), { recursive: true })
+  })
+
+  it('defaults the create location to the workspace dir under Nest Workspaces', async () => {
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: '/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
+    })
+
     await expect(callDefaultCreateProjectParent()).resolves.toBe('/workspaces')
   })
 })

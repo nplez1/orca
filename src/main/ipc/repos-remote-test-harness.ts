@@ -187,9 +187,10 @@ export function resetProjectGroupMocks(
 
 export function resetLocalRepoMocks(mocks: ReposIpcMocks): void {
   mocks.mockStore.getRepos.mockReset().mockReturnValue([])
+  // fork-comment-ok: these cases pin paths that must not move with a layout default.
   mocks.mockStore.getSettings
     .mockReset()
-    .mockReturnValue({ workspaceDir: '', nestWorkspaces: true })
+    .mockReturnValue({ workspaceDir: '', nestWorkspaces: true, worktreeLayoutMode: 'flat' })
   mocks.mockStore.addRepo.mockReset()
   mocks.mockStore.updateRepo.mockReset()
   mocks.mockStore.getProjects.mockReset().mockReturnValue([])

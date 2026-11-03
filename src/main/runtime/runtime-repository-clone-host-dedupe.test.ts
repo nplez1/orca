@@ -31,6 +31,7 @@ function createController(seed: Repo[]): {
     getRepos: () => repos,
     getRepo: (id: string) => repos.find((repo) => repo.id === id),
     getAllWorktreeMeta: () => ({}),
+    getSettings: () => ({ workspaceDir: '', nestWorkspaces: false, worktreeLayoutMode: 'flat' }),
     addRepo: (repo: Repo) => {
       repos.push(repo)
       return repo

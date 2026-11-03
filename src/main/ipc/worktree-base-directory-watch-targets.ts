@@ -88,10 +88,12 @@ async function maybeAddBaseTarget(
   const pathSettings = getWorktreePathSettings(repo, settings, mirrorDistro)
   const config = {
     repoId: repo.id,
-    repoName: getRuntimePathBasename(repo.path).replace(/\.git$/, ''),
+    // fork-comment-ok: a nested project's container is the project folder, not the branch folder.
+    repoName:
+      pathSettings.projectFolderName ?? getRuntimePathBasename(repo.path).replace(/\.git$/, ''),
     // Why: in project-folder mode the watched root IS the per-project container, so each worktree
     // is a direct child — exactly the shape the flat matcher handles. Only repo-nested interposes a
-    // repo-named container between the root and the worktrees.
+    // container (the project folder) between the root and the worktrees.
     nestWorkspaces:
       pathSettings.nestWorkspaces && !isProjectFolderLayout(resolveWorktreeLayoutMode(pathSettings))
   }

@@ -157,6 +157,36 @@ describe('repos:add + repos:clone', () => {
     )
   })
 
+  it('nests a clone under the project folder and names the repo after the project under Nest Workspaces', async () => {
+    const destination = await createTempRoot()
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: destination,
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
+    })
+    gitExecFileAsyncMock.mockImplementation((args: string[]) =>
+      Promise.resolve({
+        stdout: args[0] === 'ls-remote' ? 'ref: refs/heads/trunk\tHEAD\n' : '',
+        stderr: ''
+      })
+    )
+
+    await handlers.get('repos:clone')!(null, {
+      url: 'https://example.com/orca.git',
+      destination
+    })
+
+    const clonePath = join(destination, 'orca', 'trunk')
+    expect(gitSpawnMock).toHaveBeenCalledWith(
+      expect.arrayContaining([clonePath]),
+      expect.anything()
+    )
+    // fork-comment-ok: the container must stay named after the project, not the branch.
+    expect(mockStore.addRepo).toHaveBeenCalledWith(
+      expect.objectContaining({ displayName: 'orca', path: clonePath })
+    )
+  })
+
   it('drops a same-path negative submodule cache before a local clone', async () => {
     const destination = await createTempRoot()
     const clonePath = join(destination, 'orca')

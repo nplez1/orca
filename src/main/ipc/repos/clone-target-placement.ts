@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import {
-  isProjectFolderLayout,
+  layoutNestsPrimaryCheckout,
   resolveWorktreeLayoutMode
 } from '../../../shared/orca-workspace-layout'
 import { deriveCloneRepoNameFromUrl } from '../../git/repo-clone-path'
@@ -12,23 +12,24 @@ export type CloneTargetPlacement = {
   /** Path for the checkout, relative to the clone destination. Absent means the legacy
    *  spelling, where the checkout is the destination plus the URL-derived repo name. */
   relativeClonePath?: string
-  /** Name the project should be registered under, when the layout nests a container. */
+  /** Name the project should be registered under, when a nested layout creates a container. */
   projectName?: string
 }
 
 /**
  * Where a clone's primary checkout goes under the layout in effect.
  *
- * The project-folder layout nests it at `<destination>/<project>/<branch>`, which changes what
- * the destination field means: it is now where project folders live rather than the checkout's
- * own parent. The branch has to be known before the clone starts in order to name that folder.
+ * Both nested layouts put it at `<destination>/<project>/<branch>`, which changes what the
+ * destination field means: it is now where project folders live rather than the checkout's own
+ * parent. The branch has to be known before the clone starts in order to name that folder, and
+ * `flat` keeps the checkout directly in the destination.
  */
 export async function resolveCloneTargetPlacement(args: {
   url: string
   destination: string
   settings: Pick<GlobalSettings, 'nestWorkspaces' | 'worktreeLayoutMode'>
 }): Promise<CloneTargetPlacement> {
-  if (!isProjectFolderLayout(resolveWorktreeLayoutMode(args.settings))) {
+  if (!layoutNestsPrimaryCheckout(resolveWorktreeLayoutMode(args.settings))) {
     return {}
   }
   const projectName = deriveCloneRepoNameFromUrl(args.url)

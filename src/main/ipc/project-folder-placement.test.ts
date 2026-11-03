@@ -228,9 +228,69 @@ describe('project-folder container casing', () => {
     const repo = { path: '\\\\wsl.localhost\\Ubuntu\\home\\me\\orca\\main', displayName: 'Orca' }
     const pathSettings = getWorktreePathSettings(
       repo,
-      { nestWorkspaces: true, workspaceDir: 'C:\\Users\\me\\orca\\workspaces', worktreeLayoutMode: 'project-folder' },
+      {
+        nestWorkspaces: true,
+        workspaceDir: 'C:\\Users\\me\\orca\\workspaces',
+        worktreeLayoutMode: 'project-folder'
+      },
       'Ubuntu'
     )
     expect(pathSettings.projectFolderName).toBe('Orca')
+  })
+})
+
+// Nest Workspaces (repo-nested) keeps its own container rule: the checkout's folder, unless a
+// clone or create has already nested the checkout inside its project folder.
+describe('repo-nested container', () => {
+  const settings = {
+    nestWorkspaces: true,
+    workspaceDir: '/workspaces',
+    worktreeLayoutMode: 'repo-nested' as const
+  }
+
+  it('keeps the checkout folder as the container for a project imported in place', () => {
+    const repo = { path: '/projects/orca', displayName: 'orca' }
+    expect(computeWorktreePath('feature', repo.path, getWorktreePathSettings(repo, settings))).toBe(
+      posix.join('/workspaces', 'orca', 'feature')
+    )
+  })
+
+  it('uses the project folder holding a nested primary checkout', () => {
+    // Why: the nested checkout's own leaf is the branch, so taking it would put every nested
+    // project's worktrees in one container named after that branch.
+    const repo = { path: '/workspaces/orca/main', displayName: 'orca' }
+    expect(computeWorktreePath('feature', repo.path, getWorktreePathSettings(repo, settings))).toBe(
+      posix.join('/workspaces', 'orca', 'feature')
+    )
+  })
+
+  it('recognises the project folder of a checkout cloned outside the workspace root', () => {
+    const repo = { path: '/elsewhere/orca/main', displayName: 'orca' }
+    expect(computeWorktreePath('feature', repo.path, getWorktreePathSettings(repo, settings))).toBe(
+      posix.join('/workspaces', 'orca', 'feature')
+    )
+  })
+
+  it('falls back to the checkout folder when the parent is not the project folder', () => {
+    // A repo imported two levels down is not a nested project, so its own folder stays the container.
+    const repo = { path: '/code/vendor/orca', displayName: 'orca' }
+    expect(computeWorktreePath('feature', repo.path, getWorktreePathSettings(repo, settings))).toBe(
+      posix.join('/workspaces', 'orca', 'feature')
+    )
+  })
+
+  it('does not treat an org folder inside the workspace root as the project folder', () => {
+    // Why: a workspace root is often the code root, so `~/code/<org>/<repo>` is an ordinary import.
+    // Taking the org folder would move this repo's worktrees and collide with its siblings'.
+    const repo = { path: '/workspaces/acme/orca', displayName: 'orca' }
+    const pathSettings = getWorktreePathSettings(repo, {
+      nestWorkspaces: true,
+      workspaceDir: '/workspaces',
+      worktreeLayoutMode: 'repo-nested' as const
+    })
+    expect(pathSettings.projectFolderName).toBe('orca')
+    expect(computeWorktreePath('feature', repo.path, pathSettings)).toBe(
+      posix.join('/workspaces', 'orca', 'feature')
+    )
   })
 })

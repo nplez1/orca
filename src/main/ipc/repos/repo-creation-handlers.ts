@@ -7,7 +7,7 @@ import { isAbsolute, dirname, join } from 'node:path'
 import type { Store } from '../../persistence/loading-store/store'
 import type { Repo } from '../../../shared/repo-types'
 import {
-  isProjectFolderLayout,
+  layoutNestsPrimaryCheckout,
   resolveWorktreeLayoutMode
 } from '../../../shared/orca-workspace-layout'
 import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../shared/constants'
@@ -46,9 +46,9 @@ function getDefaultCreateProjectParent(store: Store): string {
     'defaultWorktreeLocation',
     settings.workspaceDir ?? ''
   ).trim()
-  // Why: under the project-folder layout the container's parent *is* the workspace dir, so the
+  // fork-comment-ok: under a nested layout the container's parent *is* the workspace dir, so the
   // "beside the worktree tree" fallback below would place the project outside its own container.
-  if (isProjectFolderLayout(resolveWorktreeLayoutMode(settings))) {
+  if (layoutNestsPrimaryCheckout(resolveWorktreeLayoutMode(settings))) {
     return configured || getDefaultWorkspaceDir(home)
   }
   const isUntouchedDefault =
@@ -74,17 +74,18 @@ async function resolveInitBranchLeaf(parentPath: string): Promise<string> {
 }
 
 /**
- * Where `repos:create` puts the checkout. The legacy layouts use `<parent>/<name>`. Under the
- * project-folder layout the typed name becomes the project container and the checkout inside it
- * is named for the branch `git init` is about to create, so the primary checkout is a sibling
- * of the worktrees that will land in the same container.
+ * fork-comment-ok: nested layouts nest the checkout; flat uses `<parent>/<name>`.
+ * Where `repos:create` puts the checkout. Under a nested
+ * layout the typed name becomes the project container and the checkout inside it is named for the
+ * branch `git init` is about to create, so the primary checkout is a sibling of the worktrees that
+ * will land in the same container.
  */
 async function resolveCreateTargetPath(
   store: Store,
   parentPath: string,
   name: string
 ): Promise<{ path: string } | { error: string }> {
-  if (!isProjectFolderLayout(resolveWorktreeLayoutMode(store.getSettings()))) {
+  if (!layoutNestsPrimaryCheckout(resolveWorktreeLayoutMode(store.getSettings()))) {
     return { path: join(parentPath, name) }
   }
   let containerName: string

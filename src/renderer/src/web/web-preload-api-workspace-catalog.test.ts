@@ -139,10 +139,11 @@ describe('web repos preload API', () => {
     ])
   })
 
+  // fork-comment-ok: this client cannot read the host's layout; every nested layout nests the checkout.
   it.each([
-    ['/home/alice', '/home/alice/orca/projects'],
-    ['/', '/orca/projects'],
-    ['C:\\', 'C:\\orca\\projects']
+    ['/home/alice', '/home/alice/orca/workspaces'],
+    ['/', '/orca/workspaces'],
+    ['C:\\', 'C:\\orca\\workspaces']
   ])(
     'resolves the default create-project parent from runtime host home %s',
     async (resolvedPath, expectedParent) => {

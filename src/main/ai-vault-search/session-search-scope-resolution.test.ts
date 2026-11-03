@@ -173,6 +173,17 @@ describe('project scope', () => {
     ])
   })
 
+  it('searches the project folder of a nested checkout, not its branch folder', () => {
+    const resolution = resolveSessionSearchScope(
+      { kind: 'project', projectKey: 'repo:nested' },
+      catalog({
+        repos: [{ id: 'nested', path: '/home/me/orca/workspaces/app/main', displayName: 'app' }],
+        worktreeMeta: { 'nested::/home/me/orca/workspaces/app/one': {} }
+      })
+    )
+    expect(paths(resolution)).toEqual(['/home/me/orca/workspaces/app'])
+  })
+
   it('claims no managed directory under flat placement, where the root is every project’s', () => {
     const resolution = resolveSessionSearchScope(
       { kind: 'project', projectKey: 'repo:repo-1' },

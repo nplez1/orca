@@ -15,7 +15,7 @@ import {
   resolveConfiguredWorktreeBasePaths
 } from '../../shared/worktree/configured-worktree-base-path'
 import { buildKnownOrcaWorkspaceLayouts } from '../../shared/worktree/ownership'
-import { resolveProjectFolderName } from '../ipc/worktree-logic'
+import { resolveNestedRepoContainerName, resolveProjectFolderName } from '../ipc/worktree-logic'
 import type { SessionSearchScopeCatalog } from './session-search-scope-catalog'
 
 type ScopeRepo = SessionSearchScopeCatalog['repos'][number]
@@ -62,7 +62,7 @@ export function managedWorktreeDirectories(
   const baseIsRepoScoped = (layoutPath: string): boolean =>
     configured.has(normalizeRuntimePathForComparison(layoutPath)) ||
     !isRuntimePathAbsoluteForRepo(repo.path, settings.workspaceDir)
-  const repoName = getRuntimePathBasename(repo.path).replace(/\.git$/, '')
+  const repoName = resolveNestedRepoContainerName(repo)
   const directories: string[] = []
   for (const layout of buildKnownOrcaWorkspaceLayouts(settings, repo)) {
     const layoutMode = resolveWorktreeLayoutMode(layout)
@@ -81,6 +81,7 @@ export function managedWorktreeDirectories(
     } else if (configured.has(normalizeRuntimePathForComparison(layout.path))) {
       directories.push(layout.path)
     } else if (layout.nestWorkspaces && repoName) {
+      // fork-comment-ok: a nested checkout lives at `<base>/<project>/<branch>`, so search the project folder.
       directories.push(resolveRuntimePath(layout.path, repoName))
     }
   }

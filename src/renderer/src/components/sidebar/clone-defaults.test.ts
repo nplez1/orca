@@ -16,27 +16,42 @@ describe('getCloneDestinationAutoFill project-folder layout', () => {
   })
 })
 
+describe('getCloneDestinationAutoFill nested layouts', () => {
+  it('auto-fills the workspace dir under Nest Workspaces too', () => {
+    expect(
+      getCloneDestinationAutoFill({
+        step: 'clone',
+        cloneDestination: '',
+        activeRuntimeEnvironmentId: null,
+        workspaceDir: '/Users/mvanhorn/orca/workspaces',
+        layoutMode: 'repo-nested',
+        cloneStepAutoFilled: false
+      })
+    ).toEqual({ destination: '/Users/mvanhorn/orca/workspaces' })
+  })
+})
+
 describe('getDefaultCloneParent', () => {
   it('returns the drive root for a Windows root workspaces path', () => {
-    expect(getDefaultCloneParent('C:\\workspaces')).toBe('C:\\')
+    expect(getDefaultCloneParent('C:\\workspaces', 'flat')).toBe('C:\\')
   })
 
   it('strips repeated trailing separators before matching the suffix', () => {
-    expect(getDefaultCloneParent('D:\\orca\\workspaces\\\\')).toBe('D:\\orca')
+    expect(getDefaultCloneParent('D:\\orca\\workspaces\\\\', 'flat')).toBe('D:\\orca')
   })
 
   it('does not strip a similar-looking final segment', () => {
-    expect(getDefaultCloneParent('/Users/mvanhorn/orca/project-workspaces')).toBe(
+    expect(getDefaultCloneParent('/Users/mvanhorn/orca/project-workspaces', 'flat')).toBe(
       '/Users/mvanhorn/orca/project-workspaces'
     )
   })
 
-  it('keeps the workspace dir itself under the project-folder layout', () => {
-    // Why: the clone path appends <project>/<branch> itself, so stripping the trailing segment
-    // would land the checkout outside the root the worktrees are placed under.
-    expect(getDefaultCloneParent('/Users/mvanhorn/orca/workspaces', 'project-folder')).toBe(
-      '/Users/mvanhorn/orca/workspaces'
-    )
+  it('keeps the workspace dir itself under every nested layout', () => {
+    for (const layoutMode of ['project-folder', 'repo-nested'] as const) {
+      expect(getDefaultCloneParent('/Users/mvanhorn/orca/workspaces', layoutMode)).toBe(
+        '/Users/mvanhorn/orca/workspaces'
+      )
+    }
   })
 })
 
