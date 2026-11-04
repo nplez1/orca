@@ -85,6 +85,32 @@ it('still deletes a lock that clears inside the transient budget', async () => {
   expect(fs.unlink).toHaveBeenCalledWith(expect.stringContaining('.git'))
 })
 
+it('checks cleanliness once, before it starts deleting children', async () => {
+  vi.mocked(fs.readdir).mockResolvedValue(['held', '.git'])
+  vi.mocked(fs.rm).mockRejectedValue(
+    Object.assign(new Error('held child'), { code: 'EBUSY', path: `${root}/held` })
+  )
+  // A half-deleted tree reads as dirty; a later pass must not be refused for Orca's own deletions.
+  let checks = 0
+  const authorize = vi.fn(async (checkClean: boolean) => {
+    checks += 1
+    if (checkClean && checks > 1) {
+      throw new Error('Worktree has uncommitted or untracked changes')
+    }
+    return true
+  })
+
+  const removal = removeHostCheckout(root, authorize).catch((reason: unknown) => reason)
+  await vi.runAllTimersAsync()
+
+  expect(leftoverCheckoutFolderOf(await removal)).toEqual({
+    path: root,
+    blockingFile: `${root}/held`
+  })
+  expect(authorize.mock.calls[0]).toEqual([true])
+  expect(authorize.mock.calls.slice(1).every(([checkClean]) => checkClean === false)).toBe(true)
+})
+
 it('leaves a non-lock child failure as a plain removal failure', async () => {
   vi.mocked(fs.readdir).mockResolvedValue(['denied', '.git'])
   vi.mocked(fs.rm).mockRejectedValue(Object.assign(new Error('EIO: i/o error'), { code: 'EIO' }))

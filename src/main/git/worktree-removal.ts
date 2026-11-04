@@ -19,7 +19,12 @@ import {
 } from '../../shared/worktree/remote-branch-removal'
 import { invalidateWslLinkedWorktreeGitRouting } from './wsl-linked-worktree-git-routing'
 import type { RemoveWorktreeOptions } from './worktree-operation-options'
-import { getErrorCode, gitExecOptions, normalizeLocalBranchRef } from './worktree-operation-options'
+import {
+  getErrorCode,
+  gitExecOptions,
+  normalizeLocalBranchRef,
+  removalGitEnv
+} from './worktree-operation-options'
 import { areWorktreePathsEqual } from './worktree-path-comparison'
 import { withRepoRefMaintenancePaused } from './local-repo-ref-maintenance'
 import { bumpWorktreeScanGeneration, listWorktrees } from './worktree-scan-cache'
@@ -235,19 +240,6 @@ async function localBranchExists(
   } catch {
     return false
   }
-}
-
-// Git for Windows may invoke GIT_ASK_YESNO for locked files; removal must never launch a prompt.
-function removalGitEnv(): { env?: NodeJS.ProcessEnv } {
-  const inherited = Object.keys(process.env).filter((key) => key.toUpperCase() === 'GIT_ASK_YESNO')
-  if (inherited.length === 0) {
-    return {}
-  }
-  const env = { ...process.env }
-  for (const key of inherited) {
-    delete env[key]
-  }
-  return { env }
 }
 
 // Git for Windows can exit 0 leaving junctions and parent directories; finish that accepted delete.

@@ -22,6 +22,7 @@ import { assertWorktreeCleanForRemoval } from './worktree-removal-preflight'
 import {
   getErrorCode,
   gitExecOptions,
+  removalGitEnv,
   type RemoveWorktreeOptions
 } from './worktree-operation-options'
 import { windowsLongPathGitArgs } from '../../shared/windows-long-path-git-args'
@@ -77,7 +78,8 @@ export async function removeWindowsCheckout(
 
 /**
  * A locked child leaves the folder behind, but its marker is still in place, so Git can release the
- * registration: `worktree remove` drops the administrative entry before it walks the folder.
+ * registration without the folder: `worktree remove --force` drops the administrative entry even
+ * when the folder it cannot empty makes the command exit non-zero.
  */
 async function releaseLeftoverCheckoutRegistration(
   repo: string,
@@ -88,7 +90,12 @@ async function releaseLeftoverCheckoutRegistration(
   try {
     await gitExecFileAsync(
       [...windowsLongPathGitArgs(repo), 'worktree', 'remove', '--force', '--', root],
-      { ...gitExecOptions(repo, options), admissionExempt: true as const }
+      {
+        ...gitExecOptions(repo, options),
+        ...(options.checkoutDeleteSignal ? { signal: options.checkoutDeleteSignal } : {}),
+        ...removalGitEnv(),
+        admissionExempt: true as const
+      }
     )
   } catch (error) {
     // Git may fail only on the folder it cannot empty; the registration is re-read below either way.

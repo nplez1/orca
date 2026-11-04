@@ -7,6 +7,7 @@ import { runWorktreeChangeInvalidators } from './ipc/worktree-change-invalidator
 import { parseWslPath } from './wsl'
 import { readWorktreeRemovalRecords, type WorktreeRemovalRecord } from './worktree-removal-records'
 import { failureLeftByGit } from './worktree-removal-failure'
+import { withRemovalAcceptanceFields } from './worktree-removal-acceptance-fields'
 import { differentCheckoutAtPathError, isCheckoutRegistered } from './worktree-removal-leftover'
 import {
   failedWorktreeRemovals,
@@ -119,14 +120,15 @@ function assertAcceptedBranchChoice(
 }
 
 /** Await the delete while preserving the acceptance result fields. */
-export async function finishAcceptedWorktreeRemoval<T extends RemoveWorktreeResult>(
-  accepted: T,
+export async function finishAcceptedWorktreeRemoval(
+  accepted: RemoveWorktreeResult,
   worktreeId: string,
   hostId?: ExecutionHostId
-): Promise<Omit<T, 'removing'>> {
+): Promise<RemoveWorktreeResult> {
   const { removing, ...acceptance } = accepted
   const pending = removing ? waitForPendingWorktreeRemoval(worktreeId, hostId) : undefined
-  return pending ? { ...acceptance, ...(await pending) } : acceptance
+  // Both sides can carry a warning (archive hook skipped, folder left behind); keep either.
+  return pending ? withRemovalAcceptanceFields(await pending, acceptance) : acceptance
 }
 
 export function removesInBackground(

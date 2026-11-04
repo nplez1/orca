@@ -318,15 +318,27 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   button from fix direction 3. Both are new IPC/renderer surface; the queue is bounded by a timeout
   that reports a retryable error instead, which is what removes the unbounded wait.
 - **Verified:** `pnpm tc:node` / `tc:web` / `tc:cli`, `check:code-quality:changed nplez1/main`
-  (0 findings), `oxlint` on every changed file, and 184 tests across the 14 removal-path files
+  (0 findings), `oxlint` on every changed file, and 171 tests across the 14 removal-path files
   (`host-checkout-removal`, `worktree-delete-limit`, `runtime-file-watcher-removal`,
-  `windows-worktree-removal-leftover`, `worktrees-background-removal`, `worktrees-failed-removal`,
-  `worktrees-removal-recovery`, `worktrees-remove-archive-hooks`,
-  `runtime-failed-local-worktree-removal`, `runtime-interrupted-local-worktree-removal`,
-  `worktree-failed-removal`, `worktree-removal-real-git`, `worktree-rm-cli.integration`,
-  renderer `worktrees-background-removal`) — 163 pass, 21 skipped, plus the pre-existing
-  `EnvironmentTeardownError` in `worktrees-failed-removal.test.ts` that also fails on the base
-  revision.
+  `windows-worktree-removal-leftover`, `worktrees-background-removal`, `worktrees-removal-recovery`,
+  `worktrees-remove-archive-hooks`, `runtime-failed-local-worktree-removal`,
+  `runtime-interrupted-local-worktree-removal`, `worktree-failed-removal`,
+  `worktree-removal-real-git`, `worktree-background-removal`,
+  `worktree-background-removal-records`, renderer `worktrees-background-removal`) — 150 pass,
+  21 skipped (the Windows-only real-Git cases).
+- **Review round 1** (Opus 5.5, high, on R1): three blocking findings, all fixed in R2 —
+  (a) the clean check ran on every pass, so a non-force delete's second pass read Orca's own
+  deletions as uncommitted changes and failed with a dirty error instead of the warning; the check
+  now runs once, before any child is deleted. (b) the leftover `git worktree remove` had neither
+  `GIT_ASK_YESNO` stripped nor the abort signal, so a prompt could stall exactly the call the fix
+  exists to bound; `removalGitEnv` moved to `worktree-operation-options.ts` and both are passed.
+  (c) the restart-resume path discarded the leftover warning and then threw
+  `unregisteredFolderRefusal`; it now skips that assertion when Git already released the
+  registration. Also took two MINORs: `finishAcceptedWorktreeRemoval` no longer lets the finish-time
+  warning overwrite the acceptance one, and the comments state what the delete observes rather than
+  an unverified claim about Git's internal order.
+- **Still open, and in the PR body:** the removal that _holds_ a slot is still unbounded (the queue
+  wait is not), mobile's delete reply ignores `warning`, and nothing here was reproduced on Windows.
 - **Not verified on Windows:** no Windows host was available, so the platform-specific claims are
   read from the code and covered by mocked-fs tests, not reproduced. See the issue's § Verification.
 

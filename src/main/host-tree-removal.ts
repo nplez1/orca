@@ -51,6 +51,8 @@ export async function removeHostCheckout(
 ): Promise<void> {
   const root = toHostRemovalPath(targetPath)
   let markerGone = false
+  // Only the first pass can be clean: it deletes the children, so a later check reads our own work as changes.
+  let checkClean = true
   try {
     await removeTree(root, {
       signal,
@@ -58,7 +60,8 @@ export async function removeHostCheckout(
         if (markerGone) {
           await authorize(false)
         } else {
-          markerGone = !(await authorize(true))
+          markerGone = !(await authorize(checkClean))
+          checkClean = false
           if (!markerGone) {
             const names = (await readdir(root)).filter((name) => name.toLowerCase() !== '.git')
             const results = await Promise.allSettled(

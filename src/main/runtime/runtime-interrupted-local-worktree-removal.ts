@@ -217,19 +217,26 @@ async function finishInterruptedLocalWorktreeRemoval(
   let result: RemoveWorktreeResult
   let removed = false
   try {
+    let leftoverWarning: string | undefined
     if (native) {
-      await removeWorktree(repo.path, record.worktreePath, record.force, removalOptions)
+      leftoverWarning = (
+        await removeWorktree(repo.path, record.worktreePath, record.force, removalOptions)
+      ).warning
     }
     const branch =
       record.deleteBranch && record.branch ? { name: record.branch, head: record.head } : null
     if (native) {
-      await assertUnregisteredCheckoutGone(record.worktreePath)
-      result = await deleteBranchOfUnregisteredWorktree(
+      // A folder the OS would not empty is the user's problem; Git already released the registration.
+      if (!leftoverWarning) {
+        await assertUnregisteredCheckoutGone(record.worktreePath)
+      }
+      const nativeResult = await deleteBranchOfUnregisteredWorktree(
         repo.path,
         record.worktreePath,
         branch,
         localOptions
       )
+      result = leftoverWarning ? { ...nativeResult, warning: leftoverWarning } : nativeResult
     } else {
       result = await finishUnregisteredWorktreeRemoval(
         repo.path,
