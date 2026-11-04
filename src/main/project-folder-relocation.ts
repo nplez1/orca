@@ -163,10 +163,9 @@ export type VolumeRelation = 'same' | 'cross-volume' | 'unreadable'
 
 export async function volumeRelationBetween(from: string, to: string): Promise<VolumeRelation> {
   try {
-    const [fromStats, targetParentStats] = await Promise.all([
-      stat(from),
-      stat(await nearestExistingAncestor(dirname(to)))
-    ])
+    // Walk first: an await inside the Promise.all array leaves stat(from) unhandled across it.
+    const targetParent = await nearestExistingAncestor(dirname(to))
+    const [fromStats, targetParentStats] = await Promise.all([stat(from), stat(targetParent)])
     return fromStats.dev === targetParentStats.dev ? 'same' : 'cross-volume'
   } catch {
     return 'unreadable'
