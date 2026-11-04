@@ -163,9 +163,7 @@ export type VolumeRelation = 'same' | 'cross-volume' | 'unreadable'
 
 export async function volumeRelationBetween(from: string, to: string): Promise<VolumeRelation> {
   try {
-    // Why the walk first: awaiting it inside the `Promise.all` array leaves `stat(from)` without a
-    // handler across that await, so an unreadable `from` surfaces as an unhandled rejection — which
-    // this function exists to answer with `unreadable` instead.
+    // Walk first: an await inside the Promise.all array leaves stat(from) unhandled across it.
     const targetParent = await nearestExistingAncestor(dirname(to))
     const [fromStats, targetParentStats] = await Promise.all([stat(from), stat(targetParent)])
     return fromStats.dev === targetParentStats.dev ? 'same' : 'cross-volume'

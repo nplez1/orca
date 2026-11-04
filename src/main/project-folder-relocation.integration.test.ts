@@ -165,13 +165,19 @@ describe('relocating a primary checkout with linked worktrees', () => {
 
   it('refuses the volume question for a path it cannot read, instead of claiming another volume', async () => {
     // The real implementation, not a mock: a path that cannot be stat'ed is what produced the old
-    // "the destination is on a different volume" misreport. The destination is the real shape — a
-    // container this move would create, several levels of which do not exist yet — because the walk
-    // to an existing ancestor is what leaves the failed `stat` in flight.
-    // The listener is the assertion: that failed `stat` has to be consumed here, not left to the
-    // process, where it arrives as an unhandled rejection instead of as `unreadable`.
-    const unhandled = vi.fn()
-    process.on('unhandledRejection', unhandled)
+    // "the destination is on a different volume" misreport. The destination is several levels deep
+    // and does not exist yet, which is the real shape: the walk to an existing ancestor is what
+    // leaves the failed `stat` in flight. The listener is the assertion — that `stat` has to be
+    // consumed here, not left to the process. Filtered to this test's own path because
+    // `isolate: false` lets other files share the worker.
+    const strayRejections: string[] = []
+    const recordStrayRejection = (reason: unknown): void => {
+      const text = String(reason)
+      if (text.includes('missing-checkout')) {
+        strayRejections.push(text)
+      }
+    }
+    process.on('unhandledRejection', recordStrayRejection)
     try {
       await expect(
         volumeRelationBetween(
@@ -181,9 +187,9 @@ describe('relocating a primary checkout with linked worktrees', () => {
       ).resolves.toBe('unreadable')
       await new Promise((resolve) => setTimeout(resolve, 0))
     } finally {
-      process.off('unhandledRejection', unhandled)
+      process.off('unhandledRejection', recordStrayRejection)
     }
-    expect(unhandled).not.toHaveBeenCalled()
+    expect(strayRejections).toEqual([])
   })
 
   it('creates the container it is moving into', async () => {
