@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as fs from './asar-transparent-fs'
 import { removeHostCheckout } from './host-tree-removal'
+import { leftoverCheckoutFolderOf } from '../shared/worktree/removal'
 
 vi.mock('./asar-transparent-fs', () => ({
   readdir: vi.fn(),
@@ -46,5 +47,51 @@ it('settles public child promises before starting another pass or touching the m
   pending.resolve()
   await vi.runAllTimersAsync()
   expect(await removal).toMatchObject({ name: 'AbortError' })
+  expect(fs.readdir).toHaveBeenCalledOnce()
+})
+
+it('reports the locked child once the transient retries are spent', async () => {
+  vi.mocked(fs.readdir).mockResolvedValue(['held', '.git'])
+  vi.mocked(fs.rm).mockRejectedValue(
+    Object.assign(new Error('held child'), { code: 'EBUSY', path: `${root}/held` })
+  )
+
+  const removal = removeHostCheckout(root, async () => true).catch((reason: unknown) => reason)
+  await vi.runAllTimersAsync()
+  const error = await removal
+
+  expect(leftoverCheckoutFolderOf(error)).toEqual({
+    path: root,
+    blockingFile: `${root}/held`
+  })
+  // The marker stays so Git can still release the registration for a folder it cannot empty.
+  expect(fs.unlink).not.toHaveBeenCalled()
+  // A lock that outlives every transient pass is reported, not retried forever.
+  expect(fs.readdir).toHaveBeenCalledTimes(5)
+})
+
+it('still deletes a lock that clears inside the transient budget', async () => {
+  vi.mocked(fs.readdir).mockResolvedValue(['held', '.git'])
+  vi.mocked(fs.rm)
+    .mockRejectedValueOnce(Object.assign(new Error('held child'), { code: 'EBUSY' }))
+    .mockResolvedValue(undefined)
+  vi.mocked(fs.rmdir).mockResolvedValue(undefined)
+  vi.mocked(fs.unlink).mockResolvedValue(undefined)
+
+  const removal = removeHostCheckout(root, async () => true)
+  await vi.runAllTimersAsync()
+
+  await expect(removal).resolves.toBeUndefined()
+  expect(fs.unlink).toHaveBeenCalledWith(expect.stringContaining('.git'))
+})
+
+it('leaves a non-lock child failure as a plain removal failure', async () => {
+  vi.mocked(fs.readdir).mockResolvedValue(['denied', '.git'])
+  vi.mocked(fs.rm).mockRejectedValue(Object.assign(new Error('EIO: i/o error'), { code: 'EIO' }))
+
+  const error = await removeHostCheckout(root, async () => true).catch((reason: unknown) => reason)
+
+  expect(leftoverCheckoutFolderOf(error)).toBeUndefined()
+  expect(error).toMatchObject({ code: 'EIO' })
   expect(fs.readdir).toHaveBeenCalledOnce()
 })

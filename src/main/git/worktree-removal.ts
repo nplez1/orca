@@ -1,7 +1,11 @@
 import { lstat } from 'node:fs/promises'
 import { pruneGitWorktrees } from './worktree-prune-guard'
 import type { RemoveWorktreeResult } from '../../shared/worktree/create-types'
-import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree/removal'
+import {
+  assertWorktreeUnlockedForRemoval,
+  leftoverCheckoutFolderMessage,
+  type LeftoverCheckoutFolder
+} from '../../shared/worktree/removal'
 import { windowsLongPathGitArgs } from '../../shared/windows-long-path-git-args'
 import { removeHostTree } from '../host-tree-removal'
 import { withSpan } from '../observability/tracer'
@@ -81,46 +85,61 @@ async function performRemoveWorktree(
     args.push('--force')
   }
   args.push(worktreePath)
-  await runUnderWorktreeDeleteLimit(async () => {
-    if (usesNativeWindowsRemoval(worktreePath, options)) {
-      await removeWindowsCheckout(repoPath, worktreePath, force, {
-        ...options,
-        knownRemovedWorktree: removedWorktree
-      })
-      // Release only this administrative entry, and never override a newly acquired Git lock.
-      if (
-        (await listWorktreesStrict(repoPath, options)).some((row) =>
-          areWorktreePathsEqual(row.path, worktreePath)
-        )
-      ) {
-        if (!(await isWorktreePathMissing(worktreePath))) {
-          throw new Error(
-            `Worktree path appeared during deletion: ${worktreePath}. Retry deletion.`
+  let leftover: LeftoverCheckoutFolder | undefined
+  await runUnderWorktreeDeleteLimit(
+    async () => {
+      if (usesNativeWindowsRemoval(worktreePath, options)) {
+        // A folder the OS will not empty is the user's problem; the workspace still gets removed.
+        leftover = await removeWindowsCheckout(repoPath, worktreePath, force, {
+          ...options,
+          knownRemovedWorktree: removedWorktree
+        })
+        // Release only this administrative entry, and never override a newly acquired Git lock.
+        if (
+          !leftover &&
+          (await listWorktreesStrict(repoPath, options)).some((row) =>
+            areWorktreePathsEqual(row.path, worktreePath)
+          )
+        ) {
+          if (!(await isWorktreePathMissing(worktreePath))) {
+            throw new Error(
+              `Worktree path appeared during deletion: ${worktreePath}. Retry deletion.`
+            )
+          }
+          await gitExecFileAsync(
+            [...longPathArgs, 'worktree', 'remove', '--force', '--', worktreePath],
+            execOptions
           )
         }
-        await gitExecFileAsync(
-          [...longPathArgs, 'worktree', 'remove', '--force', '--', worktreePath],
-          execOptions
-        )
+      } else {
+        await gitExecFileAsync(args, execOptions)
+        await removeCheckoutLeftByGit(worktreePath, options)
       }
-    } else {
-      await gitExecFileAsync(args, execOptions)
-      await removeCheckoutLeftByGit(worktreePath, options)
-    }
-  })
+    },
+    { signal: options.checkoutDeleteSignal }
+  )
+  const warning = leftover ? leftoverCheckoutFolderMessage(leftover) : undefined
 
   if (!branchName) {
-    return {}
+    return warning ? { warning } : {}
   }
   if (options.deleteBranch === false) {
     // Why: the branch was pinned for preservation, so nothing consumed its upstream and there is
     // no deleted local branch to pair a remote delete with.
-    return options.deleteRemoteBranch === true
-      ? { remoteBranchCleanup: { status: 'skipped-preserved' } }
-      : {}
+    const preserved =
+      options.deleteRemoteBranch === true
+        ? { remoteBranchCleanup: { status: 'skipped-preserved' as const } }
+        : {}
+    return warning ? { ...preserved, warning } : preserved
   }
 
-  return deleteBranchOfRemovedWorktree(repoPath, branchName, branchHead, options)
+  const branchResult = await deleteBranchOfRemovedWorktree(
+    repoPath,
+    branchName,
+    branchHead,
+    options
+  )
+  return warning ? { ...branchResult, warning } : branchResult
 }
 
 function deleteBranchOfRemovedWorktree(

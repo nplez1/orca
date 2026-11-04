@@ -251,6 +251,21 @@ describe('removing a worktree the host deletes in the background', () => {
     })
   })
 
+  it('shows the host warning for a workspace it removed but left a folder behind', async () => {
+    seedRow(store)
+    const warning =
+      'C:/code/app-build/held.dll could not be deleted, so the folder at C:/code/app-build was left on disk. Close any program using it, then delete that folder yourself.'
+    mockApi.worktrees.remove.mockResolvedValue({ warning })
+
+    await expect(
+      store.getState().removeWorktree({ id: worktreeId, executionHostId: null })
+    ).resolves.toEqual({ ok: true, warning })
+    expect(toast.warning).toHaveBeenCalledWith(
+      'Workspace deleted with a warning',
+      expect.objectContaining({ description: warning })
+    )
+  })
+
   it('reports the host error for a lost reply when the host lists the failed delete', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     seedRow(store)

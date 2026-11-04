@@ -1,12 +1,14 @@
 import { join, resolve } from 'node:path'
 import { readFile } from 'node:fs/promises'
-import { lstat, readdir } from '../asar-transparent-fs'
+import { lstat, readdir, unlink } from '../asar-transparent-fs'
 import { removeHostCheckout } from '../host-tree-removal'
 import { parseWslPath } from '../wsl'
 import { CLIENT_REMOVAL_HOME } from '../worktree-removal-home-guard'
 import {
   assertWorktreeUnlockedForRemoval,
-  unregisteredFolderRefusal
+  leftoverCheckoutFolderOf,
+  unregisteredFolderRefusal,
+  type LeftoverCheckoutFolder
 } from '../../shared/worktree/removal'
 import {
   assertWorktreeDoesNotContainRegisteredWorktree,
@@ -17,7 +19,15 @@ import {
 } from '../worktree-removal-safety'
 import { readTranslatedWorktreeGraph } from './worktree-list-reader'
 import { assertWorktreeCleanForRemoval } from './worktree-removal-preflight'
-import { getErrorCode, type RemoveWorktreeOptions } from './worktree-operation-options'
+import {
+  getErrorCode,
+  gitExecOptions,
+  type RemoveWorktreeOptions
+} from './worktree-operation-options'
+import { windowsLongPathGitArgs } from '../../shared/windows-long-path-git-args'
+import { areWorktreePathsEqual } from './worktree-path-comparison'
+import { gitExecFileAsync } from './runner'
+import { listWorktreesStrict } from './worktree-listing'
 
 export function usesNativeWindowsRemoval(path: string, options: { wslDistro?: string }): boolean {
   return process.platform === 'win32' && !options.wslDistro && !parseWslPath(path)
@@ -47,12 +57,54 @@ export async function removeWindowsCheckout(
   root: string,
   force: boolean,
   options: RemoveWorktreeOptions
+): Promise<LeftoverCheckoutFolder | undefined> {
+  try {
+    await removeHostCheckout(
+      root,
+      (checkClean) => authorizeWindowsCheckout(repo, root, force, options, false, checkClean),
+      options.checkoutDeleteSignal
+    )
+    return undefined
+  } catch (error) {
+    const leftover = leftoverCheckoutFolderOf(error)
+    if (!leftover) {
+      throw error
+    }
+    await releaseLeftoverCheckoutRegistration(repo, root, options, leftover)
+    return leftover
+  }
+}
+
+/**
+ * A locked child leaves the folder behind, but its marker is still in place, so Git can release the
+ * registration: `worktree remove` drops the administrative entry before it walks the folder.
+ */
+async function releaseLeftoverCheckoutRegistration(
+  repo: string,
+  root: string,
+  options: RemoveWorktreeOptions,
+  leftover: LeftoverCheckoutFolder
 ): Promise<void> {
-  await removeHostCheckout(
-    root,
-    (checkClean) => authorizeWindowsCheckout(repo, root, force, options, false, checkClean),
-    options.checkoutDeleteSignal
-  )
+  try {
+    await gitExecFileAsync(
+      [...windowsLongPathGitArgs(repo), 'worktree', 'remove', '--force', '--', root],
+      { ...gitExecOptions(repo, options), admissionExempt: true as const }
+    )
+  } catch (error) {
+    // Git may fail only on the folder it cannot empty; the registration is re-read below either way.
+    console.warn(`[git] worktree remove could not empty ${root}; checking its registration`, error)
+  }
+  if (
+    (await listWorktreesStrict(repo, options)).some((row) => areWorktreePathsEqual(row.path, root))
+  ) {
+    // Never claim the folder is all that is left while Git still lists the checkout.
+    const blocker = leftover.blockingFile ?? root
+    throw new Error(
+      `${blocker} could not be deleted, and Git still registers the checkout at ${root}. Close any program using it and delete again.`
+    )
+  }
+  // A marker pointing at a removed administrative entry is not a worktree; leave the folder inert.
+  await unlink(join(root, '.git')).catch(() => {})
 }
 
 /** Share ordinary refusal before either entrypoint publishes a retry or tears down resources. */

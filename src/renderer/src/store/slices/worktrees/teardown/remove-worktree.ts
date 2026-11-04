@@ -32,6 +32,7 @@ import { clearSessionCommitDraftForWorktree } from '@/lib/source-control-commit-
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
 import { tearDownRemovedWorktreeRendererState } from './removed-worktree-renderer-teardown'
 import { buildWorktreeRemovalSuccessResult } from './worktree-removal-result'
+import { showWorktreeRemovalWarningToast } from '@/components/sidebar/worktree-removal-warning-toast'
 import { captureWorktreeStateBeforeRemoval } from './worktree-state-before-removal'
 import { resolveWorktreeRemovalPreference } from './worktree-removal-preference'
 import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
@@ -273,7 +274,12 @@ export function createRemoveWorktree(
         suppressToast: options?.suppressPreservedBranchToast === true
       })
       pruneHostedReviewLinkMutationGenerations([worktreeId])
+      // The host finished the removal; anything it could not finish is a warning, not a failure.
+      if (removalResult?.warning) {
+        showWorktreeRemovalWarningToast(removalResult.warning)
+      }
       return buildWorktreeRemovalSuccessResult({
+        warning: removalResult?.warning,
         // Why: an auto-deleted branch is gone, so the removal reports no preserved branch.
         preservedBranch:
           preservedBranch && cleanup && !autoDeletedBranch

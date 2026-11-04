@@ -219,6 +219,8 @@ export type RemoveWorktreeResult = {
   archiveHookOverride?: ArchiveHookOverride
   /** Legacy clients receive acceptance before deletion finishes; capable clients wait for completion. */
   removing?: true
+  /** The workspace is gone, but something it left on disk or skipped needs the user's attention. */
+  warning?: string
   /** Present only when the removal asked to also delete the remote branch. Absent means the
    *  host never reconciled it — including an older relay that dropped the request. */
   remoteBranchCleanup?: RemoteBranchCleanup
