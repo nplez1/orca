@@ -341,6 +341,9 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   wait is not), mobile's delete reply ignores `warning`, and nothing here was reproduced on Windows.
 - **Not verified on Windows:** no Windows host was available, so the platform-specific claims are
   read from the code and covered by mocked-fs tests, not reproduced. See the issue's § Verification.
+- **Base:** merged `nplez1/main` @ `0f81cd7f350` (PR #276, project-folder relocation) after the PR
+  opened. Auto-merge, no conflict and no resolution hunk (`--remerge-diff` empty), and no file
+  overlap with this branch's changes.
 
 ### fix/cli-symlink-world-readable — PR #20813, closed 2026-10-16 without a review
 

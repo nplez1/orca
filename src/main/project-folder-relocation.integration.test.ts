@@ -165,10 +165,31 @@ describe('relocating a primary checkout with linked worktrees', () => {
 
   it('refuses the volume question for a path it cannot read, instead of claiming another volume', async () => {
     // The real implementation, not a mock: a path that cannot be stat'ed is what produced the old
-    // "the destination is on a different volume" misreport.
-    await expect(
-      volumeRelationBetween(join(root, 'missing-checkout'), join(root, 'orca', 'workspaces'))
-    ).resolves.toBe('unreadable')
+    // "the destination is on a different volume" misreport. The destination is several levels deep
+    // and does not exist yet, which is the real shape: the walk to an existing ancestor is what
+    // leaves the failed `stat` in flight. The listener is the assertion — that `stat` has to be
+    // consumed here, not left to the process. Filtered to this test's own path so a rejection left
+    // by another test is not blamed on this one.
+    const strayRejections: string[] = []
+    const recordStrayRejection = (reason: unknown): void => {
+      const text = String(reason)
+      if (text.includes('missing-checkout')) {
+        strayRejections.push(text)
+      }
+    }
+    process.on('unhandledRejection', recordStrayRejection)
+    try {
+      await expect(
+        volumeRelationBetween(
+          join(root, 'missing-checkout'),
+          join(root, 'not-yet', 'created', 'orca', 'workspaces', 'homelab')
+        )
+      ).resolves.toBe('unreadable')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    } finally {
+      process.off('unhandledRejection', recordStrayRejection)
+    }
+    expect(strayRejections).toEqual([])
   })
 
   it('creates the container it is moving into', async () => {
