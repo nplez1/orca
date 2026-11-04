@@ -168,8 +168,8 @@ describe('relocating a primary checkout with linked worktrees', () => {
     // "the destination is on a different volume" misreport. The destination is several levels deep
     // and does not exist yet, which is the real shape: the walk to an existing ancestor is what
     // leaves the failed `stat` in flight. The listener is the assertion — that `stat` has to be
-    // consumed here, not left to the process. Filtered to this test's own path because
-    // `isolate: false` lets other files share the worker.
+    // consumed here, not left to the process. Filtered to this test's own path so a rejection left
+    // by another test is not blamed on this one.
     const strayRejections: string[] = []
     const recordStrayRejection = (reason: unknown): void => {
       const text = String(reason)
