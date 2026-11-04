@@ -165,10 +165,25 @@ describe('relocating a primary checkout with linked worktrees', () => {
 
   it('refuses the volume question for a path it cannot read, instead of claiming another volume', async () => {
     // The real implementation, not a mock: a path that cannot be stat'ed is what produced the old
-    // "the destination is on a different volume" misreport.
-    await expect(
-      volumeRelationBetween(join(root, 'missing-checkout'), join(root, 'orca', 'workspaces'))
-    ).resolves.toBe('unreadable')
+    // "the destination is on a different volume" misreport. The destination is the real shape — a
+    // container this move would create, several levels of which do not exist yet — because the walk
+    // to an existing ancestor is what leaves the failed `stat` in flight.
+    // The listener is the assertion: that failed `stat` has to be consumed here, not left to the
+    // process, where it arrives as an unhandled rejection instead of as `unreadable`.
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    try {
+      await expect(
+        volumeRelationBetween(
+          join(root, 'missing-checkout'),
+          join(root, 'not-yet', 'created', 'orca', 'workspaces', 'homelab')
+        )
+      ).resolves.toBe('unreadable')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+    expect(unhandled).not.toHaveBeenCalled()
   })
 
   it('creates the container it is moving into', async () => {
