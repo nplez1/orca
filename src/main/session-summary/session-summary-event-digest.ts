@@ -44,17 +44,22 @@ const TOOL_NAME_PATTERN = /^[A-Za-z][\w.:-]{0,39}$/
  */
 const EXIT_CODE_PATTERN =
   /^(?:(?:Process|process|Command|command)? ?exited with (?:code|status)|Exit (?:code|status)):? (\d+)\s*$/m
-/** Unambiguous evidence that the command failed, as opposed to a file that merely mentions errors. */
+/**
+ * Unambiguous evidence that the command failed, as opposed to a file that merely mentions errors.
+ *
+ * Why escaped code points and not the glyphs: this file is bundled into the orcad server build, which
+ * refuses non-ASCII source.
+ */
 const FAILURE_TRIGGERS = [
   /^FAIL\b/,
-  /^[✗×✖]/u,
+  /^[\u2717\u00d7\u2716]/u,
   /^Traceback \(most recent call last\)/,
   /^panic:/,
   /^error\[E\d+\]/,
   /\bCommand failed\b/
 ]
 const FAILURE_LINE_PATTERN =
-  /^(?:error|Error|ERROR|FAIL|FAILED|failed|fatal|FATAL|panic:|Traceback|[✗×✖])/u
+  /^(?:error|Error|ERROR|FAIL|FAILED|failed|fatal|FATAL|panic:|Traceback|[\u2717\u00d7\u2716])/u
 
 export type SessionSummaryEventDigester = {
   /** The digest event for one message, advancing any cross-message state. */
