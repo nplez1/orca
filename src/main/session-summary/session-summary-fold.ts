@@ -36,9 +36,17 @@ import {
   buildSessionSummaryChunkPrompt,
   chunkCacheKey,
   rangeLastEventIndex,
-  type SessionSummaryChunkRange,
   type SessionSummaryGap
 } from './session-summary-chunk-prompt'
+import {
+  describeAbandonedRange,
+  firstRejectionReason,
+  recordFoldFailures,
+  type ChunkOutcome,
+  type SessionSummaryChunkFailureTracker
+} from './session-summary-fold-failure'
+
+export type { SessionSummaryChunkFailureTracker } from './session-summary-fold-failure'
 
 export type { SessionSummarySourceEvent }
 export {
@@ -58,63 +66,10 @@ export type SessionSummaryChunkCache = {
   set(key: string, delta: SessionSummaryLedgerDelta): void
 }
 
-/**
- * How many folds each slice has failed on, persisted across folds.
- *
- * Why on the store: the judgement "this slice cannot be summarized" needs evidence no single fold
- * has. Without it, one unsummarizable slice stalls every message after it for the life of the
- * session, and the only alternative — abandoning on the first failure — throws work away during a
- * transient outage.
- */
-export type SessionSummaryChunkFailureTracker = {
-  /** Counts one failed fold for this slice and answers how many it has now had. */
-  record(key: string): number
-  /** The slice was summarized after all. */
-  clear(key: string): void
-}
-
-/** What one chunk's model call produced, or why it produced nothing. */
-type ChunkOutcome =
-  | { kind: 'delta'; delta: SessionSummaryLedgerDelta }
-  | { kind: 'failed'; reason: unknown }
-  | { kind: 'abandon'; reason: unknown }
-
-/** How many folds a slice may fail on before the fold gives up on it and names the hole. */
-const CHUNK_MAX_FOLD_FAILURES = 3
-
-/**
- * The counter key for one event.
- *
- * Why the event and not the range: the parts of a message too large for one prompt are one slice of
- * the transcript, so a fold that fails three of its parts has failed the event once.
- */
-function eventFailureKey(range: SessionSummaryChunkRange, baseIndex: number): string {
-  return `${baseIndex + range.from}-${baseIndex + range.to}`
-}
-
-function firstNonDelta(settled: readonly PromiseSettledResult<ChunkOutcome>[]): number {
-  return settled.findIndex((entry) => entry.status === 'rejected' || entry.value.kind !== 'delta')
-}
-
-function firstRejectionReason(
-  settled: readonly PromiseSettledResult<ChunkOutcome>[]
-): Error | null {
-  for (const entry of settled) {
-    const reason =
-      entry.status === 'rejected'
-        ? entry.reason
-        : entry.value.kind === 'delta'
-          ? null
-          : entry.value.reason
-    if (reason !== null) {
-      return reason instanceof Error ? reason : new Error(String(reason))
-    }
-  }
-  return null
-}
-
 /** Attempts per chunk. A JSON miss is usually transient; a third doubles a genuinely broken call. */
 const CHUNK_ATTEMPTS = 2
+
+const EMPTY_DELTA: SessionSummaryLedgerDelta = {}
 
 /**
  * Where the reader's own last message sits, after folding this batch.
@@ -145,22 +100,6 @@ export type SessionSummaryFoldResult = {
   totalChunks: number
   /** Chunks that could not be summarized; the next fold resumes at the first of them. */
   gap: SessionSummaryFoldGap | null
-}
-
-const EMPTY_DELTA: SessionSummaryLedgerDelta = {}
-
-/** A slice the fold has given up on: named in the ledger so the pane accounts for it. */
-function describeAbandonedRange(range: SessionSummaryChunkRange, baseIndex: number): string {
-  const from = baseIndex + range.from
-  const to = baseIndex + Math.max(range.from, range.to - 1)
-  if (range.partCount !== undefined) {
-    // A message too large for one prompt was dropped whole: its parts are a paging device, not
-    // separate messages, so naming a part would misdescribe what was lost.
-    return `Message #${from} could not be summarized and was skipped.`
-  }
-  return from === to
-    ? `Message #${from} could not be summarized and was skipped.`
-    : `Messages #${from}-#${to} could not be summarized and were skipped.`
 }
 
 /** How many chunks the extract phase finished, and where the applied prefix ends. */
@@ -232,10 +171,15 @@ export async function foldSessionSummaryEvents(args: {
     // of chunks failing without a single success is that evidence, and it bounds the cost to one
     // wave. It is not the abandonment rule — that needs evidence a single fold cannot have.
     let consecutiveFailures = 0
+    // Which slices a model call answered for in *this* fold. Why it matters separately from a cached
+    // extract: only a real completion is evidence the brain works, and only a fold that demonstrably
+    // worked may hold a slice's failure against it — otherwise an outage would be remembered as
+    // three folds of unsummarizable slices and the whole session would be skipped.
+    const freshRanges = new Set<number>()
     const settled = await mapSettledWithConcurrency(
       ranges,
       SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY,
-      async (range): Promise<ChunkOutcome> => {
+      async (range, rangeIndex): Promise<ChunkOutcome> => {
         foldSignal.throwIfAborted()
         const cacheKey = chunkCacheKey(range, baseIndex)
         const cached = cache?.get(cacheKey)
@@ -266,7 +210,7 @@ export async function foldSessionSummaryEvents(args: {
               throw new Error('fold extract returned no usable JSON')
             }
             cache?.set(cacheKey, delta)
-            failures?.clear(eventFailureKey(range, baseIndex))
+            freshRanges.add(rangeIndex)
             consecutiveFailures = 0
             completedChunks += 1
             reportProgress()
@@ -282,39 +226,26 @@ export async function foldSessionSummaryEvents(args: {
         if (consecutiveFailures >= SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY) {
           foldController.abort(lastError)
         }
-        // Why a persisted count decides and not this fold's shape: one fold cannot tell a slice the
-        // model cannot summarize from a brain that is down — but a slice that has failed on three
-        // separate folds is unsummarizable. Without that, one such slice stalls every message after
-        // it for the life of the session.
-        const attempts = failures?.record(eventFailureKey(range, baseIndex)) ?? 1
-        return attempts >= CHUNK_MAX_FOLD_FAILURES
-          ? { kind: 'abandon', reason: lastError }
-          : { kind: 'failed', reason: lastError }
+        return { kind: 'failed', reason: lastError }
       }
     )
 
+    const abandonedEvents = recordFoldFailures({
+      settled,
+      ranges,
+      baseIndex,
+      failures,
+      brainAnswered: freshRanges.size > 0
+    })
+
     // Why the whole event: a message too large for one prompt is paged, not split into messages, so
     // half of it landing while the pane says the message was skipped would be a false account.
-    const abandonedEvents = new Set<number>()
-    for (let index = 0; index < settled.length; index += 1) {
-      const outcome = settled[index]
-      if (outcome.status === 'fulfilled' && outcome.value.kind === 'abandon') {
-        abandonedEvents.add(ranges[index].from)
-      }
-    }
-    const abandoned: string[] = []
     const outcomes: PromiseSettledResult<ChunkOutcome>[] = settled.map((entry, index) => {
       if (!abandonedEvents.has(ranges[index].from)) {
         return entry
       }
       return { status: 'fulfilled' as const, value: { kind: 'delta', delta: EMPTY_DELTA } }
     })
-    for (const eventIndex of abandonedEvents) {
-      const range = ranges.find((candidate) => candidate.from === eventIndex)
-      if (range) {
-        abandoned.push(describeAbandonedRange(range, baseIndex))
-      }
-    }
     completedChunks += abandonedEvents.size
 
     let lastApplied = appliedPrefix(outcomes)
@@ -331,12 +262,7 @@ export async function foldSessionSummaryEvents(args: {
       // failing — not yet at its third fold — must still record the gap, or the brief reads as
       // current and the retry never happens on an idle session. Only a fold where *nothing* settled
       // is a brain that is not working, and that has to stay visible.
-      const failedAt = firstNonDelta(outcomes)
-      const brainWorks = outcomes.some(
-        (entry, index) =>
-          index !== failedAt && entry.status === 'fulfilled' && entry.value.kind === 'delta'
-      )
-      if (!brainWorks) {
+      if (freshRanges.size === 0) {
         const reason = firstRejectionReason(outcomes) ?? new Error('fold produced no chunks')
         foldController.abort(reason)
         throw reason
@@ -358,6 +284,20 @@ export async function foldSessionSummaryEvents(args: {
     // cursor has to stop where it begins or the next fold would skip it.
     const foldedThrough =
       gap === null ? baseIndex + events.length : baseIndex + ranges[lastApplied + 1].from
+
+    // Why only below the cursor: an event whose slice was given up on but which sits past the point
+    // the cursor stops at was not skipped, and saying so would leave a false entry in the ledger that
+    // no later fold withdraws.
+    const abandoned: string[] = []
+    for (const eventIndex of abandonedEvents) {
+      if (baseIndex + eventIndex >= foldedThrough) {
+        continue
+      }
+      const range = ranges.find((candidate) => candidate.from === eventIndex)
+      if (range) {
+        abandoned.push(describeAbandonedRange(range, baseIndex))
+      }
+    }
 
     const merged = mergeSessionSummaryDeltas(deltas)
     // Why sliced: a degraded fold stops at the first failed chunk, so counting the reader's messages

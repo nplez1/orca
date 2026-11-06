@@ -303,6 +303,78 @@ describe('foldSessionSummaryEvents', () => {
     expect(last.ledger.gaps.join(' ')).toContain('Messages #240-#359 could not be summarized')
   })
 
+  // All the parts of a paged message share one count, so counting per part reached the give-up
+  // threshold inside a single fold and skipped a message nobody had established was unsummarizable.
+  it('counts one failed fold once, however many parts of a message failed', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        // Every part of the paged message fails; the short event before it does not.
+        if (prompt.includes('[#1 ')) {
+          throw new Error('content filter')
+        }
+        return JSON.stringify({ done: ['ok'], timeline: [] })
+      }
+    }
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: [
+        { role: 'user', text: 'first', timestamp: null },
+        { role: 'assistant', text: 'z'.repeat(60_000), timestamp: null }
+      ],
+      signal: new AbortController().signal,
+      failures
+    })
+    expect(result.ledger.foldedThrough).toBe(1)
+    expect([...counts.entries()]).toEqual([['1-2', 1]])
+  })
+
+  // An outage must not be remembered as a session full of unsummarizable slices.
+  it('holds no slice against it when no model call succeeded', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    await expect(
+      foldSessionSummaryEvents({
+        brain: {
+          complete: async ({ prompt }) => {
+            if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+              return reply()
+            }
+            throw new Error('429 rate limited')
+          }
+        },
+        ledger: emptySessionSummaryLedger(),
+        events: events(480),
+        signal: new AbortController().signal,
+        failures
+      })
+    ).rejects.toThrow('429 rate limited')
+    expect(counts.size).toBe(0)
+  })
+
   // A slice that was failing and then works again is retried, not remembered as broken.
   it('retries a slice whose earlier folds failed', async () => {
     const counts = new Map<string, number>([['0-120', 2]])
