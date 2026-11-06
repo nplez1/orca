@@ -235,7 +235,8 @@ export async function foldSessionSummaryEvents(args: {
       ranges,
       baseIndex,
       failures,
-      brainAnswered: freshRanges.size > 0
+      brainAnswered: freshRanges.size > 0,
+      aborted: foldSignal.aborted
     })
 
     // Why the whole event: a message too large for one prompt is paged, not split into messages, so

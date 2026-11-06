@@ -340,7 +340,8 @@ describe('foldSessionSummaryEvents', () => {
       failures
     })
     expect(result.ledger.foldedThrough).toBe(1)
-    expect([...counts.entries()]).toEqual([['1-2', 1]])
+    // Keyed by the event, not the range: a growing final chunk must not reset the count.
+    expect([...counts.entries()]).toEqual([['1', 1]])
   })
 
   // An outage must not be remembered as a session full of unsummarizable slices.
@@ -377,7 +378,7 @@ describe('foldSessionSummaryEvents', () => {
 
   // A slice that was failing and then works again is retried, not remembered as broken.
   it('retries a slice whose earlier folds failed', async () => {
-    const counts = new Map<string, number>([['0-120', 2]])
+    const counts = new Map<string, number>([['0', 2]])
     const failures = {
       record: (key: string): number => {
         const next = (counts.get(key) ?? 0) + 1

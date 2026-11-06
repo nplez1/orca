@@ -36,10 +36,12 @@ export type SessionSummaryChunkFailureTracker = {
  * The counter key for one event.
  *
  * Why the event and not the range: the parts of a message too large for one prompt are one slice of
- * the transcript, so a fold that fails three of its parts has failed the event once.
+ * the transcript, so a fold that fails three of its parts has failed the event once. Why the start
+ * and not the end as well: the last chunk of a live session grows with every appended message, so a
+ * key that named its end would reset the count until that chunk filled up.
  */
 export function eventFailureKey(range: SessionSummaryChunkRange, baseIndex: number): string {
-  return `${baseIndex + range.from}-${baseIndex + range.to}`
+  return `${baseIndex + range.from}`
 }
 
 /**
@@ -55,18 +57,29 @@ export function recordFoldFailures(args: {
   baseIndex: number
   failures: SessionSummaryChunkFailureTracker | undefined
   brainAnswered: boolean
+  /** The fold was cancelled: a chunk that never ran says nothing about its slice. */
+  aborted: boolean
 }): Set<number> {
   const abandoned = new Set<number>()
-  if (!args.brainAnswered) {
+  // Why nothing at all when aborted: every chunk still pending rejects with the abort, and holding a
+  // pane close or a tripped breaker against those slices would abandon messages no model ever saw.
+  if (!args.brainAnswered || args.aborted) {
     return abandoned
   }
-  const failed = new Set<number>()
   const answered = new Set<number>()
+  // Why only the slice the fold stops at: a failure past the cursor is incidental to the fold
+  // stopping early, and that slice gets its own turn once the earlier ones are folded. Counting them
+  // all would let a spell of rate limiting — one chunk through, the rest refused — abandon content
+  // that was never really tried.
+  let stoppedAt: number | null = null
   for (let index = 0; index < args.settled.length; index += 1) {
     const entry = args.settled[index]
-    const isDelta = entry.status === 'fulfilled' && entry.value.kind === 'delta'
-    const target = isDelta ? answered : failed
-    target.add(args.ranges[index].from)
+    const eventIndex = args.ranges[index].from
+    if (entry.status === 'fulfilled' && entry.value.kind === 'delta') {
+      answered.add(eventIndex)
+    } else if (entry.status === 'fulfilled' && stoppedAt === null) {
+      stoppedAt = eventIndex
+    }
   }
   for (const eventIndex of answered) {
     const range = args.ranges.find((candidate) => candidate.from === eventIndex)
@@ -74,22 +87,17 @@ export function recordFoldFailures(args: {
       args.failures?.clear(eventFailureKey(range, args.baseIndex))
     }
   }
-  for (const eventIndex of failed) {
-    // A paged message whose other part succeeded was summarized; only a slice that failed whole
-    // counts, and it counts once however many of its parts failed.
-    if (answered.has(eventIndex)) {
-      continue
-    }
-    const range = args.ranges.find((candidate) => candidate.from === eventIndex)
-    if (!range) {
-      continue
-    }
-    if (
-      (args.failures?.record(eventFailureKey(range, args.baseIndex)) ?? 1) >=
-      CHUNK_MAX_FOLD_FAILURES
-    ) {
-      abandoned.add(eventIndex)
-    }
+  // A paged message whose other part succeeded was summarized; only a slice that failed whole counts.
+  if (stoppedAt === null || answered.has(stoppedAt)) {
+    return abandoned
+  }
+  const range = args.ranges.find((candidate) => candidate.from === stoppedAt)
+  if (!range) {
+    return abandoned
+  }
+  const attempts = args.failures?.record(eventFailureKey(range, args.baseIndex)) ?? 1
+  if (attempts >= CHUNK_MAX_FOLD_FAILURES) {
+    abandoned.add(stoppedAt)
   }
   return abandoned
 }
