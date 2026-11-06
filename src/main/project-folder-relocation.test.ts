@@ -10,7 +10,7 @@ import {
 } from './project-folder-relocation'
 
 const projectFolderSettings = {
-  workspaceDir: '/Users/nathanp/orca/workspaces',
+  workspaceDir: '/Users/dev/orca/workspaces',
   nestWorkspaces: false,
   worktreeLayoutMode: 'project-folder' as const
 }
@@ -20,9 +20,9 @@ describe('planPrimaryCheckoutRelocation', () => {
     // The live shape: checkout elsewhere, worktrees already in the project folder.
     const decision = planPrimaryCheckoutRelocation({
       repo: {
-        path: '/Users/nathanp/Code/homelab',
+        path: '/Users/dev/Code/homelab',
         displayName: 'homelab',
-        worktreeBasePath: '/Users/nathanp/orca/workspaces/homelab'
+        worktreeBasePath: '/Users/dev/orca/workspaces/homelab'
       },
       settings: projectFolderSettings,
       defaultBranchName: 'main',
@@ -32,8 +32,8 @@ describe('planPrimaryCheckoutRelocation', () => {
     expect(decision).toEqual({
       kind: 'ready',
       plan: {
-        containerPath: '/Users/nathanp/orca/workspaces/homelab',
-        targetPath: '/Users/nathanp/orca/workspaces/homelab/main',
+        containerPath: '/Users/dev/orca/workspaces/homelab',
+        targetPath: '/Users/dev/orca/workspaces/homelab/main',
         defaultBranchName: 'main'
       }
     })
@@ -41,7 +41,7 @@ describe('planPrimaryCheckoutRelocation', () => {
 
   it('skips a checkout already inside its container', () => {
     const decision = planPrimaryCheckoutRelocation({
-      repo: { path: '/Users/nathanp/Code/orca/main', displayName: 'orca', worktreeBasePath: '..' },
+      repo: { path: '/Users/dev/Code/orca/main', displayName: 'orca', worktreeBasePath: '..' },
       settings: projectFolderSettings,
       defaultBranchName: 'main',
       platform: 'darwin'
