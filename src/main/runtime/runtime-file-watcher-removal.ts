@@ -15,6 +15,9 @@ type FileExplorerWatcherCommands = {
   forgetFileExplorerWatchersAfterRemoval(worktreePath: string, connectionId?: string): void
 }
 
+/** Restore is best-effort: a failed delete must still settle, even when installing on a locked tree hangs. */
+export const WATCHER_RESTORE_BUDGET_MS = 15_000
+
 export function createRuntimeFileWatcherRemoval(fileCommands: FileExplorerWatcherCommands) {
   const close = async (
     worktreePath: string,
@@ -39,10 +42,26 @@ export function createRuntimeFileWatcherRemoval(fileCommands: FileExplorerWatche
     }
   }
 
-  const restore = async (worktreePath: string, connectionId?: string): Promise<void> => {
+  // Why bounded: this runs in the removal's `finally`, so an unsettled restore would hold the
+  // workspace in Deleting forever on exactly the tree the delete could not empty.
+  const restore = async (
+    worktreePath: string,
+    connectionId?: string,
+    deadline: WatcherRemovalDeadline = createWatcherRemovalDeadline(WATCHER_RESTORE_BUDGET_MS)
+  ): Promise<void> => {
     await Promise.all([
-      connectionId ? undefined : getWorktreeWatcherRemoval().restoreLocal(worktreePath),
-      fileCommands.restoreFileExplorerWatchersAfterFailedRemoval(worktreePath, connectionId)
+      connectionId
+        ? undefined
+        : drainBeforeWatcherRemoval(
+            getWorktreeWatcherRemoval().restoreLocal(worktreePath),
+            deadline,
+            `local watcher restore for ${worktreePath}`
+          ),
+      drainBeforeWatcherRemoval(
+        fileCommands.restoreFileExplorerWatchersAfterFailedRemoval(worktreePath, connectionId),
+        deadline,
+        `file explorer watcher restore for ${worktreePath}`
+      )
     ])
   }
 

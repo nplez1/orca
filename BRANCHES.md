@@ -296,6 +296,55 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
+### nplez1/bug-a-windows-workspace-whose-checkout-folder-ca — issue #275
+
+- **Why:** on Windows a checkout folder that could not be deleted (the reported case: a debug build
+  running out of the worktree, holding file handles) left the workspace on **Deleting** for an
+  unbounded time and then produced a failed row that told the user the folder was “no longer a Git
+  worktree” while Git still listed it. Waiting indefinitely on a folder delete is not acceptable.
+- **Shape:** four changes, all on the failed-delete tail. `restore` in
+  `runtime-file-watcher-removal.ts` is now bounded by its own 15 s budget instead of awaiting a
+  native watcher install on the locked tree forever (the actual hang). `removeHostCheckout` keeps the
+  `.git` marker when a child delete stays locked and throws a `LeftoverCheckoutFolderError` naming the
+  blocking file, so `removeWindowsCheckout` can let Git release the registration (`worktree remove`
+  drops the administrative entry before it walks the folder) and return a `LeftoverCheckoutFolder`
+  instead of failing — the workspace is removed, the folder is the user's problem, and the warning
+  reaches the renderer through the new `RemoveWorktreeResult.warning`. `runUnderWorktreeDeleteLimit`
+  gained a bounded queue wait and abort support so two wedged deletes cannot block every later delete
+  for the session. Verified against the code at `6468b90d871`; F1's “five full walks plus ten Git
+  calls” premise was wrong — a stalled pass now throws before it authorizes, so a locked folder costs
+  one authorization, not five.
+- **Not done, deliberately:** the “queued row says waiting for another delete” state and a UI cancel
+  button from fix direction 3. Both are new IPC/renderer surface; the queue is bounded by a timeout
+  that reports a retryable error instead, which is what removes the unbounded wait.
+- **Verified:** `pnpm tc:node` / `tc:web` / `tc:cli`, `check:code-quality:changed nplez1/main`
+  (0 findings), `oxlint` on every changed file, and 171 tests across the 14 removal-path files
+  (`host-checkout-removal`, `worktree-delete-limit`, `runtime-file-watcher-removal`,
+  `windows-worktree-removal-leftover`, `worktrees-background-removal`, `worktrees-removal-recovery`,
+  `worktrees-remove-archive-hooks`, `runtime-failed-local-worktree-removal`,
+  `runtime-interrupted-local-worktree-removal`, `worktree-failed-removal`,
+  `worktree-removal-real-git`, `worktree-background-removal`,
+  `worktree-background-removal-records`, renderer `worktrees-background-removal`) — 150 pass,
+  21 skipped (the Windows-only real-Git cases).
+- **Review round 1** (Opus 5.5, high, on R1): three blocking findings, all fixed in R2 —
+  (a) the clean check ran on every pass, so a non-force delete's second pass read Orca's own
+  deletions as uncommitted changes and failed with a dirty error instead of the warning; the check
+  now runs once, before any child is deleted. (b) the leftover `git worktree remove` had neither
+  `GIT_ASK_YESNO` stripped nor the abort signal, so a prompt could stall exactly the call the fix
+  exists to bound; `removalGitEnv` moved to `worktree-operation-options.ts` and both are passed.
+  (c) the restart-resume path discarded the leftover warning and then threw
+  `unregisteredFolderRefusal`; it now skips that assertion when Git already released the
+  registration. Also took two MINORs: `finishAcceptedWorktreeRemoval` no longer lets the finish-time
+  warning overwrite the acceptance one, and the comments state what the delete observes rather than
+  an unverified claim about Git's internal order.
+- **Still open, and in the PR body:** the removal that _holds_ a slot is still unbounded (the queue
+  wait is not), mobile's delete reply ignores `warning`, and nothing here was reproduced on Windows.
+- **Not verified on Windows:** no Windows host was available, so the platform-specific claims are
+  read from the code and covered by mocked-fs tests, not reproduced. See the issue's § Verification.
+- **Base:** merged `nplez1/main` @ `0f81cd7f350` (PR #276, project-folder relocation) after the PR
+  opened. Auto-merge, no conflict and no resolution hunk (`--remerge-diff` empty), and no file
+  overlap with this branch's changes.
+
 ### fix/cli-symlink-world-readable — PR #20813, closed 2026-10-16 without a review
 
 - **Why:** macOS published the privileged `/usr/local/bin/orca` shim as `0700`, so `readlink` failed

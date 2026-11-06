@@ -7,6 +7,40 @@ export function unregisteredFolderRefusal(worktreePath: string): Error {
   )
 }
 
+/** A checkout whose folder could not be emptied, so the delete leaves it behind as the user's problem. */
+export type LeftoverCheckoutFolder = {
+  path: string
+  /** The file or directory the OS refused to delete, when a failure named one. */
+  blockingFile?: string
+}
+
+/** The workspace is gone either way; the warning names what the user still has to delete themselves. */
+export function leftoverCheckoutFolderMessage({
+  path,
+  blockingFile
+}: LeftoverCheckoutFolder): string {
+  return blockingFile
+    ? `${blockingFile} could not be deleted, so the folder at ${path} was left on disk. Close any program using it, then delete that folder yourself.`
+    : `The folder at ${path} could not be deleted and was left on disk. Close any program using it, then delete that folder yourself.`
+}
+
+/** Distinguishes "the folder survived" from a refusal that leaves the workspace registered. */
+export class LeftoverCheckoutFolderError extends Error {
+  /** `ENOTEMPTY`: the folder still holds entries, which the Windows retry loop may still clear. */
+  readonly code = 'ENOTEMPTY'
+  readonly leftover: LeftoverCheckoutFolder
+
+  constructor(leftover: LeftoverCheckoutFolder, options?: { cause?: unknown }) {
+    super(leftoverCheckoutFolderMessage(leftover), options)
+    this.name = 'LeftoverCheckoutFolderError'
+    this.leftover = leftover
+  }
+}
+
+export function leftoverCheckoutFolderOf(error: unknown): LeftoverCheckoutFolder | undefined {
+  return error instanceof LeftoverCheckoutFolderError ? error.leftover : undefined
+}
+
 export const LOCKED_WORKTREE_REMOVAL_PREFIX = 'Worktree is locked by Git.'
 
 export const UNSTOPPED_PTY_REMOVAL_PREFIX = 'Failed to physically stop every PTY for worktree:'

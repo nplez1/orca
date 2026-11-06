@@ -29,13 +29,15 @@ export function buildPreservedBranchCleanup(args: {
 export function buildWorktreeRemovalSuccessResult(args: {
   preservedBranch: RemoveWorktreeResult['preservedBranch'] | null
   remoteBranchCleanup: RemoveWorktreeResult['remoteBranchCleanup']
+  warning: RemoveWorktreeResult['warning']
 }): { ok: true } & RendererRemoveWorktreeResult {
-  const { preservedBranch, remoteBranchCleanup } = args
+  const { preservedBranch, remoteBranchCleanup, warning } = args
   // Why: `remoteBranchCleanup` is optional in the type, so omitting it typechecks and then
   // silently reports nothing about a remote branch the user asked to delete.
   return {
     ok: true,
     ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}),
+    ...(warning ? { warning } : {}),
     ...(preservedBranch ? { preservedBranch } : {})
   }
 }

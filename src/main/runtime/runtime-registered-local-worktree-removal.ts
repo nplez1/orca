@@ -6,7 +6,6 @@ import {
 } from '../git/windows-worktree-removal'
 import { pruneGitWorktrees } from '../git/worktree-prune-guard'
 import type { RemoveWorktreeResult } from '../../shared/worktree/create-types'
-import type { ArchiveHookOverride } from '../../shared/worktree/archive-hook-removal-gate'
 import { gateWorktreeRemovalOnArchiveHook } from '../worktree-archive-hook-gate'
 import type { Repo } from '../../shared/repo-types'
 import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree/removal'
@@ -39,6 +38,7 @@ import {
   waitForPendingWorktreeRemoval
 } from '../worktree-background-removal'
 import { runSerializedWorktreeRemovalAcceptance } from '../worktree-removal-acceptance-queue'
+import { withRemovalAcceptanceFields } from '../worktree-removal-acceptance-fields'
 
 /** Runs after the previous same-repo removal was accepted; see runSerializedWorktreeRemovalAcceptance. */
 export function removeRuntimeRegisteredLocalWorktree(
@@ -92,9 +92,8 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
   const { repo, registeredWorktree, localOptions } = args
   const canonicalPath = registeredWorktree.path
   const hooks = getEffectiveHooks(repo)
-  let warning: string | undefined
-  // Archive refusal precedes refresh, preflights, PTY stop and Git deletion; failure must leave them untouched (#19334).
-  let archiveHookOverride: ArchiveHookOverride | undefined
+  // What acceptance alone contributes to the result; Git's finish can add more, and neither may be lost.
+  const acceptedFields: RemoveWorktreeResult = {}
   if (
     hooks?.scripts.archive &&
     args.runHooks &&
@@ -107,14 +106,15 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
       undefined,
       args.hasLocalOptions ? localOptions : undefined
     )
-    archiveHookOverride = gateWorktreeRemovalOnArchiveHook({
+    // Archive refusal precedes refresh, preflights, PTY stop and Git deletion; failure must leave them untouched (#19334).
+    acceptedFields.archiveHookOverride = gateWorktreeRemovalOnArchiveHook({
       worktreePath: canonicalPath,
       result,
       allowFailure: args.allowFailedArchiveHook
     })
   } else if (hooks?.scripts.archive) {
-    warning = `orca.yaml archive hook skipped for ${canonicalPath}; pass --run-hooks to run it.`
-    console.warn(`[hooks] ${warning}`)
+    acceptedFields.warning = `orca.yaml archive hook skipped for ${canonicalPath}; pass --run-hooks to run it.`
+    console.warn(`[hooks] ${acceptedFields.warning}`)
   }
 
   const refreshedWorktrees = args.hasLocalOptions
@@ -191,14 +191,10 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
       await gate.finish(false)
     }
   }
-  const acceptedFields = {
-    ...(archiveHookOverride ? { archiveHookOverride } : {}),
-    ...(warning ? { warning } : {})
-  }
   if (!removesInBackground(canonicalPath, localOptions)) {
     const result = await finishRuntimeLocalWorktreeRemoval(args, refreshed, gate)
     args.publish()
-    return { ...result, ...acceptedFields }
+    return withRemovalAcceptanceFields(result, acceptedFields)
   }
   // After all refusals, detach slow Git deletion so request timeout cannot cancel it; clients follow the removing marker.
   void startBackgroundWorktreeRemoval({

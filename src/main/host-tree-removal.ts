@@ -1,13 +1,20 @@
 // Host deletion needs bounded Windows lock retries and unpatched fs for Electron’s .asar handling.
 
 import { getErrorCode } from './git/worktree-operation-options'
-import { unregisteredFolderRefusal } from '../shared/worktree/removal'
+import {
+  LeftoverCheckoutFolderError,
+  leftoverCheckoutFolderOf,
+  unregisteredFolderRefusal
+} from '../shared/worktree/removal'
 import { join, win32 } from 'node:path'
 import { lstat, readdir, rm, rmdir, unlink } from './asar-transparent-fs'
 import { isWindowsAbsolutePathLike } from '../shared/cross-platform-path'
 import { isWslUncPath } from '../shared/wsl-paths'
 import { stripWin32LongPathPrefix } from '../shared/windows-path-access'
 import { removeTree } from '../shared/windows-transient-lock-removal'
+
+// A child that only Windows transient-lock retries can clear; anything else aborts the delete at once.
+const TOLERATED_CHILD_FAILURES = ['EBUSY', 'EPERM', 'ENOTEMPTY']
 
 /** Convert a native host filesystem path to the Win32 long-path namespace. */
 export function toHostFilesystemPath(targetPath: string): string {
@@ -44,6 +51,7 @@ export async function removeHostCheckout(
 ): Promise<void> {
   const root = toHostRemovalPath(targetPath)
   let markerGone = false
+  let checkClean = true
   try {
     await removeTree(root, {
       signal,
@@ -51,19 +59,30 @@ export async function removeHostCheckout(
         if (markerGone) {
           await authorize(false)
         } else {
-          markerGone = !(await authorize(true))
+          markerGone = !(await authorize(checkClean))
           if (!markerGone) {
             const names = (await readdir(root)).filter((name) => name.toLowerCase() !== '.git')
+            // Only the first pass can be clean: it deletes these children, so a later check reads our own work as changes.
+            checkClean = false
             const results = await Promise.allSettled(
               names.map((name) => rm(join(root, name), { recursive: true, force: true }))
             )
-            const failures = results.filter((result) => result.status === 'rejected')
-            const failure =
-              failures.find(
-                ({ reason }) => !['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(reason?.code)
-              ) ?? failures[0]
+            const failures = results.filter(
+              (result): result is PromiseRejectedResult => result.status === 'rejected'
+            )
+            const blocking = failures.find(({ reason }) => isToleratedChildFailure(reason))
+            const failure = failures.find(({ reason }) => !isToleratedChildFailure(reason))
             if (failure) {
               throw failure.reason
+            }
+            if (blocking) {
+              // The marker stays in place, so Git can still release the registration for this folder.
+              // Retried as a transient lock: a pass that changed nothing is still cheaper than a
+              // leftover folder, and the authorized Git round-trip below is skipped until it clears.
+              throw new LeftoverCheckoutFolderError({
+                path: targetPath,
+                blockingFile: blockingFileOf(failures)
+              })
             }
             // Child promises settled; their internal Node sibling walks may still be running.
             markerGone = !(await authorize(false))
@@ -83,11 +102,31 @@ export async function removeHostCheckout(
       }
     })
   } catch (error) {
+    // The caller releases the registration and reports the folder; only the message matters here.
+    if (leftoverCheckoutFolderOf(error)) {
+      throw error
+    }
     if (markerGone && getErrorCode(error) === 'ENOTEMPTY') {
       throw unregisteredFolderRefusal(targetPath)
     }
     throw describeRemovalFailure(error)
   }
+}
+
+function isToleratedChildFailure(error: unknown): boolean {
+  const code = error instanceof Error && 'code' in error ? String(error.code) : ''
+  return TOLERATED_CHILD_FAILURES.includes(code)
+}
+
+// Name the file the OS refused, preferring a held handle over the parent's "directory not empty".
+function blockingFileOf(failures: PromiseRejectedResult[]): string | undefined {
+  const busy = failures.find(({ reason }) => getErrorCode(reason) === 'EBUSY') ?? failures[0]
+  return blockingPathOf(busy?.reason)
+}
+
+function blockingPathOf(error: unknown): string | undefined {
+  const path = error instanceof Error && 'path' in error ? error.path : undefined
+  return path === undefined ? undefined : stripWin32LongPathPrefix(String(path))
 }
 
 export async function removeHostEmptyDirectory(targetPath: string): Promise<void> {

@@ -1,7 +1,11 @@
 import { lstat } from 'node:fs/promises'
 import { pruneGitWorktrees } from './worktree-prune-guard'
 import type { RemoveWorktreeResult } from '../../shared/worktree/create-types'
-import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree/removal'
+import {
+  assertWorktreeUnlockedForRemoval,
+  leftoverCheckoutFolderMessage,
+  type LeftoverCheckoutFolder
+} from '../../shared/worktree/removal'
 import { windowsLongPathGitArgs } from '../../shared/windows-long-path-git-args'
 import { removeHostTree } from '../host-tree-removal'
 import { withSpan } from '../observability/tracer'
@@ -15,7 +19,12 @@ import {
 } from '../../shared/worktree/remote-branch-removal'
 import { invalidateWslLinkedWorktreeGitRouting } from './wsl-linked-worktree-git-routing'
 import type { RemoveWorktreeOptions } from './worktree-operation-options'
-import { getErrorCode, gitExecOptions, normalizeLocalBranchRef } from './worktree-operation-options'
+import {
+  getErrorCode,
+  gitExecOptions,
+  normalizeLocalBranchRef,
+  removalGitEnv
+} from './worktree-operation-options'
 import { areWorktreePathsEqual } from './worktree-path-comparison'
 import { withRepoRefMaintenancePaused } from './local-repo-ref-maintenance'
 import { bumpWorktreeScanGeneration, listWorktrees } from './worktree-scan-cache'
@@ -81,46 +90,61 @@ async function performRemoveWorktree(
     args.push('--force')
   }
   args.push(worktreePath)
-  await runUnderWorktreeDeleteLimit(async () => {
-    if (usesNativeWindowsRemoval(worktreePath, options)) {
-      await removeWindowsCheckout(repoPath, worktreePath, force, {
-        ...options,
-        knownRemovedWorktree: removedWorktree
-      })
-      // Release only this administrative entry, and never override a newly acquired Git lock.
-      if (
-        (await listWorktreesStrict(repoPath, options)).some((row) =>
-          areWorktreePathsEqual(row.path, worktreePath)
-        )
-      ) {
-        if (!(await isWorktreePathMissing(worktreePath))) {
-          throw new Error(
-            `Worktree path appeared during deletion: ${worktreePath}. Retry deletion.`
+  let leftover: LeftoverCheckoutFolder | undefined
+  await runUnderWorktreeDeleteLimit(
+    async () => {
+      if (usesNativeWindowsRemoval(worktreePath, options)) {
+        // A folder the OS will not empty is the user's problem; the workspace still gets removed.
+        leftover = await removeWindowsCheckout(repoPath, worktreePath, force, {
+          ...options,
+          knownRemovedWorktree: removedWorktree
+        })
+        // Release only this administrative entry, and never override a newly acquired Git lock.
+        if (
+          !leftover &&
+          (await listWorktreesStrict(repoPath, options)).some((row) =>
+            areWorktreePathsEqual(row.path, worktreePath)
+          )
+        ) {
+          if (!(await isWorktreePathMissing(worktreePath))) {
+            throw new Error(
+              `Worktree path appeared during deletion: ${worktreePath}. Retry deletion.`
+            )
+          }
+          await gitExecFileAsync(
+            [...longPathArgs, 'worktree', 'remove', '--force', '--', worktreePath],
+            execOptions
           )
         }
-        await gitExecFileAsync(
-          [...longPathArgs, 'worktree', 'remove', '--force', '--', worktreePath],
-          execOptions
-        )
+      } else {
+        await gitExecFileAsync(args, execOptions)
+        await removeCheckoutLeftByGit(worktreePath, options)
       }
-    } else {
-      await gitExecFileAsync(args, execOptions)
-      await removeCheckoutLeftByGit(worktreePath, options)
-    }
-  })
+    },
+    { signal: options.checkoutDeleteSignal }
+  )
+  const warning = leftover ? leftoverCheckoutFolderMessage(leftover) : undefined
 
   if (!branchName) {
-    return {}
+    return warning ? { warning } : {}
   }
   if (options.deleteBranch === false) {
     // Why: the branch was pinned for preservation, so nothing consumed its upstream and there is
     // no deleted local branch to pair a remote delete with.
-    return options.deleteRemoteBranch === true
-      ? { remoteBranchCleanup: { status: 'skipped-preserved' } }
-      : {}
+    const preserved =
+      options.deleteRemoteBranch === true
+        ? { remoteBranchCleanup: { status: 'skipped-preserved' as const } }
+        : {}
+    return warning ? { ...preserved, warning } : preserved
   }
 
-  return deleteBranchOfRemovedWorktree(repoPath, branchName, branchHead, options)
+  const branchResult = await deleteBranchOfRemovedWorktree(
+    repoPath,
+    branchName,
+    branchHead,
+    options
+  )
+  return warning ? { ...branchResult, warning } : branchResult
 }
 
 function deleteBranchOfRemovedWorktree(
@@ -216,19 +240,6 @@ async function localBranchExists(
   } catch {
     return false
   }
-}
-
-// Git for Windows may invoke GIT_ASK_YESNO for locked files; removal must never launch a prompt.
-function removalGitEnv(): { env?: NodeJS.ProcessEnv } {
-  const inherited = Object.keys(process.env).filter((key) => key.toUpperCase() === 'GIT_ASK_YESNO')
-  if (inherited.length === 0) {
-    return {}
-  }
-  const env = { ...process.env }
-  for (const key of inherited) {
-    delete env[key]
-  }
-  return { env }
 }
 
 // Git for Windows can exit 0 leaving junctions and parent directories; finish that accepted delete.
