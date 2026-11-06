@@ -1,170 +1,203 @@
-// The fold's second phase: the two prose reports a reader actually reads.
+// The fold's second phase: the prose a reader actually reads.
 //
 // Kept apart from the fold protocol because it answers a different question — the chunks turn a
-// transcript into facts, this turns facts into a brief a colleague would give — and because
-// prose has to be *rewritten*, not accumulated, to stay short.
+// transcript into facts, this turns facts into a brief a colleague would give — and because prose
+// has to be *rewritten*, not accumulated, to stay short.
+//
+// Why it runs as a chain rather than once per fold: extraction already scales (one bounded call per
+// chunk), but a single report call over a days-long session is bounded only by cutting its input,
+// which is how the "full" report came to describe the tail of the session and nothing before it.
+// Rewriting every group of chunks, carrying the previous report forward, keeps each call's input
+// bounded *and* coverage complete. It also means a group that fails is caught up by the next fold,
+// because the report's position on the transcript is what says what it has covered.
 import type {
+  SessionSummaryFact,
+  SessionSummaryFullReport,
   SessionSummaryLedger,
   SessionSummaryLedgerDelta,
   SessionSummaryReport,
-  SessionSummaryTimelineDeltaEntry
+  SessionSummaryTimelineDeltaEntry,
+  SessionSummaryTimelineEntry
 } from '../../shared/session-summary-types'
+import {
+  applySessionSummaryReportSection,
+  type SessionSummaryReportReply
+} from './session-summary-report-sections'
+import {
+  buildSessionSummaryReportPrompt,
+  parseSessionSummaryReportReply,
+  type SessionSummaryReportInput
+} from './session-summary-report-prompt'
+
+export {
+  applySessionSummaryReportSection,
+  buildSessionSummaryReportPrompt,
+  parseSessionSummaryReportReply
+}
+export type { SessionSummaryReportInput, SessionSummaryReportReply }
 import type { SessionFoldBrain } from './session-summary-fold'
-import { extractSessionSummaryJson } from './session-summary-json'
 
-const REPORT_INSTRUCTIONS = `You write short progress reports about a coding session an agent is working on, the way a colleague would brief you.
-Return a JSON object with exactly two keys, each a plain-text string (no markdown, no headings, no bullet lists):
-- "since": 1-3 sentences (at most 60 words) on what happened since the reader's last message to the agent. Lead with the outcome; name a failure or a decision only if it matters. If nothing notable happened, say that in one sentence.
-- "full": at most 5 sentences (at most 90 words) that stand on their own as a progress report on the whole session so far: where it stands, what is finished, what is next or blocking. Rewrite the previous full report to absorb the new work; never append to it.
-- When the input says the reader has spoken to the agent only once, the two reports would cover the same ground: set "since" to null and put everything in "full".
-Rules: respond with ONLY the JSON object. Never invent work, files, results or intentions that are not in the input. No greetings, no preamble.`
+/**
+ * Most report calls one fold may make.
+ *
+ * Why capped: each call is sequential (it carries the previous report forward), so the report phase
+ * would otherwise dominate a long fold's wall clock. A 5,000-event session is ~40 chunks, which this
+ * splits into eight groups of five.
+ */
+const REPORT_MAX_CALLS = 8
 
-const REPORT_TEXT_MAX_CHARS = 1_200
+/**
+ * Transcript messages a report group must span before the run is split into more than one.
+ *
+ * Matches the chunk budget: a group is a handful of chunks, and a range smaller than one chunk's
+ * worth of messages is one phase however it is divided.
+ */
+const REPORT_GROUP_MIN_SPAN_EVENTS = 120
 
-/** The inputs a report rewrite needs: where we stand, and what just happened. */
-export type SessionSummaryReportInput = {
-  previousSince: string | null
-  previousFull: string | null
-  /** Facts folded in this batch, already normalized. */
-  delta: SessionSummaryLedgerDelta
-  /** Timeline entries folded in this batch. */
-  timeline: readonly SessionSummaryTimelineDeltaEntry[]
-  /** Whether the reader spoke to the agent inside this batch (the window just restarted). */
-  windowRestarted: boolean
-  /** User messages so far; 1 means the window covers the whole session. */
-  userMessageCount: number
-  /**
-   * The reader's last message, after this batch.
-   *
-   * Why the model is told it: the batch usually straddles the boundary — it contains the
-   * reader's message and the work before it — so the facts alone cannot say which half is
-   * "since". Without this the two reports covered the same ground, which is the one thing the
-   * reader asked them not to do.
-   */
-  lastUserMessageIndex: number | null
+/**
+ * A run that spans more than one group opens a section per group instead of rewriting the last one.
+ *
+ * Why the code decides and not the model: coverage is the property this whole change exists for, and
+ * a model that folded three days of work into one 60-word paragraph would lose the beginning of it.
+ * A group boundary *is* a phase boundary, so a long fold yields one section per group; a small
+ * incremental fold is a single group, and rewriting the open section is exactly what it should do.
+ */
+function sectionPerGroup(groupCount: number): boolean {
+  return groupCount > 1
 }
 
-/** A timeline entry's text as it goes into the report prompt: bounded, not re-read wholesale. */
-const REPORT_TIMELINE_MAX_ENTRIES = 40
-const REPORT_TIMELINE_TEXT_MAX_CHARS = 200
-
-export function buildSessionSummaryReportPrompt(input: SessionSummaryReportInput): string {
-  const lines: string[] = []
-  lines.push(`Previous "full" report: ${input.previousFull ?? '(none)'}`)
-  lines.push(`Previous "since" report: ${input.previousSince ?? '(none)'}`)
-  if (input.windowRestarted) {
-    lines.push(
-      'The reader has sent a new message to the agent, so "since" starts from that message.'
-    )
-  }
-  const windowIndex = input.lastUserMessageIndex
-  lines.push(
-    input.userMessageCount <= 1 || windowIndex === null
-      ? 'The reader has spoken to the agent only once, so "since" and "full" cover the same ground: set "since" to null.'
-      : `The reader has spoken to the agent ${input.userMessageCount} times. "since" covers only messages after [#${windowIndex}], their last message; anything at or before it belongs to "full" alone.`
-  )
-  const facts: string[] = []
-  const pushFact = (label: string, text: string, index: number | null): void => {
-    facts.push(`${label}: ${text} [#${index ?? '?'}]`)
-  }
-  if (input.delta.goal) {
-    pushFact('goal', input.delta.goal.text, input.delta.goal.sourceIndex)
-  }
-  if (input.delta.inProgress) {
-    pushFact('in progress', input.delta.inProgress.text, input.delta.inProgress.sourceIndex)
-  }
-  for (const [label, list] of [
-    ['plan', input.delta.plan],
-    ['done', input.delta.done],
-    ['blocker', input.delta.blockers],
-    ['decision', input.delta.decisions]
-  ] as const) {
-    for (const fact of list ?? []) {
-      pushFact(label, fact.text, fact.sourceIndex)
+/** The facts and timeline entries whose provenance falls inside one report group. */
+function batchForRange(
+  ledger: SessionSummaryLedger,
+  from: number,
+  to: number,
+  includeTo: boolean
+): SessionSummaryLedgerDelta & { timeline: SessionSummaryTimelineDeltaEntry[] } {
+  const inRange = (index: number | null): boolean => {
+    // A fact with no provenance can only belong to the session's first report: it was written by a
+    // cache that predates indexes, and every later group would otherwise repeat it.
+    if (index === null) {
+      return from === 0
     }
+    return index >= from && (includeTo ? index <= to : index < to)
   }
-  lines.push('', 'Facts folded in this batch:', ...(facts.length > 0 ? facts : ['(none)']))
-  // Why bounded: a long backlog merges many chunks, and an unbounded timeline is the one part of
-  // this prompt that grows with the session rather than with the batch.
-  const timeline = input.timeline.slice(-REPORT_TIMELINE_MAX_ENTRIES).map((entry) => {
-    const text =
-      entry.text.length > REPORT_TIMELINE_TEXT_MAX_CHARS
-        ? `${entry.text.slice(0, REPORT_TIMELINE_TEXT_MAX_CHARS)}…`
-        : entry.text
-    return `[#${entry.sourceIndex} ${entry.kind}] ${text}`
-  })
-  lines.push('', 'Timeline of this batch:', ...(timeline.length > 0 ? timeline : ['(none)']))
-  return `${REPORT_INSTRUCTIONS}\n\n${lines.join('\n')}`
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-/** Parse the report rewrite; null when the model did not answer the full report. */
-export function parseSessionSummaryReports(
-  raw: string,
-  through: number
-): { since: SessionSummaryReport | null; full: SessionSummaryReport } | null {
-  const value = extractSessionSummaryJson(raw)
-  if (!isRecord(value)) {
-    return null
-  }
-  const since = typeof value.since === 'string' ? value.since.trim() : ''
-  const full = typeof value.full === 'string' ? value.full.trim() : ''
-  if (!full) {
-    return null
-  }
-  const clamp = (text: string): string =>
-    text.length > REPORT_TEXT_MAX_CHARS ? `${text.slice(0, REPORT_TEXT_MAX_CHARS - 1)}…` : text
+  const keep = (facts: readonly SessionSummaryFact[]): SessionSummaryFact[] =>
+    facts.filter((fact) => inRange(fact.sourceIndex))
+  const timeline: SessionSummaryTimelineDeltaEntry[] = ledger.timeline
+    .filter((entry) => inRange(entry.sourceIndex))
+    .map((entry: SessionSummaryTimelineEntry) => ({
+      kind: entry.kind,
+      text: entry.text,
+      sourceIndex: entry.sourceIndex
+    }))
   return {
-    // Null is a real answer, not a miss: one interaction means the window is the session.
-    since: since ? { text: clamp(since), through } : null,
-    full: { text: clamp(full), through }
+    ...(ledger.goal && inRange(ledger.goal.sourceIndex) ? { goal: ledger.goal } : {}),
+    ...(ledger.inProgress && inRange(ledger.inProgress.sourceIndex)
+      ? { inProgress: ledger.inProgress }
+      : {}),
+    plan: keep(ledger.plan),
+    done: keep(ledger.done),
+    blockers: keep(ledger.blockers),
+    decisions: keep(ledger.decisions),
+    timeline
   }
+}
+
+/** Evenly split `[from, to)` into at most `REPORT_MAX_CALLS` groups. */
+export function buildSessionSummaryReportGroups(
+  from: number,
+  to: number,
+  maxCalls = REPORT_MAX_CALLS
+): { from: number; to: number }[] {
+  const span = to - from
+  if (span <= 0) {
+    return []
+  }
+  // Why a minimum span per group: the unit of a group is a chunk of transcript, not a message, so
+  // a short range must stay one group — otherwise an incremental fold of forty messages would be
+  // split eight ways and write eight phases out of one exchange.
+  const callCount = Math.max(1, Math.min(maxCalls, Math.floor(span / REPORT_GROUP_MIN_SPAN_EVENTS)))
+  const size = Math.ceil(span / callCount)
+  const groups: { from: number; to: number }[] = []
+  for (let start = from; start < to; start += size) {
+    groups.push({ from: start, to: Math.min(to, start + size) })
+  }
+  return groups
 }
 
 /**
- * Rewrite both reports from (previous reports + this batch).
+ * Rewrite the report from (previous report + the unfolded range of the ledger).
  *
- * A failure here keeps the previous reports instead of failing the fold: the facts and the
- * timeline already landed, and a stale sentence is a smaller loss than losing the batch.
+ * A failure here keeps the previous report instead of failing the fold: the facts and the timeline
+ * already landed, and a stale sentence is a smaller loss than losing the batch. Its `through` stays
+ * where it was, which is what makes the next fold (or the catch-up on open) cover the gap.
  */
-export async function rewriteReports(args: {
+export async function rewriteSessionSummaryReports(args: {
   brain: SessionFoldBrain
   signal: AbortSignal
+  /** The ledger before this fold: it holds the report to carry forward. */
   ledger: SessionSummaryLedger
-  merged: SessionSummaryLedgerDelta
-  through: number
+  /** The ledger after this fold: it holds the facts to report on. */
+  folded: SessionSummaryLedger
   windowRestarted: boolean
   userMessageCount: number
   lastUserMessageIndex: number | null
-}): Promise<{ since: SessionSummaryReport | null; full: SessionSummaryReport } | null> {
-  try {
-    const raw = await args.brain.complete({
-      prompt: buildSessionSummaryReportPrompt({
-        previousSince: args.ledger.reportSince?.text ?? null,
-        previousFull: args.ledger.reportFull?.text ?? null,
-        delta: args.merged,
-        timeline: args.merged.timeline ?? [],
-        windowRestarted: args.windowRestarted,
-        userMessageCount: args.userMessageCount,
-        lastUserMessageIndex: args.lastUserMessageIndex
-      }),
-      signal: args.signal
-    })
-    args.signal.throwIfAborted()
-    const parsed = parseSessionSummaryReports(raw, args.through)
-    if (!parsed) {
-      return null
-    }
-    // Why enforced here and not trusted to the prompt: with one interaction the window is the
-    // session, and two reports that say the same thing give the reader a switch with no meaning.
-    return args.userMessageCount <= 1 ? { since: null, full: parsed.full } : parsed
-  } catch (error) {
-    if (args.signal.aborted) {
-      throw error
-    }
-    return null
+}): Promise<{ since: SessionSummaryReport | null; full: SessionSummaryFullReport | null }> {
+  const previous = args.ledger.reportFull
+  // Why the report's own position and not the fold's: a group that failed left `through` behind,
+  // and that is exactly the range this run has to cover. Why zero when there is no report at all:
+  // a first fold whose report phase failed advanced the cursor, and starting there would leave the
+  // beginning of the session unreported for good — the failure this change exists to remove.
+  const from = previous?.through ?? 0
+  const to = args.folded.foldedThrough
+  const groups = buildSessionSummaryReportGroups(from, to)
+  if (groups.length === 0) {
+    return { since: null, full: null }
   }
+  let report = previous
+  let since: SessionSummaryReport | null = null
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index]
+    const isLast = index === groups.length - 1
+    const batch = batchForRange(args.folded, group.from, group.to, isLast)
+    let reply: SessionSummaryReportReply | null = null
+    try {
+      const raw = await args.brain.complete({
+        prompt: buildSessionSummaryReportPrompt({
+          previous: report,
+          delta: batch,
+          timeline: batch.timeline,
+          windowRestarted: args.windowRestarted,
+          userMessageCount: args.userMessageCount,
+          lastUserMessageIndex: args.lastUserMessageIndex,
+          writesSince: isLast
+        }),
+        signal: args.signal
+      })
+      args.signal.throwIfAborted()
+      reply = parseSessionSummaryReportReply(raw)
+    } catch (error) {
+      if (args.signal.aborted) {
+        throw error
+      }
+      reply = null
+    }
+    if (!reply) {
+      // Stop the chain: the next fold resumes from the last report position, so nothing is lost.
+      break
+    }
+    report = applySessionSummaryReportSection(
+      report,
+      reply,
+      group.to,
+      sectionPerGroup(groups.length)
+    )
+    if (isLast) {
+      // Why enforced here and not trusted to the prompt: with one interaction the window is the
+      // session, and two reports that say the same thing give the reader a switch with no meaning.
+      since =
+        args.userMessageCount <= 1 || !reply.since ? null : { text: reply.since, through: group.to }
+    }
+  }
+  return { since, full: report }
 }

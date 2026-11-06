@@ -10,6 +10,9 @@ import {
   type SessionSummarySourceEvent
 } from './session-summary-fold'
 import { SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY } from './session-summary-fold-slots'
+import { SESSION_SUMMARY_REPORT_MAX_SECTIONS } from '../../shared/session-summary-types'
+
+const REPORT_PROMPT_PREFIX = 'You write the progress report'
 
 function events(count: number): SessionSummarySourceEvent[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -19,24 +22,37 @@ function events(count: number): SessionSummarySourceEvent[] {
   }))
 }
 
-function jsonBrain(handler: (prompt: string) => unknown): SessionFoldBrain {
+function reply(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    headline: 'a headline',
+    section: { title: 'a phase', text: 'something happened' },
+    startNew: false,
+    since: 'since text',
+    ...overrides
+  })
+}
+
+/** A brain that answers chunk extracts with JSON and report calls with a report. */
+function jsonBrain(handler: (prompt: string, call: number) => unknown): SessionFoldBrain {
+  let calls = 0
   return {
     complete: async ({ prompt }) => {
-      // The fold's second phase asks for the two prose reports; a JSON-only brain would
-      // otherwise count as a chunk call and answer with a chunk extract.
-      if (prompt.startsWith('You write short progress reports')) {
-        return JSON.stringify({ since: 'since text', full: 'full text' })
+      calls += 1
+      // The fold's second phase asks for the prose report; a JSON-only brain would otherwise
+      // count as a chunk call and answer with a chunk extract.
+      if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+        return reply()
       }
-      return JSON.stringify(handler(prompt))
+      return JSON.stringify(handler(prompt, calls))
     }
   }
 }
 
 describe('buildSessionSummaryChunks', () => {
   it('covers every event exactly once and respects the event cap', () => {
-    const ranges = buildSessionSummaryChunks(events(90))
-    expect(ranges[0]).toEqual({ from: 0, to: 40 })
-    expect(ranges.at(-1)?.to).toBe(90)
+    const ranges = buildSessionSummaryChunks(events(250))
+    expect(ranges[0]).toEqual({ from: 0, to: 120 })
+    expect(ranges.at(-1)?.to).toBe(250)
     for (let index = 0; index < ranges.length - 1; index += 1) {
       expect(ranges[index].to).toBe(ranges[index + 1].from)
     }
@@ -48,9 +64,28 @@ describe('buildSessionSummaryChunks', () => {
       text: 'y'.repeat(2000),
       timestamp: null
     }))
-    const ranges = buildSessionSummaryChunks(long, 3000, 40)
+    const ranges = buildSessionSummaryChunks(long, 3000, 120)
     expect(ranges.length).toBeGreaterThan(1)
     expect(ranges.at(-1)?.to).toBe(4)
+  })
+
+  // User and assistant text is no longer cut, so one message can exceed a prompt on its own. It is
+  // still one event: the parts are a paging device, not a filter.
+  it('splits one oversized event into parts without renumbering it', () => {
+    const oversized: SessionSummarySourceEvent[] = [
+      { role: 'user', text: 'short', timestamp: null },
+      { role: 'assistant', text: 'z'.repeat(7_000), timestamp: null }
+    ]
+    const ranges = buildSessionSummaryChunks(oversized, 3_000, 120)
+    expect(ranges[0]).toEqual({ from: 0, to: 1 })
+    const parts = ranges.slice(1)
+    expect(parts.length).toBe(3)
+    for (const part of parts) {
+      expect(part.from).toBe(1)
+      expect(part.to).toBe(2)
+    }
+    expect(parts[0].partFrom).toBe(0)
+    expect(parts.at(-1)?.partTo).toBe(7_000)
   })
 })
 
@@ -70,8 +105,35 @@ describe('extractSessionSummaryJson', () => {
   })
 })
 
+describe('buildSessionSummaryChunkPrompt', () => {
+  it('renders indexed events with roles', () => {
+    const prompt = buildSessionSummaryChunkPrompt(events(3), { from: 1, to: 3 }, 10)
+    expect(prompt).toContain('[#11 assistant] message 1')
+    expect(prompt).toContain('[#12 user] message 2')
+    expect(prompt).not.toContain('message 0')
+  })
+
+  // A record the reader could not decode is a hole in "the entire log" unless the prompt names it.
+  it('names a skipped record in the slice that covers it', () => {
+    const prompt = buildSessionSummaryChunkPrompt(events(3), { from: 1, to: 3 }, 0, [
+      { afterEventIndex: 2, text: 'Skipped 1 oversized transcript record.' }
+    ])
+    expect(prompt).toContain('[gap after #1] Skipped 1 oversized transcript record.')
+  })
+
+  it('renders a part with its own label and no other part of the message', () => {
+    const prompt = buildSessionSummaryChunkPrompt(
+      [{ role: 'assistant', text: 'aaaaabbbbb', timestamp: null }],
+      { from: 0, to: 1, partFrom: 5, partTo: 10, partIndex: 1, partCount: 2 },
+      0
+    )
+    expect(prompt).toContain('[#0 assistant · part 2 of 2] bbbbb')
+    expect(prompt).not.toContain('aaaaa')
+  })
+})
+
 describe('foldSessionSummaryEvents', () => {
-  it('folds chunks in order and advances foldedThrough atomically', async () => {
+  it('folds chunks in order and advances foldedThrough', async () => {
     const seenPrompts: string[] = []
     const brain = jsonBrain((prompt) => {
       seenPrompts.push(prompt)
@@ -85,32 +147,30 @@ describe('foldSessionSummaryEvents', () => {
     const result = await foldSessionSummaryEvents({
       brain,
       ledger: emptySessionSummaryLedger(),
-      events: events(45),
+      events: events(130),
       signal: new AbortController().signal
     })
     expect(result.totalChunks).toBe(2)
-    expect(result.ledger.foldedThrough).toBe(45)
+    expect(result.gap).toBeNull()
+    expect(result.ledger.foldedThrough).toBe(130)
     // A fact the extract did not index lands at its slice's last message, so it is inside the
     // "since your last message" window rather than on its boundary.
     expect(result.ledger.done).toEqual([
-      { text: 'chunk 1', sourceIndex: 39 },
-      { text: 'chunk 2', sourceIndex: 44 }
+      { text: 'chunk 1', sourceIndex: 119 },
+      { text: 'chunk 2', sourceIndex: 129 }
     ])
     expect(result.ledger.timeline.map((entry) => entry.text)).toEqual(['m1', 'm2'])
-    // Both reports are written by the same second call, so the toggle costs nothing later.
-    expect(result.ledger.reportFull?.text).toBe('full text')
-    expect(result.ledger.reportSince?.text).toBe('since text')
-    // events(45) alternates user/assistant from a user message: 23 reader messages.
-    expect(result.ledger.userMessageCount).toBe(23)
-    expect(result.ledger.lastUserMessageIndex).toBe(44)
-    // The second chunk sees later message indexes than the first.
+    expect(result.ledger.reportFull?.headline).toBe('a headline')
+    // events(130) alternates user/assistant from a user message: 65 reader messages.
+    expect(result.ledger.userMessageCount).toBe(65)
+    expect(result.ledger.lastUserMessageIndex).toBe(128)
     expect(seenPrompts[0]).toContain('#0 user')
-    expect(seenPrompts[1]).toContain('#40 ')
+    expect(seenPrompts[1]).toContain('#120 ')
   })
 
   it('reuses cached chunk extracts instead of calling the brain again', async () => {
     const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
-    cacheStore.set('0-40', { done: [{ text: 'cached', sourceIndex: 0 }], timeline: [] })
+    cacheStore.set('0-120', { done: [{ text: 'cached', sourceIndex: 0 }], timeline: [] })
     let calls = 0
     const brain = jsonBrain(() => {
       calls += 1
@@ -119,7 +179,7 @@ describe('foldSessionSummaryEvents', () => {
     const result = await foldSessionSummaryEvents({
       brain,
       ledger: emptySessionSummaryLedger(),
-      events: events(45),
+      events: events(130),
       signal: new AbortController().signal,
       cache: {
         get: (key) => cacheStore.get(key),
@@ -128,33 +188,509 @@ describe('foldSessionSummaryEvents', () => {
         }
       }
     })
-    // One chunk extract, plus the report rewrite that is not a chunk call.
     expect(calls).toBe(1)
     expect(result.ledger.done).toEqual([
       { text: 'cached', sourceIndex: 0 },
-      { text: 'fresh', sourceIndex: 44 }
+      { text: 'fresh', sourceIndex: 129 }
     ])
   })
 
-  it('applies nothing when a chunk extract fails', async () => {
-    let calls = 0
+  // Acceptance 5: no positional truncation survives. The old fold cut every event at 1,500
+  // characters, so which part of a long message reached the model depended on where it sat.
+  it('sends user and assistant text in full', async () => {
+    const longUser = `start-${'u'.repeat(4_000)}-end-user`
+    const longAssistant = `start-${'a'.repeat(4_000)}-end-assistant`
+    const prompts: string[] = []
     const brain: SessionFoldBrain = {
-      complete: async () => {
-        calls += 1
-        return calls === 1 ? JSON.stringify({ done: ['ok'] }) : 'not json at all'
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        prompts.push(prompt)
+        return JSON.stringify({ done: ['ok'] })
       }
     }
-    const ledger = emptySessionSummaryLedger()
+    await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: [
+        { role: 'user', text: longUser, timestamp: null },
+        { role: 'assistant', text: longAssistant, timestamp: null }
+      ],
+      signal: new AbortController().signal
+    })
+    const all = prompts.join('\n')
+    expect(all).toContain('-end-user')
+    expect(all).toContain('-end-assistant')
+    expect(all).not.toContain('…')
+  })
+
+  // Nothing settled anywhere is the signature of a brain that is not working, as opposed to a slice
+  // it cannot summarize — and a broken brain must not spawn a call per chunk of a long session.
+  it('stops a fold when no chunk settles, rather than calling the brain once per chunk', async () => {
+    let calls = 0
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        calls += 1
+        throw new Error('no session-summary agent is configured')
+      }
+    }
+
     await expect(
       foldSessionSummaryEvents({
         brain,
-        ledger,
-        events: events(45),
+        ledger: emptySessionSummaryLedger(),
+        events: events(2_000),
         signal: new AbortController().signal
       })
+    ).rejects.toThrow('no session-summary agent is configured')
+
+    // Two attempts per chunk, and the breaker trips after one wave: a broken brain must not spawn a
+    // call per chunk of a seventeen-chunk session.
+    expect(calls).toBeLessThanOrEqual(2 * SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
+  })
+
+  // One fold cannot tell an unsummarizable slice from a brain that is down, so the judgement needs
+  // evidence across folds: a slice that keeps failing is given up on and named rather than stalling
+  // every message after it for the life of the session.
+  it('gives up on a slice that keeps failing, after naming it', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        if (prompt.includes('[#240 ')) {
+          throw new Error('content filter')
+        }
+        return JSON.stringify({ done: ['ok'], timeline: [] })
+      }
+    }
+    let ledger = emptySessionSummaryLedger()
+    for (let fold = 0; fold < 2; fold += 1) {
+      const result = await foldSessionSummaryEvents({
+        brain,
+        ledger,
+        events: events(480).slice(ledger.foldedThrough),
+        signal: new AbortController().signal,
+        failures
+      })
+      expect(result.gap).not.toBeNull()
+      ledger = result.ledger
+    }
+    const last = await foldSessionSummaryEvents({
+      brain,
+      ledger,
+      events: events(480).slice(ledger.foldedThrough),
+      signal: new AbortController().signal,
+      failures
+    })
+    expect(last.gap).toBeNull()
+    expect(last.ledger.foldedThrough).toBe(480)
+    expect(last.ledger.gaps.join(' ')).toContain('Messages #240-#359 could not be summarized')
+  })
+
+  // All the parts of a paged message share one count, so counting per part reached the give-up
+  // threshold inside a single fold and skipped a message nobody had established was unsummarizable.
+  it('counts one failed fold once, however many parts of a message failed', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        // Every part of the paged message fails; the short event before it does not.
+        if (prompt.includes('[#1 ')) {
+          throw new Error('content filter')
+        }
+        return JSON.stringify({ done: ['ok'], timeline: [] })
+      }
+    }
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: [
+        { role: 'user', text: 'first', timestamp: null },
+        { role: 'assistant', text: 'z'.repeat(60_000), timestamp: null }
+      ],
+      signal: new AbortController().signal,
+      failures
+    })
+    expect(result.ledger.foldedThrough).toBe(1)
+    // Keyed by the event, not the range: a growing final chunk must not reset the count.
+    expect([...counts.entries()]).toEqual([['1', 1]])
+  })
+
+  // An outage must not be remembered as a session full of unsummarizable slices.
+  it('holds no slice against it when no model call succeeded', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    await expect(
+      foldSessionSummaryEvents({
+        brain: {
+          complete: async ({ prompt }) => {
+            if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+              return reply()
+            }
+            throw new Error('429 rate limited')
+          }
+        },
+        ledger: emptySessionSummaryLedger(),
+        events: events(480),
+        signal: new AbortController().signal,
+        failures
+      })
+    ).rejects.toThrow('429 rate limited')
+    expect(counts.size).toBe(0)
+  })
+
+  // A chunk that rejects because the reader closed the pane was never sent to the model, so holding
+  // it against its slice would abandon messages nobody tried to summarize.
+  it('holds nothing against a slice when the fold is cancelled', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    const controller = new AbortController()
+    await expect(
+      foldSessionSummaryEvents({
+        brain: {
+          complete: async ({ prompt }) => {
+            if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+              return reply()
+            }
+            controller.abort()
+            throw new Error('pane closed')
+          }
+        },
+        ledger: emptySessionSummaryLedger(),
+        events: events(480),
+        signal: controller.signal,
+        failures
+      })
     ).rejects.toThrow()
-    expect(ledger.foldedThrough).toBe(0)
-    expect(ledger.done).toEqual([])
+    expect(counts.size).toBe(0)
+  })
+
+  // A slice that was failing and then works again is retried, not remembered as broken.
+  it('retries a slice whose earlier folds failed', async () => {
+    const counts = new Map<string, number>([['0', 2]])
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    const result = await foldSessionSummaryEvents({
+      brain: jsonBrain(() => ({ done: ['recovered'] })),
+      ledger: emptySessionSummaryLedger(),
+      events: events(120),
+      signal: new AbortController().signal,
+      failures
+    })
+    expect(result.ledger.done.map((fact) => fact.text)).toEqual(['recovered'])
+    expect(counts.size).toBe(0)
+  })
+
+  // Acceptance 6: one flaky call out of forty must not throw away thirty-nine chunks of work.
+  it('applies the chunks before a failure and records the gap', async () => {
+    const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
+    const prompts: string[] = []
+    const brain = jsonBrain((prompt) => {
+      prompts.push(prompt)
+      // The third chunk's prompt opens at event 240; fail it, and only it, on both attempts.
+      if (prompt.includes('[#240 ')) {
+        throw new Error('flaky cli')
+      }
+      return { done: [`chunk at ${prompts.length}`] }
+    })
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(480),
+      signal: new AbortController().signal,
+      cache: { get: (key) => cacheStore.get(key), set: (key, delta) => cacheStore.set(key, delta) }
+    })
+
+    expect(result.totalChunks).toBe(4)
+    expect(result.completedChunks).toBe(2)
+    expect(result.gap).toEqual({ completedChunks: 2, totalChunks: 4 })
+    // The cursor stops where the failed chunk begins: applying a later chunk would either renumber
+    // the events or append its timeline entries twice on the next fold.
+    expect(result.ledger.foldedThrough).toBe(240)
+    expect(result.ledger.foldGap).toEqual({ completedChunks: 2, totalChunks: 4 })
+    expect(result.ledger.done).toHaveLength(2)
+    // The chunks after the failure are still cached, so the next fold does not pay for them again.
+    expect([...cacheStore.keys()].sort()).toEqual(['0-120', '120-240', '360-480'])
+  })
+
+  it('resumes after a failure without re-asking for the chunks already summarized', async () => {
+    const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
+    let failChunk = true
+    let chunkCalls = 0
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        chunkCalls += 1
+        if (failChunk && prompt.includes('[#240 ')) {
+          throw new Error('flaky cli')
+        }
+        return JSON.stringify({ done: [`chunk ${chunkCalls}`] })
+      }
+    }
+    const cache = {
+      get: (key: string) => cacheStore.get(key),
+      set: (key: string, delta: SessionSummaryLedgerDelta) => cacheStore.set(key, delta)
+    }
+    const first = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(480),
+      signal: new AbortController().signal,
+      cache
+    })
+    failChunk = false
+    chunkCalls = 0
+    const second = await foldSessionSummaryEvents({
+      brain,
+      ledger: first.ledger,
+      events: events(480).slice(first.ledger.foldedThrough),
+      signal: new AbortController().signal,
+      cache
+    })
+    // Only the chunk that failed is asked for again; the two after it came from the cache.
+    expect(chunkCalls).toBe(1)
+    expect(second.gap).toBeNull()
+    expect(second.ledger.foldedThrough).toBe(480)
+    // The facts of the chunks after the failure were not applied twice on the resume.
+    const texts = second.ledger.done.map((fact) => fact.text)
+    expect(new Set(texts).size).toBe(texts.length)
+  })
+
+  // Acceptance 7: an interrupted first fold must resume rather than restart at event 0.
+  it('keeps completed chunk extracts when the fold is interrupted', async () => {
+    const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
+    const controller = new AbortController()
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        return JSON.stringify({ done: ['chunk'] })
+      }
+    }
+    const cache = {
+      get: (key: string) => cacheStore.get(key),
+      set: (key: string, delta: SessionSummaryLedgerDelta) => cacheStore.set(key, delta)
+    }
+    let settled = 0
+    await expect(
+      foldSessionSummaryEvents({
+        brain,
+        ledger: emptySessionSummaryLedger(),
+        events: events(480),
+        signal: controller.signal,
+        cache,
+        // The reader closed the pane after the first chunk came back, which is what the runner's
+        // per-chunk persist is for: the extract is already on disk when the rest is cancelled.
+        onChunkSettled: () => {
+          settled += 1
+          if (settled === 1) {
+            controller.abort()
+          }
+        }
+      })
+    ).rejects.toThrow()
+
+    expect(cacheStore.size).toBeGreaterThan(0)
+    let secondCalls = 0
+    const resumed = await foldSessionSummaryEvents({
+      brain: {
+        complete: async ({ prompt }) => {
+          if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+            return reply()
+          }
+          secondCalls += 1
+          return JSON.stringify({ done: ['resumed'] })
+        }
+      },
+      ledger: emptySessionSummaryLedger(),
+      events: events(480),
+      signal: new AbortController().signal,
+      cache
+    })
+    // Four chunks, at least one already cached: resuming is strictly cheaper than restarting.
+    expect(secondCalls).toBeLessThan(4)
+    expect(resumed.ledger.foldedThrough).toBe(480)
+  })
+
+  // A degraded fold stops at the first failed chunk, so counting the reader's messages across the
+  // whole read would count the ones the next fold is about to count again.
+  it('does not count the reader’s messages twice across a degraded fold', async () => {
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        if (prompt.includes('[#240 ')) {
+          throw new Error('flaky cli')
+        }
+        return JSON.stringify({ done: ['ok'], timeline: [] })
+      }
+    }
+    const first = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(480),
+      signal: new AbortController().signal
+    })
+    expect(first.ledger.foldedThrough).toBe(240)
+    // events(480) alternates from a user message: 240 reader messages in total, 120 of them folded.
+    expect(first.ledger.userMessageCount).toBe(120)
+
+    const resumed = await foldSessionSummaryEvents({
+      brain: {
+        complete: async ({ prompt }) =>
+          prompt.startsWith(REPORT_PROMPT_PREFIX)
+            ? reply()
+            : JSON.stringify({ done: ['ok'], timeline: [] })
+      },
+      ledger: first.ledger,
+      events: events(480).slice(first.ledger.foldedThrough),
+      signal: new AbortController().signal
+    })
+    // The same count a clean fold of all 480 events would produce.
+    expect(resumed.ledger.userMessageCount).toBe(240)
+    expect(resumed.ledger.lastUserMessageIndex).toBe(478)
+  })
+
+  // A message larger than a prompt is sent in parts. The cursor can only stop on an event boundary,
+  // so a failure part-way through must roll the whole event out of the applied prefix — otherwise
+  // its earlier parts land a second time on the resume.
+  it('does not apply half of a split message twice', async () => {
+    const long = 'z'.repeat(60_000)
+    // Why a leading event: a failure on the cursor event is given up on, and the property under test
+    // is the roll-back that a failure *past* the cursor needs.
+    const eventsWithLongTail: SessionSummarySourceEvent[] = [
+      { role: 'user', text: 'first', timestamp: null },
+      { role: 'assistant', text: long, timestamp: null }
+    ]
+    const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
+    const cache = {
+      get: (key: string) => cacheStore.get(key),
+      set: (key: string, delta: SessionSummaryLedgerDelta) => cacheStore.set(key, delta)
+    }
+    let failSecondPart = true
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        if (failSecondPart && prompt.includes('part 2 of 3')) {
+          throw new Error('flaky cli')
+        }
+        const part = /part (\d) of (\d)/.exec(prompt)?.[1] ?? '1'
+        return JSON.stringify({ done: [`part ${part}`], timeline: [] })
+      }
+    }
+    await expect(
+      foldSessionSummaryEvents({
+        brain,
+        ledger: emptySessionSummaryLedger(),
+        events: eventsWithLongTail,
+        signal: new AbortController().signal,
+        cache
+      })
+    ).resolves.toMatchObject({ gap: { completedChunks: 1, totalChunks: 4 } })
+    // Nothing of the split event landed: its parts that did settle were cached, not applied, and the
+    // failed one has no entry so the resume retries it.
+    expect(cacheStore.has('1-2:0-24000')).toBe(true)
+    expect(cacheStore.has('1-2:24000-48000')).toBe(false)
+
+    failSecondPart = false
+    const resumed = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: eventsWithLongTail,
+      signal: new AbortController().signal,
+      cache
+    })
+    const texts = resumed.ledger.done.map((fact) => fact.text)
+    expect(texts.filter((text) => text.startsWith('part'))).toEqual(['part 1', 'part 2', 'part 3'])
+    expect(resumed.ledger.foldedThrough).toBe(2)
+  })
+
+  it('bounds how many chunk extracts run at once', async () => {
+    let inFlight = 0
+    let peak = 0
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        inFlight += 1
+        peak = Math.max(peak, inFlight)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        inFlight -= 1
+        return JSON.stringify({ done: ['chunk'] })
+      }
+    }
+
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(1_200),
+      signal: new AbortController().signal
+    })
+
+    expect(result.totalChunks).toBeGreaterThan(SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
+    expect(peak).toBeGreaterThan(1)
+    expect(peak).toBeLessThanOrEqual(SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
   })
 
   it('stops when the signal aborts', async () => {
@@ -174,74 +710,129 @@ describe('foldSessionSummaryEvents', () => {
       })
     ).rejects.toThrow()
   })
+})
 
-  it('bounds how many chunk extracts run at once', async () => {
-    // Why: each extract spawns an agent CLI, and a 2,000-message session is 50+ chunks at once.
-    let inFlight = 0
-    let peak = 0
-    const brain: SessionFoldBrain = {
-      complete: async ({ prompt }) => {
-        if (prompt.startsWith('You write short progress reports')) {
-          return JSON.stringify({ since: 'since text', full: 'full text' })
+/** A transcript with a distinctive marker in its first, middle and final third. */
+function markedTranscript(count: number): SessionSummarySourceEvent[] {
+  const list = events(count)
+  for (const [index, marker] of [
+    [10, 'MARKER-FIRST'],
+    [Math.floor(count / 2), 'MARKER-MIDDLE'],
+    [count - 10, 'MARKER-LAST']
+  ] as const) {
+    list[index] = { role: list[index].role, text: marker, timestamp: null }
+  }
+  return list
+}
+
+describe('a session of any length folds end to end', () => {
+  /**
+   * A brain that reports the markers it was shown, so the resulting report is evidence of what the
+   * fold actually covered rather than of what the fake model was told to say.
+   */
+  function markerBrain(): { brain: SessionFoldBrain; chunkPrompts: string[] } {
+    const chunkPrompts: string[] = []
+    const seen = new Set<string>()
+    let chunkCalls = 0
+    let reportCalls = 0
+    return {
+      chunkPrompts,
+      brain: {
+        complete: async ({ prompt }) => {
+          for (const marker of ['MARKER-FIRST', 'MARKER-MIDDLE', 'MARKER-LAST']) {
+            if (prompt.includes(marker)) {
+              seen.add(marker)
+            }
+          }
+          if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+            reportCalls += 1
+            const covered = [...seen].join(' ') || `report ${reportCalls}`
+            return JSON.stringify({
+              headline: covered,
+              section: { title: 'phase', text: covered },
+              startNew: false,
+              since: null
+            })
+          }
+          chunkCalls += 1
+          chunkPrompts.push(prompt)
+          const markers = ['MARKER-FIRST', 'MARKER-MIDDLE', 'MARKER-LAST'].filter((marker) =>
+            prompt.includes(marker)
+          )
+          return JSON.stringify({
+            done: markers.length > 0 ? markers : [`chunk ${chunkCalls}`],
+            timeline: []
+          })
         }
-        inFlight += 1
-        peak = Math.max(peak, inFlight)
-        // Why a zero-delay yield: this fake brain has to stay in flight across an await for the
-        // limiter's peak to be observable, and a real delay would make the test the clock's problem.
-        await new Promise((resolve) => setTimeout(resolve, 0))
-        inFlight -= 1
-        return JSON.stringify({ done: ['chunk'] })
       }
     }
+  }
 
+  // The gate: a summary that mentions only the tail fails, which is the exact failure mode the
+  // single-report-call design produced.
+  it('covers the first, middle and last third of a 5,000-event session', async () => {
+    const { brain, chunkPrompts } = markerBrain()
     const result = await foldSessionSummaryEvents({
       brain,
       ledger: emptySessionSummaryLedger(),
-      events: events(400),
+      events: markedTranscript(5_000),
       signal: new AbortController().signal
     })
 
-    expect(result.totalChunks).toBeGreaterThan(SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
-    expect(peak).toBeGreaterThan(1)
-    expect(peak).toBeLessThanOrEqual(SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
-  })
+    const report = result.ledger.reportFull
+    const reported = [report?.headline ?? '', ...(report?.sections ?? []).map((s) => s.text)].join(
+      ' '
+    )
+    expect(reported).toContain('MARKER-FIRST')
+    expect(reported).toContain('MARKER-MIDDLE')
+    expect(reported).toContain('MARKER-LAST')
+    expect(result.ledger.foldedThrough).toBe(5_000)
+    expect(result.gap).toBeNull()
 
-  it('aborts sibling chunk extracts when one chunk fails', async () => {
-    const siblingSignals: AbortSignal[] = []
-    let calls = 0
-    const brain: SessionFoldBrain = {
-      complete: async ({ signal }) => {
-        calls += 1
-        if (calls === 1) {
-          throw new Error('extract failed')
-        }
-        siblingSignals.push(signal)
-        // Why a zero-delay yield: the sibling only has to still be awaiting something when the
-        // first call's failure lands; a real delay adds nothing but wall-clock dependence.
-        await new Promise((resolve) => setTimeout(resolve, 0))
-        return JSON.stringify({ done: ['late'] })
-      }
+    // Acceptance 4: every event reached the model exactly once.
+    for (const index of [0, 10, 2_500, 4_990, 4_999]) {
+      const occurrences = chunkPrompts.reduce(
+        (total, prompt) => total + prompt.split(`[#${index} `).length - 1,
+        0
+      )
+      expect(occurrences).toBe(1)
     }
-
-    await expect(
-      foldSessionSummaryEvents({
-        brain,
-        ledger: emptySessionSummaryLedger(),
-        events: events(400),
-        signal: new AbortController().signal
-      })
-    ).rejects.toThrow('extract failed')
-
-    expect(siblingSignals.length).toBeGreaterThan(0)
-    expect(siblingSignals.every((signal) => signal.aborted)).toBe(true)
   })
-})
 
-describe('buildSessionSummaryChunkPrompt', () => {
-  it('renders indexed events with roles', () => {
-    const prompt = buildSessionSummaryChunkPrompt(events(3), { from: 1, to: 3 }, 10)
-    expect(prompt).toContain('[#11 assistant] message 1')
-    expect(prompt).toContain('[#12 user] message 2')
-    expect(prompt).not.toContain('message 0')
+  // Acceptance 2, both ends: a short session is not padded, and a long one is not clamped to a page
+  // of tail.
+  it('is proportional to the session rather than to a word count', async () => {
+    const short = await foldSessionSummaryEvents({
+      brain: markerBrain().brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(30),
+      signal: new AbortController().signal
+    })
+    expect(short.ledger.reportFull?.sections).toHaveLength(1)
+
+    const long = await foldSessionSummaryEvents({
+      brain: markerBrain().brain,
+      ledger: emptySessionSummaryLedger(),
+      events: markedTranscript(5_000),
+      signal: new AbortController().signal
+    })
+    const sections = long.ledger.reportFull?.sections ?? []
+    expect(sections.length).toBeGreaterThan(1)
+    expect(sections.length).toBeLessThanOrEqual(SESSION_SUMMARY_REPORT_MAX_SECTIONS)
+    // The sections are ordered oldest first and their positions increase across the session.
+    for (let index = 1; index < sections.length; index += 1) {
+      expect(sections[index].through).toBeGreaterThan(sections[index - 1].through)
+    }
+  })
+
+  it('records a skipped record as a named gap on the ledger', async () => {
+    const result = await foldSessionSummaryEvents({
+      brain: jsonBrain(() => ({ done: ['ok'] })),
+      ledger: emptySessionSummaryLedger(),
+      events: events(30),
+      signal: new AbortController().signal,
+      gaps: [{ afterEventIndex: 5, text: 'Skipped 1 oversized transcript record.' }]
+    })
+    expect(result.ledger.gaps).toEqual(['Skipped 1 oversized transcript record.'])
   })
 })

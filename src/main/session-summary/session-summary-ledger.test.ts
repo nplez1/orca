@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applySessionSummaryDelta,
+  boundSessionSummaryLedgerForStorage,
   emptySessionSummaryLedger,
   hasProducedLedger,
   mergeSessionSummaryDeltas,
@@ -105,6 +106,22 @@ describe('mergeSessionSummaryDeltas', () => {
   })
 })
 
+describe('the ledger does not cap its own lists', () => {
+  // The old truncation kept the *earliest* twelve at every merge, so the newest facts — the ones a
+  // reader opens the pane for — were the ones dropped. The pane caps what it renders instead.
+  it('keeps every distinct fact a session produced', () => {
+    const many = Array.from({ length: SESSION_SUMMARY_LIST_MAX_ITEMS * 4 }, (_, index) => ({
+      text: `milestone ${index}`,
+      sourceIndex: index
+    }))
+    const merged = mergeSessionSummaryDeltas([{ done: many }])
+    expect(merged.done).toHaveLength(many.length)
+    const applied = applySessionSummaryDelta(emptySessionSummaryLedger(), { done: many }, 50, 1)
+    expect(applied.done).toHaveLength(many.length)
+    expect(applied.done.at(-1)?.text).toBe(`milestone ${many.length - 1}`)
+  })
+})
+
 describe('applySessionSummaryDelta', () => {
   it('leaves absent fields untouched and clears on explicit null', () => {
     const base = {
@@ -145,13 +162,63 @@ describe('applySessionSummaryDelta', () => {
     const base: ReturnType<typeof emptySessionSummaryLedger> = {
       ...emptySessionSummaryLedger(),
       reportSince: { text: 'since', through: 4 },
-      reportFull: { text: 'full', through: 4 }
+      reportFull: {
+        headline: 'full',
+        sections: [],
+        through: 4,
+        text: 'full'
+      }
     }
     const next = applySessionSummaryDelta(base, { done: [fact('a', 5)] }, 6, 100, 5, 2)
     expect(next.lastUserMessageIndex).toBe(5)
     expect(next.userMessageCount).toBe(2)
     expect(next.reportSince).toEqual({ text: 'since', through: 4 })
-    expect(next.reportFull).toEqual({ text: 'full', through: 4 })
+    expect(next.reportFull?.text).toBe('full')
+  })
+})
+
+describe('boundSessionSummaryLedgerForStorage', () => {
+  it('keeps the newest entries and records how many it dropped', () => {
+    const timeline = Array.from({ length: 10 }, (_, index) => ({
+      id: `e${index}`,
+      kind: 'milestone' as const,
+      text: `t${index}`,
+      sourceIndex: index
+    }))
+    const bounded = boundSessionSummaryLedgerForStorage(
+      { ...emptySessionSummaryLedger(), timeline },
+      4
+    )
+    expect(bounded.timeline.map((entry) => entry.text)).toEqual(['t6', 't7', 't8', 't9'])
+    expect(bounded.timelineBase).toBe(6)
+  })
+
+  it('leaves a ledger under the bound untouched', () => {
+    const ledger = emptySessionSummaryLedger()
+    expect(boundSessionSummaryLedgerForStorage(ledger, 4)).toBe(ledger)
+  })
+
+  // Entry ids are derived from an entry's position, so a head trim would hand a new entry an id an
+  // older one already holds — duplicate React keys and a wrong seen cursor.
+  it('keeps new entry ids unique after a trim', () => {
+    const timeline = Array.from({ length: 6 }, (_, index) => ({
+      id: `old-${index}`,
+      kind: 'milestone' as const,
+      text: `t${index}`,
+      sourceIndex: index
+    }))
+    const trimmed = boundSessionSummaryLedgerForStorage(
+      { ...emptySessionSummaryLedger(), timeline, foldedThrough: 6 },
+      3
+    )
+    const next = applySessionSummaryDelta(
+      trimmed,
+      { timeline: [{ kind: 'error', text: 'new', sourceIndex: 7 }] },
+      8,
+      100
+    )
+    const ids = next.timeline.map((entry) => entry.id)
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })
 

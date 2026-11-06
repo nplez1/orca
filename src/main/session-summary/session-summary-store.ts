@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
+import { boundSessionSummaryLedgerForStorage } from './session-summary-ledger'
 import type {
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
@@ -19,6 +20,13 @@ export type SessionSummaryStoreEntry = {
   ledger: SessionSummaryLedger
   /** Completed chunk extracts not yet folded in; keys are `<from>-<to>` message ranges. */
   chunkCache: Record<string, SessionSummaryLedgerDelta>
+  /**
+   * Folds each slice has failed on, so an unsummarizable slice can be given up on.
+   *
+   * Why persisted: one fold cannot tell such a slice from a brain that is down, and the cost of
+   * guessing wrong is either a lost chunk or a session that never folds again.
+   */
+  chunkFailures?: Record<string, number>
   /** Transcript message count at last read; seeds the skeleton's backlog hint. */
   messageCount: number
   seenThrough: number
@@ -54,8 +62,13 @@ function registerExitFlush(): void {
  * v2: facts carry the transcript index they came from (`SessionSummaryFact`), which is what the
  * pane's "since your last message" window is computed from. A v1 ledger has no indexes, so it
  * cannot answer that question and is worth less than one re-fold.
+ *
+ * v3: the whole-session report is structured (headline + sections), the ledger carries
+ * `timelineBase`/`foldGap`/`gaps`, and the chunk extracts are keyed to the digest that produced
+ * them — a v2 extract was written from a prompt that truncated every event to 1,500 characters, so
+ * reusing it would fold the old, lossy reading of the same messages.
  */
-const STORE_VERSION = 2
+const STORE_VERSION = 3
 
 type SessionSummaryStoreFile = {
   version?: number
@@ -88,7 +101,20 @@ export class SessionSummaryStore {
   }
 
   set(paneKey: string, entry: SessionSummaryStoreEntry): void {
-    this.entries[paneKey] = entry
+    // Why here and not in the fold: 200 panes each keep an unbounded timeline plus its chunk cache,
+    // and what the store holds is history the pane pages through — the newest is what a reader
+    // scrolls to. The ledger's `timelineBase` keeps entry ids unique across the trim.
+    const ledger = boundSessionSummaryLedgerForStorage(entry.ledger)
+    this.entries[paneKey] = {
+      ...entry,
+      chunkFailures: entry.chunkFailures ?? {},
+      ledger,
+      // Only after a trim: the cursor counts entries, and dropping the head moved every position.
+      seenThrough:
+        ledger.timelineBase > 0
+          ? Math.min(entry.seenThrough, ledger.timelineBase + ledger.timeline.length)
+          : entry.seenThrough
+    }
     const keys = Object.keys(this.entries)
     if (keys.length > MAX_ENTRIES) {
       const evictable = keys

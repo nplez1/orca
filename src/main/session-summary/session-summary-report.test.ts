@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applySessionSummaryReportSection,
+  buildSessionSummaryReportGroups,
   buildSessionSummaryReportPrompt,
-  parseSessionSummaryReports,
-  rewriteReports
+  parseSessionSummaryReportReply,
+  rewriteSessionSummaryReports
 } from './session-summary-report'
 import { emptySessionSummaryLedger } from './session-summary-ledger'
 import type { SessionFoldBrain } from './session-summary-fold'
+import type {
+  SessionSummaryFullReport,
+  SessionSummaryLedger
+} from '../../shared/session-summary-types'
+import {
+  SESSION_SUMMARY_REPORT_MAX_CHARS,
+  SESSION_SUMMARY_REPORT_MAX_SECTIONS,
+  SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS
+} from '../../shared/session-summary-types'
 
 const input = {
-  previousSince: 'old since',
-  previousFull: 'old full',
+  previous: null,
   delta: {
     done: [{ text: 'flag parsed', sourceIndex: 44 }],
     blockers: [{ text: 'tests red', sourceIndex: 12 }]
@@ -20,11 +30,32 @@ const input = {
   ],
   windowRestarted: true,
   userMessageCount: 3,
-  lastUserMessageIndex: 40
+  lastUserMessageIndex: 40,
+  writesSince: true
 }
 
-function brain(answer: unknown): SessionFoldBrain {
-  return { complete: async () => JSON.stringify(answer) }
+function brain(answer: (prompt: string, call: number) => unknown): SessionFoldBrain {
+  let call = 0
+  return {
+    complete: async ({ prompt }) => {
+      call += 1
+      return JSON.stringify(answer(prompt, call))
+    }
+  }
+}
+
+function reply(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    headline: 'a headline',
+    section: { title: 'a phase', text: 'something happened' },
+    startNew: false,
+    since: null,
+    ...overrides
+  }
+}
+
+function ledgerWith(overrides: Partial<SessionSummaryLedger>): SessionSummaryLedger {
+  return { ...emptySessionSummaryLedger(), ...overrides }
 }
 
 describe('buildSessionSummaryReportPrompt', () => {
@@ -34,7 +65,7 @@ describe('buildSessionSummaryReportPrompt', () => {
     const prompt = buildSessionSummaryReportPrompt(input)
     expect(prompt).toContain('[#40]')
     expect(prompt).toContain('spoken to the agent 3 times')
-    expect(prompt).toContain('old full')
+    expect(prompt).toContain('flag parsed')
   })
 
   it('asks for a single report when the reader has spoken once', () => {
@@ -42,86 +73,383 @@ describe('buildSessionSummaryReportPrompt', () => {
     expect(prompt).toContain('set "since" to null')
   })
 
-  it('bounds the timeline so a long backlog cannot grow the prompt', () => {
+  // Only the group that ends at the reader's last message writes "since"; an intermediate group
+  // writing one would leave a sentence about the middle of the session labelled "since".
+  it('tells a non-final group not to write the since report', () => {
+    const prompt = buildSessionSummaryReportPrompt({ ...input, writesSince: false })
+    expect(prompt).toContain('Do not write "since"')
+  })
+
+  it('carries the previous report forward and bounds the timeline', () => {
+    const previous: SessionSummaryFullReport = {
+      headline: 'old headline',
+      sections: [{ id: 's1', title: 'old phase', text: 'old text', through: 12 }],
+      through: 12,
+      text: 'old headline\n\nold text'
+    }
     const timeline = Array.from({ length: 200 }, (_, index) => ({
       kind: 'milestone' as const,
       text: `entry ${index} ${'x'.repeat(400)}`,
       sourceIndex: index
     }))
-    const prompt = buildSessionSummaryReportPrompt({ ...input, timeline })
+    const prompt = buildSessionSummaryReportPrompt({ ...input, previous, timeline })
+    expect(prompt).toContain('old headline')
+    expect(prompt).toContain('old phase')
     expect(prompt).toContain('entry 199')
     expect(prompt).not.toContain('entry 100 ')
-    expect(prompt.length).toBeLessThan(20_000)
+    expect(prompt.length).toBeLessThan(30_000)
   })
 })
 
-describe('parseSessionSummaryReports', () => {
-  it('accepts a null since as an answer, not a miss', () => {
-    expect(parseSessionSummaryReports('{"since": null, "full": "f"}', 7)).toEqual({
-      since: null,
-      full: { text: 'f', through: 7 }
+describe('parseSessionSummaryReportReply', () => {
+  it('accepts a headline and a section', () => {
+    expect(parseSessionSummaryReportReply(JSON.stringify(reply()))).toEqual({
+      headline: 'a headline',
+      section: { title: 'a phase', text: 'something happened' },
+      startNew: false,
+      since: null
     })
   })
 
-  it('rejects a reply with no full report', () => {
-    expect(parseSessionSummaryReports('{"since": "s"}', 7)).toBeNull()
-    expect(parseSessionSummaryReports('not json', 7)).toBeNull()
+  it('reads a null since as an answer, not a miss', () => {
+    expect(
+      parseSessionSummaryReportReply('{"headline":"h","section":{"text":"t"}}')?.since
+    ).toBeNull()
+  })
+
+  // Without a headline or a section there is nothing to render, and keeping the previous report is
+  // a smaller loss than replacing it with an empty one.
+  it('rejects a reply with no headline or no section', () => {
+    expect(parseSessionSummaryReportReply(JSON.stringify({ section: { text: 't' } }))).toBeNull()
+    expect(parseSessionSummaryReportReply(JSON.stringify({ headline: 'h' }))).toBeNull()
+    expect(parseSessionSummaryReportReply('not json')).toBeNull()
+  })
+
+  it('clamps an over-long section and supplies a title', () => {
+    const parsed = parseSessionSummaryReportReply(
+      JSON.stringify({
+        headline: 'h',
+        section: { text: 'x'.repeat(SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS * 2) }
+      })
+    )
+    expect(parsed?.section.text).toHaveLength(SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS)
+    expect(parsed?.section.title).toBe('Work')
   })
 })
 
-describe('rewriteReports', () => {
-  const ledger = emptySessionSummaryLedger()
+describe('applySessionSummaryReportSection', () => {
+  const parsed = {
+    headline: 'h',
+    section: { title: 'phase', text: 'text' },
+    startNew: false,
+    since: null
+  }
 
-  it('writes both reports', async () => {
-    const reports = await rewriteReports({
-      brain: brain({ since: 's', full: 'f' }),
+  it('opens the first section and then rewrites it', () => {
+    const first = applySessionSummaryReportSection(null, parsed, 10, false)
+    expect(first.sections).toHaveLength(1)
+    expect(first.through).toBe(10)
+    const second = applySessionSummaryReportSection(
+      first,
+      { ...parsed, section: { title: 'phase', text: 'more' } },
+      20,
+      false
+    )
+    expect(second.sections).toHaveLength(1)
+    expect(second.sections[0].text).toBe('more')
+    expect(second.sections[0].through).toBe(20)
+  })
+
+  it('appends when the model or the group boundary opens a phase', () => {
+    const first = applySessionSummaryReportSection(null, parsed, 10, false)
+    const next = applySessionSummaryReportSection(
+      first,
+      { ...parsed, section: { title: 'next', text: 'later' } },
+      20,
+      true
+    )
+    expect(next.sections.map((section) => section.title)).toEqual(['phase', 'next'])
+    expect(next.sections[1].through).toBe(20)
+  })
+
+  // A report that loses its beginning is the failure this change exists to prevent, so the ceiling
+  // is enforced by merging the oldest pair rather than by dropping the newest.
+  it('merges the oldest sections when the ceiling is reached', () => {
+    let report: SessionSummaryFullReport | null = null
+    for (let index = 0; index < SESSION_SUMMARY_REPORT_MAX_SECTIONS + 3; index += 1) {
+      report = applySessionSummaryReportSection(
+        report,
+        {
+          headline: 'h',
+          section: { title: `p${index}`, text: `text ${index}` },
+          startNew: false,
+          since: null
+        },
+        index * 10,
+        true
+      )
+    }
+    expect(report?.sections).toHaveLength(SESSION_SUMMARY_REPORT_MAX_SECTIONS)
+    // The newest phase survives intact; the compression landed on the far past.
+    expect(report?.sections.at(-1)?.title).toBe(`p${SESSION_SUMMARY_REPORT_MAX_SECTIONS + 2}`)
+    expect(report?.sections[0].title).toBe('p0')
+  })
+
+  // The oldest phase must not survive every merge while the middle of the session disappears: each
+  // half is clamped before the join, so both sides of a merge stay represented.
+  it('keeps both halves of a merge rather than the first one whole', () => {
+    // Why full-length sections: a section shorter than half the ceiling would survive the clamp
+    // whole and the test would pass without exercising the merge at all.
+    const sectionText = (index: number): string =>
+      `marker-${index} ${'w'.repeat(SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS - 12)}`
+    let report: SessionSummaryFullReport | null = null
+    for (let index = 0; index < 16; index += 1) {
+      report = applySessionSummaryReportSection(
+        report,
+        {
+          headline: 'h',
+          section: { title: `p${index}`, text: sectionText(index) },
+          startNew: false,
+          since: null
+        },
+        index * 10,
+        true
+      )
+    }
+    const sections = report?.sections ?? []
+    const text = sections.map((section) => section.text).join(' ')
+    // The newest phases are intact, and the compressed past still names both sides of its merges.
+    expect(sections.at(-1)?.text).toBe(sectionText(15))
+    expect(text).toContain('marker-0')
+    expect(text).toContain('marker-1')
+    for (const section of sections) {
+      expect(section.text.length).toBeLessThanOrEqual(SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS)
+    }
+  })
+
+  it('keeps the whole report under its character ceiling', () => {
+    let report: SessionSummaryFullReport | null = null
+    for (let index = 0; index < 40; index += 1) {
+      report = applySessionSummaryReportSection(
+        report,
+        {
+          headline: 'h',
+          section: {
+            title: `p${index}`,
+            text: 'y'.repeat(SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS)
+          },
+          startNew: false,
+          since: null
+        },
+        index * 10,
+        true
+      )
+    }
+    const chars = (report?.sections ?? []).reduce(
+      (total, section) => total + section.text.length + section.title.length,
+      0
+    )
+    expect(chars).toBeLessThanOrEqual(SESSION_SUMMARY_REPORT_MAX_CHARS)
+  })
+
+  it('derives the flat text an older client renders', () => {
+    const report = applySessionSummaryReportSection(null, parsed, 10, false)
+    expect(report.text).toContain('h')
+    expect(report.text).toContain('text')
+  })
+})
+
+describe('buildSessionSummaryReportGroups', () => {
+  it('splits the unfolded range into at most eight contiguous groups', () => {
+    const groups = buildSessionSummaryReportGroups(0, 5_000)
+    expect(groups).toHaveLength(8)
+    expect(groups[0].from).toBe(0)
+    expect(groups.at(-1)?.to).toBe(5_000)
+    for (let index = 0; index < groups.length - 1; index += 1) {
+      expect(groups[index].to).toBe(groups[index + 1].from)
+    }
+  })
+
+  it('has nothing to do over an empty range', () => {
+    expect(buildSessionSummaryReportGroups(10, 10)).toEqual([])
+    expect(buildSessionSummaryReportGroups(20, 10)).toEqual([])
+  })
+})
+
+describe('rewriteSessionSummaryReports', () => {
+  it('writes one section per group and only the last group’s since', async () => {
+    const prompts: string[] = []
+    const reports = await rewriteSessionSummaryReports({
+      brain: brain((prompt, call) => {
+        prompts.push(prompt)
+        return reply({
+          headline: `headline ${call}`,
+          section: { title: `phase ${call}`, text: `work ${call}` },
+          since: `since ${call}`
+        })
+      }),
       signal: new AbortController().signal,
-      ledger,
-      merged: {},
-      through: 5,
+      ledger: emptySessionSummaryLedger(),
+      folded: ledgerWith({
+        foldedThrough: 5_000,
+        done: [
+          { text: 'early', sourceIndex: 10 },
+          { text: 'late', sourceIndex: 4_900 }
+        ]
+      }),
       windowRestarted: false,
       userMessageCount: 3,
-      lastUserMessageIndex: 4
+      lastUserMessageIndex: 4_900
     })
-    expect(reports).toEqual({
-      since: { text: 's', through: 5 },
-      full: { text: 'f', through: 5 }
-    })
+    expect(prompts).toHaveLength(8)
+    expect(reports.full?.sections).toHaveLength(8)
+    expect(reports.full?.through).toBe(5_000)
+    // Every group's phase survives: the first, the middle and the last all have a section.
+    expect(reports.full?.sections[0].text).toBe('work 1')
+    expect(reports.full?.sections.at(-1)?.text).toBe('work 8')
+    expect(reports.since?.text).toBe('since 8')
+    expect(reports.since?.through).toBe(5_000)
   })
 
-  // One interaction means the window is the session: two near-identical reports would give the
-  // reader a switch with no meaning, so the split is enforced here and not trusted to the model.
-  it('drops "since" when the reader has spoken only once', async () => {
-    const reports = await rewriteReports({
-      brain: brain({ since: 'same thing', full: 'f' }),
+  it('rewrites the open section when the fold is a single group', async () => {
+    const previous: SessionSummaryFullReport = {
+      headline: 'old',
+      sections: [{ id: 's1', title: 'old phase', text: 'old text', through: 100 }],
+      through: 100,
+      text: 'old\n\nold text'
+    }
+    const reports = await rewriteSessionSummaryReports({
+      brain: brain(() => reply({ section: { title: 'old phase', text: 'absorbed' } })),
       signal: new AbortController().signal,
-      ledger,
-      merged: {},
-      through: 5,
+      ledger: ledgerWith({ foldedThrough: 100, reportFull: previous }),
+      folded: ledgerWith({ foldedThrough: 140, reportFull: previous }),
+      windowRestarted: false,
+      userMessageCount: 3,
+      lastUserMessageIndex: 139
+    })
+    expect(reports.full?.sections).toHaveLength(1)
+    expect(reports.full?.sections[0].text).toBe('absorbed')
+    expect(reports.full?.through).toBe(140)
+  })
+
+  it('covers only the range the previous report did not reach', async () => {
+    const previous: SessionSummaryFullReport = {
+      headline: 'old',
+      sections: [{ id: 's1', title: 'old phase', text: 'old text', through: 500 }],
+      through: 500,
+      text: 'old\n\nold text'
+    }
+    const prompts: string[] = []
+    await rewriteSessionSummaryReports({
+      brain: brain((prompt) => {
+        prompts.push(prompt)
+        return reply()
+      }),
+      signal: new AbortController().signal,
+      ledger: ledgerWith({ foldedThrough: 500, reportFull: previous }),
+      folded: ledgerWith({
+        foldedThrough: 1_000,
+        reportFull: previous,
+        done: [
+          { text: 'before the report', sourceIndex: 100 },
+          { text: 'after it', sourceIndex: 510 }
+        ]
+      }),
+      windowRestarted: false,
+      userMessageCount: 3,
+      lastUserMessageIndex: 900
+    })
+    // A fact from the already-reported range is not re-offered to the model.
+    expect(prompts[0]).toContain('after it')
+    expect(prompts[0]).not.toContain('before the report')
+  })
+
+  // A stale sentence is a smaller loss than losing the batch: the caller keeps the old report, and
+  // its `through` staying behind is what makes the next fold cover the gap.
+  it('stops the chain on a failed group and keeps the last good report', async () => {
+    let call = 0
+    const reports = await rewriteSessionSummaryReports({
+      brain: {
+        complete: async () => {
+          call += 1
+          if (call === 2) {
+            throw new Error('cli failed')
+          }
+          return JSON.stringify(reply({ section: { title: 'phase', text: `work ${call}` } }))
+        }
+      },
+      signal: new AbortController().signal,
+      ledger: emptySessionSummaryLedger(),
+      folded: ledgerWith({ foldedThrough: 5_000 }),
+      windowRestarted: false,
+      userMessageCount: 3,
+      lastUserMessageIndex: 4_900
+    })
+    expect(reports.full?.sections).toHaveLength(1)
+    expect(reports.full?.through).toBe(625)
+  })
+
+  // A first fold whose report phase failed advanced the cursor and left no report at all. Starting
+  // the next run at the cursor would leave the beginning of the session unreported for good.
+  it('covers a session from its start when no report was ever written', async () => {
+    const prompts: string[] = []
+    const reports = await rewriteSessionSummaryReports({
+      brain: brain((prompt) => {
+        prompts.push(prompt)
+        return reply()
+      }),
+      signal: new AbortController().signal,
+      ledger: ledgerWith({ foldedThrough: 120, reportFull: null }),
+      folded: ledgerWith({
+        foldedThrough: 120,
+        reportFull: null,
+        done: [{ text: 'the very first thing', sourceIndex: 3 }]
+      }),
+      windowRestarted: false,
+      userMessageCount: 3,
+      lastUserMessageIndex: 100
+    })
+    expect(prompts[0]).toContain('the very first thing')
+    expect(reports.full?.through).toBe(120)
+  })
+
+  it('has nothing to rewrite when the report already reaches the fold', async () => {
+    const previous: SessionSummaryFullReport = {
+      headline: 'h',
+      sections: [],
+      through: 10,
+      text: 'h'
+    }
+    let calls = 0
+    const reports = await rewriteSessionSummaryReports({
+      brain: {
+        complete: async () => {
+          calls += 1
+          return JSON.stringify(reply())
+        }
+      },
+      signal: new AbortController().signal,
+      ledger: ledgerWith({ foldedThrough: 10, reportFull: previous }),
+      folded: ledgerWith({ foldedThrough: 10, reportFull: previous }),
+      windowRestarted: false,
+      userMessageCount: 3,
+      lastUserMessageIndex: 9
+    })
+    expect(calls).toBe(0)
+    expect(reports).toEqual({ since: null, full: null })
+  })
+
+  it('drops the since report when the reader has spoken only once', async () => {
+    const reports = await rewriteSessionSummaryReports({
+      brain: brain(() => reply({ since: 'same thing' })),
+      signal: new AbortController().signal,
+      ledger: emptySessionSummaryLedger(),
+      folded: ledgerWith({ foldedThrough: 20 }),
       windowRestarted: false,
       userMessageCount: 1,
       lastUserMessageIndex: 0
     })
-    expect(reports?.since).toBeNull()
-    expect(reports?.full.text).toBe('f')
-  })
-
-  // A stale sentence is a smaller loss than losing the batch: the caller keeps the old reports.
-  it('returns null when the rewrite fails', async () => {
-    const reports = await rewriteReports({
-      brain: {
-        complete: async () => {
-          throw new Error('cli failed')
-        }
-      },
-      signal: new AbortController().signal,
-      ledger,
-      merged: {},
-      through: 5,
-      windowRestarted: true,
-      userMessageCount: 3,
-      lastUserMessageIndex: 4
-    })
-    expect(reports).toBeNull()
+    expect(reports.since).toBeNull()
+    expect(reports.full?.headline).toBe('a headline')
   })
 })

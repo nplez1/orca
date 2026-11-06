@@ -11,6 +11,7 @@ import type {
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
 import { emptySessionSummaryLedger, hasProducedLedger } from './session-summary-ledger'
+import type { SessionSummaryTranscriptHost } from './session-summary-transcript-host'
 
 // The subset of a status row the summary needs; optional throughout because
 // hook rows arrive from hosts of varying vintage (see agent-status-types.ts).
@@ -47,6 +48,19 @@ export function buildSessionSummaryFacts(
     foldedThrough: ledger.foldedThrough,
     backlogCount: Math.max(0, messageCount - ledger.foldedThrough)
   }
+}
+
+export function initialSessionSummaryStatus(
+  host: SessionSummaryTranscriptHost,
+  hasSource: boolean
+): SessionSummaryStatus {
+  if (host.kind === 'unsupported') {
+    return 'unsupported-host'
+  }
+  // Why not gated on a local row: a paired host keeps the status rows for its own
+  // sessions, and this client's copies are cleared on reconnect. Asking the host is how
+  // a pane whose row was dropped still gets its summary (#135).
+  return host.kind === 'runtime' || hasSource ? 'folding' : 'unavailable'
 }
 
 /** A snapshot from this machine's own cache — the shape a paired host relays instead. */

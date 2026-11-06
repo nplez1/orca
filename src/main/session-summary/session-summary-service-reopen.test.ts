@@ -55,7 +55,10 @@ describe('SessionSummaryService re-opening the pane', () => {
         reads += 1
         return {
           events: currentEvents.slice(fromEventIndex),
-          totalEvents: currentEvents.length
+          totalEvents: currentEvents.length,
+          retainedBytes: 0,
+          overRetainedBudget: false,
+          gaps: []
         }
       },
       getAgentStatusEntry: () => ({

@@ -30,6 +30,7 @@ import { SessionSummaryPaneLeases } from './session-summary-pane-leases'
 import {
   buildLocalSessionSummarySnapshot,
   IDLE_FOLD,
+  initialSessionSummaryStatus,
   type SessionSummaryStatusEntry
 } from './session-summary-snapshot'
 import { isStoredBriefReusable, attributableStoredLedger } from './session-summary-brief-freshness'
@@ -123,9 +124,13 @@ export class SessionSummaryService {
     })
   }
 
-  private emit(paneKey: string): void {
+  private emit(paneKey: string, progressOnly = false): void {
     const snapshot = this.snapshot(paneKey)
-    this.listeners.forEach((listener) => listener(snapshot))
+    // Why strip the ledger: a fold reports once per completed chunk, and shipping a thousand-entry
+    // ledger each time is a structured clone per chunk to every window. The pane merges the counts
+    // into the snapshot it already holds.
+    const update = progressOnly ? { ...snapshot, ledger: null, progressOnly: true } : snapshot
+    this.listeners.forEach((listener) => listener(update))
   }
 
   /** Returns the current snapshot immediately; fold work is async and pushed via onUpdate. */
@@ -168,7 +173,7 @@ export class SessionSummaryService {
     // Why before the freshness check: a ledger that belongs to a different conversation must be
     // dropped before anything decides it is fresh enough to show.
     this.resetStaleLedger(paneKey, host, identity)
-    runtime.status = this.initialStatus(host, hasSource)
+    runtime.status = initialSessionSummaryStatus(host, hasSource)
     this.runtimes.set(paneKey, runtime)
 
     // Why: re-entering the pane is not a request to spend a model call again. A brief that is
@@ -180,6 +185,7 @@ export class SessionSummaryService {
       isStoredBriefReusable({
         revalidateWithinMs: request.revalidateWithinMs,
         foldedAt: this.deps.store.get(paneKey)?.ledger.foldedAt,
+        foldGap: this.deps.store.get(paneKey)?.ledger.foldGap ?? null,
         storedIdentity: this.deps.store.get(paneKey)?.identity,
         currentIdentity: sessionSummaryIdentityOf(identity),
         entry,
@@ -202,19 +208,6 @@ export class SessionSummaryService {
       void this.runLocalFold(paneKey, host)
     }
     return this.snapshot(paneKey)
-  }
-
-  private initialStatus(
-    host: SessionSummaryTranscriptHost,
-    hasSource: boolean
-  ): SessionSummaryStatus {
-    if (host.kind === 'unsupported') {
-      return 'unsupported-host'
-    }
-    // Why not gated on a local row: a paired host keeps the status rows for its own
-    // sessions, and this client's copies are cleared on reconnect. Asking the host is how
-    // a pane whose row was dropped still gets its summary (#135).
-    return host.kind === 'runtime' || hasSource ? 'folding' : 'unavailable'
   }
 
   /**
@@ -310,7 +303,7 @@ export class SessionSummaryService {
               runtime.error = update.error
             }
           }
-          this.emit(paneKey)
+          this.emit(paneKey, update.progressOnly === true)
         }
       }
     }).finally(() => {

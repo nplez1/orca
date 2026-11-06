@@ -96,7 +96,7 @@ describe('parseOpenCodeSessionFile', () => {
           role: 'user',
           text: text.slice(0, 256 * 1024),
           timestamp: '2026-05-01T11:13:20.000Z',
-          ...(length > 256 * 1024 ? { textTruncated: true } : {})
+          ...(length > 256 * 1024 ? { textTruncated: true, textOriginalLength: length } : {})
         }
       ])
       expect(session?.previewMessages[0]?.text).toHaveLength(220)

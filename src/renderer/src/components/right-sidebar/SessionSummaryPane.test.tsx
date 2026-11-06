@@ -57,11 +57,19 @@ function readySnapshot(overrides: Partial<SessionSummarySnapshot> = {}): Session
       decisions: [],
       timeline: [],
       reportSince: null,
-      reportFull: { text: 'Shipping the summary pane.', through: 4 },
+      reportFull: {
+        headline: 'Shipping the summary pane.',
+        sections: [],
+        through: 4,
+        text: 'Shipping the summary pane.'
+      },
       lastUserMessageIndex: 0,
       userMessageCount: 1,
       foldedThrough: 4,
-      foldedAt: 1_000
+      foldedAt: 1_000,
+      timelineBase: 0,
+      foldGap: null,
+      gaps: []
     },
     seenThrough: 0,
     fold: { running: false, completedChunks: 1, totalChunks: 1 },
@@ -121,8 +129,9 @@ describe('SessionSummaryPane', () => {
     expect(markup).toContain('Session summary')
     expect(markup).toContain('Up to date')
     expect(markup).toContain('lucide-sticky-note')
-    // The title is the whole-session goal, and the report is the written summary.
-    expect(markup).toContain('Ship the summary pane')
+    // The report's headline is the pane's top line: it is written for the whole session on every
+    // fold, so it answers "where does this stand" at any length. The goal is the fallback for a
+    // ledger whose report phase has not run.
     expect(markup).toContain('Shipping the summary pane.')
     // The ledger and the timeline start collapsed: the pane opens as a brief, not a log.
     expect(markup).toContain('Ledger')
@@ -189,7 +198,10 @@ describe('SessionSummaryPane', () => {
         lastUserMessageIndex: null,
         userMessageCount: 1,
         foldedThrough: 4,
-        foldedAt: 1
+        foldedAt: 1,
+        timelineBase: 0,
+        foldGap: null,
+        gaps: []
       }
     })
 

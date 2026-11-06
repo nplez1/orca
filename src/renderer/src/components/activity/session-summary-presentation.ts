@@ -68,6 +68,19 @@ export function resolveSessionSummaryHeaderState(
       folding: false
     }
   }
+  // Why before the backlog: a fold that could not summarize every chunk leaves a backlog too, and
+  // "N of M sections summarized" is the honest version of it.
+  const fold = snapshot?.fold
+  if (fold && fold.totalChunks > 0 && fold.completedChunks < fold.totalChunks) {
+    return {
+      hint: translate(
+        'activity.sessionSummary.partialHint',
+        '{{done}} of {{total}} sections summarized',
+        { done: fold.completedChunks, total: fold.totalChunks }
+      ),
+      folding: false
+    }
+  }
   if (backlogCount > 0) {
     return {
       hint: translate('activity.sessionSummary.backlogHint', '{{count}} events to catch up on', {

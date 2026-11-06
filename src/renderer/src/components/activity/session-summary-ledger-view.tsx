@@ -5,19 +5,23 @@ import {
   type SessionSummaryFact,
   type SessionSummaryLedger,
   type SessionSummarySnapshot,
-  type SessionSummaryTimelineEntry,
-  type SessionSummaryTimelineKind
+  type SessionSummaryTimelineEntry
 } from '../../../../shared/session-summary-types'
+import { ReportBody, reportTitleOf, sinceReportView } from './session-summary-report-view'
+import { LedgerFacts, TimelineRow, type LedgerWindowFacts } from './session-summary-evidence-view'
+
+/**
+ * Timeline rows rendered at a time.
+ *
+ * Why a page and not a virtualizer: a days-long session reaches thousands of entries, and mounting
+ * them all is what made opening the disclosure hang. The newest page is what a reader wants first,
+ * and one click reaches further back.
+ */
+const TIMELINE_PAGE_SIZE = 100
 
 /** Facts and a timeline entry, windowed to what the reader has not seen. */
 type LedgerWindow = {
-  facts: {
-    inProgress: SessionSummaryFact | null
-    plan: SessionSummaryFact[]
-    done: SessionSummaryFact[]
-    blockers: SessionSummaryFact[]
-    decisions: SessionSummaryFact[]
-  }
+  facts: LedgerWindowFacts
   timeline: SessionSummaryTimelineEntry[]
   /** Facts/timeline entries excluded because they happened before the reader's last message. */
   hiddenCount: number
@@ -57,56 +61,13 @@ export function windowSinceLastInteraction(
   }
 }
 
-function ledgerHasFacts(facts: LedgerWindow['facts']): boolean {
+function ledgerHasFacts(facts: LedgerWindowFacts): boolean {
   return Boolean(
     facts.inProgress ||
     facts.plan.length > 0 ||
     facts.done.length > 0 ||
     facts.blockers.length > 0 ||
     facts.decisions.length > 0
-  )
-}
-
-const TIMELINE_KIND_LABELS: Record<SessionSummaryTimelineKind, string> = {
-  milestone: 'Milestone',
-  decision: 'Decision',
-  error: 'Error',
-  'needs-input': 'Needs input',
-  'tool-burst': 'Work',
-  'user-input': 'Prompt'
-}
-
-function sectionLabel(text: string): React.JSX.Element {
-  return (
-    <div className="mb-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-      {text}
-    </div>
-  )
-}
-
-function TimelineRow({ entry }: { entry: SessionSummaryTimelineEntry }): React.JSX.Element {
-  return (
-    <div className="flex items-baseline gap-2 py-0.5 text-xs">
-      <span className="shrink-0 rounded-sm bg-muted px-1 py-px text-2xs text-muted-foreground">
-        {translate(`activity.sessionSummary.kind.${entry.kind}`, TIMELINE_KIND_LABELS[entry.kind])}
-      </span>
-      <span className="min-w-0 flex-1 break-words text-foreground">{entry.text}</span>
-      <span className="shrink-0 font-mono text-2xs text-muted-foreground">
-        #{entry.sourceIndex}
-      </span>
-    </div>
-  )
-}
-
-function FactList({ items }: { items: readonly SessionSummaryFact[] }): React.JSX.Element {
-  return (
-    <ul className="space-y-0.5 text-xs text-foreground">
-      {items.map((item) => (
-        <li key={item.text} className="leading-snug">
-          {item.text}
-        </li>
-      ))}
-    </ul>
   )
 }
 
@@ -155,43 +116,6 @@ function Disclosure({
   )
 }
 
-function LedgerFacts({ facts }: { facts: LedgerWindow['facts'] }): React.JSX.Element {
-  return (
-    <div className="space-y-2">
-      {facts.inProgress ? (
-        <div>
-          {sectionLabel(translate('activity.sessionSummary.now', 'Now'))}
-          <p className="text-xs leading-snug text-foreground">{facts.inProgress.text}</p>
-        </div>
-      ) : null}
-      {facts.plan.length > 0 ? (
-        <div>
-          {sectionLabel(translate('activity.sessionSummary.plan', 'Plan'))}
-          <FactList items={facts.plan} />
-        </div>
-      ) : null}
-      {facts.done.length > 0 ? (
-        <div>
-          {sectionLabel(translate('activity.sessionSummary.done', 'Done'))}
-          <FactList items={facts.done} />
-        </div>
-      ) : null}
-      {facts.blockers.length > 0 ? (
-        <div>
-          {sectionLabel(translate('activity.sessionSummary.blockers', 'Blockers'))}
-          <FactList items={facts.blockers} />
-        </div>
-      ) : null}
-      {facts.decisions.length > 0 ? (
-        <div>
-          {sectionLabel(translate('activity.sessionSummary.decisions', 'Decisions'))}
-          <FactList items={facts.decisions} />
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 /**
  * The brief: a title, then the written summary, then the ledger and the timeline — with
  * everything defaulting to what happened since the reader last spoke to the agent, and one
@@ -208,16 +132,16 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
   const [showFullSession, setShowFullSession] = React.useState(false)
   const [ledgerOpen, setLedgerOpen] = React.useState(false)
   const [timelineOpen, setTimelineOpen] = React.useState(false)
+  const [timelinePage, setTimelinePage] = React.useState(TIMELINE_PAGE_SIZE)
   const window = windowSinceLastInteraction(ledger)
   const facts = showFullSession ? fullSessionFacts(ledger) : window.facts
   const timeline = showFullSession ? ledger.timeline : window.timeline
   const hasWindowedReport = Boolean(ledger.reportSince)
-  // Why the single-interaction fallback: with one reader message the window *is* the session,
-  // so the fold writes one report and both views must show it.
-  const windowReport =
-    ledger.reportSince ?? (ledger.userMessageCount <= 1 ? ledger.reportFull : null)
-  const report = showFullSession ? ledger.reportFull : windowReport
-  const title = ledger.goal?.text ?? ledger.inProgress?.text ?? null
+  const report = sinceReportView(ledger, showFullSession)
+  // Why the report's headline and not the goal: it is written for the whole session on every fold,
+  // so it answers "where does this stand" for a session of any length. The goal is the fallback for
+  // a ledger whose report phase has not run yet.
+  const title = reportTitleOf(ledger)
   const factsAvailable = ledgerHasFacts(facts)
   // A ledger a fold wrote but that found nothing worth reporting: an empty body under
   // "Up to date" reads as a broken pane, so this is its own state.
@@ -245,30 +169,36 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
     ((hasWindowedReport && ledger.reportFull !== null) ||
       (ledger.userMessageCount > 1 && window.hiddenCount > 0))
   // Nothing in the window, but the session has history: say so rather than showing a blank.
-  const nothingSince = !showFullSession && !factsAvailable && timeline.length === 0 && !report
+  // Why the headline does not count as window content: it describes the whole session, so a window
+  // with nothing in it still has to say so underneath it.
+  const nothingSince =
+    !showFullSession &&
+    !factsAvailable &&
+    timeline.length === 0 &&
+    !report.text &&
+    report.sections.length === 0
+  const visibleTimeline =
+    timeline.length > timelinePage ? timeline.slice(timeline.length - timelinePage) : timeline
+  const hiddenTimeline = timeline.length - visibleTimeline.length
 
   return (
     <div className="space-y-3">
       {title ? <p className="text-sm font-medium leading-snug text-foreground">{title}</p> : null}
-      {report ? (
-        <div>
-          {report.through < ledger.foldedThrough ? (
-            <span className="mr-1 text-2xs text-muted-foreground">
-              {translate('activity.sessionSummary.asOf', '(as of #{{index}})', {
-                index: report.through
-              })}
-            </span>
-          ) : null}
-          <p className="whitespace-pre-line text-xs leading-relaxed text-foreground">
-            {report.text}
-          </p>
-        </div>
-      ) : null}
+      <ReportBody ledger={ledger} report={report} />
       {nothingSince ? (
         <p className="text-xs text-muted-foreground">
           {translate(
             'activity.sessionSummary.nothingSince',
             'Nothing has happened since your last message.'
+          )}
+        </p>
+      ) : null}
+      {ledger.gaps.length > 0 ? (
+        <p className="text-2xs text-muted-foreground" title={ledger.gaps.join('\n')}>
+          {translate(
+            'activity.sessionSummary.gaps',
+            '{{count}} unreadable transcript record(s) were skipped; the rest of the session was summarized.',
+            { count: ledger.gaps.length }
           )}
         </p>
       ) : null}
@@ -289,7 +219,18 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
           open={timelineOpen}
           onToggle={() => setTimelineOpen((open) => !open)}
         >
-          {timeline.map((entry) => (
+          {hiddenTimeline > 0 ? (
+            <button
+              type="button"
+              onClick={() => setTimelinePage((page) => page + TIMELINE_PAGE_SIZE)}
+              className="mb-1 text-2xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+            >
+              {translate('activity.sessionSummary.moreTimeline', 'Show {{count}} earlier', {
+                count: Math.min(hiddenTimeline, TIMELINE_PAGE_SIZE)
+              })}
+            </button>
+          ) : null}
+          {visibleTimeline.map((entry) => (
             <TimelineRow key={entry.id} entry={entry} />
           ))}
         </Disclosure>
@@ -309,7 +250,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
   )
 }
 
-function fullSessionFacts(ledger: SessionSummaryLedger): LedgerWindow['facts'] {
+function fullSessionFacts(ledger: SessionSummaryLedger): LedgerWindowFacts {
   return {
     inProgress: ledger.inProgress,
     plan: ledger.plan,
@@ -319,7 +260,7 @@ function fullSessionFacts(ledger: SessionSummaryLedger): LedgerWindow['facts'] {
   }
 }
 
-function factDetail(facts: LedgerWindow['facts'], fullSession: boolean): string {
+function factDetail(facts: LedgerWindowFacts, fullSession: boolean): string {
   const count =
     facts.plan.length + facts.done.length + facts.blockers.length + facts.decisions.length
   if (count === 0 && !facts.inProgress) {

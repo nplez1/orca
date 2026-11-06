@@ -170,9 +170,11 @@ describe('createSessionSummaryEventReader', () => {
     expect(fetchSshTranscript).not.toHaveBeenCalled()
   })
 
+  // The SSH cap is a bound on the copy, not on what the fold retains, so it is far past the old
+  // 24 MB: a session of any length folds, and only a transfer this app cannot hold is refused.
   it('reports an oversized transcript as a failure, never as a short one', async () => {
     const read = createSessionSummaryEventReader({
-      fetchSshTranscript: async () => ({ kind: 'too-large', bytes: 60 * 1024 * 1024 })
+      fetchSshTranscript: async () => ({ kind: 'too-large', bytes: 300 * 1024 * 1024 })
     })
 
     await expect(
@@ -184,7 +186,7 @@ describe('createSessionSummaryEventReader', () => {
         host: sshHost,
         signal: new AbortController().signal
       })
-    ).rejects.toThrow(/over 24 MB.*too large/)
+    ).rejects.toThrow(/over 256 MB.*too large/)
   })
 
   it('reports a deleted remote transcript as absent', async () => {

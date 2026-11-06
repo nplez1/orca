@@ -106,7 +106,7 @@ describe('AI Vault Grok session parser', () => {
           role,
           text: text.slice(0, 256 * 1024),
           timestamp: null,
-          ...(length > 256 * 1024 ? { textTruncated: true } : {})
+          ...(length > 256 * 1024 ? { textTruncated: true, textOriginalLength: length } : {})
         }))
       )
       expect(session?.previewMessages.map((message) => message.text.length)).toEqual([

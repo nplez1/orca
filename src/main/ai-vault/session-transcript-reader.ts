@@ -11,6 +11,7 @@ import {
 import { TranscriptMessageChannel } from './session-transcript-channel'
 import { hasTranscriptConsumers, transcriptResumableOffsets } from './session-transcript-consumers'
 import { mergeSkippedTranscriptRecords } from './session-transcript-record-budget'
+import type { SkippedTranscriptRecord } from './session-transcript-record-budget'
 import { throwIfAiVaultScanCancelled } from './ai-vault-scan-cancellation'
 
 type TranscriptSessionEnrichment = {
@@ -55,6 +56,17 @@ export async function readResumableTranscript(
     stateFactory: (messages: TranscriptMessageChannel) => ResumableSessionParseState
     stats?: TranscriptReadStats
     signal?: AbortSignal
+    /** One record was too large to hold and was skipped; reported in file order. */
+    onSkippedRecord?: (record: SkippedTranscriptRecord) => void
+    /**
+     * Publish an unterminated final line to consumers instead of withholding it.
+     *
+     * Why: a consumer that commits a cursor must never see a record whose newline has not arrived,
+     * because the next append would hand it the same record again. A whole-file reader has no such
+     * cursor — it re-reads from the start every time — and withholding the tail would silently drop
+     * the last message of a transcript an agent is still writing, which is the common case.
+     */
+    includeTrailingPartialLine?: boolean
   }
 ): Promise<ResumableTranscriptRead> {
   const { file } = args.candidate
@@ -113,6 +125,7 @@ export async function readResumableTranscript(
       // Preserve `this` for parsers that implement these hooks as methods.
       onLineBytes: state.consumeLineBytes?.bind(state),
       shouldStop: state.shouldStop?.bind(state),
+      ...(args.onSkippedRecord ? { onSkippedRecord: args.onSkippedRecord } : {}),
       signal: args.signal
     })
     if (args.stats) {
@@ -126,7 +139,14 @@ export async function readResumableTranscript(
     if (readResult.trailingPartialLine !== null) {
       const partialLine = readResult.trailingPartialLine
       displayState = state.clone()
-      channel.mute(() => displayState.consumeLine(partialLine))
+      const consume = (): void => {
+        displayState.consumeLine(partialLine)
+      }
+      if (args.includeTrailingPartialLine) {
+        consume()
+      } else {
+        channel.mute(consume)
+      }
     }
 
     const session = await displayState.finalize(args.platform)

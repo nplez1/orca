@@ -44,6 +44,14 @@ export async function consumeCompleteJsonlLines(args: {
   prefixCheckpoints?: JsonlPrefixCheckpoints
   shouldStop?: () => boolean
   signal?: AbortSignal
+  /**
+   * One record was discarded as it passed, in file order.
+   *
+   * Why a callback and not just the returned list: a consumer that has to place the gap among the
+   * messages it received can only do so while the read is in progress — the offset is not enough to
+   * map back onto a message index afterwards.
+   */
+  onSkippedRecord?: (record: SkippedTranscriptRecord) => void
 }): Promise<JsonlReadResult> {
   throwIfAiVaultScanCancelled(args.signal)
   if (args.shouldStop?.()) {
@@ -82,7 +90,9 @@ export async function consumeCompleteJsonlLines(args: {
       const newlineOffset = chunkStart + newlineIndex
       const recordLength = newlineOffset - consumedThrough
       if (discarding || recordLength > MAX_SESSION_TRANSCRIPT_RECORD_BYTES) {
-        skippedRecords.push({ byteOffset: consumedThrough, approximateBytes: recordLength })
+        const skipped = { byteOffset: consumedThrough, approximateBytes: recordLength }
+        skippedRecords.push(skipped)
+        args.onSkippedRecord?.(skipped)
         remainderParts = []
         remainderLength = 0
         discarding = false
@@ -148,10 +158,12 @@ export async function consumeCompleteJsonlLines(args: {
 
   if (discarding) {
     // An unterminated oversized record can still grow; retain its start as the next resume offset.
-    skippedRecords.push({
+    const skipped = {
       byteOffset: consumedThrough,
       approximateBytes: chunkStart - consumedThrough
-    })
+    }
+    skippedRecords.push(skipped)
+    args.onSkippedRecord?.(skipped)
   }
 
   return {

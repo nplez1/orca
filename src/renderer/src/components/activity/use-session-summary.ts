@@ -60,10 +60,24 @@ export function useSessionSummary(
       if (next.paneKey !== paneKey) {
         return
       }
-      if (next.ledger) {
-        seenCountRef.current = Math.max(seenCountRef.current, next.ledger.timeline.length)
+      // Why merge: a progress tick carries counts and no ledger, because shipping a thousand-entry
+      // ledger once per completed chunk is a structured clone per chunk to every window. The brief
+      // already on screen is still the right one to show.
+      const merged = next.progressOnly
+        ? {
+            ...(snapshotRef.current ?? next),
+            ...next,
+            ledger: next.ledger ?? snapshotRef.current?.ledger ?? null
+          }
+        : next
+      const timeline = merged.ledger
+      if (timeline) {
+        seenCountRef.current = Math.max(
+          seenCountRef.current,
+          timeline.timelineBase + timeline.timeline.length
+        )
       }
-      setSnapshot(next)
+      setSnapshot(merged)
     },
     [paneKey]
   )
@@ -143,7 +157,10 @@ export function useSessionSummary(
       // Why the live row and not `facts.updatedAt`: snapshots are only pushed on open and on
       // fold progress, so the one inside the snapshot is frozen at the last fold and the gate
       // would never pass. The store row keeps moving with the agent.
-      if (!current?.ledger || (agentUpdatedAtRef.current ?? 0) <= foldedAt) {
+      // Why the gap exception: a partial fold stamps `foldedAt`, so without this an idle session
+      // with chunks the fold could not summarize would keep its hole forever.
+      const hasGap = Boolean(current?.ledger?.foldGap)
+      if (!current?.ledger || ((agentUpdatedAtRef.current ?? 0) <= foldedAt && !hasGap)) {
         return
       }
       request(0, true)

@@ -24,7 +24,9 @@ it.each(['function_call_output', 'custom_tool_call_output'])(
       push: (message) => messages.push(message)
     })
     state.consumeLineBytes!(line)
-    expect(messages).toEqual([{ role: 'tool', text: 'outputonly '.repeat(300), timestamp }])
+    expect(messages).toEqual([
+      { role: 'tool', text: 'outputonly '.repeat(300), timestamp, toolKind: 'result' }
+    ])
   }
 )
 
@@ -58,7 +60,7 @@ it.each([false, true])(
     })
     expect(messages.filter((message) => message.text.includes('commandonly'))).toHaveLength(1)
     expect(messages.filter((message) => message.text === 'outputonly')).toEqual([
-      { role: 'tool', text: 'outputonly', timestamp }
+      { role: 'tool', text: 'outputonly', timestamp, toolKind: 'result' }
     ])
     expect(messages.filter((message) => message.role === 'user')).toHaveLength(1)
     expect(await state.finalize(process.platform)).toMatchObject({ messageCount: 1 })

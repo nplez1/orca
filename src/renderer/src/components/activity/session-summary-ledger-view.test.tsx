@@ -28,13 +28,25 @@ function ledger(overrides: Partial<SessionSummaryLedger> = {}): SessionSummaryLe
     ],
     reportSince: { text: 'The flag works now; the release wiring is next.', through: 46 },
     reportFull: {
-      text: 'Building a --since flag. Parsing is done; release wiring is next.',
-      through: 46
+      headline: 'Building a --since flag',
+      sections: [
+        {
+          id: 's1',
+          title: 'Parsing',
+          text: 'Parsing is done; release wiring is next.',
+          through: 46
+        }
+      ],
+      through: 46,
+      text: 'Building a --since flag\n\nParsing is done; release wiring is next.'
     },
     lastUserMessageIndex: 40,
     userMessageCount: 3,
     foldedThrough: 46,
     foldedAt: 1_000,
+    timelineBase: 0,
+    foldGap: null,
+    gaps: [],
     ...overrides
   }
 }
@@ -71,11 +83,11 @@ describe('SessionSummaryLedgerView', () => {
   it('leads with the whole-session title and the since-your-message report', () => {
     render(<SessionSummaryLedgerView snapshot={snapshotOf(ledger())} />)
 
-    expect(screen.getByText('Add a --since flag to the export CLI')).toBeTruthy()
+    // Why the report's headline and not the goal: the report is written for the whole session on
+    // every fold, so it answers "where does this stand" at any length.
+    expect(screen.getByText('Building a --since flag')).toBeTruthy()
     expect(screen.getByText('The flag works now; the release wiring is next.')).toBeTruthy()
-    expect(
-      screen.queryByText('Building a --since flag. Parsing is done; release wiring is next.')
-    ).toBeNull()
+    expect(screen.queryByText('Parsing is done; release wiring is next.')).toBeNull()
   })
 
   // The pane is a brief: the prose sits directly under the title, and the disclosures are the
@@ -83,7 +95,7 @@ describe('SessionSummaryLedgerView', () => {
   it('renders the written summary above both disclosures', () => {
     const { container } = render(<SessionSummaryLedgerView snapshot={snapshotOf(ledger())} />)
     const text = container.textContent ?? ''
-    const title = text.indexOf('Add a --since flag to the export CLI')
+    const title = text.indexOf('Building a --since flag')
     const report = text.indexOf('The flag works now')
     const ledgerRow = text.indexOf('Ledger')
     const timelineRow = text.indexOf('Timeline')
@@ -112,7 +124,7 @@ describe('SessionSummaryLedgerView', () => {
       />
     )
     const text = container.textContent ?? ''
-    const title = text.indexOf('Add a --since flag to the export CLI')
+    const title = text.indexOf('Building a --since flag')
     const fallback = text.indexOf('Nothing has happened since your last message.')
 
     expect(title).toBeLessThan(fallback)
@@ -149,9 +161,8 @@ describe('SessionSummaryLedgerView', () => {
 
     fireEvent.click(screen.getByText('Show the full session'))
 
-    expect(
-      screen.getByText('Building a --since flag. Parsing is done; release wiring is next.')
-    ).toBeTruthy()
+    expect(screen.getByText('Parsing')).toBeTruthy()
+    expect(screen.getByText('Parsing is done; release wiring is next.')).toBeTruthy()
     fireEvent.click(screen.getByText('Ledger'))
     expect(screen.getByText('flag parsed and tested')).toBeTruthy()
     fireEvent.click(screen.getByText('Timeline'))
@@ -169,10 +180,68 @@ describe('SessionSummaryLedgerView', () => {
       />
     )
 
-    expect(
-      screen.getByText('Building a --since flag. Parsing is done; release wiring is next.')
-    ).toBeTruthy()
+    expect(screen.getByText('Building a --since flag')).toBeTruthy()
     expect(screen.queryByText('Show the full session')).toBeNull()
+  })
+
+  // Acceptance 8: a days-long ledger opens its disclosure without mounting thousands of rows.
+  it('pages a huge timeline instead of rendering all of it', () => {
+    const timeline = Array.from({ length: 1_500 }, (_, index) => ({
+      id: `e${index}`,
+      kind: 'milestone' as const,
+      text: `entry ${index}`,
+      sourceIndex: index
+    }))
+    render(
+      <SessionSummaryLedgerView
+        snapshot={snapshotOf(ledger({ timeline, lastUserMessageIndex: null }))}
+      />
+    )
+    fireEvent.click(screen.getByText('Timeline'))
+
+    expect(screen.getByText('entry 1499')).toBeTruthy()
+    expect(screen.getByText('entry 1400')).toBeTruthy()
+    // The newest page is what a reader wants first; the rest is one click away.
+    expect(screen.queryByText('entry 1399')).toBeNull()
+    expect(screen.getByText('Show 100 earlier')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Show 100 earlier'))
+    expect(screen.getByText('entry 1399')).toBeTruthy()
+  })
+
+  // The ledger is append-only history now, so the cap belongs to the view — and it has to keep the
+  // newest facts, which is the end of the list.
+  it('shows the newest facts of a kind and counts the rest', () => {
+    const done = Array.from({ length: 30 }, (_, index) => ({
+      text: `done ${index}`,
+      sourceIndex: 40 + index
+    }))
+    render(
+      <SessionSummaryLedgerView
+        snapshot={snapshotOf(ledger({ done, lastUserMessageIndex: null }))}
+      />
+    )
+    fireEvent.click(screen.getByText('Ledger'))
+
+    expect(screen.getByText('done 29')).toBeTruthy()
+    expect(screen.queryByText('done 0')).toBeNull()
+    expect(screen.getByText('+18 earlier')).toBeTruthy()
+  })
+
+  // A record the reader could not decode is named rather than left as a silence.
+  it('says when the reader skipped part of the transcript', () => {
+    render(
+      <SessionSummaryLedgerView
+        snapshot={snapshotOf(
+          ledger({ gaps: ['Skipped 1 oversized transcript record over the 10.0 MiB limit.'] })
+        )}
+      />
+    )
+    expect(
+      screen.getByText(
+        '1 unreadable transcript record(s) were skipped; the rest of the session was summarized.'
+      )
+    ).toBeTruthy()
   })
 
   it('says nothing happened since the last message rather than showing a blank pane', () => {

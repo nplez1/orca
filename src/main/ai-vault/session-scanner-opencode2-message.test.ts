@@ -28,8 +28,8 @@ describe('OpenCode 2 message decoding', () => {
     expect(messages).toEqual(
       expect.arrayContaining([
         { role: 'assistant', text: 'Checking the result\nFinished', timestamp: null },
-        { role: 'tool', text: 'bash: echo proof', timestamp: null },
-        { role: 'tool', text: 'proof', timestamp: null }
+        { role: 'tool', text: 'bash: echo proof', timestamp: null, toolKind: 'call' },
+        { role: 'tool', text: 'proof', timestamp: null, toolKind: 'result' }
       ])
     )
     expect(JSON.stringify(messages)).not.toContain('must not index')

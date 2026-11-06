@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MAX_SESSION_TRANSCRIPT_RECORD_BYTES } from '../ai-vault/session-transcript-record-budget'
 
 /**
  * Which provider transcripts the fold can read.
@@ -234,21 +235,115 @@ describe('readSessionSummaryTranscriptEvents', () => {
     expect(read?.totalEvents).toBe(2)
   })
 
-  it('refuses to retain more unfolded text than the fold may hold', async () => {
+  // Acceptance 3: a transcript past the old ceiling folds rather than failing. The budget is a
+  // diagnostic now, which is what makes the 24 MB refusal unnecessary rather than merely raisable.
+  it('folds past the retained-text budget instead of refusing', async () => {
     const dir = await tempDir()
     const transcriptPath = join(dir, '2026-01-01T00-00-00-000Z_pi-session-1.jsonl')
     await writeFile(transcriptPath, piTranscript('a message', 'a reply'))
     const { readSessionSummaryEventsFromFile } = await loadSource()
 
-    await expect(
-      readSessionSummaryEventsFromFile({
-        filePath: transcriptPath,
-        parser: 'pi',
-        signal: signal(),
-        // The ceiling in production is 24 MB of text; the shape is the same at a few bytes.
-        maxRetainedBytes: 4
-      })
-    ).rejects.toThrow(/MB of unfolded messages, which is too much to fold/)
+    const read = await readSessionSummaryEventsFromFile({
+      filePath: transcriptPath,
+      parser: 'pi',
+      signal: signal(),
+      // The budget in production is 24 MB of text; the shape is the same at a few bytes.
+      maxRetainedBytes: 4
+    })
+
+    expect(read?.events.map((event) => event.text)).toEqual(['a message', 'a reply'])
+    expect(read?.overRetainedBudget).toBe(true)
+    expect(read?.retainedBytes).toBeGreaterThan(4)
+  })
+
+  // Every tool event reaches the fold as a one-line record, so a 900-line read never enters the
+  // event array as 900 lines of text.
+  it('digests tool events instead of retaining their bodies', async () => {
+    const dir = await tempDir()
+    const transcriptPath = join(dir, 'claude-1.jsonl')
+    await writeFile(
+      transcriptPath,
+      [
+        JSON.stringify({
+          type: 'user',
+          sessionId: 'claude-1',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          message: { role: 'user', content: 'read the file' }
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          sessionId: 'claude-1',
+          timestamp: '2026-01-01T00:00:01.000Z',
+          message: {
+            role: 'assistant',
+            content: [
+              { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: '/repo/a.ts' } }
+            ]
+          }
+        }),
+        JSON.stringify({
+          type: 'user',
+          sessionId: 'claude-1',
+          timestamp: '2026-01-01T00:00:02.000Z',
+          message: {
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: 't1',
+                content: Array.from({ length: 900 }, (_, index) => `line ${index}`).join('\n')
+              }
+            ]
+          }
+        })
+      ].join('\n')
+    )
+    const { readSessionSummaryEventsFromFile } = await loadSource()
+
+    const read = await readSessionSummaryEventsFromFile({
+      filePath: transcriptPath,
+      parser: 'claude',
+      signal: signal()
+    })
+
+    expect(read?.events.map((event) => event.text)).toEqual([
+      'read the file',
+      'Read /repo/a.ts',
+      'Read /repo/a.ts · 900 lines / 7.8 KB · ok'
+    ])
+  })
+
+  // Acceptance 4: a record the reader could not decode is a named gap, not a silence — and it never
+  // becomes an event, because a skipped record has no message index.
+  it('names a record the reader skipped instead of losing it silently', async () => {
+    const dir = await tempDir()
+    const transcriptPath = join(dir, 'claude-gap.jsonl')
+    const kept = `${JSON.stringify({
+      type: 'user',
+      sessionId: 'claude-gap',
+      timestamp: '2026-01-01T00:00:00.000Z',
+      message: { role: 'user', content: 'before the hole' }
+    })}\n`
+    const oversized = 'x'.repeat(MAX_SESSION_TRANSCRIPT_RECORD_BYTES + 1)
+    const after = `${JSON.stringify({
+      type: 'user',
+      sessionId: 'claude-gap',
+      timestamp: '2026-01-01T00:00:02.000Z',
+      message: { role: 'user', content: 'after the hole' }
+    })}\n`
+    await writeFile(transcriptPath, `${kept}${oversized}\n${after}`)
+    const { readSessionSummaryEventsFromFile } = await loadSource()
+
+    const read = await readSessionSummaryEventsFromFile({
+      filePath: transcriptPath,
+      parser: 'claude',
+      signal: signal()
+    })
+
+    expect(read?.events.map((event) => event.text)).toEqual(['before the hole', 'after the hole'])
+    expect(read?.gaps).toHaveLength(1)
+    expect(read?.gaps[0].afterEventIndex).toBe(1)
+    expect(read?.gaps[0].text).toContain('Skipped 1 oversized transcript record')
   })
 
   it('stops a read when the caller aborts it', async () => {

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionSummaryStore, type SessionSummaryStoreEntry } from './session-summary-store'
+import { SESSION_SUMMARY_TIMELINE_MAX_ENTRIES } from '../../shared/session-summary-types'
 
 const LEDGER = {
   goal: null,
@@ -17,13 +18,17 @@ const LEDGER = {
   lastUserMessageIndex: 1,
   userMessageCount: 2,
   foldedThrough: 2,
-  foldedAt: null
+  foldedAt: null,
+  timelineBase: 0,
+  foldGap: null,
+  gaps: []
 }
 
 const ENTRY = {
   identity: { providerSessionId: 'p1', transcriptPath: '/tmp/p1.jsonl' },
   ledger: LEDGER,
   chunkCache: {},
+  chunkFailures: {},
   messageCount: 2,
   seenThrough: 2,
   updatedAt: 1_700_000_000_000
@@ -85,6 +90,44 @@ describe('SessionSummaryStore', () => {
     expect(readdirSync(directory).filter((name) => name.endsWith('.tmp'))).toEqual([
       'session-summaries.json.tmp'
     ])
+  })
+
+  // The store is a cache with 200 panes in it, and the ledger's timeline is now unbounded in memory.
+  // What lands on disk keeps the newest entries, which is what a reader scrolls to.
+  it('bounds the timeline it retains and remembers how many it dropped', () => {
+    const store = new SessionSummaryStore(filePath())
+    const timeline = Array.from(
+      { length: SESSION_SUMMARY_TIMELINE_MAX_ENTRIES + 50 },
+      (_, index) => ({
+        id: `e${index}`,
+        kind: 'milestone' as const,
+        text: `t${index}`,
+        sourceIndex: index
+      })
+    )
+    store.set('pane', {
+      ...ENTRY,
+      ledger: { ...LEDGER, timeline, foldedThrough: timeline.length }
+    })
+    store.flush()
+
+    const stored = store.get('pane')?.ledger
+    expect(stored?.timeline).toHaveLength(SESSION_SUMMARY_TIMELINE_MAX_ENTRIES)
+    expect(stored?.timelineBase).toBe(50)
+    expect(stored?.timeline.at(-1)?.text).toBe(`t${timeline.length - 1}`)
+  })
+
+  // An entry with a chunk cache but no ledger yet is a first fold in progress, not an empty summary:
+  // dropping it is what made an interrupted first fold restart at event 0.
+  it('keeps an entry whose fold has not produced a ledger yet', () => {
+    const store = new SessionSummaryStore(filePath())
+    store.set('pane', {
+      ...ENTRY,
+      chunkCache: { '0-120': { done: [{ text: 'half', sourceIndex: 3 }] } }
+    })
+    store.flush()
+
+    expect(Object.keys(store.get('pane')?.chunkCache ?? {})).toEqual(['0-120'])
   })
 
   it('persists a deletion quickly enough for the next store to agree', () => {

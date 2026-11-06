@@ -45,6 +45,13 @@ describe('coerceRelayedLedger', () => {
     expect(ledger?.done).toEqual([{ text: 'd', sourceIndex: 9 }])
     expect(ledger?.reportSince).toEqual({ text: 's', through: 9 })
     expect(ledger?.lastUserMessageIndex).toBe(5)
+    // An older host's flat report is read as a headline plus one phase rather than dropped.
+    expect(ledger?.reportFull).toEqual({
+      headline: 'f',
+      sections: [{ id: 's0', title: 'Session', text: 'f', through: 9 }],
+      through: 9,
+      text: 'f'
+    })
   })
 
   it('drops entries it cannot read instead of rendering them', () => {

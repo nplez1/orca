@@ -80,8 +80,13 @@ function harness(
       brainPrompts.push(prompt)
       // The fold's report phase is a second prompt; answering it here keeps the two phases
       // separate so a test can assert on either.
-      if (prompt.startsWith('You write short progress reports')) {
-        return JSON.stringify({ since: 'since-report', full: 'full-report' })
+      if (prompt.startsWith('You write the progress report')) {
+        return JSON.stringify({
+          since: 'since-report',
+          headline: 'full-report',
+          section: { title: 'the phase', text: 'full-report' },
+          startNew: false
+        })
       }
       return brainReply(prompt, signal)
     }
@@ -90,7 +95,13 @@ function harness(
     store,
     readEvents: async ({ fromEventIndex }) =>
       currentEvents
-        ? { events: currentEvents.slice(fromEventIndex), totalEvents: currentEvents.length }
+        ? {
+            events: currentEvents.slice(fromEventIndex),
+            totalEvents: currentEvents.length,
+            retainedBytes: 0,
+            overRetainedBudget: false,
+            gaps: []
+          }
         : null,
     getAgentStatusEntry: () => currentEntry,
     createBrain: () => brain,
@@ -299,11 +310,14 @@ describe('SessionSummaryService', () => {
     await waitFor(() => updates.some((u) => u.status === 'ready'))
 
     const ready = updates.find((u) => u.status === 'ready')
-    expect(ready?.ledger?.reportFull?.text).toBe('full-report')
+    expect(ready?.ledger?.reportFull?.headline).toBe('full-report')
+    expect(ready?.ledger?.reportFull?.sections.map((section) => section.text)).toEqual([
+      'full-report'
+    ])
     // events(5) starts with a user message and alternates: three reader messages in total.
     expect(ready?.ledger?.reportSince?.text).toBe('since-report')
     expect(ready?.ledger?.userMessageCount).toBe(3)
-    expect(store.get('tab:leaf')?.ledger.reportFull?.text).toBe('full-report')
+    expect(store.get('tab:leaf')?.ledger.reportFull?.headline).toBe('full-report')
   })
 
   it('keeps the last good ledger when a fold fails', async () => {
@@ -362,7 +376,13 @@ describe('SessionSummaryService host routing', () => {
       readEvents: async ({ host, fromEventIndex }) => {
         hostReads.push({ host })
         return args.events
-          ? { events: args.events.slice(fromEventIndex), totalEvents: args.events.length }
+          ? {
+              events: args.events.slice(fromEventIndex),
+              totalEvents: args.events.length,
+              retainedBytes: 0,
+              overRetainedBudget: false,
+              gaps: []
+            }
           : null
       },
       getAgentStatusEntry: () => currentEntry,
@@ -425,11 +445,19 @@ describe('SessionSummaryService host routing', () => {
               decisions: [],
               timeline: [],
               reportSince: null,
-              reportFull: { text: 'Summarized on the host.', through: 3 },
+              reportFull: {
+                headline: 'Summarized on the host.',
+                sections: [],
+                through: 3,
+                text: 'Summarized on the host.'
+              },
               lastUserMessageIndex: 0,
               userMessageCount: 1,
               foldedThrough: 3,
-              foldedAt: 1
+              foldedAt: 1,
+              timelineBase: 0,
+              foldGap: null,
+              gaps: []
             }
           : null,
       seenThrough: 0,

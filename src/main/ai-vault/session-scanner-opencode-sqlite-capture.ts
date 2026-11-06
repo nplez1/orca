@@ -192,7 +192,13 @@ export function readOpenCodeSessionMessages(
     if (row.partType === 'tool') {
       const content = toolPartText(row.partData)
       const message = content
-        ? transcriptMessageFromText('tool', content.text, openTimestamp, content.textTruncated)
+        ? transcriptMessageFromText(
+            'tool',
+            content.text,
+            openTimestamp,
+            content.textTruncated,
+            'call'
+          )
         : null
       if (message) {
         openTools.push(message)

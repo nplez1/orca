@@ -11,24 +11,30 @@ import {
   resolveNativeChatTranscriptAgent,
   type NativeChatTranscriptAgent
 } from '../../shared/native-chat/native-chat-agent-support'
-import { readWholeTranscript } from '../ai-vault/session-transcript-reader'
+import { readResumableTranscript, readWholeTranscript } from '../ai-vault/session-transcript-reader'
 import {
   registerTranscriptConsumer,
   type TranscriptMessage
 } from '../ai-vault/session-transcript-consumers'
+import { resumableStateFactoryFor } from '../ai-vault/session-scanner-parse-cache'
+import { describeSkippedTranscriptRecords } from '../ai-vault/session-transcript-record-budget'
+import type { SkippedTranscriptRecord } from '../ai-vault/session-transcript-record-budget'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import { COPILOT_SESSIONS_DIR } from '../ai-vault/session-scanner-agent-sources'
 import type { SessionFileCandidate, FileWithMtime } from '../ai-vault/session-scanner-types'
 import { REMOTE_TRANSCRIPT_MAX_BYTES } from './session-summary-remote-transcript'
-import type { SessionSummarySourceEvent } from './session-summary-fold'
+import {
+  createSessionSummaryEventDigester,
+  type SessionSummarySourceEvent
+} from './session-summary-event-digest'
 
 /**
- * Fold ceiling in retained message text, not transcript bytes.
+ * Retained message text at which the read reports its budget, rather than refusing.
  *
- * Why text and not file size: the fold's parsers stream line by line and events before the ledger's
- * cursor are counted rather than kept, so what this bounds is the event array the fold holds in the
- * main process — the allocation a 500 MB transcript with inline base64 images used to exhaust. A
- * file-size cap would instead refuse long sessions that now fold fine.
+ * Why it no longer gates: the ceiling existed to bound the event array, and the array was only
+ * large because raw tool output was retained in it. Tool events are now one-line digests, so the
+ * same session allocates a fraction of what it did — and a session that still exceeds the budget
+ * gets a summary of everything instead of an error. The number stays as a diagnostic.
  */
 export const LOCAL_TRANSCRIPT_MAX_RETAINED_BYTES = REMOTE_TRANSCRIPT_MAX_BYTES
 
@@ -41,6 +47,28 @@ export type SessionSummaryEventRead = {
   events: SessionSummarySourceEvent[]
   /** Every event the transcript holds, including the ones the caller asked us to skip. */
   totalEvents: number
+  /** Retained event text, reported against `LOCAL_TRANSCRIPT_MAX_RETAINED_BYTES`. */
+  retainedBytes: number
+  /**
+   * The retained text passed the caller's budget.
+   *
+   * A diagnostic, not a verdict: the fold proceeds either way, and this is what lets a caller (and
+   * a test) say a session is bigger than the budget the read was configured with.
+   */
+  overRetainedBudget: boolean
+  /**
+   * Parts of the transcript the reader could not decode, each placed where it belongs.
+   *
+   * `afterEventIndex` is the number of messages read when the record was skipped, so the gap sits
+   * between that message and the next one. Never events: a skipped record has no message index, and
+   * inventing one would renumber every fact's provenance.
+   */
+  gaps: SessionSummaryTranscriptGap[]
+}
+
+export type SessionSummaryTranscriptGap = {
+  afterEventIndex: number
+  text: string
 }
 
 // Compile-checked: every transcript agent must name a real AI Vault agent.
@@ -136,7 +164,7 @@ export async function readSessionSummaryEventsFromFile(args: {
   parser: AiVaultAgent
   signal: AbortSignal
   fromEventIndex?: number
-  /** Overrides the fold ceiling; tests use a few bytes instead of 24 MB. */
+  /** The retained-text budget the read reports against; tests use a few bytes. */
   maxRetainedBytes?: number
 }): Promise<SessionSummaryEventRead | null> {
   const { filePath, parser, signal } = args
@@ -161,12 +189,13 @@ export async function readSessionSummaryEventsFromFile(args: {
   // Collect decoded messages via the parser's fan-out; the tag, not the path, scopes the fold to this
   // read, so a concurrent fold of the same session cannot enlist this consumer.
   const readToken = `summary-fold:${++transcriptReadSequence}`
-  const collected: TranscriptMessage[] = []
+  const collected: SessionSummarySourceEvent[] = []
+  const gaps: SessionSummaryTranscriptGap[] = []
+  const skipped: { afterEventIndex: number; record: SkippedTranscriptRecord }[] = []
   let received = 0
   let retainedBytes = 0
-  let retainedOverflow: Error | null = null
-  // Why a controller of our own: the ceiling has to stop the read, and a throw out of the consumer
-  // is swallowed by the channel so a faulty sink can never break a parse.
+  // Why a controller of our own: a throw out of the consumer is swallowed by the channel, so a
+  // failure here has to stop the read by other means.
   const readController = new AbortController()
   const abortRead = (): void => readController.abort(signal.reason)
   if (signal.aborted) {
@@ -178,56 +207,76 @@ export async function readSessionSummaryEventsFromFile(args: {
       if (start.readToken !== readToken) {
         return null
       }
+      // Why per-read state: a document-format parser that replaces an array mid-read restarts the
+      // stream through this same consumer, and state hoisted out of here would count that restart's
+      // messages on top of the ones it had already received.
+      const digester = createSessionSummaryEventDigester()
+      let read = 0
       return {
-        message(message) {
-          if (retainedOverflow) {
-            return
-          }
+        message(message: TranscriptMessage) {
+          read += 1
           received += 1
           // Why count before the cursor instead of collecting it: the ledger already covers these
-          // messages, and their text is what made every fold re-read the whole conversation.
-          if (received <= skipEvents) {
+          // messages, and their text is what made every fold re-read the whole conversation. The
+          // digester still sees them, because a tool result after the cursor belongs to a call
+          // before it.
+          if (read <= skipEvents) {
+            digester.skip(message)
             return
           }
-          retainedBytes += Buffer.byteLength(message.text, 'utf-8')
-          if (retainedBytes > maxRetainedBytes) {
-            // Why fail instead of folding what fits: a shortened transcript renumbers every event,
-            // and the ledger's cursor would then point at messages this fold never saw.
-            retainedOverflow = new Error(
-              `This session has over ${Math.max(
-                1,
-                Math.round(maxRetainedBytes / (1024 * 1024))
-              )} MB of unfolded messages, which is too much to fold in one pass.`
-            )
-            readController.abort(retainedOverflow)
-            return
-          }
-          collected.push(message)
+          const event = digester.digest(message)
+          retainedBytes += Buffer.byteLength(event.text, 'utf-8')
+          collected.push(event)
         },
         finish() {}
       }
     }
   })
   try {
-    await readWholeTranscript({
-      candidate,
-      platform: process.platform,
-      signal: readController.signal,
-      readToken
-    })
-    if (retainedOverflow) {
-      throw retainedOverflow
+    // Why the resumable path where one exists: it is the same decoder the AI Vault scanner uses, so
+    // the message stream is identical, and it applies the per-record budget — a single 500 MB JSONL
+    // line used to be read whole into one string here.
+    const stateFactory = resumableStateFactoryFor(candidate)
+    const onSkippedRecord = (record: SkippedTranscriptRecord): void => {
+      skipped.push({ afterEventIndex: received, record })
+    }
+    const reading = stateFactory
+      ? readResumableTranscript({
+          candidate,
+          platform: process.platform,
+          resume: null,
+          stateFactory,
+          signal: readController.signal,
+          readToken,
+          onSkippedRecord,
+          // A fold has no cursor to keep: it re-reads the file every time, and the last message of a
+          // transcript an agent is still writing is usually unterminated.
+          includeTrailingPartialLine: true
+        })
+      : readWholeTranscript({
+          candidate,
+          platform: process.platform,
+          signal: readController.signal,
+          readToken
+        })
+    await reading
+    for (const entry of skipped) {
+      // Why rebased: `received` counts messages from the start of the file, while the fold places a
+      // gap inside a slice that begins at the cursor. A gap before the cursor was already named by
+      // the fold that read it, and the ledger keeps it.
+      const afterEventIndex = entry.afterEventIndex - skipEvents
+      const text = describeSkippedTranscriptRecords([entry.record])
+      if (text && afterEventIndex >= 0) {
+        gaps.push({ afterEventIndex, text })
+      }
     }
     return {
-      events: collected.map((message) => ({
-        role: message.role,
-        text: message.text,
-        timestamp: message.timestamp
-      })),
-      totalEvents: received
+      events: collected,
+      totalEvents: received,
+      retainedBytes,
+      overRetainedBudget: retainedBytes > maxRetainedBytes,
+      gaps
     }
-  } catch (error) {
-    throw retainedOverflow ?? error
   } finally {
     signal.removeEventListener('abort', abortRead)
     unregister()

@@ -28,7 +28,12 @@ export function recordSessionSummarySeenCursor(args: {
   }
   const seenThrough = Math.max(
     stored.seenThrough,
-    Math.min(Math.max(0, Math.floor(args.seenTimelineCount)), stored.ledger.timeline.length)
+    Math.min(
+      Math.max(0, Math.floor(args.seenTimelineCount)),
+      // Why the base: entries trimmed from the head of the timeline keep their absolute position, so
+      // the count a viewer reports is still comparable with it.
+      stored.ledger.timelineBase + stored.ledger.timeline.length
+    )
   )
   if (seenThrough === stored.seenThrough) {
     return

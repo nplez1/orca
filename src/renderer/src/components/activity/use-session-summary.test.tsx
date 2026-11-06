@@ -120,6 +120,64 @@ describe('useSessionSummary', () => {
     expect(open.mock.calls[1]?.[0]).toMatchObject({ session })
   })
 
+  // A progress tick carries counts and no ledger, so the pane keeps the brief it is already
+  // showing instead of blanking to a skeleton once per completed chunk.
+  it('merges a progress tick into the snapshot it already holds', async () => {
+    let push: ((next: SessionSummarySnapshot) => void) | null = null
+    const ledger = {
+      goal: null,
+      plan: [],
+      inProgress: null,
+      done: [],
+      blockers: [],
+      decisions: [],
+      timeline: [],
+      reportSince: null,
+      reportFull: null,
+      lastUserMessageIndex: null,
+      userMessageCount: 0,
+      foldedThrough: 0,
+      foldedAt: null,
+      timelineBase: 0,
+      foldGap: null,
+      gaps: []
+    }
+    vi.stubGlobal('api', {
+      sessionSummary: {
+        open: vi.fn(async () =>
+          snapshot({
+            status: 'ready',
+            ledger,
+            fold: { running: false, completedChunks: 1, totalChunks: 4 }
+          })
+        ),
+        close: vi.fn(),
+        onUpdate: (listener: (next: SessionSummarySnapshot) => void) => {
+          push = listener
+          return () => {}
+        }
+      }
+    })
+
+    const { result } = renderHook(() => useSessionSummary(PANE_KEY, true))
+    await waitFor(() => expect(result.current.snapshot?.ledger).not.toBeNull())
+
+    act(() => {
+      push?.(
+        snapshot({
+          status: 'folding',
+          ledger: null,
+          progressOnly: true,
+          fold: { running: true, completedChunks: 2, totalChunks: 4 }
+        })
+      )
+    })
+
+    expect(result.current.snapshot?.ledger).toBe(ledger)
+    expect(result.current.snapshot?.fold.completedChunks).toBe(2)
+    expect(result.current.refreshing).toBe(true)
+  })
+
   it('accepts a snapshot only for the pane it belongs to', async () => {
     installBridge()
 

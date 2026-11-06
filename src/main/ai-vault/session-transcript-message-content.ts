@@ -13,7 +13,7 @@ const TRANSCRIPT_MESSAGE_TEXT_LIMIT = 256 * 1024
 const TOOL_ARGUMENT_SCAN_LIMIT = 2000
 
 type PreviewRole = AiVaultSessionPreviewMessage['role']
-type TranscriptText = { text: string | null; textTruncated: boolean }
+type TranscriptText = { text: string | null; textTruncated: boolean; originalLength: number }
 
 export function transcriptMessageRole(role: PreviewRole): TranscriptMessageRole | null {
   return role === 'user' || role === 'assistant' || role === 'tool' ? role : null
@@ -28,7 +28,8 @@ function toolCallTextFromDecoded(call: DecodedToolCall): TranscriptText {
   const bounded = argument ? sliceAtCodeUnitLimit(argument, TOOL_ARGUMENT_SCAN_LIMIT) : null
   return {
     text: name && bounded ? `${name}: ${bounded}` : (name ?? bounded),
-    textTruncated: argument !== null && bounded !== null && bounded.length < argument.length
+    textTruncated: argument !== null && bounded !== null && bounded.length < argument.length,
+    originalLength: (name?.length ?? 0) + (argument?.length ?? 0)
   }
 }
 
@@ -64,9 +65,9 @@ export function transcriptMessagesFromDecodedMessage(
   const textParts: string[] = []
   for (const block of decoded.blocks) {
     if (block.kind === 'tool_call') {
-      pushMessage(messages, 'tool', toolCallTextFromDecoded(block), decoded.timestamp)
+      pushMessage(messages, 'tool', toolCallTextFromDecoded(block), decoded.timestamp, 'call')
     } else if (block.kind === 'tool_result') {
-      pushMessage(messages, 'tool', toolResultText(block.textParts), decoded.timestamp)
+      pushMessage(messages, 'tool', toolResultText(block.textParts), decoded.timestamp, 'result')
     } else {
       textParts.push(block.text)
     }
@@ -74,7 +75,16 @@ export function transcriptMessagesFromDecodedMessage(
   if (textRole && textParts.length > 0) {
     const content = boundedJoinedText(textParts)
     const message = content.text
-      ? transcriptMessageFromText(textRole, content.text, decoded.timestamp, content.textTruncated)
+      ? transcriptMessageFromText(
+          textRole,
+          content.text,
+          decoded.timestamp,
+          content.textTruncated,
+          undefined,
+          // Why the pre-bound length: the digest names the bound that replaced the text, and the
+          // bounded length would claim the message was exactly as large as the guard.
+          content.originalLength
+        )
       : null
     if (message) {
       messages.unshift(message)
@@ -88,7 +98,7 @@ function boundedJoinedText(parts: readonly string[]): TranscriptText {
     parts.reduce((total, part) => total + part.length, 0) + Math.max(0, parts.length - 1)
   if (parts.length === 1) {
     const text = boundedText(parts[0])
-    return { text, textTruncated: text !== null && text.length < length }
+    return { text, textTruncated: text !== null && text.length < length, originalLength: length }
   }
   const prefixes: string[] = []
   // One extra code unit preserves truncation at a trailing high surrogate.
@@ -105,19 +115,27 @@ function boundedJoinedText(parts: readonly string[]): TranscriptText {
     }
   }
   const text = boundedText(prefixes.join('\n'))
-  return { text, textTruncated: text !== null && text.length < length }
+  return { text, textTruncated: text !== null && text.length < length, originalLength: length }
 }
 
 function pushMessage(
   messages: TranscriptMessage[],
   role: TranscriptMessageRole,
   content: TranscriptText,
-  timestamp: string | null
+  timestamp: string | null,
+  toolKind?: 'call' | 'result'
 ): void {
   const message =
     content.text === null
       ? null
-      : transcriptMessageFromText(role, content.text, timestamp, content.textTruncated)
+      : transcriptMessageFromText(
+          role,
+          content.text,
+          timestamp,
+          content.textTruncated,
+          toolKind,
+          content.originalLength
+        )
   if (message) {
     messages.push(message)
   }
@@ -127,15 +145,21 @@ export function transcriptMessageFromText(
   role: TranscriptMessageRole,
   value: string,
   timestamp: string | null,
-  textTruncated = false
+  textTruncated = false,
+  toolKind?: 'call' | 'result',
+  originalLength?: number
 ): TranscriptMessage | null {
   const text = boundedText(value)
+  const truncated = textTruncated || (text !== null && text.length < value.length)
   return text
     ? {
         role,
         text,
         timestamp,
-        ...(textTruncated || text.length < value.length ? { textTruncated: true as const } : {})
+        ...(toolKind ? { toolKind } : {}),
+        ...(truncated
+          ? { textTruncated: true as const, textOriginalLength: originalLength ?? value.length }
+          : {})
       }
     : null
 }

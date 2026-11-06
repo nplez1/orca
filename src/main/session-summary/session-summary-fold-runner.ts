@@ -5,27 +5,37 @@
 // extract, or a write. Nothing is applied on failure, and completed chunk extracts are
 // kept so a retry resumes instead of restarting.
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
-import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import type { AgentType } from '../../shared/agent-status-types'
 import type {
+  SessionSummaryLedger,
   SessionSummarySessionRef,
   SessionSummarySnapshot,
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
-import { emptySessionSummaryLedger, hasProducedLedger } from './session-summary-ledger'
-import {
-  foldSessionSummaryEvents,
-  type SessionFoldBrain,
-  type SessionSummaryChunkCache
-} from './session-summary-fold'
+import { foldSessionSummaryEvents, type SessionFoldBrain } from './session-summary-fold'
 import { IDLE_FOLD, type SessionSummaryStatusEntry } from './session-summary-snapshot'
+import { rewriteSessionSummaryReports } from './session-summary-report'
 import { withSessionSummaryFoldSlot } from './session-summary-fold-slots'
-import type { SessionSummaryStore, SessionSummaryStoreEntry } from './session-summary-store'
+import type { SessionSummaryStore } from './session-summary-store'
+import {
+  chunkCacheFor,
+  chunkFailuresFor,
+  persist,
+  storedEntry
+} from './session-summary-fold-persist'
 import type {
   SessionSummaryEventRead,
   SessionSummarySessionIdentity
 } from './session-summary-transcript-source'
 import type { SessionSummaryTranscriptHost } from './session-summary-transcript-host'
+import { mergeSessionRef, sessionSummaryIdentityOf } from './session-summary-session-ref'
+
+export {
+  hasSessionRef,
+  mergeSessionRef,
+  sessionSummaryIdentityChanged,
+  sessionSummaryIdentityOf
+} from './session-summary-session-ref'
 
 export type SessionSummaryFoldRunnerDeps = {
   store: SessionSummaryStore
@@ -54,85 +64,9 @@ export type SessionSummaryFoldCallbacks = {
     fold: SessionSummarySnapshot['fold']
     messageCount?: number
     error?: string
+    /** A per-chunk tick: merge the counts, keep the ledger already on screen. */
+    progressOnly?: boolean
   }) => void
-}
-
-export function sessionSummaryIdentityOf(
-  entry: SessionSummarySessionRef | undefined
-): SessionSummaryStoreEntry['identity'] {
-  return {
-    providerSessionId: entry?.providerSession?.id ?? null,
-    transcriptPath: entry?.providerSession?.transcriptPath ?? null
-  }
-}
-
-/**
- * The identity a fold should use: this process's own row, with the viewer's request filling
- * what the row cannot say.
- *
- * Why the request is a filler and not an override: the viewer is the one process guaranteed
- * to know *which* session the reader is looking at, which is exactly what a paired host or a
- * reconnected client was missing when it answered "no readable transcript" for a live
- * session. But where this process holds a row that names a session, that row is its own
- * latest evidence (hooks land here), and letting a lagging client id override it would brief
- * the previous conversation — the failure #135 is about.
- */
-export function mergeSessionRef(
-  requested: SessionSummarySessionRef | null | undefined,
-  entry: SessionSummarySessionRef | undefined
-): SessionSummarySessionRef {
-  const chosen = mergeProviderSession(entry?.providerSession, requested?.providerSession)
-  // Why paired with its session: an agent type from one side next to a session from the other
-  // describes a conversation neither side has — Pi's transcript read with Claude's parser — so
-  // the type always comes from whichever side supplied the session.
-  const agentType = chosen.fromEntry
-    ? (entry?.agentType ?? requested?.agentType)
-    : (requested?.agentType ?? entry?.agentType)
-  return {
-    ...(agentType ? { agentType } : {}),
-    ...(chosen.providerSession ? { providerSession: chosen.providerSession } : {})
-  }
-}
-
-/** The row's session when it names one; its missing transcript path from the request. */
-function mergeProviderSession(
-  local: AgentProviderSessionMetadata | undefined,
-  requested: AgentProviderSessionMetadata | undefined
-): { providerSession: AgentProviderSessionMetadata | undefined; fromEntry: boolean } {
-  if (!local) {
-    return { providerSession: requested, fromEntry: false }
-  }
-  if (local.transcriptPath || !requested?.transcriptPath || requested.id !== local.id) {
-    return { providerSession: local, fromEntry: true }
-  }
-  return {
-    providerSession: { ...local, transcriptPath: requested.transcriptPath },
-    fromEntry: true
-  }
-}
-
-/**
- * Whether two stored identities describe different conversations.
- *
- * A side without a transcript path knows less, it does not know something different: treating a
- * missing path as a change dropped a good ledger and its seen cursor whenever the identity came
- * from a request that named only the session id.
- */
-export function sessionSummaryIdentityChanged(
-  a: SessionSummaryStoreEntry['identity'],
-  b: SessionSummaryStoreEntry['identity']
-): boolean {
-  if (a.providerSessionId !== b.providerSessionId) {
-    return true
-  }
-  if (!a.transcriptPath || !b.transcriptPath) {
-    return false
-  }
-  return a.transcriptPath !== b.transcriptPath
-}
-
-export function hasSessionRef(ref: SessionSummarySessionRef): boolean {
-  return Boolean(ref.agentType || ref.providerSession)
 }
 
 /** Fold a pane's new events. Resolves when the fold settles; never throws. */
@@ -167,8 +101,8 @@ export async function runSessionSummaryFold(args: {
     if (signal.aborted) {
       return // Pane closed: cancel-on-close, nothing to report.
     }
-    // Completed chunk extracts survive a failure — but only once a fold has produced a
-    // ledger, since an unproduced one is never written. A first fold's chunks are lost.
+    // Completed chunk extracts survive a failure: each one is written as it settles, so a retry
+    // resumes instead of restarting even when no ledger was ever produced.
     const failedSession = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
     const failedIdentity = sessionSummaryIdentityOf(failedSession)
     const failedStored = storedEntry(deps, paneKey, failedIdentity)
@@ -218,9 +152,17 @@ async function runAdmittedFold(args: {
   const newEvents = read.events
   const messageCount = read.totalEvents
   if (newEvents.length === 0) {
+    // Why a report pass here: a fold whose report phase failed leaves `reportFull.through` behind
+    // its `foldedThrough`, and a session with nothing new would otherwise never catch it up.
+    const caughtUp = await catchUpSessionSummaryReports({
+      deps,
+      signal,
+      ledger: stored.ledger,
+      foldParams: args.foldParams
+    })
     // Persist first: the snapshot a listener receives reads the store, so reporting
     // 'ready' before the write showed a ready status over an absent ledger.
-    persist(deps, paneKey, identity, stored, messageCount)
+    persist(deps, paneKey, identity, { ...stored, ledger: caughtUp }, messageCount)
     report({
       // No readable content yet is 'unavailable', not a summary of nothing.
       status: messageCount === 0 ? 'unavailable' : 'ready',
@@ -239,6 +181,12 @@ async function runAdmittedFold(args: {
     signal,
     readAt: eventsReadAt,
     cache: chunkCacheFor(stored),
+    failures: chunkFailuresFor(stored),
+    gaps: read.gaps,
+    // Why write per chunk and not only at the end: quitting mid-fold used to lose every completed
+    // extract and every failure count, so reopening a long first fold restarted at event 0 and a
+    // slice that could not be summarized never reached its third fold. The store debounces the write.
+    onChunkSettled: () => persist(deps, paneKey, identity, stored, messageCount),
     onProgress: (progress) =>
       report({
         status: 'folding',
@@ -247,7 +195,8 @@ async function runAdmittedFold(args: {
           completedChunks: progress.completedChunks,
           totalChunks: progress.totalChunks
         },
-        messageCount
+        messageCount,
+        progressOnly: true
       })
   })
   signal.throwIfAborted()
@@ -259,69 +208,45 @@ async function runAdmittedFold(args: {
       completedChunks: result.completedChunks,
       totalChunks: result.totalChunks
     },
-    messageCount
-  })
-}
-
-function storedEntry(
-  deps: SessionSummaryFoldRunnerDeps,
-  paneKey: string,
-  identity: SessionSummaryStoreEntry['identity']
-): SessionSummaryStoreEntry {
-  return deps.store.get(paneKey) ?? freshStoreEntry(identity, deps.now())
-}
-
-function chunkCacheFor(stored: SessionSummaryStoreEntry): SessionSummaryChunkCache {
-  return {
-    get: (key) => stored.chunkCache[key],
-    set: (key, delta) => {
-      stored.chunkCache[key] = delta
-    }
-  }
-}
-
-function persist(
-  deps: SessionSummaryFoldRunnerDeps,
-  paneKey: string,
-  identity: SessionSummaryStoreEntry['identity'],
-  stored: SessionSummaryStoreEntry,
-  messageCount: number
-): void {
-  // Why: nothing folded yet means there is no summary to remember, and recording an
-  // empty ledger is what made the next visit claim "Up to date" over a blank body (#135).
-  if (!hasProducedLedger(stored.ledger)) {
-    return
-  }
-  // Chunk extracts covered by the new foldedThrough are already applied; drop them.
-  const chunkCache: SessionSummaryStoreEntry['chunkCache'] = {}
-  for (const [key, delta] of Object.entries(stored.chunkCache)) {
-    const from = Number.parseInt(key.split('-')[0] ?? '', 10)
-    if (Number.isFinite(from) && from >= stored.ledger.foldedThrough) {
-      chunkCache[key] = delta
-    }
-  }
-  deps.store.set(paneKey, {
-    identity,
-    ledger: stored.ledger,
-    chunkCache,
     messageCount,
-    seenThrough: stored.seenThrough,
-    updatedAt: deps.now()
+    // Why an error and not a failed status: the chunks that landed are real, and reporting
+    // 'failed' over them is what threw away a forty-chunk fold's work for one flaky call.
+    ...(result.gap
+      ? {
+          error: `${result.gap.completedChunks} of ${result.gap.totalChunks} sections summarized; the rest will be filled in on the next fold.`
+        }
+      : {})
   })
 }
 
-function freshStoreEntry(
-  identity: SessionSummaryStoreEntry['identity'],
-  now: number
-): SessionSummaryStoreEntry {
-  return {
-    identity,
-    ledger: emptySessionSummaryLedger(),
-    chunkCache: {},
-    messageCount: 0,
-    seenThrough: 0,
-    updatedAt: now
+/**
+ * Rewrite the report for facts already folded but not yet reported on.
+ *
+ * Returns the ledger unchanged when there is nothing to catch up, and when the rewrite fails — the
+ * facts are already on screen, so a stale sentence is a smaller loss than an error.
+ */
+async function catchUpSessionSummaryReports(args: {
+  deps: SessionSummaryFoldRunnerDeps
+  signal: AbortSignal
+  ledger: SessionSummaryLedger
+  foldParams: ResolvedSourceControlAiGenerationParams | null
+}): Promise<SessionSummaryLedger> {
+  // Why zero and not the cursor: no report at all means nothing has been reported, however far the
+  // facts have been folded.
+  const reported = args.ledger.reportFull?.through ?? 0
+  if (reported >= args.ledger.foldedThrough) {
+    return args.ledger
   }
+  const reports = await rewriteSessionSummaryReports({
+    brain: args.deps.createBrain(args.foldParams),
+    signal: args.signal,
+    ledger: args.ledger,
+    folded: args.ledger,
+    windowRestarted: false,
+    userMessageCount: args.ledger.userMessageCount,
+    lastUserMessageIndex: args.ledger.lastUserMessageIndex
+  })
+  return reports.full ? { ...args.ledger, reportFull: reports.full } : args.ledger
 }
 
 /**

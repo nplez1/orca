@@ -111,7 +111,9 @@ describe('parseDevinSessionFile', () => {
           role,
           text: text.slice(0, 256 * 1024),
           timestamp: null,
-          ...(text.length > 256 * 1024 ? { textTruncated: true } : {})
+          ...(text.length > 256 * 1024
+            ? { textTruncated: true, textOriginalLength: text.length }
+            : {})
         }))
       )
       expect(session?.firstUserPrompt).toBe(text.trim().slice(0, 256 * 1024))

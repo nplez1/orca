@@ -34,7 +34,7 @@ it('joins text blocks and appends tool blocks as their own messages', () => {
     )
   ).toEqual([
     { role: 'assistant', text: 'first\nsecond', timestamp: AT },
-    { role: 'tool', text: 'Bash: ls -la', timestamp: AT }
+    { role: 'tool', text: 'Bash: ls -la', timestamp: AT, toolKind: 'call' }
   ])
 })
 
@@ -51,13 +51,13 @@ it('reads a tool result carried on a user record as a tool message', () => {
       [{ type: 'tool_result', content: [{ type: 'text', text: 'exit 0' }] }],
       AT
     )
-  ).toEqual([{ role: 'tool', text: 'exit 0', timestamp: AT }])
+  ).toEqual([{ role: 'tool', text: 'exit 0', timestamp: AT, toolKind: 'result' }])
 })
 
 it('names a tool call even with no recognisable argument', () => {
   expect(
     transcriptMessagesFromContent('assistant', [{ type: 'tool_use', name: 'Read', input: {} }], AT)
-  ).toEqual([{ role: 'tool', text: 'Read', timestamp: AT }])
+  ).toEqual([{ role: 'tool', text: 'Read', timestamp: AT, toolKind: 'call' }])
 })
 
 it('emits nothing for blank or absent content', () => {
@@ -139,7 +139,15 @@ it('reads tool-result parts lazily and can project the same decoded result again
   )
   for (let read = 0; read < 2; read++) {
     expect(transcriptMessagesFromDecodedMessage(decoded)).toEqual([
-      { role: 'tool', text: 'x'.repeat(MESSAGE_LIMIT), timestamp: AT, textTruncated: true }
+      {
+        role: 'tool',
+        text: 'x'.repeat(MESSAGE_LIMIT),
+        timestamp: AT,
+        toolKind: 'result',
+        textTruncated: true,
+        // The result cap stops counting once it is full, so the length it reports is the cap.
+        textOriginalLength: MESSAGE_LIMIT
+      }
     ])
   }
 })
@@ -180,16 +188,25 @@ it('bounds joins for a large multi-block turn and keeps its later tool messages'
     spy.mockRestore()
   }
   expect(messages).toEqual([
-    { role: 'assistant', text: 'x'.repeat(MESSAGE_LIMIT), timestamp: AT, textTruncated: true },
-    { role: 'tool', text: 'Read: after-large-text', timestamp: AT },
+    {
+      role: 'assistant',
+      text: 'x'.repeat(MESSAGE_LIMIT),
+      timestamp: AT,
+      textTruncated: true,
+      textOriginalLength: 72 * (1024 * 1024) + 71
+    },
+    { role: 'tool', text: 'Read: after-large-text', timestamp: AT, toolKind: 'call' },
     {
       role: 'tool',
       text: `header\n${'x'.repeat(MESSAGE_LIMIT - 7)}`,
       timestamp: AT,
-      textTruncated: true
+      toolKind: 'result',
+      textTruncated: true,
+      // The result cap stops counting once it is full, so this is the size of what it examined.
+      textOriginalLength: 6 + 1 + 50 * (1024 * 1024)
     },
-    { role: 'tool', text: 'Bash: pwd', timestamp: AT },
-    { role: 'tool', text: 'finished', timestamp: AT }
+    { role: 'tool', text: 'Bash: pwd', timestamp: AT, toolKind: 'call' },
+    { role: 'tool', text: 'finished', timestamp: AT, toolKind: 'result' }
   ])
   expect(largestJoinedLength).toBeLessThanOrEqual(MESSAGE_LIMIT + 1)
 })
@@ -234,10 +251,20 @@ it('bounds joined text at newline and raw surrogate boundaries', () => {
     { parts: [' '.repeat(MESSAGE_LIMIT), 'visible beyond the cap'], text: null, truncated: false }
   ]
   for (const { parts, text, truncated } of cases) {
+    // The pre-truncation length is carried so a consumer can name the bound that replaced the text.
+    const originalLength =
+      parts.reduce((total, part) => total + part.length, 0) + Math.max(0, parts.length - 1)
     expect(transcriptMessagesFromContent('user', parts, AT)).toEqual(
       text === null
         ? []
-        : [{ role: 'user', text, timestamp: AT, ...(truncated ? { textTruncated: true } : {}) }]
+        : [
+            {
+              role: 'user',
+              text,
+              timestamp: AT,
+              ...(truncated ? { textTruncated: true, textOriginalLength: originalLength } : {})
+            }
+          ]
     )
   }
 })
