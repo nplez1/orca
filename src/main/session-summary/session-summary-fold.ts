@@ -1,11 +1,17 @@
-// Fold protocol: bounded transcript slices → per-chunk extracts (in parallel)
-// → one deterministic merge → one report rewrite.
+// Fold protocol: bounded transcript slices → per-chunk extracts (in parallel) → one deterministic
+// merge → a report chain over the unfolded range.
 //
-// A failed or unparseable extract fails the whole fold so the caller keeps the last good
-// ledger; completed chunk extracts are cacheable so a cancelled fold resumes instead of
-// restarting. The report rewrite is the second phase (`session-summary-report.ts`) and its
-// failure is survivable: facts without prose still beat losing the batch.
+// Three things are deliberately kept apart. *Paging* decides how many model calls a fold takes
+// (`CHUNK_MAX_CHARS` / `CHUNK_MAX_EVENTS`) and never what the model may see. *Truncation* — dropping
+// content by position once a character budget is hit — is gone. What the model sees is the digest
+// (`session-summary-event-digest.ts`), which represents every event at the detail its role deserves.
+//
+// A failing chunk no longer loses the fold: the chunks before it are applied and the rest stay in
+// the cache, so the next fold fills the gap. A failure in the *first* chunk is the one case with
+// nothing to degrade to, and it stops its siblings rather than spawning a call per chunk against a
+// brain that is not working.
 import type {
+  SessionSummaryFoldGap,
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
 } from '../../shared/session-summary-types'
@@ -16,14 +22,27 @@ import {
 } from './session-summary-ledger'
 import { SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY } from './session-summary-fold-slots'
 import { extractSessionSummaryJson } from './session-summary-json'
-import { rewriteReports } from './session-summary-report'
-import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 
-export type SessionSummarySourceEvent = {
-  role: 'user' | 'assistant' | 'tool'
-  text: string
-  timestamp: string | null
-}
+export { extractSessionSummaryJson }
+import { rewriteSessionSummaryReports } from './session-summary-report'
+import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
+import type { SessionSummarySourceEvent } from './session-summary-event-digest'
+
+import {
+  buildSessionSummaryChunks,
+  buildSessionSummaryChunkPrompt,
+  chunkCacheKey,
+  rangeLastEventIndex,
+  type SessionSummaryGap
+} from './session-summary-chunk-prompt'
+
+export type { SessionSummarySourceEvent }
+export {
+  buildSessionSummaryChunks,
+  buildSessionSummaryChunkPrompt,
+  type SessionSummaryChunkRange,
+  type SessionSummaryGap
+} from './session-summary-chunk-prompt'
 
 /** One structured-output completion; the brain is agent-CLI or direct-model. */
 export type SessionFoldBrain = {
@@ -35,74 +54,8 @@ export type SessionSummaryChunkCache = {
   set(key: string, delta: SessionSummaryLedgerDelta): void
 }
 
-const CHUNK_MAX_CHARS = 24_000
-const CHUNK_MAX_EVENTS = 40
-const EVENT_TEXT_MAX_CHARS = 1_500
-
-export type SessionSummaryChunkRange = { from: number; to: number }
-
-/** Split [0, events.length) into bounded chunks. Deterministic: same inputs → same ranges, so cache keys are stable across resumes. */
-export function buildSessionSummaryChunks(
-  events: readonly SessionSummarySourceEvent[],
-  chunkMaxChars = CHUNK_MAX_CHARS,
-  chunkMaxEvents = CHUNK_MAX_EVENTS
-): SessionSummaryChunkRange[] {
-  const ranges: SessionSummaryChunkRange[] = []
-  const eventCount = events.length
-  let from = 0
-  let chars = 0
-  for (let index = 0; index < eventCount; index += 1) {
-    chars += Math.min(events[index].text.length, EVENT_TEXT_MAX_CHARS)
-    if (chars >= chunkMaxChars || index - from + 1 >= chunkMaxEvents) {
-      ranges.push({ from, to: index + 1 })
-      from = index + 1
-      chars = 0
-    }
-  }
-  if (from < eventCount) {
-    ranges.push({ from, to: eventCount })
-  }
-  return ranges
-}
-
-export { extractSessionSummaryJson }
-
-const CHUNK_EXTRACT_INSTRUCTIONS = `You are summarizing a slice of an agent coding session transcript.
-Every fact is an object { "text": string, "sourceIndex": number } where "sourceIndex" is the message index shown in the transcript below for the message the fact came from.
-Produce a JSON object with exactly these keys:
-- "goal": fact or null — the objective the agent is working toward, if discernible
-- "plan": fact[] — steps the agent laid out (at most 5, earliest first)
-- "inProgress": fact or null — what the agent is doing at the END of this slice
-- "done": fact[] — completed milestones (at most 5)
-- "blockers": fact[] — errors, failed approaches, things awaiting input (at most 5)
-- "decisions": fact[] — notable choices made (at most 5)
-- "timeline": array of { "kind": one of "milestone"|"decision"|"error"|"needs-input"|"tool-burst"|"user-input", "text": one short sentence, "sourceIndex": number } — the notable events of this slice, chronological, at most 10.
-Rules: respond with ONLY the JSON object. Use plain lowercase text. Keep each "text" to one short sentence. If the slice is ambiguous or low-signal, say so in few entries rather than inventing detail.`
-
-function renderChunkTranscript(
-  events: readonly SessionSummarySourceEvent[],
-  range: SessionSummaryChunkRange,
-  absoluteFrom: number
-): string {
-  const lines: string[] = []
-  for (let index = range.from; index < range.to; index += 1) {
-    const event = events[index]
-    const text =
-      event.text.length > EVENT_TEXT_MAX_CHARS
-        ? `${event.text.slice(0, EVENT_TEXT_MAX_CHARS)}…`
-        : event.text
-    lines.push(`[#${absoluteFrom + index} ${event.role}] ${text}`)
-  }
-  return lines.join('\n')
-}
-
-export function buildSessionSummaryChunkPrompt(
-  events: readonly SessionSummarySourceEvent[],
-  range: SessionSummaryChunkRange,
-  absoluteFrom: number
-): string {
-  return `${CHUNK_EXTRACT_INSTRUCTIONS}\n\nTranscript slice:\n${renderChunkTranscript(events, range, absoluteFrom)}`
-}
+/** Attempts per chunk. A JSON miss is usually transient; a third doubles a genuinely broken call. */
+const CHUNK_ATTEMPTS = 2
 
 /**
  * Where the reader's own last message sits, after folding this batch.
@@ -131,12 +84,31 @@ export type SessionSummaryFoldResult = {
   ledger: SessionSummaryLedger
   completedChunks: number
   totalChunks: number
+  /** Chunks that could not be summarized; the next fold resumes at the first of them. */
+  gap: SessionSummaryFoldGap | null
+}
+
+/** How many chunks the extract phase finished, and where the applied prefix ends. */
+function appliedPrefix(
+  settled: readonly PromiseSettledResult<SessionSummaryLedgerDelta>[]
+): number {
+  let last = -1
+  for (let index = 0; index < settled.length; index += 1) {
+    if (settled[index].status !== 'fulfilled') {
+      break
+    }
+    last = index
+  }
+  return last
 }
 
 /**
- * Fold events (events[0] is the transcript message at ledger.foldedThrough)
- * into the ledger. Atomic: on any chunk failure nothing is applied, so the
- * caller's stored ledger stays the last good one.
+ * Fold events (events[0] is the transcript message at ledger.foldedThrough) into the ledger.
+ *
+ * Degrades instead of aborting: chunks before the first failure are applied, so a forty-chunk fold
+ * with one flaky call still yields a summary of thirty-nine. The cursor stops at the first failed
+ * chunk — applying a later one would either renumber the events or, on the next fold, append its
+ * timeline entries a second time.
  */
 export async function foldSessionSummaryEvents(args: {
   brain: SessionFoldBrain
@@ -144,6 +116,8 @@ export async function foldSessionSummaryEvents(args: {
   events: readonly SessionSummarySourceEvent[]
   signal: AbortSignal
   cache?: SessionSummaryChunkCache
+  /** Parts of the transcript the reader skipped; named in the slice that covers them. */
+  gaps?: readonly SessionSummaryGap[]
   /**
    * When the transcript these events came from was read.
    *
@@ -153,16 +127,21 @@ export async function foldSessionSummaryEvents(args: {
    */
   readAt?: number
   onProgress?: (result: SessionSummaryFoldResult) => void
+  /** Reports a completed chunk to the store, so an interrupted fold resumes instead of restarting. */
+  onChunkSettled?: () => void
 }): Promise<SessionSummaryFoldResult> {
   const { brain, ledger, events, signal, cache } = args
   const baseIndex = ledger.foldedThrough
   const ranges = buildSessionSummaryChunks(events)
+  const gaps = args.gaps ?? []
   let completedChunks = 0
-  const progress = (): void =>
-    args.onProgress?.({ ledger, completedChunks, totalChunks: ranges.length })
+  const reportProgress = (): void => {
+    args.onChunkSettled?.()
+    args.onProgress?.({ ledger, completedChunks, totalChunks: ranges.length, gap: null })
+  }
 
-  // Why the fold owns its controller: a failing chunk must stop its siblings instead of letting
-  // them run to the generation timeout, and a pane close must reach every chunk's own process.
+  // Why the fold owns its controller: a pane close must reach every chunk's own process, and a
+  // first-chunk failure has to stop siblings rather than run them against a broken brain.
   const foldController = new AbortController()
   const abortFromCaller = (): void => foldController.abort(signal.reason)
   if (signal.aborted) {
@@ -172,81 +151,122 @@ export async function foldSessionSummaryEvents(args: {
   signal.addEventListener('abort', abortFromCaller, { once: true })
   try {
     const foldSignal = foldController.signal
-    const deltas = await mapWithConcurrency(
+    const settled = await mapSettledWithConcurrency(
       ranges,
       SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY,
-      async (range) => {
+      async (range, rangeIndex) => {
         foldSignal.throwIfAborted()
-        const cacheKey = `${baseIndex + range.from}-${baseIndex + range.to}`
+        const cacheKey = chunkCacheKey(range, baseIndex)
         const cached = cache?.get(cacheKey)
         if (cached) {
           completedChunks += 1
-          progress()
+          reportProgress()
           return cached
         }
-        const raw = await brain.complete({
-          prompt: buildSessionSummaryChunkPrompt(events, range, baseIndex),
-          signal: foldSignal
-        })
-        foldSignal.throwIfAborted()
-        // A fact the model did not index is placed at the slice's *last* message, not its first:
-        // a slice usually opens with the reader's own message, and placing facts on that boundary
-        // hid the whole slice from the "since your last message" window.
-        const delta = normalizeSessionSummaryDelta(extractSessionSummaryJson(raw), {
-          min: baseIndex + range.from,
-          max: baseIndex + Math.max(range.from, range.to - 1),
-          fallback: baseIndex + Math.max(range.from, range.to - 1)
-        })
-        if (!delta) {
-          throw new Error('fold extract returned no usable JSON')
+        let lastError: unknown = null
+        for (let attempt = 0; attempt < CHUNK_ATTEMPTS; attempt += 1) {
+          try {
+            const raw = await brain.complete({
+              prompt: buildSessionSummaryChunkPrompt(events, range, baseIndex, gaps),
+              signal: foldSignal
+            })
+            foldSignal.throwIfAborted()
+            // A fact the model did not index is placed at the slice's *last* message, not its first:
+            // a slice usually opens with the reader's own message, and placing facts on that boundary
+            // hid the whole slice from the "since your last message" window.
+            const last = baseIndex + rangeLastEventIndex(range)
+            const delta = normalizeSessionSummaryDelta(extractSessionSummaryJson(raw), {
+              min: baseIndex + range.from,
+              max: last,
+              fallback: last
+            })
+            if (!delta) {
+              throw new Error('fold extract returned no usable JSON')
+            }
+            cache?.set(cacheKey, delta)
+            completedChunks += 1
+            reportProgress()
+            return delta
+          } catch (error) {
+            if (foldSignal.aborted) {
+              throw error
+            }
+            lastError = error
+          }
         }
-        cache?.set(cacheKey, delta)
-        completedChunks += 1
-        progress()
-        return delta
+        // Why stop the rest here: with the first chunk unusable there is no prefix to keep, so
+        // every later chunk is a model call whose answer cannot be applied. This is the one failure
+        // that aborts its siblings; a later one degrades instead.
+        if (rangeIndex === 0) {
+          foldController.abort(lastError)
+        }
+        throw lastError instanceof Error ? lastError : new Error(String(lastError))
       }
-    ).catch((error: unknown) => {
-      foldController.abort(error)
-      throw error
+    )
+
+    const lastApplied = appliedPrefix(settled)
+    if (lastApplied < 0) {
+      // Nothing landed: there is no prefix to keep and nothing to resume from, so this is a
+      // failure. Stopping the siblings is what keeps a misconfigured brain to two calls.
+      const first = settled[0]
+      foldController.abort(
+        first?.status === 'rejected' ? first.reason : new Error('fold produced no chunks')
+      )
+      throw first?.status === 'rejected' ? first.reason : new Error('fold produced no chunks')
+    }
+
+    const deltas = settled.slice(0, lastApplied + 1).map((entry) => {
+      // The prefix is fulfilled by construction: `appliedPrefix` stops at the first rejection.
+      if (entry.status !== 'fulfilled') {
+        throw new Error('fold applied a chunk that did not settle')
+      }
+      return entry.value
     })
+    const gap: SessionSummaryFoldGap | null =
+      lastApplied === ranges.length - 1
+        ? null
+        : { completedChunks: lastApplied + 1, totalChunks: ranges.length }
+    // Why the next chunk's start and not its own end: a chunk that failed was not applied, so the
+    // cursor has to stop where it begins or the next fold would skip it.
+    const foldedThrough =
+      gap === null ? baseIndex + events.length : baseIndex + ranges[lastApplied + 1].from
 
     const merged = mergeSessionSummaryDeltas(deltas)
     const readerMessages = readerMessagesAfter(ledger, events, baseIndex)
     const folded = applySessionSummaryDelta(
       ledger,
       merged,
-      baseIndex + events.length,
+      foldedThrough,
       args.readAt ?? Date.now(),
       readerMessages.lastUserMessageIndex,
-      readerMessages.userMessageCount
+      readerMessages.userMessageCount,
+      { foldGap: gap, gaps: gaps.map((entry) => entry.text) }
     )
-    // Why a second call and not a projection of the facts: a progress report is prose, and the
-    // whole point of it is to be shorter and better organised than the facts are. Its input is the
-    // previous reports plus this batch, and the prompt caps the timeline share of that, so it grows
-    // with the batch rather than with the session.
-    const reports = await rewriteReports({
+    const reports = await rewriteSessionSummaryReports({
       brain,
       signal: foldSignal,
       ledger,
-      merged,
-      through: folded.foldedThrough,
+      folded,
       windowRestarted: readerMessages.lastUserMessageIndex !== ledger.lastUserMessageIndex,
       userMessageCount: readerMessages.userMessageCount,
       lastUserMessageIndex: readerMessages.lastUserMessageIndex
     })
     // Why drop a carried-over "since" when the window moved: the previous one describes work the
     // reader has now spoken over, and a failed rewrite must not relabel it "since your last message".
-    const reportSince = reports
+    const reportSince = reports.since
       ? reports.since
       : readerMessages.lastUserMessageIndex === ledger.lastUserMessageIndex
         ? ledger.reportSince
         : null
     return {
-      ledger: reports
-        ? { ...folded, reportSince, reportFull: reports.full }
-        : { ...folded, reportSince },
-      completedChunks: ranges.length,
-      totalChunks: ranges.length
+      ledger: {
+        ...folded,
+        reportSince,
+        reportFull: reports.full ?? folded.reportFull
+      },
+      completedChunks: gap === null ? ranges.length : gap.completedChunks,
+      totalChunks: ranges.length,
+      gap
     }
   } finally {
     signal.removeEventListener('abort', abortFromCaller)

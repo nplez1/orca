@@ -3,6 +3,7 @@
 // index for "since you last looked", so rewrites would move the cursor).
 import type {
   SessionSummaryFact,
+  SessionSummaryFoldGap,
   SessionSummaryLedger,
   SessionSummaryLedgerDelta,
   SessionSummaryTimelineDeltaEntry,
@@ -11,7 +12,8 @@ import type {
 import {
   SESSION_SUMMARY_LIST_MAX_ITEMS,
   SESSION_SUMMARY_TEXT_MAX_LENGTH,
-  SESSION_SUMMARY_TIMELINE_KINDS
+  SESSION_SUMMARY_TIMELINE_KINDS,
+  SESSION_SUMMARY_TIMELINE_MAX_ENTRIES
 } from '../../shared/session-summary-types'
 
 export function emptySessionSummaryLedger(): SessionSummaryLedger {
@@ -28,7 +30,10 @@ export function emptySessionSummaryLedger(): SessionSummaryLedger {
     lastUserMessageIndex: null,
     userMessageCount: 0,
     foldedThrough: 0,
-    foldedAt: null
+    foldedAt: null,
+    timelineBase: 0,
+    foldGap: null,
+    gaps: []
   }
 }
 
@@ -113,6 +118,8 @@ function normalizeFactList(
     if (fact !== null && !out.some((existing) => existing.text === fact.text)) {
       out.push(fact)
     }
+    // Why a cap here and nowhere else: this bounds one model reply, which the prompt already asks
+    // to keep to five entries. The ledger itself is not capped — see mergeFactLists.
     if (out.length >= SESSION_SUMMARY_LIST_MAX_ITEMS) {
       break
     }
@@ -196,13 +203,22 @@ export function normalizeSessionSummaryDelta(
  *
  * Why the earliest: a fact restated in a later chunk did not become news when it was repeated,
  * and the "since your last message" window is computed from these indexes.
+ *
+ * Why unbounded: a days-long session legitimately has more than twelve milestones, and the old
+ * truncation kept the *earliest* twelve — so the newest facts, the ones a reader opens the pane
+ * for, were the ones dropped. The pane caps what it renders instead.
+ *
+ * Why a Map: with the cap gone these lists reach thousands of entries, and the `find` this used to
+ * do made every merge quadratic in the length of the session.
  */
 function mergeFactLists(...lists: SessionSummaryFact[][]): SessionSummaryFact[] {
   const out: SessionSummaryFact[] = []
+  const byText = new Map<string, SessionSummaryFact>()
   for (const list of lists) {
     for (const fact of list) {
-      const existing = out.find((item) => item.text === fact.text)
+      const existing = byText.get(fact.text)
       if (!existing) {
+        byText.set(fact.text, fact)
         out.push(fact)
         continue
       }
@@ -214,7 +230,7 @@ function mergeFactLists(...lists: SessionSummaryFact[][]): SessionSummaryFact[] 
       }
     }
   }
-  return out.slice(0, SESSION_SUMMARY_LIST_MAX_ITEMS)
+  return out
 }
 
 /**
@@ -266,8 +282,13 @@ export function applySessionSummaryDelta(
   foldedThrough: number,
   foldedAt: number,
   lastUserMessageIndex: number | null = ledger.lastUserMessageIndex,
-  userMessageCount: number = ledger.userMessageCount
+  userMessageCount: number = ledger.userMessageCount,
+  extras: {
+    foldGap?: SessionSummaryFoldGap | null
+    gaps?: readonly string[]
+  } = {}
 ): SessionSummaryLedger {
+  const timelineBase = ledger.timelineBase ?? 0
   return {
     // Why the last non-null wins: a later chunk that says nothing about the goal must not erase
     // the title. A goal is replaced, never unset, so an explicit null is "no opinion", not "none".
@@ -283,7 +304,9 @@ export function applySessionSummaryDelta(
       ...ledger.timeline,
       ...(delta.timeline ?? []).map((entry, index) => ({
         ...entry,
-        id: `${entry.sourceIndex}-${entry.kind}-${ledger.timeline.length + index}`
+        // Why the base: entries are trimmed from the head when the store is bounded, and an id
+        // derived from the trimmed length would collide with one already kept.
+        id: `${entry.sourceIndex}-${entry.kind}-${timelineBase + ledger.timeline.length + index}`
       }))
     ],
     // Carried, not derived: reports are written by the fold's report step, and a delta apply
@@ -293,6 +316,46 @@ export function applySessionSummaryDelta(
     lastUserMessageIndex,
     userMessageCount,
     foldedThrough: Math.max(ledger.foldedThrough, foldedThrough),
-    foldedAt
+    foldedAt,
+    timelineBase,
+    // Why reset by default: a fold that reached the end of what it was given has no gap, and a
+    // caller that leaves one behind would have the pane report a gap that no longer exists.
+    foldGap: extras.foldGap ?? null,
+    gaps: mergeGaps(ledger.gaps, extras.gaps)
+  }
+}
+
+function mergeGaps(previous: readonly string[], next: readonly string[] | undefined): string[] {
+  if (!next || next.length === 0) {
+    return [...previous]
+  }
+  const out = [...previous]
+  for (const gap of next) {
+    if (!out.includes(gap)) {
+      out.push(gap)
+    }
+  }
+  return out
+}
+
+/**
+ * The ledger as the store keeps it: the newest timeline entries, and a base so ids stay unique.
+ *
+ * Why bounded at all: `session-summaries.json` holds up to 200 panes, each now with an unbounded
+ * timeline and its chunk cache. The timeline is history the pane pages through, so dropping the
+ * oldest is the loss the reader can least feel.
+ */
+export function boundSessionSummaryLedgerForStorage(
+  ledger: SessionSummaryLedger,
+  maxTimelineEntries = SESSION_SUMMARY_TIMELINE_MAX_ENTRIES
+): SessionSummaryLedger {
+  const overflow = ledger.timeline.length - maxTimelineEntries
+  if (overflow <= 0) {
+    return ledger
+  }
+  return {
+    ...ledger,
+    timeline: ledger.timeline.slice(overflow),
+    timelineBase: (ledger.timelineBase ?? 0) + overflow
   }
 }

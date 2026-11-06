@@ -42,7 +42,9 @@ export {
 } from './session-parse-cache-store'
 
 // Resume only append-only folds; return factories so cached resumes avoid allocating throwaway state.
-function resumableStateFactoryFor(
+// Exported for the session-summary fold, which reads through the same decoders so it inherits the
+// per-record budget and can name the records that budget skipped.
+export function resumableStateFactoryFor(
   candidate: SessionFileCandidate
 ): ((messages: TranscriptMessageSink) => ResumableSessionParseState) | null {
   switch (candidate.agent) {

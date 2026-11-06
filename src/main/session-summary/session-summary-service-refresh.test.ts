@@ -59,7 +59,13 @@ function harness(options: {
     readEvents: async ({ fromEventIndex }) => {
       reads.push('read')
       const all = events(4)
-      return { events: all.slice(fromEventIndex), totalEvents: all.length }
+      return {
+        events: all.slice(fromEventIndex),
+        totalEvents: all.length,
+        retainedBytes: 0,
+        overRetainedBudget: false,
+        gaps: []
+      }
     },
     getAgentStatusEntry: (paneKey) => currentEntry(paneKey),
     canReadTranscript: () => true,
@@ -170,7 +176,7 @@ describe('SessionSummaryService report staleness', () => {
       ledger: {
         ...emptySessionSummaryLedger(),
         reportSince: { text: 'work since message 2', through: 3 },
-        reportFull: { text: 'whole session', through: 3 },
+        reportFull: { headline: 'whole session', sections: [], through: 3, text: 'whole session' },
         lastUserMessageIndex: 2,
         userMessageCount: 1,
         foldedThrough: 3,
@@ -185,7 +191,13 @@ describe('SessionSummaryService report staleness', () => {
       store,
       readEvents: async ({ fromEventIndex }) => {
         const all = events(6)
-        return { events: all.slice(fromEventIndex), totalEvents: all.length }
+        return {
+          events: all.slice(fromEventIndex),
+          totalEvents: all.length,
+          retainedBytes: 0,
+          overRetainedBudget: false,
+          gaps: []
+        }
       },
       getAgentStatusEntry: () => defaultEntry(),
       canReadTranscript: () => true,

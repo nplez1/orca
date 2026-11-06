@@ -39,8 +39,8 @@ it('projects one decoded turn into visible preview text and the complete searcha
 
   expect(messages).toEqual([
     { role: 'assistant', text: `private reasoning\n${text}`, timestamp: AT },
-    { role: 'tool', text: 'Bash: echo proof', timestamp: AT },
-    { role: 'tool', text: 'proof', timestamp: AT }
+    { role: 'tool', text: 'Bash: echo proof', timestamp: AT, toolKind: 'call' },
+    { role: 'tool', text: 'proof', timestamp: AT, toolKind: 'result' }
   ])
   expect(accumulator.previewMessages).toEqual([
     { role: 'assistant', text: `${text.slice(0, 217)}...`, timestamp: AT }

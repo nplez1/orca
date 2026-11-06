@@ -26,9 +26,24 @@ export type RemoteTranscriptFetch =
   /** Nothing came back: no such file, or an empty one. */
   | { kind: 'missing' }
 
-/** 24 MB: well above a long pi/Claude session, and a bound this app can hold twice. */
-export const REMOTE_TRANSCRIPT_MAX_BYTES = 24 * 1024 * 1024
-const REMOTE_TRANSCRIPT_TIMEOUT_MS = 120_000
+/**
+ * 256 MB: past any transcript a person writes by hand, and the point where a session is measured in
+ * days rather than hours.
+ *
+ * Why raised from 24 MB: the fold no longer refuses a large local transcript, so this bound is the
+ * only thing that could still make an SSH-hosted session unfetchable — and it bounds a *copy*, not
+ * what the fold retains. Streaming the remote file through the digest would remove the copy, but it
+ * needs parser state at a byte offset on the far side, which is its own change.
+ */
+export const REMOTE_TRANSCRIPT_MAX_BYTES = 256 * 1024 * 1024
+/**
+ * Two deadlines, because one number cannot serve both cases: a stalled link and a slow one.
+ *
+ * The idle timer resets on every chunk, so a slow-but-moving transfer is never killed; the overall
+ * ceiling is what stops a trickle that would otherwise hold the fold open forever.
+ */
+const REMOTE_TRANSCRIPT_IDLE_TIMEOUT_MS = 60_000
+const REMOTE_TRANSCRIPT_TOTAL_TIMEOUT_MS = 15 * 60_000
 
 export type SshTranscriptFetcherDeps = {
   /** Opens a shell command's channel on that SSH target; throws when it cannot. */
@@ -40,6 +55,8 @@ export type SshTranscriptFetcherDeps = {
   tmpRoot?: string
   maxBytes?: number
   timeoutMs?: number
+  /** Overall ceiling for one fetch; the idle timeout is derived from `timeoutMs`. */
+  totalTimeoutMs?: number
 }
 
 export function createSshTranscriptFetcher(
@@ -50,7 +67,8 @@ export function createSshTranscriptFetcher(
   signal: AbortSignal
 }) => Promise<RemoteTranscriptFetch> {
   const maxBytes = deps.maxBytes ?? REMOTE_TRANSCRIPT_MAX_BYTES
-  const timeoutMs = deps.timeoutMs ?? REMOTE_TRANSCRIPT_TIMEOUT_MS
+  const timeoutMs = deps.timeoutMs ?? REMOTE_TRANSCRIPT_IDLE_TIMEOUT_MS
+  const totalTimeoutMs = deps.totalTimeoutMs ?? REMOTE_TRANSCRIPT_TOTAL_TIMEOUT_MS
   const parentDir = deps.tmpRoot ?? tmpdir()
 
   return async ({ targetId, remotePath, signal }) => {
@@ -74,6 +92,7 @@ export function createSshTranscriptFetcher(
         localPath,
         maxBytes,
         timeoutMs,
+        totalTimeoutMs,
         signal
       })
       if (result.kind !== 'file') {
@@ -93,9 +112,10 @@ async function streamRemoteFile(args: {
   localPath: string
   maxBytes: number
   timeoutMs: number
+  totalTimeoutMs: number
   signal: AbortSignal
 }): Promise<RemoteTranscriptFetch> {
-  const { channel, localPath, maxBytes, timeoutMs, signal } = args
+  const { channel, localPath, maxBytes, timeoutMs, totalTimeoutMs, signal } = args
   if (signal.aborted) {
     // Why close: `cat` would otherwise sit blocked on a full window with no reader.
     channel.close()
@@ -107,12 +127,28 @@ async function streamRemoteFile(args: {
 
   const exitCode = await new Promise<number | null>((resolve, reject) => {
     let settled = false
+    // Two deadlines: an idle one that a moving transfer keeps pushing back, and an overall ceiling
+    // that a trickle cannot. One number cannot serve both a stalled link and a slow one.
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    const armIdle = (): void => {
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+      }
+      idleTimer = setTimeout(() => fail(new Error('remote transcript read timed out')), timeoutMs)
+    }
+    const totalTimer = setTimeout(
+      () => fail(new Error('remote transcript read exceeded its overall time limit')),
+      totalTimeoutMs
+    )
     const settle = (fn: () => void): void => {
       if (settled) {
         return
       }
       settled = true
-      clearTimeout(timer)
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+      }
+      clearTimeout(totalTimer)
       signal.removeEventListener('abort', onAbort)
       channel.off('data', onData)
       channel.off('error', fail)
@@ -128,6 +164,7 @@ async function streamRemoteFile(args: {
     }
     const onAbort = (): void => fail(new Error('remote transcript read canceled'))
     const onData = (chunk: Buffer): void => {
+      armIdle()
       bytes += chunk.byteLength
       if (bytes > maxBytes) {
         // Stop reading the moment it cannot fit: the whole file is unusable, not a tail.
@@ -152,7 +189,7 @@ async function streamRemoteFile(args: {
         sink.end((error?: Error | null) => (error ? reject(error) : resolve(status)))
       })
     }
-    const timer = setTimeout(() => fail(new Error('remote transcript read timed out')), timeoutMs)
+    armIdle()
     signal.addEventListener('abort', onAbort, { once: true })
     // An unwritable target throws out of the write stream, not out of this scope.
     sink.on('error', fail)

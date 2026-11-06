@@ -58,6 +58,46 @@ export type SessionSummaryReport = {
   through: number
 }
 
+/** One phase of a session, oldest first. */
+export type SessionSummaryReportSection = {
+  id: string
+  title: string
+  text: string
+  /** `foldedThrough` when this section was last written. */
+  through: number
+}
+
+/**
+ * The whole-session report: a headline that always answers "where does this stand", plus one
+ * section per phase.
+ *
+ * Why sections and not one paragraph: a fixed word count keeps a report short by making it
+ * *wrong* for a long session — three days cannot be reported in 90 words, so what comes out is a
+ * confident sentence about whatever happened last. Growth here is O(phases): an hour of work is
+ * one section, three days is a handful, and the oldest two merge when the ceiling is reached.
+ *
+ * Why `text` is still carried: a client older than this shape reads `reportFull.text` and would
+ * otherwise show no prose at all. It is derived from the headline and sections, never written by
+ * the model.
+ */
+export type SessionSummaryFullReport = {
+  headline: string
+  sections: SessionSummaryReportSection[]
+  through: number
+  text: string
+}
+
+/**
+ * Chunks a fold could not summarize, so the pane can say so and the next fold can fill them in.
+ *
+ * Why on the ledger: a partial fold stamps `foldedAt`, and the brief-reuse rule reads that as
+ * "nothing new since" — so without this the hole would never be revisited.
+ */
+export type SessionSummaryFoldGap = {
+  completedChunks: number
+  totalChunks: number
+}
+
 export type SessionSummaryLedger = {
   goal: SessionSummaryFact | null
   plan: SessionSummaryFact[]
@@ -76,7 +116,7 @@ export type SessionSummaryLedger = {
    */
   reportSince: SessionSummaryReport | null
   /** Whole-session progress report, rewritten on every fold so it stays glanceable. */
-  reportFull: SessionSummaryReport | null
+  reportFull: SessionSummaryFullReport | null
   /**
    * Transcript index of the last message the *user* sent, as folded so far. This is the
    * "last interaction" line: the window the pane opens on is everything after it.
@@ -87,6 +127,22 @@ export type SessionSummaryLedger = {
   /** Transcript message index through which this ledger is folded (exclusive). */
   foldedThrough: number
   foldedAt: number | null
+  /**
+   * Timeline entries dropped from the head of `timeline` to bound the store.
+   *
+   * Why it exists: entry ids are derived from the entry's position, so a head trim would hand a
+   * new entry an id an older one already holds — duplicate React keys and a wrong seen cursor.
+   */
+  timelineBase: number
+  /** Chunks this ledger's last fold could not summarize; null when the fold covered everything. */
+  foldGap: SessionSummaryFoldGap | null
+  /**
+   * Parts of the transcript the reader could not decode, named so the gap is not a silence.
+   *
+   * Never events: a skipped record has no message index, and inventing one would renumber every
+   * fact's provenance.
+   */
+  gaps: string[]
 }
 
 /** What one chunk extract (or one merged fold) contributes to a ledger. */
@@ -141,6 +197,13 @@ export type SessionSummarySnapshot = {
   seenThrough: number
   fold: SessionSummaryFoldProgress
   error?: string
+  /**
+   * A progress tick: merge these fields into the snapshot already on screen, keeping its ledger.
+   *
+   * Why: a fold reports once per completed chunk, and shipping the whole ledger each time is a
+   * structured clone of a thousand entries per chunk to every window. Progress needs counts.
+   */
+  progressOnly?: boolean
 }
 
 export type SessionSummaryOpenRequest = {
@@ -197,7 +260,21 @@ export type SessionSummaryCloseRequest = {
 }
 
 export const SESSION_SUMMARY_TEXT_MAX_LENGTH = 600
+/**
+ * How many facts of one kind the pane shows at a time.
+ *
+ * Why a view cap and not a ledger cap: the ledger is append-only history, and truncating it at
+ * every merge kept the *earliest* twelve — so the newest facts, the ones a reader opens the pane
+ * for, were the ones dropped.
+ */
 export const SESSION_SUMMARY_LIST_MAX_ITEMS = 12
+/** Most timeline entries one pane keeps on disk; the newest are kept. */
+export const SESSION_SUMMARY_TIMELINE_MAX_ENTRIES = 2_000
+/** Hard ceiling on the whole-session report, so it cannot become a book. */
+export const SESSION_SUMMARY_REPORT_MAX_SECTIONS = 8
+export const SESSION_SUMMARY_REPORT_MAX_CHARS = 4_000
+export const SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS = 600
+export const SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS = 200
 
 /**
  * The error a paired host answers with when it predates the host-fold methods.

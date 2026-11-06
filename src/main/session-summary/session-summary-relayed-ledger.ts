@@ -6,7 +6,11 @@
 // as a React child. Coercing on arrival costs one pass and keeps both directions readable.
 import type {
   SessionSummaryFact,
+  SessionSummaryFoldGap,
+  SessionSummaryFullReport,
   SessionSummaryLedger,
+  SessionSummaryReport,
+  SessionSummaryReportSection,
   SessionSummaryTimelineEntry
 } from '../../shared/session-summary-types'
 
@@ -51,7 +55,7 @@ function coerceTimeline(value: unknown): SessionSummaryTimelineEntry[] {
     : []
 }
 
-function coerceReport(value: unknown): SessionSummaryLedger['reportFull'] {
+function coerceReport(value: unknown): SessionSummaryReport | null {
   if (!isRecord(value) || typeof value.text !== 'string') {
     return null
   }
@@ -59,6 +63,75 @@ function coerceReport(value: unknown): SessionSummaryLedger['reportFull'] {
     text: value.text,
     through: typeof value.through === 'number' ? value.through : 0
   }
+}
+
+function coerceSections(value: unknown): SessionSummaryReportSection[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const out: SessionSummaryReportSection[] = []
+  for (const entry of value) {
+    if (!isRecord(entry) || typeof entry.text !== 'string') {
+      continue
+    }
+    out.push({
+      id: typeof entry.id === 'string' ? entry.id : `s${out.length}`,
+      title: typeof entry.title === 'string' && entry.title.trim() ? entry.title : 'Work',
+      text: entry.text,
+      through: coerceCount(entry.through)
+    })
+  }
+  return out
+}
+
+/**
+ * The whole-session report from either version.
+ *
+ * A host older than the structured shape relays `{ text, through }`; a newer one relays
+ * `{ headline, sections, through }`. Reading the old one as the new shape would show no prose at
+ * all, and reading the new one as the old shape would render an object as a React child.
+ */
+function coerceFullReport(value: unknown): SessionSummaryFullReport | null {
+  if (!isRecord(value)) {
+    return null
+  }
+  const through = coerceCount(value.through)
+  const sections = coerceSections(value.sections)
+  const headline = typeof value.headline === 'string' ? value.headline.trim() : ''
+  if (sections.length > 0 || headline) {
+    return {
+      headline,
+      sections,
+      through,
+      text: typeof value.text === 'string' ? value.text : headline
+    }
+  }
+  if (typeof value.text === 'string' && value.text.trim()) {
+    return {
+      headline: value.text.trim(),
+      sections: [],
+      through,
+      text: value.text
+    }
+  }
+  return null
+}
+
+function coerceFoldGap(value: unknown): SessionSummaryFoldGap | null {
+  if (!isRecord(value)) {
+    return null
+  }
+  const totalChunks = coerceCount(value.totalChunks)
+  if (totalChunks <= 0) {
+    return null
+  }
+  return { completedChunks: coerceCount(value.completedChunks), totalChunks }
+}
+
+function coerceGaps(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+    : []
 }
 
 function coerceCount(value: unknown): number {
@@ -87,12 +160,16 @@ export function coerceRelayedLedger(value: unknown): SessionSummaryLedger | null
     decisions: coerceFactList(value.decisions),
     timeline: coerceTimeline(value.timeline),
     reportSince: coerceReport(value.reportSince),
-    reportFull: coerceReport(value.reportFull),
+    reportFull: coerceFullReport(value.reportFull),
     // An older host has no boundary: everything it folded is "the session", so a null boundary
     // shows all of it rather than hiding it behind a window that does not exist there.
     lastUserMessageIndex: coerceIndex(value.lastUserMessageIndex),
     userMessageCount: coerceCount(value.userMessageCount),
     foldedThrough: coerceCount(value.foldedThrough),
-    foldedAt: typeof value.foldedAt === 'number' ? value.foldedAt : null
+    foldedAt: typeof value.foldedAt === 'number' ? value.foldedAt : null,
+    // An older host trims nothing, so every entry it holds starts at position zero.
+    timelineBase: coerceCount(value.timelineBase),
+    foldGap: coerceFoldGap(value.foldGap),
+    gaps: coerceGaps(value.gaps)
   }
 }

@@ -7,6 +7,7 @@ import type { SessionSummaryStatusEntry } from './session-summary-snapshot'
 import { mergeSessionRef, sessionSummaryIdentityOf } from './session-summary-fold-runner'
 import type { SessionSummaryStoreEntry } from './session-summary-store'
 import type {
+  SessionSummaryFoldGap,
   SessionSummaryLedger,
   SessionSummarySessionRef
 } from '../../shared/session-summary-types'
@@ -85,6 +86,8 @@ export function attributableStoredLedger(
 export function isStoredBriefReusable(args: {
   revalidateWithinMs: number | undefined
   foldedAt: number | null | undefined
+  /** Chunks the stored brief's last fold could not summarize. */
+  foldGap?: SessionSummaryFoldGap | null
   /** The session the stored brief describes, and the one being asked about. */
   storedIdentity?: SessionSummaryBriefIdentity
   currentIdentity?: SessionSummaryBriefIdentity
@@ -93,6 +96,11 @@ export function isStoredBriefReusable(args: {
 }): boolean {
   const within = args.revalidateWithinMs ?? 0
   if (within <= 0) {
+    return false
+  }
+  // Why before the age test: a partial brief is incomplete whatever its age, and the "the agent has
+  // not moved since" rule below would otherwise keep the hole forever on an idle session.
+  if (args.foldGap) {
     return false
   }
   const foldedAt = args.foldedAt

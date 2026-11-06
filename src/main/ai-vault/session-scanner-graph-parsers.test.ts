@@ -34,7 +34,11 @@ describe('AI Vault graph session parsers', () => {
           role: 'user',
           text: `${text}\ntail`.slice(0, 256 * 1024),
           timestamp: null,
-          ...(length > 256 * 1024 ? { textTruncated: true } : {})
+          // The joined message is the prompt plus its "\ntail" part, so the pre-bound length is
+          // longer than the prompt alone.
+          ...(length > 256 * 1024
+            ? { textTruncated: true, textOriginalLength: `${text}\ntail`.length }
+            : {})
         }
       ])
       expect(accumulator.previewMessages[0]?.text).toHaveLength(220)

@@ -23,6 +23,16 @@ describe('resolveSessionSummaryHeaderState', () => {
     expect(state).toEqual({ hint: 'Updating…', folding: true })
   })
 
+  // A fold that could not summarize every chunk leaves a backlog too, and "N of M sections
+  // summarized" is the honest version of it.
+  it('says how many sections a partial fold managed', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({ fold: { running: false, completedChunks: 2, totalChunks: 4 } })
+    )
+
+    expect(state).toEqual({ hint: '2 of 4 sections summarized', folding: false })
+  })
+
   it('counts the backlog when the fold is idle', () => {
     const state = resolveSessionSummaryHeaderState(
       snapshot({
@@ -96,7 +106,10 @@ describe('resolveSessionSummaryHeaderState', () => {
           lastUserMessageIndex: null,
           userMessageCount: 1,
           foldedThrough: 4,
-          foldedAt: 1
+          foldedAt: 1,
+          timelineBase: 0,
+          foldGap: null,
+          gaps: []
         },
         facts: {
           paneKey: 'pane-1',
@@ -139,7 +152,10 @@ describe('resolveSessionSummaryHeaderState', () => {
           lastUserMessageIndex: null,
           userMessageCount: 1,
           foldedThrough: 4,
-          foldedAt: 1
+          foldedAt: 1,
+          timelineBase: 0,
+          foldGap: null,
+          gaps: []
         },
         facts: {
           paneKey: 'pane-1',

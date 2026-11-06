@@ -23,7 +23,7 @@ it.each([413, 256 * 1024 + 1])(
         role,
         text: text.slice(0, 256 * 1024),
         timestamp: null,
-        ...(length > 256 * 1024 ? { textTruncated: true } : {})
+        ...(length > 256 * 1024 ? { textTruncated: true, textOriginalLength: length } : {})
       }))
     )
     const session = await state.finalize('linux')

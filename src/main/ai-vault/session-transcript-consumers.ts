@@ -11,6 +11,21 @@ export type TranscriptMessage = {
   text: string
   /** A size limit omitted some decoded text. */
   textTruncated?: true
+  /**
+   * Decoded length before that limit, so a consumer can say what it stands in for.
+   *
+   * Why here and not derived: `boundedJoinedText` computes it and used to discard it, and the
+   * fold's digest has to name the bound that replaced the content rather than imply it read it all.
+   */
+  textOriginalLength?: number
+  /**
+   * A tool message is a call (`Read: src/foo.ts`) or its result (the body).
+   *
+   * Why: the two carry completely different information — what was asked and what came back — and
+   * the fold digests them differently. Without it the digest has to guess from the shape of the
+   * text, and a tool result that happens to start with `name: ` reads as a call.
+   */
+  toolKind?: 'call' | 'result'
   timestamp: string | null
 }
 

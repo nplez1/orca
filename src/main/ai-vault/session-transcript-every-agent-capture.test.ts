@@ -148,7 +148,8 @@ it('publishes an OpenCode SQLite session through the same channel as every file 
     {
       role: 'tool',
       text: 'bash: rg --count quokka\nsrc/main/ai-vault: 3',
-      timestamp: expect.any(String)
+      timestamp: expect.any(String),
+      toolKind: 'call'
     }
   ])
 })

@@ -62,7 +62,13 @@ describe('SessionSummaryService viewer-supplied identity', () => {
       readEvents: async ({ identity, fromEventIndex }) => {
         reads.push(identity)
         const all = events(2)
-        return { events: all.slice(fromEventIndex), totalEvents: all.length }
+        return {
+          events: all.slice(fromEventIndex),
+          totalEvents: all.length,
+          retainedBytes: 0,
+          overRetainedBudget: false,
+          gaps: []
+        }
       },
       getAgentStatusEntry: () => entry,
       createBrain: () => ({
@@ -256,7 +262,13 @@ describe('SessionSummaryService stale ledger with a request-only identity', () =
       store,
       readEvents: async ({ fromEventIndex }) => {
         const all = events(3)
-        return { events: all.slice(fromEventIndex), totalEvents: all.length }
+        return {
+          events: all.slice(fromEventIndex),
+          totalEvents: all.length,
+          retainedBytes: 0,
+          overRetainedBudget: false,
+          gaps: []
+        }
       },
       getAgentStatusEntry: () => currentEntry,
       createBrain: () => ({
