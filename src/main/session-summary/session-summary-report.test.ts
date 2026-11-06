@@ -195,6 +195,30 @@ describe('applySessionSummaryReportSection', () => {
     expect(report?.sections[0].title).toBe('p0')
   })
 
+  // The oldest phase must not survive every merge while the middle of the session disappears: each
+  // half is clamped before the join, so both sides of a merge stay represented.
+  it('keeps both halves of a merge rather than the first one whole', () => {
+    let report: SessionSummaryFullReport | null = null
+    for (let index = 0; index < 16; index += 1) {
+      report = applySessionSummaryReportSection(
+        report,
+        {
+          headline: 'h',
+          section: { title: `p${index}`, text: `marker-${index} ${'w'.repeat(200)}` },
+          startNew: false,
+          since: null
+        },
+        index * 10,
+        true
+      )
+    }
+    const text = (report?.sections ?? []).map((section) => section.text).join(' ')
+    // The newest phases are intact; the compressed past still names both sides of each merge.
+    expect(text).toContain('marker-15')
+    expect(text).toContain('marker-0')
+    expect(text).toContain('marker-1')
+  })
+
   it('keeps the whole report under its character ceiling', () => {
     let report: SessionSummaryFullReport | null = null
     for (let index = 0; index < 40; index += 1) {
@@ -355,6 +379,30 @@ describe('rewriteSessionSummaryReports', () => {
     })
     expect(reports.full?.sections).toHaveLength(1)
     expect(reports.full?.through).toBe(625)
+  })
+
+  // A first fold whose report phase failed advanced the cursor and left no report at all. Starting
+  // the next run at the cursor would leave the beginning of the session unreported for good.
+  it('covers a session from its start when no report was ever written', async () => {
+    const prompts: string[] = []
+    const reports = await rewriteSessionSummaryReports({
+      brain: brain((prompt) => {
+        prompts.push(prompt)
+        return reply()
+      }),
+      signal: new AbortController().signal,
+      ledger: ledgerWith({ foldedThrough: 120, reportFull: null }),
+      folded: ledgerWith({
+        foldedThrough: 120,
+        reportFull: null,
+        done: [{ text: 'the very first thing', sourceIndex: 3 }]
+      }),
+      windowRestarted: false,
+      userMessageCount: 3,
+      lastUserMessageIndex: 100
+    })
+    expect(prompts[0]).toContain('the very first thing')
+    expect(reports.full?.through).toBe(120)
   })
 
   it('has nothing to rewrite when the report already reaches the fold', async () => {

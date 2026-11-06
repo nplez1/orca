@@ -33,6 +33,7 @@ import {
   buildSessionSummaryChunkPrompt,
   chunkCacheKey,
   rangeLastEventIndex,
+  type SessionSummaryChunkRange,
   type SessionSummaryGap
 } from './session-summary-chunk-prompt'
 
@@ -86,6 +87,17 @@ export type SessionSummaryFoldResult = {
   totalChunks: number
   /** Chunks that could not be summarized; the next fold resumes at the first of them. */
   gap: SessionSummaryFoldGap | null
+}
+
+const EMPTY_DELTA: SessionSummaryLedgerDelta = {}
+
+/** A slice the fold has given up on: named in the ledger so the pane accounts for it. */
+function describeAbandonedRange(range: SessionSummaryChunkRange, baseIndex: number): string {
+  const from = baseIndex + range.from
+  const to = baseIndex + Math.max(range.from, range.to - 1)
+  return from === to
+    ? `Message #${from} could not be summarized and was skipped.`
+    : `Messages #${from}-#${to} could not be summarized and were skipped.`
 }
 
 /** How many chunks the extract phase finished, and where the applied prefix ends. */
@@ -151,6 +163,7 @@ export async function foldSessionSummaryEvents(args: {
   signal.addEventListener('abort', abortFromCaller, { once: true })
   try {
     const foldSignal = foldController.signal
+    const abandoned: string[] = []
     const settled = await mapSettledWithConcurrency(
       ranges,
       SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY,
@@ -194,6 +207,15 @@ export async function foldSessionSummaryEvents(args: {
             lastError = error
           }
         }
+        // Why give up here: a chunk that stopped the previous fold too has now failed twice, and
+        // aborting again would leave the session stalled forever — every later message unfolderable
+        // because one slice cannot be summarized. It becomes a named gap instead.
+        if (rangeIndex === 0 && ledger.foldGap !== null) {
+          abandoned.push(describeAbandonedRange(range, baseIndex))
+          completedChunks += 1
+          reportProgress()
+          return EMPTY_DELTA
+        }
         // Why stop the rest here: with the first chunk unusable there is no prefix to keep, so
         // every later chunk is a model call whose answer cannot be applied. This is the one failure
         // that aborts its siblings; a later one degrades instead.
@@ -204,7 +226,15 @@ export async function foldSessionSummaryEvents(args: {
       }
     )
 
-    const lastApplied = appliedPrefix(settled)
+    let lastApplied = appliedPrefix(settled)
+    // S2: a part range must not leave half an event applied. The cursor stops at an event index, so
+    // backing off to before the split event is what keeps its earlier parts from landing twice.
+    const stopRange = lastApplied >= 0 ? ranges[lastApplied + 1] : undefined
+    if (stopRange?.partFrom !== undefined && stopRange.partFrom > 0) {
+      while (lastApplied >= 0 && ranges[lastApplied].from === stopRange.from) {
+        lastApplied -= 1
+      }
+    }
     if (lastApplied < 0) {
       // Nothing landed: there is no prefix to keep and nothing to resume from, so this is a
       // failure. Stopping the siblings is what keeps a misconfigured brain to two calls.
@@ -232,7 +262,13 @@ export async function foldSessionSummaryEvents(args: {
       gap === null ? baseIndex + events.length : baseIndex + ranges[lastApplied + 1].from
 
     const merged = mergeSessionSummaryDeltas(deltas)
-    const readerMessages = readerMessagesAfter(ledger, events, baseIndex)
+    // Why sliced: a degraded fold stops at the first failed chunk, so counting the reader's messages
+    // across the whole read would count the ones the next fold is about to count again.
+    const readerMessages = readerMessagesAfter(
+      ledger,
+      events.slice(0, foldedThrough - baseIndex),
+      baseIndex
+    )
     const folded = applySessionSummaryDelta(
       ledger,
       merged,
@@ -240,7 +276,7 @@ export async function foldSessionSummaryEvents(args: {
       args.readAt ?? Date.now(),
       readerMessages.lastUserMessageIndex,
       readerMessages.userMessageCount,
-      { foldGap: gap, gaps: gaps.map((entry) => entry.text) }
+      { foldGap: gap, gaps: [...gaps.map((entry) => entry.text), ...abandoned] }
     )
     const reports = await rewriteSessionSummaryReports({
       brain,

@@ -96,8 +96,8 @@ export async function runSessionSummaryFold(args: {
     if (signal.aborted) {
       return // Pane closed: cancel-on-close, nothing to report.
     }
-    // Completed chunk extracts survive a failure — but only once a fold has produced a
-    // ledger, since an unproduced one is never written. A first fold's chunks are lost.
+    // Completed chunk extracts survive a failure: each one is written as it settles, so a retry
+    // resumes instead of restarting even when no ledger was ever produced.
     const failedSession = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
     const failedIdentity = sessionSummaryIdentityOf(failedSession)
     const failedStored = storedEntry(deps, paneKey, failedIdentity)
@@ -224,7 +224,9 @@ async function catchUpSessionSummaryReports(args: {
   ledger: SessionSummaryLedger
   foldParams: ResolvedSourceControlAiGenerationParams | null
 }): Promise<SessionSummaryLedger> {
-  const reported = args.ledger.reportFull?.through ?? args.ledger.foldedThrough
+  // Why zero and not the cursor: no report at all means nothing has been reported, however far the
+  // facts have been folded.
+  const reported = args.ledger.reportFull?.through ?? 0
   if (reported >= args.ledger.foldedThrough) {
     return args.ledger
   }

@@ -78,10 +78,14 @@ function boundSections(sections: SessionSummaryReportSection[]): SessionSummaryR
       break
     }
     const [first, second] = out
+    // Why each half is clamped: clamping the concatenation kept the first section whole and dropped
+    // the second entirely, so the oldest phase survived every merge and the middle of the session
+    // disappeared — the failure this change exists to remove.
+    const half = Math.floor((SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS - 1) / 2)
     out.splice(0, 2, {
       id: first.id,
       title: first.title,
-      text: clamp(`${first.text} ${second.text}`, SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS),
+      text: `${clamp(first.text, half)} ${clamp(second.text, half)}`,
       through: second.through
     })
   }

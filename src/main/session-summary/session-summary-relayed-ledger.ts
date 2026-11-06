@@ -4,6 +4,7 @@
 // relays a ledger whose facts are bare strings and which has no window boundary, and reading
 // that as-is hides every fact (nothing compares greater than `undefined`) and renders an object
 // as a React child. Coercing on arrival costs one pass and keeps both directions readable.
+import { SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS } from '../../shared/session-summary-types'
 import type {
   SessionSummaryFact,
   SessionSummaryFoldGap,
@@ -107,11 +108,14 @@ function coerceFullReport(value: unknown): SessionSummaryFullReport | null {
     }
   }
   if (typeof value.text === 'string' && value.text.trim()) {
+    // Why a section and not the headline: an older host's report is a paragraph, and the headline is
+    // the pane's one-line top line — putting a paragraph there pushes the brief off the screen.
+    const text = value.text.trim()
     return {
-      headline: value.text.trim(),
-      sections: [],
+      headline: clampHeadline(text),
+      sections: [{ id: 's0', title: 'Session', text, through }],
       through,
-      text: value.text
+      text
     }
   }
   return null
@@ -132,6 +136,14 @@ function coerceGaps(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
     : []
+}
+
+/** The first sentence of a report, bounded to what the headline is allowed to be. */
+function clampHeadline(text: string): string {
+  const sentence = /^.*?[.!?](\s|$)/.exec(text)?.[0]?.trim() || text
+  return sentence.length > SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS
+    ? `${sentence.slice(0, SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS - 1)}…`
+    : sentence
 }
 
 function coerceCount(value: unknown): number {

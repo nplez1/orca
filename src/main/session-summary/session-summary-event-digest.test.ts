@@ -85,9 +85,21 @@ describe('createSessionSummaryEventDigester', () => {
   it('reports a clean command as ok without inventing a failure', () => {
     const digester = createSessionSummaryEventDigester()
     digester.digest(call('Bash: npm run build'))
-    const event = digester.digest(result('built 42 modules\nexit code 0'))
+    const event = digester.digest(result('built 42 modules\nExit code: 0'))
     expect(event.text).toContain('exit 0')
     expect(event.text).not.toContain('failed')
+  })
+
+  // A shell script's own `exit 1` is not a command's exit status: the pattern is anchored to the
+  // forms a harness emits, or every read of a script would be reported as a failed command.
+  it('does not call a read failed because the file contains an exit statement', () => {
+    const digester = createSessionSummaryEventDigester()
+    digester.digest(call('Read: /repo/deploy.sh'))
+    const event = digester.digest(
+      result(['#!/bin/sh', 'if [ -z "$1" ]; then', '  exit 1', 'fi'].join('\n'))
+    )
+    expect(event.text).toContain('ok')
+    expect(event.text).not.toContain('exit 1')
   })
 
   // A file whose contents mention errors is not a failure: the trigger has to be structural, or
@@ -149,6 +161,8 @@ describe('createSessionSummaryEventDigester', () => {
     const event = digester.digest(
       result('lots of output', { textTruncated: true, textOriginalLength: 900_000 })
     )
-    expect(event.text).toContain('truncated at 878.9 KB read')
+    // A tool result's cap stops counting once it is full, so the digest names the limit instead of
+    // quoting a figure that is the cap rather than the truth.
+    expect(event.text).toContain('truncated by the reader')
   })
 })

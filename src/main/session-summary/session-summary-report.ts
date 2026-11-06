@@ -145,8 +145,10 @@ export async function rewriteSessionSummaryReports(args: {
 }): Promise<{ since: SessionSummaryReport | null; full: SessionSummaryFullReport | null }> {
   const previous = args.ledger.reportFull
   // Why the report's own position and not the fold's: a group that failed left `through` behind,
-  // and that is exactly the range this run has to cover.
-  const from = previous?.through ?? args.ledger.foldedThrough
+  // and that is exactly the range this run has to cover. Why zero when there is no report at all:
+  // a first fold whose report phase failed advanced the cursor, and starting there would leave the
+  // beginning of the session unreported for good — the failure this change exists to remove.
+  const from = previous?.through ?? 0
   const to = args.folded.foldedThrough
   const groups = buildSessionSummaryReportGroups(from, to)
   if (groups.length === 0) {

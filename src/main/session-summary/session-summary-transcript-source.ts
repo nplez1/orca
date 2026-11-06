@@ -261,9 +261,13 @@ export async function readSessionSummaryEventsFromFile(args: {
         })
     await reading
     for (const entry of skipped) {
+      // Why rebased: `received` counts messages from the start of the file, while the fold places a
+      // gap inside a slice that begins at the cursor. A gap before the cursor was already named by
+      // the fold that read it, and the ledger keeps it.
+      const afterEventIndex = entry.afterEventIndex - skipEvents
       const text = describeSkippedTranscriptRecords([entry.record])
-      if (text) {
-        gaps.push({ afterEventIndex: entry.afterEventIndex, text })
+      if (text && afterEventIndex >= 0) {
+        gaps.push({ afterEventIndex, text })
       }
     }
     return {

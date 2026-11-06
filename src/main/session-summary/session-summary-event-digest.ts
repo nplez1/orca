@@ -36,7 +36,14 @@ const TOOL_SCAN_WINDOW_CHARS = 8_000
 /** A tool name is a short identifier; anything else is a sentence that happens to contain a colon. */
 const TOOL_NAME_PATTERN = /^[A-Za-z][\w.:-]{0,39}$/
 
-const EXIT_CODE_PATTERN = /\bexit(?:ed)?(?: with)?(?: code| status)?[: ]+(\d+)\b/i
+/**
+ * A harness-reported exit status, anchored to a whole line.
+ *
+ * Why anchored: `exit 1` appears in any shell script a tool reads, and an unanchored pattern
+ * labelled every such read as a failed command — which the extract then turned into a blocker.
+ */
+const EXIT_CODE_PATTERN =
+  /^(?:(?:Process|process|Command|command)? ?exited with (?:code|status)|Exit (?:code|status)):? (\d+)\s*$/m
 /** Unambiguous evidence that the command failed, as opposed to a file that merely mentions errors. */
 const FAILURE_TRIGGERS = [
   /^FAIL\b/,
@@ -152,7 +159,9 @@ function digestToolResult(message: TranscriptMessage, paired: PendingToolCall | 
     parts.push(outcome)
   }
   if (message.textTruncated) {
-    parts.push(`truncated at ${formatBytes(message.textOriginalLength ?? 0)} read`)
+    // Why no size: a tool result's cap stops counting once it is full, so the length it reports is
+    // the cap rather than the truth. Naming the limit is accurate; a figure would not be.
+    parts.push('truncated by the reader')
   }
   return parts.join(' · ')
 }

@@ -29,6 +29,14 @@ export type SessionSummaryChunkRange = {
   to: number
   partFrom?: number
   partTo?: number
+  /**
+   * This part's position and the event's total, computed once at planning time.
+   *
+   * Why not derived from the span at render time: the last part of a message is narrower than the
+   * others, so a label derived from its own width called a three-part message "part 5 of 5".
+   */
+  partIndex?: number
+  partCount?: number
 }
 
 /** A part of the transcript the reader could not decode, placed by the messages read before it. */
@@ -56,12 +64,16 @@ export function buildSessionSummaryChunks(
       if (index > from) {
         flush(index)
       }
+      const partCount = Math.ceil(length / chunkMaxChars)
       for (let offset = 0; offset < length; offset += chunkMaxChars) {
+        const partIndex = Math.floor(offset / chunkMaxChars)
         ranges.push({
           from: index,
           to: index + 1,
           partFrom: offset,
-          partTo: Math.min(length, offset + chunkMaxChars)
+          partTo: Math.min(length, offset + chunkMaxChars),
+          partIndex,
+          partCount
         })
       }
       from = index + 1
@@ -116,13 +128,10 @@ function renderChunkTranscript(
       lines.push(`[#${absoluteFrom + index} ${event.role}] ${event.text}`)
       continue
     }
-    const partCount = Math.ceil(event.text.length / (range.partTo - range.partFrom))
-    const partNumber = Math.floor(range.partFrom / (range.partTo - range.partFrom)) + 1
     lines.push(
-      `[#${absoluteFrom + index} ${event.role} · part ${partNumber} of ${partCount}] ${event.text.slice(
-        range.partFrom,
-        range.partTo
-      )}`
+      `[#${absoluteFrom + index} ${event.role} · part ${(range.partIndex ?? 0) + 1} of ${
+        range.partCount ?? 1
+      }] ${event.text.slice(range.partFrom, range.partTo)}`
     )
   }
   return lines.join('\n')
