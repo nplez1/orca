@@ -95,6 +95,11 @@ const EMPTY_DELTA: SessionSummaryLedgerDelta = {}
 function describeAbandonedRange(range: SessionSummaryChunkRange, baseIndex: number): string {
   const from = baseIndex + range.from
   const to = baseIndex + Math.max(range.from, range.to - 1)
+  if (range.partCount !== undefined) {
+    // A message too large for one prompt was dropped whole: its parts are a paging device, not
+    // separate messages, so naming a part would misdescribe what was lost.
+    return `Message #${from} could not be summarized and was skipped.`
+  }
   return from === to
     ? `Message #${from} could not be summarized and was skipped.`
     : `Messages #${from}-#${to} could not be summarized and were skipped.`
@@ -163,15 +168,20 @@ export async function foldSessionSummaryEvents(args: {
   signal.addEventListener('abort', abortFromCaller, { once: true })
   try {
     const foldSignal = foldController.signal
-    const abandoned: string[] = []
+    // Why a breaker and not "the first chunk failed": whether a chunk failure means "this slice" or
+    // "this brain" can only be told from another chunk settling, and a dead brain never provides
+    // one. A full wave of chunks failing without a single success is that evidence, and it stops the
+    // fold after two waves of calls instead of one per chunk of a long session.
+    let consecutiveFailures = 0
     const settled = await mapSettledWithConcurrency(
       ranges,
       SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY,
-      async (range, rangeIndex) => {
+      async (range) => {
         foldSignal.throwIfAborted()
         const cacheKey = chunkCacheKey(range, baseIndex)
         const cached = cache?.get(cacheKey)
         if (cached) {
+          consecutiveFailures = 0
           completedChunks += 1
           reportProgress()
           return cached
@@ -197,6 +207,7 @@ export async function foldSessionSummaryEvents(args: {
               throw new Error('fold extract returned no usable JSON')
             }
             cache?.set(cacheKey, delta)
+            consecutiveFailures = 0
             completedChunks += 1
             reportProgress()
             return delta
@@ -207,45 +218,70 @@ export async function foldSessionSummaryEvents(args: {
             lastError = error
           }
         }
-        // Why give up here: a chunk that stopped the previous fold too has now failed twice, and
-        // aborting again would leave the session stalled forever — every later message unfolderable
-        // because one slice cannot be summarized. It becomes a named gap instead.
-        if (rangeIndex === 0 && ledger.foldGap !== null) {
-          abandoned.push(describeAbandonedRange(range, baseIndex))
-          completedChunks += 1
-          reportProgress()
-          return EMPTY_DELTA
-        }
-        // Why stop the rest here: with the first chunk unusable there is no prefix to keep, so
-        // every later chunk is a model call whose answer cannot be applied. This is the one failure
-        // that aborts its siblings; a later one degrades instead.
-        if (rangeIndex === 0) {
+        consecutiveFailures += 1
+        if (consecutiveFailures >= SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY) {
           foldController.abort(lastError)
         }
         throw lastError instanceof Error ? lastError : new Error(String(lastError))
       }
     )
 
-    let lastApplied = appliedPrefix(settled)
+    // Why the decision is made here and not inside a chunk: a slice the model cannot summarize and a
+    // brain that is not working look identical from one chunk. A chunk that did settle is the
+    // evidence that separates them, and only the whole wave knows whether there is one.
+    const firstRejected = settled.findIndex((entry) => entry.status === 'rejected')
+    const abandoned: string[] = []
+    let outcomes: readonly PromiseSettledResult<SessionSummaryLedgerDelta>[] = settled
+    if (firstRejected !== -1) {
+      const failedFrom = ranges[firstRejected].from
+      const brainWorks = settled.some(
+        (entry, index) => entry.status === 'fulfilled' && index !== firstRejected
+      )
+      // Why only the cursor event: the cursor can only stop on an event boundary, so abandoning an
+      // event further in would leave a hole the cursor can never step over — a later failure
+      // degrades the prefix instead.
+      const atCursor = failedFrom === ranges[0].from
+      if (atCursor && brainWorks) {
+        outcomes = settled.map((entry, index) =>
+          ranges[index].from === failedFrom && entry.status === 'rejected'
+            ? { status: 'fulfilled' as const, value: EMPTY_DELTA }
+            : entry
+        )
+        const skipped = settled.filter(
+          (entry, index) => ranges[index].from === failedFrom && entry.status === 'rejected'
+        ).length
+        completedChunks += skipped
+        abandoned.push(describeAbandonedRange(ranges[firstRejected], baseIndex))
+      } else if (atCursor) {
+        // Nothing settled anywhere: the brain is not working, not the slice. Stopping the siblings
+        // keeps a misconfigured agent to one call instead of one per chunk.
+        const failed = settled[firstRejected]
+        const reason = failed.status === 'rejected' ? failed.reason : new Error('fold failed')
+        foldController.abort(reason)
+        throw reason instanceof Error ? reason : new Error(String(reason))
+      }
+    }
+
+    let lastApplied = appliedPrefix(outcomes)
     // S2: a part range must not leave half an event applied. The cursor stops at an event index, so
     // backing off to before the split event is what keeps its earlier parts from landing twice.
-    const stopRange = lastApplied >= 0 ? ranges[lastApplied + 1] : undefined
+    const stopRange = lastApplied !== -1 ? ranges[lastApplied + 1] : undefined
     if (stopRange?.partFrom !== undefined && stopRange.partFrom > 0) {
-      while (lastApplied >= 0 && ranges[lastApplied].from === stopRange.from) {
+      while (lastApplied !== -1 && ranges[lastApplied].from === stopRange.from) {
         lastApplied -= 1
       }
     }
-    if (lastApplied < 0) {
-      // Nothing landed: there is no prefix to keep and nothing to resume from, so this is a
-      // failure. Stopping the siblings is what keeps a misconfigured brain to two calls.
-      const first = settled[0]
-      foldController.abort(
-        first?.status === 'rejected' ? first.reason : new Error('fold produced no chunks')
-      )
-      throw first?.status === 'rejected' ? first.reason : new Error('fold produced no chunks')
+    if (lastApplied === -1) {
+      // Only reachable after backing off a partially applied event, so the reason to report is the
+      // chunk that actually failed rather than a generic "nothing landed".
+      const failed = settled[firstRejected]
+      const reason =
+        failed?.status === 'rejected' ? failed.reason : new Error('fold produced no chunks')
+      foldController.abort(reason)
+      throw reason instanceof Error ? reason : new Error(String(reason))
     }
 
-    const deltas = settled.slice(0, lastApplied + 1).map((entry) => {
+    const deltas = outcomes.slice(0, lastApplied + 1).map((entry) => {
       // The prefix is fulfilled by construction: `appliedPrefix` stops at the first rejection.
       if (entry.status !== 'fulfilled') {
         throw new Error('fold applied a chunk that did not settle')

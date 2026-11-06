@@ -225,28 +225,17 @@ describe('foldSessionSummaryEvents', () => {
     expect(all).not.toContain('…')
   })
 
-  it('stops a fold whose first chunk fails, rather than calling the brain once per chunk', async () => {
-    const siblingSignals: AbortSignal[] = []
+  // Nothing settled anywhere is the signature of a brain that is not working, as opposed to a slice
+  // it cannot summarize — and a broken brain must not spawn a call per chunk of a long session.
+  it('stops a fold when no chunk settles, rather than calling the brain once per chunk', async () => {
     let calls = 0
     const brain: SessionFoldBrain = {
-      complete: async ({ prompt, signal }) => {
+      complete: async ({ prompt }) => {
         if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
           return reply()
         }
         calls += 1
-        // Why by prompt and not by call count: the retry is the point, so the failure has to be a
-        // property of the chunk rather than of the first call the brain happens to see.
-        if (prompt.includes('[#0 ')) {
-          throw new Error('extract failed')
-        }
-        if (signal.aborted) {
-          throw new Error('aborted')
-        }
-        siblingSignals.push(signal)
-        // Why a zero-delay yield: the sibling only has to still be awaiting something when the
-        // first call's failure lands; a real delay adds nothing but wall-clock dependence.
-        await new Promise((resolve) => setTimeout(resolve, 0))
-        return JSON.stringify({ done: ['late'] })
+        throw new Error('no session-summary agent is configured')
       }
     }
 
@@ -257,12 +246,36 @@ describe('foldSessionSummaryEvents', () => {
         events: events(2_000),
         signal: new AbortController().signal
       })
-    ).rejects.toThrow('extract failed')
+    ).rejects.toThrow('no session-summary agent is configured')
 
-    expect(siblingSignals.every((signal) => signal.aborted)).toBe(true)
-    // The chunks already in flight finish or abort, and nothing new starts: a broken brain must not
-    // spawn a call per chunk of a seventeen-chunk session.
-    expect(calls).toBeLessThanOrEqual(SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY + 2)
+    // Two attempts per chunk, and the breaker trips after one wave: a broken brain must not spawn a
+    // call per chunk of a seventeen-chunk session.
+    expect(calls).toBeLessThanOrEqual(2 * SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
+  })
+
+  // The other half of that judgement: one slice the model cannot summarize, with the rest of the
+  // fold working, is given up on and named rather than stalling the session.
+  it('gives up on the cursor slice when the rest of the fold settles', async () => {
+    const brain: SessionFoldBrain = {
+      complete: async ({ prompt }) => {
+        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+          return reply()
+        }
+        if (prompt.includes('[#0 ')) {
+          throw new Error('content filter')
+        }
+        return JSON.stringify({ done: ['ok'], timeline: [] })
+      }
+    }
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(480),
+      signal: new AbortController().signal
+    })
+    expect(result.gap).toBeNull()
+    expect(result.ledger.foldedThrough).toBe(480)
+    expect(result.ledger.gaps.join(' ')).toContain('Messages #0-#119 could not be summarized')
   })
 
   // Acceptance 6: one flaky call out of forty must not throw away thirty-nine chunks of work.
@@ -444,6 +457,12 @@ describe('foldSessionSummaryEvents', () => {
   // its earlier parts land a second time on the resume.
   it('does not apply half of a split message twice', async () => {
     const long = 'z'.repeat(60_000)
+    // Why a leading event: a failure on the cursor event is given up on, and the property under test
+    // is the roll-back that a failure *past* the cursor needs.
+    const eventsWithLongTail: SessionSummarySourceEvent[] = [
+      { role: 'user', text: 'first', timestamp: null },
+      { role: 'assistant', text: long, timestamp: null }
+    ]
     const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
     const cache = {
       get: (key: string) => cacheStore.get(key),
@@ -466,27 +485,27 @@ describe('foldSessionSummaryEvents', () => {
       foldSessionSummaryEvents({
         brain,
         ledger: emptySessionSummaryLedger(),
-        events: [{ role: 'assistant', text: long, timestamp: null }],
+        events: eventsWithLongTail,
         signal: new AbortController().signal,
         cache
       })
-    ).rejects.toThrow()
-    // Nothing landed: the parts that did settle were cached, not applied, and the failed one has no
-    // entry so the resume retries it.
-    expect(cacheStore.has('0-1:0-24000')).toBe(true)
-    expect(cacheStore.has('0-1:24000-48000')).toBe(false)
+    ).resolves.toMatchObject({ gap: { completedChunks: 1, totalChunks: 4 } })
+    // Nothing of the split event landed: its parts that did settle were cached, not applied, and the
+    // failed one has no entry so the resume retries it.
+    expect(cacheStore.has('1-2:0-24000')).toBe(true)
+    expect(cacheStore.has('1-2:24000-48000')).toBe(false)
 
     failSecondPart = false
     const resumed = await foldSessionSummaryEvents({
       brain,
       ledger: emptySessionSummaryLedger(),
-      events: [{ role: 'assistant', text: long, timestamp: null }],
+      events: eventsWithLongTail,
       signal: new AbortController().signal,
       cache
     })
     const texts = resumed.ledger.done.map((fact) => fact.text)
-    expect(texts).toEqual(['part 1', 'part 2', 'part 3'])
-    expect(resumed.ledger.foldedThrough).toBe(1)
+    expect(texts.filter((text) => text.startsWith('part'))).toEqual(['part 1', 'part 2', 'part 3'])
+    expect(resumed.ledger.foldedThrough).toBe(2)
   })
 
   // A chunk that stopped one fold and fails again has to be given up on, or one unsummarizable slice

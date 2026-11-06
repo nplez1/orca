@@ -198,13 +198,17 @@ describe('applySessionSummaryReportSection', () => {
   // The oldest phase must not survive every merge while the middle of the session disappears: each
   // half is clamped before the join, so both sides of a merge stay represented.
   it('keeps both halves of a merge rather than the first one whole', () => {
+    // Why full-length sections: a section shorter than half the ceiling would survive the clamp
+    // whole and the test would pass without exercising the merge at all.
+    const sectionText = (index: number): string =>
+      `marker-${index} ${'w'.repeat(SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS - 12)}`
     let report: SessionSummaryFullReport | null = null
     for (let index = 0; index < 16; index += 1) {
       report = applySessionSummaryReportSection(
         report,
         {
           headline: 'h',
-          section: { title: `p${index}`, text: `marker-${index} ${'w'.repeat(200)}` },
+          section: { title: `p${index}`, text: sectionText(index) },
           startNew: false,
           since: null
         },
@@ -212,11 +216,15 @@ describe('applySessionSummaryReportSection', () => {
         true
       )
     }
-    const text = (report?.sections ?? []).map((section) => section.text).join(' ')
-    // The newest phases are intact; the compressed past still names both sides of each merge.
-    expect(text).toContain('marker-15')
+    const sections = report?.sections ?? []
+    const text = sections.map((section) => section.text).join(' ')
+    // The newest phases are intact, and the compressed past still names both sides of its merges.
+    expect(sections.at(-1)?.text).toBe(sectionText(15))
     expect(text).toContain('marker-0')
     expect(text).toContain('marker-1')
+    for (const section of sections) {
+      expect(section.text.length).toBeLessThanOrEqual(SESSION_SUMMARY_REPORT_SECTION_MAX_CHARS)
+    }
   })
 
   it('keeps the whole report under its character ceiling', () => {
