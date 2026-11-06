@@ -376,6 +376,41 @@ describe('foldSessionSummaryEvents', () => {
     expect(counts.size).toBe(0)
   })
 
+  // A chunk that rejects because the reader closed the pane was never sent to the model, so holding
+  // it against its slice would abandon messages nobody tried to summarize.
+  it('holds nothing against a slice when the fold is cancelled', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    const controller = new AbortController()
+    await expect(
+      foldSessionSummaryEvents({
+        brain: {
+          complete: async ({ prompt }) => {
+            if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
+              return reply()
+            }
+            controller.abort()
+            throw new Error('pane closed')
+          }
+        },
+        ledger: emptySessionSummaryLedger(),
+        events: events(480),
+        signal: controller.signal,
+        failures
+      })
+    ).rejects.toThrow()
+    expect(counts.size).toBe(0)
+  })
+
   // A slice that was failing and then works again is retried, not remembered as broken.
   it('retries a slice whose earlier folds failed', async () => {
     const counts = new Map<string, number>([['0', 2]])
