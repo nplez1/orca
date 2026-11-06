@@ -17,7 +17,12 @@ import { IDLE_FOLD, type SessionSummaryStatusEntry } from './session-summary-sna
 import { rewriteSessionSummaryReports } from './session-summary-report'
 import { withSessionSummaryFoldSlot } from './session-summary-fold-slots'
 import type { SessionSummaryStore } from './session-summary-store'
-import { chunkCacheFor, persist, storedEntry } from './session-summary-fold-persist'
+import {
+  chunkCacheFor,
+  chunkFailuresFor,
+  persist,
+  storedEntry
+} from './session-summary-fold-persist'
 import type {
   SessionSummaryEventRead,
   SessionSummarySessionIdentity
@@ -176,9 +181,11 @@ async function runAdmittedFold(args: {
     signal,
     readAt: eventsReadAt,
     cache: chunkCacheFor(stored),
+    failures: chunkFailuresFor(stored),
     gaps: read.gaps,
     // Why write per chunk and not only at the end: quitting mid-fold used to lose every completed
-    // extract, so reopening a long first fold restarted at event 0. The store debounces the write.
+    // extract and every failure count, so reopening a long first fold restarted at event 0 and a
+    // slice that could not be summarized never reached its third fold. The store debounces the write.
     onChunkSettled: () => persist(deps, paneKey, identity, stored, messageCount),
     onProgress: (progress) =>
       report({

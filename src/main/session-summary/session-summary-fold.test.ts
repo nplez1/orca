@@ -253,29 +253,78 @@ describe('foldSessionSummaryEvents', () => {
     expect(calls).toBeLessThanOrEqual(2 * SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY)
   })
 
-  // The other half of that judgement: one slice the model cannot summarize, with the rest of the
-  // fold working, is given up on and named rather than stalling the session.
-  it('gives up on the cursor slice when the rest of the fold settles', async () => {
+  // One fold cannot tell an unsummarizable slice from a brain that is down, so the judgement needs
+  // evidence across folds: a slice that keeps failing is given up on and named rather than stalling
+  // every message after it for the life of the session.
+  it('gives up on a slice that keeps failing, after naming it', async () => {
+    const counts = new Map<string, number>()
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
     const brain: SessionFoldBrain = {
       complete: async ({ prompt }) => {
         if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
           return reply()
         }
-        if (prompt.includes('[#0 ')) {
+        if (prompt.includes('[#240 ')) {
           throw new Error('content filter')
         }
         return JSON.stringify({ done: ['ok'], timeline: [] })
       }
     }
-    const result = await foldSessionSummaryEvents({
+    let ledger = emptySessionSummaryLedger()
+    for (let fold = 0; fold < 2; fold += 1) {
+      const result = await foldSessionSummaryEvents({
+        brain,
+        ledger,
+        events: events(480).slice(ledger.foldedThrough),
+        signal: new AbortController().signal,
+        failures
+      })
+      expect(result.gap).not.toBeNull()
+      ledger = result.ledger
+    }
+    const last = await foldSessionSummaryEvents({
       brain,
-      ledger: emptySessionSummaryLedger(),
-      events: events(480),
-      signal: new AbortController().signal
+      ledger,
+      events: events(480).slice(ledger.foldedThrough),
+      signal: new AbortController().signal,
+      failures
     })
-    expect(result.gap).toBeNull()
-    expect(result.ledger.foldedThrough).toBe(480)
-    expect(result.ledger.gaps.join(' ')).toContain('Messages #0-#119 could not be summarized')
+    expect(last.gap).toBeNull()
+    expect(last.ledger.foldedThrough).toBe(480)
+    expect(last.ledger.gaps.join(' ')).toContain('Messages #240-#359 could not be summarized')
+  })
+
+  // A slice that was failing and then works again is retried, not remembered as broken.
+  it('retries a slice whose earlier folds failed', async () => {
+    const counts = new Map<string, number>([['0-120', 2]])
+    const failures = {
+      record: (key: string): number => {
+        const next = (counts.get(key) ?? 0) + 1
+        counts.set(key, next)
+        return next
+      },
+      clear: (key: string): void => {
+        counts.delete(key)
+      }
+    }
+    const result = await foldSessionSummaryEvents({
+      brain: jsonBrain(() => ({ done: ['recovered'] })),
+      ledger: emptySessionSummaryLedger(),
+      events: events(120),
+      signal: new AbortController().signal,
+      failures
+    })
+    expect(result.ledger.done.map((fact) => fact.text)).toEqual(['recovered'])
+    expect(counts.size).toBe(0)
   })
 
   // Acceptance 6: one flaky call out of forty must not throw away thirty-nine chunks of work.
@@ -506,41 +555,6 @@ describe('foldSessionSummaryEvents', () => {
     const texts = resumed.ledger.done.map((fact) => fact.text)
     expect(texts.filter((text) => text.startsWith('part'))).toEqual(['part 1', 'part 2', 'part 3'])
     expect(resumed.ledger.foldedThrough).toBe(2)
-  })
-
-  // A chunk that stopped one fold and fails again has to be given up on, or one unsummarizable slice
-  // stalls every message after it forever.
-  it('gives up on a chunk that has already stopped a fold', async () => {
-    const brain: SessionFoldBrain = {
-      complete: async ({ prompt }) => {
-        if (prompt.startsWith(REPORT_PROMPT_PREFIX)) {
-          return reply()
-        }
-        // One slice is unsummarizable, whatever fold asks for it.
-        if (prompt.includes('[#240 ')) {
-          throw new Error('content filter')
-        }
-        return JSON.stringify({ done: ['ok'], timeline: [] })
-      }
-    }
-    const first = await foldSessionSummaryEvents({
-      brain,
-      ledger: emptySessionSummaryLedger(),
-      events: events(480),
-      signal: new AbortController().signal
-    })
-    expect(first.gap).toEqual({ completedChunks: 2, totalChunks: 4 })
-
-    const second = await foldSessionSummaryEvents({
-      brain,
-      ledger: first.ledger,
-      events: events(480).slice(first.ledger.foldedThrough),
-      signal: new AbortController().signal
-    })
-    // Given up on rather than stalling: the messages after it are folded and the gap is named.
-    expect(second.gap).toBeNull()
-    expect(second.ledger.foldedThrough).toBe(480)
-    expect(second.ledger.gaps.join(' ')).toContain('Messages #240-#359 could not be summarized')
   })
 
   it('bounds how many chunk extracts run at once', async () => {

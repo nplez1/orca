@@ -20,6 +20,13 @@ export type SessionSummaryStoreEntry = {
   ledger: SessionSummaryLedger
   /** Completed chunk extracts not yet folded in; keys are `<from>-<to>` message ranges. */
   chunkCache: Record<string, SessionSummaryLedgerDelta>
+  /**
+   * Folds each slice has failed on, so an unsummarizable slice can be given up on.
+   *
+   * Why persisted: one fold cannot tell such a slice from a brain that is down, and the cost of
+   * guessing wrong is either a lost chunk or a session that never folds again.
+   */
+  chunkFailures?: Record<string, number>
   /** Transcript message count at last read; seeds the skeleton's backlog hint. */
   messageCount: number
   seenThrough: number
@@ -100,6 +107,7 @@ export class SessionSummaryStore {
     const ledger = boundSessionSummaryLedgerForStorage(entry.ledger)
     this.entries[paneKey] = {
       ...entry,
+      chunkFailures: entry.chunkFailures ?? {},
       ledger,
       // Only after a trim: the cursor counts entries, and dropping the head moved every position.
       seenThrough:

@@ -28,6 +28,7 @@ const ENTRY = {
   identity: { providerSessionId: 'p1', transcriptPath: '/tmp/p1.jsonl' },
   ledger: LEDGER,
   chunkCache: {},
+  chunkFailures: {},
   messageCount: 2,
   seenThrough: 2,
   updatedAt: 1_700_000_000_000
