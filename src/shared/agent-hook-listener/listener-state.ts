@@ -92,10 +92,8 @@ export type HookListenerState = {
   copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
   /** Live descendants for every provider that does not own a roster of its own. */
   descendantRosterByPaneKey: Map<string, AgentDescendantRoster>
-  /** LOCAL(nplez1): the child roster the pane's OWN lane last reported on its payload, with when it
-   *  said so. A child event carries no roster of its own, so republishing the descendant roster
-   *  alone would drop these children from the display mid-run; the stamp bounds the carry-forward
-   *  to the same quiet window the roster itself is reaped on. */
+  // fork-comment-ok: the field must sit beside the roster it completes, and its doc is one line
+  /** The child roster the pane's OWN lane last reported, stamped so the carry-forward reaps. */
   reportedSubagentsByPaneKey: Map<string, ReportedPaneSubagents>
   /** Children whose row is gone, by the provider conversation they reported on, with when it went.
    *  A child's own process can outlive its row (a spooled hook, a retirement that beat it), and a
@@ -117,7 +115,6 @@ export type HookListenerState = {
 
 export type ReportedPaneSubagents = {
   children: AgentSubagentSnapshot[]
-  /** When the pane's own lane last named them. */
   at: number
 }
 

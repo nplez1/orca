@@ -453,9 +453,6 @@ describe('a Pi cancel beside a live child row', () => {
     })
   })
 
-  // Why: a settle writes `done` straight into the cached row without touching the listener's lead
-  // verdict, so a later restate must read that verdict off the row — folding the stale `working` back
-  // in would resurrect a row the host had already settled.
   it('keeps a cancelled row settled when the model changes afterwards', async () => {
     await startTurn()
     expect(pressCtrlC()).toBe(true)
@@ -472,9 +469,6 @@ describe('a Pi cancel beside a live child row', () => {
     })
   })
 
-  // Why: the settle above writes `done` into the cached row but not into the listener's lead verdict,
-  // so a hold the restate then creates must record that `done` — otherwise the next restate drains
-  // the child and republishes the stale `working`, reviving a row the host had already settled.
   it('settles again after a child that appeared under a cancelled row is gone', async () => {
     await startTurn()
     expect(pressCtrlC()).toBe(true)
