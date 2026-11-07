@@ -127,6 +127,22 @@ describe('applyPiScheduledWorkHold', () => {
     expect(applyPiScheduledWorkHold(state, PANE, payload('done'))?.workingMode).toBeUndefined()
   })
 
+  it('reads a live child off the payload rather than earning the monitoring badge', () => {
+    const state = createHookListenerState()
+    recordPiScheduledWork(state, PANE, field([{ id: 'loop-1', kind: 'live' }]))
+
+    // Why: the row's own roster is the #283 input. Agent work outranks the monitor, so a turn held by
+    // both must not claim the badge — this is the one place the two holds are decided together.
+    const held = applyPiScheduledWorkHold(
+      state,
+      PANE,
+      payload('done', { subagents: [{ id: 'run-1', state: 'working', startedAt: 1 }] })
+    )
+
+    expect(held?.state).toBe('working')
+    expect(held?.workingMode).toBeUndefined()
+  })
+
   it('never holds a session boundary row', () => {
     const state = createHookListenerState()
     recordPiScheduledWork(state, PANE, field([{ id: 'loop-1', kind: 'live' }]))

@@ -17,6 +17,7 @@ import type { AgentStatusLegacyIngressCaller } from '../agent-status-legacy-ingr
 import type { ClaudeLaunchedBackgroundTasks } from '../claude-owed-task-notifications'
 import type { ClaudeSubagentRoster } from '../claude-subagent-roster'
 import type { AgentDescendantRoster } from '../agent-descendant-roster'
+import type { AgentSubagentSnapshot } from '../agent-status-subagent-snapshot'
 import type { CodexSubagentRoster } from '../codex-subagent-roster'
 import type { CodexSubagentTranscriptState } from '../codex-subagent-transcript'
 import type { MuseSessionLogState } from '../muse-session-log'
@@ -91,6 +92,9 @@ export type HookListenerState = {
   copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
   /** Live descendants for every provider that does not own a roster of its own. */
   descendantRosterByPaneKey: Map<string, AgentDescendantRoster>
+  // fork-comment-ok: the field must sit beside the roster it completes, and its doc is one line
+  /** The child roster the pane's OWN lane last reported, stamped so the carry-forward reaps. */
+  reportedSubagentsByPaneKey: Map<string, ReportedPaneSubagents>
   /** Children whose row is gone, by the provider conversation they reported on, with when it went.
    *  A child's own process can outlive its row (a spooled hook, a retirement that beat it), and a
    *  post from it would otherwise be read as the pane's own agent. */
@@ -107,6 +111,11 @@ export type HookListenerState = {
   piScheduledWorkByPaneKey: Map<string, readonly PiScheduledJob[]>
   /** Hermes turn per pane, so tool hooks from its post-turn background review can be ignored. */
   hermesTurnByPaneKey: Map<string, HermesPaneTurn>
+}
+
+export type ReportedPaneSubagents = {
+  children: AgentSubagentSnapshot[]
+  at: number
 }
 
 export type HermesPaneTurn = {
@@ -175,6 +184,7 @@ export function createHookListenerState(
     lastLaunchTokenByPaneKey: new Map(),
     copilotBackgroundWorkByPaneKey: new Map(),
     descendantRosterByPaneKey: new Map(),
+    reportedSubagentsByPaneKey: new Map(),
     retiredPiClaudeChildrenByPaneKey: new Map(),
     descendantLeadStateByPaneKey: new Map(),
     piScheduledWorkByPaneKey: new Map(),
@@ -277,6 +287,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   deletePaneScopedCacheEntry(state.lastLaunchTokenByPaneKey, paneKey)
   state.copilotBackgroundWorkByPaneKey.delete(paneKey)
   state.descendantRosterByPaneKey.delete(paneKey)
+  state.reportedSubagentsByPaneKey.delete(paneKey)
   state.retiredPiClaudeChildrenByPaneKey.delete(paneKey)
   state.descendantLeadStateByPaneKey.delete(paneKey)
   state.piScheduledWorkByPaneKey.delete(paneKey)
@@ -337,6 +348,7 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.lastLaunchTokenByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.copilotBackgroundWorkByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantRosterByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.reportedSubagentsByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantLeadStateByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.piScheduledWorkByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.hermesTurnByPaneKey, fromPaneKey, toPaneKey)
@@ -385,6 +397,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.lastLaunchTokenByPaneKey.clear()
   state.copilotBackgroundWorkByPaneKey.clear()
   state.descendantRosterByPaneKey.clear()
+  state.reportedSubagentsByPaneKey.clear()
   state.descendantLeadStateByPaneKey.clear()
   state.piScheduledWorkByPaneKey.clear()
   state.hermesTurnByPaneKey.clear()

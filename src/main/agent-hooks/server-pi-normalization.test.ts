@@ -453,6 +453,38 @@ describe('a Pi cancel beside a live child row', () => {
     })
   })
 
+  it('keeps a cancelled row settled when the model changes afterwards', async () => {
+    await startTurn()
+    expect(pressCtrlC()).toBe(true)
+
+    const response = await postHookEvent(
+      server,
+      buildBody({ hook_event_name: 'model_select', model: 'anthropic/claude-opus-5' }),
+      '/hook/pi'
+    )
+    expect(response.status).toBe(204)
+    expect(server.getStatusSnapshotForPane(PANE)[0]).toMatchObject({
+      state: 'done',
+      interrupted: true
+    })
+  })
+
+  it('does not reopen a cancelled row for a child that appears afterwards', async () => {
+    await startTurn()
+    expect(pressCtrlC()).toBe(true)
+
+    const response = await postHookEvent(
+      server,
+      buildBody({ hook_event_name: 'subagents_update', subagents: [SCOUT] }),
+      '/hook/pi'
+    )
+    expect(response.status).toBe(204)
+    expect(server.getStatusSnapshotForPane(PANE)[0]).toMatchObject({
+      state: 'done',
+      interrupted: true
+    })
+  })
+
   // Without main-agent evidence, live children make turn cancellation indistinguishable from idle-prompt Ctrl+C.
   it('leaves the working row alone while a child still runs', async () => {
     await startTurn([{ id: 'run-scout', state: 'working', startedAt: 1_000, agentType: 'scout' }])
