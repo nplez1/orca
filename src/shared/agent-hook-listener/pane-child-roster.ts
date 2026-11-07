@@ -1,0 +1,100 @@
+import {
+  AGENT_DESCENDANT_QUIET_REAP_MS,
+  agentDescendantRosterToSnapshots
+} from '../agent-descendant-roster'
+import { foldAgentLeadStatus } from '../agent-lead-status-fold'
+import type { AgentSubagentSnapshot } from '../agent-status-subagent-snapshot'
+import type { AgentStatusState, ParsedAgentStatusPayload } from '../agent-status-types'
+import {
+  paneChildWorkLiveness,
+  paneHoldEvidence,
+  type PaneHoldEvidence
+} from './descendant-pane-hold-evidence'
+import type { HookListenerState } from './listener-state'
+
+/** The pane's child roster: the live set this lane builds from descendant events, unioned with the
+ *  roster the pane's own lane reports on its payload.
+ *
+ *  One set decides both the row's child list and its state. Two rosters is what let a session read
+ *  `done` while the fleet list rendered its child spinning (#283): the display read the payload's own
+ *  list while only this lane's list gated the state, so whichever list the other surface did not read
+ *  could disagree freely. Roster entries win a shared id — they carry the tool line and the `waiting`
+ *  state a child's own stream reported, which the reporting lane cannot know. */
+export function paneChildSnapshots(
+  state: HookListenerState,
+  paneKey: string,
+  reported: readonly AgentSubagentSnapshot[] | undefined
+): AgentSubagentSnapshot[] {
+  const tracked =
+    agentDescendantRosterToSnapshots(state.descendantRosterByPaneKey.get(paneKey)) ?? []
+  if (!reported || reported.length === 0) {
+    return tracked
+  }
+  if (tracked.length === 0) {
+    return [...reported]
+  }
+  const trackedIds = new Set(tracked.map((child) => child.id))
+  return [...tracked, ...reported.filter((child) => !trackedIds.has(child.id))].sort(
+    (a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id)
+  )
+}
+
+/** Record what the pane's own lane last said about its children. An empty or absent list is the
+ *  lane saying it has none, so it clears rather than carries. */
+export function rememberReportedChildren(
+  state: HookListenerState,
+  paneKey: string,
+  reported: readonly AgentSubagentSnapshot[] | undefined,
+  now: number
+): void {
+  if (!reported || reported.length === 0) {
+    state.reportedSubagentsByPaneKey.delete(paneKey)
+    return
+  }
+  state.reportedSubagentsByPaneKey.set(paneKey, { children: [...reported], at: now })
+}
+
+/** Those children, while the claim is still inside the roster's quiet window. A child event carries
+ *  no roster of its own, so without this it would republish the row with them missing — the mid-run
+ *  disappearance this roster exists to prevent. */
+export function carriedReportedChildren(
+  state: HookListenerState,
+  paneKey: string,
+  now: number
+): AgentSubagentSnapshot[] | undefined {
+  const reported = state.reportedSubagentsByPaneKey.get(paneKey)
+  if (!reported) {
+    return undefined
+  }
+  if (now - reported.at > AGENT_DESCENDANT_QUIET_REAP_MS) {
+    state.reportedSubagentsByPaneKey.delete(paneKey)
+    return undefined
+  }
+  return reported.children
+}
+
+/** Publish one row from one child roster: the state and the child list a reader renders come out of
+ *  the same list, through the same fold every other lane uses.
+ *
+ *  `workingMode` and `sessionBoundary` are the fold's to write. A row the fold no longer holds as a
+ *  monitor must not keep the badge, and a session boundary describes a row that is still settling —
+ *  a client without the boundary capability drops a flagged tab's whole status, so the flag must
+ *  never ride on a row the fold turned live. */
+export function resolvePaneHold(
+  payload: ParsedAgentStatusPayload,
+  leadState: AgentStatusState,
+  children: readonly AgentSubagentSnapshot[],
+  evidence: PaneHoldEvidence = paneHoldEvidence(children)
+): ParsedAgentStatusPayload {
+  const resolution = foldAgentLeadStatus({
+    leadState,
+    childWorkLiveness: paneChildWorkLiveness(evidence)
+  })
+  return {
+    ...payload,
+    state: resolution.stateName,
+    workingMode: resolution.workingMode,
+    sessionBoundary: resolution.stateName === 'done' ? payload.sessionBoundary : undefined,
+    subagents: children.length > 0 ? [...children] : undefined
+  }
+}

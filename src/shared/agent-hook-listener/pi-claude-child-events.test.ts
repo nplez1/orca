@@ -53,6 +53,28 @@ describe('a claude CLI child of a pi subagent run', () => {
     publishParentWithClaudeChild(state, CHILD_CONVERSATION)
   })
 
+  it('keeps the roster the pane last reported when a child event carries none', () => {
+    normalizeAndAccept(state, 'pi', {
+      hook_event_name: 'subagents_update',
+      ...PARENT_SESSION,
+      subagents: [{ id: 'sync-child', state: 'working', startedAt: 1, description: 'search' }]
+    })
+
+    // Why: the child's own stream describes the child, not the pane, so it carries no roster of its
+    // own. Republishing from the descendant roster alone would drop the pane's other running child
+    // from the display mid-run — the disappearance this lane exists to prevent.
+    const child = normalizeAndAccept(
+      state,
+      'claude',
+      claudeChildEvent('PreToolUse', { tool_name: 'Read', tool_input: { file_path: '/a' } })
+    )
+    expect(child?.payload.state).toBe('working')
+    expect(child?.payload.subagents?.map((entry) => entry.id).sort()).toEqual([
+      'run-1',
+      'sync-child'
+    ])
+  })
+
   it('is found by its own conversation, and only for this pane', () => {
     expect(findPiClaudeChild(state, PANE_KEY, CHILD_CONVERSATION)).toEqual({
       id: 'run-1',

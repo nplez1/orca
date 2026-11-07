@@ -10,6 +10,7 @@ import {
 import { normalizeAndAccept, PANE_KEY } from './agent-hook-listener-test-harness'
 import type { AgentHookSource } from './agent-hook-relay'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from './agent-descendant-roster'
+import { foldMainAgentWithRowChildWork } from './agent-hook-row-child-work-fold'
 
 /** Every case drives `normalizeHookPayload`, the entry both the main process and the relay
  *  call, so a fix that never reaches production wiring cannot pass here. */
@@ -282,6 +283,157 @@ describe('descendant lifecycle never settles the pane', () => {
         publish('grok', { hookEventName: 'SubagentStop', subagentType: 'x', subagentId: 'sub-1' })
           ?.payload.state
       ).toBeUndefined()
+    })
+  })
+
+  // Why: #283. The row's state and the child list it publishes are two surfaces of one session —
+  // the sidebar card and the fleet list — and they disagreed because only the `subagent_runs` roster
+  // gated the state while the display read the payload's own roster. One roster now decides both.
+  describe('one roster decides the row and its children (#283)', () => {
+    const CHILD = { id: 'child-1', state: 'working', startedAt: 5, agentType: 'researcher' }
+    const RUN = { id: 'run-1', agent_type: 'researcher' }
+
+    const startTurn = (): void => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'agent_start' })
+    }
+
+    /** The cross-surface contract: re-folding a published row's own children into its own state
+     *  must reproduce it, so no surface can read the row and its children differently. */
+    const expectRowAgreesWithChildren = (row: ReturnType<typeof publish>): void => {
+      expect(row).not.toBeNull()
+      expect(
+        foldMainAgentWithRowChildWork(row!.payload.state, { payload: row!.payload }).stateName
+      ).toBe(row!.payload.state)
+    }
+
+    it('holds the pane for a child only the payload roster names', () => {
+      startTurn()
+      const ended = publish('pi', { hook_event_name: 'agent_end', subagents: [CHILD] })
+      expect(ended?.payload.state).toBe('working')
+      expect(ended?.payload.subagents).toEqual([expect.objectContaining({ id: 'child-1' })])
+      expectRowAgreesWithChildren(ended)
+    })
+
+    it('holds the pane for a child a restated row names', () => {
+      startTurn()
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
+      for (const hook_event_name of ['model_select', 'subagents_update']) {
+        const restated = publish('pi', {
+          hook_event_name,
+          ...(hook_event_name === 'model_select' ? { model: 'x/y' } : {}),
+          subagents: [CHILD]
+        })
+        expect(restated?.payload.state).toBe('working')
+        expectRowAgreesWithChildren(restated)
+        expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
+      }
+    })
+
+    it('settles a restated row once its children are gone, keeping the lead verdict', () => {
+      startTurn()
+      publish('pi', { hook_event_name: 'agent_end' })
+      publish('pi', { hook_event_name: 'subagents_update', subagents: [CHILD] })
+
+      // Why: the restate carries the gated `working`, not the lead's own verdict. Recording it as
+      // the verdict would pin the pane working with nothing left to correct it.
+      expect(publishedState('pi', { hook_event_name: 'subagents_update' })).toBe('done')
+      expect(state.descendantLeadStateByPaneKey.get(PANE_KEY)).toBe('done')
+    })
+
+    it('settles after an async hold and a restate drain it', () => {
+      startTurn()
+      publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [RUN] })
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('working')
+      publish('pi', { hook_event_name: 'model_select', model: 'x/y' })
+      const drained = publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
+      expect(drained?.payload.state).toBe('done')
+    })
+
+    it('publishes both rosters, and keeps the reported one when the async set drains', () => {
+      startTurn()
+      publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [RUN] })
+      const both = publish('pi', { hook_event_name: 'subagents_update', subagents: [CHILD] })
+      expect(both?.payload.state).toBe('working')
+      expect(both?.payload.subagents?.map((child) => child.id)).toEqual(['child-1', 'run-1'])
+
+      // Why: an async child finishing is not evidence the pane's own child finished. The display
+      // must not lose a running child because the other roster drained. The extension merges its own
+      // roster into every post, so this drain carries one — exactly the shape the wire produces.
+      const drained = publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [],
+        subagents: [CHILD]
+      })
+      expect(drained?.payload.state).toBe('working')
+      expect(drained?.payload.subagents?.map((child) => child.id)).toEqual(['child-1'])
+      expect(publishedState('pi', { hook_event_name: 'agent_end', subagents: [CHILD] })).toBe(
+        'working'
+      )
+    })
+
+    it('settles once the pane’s own lane reports no children left', () => {
+      startTurn()
+      publish('pi', { hook_event_name: 'subagents_update', subagents: [CHILD] })
+      expect(publishedState('pi', { hook_event_name: 'agent_end', subagents: [CHILD] })).toBe(
+        'working'
+      )
+      // Why: on a pi post an absent roster is the pane's own lane saying it has none — not an
+      // opinion to carry forward, which would pin the pane on a child that has finished.
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
+    })
+
+    it('lists a child both rosters name once, with the roster entry', () => {
+      startTurn()
+      publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [{ id: 'child-1', agent_type: 'researcher' }]
+      })
+      const row = publish('pi', {
+        hook_event_name: 'subagents_update',
+        subagents: [{ id: 'child-1', state: 'working', startedAt: 5 }]
+      })
+      expect(row?.payload.subagents).toEqual([expect.objectContaining({ id: 'child-1' })])
+      expect(row?.payload.state).toBe('working')
+    })
+
+    it('settles a pane whose published children have all finished', () => {
+      startTurn()
+      const ended = publish('pi', {
+        hook_event_name: 'agent_end',
+        subagents: [{ id: 'child-1', state: 'idle', startedAt: 5 }]
+      })
+      expect(ended?.payload.state).toBe('done')
+      expect(ended?.payload.subagents?.map((child) => child.state)).toEqual(['idle'])
+    })
+
+    it('leaves a pane with no children exactly as its provider described it', () => {
+      startTurn()
+      const ended = publish('pi', { hook_event_name: 'agent_end' })
+      expect(ended?.payload.state).toBe('done')
+      expect(ended?.payload.subagents).toBeUndefined()
+    })
+
+    it('never flags a session boundary or a monitor badge on a row it held open', () => {
+      startTurn()
+      const ended = publish('pi', {
+        hook_event_name: 'agent_end',
+        session_boundary: true,
+        subagents: [CHILD]
+      })
+      expect(ended?.payload.state).toBe('working')
+      expect(ended?.payload.sessionBoundary).toBeUndefined()
+      expect(ended?.payload.workingMode).toBeUndefined()
+    })
+
+    it('forgets the reported roster when the pane starts a new agent process', () => {
+      startTurn()
+      publish('pi', { hook_event_name: 'subagents_update', subagents: [CHILD] })
+      expect(state.reportedSubagentsByPaneKey.has(PANE_KEY)).toBe(true)
+
+      publish('pi', { hook_event_name: 'session_start' })
+      expect(state.reportedSubagentsByPaneKey.has(PANE_KEY)).toBe(false)
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
     })
   })
 

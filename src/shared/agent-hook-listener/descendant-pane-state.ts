@@ -1,7 +1,5 @@
 import type { AgentHookSource } from '../agent-hook-relay'
 import {
-  agentDescendantEffectiveState,
-  agentDescendantRosterToSnapshots,
   finishAgentDescendant,
   pruneStaleAgentDescendants,
   replaceAgentDescendants,
@@ -11,6 +9,12 @@ import {
 import { normalizeAgentStatusPayload, type ParsedAgentStatusPayload } from '../agent-status-types'
 import type { DescendantEntry, DescendantEventFacts } from './descendant-events'
 import { deleteLegacyAgentStatus, type HookListenerState } from './listener-state'
+import {
+  carriedReportedChildren,
+  paneChildSnapshots,
+  rememberReportedChildren,
+  resolvePaneHold
+} from './pane-child-roster'
 
 function getOrCreateDescendantRoster(
   state: HookListenerState,
@@ -46,6 +50,11 @@ export function applyDescendantEventToPane(
       now
     )
     replaceAgentDescendants(roster, facts.children, now)
+    // Why only when the fact carries one: a live-set post is the pane's own lane, so its absent
+    // list means none, while a child fact carries no list and must keep the one last reported.
+    if (facts.reported !== undefined) {
+      rememberReportedChildren(state, paneKey, facts.reported, now)
+    }
   } else if (facts.id) {
     if (facts.ended) {
       const roster = state.descendantRosterByPaneKey.get(paneKey) ?? new Map()
@@ -71,6 +80,7 @@ export function applyDescendantEventToPane(
     }
   }
   dropEmptyDescendantRoster(state, paneKey, now)
+  const children = paneChildSnapshots(state, paneKey, carriedReportedChildren(state, paneKey, now))
 
   // Why: a child's END with no lead state has nothing to gate on. Publishing `working`
   // from it would let a stray child completion relabel a pane whose own turn nobody has
@@ -80,7 +90,9 @@ export function applyDescendantEventToPane(
   // Why: nothing left can justify a row, and nothing ever described the pane's own turn — the only
   // row that can be standing is the hold this lane published, which no event is left to clear.
   const nothingClaimsThePane =
-    leadState === undefined && !state.descendantRosterByPaneKey.has(paneKey)
+    leadState === undefined &&
+    !state.descendantRosterByPaneKey.has(paneKey) &&
+    children.length === 0
   if (facts.kind === 'child' && facts.ended === true && leadState === undefined) {
     if (nothingClaimsThePane) {
       retractDescendantHoldRow(state, paneKey)
@@ -99,17 +111,8 @@ export function applyDescendantEventToPane(
   // Why: a child event before any lead event still proves the pane is working — the lead spawned it.
   const effectiveLeadState = leadState ?? 'working'
   const cachedTool = state.lastToolByPaneKey.get(paneKey) ?? {}
-  // Why: a child's wait must surface even when its provider never named which child is waiting,
-  // so there is no roster row to carry the state.
-  const effectiveState =
-    facts.kind === 'child' && facts.waiting === true
-      ? 'waiting'
-      : agentDescendantEffectiveState(
-          state.descendantRosterByPaneKey.get(paneKey),
-          effectiveLeadState
-        )
-  return normalizeAgentStatusPayload({
-    state: effectiveState,
+  const payload = normalizeAgentStatusPayload({
+    state: effectiveLeadState,
     prompt: state.lastPromptByPaneKey.get(paneKey) ?? '',
     // Why the pane's own type rather than the reporter's: this is the first descendant lane whose
     // reporter can be a DIFFERENT provider from the lead (a claude CLI child of a pi run), and
@@ -119,9 +122,21 @@ export function applyDescendantEventToPane(
     toolInput: cachedTool.toolInput,
     interactivePrompt: cachedTool.interactivePrompt,
     lastAssistantMessage: cachedTool.lastAssistantMessage,
-    lastAssistantMessageIsToolOutput: cachedTool.lastAssistantMessageIsToolOutput,
-    subagents: agentDescendantRosterToSnapshots(state.descendantRosterByPaneKey.get(paneKey))
+    lastAssistantMessageIsToolOutput: cachedTool.lastAssistantMessageIsToolOutput
   })
+  if (!payload) {
+    return null
+  }
+  // Why the override: a child's wait must surface even when its provider never named which child is
+  // waiting, so there is no roster row to carry the state.
+  return resolvePaneHold(
+    payload,
+    effectiveLeadState,
+    children,
+    facts.kind === 'child' && facts.waiting === true
+      ? { runningAgent: true, waitingAgent: true }
+      : undefined
+  )
 }
 
 /** Drop the row this lane published from a live child set, once nothing is left to justify it:
@@ -134,9 +149,6 @@ function retractDescendantHoldRow(state: HookListenerState, paneKey: string): vo
   }
 }
 
-/** Fold the live child set an event carried into the pane's roster. Returns nothing: the
- *  event's own payload is still normalized and gated as usual, so this only updates what that
- *  gate reads — which is how an add the transport coalesced away is repaired by the next event. */
 /** How long a retired child's conversation is still recognised. Long enough for a spooled hook
  *  written before the retirement to be replayed, short enough that it never catches a new run —
  *  a conversation id is never reused. */
@@ -150,31 +162,13 @@ function rememberRetiredDescendants(
   kept: ReadonlySet<string>,
   now: number
 ): void {
-  const retired = Array.from(roster, ([id, tracked]) => ({ id, tracked })).filter(
-    (entry) => !kept.has(entry.id) && entry.tracked.providerSession !== undefined
-  )
-  if (retired.length === 0) {
-    return
-  }
-  let byConversation = state.retiredPiClaudeChildrenByPaneKey.get(paneKey)
-  if (!byConversation) {
-    byConversation = new Map()
-    state.retiredPiClaudeChildrenByPaneKey.set(paneKey, byConversation)
-  }
-  for (const entry of retired) {
-    const conversation = entry.tracked.providerSession
-    if (conversation) {
-      byConversation.set(conversation, now)
-    }
-  }
-  for (const [conversation, at] of byConversation) {
-    if (now - at > RETIRED_DESCENDANT_MEMORY_MS) {
-      byConversation.delete(conversation)
+  for (const [id, tracked] of roster) {
+    if (!kept.has(id)) {
+      rememberRetiredDescendant(state, paneKey, tracked.providerSession, now)
     }
   }
 }
 
-/** Whether a conversation belonged to a child of this pane whose row has gone. */
 /** Remember one child's conversation as retired, for the same short window as a roster departure. */
 function rememberRetiredDescendant(
   state: HookListenerState,
@@ -191,6 +185,11 @@ function rememberRetiredDescendant(
     state.retiredPiClaudeChildrenByPaneKey.set(paneKey, byConversation)
   }
   byConversation.set(providerSession, now)
+  for (const [conversation, at] of byConversation) {
+    if (now - at > RETIRED_DESCENDANT_MEMORY_MS) {
+      byConversation.delete(conversation)
+    }
+  }
 }
 
 export function isRetiredPiClaudeChild(
@@ -220,27 +219,39 @@ export function applyDescendantLiveSet(
 
 /** The pane is idle only when its lead session is idle AND no descendant is live.
  *  Records the lead's own verdict first, so draining the last descendant later
- *  republishes what the lead actually said instead of the gated value. */
+ *  republishes what the lead actually said instead of the gated value.
+ *
+ *  `restated` marks a payload that is the PREVIOUS published row rather than a fresh verdict (pi's
+ *  `model_select` / `subagents_update` republish what they were handed). Its state is this fold's own
+ *  output, so recording it as the verdict would pin the pane working once the last child drained. */
 export function gatePaneStateOnDescendants(
   state: HookListenerState,
   paneKey: string,
-  payload: ParsedAgentStatusPayload | null
+  payload: ParsedAgentStatusPayload | null,
+  options: { restated?: boolean } = {}
 ): ParsedAgentStatusPayload | null {
   if (!payload) {
     return payload
   }
-  state.descendantLeadStateByPaneKey.set(paneKey, payload.state)
-  dropEmptyDescendantRoster(state, paneKey, Date.now())
-  const roster = state.descendantRosterByPaneKey.get(paneKey)
-  if (!roster) {
+  const now = Date.now()
+  if (options.restated !== true) {
+    state.descendantLeadStateByPaneKey.set(paneKey, payload.state)
+  }
+  // Why the payload's own list wins when it has one: a provider that reports its roster on every
+  // post means an absent list is "no children", so carrying the last forward would resurrect one.
+  rememberReportedChildren(state, paneKey, payload.subagents, now)
+  dropEmptyDescendantRoster(state, paneKey, now)
+  const children = paneChildSnapshots(state, paneKey, payload.subagents)
+  // Why reference-identical: a pane with no children must publish exactly what its provider said —
+  // unless the payload is a restate, whose state is this fold's own output and must be re-resolved.
+  if (children.length === 0 && options.restated !== true) {
     return payload
   }
-  const gated = agentDescendantEffectiveState(roster, payload.state)
-  return {
-    ...payload,
-    state: gated,
-    subagents: agentDescendantRosterToSnapshots(roster)
-  }
+  const leadState =
+    options.restated === true
+      ? (state.descendantLeadStateByPaneKey.get(paneKey) ?? payload.state)
+      : payload.state
+  return resolvePaneHold(payload, leadState, children)
 }
 
 /** Whether a child this lane knows about is blocked on a human answer. Only the narrow grok reader
@@ -280,5 +291,6 @@ function dropEmptyDescendantRoster(state: HookListenerState, paneKey: string, no
 
 export function clearDescendantScope(state: HookListenerState, paneKey: string): void {
   state.descendantRosterByPaneKey.delete(paneKey)
+  state.reportedSubagentsByPaneKey.delete(paneKey)
   state.descendantLeadStateByPaneKey.delete(paneKey)
 }

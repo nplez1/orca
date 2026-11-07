@@ -2,7 +2,6 @@ import {
   AGENT_MODEL_MAX_LENGTH,
   AGENT_STATUS_TOOL_INPUT_MAX_LENGTH,
   AGENT_TYPE_MAX_LENGTH,
-  type AgentStatusState,
   type AgentSubagentSnapshot
 } from './agent-status-types'
 import { normalizeOptionalField } from './agent-status-field-normalization'
@@ -203,23 +202,4 @@ export function findAgentDescendantByProviderSession(
     }
   }
   return null
-}
-
-/** The pane's state once its live descendants are taken into account: a lead
- *  `done` is only the pane's `done` when nothing is still running under it. A
- *  descendant blocked on a human answer outranks the lead's own working state,
- *  since that wait is the actionable one. */
-export function agentDescendantEffectiveState(
-  roster: AgentDescendantRoster | undefined,
-  leadState: AgentStatusState
-): AgentStatusState {
-  if (!roster || roster.size === 0) {
-    return leadState
-  }
-  for (const tracked of roster.values()) {
-    if (tracked.state === 'waiting') {
-      return 'waiting'
-    }
-  }
-  return leadState === 'done' ? 'working' : leadState
 }

@@ -280,8 +280,18 @@ export function normalizeProviderEvent(input: {
   // the owning lane drops every event that names a child — so a waiter this lane recorded gates the
   // row. Gating only that case keeps this from becoming a second copy of the owner's working logic.
   const gateDescendants = !ownsDescendants || paneHasWaitingDescendant(state, paneKey)
+  // LOCAL(nplez1): pi's model_select / subagents_update republish the row they were handed rather
+  // than report a new verdict, so the state they carry is this gate's own output. Folding it back in
+  // as the lead's verdict would lose the verdict it came from, and the pane would stay working once
+  // the last child drained. Kept here rather than in the normalizer so `pi-family-events.ts` stays
+  // upstream's file.
+  const restated =
+    (source === 'pi' || source === 'omp' || source === 'prime-agent') &&
+    (eventName === 'model_select' || eventName === 'subagents_update')
   return {
-    payload: gateDescendants ? gatePaneStateOnDescendants(state, paneKey, payload) : payload,
+    payload: gateDescendants
+      ? gatePaneStateOnDescendants(state, paneKey, payload, { restated })
+      : payload,
     resolvedPromptText,
     promptInteractionKey,
     hasTranscriptPromptEvidence,

@@ -1,5 +1,7 @@
 import type { AgentHookSource } from '../agent-hook-relay'
 import { isAskUserQuestionTool } from '../agent-question-answered-intent'
+import { normalizeAgentSubagentsField } from '../agent-status-subagent-snapshot'
+import type { AgentSubagentSnapshot } from '../agent-status-subagent-snapshot'
 import { readFirstString } from './interactive-tool'
 import { isGrokEvent, normalizeHookEventName } from './provider-event-names'
 import { readString } from './tool-input-preview'
@@ -48,7 +50,11 @@ export type DescendantEventFacts =
       /** That tool call finished, so the row must stop naming it. */
       toolEnded?: boolean
     } & Partial<DescendantEntry>)
-  | { kind: 'live-set'; children: readonly DescendantEntry[] }
+  | {
+      kind: 'live-set'
+      children: readonly DescendantEntry[]
+      reported?: readonly AgentSubagentSnapshot[]
+    }
 
 /** How one provider reports its descendants. Both questions live together on purpose: a
  *  provider that opts into descendants MUST also answer how the pane recovers when a
@@ -71,7 +77,18 @@ function readPiDescendantEvent(
     return null
   }
   const children = readPiDescendantLiveSet(hookPayload)
-  return children ? { kind: 'live-set', children } : null
+  // Why the second roster rides along: a pi post merges its own child list into every payload, so
+  // this one names the children the DISPLAY shows as well as the async runs this lane holds. One
+  // roster decides both, or the row can settle `done` beside a child the fleet list renders spinning.
+  return children
+    ? {
+        kind: 'live-set',
+        children,
+        // Why an empty list rather than absent: on a pi post the field's absence IS "no children",
+        // and a listener that read it as "no opinion" would carry a dropped child forward.
+        reported: normalizeAgentSubagentsField(hookPayload.subagents) ?? []
+      }
+    : null
 }
 
 /** The live child set a pi pane rides on EVERY post, not only the dedicated event. pi's

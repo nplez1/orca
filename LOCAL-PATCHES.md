@@ -511,6 +511,49 @@ Anchors:
 Bounded by the lane's quiet window, not by a scope reset: an owning provider's roster has no reset
 for this lane to read, so a question nothing ever retracts cannot hold the row forever.
 
+**Addendum 2026-11-07 — one roster decides both the row and its children (#283).** A pi pane
+publishes two child inventories: `subagent_runs`, the fork's async live set, and `subagents`,
+upstream's roster from `task:subagent:lifecycle`. Only the first gated the row's state, while the
+display renders the second — so a row could publish `done` beside a child the fleet list showed
+spinning, which is exactly what #283 reported. Three triggers were reproduced through
+`normalizeHookPayload` before any code changed: an `agent_end` carrying a live `subagents` roster, a
+`model_select` / `subagents_update` restating a previous `done` row with one, and both rosters live at
+once (where the async roster _replaced_ the display roster and hid a running child).
+
+The fix is one roster for both outputs: `pane-child-roster.ts` unions the two by id (roster entries
+win, since they carry the tool line and a child's own `waiting`), publishes that list as `subagents`,
+and derives the state from the same list through `foldAgentLeadStatus`. The merged list is computed
+per publication and never written into `descendantRosterByPaneKey` — `replaceAgentDescendants` would
+delete the reported children on every `subagent_runs` post. `descendant-pane-hold-evidence.ts` holds
+the evidence split, which is the seam #284's scheduled-work input joins as `hasLiveNonAgentWork`
+(`working` + `workingMode: 'monitoring'`) rather than a second hold; today every child it classifies
+is agent work, so it can only yield plain `working` and the monitoring reservation below is untouched.
+
+Two things the fold needs that a naive version gets wrong. **A restate is not a verdict:** pi's
+`model_select` / `subagents_update` republish the row they were handed, so the state they carry is the
+gate's own output; recording it as the lead's verdict pinned the pane `working` once the last child
+drained, so the gate takes a `restated` flag from `provider-dispatch.ts` (kept out of
+`pi-family-events.ts`, which stays upstream's file). **A child event carries no roster of its own:**
+`reportedSubagentsByPaneKey` carries the pane's last reported children into those publications, stamped
+and reaped on the roster's own quiet window so a lane that dies mid-child cannot pin the row.
+`agentDescendantEffectiveState` is gone — the map-based fold had no callers left once both paths went
+through `foldAgentLeadStatus`.
+
+Anchors:
+
+- `src/shared/agent-hook-listener/pane-child-roster.ts` — the union, the reported-children store, and
+  `resolvePaneHold`, which writes `state`, `workingMode`, `sessionBoundary` and `subagents` together.
+- `src/shared/agent-hook-listener/descendant-pane-hold-evidence.ts` — `paneHoldEvidence` /
+  `paneChildWorkLiveness`, the seam #284 extends.
+- `src/shared/agent-hook-listener/descendant-pane-state.ts` — `gatePaneStateOnDescendants` (`restated`)
+  and `applyDescendantEventToPane` (both now publish through `resolvePaneHold`).
+- `src/shared/agent-hook-listener/descendant-events.ts` — `reported` on a pi live-set fact, where an
+  absent `subagents` field means _none_ rather than _no opinion_.
+- Tests: `agent-hook-listener-descendant-lifecycle.test.ts` § "one roster decides the row and its
+  children (#283)" (all three triggers, the negatives, and a `foldMainAgentWithRowChildWork` invariant
+  that no published row disagrees with its own children), `pane-child-roster.test.ts`, and the
+  carry-forward case in `pi-claude-child-events.test.ts`.
+
 ### `local(agents)`: a claude CLI child is not a second session
 
 A pi session can dispatch a subagent through the `claude` CLI (`pi-subagents` → `claude --print`).
