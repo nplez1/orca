@@ -31,7 +31,7 @@ export function getPiAgentStatusScheduledWorkBusLines(kind: PiAgentKind): string
     '  piScheduledWork.binding = null',
     '  for (const entry of binding.listeners) {',
     '    try {',
-    '      if (typeof entry.release === "function") (entry.release as () => void)()',
+    '      if (typeof entry.release === "function") entry.release()',
     '      else if (typeof binding.bus.off === "function") binding.bus.off(entry.channel, entry.listener)',
     '    } catch {',
     '      // A bus without a release path dies with its registration; nothing else can hold it.',

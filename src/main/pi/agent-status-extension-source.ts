@@ -273,6 +273,9 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '    // After WSL loopback failure, retry through host curl.exe.',
     '    if (!isWslRuntime()) throw error',
     '    await postViaWindowsCurl(body, ompRuntime, coords)',
+    // Why again on the fallback: this path delivers too, and a promotion only on the loopback success
+    // would leave the next re-check believing an already-published inventory is still owed.
+    ...(kind === 'pi' ? ['    piScheduledWorkDelivered()'] : []),
     '  } finally {',
     '    if (timeout) clearTimeout(timeout)',
     '  }',
