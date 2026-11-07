@@ -265,6 +265,10 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '      timeoutPromise,',
     '    ])',
     "    if (!response.ok) throw new Error('Orca hook HTTP ' + response.status)",
+    // Why on delivery and not on build: a build that never reached Orca must not be what tells the next
+    // re-check there is nothing left to say. Here, and not in the queue's success path, so an attempt that
+    // returned before building (no endpoint coords) cannot promote a body it never built.
+    ...(kind === 'pi' ? ['    piScheduledWorkDelivered()'] : []),
     '  } catch (error) {',
     '    // After WSL loopback failure, retry through host curl.exe.',
     '    if (!isWslRuntime()) throw error',

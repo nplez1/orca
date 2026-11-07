@@ -51,7 +51,9 @@ function serveSchedules(
   inventory: Inventory,
   state: { serving: boolean; replyAsync: boolean }
 ) {
-  const answer = (channel: string, jobs: unknown) => (raw: unknown) => {
+  // Why the field name and not the array: a test swaps the inventory wholesale, and a captured array
+  // would keep answering with the one it was bound to.
+  const answer = (channel: string, field: keyof Inventory) => (raw: unknown) => {
     if (!state.serving) {
       return
     }
@@ -59,7 +61,7 @@ function serveSchedules(
     if (!requestId) {
       return
     }
-    const reply = { success: true, data: { jobs } }
+    const reply = { success: true, data: { jobs: inventory[field] } }
     if (state.replyAsync) {
       // Why: pi-subagents awaits its handler, so its list reply lands after the post that asked.
       void Promise.resolve().then(() => emitter.emit(`${channel}:reply:${requestId}`, reply))
@@ -67,8 +69,8 @@ function serveSchedules(
     }
     emitter.emit(`${channel}:reply:${requestId}`, reply)
   }
-  emitter.on(LIVE_LIST, answer(LIVE_LIST, inventory.live))
-  emitter.on(COLD_LIST, answer(COLD_LIST, inventory.cold))
+  emitter.on(LIVE_LIST, answer(LIVE_LIST, 'live'))
+  emitter.on(COLD_LIST, answer(COLD_LIST, 'cold'))
 }
 
 /** Drives the REAL generated extension into the REAL listener, so the row asserted here is the row a
@@ -303,14 +305,49 @@ describe('pi scheduled work holds the pane as monitoring', () => {
 
   it('publishes a change that landed while a post was already in flight', async () => {
     const inventory: Inventory = { live: [], cold: [] }
-    // Why an async cold reply: pi-subagents awaits its handler, so its answer always lands after the
-    // completion post that asked for it.
-    const harness = createHarness({ inventory, replyAsync: true })
+    const harness = createHarness({ inventory })
     await startTurn(harness)
     inventory.cold.push(coldJob())
     await drive(harness, 'agent_end', {})
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
 
+    // Why a held delivery: the update's body is built while `cold-2` is still armed, so only a later
+    // attempt can publish the removal that lands behind it.
+    let open: () => void = () => undefined
+    harness.holdDelivery(
+      new Promise<void>((resolve) => {
+        open = resolve
+      })
+    )
+    inventory.cold = [coldJob({ id: 'cold-2' })]
+    harness.emitPiEvent(SCHEDULED_EVENT, { type: 'updated', job: coldJob({ id: 'cold-2' }) })
+    await flush()
+
+    inventory.cold = []
+    harness.emitPiEvent(SCHEDULED_EVENT, { type: 'removed', jobId: 'cold-2' })
+    await flush()
+    harness.releaseDelivery()
+    open()
+    // Why past the retry interval: the flush that found a post in flight re-arms itself.
+    await vi.advanceTimersByTimeAsync(1_000)
+    await flush()
+
+    // Why this order: the held body carried `cold-2`, and the retry is what clears it.
+    expect(harness.posted.at(-2)?.scheduled_work).toEqual({
+      jobs: [{ id: 'cold-2', kind: 'cold', next_in_ms: 3_600_000 }]
+    })
+    expect(harness.posted.at(-1)?.scheduled_work).toBeUndefined()
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+  })
+
+  it('retries the restatement when the change landed behind the completion itself', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    inventory.cold.push(coldJob())
+
+    // Why: pi-subagents awaits its list handler, so its answer lands after the completion post that
+    // asked — which is exactly when a post is already in flight.
     let open: () => void = () => undefined
     harness.holdDelivery(
       new Promise<void>((resolve) => {
@@ -318,14 +355,15 @@ describe('pi scheduled work holds the pane as monitoring', () => {
       })
     )
     void harness.callHook('agent_end', {}, leadContext())
-    // Why: the job is stopped while the post that describes it is still in flight.
-    inventory.cold.length = 0
-    await vi.advanceTimersByTimeAsync(60_000)
+    inventory.cold = []
+    await flush()
     harness.releaseDelivery()
     open()
+    await vi.advanceTimersByTimeAsync(1_000)
     await flush()
 
     expect(harness.accepted.at(-1)?.state).toBe('done')
+    expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
   })
 
   it('reads exactly as today when no extension answers the inventory', async () => {
