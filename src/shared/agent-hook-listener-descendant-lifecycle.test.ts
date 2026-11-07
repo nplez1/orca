@@ -5,6 +5,7 @@ import {
   deleteLegacyAgentStatus,
   movePaneCacheState,
   paneHasStateClaims,
+  seedLegacyAgentStatusForTests,
   type HookListenerState
 } from './agent-hook-listener/listener-state'
 import { normalizeAndAccept, PANE_KEY } from './agent-hook-listener-test-harness'
@@ -345,6 +346,45 @@ describe('descendant lifecycle never settles the pane', () => {
       // the verdict would pin the pane working with nothing left to correct it.
       expect(publishedState('pi', { hook_event_name: 'subagents_update' })).toBe('done')
       expect(state.descendantLeadStateByPaneKey.get(PANE_KEY)).toBe('done')
+    })
+
+    it('keeps a host-settled verdict through a restate, and settles again on the drain', () => {
+      // Why seeded: a host-side settle (a Ctrl-C) writes `done` and its `mainAgent` into the cached
+      // row without touching the lead verdict, which is how the listener finds it.
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      seedLegacyAgentStatusForTests(state, {
+        ...state.lastStatusByPaneKey.get(PANE_KEY)!,
+        payload: {
+          ...state.lastStatusByPaneKey.get(PANE_KEY)!.payload,
+          state: 'done',
+          interrupted: true,
+          mainAgent: { state: 'done', outcome: 'cancellation', stateStartedAt: 1 }
+        }
+      })
+      expect(state.descendantLeadStateByPaneKey.get(PANE_KEY)).toBe('working')
+
+      expect(
+        publishedState('pi', { hook_event_name: 'subagents_update', subagents: [CHILD] })
+      ).toBe('working')
+      // Why: the restate must recover the settled verdict, not republish the hold it produced.
+      expect(publishedState('pi', { hook_event_name: 'subagents_update' })).toBe('done')
+      expect(state.descendantLeadStateByPaneKey.get(PANE_KEY)).toBe('done')
+    })
+
+    it('never records a restated value the pane did not report', () => {
+      // A pane whose row the child lane published first has no recorded verdict at all.
+      publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [RUN] })
+      expect(state.descendantLeadStateByPaneKey.has(PANE_KEY)).toBe(false)
+
+      publish('pi', { hook_event_name: 'model_select', model: 'x/y' })
+      // Why: that state is this lane's own synthesis, so recording it would leave the drain below
+      // with a verdict nobody reported — and the row would be pinned working for good.
+      expect(state.descendantLeadStateByPaneKey.has(PANE_KEY)).toBe(false)
+
+      expect(
+        publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
+      ).toBeNull()
+      expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(false)
     })
 
     it('settles after an async hold and a restate drain it', () => {

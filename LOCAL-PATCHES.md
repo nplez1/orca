@@ -537,11 +537,15 @@ it rather than building a second hold. `resolvePiPaneStatus` keeps the split: a 
 `hasLiveNonAgentWork` (`working` + `workingMode: 'monitoring'`). `applyPiScheduledWorkHold` reads the
 child half back off the payload's own roster, which is the one roster the gate published.
 
-The restate problem is upstream's half of the same seam and stays there: `pi-family-events.ts`
-`restatedLeadFields` re-derives the lead's verdict from what the gate recorded (or from `mainAgent`) on
-every restatement event, so a restatement never republishes this fold's output as a verdict. #283 briefly
-carried its own `restated` flag in `provider-dispatch.ts`; #284's normalizer-level rule made it redundant
-and it is gone.
+The restate problem is split across the two halves of the seam, and both are needed.
+`pi-family-events.ts` `restatedLeadFields` re-derives the _published state_ from the lead's own verdict —
+the recorded one, except that a settled `mainAgent` outranks it, because a host-side settle (Ctrl-C,
+`server-status-inference.ts` `settleTurnWithoutStop`) writes `done` into the cached row without touching
+the record. `gatePaneStateOnDescendants` takes `restated` from the same `PI_RESTATEMENT_EVENTS` set and
+records nothing for one — a restated state is derived from the record, so writing it back would turn a
+value this lane synthesised (`applyDescendantEventToPane`'s `leadState ?? 'working'`) into the verdict,
+and the drain that follows could never settle. A restated `done` is the exception and is recorded: the
+fold only outputs `done` from a `done` lead, and only a settled row can supply one.
 
 One ordering change comes with the fold and is intended: a lead that is itself `blocked` or `waiting`
 now keeps that word where `agentDescendantEffectiveState` returned `waiting` for any waiting child.
@@ -556,8 +560,11 @@ Anchors:
   `resolvePaneHold`, which writes `state`, `workingMode`, `sessionBoundary`, `interrupted` and
   `subagents` together.
 - `src/shared/agent-hook-listener/providers/pi-pane-hold-evidence.ts` — the one pi fold, both inputs.
-- `src/shared/agent-hook-listener/descendant-pane-state.ts` — `gatePaneStateOnDescendants` and
-  `applyDescendantEventToPane`, both publishing through `resolvePaneHold`.
+- `src/shared/agent-hook-listener/descendant-pane-state.ts` — `gatePaneStateOnDescendants` (`restated`)
+  and `applyDescendantEventToPane`, both publishing through `resolvePaneHold`.
+- `src/shared/agent-hook-listener/providers/pi-family-events.ts` — `PI_RESTATEMENT_EVENTS`, exported so
+  the normalizer and the gate cannot disagree about which events republish a row, and
+  `restatedLeadFields`' settled-row rule.
 - `src/shared/agent-hook-listener/descendant-events.ts` — `reported` on a pi live-set fact, where an
   absent `subagents` field means _none_ rather than _no opinion_.
 - Tests: `agent-hook-listener-descendant-lifecycle.test.ts` § "one roster decides the row and its

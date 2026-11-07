@@ -33,7 +33,7 @@ import { codexHookEventForEphemeralThread } from './providers/codex-ephemeral-th
 import { normalizeGeminiEvent } from './providers/gemini-events'
 import { normalizeOpenCodeFamilyEvent } from './providers/opencode-family-events'
 import { normalizeCursorEvent } from './providers/cursor-events'
-import { normalizePiCompatibleEvent } from './providers/pi-family-events'
+import { normalizePiCompatibleEvent, PI_RESTATEMENT_EVENTS } from './providers/pi-family-events'
 import { normalizeDroidEvent } from './providers/droid-events'
 import { normalizeCommandCodeEvent } from './providers/command-code-events'
 import { normalizeGrokEvent } from './providers/grok-events'
@@ -280,8 +280,13 @@ export function normalizeProviderEvent(input: {
   // the owning lane drops every event that names a child — so a waiter this lane recorded gates the
   // row. Gating only that case keeps this from becoming a second copy of the owner's working logic.
   const gateDescendants = !ownsDescendants || paneHasWaitingDescendant(state, paneKey)
+  // fork-comment-ok: the gate and the normalizer must agree on this set, and the import says why
+  // The normalizer already knows which events republish a row; a second list here would drift.
+  const restated = PI_RESTATEMENT_EVENTS.has(eventName)
   return {
-    payload: gateDescendants ? gatePaneStateOnDescendants(state, paneKey, payload) : payload,
+    payload: gateDescendants
+      ? gatePaneStateOnDescendants(state, paneKey, payload, { restated })
+      : payload,
     resolvedPromptText,
     promptInteractionKey,
     hasTranscriptPromptEvidence,

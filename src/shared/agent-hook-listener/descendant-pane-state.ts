@@ -219,19 +219,27 @@ export function applyDescendantLiveSet(
  *  Records the lead's own verdict first, so draining the last descendant later
  *  republishes what the lead actually said instead of the gated value.
  *
- *  A provider that restates a row it was handed (`pi-family-events.ts` `restatedLeadFields`) hands
- *  over the lead's own verdict, never this fold's output, so the verdict recorded here is always the
- *  lead's. */
+ *  `restated` marks a payload that republishes a row rather than report a verdict. Its state is
+ *  derived (by `pi-family-events.ts` `restatedLeadFields`) from the record this gate keeps, so
+ *  recording it back would let a value this lane synthesised — `applyDescendantEventToPane`'s
+ *  `leadState ?? 'working'` — become the verdict, and the drain that follows could never settle. */
 export function gatePaneStateOnDescendants(
   state: HookListenerState,
   paneKey: string,
-  payload: ParsedAgentStatusPayload | null
+  payload: ParsedAgentStatusPayload | null,
+  options: { restated?: boolean } = {}
 ): ParsedAgentStatusPayload | null {
   if (!payload) {
     return payload
   }
   const now = Date.now()
-  state.descendantLeadStateByPaneKey.set(paneKey, payload.state)
+  // Why also a restated `done`: the fold only ever outputs `done` from a `done` lead, and a restated
+  // `done` can only come from a settled row — so it is the lead's own verdict, and the one a host-side
+  // settle (Ctrl-C) wrote into the cached row without touching this map. Every other restated state
+  // may be a value this lane synthesised, and recording it would pin the row.
+  if (options.restated !== true || payload.state === 'done') {
+    state.descendantLeadStateByPaneKey.set(paneKey, payload.state)
+  }
   // Why the payload's own list wins when it has one: a provider that reports its roster on every
   // post means an absent list is "no children", so carrying the last forward would resurrect one.
   rememberReportedChildren(state, paneKey, payload.subagents, now)

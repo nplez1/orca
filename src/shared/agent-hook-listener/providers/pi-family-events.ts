@@ -11,7 +11,7 @@ import { parseOmpPlanReviewPrompt } from '../../omp-plan-review-prompt'
 import { mainAgentState } from '../../main-agent-status'
 
 /** Events that restate an existing row between turns instead of opening one of their own. */
-const PI_RESTATEMENT_EVENTS: ReadonlySet<unknown> = new Set([
+export const PI_RESTATEMENT_EVENTS: ReadonlySet<unknown> = new Set([
   'model_select',
   'subagents_update',
   'scheduled_work_update'
@@ -151,7 +151,13 @@ function restatedLeadFields(
   previous: ParsedAgentStatusPayload
 ): Pick<ParsedAgentStatusPayload, 'state'> & { workingMode: undefined; mainAgent: undefined } {
   return {
-    state: state.descendantLeadStateByPaneKey.get(paneKey) ?? mainAgentState(previous),
+    // fork-comment-ok: the ordering is the whole point and is not derivable from the expression
+    // A host-side settle (Ctrl-C) writes `done` into the cached row without touching the record, so
+    // the record must not outrank it. A hold only publishes `mainAgent` from a lead verdict.
+    state:
+      mainAgentState(previous) === 'done'
+        ? 'done'
+        : (state.descendantLeadStateByPaneKey.get(paneKey) ?? mainAgentState(previous)),
     workingMode: undefined,
     mainAgent: undefined
   }
