@@ -6,6 +6,7 @@ import { getPiAgentStatusRuntimeDetectionSourceLines } from './agent-status-runt
 import { getPiAgentStatusAsyncSubagentSessionModuleLines } from './agent-status-async-subagent-session-source'
 import { getPiAgentStatusWslCurlSourceLines } from './agent-status-wsl-curl-source'
 import { getPiSubagentSnapshotSourceLines } from './agent-status-subagent-roster-source'
+import { getPiAgentStatusScheduledWorkModuleLines } from './agent-status-scheduled-work-source'
 
 export const ORCA_PI_AGENT_STATUS_EXTENSION_FILE = 'orca-agent-status.ts'
 
@@ -107,7 +108,7 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
   // Pi resumes by transcript; OMP resumes by session ID (#8962).
   const payloadLine =
     kind !== 'omp'
-      ? '    payload: { hook_event_name: hookEventName, ...(ompRuntime ? metadata : getPersistedSessionMetadata(metadata)), ...subagents, ...extra },'
+      ? `    payload: { hook_event_name: hookEventName, ...(ompRuntime ? metadata : getPersistedSessionMetadata(metadata)), ...subagents, ...extra${kind === 'pi' ? ', ...scheduledWorkField' : ''} },`
       : '    payload: { hook_event_name: hookEventName, ...metadata, ...subagents, ...extra },'
 
   // Read endpoint files after Orca restarts because PTY-spawn environment stays frozen.
@@ -123,6 +124,7 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     ...modelMetadataSourceLines,
     '',
     ...getPiSubagentSnapshotSourceLines(),
+    ...getPiAgentStatusScheduledWorkModuleLines(kind),
     ...sessionMetadataSourceLines,
     '',
     '// Stat/mtime caching avoids reparsing endpoint files during streaming events.',
@@ -223,6 +225,8 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '  const coords = resolveHookCoords()',
     '  const paneKey = process.env.ORCA_PANE_KEY',
     '  if (!coords.port || !coords.token || !paneKey) return',
+    // Why here and not at enqueue: a coalesced or retried post carries the inventory that is true now.
+    ...(kind === 'pi' ? ['  const scheduledWorkField = piScheduledWorkField()'] : []),
     // Why: the endpoint watch republishes this snapshot, and reads it as the pane's own statement of
     // what it is doing — recorded on the attempt, because a failed delivery is what it has to answer.
     '  noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, endpointKeyOf(coords), latest)',

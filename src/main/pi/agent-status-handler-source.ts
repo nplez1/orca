@@ -21,6 +21,7 @@ import {
   getAgentStatusSessionBoundaryHandlerSourceLines,
   getPiLateBusyPostCompletionSourceLines
 } from './agent-status-session-boundary-source'
+import { getPiAgentStatusScheduledWorkSetupLines } from './agent-status-scheduled-work-source'
 
 export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] {
   const sessionStartHandler =
@@ -116,6 +117,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     `  process.env.${ownerEnv} = selfPid`,
     '  resetPostQueue()',
     ...getPiSubagentRosterSetupSourceLines(kind),
+    ...getPiAgentStatusScheduledWorkSetupLines(kind),
     ...getOmpSessionOwnerHandlerSourceLines(kind),
     ...getAgentStatusSessionBoundaryHandlerSourceLines(kind),
     ...getOmpModelCommandSourceLines(),
@@ -218,6 +220,8 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     ...(kind === 'pi'
       ? [
           '    const replyFields = takeCompletedReplyFields()',
+          // Why before the post: the snapshot is built at delivery, so the hold must already be current.
+          '    piScheduledWorkRefresh()',
           "    post('agent_end', final ? { session_boundary: true } : replyFields, final)"
         ]
       : ["    post('agent_end', final ? { session_boundary: true } : {}, final)"]),

@@ -8,6 +8,14 @@ import { resolvePrompt, resolveToolState } from '../prompt-fields'
 import { extractToolFields, isNewTurnEvent } from '../provider-event-routing'
 import { readString } from '../tool-input-preview'
 import { parseOmpPlanReviewPrompt } from '../../omp-plan-review-prompt'
+import { mainAgentState } from '../../main-agent-status'
+
+/** Events that restate an existing row between turns instead of opening one of their own. */
+const PI_RESTATEMENT_EVENTS: ReadonlySet<unknown> = new Set([
+  'model_select',
+  'subagents_update',
+  'scheduled_work_update'
+])
 
 /** Normalize Pi/OMP/Prime lifecycle, question waits and live roster/model evidence; ignore events with no status. */
 export function normalizePiCompatibleEvent(
@@ -33,8 +41,8 @@ export function normalizePiCompatibleEvent(
     hookPayload.model_switch_command === 'orca-model' ? 'orca-model' : undefined
   // Each post carries the whole live roster; absence means none.
   const subagents = hookPayload.subagents
-  if (eventName === 'model_select' || eventName === 'subagents_update') {
-    // Restate inter-turn model/child changes on an existing visible row; hidden resume placeholders carry no state.
+  if (PI_RESTATEMENT_EVENTS.has(eventName)) {
+    // Restate inter-turn model/child/scheduled changes on an existing visible row; hidden resume placeholders carry no state.
     const previous = state.lastStatusByPaneKey.get(paneKey)
     if (
       !previous ||
@@ -46,6 +54,9 @@ export function normalizePiCompatibleEvent(
     }
     return normalizeAgentStatusPayload({
       ...previous.payload,
+      // Why for every restatement: the row it restates may be held `working` by a finished turn, and a
+      // restatement that republishes that `working` as the lead's verdict pins the badge for good.
+      ...restatedLeadFields(previous.payload),
       ...(eventName === 'model_select' ? { model, modelSwitchCommand } : {}),
       subagents
     })
@@ -126,6 +137,15 @@ export function normalizePiCompatibleEvent(
       ? { sessionBoundary: true }
       : {})
   })
+}
+
+/** A restatement re-derives the fold: the lead's own verdict is on `mainAgent` once a hold consumed it,
+ *  and re-reading the held `working` would pin the badge after the last job stopped. A row with no
+ *  `mainAgent` is its own verdict, so this is a no-op for every unheld row. */
+function restatedLeadFields(
+  previous: ParsedAgentStatusPayload
+): Pick<ParsedAgentStatusPayload, 'state'> & { workingMode: undefined; mainAgent: undefined } {
+  return { state: mainAgentState(previous), workingMode: undefined, mainAgent: undefined }
 }
 
 const OMP_APPROVAL_RELEASE_EVENTS: ReadonlySet<unknown> = new Set([

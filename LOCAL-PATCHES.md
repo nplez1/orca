@@ -666,6 +666,49 @@ change beyond the status-bar badge — inherent in calling a shell agent work ra
 of the fold. If the stats change is unwanted, the alternative is to keep upstream's evidence split
 and strip only the `workingMode` from the published payloads.
 
+### `local(agents)`: scheduled work earns the monitoring badge for pi too
+
+`#284`. A pi session with a `/loop` armed, a pending `ScheduleWakeup`, or a cold pi-subagents job used
+to read `done` when its turn ended: `providers/pi-family-events.ts` mapped `agent_end` straight to
+`done`, and the extension's only hold before posting it was its child roster. The work was real — a
+live loop's timer re-enters the session, a cold job spawns a subagent — so the row was wrong for
+minutes at a time, and closing the tab fired the loop into a session believed finished.
+
+The badge is the one `local(agents)` above already owns (`workingMode: 'monitoring'`), so this is a
+missing evidence class, not a new state. It mirrors Claude's session cron, one lane over:
+
+- `src/main/pi/agent-status-scheduled-work-source.ts` — the inventory. Two `pi.events` RPC channels
+  (`loop:rpc:schedules:list` served by the user's `loop` extension, `subagents:rpc:schedules:list` by
+  pi-subagents) are cached in `globalThis` and posted as `scheduled_work` on **every** pi post, computed
+  while the body is built. Live loops publish nothing when armed, stopped or expired, so a re-check
+  timer (≤60s) is the only thing that can clear a hold nobody announced; it also restates every 10
+  minutes, because a silent `monitoring` row decays to `unverifiable` at 30.
+- `src/shared/agent-hook-listener/pi-scheduled-work.ts` — the wire reader. Relative `next_in_ms`, so a
+  relayed or SSH pane's clock skew cannot move the hold; bounded to 20 jobs; a fire more than two
+  minutes overdue means nothing refreshed the evidence, so it holds nothing.
+- `src/shared/agent-hook-listener/providers/pi-pane-hold-evidence.ts` — the pi lane's pane-hold fold,
+  the analogue of `resolveClaudePaneStatus` and the seam `#283` adds its child-work input to. Applied
+  at **one** place, `agent-hook-listener.ts`, after `gatePaneStateOnDescendants` and after the session
+  placeholder: the gate records the lead's own verdict, so a fold applied before it would teach the
+  gate that a finished turn was working. The inventory is cached per pane
+  (`piScheduledWorkByPaneKey`) because a republish can be triggered by something carrying no inventory
+  at all — a descendant draining, a resumed session's placeholder — and reading absence there would
+  drop a hold nothing has cleared.
+- A held row publishes `mainAgent.state === 'done'`. Two readers need it: a restatement
+  (`pi-family-events.ts` rebuilds every restatement from `mainAgentState`) would otherwise republish
+  the held `working` as the lead's verdict and pin the badge for good; and
+  `programStatusHookYieldEndsAt` pins hook precedence to `Infinity` only for
+  `isAgentStatusHeldOpenByChildWork`, without which the program-status lane takes the row over two
+  minutes after every turn.
+
+Fail-safe, not fail-active: a pi that serves neither channel posts no field, and reads exactly as it
+did. OMP and prime-agent are untouched — no emission, no fold.
+
+Tests: `src/main/pi/agent-status-scheduled-work.test.ts` drives the real generated source into the real
+listener, `providers/pi-pane-hold-evidence.test.ts` pins the reader and the fold,
+`server-program-status-hook-yield.test.ts` pins the silence fallback, and
+`agent-hook-listener-pi-compatible.test.ts` pins the restatement.
+
 ### `local(skills)`: re-track the three agent skills the internal move removed
 
 Upstream moved its agent skills out of the tree on 2026-04-29 (`c85f487ebf`, "chore: move agent

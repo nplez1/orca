@@ -2,6 +2,7 @@
    copilot background-work and retired pi-claude child maps. */
 import type { AgentMainAgentStatus, AgentStatusState } from '../agent-status-types'
 import type { AgentChildWorkKind } from '../agent-status-child-work'
+import type { PiScheduledJob } from './pi-scheduled-work'
 import type { ClaudeLeadTurnState, CodexLeadTurnState } from './main-agent-turn-state'
 
 export type { ClaudeLeadTurnState, CodexLeadTurnState } from './main-agent-turn-state'
@@ -99,6 +100,11 @@ export type HookListenerState = {
    *  NOT a state claim (see `paneHasStateClaims`): it only refines a republish that an
    *  incoming descendant event already triggered, and never creates a row on its own. */
   descendantLeadStateByPaneKey: Map<string, AgentStatusState>
+  /** Scheduled work a pi pane's own extension last reported armed — a loop, a pending wakeup or a cold
+   *  job. Kept here rather than read off the current event because a republish can be triggered by
+   *  something that carries no inventory at all (a descendant draining, a resumed session's
+   *  placeholder), and reading absence there would drop a hold nothing has cleared. */
+  piScheduledWorkByPaneKey: Map<string, readonly PiScheduledJob[]>
   /** Hermes turn per pane, so tool hooks from its post-turn background review can be ignored. */
   hermesTurnByPaneKey: Map<string, HermesPaneTurn>
 }
@@ -171,6 +177,7 @@ export function createHookListenerState(
     descendantRosterByPaneKey: new Map(),
     retiredPiClaudeChildrenByPaneKey: new Map(),
     descendantLeadStateByPaneKey: new Map(),
+    piScheduledWorkByPaneKey: new Map(),
     hermesTurnByPaneKey: new Map()
   }
   legacyStatusAdapterByState.set(state, adapter)
@@ -272,6 +279,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.descendantRosterByPaneKey.delete(paneKey)
   state.retiredPiClaudeChildrenByPaneKey.delete(paneKey)
   state.descendantLeadStateByPaneKey.delete(paneKey)
+  state.piScheduledWorkByPaneKey.delete(paneKey)
   state.hermesTurnByPaneKey.delete(paneKey)
 }
 
@@ -288,7 +296,8 @@ export function paneHasStateClaims(state: HookListenerState, paneKey: string): b
     state.codexSubagentRosterByPaneKey.has(paneKey) ||
     state.codexLeadStateByPaneKey.has(paneKey) ||
     state.copilotBackgroundWorkByPaneKey.has(paneKey) ||
-    state.descendantRosterByPaneKey.has(paneKey)
+    state.descendantRosterByPaneKey.has(paneKey) ||
+    state.piScheduledWorkByPaneKey.has(paneKey)
   )
 }
 
@@ -329,6 +338,7 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.copilotBackgroundWorkByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantRosterByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantLeadStateByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.piScheduledWorkByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.hermesTurnByPaneKey, fromPaneKey, toPaneKey)
 }
 
@@ -376,5 +386,6 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.copilotBackgroundWorkByPaneKey.clear()
   state.descendantRosterByPaneKey.clear()
   state.descendantLeadStateByPaneKey.clear()
+  state.piScheduledWorkByPaneKey.clear()
   state.hermesTurnByPaneKey.clear()
 }

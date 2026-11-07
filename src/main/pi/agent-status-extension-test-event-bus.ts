@@ -4,6 +4,7 @@ import type { EventEmitter } from 'node:events'
 export type PiEventBus = {
   on: (name: string, listener: (event: unknown) => void) => unknown
   off?: (name: string, listener: (event: unknown) => void) => unknown
+  emit?: (name: string, payload: unknown) => unknown
 }
 
 type BusSubscription = [string, (event: unknown) => void]
@@ -15,19 +16,28 @@ export function createTrackedPiEventBus(
   emitter: EventEmitter,
   subscriptions: BusSubscription[]
 ): PiEventBus {
+  const release = (name: string, listener: (event: unknown) => void): void => {
+    emitter.off(name, listener)
+    for (let index = subscriptions.length - 1; index >= 0; index--) {
+      const [entryName, entryListener] = subscriptions[index]
+      if (entryName === name && entryListener === listener) {
+        subscriptions.splice(index, 1)
+      }
+    }
+  }
   return {
     on(name: string, listener: (event: unknown) => void) {
       emitter.on(name, listener)
       subscriptions.push([name, listener])
+      // Why a release function: an RPC asks on a request-scoped reply channel and settles once.
+      return () => release(name, listener)
     },
     off(name: string, listener: (event: unknown) => void) {
-      emitter.off(name, listener)
-      for (let index = subscriptions.length - 1; index >= 0; index--) {
-        const [entryName, entryListener] = subscriptions[index]
-        if (entryName === name && entryListener === listener) {
-          subscriptions.splice(index, 1)
-        }
-      }
+      release(name, listener)
+    },
+    // Why: extensions talk to each other over this bus, so a harness without `emit` cannot answer an RPC.
+    emit(name: string, payload: unknown) {
+      emitter.emit(name, payload)
     }
   }
 }

@@ -49,6 +49,8 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     // Reload/current-file resume retains session ownership and future child reports.
     "    const keepsSession = reason === 'reload' || (reason === 'resume' && typeof target === 'string' && target === sessionMetadata.session_file)",
     '    if (!keepsSession) clearRunnerExitCheck()',
+    // Why: a replaced session's loops do not come back with it, so its hold must not outlive it.
+    '    if (!keepsSession) piScheduledWorkReset()',
     // LOCAL(nplez1): Pi hands the factory it re-runs after this a FRESH `pi.events` for every
     // reload, resume and fork, so the next registration has to be allowed to arm that bus. Only
     // upstream's roster keys off the evaluation and is reset here; this lane's binding is keyed by
