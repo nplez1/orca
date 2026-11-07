@@ -3,13 +3,9 @@ import {
   agentDescendantRosterToSnapshots
 } from '../agent-descendant-roster'
 import { foldAgentLeadStatus } from '../agent-lead-status-fold'
+import { agentChildWorkLiveness } from '../agent-status-child-work-liveness'
 import type { AgentSubagentSnapshot } from '../agent-status-subagent-snapshot'
 import type { AgentStatusState, ParsedAgentStatusPayload } from '../agent-status-types'
-import {
-  paneChildWorkLiveness,
-  paneHoldEvidence,
-  type PaneHoldEvidence
-} from './descendant-pane-hold-evidence'
 import type { HookListenerState } from './listener-state'
 
 /** A child both rosters name: the tracked entry owns its state and tool line, and the reporting lane
@@ -101,11 +97,15 @@ export function resolvePaneHold(
   payload: ParsedAgentStatusPayload,
   leadState: AgentStatusState,
   children: readonly AgentSubagentSnapshot[],
-  evidence: PaneHoldEvidence = paneHoldEvidence(children)
+  /** A wait this lane recorded for a provider that owns its own roster, which lists no child row. */
+  waitingWithoutChildRow = false
 ): ParsedAgentStatusPayload {
   const resolution = foldAgentLeadStatus({
     leadState,
-    childWorkLiveness: paneChildWorkLiveness(evidence)
+    childWorkLiveness: agentChildWorkLiveness([
+      ...children.map((child) => ({ kind: 'agent' as const, state: child.state })),
+      ...(waitingWithoutChildRow ? [{ kind: 'agent' as const, state: 'waiting' as const }] : [])
+    ])
   })
   return {
     ...payload,

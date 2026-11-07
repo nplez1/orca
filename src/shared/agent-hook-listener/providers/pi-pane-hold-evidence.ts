@@ -3,7 +3,10 @@ import {
   foldAgentLeadStatus,
   type AgentLeadStatusResolution
 } from '../../agent-lead-status-fold'
-import { agentChildWorkLivenessFromEvidence } from '../../agent-status-child-work-liveness'
+import {
+  agentChildWorkLiveness,
+  agentChildWorkLivenessFromEvidence
+} from '../../agent-status-child-work-liveness'
 import type { AgentStatusState, ParsedAgentStatusPayload } from '../../agent-status-types'
 import type { HookListenerState } from '../listener-state'
 import { readPiScheduledWork, type PiScheduledJob } from '../pi-scheduled-work'
@@ -75,7 +78,13 @@ export function applyPiScheduledWorkHold(
   const previousMainAgent = state.lastStatusByPaneKey.get(paneKey)?.payload.mainAgent
   const jobs: readonly PiScheduledJob[] = state.piScheduledWorkByPaneKey.get(paneKey) ?? []
   const resolution = resolvePiPaneStatus(payload.state, {
-    runningAgent: false,
+    // Why from the payload: the descendant gate has already folded the pane's one child roster into
+    // `state`, and this fold reads that roster back so agent work outranks the monitoring badge
+    // rather than the two being decided from different inputs.
+    runningAgent:
+      agentChildWorkLiveness(
+        payload.subagents?.map((child) => ({ kind: 'agent' as const, state: child.state }))
+      ) !== null,
     scheduledWork: jobs.length > 0
   })
   if (resolution.stateName === payload.state) {

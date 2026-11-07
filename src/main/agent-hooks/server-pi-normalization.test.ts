@@ -469,23 +469,20 @@ describe('a Pi cancel beside a live child row', () => {
     })
   })
 
-  it('settles again after a child that appeared under a cancelled row is gone', async () => {
+  it('does not reopen a cancelled row for a child that appears afterwards', async () => {
     await startTurn()
     expect(pressCtrlC()).toBe(true)
 
-    const held = await postHookEvent(
+    const response = await postHookEvent(
       server,
       buildBody({ hook_event_name: 'subagents_update', subagents: [SCOUT] }),
       '/hook/pi'
     )
-    expect(held.status).toBe(204)
+    expect(response.status).toBe(204)
     expect(server.getStatusSnapshotForPane(PANE)[0]).toMatchObject({
-      state: 'working',
-      subagents: [expect.objectContaining({ id: 'run-scout' })]
+      state: 'done',
+      interrupted: true
     })
-
-    await postHookEvent(server, buildBody({ hook_event_name: 'subagents_update' }), '/hook/pi')
-    expect(server.getStatusSnapshotForPane(PANE)[0]).toMatchObject({ state: 'done' })
   })
 
   // Without main-agent evidence, live children make turn cancellation indistinguishable from idle-prompt Ctrl+C.

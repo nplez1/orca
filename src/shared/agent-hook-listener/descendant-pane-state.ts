@@ -134,8 +134,6 @@ export function applyDescendantEventToPane(
     effectiveLeadState,
     children,
     facts.kind === 'child' && facts.waiting === true
-      ? { runningAgent: true, waitingAgent: true }
-      : undefined
   )
 }
 
@@ -221,45 +219,29 @@ export function applyDescendantLiveSet(
  *  Records the lead's own verdict first, so draining the last descendant later
  *  republishes what the lead actually said instead of the gated value.
  *
- *  `restated` marks a payload that is the PREVIOUS published row rather than a fresh verdict (pi's
- *  `model_select` / `subagents_update` republish what they were handed). Its state is this fold's own
- *  output, so recording it as the verdict would pin the pane working once the last child drained. */
+ *  A provider that restates a row it was handed (`pi-family-events.ts` `restatedLeadFields`) hands
+ *  over the lead's own verdict, never this fold's output, so the verdict recorded here is always the
+ *  lead's. */
 export function gatePaneStateOnDescendants(
   state: HookListenerState,
   paneKey: string,
-  payload: ParsedAgentStatusPayload | null,
-  options: { restated?: boolean } = {}
+  payload: ParsedAgentStatusPayload | null
 ): ParsedAgentStatusPayload | null {
   if (!payload) {
     return payload
   }
   const now = Date.now()
-  // Why also on a restate that carries `done`: the fold only ever outputs `done` from a `done` lead,
-  // so that verdict is the lead's own — and the row's writer may be a host-side settle that never
-  // touched this map (a Ctrl-C), which would otherwise leave a stale `working` for the next child
-  // event to republish.
-  if (options.restated !== true || payload.state === 'done') {
-    state.descendantLeadStateByPaneKey.set(paneKey, payload.state)
-  }
+  state.descendantLeadStateByPaneKey.set(paneKey, payload.state)
   // Why the payload's own list wins when it has one: a provider that reports its roster on every
   // post means an absent list is "no children", so carrying the last forward would resurrect one.
   rememberReportedChildren(state, paneKey, payload.subagents, now)
   dropEmptyDescendantRoster(state, paneKey, now)
   const children = paneChildSnapshots(state, paneKey, payload.subagents)
-  // Why reference-identical: a pane with no children must publish exactly what its provider said —
-  // unless the payload is a restate, whose state is this fold's own output and must be re-resolved.
-  if (children.length === 0 && options.restated !== true) {
+  // Why reference-identical: a pane with no children must publish exactly what its provider said.
+  if (children.length === 0) {
     return payload
   }
-  // Why a restate cannot simply read the recorded verdict: a host-side settle (a Ctrl-C) writes
-  // `done` straight into the cached row without touching this map, and folding the stale `working`
-  // back in would resurrect a row the host had already settled. A `done` verdict on the payload is
-  // therefore the lead's own; anything else may be this gate's held output, so the record wins.
-  const leadState =
-    options.restated === true && payload.state !== 'done'
-      ? (state.descendantLeadStateByPaneKey.get(paneKey) ?? payload.state)
-      : payload.state
-  return resolvePaneHold(payload, leadState, children)
+  return resolvePaneHold(payload, payload.state, children)
 }
 
 /** Whether a child this lane knows about is blocked on a human answer. Only the narrow grok reader

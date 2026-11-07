@@ -491,6 +491,29 @@ describe('descendant lifecycle never settles the pane', () => {
       expect(held?.payload.subagents?.map((child) => child.id)).toEqual(['child-1'])
     })
 
+    it('reads plain working, not monitoring, when a child and scheduled work both hold a turn', () => {
+      startTurn()
+      const held = publish('pi', {
+        hook_event_name: 'agent_end',
+        scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 300_000 }] },
+        subagents: [CHILD]
+      })
+      // Why no badge: agent work outranks scheduled work, and the monitoring badge is for a turn held
+      // only by a monitor that will wake it. The two inputs are one fold, so the answer is one state.
+      expect(held?.payload.state).toBe('working')
+      expect(held?.payload.workingMode).toBeUndefined()
+    })
+
+    it('keeps the monitoring badge when only scheduled work holds the turn', () => {
+      startTurn()
+      const held = publish('pi', {
+        hook_event_name: 'agent_end',
+        scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 300_000 }] }
+      })
+      expect(held?.payload.state).toBe('working')
+      expect(held?.payload.workingMode).toBe('monitoring')
+    })
+
     it('forgets the reported roster when the pane starts a new agent process', () => {
       startTurn()
       publish('pi', { hook_event_name: 'subagents_update', subagents: [CHILD] })
