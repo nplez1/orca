@@ -453,6 +453,25 @@ describe('a Pi cancel beside a live child row', () => {
     })
   })
 
+  // Why: a settle writes `done` straight into the cached row without touching the listener's lead
+  // verdict, so a later restate must read that verdict off the row — folding the stale `working` back
+  // in would resurrect a row the host had already settled.
+  it('keeps a cancelled row settled when the model changes afterwards', async () => {
+    await startTurn()
+    expect(pressCtrlC()).toBe(true)
+
+    const response = await postHookEvent(
+      server,
+      buildBody({ hook_event_name: 'model_select', model: 'anthropic/claude-opus-5' }),
+      '/hook/pi'
+    )
+    expect(response.status).toBe(204)
+    expect(server.getStatusSnapshotForPane(PANE)[0]).toMatchObject({
+      state: 'done',
+      interrupted: true
+    })
+  })
+
   // Without main-agent evidence, live children make turn cancellation indistinguishable from idle-prompt Ctrl+C.
   it('leaves the working row alone while a child still runs', async () => {
     await startTurn([{ id: 'run-scout', state: 'working', startedAt: 1_000, agentType: 'scout' }])

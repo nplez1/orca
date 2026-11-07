@@ -247,8 +247,12 @@ export function gatePaneStateOnDescendants(
   if (children.length === 0 && options.restated !== true) {
     return payload
   }
+  // Why a restate cannot simply read the recorded verdict: a host-side settle (a Ctrl-C) writes
+  // `done` straight into the cached row without touching this map, and folding the stale `working`
+  // back in would resurrect a row the host had already settled. A `done` verdict on the payload is
+  // therefore the lead's own; anything else may be this gate's held output, so the record wins.
   const leadState =
-    options.restated === true
+    options.restated === true && payload.state !== 'done'
       ? (state.descendantLeadStateByPaneKey.get(paneKey) ?? payload.state)
       : payload.state
   return resolvePaneHold(payload, leadState, children)

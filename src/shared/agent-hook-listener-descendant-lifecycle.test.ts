@@ -298,10 +298,16 @@ describe('descendant lifecycle never settles the pane', () => {
       publish('pi', { hook_event_name: 'agent_start' })
     }
 
-    /** The cross-surface contract: re-folding a published row's own children into its own state
-     *  must reproduce it, so no surface can read the row and its children differently. */
+    /** The cross-surface contract, in the direction that matters: a row must never read `done`
+     *  while the child list it publishes holds live work, and re-folding that list into the row's own
+     *  state must reproduce it — so no surface can read the row and its children differently. */
     const expectRowAgreesWithChildren = (row: ReturnType<typeof publish>): void => {
       expect(row).not.toBeNull()
+      // Why only `idle`: a snapshot has no `done` — every other state is a live claim.
+      const live = (row!.payload.subagents ?? []).filter((child) => child.state !== 'idle')
+      if (live.length > 0) {
+        expect(row!.payload.state).not.toBe('done')
+      }
       expect(
         foldMainAgentWithRowChildWork(row!.payload.state, { payload: row!.payload }).stateName
       ).toBe(row!.payload.state)
@@ -424,6 +430,65 @@ describe('descendant lifecycle never settles the pane', () => {
       expect(ended?.payload.state).toBe('working')
       expect(ended?.payload.sessionBoundary).toBeUndefined()
       expect(ended?.payload.workingMode).toBeUndefined()
+    })
+
+    it('drops the reported roster when the async lane carries none', () => {
+      startTurn()
+      const both = publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [RUN],
+        subagents: [CHILD]
+      })
+      expect(both?.payload.subagents?.map((child) => child.id)).toEqual(['child-1', 'run-1'])
+
+      // Why: on a pi post the field's absence is the pane's own lane saying it has none. Reading it
+      // as "no opinion" would carry a dropped child forward and hold the row on a finished child.
+      const drained = publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: []
+      })
+      expect(drained?.payload.subagents).toBeUndefined()
+    })
+
+    it('fills a shared child id with the label only the reporting lane carries', () => {
+      startTurn()
+      publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [{ id: 'child-1', agent_type: 'researcher' }]
+      })
+      const row = publish('pi', {
+        hook_event_name: 'subagents_update',
+        subagents: [{ id: 'child-1', state: 'working', startedAt: 5, description: 'trace it' }]
+      })
+      expect(row?.payload.subagents).toEqual([
+        expect.objectContaining({ id: 'child-1', agentType: 'researcher', description: 'trace it' })
+      ])
+    })
+
+    it('holds an omp or prime-agent pane by the same fold', () => {
+      publish('omp', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      expect(publishedState('omp', { hook_event_name: 'agent_end', subagents: [CHILD] })).toBe(
+        'working'
+      )
+
+      publish('prime-agent', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('prime-agent', { hook_event_name: 'agent_end' })
+      expect(
+        publishedState('prime-agent', { hook_event_name: 'subagents_update', subagents: [CHILD] })
+      ).toBe('working')
+      expect(publishedState('prime-agent', { hook_event_name: 'subagents_update' })).toBe('done')
+    })
+
+    it('keeps an omp approval hold blocked when a child appears under it', () => {
+      publish('omp', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('omp', { hook_event_name: 'tool_approval_requested', tool_name: 'Bash' })
+      expect(state.lastStatusByPaneKey.get(PANE_KEY)?.payload.state).toBe('blocked')
+
+      // Why: the approval hold reads the cached row, so a fold that turned `blocked` into `working`
+      // would release the hold as a side effect of holding the row open for a child.
+      const held = publish('omp', { hook_event_name: 'subagents_update', subagents: [CHILD] })
+      expect(held?.payload.state).toBe('blocked')
+      expect(held?.payload.subagents?.map((child) => child.id)).toEqual(['child-1'])
     })
 
     it('forgets the reported roster when the pane starts a new agent process', () => {

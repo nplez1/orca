@@ -533,11 +533,21 @@ Two things the fold needs that a naive version gets wrong. **A restate is not a 
 `model_select` / `subagents_update` republish the row they were handed, so the state they carry is the
 gate's own output; recording it as the lead's verdict pinned the pane `working` once the last child
 drained, so the gate takes a `restated` flag from `provider-dispatch.ts` (kept out of
-`pi-family-events.ts`, which stays upstream's file). **A child event carries no roster of its own:**
+`pi-family-events.ts`, which stays upstream's file). A restate still reads a `done` verdict off the
+payload itself, because a host-side settle (Ctrl-C, `server-status-inference.ts` `settleTurnWithoutStop`)
+writes `done` into the cached row without touching this map — folding the stale `working` back in
+resurrected a row the host had already settled. **A child event carries no roster of its own:**
 `reportedSubagentsByPaneKey` carries the pane's last reported children into those publications, stamped
 and reaped on the roster's own quiet window so a lane that dies mid-child cannot pin the row.
 `agentDescendantEffectiveState` is gone — the map-based fold had no callers left once both paths went
 through `foldAgentLeadStatus`.
+
+One ordering change comes with the fold and is intended: a lead that is itself `blocked` or `waiting`
+now keeps that word where `agentDescendantEffectiveState` returned `waiting` for any waiting child.
+`foldAgentLeadStatus` keeps the lead's own vocabulary first because the row's `toolName` and
+`interactivePrompt` are the lead's, so `waiting` beside a `blocked` prompt named the wrong surface. The
+grok rule is untouched either way: a child's unanswered question still prevents `done`, and grok never
+produces `blocked` as a lead state.
 
 Anchors:
 
