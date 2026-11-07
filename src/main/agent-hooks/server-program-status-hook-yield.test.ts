@@ -409,4 +409,27 @@ describe('OSC 7501 status beside hooks', () => {
       expect(paneRow()?.programStatus).toBeUndefined()
     })
   })
+  it('keeps a held pi pane through the silence fallback while its session has scheduled work', async () => {
+    // Why: a pi session with a loop armed is held `working` with nothing else reporting, so the
+    // program-status fallback must not settle it two minutes later.
+    const response = await postHookEvent(
+      server,
+      buildBody({
+        hook_event_name: 'agent_end',
+        scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 300_000 }] }
+      }),
+      '/hook/pi'
+    )
+    expect(response.status).toBe(204)
+    expect(paneRow()).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+
+    try {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(Date.now() + HOOK_SILENCE_BEFORE_PROGRAM_STATUS_FALLBACK_MS)
+      programStatus({ state: 'done', agentType: 'pi' })
+      expect(paneRow()).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

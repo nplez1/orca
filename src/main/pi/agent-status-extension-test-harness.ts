@@ -189,7 +189,8 @@ export function createAgentStatusExtensionHarness(args: {
     argv: args.argv ?? ['node', '/usr/bin/orca']
   }
 
-  const context = {
+  // Why the annotation: the VM sandbox takes an indexable global bag, and `globalThis` is assigned below.
+  const context: Record<string, unknown> = {
     module,
     exports: module.exports,
     require: requireMock,
@@ -205,8 +206,11 @@ export function createAgentStatusExtensionHarness(args: {
     URL,
     AbortController,
     setTimeout,
-    clearTimeout
-  } as Record<string, unknown>
+    clearTimeout,
+    // Why the host's Date: the VM realm has its own, so a faked clock would leave the extension on the
+    // real one — and a scheduled hold is entirely a comparison between the two.
+    Date
+  }
   context.globalThis = context
 
   const source = getPiAgentStatusExtensionSource(args.kind)

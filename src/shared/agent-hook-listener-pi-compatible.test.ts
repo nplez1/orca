@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createHookListenerState,
+  seedLegacyAgentStatusForTests,
   type HookListenerState
 } from './agent-hook-listener/listener-state'
 import { normalizeHookPayload } from './agent-hook-listener'
@@ -513,5 +514,53 @@ describe('shared agent-hook-listener', () => {
       providerSessionOnly: true,
       payload: { state: 'done', prompt: '', agentType: 'prime-agent' }
     })
+  })
+  it('holds a finished pi turn as monitoring while its session has scheduled work armed', () => {
+    // Why seed: a restatement re-reads the row the pane last published, as the real listener stores it.
+    const post = (payload: Record<string, unknown>) => {
+      const event = normalizeHookPayload(state, 'pi', { paneKey: PANE_KEY, payload }, 'production')
+      if (event) {
+        seedLegacyAgentStatusForTests(state, event)
+      }
+      return event
+    }
+
+    post({ hook_event_name: 'agent_start', prompt: 'watch the deploy' })
+    const held = post({
+      hook_event_name: 'agent_end',
+      turn_completed_at: 1_700_000_000_000,
+      scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 300_000 }] }
+    })
+
+    expect(held?.payload.state).toBe('working')
+    expect(held?.payload.workingMode).toBe('monitoring')
+    // Why: the lead's own verdict, which the fold consumed — a restatement recovers it from here.
+    expect(held?.payload.mainAgent?.state).toBe('done')
+    expect(held?.payload.turnCompletedAt).toBe(1_700_000_000_000)
+
+    // A child update restates the row; it must not republish the hold as the lead's own verdict.
+    const restated = post({
+      hook_event_name: 'subagents_update',
+      scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 200_000 }] }
+    })
+    expect(restated?.payload.workingMode).toBe('monitoring')
+
+    // The last job stopped: the restatement settles on the lead's verdict instead of the stale hold.
+    const cleared = post({ hook_event_name: 'scheduled_work_update', scheduled_work: { jobs: [] } })
+    expect(cleared?.payload.state).toBe('done')
+    expect(cleared?.payload.workingMode).toBeUndefined()
+    expect(cleared?.payload.mainAgent).toBeUndefined()
+  })
+
+  it('reads a pi post with no scheduled-work field exactly as before', () => {
+    const post = (payload: Record<string, unknown>) =>
+      normalizeHookPayload(state, 'pi', { paneKey: PANE_KEY, payload }, 'production')
+
+    post({ hook_event_name: 'agent_start', prompt: 'no loops here' })
+    const ended = post({ hook_event_name: 'agent_end' })
+
+    expect(ended?.payload.state).toBe('done')
+    expect(ended?.payload.workingMode).toBeUndefined()
+    expect(ended?.payload.mainAgent).toBeUndefined()
   })
 })

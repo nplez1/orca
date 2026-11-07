@@ -21,6 +21,10 @@ import {
   getAgentStatusSessionBoundaryHandlerSourceLines,
   getPiLateBusyPostCompletionSourceLines
 } from './agent-status-session-boundary-source'
+import {
+  getPiAgentStatusScheduledWorkBusLines,
+  getPiAgentStatusScheduledWorkSessionStartLines
+} from './agent-status-scheduled-work-bus-source'
 
 export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] {
   const sessionStartHandler =
@@ -29,6 +33,9 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
           "  onStatus('session_start', (event, ctx) => {",
           '    updateSessionMetadata(ctx)',
           ...getPiAgentStatusAsyncSubagentSessionNoteLines(kind),
+          // Why here and not at factory time: only the pane-owning registration reaches this handler, and
+          // an in-process subagent must not re-point the shared inventory at its own bus.
+          ...getPiAgentStatusScheduledWorkSessionStartLines(kind),
           ...(kind === 'pi' ? ['    piUiPromptDepth = 0'] : []),
           '    // Reload replaces registration without ending the turn; preserve status and unread state.',
           "    if (event.reason === 'reload') return",
@@ -105,6 +112,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
   return [
     ...getAgentStatusInputRedactionSourceLines(),
     ...getAgentStatusAssistantTextSourceLines(),
+    ...getPiAgentStatusScheduledWorkBusLines(kind),
     '// Preserve ordinary preview data; credential references never leave the agent host.',
     ...getPiOwnerLivenessSourceLines(),
     '// Inherited pane identity permits only the lead process; PID equality retains in-process reloads.',
@@ -218,6 +226,8 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     ...(kind === 'pi'
       ? [
           '    const replyFields = takeCompletedReplyFields()',
+          // Why before the post: the snapshot is built at delivery, so the hold must already be current.
+          '    piScheduledWorkRefresh()',
           "    post('agent_end', final ? { session_boundary: true } : replyFields, final)"
         ]
       : ["    post('agent_end', final ? { session_boundary: true } : {}, final)"]),

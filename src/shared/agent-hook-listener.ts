@@ -30,6 +30,10 @@ import {
   trackOpenCodePaneLaunchToken
 } from './agent-hook-listener/opencode-session-registry'
 import { claudeRowHasUnlistedLiveWork } from './agent-hook-listener/providers/claude-pane-hold-evidence'
+import {
+  applyPiScheduledWorkHold,
+  recordPiScheduledWork
+} from './agent-hook-listener/providers/pi-pane-hold-evidence'
 import { readString } from './agent-hook-listener/tool-input-preview'
 import {
   hasSeparateHookSessionAdmission,
@@ -293,14 +297,22 @@ export function normalizeHookPayload(
       ? { ...heldPlaceholder, sessionBoundary: true }
       : heldPlaceholder
   const transportPayload = dispatched.payload ?? gatedPlaceholder
+  // Why here, once, after the gate and the placeholder: the gate records the lead's own verdict before
+  // any fold consumes it, and every republish path — a finished turn, a descendant draining, a resumed
+  // session's placeholder — passes through this line with the inventory this post carries.
+  if (source === 'pi') {
+    recordPiScheduledWork(state, paneKey, hookPayloadRecord)
+  }
+  const piHeldPayload =
+    source === 'pi' ? applyPiScheduledWorkHold(state, paneKey, transportPayload) : transportPayload
   // Why: an identity-only record is what discards a status row, so it is only right while there is
   // no state to publish. A resume whose children are still live does have one, and publishing it is
   // how the pane gets its hold back instead of waiting for the next child event to describe one.
   const providerSessionOnlyRecord =
-    providerSessionOnly && (transportPayload?.subagents?.length ?? 0) === 0
+    providerSessionOnly && (piHeldPayload?.subagents?.length ?? 0) === 0
   const restoredUnconfirmed =
     source === 'claude' && state.claudeUnconfirmedRestoredStatusPaneKeys.delete(paneKey)
-  if (!transportPayload) {
+  if (!piHeldPayload) {
     return null
   }
   const grokActiveTurn = source === 'grok' ? state.grokActiveTurnByPaneKey.get(paneKey) : undefined
@@ -353,6 +365,6 @@ export function normalizeHookPayload(
     ...(statusAdmissionSession ? { statusAdmissionSession } : {}),
     ...(providerSessionOnlyRecord ? { providerSessionOnly: true } : {}),
     ...dispatched.hostTurnSignals,
-    payload: transportPayload
+    payload: piHeldPayload
   }
 }
