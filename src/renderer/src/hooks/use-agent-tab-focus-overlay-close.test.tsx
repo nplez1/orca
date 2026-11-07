@@ -54,6 +54,20 @@ async function drainQueuedTasks(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+/**
+ * Why: deliver the observer's records without yielding to a queued task. `act(async …)`
+ * resolves through one (`setImmediate`, else `MessageChannel`), which let the hook's 0ms
+ * decision run before the focus landed — a restore a browser never makes, and the
+ * nightly's flake.
+ *
+ * Why it stays its own await: the extra hop is what puts a decision queued from the
+ * observer ahead of the focus below, so a `queueMicrotask` regression reds this case.
+ * Inlined into the test body, it would not.
+ */
+async function drainObserverMicrotask(): Promise<void> {
+  await Promise.resolve()
+}
+
 let root: Root
 let container: HTMLDivElement
 
@@ -125,12 +139,10 @@ describe('overlay close returns focus to the agent tab', () => {
     // A synchronously closed popup unmounts before mousedown moves the focus: the removal
     // is observed first, and only then does the click land on the row.
     overlay.remove()
-    await act(async () => {
-      await Promise.resolve()
-    })
+    await drainObserverMicrotask()
     row.focus()
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await drainQueuedTasks()
     })
 
     expect(restore).not.toHaveBeenCalled()
