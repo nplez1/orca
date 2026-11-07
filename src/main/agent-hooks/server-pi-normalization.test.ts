@@ -472,6 +472,28 @@ describe('a Pi cancel beside a live child row', () => {
     })
   })
 
+  // Why: the settle above writes `done` into the cached row but not into the listener's lead verdict,
+  // so a hold the restate then creates must record that `done` — otherwise the next restate drains
+  // the child and republishes the stale `working`, reviving a row the host had already settled.
+  it('settles again after a child that appeared under a cancelled row is gone', async () => {
+    await startTurn()
+    expect(pressCtrlC()).toBe(true)
+
+    const held = await postHookEvent(
+      server,
+      buildBody({ hook_event_name: 'subagents_update', subagents: [SCOUT] }),
+      '/hook/pi'
+    )
+    expect(held.status).toBe(204)
+    expect(server.getStatusSnapshotForPane(PANE)[0]).toMatchObject({
+      state: 'working',
+      subagents: [expect.objectContaining({ id: 'run-scout' })]
+    })
+
+    await postHookEvent(server, buildBody({ hook_event_name: 'subagents_update' }), '/hook/pi')
+    expect(server.getStatusSnapshotForPane(PANE)[0]).toMatchObject({ state: 'done' })
+  })
+
   // Without main-agent evidence, live children make turn cancellation indistinguishable from idle-prompt Ctrl+C.
   it('leaves the working row alone while a child still runs', async () => {
     await startTurn([{ id: 'run-scout', state: 'working', startedAt: 1_000, agentType: 'scout' }])

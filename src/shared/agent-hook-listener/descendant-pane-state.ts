@@ -234,7 +234,11 @@ export function gatePaneStateOnDescendants(
     return payload
   }
   const now = Date.now()
-  if (options.restated !== true) {
+  // Why also on a restate that carries `done`: the fold only ever outputs `done` from a `done` lead,
+  // so that verdict is the lead's own — and the row's writer may be a host-side settle that never
+  // touched this map (a Ctrl-C), which would otherwise leave a stale `working` for the next child
+  // event to republish.
+  if (options.restated !== true || payload.state === 'done') {
     state.descendantLeadStateByPaneKey.set(paneKey, payload.state)
   }
   // Why the payload's own list wins when it has one: a provider that reports its roster on every

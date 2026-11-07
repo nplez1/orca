@@ -12,14 +12,6 @@ import {
 } from './descendant-pane-hold-evidence'
 import type { HookListenerState } from './listener-state'
 
-/** The pane's child roster: the live set this lane builds from descendant events, unioned with the
- *  roster the pane's own lane reports on its payload.
- *
- *  One set decides both the row's child list and its state. Two rosters is what let a session read
- *  `done` while the fleet list rendered its child spinning (#283): the display read the payload's own
- *  list while only this lane's list gated the state, so whichever list the other surface did not read
- *  could disagree freely. Roster entries win a shared id — they carry the tool line and the `waiting`
- *  state a child's own stream reported, which the reporting lane cannot know. */
 /** A child both rosters name: the tracked entry owns its state and tool line, and the reporting lane
  *  fills any label it alone carries — a row named by its description beats one named by its type. */
 function withReportedLabels(
@@ -35,6 +27,14 @@ function withReportedLabels(
   }
 }
 
+/** The pane's child roster: the live set this lane builds from descendant events, unioned with the
+ *  roster the pane's own lane reports on its payload.
+ *
+ *  One set decides both the row's child list and its state. Two rosters is what let a session read
+ *  `done` while the fleet list rendered its child spinning (#283): the display read the payload's own
+ *  list while only this lane's list gated the state, so whichever list the other surface did not read
+ *  could disagree freely. Roster entries own a shared id — they carry the tool line and the `waiting`
+ *  state a child's own stream reported, which the reporting lane cannot know. */
 export function paneChildSnapshots(
   state: HookListenerState,
   paneKey: string,

@@ -552,7 +552,8 @@ produces `blocked` as a lead state.
 Anchors:
 
 - `src/shared/agent-hook-listener/pane-child-roster.ts` — the union, the reported-children store, and
-  `resolvePaneHold`, which writes `state`, `workingMode`, `sessionBoundary` and `subagents` together.
+  `resolvePaneHold`, which writes `state`, `workingMode`, `sessionBoundary`, `interrupted` and
+  `subagents` together.
 - `src/shared/agent-hook-listener/descendant-pane-hold-evidence.ts` — `paneHoldEvidence` /
   `paneChildWorkLiveness`, the seam #284 extends.
 - `src/shared/agent-hook-listener/descendant-pane-state.ts` — `gatePaneStateOnDescendants` (`restated`)
