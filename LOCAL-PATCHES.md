@@ -677,12 +677,16 @@ minutes at a time, and closing the tab fired the loop into a session believed fi
 The badge is the one `local(agents)` above already owns (`workingMode: 'monitoring'`), so this is a
 missing evidence class, not a new state. It mirrors Claude's session cron, one lane over:
 
-- `src/main/pi/agent-status-scheduled-work-source.ts` — the inventory. Two `pi.events` RPC channels
+- `src/main/pi/agent-status-scheduled-work-source.ts` + `agent-status-scheduled-work-bus-source.ts` —
+  the inventory. Two `pi.events` RPC channels
   (`loop:rpc:schedules:list` served by the user's `loop` extension, `subagents:rpc:schedules:list` by
   pi-subagents) are cached in `globalThis` and posted as `scheduled_work` on **every** pi post, computed
   while the body is built. Live loops publish nothing when armed, stopped or expired, so a re-check
   timer (≤60s) is the only thing that can clear a hold nobody announced; it also restates every 10
-  minutes, because a silent `monitoring` row decays to `unverifiable` at 30.
+  minutes, because a silent `monitoring` row decays to `unverifiable` at 30. The bus is adopted from the
+  **fenced** `session_start` handler, never at factory time: pi-subagents runs children in-process on
+  their own bus and with the same pid, so a factory-scope adoption would let the first subagent point
+  the lead's refreshes at a bus that serves no loops.
 - `src/shared/agent-hook-listener/pi-scheduled-work.ts` — the wire reader. Relative `next_in_ms`, so a
   relayed or SSH pane's clock skew cannot move the hold; bounded to 20 jobs; a fire more than two
   minutes overdue means nothing refreshed the evidence, so it holds nothing.

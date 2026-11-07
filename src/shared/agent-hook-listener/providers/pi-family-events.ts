@@ -56,7 +56,7 @@ export function normalizePiCompatibleEvent(
       ...previous.payload,
       // Why for every restatement: the row it restates may be held `working` by a finished turn, and a
       // restatement that republishes that `working` as the lead's verdict pins the badge for good.
-      ...restatedLeadFields(previous.payload),
+      ...restatedLeadFields(state, paneKey, previous.payload),
       ...(eventName === 'model_select' ? { model, modelSwitchCommand } : {}),
       subagents
     })
@@ -139,13 +139,22 @@ export function normalizePiCompatibleEvent(
   })
 }
 
-/** A restatement re-derives the fold: the lead's own verdict is on `mainAgent` once a hold consumed it,
- *  and re-reading the held `working` would pin the badge after the last job stopped. A row with no
- *  `mainAgent` is its own verdict, so this is a no-op for every unheld row. */
+/** A restatement re-derives the fold from the lead's OWN verdict, never from the row it is restating.
+ *
+ *  Three ways the published state stops being the lead's verdict, and all three must be undone here: the
+ *  scheduled-work hold (recoverable from `mainAgent`), the descendant gate (recoverable from what the gate
+ *  recorded), and both at once. Re-reading either as the verdict pins the row: the gate would store
+ *  `working` for a finished turn, and the drain that follows would never settle it. */
 function restatedLeadFields(
+  state: HookListenerState,
+  paneKey: string,
   previous: ParsedAgentStatusPayload
 ): Pick<ParsedAgentStatusPayload, 'state'> & { workingMode: undefined; mainAgent: undefined } {
-  return { state: mainAgentState(previous), workingMode: undefined, mainAgent: undefined }
+  return {
+    state: state.descendantLeadStateByPaneKey.get(paneKey) ?? mainAgentState(previous),
+    workingMode: undefined,
+    mainAgent: undefined
+  }
 }
 
 const OMP_APPROVAL_RELEASE_EVENTS: ReadonlySet<unknown> = new Set([

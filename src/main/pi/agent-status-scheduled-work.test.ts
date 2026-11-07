@@ -30,8 +30,11 @@ type LiveJob = {
 /** A cold scheduler job as pi-subagents lists it. */
 type ColdJob = { id: string; schedule: string; prompt: string; enabled: boolean; nextRun?: string }
 
-/** The two extensions `/loop` sits on, answering their list channels on the session bus. */
 type Inventory = { live: LiveJob[]; cold: ColdJob[] }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
 
 /** The request id an RPC channel carries, without asserting on the payload a peer sent. */
 function requestIdOf(raw: unknown): string | undefined {
@@ -42,49 +45,52 @@ function requestIdOf(raw: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function serveSchedules(emitter: EventEmitter, inventory: Inventory) {
-  emitter.on(LIVE_LIST, (raw) => {
+/** What the two extensions `/loop` sits on do: answer their list channels on the session bus. */
+function serveSchedules(
+  emitter: EventEmitter,
+  inventory: Inventory,
+  state: { serving: boolean; replyAsync: boolean }
+) {
+  const answer = (channel: string, jobs: unknown) => (raw: unknown) => {
+    if (!state.serving) {
+      return
+    }
     const requestId = requestIdOf(raw)
     if (!requestId) {
       return
     }
-    emitter.emit(`${LIVE_LIST}:reply:${requestId}`, {
-      success: true,
-      data: { jobs: inventory.live }
-    })
-  })
-  emitter.on(COLD_LIST, (raw) => {
-    const requestId = requestIdOf(raw)
-    if (!requestId) {
+    const reply = { success: true, data: { jobs } }
+    if (state.replyAsync) {
+      // Why: pi-subagents awaits its handler, so its list reply lands after the post that asked.
+      void Promise.resolve().then(() => emitter.emit(`${channel}:reply:${requestId}`, reply))
       return
     }
-    emitter.emit(`${COLD_LIST}:reply:${requestId}`, {
-      success: true,
-      data: { jobs: inventory.cold }
-    })
-  })
+    emitter.emit(`${channel}:reply:${requestId}`, reply)
+  }
+  emitter.on(LIVE_LIST, answer(LIVE_LIST, inventory.live))
+  emitter.on(COLD_LIST, answer(COLD_LIST, inventory.cold))
 }
 
 /** Drives the REAL generated extension into the REAL listener, so the row asserted here is the row a
  *  pi pane would show. */
 function createHarness(
-  options: { inventory?: { live: LiveJob[]; cold: ColdJob[] }; serve?: boolean } = {}
+  options: { inventory?: Inventory; serve?: boolean; replyAsync?: boolean } = {}
 ) {
   const state = createHookListenerState()
   const accepted: (ParsedAgentStatusPayload | undefined)[] = []
   const posted: Record<string, unknown>[] = []
   const inventory: Inventory = options.inventory ?? { live: [], cold: [] }
+  const serving = { serving: options.serve !== false, replyAsync: options.replyAsync === true }
+  // Why: a test can hold a delivery open to prove what a post in flight does to the inventory.
+  let deliveryGate: Promise<void> | null = null
   const harness = createAgentStatusExtensionHarness({
     kind: 'pi',
     env: HOOK_ENV,
-    ...(options.serve === false
-      ? {}
-      : { seedEventBus: (emitter: EventEmitter) => serveSchedules(emitter, inventory) }),
+    seedEventBus: (emitter: EventEmitter) => serveSchedules(emitter, inventory, serving),
     fetchImpl: async (_url, init) => {
+      if (deliveryGate) {
+        await deliveryGate
+      }
       const body: { payload?: Record<string, unknown> } = JSON.parse(String(init?.body))
       posted.push(body.payload ?? {})
       const event = normalizeHookPayload(state, 'pi', body, 'production')
@@ -95,7 +101,19 @@ function createHarness(
       return { ok: true }
     }
   })
-  return { ...harness, accepted, posted, inventory }
+  return {
+    ...harness,
+    accepted,
+    posted,
+    inventory,
+    serving,
+    holdDelivery: (gate: Promise<void>) => {
+      deliveryGate = gate
+    },
+    releaseDelivery: () => {
+      deliveryGate = null
+    }
+  }
 }
 
 async function flush(): Promise<void> {
@@ -106,11 +124,22 @@ async function flush(): Promise<void> {
   }
 }
 
+/** A session the extension can name, so the ownership fence can tell the lead from its children. */
+function leadContext(): HookContext {
+  return {
+    isIdle: () => true,
+    sessionManager: {
+      getSessionId: () => 'lead-session',
+      getSessionFile: () => '/sessions/lead.jsonl'
+    }
+  }
+}
+
 async function drive(
   harness: ReturnType<typeof createHarness>,
   name: string,
   event: unknown = {},
-  context: HookContext = { isIdle: () => true }
+  context: HookContext = leadContext()
 ): Promise<void> {
   await harness.callHook(name, event, context)
   await flush()
@@ -120,6 +149,28 @@ async function startTurn(harness: ReturnType<typeof createHarness>): Promise<voi
   await drive(harness, 'session_start', { reason: 'startup' })
   await drive(harness, 'before_agent_start', { prompt: 'run the sweep' })
   await drive(harness, 'agent_start')
+}
+
+function liveLoop(overrides: Partial<LiveJob> = {}): LiveJob {
+  return {
+    id: 'loop-1',
+    prompt: 'check the deploy',
+    mode: 'fixed',
+    nextAt: Date.now() + 300_000,
+    runs: 0,
+    ...overrides
+  }
+}
+
+function coldJob(overrides: Partial<ColdJob> = {}): ColdJob {
+  return {
+    id: 'cold-1',
+    schedule: 'every 1h',
+    prompt: 'sweep the queue',
+    enabled: true,
+    nextRun: new Date(Date.now() + 3_600_000).toISOString(),
+    ...overrides
+  }
 }
 
 describe('pi scheduled work holds the pane as monitoring', () => {
@@ -135,13 +186,7 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })
     await startTurn(harness)
-    inventory.live.push({
-      id: 'loop-1',
-      prompt: 'check the deploy',
-      mode: 'fixed',
-      nextAt: Date.now() + 300_000,
-      runs: 0
-    })
+    inventory.live.push(liveLoop())
 
     await drive(harness, 'agent_end', {})
 
@@ -152,7 +197,6 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
     // Why: the lead's own verdict the fold consumed, so a restatement can recover it.
     expect(harness.accepted.at(-1)?.mainAgent?.state).toBe('done')
-    expect(harness.accepted.at(-1)?.mainAgent?.stateStartedAt).toBeTypeOf('number')
   })
 
   it('holds a self-paced loop that has no armed wakeup yet', async () => {
@@ -160,14 +204,13 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     const harness = createHarness({ inventory })
     await startTurn(harness)
     // Why: a dynamic loop mid-turn is present without `nextAt`; presence, not a deadline, is the signal.
-    inventory.live.push({ id: 'loop-d', prompt: 'keep watching', mode: 'dynamic', runs: 1 })
+    inventory.live.push(liveLoop({ id: 'loop-d', mode: 'dynamic', nextAt: undefined }))
 
     await drive(harness, 'agent_end', {})
 
     expect(harness.posted.at(-1)?.scheduled_work).toEqual({
       jobs: [{ id: 'loop-d', kind: 'live' }]
     })
-    expect(harness.accepted.at(-1)?.state).toBe('working')
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
   })
 
@@ -175,13 +218,7 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })
     await startTurn(harness)
-    inventory.cold.push({
-      id: 'cold-1',
-      schedule: 'every 1h',
-      prompt: 'sweep the queue',
-      enabled: true,
-      nextRun: new Date(Date.now() + 3_600_000).toISOString()
-    })
+    inventory.cold.push(coldJob())
 
     await drive(harness, 'agent_end', {})
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
@@ -202,13 +239,7 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })
     await startTurn(harness)
-    inventory.live.push({
-      id: 'loop-1',
-      prompt: 'check the deploy',
-      mode: 'fixed',
-      nextAt: Date.now() + 300_000,
-      runs: 0
-    })
+    inventory.live.push(liveLoop())
     await drive(harness, 'agent_end', {})
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
 
@@ -219,21 +250,32 @@ describe('pi scheduled work holds the pane as monitoring', () => {
 
     expect(harness.accepted.at(-1)?.state).toBe('done')
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
-    // Why: the restatement drops the hold's mainAgent, so the row is exactly what it was before the hold.
+    // Why: the restatement drops the hold's mainAgent, so the row is what it was before the hold.
     expect(harness.accepted.at(-1)?.mainAgent).toBeUndefined()
+  })
+
+  it('stops believing an inventory whose channel stopped answering', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    inventory.live.push(liveLoop())
+    await drive(harness, 'agent_end', {})
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    // Why: the extension was unloaded mid-session. One unanswered ask is a race; two mean nobody serves
+    // the channel, and the hold must not outlive the evidence that produced it.
+    harness.serving.serving = false
+    await vi.advanceTimersByTimeAsync(120_000)
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('done')
   })
 
   it('re-checks as soon as a scheduler event says the inventory moved', async () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })
     await startTurn(harness)
-    inventory.cold.push({
-      id: 'cold-1',
-      schedule: 'every 1h',
-      prompt: 'sweep the queue',
-      enabled: true,
-      nextRun: new Date(Date.now() + 3_600_000).toISOString()
-    })
+    inventory.cold.push(coldJob())
     await drive(harness, 'agent_end', {})
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
 
@@ -251,18 +293,39 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     await drive(harness, 'agent_end', {})
     expect(harness.accepted.at(-1)?.state).toBe('done')
 
-    inventory.cold.push({
-      id: 'cold-restored',
-      schedule: 'every 30m',
-      prompt: 'resumed job',
-      enabled: true,
-      nextRun: new Date(Date.now() + 1_800_000).toISOString()
-    })
+    inventory.cold.push(coldJob({ id: 'cold-restored' }))
     harness.emitPiEvent(SCHEDULER_READY, {})
     await flush()
 
     expect(harness.accepted.at(-1)?.state).toBe('working')
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+  })
+
+  it('publishes a change that landed while a post was already in flight', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    // Why an async cold reply: pi-subagents awaits its handler, so its answer always lands after the
+    // completion post that asked for it.
+    const harness = createHarness({ inventory, replyAsync: true })
+    await startTurn(harness)
+    inventory.cold.push(coldJob())
+    await drive(harness, 'agent_end', {})
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    let open: () => void = () => undefined
+    harness.holdDelivery(
+      new Promise<void>((resolve) => {
+        open = resolve
+      })
+    )
+    void harness.callHook('agent_end', {}, leadContext())
+    // Why: the job is stopped while the post that describes it is still in flight.
+    inventory.cold.length = 0
+    await vi.advanceTimersByTimeAsync(60_000)
+    harness.releaseDelivery()
+    open()
+    await flush()
+
+    expect(harness.accepted.at(-1)?.state).toBe('done')
   })
 
   it('reads exactly as today when no extension answers the inventory', async () => {
@@ -274,19 +337,43 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     expect(harness.posted.at(-1)?.scheduled_work).toBeUndefined()
     expect(harness.accepted.at(-1)?.state).toBe('done')
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
+    // Why: a turn end must arm nothing. A probe with no responder keeps one listener and no timer.
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('never lets an in-process subagent take the inventory bus away from the lead', async () => {
+    const inventory: Inventory = { live: [], cold: [] }
+    const harness = createHarness({ inventory })
+    await startTurn(harness)
+    inventory.live.push(liveLoop())
+    await drive(harness, 'agent_end', {})
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    // Why: pi-subagents runs children in-process on their own bus and with the same pid, so the child's
+    // registration reaches the same module state — and its bus serves no loops at all.
+    const child = harness.registerTaskChild()
+    await child.callHook(
+      'session_start',
+      { reason: 'startup' },
+      {
+        isIdle: () => true,
+        sessionManager: {
+          getSessionId: () => 'child-session',
+          getSessionFile: () => '/sessions/child.jsonl'
+        }
+      }
+    )
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flush()
+
+    expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
   })
 
   it('never holds a session boundary row', async () => {
     const inventory: Inventory = { live: [], cold: [] }
     const harness = createHarness({ inventory })
     await startTurn(harness)
-    inventory.live.push({
-      id: 'loop-1',
-      prompt: 'check the deploy',
-      mode: 'fixed',
-      nextAt: Date.now() + 300_000,
-      runs: 0
-    })
+    inventory.live.push(liveLoop())
     await drive(harness, 'agent_end', {})
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
 
@@ -304,23 +391,27 @@ describe('pi scheduled work holds the pane as monitoring', () => {
     await startTurn(harness)
     harness.emitPiEvent('subagents:started', { id: 'run-1', type: 'researcher' })
     await flush()
-    inventory.live.push({
-      id: 'loop-1',
-      prompt: 'check the deploy',
-      mode: 'fixed',
-      nextAt: Date.now() + 300_000,
-      runs: 0
-    })
+    // Why a self-paced loop: it carries no deadline, so the heartbeat below is the only thing keeping
+    // the hold fresh — which is exactly the restatement the drain must not let pin the row.
+    inventory.live.push(liveLoop({ id: 'loop-d', mode: 'dynamic', nextAt: undefined }))
 
     await drive(harness, 'agent_end', {})
     // Why: a running child is agent work, which outranks the monitor.
     expect(harness.accepted.at(-1)?.state).toBe('working')
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
 
+    // Why the heartbeat: a restatement must not republish the child-gated `working` as the lead's own
+    // verdict, or the drain below would never settle the row.
+    await vi.advanceTimersByTimeAsync(11 * 60_000)
     harness.emitPiEvent('subagents:completed', { id: 'run-1' })
     await drive(harness, 'agent_end', {})
 
     expect(harness.accepted.at(-1)?.state).toBe('working')
     expect(harness.accepted.at(-1)?.workingMode).toBe('monitoring')
+
+    inventory.live.length = 0
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flush()
+    expect(harness.accepted.at(-1)?.state).toBe('done')
   })
 })

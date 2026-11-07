@@ -9,6 +9,7 @@ import { deriveFallbackToolInputPreview, deriveToolInputPreview } from './tool-i
 import type { AgentHookSource } from '../agent-hook-relay'
 import type { AgentProviderSessionMetadata } from '../agent-session/lifecycle/agent-session-resume'
 import { applyDescendantEventToPane, isRetiredPiClaudeChild } from './descendant-pane-state'
+import { applyPiScheduledWorkHold } from './providers/pi-pane-hold-evidence'
 import { isNestedPiSessionEvent } from './nested-pi-session-guard'
 import type { DescendantEventFacts } from './descendant-events'
 import type { AgentHookEventPayload } from './listener-event'
@@ -174,12 +175,18 @@ export function buildPiClaudeChildEvent(args: {
   /** The provider that owns the pane. The child's own source would drive the parent's turn. */
   paneSource: AgentHookSource
 }): AgentHookEventPayload | null {
-  const payload = applyDescendantEventToPane(
+  const republished = applyDescendantEventToPane(
     args.state,
     args.source,
     args.paneKey,
     readPiClaudeChildEvent(args.match, args.eventName, args.hookPayload)
   )
+  // Why the hold again here: this path builds the pane's row outside `normalizeHookPayload`, so a child
+  // draining would otherwise settle a pi pane `done` while its session still has work scheduled.
+  const payload =
+    args.paneSource === 'pi'
+      ? applyPiScheduledWorkHold(args.state, args.paneKey, republished)
+      : republished
   if (!payload) {
     return null
   }

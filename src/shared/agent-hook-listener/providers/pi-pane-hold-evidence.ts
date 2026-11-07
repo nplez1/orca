@@ -72,6 +72,7 @@ export function applyPiScheduledWorkHold(
   if (payload.sessionBoundary === true) {
     return payload
   }
+  const previousMainAgent = state.lastStatusByPaneKey.get(paneKey)?.payload.mainAgent
   const jobs: readonly PiScheduledJob[] = state.piScheduledWorkByPaneKey.get(paneKey) ?? []
   const resolution = resolvePiPaneStatus(payload.state, {
     runningAgent: false,
@@ -84,9 +85,14 @@ export function applyPiScheduledWorkHold(
     ...payload,
     state: resolution.stateName,
     workingMode: resolution.workingMode,
+    // Why the previous row: a re-hold of the same finished turn keeps its clock, so the turn-news
+    // listener cannot read a fresh stamp as a turn that has just ended.
     mainAgent: continueMainAgentStatus(
-      undefined,
-      { state: 'done', stateStartedAt: payload.turnCompletedAt ?? now },
+      previousMainAgent,
+      {
+        state: 'done',
+        stateStartedAt: payload.turnCompletedAt ?? previousMainAgent?.stateStartedAt
+      },
       now
     )
   }

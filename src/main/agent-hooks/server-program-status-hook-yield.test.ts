@@ -423,10 +423,13 @@ describe('OSC 7501 status beside hooks', () => {
     expect(response.status).toBe(204)
     expect(paneRow()).toMatchObject({ state: 'working', workingMode: 'monitoring' })
 
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(Date.now() + HOOK_SILENCE_BEFORE_PROGRAM_STATUS_FALLBACK_MS)
-    programStatus({ state: 'done', agentType: 'pi' })
-    expect(paneRow()).toMatchObject({ state: 'working', workingMode: 'monitoring' })
-    vi.useRealTimers()
+    try {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(Date.now() + HOOK_SILENCE_BEFORE_PROGRAM_STATUS_FALLBACK_MS)
+      programStatus({ state: 'done', agentType: 'pi' })
+      expect(paneRow()).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

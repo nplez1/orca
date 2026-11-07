@@ -187,6 +187,9 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '  void postOnce(next.hookEventName, next.extra, next.metadata, next.ompRuntime, next.final === true, isNewestEnqueue(next))',
     '    .then(() => {',
     '      next.delivered = true',
+    // Why on delivery: a build that never reached Orca must not be what tells the next re-check the
+    // scheduled inventory is already published.
+    ...(kind === 'pi' ? ['      piScheduledWorkDelivered()'] : []),
     "      if (next.hookEventName === 'agent_end') {",
     '        postQueue.completionDelivered = true',
     '        // Why the guard: children still running keep the roster snapshot the watch republishes.',
