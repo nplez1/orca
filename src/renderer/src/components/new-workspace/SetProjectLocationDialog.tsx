@@ -18,6 +18,7 @@ import { parseExecutionHostId } from '../../../../shared/execution-host'
 import type { RepoKind } from '../../../../shared/repo-types'
 import { pickLocalProjectLocationFolder } from './pick-local-project-folder'
 import { CloneForm, ExistingFolderForm, LocationActionButton } from './SetProjectLocationForms'
+import type { ProjectHostSetupProvisioning } from './use-workspace-copy-target'
 
 type DialogView = 'choose' | 'existing' | 'clone' | 'browse'
 type BrowseField = 'existing' | 'clone'
@@ -28,7 +29,8 @@ type SetProjectLocationDialogProps = {
   projectKind: RepoKind
   defaultCloneUrl: string
   onClose: () => void
-  onReady: (setupId: string) => void
+  /** `provisioning` tells the composer whether this flow cloned the checkout, which makes the clone the copy. */
+  onReady: (setupId: string, provisioning: ProjectHostSetupProvisioning) => void
 }
 
 export function SetProjectLocationDialog({
@@ -97,7 +99,7 @@ function SetProjectLocationDialogBody({
   projectKind: RepoKind
   defaultCloneUrl: string
   exitHostBrowser: RefObject<(() => boolean) | null>
-  onReady: (setupId: string) => void
+  onReady: (setupId: string, provisioning: ProjectHostSetupProvisioning) => void
 }): React.JSX.Element {
   const setupProjectExistingFolder = useAppStore((state) => state.setupProjectExistingFolder)
   const setupProjectClone = useAppStore((state) => state.setupProjectClone)
@@ -162,7 +164,10 @@ function SetProjectLocationDialogBody({
         displayName: projectName
       })
       if (result && !abandoned.current) {
-        onReady(getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }))
+        onReady(
+          getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }),
+          'existing-folder'
+        )
       }
     } finally {
       setIsSubmitting(false)
@@ -183,7 +188,10 @@ function SetProjectLocationDialogBody({
         displayName: projectName
       })
       if (result && !abandoned.current) {
-        onReady(getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }))
+        onReady(
+          getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }),
+          'cloned'
+        )
       }
     } finally {
       setIsSubmitting(false)

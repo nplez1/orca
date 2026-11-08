@@ -268,9 +268,11 @@ describe('buildProjectHostSetupOptions', () => {
         id: 'needs-setup:ssh:builder',
         kind: 'needs-setup',
         label: 'Builder',
-        detail: 'Project location not set',
+        // Why: an ssh target cannot take a project, so the row says what to do instead of offering a click
+        // the store would refuse.
+        detail: 'Set this project up from a Remote Orca Server on that host',
         isAvailable: true,
-        canSetLocation: true
+        canSetLocation: false
       })
     ])
   })
@@ -286,7 +288,7 @@ describe('buildProjectHostSetupOptions', () => {
 
     expect(options.at(-1)).toMatchObject({
       kind: 'needs-setup',
-      detail: 'Project location not set',
+      detail: 'Add a remote to this project first',
       isAvailable: true,
       canSetLocation: false
     })

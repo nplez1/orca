@@ -649,6 +649,63 @@ describe('registerWorktreeHandlers', () => {
     )
   })
 
+  it('recreates a copied workspace fork remote before resolving its base ref', async () => {
+    listWorktreesMock.mockResolvedValue([
+      {
+        path: '/workspace/fix-login',
+        head: 'abc123',
+        branch: 'refs/heads/feature/fix-login',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    store.setWorktreeMeta.mockImplementation((_target: HostWorktreeTarget, meta) => meta)
+    // No configured remote for this URL, so the copy has to add and fetch it.
+    gitExecFileAsyncMock.mockResolvedValue({ stdout: '', stderr: '' })
+
+    await handlers['worktrees:create'](null, {
+      repoId: 'repo-1',
+      name: 'fix-login',
+      baseBranch: 'fork/feature/fix-login',
+      branchNameOverride: 'feature/fix-login',
+      exactBranchName: true,
+      pushTarget: {
+        remoteName: 'fork',
+        branchName: 'feature/fix-login',
+        remoteUrl: 'git@github.com:alice/orca.git',
+        remoteCreated: true
+      }
+    })
+
+    // Why: the target host has never seen this remote, so the copy's base ref cannot exist until
+    // the remote is added and the branch fetched from it.
+    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
+      [
+        'remote',
+        'add',
+        '-t',
+        'feature/fix-login',
+        '--no-tags',
+        'fork',
+        'git@github.com:alice/orca.git'
+      ],
+      expect.objectContaining({ cwd: '/workspace/repo' })
+    )
+    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
+      [
+        'fetch',
+        'fork',
+        '+refs/heads/feature/fix-login*:refs/remotes/fork/feature/fix-login*'
+      ],
+      expect.objectContaining({ cwd: '/workspace/repo' })
+    )
+    // Why: the remote exists now, so the copy takes its upstream instead of waiting for a deferred mint.
+    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
+      ['branch', '--set-upstream-to', 'fork/feature/fix-login', 'feature/fix-login'],
+      expect.objectContaining({ cwd: '/workspace/fix-login' })
+    )
+  })
+
   it('does not claim the Orca-created marker at create when a sibling worktree minted the fork remote', async () => {
     listWorktreesMock.mockResolvedValue([
       {

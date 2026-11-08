@@ -185,7 +185,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         telemetrySource,
         linkedIssue: submitLinkedIssueNumber,
         linkedPR: submitLinkedPR,
-        pushTarget: submitPushTarget,
+        pushTarget: options?.lockedPushTarget ?? submitPushTarget,
         agent,
         agentLaunchRoute,
         linkedLinearIssue,

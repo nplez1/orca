@@ -87,6 +87,8 @@ export async function createRuntimeLocalGitWorktree(args: {
   workspaceRoot: string
   branchName: string
   worktreePath: string
+  /** This create added and fetched the push target's remote, so the checkout can take its upstream. */
+  pushTargetMaterialized?: boolean
   effectiveSanitizedName?: string
   checkoutExistingBranch: boolean
   localWorktreeGitOptions: LocalGitExecOptions
@@ -109,6 +111,11 @@ export async function createRuntimeLocalGitWorktree(args: {
   }
   // Defer fork remote add/fetch and redundant same-repo fetch until push/pull/fetch/fast-forward; persist metadata unchanged (#17828).
   const preparedPushTarget = args.request.pushTarget
+  // Why materialized: this create already added and fetched the remote, so the copy can take that
+  // branch's upstream instead of waiting for the deferred materializer to mint the remote again.
+  const shouldConfigurePushTarget = Boolean(
+    preparedPushTarget && (!preparedPushTarget.remoteUrl || args.pushTargetMaterialized)
+  )
   const suggestLocalBaseRefUpdate =
     !args.settings.refreshLocalBaseRefOnWorktreeCreate &&
     !args.settings.localBaseRefSuggestionDismissed &&
@@ -210,7 +217,7 @@ export async function createRuntimeLocalGitWorktree(args: {
   }
   // Set upstream only for existing same-repo remotes; deferred fork remotes materialize at first push/pull/fetch.
   const configuredPushTarget =
-    preparedPushTarget && !preparedPushTarget.remoteUrl
+    preparedPushTarget && shouldConfigurePushTarget
       ? await configureCreatedWorktreePushTarget(
           args.worktreePath,
           args.branchName,

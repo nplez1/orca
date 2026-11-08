@@ -14,6 +14,9 @@ import type { LocalGitExecOptions } from '../git/repo-default-base-ref'
 import { resolveLocalGitUsername } from '../git/git-username'
 import { computeWorkspaceRoot, getWorktreePathSettings } from '../ipc/worktree-logic'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
+import { materializeCopiedPushTargetBase } from '../worktree-create-push-target-base'
+import { prepareWorktreePushTarget } from '../ipc/worktree-remote'
+import { getRepoExecutionHostId } from '../../shared/execution-host'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
 import type { RemoteFetchResult, RemoteTrackingBase } from './runtime-remote-fetch-controller'
 import type { HostedReviewExecutionOptions } from '../source-control/hosted-review-git-options'
@@ -112,8 +115,22 @@ async function performRuntimeLocalWorktreeCreate<T>(
     !request.branchNameOverride && settings.branchPrefix === 'git-username'
       ? resolveLocalGitUsername(repo.path, repo.ghAccount)
       : Promise.resolve('')
+  // Why: a copied workspace's branch lives on a remote Orca added on another host, so this host
+  // has to recreate that remote before any base ref can name it.
+  const copiedPushTargetBase = await materializeCopiedPushTargetBase({
+    request,
+    prepare: (target) =>
+      prepareWorktreePushTarget(
+        repo.path,
+        target,
+        store,
+        repo.id,
+        worktreeGitOptions,
+        getRepoExecutionHostId(repo)
+      )
+  })
   const baseBranchPromise = resolveWorktreeCreateBase({
-    requestedBaseBranch: request.baseBranch,
+    requestedBaseBranch: copiedPushTargetBase.baseBranch,
     repoWorktreeBaseRef: repo.worktreeBaseRef,
     resolveDefaultBaseRef: () => resolveDefaultBaseRefWithLocalGit(gitExecOptions),
     isBaseUsable: async (candidate) => {
@@ -147,6 +164,11 @@ async function performRuntimeLocalWorktreeCreate<T>(
     refreshRemoteTrackingBase: args.refreshRemoteTrackingBase,
     timing: args.timing
   })
+  // Why: naming and metadata must read the remote this host actually fetched, not the one the
+  // source host named — the prepared name can be a reused or suffixed remote.
+  const preparedRequest = copiedPushTargetBase.materialized
+    ? { ...request, pushTarget: copiedPushTargetBase.pushTarget }
+    : request
   const baseRefRefresh = startRuntimeLocalBaseRefRefresh({
     repoPath: repo.path,
     base,
@@ -157,7 +179,7 @@ async function performRuntimeLocalWorktreeCreate<T>(
   })
   const candidate = await args.timing.time('resolve_name', () =>
     resolveRuntimeLocalWorktreeCreateCandidate({
-      request,
+      request: preparedRequest,
       repo,
       settings,
       worktreePathSettings: pathSettings,
@@ -178,7 +200,7 @@ async function performRuntimeLocalWorktreeCreate<T>(
   )
   try {
     const git = await createRuntimeLocalGitWorktree({
-      request,
+      request: preparedRequest,
       repo,
       store,
       settings,
@@ -186,6 +208,7 @@ async function performRuntimeLocalWorktreeCreate<T>(
       workspaceRoot: computeWorkspaceRoot(repo.path, pathSettings),
       branchName: candidate.branchName,
       worktreePath: candidate.worktreePath,
+      pushTargetMaterialized: copiedPushTargetBase.materialized,
       effectiveSanitizedName: candidate.effectiveSanitizedName,
       checkoutExistingBranch: candidate.checkoutExistingBranch,
       localWorktreeGitOptions: worktreeGitOptions,
@@ -194,7 +217,7 @@ async function performRuntimeLocalWorktreeCreate<T>(
       timing: args.timing
     })
     const materialized = await materializeRuntimeLocalWorktree({
-      request,
+      request: preparedRequest,
       repo,
       store,
       settings,

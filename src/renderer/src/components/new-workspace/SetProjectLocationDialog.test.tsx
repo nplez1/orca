@@ -105,7 +105,8 @@ describe('SetProjectLocationDialog', () => {
       kind: 'git',
       displayName: 'orca'
     })
-    expect(onReady).toHaveBeenCalledWith(JSON.stringify(['setup-openclaw', 'ssh:openclaw']))
+    // Why the method: only our own clone can make the clone itself the copy.
+    expect(onReady).toHaveBeenCalledWith(JSON.stringify(['setup-openclaw', 'ssh:openclaw']), 'existing-folder')
     expect(onClose).not.toHaveBeenCalled()
   })
 
@@ -190,6 +191,7 @@ describe('SetProjectLocationDialog', () => {
     await user.type(screen.getByPlaceholderText('/path/to/project/on/host'), '/remote/orca')
     await user.click(screen.getByRole('button', { name: 'Set location' }))
 
-    expect(onReady).toHaveBeenCalledWith(JSON.stringify(['setup-openclaw', 'ssh:openclaw']))
+    // Why the method: only our own clone can make the clone itself the copy.
+    expect(onReady).toHaveBeenCalledWith(JSON.stringify(['setup-openclaw', 'ssh:openclaw']), 'existing-folder')
   })
 })

@@ -38,6 +38,7 @@ import {
 import { getSshStatusLabel } from './new-workspace/new-workspace-composer-ssh-status'
 import { useNewWorkspaceComposerFileDrop } from './new-workspace/use-new-workspace-composer-file-drop'
 import { useComposerFileDragOver } from './new-workspace/use-composer-file-drag-over'
+import type { ProjectHostSetupProvisioning } from './new-workspace/use-workspace-copy-target'
 import { buildDefaultAgentSettingsUpdate } from '../../../shared/default-agent-settings'
 
 // Lazy-load the project-location browser outside boot; warming shares this module entry with the click.
@@ -250,9 +251,9 @@ export default function NewWorkspaceComposerCard(
     onNestedDialogOpenChange?.(false)
   }, [onNestedDialogOpenChange])
   const handleSetLocationReady = React.useCallback(
-    (setupId: string): void => {
+    (setupId: string, provisioning: ProjectHostSetupProvisioning): void => {
       handleSetLocationClose()
-      onProjectHostSetupChange?.(setupId)
+      onProjectHostSetupChange?.(setupId, provisioning)
     },
     [handleSetLocationClose, onProjectHostSetupChange]
   )
