@@ -19,53 +19,30 @@ import {
   pickQuickWorkspaceAgent,
   resolveQuickWorkspaceAgentSelection
 } from '@/lib/quick-workspace-agent-selection'
-import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { useAgentsOfferedForLaunch } from '@/lib/host-chat-program-acquisition'
 import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
-import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
-import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
-import type { WorkspaceStatus } from '../../../shared/worktree/types'
-import type { ExecutionHostId } from '../../../shared/execution-host'
-import { isLockedSourceHostTarget } from '@/components/new-workspace/locked-target-host'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import {
+  useWorkspaceCopyTarget,
+  type ProjectHostSetupProvisioning
+} from '@/components/new-workspace/use-workspace-copy-target'
+import { branchName } from '@/lib/git-utils'
+import { activateAndRevealWorktree } from '@/lib/worktree-activation'
+import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
 import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/folder-workspace-composer-helpers'
-import type { WorkspaceCreationTargetHint } from '@/lib/project-host-workspace-target'
 import { useAgentMenuObservation } from '@/components/tab-bar/use-new-tab-agent-menu-rows'
 import { addAppKeyListener, removeAppKeyListener } from '@/lib/app-keyboard-router'
+import type { ComposerModalData } from '@/components/new-workspace/composer-modal-data'
+
+export type { ComposerModalData }
 
 // Keep Add Project’s clone/SSH machinery outside the composer entry render, matching App loading.
 const HostedAddRepoDialog = lazyWithRetry(() => import('@/components/sidebar/AddRepoDialog'), {
   reloadKey: 'composer-add-repo'
 })
-
-export type ComposerModalData = {
-  prefilledName?: string
-  initialRepoId?: string
-  initialEphemeralVmRecipeId?: string
-  initialProjectGroupId?: string
-  linkedWorkItem?: LinkedWorkItemSummary | null
-  initialGitHubWorkItem?: GitHubWorkItem | null
-  taskSourceContext?: TaskSourceContext | null
-  initialWorkspaceTarget?: WorkspaceCreationTargetHint | null
-  initialBaseBranch?: string
-  /** Set when an existing workspace is being copied to another host: the name and branch are
-   *  implied by that workspace, so the composer shows them as fixed facts. */
-  lockedWorkspaceBranch?: string
-  /** Host the copied workspace already lives on; recreating it there would only rename the branch. */
-  lockedWorkspaceSourceHostId?: ExecutionHostId
-  /** Paired-runtime owner of the source workspace, which counts as the same host. */
-  lockedWorkspaceSourceRuntimeOwnerEnvironmentId?: string
-  initialWorkspaceStatus?: WorkspaceStatus
-  enableIssueAutomation?: boolean
-  /** Creation-surface telemetry; each opener supplies it, otherwise use unknown. */
-  telemetrySource?: WorkspaceCreateTelemetrySource
-  contextualTourSource?: string
-  setupGuideTourRequestId?: string
-}
 
 export default function NewWorkspaceComposerModal(): React.JSX.Element | null {
   const visible = useAppStore((s) => s.activeModal === 'new-workspace-composer')
@@ -137,9 +114,7 @@ function QuickTabBody({
   // Why: copying an existing workspace fixes the branch; the base ref follows it so the checkout
   // starts from that branch instead of whatever the target host defaults to.
   const lockedWorkspaceBranch = modalData.lockedWorkspaceBranch
-  const lockedWorkspaceSourceHostId = modalData.lockedWorkspaceSourceHostId
-  const lockedWorkspaceSourceRuntimeOwnerEnvironmentId =
-    modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
+  const lockedWorkspacePushTarget = modalData.lockedWorkspacePushTarget
   const initialBaseBranch = modalData.initialBaseBranch ?? lockedWorkspaceBranch
   const {
     cardProps,
@@ -173,17 +148,37 @@ function QuickTabBody({
   })
   // Why: the same branch cannot be checked out twice on one host, so git would silently
   // rename the copy instead of copying it — the target host is the whole point of the flow.
-  const selectedSetupHostId = cardProps.projectHostSetupOptions?.find(
-    (option) => option.id === cardProps.selectedProjectHostSetupId
-  )?.hostId
-  const lockedTargetIsSourceHost =
-    // Why: a VM recipe creates nothing on the repo's host, so the source host is not the target.
-    !cardProps.selectedEphemeralVmRecipeId &&
-    isLockedSourceHostTarget({
-      sourceHostId: lockedWorkspaceSourceHostId,
-      sourceRuntimeOwnerEnvironmentId: lockedWorkspaceSourceRuntimeOwnerEnvironmentId,
-      selectedTargetHostIds: [cardProps.selectedRepoExecutionHostId, selectedSetupHostId]
-    })
+  const {
+    lockedTargetIsSourceHost,
+    onlySourceHostAvailable,
+    recordProvisionedSetup,
+    resolveCloneLandedCopy,
+    selectedTargetHostLabel
+  } = useWorkspaceCopyTarget({
+    ...(lockedWorkspaceBranch ? { lockedWorkspaceBranch } : {}),
+    ...(modalData.lockedWorkspaceSourceHostId
+      ? { sourceHostId: modalData.lockedWorkspaceSourceHostId }
+      : {}),
+    ...(modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
+      ? {
+          sourceRuntimeOwnerEnvironmentId: modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
+        }
+      : {}),
+    projectHostSetupOptions: cardProps.projectHostSetupOptions ?? [],
+    selectedProjectHostSetupId: cardProps.selectedProjectHostSetupId ?? null,
+    selectedRepoExecutionHostId: cardProps.selectedRepoExecutionHostId,
+    selectedEphemeralVmRecipeId: cardProps.selectedEphemeralVmRecipeId,
+    hasLockedPushTarget: Boolean(lockedWorkspacePushTarget)
+  })
+  const handleProjectHostSetupProvisioned = useCallback(
+    (setupId: string, provisioning?: ProjectHostSetupProvisioning): void => {
+      if (provisioning) {
+        recordProvisionedSetup(setupId, provisioning)
+      }
+      cardProps.onProjectHostSetupChange?.(setupId)
+    },
+    [cardProps, recordProvisionedSetup]
+  )
   // Why: the composer's built-in `onOpenAgentSettings` handler navigates to
   // the settings page and closes the modal. For the quick-create flow we want
   // a less disruptive affordance — a nested dialog layered over the composer
@@ -265,18 +260,41 @@ function QuickTabBody({
     if (effectiveCreateDisabled) {
       return
     }
+    // Why before create: when our own clone already checked the copied branch out, the clone is
+    // the copy, so asking the host for it again could only collide and report a false failure.
+    const landedCopy = await resolveCloneLandedCopy()
+    if (landedCopy) {
+      toast.success(
+        translate(
+          'auto.components.NewWorkspaceComposerModal.copyAlreadyLanded',
+          'This project is now on {{host}} on {{branch}}.',
+          {
+            host: selectedTargetHostLabel,
+            branch: branchName(lockedWorkspaceBranch ?? '')
+          }
+        )
+      )
+      activateAndRevealWorktree(landedCopy.id, { navigationIntent: 'user-open' })
+      onClose()
+      return
+    }
     await submitQuick(quickAgent, {
       setupOnly: quickSetupOnly,
       // Why: a copied workspace keeps its branch, so a collision must fail instead of suffixing.
       exactBranchName: Boolean(lockedWorkspaceBranch),
+      ...(lockedWorkspacePushTarget ? { lockedPushTarget: lockedWorkspacePushTarget } : {}),
       launchChoice: launchSelection.choice
     })
   }, [
     effectiveCreateDisabled,
     lockedWorkspaceBranch,
+    lockedWorkspacePushTarget,
+    onClose,
     quickAgent,
     launchSelection.choice,
     quickSetupOnly,
+    resolveCloneLandedCopy,
+    selectedTargetHostLabel,
     submitQuick
   ])
   // Why: Add Project layers over the composer as a nested dialog instead of
@@ -394,6 +412,8 @@ function QuickTabBody({
         {...cardProps}
         identityLocked={Boolean(lockedWorkspaceBranch)}
         lockedTargetIsSourceHost={lockedTargetIsSourceHost}
+        onlySourceHostAvailable={onlySourceHostAvailable}
+        onProjectHostSetupChange={handleProjectHostSetupProvisioned}
         createDisabled={effectiveCreateDisabled}
         impliedTaskSourceUrl={impliedTaskSourceUrl}
         // Chips list offered agents, keeping a pick whose chat is still being learned.

@@ -87,7 +87,8 @@
         "pickAnotherHost": "This workspace already lives on that host. Pick another one to copy this branch there.",
         "test": {
           "fixture": {}
-        }
+        },
+        "addAnotherHostToCopy": "Add another host to copy this workspace to — none other is configured yet."
       },
       "PullRequestPage": {
         "18f2af42ac": null,
@@ -769,6 +770,10 @@
               "cd68b9654d": "Open console"
             }
           }
+        },
+        "RepositoryPane": {
+          "projectNeedsRemote": "Add a remote to this project first",
+          "projectSetupNeedsServer": "Set this project up from a Remote Orca Server on that host"
         }
       },
       "sidebar": {
@@ -813,7 +818,10 @@
           "mergeVerdictTitle": "Merge: {{value0}}"
         },
         "WorktreeContextMenu": {
-          "addToAnotherHost": "Add to another host…"
+          "addToAnotherHost": "Add to another host…",
+          "copyRefusedFolderProject": "Folder projects have no branch to copy to another host.",
+          "copyRefusedNoSharedRemote": "Add a remote to this project first — another host can only find it through one.",
+          "copyRefusedPublishRemote": "This workspace's branch lives on a remote another host can't recreate."
         },
         "WorktreeIssueLinkField": {},
         "WorktreeList": {
@@ -849,6 +857,11 @@
           "card": {
             "meta": {
               "row": {}
+            }
+          },
+          "removal": {
+            "warning": {
+              "title": "Workspace deleted with a warning"
             }
           }
         },
@@ -945,6 +958,9 @@
       },
       "taskPageJiraBoard": {
         "changeStatusFailed": null
+      },
+      "NewWorkspaceComposerModal": {
+        "copyAlreadyLanded": "This project is now on {{host}} on {{branch}}."
       }
     },
     "hooks": {

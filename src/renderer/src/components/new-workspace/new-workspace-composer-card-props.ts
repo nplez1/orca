@@ -6,6 +6,7 @@ import type {
   NeedsSetupProjectHostOption,
   ProjectHostSetupOption
 } from '@/lib/project-host-setup-options'
+import type { ProjectHostSetupProvisioning } from './use-workspace-copy-target'
 import type { SetupConfig } from '../../../../shared/orca-hook-setup-config'
 import type { WorkspaceCreateErrorDisplay } from '@/lib/workspace-create-error-format'
 import type { SmartNameMode } from '../../../../shared/new-workspace/smart-workspace-source-results'
@@ -34,6 +35,8 @@ export type NewWorkspaceComposerCardProps = {
   identityLocked?: boolean
   /** The picked host already owns this workspace; recreating it there would only rename the branch. */
   lockedTargetIsSourceHost?: boolean
+  /** No host other than the source is configured, so the copy has nowhere to go yet. */
+  onlySourceHostAvailable?: boolean
   contextualTourSource?: string
   containerClassName?: string
   contentClassName?: string
@@ -63,7 +66,10 @@ export type NewWorkspaceComposerCardProps = {
   onProjectChange: (value: string) => void
   projectHostSetupOptions?: ProjectHostSetupOption[]
   selectedProjectHostSetupId?: string | null
-  onProjectHostSetupChange?: (setupId: string) => void
+  onProjectHostSetupChange?: (
+    setupId: string,
+    provisioning?: ProjectHostSetupProvisioning
+  ) => void
   ephemeralVmRecipes?: EphemeralVmRecipeOption[]
   selectedEphemeralVmRecipeId?: string | null
   onEphemeralVmRecipeChange?: (recipeId: string | null) => void

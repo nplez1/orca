@@ -3,7 +3,7 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import {
   buildWorktreeToHostComposerData,
-  canAddWorktreeToAnotherHost
+  getAddWorktreeToAnotherHostAvailability
 } from './worktree-to-host-composer-data'
 
 const localRepo: Repo = {
@@ -69,6 +69,30 @@ describe('add workspace to another host', () => {
     expect(data.initialBaseBranch).toBe('fork/feature/fix-login')
   })
 
+  it('carries the fork remote URL so the target host can recreate that remote', () => {
+    const data = buildWorktreeToHostComposerData({
+      worktree: makeWorktree({
+        pushTarget: {
+          remoteName: 'fork',
+          branchName: 'feature/fix-login',
+          remoteUrl: 'git@github.com:alice/orca.git',
+          remoteCreated: true
+        }
+      }),
+      repo: localRepo,
+      projectId: 'github:acme/app'
+    })
+
+    // Why the URL and not remoteCreated: ownership of the remote on the source host says nothing
+    // about the target, which has to add and fetch the remote itself.
+    expect(data.lockedWorkspacePushTarget).toEqual({
+      remoteName: 'fork',
+      branchName: 'feature/fix-login',
+      remoteUrl: 'git@github.com:alice/orca.git'
+    })
+    expect(data.initialBaseBranch).toBe('fork/feature/fix-login')
+  })
+
   it('keeps the repo row as a fallback when the workspace never got a project id', () => {
     const data = buildWorktreeToHostComposerData({
       worktree: makeWorktree(),
@@ -99,34 +123,93 @@ describe('add workspace to another host', () => {
     expect(inherited.lockedWorkspaceSourceRuntimeOwnerEnvironmentId).toBe('env-b')
   })
 
-  it('has nothing to copy without a branch or outside a git project', () => {
-    expect(canAddWorktreeToAnotherHost({ worktree: makeWorktree(), repo: localRepo })).toBe(true)
+  it('offers the copy for every workspace on a branch, including the primary checkout', () => {
     expect(
-      canAddWorktreeToAnotherHost({ worktree: makeWorktree({ branch: '  ' }), repo: localRepo })
-    ).toBe(false)
-    // Why: folder projects have no Available Hosts section for the copy to land in.
-    expect(
-      canAddWorktreeToAnotherHost({ worktree: makeWorktree(), repo: { kind: 'folder' } })
-    ).toBe(false)
-    // The target host's own primary checkout already holds the default branch.
-    expect(
-      canAddWorktreeToAnotherHost({
-        worktree: makeWorktree({ isMainWorktree: true }),
-        repo: localRepo
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree(),
+        repo: localRepo,
+        projectId: 'github:acme/app'
       })
-    ).toBe(false)
-    // A fork-PR head ref only exists on the remote Orca added on this host.
+    ).toEqual({ kind: 'available' })
+    // Why: the branch being copied decides whether the copy lands, not whether the row is the
+    // repo's primary checkout — a primary checkout on a feature branch copies fine.
     expect(
-      canAddWorktreeToAnotherHost({
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree({ isMainWorktree: true, branch: 'refs/heads/feature/fix-login' }),
+        repo: localRepo,
+        projectId: 'github:acme/app'
+      })
+    ).toEqual({ kind: 'available' })
+  })
+
+  it('offers the copy for a fork-PR workspace whose remote Orca can recreate', () => {
+    expect(
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree({
+          pushTarget: {
+            remoteName: 'fork',
+            branchName: 'fix-login',
+            remoteUrl: 'git@github.com:alice/orca.git',
+            remoteCreated: true
+          }
+        }),
+        repo: localRepo,
+        projectId: 'github:acme/app'
+      })
+    ).toEqual({ kind: 'available' })
+  })
+
+  it('refuses what no target host could satisfy, and hides a detached HEAD', () => {
+    // Why: a folder project has no branch to recreate on another host.
+    expect(
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree(),
+        repo: { kind: 'folder' },
+        projectId: 'github:acme/app'
+      })
+    ).toEqual({ kind: 'refused', reason: 'folder-project' })
+    // Why: repo:<id> names a project only this host can resolve.
+    expect(
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree(),
+        repo: localRepo,
+        projectId: 'repo:local-repo'
+      })
+    ).toEqual({ kind: 'refused', reason: 'project-without-shared-remote' })
+    // Why: a legacy row can carry a created remote without the URL needed to recreate it.
+    expect(
+      getAddWorktreeToAnotherHostAvailability({
         worktree: makeWorktree({
           pushTarget: { remoteName: 'fork', branchName: 'fix-login', remoteCreated: true }
         }),
-        repo: localRepo
+        repo: localRepo,
+        projectId: 'github:acme/app'
       })
-    ).toBe(false)
-    // A detached HEAD reaches the row as an empty branch.
+    ).toEqual({ kind: 'refused', reason: 'publish-remote-not-recreatable' })
+    // Why: a branch only another host's remote holds is equally unreachable there.
     expect(
-      canAddWorktreeToAnotherHost({ worktree: makeWorktree({ branch: '' }), repo: localRepo })
-    ).toBe(false)
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree({
+          pushTarget: { remoteName: 'alice', branchName: 'fix-login' }
+        }),
+        repo: localRepo,
+        projectId: 'github:acme/app'
+      })
+    ).toEqual({ kind: 'refused', reason: 'publish-remote-not-recreatable' })
+    // A detached HEAD reaches the row as an empty branch, and has nothing to copy.
+    expect(
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree({ branch: '' }),
+        repo: localRepo,
+        projectId: 'github:acme/app'
+      })
+    ).toEqual({ kind: 'hidden' })
+    expect(
+      getAddWorktreeToAnotherHostAvailability({
+        worktree: makeWorktree({ branch: '  ' }),
+        repo: localRepo,
+        projectId: 'github:acme/app'
+      })
+    ).toEqual({ kind: 'hidden' })
   })
 })

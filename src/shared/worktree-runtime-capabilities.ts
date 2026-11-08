@@ -40,6 +40,10 @@ export const WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY =
 // not get. Clients must refuse rather than create the wrong branch.
 export const WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY =
   'worktree.exact-branch-name.v1' as const
+// Why: an older host cannot recreate the remote a copied workspace's branch lives on, so it fails
+// on a ref it never fetched. Clients refuse with "update the host" instead of that dead end.
+export const WORKTREE_PUSH_TARGET_BASE_RUNTIME_CAPABILITY =
+  'worktree.create.push-target-base.v1' as const
 export const WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY =
   'worktree.visibility-defaults.v1' as const
 export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =
@@ -68,6 +72,7 @@ export const WORKTREE_RUNTIME_CAPABILITIES = [
   FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY,
   WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
   WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
+  WORKTREE_PUSH_TARGET_BASE_RUNTIME_CAPABILITY,
   WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY,
   WORKTREE_REMOVE_BRANCH_POLICY_RUNTIME_CAPABILITY,
   WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,

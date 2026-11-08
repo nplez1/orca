@@ -20,7 +20,7 @@ import {
 } from './worktree-context-menu-policy'
 import {
   buildWorktreeToHostComposerData,
-  canAddWorktreeToAnotherHost
+  getAddWorktreeToAnotherHostAvailability
 } from './worktree-to-host-composer-data'
 import { getProjectHostSetupProjectionFromState } from '@/store/selectors'
 
@@ -190,25 +190,31 @@ export function useWorktreeContextMenuCommands(args: {
       activateAndRevealWorktree(args.validParentWorktreeId, { navigationIntent: 'user-open' })
     }
   }, [args.validParentWorktreeId])
-  const canAddToAnotherHost = canAddWorktreeToAnotherHost({
+  // Why the row's own id only: the projection is a catalog read the gate should not repeat on every
+  // render, and a row without one still gets the composer, which names the project from its repo.
+  const addToAnotherHost = getAddWorktreeToAnotherHostAvailability({
     worktree: args.worktree,
-    repo: args.repo
+    repo: args.repo,
+    projectId: args.worktree.projectId ?? null
   })
   const handleAddToAnotherHost = useCallback(() => {
     args.setMenuOpenState(false)
-    const projectId =
-      args.worktree.projectId ??
-      getProjectHostSetupProjectionFromState(args.getState()).setups.find(
-        (setup) => setup.repoId === args.worktree.repoId
-      )?.projectId ??
-      null
     args.openModal(
       'new-workspace-composer',
-      buildWorktreeToHostComposerData({ worktree: args.worktree, repo: args.repo, projectId })
+      buildWorktreeToHostComposerData({
+        worktree: args.worktree,
+        repo: args.repo,
+        projectId:
+          args.worktree.projectId ??
+          getProjectHostSetupProjectionFromState(args.getState()).setups.find(
+            (setup) => setup.repoId === args.worktree.repoId
+          )?.projectId ??
+          null
+      })
     )
   }, [args])
   return {
-    canAddToAnotherHost,
+    addToAnotherHost,
     handleAddToAnotherHost,
     handleAssignWorkspaceStatus,
     handleCloseTerminals,

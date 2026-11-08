@@ -6,16 +6,18 @@ import {
   type ExecutionHostId
 } from '../../../shared/execution-host'
 import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host-registry'
-import { isHostLocalProjectId } from '../../../shared/project-host-setup-projection'
 import { isEphemeralVmRuntimeEnvironment } from '../../../shared/runtime-environments'
 import { isMergedAwayExecutionHost } from '../../../shared/managed-orcad-execution-host'
-import {
-  PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
-  WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY
-} from '../../../shared/protocol-version'
 import type { ProjectHostSetup } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
-import { translate } from '@/i18n/i18n'
+
+import {
+  canSetProjectLocation,
+  getHostHealthUnavailableDetail,
+  getHostSetupUnavailableDetail,
+  getPendingSetupDetail,
+  getProjectLocationUnavailableDetail
+} from './project-host-setup-availability'
 import { dedupeReadySetupRows } from './project-host-setup-row-dedupe'
 
 export type ProjectHostSetupSelection = { id: string; hostId: ExecutionHostId }
@@ -187,10 +189,11 @@ function buildNeedsSetupOptions({
         label: host.label || getExecutionHostLabel(host.id),
         detail:
           unavailableDetail ??
+          getProjectLocationUnavailableDetail(projectId, host.id) ??
           (pendingSetup ? getPendingSetupDetail(pendingSetup) : 'Project location not set'),
         isAvailable,
         attention: host.health === 'error',
-        canSetLocation: canSetProjectLocation(projectId, isAvailable, pendingSetup),
+        canSetLocation: canSetProjectLocation(projectId, isAvailable, pendingSetup, host.id),
         ...(connectAction ? { connectAction } : {})
       }
     })
@@ -204,66 +207,6 @@ function isEphemeralVmProjectHost(host: ExecutionHostRegistryEntry | undefined):
 function isRuntimeOwnedSshSetupHost(hostId: ExecutionHostId): boolean {
   const parsed = parseExecutionHostId(hostId)
   return parsed?.kind === 'ssh' && isRuntimeOwnedSshTargetId(parsed.targetId)
-}
-
-export function getHostSetupUnavailableDetail(host: ExecutionHostRegistryEntry): string | null {
-  if (host.health === 'blocked') {
-    return translate(
-      'auto.components.settings.RepositoryPane.hostSetupBlockedVersion',
-      'Orca server version is incompatible'
-    )
-  }
-  if (host.kind !== 'runtime') {
-    return null
-  }
-  if (!host.capabilities) {
-    return translate(
-      'auto.components.settings.RepositoryPane.hostSetupCheckingCapability',
-      'Checking host capabilities'
-    )
-  }
-  if (
-    !host.capabilities.includes(PROJECT_HOST_SETUP_RUNTIME_CAPABILITY) ||
-    !host.capabilities.includes(WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY)
-  ) {
-    return translate(
-      'auto.components.settings.RepositoryPane.hostSetupMissingCapability',
-      'Update Orca on this host to set up projects'
-    )
-  }
-  return null
-}
-
-function getHostHealthUnavailableDetail(
-  health: ExecutionHostRegistryEntry['health']
-): string | null {
-  switch (health) {
-    case 'connecting':
-      return 'Connecting to host'
-    case 'disconnected':
-      return 'Connect this host to set up projects'
-    case 'error':
-      return 'Host connection needs attention'
-    case 'available':
-    case 'blocked':
-    case 'local':
-      return null
-  }
-}
-
-function canSetProjectLocation(
-  projectId: string,
-  isAvailable: boolean,
-  pendingSetup: ProjectHostSetup | undefined
-): boolean {
-  // Cross-host setup links project identity; host-local repo:<id> has no match, so show status instead of a guaranteed error button.
-  if (!isAvailable || isHostLocalProjectId(projectId)) {
-    return false
-  }
-  if (!pendingSetup) {
-    return true
-  }
-  return pendingSetup.setupState === 'not-set-up' || pendingSetup.setupState === 'error'
 }
 
 function getHostConnectAction(
@@ -280,21 +223,6 @@ function getHostConnectAction(
     return { kind: 'runtime', environmentId: parsed.environmentId }
   }
   return undefined
-}
-
-function getPendingSetupDetail(setup: ProjectHostSetup): string {
-  switch (setup.setupState) {
-    case 'not-set-up':
-      return 'Project tracked on this host but not set up'
-    case 'setting-up':
-      return 'Project setup is in progress'
-    case 'error':
-      return 'Project setup needs attention'
-    case 'unsupported':
-      return 'Project is unsupported on this host'
-    case 'ready':
-      return setup.path
-  }
 }
 
 function compareProjectHostSetupOptions(

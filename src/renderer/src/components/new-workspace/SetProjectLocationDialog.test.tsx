@@ -105,7 +105,11 @@ describe('SetProjectLocationDialog', () => {
       kind: 'git',
       displayName: 'orca'
     })
-    expect(onReady).toHaveBeenCalledWith(JSON.stringify(['setup-openclaw', 'ssh:openclaw']))
+    // Why the method: only our own clone can make the clone itself the copy.
+    expect(onReady).toHaveBeenCalledWith(
+      JSON.stringify(['setup-openclaw', 'ssh:openclaw']),
+      'existing-folder'
+    )
     expect(onClose).not.toHaveBeenCalled()
   })
 
@@ -125,6 +129,32 @@ describe('SetProjectLocationDialog', () => {
 
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('reports a clone as the flow that provisioned the checkout', async () => {
+    storeMocks.setupProjectClone.mockResolvedValue({ setup: { id: 'setup-openclaw-clone' } })
+    const onReady = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <SetProjectLocationDialog
+        option={option}
+        projectName="orca"
+        projectKind="git"
+        defaultCloneUrl="https://github.com/stablyai/orca.git"
+        onClose={vi.fn()}
+        onReady={onReady}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /Clone from URL/ }))
+    await user.type(screen.getByPlaceholderText('/destination/on/host'), '/remote/orca')
+    await user.click(screen.getByRole('button', { name: 'Clone' }))
+
+    // Why: only our own clone makes the clone itself the copy of a default-branch workspace.
+    expect(onReady).toHaveBeenCalledWith(
+      JSON.stringify(['setup-openclaw-clone', 'ssh:openclaw']),
+      'cloned'
+    )
   })
 
   it('does not retarget the composer when a slow clone lands after dismissal', async () => {
@@ -190,6 +220,10 @@ describe('SetProjectLocationDialog', () => {
     await user.type(screen.getByPlaceholderText('/path/to/project/on/host'), '/remote/orca')
     await user.click(screen.getByRole('button', { name: 'Set location' }))
 
-    expect(onReady).toHaveBeenCalledWith(JSON.stringify(['setup-openclaw', 'ssh:openclaw']))
+    // Why the method: only our own clone can make the clone itself the copy.
+    expect(onReady).toHaveBeenCalledWith(
+      JSON.stringify(['setup-openclaw', 'ssh:openclaw']),
+      'existing-folder'
+    )
   })
 })

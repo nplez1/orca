@@ -33,7 +33,8 @@ import {
 import {
   WORKTREE_OPEN_EXISTING_BRANCH_RUNTIME_CAPABILITY,
   WORKTREE_OPEN_EXISTING_BRANCH_V2_RUNTIME_CAPABILITY,
-  WORKTREE_OPEN_EXISTING_BRANCH_V2_REQUEST_RUNTIME_CAPABILITY
+  WORKTREE_OPEN_EXISTING_BRANCH_V2_REQUEST_RUNTIME_CAPABILITY,
+  WORKTREE_PUSH_TARGET_BASE_RUNTIME_CAPABILITY
 } from '../../../../../../shared/worktree-runtime-capabilities'
 import { ensureLocalRuntimeCapabilities } from '../../../../runtime/local-runtime-capabilities'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/local-base-ref-suggestion-toast'
@@ -254,6 +255,19 @@ export function createCreateWorktree(
           target.environmentId,
           WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
           'Update the remote runtime to copy a workspace to it'
+        )
+      }
+      if (
+        options?.exactBranchName &&
+        request.pushTarget?.remoteUrl &&
+        target.kind === 'environment'
+      ) {
+        // Why: an older host cannot recreate the remote that branch lives on, so it would fail on a
+        // ref it never fetched — say so instead of leaving the user with that dead end.
+        await assertRuntimeEnvironmentCapability(
+          target.environmentId,
+          WORKTREE_PUSH_TARGET_BASE_RUNTIME_CAPABILITY,
+          'Update the remote runtime to copy a fork workspace to it'
         )
       }
       if (

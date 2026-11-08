@@ -39,6 +39,7 @@ import { WorktreeCreateCollisionError } from '../../shared/new-workspace/worktre
 import { resolveLocalGitUsername } from '../git/git-username'
 import { hasLocalWorktreeBaseRef } from '../git/worktree-base-ref-probe'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
+import { materializeCopiedPushTargetBase } from '../worktree-create-push-target-base'
 import { getHostedReviewForBranch } from '../source-control/hosted-review'
 import type { ForgeProviderId } from '../source-control/forge-provider'
 import { validateGitPushTarget } from '../git/push-target-validation'
@@ -1062,8 +1063,24 @@ async function performLocalWorktreeCreate(
     !args.branchNameOverride && settings.branchPrefix === 'git-username'
       ? resolveLocalGitUsername(repo.path, repo.ghAccount)
       : Promise.resolve('')
+  // Why: a copied workspace's branch lives on a remote Orca added on another host, so this host
+  // has to recreate that remote before any base ref can name it.
+  const copiedPushTargetBase = await materializeCopiedPushTargetBase({
+    request: args,
+    // The fetch is the slow half of a copy; without this the create surface shows no progress.
+    beforePrepare: () => emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId),
+    prepare: (target) =>
+      prepareWorktreePushTarget(
+        repo.path,
+        target,
+        store,
+        repo.id,
+        localWorktreeGitOptions,
+        getRepoExecutionHostId(repo)
+      )
+  })
   const baseBranchPromise = resolveWorktreeCreateBase({
-    requestedBaseBranch: args.baseBranch,
+    requestedBaseBranch: copiedPushTargetBase.baseBranch,
     repoWorktreeBaseRef: repo.worktreeBaseRef,
     resolveDefaultBaseRef: () => resolveDefaultBaseRefWithLocalGit(localGitExecOptions),
     isBaseUsable: async (baseBranchCandidate) => {
@@ -1493,7 +1510,7 @@ async function performLocalWorktreeCreate(
   })
 
   // Defer fork remote creation/fetch until first synchronization; read-only review creation needs neither.
-  const preparedPushTarget: GitPushTarget | undefined = args.pushTarget
+  const preparedPushTarget: GitPushTarget | undefined = copiedPushTargetBase.pushTarget
 
   const suggestLocalBaseRefUpdate =
     !settings.refreshLocalBaseRefOnWorktreeCreate &&
@@ -1610,7 +1627,9 @@ async function performLocalWorktreeCreate(
 
   // Upstream assignment needs an existing remote; fork remotes materialize later.
   let configuredPushTarget: GitPushTarget | undefined = preparedPushTarget
-  if (preparedPushTarget && !preparedPushTarget.remoteUrl) {
+  // Why materialized: this create already added and fetched the remote, so the copy can take that
+  // branch's upstream instead of waiting for the deferred materializer to mint the remote again.
+  if (preparedPushTarget && (!preparedPushTarget.remoteUrl || copiedPushTargetBase.materialized)) {
     configuredPushTarget = await configureCreatedWorktreePushTarget(
       worktreePath,
       branchName,

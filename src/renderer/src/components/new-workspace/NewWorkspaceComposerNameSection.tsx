@@ -53,6 +53,7 @@ type NewWorkspaceComposerNameSectionProps = Pick<
   | 'startFromResetHint'
   | 'identityLocked'
   | 'lockedTargetIsSourceHost'
+  | 'onlySourceHostAvailable'
 > & {
   onNamePlainEnter: () => void
 }
@@ -98,7 +99,8 @@ export function NewWorkspaceComposerNameSection({
   onBaseBranchChange,
   startFromResetHint,
   identityLocked = false,
-  lockedTargetIsSourceHost = false
+  lockedTargetIsSourceHost = false,
+  onlySourceHostAvailable = false
 }: NewWorkspaceComposerNameSectionProps): React.JSX.Element {
   const showBaseRefPicker =
     !identityLocked &&
@@ -197,6 +199,14 @@ export function NewWorkspaceComposerNameSection({
           {translate(
             'auto.components.NewWorkspaceComposerCard.pickAnotherHost',
             'This workspace already lives on that host. Pick another one to copy this branch there.'
+          )}
+        </p>
+      ) : null}
+      {onlySourceHostAvailable ? (
+        <p className="text-[11px] text-muted-foreground">
+          {translate(
+            'auto.components.NewWorkspaceComposerCard.addAnotherHostToCopy',
+            'Add another host to copy this workspace to — none other is configured yet.'
           )}
         </p>
       ) : null}

@@ -61,6 +61,8 @@ export type QuickSubmitOptions = {
   setupOnly?: boolean
   /** Refuse a branch-name collision instead of suffixing; the copied workspace keeps its branch. */
   exactBranchName?: boolean
+  /** The remote a copied workspace publishes to, so the target host can recreate it. */
+  lockedPushTarget?: GitPushTarget
   launchChoice?: AgentLaunchChoice
 }
 
