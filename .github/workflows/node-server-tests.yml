@@ -46,9 +46,6 @@ on:
         description: Use Blacksmith where the platform and architecture are available
         type: boolean
         default: true
-  # Requalify fresh builds daily; publish missing immutable Windows cache keys.
-  schedule:
-    - cron: '30 11 * * *'
 
 permissions:
   contents: read

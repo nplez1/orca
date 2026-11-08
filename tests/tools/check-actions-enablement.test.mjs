@@ -3,8 +3,11 @@ import {
   ACCEPTED_RUNNER_LABELS,
   ALLOWED_INERT,
   EXPECTED_TRIGGERS,
+  FORK_SCHEDULES,
   REQUIRED,
+  actionsPermissionsArgs,
   calleesOf,
+  judgeActionsEnabled,
   judgeEnablement,
   readFacts,
   residualProblems,
@@ -37,6 +40,95 @@ describe('the pinned trigger table', () => {
     expect(triggersOf('on: push\n')).toEqual(['push'])
     expect(triggersOf('on: [push, pull_request]\n')).toEqual(['push', 'pull_request'])
     expect(triggersOf('on:\n  push:\n    branches: [main]\n')).toEqual(['push'])
+  })
+})
+
+describe('inherited crons', () => {
+  // The 2026-11-06 disable: `node-server-tests.yml` and `performance-contracts.yml` carried upstream's
+  // cron, nobody on this fork wrote it, and `EXPECTED_TRIGGERS` pinned it as expected — so the check
+  // that exists to catch work nobody asked for was instead enforcing it.
+  it('reports an enabled lane on a clock this fork never asked for', () => {
+    const path = '.github/workflows/node-server-tests.yml'
+    const verdict = judge([active(path)], factsFor(path, ['pull_request', 'schedule']), {
+      required: [path],
+      allowedInert: [],
+      expected: { [path]: ['pull_request', 'schedule'] },
+      forkSchedules: FORK_SCHEDULES
+    })
+
+    expect(verdict.inheritedSchedules).toEqual([{ path, id: 1 }])
+    expect(verdict.ok).toBe(false)
+  })
+
+  it('is not auto-disabled, because the fix is to delete the cron and keep the lane', () => {
+    const path = '.github/workflows/node-server-tests.yml'
+    const verdict = judge([active(path)], factsFor(path, ['pull_request', 'schedule']), {
+      required: [],
+      allowedInert: [path],
+      expected: { [path]: ['pull_request', 'schedule'] },
+      forkSchedules: FORK_SCHEDULES
+    })
+
+    expect(verdict.disableTargets).toEqual([])
+    expect(residualProblems({ verdict })).toBe(1)
+  })
+
+  it('accepts a cron the fork wrote for itself', () => {
+    const path = '.github/workflows/fork-main-tests.yml'
+    const verdict = judge([active(path)], factsFor(path, ['schedule', 'workflow_dispatch']), {
+      required: [path],
+      allowedInert: [],
+      expected: { [path]: ['schedule', 'workflow_dispatch'] },
+      forkSchedules: FORK_SCHEDULES
+    })
+
+    expect(verdict.inheritedSchedules).toEqual([])
+    expect(verdict.ok).toBe(true)
+  })
+
+  it('names a reason for every file it allows a clock, and every one is a lane this fork owns', () => {
+    for (const [path, why] of Object.entries(FORK_SCHEDULES)) {
+      expect(REQUIRED, path).toContain(path)
+      expect(why.length, path).toBeGreaterThan(20)
+    }
+  })
+
+  it('leaves no inherited cron enabled in this checkout', () => {
+    const enabled = [...REQUIRED, ...ALLOWED_INERT]
+    // Scoped to the enabled set: `readFacts` also resolves callees, and a disabled callee may carry a
+    // cron of its own without that cron ever firing — `e2e.yml` does exactly that.
+    const facts = readFacts(enabled)
+
+    for (const path of enabled) {
+      if ((facts[path]?.triggers ?? []).includes('schedule')) {
+        expect(Object.hasOwn(FORK_SCHEDULES, path), `${path} fires on a cron`).toBe(true)
+      }
+    }
+  })
+})
+
+describe('the repo-level Actions switch', () => {
+  // On 2026-11-06 every per-workflow state read `active` and this check said OK while nothing had run
+  // for 33 hours, because nothing here looked at the repository-level switch at all.
+  it('reports an explicit false, which no per-workflow state would show', () => {
+    expect(judgeActionsEnabled({ enabled: false, allowed_actions: 'all' })).toMatchObject({
+      allowedActions: 'all'
+    })
+    expect(judgeActionsEnabled({ enabled: false }).reason).toContain('no lane here can run')
+  })
+
+  it('stays quiet when Actions are on, so a normal run gains no noise', () => {
+    expect(judgeActionsEnabled({ enabled: true, allowed_actions: 'all' })).toBe(null)
+  })
+
+  it('stays quiet on an unreadable payload rather than reddening a permissions hiccup', () => {
+    expect(judgeActionsEnabled(null)).toBe(null)
+    expect(judgeActionsEnabled('nope')).toBe(null)
+    expect(judgeActionsEnabled({})).toBe(null)
+  })
+
+  it('asks the endpoint that answers the question, not one that reports the same false green', () => {
+    expect(actionsPermissionsArgs().join(' ')).toBe('api repos/nplez1/orca/actions/permissions')
   })
 })
 
