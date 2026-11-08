@@ -46,6 +46,8 @@ const JOB_LOOKUPS = 5
  * the slot's own minute.
  */
 const SCHEDULE_DELAY_H = 12
+// A nightly dead for longer than this needs a report, not a longer history.
+const MAX_MISSED_SLOTS = 14
 // Repo-wide history depth: the only evidence that separates "this cron is broken" from "Actions was
 // off for the whole repository".
 const REPO_RUN_LIMIT = 100
@@ -72,6 +74,7 @@ const EMPTY_FACTS = {
   jobReadError: null,
   staleSchedule: false,
   missedSlot: null,
+  missedSlots: 0,
   repoRunsInWindow: null,
   repoReadError: null
 }
@@ -142,44 +145,61 @@ const ageHours = (iso, now) => (now - Date.parse(iso)) / HOUR
 const iso = (ms) => (ms === null ? null : new Date(ms).toISOString().replace(/\.000Z$/, 'Z'))
 
 /**
- * The first cron slot after the newest scheduled run — the one that should have produced a run and
- * did not. Null when no slot has come due yet, or when the timestamp cannot be read.
+ * Every cron slot after the newest scheduled run that has come due, oldest first. Bounded because a
+ * nightly that has been dead for weeks needs a report, not a history.
  */
-export function firstMissedSlot(lastScheduledIso, now = Date.now()) {
+export function missedSlots(lastScheduledIso, now = Date.now()) {
   const from = Date.parse(lastScheduledIso)
   if (!Number.isFinite(from)) {
-    return null
+    return []
   }
   const at = new Date(from)
   const midnight = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate())
   const offset = (CRON_UTC_HOUR * 60 + CRON_UTC_MINUTE) * 60 * 1000
-  for (let day = 0; day < 8; day += 1) {
+  const slots = []
+  for (let day = 0; day <= MAX_MISSED_SLOTS; day += 1) {
     const slot = midnight + day * DAY + offset
-    if (slot > from) {
-      return slot <= now ? slot : null
+    if (slot > from && slot <= now) {
+      slots.push(slot)
     }
   }
-  return null
+  return slots
+}
+
+/**
+ * The slot whose evidence is worth reading: the newest one whose window has closed. The oldest would
+ * blame a past outage for a cron that is still broken — after the 2026-11-07 silence, the slots since
+ * are what say whether it is firing *now*.
+ */
+export function slotUnderReview(slots, now = Date.now()) {
+  const closed = slots.filter((slot) => slot + SCHEDULE_DELAY_H * HOUR <= now)
+  return closed.at(-1) ?? null
 }
 
 /**
  * Why a slot went unanswered, read from repository-wide history rather than this workflow's own.
  *
- * A repository that keeps six workflows on a clock cannot go quiet for half a day by itself, so
+ * A repository that keeps four workflows on a daily clock cannot go quiet for half a day by itself, so
  * silence across the window the slot should have fired in means the repository-level Actions switch
  * was off or GitHub was down — neither of which this workflow can fix, and neither of which the
- * workflow-scoped run list can see. Any run of any workflow inside that window means Actions was
- * live, which puts the fault back on this workflow's schedule or its enablement.
+ * workflow-scoped run list can see. Runs without a `schedule` event are a third answer: the repository
+ * is working and the scheduler is not firing crons at all, which no enablement of this workflow's
+ * explains. Only a scheduled run of some workflow puts the fault back on this workflow.
  */
 export function diagnoseSlot(slot, repoRuns, now = Date.now()) {
-  if (slot === null || !Array.isArray(repoRuns)) {
-    return {
-      kind: 'unknown',
-      runsInWindow: null,
-      workflows: [],
-      silentFrom: null,
-      silentHours: null
-    }
+  const empty = {
+    kind: 'unknown',
+    reason: 'no-slot',
+    runsInWindow: null,
+    workflows: [],
+    silentFrom: null,
+    silentHours: null
+  }
+  if (slot === null) {
+    return empty
+  }
+  if (!Array.isArray(repoRuns)) {
+    return { ...empty, reason: 'not-read' }
   }
   const windowEnd = slot + SCHEDULE_DELAY_H * HOUR
   const created = repoRuns.map((record) => Date.parse(record.createdAt)).filter(Number.isFinite)
@@ -189,27 +209,42 @@ export function diagnoseSlot(slot, repoRuns, now = Date.now()) {
   })
   const before = created.filter((at) => at < slot).sort((a, b) => b - a)[0] ?? null
   const after = created.filter((at) => at > windowEnd).sort((a, b) => a - b)[0] ?? null
-  return {
-    kind: inWindow.length > 0 ? 'live' : 'silent',
+  const facts = {
     runsInWindow: inWindow.length,
     workflows: [...new Set(inWindow.map((record) => record.workflowName))].slice(0, 3),
     silentFrom: iso(before),
     silentHours: before === null ? null : Math.round(((after ?? now) - before) / HOUR / 0.1) / 10
   }
+  // Why: a page of 100 runs may not reach back to the slot, and an empty window then proves nothing —
+  // reading it as silence is how a truncated list would manufacture the exact false cause this
+  // diagnosis exists to avoid.
+  if (before === null && repoRuns.length >= REPO_RUN_LIMIT) {
+    return { ...facts, kind: 'unknown', reason: 'truncated' }
+  }
+  if (inWindow.length === 0) {
+    return { ...facts, kind: 'silent', reason: 'silence' }
+  }
+  const scheduled = inWindow.filter((record) => record.event === 'schedule').length
+  return scheduled > 0
+    ? { ...facts, kind: 'live', reason: 'scheduled' }
+    : { ...facts, kind: 'cron-less', reason: 'no-scheduled-run' }
 }
 
-/** The one sentence that says which of the three causes a stale schedule has. */
-function stalenessCause({ slot, diagnosis, repoReadError }) {
+/** The one sentence that says which cause a stale schedule has. */
+function stalenessCause({ slot, diagnosis, repoReadError, missedCount }) {
   if (slot === null) {
-    // No slot has come due, so there is no window to look in — the schedule itself is the answer.
+    // No scheduled run to measure a slot from — the schedule itself is the answer.
     return 'the cron is not firing, or the workflow is disabled.'
   }
   const slotText = `the ${iso(slot)} slot`
+  const slotsText = missedCount > 1 ? ` (${missedCount} slots missed)` : ''
   if (diagnosis.kind === 'unknown') {
     const why =
-      repoReadError === null
-        ? 'the repository-wide run history was not read'
-        : `the repository-wide run history could not be read (${repoReadError})`
+      repoReadError !== null
+        ? `the repository-wide run history could not be read (${repoReadError})`
+        : diagnosis.reason === 'truncated'
+          ? `the repository-wide history stops short of ${iso(slot)}, so there is no evidence either way`
+          : 'the repository-wide run history was not read'
     return (
       'the cron is not firing, or the workflow is disabled — ' +
       `and ${why}, so whether Actions itself was off is unknown.`
@@ -222,15 +257,23 @@ function stalenessCause({ slot, diagnosis, repoReadError }) {
         : `no workflow in ${REPO} ran in the ${SCHEDULE_DELAY_H}h after it either ` +
           `(${diagnosis.silentHours}h of silence from ${diagnosis.silentFrom})`
     return (
-      `${slotText} produced no run, and ${silence} — so the repository-level Actions switch was ` +
-      `off or GitHub was down, which is not this cron. Check ` +
+      `${slotText}${slotsText} produced no run, and ${silence} — so the repository-level Actions ` +
+      `switch was off or GitHub was down, which is not this cron. Check ` +
       `https://github.com/${REPO}/settings/actions, then re-run this once Actions is back.`
     )
   }
+  const names = diagnosis.workflows.join(', ')
+  if (diagnosis.kind === 'cron-less') {
+    return (
+      `${slotText}${slotsText} produced no run, and although ${diagnosis.runsInWindow} run(s) did ` +
+      `start inside its ${SCHEDULE_DELAY_H}h window (${names}), none of them was scheduled — so ` +
+      `GitHub is not firing crons at all, which this workflow's enablement does not explain.`
+    )
+  }
   return (
-    `${slotText} produced no run, but ${diagnosis.runsInWindow} run(s) of other workflows did ` +
-    `start inside its ${SCHEDULE_DELAY_H}h window (${diagnosis.workflows.join(', ')}), so Actions ` +
-    `is live and this workflow's own schedule or enablement is the problem.`
+    `${slotText}${slotsText} produced no run, but ${diagnosis.runsInWindow} run(s) started inside ` +
+    `its ${SCHEDULE_DELAY_H}h window and at least one was scheduled (${names}), so Actions and its ` +
+    `scheduler are both live and this workflow's own schedule or enablement is the problem.`
   )
 }
 
@@ -294,6 +337,9 @@ export function judgeLiveness(
   if (!Array.isArray(runs) || runs.length === 0) {
     return {
       ...EMPTY_FACTS,
+      // A backstop that has never run is the worst case, so it is stale by definition — a consumer
+      // keying on this field must not miss it.
+      staleSchedule: true,
       ok: false,
       code: 1,
       summary: `no run of ${WORKFLOW} has ever been recorded — the backstop is not wired up`
@@ -348,6 +394,7 @@ export function judgeLiveness(
     jobReadError,
     staleSchedule: false,
     missedSlot: null,
+    missedSlots: 0,
     repoRunsInWindow: null,
     repoReadError
   }
@@ -376,19 +423,21 @@ export function judgeLiveness(
       scheduleAge === null
         ? 'no scheduled run has ever been recorded'
         : `the newest scheduled run is ${facts.scheduleAgeHours}h old (${newestScheduled.conclusion ?? newestScheduled.status})`
-    const slot = newestScheduled ? firstMissedSlot(newestScheduled.createdAt, now) : null
+    const slots = newestScheduled ? missedSlots(newestScheduled.createdAt, now) : []
+    const slot = slotUnderReview(slots, now)
     const diagnosis = diagnoseSlot(slot, repoRuns, now)
     return {
       ...facts,
       staleSchedule: true,
       missedSlot: iso(slot),
+      missedSlots: slots.length,
       repoRunsInWindow: diagnosis.runsInWindow,
       ok: false,
       code: 1,
       summary:
         `${ageText}, past the ${STALE_AFTER_H}h threshold for a ` +
         `${CRON_UTC_HOUR}:${String(CRON_UTC_MINUTE).padStart(2, '0')} UTC daily schedule — ` +
-        `${stalenessCause({ slot, diagnosis, repoReadError })}` +
+        `${stalenessCause({ slot, diagnosis, repoReadError, missedCount: slots.length })}` +
         `${inFlightNote}${verdictlessNote}${jobErrorNote}`
     }
   }
@@ -493,9 +542,9 @@ async function main() {
 
   const now = Date.now()
   let verdict = judgeLiveness(runs, now, { jobs, jobReadError })
-  if (verdict.staleSchedule) {
-    // Why only when stale: one more `gh` call on the daily path, for a question that only exists on a
-    // night the schedule did not produce.
+  if (verdict.staleSchedule && verdict.missedSlot !== null) {
+    // Why only when a slot is due: one more `gh` call on the daily path, for a question that only
+    // exists on a night the schedule did not produce.
     let repoRuns = null
     let repoReadError = null
     try {
