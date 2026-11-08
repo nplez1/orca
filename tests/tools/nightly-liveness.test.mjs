@@ -1,6 +1,12 @@
 import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
-import { judgeLiveness, runsNeedingJobs, verdictOf } from '../../local/check-nightly-liveness.mjs'
+import {
+  diagnoseSlot,
+  firstMissedSlot,
+  judgeLiveness,
+  runsNeedingJobs,
+  verdictOf
+} from '../../local/check-nightly-liveness.mjs'
 
 const NOW = Date.parse('2026-10-26T12:00:00Z')
 const hoursAgo = (h) => new Date(NOW - h * 3600_000).toISOString()
@@ -351,6 +357,136 @@ describe('nightly liveness', () => {
   })
 })
 
+describe('why a slot went unanswered', () => {
+  // 2026-11-06: GitHub turned Actions off for the whole repository to stop inherited upstream crons.
+  // The 2026-11-07 slot produced no run, and nothing else in the repository ran for 34h either —
+  // which the workflow-scoped run list cannot see, so the check could only blame the cron.
+  const silentRun = () =>
+    run({
+      databaseId: 90,
+      conclusion: 'failure',
+      createdAt: new Date(NOW - 40 * 3600_000).toISOString()
+    })
+  const repoRun = (at, workflowName = 'Fork base gates') => ({
+    createdAt: new Date(at).toISOString(),
+    databaseId: 1,
+    event: 'schedule',
+    status: 'completed',
+    workflowName
+  })
+  const HOUR_MS = 3600_000
+  // NOW is 2026-10-26T12:00Z, so the slot a 40h-old nightly missed is 2026-10-25T04:53Z.
+  const lastBeforeSlot = Date.parse('2026-10-24T18:09:57Z')
+  const slot = Date.parse('2026-10-25T04:53:00Z')
+
+  it('names the repository-level switch when nothing in the repository ran in the slot window', () => {
+    const verdict = judgeLiveness([silentRun()], NOW, {
+      repoRuns: [repoRun(lastBeforeSlot), repoRun(NOW - HOUR_MS, 'Fork CI health')]
+    })
+    expect(verdict).toMatchObject({ ok: false, code: 1, staleSchedule: true })
+    expect(verdict.missedSlot).toBe('2026-10-25T04:53:00Z')
+    expect(verdict.repoRunsInWindow).toBe(0)
+    expect(verdict.summary).toMatch(/Actions switch was off or GitHub was down/)
+    expect(verdict.summary).toMatch(/40\.8h of silence from 2026-10-24T18:09:57Z/)
+    expect(verdict.summary).not.toMatch(/the cron is not firing/)
+  })
+
+  it('puts the fault back on this workflow when another workflow ran inside the window', () => {
+    const verdict = judgeLiveness([silentRun()], NOW, {
+      repoRuns: [
+        repoRun(lastBeforeSlot),
+        repoRun(slot + 2 * HOUR_MS, 'Fork CI health'),
+        repoRun(slot + 3 * HOUR_MS, 'Mobile Checks')
+      ]
+    })
+    expect(verdict.repoRunsInWindow).toBe(2)
+    expect(verdict.summary).toMatch(/2 run\(s\) of other workflows did start/)
+    expect(verdict.summary).toMatch(/Fork CI health, Mobile Checks/)
+    expect(verdict.summary).toMatch(/this workflow's own schedule or enablement/)
+  })
+
+  it('does not read a run that arrives after the window as proof the cron fired', () => {
+    const verdict = judgeLiveness([silentRun()], NOW, {
+      repoRuns: [repoRun(lastBeforeSlot), repoRun(slot + 20 * HOUR_MS, 'Fork CI health')]
+    })
+    expect(verdict.repoRunsInWindow).toBe(0)
+    expect(verdict.summary).toMatch(/Actions switch was off or GitHub was down/)
+  })
+
+  it('says the repository history was unreadable rather than guessing a cause', () => {
+    const verdict = judgeLiveness([silentRun()], NOW, { repoReadError: 'gh: HTTP 403' })
+    expect(verdict).toMatchObject({ ok: false, code: 1, staleSchedule: true })
+    expect(verdict.repoReadError).toBe('gh: HTTP 403')
+    expect(verdict.summary).toMatch(/could not be read \(gh: HTTP 403\)/)
+    expect(verdict.summary).toMatch(/whether Actions itself was off is unknown/)
+  })
+
+  it('keeps the old wording when the repository history was not read at all', () => {
+    const verdict = judgeLiveness([silentRun()], NOW)
+    expect(verdict.staleSchedule).toBe(true)
+    expect(verdict.repoRunsInWindow).toBeNull()
+    expect(verdict.summary).toMatch(/the cron is not firing/)
+    expect(verdict.summary).toMatch(/was not read/)
+  })
+
+  it('asks no repository-wide question when the schedule is healthy', () => {
+    const verdict = judgeLiveness([run()], NOW, { repoRuns: [] })
+    expect(verdict).toMatchObject({ ok: true, staleSchedule: false, repoRunsInWindow: null })
+  })
+
+  it('blames the schedule itself when no slot has come due, even with history in hand', () => {
+    // A dispatch-only history has no schedule clock to be stale against, so there is no window to
+    // look in and the old sentence is still the right one — not "the history was not read".
+    const verdict = judgeLiveness(
+      [run({ event: 'workflow_dispatch', createdAt: hoursAgo(1) })],
+      NOW,
+      {
+        repoRuns: [repoRun(NOW - HOUR_MS)]
+      }
+    )
+    expect(verdict.missedSlot).toBeNull()
+    expect(verdict.summary).toMatch(/the cron is not firing/)
+    expect(verdict.summary).not.toMatch(/was not read/)
+  })
+
+  it('classifies the slot window itself, without a verdict to hang it on', () => {
+    const silent = diagnoseSlot(slot, [repoRun(lastBeforeSlot)], NOW)
+    expect(silent).toMatchObject({ kind: 'silent', runsInWindow: 0 })
+    expect(silent.silentHours).toBe(41.8)
+    expect(diagnoseSlot(slot, [repoRun(slot + HOUR_MS, 'Mobile Checks')], NOW)).toMatchObject({
+      kind: 'live',
+      runsInWindow: 1,
+      workflows: ['Mobile Checks']
+    })
+    // Why unknown: a missing slot and an unread history are different failures, and only one of them
+    // is a statement about Actions.
+    expect(diagnoseSlot(null, [], NOW).kind).toBe('unknown')
+    expect(diagnoseSlot(slot, null, NOW).kind).toBe('unknown')
+  })
+})
+
+describe('firstMissedSlot', () => {
+  const at = (iso) => Date.parse(iso)
+
+  it('returns the next 04:53 UTC after the last scheduled run', () => {
+    const slot = firstMissedSlot('2026-11-06T12:31:41Z', at('2026-11-08T04:30:00Z'))
+    expect(new Date(slot).toISOString()).toBe('2026-11-07T04:53:00.000Z')
+  })
+
+  it("takes the same day's slot when the last run landed before it", () => {
+    const slot = firstMissedSlot('2026-11-06T02:00:00Z', at('2026-11-07T06:00:00Z'))
+    expect(new Date(slot).toISOString()).toBe('2026-11-06T04:53:00.000Z')
+  })
+
+  it('returns null when no slot has come due yet', () => {
+    expect(firstMissedSlot('2026-11-06T12:31:41Z', at('2026-11-07T01:00:00Z'))).toBeNull()
+  })
+
+  it('returns null for an unreadable timestamp rather than inventing a slot', () => {
+    expect(firstMissedSlot('not a date', at('2026-11-08T04:30:00Z'))).toBeNull()
+  })
+})
+
 describe('nightly liveness CLI', () => {
   it('exits 2 with a full JSON shape when gh cannot be read', () => {
     const result = spawnSync(process.execPath, ['local/check-nightly-liveness.mjs', '--json'], {
@@ -385,7 +521,11 @@ describe('nightly liveness CLI', () => {
         'verdictAgeHours',
         'verdictRunId',
         'verdictlessRuns',
-        'wedgeAgeHours'
+        'wedgeAgeHours',
+        'staleSchedule',
+        'missedSlot',
+        'repoRunsInWindow',
+        'repoReadError'
       ].sort()
     )
   })

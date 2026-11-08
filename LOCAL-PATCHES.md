@@ -3152,6 +3152,42 @@ nightly, no health report and no release lane before anyone noticed, because eve
 inside the thing that was off. The host-side run above is the only one that closes that, and it is a
 launchd job rather than a workflow.
 
+#### The stale-nightly check could not name the third cause (2026-11-08, #291)
+
+The disable above surfaced as `check-nightly-liveness` exit 1: _"the newest scheduled run is 40h old
+(failure), past the 36h threshold for a 4:53 UTC daily schedule — the cron is not firing, or the
+workflow is disabled."_ Both of those were false. The cron was fine and the workflow read `active`; the
+repository-level switch was off. `judgeActionsEnabled` can only read that switch from the host, because
+a workflow token gets `403 Resource not accessible by integration` from
+`GET /repos/{owner}/{repo}/actions/permissions` — that 403 is in issue #291's own report, printed beside
+a `check-actions-enablement` row that says `OK`.
+
+So the check now **infers** the cause rather than guessing between two. When the schedule is stale it
+reads repository-wide run history (`gh run list --repo`, no workflow and no branch filter) and asks the
+one question a workflow-scoped list cannot: did anything in this repository run inside the 12 h window
+the missed slot should have fired in? Silence across that window means the Actions switch was off or
+GitHub was down; any run of any workflow inside it puts the fault back on this workflow's schedule or
+enablement. Replayed against this incident it names it, in the same words it would have used on
+2026-11-07: _"the 2026-11-07T04:53:00Z slot produced no run, and no workflow in nplez1/orca ran in the
+12h after it either (34.3h of silence from 2026-11-06T18:09:57Z) — so the repository-level Actions
+switch was off or GitHub was down, which is not this cron."_
+
+Three bounds keep it honest. The 12 h window is measured, not assumed: every nightly so far has landed
+between 10:37 and 12:54 UTC against a 04:53 schedule, so GitHub's cron delay is hours and a slot's own
+minute proves nothing. The read happens **only** when the schedule is already stale — one extra `gh` call
+on a night that did not happen, never on the daily path. And a failed or forbidden read reports the
+cause as unknown rather than falling back to the old two-way guess, which is the mistake this change
+exists to remove. A `--json` consumer sees it as `staleSchedule`, `missedSlot`, `repoRunsInWindow` and
+`repoReadError`.
+
+It cannot _fix_ a disabled repository — nothing inside Actions can. What it changes is who the issue
+blames: the triage that took this from a red nightly to a cause read the cron, the workflow's enablement
+and the last run's logs first, and none of them was the answer.
+
+The same run's red shard was a different problem and is already fixed: `use-agent-tab-focus-overlay-
+close.test.tsx › leaves focus that lands after the overlay is gone` raced `act`'s queued task flush, and
+#285 drains the observer's records on a microtask instead.
+
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries
