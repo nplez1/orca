@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   diagnoseSlot,
   judgeLiveness,
-  missedSlots,
+  missedSchedule,
   runsNeedingJobs,
-  slotUnderReview,
   verdictOf
 } from '../../local/check-nightly-liveness.mjs'
 
@@ -420,7 +419,7 @@ describe('why a slot went unanswered', () => {
       ]
     })
     expect(verdict.summary).toMatch(/none of them was scheduled/)
-    expect(verdict.summary).toMatch(/GitHub is not firing crons at all/)
+    expect(verdict.summary).toMatch(/no cron in the repository fired in that window either/)
     expect(verdict.summary).not.toMatch(/this workflow's own schedule or enablement/)
   })
 
@@ -452,7 +451,7 @@ describe('why a slot went unanswered', () => {
     expect(verdict.missedSlot).toBe('2026-11-09T04:53:00Z')
     expect(verdict.missedSlots).toBe(4)
     expect(verdict.summary).toMatch(/this workflow's own schedule or enablement/)
-    expect(verdict.summary).toMatch(/4 slots missed/)
+    expect(verdict.summary).toMatch(/4 slots due since then/)
   })
 
   it('says the history stops short rather than calling a truncated page silence', () => {
@@ -462,7 +461,7 @@ describe('why a slot went unanswered', () => {
       repoRun(NOW - index * 60_000, 'Fork base gates')
     )
     const verdict = judgeLiveness([silentRun()], NOW, { repoRuns: truncated })
-    expect(verdict.summary).toMatch(/stops short of 2026-10-25T04:53:00Z/)
+    expect(verdict.summary).toMatch(/holds no run before 2026-10-25T04:53:00Z/)
     expect(verdict.summary).toMatch(/no evidence either way/)
     expect(verdict.summary).not.toMatch(/Actions switch was off/)
   })
@@ -530,13 +529,14 @@ describe('why a slot went unanswered', () => {
   })
 })
 
-describe('missedSlots', () => {
+describe('missedSchedule', () => {
   const at = (iso) => Date.parse(iso)
   const utc = (ms) => new Date(ms).toISOString().replace(/\.000Z$/, 'Z')
 
-  it('lists every slot after the last scheduled run, oldest first', () => {
-    const slots = missedSlots('2026-11-06T12:31:41Z', at('2026-11-09T05:00:00Z'))
-    expect(slots.map(utc)).toEqual([
+  it('counts every due slot, oldest first in the listing', () => {
+    const owed = missedSchedule('2026-11-06T12:31:41Z', at('2026-11-09T05:00:00Z'))
+    expect(owed.due).toBe(3)
+    expect(owed.recent.map(utc)).toEqual([
       '2026-11-07T04:53:00Z',
       '2026-11-08T04:53:00Z',
       '2026-11-09T04:53:00Z'
@@ -544,23 +544,39 @@ describe('missedSlots', () => {
   })
 
   it("takes the same day's slot when the last run landed before it", () => {
-    expect(missedSlots('2026-11-06T02:00:00Z', at('2026-11-07T06:00:00Z')).map(utc)).toEqual([
-      '2026-11-06T04:53:00Z',
-      '2026-11-07T04:53:00Z'
-    ])
+    const owed = missedSchedule('2026-11-06T02:00:00Z', at('2026-11-07T06:00:00Z'))
+    expect(owed.due).toBe(2)
+    expect(owed.recent.map(utc)).toEqual(['2026-11-06T04:53:00Z', '2026-11-07T04:53:00Z'])
   })
 
-  it('lists nothing when no slot has come due yet, or when the timestamp is unreadable', () => {
-    expect(missedSlots('2026-11-06T12:31:41Z', at('2026-11-07T01:00:00Z'))).toEqual([])
-    expect(missedSlots('not a date', at('2026-11-08T04:30:00Z'))).toEqual([])
+  it('owes nothing when no slot has come due yet, or when the timestamp is unreadable', () => {
+    expect(missedSchedule('2026-11-06T12:31:41Z', at('2026-11-07T01:00:00Z'))).toEqual({
+      slot: null,
+      due: 0,
+      recent: []
+    })
+    expect(missedSchedule('not a date', at('2026-11-08T04:30:00Z')).due).toBe(0)
   })
 
-  it('reviews the newest slot whose window has closed, and nothing while it is still open', () => {
-    const slots = missedSlots('2026-11-06T12:31:41Z', at('2026-11-09T05:00:00Z'))
+  it('judges the newest slot whose window has closed, never one that is still open', () => {
     // 11-09's window closes at 16:53, so at 05:00 the newest closed slot is 11-08's.
-    expect(utc(slotUnderReview(slots, at('2026-11-09T05:00:00Z')))).toBe('2026-11-08T04:53:00Z')
-    expect(utc(slotUnderReview(slots, at('2026-11-09T17:00:00Z')))).toBe('2026-11-09T04:53:00Z')
-    expect(slotUnderReview([], at('2026-11-09T17:00:00Z'))).toBeNull()
+    expect(utc(missedSchedule('2026-11-06T12:31:41Z', at('2026-11-09T05:00:00Z')).slot)).toBe(
+      '2026-11-08T04:53:00Z'
+    )
+    expect(utc(missedSchedule('2026-11-06T12:31:41Z', at('2026-11-09T17:00:00Z')).slot)).toBe(
+      '2026-11-09T04:53:00Z'
+    )
+  })
+
+  it('keeps counting past the listing cap, so a month of silence is not reported as two weeks', () => {
+    // Why: the first version capped the enumeration at 14 slots, which both froze the judged slot two
+    // weeks in the past and understated the outage — the same bug it was written to fix.
+    const owed = missedSchedule('2026-10-01T12:00:00Z', at('2026-11-08T05:00:00Z'))
+    expect(owed.due).toBe(38)
+    expect(owed.recent).toHaveLength(14)
+    // 11-08's slot is due but its window is still open at 05:00, so 11-07's is the one judged.
+    expect(utc(owed.recent.at(-1))).toBe('2026-11-08T04:53:00Z')
+    expect(utc(owed.slot)).toBe('2026-11-07T04:53:00Z')
   })
 })
 

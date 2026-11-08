@@ -3182,8 +3182,11 @@ the slot should have fired in? Run against this incident, the answer it prints i
 > either (34.3h of silence from 2026-11-06T18:09:57Z) — so the repository-level Actions switch was off
 > or GitHub was down, which is not this cron.
 
-Four bounds keep it honest. It judges the **newest** slot whose window has closed, because the oldest
-would blame a past outage for a cron that is still broken. The 12 h window is measured, not assumed:
+Five bounds keep it honest. It judges the **newest** slot whose window has closed, because the oldest
+would blame a past outage for a cron that is still broken — and `missedSlot` therefore means the slot
+being judged, not the first one missed, which a `--json` consumer has to read that way. The count of
+due slots is arithmetic and uncapped (only the listing is bounded at 14), because a month-long outage
+reported as two weeks is the same class of error. The 12 h window is measured, not assumed:
 every nightly so far has landed between 10:37 and 12:54 UTC against a 04:53 schedule, so GitHub's cron
 delay is hours and a slot's own minute proves nothing. A page of runs that **stops short** of the slot
 is reported as no evidence rather than as silence, because a truncated list would manufacture exactly

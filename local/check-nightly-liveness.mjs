@@ -18,7 +18,7 @@
  * upstream crons, the 2026-11-07 slot went unanswered, and this check could only guess between the
  * first two while the actual cause sat in a repository setting no workflow token may read. So a stale
  * verdict also reads repository-wide history: silence across the window the slot should have fired in
- * names the switch, and any other workflow running in it puts the fault back on this workflow.
+ * names the switch, and a scheduled run of some other workflow in it puts the fault back on this one.
  */
 import { execFile } from 'node:child_process'
 import { existsSync, realpathSync } from 'node:fs'
@@ -46,8 +46,8 @@ const JOB_LOOKUPS = 5
  * the slot's own minute.
  */
 const SCHEDULE_DELAY_H = 12
-// A nightly dead for longer than this needs a report, not a longer history.
-const MAX_MISSED_SLOTS = 14
+// How many due slots the report lists. The count is arithmetic and uncapped; only the listing is bounded.
+const MAX_LISTED_SLOTS = 14
 // Repo-wide history depth: the only evidence that separates "this cron is broken" from "Actions was
 // off for the whole repository".
 const REPO_RUN_LIMIT = 100
@@ -121,7 +121,8 @@ const REPO_FIELDS = ['createdAt', 'databaseId', 'event', 'status', 'workflowName
 
 /**
  * Every workflow's runs, newest first. Not filtered by workflow or branch on purpose: the question is
- * whether anything in this repository ran at all, and any run anywhere answers it.
+ * what ran anywhere in this repository, and the `event` field separates a live scheduler from a live
+ * repository.
  */
 async function fetchRepoRuns() {
   const { stdout } = await run(
@@ -144,36 +145,48 @@ async function fetchJobs(runId) {
 const ageHours = (iso, now) => (now - Date.parse(iso)) / HOUR
 const iso = (ms) => (ms === null ? null : new Date(ms).toISOString().replace(/\.000Z$/, 'Z'))
 
-/**
- * Every cron slot after the newest scheduled run that has come due, oldest first. Bounded because a
- * nightly that has been dead for weeks needs a report, not a history.
- */
-export function missedSlots(lastScheduledIso, now = Date.now()) {
-  const from = Date.parse(lastScheduledIso)
-  if (!Number.isFinite(from)) {
-    return []
-  }
-  const at = new Date(from)
-  const midnight = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate())
+/** The newest cron slot at or before `at`, as an epoch millisecond. */
+function newestSlotAtOrBefore(at) {
+  const d = new Date(at)
+  const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
   const offset = (CRON_UTC_HOUR * 60 + CRON_UTC_MINUTE) * 60 * 1000
-  const slots = []
-  for (let day = 0; day <= MAX_MISSED_SLOTS; day += 1) {
-    const slot = midnight + day * DAY + offset
-    if (slot > from && slot <= now) {
-      slots.push(slot)
-    }
-  }
-  return slots
+  const today = midnight + offset
+  return today <= at ? today : today - DAY
 }
 
 /**
- * The slot whose evidence is worth reading: the newest one whose window has closed. The oldest would
- * blame a past outage for a cron that is still broken — after the 2026-11-07 silence, the slots since
- * are what say whether it is firing *now*.
+ * The cron slots this schedule owes.
+ *
+ * - `slot` — the newest slot whose window has closed, which is the one worth judging. The oldest would
+ *   blame a past outage for a cron that is still broken: after the 2026-11-07 silence, the slots since
+ *   are what say whether it is firing *now*.
+ * - `due` — how many slots have come due, counted arithmetically and never capped, because an outage
+ *   that lasted a month must not be reported as two weeks.
+ * - `recent` — the last `MAX_LISTED_SLOTS` due slots, oldest first, for display.
+ *
+ * A slot whose window is still open is counted as due but never judged: it may still produce a run.
  */
-export function slotUnderReview(slots, now = Date.now()) {
-  const closed = slots.filter((slot) => slot + SCHEDULE_DELAY_H * HOUR <= now)
-  return closed.at(-1) ?? null
+export function missedSchedule(lastScheduledIso, now = Date.now()) {
+  const from = Date.parse(lastScheduledIso)
+  if (!Number.isFinite(from)) {
+    return { slot: null, due: 0, recent: [] }
+  }
+  const newestDue = newestSlotAtOrBefore(now)
+  const firstDue = newestSlotAtOrBefore(from) + DAY
+  if (newestDue < firstDue) {
+    return { slot: null, due: 0, recent: [] }
+  }
+  const due = (newestDue - firstDue) / DAY + 1
+  const closed = newestSlotAtOrBefore(now - SCHEDULE_DELAY_H * HOUR)
+  const recent = []
+  for (
+    let slot = Math.max(firstDue, newestDue - (MAX_LISTED_SLOTS - 1) * DAY);
+    slot <= newestDue;
+    slot += DAY
+  ) {
+    recent.push(slot)
+  }
+  return { slot: closed < firstDue ? null : closed, due, recent }
 }
 
 /**
@@ -215,19 +228,19 @@ export function diagnoseSlot(slot, repoRuns, now = Date.now()) {
     silentFrom: iso(before),
     silentHours: before === null ? null : Math.round(((after ?? now) - before) / HOUR / 0.1) / 10
   }
-  // Why: a page of 100 runs may not reach back to the slot, and an empty window then proves nothing —
-  // reading it as silence is how a truncated list would manufacture the exact false cause this
-  // diagnosis exists to avoid.
-  if (before === null && repoRuns.length >= REPO_RUN_LIMIT) {
-    return { ...facts, kind: 'unknown', reason: 'truncated' }
+  if (inWindow.length > 0) {
+    const scheduled = inWindow.filter((record) => record.event === 'schedule').length
+    return scheduled > 0
+      ? { ...facts, kind: 'live', reason: 'scheduled' }
+      : { ...facts, kind: 'cron-less', reason: 'no-scheduled-run' }
   }
-  if (inWindow.length === 0) {
-    return { ...facts, kind: 'silent', reason: 'silence' }
+  // Why: silence needs a run *before* the slot to be a silence at all. This workflow's own last run is
+  // always older than the slot, so a page with nothing before it cannot reach the slot — and reading
+  // that as silence is how a short list would manufacture the exact false cause this exists to avoid.
+  if (before === null) {
+    return { ...facts, kind: 'unknown', reason: 'short-history' }
   }
-  const scheduled = inWindow.filter((record) => record.event === 'schedule').length
-  return scheduled > 0
-    ? { ...facts, kind: 'live', reason: 'scheduled' }
-    : { ...facts, kind: 'cron-less', reason: 'no-scheduled-run' }
+  return { ...facts, kind: 'silent', reason: 'silence' }
 }
 
 /** The one sentence that says which cause a stale schedule has. */
@@ -237,13 +250,13 @@ function stalenessCause({ slot, diagnosis, repoReadError, missedCount }) {
     return 'the cron is not firing, or the workflow is disabled.'
   }
   const slotText = `the ${iso(slot)} slot`
-  const slotsText = missedCount > 1 ? ` (${missedCount} slots missed)` : ''
+  const slotsText = missedCount > 1 ? ` (${missedCount} slots due since then)` : ''
   if (diagnosis.kind === 'unknown') {
     const why =
       repoReadError !== null
         ? `the repository-wide run history could not be read (${repoReadError})`
-        : diagnosis.reason === 'truncated'
-          ? `the repository-wide history stops short of ${iso(slot)}, so there is no evidence either way`
+        : diagnosis.reason === 'short-history'
+          ? `the repository-wide history holds no run before ${iso(slot)}, so there is no evidence either way`
           : 'the repository-wide run history was not read'
     return (
       'the cron is not firing, or the workflow is disabled — ' +
@@ -267,7 +280,8 @@ function stalenessCause({ slot, diagnosis, repoReadError, missedCount }) {
     return (
       `${slotText}${slotsText} produced no run, and although ${diagnosis.runsInWindow} run(s) did ` +
       `start inside its ${SCHEDULE_DELAY_H}h window (${names}), none of them was scheduled — so ` +
-      `GitHub is not firing crons at all, which this workflow's enablement does not explain.`
+      `no cron in the repository fired in that window either, which this workflow's enablement does ` +
+      `not explain.`
     )
   }
   return (
@@ -423,21 +437,23 @@ export function judgeLiveness(
       scheduleAge === null
         ? 'no scheduled run has ever been recorded'
         : `the newest scheduled run is ${facts.scheduleAgeHours}h old (${newestScheduled.conclusion ?? newestScheduled.status})`
-    const slots = newestScheduled ? missedSlots(newestScheduled.createdAt, now) : []
-    const slot = slotUnderReview(slots, now)
-    const diagnosis = diagnoseSlot(slot, repoRuns, now)
+    const owed = newestScheduled
+      ? missedSchedule(newestScheduled.createdAt, now)
+      : { slot: null, due: 0, recent: [] }
+    const diagnosis = diagnoseSlot(owed.slot, repoRuns, now)
     return {
       ...facts,
       staleSchedule: true,
-      missedSlot: iso(slot),
-      missedSlots: slots.length,
+      // The slot being judged, which is the newest one whose window has closed — not the first missed.
+      missedSlot: iso(owed.slot),
+      missedSlots: owed.due,
       repoRunsInWindow: diagnosis.runsInWindow,
       ok: false,
       code: 1,
       summary:
         `${ageText}, past the ${STALE_AFTER_H}h threshold for a ` +
         `${CRON_UTC_HOUR}:${String(CRON_UTC_MINUTE).padStart(2, '0')} UTC daily schedule — ` +
-        `${stalenessCause({ slot, diagnosis, repoReadError, missedCount: slots.length })}` +
+        `${stalenessCause({ slot: owed.slot, diagnosis, repoReadError, missedCount: owed.due })}` +
         `${inFlightNote}${verdictlessNote}${jobErrorNote}`
     }
   }
