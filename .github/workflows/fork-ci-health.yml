@@ -16,6 +16,13 @@ name: Fork CI health
 #
 # Why it can afford `issues: write`: it owns exactly one issue, and the token is scoped to this
 # repository. `actions: read` is what the liveness check needs to read run history.
+#
+# Why a second token: a red issue is delegated to the autonomous pipeline by applying `agent:auto`,
+# and `driver.py::_labeler_permission` refuses a label whose `labeled` actor is a bot — "an agent
+# holding a token must not be able to queue work for itself". `GITHUB_TOKEN` is `github-actions[bot]`,
+# so the label has to be applied by `AGENT_DELEGATE_TOKEN`, a token whose actor is a collaborator with
+# write access. Without it the report still runs and still opens the issue; it exits 2 rather than
+# filing a red night nobody picks up.
 on:
   schedule:
     # Off the hour, and after the 04:53 nightly has settled: a check that runs while the nightly is
@@ -51,4 +58,5 @@ jobs:
       - name: Run the health checks and report
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_DELEGATE_TOKEN: ${{ secrets.AGENT_DELEGATE_TOKEN }}
         run: node local/ci-health-report.mjs

@@ -592,5 +592,12 @@ if (
   existsSync(process.argv[1]) &&
   import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
 ) {
-  await main()
+  // Why: an uncaught throw exits 1, the same code as "attention". `ci-health-report` delegates exit 1
+  // to the autonomous pipeline, so a crash must report 2 (cannot tell) instead of masquerading as a red.
+  try {
+    await main()
+  } catch (error) {
+    console.error(`nightly liveness: cannot tell — ${firstLine(error)}`)
+    process.exit(2)
+  }
 }

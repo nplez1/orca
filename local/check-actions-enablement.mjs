@@ -816,5 +816,13 @@ if (
   existsSync(process.argv[1]) &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-  main()
+  // Why: an uncaught throw exits 1, which is the same code as "attention needed". The exit codes are a
+  // contract `ci-health-report` reads — it delegates 1 to the autonomous pipeline and withholds 2 — so a
+  // crash that exits 1 would hand a broken harness to an implementer with auto-merge.
+  try {
+    main()
+  } catch (error) {
+    console.error(`check-actions: could not tell — ${firstLine(error)}`)
+    process.exit(2)
+  }
 }

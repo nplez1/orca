@@ -376,5 +376,12 @@ if (
   existsSync(process.argv[1]) &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-  main()
+  // Why: an uncaught throw exits 1, the same code as "attention". `ci-health-report` delegates exit 1
+  // to the autonomous pipeline, so a crash must report 2 (cannot tell) instead of masquerading as a red.
+  try {
+    main()
+  } catch (error) {
+    console.error(`queued runs: cannot tell — ${firstLine(error)}`)
+    process.exit(2)
+  }
 }

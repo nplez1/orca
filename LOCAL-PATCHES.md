@@ -3162,6 +3162,36 @@ sweep cannot disable them either.
 nightly, no health report and no release lane before anyone noticed, because every detector lives
 inside the thing that was off. The host-side run above is the only one that closes that, and it is a
 launchd job rather than a workflow.
+||||||| parent of 5aae9e8c529 (local(ci): delegate a red nightly to the agent:auto pipeline)
+
+#### The health issue delegates itself (2026-11-08)
+
+A red nightly still needed a person: `fork-ci-health.yml` opened `Fork CI health: attention`, and
+the rule in `~/Code/orca/AGENTS.md` was that the first agent to open a session triages it. Meanwhile
+the `agent:auto` pipeline had a working end-to-end lane, so the red night sat until someone noticed.
+`ci-health-report.mjs` now reconciles `agent:auto` against its own verdict and the pipeline picks the
+issue up.
+
+**The obvious implementation does not work, and that is the point of recording it here.** Adding
+`--label agent:auto` to the existing `gh issue create` would have produced an issue the driver skips
+forever: `driver.py::_labeler_permission` reads the `labeled` event's actor and returns `skip_labeler`
+for any `[bot]` actor before it ever checks permission, because "an agent holding a token must not be
+able to queue work for itself". The workflow authenticates as `github-actions[bot]`, so the label has
+to come from a token whose actor is a collaborator — `AGENT_DELEGATE_TOKEN` — and the report exits 2
+rather than quietly leaving the label off when that secret is unset. Silent success is the failure
+mode this file exists to end, so it must not be reintroduced by the fix.
+
+**The known-red filter was already there, one layer down.** No new filter was written: a shard job
+fails only when its red matches no entry in `local/nightly-linux-known-red.json`
+(`local/check-unit-shard-verdict.mjs`, called at `unit-tests.yml:176`), so a known-red-only night is
+green at the job level and `failedJobs` is empty. The classes `AGENTS.md` forbids fixing inside the
+fork therefore cannot reach the issue at all — asserted in the issue body rather than assumed.
+
+**Two narrower calls worth disagreeing with deliberately.** Only exit 1 delegates: exit 2 means a
+check never reached a verdict, which is a broken harness rather than a scoped request, and an
+implementer with auto-merge should not be guessing at it. And `close` never removes the label, since
+the pipeline keeps it on a closed issue as the audit record; an `update` whose red has cleared does
+remove it, which revokes the delegation before a workspace can merge a fix for a failure that is gone.
 
 #### The stale-nightly check could not name the third cause (2026-11-08, #291)
 

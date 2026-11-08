@@ -2,13 +2,20 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  AGENT_AUTO_LABEL,
   CHECKS,
   ISSUE_TITLE,
   MARKER,
   decideAction,
+  decideLabel,
   findOpenIssue,
+  issueLabels,
   issueLookupArgs,
-  judgeHealth
+  issueNumberFromCreateOutput,
+  judgeDelegation,
+  judgeHealth,
+  labelAction,
+  labelEnv
 } from '../../local/ci-health-report.mjs'
 import { REPO_ROOT, readWorkflow, runScripts, triggerKeys } from './workflow-file.mjs'
 
@@ -107,6 +114,131 @@ describe('what to do with the issue', () => {
   })
 })
 
+describe('the delegation to the agent pipeline', () => {
+  it('delegates an attention verdict and names the check that caused it', () => {
+    const delegation = judgeDelegation([
+      check('check-actions-enablement', 1),
+      check('check-nightly-liveness', 0)
+    ])
+
+    expect(delegation.delegate).toBe(true)
+    expect(delegation.reason).toContain('check-actions-enablement')
+  })
+
+  it('does not delegate a night where nothing reached a verdict', () => {
+    const delegation = judgeDelegation([
+      check('check-actions-enablement', 2),
+      check('check-nightly-liveness', 2)
+    ])
+
+    expect(delegation.delegate).toBe(false)
+    expect(delegation.reason).toContain('broken check is not a scoped defect')
+  })
+
+  it('delegates on one real red even when another check could not tell', () => {
+    expect(
+      judgeDelegation([check('check-actions-enablement', 2), check('check-nightly-liveness', 1)])
+    ).toMatchObject({ delegate: true })
+  })
+
+  it('delegates nothing on a clean night', () => {
+    expect(judgeDelegation(clean())).toMatchObject({
+      delegate: false,
+      reason: 'every check is clean'
+    })
+  })
+
+  it('tells the reader in the issue body whether it was delegated', () => {
+    expect(
+      judgeHealth([check('check-actions-enablement', 1), check('check-nightly-liveness', 0)]).body
+    ).toContain(`**Delegated:** \`${AGENT_AUTO_LABEL}\` is applied`)
+    expect(judgeHealth(clean()).body).toContain('**Not delegated:**')
+  })
+
+  it('says an allowlisted class cannot reach the issue, so the red is unclassified', () => {
+    const body = judgeHealth([
+      check('check-actions-enablement', 0),
+      check('check-nightly-liveness', 1)
+    ]).body
+
+    expect(body).toContain('local/check-unit-shard-verdict.mjs')
+    expect(body).toContain('known-red classes stay out of the delegation')
+  })
+
+  it('reconciles the label with the verdict, and never strips it on close', () => {
+    expect(labelAction({ delegate: true, hasLabel: false })).toBe('add')
+    expect(labelAction({ delegate: true, hasLabel: true })).toBe('none')
+    expect(labelAction({ delegate: false, hasLabel: true })).toBe('remove')
+    expect(labelAction({ delegate: false, hasLabel: false })).toBe('none')
+  })
+
+  it('reads label names whether gh returns objects or strings', () => {
+    expect(issueLabels({ labels: [{ name: AGENT_AUTO_LABEL }, { name: 'bug' }] })).toEqual([
+      AGENT_AUTO_LABEL,
+      'bug'
+    ])
+    expect(issueLabels({ labels: ['bug'] })).toEqual(['bug'])
+    expect(issueLabels({})).toEqual([])
+    expect(issueLabels(null)).toEqual([])
+  })
+
+  it('asks the lookup for labels, so the reconciliation has something to read', () => {
+    const args = issueLookupArgs()
+
+    expect(args[args.indexOf('--json') + 1].split(',')).toContain('labels')
+  })
+
+  // The old title claimed "never strips it on close" while only `labelAction` was tested. The close rule
+  // lives in the orchestration, so it is extracted into `decideLabel` and pinned where it actually runs.
+  it('never strips the label on close, because it is the audit record', () => {
+    expect(decideLabel({ action: 'close', delegated: false, labels: [AGENT_AUTO_LABEL] })).toBe(
+      'none'
+    )
+    expect(decideLabel({ action: 'close', delegated: true, labels: [AGENT_AUTO_LABEL] })).toBe(
+      'none'
+    )
+  })
+
+  it('adds on a red create or update, and removes once the red has cleared', () => {
+    expect(decideLabel({ action: 'create', delegated: true, labels: [] })).toBe('add')
+    expect(decideLabel({ action: 'update', delegated: true, labels: [] })).toBe('add')
+    expect(decideLabel({ action: 'update', delegated: false, labels: [AGENT_AUTO_LABEL] })).toBe(
+      'remove'
+    )
+    expect(decideLabel({ action: 'update', delegated: false, labels: [] })).toBe('none')
+    expect(decideLabel({ action: 'update', delegated: true, labels: [AGENT_AUTO_LABEL] })).toBe(
+      'none'
+    )
+  })
+
+  // A `[bot]` actor is refused by the driver before it checks permission, so the workflow token must not
+  // survive into the child environment under either name.
+  it('builds a child env where the workflow token cannot win by precedence', () => {
+    const env = labelEnv({ GH_TOKEN: 'bot', GITHUB_TOKEN: 'bot', PATH: '/bin' }, 'pat')
+
+    expect(env.GH_TOKEN).toBe('pat')
+    expect(env).not.toHaveProperty('GITHUB_TOKEN')
+    expect(env.PATH).toBe('/bin')
+  })
+
+  // The first branch dispatch created the issue and then failed, because `gh issue list --search`
+  // reads a search index that had not caught up. The create output is the immediate answer.
+  it('reads the new issue number from the create output, not from the lagging search index', () => {
+    expect(issueNumberFromCreateOutput('https://github.com/nplez1/orca/issues/290\n')).toBe(290)
+    expect(issueNumberFromCreateOutput('https://github.com/nplez1/orca/issues/290')).toBe(290)
+    expect(issueNumberFromCreateOutput('  https://github.com/nplez1/orca/issues/7  ')).toBe(7)
+  })
+
+  it('answers null rather than a wrong number when the output has no URL', () => {
+    expect(issueNumberFromCreateOutput('')).toBe(null)
+    expect(issueNumberFromCreateOutput(null)).toBe(null)
+    expect(issueNumberFromCreateOutput('Creating issue...')).toBe(null)
+    expect(issueNumberFromCreateOutput('https://github.com/nplez1/orca/issues/not-a-number')).toBe(
+      null
+    )
+  })
+})
+
 describe('the lane that runs it', () => {
   it('exists, runs both checks through one script, and declares what it reads and writes', () => {
     const workflow = readWorkflow('.github/workflows/fork-ci-health.yml')
@@ -124,6 +256,15 @@ describe('the lane that runs it', () => {
     for (const entry of CHECKS) {
       expect(existsSync(join(REPO_ROOT, entry.script)), entry.script).toBe(true)
     }
+  })
+
+  it('labels with a token that is not the workflow token, because a bot cannot delegate', () => {
+    const workflow = readWorkflow('.github/workflows/fork-ci-health.yml')
+    const steps = workflow.jobs.health.steps
+    const report = steps.find((step) => String(step.run ?? '').includes('ci-health-report.mjs'))
+
+    expect(report.env).toMatchObject({ GH_DELEGATE_TOKEN: '${{ secrets.AGENT_DELEGATE_TOKEN }}' })
+    expect(report.env.GH_TOKEN).toBe('${{ secrets.GITHUB_TOKEN }}')
   })
 })
 
