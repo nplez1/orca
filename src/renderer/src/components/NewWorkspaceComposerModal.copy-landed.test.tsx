@@ -58,6 +58,7 @@ function primaryCheckoutOnMain(): Worktree {
     branch: 'refs/heads/main',
     isBare: false,
     isMainWorktree: true,
+    hostId: 'runtime:env-b',
     displayName: 'main',
     comment: '',
     linkedIssue: null,

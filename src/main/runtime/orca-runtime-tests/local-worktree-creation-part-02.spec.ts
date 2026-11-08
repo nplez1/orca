@@ -680,7 +680,8 @@ describe('OrcaRuntimeService', () => {
       await runtime.createManagedWorktree({
         repoSelector: 'id:repo-1',
         name: 'fix-title',
-        baseBranch: 'main',
+        // The same base a copy would use, so only the exact-branch flag separates the two.
+        baseBranch: 'fork/feature/fix',
         pushTarget: {
           remoteName: 'fork',
           branchName: 'feature/fix',
@@ -688,11 +689,16 @@ describe('OrcaRuntimeService', () => {
         }
       })
 
-      // Why: only a copy keeps a branch it must fetch first; every other create defers the remote.
-      expect(gitSpy).not.toHaveBeenCalledWith(
-        ['remote', 'add', expect.anything(), '--no-tags', expect.anything(), expect.anything()],
-        expect.anything()
+      // Why: only a copy keeps a branch it must fetch first; every other create defers the remote
+      // to the first push/pull/fetch, so nothing may add it before the checkout exists.
+      const addWorktreeOrder = vi.mocked(addWorktree).mock.invocationCallOrder[0] ?? 0
+      const earlyRemoteAdd = gitSpy.mock.calls.findIndex(
+        (call, index) =>
+          call[0][0] === 'remote' &&
+          call[0][1] === 'add' &&
+          (gitSpy.mock.invocationCallOrder[index] ?? Infinity) < addWorktreeOrder
       )
+      expect(earlyRemoteAdd).toBe(-1)
     } finally {
       gitSpy.mockRestore()
     }

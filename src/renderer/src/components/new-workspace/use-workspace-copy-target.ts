@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../../shared/execution-host'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { branchName } from '@/lib/git-utils'
 import {
@@ -129,8 +129,8 @@ export function useWorkspaceCopyTarget(input: WorkspaceCopyTargetInput): Workspa
       (worktree) =>
         worktree.isMainWorktree === true &&
         branchName(worktree.branch ?? '') === branchName(lockedWorkspaceBranch) &&
-        // A twin repo id can hold another host's row; unstamped rows belong to the local host.
-        (!worktree.hostId || worktree.hostId === hostId)
+        // A twin repo id can hold another host's row, and an unstamped row is a local one.
+        (worktree.hostId ?? LOCAL_EXECUTION_HOST_ID) === hostId
     )
     return landed ?? null
   }, [copyMode, clonedSetupKeys, hasLockedPushTarget, lockedWorkspaceBranch, selectedReadyOption])

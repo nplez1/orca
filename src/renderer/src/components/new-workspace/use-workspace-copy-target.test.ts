@@ -83,7 +83,9 @@ afterEach(() => {
 
 describe('useWorkspaceCopyTarget', () => {
   it('treats our own clone that already holds the branch as the copy', async () => {
-    const { result } = renderCopyTarget({}, [worktreeAt(CLONE_PATH, 'refs/heads/main')])
+    const { result } = renderCopyTarget({}, [
+      worktreeAt(CLONE_PATH, 'refs/heads/main', { hostId: 'runtime:env-b' })
+    ])
 
     act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
     await expect(result.current.resolveCloneLandedCopy()).resolves.toMatchObject({
@@ -95,7 +97,9 @@ describe('useWorkspaceCopyTarget', () => {
   })
 
   it('never calls a checkout we did not clone the copy, even on the same branch', async () => {
-    const { result } = renderCopyTarget({}, [worktreeAt(CLONE_PATH, 'refs/heads/main')])
+    const { result } = renderCopyTarget({}, [
+      worktreeAt(CLONE_PATH, 'refs/heads/main', { hostId: 'runtime:env-b' })
+    ])
 
     // Why: an import of an existing folder is a pre-existing checkout, which stays a refusal.
     act(() =>
@@ -118,7 +122,10 @@ describe('useWorkspaceCopyTarget', () => {
 
   it('does not treat a non-primary checkout on the branch as the clone', async () => {
     const { result } = renderCopyTarget({}, [
-      worktreeAt(CLONE_PATH, 'refs/heads/main', { isMainWorktree: false })
+      worktreeAt(CLONE_PATH, 'refs/heads/main', {
+        isMainWorktree: false,
+        hostId: 'runtime:env-b'
+      })
     ])
 
     act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
@@ -138,7 +145,9 @@ describe('useWorkspaceCopyTarget', () => {
   })
 
   it('leaves the create alone when the clone checked out another branch', async () => {
-    const { result } = renderCopyTarget({}, [worktreeAt(CLONE_PATH, 'refs/heads/develop')])
+    const { result } = renderCopyTarget({}, [
+      worktreeAt(CLONE_PATH, 'refs/heads/develop', { hostId: 'runtime:env-b' })
+    ])
 
     act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
 
