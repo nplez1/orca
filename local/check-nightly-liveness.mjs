@@ -250,7 +250,8 @@ function stalenessCause({ slot, diagnosis, repoReadError, missedCount }) {
     return 'the cron is not firing, or the workflow is disabled.'
   }
   const slotText = `the ${iso(slot)} slot`
-  const slotsText = missedCount > 1 ? ` (${missedCount} slots due since then)` : ''
+  const slotsText =
+    missedCount > 1 ? ` (${missedCount} slots due since the last scheduled run)` : ''
   if (diagnosis.kind === 'unknown') {
     const why =
       repoReadError !== null

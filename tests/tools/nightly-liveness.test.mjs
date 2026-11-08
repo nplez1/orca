@@ -451,7 +451,7 @@ describe('why a slot went unanswered', () => {
     expect(verdict.missedSlot).toBe('2026-11-09T04:53:00Z')
     expect(verdict.missedSlots).toBe(4)
     expect(verdict.summary).toMatch(/this workflow's own schedule or enablement/)
-    expect(verdict.summary).toMatch(/4 slots due since then/)
+    expect(verdict.summary).toMatch(/4 slots due since the last scheduled run/)
   })
 
   it('says the history stops short rather than calling a truncated page silence', () => {
@@ -463,6 +463,17 @@ describe('why a slot went unanswered', () => {
     const verdict = judgeLiveness([silentRun()], NOW, { repoRuns: truncated })
     expect(verdict.summary).toMatch(/holds no run before 2026-10-25T04:53:00Z/)
     expect(verdict.summary).toMatch(/no evidence either way/)
+    expect(verdict.summary).not.toMatch(/Actions switch was off/)
+  })
+
+  it('calls a short page that cannot reach the slot no evidence, not silence', () => {
+    // Why: this workflow's own last run is always older than the slot, so a page with nothing before
+    // it cannot have reached the slot however few runs it holds — the full-page guard missed that.
+    const verdict = judgeLiveness([silentRun()], NOW, {
+      repoRuns: [repoRun(slot + 20 * HOUR_MS, 'Fork CI health')]
+    })
+    expect(verdict.repoRunsInWindow).toBe(0)
+    expect(verdict.summary).toMatch(/holds no run before 2026-10-25T04:53:00Z/)
     expect(verdict.summary).not.toMatch(/Actions switch was off/)
   })
 
@@ -566,6 +577,18 @@ describe('missedSchedule', () => {
     expect(utc(missedSchedule('2026-11-06T12:31:41Z', at('2026-11-09T17:00:00Z')).slot)).toBe(
       '2026-11-09T04:53:00Z'
     )
+  })
+
+  it('excludes a slot the last run landed on, and includes the one before it', () => {
+    // The rule is `slot > from` on both sides, so a run exactly at 04:53 owes the next day's slot.
+    expect(missedSchedule('2026-11-07T04:53:00Z', at('2026-11-08T05:00:00Z')).due).toBe(1)
+    expect(missedSchedule('2026-11-07T04:53:00.001Z', at('2026-11-08T05:00:00Z')).due).toBe(1)
+    expect(missedSchedule('2026-11-07T04:52:59.999Z', at('2026-11-08T05:00:00Z')).due).toBe(2)
+  })
+
+  it('treats a window closing exactly now as closed', () => {
+    const owed = missedSchedule('2026-11-06T12:31:41Z', at('2026-11-08T16:53:00Z'))
+    expect(utc(owed.slot)).toBe('2026-11-08T04:53:00Z')
   })
 
   it('keeps counting past the listing cap, so a month of silence is not reported as two weeks', () => {
