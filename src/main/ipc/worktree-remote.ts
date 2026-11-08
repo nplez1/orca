@@ -1067,6 +1067,8 @@ async function performLocalWorktreeCreate(
   // has to recreate that remote before any base ref can name it.
   const copiedPushTargetBase = await materializeCopiedPushTargetBase({
     request: args,
+    // The fetch is the slow half of a copy; without this the create surface shows no progress.
+    beforePrepare: () => emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId),
     prepare: (target) =>
       prepareWorktreePushTarget(
         repo.path,

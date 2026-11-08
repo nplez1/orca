@@ -21,6 +21,8 @@ export type WorkspaceCopyTargetInput = {
   selectedProjectHostSetupId: string | null
   selectedRepoExecutionHostId?: ExecutionHostId | null
   selectedEphemeralVmRecipeId?: string | null
+  /** The copy also recreates a fork remote, so its branch is not the checkout's own branch. */
+  hasLockedPushTarget?: boolean
 }
 
 export type WorkspaceCopyTarget = {
@@ -51,7 +53,8 @@ export function useWorkspaceCopyTarget(input: WorkspaceCopyTargetInput): Workspa
     projectHostSetupOptions,
     selectedProjectHostSetupId,
     selectedRepoExecutionHostId,
-    selectedEphemeralVmRecipeId
+    selectedEphemeralVmRecipeId,
+    hasLockedPushTarget = false
   } = input
   const copyMode = Boolean(lockedWorkspaceBranch)
   const [clonedSetupKeys, setClonedSetupKeys] = useState<ReadonlySet<string>>(() => new Set())
@@ -109,20 +112,28 @@ export function useWorkspaceCopyTarget(input: WorkspaceCopyTargetInput): Workspa
     if (!copyMode || !lockedWorkspaceBranch || !selectedReadyOption) {
       return null
     }
+    // Why not for a fork copy: the clone's checkout holds upstream's branch, not the fork's, so
+    // reporting it as the copy would name a branch the copy does not have.
+    if (hasLockedPushTarget) {
+      return null
+    }
     if (!clonedSetupKeys.has(getProjectHostSetupSelectionKey(selectedReadyOption))) {
       return null
     }
+    const hostId = selectedReadyOption.hostId
     const store = useAppStore.getState()
-    await store.fetchWorktrees(selectedReadyOption.repoId)
-    // Why the path: a clone's destination is that repo's primary checkout, so it identifies the
-    // checkout this flow created without guessing which host a twin repo id belongs to.
+    await store.fetchWorktrees(selectedReadyOption.repoId, { executionHostId: hostId })
+    // Why the primary checkout: a fresh clone has exactly one, so it identifies the checkout this
+    // flow created without comparing path spellings Windows, symlinks and WSL report differently.
     const landed = (useAppStore.getState().worktreesByRepo[selectedReadyOption.repoId] ?? []).find(
       (worktree) =>
-        worktree.path === selectedReadyOption.path &&
-        branchName(worktree.branch ?? '') === branchName(lockedWorkspaceBranch)
+        worktree.isMainWorktree === true &&
+        branchName(worktree.branch ?? '') === branchName(lockedWorkspaceBranch) &&
+        // A twin repo id can hold another host's row; unstamped rows belong to the local host.
+        (!worktree.hostId || worktree.hostId === hostId)
     )
     return landed ?? null
-  }, [copyMode, clonedSetupKeys, lockedWorkspaceBranch, selectedReadyOption])
+  }, [copyMode, clonedSetupKeys, hasLockedPushTarget, lockedWorkspaceBranch, selectedReadyOption])
 
   return {
     lockedTargetIsSourceHost,

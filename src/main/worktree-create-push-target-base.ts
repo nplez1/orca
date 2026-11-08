@@ -24,10 +24,13 @@ export type CopiedPushTargetBase = {
  */
 export async function materializeCopiedPushTargetBase({
   request,
-  prepare
+  prepare,
+  beforePrepare
 }: {
   request: CopiedPushTargetBaseRequest
   prepare: (target: GitPushTarget) => Promise<GitPushTarget>
+  /** Runs once the gate passes and before the network fetch, so the surface can say it is fetching. */
+  beforePrepare?: () => void
 }): Promise<CopiedPushTargetBase> {
   const { exactBranchName, pushTarget, baseBranch } = request
   const remoteUrl = pushTarget?.remoteUrl?.trim()
@@ -43,6 +46,7 @@ export async function materializeCopiedPushTargetBase({
   ) {
     return { baseBranch, pushTarget, materialized: false }
   }
+  beforePrepare?.()
   const prepared = await prepare({ ...pushTarget, remoteName, remoteUrl })
   return {
     // Why the prepared name: an existing remote for that URL is reused under its own name, and a

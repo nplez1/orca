@@ -581,4 +581,120 @@ describe('OrcaRuntimeService', () => {
     expect(addRetiredWorktreeName).toHaveBeenCalledWith('repo-1', 'nautilus')
     expect(witness.afterAdd).toBeGreaterThan(witness.duringAdd ?? Infinity)
   })
+  it('recreates a copied workspace fork remote before the runtime host resolves its base', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const createdWorktree = {
+      path: '/tmp/workspaces/fix-title',
+      head: 'abc123',
+      branch: 'refs/heads/feature/fix',
+      isBare: false,
+      isMainWorktree: false
+    }
+    computeWorktreePathMock.mockReturnValue(createdWorktree.path)
+    ensurePathWithinWorkspaceMock.mockReturnValue(createdWorktree.path)
+    vi.mocked(getBranchConflictKind).mockResolvedValue(null)
+    vi.mocked(listWorktrees).mockResolvedValueOnce([createdWorktree])
+    const gitSpy = vi.spyOn(gitRunner, 'gitExecFileAsync').mockResolvedValue({
+      stdout: '',
+      stderr: ''
+    })
+
+    try {
+      await runtime.createManagedWorktree({
+        repoSelector: 'id:repo-1',
+        name: 'fix-title',
+        baseBranch: 'fork/feature/fix',
+        branchNameOverride: 'feature/fix',
+        exactBranchName: true,
+        pushTarget: {
+          remoteName: 'fork',
+          branchName: 'feature/fix',
+          remoteUrl: 'git@github.com:alice/orca.git',
+          remoteCreated: true
+        }
+      })
+
+      // Why: this host has never seen that remote, so the copy's base cannot exist until it is added
+      // and the branch fetched from it.
+      expect(gitSpy).toHaveBeenCalledWith(
+        [
+          'remote',
+          'add',
+          '-t',
+          'feature/fix',
+          '--no-tags',
+          'fork',
+          'git@github.com:alice/orca.git'
+        ],
+        expect.objectContaining({ cwd: TEST_REPO_PATH })
+      )
+      expect(gitSpy).toHaveBeenCalledWith(
+        ['fetch', 'fork', '+refs/heads/feature/fix*:refs/remotes/fork/feature/fix*'],
+        expect.objectContaining({ cwd: TEST_REPO_PATH })
+      )
+      expect(gitSpy).toHaveBeenCalledWith(
+        ['branch', '--set-upstream-to', 'fork/feature/fix', 'feature/fix'],
+        expect.objectContaining({ cwd: createdWorktree.path })
+      )
+      expect(addWorktree).toHaveBeenCalledWith(
+        TEST_REPO_PATH,
+        createdWorktree.path,
+        'feature/fix',
+        'fork/feature/fix',
+        false,
+        false,
+        {}
+      )
+      const remoteAddIndex = gitSpy.mock.calls.findIndex(
+        (call) => call[0][0] === 'remote' && call[0][1] === 'add'
+      )
+      expect(remoteAddIndex).toBeGreaterThanOrEqual(0)
+      // Why the order: the base ref can only exist after the remote is added and fetched.
+      expect(gitSpy.mock.invocationCallOrder[remoteAddIndex]).toBeLessThan(
+        vi.mocked(addWorktree).mock.invocationCallOrder[0] ?? 0
+      )
+    } finally {
+      gitSpy.mockRestore()
+    }
+  })
+
+  it('leaves a non-copy create alone even when it carries a fork remote URL', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const createdWorktree = {
+      path: '/tmp/workspaces/fix-title',
+      head: 'abc123',
+      branch: 'refs/heads/fix-title',
+      isBare: false,
+      isMainWorktree: false
+    }
+    computeWorktreePathMock.mockReturnValue(createdWorktree.path)
+    ensurePathWithinWorkspaceMock.mockReturnValue(createdWorktree.path)
+    vi.mocked(getBranchConflictKind).mockResolvedValue(null)
+    vi.mocked(listWorktrees).mockResolvedValueOnce([createdWorktree])
+    const gitSpy = vi.spyOn(gitRunner, 'gitExecFileAsync').mockResolvedValue({
+      stdout: '',
+      stderr: ''
+    })
+
+    try {
+      await runtime.createManagedWorktree({
+        repoSelector: 'id:repo-1',
+        name: 'fix-title',
+        baseBranch: 'main',
+        pushTarget: {
+          remoteName: 'fork',
+          branchName: 'feature/fix',
+          remoteUrl: 'git@github.com:alice/orca.git'
+        }
+      })
+
+      // Why: only a copy keeps a branch it must fetch first; every other create defers the remote.
+      expect(gitSpy).not.toHaveBeenCalledWith(
+        ['remote', 'add', expect.anything(), '--no-tags', expect.anything(), expect.anything()],
+        expect.anything()
+      )
+    } finally {
+      gitSpy.mockRestore()
+    }
+  })
 })

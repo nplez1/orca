@@ -11,10 +11,9 @@ const storeMocks = vi.hoisted(() => {
 })
 
 vi.mock('@/store', () => ({
-  useAppStore: Object.assign(
-    (selector: (state: unknown) => unknown) => selector(storeMocks),
-    { getState: () => storeMocks }
-  )
+  useAppStore: Object.assign((selector: (state: unknown) => unknown) => selector(storeMocks), {
+    getState: () => storeMocks
+  })
 }))
 
 import { useWorkspaceCopyTarget } from './use-workspace-copy-target'
@@ -37,7 +36,7 @@ function readyOption(
   }
 }
 
-function worktreeAt(path: string, branch: string): Worktree {
+function worktreeAt(path: string, branch: string, overrides: Partial<Worktree> = {}): Worktree {
   return {
     id: `repo-b::${path}`,
     repoId: 'repo-b',
@@ -55,7 +54,8 @@ function worktreeAt(path: string, branch: string): Worktree {
     isUnread: false,
     isPinned: false,
     sortOrder: 0,
-    lastActivityAt: 0
+    lastActivityAt: 0,
+    ...overrides
   }
 }
 
@@ -89,14 +89,49 @@ describe('useWorkspaceCopyTarget', () => {
     await expect(result.current.resolveCloneLandedCopy()).resolves.toMatchObject({
       id: `repo-b::${CLONE_PATH}`
     })
-    expect(storeMocks.fetchWorktrees).toHaveBeenCalledWith('repo-b')
+    expect(storeMocks.fetchWorktrees).toHaveBeenCalledWith('repo-b', {
+      executionHostId: 'runtime:env-b'
+    })
   })
 
   it('never calls a checkout we did not clone the copy, even on the same branch', async () => {
     const { result } = renderCopyTarget({}, [worktreeAt(CLONE_PATH, 'refs/heads/main')])
 
     // Why: an import of an existing folder is a pre-existing checkout, which stays a refusal.
-    act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'existing-folder'))
+    act(() =>
+      result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'existing-folder')
+    )
+
+    await expect(result.current.resolveCloneLandedCopy()).resolves.toBeNull()
+    expect(storeMocks.fetchWorktrees).not.toHaveBeenCalled()
+  })
+
+  it("does not mistake another host's twin checkout for this clone", async () => {
+    const { result } = renderCopyTarget({}, [
+      worktreeAt(CLONE_PATH, 'refs/heads/main', { hostId: 'local' })
+    ])
+
+    act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
+
+    await expect(result.current.resolveCloneLandedCopy()).resolves.toBeNull()
+  })
+
+  it('does not treat a non-primary checkout on the branch as the clone', async () => {
+    const { result } = renderCopyTarget({}, [
+      worktreeAt(CLONE_PATH, 'refs/heads/main', { isMainWorktree: false })
+    ])
+
+    act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
+
+    await expect(result.current.resolveCloneLandedCopy()).resolves.toBeNull()
+  })
+
+  it('leaves a fork copy to the create path, whose branch the clone does not hold', async () => {
+    const { result } = renderCopyTarget({ hasLockedPushTarget: true }, [
+      worktreeAt(CLONE_PATH, 'refs/heads/main')
+    ])
+
+    act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
 
     await expect(result.current.resolveCloneLandedCopy()).resolves.toBeNull()
     expect(storeMocks.fetchWorktrees).not.toHaveBeenCalled()

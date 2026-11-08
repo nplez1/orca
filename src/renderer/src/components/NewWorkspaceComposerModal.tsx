@@ -161,14 +161,14 @@ function QuickTabBody({
       : {}),
     ...(modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
       ? {
-          sourceRuntimeOwnerEnvironmentId:
-            modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
+          sourceRuntimeOwnerEnvironmentId: modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
         }
       : {}),
     projectHostSetupOptions: cardProps.projectHostSetupOptions ?? [],
     selectedProjectHostSetupId: cardProps.selectedProjectHostSetupId ?? null,
     selectedRepoExecutionHostId: cardProps.selectedRepoExecutionHostId,
-    selectedEphemeralVmRecipeId: cardProps.selectedEphemeralVmRecipeId
+    selectedEphemeralVmRecipeId: cardProps.selectedEphemeralVmRecipeId,
+    hasLockedPushTarget: Boolean(lockedWorkspacePushTarget)
   })
   const handleProjectHostSetupProvisioned = useCallback(
     (setupId: string, provisioning?: ProjectHostSetupProvisioning): void => {

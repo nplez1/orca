@@ -357,6 +357,50 @@ describe('worktree remote runtime mutations', () => {
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
   })
 
+  it('refuses a fork copy on a paired runtime that cannot recreate the remote', async () => {
+    const oldRuntimeStatus = createCompatibleRuntimeStatusResponse('runtime-old')
+    if (oldRuntimeStatus.ok) {
+      oldRuntimeStatus.result.capabilities = oldRuntimeStatus.result.capabilities?.filter(
+        (capability) => capability !== 'worktree.create.push-target-base.v1'
+      )
+    }
+    runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) =>
+      args.method === 'status.get' ? oldRuntimeStatus : runtimeEnvironmentCall(args)
+    )
+    const store = createRepoTestStore()
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+      worktreesByRepo: { repo1: [] }
+    } as Partial<AppState>)
+    seedRepoHost(store, 'runtime:env-1')
+    const createWorktree = store.getState().createWorktree
+    const args: Parameters<typeof createWorktree> = [
+      'repo1',
+      'fix-login',
+      'fork/fix-login',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        remoteName: 'fork',
+        branchName: 'fix-login',
+        remoteUrl: 'git@github.com:alice/orca.git'
+      },
+      undefined,
+      'fix-login'
+    ]
+    args[25] = { exactBranchName: true }
+
+    // Why: the older host would fail on a ref it never fetched, so refuse before creating anything.
+    await expect(createWorktree(...args)).rejects.toThrow(
+      'Update the remote runtime to copy a fork workspace to it'
+    )
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+  })
+
   it('refuses an exact-branch copy on a paired runtime that cannot honour it', async () => {
     const oldRuntimeStatus = createCompatibleRuntimeStatusResponse('runtime-old')
     if (oldRuntimeStatus.ok) {
