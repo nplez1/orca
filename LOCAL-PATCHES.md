@@ -3103,6 +3103,55 @@ caller that omits the input would pass statically — the run-status check catch
 production instead. The mirror push evaluates upstream's copy of each file, which this scan never
 reads. `/jobs` is read one page.
 
+#### GitHub disabled Actions for inherited crons (2026-11-06)
+
+On 2026-11-06 GitHub switched Actions off for the whole repository. The stated reason was compute
+"wasted" by inherited workflows: _"Workflows inherited from the upstream repository often run on
+schedules or events that aren't needed on a fork."_ Nothing had run since 18:09 that day, and every
+endpoint this repo's own checks read still said healthy — `actions/permissions` reported
+`enabled: true`, all 18 active workflows reported `active`, and `check-actions-enablement` printed
+`OK` while CI had been dead for 33 hours.
+
+**The inherited crons were the fault, and the sweep was enforcing them.** Two upstream files carried
+upstream's cron and nothing else did:
+
+| file                        | cron          | fork-written?   |
+| --------------------------- | ------------- | --------------- |
+| `node-server-tests.yml`     | `30 11 * * *` | no — upstream's |
+| `performance-contracts.yml` | `15 9 * * *`  | no — upstream's |
+
+The other four schedules are `fork-main-tests` (`53 4`), `fork-main-gates` (`23 4`),
+`fork-upstream-tags` (`17 3`) and `fork-ci-health` (`11 6`) — every one of them a lane this fork wrote.
+The problem was not that the two upstream crons were invisible: `EXPECTED_TRIGGERS` **pinned them as
+expected**, so the guard that exists to catch work nobody asked for was the mechanism keeping it.
+Pinning the status quo is not approving it, and the table could not tell the difference.
+
+**Three changes, in the order they matter.**
+
+- The two `schedule:` blocks are gone. Both lanes keep their `pull_request` legs, which is the coverage
+  the fork enabled them for; `node-server-tests` keeps `workflow_call`, so `qualified-orcad-template`
+  still reaches it. Measured cost of the removed crons: 324 + 85 minutes a week.
+- `FORK_SCHEDULES` is a new positive assertion in `check-actions-enablement.mjs`: the only files
+  allowed a `schedule:` trigger, each with the reason it needs a clock. An enabled file with a cron and
+  no entry is reported as `SCHEDULE` and is **never** auto-disabled — the fix is to delete the cron,
+  not to switch the lane off, and a `--fix` that disabled `node-server-tests` would delete real
+  headless-path coverage to solve a scheduling problem.
+- `judgeActionsEnabled` reads `GET /repos/nplez1/orca/actions/permissions` and reports an explicit
+  `enabled: false`. It can only help from outside Actions — a repository with Actions disabled cannot
+  run the workflow that would report it — so its value is `node local/check-actions-enablement.mjs` on
+  the host, which is the only vantage point that can see an absence of runs as an absence.
+
+**Why this is not just "we deleted two lines".** The next upstream sync can put either cron back, and
+it will: those are upstream's files. `FORK_SCHEDULES` is what makes the reintroduction a report rather
+than a silent return, and `local/sync/push-upstream-mirror.mjs` already runs
+`check-actions-enablement --fix` after a sync. The four fork-owned crons are in `REQUIRED`, so the same
+sweep cannot disable them either.
+
+**Not fixed, and worth knowing.** The 2026-11-06 disable also means the fork ran ~33 hours with no
+nightly, no health report and no release lane before anyone noticed, because every detector lives
+inside the thing that was off. The host-side run above is the only one that closes that, and it is a
+launchd job rather than a workflow.
+
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries

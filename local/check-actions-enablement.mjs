@@ -113,14 +113,9 @@ export const EXPECTED_TRIGGERS = {
     'workflow_dispatch'
   ],
   '.github/workflows/mobile.yml': ['pull_request', 'push'],
-  '.github/workflows/node-server-tests.yml': [
-    'pull_request',
-    'workflow_dispatch',
-    'workflow_call',
-    'schedule'
-  ],
+  '.github/workflows/node-server-tests.yml': ['pull_request', 'workflow_dispatch', 'workflow_call'],
   '.github/workflows/macos-updater-tests.yml': ['pull_request', 'workflow_dispatch'],
-  '.github/workflows/performance-contracts.yml': ['schedule', 'workflow_dispatch', 'pull_request'],
+  '.github/workflows/performance-contracts.yml': ['workflow_dispatch', 'pull_request'],
   '.github/workflows/zcode-account-contract.yml': ['workflow_dispatch'],
   '.github/workflows/unit-module-cache-benchmark.yml': ['workflow_dispatch'],
   '.github/workflows/windows-native-preparation-benchmark.yml': ['workflow_dispatch'],
@@ -128,6 +123,35 @@ export const EXPECTED_TRIGGERS = {
   '.github/workflows/qualified-orcad-template.yml': ['workflow_call'],
   '.github/workflows/layout-owner-e2e.yml': ['workflow_dispatch'],
   '.github/workflows/dev-channel-win-publish.yml': ['workflow_call']
+}
+
+/**
+ * The only files allowed to carry a `schedule:` trigger, each with the reason it needs a clock.
+ *
+ * Why this is separate from `EXPECTED_TRIGGERS`: that table pins which triggers an enabled lane has, so
+ * it can only catch a trigger being added to a file someone already thought about. It recorded
+ * `schedule` as expected for `node-server-tests.yml` and `performance-contracts.yml` — both upstream
+ * files nobody on this fork wrote, both firing upstream's cron daily — and pinning the status quo is not
+ * the same as approving it.
+ *
+ * On 2026-11-06 GitHub disabled Actions on this repository for exactly that: "Workflows inherited from
+ * the upstream repository often run on schedules or events that aren't needed on a fork." Nothing in
+ * this file objected, because the objectionable crons were pinned as expected. A list that has to name
+ * the reason, rather than one that records what is already there, is the difference.
+ *
+ * An entry here is a claim that this fork needs the lane to run on a clock. An enabled file with a
+ * `schedule:` and no entry is reported and is never auto-disabled: the fix is to delete the cron from
+ * the file, not to switch the whole lane off.
+ */
+export const FORK_SCHEDULES = {
+  '.github/workflows/fork-main-tests.yml':
+    'the nightly unit backstop — nothing else tests nplez1/main between merges',
+  '.github/workflows/fork-main-gates.yml':
+    'repo-wide oxlint, max-lines, localization catalogs and `pnpm tc` on the release line',
+  '.github/workflows/fork-ci-health.yml':
+    'watches the other lanes; a watchdog with no clock is not one',
+  '.github/workflows/fork-upstream-tags.yml':
+    "mirrors upstream's release tags, which the fork's release line is cut from"
 }
 
 /**
@@ -319,6 +343,40 @@ export function workflowListArgs() {
   return ['api', '--paginate', '--slurp', `repos/${REPO}/actions/workflows?per_page=100`]
 }
 
+/** The repo-level switch. Distinct from every per-workflow state: it can be off while they read active. */
+export function actionsPermissionsArgs() {
+  return ['api', `repos/${REPO}/actions/permissions`]
+}
+
+/**
+ * Whether GitHub has Actions switched off for the whole repository.
+ *
+ * Why this exists: on 2026-11-06 GitHub disabled Actions on this repo to stop compute "wasted" by
+ * inherited upstream workflows. Every per-workflow state still read `active`, the enablement endpoints
+ * still read `enabled: true`, and this check — the one whose whole job is noticing that CI is not
+ * running — reported `OK` while nothing had run for 33 hours.
+ *
+ * What it cannot do: run from inside Actions, which is where this check normally runs. A disabled
+ * repository cannot run the workflow that would report it disabled. It is useful when invoked from the
+ * host instead (`node local/check-actions-enablement.mjs`), which is the only vantage point that can
+ * see an absence of runs as an absence.
+ *
+ * Only an explicit `false` is reported. A failed read stays silent: `--fix` is destructive and this is
+ * not worth a spurious red on a permissions hiccup.
+ */
+export function judgeActionsEnabled(payload) {
+  if (payload === null || typeof payload !== 'object') {
+    return null
+  }
+  if (payload.enabled !== false) {
+    return null
+  }
+  return {
+    reason: `Actions is disabled for ${REPO}, so no lane here can run at all`,
+    allowedActions: payload.allowed_actions ?? null
+  }
+}
+
 /** The runs `--fix` must cancel: disabling a workflow does not touch a run already going. */
 export function cancellableRuns(runs) {
   return (runs ?? [])
@@ -343,6 +401,7 @@ export function judgeEnablement(
     required = REQUIRED,
     allowedInert = ALLOWED_INERT,
     expected = EXPECTED_TRIGGERS,
+    forkSchedules = FORK_SCHEDULES,
     acceptedRunners = ACCEPTED_RUNNER_LABELS
   } = {}
 ) {
@@ -360,6 +419,7 @@ export function judgeEnablement(
 
   const triggerDrift = []
   const requiredTriggerDrift = []
+  const inheritedSchedules = []
   const unpinned = []
   const unapprovedRunners = []
   const forbiddenTriggers = []
@@ -387,6 +447,11 @@ export function judgeEnablement(
     if (pinned === undefined) {
       unpinned.push({ path: workflow.path, all: entry.triggers })
       continue
+    }
+    // Checked before the pin comparison and independent of it: `EXPECTED_TRIGGERS` can only compare a
+    // lane to what it was, and what it was may be an upstream cron this fork never wanted.
+    if (entry.triggers.includes('schedule') && !Object.hasOwn(forkSchedules, workflow.path)) {
+      inheritedSchedules.push({ path: workflow.path, id: workflow.id })
     }
     if (!sameTriggers(entry.triggers, pinned)) {
       const drift = { path: workflow.path, expected: pinned, all: entry.triggers }
@@ -467,7 +532,8 @@ export function judgeEnablement(
     stale.length +
     unreadable.length +
     unapprovedRunners.length +
-    forbiddenTriggers.length
+    forbiddenTriggers.length +
+    inheritedSchedules.length
   return {
     total: workflows.length,
     activeCount: active.length,
@@ -476,6 +542,7 @@ export function judgeEnablement(
     stale,
     triggerDrift,
     requiredTriggerDrift,
+    inheritedSchedules,
     unpinned,
     unapprovedRunners,
     forbiddenTriggers,
@@ -503,7 +570,8 @@ export function residualProblems({ verdict, fix = false, disabled = [], failed =
     verdict.unreadable.length +
     verdict.unapprovedRunners.length +
     verdict.forbiddenTriggers.length +
-    verdict.requiredTriggerDrift.length
+    verdict.requiredTriggerDrift.length +
+    verdict.inheritedSchedules.length
   )
 }
 
@@ -632,6 +700,14 @@ function report(verdict, fix) {
       `  TRIGGER  pinned [${t.expected.join(', ')}] but the file fires on [${t.all.join(', ')}]${only}: ${t.path}`
     )
   }
+  for (const s of verdict.inheritedSchedules) {
+    console.log(
+      `  SCHEDULE an inherited cron this fork never asked for — delete the schedule from the file: ${s.path}`
+    )
+  }
+  if (verdict.actionsDisabled) {
+    console.log(`  DISABLED ${verdict.actionsDisabled.reason}`)
+  }
   for (const u of verdict.unpinned) {
     console.log(`  UNPINNED active but no triggers pinned, so its shape is unproven: ${u.path}`)
   }
@@ -652,6 +728,9 @@ function report(verdict, fix) {
 
   const { disabled, failed } = applyFixes(verdict, fix)
   const residual = residualProblems({ verdict, fix, disabled, failed })
+  if (verdict.actionsDisabled) {
+    return residual + 1
+  }
   if (residual > 0) {
     if (verdict.disableTargets.length > 0 && !fix) {
       console.log('  fix: node local/check-actions-enablement.mjs --fix')
@@ -712,10 +791,20 @@ function main() {
     process.exit(2)
   }
 
+  // Read defensively: the workflow list above already proved `gh` works, so a failure here is about
+  // this endpoint rather than about the machine, and it must not turn a real verdict into an error.
+  let actionsEnabled = null
+  try {
+    actionsEnabled = judgeActionsEnabled(JSON.parse(gh(actionsPermissionsArgs())))
+  } catch {
+    actionsEnabled = null
+  }
+
   const verdict = judgeEnablement({
     workflows,
     facts: readFacts(Object.keys(EXPECTED_TRIGGERS), ROOT)
   })
+  verdict.actionsDisabled = actionsEnabled
   if (report(verdict, fix) > 0) {
     process.exit(1)
   }
