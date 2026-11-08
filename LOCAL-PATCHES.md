@@ -3141,6 +3141,17 @@ Pinning the status quo is not approving it, and the table could not tell the dif
   run the workflow that would report it — so its value is `node local/check-actions-enablement.mjs` on
   the host, which is the only vantage point that can see an absence of runs as an absence.
 
+**The cron removal broke an upstream test, and the PR gate did not run it.**
+`config/scripts/node-server-native-compat-scope.test.mjs` pinned `workflow.on.schedule` for
+`node-server-tests.yml` at one entry; deleting the cron made that `Target cannot be null or undefined`.
+It reached `nplez1/main` because every path #288 touched — `local/`, `tests/`, `.github/`, `*.md` — is
+in `open-pr.mjs`'s `TARGETED_PATHS`, so gate 1 read "not required" and no suite ran; the first run to
+see it was the 2026-11-08 dispatch, shard 12/12. The assertion now pins the fork's truth
+(`not.toHaveProperty('schedule')`) with the reason inline. The lesson is not "run the suite more" — the
+classification was right about every path it looked at. It is that a **workflow file is a global input
+when a test parses it**, which no path rule can express, so the `config/scripts` consumers are where to
+look after any workflow edit.
+
 **Why this is not just "we deleted two lines".** The next upstream sync can put either cron back, and
 it will: those are upstream's files. `FORK_SCHEDULES` is what makes the reintroduction a report rather
 than a silent return, and `local/sync/push-upstream-mirror.mjs` already runs
@@ -3151,6 +3162,48 @@ sweep cannot disable them either.
 nightly, no health report and no release lane before anyone noticed, because every detector lives
 inside the thing that was off. The host-side run above is the only one that closes that, and it is a
 launchd job rather than a workflow.
+
+#### The stale-nightly check could not name the third cause (2026-11-08, #291)
+
+The disable above surfaced as `check-nightly-liveness` exit 1: _"the newest scheduled run is 40h old
+(failure), past the 36h threshold for a 4:53 UTC daily schedule — the cron is not firing, or the
+workflow is disabled."_ Both of those were false. The cron was fine and the workflow read `active`; the
+repository-level switch was off. `judgeActionsEnabled` can only read that switch from the host, because
+a workflow token gets `403 Resource not accessible by integration` from
+`GET /repos/{owner}/{repo}/actions/permissions` — that 403 is in issue #291's own report, printed beside
+a `check-actions-enablement` row that says `OK`.
+
+So the check now **infers** the cause rather than guessing between two. When the schedule is stale it
+reads repository-wide run history (`gh run list --repo`, no workflow and no branch filter) and asks the
+one question a workflow-scoped list cannot: did anything in this repository run inside the 12 h window
+the slot should have fired in? Run against this incident, the answer it prints is:
+
+> the 2026-11-07T04:53:00Z slot produced no run, and no workflow in nplez1/orca ran in the 12h after it
+> either (34.3h of silence from 2026-11-06T18:09:57Z) — so the repository-level Actions switch was off
+> or GitHub was down, which is not this cron.
+
+Five bounds keep it honest. It judges the **newest** slot whose window has closed, because the oldest
+would blame a past outage for a cron that is still broken — and `missedSlot` therefore means the slot
+being judged, not the first one missed, which a `--json` consumer has to read that way. The count of
+due slots is arithmetic and uncapped (only the listing is bounded at 14), because a month-long outage
+reported as two weeks is the same class of error. The 12 h window is measured, not assumed:
+every nightly so far has landed between 10:37 and 12:54 UTC against a 04:53 schedule, so GitHub's cron
+delay is hours and a slot's own minute proves nothing. A page of runs that **stops short** of the slot
+is reported as no evidence rather than as silence, because a truncated list would manufacture exactly
+the false cause this exists to find. And runs without a `schedule` event are their own answer — the
+repository is working and no cron anywhere is firing, which no enablement of this workflow explains.
+The read happens **only** when a slot is due, and a failed or forbidden read reports the cause as
+unknown rather than falling back to the old two-way guess. A `--json` consumer sees all of it as
+`staleSchedule`, `missedSlot`, `missedSlots`, `repoRunsInWindow` and `repoReadError`.
+
+It cannot _fix_ a disabled repository — nothing inside Actions can. What it changes is who the issue
+blames: this triage read the cron, the workflow's enablement and the last run's logs first, and none of
+them was the answer.
+
+The same run's red shard was a different problem and is already fixed: `use-agent-tab-focus-overlay-
+close.test.tsx › leaves focus that lands after the overlay is gone` raced `act`'s queued task flush, and
+#285 drains the observer's records on a microtask instead. The first run carrying that fix, the
+2026-11-08 dispatch, passed shard 4/12.
 
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 

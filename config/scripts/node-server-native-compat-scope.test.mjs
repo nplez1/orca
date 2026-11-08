@@ -331,7 +331,10 @@ it('limits test-only native skip evidence to ordinary pull requests', () => {
   }
   expect(workflow.on).toHaveProperty('workflow_dispatch')
   expect(workflow.on).toHaveProperty('workflow_call')
-  expect(workflow.on.schedule).toHaveLength(1)
+  // Why: the fork deleted this cron on 2026-11-06, when GitHub disabled Actions for the whole
+  // repository over inherited schedules. `FORK_SCHEDULES` in `local/check-actions-enablement.mjs`
+  // is the assertion that keeps it gone; see LOCAL-PATCHES.md § local(ci).
+  expect(workflow.on).not.toHaveProperty('schedule')
 })
 
 it('configures server glibc 2.28 slots and the glibc 2.17 compatibility lane', () => {
