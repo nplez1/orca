@@ -111,13 +111,29 @@ describe('useWorkspaceCopyTarget', () => {
   })
 
   it("does not mistake another host's twin checkout for this clone", async () => {
-    const { result } = renderCopyTarget({}, [
-      worktreeAt(CLONE_PATH, 'refs/heads/main', { hostId: 'local' })
-    ])
+    // Why unstamped: a local row arrives without a host id, and a twin repo id can hold both hosts.
+    const twin = renderCopyTarget({}, [worktreeAt(CLONE_PATH, 'refs/heads/main')])
 
-    act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
+    act(() => twin.result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
 
-    await expect(result.current.resolveCloneLandedCopy()).resolves.toBeNull()
+    await expect(twin.result.current.resolveCloneLandedCopy()).resolves.toBeNull()
+
+    // The same unstamped row is this host's own checkout when the target is the local host.
+    const local = renderCopyTarget(
+      {
+        sourceHostId: 'runtime:env-b',
+        projectHostSetupOptions: [readyOption({ id: 'setup-local', hostId: 'local' })],
+        selectedProjectHostSetupId: 'setup-local',
+        selectedRepoExecutionHostId: 'local'
+      },
+      [worktreeAt(CLONE_PATH, 'refs/heads/main')]
+    )
+
+    act(() => local.result.current.recordProvisionedSetup('["setup-local","local"]', 'cloned'))
+
+    await expect(local.result.current.resolveCloneLandedCopy()).resolves.toMatchObject({
+      path: CLONE_PATH
+    })
   })
 
   it('does not treat a non-primary checkout on the branch as the clone', async () => {

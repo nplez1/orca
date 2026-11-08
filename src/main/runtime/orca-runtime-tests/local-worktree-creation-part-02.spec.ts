@@ -691,6 +691,7 @@ describe('OrcaRuntimeService', () => {
 
       // Why: only a copy keeps a branch it must fetch first; every other create defers the remote
       // to the first push/pull/fetch, so nothing may add it before the checkout exists.
+      expect(addWorktree).toHaveBeenCalled()
       const addWorktreeOrder = vi.mocked(addWorktree).mock.invocationCallOrder[0] ?? 0
       const earlyRemoteAdd = gitSpy.mock.calls.findIndex(
         (call, index) =>
