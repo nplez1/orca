@@ -18,10 +18,22 @@
  * unhappy, updates that same issue on every later run, and closes it when all of them are clean — so
  * the signal is a durable record with a state, not a log line nobody reads.
  *
- *   node local/ci-health-report.mjs               run both checks, open/update/close the issue
+ * A red issue also carries `agent:auto`, which hands it to the autonomous pipeline in
+ * `~/Code/homelab/agent-driver` instead of waiting for a human to triage it. Two things make that
+ * narrower than it looks, and both are load-bearing:
+ *
+ *   - the label is applied with a token whose actor is a collaborator, never with `GITHUB_TOKEN`.
+ *     `driver.py::_labeler_permission` refuses a `[bot]` actor outright — "an agent holding a token
+ *     must not be able to queue work for itself" — so a workflow-token label is skipped every tick.
+ *   - an allowlisted known-red class never reaches this issue at all. A shard job only fails when
+ *     its red matches nothing in `local/nightly-linux-known-red.json`
+ *     (`local/check-unit-shard-verdict.mjs`), so the classes `AGENTS.md` says must not be fixed
+ *     inside the fork cannot be delegated here by construction.
+ *
+ *   node local/ci-health-report.mjs               run the checks, open/update/close the issue
  *   node local/ci-health-report.mjs --dry-run     print the verdict and the action it would take
  *
- * Exit codes: 0 both clean, 1 attention needed (the run is red so the failure notifies), 2 could not
+ * Exit codes: 0 all clean, 1 attention needed (the run is red so the failure notifies), 2 could not
  * tell — which is not a pass either.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -43,6 +55,75 @@ export const CHECKS = [
 export const ISSUE_TITLE = 'Fork CI health: attention'
 /** A findable marker, so a body edited by hand still reads as machine-owned. */
 export const MARKER = '<!-- fork-ci-health -->'
+/** The pipeline label. Applying it delegates the issue's product calls and lets the gate merge. */
+export const AGENT_AUTO_LABEL = 'agent:auto'
+
+/**
+ * Whether this red is a scoped defect the pipeline may take on.
+ *
+ * Only exit 1 delegates. Exit 2 means a check never reached a verdict — a missing `gh`, an unreadable
+ * run history — which is a broken harness rather than a bounded request, and an implementer with
+ * auto-merge pointed at it would be guessing at what to fix.
+ */
+export function judgeDelegation(checks) {
+  const red = checks.filter((check) => check.code === 1)
+  if (red.length > 0) {
+    return {
+      delegate: true,
+      reason: `${red.map((check) => check.name).join(', ')} needs attention`
+    }
+  }
+  const unknown = checks.filter((check) => check.code !== 0)
+  if (unknown.length > 0) {
+    return {
+      delegate: false,
+      reason:
+        `${unknown.map((check) => check.name).join(', ')} could not tell` +
+        ' — a broken check is not a scoped defect'
+    }
+  }
+  return { delegate: false, reason: 'every check is clean' }
+}
+
+/**
+ * Reconcile the label with the verdict. `close` is never `remove`: the pipeline keeps `agent:auto` on
+ * a closed issue as the audit record of what was delegated.
+ */
+export function labelAction({ delegate, hasLabel }) {
+  if (delegate) {
+    return hasLabel ? 'none' : 'add'
+  }
+  return hasLabel ? 'remove' : 'none'
+}
+
+/**
+ * What to do with the label, including the rule that `close` never strips it: the pipeline keeps
+ * `agent:auto` on a closed issue as the audit record of what was delegated.
+ */
+export function decideLabel({ action, delegated, labels }) {
+  if (action === 'close') {
+    return 'none'
+  }
+  return labelAction({ delegate: delegated, hasLabel: labels.includes(AGENT_AUTO_LABEL) })
+}
+
+/**
+ * The child environment for the label call. `gh` prefers `GH_TOKEN` over `GITHUB_TOKEN`, but both are
+ * overridden so the workflow token cannot win by precedence — the actor has to be a collaborator, not
+ * `github-actions[bot]`, or the driver refuses the delegation before it checks permission.
+ */
+export function labelEnv(base, token) {
+  const env = { ...base, GH_TOKEN: token }
+  delete env.GITHUB_TOKEN
+  return env
+}
+
+/** `gh --json labels` yields objects; the names are what the decision reads. */
+export function issueLabels(issue) {
+  return (issue?.labels ?? [])
+    .map((label) => (typeof label === 'string' ? label : label?.name))
+    .filter(Boolean)
+}
 
 const EXIT_MEANING = {
   0: 'clean',
@@ -71,11 +152,28 @@ export function judgeHealth(checks, { runUrl = null } = {}) {
   const unknown = checks.filter((check) => check.code === 2)
   const failed = checks.filter((check) => check.code !== 0)
   const ok = failed.length === 0
+  const delegation = judgeDelegation(checks)
   const lines = [
     MARKER,
     'Opened by `.github/workflows/fork-ci-health.yml`, which runs the fork health checks daily',
     'and updates this one issue. Closed automatically when they are all clean again.',
     '',
+    ...(delegation.delegate
+      ? [
+          `**Delegated:** \`${AGENT_AUTO_LABEL}\` is applied, so the agent pipeline picks this up and`,
+          'decides the product-level calls for it.',
+          '',
+          'To stop it working this issue, add `agent:hold` — the pipeline honours that over everything,',
+          'including an open PR. Removing `agent:auto` is not enough: this body is rewritten every day',
+          'and the label is reconciled with the verdict, so a red night puts it back.',
+          '',
+          'Making the checks green by widening an allowlist is not a fix. Adding a red to',
+          '`local/nightly-linux-known-red.json`, or editing `REQUIRED` / `EXPECTED_TRIGGERS` in',
+          '`local/check-actions-enablement.mjs`, hides the finding instead of clearing it and is a',
+          'blocking review comment.',
+          ''
+        ]
+      : [`**Not delegated:** no \`${AGENT_AUTO_LABEL}\` — ${delegation.reason}.`, '']),
     '| check | result |',
     '|---|---|',
     ...checks.map(
@@ -103,6 +201,10 @@ export function judgeHealth(checks, { runUrl = null } = {}) {
       'A red nightly needs an owner: the first agent to open a session triages it, and either fixes it',
       'or files it. `node local/check-nightly-liveness.mjs --json` carries the facts, and',
       '`local/nightly-linux-known-red.json` is where a Linux-only red is classified with evidence.',
+      '',
+      'An allowlisted class never reaches this issue: a shard job fails only when its red matches no',
+      'entry in that file (`local/check-unit-shard-verdict.mjs`), so a red here is an unclassified one',
+      'or an infrastructure failure, and the known-red classes stay out of the delegation.',
       ''
     )
   }
@@ -113,6 +215,8 @@ export function judgeHealth(checks, { runUrl = null } = {}) {
     ok,
     title: ISSUE_TITLE,
     code: ok ? 0 : unknown.length === checks.length ? 2 : 1,
+    delegated: delegation.delegate,
+    delegationReason: delegation.reason,
     body: lines.join('\n').trimEnd()
   }
 }
@@ -139,12 +243,74 @@ export function findOpenIssue(listOutput) {
   return issues.find((issue) => issue.title === ISSUE_TITLE) ?? null
 }
 
+/**
+ * The issue number `gh issue create` reports, taken from the URL it prints.
+ *
+ * Why not look the issue up by title afterwards: `gh issue list --search` reads GitHub's search index,
+ * which lags a freshly created issue by minutes. The first branch dispatch of this workflow created the
+ * issue, then failed with "the issue was created but cannot be found by its exact title" — the create
+ * had worked and the search had not caught up. The create output is the only immediate, exact answer.
+ */
+export function issueNumberFromCreateOutput(output) {
+  const match = /\/issues\/(\d+)\s*$/.exec(String(output ?? '').trim())
+  return match ? Number(match[1]) : null
+}
+
+/**
+ * Apply or remove the delegation label as a collaborator, not as the workflow.
+ *
+ * `driver.py::_labeler_permission` reads the `labeled` event's actor and refuses a bot even with write
+ * permission, so this has to run on a token whose actor is a person. Failing closed is deliberate: a
+ * silent no-label is a red night nobody ever picks up, which is the exact shape this whole file exists
+ * to end.
+ */
+function applyDelegationLabel({ number, add }) {
+  const token = (process.env.GH_DELEGATE_TOKEN ?? '').trim()
+  if (!token) {
+    console.error(
+      `ci-health: #${number} needs \`${AGENT_AUTO_LABEL}\` ${add ? 'added' : 'removed'} but ` +
+        'GH_DELEGATE_TOKEN is unset, so the pipeline will not see it. Set the AGENT_DELEGATE_TOKEN ' +
+        'secret to a token whose actor is a repo collaborator.'
+    )
+    return 2
+  }
+  // `gh` prefers GH_TOKEN over GITHUB_TOKEN, but both are overridden so the ambient workflow token
+  // cannot win by precedence.
+  const env = labelEnv(process.env, token)
+  try {
+    gh(
+      [
+        'issue',
+        'edit',
+        String(number),
+        '--repo',
+        REPO,
+        add ? '--add-label' : '--remove-label',
+        AGENT_AUTO_LABEL
+      ],
+      { env }
+    )
+  } catch (error) {
+    console.error(
+      `ci-health: could not ${add ? 'add' : 'remove'} \`${AGENT_AUTO_LABEL}\` on #${number}: ${String(error.message).split('\n')[0]}`
+    )
+    return 2
+  }
+  console.log(`ci-health: ${add ? 'applied' : 'removed'} ${AGENT_AUTO_LABEL} on #${number}`)
+  return 0
+}
+
 function runChecks() {
   return CHECKS.map((check) => {
+    // The delegate token belongs to the label step alone. These checks quote their output into a public
+    // issue, so a secret in their environment is one `console.error(process.env)` away from a leak.
+    const env = { ...process.env }
+    delete env.GH_DELEGATE_TOKEN
     const result = spawnSync('node', [resolve(ROOT, check.script)], {
       cwd: ROOT,
       encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024
+      maxBuffer: 32 * 1024 * 1024,
+      env
     })
     return {
       name: check.name,
@@ -169,7 +335,7 @@ export function issueLookupArgs() {
     '--search',
     `"${ISSUE_TITLE}" in:title`,
     '--json',
-    'number,title',
+    'number,title,labels',
     '--limit',
     '50'
   ]
@@ -207,21 +373,35 @@ function main() {
     }
   }
   const action = decideAction({ ok: verdict.ok, issueNumber: issue?.number })
+  const wanted = decideLabel({
+    action,
+    delegated: verdict.delegated,
+    labels: issueLabels(issue)
+  })
 
-  console.error(`ci-health: ${verdict.ok ? 'both checks clean' : 'attention needed'} — ${action}`)
+  console.error(
+    `ci-health: ${verdict.ok ? 'all checks clean' : 'attention needed'} — ${action}; label ${wanted}`
+  )
 
   if (dryRun) {
     console.log(verdict.body)
     process.exit(verdict.code)
   }
 
+  let target = issue?.number ?? null
   try {
     if (action === 'create') {
-      writeBody(
+      const created = gh(
         ['issue', 'create', '--repo', REPO, '--title', ISSUE_TITLE, '--body-file', '-'],
-        verdict.body
+        { input: verdict.body }
       )
-      console.log(`ci-health: opened "${ISSUE_TITLE}"`)
+      // From the create output, because the search index lags a new issue. The lookup is a fallback for
+      // a `gh` that stops printing the URL, not the primary path.
+      target = issueNumberFromCreateOutput(created) ?? openIssue()?.number ?? null
+      if (target === null) {
+        throw new Error('the issue was created but its number could not be read from the output')
+      }
+      console.log(`ci-health: opened #${target}`)
     } else if (action === 'update') {
       writeBody(
         ['issue', 'edit', String(issue.number), '--repo', REPO, '--body-file', '-'],
@@ -236,13 +416,20 @@ function main() {
         '--repo',
         REPO,
         '--comment',
-        'Both fork health checks are clean again.'
+        'All fork health checks are clean again.'
       ])
       console.log(`ci-health: closed #${issue.number}`)
     }
   } catch (error) {
     console.error(`ci-health: ${action} failed: ${String(error.message).split('\n')[0]}`)
     process.exit(2)
+  }
+
+  if (wanted !== 'none' && target !== null) {
+    const labelCode = applyDelegationLabel({ number: target, add: wanted === 'add' })
+    if (labelCode !== 0) {
+      process.exit(labelCode)
+    }
   }
 
   process.exit(verdict.code)
