@@ -1,9 +1,10 @@
 import type { JiraSprint, JiraSprintAssignment } from '../../shared/jira/jira-types'
-import { acquire, release } from './request-queue'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { clearToken, getSingleClient, isAuthError } from './client'
 import { JIRA_AGILE_API, mapJiraSprint, mapJiraSprintField } from './jira-agile-api'
+import { JIRA_WHOLE_READ_DEADLINE_MS, withJiraQueuedDeadline } from './jira-read-failure'
+import { JiraRequestTimeoutError } from './jira-request-deadline'
 import { asRecord, fetchPagedRecords, type JiraRecord } from './jira-record-pages'
 
 const SPRINT_PAGE_SIZE = 50
@@ -31,7 +32,8 @@ function compareSprints(a: JiraSprint, b: JiraSprint): number {
  *  already holds a request-queue slot. */
 export async function fetchBoardSprints(
   entry: JiraClientForSite,
-  boardId: string
+  boardId: string,
+  signal?: AbortSignal
 ): Promise<JiraSprint[]> {
   const encodedBoardId = encodeURIComponent(boardId)
   const records = await fetchPagedRecords(
@@ -45,7 +47,8 @@ export async function fetchBoardSprints(
       })
       return `${JIRA_AGILE_API}/board/${encodedBoardId}/sprint?${params.toString()}`
     },
-    SPRINT_PAGE_SIZE
+    SPRINT_PAGE_SIZE,
+    signal ? { signal } : undefined
   )
   return (
     records
@@ -69,43 +72,51 @@ export async function getIssueSprintAssignment(request: {
   boardId?: string | null
 }): Promise<JiraSprintAssignment> {
   const entry = getSingleClient(request.siteId)
-  await acquire()
-  try {
-    const issue = await jiraRequest<JiraRecord>(
-      entry,
-      `${JIRA_AGILE_API}/issue/${encodeURIComponent(request.key)}`
-    )
-    const sprint = mapJiraSprintField(asRecord(issue.fields).sprint)
-    const boardIds = [
-      ...new Set([request.boardId, sprint?.boardId].filter((id): id is string => Boolean(id)))
-    ]
-    const listed: JiraSprint[] = []
-    for (const boardId of boardIds) {
+  // Why one deadline over the whole read: it lists every page of every board the issue
+  // could move to, so per-request patience does not bound how long it can take.
+  return withJiraQueuedDeadline(
+    'sprint assignment',
+    JIRA_WHOLE_READ_DEADLINE_MS,
+    async (signal) => {
       try {
-        listed.push(...(await fetchBoardSprints(entry, boardId)))
-      } catch (error) {
-        // Why: a board that will not list sprints — a Kanban board, or one the user
-        // can no longer see — must not hide what the remaining boards offer.
-        if (isAuthError(error)) {
-          throw error
+        const issue = await jiraRequest<JiraRecord>(
+          entry,
+          `${JIRA_AGILE_API}/issue/${encodeURIComponent(request.key)}`,
+          { signal }
+        )
+        const sprint = mapJiraSprintField(asRecord(issue.fields).sprint)
+        const boardIds = [
+          ...new Set([request.boardId, sprint?.boardId].filter((id): id is string => Boolean(id)))
+        ]
+        const listed: JiraSprint[] = []
+        for (const boardId of boardIds) {
+          try {
+            listed.push(...(await fetchBoardSprints(entry, boardId, signal)))
+          } catch (error) {
+            // Why: a board that will not list sprints — a Kanban board, or one the user
+            // can no longer see — must not hide what the remaining boards offer. A stall
+            // is the exception: swallowing it would offer a shortened list as if it were
+            // every sprint the issue could move to.
+            if (isAuthError(error) || error instanceof JiraRequestTimeoutError || signal.aborted) {
+              throw error
+            }
+            recordSwallowedFailure('jira', error, 'board sprint list unavailable')
+          }
         }
-        recordSwallowedFailure('jira', error, 'board sprint list unavailable')
+        // The current sprint stays pickable even when its own board was not listed.
+        const byId = new Map<string, JiraSprint>()
+        for (const option of [...listed, ...(sprint ? [sprint] : [])]) {
+          if (!byId.has(option.id)) {
+            byId.set(option.id, option)
+          }
+        }
+        return { sprint, sprints: [...byId.values()].sort(compareSprints) }
+      } catch (error) {
+        if (isAuthError(error)) {
+          clearToken(entry.site.id)
+        }
+        throw error
       }
     }
-    // The current sprint stays pickable even when its own board was not listed.
-    const byId = new Map<string, JiraSprint>()
-    for (const option of [...listed, ...(sprint ? [sprint] : [])]) {
-      if (!byId.has(option.id)) {
-        byId.set(option.id, option)
-      }
-    }
-    return { sprint, sprints: [...byId.values()].sort(compareSprints) }
-  } catch (error) {
-    if (isAuthError(error)) {
-      clearToken(entry.site.id)
-    }
-    throw error
-  } finally {
-    release()
-  }
+  )
 }

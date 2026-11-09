@@ -66,7 +66,9 @@ export function createWebJiraApi(): PreloadApi['jira'] {
     lookupIssueSummary: ({ requestId: _requestId, ...args }) =>
       jiraCall('lookupIssueSummary', args),
     cancelIssueSummary: () => Promise.resolve(),
-    createIssue: (args) => jiraCall('createIssue', args),
+    // Why the longer timeout: the host's verdict on a create it aborted says the issue
+    // may exist, and the generic timeout would hide it behind a safe-looking retry.
+    createIssue: (args) => jiraCall('createIssue', args, JIRA_WRITE_RPC_TIMEOUT_MS),
     generateIssueSummary: async () => ({
       success: false,
       error: translate(
@@ -109,7 +111,7 @@ export function createWebJiraApi(): PreloadApi['jira'] {
         JIRA_WRITE_RPC_TIMEOUT_MS
       ).catch(rethrowJiraWriteTimeout)
     },
-    addIssueComment: (args) => jiraCall('addIssueComment', args),
+    addIssueComment: (args) => jiraCall('addIssueComment', args, JIRA_WRITE_RPC_TIMEOUT_MS),
     issueComments: (args) => readJiraPayload('issueCommentsStream', 'issueComments', args),
     listProjects: (args) => jiraCall('listProjects', args),
     listFavouriteFilters: (args) => jiraCall('listFavouriteFilters', args),

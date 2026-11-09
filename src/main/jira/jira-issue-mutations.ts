@@ -18,6 +18,15 @@ import {
   JIRA_WRITE_FETCH_TIMEOUT_MS,
   JIRA_WRITE_TIMEOUT_MESSAGE
 } from '../../shared/jira/jira-write-deadline'
+import { JiraRequestTimeoutError } from './jira-request-deadline'
+
+/** Reported when a create's transport deadline fired: the issue may exist anyway. */
+const JIRA_CREATE_TIMEOUT_MESSAGE =
+  'Jira did not answer in time, so the issue may have been created. Check the project before retrying.'
+
+/** The same for a comment, which a retry would post twice. */
+const JIRA_COMMENT_TIMEOUT_MESSAGE =
+  'Jira did not answer in time, so the comment may have been posted. Reload the issue before retrying.'
 
 /** Cloud uses accountId; Server/DC uses username, stored in mapUser's accountId slot. */
 export function userFieldRef(site: JiraSite, id: string | null): JiraRecord {
@@ -92,7 +101,11 @@ function describeUpdateFailure(error: unknown): JiraMutationResult {
 /** The deadline's own abort, which says the write may still land: a plain failure
  *  would make the caller roll back a field Jira may have just saved. */
 function isWriteDeadlineAbort(error: unknown, signal: AbortSignal): boolean {
-  return signal.aborted || (error instanceof Error && error.name === 'AbortError')
+  return (
+    signal.aborted ||
+    error instanceof JiraRequestTimeoutError ||
+    (error instanceof Error && error.name === 'AbortError')
+  )
 }
 
 /** Creates an issue, shaping the customFields keys named by `userFieldKeys`. */
@@ -137,6 +150,11 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
     if (isAuthError(error)) {
       clearToken(entry.site.id)
       throw error
+    }
+    if (error instanceof JiraRequestTimeoutError) {
+      // Why no error code: a code makes the surface render its own "Failed to create
+      // issue." copy, which reads as a safe retry — the one thing this is not.
+      return { ok: false, error: JIRA_CREATE_TIMEOUT_MESSAGE }
     }
     return error instanceof Error
       ? { ok: false, error: error.message }
@@ -292,6 +310,9 @@ export async function addIssueComment(
     if (isAuthError(error)) {
       clearToken(entry.site.id)
       throw error
+    }
+    if (error instanceof JiraRequestTimeoutError) {
+      return { ok: false, error: JIRA_COMMENT_TIMEOUT_MESSAGE }
     }
     return error instanceof Error
       ? { ok: false, error: error.message }

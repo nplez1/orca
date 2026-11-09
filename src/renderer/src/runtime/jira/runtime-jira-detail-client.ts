@@ -107,7 +107,9 @@ export async function jiraAddIssueCommentForTarget(
   const args = { key, body, siteId: siteId ?? undefined, bodyFormat }
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraCommentResult>(target, 'jira.addIssueComment', args, {
-        timeoutMs: 30_000
+        // Why above the host's own deadline: the host's verdict on a comment it aborted
+        // says the comment may exist, and the client's generic timeout would hide it.
+        timeoutMs: JIRA_WRITE_RPC_TIMEOUT_MS
       })
     : window.api.jira.addIssueComment(args)
 }

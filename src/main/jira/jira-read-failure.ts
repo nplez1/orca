@@ -7,6 +7,11 @@ export type JiraIssueSearchFailure = {
   auth: boolean
 }
 
+/** One user-visible read that fans out into several round trips still has to end.
+ *  Above the 30 s every single request is bounded by and above the renderer's own RPC
+ *  deadline, so this only cuts a read nobody is waiting on any more. */
+export const JIRA_WHOLE_READ_DEADLINE_MS = 60_000
+
 /**
  * Run against one signal that trips on the caller's abort or the request deadline.
  *
