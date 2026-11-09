@@ -208,10 +208,11 @@ describe('RateLimitService', () => {
       expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(1)
       expect(fetchCodexRateLimits).toHaveBeenCalledTimes(1)
 
-      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1)
       window.emit('focus')
       await vi.advanceTimersByTimeAsync(0)
       expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(2)
+      expect(fetchCodexRateLimits).toHaveBeenCalledTimes(2)
 
       service.stop()
     } finally {
