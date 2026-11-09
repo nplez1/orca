@@ -1,5 +1,6 @@
 import { getWorkspaceAttachments } from '../../../../../../shared/workspace-attachments/workspace-attachments'
 import type { WorktreeCardProperty } from '../../../../../../shared/ui-chrome-types'
+import { resolveEphemeralVmLeaseIndicator } from '../../ephemeral-vm-lease-presentation'
 import type {
   WorkspaceCardFacts,
   WorkspaceCardShowOptions
@@ -39,6 +40,7 @@ function showOptions(cardProps: readonly WorktreeCardProperty[]): WorkspaceCardS
 export function buildWorkspaceCardFacts(card: WorktreeCardController): WorkspaceCardFacts {
   const { worktree, repo, hoverReview } = card
   const runtimeHost = !repo?.connectionId && card.parsedRepoHost?.kind === 'runtime'
+  const hostGroup = card.branchGroup ?? []
   return {
     ws: {
       id: worktree.id,
@@ -65,7 +67,12 @@ export function buildWorkspaceCardFacts(card: WorktreeCardController): Workspace
     host: {
       kind: repo?.connectionId ? 'ssh' : runtimeHost ? 'runtime' : 'local',
       contextLabel: card.hostContextLabel || null,
-      runtimeDisconnected: card.isRuntimeDisconnected
+      runtimeDisconnected: card.isRuntimeDisconnected,
+      group:
+        hostGroup.length > 1
+          ? hostGroup.map((member) => ({ hostId: member.hostId, label: member.hostLabel }))
+          : [],
+      lease: resolveEphemeralVmLeaseIndicator(card.ephemeralLease) !== null
     },
     git: {
       conflictOperation: card.conflictOperation ?? null,

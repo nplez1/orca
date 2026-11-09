@@ -21,6 +21,7 @@ import {
 } from '../metadata/worktree-card-meta-items'
 import { shouldBeginWorktreeRename } from '../controller/worktree-card-model'
 import { WorktreeCardSshHostControl } from '../host/WorktreeCardSshHostControl'
+import { WorktreeBranchHostSelect } from '../../WorktreeBranchHostSelect'
 import { WorktreeHostContextBadge } from '../host/WorktreeHostContextBadge'
 import { WorktreeTitleInlineRename } from '../identity/WorktreeTitleInlineRename'
 import { cardElement } from './card-template-compiler'
@@ -68,6 +69,22 @@ function sshControl(props: Readonly<Record<string, unknown>>, card: Card): React
       targetRemoved={card.sshTargetRemoved}
       sshOwnerEnvironmentId={card.sshOwnerEnvironmentId}
       iconOnly={props.iconOnly === true}
+      onPointerDown={card.stopQuickActionPointerPropagation}
+    />
+  )
+}
+
+function branchHostSelect(card: Card): React.ReactNode {
+  const members = card.branchGroup
+  if (!members || members.length < 2) {
+    return null
+  }
+  return (
+    <WorktreeBranchHostSelect
+      members={members}
+      selectedHostId={card.selectedBranchHostId ?? members[0].hostId}
+      groupKey={card.branchGroupKey ?? ''}
+      onSelectHost={card.onSelectBranchHost}
       onPointerDown={card.stopQuickActionPointerPropagation}
     />
   )
@@ -124,6 +141,7 @@ export const CARD_IDENTITY_PARTS = {
       onClick={card.handleWorkspaceQuickAction}
     />
   )),
+  BranchHostSelect: part([], (_props, _children, card) => branchHostSelect(card)),
   MetaRepoBadge: part([], (_props, _children, { repo }) =>
     repo ? <WorktreeCardMetaRepoBadge repo={repo} /> : null
   ),

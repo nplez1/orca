@@ -21,6 +21,11 @@ export type WorkspaceCardShowOptions = {
   host: boolean
 }
 
+export type WorkspaceCardHostMember = {
+  hostId: string
+  label: string
+}
+
 /** What a card template can read about one workspace. Host-neutral: SSH and server workspaces
  *  report through `host`, and folder workspaces have `kind: 'folder'` with git facts empty. */
 export type WorkspaceCardFacts = {
@@ -54,6 +59,8 @@ export type WorkspaceCardFacts = {
     /** The host label the list shows beside cards from another host, if any. */
     contextLabel: string | null
     runtimeDisconnected: boolean
+    group: readonly WorkspaceCardHostMember[]
+    lease: boolean
   }
   git: {
     /** `merge`, `rebase`, `cherry-pick`, `revert` or `unknown` while one is in progress. */
