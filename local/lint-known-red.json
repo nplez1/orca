@@ -37,13 +37,6 @@
   "recordedAt": "2026-11-09",
   "entries": [
     {
-      "step": "check:code-quality:changed",
-      "class": "sync-merge-unpushed-base",
-      "owner": "2026-11-08 sync of upstream 51c77320bc (merge 8cd6d83db79)",
-      "evidence": "The step diffs against merge-base(origin/HEAD, HEAD). Until nplez1/main is pushed, origin/HEAD is the pre-sync tip 3f8bbfb269e, so the 'changed' set is upstream's 1537 commits (25,053 code files) and spawnSync oxlint dies with E2BIG before reporting anything. The runbook's sync-sized form (`check:code-quality:changed upstream/main`, UPSTREAM-SYNC-RUNBOOK.md step 3) ran to completion: 96 findings on 72 distinct lines across 2880 fork-diverged files, every line present verbatim in the pre-sync tree, so none is written by the resolution. The post-merge fix-ups ran under ORCA_CODE_QUALITY_BASE=HEAD: 0 findings across 19 files. Stale after the push; prune it then.",
-      "flaky": false
-    },
-    {
       "step": "check-upstream-file-comments",
       "match": "^(?:src/main/ai-vault/session-scanner-jsonl-reader\\.ts: 9 fork comment line\\(s\\), baseline 0|src/main/ai-vault/transcripts/session-transcript-consumers\\.ts: 15 fork comment line\\(s\\), baseline 0|src/main/ai-vault/transcripts/session-transcript-reader\\.ts: 14 fork comment line\\(s\\), baseline 6)$",
       "class": "fork-comment-growth-pre-sync",
