@@ -143,25 +143,16 @@ export function installedAppExecutableCandidates(
     ]
   }
   if (platform === 'win32') {
+    const localAppData = environment.LOCALAPPDATA
+    const programFiles = environment.ProgramFiles
     return [
-      ...(environment.LOCALAPPDATA
+      ...(localAppData
         ? [WINDOWS_INSTALL_DIRECTORY_NAME, WINDOWS_LEGACY_INSTALL_DIRECTORY_NAME].map((directory) =>
-            joinPath(
-              environment.LOCALAPPDATA as string,
-              'Programs',
-              directory,
-              WINDOWS_APP_EXECUTABLE_NAME
-            )
+            joinPath(localAppData, 'Programs', directory, WINDOWS_APP_EXECUTABLE_NAME)
           )
         : []),
-      ...(environment.ProgramFiles
-        ? [
-            joinPath(
-              environment.ProgramFiles,
-              WINDOWS_INSTALL_DIRECTORY_NAME,
-              WINDOWS_APP_EXECUTABLE_NAME
-            )
-          ]
+      ...(programFiles
+        ? [joinPath(programFiles, WINDOWS_INSTALL_DIRECTORY_NAME, WINDOWS_APP_EXECUTABLE_NAME)]
         : [])
     ]
   }
