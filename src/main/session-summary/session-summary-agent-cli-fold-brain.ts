@@ -2,16 +2,20 @@
 // one-shot mode. The app has no direct model client (see docs/reference/
 // session-summary.md); a direct-model brain can replace this without touching
 // the fold protocol — it only needs `complete(prompt) -> raw text`.
-import { mkdirSync } from 'node:fs'
 import {
   getCommitMessageAgentSpec,
   isCustomAgentId
 } from '../../shared/source-control/ai/generation/commit-message-agent-spec'
 import { planCommitMessageGeneration } from '../../shared/source-control/ai/generation/commit-message-plan'
-import type { CommitMessagePlanInput } from '../../shared/source-control/ai/generation/commit-message-plan'
+import type {
+  CommitMessagePlan,
+  CommitMessagePlanInput
+} from '../../shared/source-control/ai/generation/commit-message-plan'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
 import { spawnSourceControlAgent } from '../text-generation/source-control-agent-launch'
 import { killSourceControlAgentProcess } from '../text-generation/source-control-local-process'
+import type { SpawnSourceControlAgent } from '../text-generation/source-control-text-generation-types'
+import { prepareSessionSummaryFoldCwd } from './session-summary-scratch'
 import {
   MAX_SOURCE_CONTROL_AGENT_OUTPUT_BYTES,
   SOURCE_CONTROL_GENERATION_TIMEOUT_MS
@@ -22,9 +26,10 @@ export type AgentCliFoldBrainDeps = {
   /** The configured fold agent; null means nothing usable is selected, which fails the
    *  fold rather than substituting an agent the user did not choose. */
   resolveParams: () => ResolvedSourceControlAiGenerationParams | null
-  /** Where the CLI runs. Folds need no repo context; callers pass a scratch dir, which
-   *  this brain creates because a missing cwd fails the spawn. */
-  cwd: string
+  /** Parent for the fold's working directory: userData, never a shared temp root. */
+  scratchRoot: string
+  /** Test seam: the agent CLI spawn, observed to assert the cwd it runs in. */
+  spawnAgent?: SpawnSourceControlAgent
 }
 
 export function createAgentCliSessionFoldBrain(deps: AgentCliFoldBrainDeps): SessionFoldBrain {
@@ -36,7 +41,6 @@ export function createAgentCliSessionFoldBrain(deps: AgentCliFoldBrainDeps): Ses
       if (!params) {
         throw new Error('No session-summary agent is configured. Choose one in Settings → Agents.')
       }
-      mkdirSync(deps.cwd, { recursive: true })
       const agentId = params.agentId
       const defaultModel = isCustomAgentId(agentId)
         ? 'default'
@@ -56,65 +60,77 @@ export function createAgentCliSessionFoldBrain(deps: AgentCliFoldBrainDeps): Ses
         throw new Error(planned.error)
       }
       const plan = planned.plan
-      return await new Promise<string>((resolve, reject) => {
-        let child
-        try {
-          child = spawnSourceControlAgent({
-            binary: plan.binary,
-            args: plan.args,
-            cwd: deps.cwd,
-            stdinMode: plan.stdinPayload === null ? 'ignore' : 'pipe',
-            useCwdForNative: true
-          })
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)))
-          return
-        }
-        let stdout = ''
-        let settled = false
-        const settle = (fn: () => void): void => {
-          if (settled) {
-            return
-          }
-          settled = true
-          clearTimeout(timer)
-          fn()
-        }
-        const fail = (message: string): void => {
-          settle(() => {
-            void killSourceControlAgentProcess(child)
-            reject(new Error(message))
-          })
-        }
-        const timer = setTimeout(
-          () => fail('session summary fold timed out'),
-          SOURCE_CONTROL_GENERATION_TIMEOUT_MS
-        )
-        const onAbort = (): void => fail('session summary fold canceled')
-        signal.addEventListener('abort', onAbort, { once: true })
-        child.stdout?.on('data', (data: Buffer) => {
-          if (stdout.length < MAX_SOURCE_CONTROL_AGENT_OUTPUT_BYTES) {
-            stdout += data.toString('utf8')
-          }
-        })
-        child.stderr?.on('data', () => {})
-        child.on('error', (error) => fail(error.message))
-        child.on('close', (code) => {
-          signal.removeEventListener('abort', onAbort)
-          const trimmed = stdout.trim()
-          settle(() => {
-            if (trimmed) {
-              resolve(trimmed)
-            } else {
-              reject(new Error(`agent CLI produced no output (exit ${code})`))
-            }
-          })
-        })
-        if (plan.stdinPayload !== null) {
-          child.stdin?.on('error', () => {})
-          child.stdin?.end(plan.stdinPayload)
-        }
-      })
+      const cwd = prepareSessionSummaryFoldCwd(deps.scratchRoot)
+      return await runAgent({ plan, cwd, signal, spawnAgent: deps.spawnAgent })
     }
   }
+}
+
+async function runAgent(args: {
+  plan: CommitMessagePlan
+  cwd: string
+  signal: AbortSignal
+  spawnAgent?: SpawnSourceControlAgent
+}): Promise<string> {
+  const { plan, cwd, signal } = args
+  const spawnAgent = args.spawnAgent ?? spawnSourceControlAgent
+  return await new Promise<string>((resolve, reject) => {
+    let child
+    try {
+      child = spawnAgent({
+        binary: plan.binary,
+        args: plan.args,
+        cwd,
+        stdinMode: plan.stdinPayload === null ? 'ignore' : 'pipe',
+        useCwdForNative: true
+      })
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)))
+      return
+    }
+    let stdout = ''
+    let settled = false
+    const settle = (fn: () => void): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timer)
+      fn()
+    }
+    const fail = (message: string): void => {
+      settle(() => {
+        void killSourceControlAgentProcess(child)
+        reject(new Error(message))
+      })
+    }
+    const timer = setTimeout(
+      () => fail('session summary fold timed out'),
+      SOURCE_CONTROL_GENERATION_TIMEOUT_MS
+    )
+    const onAbort = (): void => fail('session summary fold canceled')
+    signal.addEventListener('abort', onAbort, { once: true })
+    child.stdout?.on('data', (data: Buffer) => {
+      if (stdout.length < MAX_SOURCE_CONTROL_AGENT_OUTPUT_BYTES) {
+        stdout += data.toString('utf8')
+      }
+    })
+    child.stderr?.on('data', () => {})
+    child.on('error', (error) => fail(error.message))
+    child.on('close', (code) => {
+      signal.removeEventListener('abort', onAbort)
+      const trimmed = stdout.trim()
+      settle(() => {
+        if (trimmed) {
+          resolve(trimmed)
+        } else {
+          reject(new Error(`agent CLI produced no output (exit ${code})`))
+        }
+      })
+    })
+    if (plan.stdinPayload !== null) {
+      child.stdin?.on('error', () => {})
+      child.stdin?.end(plan.stdinPayload)
+    }
+  })
 }

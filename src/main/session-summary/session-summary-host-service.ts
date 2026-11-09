@@ -3,7 +3,6 @@
 // Electron-free on purpose: a paired Orca server (`orcad`) serves the same methods with
 // no Electron app, so this module reaches user data and status rows only through the
 // app-environment shim and the hook server. See docs/reference/session-summary.md.
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
@@ -11,6 +10,7 @@ import { isTuiAgent } from '../../shared/agent-launch/catalog/tui-agent-config'
 import { isCustomAgentId } from '../../shared/source-control/ai/generation/commit-message-agent-spec'
 import { agentHookServer } from '../agent-hooks/server'
 import { createAgentCliSessionFoldBrain } from './session-summary-agent-cli-fold-brain'
+import { sweepStaleSessionSummaryScratchDirsOnce } from './session-summary-scratch'
 import { SessionSummaryService } from './session-summary-service'
 import { SessionSummaryStore } from './session-summary-store'
 import {
@@ -85,6 +85,8 @@ export function sessionSummaryHostService(): SessionSummaryService {
   if (cached?.userDataPath === userDataPath) {
     return cached.service
   }
+  // Reaps the fold scratch dirs a crashed run left behind in the temp root.
+  sweepStaleSessionSummaryScratchDirsOnce()
   const service = new SessionSummaryService({
     store: new SessionSummaryStore(join(userDataPath, 'session-summaries.json')),
     // The transcript is on this machine: this is the local half of the fold.
@@ -99,7 +101,8 @@ export function sessionSummaryHostService(): SessionSummaryService {
         // and model from its own settings and sent them. Falling back to *this* host's
         // settings would spawn an agent the reader never chose for a session's own text.
         resolveParams: () => params,
-        cwd: join(tmpdir(), 'orca-session-summary')
+        // This host folds in place, so its own userData is the private parent.
+        scratchRoot: userDataPath
       }),
     now: () => Date.now()
   })
