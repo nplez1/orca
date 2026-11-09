@@ -98,7 +98,7 @@ jobs:
 
       - name: Shard plan
         id: plan
-        run: node config/scripts/ci-unit-plan.mjs
+        run: node config/scripts/ci/unit-selection/ci-unit-plan.mjs
 
   unit-tests:
     needs: [release-ref, unit-plan]
@@ -183,7 +183,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: node config/scripts/verify-macos-release-env.mjs
+        run: node config/scripts/desktop-distribution/macos/verify-macos-release-env.mjs
 
       # Why stamp the version: upstream's numbering is not a stream this fork can ride — two
       # builds of the same package.json version compare equal and the updater then reports
@@ -513,7 +513,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          node config/scripts/native-build/node-addons/ensure-native-runtime.mjs --runtime=electron
           pnpm exec electron-builder --config config/electron-builder.np.config.cjs --linux AppImage deb rpm \
             --x64 --publish always \
             --config.publish.owner=${{ env.PUBLISH_OWNER }} \

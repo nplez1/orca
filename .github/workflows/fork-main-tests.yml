@@ -46,7 +46,7 @@ jobs:
 
       - name: Shard plan
         id: plan
-        run: node config/scripts/ci-unit-plan.mjs
+        run: node config/scripts/ci/unit-selection/ci-unit-plan.mjs
 
   test:
     needs: [plan]
