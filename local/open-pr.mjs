@@ -46,6 +46,17 @@ import {
   resolvedGateCacheDir,
   toolchainVersions
 } from './gate-verdict-cache.mjs'
+import { changedPathsIn, forkOwnedPathsInRange } from './fork-owned-paths.mjs'
+
+// Why re-exported rather than owned here: `.husky/commit-msg` enforces the same set at commit time,
+// so it lives in `fork-owned-paths.mjs`; this module stays the name its callers already import.
+export {
+  FORK_OWNED_PATHS,
+  changedPathsIn,
+  derivedForkOwnedPaths,
+  forkOnlyPathsIn,
+  forkOwnedPathsInRange
+} from './fork-owned-paths.mjs'
 
 const FORK = 'nplez1/orca'
 const UPSTREAM = 'stablyai/orca'
@@ -329,102 +340,6 @@ export function evaluateGates({
   return { problems, passes, waived: [...waivers.entries()] }
 }
 
-export const FORK_OWNED_PATHS = [
-  'local/',
-  '.agents/skills/',
-  '.github/workflows/fork-*.yml',
-  '.github/scripts/fork-release-notes.mjs',
-  '.github/scripts/fork-release-ref-guard.sh',
-  'LOCAL-PATCHES.md',
-  'BRANCHES.md',
-  'UPSTREAM-SYNC-RUNBOOK.md',
-  '.husky/commit-msg'
-]
-
-/** Where the fork's own line lives, most authoritative first. */
-export const FORK_LINE_REFS = [
-  'refs/remotes/origin/nplez1/main',
-  'refs/heads/nplez1/main',
-  'nplez1/main'
-]
-
-/**
- * The fork-owned set, derived instead of listed: the files the fork's own line adds to a top-level
- * tree the upstream base does not carry at all.
- *
- * Why top-level trees: the hand list could not keep up — `.agents/skills/**`,
- * `.github/workflows/fork-*.yml`, `.github/scripts/fork-release-notes.mjs` and `local/orca-vm/` were
- * all fork-added and all absent from it. Why not files, and not nested directories either:
- * BRANCHES.md records that upstream work is cut from code that has already landed on `nplez1/main`,
- * so every new `src/` file — including one in a directory the fork created, a provider for instance —
- * is "added since upstream/main" and would be refused. That is the one path fork work has to reach
- * upstream, so a tree upstream already owns stays reviewable; a whole tree it lacks does not.
- *
- * Returns `null` when no fork line is reachable, in which case only the literal list applies.
- */
-export function derivedForkOwnedPaths(upstreamBase, gitRun = git, refs = FORK_LINE_REFS) {
-  const attempt = (args) => {
-    try {
-      return gitRun(args)
-    } catch {
-      return null
-    }
-  }
-  for (const ref of refs) {
-    if (attempt(['rev-parse', '--verify', '--quiet', ref]) === null) {
-      continue
-    }
-    const added = attempt([
-      'diff',
-      '--name-only',
-      '--diff-filter=A',
-      '--no-renames',
-      `${upstreamBase}...${ref}`
-    ])
-    const upstreamTop = attempt(['ls-tree', '--name-only', upstreamBase])
-    if (added === null || upstreamTop === null) {
-      return null
-    }
-    const owned = new Set(
-      upstreamTop
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-    )
-    return added
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .filter((path) => !owned.has(path.split('/')[0]))
-  }
-  return null
-}
-
-/**
- * The changed paths in `range` that are fork-owned, by the literal list and by the derived set.
- * Both, because they answer different questions: the list catches a fork file the branch *modified*
- * (`.husky/commit-msg` exists upstream), the derived set catches a fork tree nobody listed.
- */
-export function forkOwnedPathsInRange(range, upstreamBase, gitRun = git) {
-  const changed = changedPathsIn(range, gitRun)
-  const listed = forkOnlyPathsIn(range, gitRun)
-  const derived = derivedForkOwnedPaths(upstreamBase, gitRun)
-  const derivedInDiff = derived === null ? [] : changed.filter((path) => derived.includes(path))
-  return [...new Set([...listed, ...derivedInDiff])]
-}
-
-/**
- * The changed paths a PR will show. Exported and injectable for the same reason `forkOnlyPathsIn` is:
- * the `--no-renames` flag is the fix for a real hole, and a hole that is only described in a comment
- * comes back the next time someone tidies the call.
- */
-export function changedPathsIn(range, gitRun = git) {
-  return gitRun(['diff', '--name-only', '--no-renames', range])
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
 /**
  * Paths whose change makes a targeted test run prove nothing: the build, the workspace definition,
  * config every project reads, and the two `src` trees every process imports. Why this list and not
@@ -506,27 +421,6 @@ export function needsFullUnitGate(changedPaths, runtimeInputs = null) {
     return { required: true, why: `${global[0]}${more} is a global input` }
   }
   return { required: false, why: 'every changed path is covered by targeted tests' }
-}
-
-/**
- * Why the glob magic on a wildcard entry: a pathspec is a prefix match, so `.github/workflows/fork-`
- * would match a file literally named that, and `fork-*.yml` needs `:(glob)` to match a pattern.
- */
-function forkOwnedPathspec(path) {
-  return path.includes('*') ? `:(top,glob)${path}` : `:(top)${path}`
-}
-
-/**
- * Why a path check on top of the subject check: the subject prefix is a convention, and a squash or
- * a differently-worded commit carries the same files upstream without one.
- */
-export function forkOnlyPathsIn(range, gitRun = git) {
-  // Why `:(top)`: pathspecs are relative to the current directory, so a run from a subdirectory would
-  // look under `<subdir>/local/` and find nothing.
-  return gitRun(['diff', '--name-only', range, '--', ...FORK_OWNED_PATHS.map(forkOwnedPathspec)])
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
 }
 
 function main() {

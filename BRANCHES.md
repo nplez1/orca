@@ -127,10 +127,16 @@ depends on, and what is blocking it.** If the two disagree, the script is right.
   refuses the mismatch instead of letting review find it.
 - Upstream-bound PR branches are cut from `origin/main`, **never** from `nplez1/main`. That is
   what makes it impossible for a fork-only patch to leak into an upstream-bound PR.
-- A `local(...)` commit is refused on any branch that does **not** descend from `nplez1/main`
-  (`.husky/commit-msg`). The test is ancestry, not the branch name: every fork PR branch carries
-  `nplez1/main` in its history and is allowed, `nplez1/main` itself is allowed, and an upstream-bound
-  branch cut from `origin/main` is refused. If it fires, switch branches — do not bypass it.
+- A `local(...)` commit is refused on any branch that is **not on `nplez1/main`'s own line**
+  (`.husky/commit-msg`). The test is lineage, not the branch name and not the fork's current tip:
+  a fork PR branch descends from a commit on that line and is allowed however far behind it is, and
+  `nplez1/main` itself is allowed. On an upstream-bound branch the same hook refuses a `local(`
+  subject, and also refuses a commit staging a fork-owned path (`local/**`, `.agents/skills/**`,
+  `LOCAL-PATCHES.md`, …) under any subject, because the subject prefix is a convention a squash does
+  not carry. The hook only runs on a tree that carries it: a clean upstream checkout has no
+  `.husky/commit-msg`, and husky exits 0 when a hook file is absent, so this is the earlier stop and
+  not the only one — `open-pr.mjs --upstream` is the other. If it fires, switch branches — do not
+  bypass it.
 - A fork-only patch may only touch files that no PR branch owns. `package.json` and the
   rebuild-and-relaunch script are the current examples; see [LOCAL-PATCHES.md](./LOCAL-PATCHES.md).
 - One commit per topic on a PR branch, message in the repo's conventional style, and the branch must

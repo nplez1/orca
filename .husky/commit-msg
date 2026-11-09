@@ -9,24 +9,26 @@
 # It deliberately does NOT refuse `local(` on a fork PR branch. It used to, and the result was worse
 # than the mistake it guarded: policy work committed there without the `local(` label at least five
 # times (#146, #130, #142, #177, #52), which is an *unlabelled* fork-only change riding a fork PR.
-# A fork PR branch descends from nplez1/main, and that lineage is the line the rule should follow.
-
-branch="$(git branch --show-current)"
-subject="$(head -1 "$1")"
-
-case "$subject" in
-  local\(*)
-    # nplez1/main itself, or anything carrying it in its history, is the fork's own line.
-    if git merge-base --is-ancestor nplez1/main HEAD 2>/dev/null; then
-      :
-    else
-      echo "" >&2
-      echo "commit-msg: refusing a fork-only commit on '$branch'." >&2
-      echo "  '$subject' belongs on a branch that descends from nplez1/main." >&2
-      echo "  This branch does not, so it is upstream-bound: a fork-only change here would be" >&2
-      echo "  reviewed as part of that PR's diff." >&2
-      echo "" >&2
-      exit 1
-    fi
-    ;;
-esac
+# A fork PR branch descends from nplez1/main, and that lineage is the line the rule follows — however
+# far behind the fork's current tip it is (#319).
+#
+# The decision is in `local/commit-msg-guard.mjs` because it needs the fork-owned path set that
+# `open-pr.mjs` owns, and a second copy of that list in sh would drift. Husky 9 runs hooks with
+# `sh -e`, so this file stays sh and delegates.
+top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
+if [ -z "$top" ] || [ ! -f "$top/local/commit-msg-guard.mjs" ]; then
+  echo "" >&2
+  echo "commit-msg: refusing to commit: this tree carries the fork's commit-msg hook but not the" >&2
+  echo "  guard it runs ('local/commit-msg-guard.mjs'). That combination only happens when a" >&2
+  echo "  fork-only file has leaked onto an upstream-bound branch." >&2
+  echo "  Drop it, and stage the removal so the leak leaves the branch:" >&2
+  echo "    git rm .husky/commit-msg      # if it is tracked" >&2
+  echo "    rm .husky/commit-msg          # if it is untracked" >&2
+  echo "" >&2
+  exit 1
+fi
+if ! command -v node >/dev/null 2>&1; then
+  echo "commit-msg: node is not on PATH; the fork-only guard cannot run on this commit." >&2
+  exit 0
+fi
+exec node "$top/local/commit-msg-guard.mjs" "$1"
