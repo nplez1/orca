@@ -89,15 +89,16 @@ const NON_UNIT_TEST_RUNNERS = [
   },
   {
     // Why: fork-local `node --test` files, run by `local/run-fork-tests.mjs` in both fork lanes.
-    name: 'fork-local node:test (local/run-fork-tests.mjs)',
+    name: 'fork-local node:test (fork-main-gates)',
     include: ['local/**/*.test.mjs'],
-    sources: [
-      'local/run-fork-tests.mjs',
-      'local/gate-unit.mjs',
-      '.github/workflows/fork-main-gates.yml',
-      '.github/workflows/fork-pr-gates.yml'
-    ],
-    mirrors: ["const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']", 'node local/run-fork-tests.mjs']
+    sources: ['.github/workflows/fork-main-gates.yml'],
+    mirrors: ['run: node local/run-fork-tests.mjs']
+  },
+  {
+    name: 'fork-local node:test (fork-pr-gates)',
+    include: ['local/**/*.test.mjs'],
+    sources: ['.github/workflows/fork-pr-gates.yml'],
+    mirrors: ['run: node local/run-fork-tests.mjs']
   },
   {
     // `orca plugin test` runs every example's own tests in Node; the unit test drives it.

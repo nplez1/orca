@@ -24,7 +24,7 @@ const ROOT = path.resolve(import.meta.dirname, '..')
 const BASELINE = 'config/max-lines-baseline.txt'
 const KINDS = new Set(['inline', 'mobile-config'])
 
-export function parseBaseline(text) {
+function parseBaseline(text) {
   return text
     .split('\n')
     .map((line) => line.trim())
@@ -74,6 +74,8 @@ test('exempts only upstream-owned files (the recorded sync base is upstream)', (
     forkOwned.map((entry) => entry.path),
     [],
     'a fork-owned file over the max-lines budget must be split, not exempted: it has no upstream ' +
-      'copy to conflict with, so the cap is a free guard there (LOCAL-PATCHES.md § local(lint))'
+      'copy to conflict with, so the cap is a free guard there (LOCAL-PATCHES.md § local(lint)). ' +
+      'If the file IS upstream-owned, the recorded sync base is older than this sync — re-run ' +
+      '`node local/check-upstream-file-comments.mjs --init --accept "<why>"` to move it forward'
   )
 })

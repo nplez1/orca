@@ -25,8 +25,8 @@ const INHERITED_APP_ENV = [
   // Why: a pane exports this, and the codex-shell preflight then adds an SSH-marker flag that two
   // exact-args cases assert against — a red about the pane, not the tree (see LOCAL-PATCHES.md).
   'ORCA_REMOTE_VIEWER_CLIPBOARD',
-  // Why: under a test runner a nested `node --test` reports its failures to the parent over IPC and
-  // exits 0, so a failing suite would read as a pass — the one thing a gate must never do.
+  // Why: under a test runner Node treats a nested `node --test` as recursive, prints "skipping running
+  // files" and exits 0, so a failing suite would read as a pass — the one thing a gate must never do.
   'NODE_TEST_CONTEXT'
 ]
 /** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */

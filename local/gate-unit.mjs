@@ -29,7 +29,7 @@
  * Exit: 0 pass, 1 fail, 2 usage or environment problem.
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -37,6 +37,7 @@ import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-
 import { flakeWaiver, packageJsonChangedForTests } from './gate-flake-coupling.mjs'
 import { quarantinedFiles, runnableFiles } from './unit-lane-files.mjs'
 import { rerunIsolation, runSuite } from './unit-suite-run.mjs'
+import { FORK_TEST_INCLUDE, forkTestFiles } from './run-fork-tests.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
@@ -68,18 +69,10 @@ const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000
 const MAX_SUMMARY_LIST = 12
-/** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
-const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
 
-function normalise(name) {
-  return String(name ?? '').replaceAll('\\', '/')
-}
-
-export function forkTestFiles(root = ROOT) {
-  return globSync(FORK_TEST_INCLUDE, { cwd: root, exclude: ['**/node_modules/**'] })
-    .map(normalise)
-    .sort()
-}
+// Why from the lane's own module: one definition of which files these are, so the gate's fork step and
+// `node local/run-fork-tests.mjs` cannot disagree about it.
+export { FORK_TEST_INCLUDE, forkTestFiles }
 
 function usage() {
   return 'usage: node local/gate-unit.mjs [--allowlist PATH] [--no-cache] [--allow-dirty] [--timeout-ms N] [-- <vitest args>]'

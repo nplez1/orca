@@ -8,7 +8,7 @@
 // fixtures are written outside the repo on purpose: `local/**/*.test.mjs` is what the real lane globs, and
 // a deliberately failing fixture inside it would turn the lane red.
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -18,10 +18,11 @@ const PASSING = "import test from 'node:test'\ntest('passes', () => {})\n"
 const FAILING =
   "import test from 'node:test'\nimport assert from 'node:assert/strict'\ntest('fails', () => { assert.fail('deliberate') })\n"
 const HANGING =
-  "import test from 'node:test'\ntest('hangs', () => new Promise((resolve) => setTimeout(resolve, 30_000)))\n"
+  "import test from 'node:test'\ntest('hangs', () => new Promise((resolve) => setTimeout(resolve, 3_000)))\n"
 
-function scratch() {
+function scratch(t) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-unit-suite-run-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
   const fixture = (name, source) => {
     const file = join(dir, name)
     writeFileSync(file, source)
@@ -30,35 +31,32 @@ function scratch() {
   return { dir, reportPath: join(dir, 'report.json'), logPath: join(dir, 'run.log'), fixture }
 }
 
-function gateRun({ timeoutMs = 10_000, forkTests, deps } = {}) {
-  const { reportPath, logPath, fixture } = scratch()
+function gateRun(t, { timeoutMs = 10_000, deps } = {}) {
+  const { reportPath, logPath, fixture } = scratch(t)
   return {
     fixture,
     run: (files) =>
-      runSuite(
-        { reportPath, logPath, timeoutMs, vitestArgs: [], forkTests: files ?? forkTests },
-        deps
-      )
+      runSuite({ reportPath, logPath, timeoutMs, vitestArgs: [], forkTests: files }, deps)
   }
 }
 
-test('a fork program that cannot start is reported, not read as a clean exit', () => {
-  const { run, fixture } = gateRun({ deps: { forkProgram: '/nonexistent/orca-node' } })
+test('a fork program that cannot start is reported, not read as a clean exit', (t) => {
+  const { run, fixture } = gateRun(t, { deps: { forkProgram: '/nonexistent/orca-node' } })
   const result = run([fixture('passing.test.mjs', PASSING)])
   assert.match(result.outcome, /^fork-local tests could not run: /)
   assert.match(result.outcome, /ENOENT/)
   assert.equal(result.forkTestsPassed, false)
 })
 
-test('a fork step killed at its deadline reports a timeout, not a pass', () => {
-  const { run, fixture } = gateRun({ timeoutMs: 250 })
+test('a fork step killed at its deadline reports a timeout, not a pass', (t) => {
+  const { run, fixture } = gateRun(t, { timeoutMs: 250 })
   const result = run([fixture('hanging.test.mjs', HANGING)])
   assert.equal(result.outcome, 'timed-out')
   assert.equal(result.forkTestsPassed, false)
 })
 
-test('a fork step that ran and failed names the step, not the suite', () => {
-  const { run, fixture } = gateRun()
+test('a fork step that ran and failed names the step, not the suite', (t) => {
+  const { run, fixture } = gateRun(t)
   const result = run([fixture('failing.test.mjs', FAILING)])
   assert.equal(result.outcome, 'fork-local tests failed')
   assert.equal(result.forkTestsPassed, false)

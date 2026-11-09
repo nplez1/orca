@@ -2458,8 +2458,9 @@ stayed true because nothing changed.
   when the pattern matches nothing** (measured), so a lane that silently proved nothing would be the
   same class of defect as the one this closes. An empty match is exit 2, the refusal `gate-unit.mjs`
   already makes for its own fork step. The runner entry in `check-test-file-runners.mjs` loses
-  `manual: true` and names both workflows, so the drift check now fails if the command leaves one.
-- **`tests/tools/max-lines-policy.test.mjs` is gone; the rule lives in `local/max-lines-exemption.test.mjs`.**
+  `manual: true` and becomes one row per workflow, so removing the step from either one is drift.
+- **The max-lines exemption rule moved out of the Vitest inventory**, from the retired
+  tests/tools/max-lines-policy.test.mjs to `local/max-lines-exemption.test.mjs`.
   The old test tried `origin/main`, then fell back to `origin/HEAD` — which on this fork resolves to
   `origin/nplez1/main`, where every path "exists upstream", so the rule checked nothing. It also
   `skipIf`-ed silently in a CI checkout, which has neither ref. The comparison is now the **recorded
@@ -2473,10 +2474,10 @@ stayed true because nothing changed.
   tests. The test left the Vitest inventory and joined the fork-local lane, which runs on PRs: coverage
   went up, not down (`pr.yml` is disabled here and the unit suite is nightly-only).
 - **`unit-suite-run.mjs` has tests**, which is what found the last one: a nested `node --test` run under
-  a test runner reports its failures to the parent over IPC and **exits 0**, so `NODE_TEST_CONTEXT` is
-  now cleared for every spawn alongside the app's own inherited env. A gate started from inside a test
-  would otherwise have read a failing suite as a pass. `runSuite` takes a `forkProgram` seam so the
-  ENOENT case is reachable; timeout and a non-zero fork step use real spawns.
+  a test runner prints "skipping running files" and **exits 0**, so `NODE_TEST_CONTEXT` is now cleared
+  for every spawn alongside the app's own inherited env. A gate started from inside a test would
+  otherwise have read a failing suite as a pass. `runSuite` takes a `forkProgram` seam so the ENOENT
+  case is reachable; timeout and a non-zero fork step use real spawns.
 
 The five `local/sync/*.mjs` entry points stay untested on purpose: they export nothing and are argument
 parsing over `lib/` modules that are covered.
