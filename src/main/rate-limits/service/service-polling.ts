@@ -61,11 +61,11 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return false
     }
-    // UI-only polling pauses while inactive to save CLI/API budget; activation refreshes it.
-    if (!this.mainWindow.isVisible() || this.mainWindow.isMinimized()) {
-      return false
-    }
-    return this.mainWindow.isFocused()
+    // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
+    // Why no visibility/focus gate: a serve-mode host keeps its window hidden, so upstream's
+    // "pause while inactive" rule meant a remote host never polled usage at all — its numbers only
+    // moved when a session posted a live receipt. Usage is polled on the timer, focused or not.
+    return true
   }
 
   protected getActiveProviderState(): ActiveProviderState[] {

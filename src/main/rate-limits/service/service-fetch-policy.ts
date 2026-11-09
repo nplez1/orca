@@ -89,9 +89,9 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     )
   }
 
-  // fork-comment-ok: the CLI probe answers without the endpoint, so its Retry-After cannot stop the lane.
+  // fork-comment-ok: an endpoint-free source answers Claude, so its Retry-After cannot stop the lane.
   protected canRefreshThroughRetryAfter(provider: ActiveRateLimitProvider): boolean {
-    return !retryAfterBlocksProviderLane(provider, this.shouldAllowClaudeUsagePanelSupplement())
+    return !retryAfterBlocksProviderLane(provider)
   }
 
   protected resolveClaudeFetchApply(

@@ -36,8 +36,7 @@ export async function readActiveClaudeUsageFromProbe(
   }
   // Why keep it: the endpoint's wait is still the endpoint's, and carrying it means a probe that
   // fails inside that window cannot spend the request the endpoint asked Orca to hold.
-  const openRetryAtMs = options.usageEndpointRetryAtMs
-  const retryAtMs = openRetryAtMs && openRetryAtMs > Date.now() ? openRetryAtMs : null
+  const retryAtMs = openEndpointRetryAtMs(options)
   return {
     ...reading,
     usageMetadata: {
@@ -46,6 +45,14 @@ export async function readActiveClaudeUsageFromProbe(
       authProvenance: authPreparation?.provenance ?? 'system'
     }
   }
+}
+
+/** The endpoint's own Retry-After, while it is still open. */
+export function openEndpointRetryAtMs(
+  options: ClaudeRateLimitFetchOptions | undefined
+): number | null {
+  const retryAtMs = options?.usageEndpointRetryAtMs
+  return retryAtMs && retryAtMs > Date.now() ? retryAtMs : null
 }
 
 /**
@@ -66,10 +73,9 @@ export function claudeUsageEndpointGatedResult(
 }
 
 /** True while a provider's open Retry-After must block its whole lane. */
-export function retryAfterBlocksProviderLane(
-  provider: ProviderRateLimits['provider'],
-  probeAvailable: boolean
-): boolean {
-  // The probe never asks the endpoint, so its Retry-After only gates the endpoint, not the lane.
-  return !(provider === 'claude' && probeAvailable)
+export function retryAfterBlocksProviderLane(provider: ProviderRateLimits['provider']): boolean {
+  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
+  // Why never Claude: the header probe answers without the endpoint and needs no platform, so an
+  // endpoint Retry-After gates that one request and never the lane.
+  return provider !== 'claude'
 }
