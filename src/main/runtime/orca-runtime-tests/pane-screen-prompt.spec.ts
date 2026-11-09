@@ -220,6 +220,19 @@ const PI_ASK_CARD = [
 const PI_NEEDS_INPUT_TITLE = '\x1b]0;\u03c0 ! worker\x07'
 const PI_WORKING_TITLE = '\x1b]0;\u03c0 : worker\x07'
 const PI_IDLE_TITLE = '\x1b]0;\u03c0 > worker\x07'
+/** pi paints its ask card in the alternate screen and leaves it when the card closes, which is the
+ *  witness that separates a live card from a marker lagging its own close. */
+const PI_ALTERNATE_SCREEN = '\x1b[?1049h'
+
+/** Pi-Bolt 1.1.7's multi-select footer, taken from the running build: no cancel half and comma
+ *  separators, so no anchor matches it - and it is still a dialog a person has to answer. */
+const PI_UNMEASURED_CARD = [
+  ' Ask Colours',
+  ' \u276f [ ] Blue',
+  '   [ ] Red',
+  ' Space to toggle, Enter to confirm, a to select all, n to select none, i to invert, l to toggle latest;',
+  ''
+].join('\r\n')
 
 async function piTerminalRuntime(
   deps: { onPaneScreenPromptGained?: (paneKey: string) => void } = {}
@@ -230,6 +243,9 @@ async function piTerminalRuntime(
     spawn,
     write: () => true,
     kill: () => true,
+    // Why the size: production reads a ruled grid for a pane whose size it knows, which is where the
+    // alternate-screen witness comes from. Without one every read is a mode-less live projection.
+    getSize: () => ({ cols: 120, rows: 40 }),
     getForegroundProcess: async () => null
   })
   await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { command: 'pi', title: 'worker' })
@@ -267,17 +283,57 @@ describe('the ask card a pi pane is holding', () => {
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
   })
 
-  it('holds the wait while the pane still claims a card the grid no longer shows', async () => {
+  it('answers from the pane marker alone once the grid no longer shows the card', async () => {
     const { runtime, paneKey, flush } = await piTerminalRuntime()
-    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_ASK_CARD, 1_000)
+    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_ALTERNATE_SCREEN + PI_ASK_CARD, 1_000)
     await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).not.toBeNull()
     runtime.onPtyData('pty-screen', '\x1b[2J\x1b[H  \u2713 12 tests passed\r\n', 2_000)
     await flush()
-    // Why undefined and not null: the pane's own marker still claims a dialog, so an emptied grid
-    // is a card that was answered (the marker follows within the second), not evidence nobody is
-    // waiting. Releasing here is how a collapsed or clipped card became a Working tab (#227).
+    // Why the marker still answers and not `undefined`: holding a wait is not a rescue. The row this
+    // lane exists for already reads `working` (a later post displaced the hook's wait), and
+    // "cannot see it" leaves that row on Working for as long as the card stands - the marker is the
+    // pane's own claim that it should not. Releasing to null is what a withdrawn claim means.
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({
+      reason: 'agent-interactive-prompt',
+      current: true
+    })
+  })
+
+  it('reads a wait for a footer this reader has never seen', async () => {
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData(
+      'pty-screen',
+      PI_NEEDS_INPUT_TITLE + PI_ALTERNATE_SCREEN + PI_UNMEASURED_CARD,
+      1_000
+    )
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({
+      reason: 'agent-interactive-prompt',
+      current: true
+    })
+  })
+
+  it('holds, rather than claims, once the pane has left the card behind', async () => {
+    // Why: an answered card's marker follows within the second, and pi killed with a card up leaves
+    // one behind. Outside the alternate screen there is no dialog for the marker to be claiming, so
+    // a hold keeps an existing wait without starting one the pane never earned (#136 in miniature).
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_UNMEASURED_CARD, 1_000)
+    await flush()
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeUndefined()
+  })
+
+  it('releases on a withdrawn marker even while the card is still painted', async () => {
+    // Why: the marker is now the only clear, so a marker that withdraws under a still-painted card
+    // must release - otherwise answering a card whose repaint lags its close pins Needs You.
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_ASK_CARD, 1_000)
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).not.toBeNull()
+    runtime.onPtyData('pty-screen', PI_WORKING_TITLE, 2_000)
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
   })
 
   it('ends the wait once the pane withdraws its own claim', async () => {
@@ -312,18 +368,21 @@ describe('the ask card a pi pane is holding', () => {
     expect(gained).toEqual([paneKey])
   })
 
-  it('holds the wait rather than releasing it on a footer it cannot read', async () => {
-    // Why undefined and not null: the pane still claims a dialog with `π !`, and a footer this
-    // reader has not learned is an unreadable grid - releasing there is a Working tab over a card
-    // a person still has to answer (#227).
+  it('answers a wait for a footer it cannot read, rather than only holding one', async () => {
+    // Why a wait and not `undefined`: holding keeps a wait that already exists, and the row this
+    // lane is for already reads `working` - so "cannot see it" left it on Working for as long as
+    // the card stood. The pane's `π !` is its own claim that a dialog is open; the footer is not.
     const { runtime, paneKey, flush } = await piTerminalRuntime()
     runtime.onPtyData(
       'pty-screen',
-      `${PI_NEEDS_INPUT_TITLE} Do you trust this workspace?\r\n Press enter to confirm\r\n`,
+      `${PI_NEEDS_INPUT_TITLE}${PI_ALTERNATE_SCREEN} Do you trust this workspace?\r\n Press enter to confirm\r\n`,
       1_000
     )
     await flush()
-    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeUndefined()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toMatchObject({
+      reason: 'agent-interactive-prompt',
+      current: true
+    })
   })
 
   it("recognises pi's own selector footer, which a permission gate paints", async () => {

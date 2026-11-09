@@ -81,11 +81,14 @@ describe('pi ask-card gained stamp', () => {
     expect(gained.observe('pty-1', CARD_GRID, 9_000)?.since).toBe(1_000)
   })
 
-  it('forgets the card once the grid no longer holds it', () => {
+  it('keeps the stamp when the grid stops showing the card, because the marker owns the clear', () => {
+    // Why: the marker is the authority on whether a dialog is still open. Clearing on an absent
+    // footer would reset `since` on every read of a card this reader cannot recognise - the very
+    // case the claim answers - turning the stamp into "the last time we looked".
     const gained = new PiAskDialogScreenGained()
     gained.observe('pty-1', CARD_GRID, 1_000)
     expect(gained.observe('pty-1', [' done, 42 tests passed'], 5_000)).toBeNull()
-    expect(gained.observe('pty-1', CARD_GRID, 7_000)?.since).toBe(7_000)
+    expect(gained.observe('pty-1', CARD_GRID, 7_000)?.since).toBe(1_000)
   })
 
   it('answers unreadable for a grid it does not have, which is not an empty one', () => {
@@ -107,5 +110,37 @@ describe('pi ask-card gained stamp', () => {
     gained.observe('pty-1', CARD_GRID, 1_000)
     gained.forget('pty-1')
     expect(gained.observe('pty-1', CARD_GRID, 8_000)?.since).toBe(8_000)
+  })
+})
+
+describe("the pane's own dialog claim", () => {
+  it('answers a wait for a card the grid cannot be read for', () => {
+    // Why: `π !` is pi's own claim, painted for exactly as long as a dialog holds the pane. The
+    // footer vocabulary is a proxy measured one card build at a time, and every wording it did not
+    // know left a displaced row on Working - the bug this answers for.
+    const gained = new PiAskDialogScreenGained()
+    expect(gained.observeClaim('pty-1', 1_000)).toEqual({
+      reason: 'agent-interactive-prompt',
+      since: 1_000
+    })
+  })
+
+  it('keeps the first sighting of the claim across later reads', () => {
+    const gained = new PiAskDialogScreenGained()
+    gained.observeClaim('pty-1', 1_000)
+    expect(gained.observeClaim('pty-1', 9_000).since).toBe(1_000)
+  })
+
+  it('shares one clock with the grid, so a card read either way is dated once', () => {
+    const gained = new PiAskDialogScreenGained()
+    expect(gained.observe('pty-1', CARD_GRID, 1_000)?.since).toBe(1_000)
+    expect(gained.observeClaim('pty-1', 5_000).since).toBe(1_000)
+  })
+
+  it('starts a new clock once the pane withdraws the claim', () => {
+    const gained = new PiAskDialogScreenGained()
+    gained.observeClaim('pty-1', 1_000)
+    gained.forget('pty-1')
+    expect(gained.observeClaim('pty-1', 6_000).since).toBe(6_000)
   })
 })
