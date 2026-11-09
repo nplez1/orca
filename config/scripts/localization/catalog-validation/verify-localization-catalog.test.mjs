@@ -223,10 +223,18 @@ describe('verify-localization-catalog', () => {
       enCatalog: { auto: { example: 'Flat' } },
       forkEnCatalog: { auto: { example: { greeting: 'Hi' } } },
       expected: 'structural: auto.example'
+    },
+    {
+      case: 'the overlay replaces an upstream subtree with a string',
+      enCatalog: { auto: { example: { greeting: { nested: 'Nested' } } } },
+      forkEnCatalog: { auto: { example: { greeting: 'Hi' } } },
+      expected: 'structural: auto.example.greeting'
     }
   ])('fails when $case', async ({ enCatalog, forkEnCatalog, overridesManifest, expected }) => {
     const { root } = makeProject({
-      sourceText: 'export {}\n',
+      // A missing reference makes `--fix` write the overlay, so the ordering claim is load-bearing.
+      sourceText:
+        "import { translate } from '@/i18n/i18n'\nexport const label = translate('auto.example.missing', 'Fallback')\n",
       enCatalog,
       forkEnCatalog,
       overridesManifest

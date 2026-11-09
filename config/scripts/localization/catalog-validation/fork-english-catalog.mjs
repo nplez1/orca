@@ -85,7 +85,10 @@ export function collectOverlayOverrideDrift(overlay, upstreamCatalog, manifest) 
   const walk = (node, upstreamNode, prefix) => {
     for (const [key, value] of Object.entries(node)) {
       const pathKey = prefix ? `${prefix}.${key}` : key
-      const upstreamValue = isPlainObject(upstreamNode) ? upstreamNode[key] : undefined
+      const upstreamValue =
+        isPlainObject(upstreamNode) && Object.hasOwn(upstreamNode, key)
+          ? upstreamNode[key]
+          : undefined
       // A tombstone is checked against upstream by `reportStaleTombstones` instead.
       if (value === null) {
         continue

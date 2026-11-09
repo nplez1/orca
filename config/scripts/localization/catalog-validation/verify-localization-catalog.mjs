@@ -346,7 +346,7 @@ function reportOverrideDrift(drift, manifestLabel) {
     {
       heading: "en.json overlay repeats upstream's value instead of overriding it:",
       lines: drift.noop.map((key) => `no-op override: ${key}`),
-      remedy: 'Delete those entries; the merged catalog is unchanged without them.'
+      remedy: `Delete those entries from the overlay, and their records from ${manifestLabel}.`
     }
   ]
   const failing = blocks.filter((block) => block.lines.length > 0)
