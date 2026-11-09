@@ -692,7 +692,9 @@ the next post from the new session is adopted once the child it is unrelated to 
 A child's own stream that arrives after its row has gone is refused too, for five minutes and only
 on the conversation it reported: a spooled hook, or a retirement that beat the process, would
 otherwise be read as the pane's own agent — ending its presence on a `SessionEnd`, relabelling it on
-a `Stop`.
+a `Stop`. That fence is pane-scoped state like every other, so it rides a pane re-key
+(`movePaneCacheState`) and dies with the listener's caches (`clearAllListenerCaches`); before #311 it
+did neither, so a re-keyed pane lost the fence on its new key and kept a dead one on the old.
 
 **The child's own stream was refused, so the row had nothing to say.** `isInheritedPaneOwnerEvent`
 correctly refuses a second agent in an active pane, which meant the child's tool, model and wait
@@ -837,12 +839,22 @@ missing evidence class, not a new state. It mirrors Claude's session cron, one l
   the lead's refreshes at a bus that serves no loops.
 - `src/shared/agent-hook-listener/pi-scheduled-work.ts` — the wire reader. Relative `next_in_ms`, so a
   relayed or SSH pane's clock skew cannot move the hold; bounded to 20 jobs; a fire more than two
-  minutes overdue means nothing refreshed the evidence, so it holds nothing.
+  minutes overdue means nothing refreshed the evidence, so it holds nothing. That rule is judged
+  twice: on arrival, and again whenever the hold is applied, against the receipt time the cached
+  inventory now carries (`receivedAt`, `piScheduledWorkIsLive`). Without the second judgement a
+  cached hold never aged — the extension dying without posting again left the pane `monitoring`
+  until upstream's 30-minute decay (#311). The receipt also bounds the inventory itself at 13
+  minutes: the extension's key excludes the countdown, so a fire that merely moves posts nothing and
+  the 10-minute restatement is the only freshness signal there is. That bound is what ages the job
+  shapes with no fire time to age against — a self-paced loop waiting for its next wakeup, a cold job
+  a day out.
 - `src/shared/agent-hook-listener/providers/pi-pane-hold-evidence.ts` — the pi lane's pane-hold fold,
   the analogue of `resolveClaudePaneStatus` and the seam `#283` adds its child-work input to. Applied
-  at **one** place, `agent-hook-listener.ts`, after `gatePaneStateOnDescendants` and after the session
-  placeholder: the gate records the lead's own verdict, so a fold applied before it would teach the
-  gate that a finished turn was working. The inventory is cached per pane
+  at **two** places — `normalization/normalize-hook-payload.ts` for the pane's own posts, and
+  `pi-claude-child-events.ts` for a claude child's republish, which builds the row outside that
+  normalizer — and both run after `gatePaneStateOnDescendants` and after the session placeholder: the
+  gate records the lead's own verdict, so a fold applied before it would teach the gate that a
+  finished turn was working. The inventory is cached per pane
   (`piScheduledWorkByPaneKey`) because a republish can be triggered by something carrying no inventory
   at all — a descendant draining, a resumed session's placeholder — and reading absence there would
   drop a hold nothing has cleared.

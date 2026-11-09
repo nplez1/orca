@@ -3,7 +3,7 @@
 import type { AgentMainAgentStatus } from '../agent-status/lifecycle/main-agent-status'
 import type { AgentStatusState } from '../agent-status/contracts/agent-status-types'
 import type { AgentChildWorkKind } from '../agent-status/child-work/agent-status-child-work'
-import type { PiScheduledJob } from './pi-scheduled-work'
+import type { PiScheduledWorkInventory } from './pi-scheduled-work'
 import type { ClaudeLeadTurnState, CodexLeadTurnState } from './main-agent-turn-state'
 
 import {
@@ -114,10 +114,11 @@ export type HookListenerState = {
    *  incoming descendant event already triggered, and never creates a row on its own. */
   descendantLeadStateByPaneKey: Map<string, AgentStatusState>
   /** Scheduled work a pi pane's own extension last reported armed — a loop, a pending wakeup or a cold
-   *  job. Kept here rather than read off the current event because a republish can be triggered by
+   *  job — with when that post arrived, because its fire times are relative to it and the hold must
+   *  age. Kept here rather than read off the current event because a republish can be triggered by
    *  something that carries no inventory at all (a descendant draining, a resumed session's
    *  placeholder), and reading absence there would drop a hold nothing has cleared. */
-  piScheduledWorkByPaneKey: Map<string, readonly PiScheduledJob[]>
+  piScheduledWorkByPaneKey: Map<string, PiScheduledWorkInventory>
   /** Hermes turn per pane, so tool hooks from its post-turn background review can be ignored. */
   hermesTurnByPaneKey: Map<string, HermesPaneTurn>
 }
@@ -351,6 +352,7 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.copilotBackgroundWorkByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantRosterByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.reportedSubagentsByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.retiredPiClaudeChildrenByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.descendantLeadStateByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.piScheduledWorkByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.hermesTurnByPaneKey, fromPaneKey, toPaneKey)
@@ -401,6 +403,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.copilotBackgroundWorkByPaneKey.clear()
   state.descendantRosterByPaneKey.clear()
   state.reportedSubagentsByPaneKey.clear()
+  state.retiredPiClaudeChildrenByPaneKey.clear()
   state.descendantLeadStateByPaneKey.clear()
   state.piScheduledWorkByPaneKey.clear()
   state.hermesTurnByPaneKey.clear()
