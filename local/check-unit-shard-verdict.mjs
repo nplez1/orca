@@ -110,20 +110,27 @@ export function unhandledExplanation(headline, entries = []) {
 export function matchAssignedFiles(report, assignedFiles) {
   const assigned = new Set(assignedFiles)
   const matched = new Map()
-  const unexpected = new Set()
+  const unassigned = new Set()
   for (const file of report?.testResults ?? []) {
     const path = String(file?.name ?? '').replaceAll('\\', '/')
     const suffixes = [path]
     for (let at = path.indexOf('/'); at !== -1; at = path.indexOf('/', at + 1)) {
       suffixes.push(path.slice(at + 1))
     }
-    const match = suffixes.find((suffix) => assigned.has(suffix)) ?? null
+    // Why the `/`: a suffix is only a path match at a separator, so `…/src/a.test.ts` never pairs
+    // with an assigned `a.test.ts`. Every `UNIT_INCLUDE` glob is two directories deep, so an
+    // assigned file always has one; the whole path is accepted as-is for a report that is already
+    // repo-relative.
+    const match =
+      suffixes.find(
+        (suffix, depth) => (depth === 0 || suffix.includes('/')) && assigned.has(suffix)
+      ) ?? null
     matched.set(path, match)
     if (match === null) {
-      unexpected.add(path)
+      unassigned.add(path)
     }
   }
-  return { matched, unexpected: [...unexpected].sort() }
+  return { matched, unassigned: [...unassigned].sort() }
 }
 
 /**
@@ -286,7 +293,7 @@ export function decideUnitShardVerdict({
           'the shard assignment gives this shard no files, so nothing proves what it should have run'
         )
       } else {
-        const { matched, unexpected } = matchAssignedFiles(report, assignedFiles)
+        const { matched, unassigned } = matchAssignedFiles(report, assignedFiles)
         // Why the pairing happens here rather than inside the shared check: `reportFileSetProblem`
         // resolves a report path against the judging process's own checkout, and this verdict has to
         // judge a report produced somewhere else too — a downloaded artifact names
@@ -301,10 +308,10 @@ export function decideUnitShardVerdict({
         }
         // Why the other direction: a manifest from another run, shard or revision can be a subset of
         // this one, and then a missing-file check alone reads it as the whole assignment.
-        if (unexpected.length > 0) {
-          const more = unexpected.length > 12 ? ` …and ${unexpected.length - 12} more` : ''
+        if (unassigned.length > 0) {
+          const more = unassigned.length > 12 ? ` …and ${unassigned.length - 12} more` : ''
           problems.push(
-            `the report names ${unexpected.length} file(s) this shard was not assigned, so the assignment does not describe this run: ${unexpected.slice(0, 12).join(', ')}${more}`
+            `the report names ${unassigned.length} file(s) this shard was not assigned, so the assignment does not describe this run: ${unassigned.slice(0, 12).join(', ')}${more}`
           )
         }
       }
@@ -381,17 +388,18 @@ export function decideUnitShardVerdict({
   if (outcome !== 'success' && outcome !== 'failure') {
     problems.push(`unknown test-step outcome "${outcome}"`)
   } else if (outcome === 'failure' && problems.length === 0 && absorbed.length === 0) {
-    // Why per headline: a tolerated worker crash cannot explain the exit by itself, because it can
-    // lose tests inside a file that is still listed — the file set cannot see that.
-    const explanatory = tolerated.filter(
-      (headline) => unhandledExplanation(headline, unhandledErrors).explainsFailure
+    // Why any crash fails the shard, even beside another tolerated headline: a worker that died can
+    // lose tests inside a file the report still lists, which the file set cannot see. A bystander
+    // teardown error does not rule that out, so only an absorbed red may account for the exit.
+    const unexplained = tolerated.filter(
+      (headline) => !unhandledExplanation(headline, unhandledErrors).explainsFailure
     )
-    if (explanatory.length === 0) {
+    if (unexplained.length > 0) {
       problems.push(
-        tolerated.length === 0
-          ? 'the shard failed without the tolerated Vitest teardown race'
-          : `the shard failed and its only tolerated error cannot account for it — a worker crash can lose tests the report still lists: ${tolerated.join('; ')}`
+        `the shard failed and nothing absorbed accounts for its worker crash, which can lose tests the report still lists: ${unexplained.join('; ')}`
       )
+    } else if (tolerated.length === 0) {
+      problems.push('the shard failed without the tolerated Vitest teardown race')
     }
   }
 

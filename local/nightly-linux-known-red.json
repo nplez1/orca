@@ -113,7 +113,7 @@
       "class": "pool-crash",
       "owner": "unattributed",
       "explainsFailure": false,
-      "evidence": "LOCAL-PATCHES.md records a node-runtime worker dying mid-run on this pool; it names no test, and the run it came from had every named failure already triaged. Same claim as the Mac manifest's entry. `explainsFailure: false` because a worker that died can lose tests inside a file the report still lists, so a crash cannot be the only explanation for a failed shard — it is only tolerable beside a known red that already explains the exit."
+      "evidence": "LOCAL-PATCHES.md records a node-runtime worker dying mid-run on this pool; it names no test, and the run it came from had every named failure already triaged. The Mac manifest carries the same headline, but only this entry sets `explainsFailure: false`: the shard verdict judges a Linux shard against its assignment, and a worker that died can lose tests inside a file the report still lists, so a crash cannot be the only explanation for a failed shard — it is tolerable only beside a known red that already explains the exit. `local/gate-unit.mjs` does not read the field."
     },
     {
       "match": "^Unknown Error: BuildMessage: ModuleNotFound resolving \"http://localhost:3000/.*monaco-editor.*ts\\.worker\\.js\\?worker_file&type=module\" \\(entry point\\)$",

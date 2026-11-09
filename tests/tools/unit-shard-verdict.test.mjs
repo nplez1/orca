@@ -1,92 +1,27 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import {
   TOLERATED_UNHANDLED_ERROR,
-  collectUnhandledErrors,
-  decideUnitShardVerdict,
-  readShardAssignment
+  collectUnhandledErrors
 } from '../../local/check-unit-shard-verdict.mjs'
+import {
+  CANCELED,
+  CANCELED_ENTRY,
+  POOL_CRASH,
+  POOL_CRASH_ENTRY,
+  SCRIPT,
+  cleanupTempDirs,
+  decide,
+  log,
+  report,
+  run,
+  runRaw,
+  tempDir
+} from './unit-shard-verdict-harness.mjs'
 
-const SCRIPT = new URL('../../local/check-unit-shard-verdict.mjs', import.meta.url).pathname
-const REPO_ROOT = new URL('../../', import.meta.url).pathname
-// Verbatim what Vitest's pool prints, and the entry the Linux manifest tolerates it with.
-const POOL_CRASH = 'Error: [vitest-pool]: Worker node-runtime emitted error.'
-const POOL_CRASH_ENTRY = {
-  match: '^Error: \\[vitest-pool\\]: Worker node-runtime emitted error\\.$',
-  class: 'pool-crash',
-  explainsFailure: false
-}
-const CANCELED = 'Canceled: Canceled'
-const CANCELED_ENTRY = { match: '^Canceled: Canceled$', class: 'third-party-teardown' }
-const dirs = []
-
-afterEach(() => {
-  for (const dir of dirs.splice(0)) {
-    rmSync(dir, { recursive: true, force: true })
-  }
-})
-
-function report({
-  totalTests = 100,
-  failedTests = 0,
-  failedSuites = 0,
-  failing = [],
-  passing = [],
-  fileLevelFailures = []
-} = {}) {
-  return JSON.stringify({
-    numTotalTestSuites: failedSuites + passing.length + fileLevelFailures.length + 1,
-    numFailedTestSuites: failedSuites + fileLevelFailures.length,
-    numTotalTests: totalTests,
-    numFailedTests: failedTests,
-    success: failedTests === 0 && failedSuites === 0,
-    testResults: [
-      ...failing.map(([name, fullName, message]) => ({
-        name,
-        status: 'failed',
-        ...(message ? { message } : {}),
-        assertionResults: [{ status: 'failed', title: fullName, fullName }]
-      })),
-      ...passing.map(([name, fullName = 'passes']) => ({
-        name,
-        status: 'passed',
-        assertionResults: [{ status: 'passed', title: fullName, fullName }]
-      })),
-      ...fileLevelFailures.map((name) => ({ name, status: 'failed', assertionResults: [] }))
-    ]
-  })
-}
-
-function log({ errors = [], declaredCount = errors.length } = {}) {
-  if (declaredCount === 0) {
-    return ' Test Files  1192 passed (1204)\n      Tests  12231 passed (12313)\n'
-  }
-  const blocks = errors
-    .map(
-      (headline) =>
-        `\u2500\u2500\u2500\u2500\u2500\u2500 Unhandled Rejection \u2500\u2500\u2500\u2500\u2500\u2500\n` +
-        `\u001b[31m\u001b[1m${headline}\u001b[22m\u001b[39m\n` +
-        `This error originated in "src/main/ipc/worktrees-detected-scan-cache.test.ts" test file.`
-    )
-    .join('\n')
-  return (
-    `\u2500\u2500\u2500\u2500\u2500\u2500 Unhandled Errors \u2500\u2500\u2500\u2500\u2500\u2500\n` +
-    `Vitest caught ${declaredCount} unhandled error${declaredCount === 1 ? '' : 's'} during the test run.\n` +
-    `This might cause false positive tests.\n${blocks}\n` +
-    ` Test Files  1192 passed (1204)\n      Tests  12231 passed (12313)\n     Errors  ${declaredCount} error\n`
-  )
-}
-
-const decide = (overrides = {}) =>
-  decideUnitShardVerdict({
-    reportText: report(),
-    logText: log(),
-    outcome: 'success',
-    ...overrides
-  })
+afterEach(cleanupTempDirs)
 
 it('reads the teardown race out of the log and tolerates exactly it', () => {
   const collected = collectUnhandledErrors(log({ errors: [TOLERATED_UNHANDLED_ERROR] }))
@@ -183,67 +118,6 @@ it('fails on an outcome it cannot judge', () => {
   )
 })
 
-it('fails when an assigned file is missing from the report', () => {
-  const verdict = decide({
-    reportText: report({ totalTests: 1, passing: [['src/a.test.ts', 'runs']] }),
-    assignedFiles: ['src/a.test.ts', 'src/b.test.ts']
-  })
-
-  expect(verdict.ok).toBe(false)
-  expect(verdict.problems).toEqual([
-    'the report does not name 1 file(s) the lane should have run: src/b.test.ts'
-  ])
-})
-
-it('passes when the report names every assigned file', () => {
-  const verdict = decide({
-    reportText: report({
-      passing: [
-        ['src/a.test.ts', 'runs'],
-        ['src/b.test.ts', 'runs']
-      ]
-    }),
-    assignedFiles: ['src/a.test.ts', 'src/b.test.ts']
-  })
-
-  expect(verdict).toEqual({ ok: true, tolerated: [], absorbed: [], prunable: [], problems: [] })
-})
-
-it('matches an absolute CI report path against a repo-relative assignment', () => {
-  const verdict = decide({
-    reportText: report({ passing: [[`${REPO_ROOT}src/a.test.ts`, 'runs']] }),
-    assignedFiles: ['src/a.test.ts']
-  })
-
-  expect(verdict.ok).toBe(true)
-})
-
-it('fails when the report names a file the shard was not assigned', () => {
-  const verdict = decide({
-    reportText: report({
-      passing: [
-        ['src/a.test.ts', 'runs'],
-        ['src/other.test.ts', 'runs']
-      ]
-    }),
-    assignedFiles: ['src/a.test.ts']
-  })
-
-  expect(verdict.ok).toBe(false)
-  expect(verdict.problems).toEqual([
-    'the report names 1 file(s) this shard was not assigned, so the assignment does not describe this run: src/other.test.ts'
-  ])
-})
-
-it('fails when the assignment gives the shard no files', () => {
-  const verdict = decide({ assignedFiles: [] })
-
-  expect(verdict.ok).toBe(false)
-  expect(verdict.problems).toContain(
-    'the shard assignment gives this shard no files, so nothing proves what it should have run'
-  )
-})
-
 it('does not let a tolerated pool crash explain a failed shard on its own', () => {
   const verdict = decide({
     logText: log({ errors: [POOL_CRASH] }),
@@ -254,7 +128,23 @@ it('does not let a tolerated pool crash explain a failed shard on its own', () =
   expect(verdict.tolerated).toEqual([POOL_CRASH])
   expect(verdict.ok).toBe(false)
   expect(verdict.problems).toEqual([
-    `the shard failed and its only tolerated error cannot account for it — a worker crash can lose tests the report still lists: ${POOL_CRASH}`
+    `the shard failed and nothing absorbed accounts for its worker crash, which can lose tests the report still lists: ${POOL_CRASH}`
+  ])
+})
+
+it('does not let a bystander tolerated error explain a shard that also crashed', () => {
+  // The BLOCKER shape review found: a crash beside a benign teardown headline used to read as
+  // explained, because only "every tolerated headline" was consulted, not the crash itself.
+  const verdict = decide({
+    logText: log({ errors: [POOL_CRASH, CANCELED] }),
+    outcome: 'failure',
+    unhandledErrors: [POOL_CRASH_ENTRY, CANCELED_ENTRY]
+  })
+
+  expect(verdict.tolerated).toEqual([POOL_CRASH, CANCELED])
+  expect(verdict.ok).toBe(false)
+  expect(verdict.problems).toEqual([
+    `the shard failed and nothing absorbed accounts for its worker crash, which can lose tests the report still lists: ${POOL_CRASH}`
   ])
 })
 
@@ -286,34 +176,6 @@ it('keeps a tolerated run-level error able to explain a failed shard by itself',
   expect(verdict.tolerated).toEqual([CANCELED])
 })
 
-it('reads the selected shard out of the sequencer manifest and rejects a stale one', () => {
-  const assignment = {
-    runId: '1',
-    runAttempt: '1',
-    selectedShard: 2,
-    shards: [{ files: ['src/a.test.ts'] }, { files: ['src/b.test.ts'] }]
-  }
-  const text = JSON.stringify(assignment)
-
-  expect(readShardAssignment(text, { runId: '1', runAttempt: '1' })).toEqual({
-    files: ['src/b.test.ts']
-  })
-  expect(readShardAssignment(text, { runId: '2', runAttempt: '1' }).problem).toContain(
-    'from runId 1, not this one (2)'
-  )
-  expect(readShardAssignment(text, { runId: '1', runAttempt: '2' }).problem).toContain(
-    'from runAttempt 1, not this one (2)'
-  )
-  expect(readShardAssignment('not json').problem).toContain('unreadable')
-  expect(readShardAssignment(JSON.stringify({ shards: [] })).problem).toContain('holds no shards')
-  expect(
-    readShardAssignment(JSON.stringify({ shards: [{ files: ['a'] }], selectedShard: 3 })).problem
-  ).toContain('which is not one of its 1 shard(s)')
-  expect(
-    readShardAssignment(JSON.stringify({ shards: [{ files: 'a' }], selectedShard: 1 })).problem
-  ).toContain('no usable file list')
-})
-
 it('pins the pool-crash entry as one that cannot explain a failed shard', () => {
   const manifest = JSON.parse(
     readFileSync(new URL('../../local/nightly-linux-known-red.json', import.meta.url), 'utf8')
@@ -322,55 +184,6 @@ it('pins the pool-crash entry as one that cannot explain a failed shard', () => 
 
   expect(crash?.explainsFailure).toBe(false)
 })
-
-function run(
-  reportText,
-  logText,
-  outcome,
-  knownRed = [],
-  { unhandledErrors = [], assignment = null } = {}
-) {
-  const dir = mkdtempSync(join(tmpdir(), 'unit-shard-verdict-'))
-  dirs.push(dir)
-  const reportPath = join(dir, 'report.json')
-  const logPath = join(dir, 'shard.log')
-  // Why always written, even when empty: otherwise a run on Linux falls back to the repo's real
-  // manifest and the test means something different on CI than it does here.
-  const knownRedPath = join(dir, 'known-red.json')
-  writeFileSync(reportPath, reportText)
-  writeFileSync(logPath, logText)
-  writeFileSync(knownRedPath, JSON.stringify({ entries: knownRed, unhandledErrors }))
-  const args = [SCRIPT, reportPath, logPath, outcome, '--known-red', knownRedPath]
-  if (assignment !== null) {
-    const assignmentPath = join(dir, 'unit-assignment.json')
-    writeFileSync(
-      assignmentPath,
-      typeof assignment === 'string' ? assignment : JSON.stringify(assignment)
-    )
-    args.push('--assignment', assignmentPath)
-  }
-  try {
-    return {
-      status: 0,
-      stdout: execFileSync(process.execPath, args, {
-        encoding: 'utf8'
-      })
-    }
-  } catch (error) {
-    return { status: error.status, stdout: `${error.stdout}${error.stderr}` }
-  }
-}
-
-function runRaw(args) {
-  try {
-    return {
-      status: 0,
-      stdout: execFileSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' })
-    }
-  } catch (error) {
-    return { status: error.status, stdout: `${error.stdout}${error.stderr}` }
-  }
-}
 
 it('exits zero for a tolerated race and warns with the upstream issue', () => {
   const result = run(report(), log({ errors: [TOLERATED_UNHANDLED_ERROR] }), 'failure')
@@ -534,8 +347,7 @@ it('fails when the named manifest is missing or malformed', () => {
   expect(
     runRaw(['report.json', 'shard.log', 'failure', '--known-red', '/nonexistent/x.json']).status
   ).toBe(1)
-  const dir = mkdtempSync(join(tmpdir(), 'unit-shard-verdict-'))
-  dirs.push(dir)
+  const dir = tempDir()
   const malformed = join(dir, 'bad.json')
   writeFileSync(malformed, '{"entries": "not an array"}')
   expect(runRaw(['report.json', 'shard.log', 'failure', '--known-red', malformed]).status).toBe(1)
@@ -557,33 +369,6 @@ it('does not read a shared filename in a sibling directory as the listed file', 
   expect(result.stdout).toContain('::error::unit shard: failing: src/other/a.test.ts')
 })
 
-it('exits zero when the assignment accounts for every file in the report', () => {
-  const result = run(
-    report({ totalTests: 2, passing: [['src/a.test.ts', 'runs']] }),
-    log(),
-    'success',
-    [],
-    { assignment: { selectedShard: 1, shards: [{ files: ['src/a.test.ts'] }] } }
-  )
-
-  expect(result.status).toBe(0)
-})
-
-it('exits non-zero when an assigned file is absent from the report', () => {
-  const result = run(
-    report({ totalTests: 2, passing: [['src/a.test.ts', 'runs']] }),
-    log(),
-    'success',
-    [],
-    { assignment: { selectedShard: 1, shards: [{ files: ['src/a.test.ts', 'src/b.test.ts'] }] } }
-  )
-
-  expect(result.status).toBe(1)
-  expect(result.stdout).toContain(
-    '::error::unit shard: the report does not name 1 file(s) the lane should have run: src/b.test.ts'
-  )
-})
-
 it('exits non-zero when the shard failed on a tolerated crash and nothing else', () => {
   const result = run(report(), log({ errors: [POOL_CRASH] }), 'failure', [], {
     unhandledErrors: [POOL_CRASH_ENTRY]
@@ -593,43 +378,20 @@ it('exits non-zero when the shard failed on a tolerated crash and nothing else',
   expect(result.stdout).toContain(
     '::warning::unit shard tolerated a listed run-level error [pool-crash]'
   )
-  expect(result.stdout).toContain('its only tolerated error cannot account for it')
+  expect(result.stdout).toContain('nothing absorbed accounts for its worker crash')
 })
 
-it('exits non-zero when the assignment cannot be read or does not describe a shard', () => {
-  const malformed = run(report(), log(), 'success', [], { assignment: 'not json' })
+it('rejects a manifest whose explainsFailure is not a boolean', () => {
+  const result = run(report(), log(), 'success', [], {
+    unhandledErrors: [{ ...POOL_CRASH_ENTRY, explainsFailure: 'no' }]
+  })
 
-  expect(malformed.status).toBe(1)
-  expect(malformed.stdout).toContain('::error::unit shard: the shard assignment is unreadable')
-
-  const dir = mkdtempSync(join(tmpdir(), 'unit-shard-verdict-'))
-  dirs.push(dir)
-  const reportPath = join(dir, 'report.json')
-  const logPath = join(dir, 'shard.log')
-  writeFileSync(reportPath, report())
-  writeFileSync(logPath, log())
-  const absent = runRaw([
-    reportPath,
-    logPath,
-    'success',
-    '--assignment',
-    join(dir, 'missing-assignment.json')
-  ])
-
-  expect(absent.status).toBe(1)
-  expect(absent.stdout).toContain('::error::unit shard: cannot read the shard assignment')
-})
-
-it('treats --assignment without a path as a usage error, not as no assignment', () => {
-  const result = runRaw(['report.json', 'shard.log', 'failure', '--assignment'])
-
-  expect(result.status).toBe(2)
-  expect(result.stdout).toContain('--assignment needs a path')
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain('an unhandledErrors entry has a non-boolean explainsFailure')
 })
 
 it('fails when the report is missing, so a crashed run cannot pass as green', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'unit-shard-verdict-'))
-  dirs.push(dir)
+  const dir = tempDir()
   const logPath = join(dir, 'shard.log')
   writeFileSync(logPath, log())
   let failed = false
