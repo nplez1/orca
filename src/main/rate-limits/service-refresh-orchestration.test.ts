@@ -15,6 +15,7 @@ import {
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
 import { readGrokAuthSession } from './grok-auth'
 import { fetchKimiRateLimits } from './kimi-fetcher'
+import { fetchMuseRateLimits } from './muse-usage-fetcher'
 
 vi.mock('./claude-fetcher', () => ({
   fetchClaudeRateLimits: vi.fn(),
@@ -258,5 +259,18 @@ describe('disabled usage providers', () => {
 
     expect(fetchAntigravityRateLimits).not.toHaveBeenCalled()
     expect(service.getState().antigravity).toBeNull()
+  })
+
+  it('never spawns the Muse CLI when Muse is switched off, even with its meter showing', async () => {
+    // Why the visible meter: the switch used to gate only the meter, so the CLI ran anyway.
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'muse'
+    })
+    service.setMuseUsageEnabledResolver(() => true)
+
+    await service.refresh()
+
+    expect(fetchMuseRateLimits).not.toHaveBeenCalled()
+    expect(service.getState().muse).toBeNull()
   })
 })

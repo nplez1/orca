@@ -274,9 +274,10 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     })
   }
 
-  // Started before the shared preparation awaits; hidden meters skip the CLI spawn entirely.
+  // Started before the shared preparation awaits; a hidden meter or a switched-off provider skips the spawn.
   private startMuseUsageFetch(signal: AbortSignal): Promise<SettledProviderResult> {
-    const enabled = this.museUsageEnabledResolver?.() ?? true
+    const enabled =
+      !this.isUsageProviderDisabled('muse') && (this.museUsageEnabledResolver?.() ?? true)
     const previous = this.state.muse
     const beforeFetch = enabled
       ? this.withFetchingStatus(previous, 'muse')
