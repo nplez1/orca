@@ -3753,7 +3753,6 @@ is here and not above their code (the rule at the top of this file).
 | terminal-daemon launchd label      | `com.nplez1.orca.terminal.<hash>.v<n>`              | the appId                             | `config/scripts/electron-builder-np-config.test.mjs` |
 | Command Code endpoint recovery     | `orca-np`, `orca-np-dev`, `orca-dev`, `orca-dev-wt` | `app-directory-names.ts`              | `command-code-managed-script.test.ts`                |
 
-
 Six things a reader will otherwise get wrong:
 
 - **The Windows install directory is the package name, not the product name.** NSIS's `APP_FILENAME`
@@ -3792,4 +3791,3 @@ Six things a reader will otherwise get wrong:
   copy in that same folder is `Orca.exe`, so the name inside the folder is what separates them and the
   legacy directory is safe to resolve. Only a build older than both (executable `Orca.exe`) stays
   unreachable, and that one is indistinguishable from the official app by design.
-
