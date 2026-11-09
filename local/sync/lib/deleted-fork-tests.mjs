@@ -12,14 +12,20 @@
 //
 //   node local/sync/lib/deleted-fork-tests.mjs --baseline-init --accept "<why>"
 //
-// Pure for the comparison; the git reads live in post-sync-checks.mjs and in the CLI below.
+// The pure part is `forkModifiedTests` + `compareDeletedForkTests`; `upstreamDeletedForkTests()` is the
+// post-sync row, and the CLI at the bottom writes the baseline.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
-import { gitText, repoRoot, run, splitNul } from './run.mjs'
-import { pinnedUpstreamBase, resolvePreSyncTip } from './sync-range.mjs'
+import { STATUS, changedNames, gitText, repoRoot, run, splitNul } from './run.mjs'
+import {
+  BACKUP_REF,
+  foreignTipFailure,
+  pinnedUpstreamBase,
+  resolvePreSyncTip
+} from './sync-range.mjs'
 
 export const BASELINE_PATH = path.join('local', 'sync', 'upstream-deleted-fork-tests-baseline.json')
 export const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
@@ -190,4 +196,86 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       process.exitCode = 2
     }
   )
+}
+
+// ---- fork-modified tests upstream deleted ----------------------------------------------------
+
+/**
+ * Fork-modified test files that are gone at HEAD after the sync.
+ *
+ * Invisible to every other row: `deletedForkModules` skips tests on purpose, and `lostContent` only
+ * sees files still modified at HEAD. The gate is a baseline bound to this sync's range, so the next
+ * sync reports its own set instead of inheriting this one's.
+ */
+export function upstreamDeletedForkTests(tip, source, problem = null) {
+  if (problem !== null) {
+    return foreignTipFailure(
+      problem,
+      'the scan would read the wrong range and report clean, so it refuses instead'
+    )
+  }
+  if (!tip) {
+    return {
+      status: STATUS.unavailable,
+      summary: `no pre-sync tip: ${BACKUP_REF} is absent and no state file names one`,
+      details: []
+    }
+  }
+  const pinned = pinnedUpstreamBase(tip, source)
+  if (pinned.base === null) {
+    return {
+      status: STATUS.failed,
+      summary: `cannot pin the upstream base: ${pinned.problem}`,
+      details: ['without it the set is unmeasurable, which is not the same as empty']
+    }
+  }
+  const oldBase = gitText(['merge-base', tip, pinned.base])
+  if (!oldBase) {
+    return {
+      status: STATUS.failed,
+      summary: `no merge base between ${tip.slice(0, 10)} and the pinned base ${pinned.base.slice(0, 10)}`,
+      details: []
+    }
+  }
+  // `M` only, renames off: a file the fork added cannot have been retired by upstream, and a rename
+  // pair drops the old path from the set this classifier reads.
+  const changed = changedNames(['--no-renames', '--diff-filter=M', oldBase, tip])
+  const listing = gitText(['ls-tree', '-r', '--name-only', '-z', 'HEAD'])
+  if (changed === null || listing === null) {
+    return {
+      status: STATUS.failed,
+      summary: `git could not read ${oldBase.slice(0, 10)}..${tip.slice(0, 10)} or the HEAD tree`,
+      details: []
+    }
+  }
+  const { modified, gone } = forkModifiedTests({
+    changed,
+    presentAtHead: new Set(splitNul(listing))
+  })
+  const { baseline, problem: baselineProblem } = readBaseline(repoRoot())
+  if (baseline === null) {
+    return {
+      status: STATUS.failed,
+      summary: `the deleted-test baseline cannot be read: ${baselineProblem}`,
+      details: [
+        'an unreadable baseline is not "nothing was lost"; regenerate it with',
+        '  node local/sync/lib/deleted-fork-tests.mjs --baseline-init --accept "<why>"'
+      ]
+    }
+  }
+  const comparison = compareDeletedForkTests({
+    baseline,
+    gone,
+    range: { base: pinned.base, tip }
+  })
+  return {
+    status: comparison.clean ? STATUS.passed : STATUS.failed,
+    summary: comparison.clean
+      ? `${gone.length} fork-modified test file(s) gone at HEAD, all recorded for this range`
+      : `${comparison.appeared.length} fork-modified test file(s) gone at HEAD and not recorded`,
+    details: [
+      `${modified.length} test file(s) the fork modified between ${oldBase.slice(0, 10)} and the pre-sync tip`,
+      ...describeComparison(comparison, { total: gone.length })
+    ]
+  }
 }

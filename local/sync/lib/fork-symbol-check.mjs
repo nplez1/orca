@@ -7,7 +7,7 @@ import { parseExpectedSymbols } from './expected-deletions.mjs'
 import { forkAdded, forkSurface, manifestEntry, survivalVerdict } from './fork-symbols.mjs'
 import { blobs, upstreamMoves } from './fork-surface-git.mjs'
 import { addedLines } from './rename-forecast.mjs'
-import { isDeletedCodeModule } from './deleted-fork-modules.mjs'
+import { isDeletedCodeModule } from './post-sync-checks.mjs'
 import { BACKUP_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 import { STATUS, git, gitText, repoRoot, splitNul, tailText } from './run.mjs'
 

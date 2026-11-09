@@ -6,19 +6,12 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { citedGuards as extractCitedGuards, missingCitedGuards } from './cited-guards.mjs'
-import {
-  compareDeletedForkTests,
-  describeComparison as describeDeletedForkTests,
-  forkModifiedTests,
-  readBaseline as readDeletedForkTestsBaseline
-} from './deleted-fork-tests.mjs'
+import { readDeletionManifest } from './expected-deletions.mjs'
 import {
   compareIdentityBaseline,
   describeComparison,
   readIdentityBaseline
 } from './identity-baseline.mjs'
-import { LOCALES_DIR, localeDriftReport } from './locale-drift.mjs'
 import { BACKUP_REF, UPSTREAM_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 import {
   STATUS,
@@ -43,6 +36,148 @@ const SOURCE_FILE = /\.[cm]?[jt]sx?$/
 
 export const FORK_SLUG = 'nplez1/orca'
 export const BUILDER_CONFIG = './config/electron-builder.config.cjs'
+
+export const UPSTREAM_SLUG = /stablyai\/orca(?![\w-])/
+// The tree upstream keeps reorganising: `updater/lifecycle/`, `updater/releases/` and four more
+// levels appeared in the 2026-11-08 sync, which is how a top-level-only glob stopped finding them.
+export const FEED_TREE = 'src/main/updater'
+// The update feed must keep naming the fork: without it an update check resolves upstream releases
+// and a fork install "upgrades" to a build carrying none of the fork's patches. These are the files
+// that hold or derive the repo, so a loss here is a lost feed; a generic helper naming no repo is not.
+export const FEED_FILES = [
+  'src/main/updater-release-targets.ts',
+  'src/main/updater/lifecycle/updater-setup.ts',
+  'src/main/updater/releases/updater-prerelease-feed.ts',
+  'src/main/updater/releases/updater-release-readiness.ts',
+  'src/shared/release-channel.ts'
+]
+
+/** True when one of `file`'s relative imports resolves to a file that carries the slug. */
+function importsHolder(file, text, holders) {
+  const dir = path.posix.dirname(file)
+  for (const match of text.matchAll(/from\s+'(\.{1,2}\/[^']+)'/g)) {
+    const specifier = match[1]
+    for (const candidate of [specifier, `${specifier}.ts`, `${specifier}/index.ts`]) {
+      if (holders.has(path.posix.normalize(path.posix.join(dir, candidate)))) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * The feed classification, as a pure function of the file list and their text (`null` = absent).
+ *
+ * Two findings fail: an anchor that no longer names the fork, and any file in the tree that names
+ * upstream's repo. A generic helper that names no repo at all is normal — most of them never touch
+ * a release URL — so it is counted rather than listed line by line.
+ */
+export function classifyFeedFiles({ files, anchors, textOf }) {
+  const absent = []
+  const upstream = []
+  const missing = []
+  const silent = []
+  const holders = new Set()
+  const texts = new Map()
+  for (const file of files) {
+    const text = textOf(file)
+    texts.set(file, text)
+    if (text === null) {
+      absent.push(file)
+      continue
+    }
+    if (text.includes(FORK_SLUG)) {
+      holders.add(file)
+    }
+    for (const line of text.split('\n')) {
+      if (UPSTREAM_SLUG.test(line)) {
+        upstream.push(`${file}: ${line.trim()}`)
+      }
+    }
+  }
+  // The slug may be held once and derived everywhere else, so a file that imports a file which does
+  // carry it is satisfied through that constant — the alternative is a copy of the literal that can
+  // drift, which is what this check exists to prevent.
+  for (const file of anchors) {
+    const text = texts.get(file) ?? null
+    if (text === null) {
+      missing.push(`${file}: missing from the tree`)
+      if (!absent.includes(file)) {
+        absent.push(file)
+      }
+    } else if (!holders.has(file) && !importsHolder(file, text, holders)) {
+      missing.push(`${file}: no reference to ${FORK_SLUG}`)
+    }
+  }
+  for (const file of files) {
+    if (!anchors.includes(file) && !holders.has(file)) {
+      silent.push(file)
+    }
+  }
+  return { absent, upstream, missing, silent, scanned: files.length }
+}
+
+/** Every tracked file under the updater tree, plus the anchors that live outside it. */
+function feedFiles() {
+  const listing = gitText(['ls-files', '-z', '--', FEED_TREE])
+  const tracked = listing === null ? [] : splitNul(listing)
+  if (tracked.length === 0) {
+    return null
+  }
+  return [...new Set([...FEED_FILES, ...tracked])].sort()
+}
+
+export function updaterFeed() {
+  const files = feedFiles()
+  if (files === null) {
+    return {
+      status: STATUS.failed,
+      summary: `${FEED_TREE}/ has no tracked files, so the updater cannot be scanned`,
+      details: []
+    }
+  }
+  const result = classifyFeedFiles({
+    files,
+    anchors: FEED_FILES,
+    textOf: (file) => {
+      try {
+        return readFileSync(path.join(repoRoot(), file), 'utf8')
+      } catch {
+        return null
+      }
+    }
+  })
+  const helpers = files.filter((file) => path.posix.basename(file).startsWith('updater-'))
+  const details = [
+    `${result.scanned} file(s) scanned: ${FEED_TREE}/ plus ${FEED_FILES.length} anchor(s), ${helpers.length} updater-*.ts helper(s)`,
+    ...(result.silent.length === 0
+      ? []
+      : [`${result.silent.length} file(s) name no repository, expected for a generic helper`]),
+    // No `updater-*.ts` at any depth means upstream moved the updater again, which is the state that
+    // made a top-level-only glob scan nothing and report a pass.
+    ...(helpers.length === 0
+      ? [`${FEED_TREE}/ has no updater-*.ts at any depth: upstream may have moved the updater`]
+      : []),
+    ...result.upstream.map((line) => `  ! ${line}`),
+    ...result.missing.map((line) => `  ! ${line}`)
+  ]
+  if (result.upstream.length > 0) {
+    return {
+      status: STATUS.failed,
+      summary: `${result.upstream.length} line(s) under ${FEED_TREE}/ name upstream's repository`,
+      details
+    }
+  }
+  return {
+    status: result.missing.length > 0 ? STATUS.failed : STATUS.passed,
+    summary:
+      result.missing.length > 0
+        ? `${result.missing.length} feed anchor(s) lost the fork reference`
+        : `feed override still points at the fork (${result.scanned} file(s) scanned)`,
+    details
+  }
+}
 
 export function localizationVerifiers() {
   const details = []
@@ -198,22 +333,181 @@ export function identitySweep() {
 // The pre-sync tip and the pinned upstream base live in lib/sync-range.mjs: they are the input every
 // check below shares, and the check that they belong to THIS merge is what makes them safe to use.
 
-// Runbook Step 3.1, the check that catches the dropped-merge-commit trap: a MODIFIED file that
-// upstream never touched in this sync's range means the replay moved content it did not own. A path
-// upstream does not have at all is fork-only by construction, and expected here. This is a red-flag
-// scan over modified files — it does not prove that no content was lost anywhere else.
-export function lostContent(tip, source, problem = null) {
+export { lostContent } from './lost-content.mjs'
+
+// ---- deleted modules -------------------------------------------------------------------------
+
+// Extensions a deleted file has to have to be carrying behaviour of its own. A deleted `.json`,
+// `.md` or `.snap` is a removal a reviewer can see; a deleted module is where a unique side effect
+// can disappear without any conflict marker or type error.
+const CODE_EXTENSIONS = new Set(['.ts', '.tsx', '.mjs'])
+// Tests, spec files, and the fixture/mock trees are not the module a caller imports.
+const NOT_A_MODULE = /(^|[.-])(test|spec)\.|[.-](test|tests|fixture|fixtures)$/
+const NOT_A_MODULE_DIR = new Set(['__fixtures__', '__mocks__', '__tests__'])
+
+// Repo-relative paths, so the posix flavour is the right one on every platform.
+export function isDeletedCodeModule(file) {
+  const ext = path.posix.extname(file)
+  if (!CODE_EXTENSIONS.has(ext) || file.endsWith('.d.ts')) {
+    return false
+  }
+  const segments = file.split('/')
+  if (segments.some((segment) => NOT_A_MODULE_DIR.has(segment))) {
+    return false
+  }
+  return !NOT_A_MODULE.test(segments.at(-1))
+}
+
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
+// Words that follow `export` in a declaration but are never the declared name themselves.
+const NOT_A_NAME = new Set([
+  'abstract',
+  'async',
+  'class',
+  'const',
+  'declare',
+  'default',
+  'enum',
+  'export',
+  'extends',
+  'from',
+  'function',
+  'implements',
+  'interface',
+  'let',
+  'namespace',
+  'type',
+  'var'
+])
+// Ordered: `const enum` before `const`, which would otherwise record the word `enum` as the name.
+const DECLARED_EXPORTS = [
+  [/\bexport\s+(?:declare\s+)?const\s+enum\s+([A-Za-z_$][\w$]*)/g, 'type'],
+  [
+    /\bexport\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/g,
+    'function'
+  ],
+  [/\bexport\s+(?:declare\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/g, 'class'],
+  [/\bexport\s+(?:declare\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g, 'const'],
+  [/\bexport\s+(?:declare\s+)?(?:type|interface|enum|namespace)\s+([A-Za-z_$][\w$]*)/g, 'type']
+]
+const EXPORT_CLAUSE = /\bexport\s+(?:type\s+)?\{([^}]*)\}/g
+// `export default` has no name a caller could import; only a named form is searchable.
+const DEFAULT_EXPORT =
+  /\bexport\s+default\s+(?:async\s+)?(?:function\s*\*?\s*|class\s+)?([A-Za-z_$][\w$]*)?/g
+
+// A parser, not a compiler: it reads the names a caller would import, so the live-tree search
+// below has something to look for. It says nothing about how the module behaved.
+export function exportInventory(source) {
+  const text = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
+  const found = new Map()
+  const record = (name, kind) => {
+    if (typeof name !== 'string' || !IDENTIFIER.test(name) || NOT_A_NAME.has(name)) {
+      return
+    }
+    if (!found.has(name)) {
+      found.set(name, kind)
+    }
+  }
+  for (const [pattern, kind] of DECLARED_EXPORTS) {
+    for (const match of text.matchAll(pattern)) {
+      record(match[1], kind)
+    }
+  }
+  for (const match of text.matchAll(EXPORT_CLAUSE)) {
+    for (const item of match[1].split(',')) {
+      // `X` and `X as Y` both export the alias: that is the name a caller imports.
+      const [local, alias] = item
+        .replace(/\btype\s+/, '')
+        .trim()
+        .split(/\s+as\s+/)
+      record(alias ?? local, 're-export')
+    }
+  }
+  for (const match of text.matchAll(DEFAULT_EXPORT)) {
+    if (match[1] === undefined) {
+      if (!found.has('default')) {
+        found.set('default', 'default')
+      }
+      continue
+    }
+    record(match[1], 'default')
+  }
+  return [...found]
+    .map(([name, kind]) => ({ name, kind, anonymous: name === 'default' }))
+    .sort((a, b) => (a.name < b.name ? -1 : 1))
+}
+
+// The deletions this sync made, with the exported surface of each deleted fork-only module. The
+// modified-file scan above cannot see any of this: a deleted file is not in `--diff-filter=M`, and
+// a module whose behaviour had a unique side effect is exactly what an "upstream supersedes it"
+// call gets wrong.
+//
+// This proves a scan over deleted paths and export names. It does not prove that no behaviour was
+// lost: an export still referenced by a shim, or behaviour that reached the fork through a path
+// with no exported name, is outside what it can see.
+
+/**
+ * Deletions a reviewer has judged superseded, from `local/sync/expected-deletions.json`.
+ *
+ * A deleted module legitimately leaves no reference to its exports behind when its behaviour moved
+ * into a live module under a different name, so the export scan needs a way to record that verdict
+ * rather than failing forever on a supersession someone already checked.
+ *
+ * `base` is the pinned upstream base: an entry bound to a blob upstream no longer has is a question
+ * again, and an entry neither side has any more is prunable.
+ */
+function readExpectedDeletions(base = null) {
+  const file = path.join(repoRoot(), 'local/sync/expected-deletions.json')
+  let text = null
+  try {
+    text = readFileSync(file, 'utf8')
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+      return {
+        acknowledged: {},
+        prunable: [],
+        failure: `${file} could not be read: ${error instanceof Error ? error.message : String(error)}`
+      }
+    }
+  }
+  const at = (ref) =>
+    ref === null ? null : new Set(splitNul(gitText(['ls-tree', '-r', '--name-only', '-z', ref])))
+  // Why the shared reader: the manifest's shape is `deletions[]` with a per-entry status, and a second
+  // reader with its own idea of it is how this check read the retired `acknowledged` key for a week and
+  // reported FAILED on every run.
+  const manifest = readDeletionManifest({
+    text,
+    presentAtHead: at('HEAD') ?? new Set(),
+    presentUpstream: at(base),
+    upstreamBlobOf: (entryPath) =>
+      base === null
+        ? null
+        : gitText(['rev-parse', '--verify', '--quiet', [base, entryPath].join(':')])
+  })
+  const acknowledged = {}
+  for (const entry of manifest.entries) {
+    // `pending-decision` acknowledges nothing, and neither does one the binding reopened.
+    if (entry.status === 'expected-deletion') {
+      acknowledged[entry.path] = { reason: entry.reason }
+    }
+  }
+  return { acknowledged, prunable: manifest.prunable, failure: manifest.failure }
+}
+
+export function deletedForkModules(tip, source, problem = null) {
   if (problem !== null) {
     return foreignTipFailure(
       problem,
-      'the scan would compare the wrong range and report clean, so it refuses instead'
+      'the scan would read the wrong tip and report clean, so it refuses instead'
     )
   }
   if (!tip) {
     return {
       status: STATUS.unavailable,
       summary: `no pre-sync tip: ${BACKUP_REF} is absent and no state file names one`,
-      details: []
+      details: [
+        'the exported surface of a deleted module can only be read at the pre-sync tip, so this is not a pass'
+      ]
     }
   }
   const pinned = pinnedUpstreamBase(tip, source)
@@ -222,7 +516,7 @@ export function lostContent(tip, source, problem = null) {
       status: STATUS.failed,
       summary: `cannot pin the upstream base: ${pinned.problem}`,
       details: [
-        'the scan compares against the base pre-sync recorded; without it the answer is unknown, not clean'
+        'without the pinned base every deleted path reads as fork-only, which is the wrong answer to publish'
       ]
     }
   }
@@ -235,241 +529,157 @@ export function lostContent(tip, source, problem = null) {
       details: []
     }
   }
-  const upstreamChanged = changedNames([oldBase, base])
-  const modified = changedNames(['--diff-filter=M', tip, 'HEAD'])
-  // A failed diff has to read as a failed check: an empty result set looks exactly like "nothing
-  // modified here", which is the clean answer this scan must not invent.
-  if (upstreamChanged === null || modified === null) {
-    const range =
-      upstreamChanged === null
-        ? `${oldBase.slice(0, 10)}..${base.slice(0, 10)}`
-        : `${tip.slice(0, 10)}..HEAD`
+  // Renames off on both sides, deliberately: git pairs a deletion with a similar addition and reports
+  // the pair as `R`, which drops the deleted path from the set this classifier reads. Two paths were
+  // lost that way — `filesystem-text-search-handler.ts` from our side, and
+  // `terminal-file-link-detection-ranges.ts` from upstream's, which then read as a fork-only deletion
+  // with a lost export when upstream had simply renamed the file.
+  const upstreamChanged = changedNames(['--no-renames', oldBase, base])
+  // Renames off here too: see the note above.
+  const deleted = changedNames(['--no-renames', '--diff-filter=D', tip, 'HEAD'])
+  if (upstreamChanged === null || deleted === null) {
     return {
       status: STATUS.failed,
-      summary: `git diff --name-only failed for ${range}`,
-      details: ['the modified/upstream-touched sets are unknown, so the scan cannot report clean']
+      summary: `git diff --name-only failed for ${tip.slice(0, 10)}..HEAD`,
+      details: [
+        'the deleted and upstream-touched sets are unknown, so the scan cannot report clean'
+      ]
     }
   }
   const upstreamFiles = new Set(upstreamChanged)
-  const redFlags = []
   const forkOnly = []
-  for (const file of modified.filter((name) => !upstreamFiles.has(name))) {
-    // The pinned base resolves, so a cat-file miss means the path is absent there (fork-only
-    // by construction), not that the probe failed.
+  const upstreamDeleted = []
+  const stillUpstream = []
+  for (const file of deleted) {
     if (git(['cat-file', '-e', `${base}:${file}`]).ok) {
-      redFlags.push(file)
+      stillUpstream.push(file)
+    } else if (upstreamFiles.has(file)) {
+      upstreamDeleted.push(file)
     } else {
       forkOnly.push(file)
     }
   }
-  return {
-    // A review pointer, not a verdict. The runbook calls a modified file upstream never touched a
-    // "red flag", and it is one — the merge's own resolutions legitimately touch such files (a
-    // barrel re-point after an extraction, for instance), so failing here would make this gate
-    // permanently red and therefore ignored. Deletions, which can be proven unreferenced, still
-    // fail; this lists what a reviewer should look at.
-    status: STATUS.info,
-    summary:
-      redFlags.length === 0
-        ? `red-flag scan clear (modified files only); ${forkOnly.length} fork-only file(s) listed below`
-        : `${redFlags.length} modified file(s) upstream never touched in this range — review them, not proven lost`,
-    details: [
-      `pre-sync tip: ${tip.slice(0, 10)} from ${source}`,
-      `pinned upstream base: ${base.slice(0, 10)} from ${pinned.source}`,
-      `old base (merge-base of that tip and the pinned base): ${oldBase.slice(0, 10)}`,
-      `${modified.length} file(s) modified here, ${upstreamFiles.size} file(s) upstream touched`,
-      `red flags (the pinned base knows the path but upstream did not touch it in this range): ${redFlags.length}`,
-      ...(redFlags.length === 0 ? [] : redFlags.slice(0, 30).map((file) => `  ! ${file}`)),
-      `fork-only by construction (path absent at the pinned base), expected here: ${forkOnly.length}`,
-      ...forkOnly.slice(0, 30).map((file) => `  - ${file}`)
-    ]
-  }
-}
-// ---- cited guards ----------------------------------------------------------------------------
-
-/**
- * Every test path and package script LOCAL-PATCHES.md cites, resolved against the tree.
- *
- * The ledger is the only record of why each fork patch exists, and its citations are how a reader
- * checks one. Nothing read them, so the 2026-11-08 sync moved 14 cited tests into upstream's
- * owner-scoped directories, retired 16 more, and dropped the `rebuild:mac:relaunch-installed` script
- * without anything going red. This is the row that reads them.
- */
-export function citedGuards() {
-  const file = path.join(repoRoot(), 'LOCAL-PATCHES.md')
-  let markdown = null
-  try {
-    markdown = readFileSync(file, 'utf8')
-  } catch {
-    return {
-      status: STATUS.failed,
-      summary: 'LOCAL-PATCHES.md could not be read',
-      details: [file]
-    }
-  }
-  const tracked = gitText(['ls-files', '-z'])
-  if (tracked === null) {
-    return {
-      status: STATUS.failed,
-      summary: 'git ls-files failed, so no citation can be resolved',
-      details: []
-    }
-  }
-  let scripts = null
-  try {
-    scripts = JSON.parse(readFileSync(path.join(repoRoot(), 'package.json'), 'utf8')).scripts
-  } catch {
-    return {
-      status: STATUS.failed,
-      summary: 'package.json could not be read, so no script citation can be resolved',
-      details: []
-    }
-  }
-  const cited = extractCitedGuards(markdown)
-  const result = missingCitedGuards({
-    cited,
-    tracked: splitNul(tracked),
-    scripts: scripts ?? {}
-  })
   const details = [
-    `${result.checkedPaths} cited test path(s) and ${result.checkedScripts} cited script(s) resolved`,
-    ...result.missingPaths.map((file) => `  ! ${file} — cited, but no tracked file matches`),
-    ...result.missingScripts.map(
-      (name) => `  ! ${name} — cited, but package.json has no such script`
-    )
+    `pre-sync tip: ${tip.slice(0, 10)} from ${source}`,
+    `deleted between that tip and HEAD, with renames off: ${deleted.length} path(s)`,
+    `upstream deleted it too (upstream touched the path in this range and it is gone at the pinned base): ${upstreamDeleted.length}`,
+    ...upstreamDeleted.slice(0, 30).map((file) => `  - ${file}`),
+    ...(stillUpstream.length === 0
+      ? []
+      : [
+          `still at the pinned base, so the deletion is ours alone: ${stillUpstream.length}`,
+          ...stillUpstream.slice(0, 30).map((file) => `  - ${file}`)
+        ]),
+    `fork-only by construction (absent at the pinned base, untouched upstream in this range): ${forkOnly.length}`,
+    ...forkOnly.slice(0, 30).map((file) => `  - ${file}`)
   ]
-  const missing = result.missingPaths.length + result.missingScripts.length
-  return {
-    status: missing === 0 ? STATUS.passed : STATUS.failed,
-    summary:
-      missing === 0
-        ? `every guard LOCAL-PATCHES.md cites still exists (${result.checkedPaths} path(s), ${result.checkedScripts} script(s))`
-        : `${missing} guard(s) LOCAL-PATCHES.md cites no longer exist`,
-    details
+  const scanFailures = []
+  const unreferenced = []
+  const acknowledgedUnreferenced = []
+  const expectations = readExpectedDeletions(base)
+  if (expectations.failure !== null) {
+    scanFailures.push(expectations.failure)
   }
-}
-
-// ---- locale tombstones -----------------------------------------------------------------------
-
-/**
- * `src/renderer/src/i18n/locales/` must be upstream's, byte-for-byte.
- *
- * LOCAL-PATCHES.md § local(i18n) says so and nothing enforced it, so the 2026-11-08 sync deleted
- * three keys from all 11 catalogs — the twelve highest-churn paths in the tree — which is 11 files
- * that will conflict again on the next sync for no reason at all. The fork's own strings and its
- * orphan tombstones live in `i18n/fork/*.json`.
- */
-export function localeDrift() {
-  const base = gitText(['merge-base', 'HEAD', UPSTREAM_REF])
-  if (!base) {
-    return {
-      status: STATUS.unavailable,
-      summary: `${UPSTREAM_REF} is not fetched, so the locale ruler cannot be placed`,
-      details: ['run: git fetch upstream']
+  const acknowledgedPaths = Object.keys(expectations.acknowledged)
+  // Why presence rather than this sync's deleted set: the manifest settles deletions from every past
+  // sync, so asking which of them this one range deleted reads all 22 settled entries as stale on
+  // every run. A deletion that is *back* is the thing worth reporting.
+  const staleAcknowledgements = acknowledgedPaths.filter((file) =>
+    existsSync(path.join(repoRoot(), file))
+  )
+  const modules = forkOnly.filter(isDeletedCodeModule)
+  for (const file of modules) {
+    const content = gitText(['show', `${tip}:${file}`])
+    if (content === null) {
+      // The tip resolves and it is the tip's own HEAD-side path, so a `git show` miss is the probe
+      // failing, not an empty module.
+      scanFailures.push(`${file}: git show ${tip.slice(0, 10)}:${file} failed`)
+      continue
+    }
+    const exported = exportInventory(content)
+    if (exported.length === 0) {
+      details.push(`  ${file} — no exported name to cross-check`)
+      continue
+    }
+    details.push(`  ${file} — exported surface at ${tip.slice(0, 10)}:`)
+    for (const { name, kind, anonymous } of exported) {
+      if (anonymous) {
+        details.push(`      default (anonymous, ${kind}) — no name to search for`)
+        continue
+      }
+      // `local/sync/` is excluded because this tool and the ledger name these modules by
+      // construction; counting that as a caller would manufacture the clean answer.
+      const result = git(['grep', '-l', '-F', '-e', name, 'HEAD', '--', ':!local/sync'])
+      if (!result.ok && result.code !== 1) {
+        scanFailures.push(
+          `${file}: git grep for ${name} exited ${result.code ?? 'without running'} — ${tailText(result.stderr, 2).join(' ')}`
+        )
+        continue
+      }
+      const hits = result.ok
+        ? result.stdout
+            .split('\n')
+            .filter(Boolean)
+            .map((line) => line.replace(/^HEAD:/, ''))
+        : []
+      if (hits.length === 0) {
+        const ack = expectations.acknowledged[file]
+        if (ack) {
+          acknowledgedUnreferenced.push(`${file}: ${name}`)
+          details.push(
+            `      ~ ${name} (${kind}) — no reference left, acknowledged: ${ack.reason || 'no reason recorded'}`
+          )
+        } else {
+          unreferenced.push(`${file}: ${name}`)
+          details.push(
+            `      ! ${name} (${kind}) — no reference in the live tree: its caller left with it`
+          )
+        }
+      } else {
+        details.push(
+          `      ${name} (${kind}) — ${hits.length} reference(s): ${hits.slice(0, 3).join(', ')}`
+        )
+      }
     }
   }
-  const changed = changedNames([base, 'HEAD', '--', LOCALES_DIR])
-  if (changed === null) {
-    return {
-      status: STATUS.failed,
-      summary: `git diff ${base.slice(0, 10)}..HEAD failed for ${LOCALES_DIR}/`,
-      details: ['an unreadable diff is not an empty one']
+  if (staleAcknowledgements.length > 0) {
+    details.push(
+      `acknowledged deletions that are present again (stale entries in local/sync/expected-deletions.json): ${staleAcknowledgements.length}`
+    )
+    for (const file of staleAcknowledgements) {
+      details.push(`  ? ${file}`)
     }
   }
-  const report = localeDriftReport({ base, changed })
-  return {
-    status: report.clean ? STATUS.passed : STATUS.failed,
-    summary: report.detail,
-    details: [
-      ...report.files.map((file) => `  ! ${file}`),
-      ...(report.clean
-        ? []
-        : [
-            'restore the file to upstream and tombstone the key in src/renderer/src/i18n/fork/<lang>.json:',
-            '  git checkout <upstream-base> -- src/renderer/src/i18n/locales/'
-          ])
-    ]
+  for (const file of expectations.prunable) {
+    details.push(`  ? ${file} — in the manifest, but neither side has it any more: prune the entry`)
   }
-}
-
-// ---- fork-modified tests upstream deleted ----------------------------------------------------
-
-/**
- * Fork-modified test files that are gone at HEAD after the sync.
- *
- * Invisible to every other row: `deletedForkModules` skips tests on purpose, and `lostContent` only
- * sees files still modified at HEAD. The gate is a baseline bound to this sync's range, so the next
- * sync reports its own set instead of inheriting this one's.
- */
-export function upstreamDeletedForkTests(tip, source, problem = null) {
-  if (problem !== null) {
-    return foreignTipFailure(
-      problem,
-      'the scan would read the wrong range and report clean, so it refuses instead'
+  if (acknowledgedUnreferenced.length > 0) {
+    details.push(
+      `acknowledged as superseded, so not counted against the scan: ${acknowledgedUnreferenced.length}`
     )
   }
-  if (!tip) {
-    return {
-      status: STATUS.unavailable,
-      summary: `no pre-sync tip: ${BACKUP_REF} is absent and no state file names one`,
-      details: []
-    }
-  }
-  const pinned = pinnedUpstreamBase(tip, source)
-  if (pinned.base === null) {
+  details.push(
+    `scanned ${modules.length} deleted fork-only code module(s) for names the live tree no longer references`
+  )
+  details.push(
+    'this is a scan of deleted paths and export names, not proof that no behaviour was lost'
+  )
+  if (scanFailures.length > 0) {
     return {
       status: STATUS.failed,
-      summary: `cannot pin the upstream base: ${pinned.problem}`,
-      details: ['without it the set is unmeasurable, which is not the same as empty']
+      summary: `the exported surface could not be read for ${scanFailures.length} deleted path(s)`,
+      details: [...scanFailures.map((line) => `  ! ${line}`), ...details]
     }
   }
-  const oldBase = gitText(['merge-base', tip, pinned.base])
-  if (!oldBase) {
-    return {
-      status: STATUS.failed,
-      summary: `no merge base between ${tip.slice(0, 10)} and the pinned base ${pinned.base.slice(0, 10)}`,
-      details: []
-    }
-  }
-  // `M` only, renames off: a file the fork added cannot have been retired by upstream, and a rename
-  // pair drops the old path from the set this classifier reads.
-  const changed = changedNames(['--no-renames', '--diff-filter=M', oldBase, tip])
-  const listing = gitText(['ls-tree', '-r', '--name-only', '-z', 'HEAD'])
-  if (changed === null || listing === null) {
-    return {
-      status: STATUS.failed,
-      summary: `git could not read ${oldBase.slice(0, 10)}..${tip.slice(0, 10)} or the HEAD tree`,
-      details: []
-    }
-  }
-  const { modified, gone } = forkModifiedTests({
-    changed,
-    presentAtHead: new Set(splitNul(listing))
-  })
-  const { baseline, problem: baselineProblem } = readDeletedForkTestsBaseline(repoRoot())
-  if (baseline === null) {
-    return {
-      status: STATUS.failed,
-      summary: `the deleted-test baseline cannot be read: ${baselineProblem}`,
-      details: [
-        'an unreadable baseline is not "nothing was lost"; regenerate it with',
-        '  node local/sync/lib/deleted-fork-tests.mjs --baseline-init --accept "<why>"'
-      ]
-    }
-  }
-  const comparison = compareDeletedForkTests({
-    baseline,
-    gone,
-    range: { base: pinned.base, tip }
-  })
   return {
-    status: comparison.clean ? STATUS.passed : STATUS.failed,
-    summary: comparison.clean
-      ? `${gone.length} fork-modified test file(s) gone at HEAD, all recorded for this range`
-      : `${comparison.appeared.length} fork-modified test file(s) gone at HEAD and not recorded`,
-    details: [
-      `${modified.length} test file(s) the fork modified between ${oldBase.slice(0, 10)} and the pre-sync tip`,
-      ...describeDeletedForkTests(comparison, { total: gone.length })
-    ]
+    status: unreferenced.length === 0 ? STATUS.passed : STATUS.failed,
+    summary:
+      unreferenced.length === 0
+        ? `clear scan: no unreviewed unreferenced export among ${modules.length} deleted fork-only module(s)`
+        : `${unreferenced.length} export(s) of deleted fork-only module(s) have no surviving reference`,
+    details:
+      unreferenced.length === 0
+        ? details
+        : [...unreferenced.map((line) => `  ! ${line}`), ...details]
   }
 }

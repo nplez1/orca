@@ -15,7 +15,12 @@
 // `orca://`, and guessing at them would make the row noise. A bare `pnpm test` is not checked either,
 // because `install`, `exec` and the rest are pnpm's own verbs rather than the repo's.
 //
-// Pure: markdown, the tracked file list and the package scripts in, findings out.
+// The pure part is `extractCitedGuards` + `missingCitedGuards`; `citedGuards()` is the post-sync row, which
+// reads the ledger, the tracked file list and `package.json`.
+
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { STATUS, gitText, repoRoot, splitNul } from './run.mjs'
 
 const TEST_PATH =
   /^(?:src|config|tests|mobile|native|resources|local|docs|scripts|\.github)\/[\w./*+@-]+\.(?:test|spec)\.[cm]?[jt]sx?$/
@@ -33,7 +38,7 @@ function globToRegExp(pattern) {
   return new RegExp(`^${body}$`)
 }
 
-export function citedGuards(markdown) {
+export function extractCitedGuards(markdown) {
   const paths = new Set()
   const scripts = new Set()
   for (const match of markdown.matchAll(/`([^`\n]+)`/g)) {
@@ -81,5 +86,69 @@ export function missingCitedGuards({ cited, tracked, scripts }) {
     missingScripts,
     checkedPaths: cited.paths.length,
     checkedScripts: cited.scripts.length
+  }
+}
+
+// ---- cited guards ----------------------------------------------------------------------------
+
+/**
+ * Every test path and package script LOCAL-PATCHES.md cites, resolved against the tree.
+ *
+ * The ledger is the only record of why each fork patch exists, and its citations are how a reader
+ * checks one. Nothing read them, so the 2026-11-08 sync moved 14 cited tests into upstream's
+ * owner-scoped directories, retired 16 more, and dropped the `rebuild:mac:relaunch-installed` script
+ * without anything going red. This is the row that reads them.
+ */
+export function citedGuards() {
+  const file = path.join(repoRoot(), 'LOCAL-PATCHES.md')
+  let markdown = null
+  try {
+    markdown = readFileSync(file, 'utf8')
+  } catch {
+    return {
+      status: STATUS.failed,
+      summary: 'LOCAL-PATCHES.md could not be read',
+      details: [file]
+    }
+  }
+  const tracked = gitText(['ls-files', '-z'])
+  if (tracked === null) {
+    return {
+      status: STATUS.failed,
+      summary: 'git ls-files failed, so no citation can be resolved',
+      details: []
+    }
+  }
+  let scripts = null
+  try {
+    scripts = JSON.parse(readFileSync(path.join(repoRoot(), 'package.json'), 'utf8')).scripts
+  } catch {
+    return {
+      status: STATUS.failed,
+      summary: 'package.json could not be read, so no script citation can be resolved',
+      details: []
+    }
+  }
+  const cited = extractCitedGuards(markdown)
+  const result = missingCitedGuards({
+    cited,
+    tracked: splitNul(tracked),
+    scripts: scripts ?? {}
+  })
+  const details = [
+    `${result.checkedPaths} cited test path(s) and ${result.checkedScripts} cited script(s) resolved`,
+    ...result.missingPaths.map((file) => `  ! ${file} — cited, but no tracked file matches`),
+    ...result.missingScripts.map(
+      (name) => `  ! ${name} — cited, but package.json has no such script`
+    )
+  ]
+  const missing = result.missingPaths.length + result.missingScripts.length
+  return {
+    status: missing === 0 ? STATUS.passed : STATUS.failed,
+    summary:
+      missing === 0
+        ? `every guard LOCAL-PATCHES.md cites still exists (${result.checkedPaths} path(s), ${result.checkedScripts} script(s))`
+        : `${missing} guard(s) LOCAL-PATCHES.md cites no longer exist`,
+    details
   }
 }

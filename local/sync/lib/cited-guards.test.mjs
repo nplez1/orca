@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { citedGuards, missingCitedGuards } from './cited-guards.mjs'
+import { extractCitedGuards, missingCitedGuards } from './cited-guards.mjs'
 
 const tracked = [
   'src/main/thing.test.ts',
@@ -15,7 +15,8 @@ const tracked = [
   'src/shared/plain.ts'
 ]
 const scripts = { lint: 'x', 'check:code-quality:changed': 'y' }
-const resolve = (markdown) => missingCitedGuards({ cited: citedGuards(markdown), tracked, scripts })
+const resolve = (markdown) =>
+  missingCitedGuards({ cited: extractCitedGuards(markdown), tracked, scripts })
 
 test('a cited test path that no tracked file matches fails, and is named', () => {
   const result = resolve('See `src/main/gone.test.ts` for the guard.')

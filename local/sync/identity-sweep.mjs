@@ -436,12 +436,17 @@ function baselineCommand({ init, reportOnly, accept }) {
   const { baseline: previous, problem } = readIdentityBaseline(REPO_ROOT)
   if (init) {
     const next = buildBaseline(reportOnly, { base: mergeBase(), accepted: accept, note: '' })
-    const grew = previous !== null && next.total > previous.total
+    // Growth is judged per pair as well as in total: a total that fell while a new file appeared is
+    // still a new finding, and recording it silently is what this ratchet exists to prevent.
+    const appeared =
+      previous === null ? [] : compareIdentityBaseline({ baseline: previous, reportOnly }).appeared
+    const grew = previous !== null && (next.total > previous.total || appeared.length > 0)
     if (grew && !accept) {
       process.stderr.write(
-        `identity-sweep: the baseline may only shrink — this scan has ${next.total} report-only ` +
-          `finding(s) against a recorded ${previous.total}. Pass --accept <reason> when the growth ` +
-          'is not this branch\u2019s to fix.\n'
+        `identity-sweep: refusing to record new findings — this scan has ${appeared.length} ` +
+          `rule/file pair(s) the baseline has never seen (${next.total} finding(s) against a ` +
+          `recorded ${previous.total}). Pass --accept <reason> when the growth is not this ` +
+          'branch\u2019s to fix.\n'
       )
       return 1
     }

@@ -16,19 +16,19 @@ import {
 } from './checks.mjs'
 import { danglingForkReferences } from './dangling-references.mjs'
 import { forkSymbolSurvival } from './fork-symbol-check.mjs'
-import { deletedForkModules } from './deleted-fork-modules.mjs'
+import { citedGuards } from './cited-guards.mjs'
+import { upstreamDeletedForkTests } from './deleted-fork-tests.mjs'
+import { localeDrift } from './locale-drift.mjs'
 import {
   FORK_SLUG,
   builderConfig,
-  citedGuards,
+  deletedForkModules,
   identitySweep,
-  localeDrift,
   localizationVerifiers,
   lostContent,
   unreferencedForkModules,
-  upstreamDeletedForkTests
+  updaterFeed
 } from './post-sync-checks.mjs'
-import { updaterFeed } from './updater-feed.mjs'
 
 /** The ids, in report order. Exported so `--waive` can be validated before any check runs. */
 export function postSyncRowIds({ options } = {}) {
