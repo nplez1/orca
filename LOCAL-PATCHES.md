@@ -95,9 +95,12 @@ stops anyone choosing it in the first place. `hasDedicatedReleaseRepo` still rep
 channels as such, because it feeds the updater's _reporting_ path — a legacy value that resolves to
 this fork is cosmetically described as a dev build, which is harmless and unreachable from the UI.
 
-Tests that pin the re-pointed URLs and the single-stream mapping: `src/main/updater-release-builds.test.ts`,
-`src/main/updater.check-preflight.test.ts`, and `src/main/updater.prerelease-fallback.test.ts`. They
-assert this fork's repo path, so a sync that restores upstream's expectations turns them red again.
+Tests that pin the re-pointed URLs and the single-stream mapping:
+`src/main/updater/updater.check-preflight.test.ts`, `src/main/updater/updater.prerelease-fallback.test.ts` and
+`src/main/updater-stable-feed-fallback.test.ts`. They assert this fork's repo path, so a sync that
+restores upstream's expectations turns them red again. `updater-release-builds` lost its test when the
+module moved into `updater/releases/` in the 2026-11-08 sync, so it is covered only through the three
+above.
 
 **The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
 `ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that
@@ -164,13 +167,14 @@ Anchors:
 - `probeCandidates` still widens to every newer candidate. It is no longer load-bearing against the
   atom noise — the release list has none — but it costs one round trip and stays true for the fallback
   feed, where the mirrored tags are.
-- `src/main/updater-prerelease-feed.test.ts` — `finds this repo's own release when mirrored tags have
+- `src/main/updater/releases/updater-prerelease-feed.test.ts` — `finds this repo's own release when mirrored tags have
   crowded out the atom feed` (this incident), `takes its candidate tags from the release list`, the
   draft/asset-less case, and both fallback cases.
-- `src/main/updater-latest-stable-feed.test.ts` — `accepts the fork's own -np. release line`.
-- `src/main/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case, which now
+- `src/main/updater-stable-feed-fallback.test.ts` — `accepts the fork's own -np. release line, which
+  releases/latest resolves to`.
+- `src/main/updater/releases/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case, which now
   exercises the atom fallback.
-- `src/main/updater.publishing-window-feed.test.ts` — the last-good pin reaching `available`.
+- `src/main/updater/updater.publishing-window-feed.test.ts` — the last-good pin reaching `available`.
 - `src/main/updater-release-targets.ts` and `src/main/updater-release-readiness.ts` — the URL and
   probe halves, split out of the resolver so it stays inside the 300-line module limit. A sync that
   restores the single file has to take these two with it.
@@ -244,7 +248,7 @@ imports `locales/*.json` directly, so a fork string used by a menu, tray or dial
 back to English. Nothing is lost today — every non-null overlay entry is renderer-only — but a fork
 string that needs main-process copy belongs in `src/main`'s own catalog, not in the overlay.
 
-Tests that pin the mechanism: `config/scripts/fork-english-catalog.test.mjs`,
+Tests that pin the mechanism: `config/scripts/localization/catalog-validation/fork-english-catalog.test.mjs`,
 `src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the overlay-fetch-failure path),
 `tests/tools/i18n-catalog-overlay-parity.test.mjs`.
 
@@ -808,8 +812,9 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   `resolution.workingMode`, so a grok background shell reads plain `working`. Grok has no cron concept,
   so it never earns the badge.
 - Tests that encode the policy (all would need re-adapting if it is ever dropped):
-  `src/shared/claude-background-task-status.test.ts`, `src/shared/main-agent-status-parity.test.ts`
-  (the Claude and Grok lane helpers plus the six shell/watcher stories),
+  `src/shared/claude-background-task-status.test.ts` (the Claude and Grok lane helpers plus the six
+  shell/watcher stories; the `main-agent-status-parity` companion suite was retired in the 2026-11-08
+  sync),
   `src/main/agent-hooks/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
   `server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`, plus the four
   upstream helper-settlement suites that assert the badge directly
@@ -970,16 +975,20 @@ manifest fails there.
 
 `ORCA_SKILLS_REPOSITORY_URL` is pinned by `tests/tools/fork-invariants.test.mjs`, which asserts the
 install rail's tree URL names `nplez1/orca` at the build commit. Seven paths this section used to cite
-no longer exist: `src/shared/agent-feature-install-commands.test.ts` and
-`src/shared/skill-freshness.test.ts` were retired on 2026-10-27 — and the `isOrcaSkillLockSource`
-predicate they covered is gone; see the lock paragraph above — and
-`src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts`,
-`src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts`, `src/main/pty/wsl-orca-env.test.ts`,
-`src/main/skills/skill-lock-sources.test.ts` and `src/main/skills/skill-update-run.test.ts` were
-deleted upstream (bulk test removals, fork issue #312). The pane `BROWSER` is the one of those the
+no longer exist — src/shared/agent-feature-install-commands.test.ts and
+src/shared/skill-freshness.test.ts were retired on 2026-10-27 (and the `isOrcaSkillLockSource`
+predicate they covered is gone; see the lock paragraph above), and
+src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts,
+src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts, src/main/pty/wsl-orca-env.test.ts,
+src/main/skills/skill-lock-sources.test.ts and src/main/skills/skill-update-run.test.ts were deleted
+upstream (bulk test removals, fork issue #312). The pane `BROWSER` is the one of those the
 fork-invariants test now owns; nothing replaced the rest, so this section is the whole of what a sync
 can turn red on skill names. `src/cli/skills.test.ts` covers the CLI's skill listing, not the install
 rail.
+
+**A path here is in backticks only while it must exist.** `local/sync/lib/cited-guards.mjs` resolves
+every backticked test path and package script in this file, and post-sync's `cited-guards` row fails on
+one that does not — so a retired path is written plain, as history.
 
 Not covered, deliberately: `~/.agents/.skill-lock.json` on an existing machine still records
 `stablyai/orca` until the next update rewrites it, and `src/renderer/src/i18n/locales/*.json` keep a
@@ -1122,7 +1131,7 @@ cause — a suppressed red is also an unexamined one, which is what this sweep c
   a commit that fixed anything — there is no such commit, and the entry had no `LOCAL-PATCHES.md`
   evidence line at all, which is how it survived.
 - **`mobile-font-repaint` (1) — closed as a premise guard, and the entry's "real render finding"
-  claim was wrong.** `config/scripts/mobile-web-app/mobile-web-app-terminal-font-render.test.mjs`
+  claim was wrong.** `config/scripts/mobile-web-app/terminal/mobile-web-app-terminal-font-render.test.mjs`
   asserts that a stalled web font leaves tofu on screen and that the glyph repaints when the font
   arrives. This host has `~/Library/Fonts/NerdFonts/Symbols/SymbolsNerdFontMono-Regular.ttf`
   installed, and the terminal stack names that same family
@@ -1186,7 +1195,7 @@ The five below are the same class and were classified here rather than chased, e
 signature that identifies it. None imports a module this fork changed.
 
 - `src/main/cli/packaged-cli-assets.test.ts`, `src/main/orcad/orcad-forked-child-paths.test.ts`,
-  `config/scripts/macos-terminal-host-bundle.test.mjs` — `os.tmpdir()` resolves to `/var/folders/…`
+  `config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs` — `os.tmpdir()` resolves to `/var/folders/…`
   while the code under test reports the resolved `/private/var/folders/…`.
 - `src/main/cli/cli-command-privileged-transaction.test.ts` — "Refusing to replace non-Orca command
   at /var/folders/…/protected/orca". **Re-diagnosed and repaired in `local(test)` below, fork issue
@@ -1204,7 +1213,7 @@ signature that identifies it. None imports a module this fork changed.
   explicit `undefined` as NULL, so the contract it asserted no longer existed. Neither was something
   "the bundled SQLite" did to this fork alone, and that is what made the first one dangerous: a dead
   entry can never be reported stale.
-- `src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
+- `src/main/daemon/shell-readiness/testing/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
   output", the PTY/subprocess class recorded above.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
   — a git checkout of a baseline ref — when the machine is loaded. They pass on a quiet machine.
@@ -1219,7 +1228,7 @@ self-contained set — the case now pins `agent: 'pi'`), `agent-session-failure-
 (a fork-only terminal-wait file read `pty.paneKey` directly and now goes through `paneOfPty`).
 Fourteen were already recorded. The last two are the same host-toolchain class as their neighbours:
 
-- `config/scripts/dependency-security-release.test.mjs` — the audit action's bash step uses
+- `config/scripts/dependency-security/audit-tools/dependency-security-release.test.mjs` — the audit action's bash step uses
   `mapfile`, and this machine's bash is Apple's 3.2 (`bash: mapfile: command not found`). Same
   signature as `ci-managed-ssh-execution.test.mjs`, which is already recorded.
 - `tests/e2e/cross-version-wire/host-model-catalog-released-phone.unit.test.ts` — both cases call
@@ -1297,7 +1306,7 @@ answer, so every transitive importer of the mocked module gets the registry's re
 `undefined`; the session-scanner case passes and was never listed. The merge's own full run
 (@`51f09025ca`) passed 134,537 cases with 35 allowlisted failures and **one** unexpected one, that
 mock. Eight entries whose failures stopped reproducing were pruned, and
-`config/scripts/ci-managed-ssh-execution.test.mjs` was added: the workflow step its cases execute calls
+`config/scripts/ci/workflow-contracts/ci-managed-ssh-execution.test.mjs` was added: the workflow step its cases execute calls
 `mapfile`, which macOS's `/bin/bash` 3.2 does not have (the ubuntu runners ship bash 5) — the same
 `host-toolchain` class as the `pr-auxiliary-preflight-admission` entries.
 
@@ -1986,9 +1995,9 @@ Converged on the fork's shape, as one collector on all three surfaces:
 stay in the catalogue rather than being deleted, because removing a key churns all 20 locales and the
 regenerated catalogues are a sync-owned artifact.
 
-Tests that pin the new behaviour: `src/shared/jira-transition-fields.test.ts` (a filled field is not
-asked, resolution/comment still are), `src/main/jira/jira-transition-required-fields.test.ts` (the
-value read and its failure path), `task-page-jira-board-view.test.tsx` / `jira-issue-transition-control.test.tsx`
+Tests that pin the new behaviour: `src/shared/jira/jira-transition-fields.test.ts` (a filled field is not
+asked, resolution/comment still are), `src/renderer/src/components/task-page/jira/task-page-jira-board-transitions.test.ts`
+(the value read and its failure path), `task-page-jira-board-view.test.tsx` / `jira-issue-transition-control.test.tsx`
 (the filled-field move, the collected custom field, and the field-level rejection) and
 `task-page/jira/Board.test.tsx` (the shared form's submit label). A sync that restores upstream's
 `unsupported` kind turns all of them red.
@@ -2053,8 +2062,8 @@ failing test is not named, and the file's remaining tests vanish from the counts
 `Test Files N passed (N+1)`). A _synchronous_ assertion failure in the same file reports normally, which
 is what makes it look like a flake.
 
-Reproduced 2026-10-22 against `src/renderer/src/components/JiraIssueWorkspace.transition-source.test.tsx`
-by appending a deliberate `findByPlaceholderText` timeout: in the bun pool → EISDIR, no test named; the
+Reproduced 2026-10-22 against src/renderer/src/components/JiraIssueWorkspace.transition-source.test.tsx
+(since retired) by appending a deliberate `findByPlaceholderText` timeout: in the bun pool → EISDIR, no test named; the
 same file under the node runtime → `× scratch: deliberate timeout reports itself`, failing test named.
 Minimal files with the same failing query reported fine in bun, so the trigger is the file, not the
 query.
@@ -2133,10 +2142,11 @@ Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted
 
 **Reversed 2026-10-27, with the measurement that reversed it.** This section used to record the cap as
 `"off"` in the four overrides that carried 300/400/600/800. That worked and cost more than it saved:
-with the rule off, two of upstream's own coverage tests in
-`config/scripts/check-max-lines-ratchet.test.mjs` fail (they assert the installed oxlint still flags an
-over-budget file), and the ratchet script — whose whole job is to freeze who may bypass the rule —
-becomes inert. So the fork was paying four changed lines in a file upstream owns _and_ a red gate, to
+with the rule off, two of upstream's own coverage tests fail (they assert the installed oxlint still
+flags an over-budget file), and the ratchet script — whose whole job is to freeze who may bypass the
+rule — becomes inert. Those two tests were retired with the script's move to
+`config/scripts/static-analysis/ratchets/source-budget/check-max-lines-ratchet.mjs` in the 2026-11-08
+sync, so nothing pins the rule today. So the fork was paying four changed lines in a file upstream owns _and_ a red gate, to
 avoid an exemption list.
 
 The exemption list turned out to be longer than the first pass measured. With upstream's rule restored,
@@ -2194,8 +2204,8 @@ npx oxlint --config .oxlintrc.maxprobe.json --format json . | node -e '
 rm .oxlintrc.maxprobe.json
 ```
 
-Then `node config/scripts/check-max-lines-ratchet.mjs` (expect `OK — N grandfathered entries`) and
-`pnpm test config/scripts/check-max-lines-ratchet.test.mjs` for upstream's own coverage. A row whose file
+Then `node config/scripts/static-analysis/ratchets/source-budget/check-max-lines-ratchet.mjs` (expect
+`OK — N grandfathered entries`). A row whose file
 the fork later slims back under budget is reported stale by `--prune`, so the list shrinks on its own; it
 should never need to grow without a reviewer saying yes.
 
@@ -2539,7 +2549,7 @@ across five files, each creating a temp dir with `mkdtemp(tmpdir())` and compari
 subject had resolved — the darwin launcher's `cd -P`, orcad's deploy root, a spawned child's reported
 cwd. Each now resolves its temp dir first:
 `orcad-forked-child-paths.test.ts` (4), `cli/packaged-cli-assets.test.ts` (1),
-`config/scripts/verify-cli-bin.test.mjs` (1), `config/scripts/macos-terminal-host-bundle.test.mjs` (1).
+`config/scripts/cli-build/verify-cli-bin.test.mjs` (1), `config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs` (1).
 The `orca-runtime` pair above is the other two.
 
 Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
@@ -3374,8 +3384,10 @@ Pinning the status quo is not approving it, and the table could not tell the dif
   the host, which is the only vantage point that can see an absence of runs as an absence.
 
 **The cron removal broke an upstream test, and the PR gate did not run it.**
-`config/scripts/node-server-native-compat-scope.test.mjs` pinned `workflow.on.schedule` for
-`node-server-tests.yml` at one entry; deleting the cron made that `Target cannot be null or undefined`.
+A test in what is now `config/scripts/node-server/qualification/node-server-change-scope.mjs` pinned
+`workflow.on.schedule` for `node-server-tests.yml` at one entry; deleting the cron made that
+`Target cannot be null or undefined`. That assertion went with the 2026-11-08 sync, so nothing pins the
+cron's absence today.
 It reached `nplez1/main` because every path #288 touched — `local/`, `tests/`, `.github/`, `*.md` — is
 in `open-pr.mjs`'s `TARGETED_PATHS`, so gate 1 read "not required" and no suite ran; the first run to
 see it was the 2026-11-08 dispatch, shard 12/12. The assertion now pins the fork's truth

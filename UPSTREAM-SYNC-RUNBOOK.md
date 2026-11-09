@@ -239,10 +239,13 @@ node local/sync/post-sync.mjs
 
 That runs the integration checks in one pass: conflict markers, the fork identity sweep, the
 derived catalogs (regenerate + both localization verifiers), the builder config loading, the five
-update-feed references still naming `nplez1/orca`, the lost-content diff, the exported surface of every
-fork-only module the sync deleted, the names the fork added to a surviving file that the merged file no
-longer declares (the `fork-symbols.mjs` scan, run here as the `fork-symbol-survival` row), fork-added
-references that resolve to nothing at HEAD, and `pnpm tc`.
+anchors that hold the fork's release repo (they must still name `nplez1/orca`, and nothing under
+`src/main/updater/` may name upstream's), the locale catalogs byte-identical to upstream, every test
+path and package script `LOCAL-PATCHES.md` cites still existing, the lost-content diff, the exported
+surface of every fork-only module the sync deleted, the fork-modified test files the sync left gone,
+the names the fork added to a surviving file that the merged file no longer declares (the
+`fork-symbols.mjs` scan, run here as the `fork-symbol-survival` row), fork-added references that
+resolve to nothing at HEAD, and `pnpm tc`.
 
 It also refuses to measure the wrong sync. The pre-sync tip and the recorded new base are checked against
 HEAD — on a merge they have to be its first and second parents — so a state file or backup ref left by an

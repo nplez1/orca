@@ -3,7 +3,9 @@
     "components": {
       "settings": {
         "AccountsPane": {
-          "0c64dc2a64": null
+          "0c64dc2a64": null,
+          "340d6f7a85": null,
+          "remoteScopeAuthContext": null
         },
         "OpenAiTranscriptionKeyDialog": {
           "d246b2bdb3": "Ключи локальной среды выполнения хранятся в ~/.orca-np с использованием зашифрованного хранилища Electron, если оно доступно."
@@ -83,6 +85,11 @@
       },
       "taskPageJiraBoard": {
         "changeStatusFailed": null
+      },
+      "sidebar": {
+        "WorktreeContextMenu": {
+          "editDetails": null
+        }
       }
     },
     "hooks": {

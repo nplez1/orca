@@ -168,6 +168,7 @@
     "rebuild:electron": "node config/scripts/native-build/node-addons/rebuild-native-deps.mjs",
     "reclaim-space": "node config/scripts/worktree-storage/reclaim-worktree-space.mjs",
     "rebuild:node": "node config/scripts/native-build/node-addons/ensure-native-runtime.mjs --runtime=node --force",
+    "rebuild:mac:relaunch-installed": "bash config/scripts/rebuild-and-relaunch-installed-macos-arm64.sh",
     "build:unpack": "pnpm run build && pnpm run ensure:electron-runtime && electron-builder --config config/electron-builder.np.config.cjs --dir",
     "build:win": "pnpm run build:desktop && pnpm run ensure:electron-runtime && electron-builder --config config/electron-builder.np.config.cjs --win",
     "build:icons": "bash resources/icon-source/generate.sh",

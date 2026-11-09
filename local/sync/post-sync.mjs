@@ -57,14 +57,18 @@ function usage() {
 
 Integration checks, each reported separately: no conflict markers (delegating to
 local/sync/conflicts.mjs --verify when present), the derived localization catalog regenerates to
-no diff, both localization verifiers, the fork builder config (${BUILDER_CONFIG})
-still loading, the update feed still naming ${FORK_SLUG}, the fork identity sweep (delegating to
-local/sync/identity-sweep.mjs when present), a red-flag scan of the files modified since the pre-sync
-tip compared against the upstream base pre-sync recorded, an inventory of the exported surface of
-every fork-only module this sync deleted (each name searched for a surviving reference), the names the
-fork added to a surviving file that the merged file no longer declares, fork-added references that
-resolve to nothing at HEAD, the repo-wide lint the changed-lines gate never runs (which is how the
-np.18 merge left six over-cap files for a later PR to inherit), and the merged tip typecheck
+no diff, both localization verifiers, the locale catalogs byte-identical to upstream (the fork's own
+strings and its tombstones live in src/renderer/src/i18n/fork/), the fork builder config
+(${BUILDER_CONFIG}) still loading, the five release-repo anchors still naming ${FORK_SLUG} and nothing
+under src/main/updater/ naming upstream's repo, the fork identity sweep (delegating to
+local/sync/identity-sweep.mjs when present, and gated on its frozen report-only baseline), every test
+path and package script LOCAL-PATCHES.md cites still existing, a red-flag scan of the files modified
+since the pre-sync tip compared against the upstream base pre-sync recorded, an inventory of the
+exported surface of every fork-only module this sync deleted (each name searched for a surviving
+reference), the fork-modified test files this sync left gone (against a baseline bound to this range),
+the names the fork added to a surviving file that the merged file no longer declares, fork-added
+references that resolve to nothing at HEAD, the repo-wide lint the changed-lines gate never runs (which
+is how the np.18 merge left six over-cap files for a later PR to inherit), and the merged tip typecheck
 (${TYPE_CHECK_COMMAND}).
 
 Options:

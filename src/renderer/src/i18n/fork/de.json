@@ -9,7 +9,9 @@
           "d8c988dab4": "~/.orca-np/keybindings.json"
         },
         "AccountsPane": {
-          "0c64dc2a64": null
+          "0c64dc2a64": null,
+          "340d6f7a85": null,
+          "remoteScopeAuthContext": null
         },
         "sshHostServer": {},
         "ExperimentalPane": {
@@ -83,6 +85,11 @@
       },
       "taskPageJiraBoard": {
         "changeStatusFailed": null
+      },
+      "sidebar": {
+        "WorktreeContextMenu": {
+          "editDetails": null
+        }
       }
     },
     "App": {

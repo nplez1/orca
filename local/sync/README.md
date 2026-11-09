@@ -76,12 +76,16 @@ The two mistakes it is designed to prevent, both made for real:
   `Map` entries, a missing comma).
 
 **`post-sync.mjs`** — the integration checks, grouped and machine-checkable: conflict markers, the
-identity sweep, the derived catalogs and both localization verifiers, the builder config, the
-update-feed references, the lost-content diff, the exported surface of every deleted fork-only
-module (each name searched for a surviving reference — a deleted module is invisible to a
-modified-files diff), the fork-added names a merged file no longer declares (`forkSymbolSurvival`, so
-`fork-symbols.mjs` below runs as one row of this command rather than as a step somebody has to remember),
-fork-added module specifiers that resolve to nothing at HEAD, and `pnpm tc`. "Skipped" and "unavailable"
+identity sweep, the derived catalogs and both localization verifiers, the locale catalogs
+(`localeDrift`: upstream owns `i18n/locales/` byte-for-byte, so any diff there is conflict adjacency),
+the builder config, the update-feed anchors and the whole `src/main/updater/` tree, every test path and
+package script `LOCAL-PATCHES.md` cites (`citedGuards`), the lost-content diff, the exported surface of
+every deleted fork-only module (each name searched for a surviving reference — a deleted module is
+invisible to a modified-files diff), the fork-modified test files the sync left gone
+(`upstreamDeletedForkTests`, baselined per sync range), the fork-added names a merged file no longer
+declares (`forkSymbolSurvival`, so `fork-symbols.mjs` below runs as one row of this command rather than
+as a step somebody has to remember), fork-added module specifiers that resolve to nothing at HEAD, and
+`pnpm tc`. "Skipped" and "unavailable"
 are reported as themselves; `unavailable` fails the run unless `--waive <id>:<reason>` records why, and
 the waiver is printed. A clean run deletes the pre-sync state file, and the tip and base every range
 check uses are checked against HEAD's own parents first (`lib/sync-range.mjs`).
@@ -102,7 +106,10 @@ is still the tip, so the default would otherwise compare the tip with itself and
 **`identity-sweep.mjs`** — upstream reintroduces `~/.orca`, `orca.exe` and `orca-dev` every sync.
 This reports them against a documented allowlist (the `orca://` scheme, the relay's fixed shim, the
 legacy daemon exe name) and fixes only the mechanical literal cases. Persisted-path changes are
-report-only until the `~/.orca` migration is designed.
+report-only until the `~/.orca` migration is designed — and `identity-sweep-baseline.json` freezes
+which report-only findings already exist, per rule and per file, so post-sync's row fails on a new one
+instead of passing on `fixable === 0`. `--baseline-init [--accept <reason>]` and `--baseline-prune`
+move it, and the total may only shrink.
 
 **`curate.mjs`** — **retired 2026-10-27.** It planned a curated, linear patch series for the _rebase_
 era: a contiguous partition of the release line where each patch's tree is a real historical tree. It
