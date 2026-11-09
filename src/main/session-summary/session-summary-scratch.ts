@@ -1,27 +1,78 @@
-// Scratch directories the session-summary fold hands to the agent CLI as its working directory.
+// Working directory the session-summary fold hands to the agent CLI.
 //
-// The CLI loads project config (`.claude/settings.json` hooks, `CLAUDE.md`, `AGENTS.md`) from its cwd and
-// runs it as this user, so the cwd must be a directory nobody else can pre-create or plant content in.
-// `mkdtemp` creates it atomically with a random suffix and mode 0700.
-import { mkdtempSync } from 'node:fs'
+// The CLI loads project instructions and config (`.claude/settings.json`, `CLAUDE.md`, `AGENTS.md`) from
+// its cwd and every parent up to the filesystem root, and runs what it finds as this user with the
+// transcript as its prompt. So the cwd must live somewhere no other local user can write — which a
+// shared temp root is not — and must hold nothing a previous call left behind.
+import { chmodSync, lstatSync, mkdirSync, readdirSync } from 'node:fs'
 import { lstat, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { removeTree } from '../../shared/windows-transient-lock-removal'
+import type { Stats } from 'node:fs'
+import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
+import { removeTree, removeTreeSync } from '../../shared/windows-transient-lock-removal'
 
-/** mkdtemp's suffix is exactly six alphanumerics; a planted or foreign name cannot match this. */
-const SCRATCH_DIR_NAME = /^orca-session-summary-[A-Za-z0-9]{6}$/
+export const SESSION_SUMMARY_FOLD_CWD_DIR_NAME = 'session-summary-fold-cwd'
+
+/** `mkdtemp`'s suffix is exactly six alphanumerics; the sweep only ever matches that shape. */
+const TRANSCRIPT_DIR_NAME = /^orca-session-summary-[A-Za-z0-9]{6}$/
 
 /**
- * Longer than any directory we create can live: an agent call is capped at 60 s
- * (`SOURCE_CONTROL_GENERATION_TIMEOUT_MS`) and a remote transcript fetch at 15 min, so an hour
- * cannot reach a fold running in another Orca instance.
+ * Longer than any transcript copy can live: the fetch has a 15-minute ceiling and disposes its copy
+ * right after parsing, so an hour cannot reach a fetch running in another Orca instance.
  */
 export const SESSION_SUMMARY_SCRATCH_MAX_AGE_MS = 60 * 60_000
 
-/** A fresh, private working directory for one agent call. */
-export function createSessionSummaryScratchDir(root: string = tmpdir()): string {
-  return mkdtempSync(join(root, 'orca-session-summary-'))
+/**
+ * The fold's cwd, prepared for one agent call.
+ *
+ * Why one stable path rather than a fresh random one per call: the Claude CLI keys
+ * `~/.claude/projects/<cwd>` by the working directory, so a random cwd per call would leave a
+ * ~150 KB session file behind for every chunk of every fold. The directory is emptied instead, which
+ * is what keeps a previous call's content out of this one.
+ */
+export function prepareSessionSummaryFoldCwd(root: string): string {
+  const dir = join(root, SESSION_SUMMARY_FOLD_CWD_DIR_NAME)
+  ensureOwnedDirectory(dir)
+  for (const entry of readdirSync(dir)) {
+    removeTreeSync(join(dir, entry))
+  }
+  return dir
+}
+
+/** Creates the directory private to this user, replacing anything at that path that is not. */
+function ensureOwnedDirectory(dir: string): void {
+  // mkdir's recursive mode succeeds silently over an existing directory, whoever created it.
+  const existing = lstatIfPresent(dir)
+  if (existing && (!existing.isDirectory() || !isOwnedByCurrentUser(existing))) {
+    removeTreeSync(dir)
+  }
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  const stats = lstatSync(dir)
+  if (!stats.isDirectory() || !isOwnedByCurrentUser(stats)) {
+    throw new Error(`Cannot use ${dir} as the session-summary working directory.`)
+  }
+  // mkdir's mode is masked by the umask, and an existing directory keeps whatever it had.
+  if (process.platform !== 'win32') {
+    chmodSync(dir, 0o700)
+  }
+}
+
+function lstatIfPresent(path: string): Stats | null {
+  try {
+    return lstatSync(path)
+  } catch (error) {
+    if (isDefinitiveAbsence(error)) {
+      return null
+    }
+    throw error
+  }
+}
+
+function isOwnedByCurrentUser(stats: Stats): boolean {
+  const uid = process.getuid?.()
+  // Windows has no uid to compare; its temp and profile directories are already per-user.
+  return uid === undefined || stats.uid === uid
 }
 
 export type SessionSummaryScratchSweepOptions = {
@@ -31,10 +82,10 @@ export type SessionSummaryScratchSweepOptions = {
 }
 
 /**
- * Removes the scratch dirs a crashed process left behind. Returns how many were removed.
+ * Removes the transcript copies a crashed run left in the temp root. Returns how many were removed.
  *
- * Only `lstat`s and only the exact `mkdtemp` name shape: a path another local user could have planted
- * — a symlink, or the legacy fixed `orca-session-summary` — is never followed and never removed.
+ * Only `lstat`s, and only the exact `mkdtemp` name shape: a path another local user could have
+ * planted — a symlink, or the legacy fixed `orca-session-summary` — is never followed or removed.
  */
 export async function sweepStaleSessionSummaryScratchDirs(
   options: SessionSummaryScratchSweepOptions = {}
@@ -51,7 +102,7 @@ export async function sweepStaleSessionSummaryScratchDirs(
   }
   let removed = 0
   for (const entry of entries) {
-    if (!SCRATCH_DIR_NAME.test(entry.name)) {
+    if (!TRANSCRIPT_DIR_NAME.test(entry.name)) {
       continue
     }
     const path = join(root, entry.name)

@@ -12,11 +12,10 @@ import type {
   CommitMessagePlanInput
 } from '../../shared/source-control/ai/generation/commit-message-plan'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
-import { removeTree } from '../../shared/windows-transient-lock-removal'
 import { spawnSourceControlAgent } from '../text-generation/source-control-agent-launch'
 import { killSourceControlAgentProcess } from '../text-generation/source-control-local-process'
 import type { SpawnSourceControlAgent } from '../text-generation/source-control-text-generation-types'
-import { createSessionSummaryScratchDir } from './session-summary-scratch'
+import { prepareSessionSummaryFoldCwd } from './session-summary-scratch'
 import {
   MAX_SOURCE_CONTROL_AGENT_OUTPUT_BYTES,
   SOURCE_CONTROL_GENERATION_TIMEOUT_MS
@@ -27,8 +26,8 @@ export type AgentCliFoldBrainDeps = {
   /** The configured fold agent; null means nothing usable is selected, which fails the
    *  fold rather than substituting an agent the user did not choose. */
   resolveParams: () => ResolvedSourceControlAiGenerationParams | null
-  /** Parent for the per-call scratch cwd; tests point it at their own root. */
-  tmpRoot?: string
+  /** Parent for the fold's working directory: userData, never a shared temp root. */
+  scratchRoot: string
   /** Test seam: the agent CLI spawn, observed to assert the cwd it runs in. */
   spawnAgent?: SpawnSourceControlAgent
 }
@@ -61,16 +60,8 @@ export function createAgentCliSessionFoldBrain(deps: AgentCliFoldBrainDeps): Ses
         throw new Error(planned.error)
       }
       const plan = planned.plan
-      // Why a directory per call: the CLI loads hooks and project instructions from its cwd, so a
-      // fixed path under a shared temp root lets another local user plant them.
-      const cwd = createSessionSummaryScratchDir(deps.tmpRoot)
-      try {
-        return await runAgent({ plan, cwd, signal, spawnAgent: deps.spawnAgent })
-      } finally {
-        await removeTree(cwd).catch((error: unknown) => {
-          console.error('[session-summary] Failed to remove fold scratch dir:', error)
-        })
-      }
+      const cwd = prepareSessionSummaryFoldCwd(deps.scratchRoot)
+      return await runAgent({ plan, cwd, signal, spawnAgent: deps.spawnAgent })
     }
   }
 }

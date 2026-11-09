@@ -54,7 +54,9 @@ export function createSessionSummaryService(
       createAgentCliSessionFoldBrain({
         // Request params are an explicit override; the user's text-generation
         // settings are the normal source.
-        resolveParams: () => params ?? resolveSessionSummaryFoldParams(getSettings())
+        resolveParams: () => params ?? resolveSessionSummaryFoldParams(getSettings()),
+        // Folds carry their context in the prompt; this is only somewhere private to run.
+        scratchRoot: userDataPath
       }),
     hostFold: overrides.hostFold ?? runtimeHostFoldClient(userDataPath),
     // The host fold spawns the agent on that host, so this window's choice travels with it.

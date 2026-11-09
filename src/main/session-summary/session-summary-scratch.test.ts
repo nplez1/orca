@@ -13,7 +13,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  createSessionSummaryScratchDir,
+  prepareSessionSummaryFoldCwd,
+  SESSION_SUMMARY_FOLD_CWD_DIR_NAME,
   SESSION_SUMMARY_SCRATCH_MAX_AGE_MS,
   sweepStaleSessionSummaryScratchDirs
 } from './session-summary-scratch'
@@ -36,26 +37,66 @@ function age(path: string, ageMs: number): void {
   utimesSync(path, when, when)
 }
 
-describe('session-summary scratch directories', () => {
-  it('creates a new directory per call rather than reusing one', () => {
+describe('the fold working directory', () => {
+  it('creates it empty and keeps it at one path', () => {
     const root = scratchRoot()
 
-    const first = createSessionSummaryScratchDir(root)
-    const second = createSessionSummaryScratchDir(root)
+    const first = prepareSessionSummaryFoldCwd(root)
+    writeFileSync(join(first, 'leftover'), 'from a previous call')
+    const second = prepareSessionSummaryFoldCwd(root)
 
-    expect(first).not.toBe(second)
-    expect(statSync(first).isDirectory()).toBe(true)
-    expect(statSync(second).isDirectory()).toBe(true)
-    expect(readdirSync(first)).toEqual([])
+    expect(first).toBe(second)
+    expect(second).toBe(join(root, SESSION_SUMMARY_FOLD_CWD_DIR_NAME))
+    expect(readdirSync(second)).toEqual([])
   })
 
-  it.skipIf(process.platform === 'win32')('creates it private to this user', () => {
-    const dir = createSessionSummaryScratchDir(scratchRoot())
+  it('empties a directory a previous run left content in', () => {
+    const root = scratchRoot()
+    const dir = join(root, SESSION_SUMMARY_FOLD_CWD_DIR_NAME)
+    mkdirSync(join(dir, '.claude'), { recursive: true })
+    writeFileSync(join(dir, 'CLAUDE.md'), 'planted')
+    writeFileSync(join(dir, '.claude', 'settings.json'), '{}')
 
+    prepareSessionSummaryFoldCwd(root)
+
+    expect(readdirSync(dir)).toEqual([])
+  })
+
+  it('replaces a file at that path with a directory', () => {
+    const root = scratchRoot()
+    writeFileSync(join(root, SESSION_SUMMARY_FOLD_CWD_DIR_NAME), 'not a directory')
+
+    const dir = prepareSessionSummaryFoldCwd(root)
+
+    expect(statSync(dir).isDirectory()).toBe(true)
+    expect(readdirSync(dir)).toEqual([])
+  })
+
+  it.skipIf(process.platform === 'win32')('replaces a symlink instead of following it', () => {
+    const root = scratchRoot()
+    const target = join(scratchRoot(), 'planted')
+    mkdirSync(target)
+    writeFileSync(join(target, 'CLAUDE.md'), 'planted')
+    symlinkSync(target, join(root, SESSION_SUMMARY_FOLD_CWD_DIR_NAME))
+
+    const dir = prepareSessionSummaryFoldCwd(root)
+
+    expect(statSync(dir).isDirectory()).toBe(true)
+    expect(readdirSync(dir)).toEqual([])
+    expect(readdirSync(target)).toEqual(['CLAUDE.md'])
+  })
+
+  it.skipIf(process.platform === 'win32')('tightens a directory left with a wider mode', () => {
+    const root = scratchRoot()
+    const dir = join(root, SESSION_SUMMARY_FOLD_CWD_DIR_NAME)
+    mkdirSync(dir, { recursive: true, mode: 0o755 })
+
+    expect(prepareSessionSummaryFoldCwd(root)).toBe(dir)
     expect(statSync(dir).mode & 0o777).toBe(0o700)
-    expect(statSync(dir).uid).toBe(process.getuid?.())
   })
+})
 
+describe('the transcript scratch sweep', () => {
   it('removes only old directories of its own making', async () => {
     const root = scratchRoot()
     const stale = join(root, 'orca-session-summary-abc123')
@@ -85,35 +126,18 @@ describe('session-summary scratch directories', () => {
     }
   })
 
-  it('reaps a directory the real helper created', async () => {
-    const root = scratchRoot()
-    const dir = createSessionSummaryScratchDir(root)
-    age(dir, SESSION_SUMMARY_SCRATCH_MAX_AGE_MS * 2)
-
-    await expect(sweepStaleSessionSummaryScratchDirs({ root })).resolves.toBe(1)
-
-    expect(existsSync(dir)).toBe(false)
-  })
-
   it('removes only directories, never a file wearing the same name', async () => {
     const root = scratchRoot()
-    const foreign = join(root, 'orca-session-summary-abc123')
-    mkdirSync(foreign)
-    writeFileSync(join(foreign, 'CLAUDE.md'), 'planted')
-    age(foreign, SESSION_SUMMARY_SCRATCH_MAX_AGE_MS * 2)
+    const stale = join(root, 'orca-session-summary-abc123')
+    mkdirSync(stale)
+    age(stale, SESSION_SUMMARY_SCRATCH_MAX_AGE_MS * 2)
     const file = join(root, 'orca-session-summary-xyz789')
     writeFileSync(file, 'not a directory')
     age(file, SESSION_SUMMARY_SCRATCH_MAX_AGE_MS * 2)
 
-    const removed = await sweepStaleSessionSummaryScratchDirs({
-      root,
-      now: Date.now(),
-      maxAgeMs: SESSION_SUMMARY_SCRATCH_MAX_AGE_MS
-    })
+    await expect(sweepStaleSessionSummaryScratchDirs({ root })).resolves.toBe(1)
 
-    // Both are old and correctly shaped; only the directory is ours to delete.
-    expect(removed).toBe(1)
-    expect(existsSync(foreign)).toBe(false)
+    expect(existsSync(stale)).toBe(false)
     expect(existsSync(file)).toBe(true)
   })
 

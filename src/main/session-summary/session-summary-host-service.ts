@@ -100,7 +100,9 @@ export function sessionSummaryHostService(): SessionSummaryService {
         // Why no settings fallback: the client that opened this pane resolved the agent
         // and model from its own settings and sent them. Falling back to *this* host's
         // settings would spawn an agent the reader never chose for a session's own text.
-        resolveParams: () => params
+        resolveParams: () => params,
+        // This host folds in place, so its own userData is the private parent.
+        scratchRoot: userDataPath
       }),
     now: () => Date.now()
   })
