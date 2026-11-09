@@ -3585,18 +3585,46 @@ close.test.tsx › leaves focus that lands after the overlay is gone` raced `act
 
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
-`.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries
-`nplez1/main` in its history. Upstream-bound branches are cut from `origin/main`, so a fork-only file
-committed to one is reviewed upstream. It is `commit-msg` rather than `pre-commit` because the message
-is what identifies the commit as fork-only, and `pre-commit` cannot see it.
+`.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch is on
+`nplez1/main`'s own line, and refuses any commit staging a fork-owned path on a branch that is not.
+Upstream-bound branches are cut from `origin/main`, so a fork-only file committed to one is reviewed
+upstream. It is `commit-msg` rather than `pre-commit` because the message is what identifies the
+commit as fork-only, and `pre-commit` cannot see it. The decision lives in
+`local/commit-msg-guard.mjs`, which imports the same fork-owned path set from
+`local/fork-owned-paths.mjs` that `local/open-pr.mjs --upstream` refuses at PR time — one definition,
+two stops.
 
 **Scoped to lineage on 2026-10-27, not to a branch name.** The original rule allowed `local(` on
 `nplez1/main` and nowhere else, which included fork PR branches — and the result was worse than the
 mistake it guarded: policy work committed there _without_ the `local(` label at least five times
 (#146, #130, #142, #177, #52), producing unlabelled fork-only changes riding fork PRs. A fork PR
-branch descends from `nplez1/main`; that lineage is what the rule now follows, so `local(` is allowed
-on the fork's own line and still refused on anything cut from `origin/main`. `local/open-pr.mjs
---upstream` remains the second stop, refusing the subject and every fork-owned path.
+branch descends from `nplez1/main`; that lineage is what the rule follows, so `local(` is allowed
+on the fork's own line and still refused on anything cut from `origin/main`.
+
+**Tested as lineage, not as the tip, on 2026-11-09 (#319).** The first lineage test asked whether the
+_current_ `nplez1/main` tip was an ancestor of `HEAD`, so the moment the fork advanced — any other PR
+squash-merging — every older fork branch was refused, which pushed exactly the same unlabelled-commit
+workaround. It also refused every `local(` commit when no local `nplez1/main` ref existed, which is
+the state of a fresh clone. Now: `merge-base --all HEAD <forkRef>` must be non-empty, and `git
+rev-list -1 <bases> --not <every resolvable upstream ref>` must be non-empty — the fork's own commits
+have to be behind `HEAD`, however far behind the tip the branch is. The union of upstream refs
+(`upstream/main`, `origin/main`, `main`) is deliberate: with one base, a fork that has synced further
+than that base would read a branch cut from a fresher `origin/main` as fork work. Unresolvable refs,
+an unborn `HEAD`, and a fork ref with no reachable common ancestor (a `--depth` clone) allow the
+commit with a warning, because a hook that blocks a fresh clone gets `--no-verify`'d and then guards
+nothing.
+
+**Known limit, not a bug to rediscover:** a branch whose commits reach `nplez1/main` through a merge
+commit rather than a squash is indistinguishable from fork work, because its own commits become
+fork-only bases. Lineage cannot tell that case apart from a real fork branch. The `local(` subject and
+the fork-owned paths are what remain, plus `open-pr --upstream`.
+
+**The hook can only see a tree that carries it.** Neither `origin/main` nor `upstream/main` has
+`.husky/commit-msg` or `local/`, and husky's runner exits 0 when a hook file is absent, so a clean
+upstream checkout has no hook at all. It fires on a tree that already carries the fork's hook: a merge
+of `nplez1/main` into an upstream branch, a manual checkout of the hook, or a tree that has already
+leaked. `local/open-pr.mjs --upstream` remains the stop for the rest, and a plain `gh pr create`
+still bypasses both.
 
 If a commit is wrongly refused, the fix is to branch from `nplez1/main`, not to bypass the hook.
 
