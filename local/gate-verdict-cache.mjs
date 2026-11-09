@@ -19,6 +19,11 @@ export const GATE_INPUT_PATHS = [
   'local/unit-lane-files.mjs',
   'local/unit-suite-run.mjs',
   'local/gate-flake-coupling.mjs',
+  // Why the selector's file list and its predicate are here: the flake waiver derives its setup files
+  // from the first and its runtime-entry-point rule from the second, so a tree whose answer differs from
+  // the commit's (an in-progress sync, `--allow-dirty`) must not reuse a verdict.
+  'config/scripts/ci/unit-selection/dependency-graph/ci-unit-files.mjs',
+  'config/scripts/ci/unit-selection/ci-unit-selection.mjs',
   'local/gate-verdict-cache.mjs',
   'local/check-unit-shard-verdict.mjs',
   'config/.bun-version'

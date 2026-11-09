@@ -17,6 +17,8 @@
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { isUnitRuntimeEntryPoint } from '../config/scripts/ci/unit-selection/ci-unit-selection.mjs'
+import { UNIT_SETUP_FILES } from '../config/scripts/ci/unit-selection/dependency-graph/ci-unit-files.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const TEST_FILE_SUFFIX = /\.(?:test|spec)\.[cm]?[jt]sx?$/
@@ -33,8 +35,15 @@ const IMPORT_SPECIFIER =
 /**
  * Files every unit test runs under, by name, because no test imports them: the runner, the setup
  * files it installs, and the dependency graph the whole suite resolves against.
+ *
+ * Why `UNIT_SETUP_FILES` is spread rather than copied: the hand copy went stale three setup files
+ * behind (fork issue #315), so a branch that edited one of them had every load-only failure waived as
+ * "FLAKY, not ours" — the waiver certifying the opposite of what the diff did. `isUnitRuntimeEntryPoint`
+ * closes the other half: the selector's runtime-entry-point rule couples every test whether or not
+ * anyone remembered to add the file to the list.
  */
 export const SHARED_TEST_INPUTS = [
+  ...UNIT_SETUP_FILES,
   'config/vitest.config.ts',
   // Not an import the parser sees: the config loads it through `createRequire(import.meta.url)(…)`.
   'config/dark-build-switches.cjs',
@@ -42,11 +51,6 @@ export const SHARED_TEST_INPUTS = [
   // Why a directory: the runner's one bare import is the whole process-host package, and a trailing
   // slash couples to any file in it.
   'src/packages/process-host/',
-  'config/scripts/test-runtime/environment/vitest-real-agent-home-write-guard.ts',
-  'config/scripts/test-runtime/environment/vitest-bun-node-builtins.ts',
-  'config/scripts/test-runtime/dom/vitest-dom-setup.ts',
-  'config/scripts/test-runtime/environment/vitest-host-ports-setup.ts',
-  'config/scripts/test-runtime/environment/vitest-caller-identity-env-setup.ts',
   'package.json',
   'pnpm-lock.yaml'
 ]
@@ -55,7 +59,10 @@ export const SHARED_TEST_INPUTS = [
 // selection actually lives, and a hand list went stale the first time (it missed the node-runtime
 // pool, the sequencer and the runtime file set, so a branch that re-seated tests into that pool could
 // still waive its own flake).
-const HARNESS_ROOT_FILES = ['config/vitest.config.ts', 'config/scripts/test-runtime/execution-policy/run-vitest.mjs']
+const HARNESS_ROOT_FILES = [
+  'config/vitest.config.ts',
+  'config/scripts/test-runtime/execution-policy/run-vitest.mjs'
+]
 
 export function importSpecifiers(source) {
   const specifiers = []
@@ -137,6 +144,21 @@ export function branchCoupledPaths(testFile, readSource = readRepoFile) {
   return [...paths]
 }
 
+/**
+ * Whether one diff path is a file every test runs under: a listed input, a listed directory, or the
+ * selector's runtime-entry-point rule — the half of it a list cannot hold, because a new setup file
+ * couples every test before anyone adds it to `UNIT_SETUP_FILES`.
+ * `local/sync/lib/smoke-select.mjs` asks this rather than re-deriving it, so the two cannot disagree
+ * about which paths count; the waiver additionally narrows a scripts-only `package.json` diff, which is
+ * a judgement about the diff rather than about the path.
+ */
+export function isSharedHarnessPath(file, sharedPaths = sharedHarnessPaths()) {
+  return (
+    sharedPaths.some((path) => (path.endsWith('/') ? file.startsWith(path) : file === path)) ||
+    isUnitRuntimeEntryPoint(file)
+  )
+}
+
 /** A trailing slash in the harness set means "any file under this directory". */
 function sharedMatch(diffFiles, { packageJsonShared = true } = {}) {
   const shared = sharedHarnessPaths()
@@ -156,6 +178,14 @@ function sharedMatch(diffFiles, { packageJsonShared = true } = {}) {
     const prefix = prefixes.find((candidate) => file.startsWith(candidate))
     if (prefix) {
       return prefix
+    }
+  }
+  // Why the selector's own predicate as well as the list: it is the rule that already answers "this
+  // file re-seats the unit runtime", so a new setup file couples every test the moment it exists, not
+  // once someone adds it to `UNIT_SETUP_FILES`.
+  for (const file of diffFiles) {
+    if (isUnitRuntimeEntryPoint(file)) {
+      return file
     }
   }
   return null
