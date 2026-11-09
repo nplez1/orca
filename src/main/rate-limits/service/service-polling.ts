@@ -90,8 +90,12 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     }
     // A hidden Muse meter keeps an idle snapshot, which must not force a full refresh on every focus.
     const museEnabled = this.museUsageEnabledResolver?.() ?? true
+    // fork-comment-ok: switched-off providers are fork-only, so this rationale has no upstream home.
+    // A switched-off slot is null on every push, so including it refetches everything on focus.
+    const disabled = new Set<string>(this.disabledUsageProviderIds())
     return Object.entries(byProvider)
       .filter(([provider]) => provider !== 'muse' || museEnabled)
+      .filter(([provider]) => !disabled.has(provider))
       .map(([provider, limits]) => ({
         provider: provider as ActiveRateLimitProvider,
         limits
