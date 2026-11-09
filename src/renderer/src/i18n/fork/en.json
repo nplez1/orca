@@ -430,7 +430,9 @@
       "settings": {
         "AccountsPane": {
           "0c64dc2a64": "Gemini CLI (legacy)",
-          "aa4de4475b": "Gemini CLI (legacy)"
+          "aa4de4475b": "Gemini CLI (legacy)",
+          "340d6f7a85": null,
+          "remoteScopeAuthContext": null
         },
         "AdvancedPane": {
           "9b1f52e764": "Extra logging for troubleshooting Orca itself.",
@@ -822,7 +824,8 @@
           "copyRefusedFolderProject": "Folder projects have no branch to copy to another host.",
           "copyRefusedNoSharedRemote": "Add a remote to this project first — another host can only find it through one.",
           "copyRefusedPublishRemote": "This workspace's branch lives on a remote another host can't recreate.",
-          "439fa94d53": "Update"
+          "439fa94d53": "Update",
+          "editDetails": null
         },
         "WorktreeIssueLinkField": {},
         "WorktreeList": {

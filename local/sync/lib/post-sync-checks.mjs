@@ -4,9 +4,14 @@
 // driver owns the check's title, its remediation text and its place in the report. Split out of
 // post-sync.mjs only so that file stays a readable driver.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { readDeletionManifest } from './expected-deletions.mjs'
+import {
+  compareIdentityBaseline,
+  describeComparison,
+  readIdentityBaseline
+} from './identity-baseline.mjs'
 import { BACKUP_REF, UPSTREAM_REF, foreignTipFailure, pinnedUpstreamBase } from './sync-range.mjs'
 import {
   STATUS,
@@ -31,15 +36,153 @@ const SOURCE_FILE = /\.[cm]?[jt]sx?$/
 
 export const FORK_SLUG = 'nplez1/orca'
 export const BUILDER_CONFIG = './config/electron-builder.config.cjs'
-// The update feed must keep naming the fork: without it an update check resolves upstream
-// releases and a fork install "upgrades" to a build carrying none of the fork's patches.
-// `updater-release-targets.ts` holds RELEASES_REPO, the one declaration every feed URL derives from.
-const FEED_FILES = [
+
+// The upstream main repo. Not a substring test: `stablyai/orca-hourly` and its daily and adhoc
+// siblings are different repositories, kept on purpose in `release-channel.ts` because the fork
+// routes every channel to its own repo rather than deleting the dev-channel names. It matches the
+// slug as a string, so an `owner: 'stablyai', repo: 'orca'` object form would not be caught; nothing
+// in the updater writes one, and a regex guessing at it would be the kind of pattern nobody reads.
+export const UPSTREAM_SLUG = /stablyai\/orca(?![\w-])/
+// The tree upstream keeps reorganising: `updater/lifecycle/`, `updater/releases/` and four more
+// levels appeared in the 2026-11-08 sync, which is how a top-level-only glob stopped finding them.
+export const FEED_TREE = 'src/main/updater'
+// The update feed must keep naming the fork: without it an update check resolves upstream releases
+// and a fork install "upgrades" to a build carrying none of the fork's patches. These are the files
+// that hold or derive the repo, so a loss here is a lost feed; a generic helper naming no repo is not.
+export const FEED_FILES = [
   'src/main/updater-release-targets.ts',
+  'src/main/updater/lifecycle/updater-setup.ts',
   'src/main/updater/releases/updater-prerelease-feed.ts',
+  'src/main/updater/releases/updater-release-readiness.ts',
   'src/shared/release-channel.ts'
 ]
-const FEED_GLOB = { dir: 'src/main/updater', prefix: 'updater-' }
+
+/** True when one of `file`'s relative imports resolves to a file that carries the slug. */
+function importsHolder(file, text, holders) {
+  const dir = path.posix.dirname(file)
+  for (const match of text.matchAll(/from\s+'(\.{1,2}\/[^']+)'/g)) {
+    const specifier = match[1]
+    for (const candidate of [specifier, `${specifier}.ts`, `${specifier}/index.ts`]) {
+      if (holders.has(path.posix.normalize(path.posix.join(dir, candidate)))) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * The feed classification, as a pure function of the file list and their text (`null` = absent).
+ *
+ * Two findings fail: an anchor that no longer names the fork, and any file in the tree that names
+ * upstream's repo. A generic helper that names no repo at all is normal — most of them never touch
+ * a release URL — so it is counted rather than listed line by line.
+ */
+export function classifyFeedFiles({ files, anchors, textOf }) {
+  const absent = []
+  const upstream = []
+  const missing = []
+  const silent = []
+  const holders = new Set()
+  const texts = new Map()
+  for (const file of files) {
+    const text = textOf(file)
+    texts.set(file, text)
+    if (text === null) {
+      absent.push(file)
+      continue
+    }
+    if (text.includes(FORK_SLUG)) {
+      holders.add(file)
+    }
+    for (const line of text.split('\n')) {
+      if (UPSTREAM_SLUG.test(line)) {
+        upstream.push(`${file}: ${line.trim()}`)
+      }
+    }
+  }
+  // The slug may be held once and derived everywhere else, so a file that imports a file which does
+  // carry it is satisfied through that constant — the alternative is a copy of the literal that can
+  // drift, which is what this check exists to prevent.
+  for (const file of anchors) {
+    const text = texts.get(file) ?? null
+    if (text === null) {
+      missing.push(`${file}: missing from the tree`)
+      if (!absent.includes(file)) {
+        absent.push(file)
+      }
+    } else if (!holders.has(file) && !importsHolder(file, text, holders)) {
+      missing.push(`${file}: no reference to ${FORK_SLUG}`)
+    }
+  }
+  for (const file of files) {
+    if (!anchors.includes(file) && !holders.has(file)) {
+      silent.push(file)
+    }
+  }
+  return { absent, upstream, missing, silent, scanned: files.length }
+}
+
+/** Every tracked file under the updater tree, plus the anchors that live outside it. */
+function feedFiles() {
+  const listing = gitText(['ls-files', '-z', '--', FEED_TREE])
+  const tracked = listing === null ? [] : splitNul(listing)
+  if (tracked.length === 0) {
+    return null
+  }
+  return [...new Set([...FEED_FILES, ...tracked])].sort()
+}
+
+export function updaterFeed() {
+  const files = feedFiles()
+  if (files === null) {
+    return {
+      status: STATUS.failed,
+      summary: `${FEED_TREE}/ has no tracked files, so the updater cannot be scanned`,
+      details: []
+    }
+  }
+  const result = classifyFeedFiles({
+    files,
+    anchors: FEED_FILES,
+    textOf: (file) => {
+      try {
+        return readFileSync(path.join(repoRoot(), file), 'utf8')
+      } catch {
+        return null
+      }
+    }
+  })
+  const helpers = files.filter((file) => path.posix.basename(file).startsWith('updater-'))
+  const details = [
+    `${result.scanned} file(s) scanned: ${FEED_TREE}/ plus ${FEED_FILES.length} anchor(s), ${helpers.length} updater-*.ts helper(s)`,
+    ...(result.silent.length === 0
+      ? []
+      : [`${result.silent.length} file(s) name no repository, expected for a generic helper`]),
+    // No `updater-*.ts` at any depth means upstream moved the updater again, which is the state that
+    // made a top-level-only glob scan nothing and report a pass.
+    ...(helpers.length === 0
+      ? [`${FEED_TREE}/ has no updater-*.ts at any depth: upstream may have moved the updater`]
+      : []),
+    ...result.upstream.map((line) => `  ! ${line}`),
+    ...result.missing.map((line) => `  ! ${line}`)
+  ]
+  if (result.upstream.length > 0) {
+    return {
+      status: STATUS.failed,
+      summary: `${result.upstream.length} line(s) in the scanned files name upstream's repository`,
+      details
+    }
+  }
+  return {
+    status: result.missing.length > 0 ? STATUS.failed : STATUS.passed,
+    summary:
+      result.missing.length > 0
+        ? `${result.missing.length} feed anchor(s) lost the fork reference`
+        : `feed override still points at the fork (${result.scanned} file(s) scanned)`,
+    details
+  }
+}
 
 export function localizationVerifiers() {
   const details = []
@@ -83,100 +226,6 @@ export function builderConfig() {
   }
 }
 
-function feedFiles() {
-  const dir = path.join(repoRoot(), FEED_GLOB.dir)
-  if (!existsSync(dir)) {
-    return null
-  }
-  const glob = readdirSync(dir)
-    .filter((name) => name.startsWith(FEED_GLOB.prefix) && name.endsWith('.ts'))
-    .sort()
-    .map((name) => `${FEED_GLOB.dir}/${name}`)
-  return [...FEED_FILES, ...glob]
-}
-
-/** True when one of `file`'s relative imports resolves to a file that carries the slug. */
-function importsHolder(file, holders) {
-  const source = readFileSync(path.join(repoRoot(), file), 'utf8')
-  const dir = path.posix.dirname(file)
-  for (const match of source.matchAll(/from\s+'(\.{1,2}\/[^']+)'/g)) {
-    const specifier = match[1]
-    for (const candidate of [specifier, `${specifier}.ts`, `${specifier}/index.ts`]) {
-      const resolved = path.posix.normalize(path.posix.join(dir, candidate))
-      if (holders.has(resolved)) {
-        return true
-      }
-    }
-  }
-  return false
-}
-
-export function updaterFeed() {
-  const files = feedFiles()
-  if (files === null) {
-    return { status: STATUS.failed, summary: `${FEED_GLOB.dir}/ does not exist`, details: [] }
-  }
-  const details = []
-  const missing = []
-  const scanFailures = []
-  const globbed = files.filter((file) => !FEED_FILES.includes(file))
-  // The slug may be held once and derived everywhere else, so a feed file that imports a file which
-  // does carry it is satisfied through that constant — the alternative is a copy of the literal that
-  // can drift, which is what this check exists to prevent.
-  const holders = new Set()
-  const silent = []
-  for (const file of files) {
-    const present = existsSync(path.join(repoRoot(), file))
-    const grepped = present ? git(['grep', '-n', '-F', '-e', FORK_SLUG, '--', file]) : null
-    // git grep exits 1 for "no match", which is the finding this check wants; any other non-zero
-    // status is the scan failing and must not read as a missing reference.
-    if (grepped && !grepped.ok && grepped.code !== 1) {
-      scanFailures.push(
-        `${file}: git grep exited ${grepped.code ?? 'without running'} — ${tailText(grepped.stderr, 2).join(' ')}`
-      )
-      continue
-    }
-    const hits = grepped?.ok ? grepped.stdout.split('\n').filter(Boolean) : []
-    if (hits.length > 0) {
-      holders.add(file)
-      details.push(...hits)
-      continue
-    }
-    silent.push({ file, present })
-  }
-  // The runbook greps the whole file list in one command, so a generic `updater-*.ts` helper that
-  // never names a repo is normal and only reported. A missing reference in a file that holds the
-  // fork's feed override is the failure this check exists for — unless the file reaches the slug
-  // through a checked constant, which is the shape `updater-release-targets.ts` exists for.
-  for (const { file, present } of silent) {
-    if (!FEED_FILES.includes(file)) {
-      details.push(`${file}: no reference, expected for a generic updater helper`)
-      continue
-    }
-    if (importsHolder(file, holders)) {
-      details.push(`${file}: names ${FORK_SLUG} through a checked constant, not a literal`)
-      continue
-    }
-    missing.push(file)
-    details.push(`${file}: no reference to ${FORK_SLUG}${present ? '' : ' (file is missing)'}`)
-  }
-  if (globbed.length === 0) {
-    details.push(
-      `${FEED_GLOB.dir}/${FEED_GLOB.prefix}*.ts is empty: upstream may have moved the updater`
-    )
-  }
-  const failed = scanFailures.length > 0
-  return {
-    status: failed || missing.length > 0 ? STATUS.failed : STATUS.passed,
-    summary: failed
-      ? `the fork-reference scan could not run for ${scanFailures.length} file(s)`
-      : missing.length === 0
-        ? `feed override still points at the fork (${globbed.length} ${FEED_GLOB.prefix}*.ts helper(s) scanned)`
-        : `${missing.length} feed override file(s) lost the fork reference`,
-    details: [...scanFailures.map((line) => `  ! ${line}`), ...details]
-  }
-}
-
 /**
  * Fork-only modules under `src/` that nothing imports. The sync cannot see these: no conflict marker
  * points at a file upstream does not have, so a fork module whose last caller was removed upstream
@@ -214,6 +263,11 @@ export function unreferencedForkModules({ allowlist = [] } = {}) {
   }
 }
 
+/**
+ * The identity sweep as a gate: a fixable finding fails, and so does a report-only finding the frozen
+ * baseline has never seen. Without the second half the row passed on any tree at all — there are
+ * hundreds of report-only findings, so `fixable === 0` was the whole verdict.
+ */
 export function identitySweep() {
   const sweep = 'identity-sweep.mjs'
   if (!toolExists(sweep)) {
@@ -239,112 +293,52 @@ export function identitySweep() {
     }
   }
   const fixable = report.counts?.fixable ?? 0
-  const reportOnly = report.counts?.reportOnly ?? 0
+  const fixableDetails = (report.fixable ?? [])
+    .slice(0, 30)
+    .map((hit) => `  ! ${hit.file}:${hit.line}  ${hit.text} -> ${hit.to}`)
+  const { baseline, problem } = readIdentityBaseline(repoRoot())
+  if (baseline === null) {
+    return {
+      status: STATUS.failed,
+      summary: `the report-only baseline cannot be read: ${problem}`,
+      details: [
+        'an unreadable baseline is not "no new findings"; regenerate it with',
+        '  node local/sync/identity-sweep.mjs --baseline-init --accept "<why>"'
+      ]
+    }
+  }
+  const comparison = compareIdentityBaseline({ baseline, reportOnly: report.reportOnly ?? [] })
+  const details = [...fixableDetails, ...describeComparison(comparison)]
+  if (fixable > 0) {
+    return {
+      status: STATUS.failed,
+      summary: `${fixable} fixable violation(s) (${sweep})`,
+      details
+    }
+  }
+  if (!comparison.clean) {
+    const counts = [
+      comparison.appeared.length > 0 ? `${comparison.appeared.length} new` : null,
+      comparison.grown.length > 0 ? `${comparison.grown.length} grown` : null,
+      comparison.shrunk ? 'the total shrank' : null
+    ].filter(Boolean)
+    return {
+      status: STATUS.failed,
+      summary: `report-only findings moved against the frozen baseline: ${counts.join(', ')} (${sweep})`,
+      details
+    }
+  }
   return {
-    status: fixable === 0 ? STATUS.passed : STATUS.failed,
-    summary:
-      fixable === 0
-        ? `no fixable violations, ${reportOnly} report-only (${sweep})`
-        : `${fixable} fixable violation(s) (${sweep})`,
-    details: [
-      `${reportOnly} report-only finding(s) are informational and need a decision, not a rewrite`,
-      ...(report.fixable ?? [])
-        .slice(0, 30)
-        .map((hit) => `  ! ${hit.file}:${hit.line}  ${hit.text} -> ${hit.to}`)
-    ]
+    status: STATUS.passed,
+    summary: `no fixable violations, ${comparison.total} report-only at baseline (${sweep})`,
+    details
   }
 }
 
 // The pre-sync tip and the pinned upstream base live in lib/sync-range.mjs: they are the input every
 // check below shares, and the check that they belong to THIS merge is what makes them safe to use.
 
-// Runbook Step 3.1, the check that catches the dropped-merge-commit trap: a MODIFIED file that
-// upstream never touched in this sync's range means the replay moved content it did not own. A path
-// upstream does not have at all is fork-only by construction, and expected here. This is a red-flag
-// scan over modified files — it does not prove that no content was lost anywhere else.
-export function lostContent(tip, source, problem = null) {
-  if (problem !== null) {
-    return foreignTipFailure(
-      problem,
-      'the scan would compare the wrong range and report clean, so it refuses instead'
-    )
-  }
-  if (!tip) {
-    return {
-      status: STATUS.unavailable,
-      summary: `no pre-sync tip: ${BACKUP_REF} is absent and no state file names one`,
-      details: []
-    }
-  }
-  const pinned = pinnedUpstreamBase(tip, source)
-  if (pinned.base === null) {
-    return {
-      status: STATUS.failed,
-      summary: `cannot pin the upstream base: ${pinned.problem}`,
-      details: [
-        'the scan compares against the base pre-sync recorded; without it the answer is unknown, not clean'
-      ]
-    }
-  }
-  const base = pinned.base
-  const oldBase = gitText(['merge-base', tip, base])
-  if (!oldBase) {
-    return {
-      status: STATUS.failed,
-      summary: `no merge base between ${tip.slice(0, 10)} and the pinned base ${base.slice(0, 10)}`,
-      details: []
-    }
-  }
-  const upstreamChanged = changedNames([oldBase, base])
-  const modified = changedNames(['--diff-filter=M', tip, 'HEAD'])
-  // A failed diff has to read as a failed check: an empty result set looks exactly like "nothing
-  // modified here", which is the clean answer this scan must not invent.
-  if (upstreamChanged === null || modified === null) {
-    const range =
-      upstreamChanged === null
-        ? `${oldBase.slice(0, 10)}..${base.slice(0, 10)}`
-        : `${tip.slice(0, 10)}..HEAD`
-    return {
-      status: STATUS.failed,
-      summary: `git diff --name-only failed for ${range}`,
-      details: ['the modified/upstream-touched sets are unknown, so the scan cannot report clean']
-    }
-  }
-  const upstreamFiles = new Set(upstreamChanged)
-  const redFlags = []
-  const forkOnly = []
-  for (const file of modified.filter((name) => !upstreamFiles.has(name))) {
-    // The pinned base resolves, so a cat-file miss means the path is absent there (fork-only
-    // by construction), not that the probe failed.
-    if (git(['cat-file', '-e', `${base}:${file}`]).ok) {
-      redFlags.push(file)
-    } else {
-      forkOnly.push(file)
-    }
-  }
-  return {
-    // A review pointer, not a verdict. The runbook calls a modified file upstream never touched a
-    // "red flag", and it is one — the merge's own resolutions legitimately touch such files (a
-    // barrel re-point after an extraction, for instance), so failing here would make this gate
-    // permanently red and therefore ignored. Deletions, which can be proven unreferenced, still
-    // fail; this lists what a reviewer should look at.
-    status: STATUS.info,
-    summary:
-      redFlags.length === 0
-        ? `red-flag scan clear (modified files only); ${forkOnly.length} fork-only file(s) listed below`
-        : `${redFlags.length} modified file(s) upstream never touched in this range — review them, not proven lost`,
-    details: [
-      `pre-sync tip: ${tip.slice(0, 10)} from ${source}`,
-      `pinned upstream base: ${base.slice(0, 10)} from ${pinned.source}`,
-      `old base (merge-base of that tip and the pinned base): ${oldBase.slice(0, 10)}`,
-      `${modified.length} file(s) modified here, ${upstreamFiles.size} file(s) upstream touched`,
-      `red flags (the pinned base knows the path but upstream did not touch it in this range): ${redFlags.length}`,
-      ...(redFlags.length === 0 ? [] : redFlags.slice(0, 30).map((file) => `  ! ${file}`)),
-      `fork-only by construction (path absent at the pinned base), expected here: ${forkOnly.length}`,
-      ...forkOnly.slice(0, 30).map((file) => `  - ${file}`)
-    ]
-  }
-}
+export { lostContent } from './lost-content.mjs'
 
 // ---- deleted modules -------------------------------------------------------------------------
 

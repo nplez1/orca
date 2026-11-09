@@ -10,14 +10,24 @@
  * readers, where re-pointing a path is a per-store data migration.
  *
  * Exit status is non-zero only for a fixable finding: report-only findings need a decision, not a
- * rewrite, and there are hundreds of them, so a gate that always fails is no gate at all. --strict
- * fails on report-only findings too.
+ * rewrite, and there are hundreds of them, so a gate that always fails is no gate at all. What stops
+ * that being a gate that never fails is the frozen baseline in `identity-sweep-baseline.json`: the
+ * post-sync row fails on a report-only finding the baseline has never seen. --strict fails on any of
+ * them.
  *
  * Usage: node local/sync/identity-sweep.mjs [--json] [--fix] [--strict] [--help]
+ *        node local/sync/identity-sweep.mjs --baseline-init [--accept <reason>] | --baseline-prune
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, relative } from 'node:path'
+import {
+  BASELINE_PATH,
+  buildBaseline,
+  compareIdentityBaseline,
+  readIdentityBaseline,
+  rewriteRefusal
+} from './lib/identity-baseline.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const SCAN_ROOTS = ['src', 'config', 'mobile', 'resources', 'native', '.github/workflows']
@@ -309,12 +319,23 @@ function printReport({ violations, allowed, files, skipped }, strict = false) {
 const USAGE = `Scans ${SCAN_ROOTS.join(', ')} for names this fork renamed to "Orca NP".
 
   node local/sync/identity-sweep.mjs [--json] [--fix] [--strict] [--help]
+  node local/sync/identity-sweep.mjs --baseline-init [--accept <reason>]
+  node local/sync/identity-sweep.mjs --baseline-prune
 
 Buckets
   fixable  a mechanical literal (path, executable name, test expectation, config value, NSIS
            define). --fix rewrites these, prints every file it changed, safe to run twice.
   why      a real violation awaiting a decision: persisted user paths, on-disk state, the bare
            \`orca\`, legacy names. Never rewritten.
+
+Baseline
+  ${BASELINE_PATH} freezes the report-only findings per rule and per file. The gate
+  (post-sync's identity-sweep row) fails on a new pair, on a count above its frozen value, and on a
+  total that moved at all — so the set may only shrink, and only through --baseline-prune.
+  --baseline-init   rewrite it at the current scan; a new or grown rule/file pair needs --accept
+                    <reason>, which is recorded in the file
+  --baseline-prune  lower every count and the total to the current scan; it refuses to raise either,
+                    and refuses to record a pair it has never seen
 
 Exit status
   non-zero only when a fixable finding remains. Report-only findings are informational by
@@ -349,22 +370,118 @@ function exitCodeFor(fixable, reportOnly, strict) {
   return strict && reportOnly.length > 0 ? 1 : 0
 }
 
-function main() {
-  const flags = new Set(process.argv.slice(2))
-  const unknown = [...flags].filter(
-    (flag) => !['--json', '--fix', '--strict', '--help', '-h'].includes(flag)
+function parseArgs(argv) {
+  const options = {
+    json: false,
+    fix: false,
+    strict: false,
+    help: false,
+    baselineInit: false,
+    baselinePrune: false,
+    accept: null
+  }
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === '--json') {
+      options.json = true
+    } else if (arg === '--fix') {
+      options.fix = true
+    } else if (arg === '--strict') {
+      options.strict = true
+    } else if (arg === '--help' || arg === '-h') {
+      options.help = true
+    } else if (arg === '--baseline-init') {
+      options.baselineInit = true
+    } else if (arg === '--baseline-prune') {
+      options.baselinePrune = true
+    } else if (arg === '--accept') {
+      options.accept = (argv[(index += 1)] ?? '').trim()
+      if (options.accept === '') {
+        throw new Error('--accept needs a reason')
+      }
+    } else {
+      throw new Error(`unknown argument '${arg}' — try --help`)
+    }
+  }
+  if (options.baselineInit && options.baselinePrune) {
+    throw new Error('--baseline-init and --baseline-prune are different rewrites; pick one')
+  }
+  if (options.accept && !options.baselineInit) {
+    throw new Error('--accept only applies to --baseline-init')
+  }
+  return options
+}
+
+/** The upstream merge base the baseline was measured against, or null when there is none to read. */
+function mergeBase() {
+  const result = spawnSync('git', ['merge-base', 'HEAD', 'upstream/main'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8'
+  })
+  return result.status === 0 ? result.stdout.trim() || null : null
+}
+
+function writeBaseline(reportOnly, { accepted = null }) {
+  const note =
+    'Report-only identity findings (LOCAL-PATCHES.md, local(identity)). Frozen per rule and per ' +
+    'file; the set may only shrink, and only through --baseline-prune. Regenerate with ' +
+    '`node local/sync/identity-sweep.mjs --baseline-init [--accept <reason>]`.'
+  const baseline = buildBaseline(reportOnly, { base: mergeBase(), accepted, note })
+  writeFileSync(join(REPO_ROOT, BASELINE_PATH), `${JSON.stringify(baseline, null, 2)}\n`)
+  return baseline
+}
+
+/**
+ * `--baseline-init` may absorb growth only with a written reason, and `--baseline-prune` may only
+ * lower. Both refusals come from `rewriteRefusal`, so a pair that appeared or grew is never recorded
+ * silently by either — the prune path is the one that used to, because it only compared totals.
+ */
+function baselineCommand({ init, reportOnly, accept }) {
+  const { baseline: previous, problem } = readIdentityBaseline(REPO_ROOT)
+  const comparison =
+    previous === null ? null : compareIdentityBaseline({ baseline: previous, reportOnly })
+  const refusal =
+    comparison === null ? null : rewriteRefusal({ mode: init ? 'init' : 'prune', comparison })
+  if (refusal !== null && !(init && accept)) {
+    process.stderr.write(`identity-sweep: ${refusal}\n`)
+    return 1
+  }
+  if (!init && previous === null) {
+    process.stderr.write(
+      `identity-sweep: --baseline-prune needs an existing baseline (${problem}). ` +
+        'Run --baseline-init first.\n'
+    )
+    return 1
+  }
+  const written = writeBaseline(reportOnly, {
+    accepted: init ? accept : (previous?.accepted ?? null)
+  })
+  const verb = init ? 'wrote' : 'pruned'
+  process.stdout.write(
+    `identity-sweep: ${verb} ${BASELINE_PATH} — ${written.total} report-only finding(s)` +
+      `${previous ? ` (was ${previous.total})` : ''}` +
+      `${comparison !== null && comparison.stale.length > 0 ? `, ${comparison.stale.length} stale entr(ies) dropped` : ''}\n`
   )
-  if (unknown.length > 0) {
-    process.stderr.write(`identity-sweep: unknown argument '${unknown[0]}' — try --help\n`)
+  if (init && refusal !== null) {
+    process.stdout.write(`identity-sweep: accepted growth — ${accept}\n`)
+  }
+  return 0
+}
+
+function main() {
+  let options
+  try {
+    options = parseArgs(process.argv.slice(2))
+  } catch (error) {
+    process.stderr.write(`identity-sweep: ${error.message}\n`)
     process.exitCode = 2
     return
   }
-  if (flags.has('--help') || flags.has('-h')) {
+  if (options.help) {
     printHelp()
     return
   }
-  const strict = flags.has('--strict')
-  if (flags.has('--fix')) {
+  if (options.fix) {
     const changed = applyFixes(scan().violations)
     const say = ({ file, replacements }) =>
       `identity-sweep: rewrote ${file} — ${replacements} replacements`
@@ -373,11 +490,20 @@ function main() {
   const result = scan()
   const fixable = result.violations.filter(isFixable)
   const reportOnly = result.violations.filter((hit) => !isFixable(hit))
-  if (flags.has('--json')) {
+  if (options.baselineInit || options.baselinePrune) {
+    process.exitCode = baselineCommand({
+      init: options.baselineInit,
+      // The baseline is keyed by the same shape `--json` publishes, so the row and the CLI agree.
+      reportOnly: reportOnly.map((hit) => ({ rule: hit.id, file: hit.file })),
+      accept: options.accept
+    })
+    return
+  }
+  if (options.json) {
     const brief = (hit) => ({ rule: hit.id, file: hit.file, line: hit.line, text: hit.text })
     const json = {
-      ok: exitCodeFor(fixable, reportOnly, strict) === 0,
-      strict,
+      ok: exitCodeFor(fixable, reportOnly, options.strict) === 0,
+      strict: options.strict,
       filesScanned: result.files
     }
     json.filesSkipped = result.skipped
@@ -391,10 +517,10 @@ function main() {
     json.allowlisted = result.allowed.map((hit) => ({ ...brief(hit), why: hit.allowed }))
     process.stdout.write(`${JSON.stringify(json, null, 2)}\n`)
   } else {
-    printReport(result, strict)
+    printReport(result, options.strict)
   }
   // Why exitCode and not exit(): a large --json report must not be truncated on a pipe.
-  process.exitCode = exitCodeFor(fixable, reportOnly, strict)
+  process.exitCode = exitCodeFor(fixable, reportOnly, options.strict)
 }
 
 main()

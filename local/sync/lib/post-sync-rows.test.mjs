@@ -15,10 +15,13 @@ test('the range checks the audit named are rows, not a tool somebody has to reme
   for (const id of [
     'lost-content',
     'deleted-fork-modules',
+    'upstream-deleted-fork-tests',
     'fork-symbol-survival',
     'dangling-references',
     'repo-lint',
     'fork-invariants',
+    'cited-guards',
+    'locale-drift',
     'typecheck'
   ]) {
     assert.ok(ids.includes(id), id)
@@ -43,6 +46,7 @@ test('a tip that belongs to another sync fails every row that would read the ran
   for (const id of [
     'lost-content',
     'deleted-fork-modules',
+    'upstream-deleted-fork-tests',
     'fork-symbol-survival',
     'dangling-references'
   ]) {
@@ -56,10 +60,24 @@ test('no tip leaves those rows unavailable, which is not a pass', () => {
   for (const id of [
     'lost-content',
     'deleted-fork-modules',
+    'upstream-deleted-fork-tests',
     'fork-symbol-survival',
     'dangling-references'
   ]) {
     const outcome = row(id, { tip: null })[3]()
     assert.equal(outcome.status, 'unavailable', id)
   }
+})
+
+test('the three rows the sync review asked for are wired, once each', () => {
+  const ids = postSyncRowIds({})
+  for (const id of ['cited-guards', 'locale-drift', 'upstream-deleted-fork-tests']) {
+    assert.equal(ids.filter((candidate) => candidate === id).length, 1, id)
+  }
+  // The locale rule is not a range row: it measures against the upstream merge base, so a foreign
+  // pre-sync tip must not change its verdict.
+  assert.deepEqual(
+    row('locale-drift', { problem: null })[3](),
+    row('locale-drift', { problem: 'the state file names another sync' })[3]()
+  )
 })

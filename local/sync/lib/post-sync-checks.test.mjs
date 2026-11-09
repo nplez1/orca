@@ -1,10 +1,11 @@
-// Fixture tests for the two pure pieces of the deleted-module check: which deleted paths count as a
-// code module, and what a deleted module's exported surface was. No git, no filesystem:
+// Fixture tests for the pure pieces of the post-sync checks: which deleted paths count as a code
+// module, what a deleted module's exported surface was, and how the update feed's files classify.
+// No git, no filesystem:
 //   node --test local/sync/lib/post-sync-checks.test.mjs
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { exportInventory, isDeletedCodeModule } from './post-sync-checks.mjs'
+import { classifyFeedFiles, exportInventory, isDeletedCodeModule } from './post-sync-checks.mjs'
 
 test('a deleted module is code that a caller could have imported', () => {
   assert.equal(
@@ -91,4 +92,68 @@ test('a declared name is reported once, and keywords are never taken for a name'
 
 test('a module with no exports inventories empty, not as the empty name', () => {
   assert.deepEqual(exportInventory("import x from 'y'\nconsole.log(x)\n"), [])
+})
+
+const ANCHOR = 'src/main/updater/releases/updater-prerelease-feed.ts'
+const feed = (files) =>
+  classifyFeedFiles({
+    files: Object.keys(files),
+    anchors: [ANCHOR],
+    textOf: (file) => files[file] ?? null
+  })
+
+test('upstream\u2019s repo in a nested file fails, whatever depth upstream moved it to', () => {
+  const result = feed({
+    [ANCHOR]: "const REPO = 'nplez1/orca'\n",
+    'src/main/updater/lifecycle/updater-setup.ts':
+      "url: 'https://github.com/stablyai/orca/releases'\n"
+  })
+  assert.deepEqual(result.missing, [])
+  assert.equal(result.upstream.length, 1)
+  assert.match(result.upstream[0], /^src\/main\/updater\/lifecycle\/updater-setup\.ts: /)
+})
+
+test('a dev-channel repo is not upstream\u2019s main repo, so it stays green', () => {
+  const result = feed({
+    [ANCHOR]: "const REPO = 'nplez1/orca'\n",
+    'src/main/updater/releases/updater-release-build-cache.test.ts':
+      'releaseUrl: `https://github.com/stablyai/orca-hourly/releases/tag/${tag}`,\n'
+  })
+  assert.deepEqual(result.upstream, [])
+  assert.deepEqual(result.missing, [])
+})
+
+test('an anchor that names no repo and imports none fails', () => {
+  const result = feed({
+    [ANCHOR]: "import { x } from './elsewhere'\n"
+  })
+  assert.deepEqual(result.missing, [`${ANCHOR}: no reference to nplez1/orca`])
+})
+
+test('an anchor that reaches the slug through a checked constant is satisfied', () => {
+  const result = feed({
+    'src/main/updater-release-targets.ts': "export const RELEASES_REPO = 'nplez1/orca'\n",
+    [ANCHOR]: "import { RELEASES_REPO } from '../../updater-release-targets'\n"
+  })
+  assert.deepEqual(result.missing, [])
+  assert.deepEqual(result.silent, [])
+})
+
+test('a missing anchor is a failure, not a silent skip', () => {
+  const result = feed({ 'src/main/updater/updater-events.ts': 'export {}\n' })
+  assert.deepEqual(result.missing, [`${ANCHOR}: missing from the tree`])
+  assert.deepEqual(result.absent, [ANCHOR])
+})
+
+test('a generic helper that names no repo is counted, not listed', () => {
+  const result = feed({
+    [ANCHOR]: "const REPO = 'nplez1/orca'\n",
+    'src/main/updater/updater-events.ts': 'export const a = 1\n',
+    'src/main/updater/releases/updater-changelog.ts': 'export const b = 2\n'
+  })
+  assert.deepEqual([...result.silent].sort(), [
+    'src/main/updater/releases/updater-changelog.ts',
+    'src/main/updater/updater-events.ts'
+  ])
+  assert.equal(result.scanned, 3)
 })

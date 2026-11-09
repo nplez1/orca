@@ -16,6 +16,9 @@ import {
 } from './checks.mjs'
 import { danglingForkReferences } from './dangling-references.mjs'
 import { forkSymbolSurvival } from './fork-symbol-check.mjs'
+import { citedGuards } from './cited-guards.mjs'
+import { upstreamDeletedForkTests } from './deleted-fork-tests.mjs'
+import { localeDrift } from './locale-drift.mjs'
 import {
   FORK_SLUG,
   builderConfig,
@@ -55,6 +58,12 @@ export function postSyncRows({ tip, source, problem, options }) {
       localizationVerifiers
     ],
     [
+      'locale-drift',
+      'upstream owns every locale catalog, byte-for-byte',
+      'restore the file to upstream and tombstone the key in src/renderer/src/i18n/fork/<lang>.json — a fork edit here is conflict adjacency on the twelve highest-churn paths in the tree',
+      localeDrift
+    ],
+    [
       'builder-config',
       'the fork builder config loads',
       'the fork patches this file; a clean merge into it was wrong',
@@ -68,8 +77,8 @@ export function postSyncRows({ tip, source, problem, options }) {
     ],
     [
       'identity-sweep',
-      'fork identity sweep',
-      'the named paths carry upstream identity (bundle id, app name, data dir) that the fork must own',
+      'fork identity sweep, with no report-only finding the baseline has never seen',
+      'the named paths carry upstream identity (bundle id, app name, data dir) that the fork must own; a new report-only hit is a regression, and an existing one that moved needs --baseline-init --accept <reason> or --baseline-prune',
       identitySweep
     ],
     [
@@ -77,6 +86,12 @@ export function postSyncRows({ tip, source, problem, options }) {
       'fork identity anchors still resolve to this build, not an official install',
       'upstream extracts an anchor into a new file that carries the official name and nothing conflicts; point it at the fork constant before pushing',
       forkInvariants
+    ],
+    [
+      'cited-guards',
+      'every test path and package script LOCAL-PATCHES.md cites still exists',
+      'the ledger is the only record of why each fork patch exists; repoint a moved citation, and restore a lost script rather than deleting the claim',
+      citedGuards
     ],
     [
       'lost-content',
@@ -89,6 +104,12 @@ export function postSyncRows({ tip, source, problem, options }) {
       'deleted fork-only modules, with the exported surface each one carried',
       'for each name listed as unreferenced, find the caller the deletion dropped and re-home it; "upstream supersedes this" is not a review',
       () => deletedForkModules(tip, source, problem)
+    ],
+    [
+      'upstream-deleted-fork-tests',
+      'fork-modified test files that are gone at HEAD after the sync',
+      'for each one, either it was re-homed and the re-homed file carries the fork cases, or its loss is recorded in local/sync/upstream-deleted-fork-tests-baseline.json with a reason',
+      () => upstreamDeletedForkTests(tip, source, problem)
     ],
     [
       'fork-symbol-survival',

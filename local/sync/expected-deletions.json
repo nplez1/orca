@@ -938,6 +938,13 @@
       "status": "expected-deletion",
       "supersededBy": "moved to AiGenerationSelectProps in the same file",
       "reason": "The 2026-11-08 merge split this file's props: `activeThinking` now lives on `AiGenerationSelectProps` (the selects used when there are no picker entries) rather than on `AiGenerationFieldsProps`. It is still declared, still passed by SessionSummaryAiSetting.tsx and still asserted by ai-generation-fields.test.tsx — a rename within the file, not a lost fork capability."
+    },
+    {
+      "path": "local/sync/lib/post-sync-checks.mjs",
+      "symbol": "FEED_GLOB",
+      "status": "expected-deletion",
+      "supersededBy": "`FEED_TREE` plus `git ls-files -- src/main/updater` in the same file",
+      "reason": "Removed by #313 on purpose: `FEED_GLOB` encoded a non-recursive `readdirSync` over the top level of `src/main/updater/`, and that glob is why the check passed while upstream moved the feed anchors into `lifecycle/` and `releases/`. The scan now reads every tracked file under the tree, so there is nothing left for the constant to hold."
     }
   ]
 }

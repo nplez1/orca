@@ -10,7 +10,9 @@
       },
       "settings": {
         "AccountsPane": {
-          "0c64dc2a64": null
+          "0c64dc2a64": null,
+          "340d6f7a85": null,
+          "remoteScopeAuthContext": null
         },
         "GeneralWorkspaceSettingsSection": {
           "0cda18153c": "Where each project's main checkout and its workspaces are created.",
@@ -96,6 +98,11 @@
       },
       "taskPageJiraBoard": {
         "changeStatusFailed": null
+      },
+      "sidebar": {
+        "WorktreeContextMenu": {
+          "editDetails": null
+        }
       }
     },
     "hooks": {
