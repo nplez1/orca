@@ -1,5 +1,4 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { agentHookServer } from '../agent-hooks/server'
@@ -18,6 +17,7 @@ import {
 } from '../session-summary/session-summary-host-fold-client'
 import { registerHostSessionSummaryService } from '../session-summary/session-summary-host-service'
 import { createSshTranscriptFetcher } from '../session-summary/session-summary-remote-transcript'
+import { sweepStaleSessionSummaryScratchDirsOnce } from '../session-summary/session-summary-scratch'
 import {
   resolveSessionSummaryFoldParams,
   type SessionSummaryFoldSettings
@@ -40,6 +40,8 @@ export function createSessionSummaryService(
   overrides: SessionSummaryServiceOverrides = {}
 ): SessionSummaryService {
   const userDataPath = overrides.userDataPath ?? getAppEnvironment().getPath('userData')
+  // Reaps the fold scratch dirs a crashed run left behind in the temp root.
+  sweepStaleSessionSummaryScratchDirsOnce()
   return new SessionSummaryService({
     store: new SessionSummaryStore(join(userDataPath, 'session-summaries.json')),
     readEvents: createSessionSummaryEventReader({
@@ -52,9 +54,7 @@ export function createSessionSummaryService(
       createAgentCliSessionFoldBrain({
         // Request params are an explicit override; the user's text-generation
         // settings are the normal source.
-        resolveParams: () => params ?? resolveSessionSummaryFoldParams(getSettings()),
-        // Folds carry their context in the prompt; the CLI never needs a repo cwd.
-        cwd: join(tmpdir(), 'orca-session-summary')
+        resolveParams: () => params ?? resolveSessionSummaryFoldParams(getSettings())
       }),
     hostFold: overrides.hostFold ?? runtimeHostFoldClient(userDataPath),
     // The host fold spawns the agent on that host, so this window's choice travels with it.
