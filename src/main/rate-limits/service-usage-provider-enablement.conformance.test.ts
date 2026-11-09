@@ -356,6 +356,16 @@ function expectProviderNotQueried(wiring: ProviderEnablementWiring, state: RateL
   }
 }
 
+function expectProviderQueried(wiring: ProviderEnablementWiring): void {
+  // Why not `toHaveBeenCalled`: an off-flag fetcher is invoked either way, so only the flag
+  // it carried distinguishes "queried" from "switched off".
+  if (wiring.query.kind === 'skipped') {
+    expect(wiring.query.mock()).toHaveBeenCalled()
+    return
+  }
+  expect(wiring.query.mock().mock.calls.some((call) => call[0] === true)).toBe(true)
+}
+
 function stateSlot(
   state: RateLimitState,
   provider: DisableableUsageProviderId
@@ -389,6 +399,30 @@ describe('usage provider enablement conformance', () => {
     vi.mocked(hasFireworksCredentials).mockReturnValue(true)
     vi.mocked(hasDeepInfraApiKey).mockReturnValue(true)
     vi.mocked(hasCopilotCredentials).mockReturnValue(true)
+    // Why a live session each: a `missing` reader makes the grok/cursor presence flags read
+    // false whether or not the switch gates them, so the flag assertions would be vacuous.
+    vi.mocked(readGrokAuthSession).mockReturnValue({
+      status: 'ok',
+      session: {
+        accessToken: 'grok-token',
+        userId: null,
+        email: null,
+        teamId: null,
+        expiresAtMs: null,
+        oidcClientId: null
+      }
+    })
+    vi.mocked(readCursorAuthSession).mockResolvedValue({
+      status: 'ok',
+      session: {
+        email: null,
+        displayName: null,
+        membershipType: null,
+        subscriptionStatus: null,
+        token: { raw: 'cursor-token', subject: 'auth0|user_1', expiresAtMs: null },
+        source: 'cli'
+      }
+    })
   })
 
   afterEach(() => {
@@ -401,45 +435,61 @@ describe('usage provider enablement conformance', () => {
   it.each(USAGE_PROVIDER_IDS)(
     'never queries %s, reads its credentials, or refetches on focus when it is the only provider switched off',
     async (disabledProvider) => {
-      const spies = createCredentialReadSpies()
-      const wiring = providerWiring(spies)
-      const service = new CountingFetchAllService({
-        isUsageProviderDisabled: (providerId) => providerId === disabledProvider
-      })
-      configureLiveProviderAccess(service, spies)
-      const window = new FakeRateLimitWindow()
-      service.attach(asRateLimitWindow(window))
-
-      try {
-        await service.refresh()
-        expect(service.fetchAllCalls).toBe(1)
-
-        const state = service.getState()
-        expectProviderNotQueried(wiring[disabledProvider], state)
-        expect(stateSlot(state, disabledProvider)).toBeNull()
-        // The switch turns off one provider, not the cycle: every sibling still queries.
-        for (const provider of USAGE_PROVIDER_IDS) {
-          if (provider !== disabledProvider) {
-            expect(wiring[provider].query.mock()).toHaveBeenCalled()
-          }
-        }
-
-        // #300: the disabled slot is null on every push, so a plan that counted it saw a
-        // null slot and refetched every provider on every focus.
-        window.emit('focus')
-        expect(service.fetchAllCalls).toBe(1)
-
-        // Control: the same focus path does refetch once the throttle lapses, so the
-        // assertion above is a gate and not a dead listener.
-        await vi.advanceTimersByTimeAsync(MIN_REFETCH_MS + 1)
-        window.emit('focus')
-        expect(service.fetchAllCalls).toBe(2)
-        await service.inFlight
-        expectProviderNotQueried(wiring[disabledProvider], service.getState())
-        expect(stateSlot(service.getState(), disabledProvider)).toBeNull()
-      } finally {
-        service.stop()
-      }
+      await verifySwitchHonored([disabledProvider])
     }
   )
+
+  // Why more than one: the deleted suite's only multi-provider case, and the disabled set is
+  // walked in several places, so a set of one proves only the single-provider path.
+  it('honours every switched-off provider at once', async () => {
+    await verifySwitchHonored(['gemini', 'cursor'])
+  })
 })
+
+async function verifySwitchHonored(
+  disabledProviders: readonly DisableableUsageProviderId[]
+): Promise<void> {
+  const spies = createCredentialReadSpies()
+  const wiring = providerWiring(spies)
+  const service = new CountingFetchAllService({
+    isUsageProviderDisabled: (providerId) => disabledProviders.includes(providerId)
+  })
+  configureLiveProviderAccess(service, spies)
+  const window = new FakeRateLimitWindow()
+  service.attach(asRateLimitWindow(window))
+
+  try {
+    await service.refresh()
+    expect(service.fetchAllCalls).toBe(1)
+
+    const state = service.getState()
+    for (const provider of disabledProviders) {
+      expectProviderNotQueried(wiring[provider], state)
+      expect(stateSlot(state, provider)).toBeNull()
+    }
+    // The switch turns off those providers, not the cycle: every sibling still queries.
+    for (const provider of USAGE_PROVIDER_IDS) {
+      if (!disabledProviders.includes(provider)) {
+        expectProviderQueried(wiring[provider])
+      }
+    }
+
+    // #300: a disabled slot is null on every push, so a plan that counted one saw a null
+    // slot and refetched every provider on every focus.
+    window.emit('focus')
+    expect(service.fetchAllCalls).toBe(1)
+
+    // Control: the same focus path does refetch once the throttle lapses, so the assertion
+    // above is a gate and not a dead listener.
+    await vi.advanceTimersByTimeAsync(MIN_REFETCH_MS + 1)
+    window.emit('focus')
+    expect(service.fetchAllCalls).toBe(2)
+    await service.inFlight
+    for (const provider of disabledProviders) {
+      expectProviderNotQueried(wiring[provider], service.getState())
+      expect(stateSlot(service.getState(), provider)).toBeNull()
+    }
+  } finally {
+    service.stop()
+  }
+}
