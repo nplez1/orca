@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { installedAppExecutableCandidates } from './install-layout-names'
+import {
+  installedAppExecutableCandidates,
+  LEGACY_MAC_DAEMON_JOB_LABEL_PREFIX,
+  MAC_DAEMON_JOB_LABEL_PREFIX,
+  macDaemonJobLabelWith
+} from './install-layout-names'
+
+describe('macDaemonJobLabelWith', () => {
+  it('names this build, and keeps the pre-rename label the old builds wrote', () => {
+    expect(MAC_DAEMON_JOB_LABEL_PREFIX).toBe('com.nplez1.orca.terminal')
+    expect(LEGACY_MAC_DAEMON_JOB_LABEL_PREFIX).toBe('com.stablyai.orca.terminal')
+    expect(macDaemonJobLabelWith(MAC_DAEMON_JOB_LABEL_PREFIX, '/tmp/userData', 55)).toMatch(
+      /^com\.nplez1\.orca\.terminal\.[0-9a-f]{16}\.v55$/
+    )
+    expect(macDaemonJobLabelWith(LEGACY_MAC_DAEMON_JOB_LABEL_PREFIX, '/tmp/userData', 55)).toBe(
+      macDaemonJobLabelWith(MAC_DAEMON_JOB_LABEL_PREFIX, '/tmp/userData', 55).replace(
+        MAC_DAEMON_JOB_LABEL_PREFIX,
+        LEGACY_MAC_DAEMON_JOB_LABEL_PREFIX
+      )
+    )
+  })
+})
 
 describe('installedAppExecutableCandidates', () => {
   it('resolves this build beside an official Orca on macOS', () => {

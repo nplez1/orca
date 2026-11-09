@@ -3771,10 +3771,12 @@ Six things a reader will otherwise get wrong:
   last place naming the other app. The label's profile hash is `sha256(resolve(userDataPath))`, and
   this build's `userData` is `appData/orca-np`, so a `com.stablyai.orca.terminal.<hash>` job can only
   be one of our own earlier builds — an official install's `userData` hashes differently. That job is
-  released before bootstrap inside the same deadline that reserves time for bootstrap and startup:
-  booted out if it is stopped, waited out if it is still running, and left alone if it outlives the
-  deadline, because booting out a live daemon would kill the user's terminals. This costs one extra
-  `launchctl print` per launch, for a label that is almost always missing.
+  released before bootstrap: waited out until the deadline that reserves time for bootstrap and
+  startup if it is still running, booted out if it is stopped (which pays `stopMacDaemonJob`'s own
+  10 s `bootout` plus 3 s poll, outside that budget, once — after that the job is gone), and left
+  alone if it outlives the deadline, because booting out a live daemon would kill the user's
+  terminals. This costs one extra `launchctl print` per launch, for a label that is almost always
+  missing.
 - **`orca-dev` and `orca-dev-wt` stay in the hook's recovery list.** They are still this fork's dev
   profile roots (`SHARED_DEV_PROFILE_DIR_NAME`, `WORKTREE_DEV_PROFILES_DIR_NAME` in
   `dev-instance-isolation.mjs`); only upstream's packaged `orca` root left the list, because adopting

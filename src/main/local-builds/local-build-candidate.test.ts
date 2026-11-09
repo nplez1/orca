@@ -84,8 +84,6 @@ describe('loadLocalBuildCandidate', () => {
     ).rejects.toThrow('regular files, not links')
   })
 
-  // Why: the zip is rooted at the bundle name, so a path naming upstream's bundle reads nothing and
-  // every local build is rejected as "predates local switching".
   it.skipIf(process.platform !== 'darwin')(
     'reads the compatibility file out of a zip rooted at this build’s bundle',
     async () => {

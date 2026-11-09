@@ -71,6 +71,7 @@ vi.mock('../../../transport/client/daemon-client', () => ({
 
 import { launchMacDaemonFromStableBundle } from '../macos-daemon-launchd'
 import { legacyMacDaemonJobLabel, macDaemonJobLabel } from '../macos-daemon-job-label'
+import { DAEMON_SHUTDOWN_TIMEOUT_MS } from '../../../launch/daemon-shutdown-deadline'
 import type { DaemonChildSpawnOptions } from '../../../launch/daemon-launched-child-spawn'
 import { PROTOCOL_VERSION } from '../../../protocol/daemon-protocol-version'
 
@@ -190,8 +191,12 @@ beforeEach(async () => {
           (launchctl.print.length > 1 ? launchctl.print.shift() : launchctl.print[0]) ?? missing
         )
       }
-      if (verb === 'bootout' && spec.args?.[1] === service() && launchctl.bootout.code === 0) {
-        launchctl.print = [missing]
+      if (verb === 'bootout' && launchctl.bootout.code === 0) {
+        if (spec.args?.[1] === legacyService()) {
+          launchctl.legacyPrint = missing
+        } else if (spec.args?.[1] === service()) {
+          launchctl.print = [missing]
+        }
       }
       return verb === 'bootstrap' ? launchctl.bootstrap : launchctl.bootout
     }
@@ -265,7 +270,7 @@ it('boots out a stopped job left under the pre-rename label', async () => {
 
   expect(handle).not.toBeNull()
   expect(launchctlCalls('bootout').map((spec) => spec.args?.[1])).toEqual([legacyService()])
-  expect(launchctlCalls('bootstrap').map((spec) => spec.args?.[1])).toEqual([`gui/501`])
+  expect(job).toMatchObject({ Label: macDaemonJobLabel(state.root) })
   await handle?.shutdown()
 })
 
@@ -274,9 +279,9 @@ it('waits out a running job left under the pre-rename label without booting it o
   launchctl.legacyPrint = running
   const handle = await launchMacDaemonFromStableBundle(options, roomyDeadline())
 
-  expect(retirementClock.now - startedAt).toBeGreaterThan(0)
+  expect(retirementClock.now - startedAt).toBe(DAEMON_SHUTDOWN_TIMEOUT_MS + 2_000)
   expect(launchctlCalls('bootout')).toHaveLength(0)
-  expect(handle).not.toBeNull()
+  expect(job).toMatchObject({ Label: macDaemonJobLabel(state.root) })
   await handle?.shutdown()
 })
 

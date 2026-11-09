@@ -63,7 +63,10 @@ export const WINDOWS_LEGACY_INSTALL_DIRECTORY_NAME = 'orca'
 /** `/opt/<this>` — FpmTarget stages the deb/rpm payload under the sanitized product name. */
 export const LINUX_INSTALL_DIRECTORY_NAME = APP_DISPLAY_NAME
 
-/** `linux.executableName`, i.e. `/opt/Orca NP/orca-np`. It is the package name, as on Windows. */
+/**
+ * `linux.executableName`, i.e. `/opt/Orca NP/orca-np` — the package name, not the product name, because
+ * deb/rpm payload paths are named after it.
+ */
 export const LINUX_APP_EXECUTABLE_NAME = CLI_COMMAND_NAME
 
 /**
