@@ -6,7 +6,7 @@ keywords:
   - npx skills add
   - orca-cli skill
   - orchestration skill
-  - computer-use skill
+  - Orca Computer Use skill
   - orca-linear skill
   - orca-emulator skill
   - orca-emulator-android skill
@@ -23,13 +23,13 @@ Orca install, which targets a different app and data directory.
 
 ## Installable Orca skills
 
-Use `npx skills add` with this build's repository and the skill name. Default agent setup usually installs `orca-cli`, `computer-use`, and `orchestration`.
+Use `npx skills add` with this build's repository and the skill name. Default agent setup usually installs `orca-cli`, `orca-computer-use`, and `orchestration`.
 
-| Skill                                               | Install                                                                                 | Use it for                                                    |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Skill                                               | Install                                                                                   | Use it for                                                    |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | [`orca-cli`](#orca-cli)                             | `npx skills add https://github.com/nplez1/orca --skill orca-cli --global`               | Worktrees, terminals, files, automations, embedded browser.   |
 | [`orchestration`](#orchestration)                   | `npx skills add https://github.com/nplez1/orca --skill orchestration --global`          | Multi-agent Runs, tasks, supervised workers, messages, gates. |
-| [`computer-use`](#computer-use)                     | `npx skills add https://github.com/nplez1/orca --skill computer-use --global`           | Desktop apps via accessibility trees and safe UI actions.     |
+| [`orca-computer-use`](#orca-computer-use)           | `npx skills add https://github.com/nplez1/orca --skill orca-computer-use --global`      | Desktop apps via accessibility trees and safe UI actions.     |
 | [`orca-linear`](#orca-linear)                       | `npx skills add https://github.com/nplez1/orca --skill orca-linear --global`            | Linear ticket read/write through `orca linear`.               |
 | [`orca-emulator`](#orca-emulator)                   | `npx skills add https://github.com/nplez1/orca --skill orca-emulator --global`          | iOS Simulator control.                                        |
 | [`orca-emulator-android`](#orca-emulator-android)   | `npx skills add https://github.com/nplez1/orca --skill orca-emulator-android --global`  | Android emulator/device via adb.                              |
@@ -124,10 +124,12 @@ npx skills add https://github.com/nplez1/orca --skill orchestration --global
 
 Use this when an agent should coordinate other agents through Runs, tasks, supervised workers, and decision gates. See [Orchestration](/docs/cli/orchestration). Always load `orca skills get orchestration --full` before mutating orchestration state — the legacy `orchestration run` command is retired.
 
-## computer-use
+<span id="computer-use" />
+
+## orca-computer-use
 
 ```bash
-npx skills add https://github.com/nplez1/orca --skill computer-use --global
+npx skills add https://github.com/nplez1/orca --skill orca-computer-use --global
 ```
 
 Use this when an agent needs to inspect and operate local desktop app windows. See [Computer use](/docs/cli/computer-use).

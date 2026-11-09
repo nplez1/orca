@@ -5,25 +5,26 @@ import {
   presentPrMerge,
   resolveMobileAdminMergeBypassRequired
 } from '../components/pr-sidebar/pr-actions-state'
-import { useMobilePrActions } from '../session/use-mobile-pr-actions'
-import { useMobilePrAiTriage, type PrAiTriageKey } from '../session/use-mobile-pr-ai-triage'
+import { useMobilePrActions } from './review/use-mobile-pr-actions'
+import './review/pr-actions-engine'
+import type { PrActionBusyKey } from './review/pr-actions-engine'
+import { prActionSlices, type PrSlice } from './review/mobile-pr-queries'
+import { useMobilePrAiTriage, type PrAiTriageKey } from './review/use-mobile-pr-ai-triage'
 import {
   buildPrFixChecksPrompt,
   buildResolveConflictsPrompt as buildReviewConflictsPrompt
-} from '../session/pr-ai-triage-prompt'
-import type { PrSidebarState } from '../session/mobile-pr-sidebar-state'
-import type { PrSidebarLoadOptions } from '../session/use-mobile-pr-sidebar-controller'
-import { buildResolveConflictsPrompt } from '../../../src/shared/source-control-conflict-prompts'
+} from './review/pr-ai-triage-prompt'
+import type { PrSidebarState } from './review/mobile-pr-sidebar-state'
+import { buildResolveConflictsPrompt } from '../../../src/shared/source-control/recovery/source-control-conflict-prompts'
 import { resolveGitHubPRMergeMethods } from '../../../src/shared/github/pull-request-merge-methods'
 import type { GitHubPRMergeMethod } from '../../../src/shared/github/pull-request-types'
-import { summarizeProviderChecks } from '../../../src/shared/provider-check-summary'
-import { getBrokenChecks } from '../../../src/shared/pr-checks-fix-prompt'
-import { resolveSourceControlCommitAreaPrimaryActionDecision } from '../../../src/shared/source-control-primary-action-decision'
+import { summarizeProviderChecks } from '../../../src/shared/source-control/checks/provider-check-summary'
+import { getBrokenChecks } from '../../../src/shared/source-control/checks/pr-checks-fix-prompt'
+import { resolveSourceControlCommitAreaPrimaryActionDecision } from '../../../src/shared/source-control/decisions/source-control-primary-action-decision'
 import {
   resolveSourceControlNextStep,
-  type SourceControlNextStep,
   type SourceControlNextStepReview
-} from '../../../src/shared/source-control-next-step-decision'
+} from '../../../src/shared/source-control/decisions/source-control-next-step-decision'
 import { splitWorktreeIdForFilesystem } from '../../../src/shared/worktree/id'
 import { MOBILE_COMPLETE_MERGE_ACTION_ID } from './mobile-source-control-conflict-actions'
 import {
@@ -43,23 +44,14 @@ type Params = {
   prState: PrSidebarState
   /** False on hosts without PR support; the bar then stops at Create PR. */
   reviewsSupported: boolean
-  refetchPr: (options?: PrSidebarLoadOptions) => void
+  /** Re-reads the parts of the PR a write changed; a failed read keeps the shown PR. */
+  rereadPr: (slices: readonly PrSlice[]) => Promise<void>
   headSha: string | null
   /** The Changes body shows git workflow failures; elsewhere the bar has to. */
   showWorkflowErrors: boolean
   /** Opens the PR tab's Merge sheet, which picks the method, instead of confirming the default. */
   onMerge?: () => void
 }
-
-// Steps where the bar itself offers the PR's merge actions.
-// Agent steps leave Merge and auto-merge to the PR body.
-const REVIEW_STEPS: ReadonlySet<SourceControlNextStep['kind']> = new Set([
-  'merge_when_ready',
-  'auto_merge_on',
-  'merge',
-  'merge_blocked',
-  'merged'
-])
 
 export type MobileMergeConfirm = {
   title: string
@@ -76,7 +68,7 @@ export function useMobileSourceControlNextStep({
   review,
   prState,
   reviewsSupported,
-  refetchPr,
+  rereadPr,
   headSha,
   showWorkflowErrors,
   onMerge
@@ -86,6 +78,10 @@ export function useMobileSourceControlNextStep({
   const readyPr = prState.kind === 'ready' ? prState.data : null
   const prNumber = readyPr?.pr.number ?? 0
   const prRepo = readyPr?.pr.prRepo ?? null
+  const rereadAfterAction = useCallback(
+    (action: PrActionBusyKey) => rereadPr(prActionSlices(action)),
+    [rereadPr]
+  )
   const actions = useMobilePrActions({
     client,
     connState,
@@ -93,7 +89,7 @@ export function useMobileSourceControlNextStep({
     prNumber,
     headSha,
     prRepo,
-    refetch: refetchPr
+    refetch: rereadAfterAction
   })
   const { hostCapabilities, statusPending, statusReadable } = useHostProtocolGates()
   const triage = useMobilePrAiTriage({
@@ -267,11 +263,10 @@ export function useMobileSourceControlNextStep({
       : step.kind === 'resolve_conflicts'
         ? 'resolve-conflicts'
         : null
-  // On the PR tab the body's own AI button already shows this launcher's notice.
-  const agentNotice =
-    triageKey && !showWorkflowErrors
-      ? { ...triage.noticeFor(triageKey), availability: triage.availability }
-      : null
+  // The bar's agent button is the only one on either tab, so its launch notice shows under it.
+  const agentNotice = triageKey
+    ? { ...triage.noticeFor(triageKey), availability: triage.availability }
+    : null
   const workflowError = showWorkflowErrors
     ? (state.actionError ?? state.commitFailureRecovery?.error ?? null)
     : null
@@ -298,9 +293,7 @@ export function useMobileSourceControlNextStep({
         }
       : null
 
-  // While the bar is on a local step, the PR body keeps its own Merge so it stays reachable.
   return {
-    offersMerge: REVIEW_STEPS.has(step.kind),
     view,
     notice,
     agentNotice,

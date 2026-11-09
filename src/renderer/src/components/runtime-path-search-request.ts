@@ -1,6 +1,6 @@
 import type { MutableRefObject } from 'react'
-import { createBrowserUuid } from '@/lib/browser-uuid'
-import type { PathSearchMode } from '../../../shared/quick-open-path-search'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import type { PathSearchMode } from '../../../shared/quick-open/quick-open-path-search'
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import {
   WORKSPACE_PATH_SEARCH_ROW_FLAGS,
@@ -8,8 +8,8 @@ import {
 } from '../../../shared/workspace-path-search-contract'
 import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
 import { cancelRuntimeFileList, searchRuntimeFilePaths } from '@/runtime/runtime-file-client'
-import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
-import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
+import { runtimeTargetForOwnerEnvironment } from '../runtime/rpc/targets/runtime-client-target'
+import type { FileExplorerOperationOwner } from './right-sidebar/file-explorer/tree/file-explorer-types'
 import { recordRendererPathSearchDuration } from './right-sidebar/file-explorer-name-filter-timing'
 import {
   queueLatestRuntimePathSearch,

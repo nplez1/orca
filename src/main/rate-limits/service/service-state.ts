@@ -1,11 +1,14 @@
+import type { LocalAccountRuntimeTarget } from '../../../shared/local-account-runtime'
 import type { BrowserWindow } from 'electron'
 import type {
+  AntigravityAccountUsage,
   InactiveAccountUsage,
   ProviderRateLimits,
   RateLimitState
 } from '../../../shared/rate-limit-types'
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import { USAGE_PROVIDER_IDS } from '../../../shared/usage-provider-enablement'
+import type { AntigravityAccountUsageRecorder } from '../antigravity-account-usage'
 import {
   type ActiveRateLimitProvider,
   type InactiveCodexAccountInfo,
@@ -16,6 +19,7 @@ import {
   type OpenCodeGoRateLimitConfig,
   type MiniMaxRateLimitConfig,
   type AntigravityUsageEnabledResolver,
+  type MuseUsageEnabledResolver,
   type ZcodePlanRateLimitConfig,
   type DeepSeekRateLimitConfig,
   type DeepInfraRateLimitConfig,
@@ -68,7 +72,8 @@ export abstract class RateLimitServiceState {
     deepseek: null,
     fireworks: null,
     deepinfra: null,
-    copilot: null
+    copilot: null,
+    muse: null
   }
   // Grok's auth-file probe runs per fetch cycle, gated with the provider's disabled state.
   protected grokAuthConfigured = false
@@ -93,7 +98,8 @@ export abstract class RateLimitServiceState {
     deepseek: 0,
     fireworks: 0,
     deepinfra: 0,
-    copilot: 0
+    copilot: 0,
+    muse: 0
   }
   // Failures increase activation backoff; success/unavailable resets it.
   protected activeFailureStreakByProvider: Record<ActiveRateLimitProvider, number> = {
@@ -110,9 +116,12 @@ export abstract class RateLimitServiceState {
     deepseek: 0,
     fireworks: 0,
     deepinfra: 0,
-    copilot: 0
+    copilot: 0,
+    muse: 0
   }
   protected mainWindow: BrowserWindow | null = null
+  /** Paired clients streaming usage (accounts.subscribe); headless hosts have no window to watch. */
+  protected usageViewers = 0
   protected detachWindowListeners: (() => void) | null = null
   protected isFetching = false
   protected fullFetchQueued = false
@@ -165,6 +174,10 @@ export abstract class RateLimitServiceState {
   protected copilotConfigResolver: (() => CopilotRateLimitConfig) | null = null
   protected geminiCliOAuthEnabledResolver: GeminiCliOAuthEnabledResolver | null = null
   protected antigravityUsageEnabledResolver: AntigravityUsageEnabledResolver | null = null
+  protected antigravityFetchTarget: LocalAccountRuntimeTarget = { runtime: 'host', wslDistro: null }
+  protected antigravityAccountUsageRecorder: AntigravityAccountUsageRecorder | null = null
+  protected antigravityAccounts: AntigravityAccountUsage[] = []
+  protected museUsageEnabledResolver: MuseUsageEnabledResolver | null = null
   protected inactiveClaudeAccountsResolver: (() => InactiveClaudeAccountInfo[]) | null = null
   protected inactiveCodexAccountsResolver: (() => InactiveCodexAccountInfo[]) | null = null
   protected networkProxySettingsResolver: (() => NetworkProxySettings) | null = null

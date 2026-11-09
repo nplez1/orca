@@ -10,7 +10,7 @@ import { GitHubStarButton } from '@/components/GitHubStarButton'
 import { useOrcaStarState } from '@/components/orca-star-state'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { OrcaBrandMark } from '@/components/OrcaBrandMark'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 
 type ShortcutItem = { id: string; shortcut: ShortcutKeyComboDetails; action: string }
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PairingOffer } from '../../shared/pairing'
+import type { PairingOffer } from '../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import { HOST_SETTINGS_APPLY_METHOD } from '../../shared/host-settings-replication'
 import type { HostSettingsReplicationApplyResult } from '../../shared/host-settings-replication'

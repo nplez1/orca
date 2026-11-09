@@ -4,8 +4,8 @@ import {
   type HostSettingsReplicationApplyResult
 } from '../../shared/host-settings-replication'
 import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime/remote-runtime-client'
-import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
-import { resolveEnvironmentPairingOffer } from '../../shared/runtime-environment-store'
+import { pairedRuntimeConnectionFromOffer } from '../../shared/remote-runtime/pairing/paired-runtime-connection'
+import { resolveEnvironmentPairingOffer } from '../../shared/remote-runtime/host-store/runtime-environment-store'
 import { HOST_SETTINGS_CREDENTIAL_PORTS } from './host-settings-credential-ports'
 import { setReplicatedCredentialChangeListener } from './host-settings-replication-service'
 import {

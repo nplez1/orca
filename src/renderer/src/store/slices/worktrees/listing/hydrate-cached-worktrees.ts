@@ -3,7 +3,7 @@ import {
   LOCAL_EXECUTION_HOST_ID
 } from '../../../../../../shared/execution-host'
 import type { DetectedWorktreeListResult } from '../../../../../../shared/worktree/types'
-import type { WorktreeSlice } from '../../worktree-helpers'
+import type { WorktreeSlice } from '../worktree-slice-contract'
 import type { WorktreeSliceGet, WorktreeSliceSet } from './worktree-slice-types'
 import { mergeFetchedWorktrees } from './fetched-worktree-merge'
 import { getProjectHostSetupForRepoHost } from './worktree-host-ownership'

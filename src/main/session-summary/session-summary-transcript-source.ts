@@ -3,22 +3,25 @@
 // structured journal and PTY fallbacks are later adapters over the same events.
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { AgentType } from '../../shared/agent-status-types'
-import type { AiVaultAgent } from '../../shared/ai-vault-types'
-import { isAiVaultAgent } from '../../shared/ai-vault-types'
+import type { AgentType } from '../../shared/agent-status/contracts/agent-status-types'
+import type { AiVaultAgent } from '../../shared/ai-vault/contracts/ai-vault-types'
+import { isAiVaultAgent } from '../../shared/ai-vault/contracts/ai-vault-types'
 import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import {
   resolveNativeChatTranscriptAgent,
   type NativeChatTranscriptAgent
 } from '../../shared/native-chat/native-chat-agent-support'
-import { readResumableTranscript, readWholeTranscript } from '../ai-vault/session-transcript-reader'
+import {
+  readResumableTranscript,
+  readWholeTranscript
+} from '../ai-vault/transcripts/session-transcript-reader'
 import {
   registerTranscriptConsumer,
   type TranscriptMessage
-} from '../ai-vault/session-transcript-consumers'
-import { resumableStateFactoryFor } from '../ai-vault/session-scanner-parse-cache'
-import { describeSkippedTranscriptRecords } from '../ai-vault/session-transcript-record-budget'
-import type { SkippedTranscriptRecord } from '../ai-vault/session-transcript-record-budget'
+} from '../ai-vault/transcripts/session-transcript-consumers'
+import { resumableStateFactoryFor } from '../ai-vault/parse-cache/session-scanner-parse-cache'
+import { describeSkippedTranscriptRecords } from './session-summary-skipped-record-text'
+import type { SkippedTranscriptRecord } from '../ai-vault/transcripts/session-transcript-record-budget'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import { COPILOT_SESSIONS_DIR } from '../ai-vault/session-scanner-agent-sources'
 import type { SessionFileCandidate, FileWithMtime } from '../ai-vault/session-scanner-types'

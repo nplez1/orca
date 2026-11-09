@@ -9,7 +9,6 @@ import {
 import type { Repo } from '../../shared/repo-types'
 import { isWindowsAbsolutePathLike, resolveRuntimePath } from '../../shared/cross-platform-path'
 import { isWslUncPath, resolveWslRepoWorktreeBasePath } from '../../shared/wsl-paths'
-import { getWslHome, getWslHomeAsync, parseWslPath } from '../wsl'
 import {
   adoptExistingDirectoryName,
   getRuntimePathOps,
@@ -17,6 +16,8 @@ import {
   resolveNestedRepoContainerName,
   resolveProjectFolderName
 } from './project-folder-placement'
+import { getWslHome, getWslHomeAsync } from '../wsl/discovery/distro-catalog'
+import { parseWslPath } from '../wsl/filesystem/unc-path-access'
 
 export { resolveNestedRepoContainerName } from './project-folder-placement'
 export { resolveProjectFolderName } from './project-folder-placement'

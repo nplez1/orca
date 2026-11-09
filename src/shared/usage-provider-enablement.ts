@@ -27,7 +27,8 @@ export const USAGE_PROVIDER_IDS = [
   'copilot',
   'grok',
   'cursor',
-  'zcode'
+  'zcode',
+  'muse'
 ] as const
 
 export type DisableableUsageProviderId = (typeof USAGE_PROVIDER_IDS)[number]

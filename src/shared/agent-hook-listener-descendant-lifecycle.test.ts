@@ -4,14 +4,17 @@ import {
   createHookListenerState,
   deleteLegacyAgentStatus,
   movePaneCacheState,
-  paneHasStateClaims,
   seedLegacyAgentStatusForTests,
   type HookListenerState
 } from './agent-hook-listener/listener-state'
-import { normalizeAndAccept, PANE_KEY } from './agent-hook-listener-test-harness'
-import type { AgentHookSource } from './agent-hook-relay'
+import { paneHasStateClaims } from './agent-hook-listener/pane-state-claims'
+import {
+  normalizeAndAccept,
+  PANE_KEY
+} from './agent-hook-listener/normalization/agent-hook-listener-test-harness'
+import type { AgentHookSource } from './agent-hook-listener/transport/agent-hook-relay'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from './agent-descendant-roster'
-import { foldMainAgentWithRowChildWork } from './agent-hook-row-child-work-fold'
+import { foldMainAgentWithRowChildWork } from './agent-hook-listener/state/agent-hook-row-child-work-fold'
 
 /** Every case drives `normalizeHookPayload`, the entry both the main process and the relay
  *  call, so a fix that never reaches production wiring cannot pass here. */

@@ -2,10 +2,10 @@ import { isValidElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { AiVaultSearchSettings } from '../../../../shared/ai-vault-search-settings'
+import type { AiVaultSearchSettings } from '../../../../shared/ai-vault/search/ai-vault-search-settings'
 import { AgentSessionSearchSection } from './AgentSessionSearchSection'
-import { getAgentsPaneSearchEntries } from './agents-search'
-import { matchesSettingsSearch } from './settings-search'
+import { getAgentsPaneSearchEntries } from './agents/agents-search'
+import { matchesSettingsSearch } from './search/settings-search'
 
 type ReactElementLike = {
   type: unknown

@@ -1,5 +1,5 @@
-import type { WorkerThreadFactory } from '../lazy-worker-thread-host'
-import { WorkerThreadRequestQueue } from '../worker-thread-request-queue'
+import type { WorkerThreadFactory } from '../worker-threads/worker-thread-transport'
+import { WorkerThreadRequestQueue } from '../worker-threads/worker-thread-request-queue'
 import { errorMessage } from './workspace-path-index-worker-response'
 import { workerTransferList } from './workspace-path-index-worker-transfer'
 import type {

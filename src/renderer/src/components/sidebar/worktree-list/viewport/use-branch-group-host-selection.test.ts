@@ -13,7 +13,7 @@ import {
   remoteWorktree,
   repo,
   worktree
-} from '../../worktree-list-groups-test-fixtures'
+} from '../grouping/worktree-list-groups-test-fixtures'
 import {
   findBranchGroupHostTarget,
   useBranchGroupHostSelection

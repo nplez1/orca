@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TaskPageJiraBoardModel } from './task-page-jira-board-types'
 import type { JiraBoardOverview, JiraBoardSelection } from '../../../shared/jira/jira-types'
-import { jiraGetBoardOverview } from '@/runtime/runtime-jira-client'
+import { jiraGetBoardOverview } from '../runtime/jira/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import {

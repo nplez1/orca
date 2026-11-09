@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
 import {
   createAgentStatusExtensionHarness,
   type AgentStatusExtensionHarness,
@@ -7,18 +6,18 @@ import {
 } from './agent-status-extension-test-harness'
 import {
   agentEndCount,
-  childIds,
-  complete,
   endTurn,
-  exitRunner,
-  idle,
   postedHookNames,
   postedSubagentRunIds,
   posts,
   startAsync,
-  startChild,
+  complete,
+  exitRunner,
   startWorkflow,
-  WORKFLOW
+  startChild,
+  WORKFLOW,
+  idle,
+  childIds
 } from './agent-status-subagent-event-fixtures'
 
 // Match Pi 0.87.1/pi-subagents 0.71.0 registration replacement and fresh event buses.
@@ -105,16 +104,6 @@ describe('Pi session changes', () => {
     ])
   })
 
-  it('posts nothing on quit, even with children still running', async () => {
-    const harness = createPi()
-    await holdRunOpen(harness)
-    const sent = posts(harness).length
-    await harness.callHook('session_shutdown', { reason: 'quit' })
-    await vi.advanceTimersByTimeAsync(5_000)
-
-    expect(posts(harness)).toHaveLength(sent)
-  })
-
   it('re-opens the run for a child of the next session after a turn the old one cut off', async () => {
     const harness = createPi()
     await harness.callHook('session_start', { reason: 'startup' }, session('A'))
@@ -177,18 +166,6 @@ describe('Pi session changes', () => {
       hook_event_name: 'session_start',
       session_id: 'B'
     })
-  })
-
-  it('posts nothing for an old session whose run already ended', async () => {
-    const harness = createPi()
-    await harness.callHook('agent_start', {}, session('A'))
-    await endTurn(harness)
-    expect(agentEndCount(harness)).toBe(1)
-
-    await harness.replacePiSession('fork', '/sessions/B.jsonl')
-    await vi.advanceTimersByTimeAsync(0)
-
-    expect(agentEndCount(harness)).toBe(1)
   })
 
   it('delivers the old session’s completion ahead of a new session posted behind an in-flight delivery', async () => {

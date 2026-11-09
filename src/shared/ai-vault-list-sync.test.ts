@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AiVaultSession } from './ai-vault-types'
+import type { AiVaultSession } from './ai-vault/contracts/ai-vault-types'
 import { applyAiVaultListDelta } from './ai-vault-list-sync'
 import { aiVaultSessionSortTime, sortAiVaultSessionsByRecency } from './ai-vault-session-sort'
 

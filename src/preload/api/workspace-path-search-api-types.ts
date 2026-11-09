@@ -1,5 +1,5 @@
 import type { FilePathSearchResult } from '../../shared/file-path-search-result'
-import type { PathSearchMode } from '../../shared/quick-open-path-search'
+import type { PathSearchMode } from '../../shared/quick-open/quick-open-path-search'
 import type {
   WorkspacePathSearchCorrelationId,
   WorkspacePathSearchDiagnosticsSummary,

@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
-import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
+import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 import { TaskPageJiraBoardColumns } from './BoardColumns'
 
 const openUrl = vi.fn()

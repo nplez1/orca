@@ -1,8 +1,8 @@
-import type { LinearIssueData } from './linear-issue-publication'
+import type { LinearIssueData } from './linear-issue-read'
 import { isIntegrationCredentialDecryptionError } from '../../../../../shared/integration-credential-errors'
-import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
 import { ownedSourceTarget, type OwnedSource } from '@/lib/provider-source-target'
-import type { CacheEntry } from '../../github/cache-model'
+import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
+import type { CacheEntry } from '../../github/cache/cache-model'
 import type { LinearIssue } from '../../../../../shared/linear/issue-types'
 import type {
   LinearCollectionResult,

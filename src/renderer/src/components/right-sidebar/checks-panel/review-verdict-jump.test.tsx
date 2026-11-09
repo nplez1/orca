@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PRComment } from '../../../../../shared/github/comment-types'
-import { getPRCommentPresentationClasses } from '../pr-comment-presentation'
+import { getPRCommentPresentationClasses } from './comments/pr-comment-presentation'
 
 vi.mock('@/lib/element-scroll-reveal', () => ({
   scrollElementBottomIntoView: vi.fn(),
@@ -55,8 +55,8 @@ vi.mock('@/components/ui/dropdown-menu', () => {
 })
 
 import { scrollElementCenterIntoView } from '@/lib/element-scroll-reveal'
-import { PRCommentsList } from './comments-list'
-import { PR_COMMENT_REVEAL_HIGHLIGHT_MS } from './use-comments-list-state'
+import { PRCommentsList } from './comments/comments-list'
+import { PR_COMMENT_REVEAL_HIGHLIGHT_MS } from './comments/use-comments-list-state'
 
 let container: HTMLDivElement
 let root: Root

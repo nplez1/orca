@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MAX_SESSION_TRANSCRIPT_RECORD_BYTES } from '../ai-vault/session-transcript-record-budget'
+import { MAX_SESSION_TRANSCRIPT_RECORD_BYTES } from '../ai-vault/transcripts/session-transcript-record-budget'
 
 /**
  * Which provider transcripts the fold can read.

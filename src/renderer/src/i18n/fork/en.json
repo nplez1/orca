@@ -429,7 +429,7 @@
       },
       "settings": {
         "AccountsPane": {
-          "0c64dc2a64": null,
+          "0c64dc2a64": "Gemini CLI (legacy)",
           "aa4de4475b": "Gemini CLI (legacy)"
         },
         "AdvancedPane": {
@@ -821,7 +821,8 @@
           "addToAnotherHost": "Add to another host…",
           "copyRefusedFolderProject": "Folder projects have no branch to copy to another host.",
           "copyRefusedNoSharedRemote": "Add a remote to this project first — another host can only find it through one.",
-          "copyRefusedPublishRemote": "This workspace's branch lives on a remote another host can't recreate."
+          "copyRefusedPublishRemote": "This workspace's branch lives on a remote another host can't recreate.",
+          "439fa94d53": "Update"
         },
         "WorktreeIssueLinkField": {},
         "WorktreeList": {
@@ -961,6 +962,14 @@
       },
       "NewWorkspaceComposerModal": {
         "copyAlreadyLanded": "This project is now on {{host}} on {{branch}}."
+      },
+      "feature": {
+        "wall": {
+          "AiCommitPrSettingsCard": {
+            "be8917699e": "Model",
+            "4b2fc4b80c": "Thinking effort"
+          }
+        }
       }
     },
     "hooks": {
@@ -1344,6 +1353,11 @@
     },
     "activity": {
       "setup": "Setting up…"
+    }
+  },
+  "accounts": {
+    "antigravity": {
+      "scope": "Manage the native agy account on {{host}}."
     }
   }
 }

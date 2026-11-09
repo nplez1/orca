@@ -6,7 +6,7 @@ import {
   sidecarSnapshotFile,
   withSidecarSnapshotQueue,
   writeSidecarSnapshot
-} from '../../../sidecar-snapshot-file'
+} from '../../../filesystem/sidecar-snapshot-file'
 
 const SCHEMA_VERSION = 1
 const MAX_CACHE_AGE_MS = 7 * 24 * 60 * 60 * 1_000

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { buildAutomationHostCatalog } from './automation-host-catalog'
 import type {
   AutomationCatalogHydrationEvidence,
+  AutomationCatalogSshMirrorInput,
   AutomationHostCatalogEntry
 } from './automation-host-catalog-types'
 import {
-  automationCreateEligibleProjects,
   automationCreateHostOffered,
   automationCreateHostStableKey,
   automationCreateProjectMismatch,
@@ -17,13 +18,24 @@ import {
 import { groupReposByAutomationAuthority } from './automation-authority-identity'
 import type { Repo } from '../../../../shared/repo-types'
 
+function mirror(
+  targets: AutomationCatalogSshMirrorInput['targets']
+): AutomationCatalogSshMirrorInput {
+  return {
+    targetsHydrated: true,
+    targets,
+    removedTargetLabels: new Map(),
+    connectionStatusByTargetId: new Map()
+  }
+}
+
 function entry(overrides: Partial<AutomationHostCatalogEntry> = {}): AutomationHostCatalogEntry {
   return {
     stableRef: { authority: { kind: 'desktop' }, selector: { kind: 'self' } },
     owner: { authority: { kind: 'desktop' }, selector: { kind: 'self' } },
     stableKey: 'host:desktop:self',
     label: 'This computer',
-    authorityLabel: 'Desktop',
+    authorityLabel: 'This computer',
     kind: 'self',
     catalogState: 'authoritative',
     authorityHealth: 'fresh',
@@ -276,57 +288,35 @@ describe('create project mismatch', () => {
     expect(automationCreateProjectMismatch(tables, desktopSelf, 'runtime-repo')).toBe(true)
     expect(automationCreateProjectMismatch(tables, desktopSelf, 'ssh-repo')).toBe(true)
     expect(automationCreateProjectMismatch(tables, desktopSelf, 'repo-1')).toBe(true)
-    expect(
-      automationCreateProjectMismatch(
-        tables,
+  })
+})
+
+describe('create destination on a managed SSH host', () => {
+  it("lists only the host's server and lands its desktop SSH key there", () => {
+    const { entries } = buildAutomationHostCatalog({
+      desktop: {
+        label: 'Local Mac',
+        ssh: mirror([{ targetId: 'box', label: 'Build box', generation: 2 }])
+      },
+      runtimes: [
         {
-          ...desktopSelf,
-          destination: { selector: { kind: 'ssh', targetId: 'box', targetGeneration: 3 } }
-        },
-        'ssh-repo'
-      )
-    ).toBe(false)
-  })
+          environmentId: 'env-1',
+          label: 'Build box',
+          pairingRevision: 3,
+          authorityHealth: 'fresh',
+          querySupport: 'scoped',
+          ssh: mirror([]),
+          managedSshTargetId: 'box'
+        }
+      ],
+      runtimeCatalogSettled: true
+    })
+    const desktopSshKey = 'host:desktop:ssh:box'
 
-  it('refuses a repo id another authority owns for a runtime destination', () => {
-    // The exact repo_not_found bug: a desktop-local repo id sent to a remote
-    // host can never resolve there, so the miss is a verdict, not lag.
-    const tables = groupReposByAutomationAuthority([
-      repo({ id: 'repo-1' }),
-      repo({ id: 'runtime-repo', executionHostId: 'runtime:gpu' })
-    ])
-    const runtimeSelf = {
-      authority: { kind: 'runtime' as const, environmentId: 'gpu', pairingRevision: 4 },
-      destination: { selector: { kind: 'self' as const } },
-      entry: entry()
-    }
-    expect(automationCreateProjectMismatch(tables, runtimeSelf, 'repo-1')).toBe(true)
-    expect(automationCreateProjectMismatch(tables, runtimeSelf, 'runtime-repo')).toBe(false)
-    // An id in no table at all fails closed for every destination.
-    expect(automationCreateProjectMismatch(tables, runtimeSelf, 'missing')).toBe(true)
-    expect(automationCreateProjectMismatch(tables, desktopSelf, 'missing')).toBe(true)
+    const desktopSsh = entries.find((entry) => entry.stableKey === desktopSshKey)
+    expect(desktopSsh && automationCreateHostOffered(desktopSsh)).toBe(false)
+    expect(preselectAutomationCreateHost(entries, desktopSshKey, null)?.stableKey).toBe(
+      'host:runtime:env-1:self'
+    )
   })
-
-  it.each([false, true])(
-    'offers the exact copied project on its selected host (reverse=%s)',
-    (reverse) => {
-      const local = repo({ executionHostId: 'local' })
-      const ssh = repo({ executionHostId: 'ssh:box' })
-      const repos = reverse ? [ssh, local] : [local, ssh]
-      const tables = groupReposByAutomationAuthority(repos)
-      const remote = {
-        ...desktopSelf,
-        destination: { selector: { kind: 'ssh' as const, targetId: 'box', targetGeneration: 3 } }
-      }
-      expect(automationCreateEligibleProjects(tables, desktopSelf, repos)).toEqual([local])
-      expect(automationCreateEligibleProjects(tables, remote, repos)).toEqual([ssh])
-      expect(automationCreateProjectMismatch(tables, remote, ssh.id)).toBe(false)
-      const ambiguous = groupReposByAutomationAuthority([
-        ...repos,
-        { ...ssh, displayName: 'duplicate' }
-      ])
-      expect(automationCreateEligibleProjects(ambiguous, remote, repos)).toEqual([])
-      expect(automationCreateEligibleProjects(ambiguous, desktopSelf, repos)).toEqual([local])
-    }
-  )
 })

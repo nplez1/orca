@@ -1,13 +1,13 @@
 import { lstat } from 'node:fs/promises'
 import * as path from 'node:path'
-import type { FsChangeEvent } from '../../../../shared/filesystem-entry-types'
+import type { FsChangeEvent } from '../../../../shared/file-watch/filesystem-change-event'
 import type { WorkspacePathIndexDeltaMutation } from '../../../workspace-path-index/workspace-path-index-worker-protocol'
 import { workspacePathCatalogPathFlags } from '../../../../shared/workspace-path-catalog'
 import {
   relativePathInsideRoot,
   isWindowsAbsolutePathLike
 } from '../../../../shared/cross-platform-path'
-import { buildRgArgsForQuickOpen } from '../../../../shared/quick-open-filter'
+import { buildRgArgsForQuickOpen } from '../../../../shared/quick-open/quick-open-filter'
 import type { WorkspacePathSearchCorrelationId } from '../../../../shared/workspace-path-search-instrumentation'
 import { getLocalGitOptionsForRegisteredWorktree } from '../../local-worktree-runtime-options'
 import {
@@ -20,7 +20,7 @@ import {
   invalidateLocalWorkspacePathIndex
 } from '../../../workspace-path-index/workspace-path-index-runtime'
 import { scanRipgrepPaths } from '../../quick-open-rg-path-scan'
-import { parseWslPath } from '../../../wsl'
+import { parseWslPath } from '../../../wsl/filesystem/unc-path-access'
 
 const DELTA_BATCH_PATHS = 256
 let reconciliationSequence = 0

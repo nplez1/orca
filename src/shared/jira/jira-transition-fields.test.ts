@@ -21,23 +21,6 @@ function transition(fields: JiraTransition['fields']): JiraTransition {
 }
 
 describe('jira-transition-fields', () => {
-  it('treats transitions without required fields as one-click', () => {
-    expect(classifyTransitionRequirements(transition(undefined))).toEqual({ kind: 'none' })
-    expect(
-      classifyTransitionRequirements(
-        transition([
-          {
-            key: 'comment',
-            name: 'Comment',
-            required: false,
-            schema: { type: 'string', system: 'comment' }
-          }
-        ])
-      )
-    ).toEqual({ kind: 'none' })
-    expect(requiredTransitionFields(transition(undefined))).toEqual([])
-  })
-
   it('does not ask for a required field Jira will default itself', () => {
     // Why the fork's rule: prompting for a field the site fills in itself turns a
     // valid move into a blocked one.

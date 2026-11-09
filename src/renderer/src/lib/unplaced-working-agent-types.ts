@@ -1,10 +1,10 @@
-import { isExplicitAgentStatusFresh } from './agent-status'
-import { parseAgentStatusPaneIdentity } from '../../../shared/agent-status-worktree-attribution'
-import {
-  AGENT_STATUS_STALE_AFTER_MS,
-  type AgentStatusEntry,
-  type AgentType
-} from '../../../shared/agent-status-types'
+import { isExplicitAgentStatusFresh } from './pane-agent-evidence'
+import { parseAgentStatusPaneIdentity } from '../../../shared/agent-status/identity/agent-status-worktree-attribution'
+import type {
+  AgentStatusEntry,
+  AgentType
+} from '../../../shared/agent-status/contracts/agent-status-types'
+import { AGENT_STATUS_STALE_AFTER_MS } from '../../../shared/agent-status/contracts/agent-status-freshness'
 
 /**
  * Agent types a title must not claim permission for: exactly one fresh `working` row of that type

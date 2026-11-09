@@ -2,7 +2,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { useAppStore } from '../../store'
 import { armFloatingPanelReclaimIntent } from '@/lib/floating-workspace-focus-reclaim'
 import { isFloatingWorkspacePanelFocused } from '@/lib/floating-workspace-terminal-actions'
-import { selectFloatingVisibleTabCount } from '@/store/selectors'
+import { selectFloatingVisibleTabCount } from '@/store/workspaces/floating/floating-workspace-panel-selector'
 
 const NO_REACTION = (): void => {}
 

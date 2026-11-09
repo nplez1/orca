@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn()
 }))
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraIssueComments: (...args: unknown[]) => mocks.jiraIssueComments(...args),
   jiraAddIssueComment: (...args: unknown[]) => mocks.jiraAddIssueComment(...args)
 }))

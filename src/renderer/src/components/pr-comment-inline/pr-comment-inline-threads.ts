@@ -1,5 +1,8 @@
 import type { PRComment } from '../../../../shared/github/comment-types'
-import { getPRCommentGroupRoot, groupPRComments } from '../../../../shared/pr-comment-groups'
+import {
+  getPRCommentGroupRoot,
+  groupPRComments
+} from '../../../../shared/source-control/review-comments/pr-comment-groups'
 
 /** Zone key prefix for an inline PR thread. Doubles as the pending-reveal id used by jump-to-comment. */
 const PR_COMMENT_INLINE_ID_PREFIX = 'github-pr-comment:'

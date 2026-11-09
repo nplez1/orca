@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import {
   areTaskSourceContextsEqual,
   type TaskSourceContext
-} from '../../../shared/task-source-context'
+} from '../../../shared/work-items/task-source-context'
 
 /**
  * One reference per equal source value. Why a value comparison and not `useMemo`: a derived source

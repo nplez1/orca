@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildLinuxElectronBuilderArgs } from './build-linux-local.mjs'
+import { buildLinuxElectronBuilderArgs } from './desktop-distribution/linux/build-linux-local.mjs'
 import { APP_DISPLAY_NAME } from '../../src/shared/app-display-name'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
@@ -145,7 +145,7 @@ describe('Orca NP electron-builder overlay', () => {
   it('is the config every Orca NP build entry point packages with', () => {
     const sources = [
       '.github/workflows/fork-release.yml',
-      'config/scripts/build-mac-local.mjs',
+      'config/scripts/desktop-distribution/macos/build-mac-local.mjs',
       'package.json'
     ].map((path) => readFileSync(join(REPO_ROOT, path), 'utf8'))
     for (const source of sources) {

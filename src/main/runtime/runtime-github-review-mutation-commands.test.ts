@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import type * as GitHubClientModule from '../github/client'
-import type { LocalProjectGhExecOptions } from '../project-runtime-git-options'
+import type * as MergePRModule from '../github/client/merge/merge-pr'
+import type { LocalProjectGhExecOptions } from '../workspaces/execution-host/project-runtime-git-options'
 
 const mergePRMock = vi.hoisted(() => vi.fn(async () => ({ ok: true as const })))
 
-vi.mock('../github/client', async (importOriginal) => ({
-  ...(await importOriginal<typeof GitHubClientModule>()),
+vi.mock('../github/client/merge/merge-pr', async (importOriginal) => ({
+  ...(await importOriginal<typeof MergePRModule>()),
   mergePR: mergePRMock
 }))
 
-import { RuntimeGitHubReviewMutationCommands } from './runtime-github-review-mutation-commands'
+import { RuntimeGitHubReviewMutationCommands } from './integrations/github/runtime-github-review-mutation-commands'
 
 const REPO = {
   id: 'repo-1',

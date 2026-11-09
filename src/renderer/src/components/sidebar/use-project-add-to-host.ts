@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store'
-import { useProjectHostSetupProjection } from '@/store/selectors'
+import { useProjectHostSetupProjection } from '../../store/projects/use-project-host-setup-projection'
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
 import { getProjectHostSetupsForProject } from '../../../../shared/project-host-setup-projection'
 import type { Repo } from '../../../../shared/repo-types'

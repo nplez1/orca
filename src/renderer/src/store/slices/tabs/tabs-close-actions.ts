@@ -1,33 +1,32 @@
-import { retireRemovedNativeChatDraftPositions } from '@/components/native-chat/native-chat-draft-cache'
-import { retireStructuredAgentSessionReadOwner } from '@/components/native-chat/structured-agent-session-read-owner-registry'
+import { editorTabRetirement } from '../editor/tabs/editor-tab-retirement'
+export { landOnEmptiedWorktree } from './tabs-empty-workspace'
+import { retireRemovedNativeChatDraftPositions } from '@/components/native-chat/drafts/native-chat-draft-position-retirement'
+import { retireStructuredAgentSessionReadOwner } from '@/components/native-chat/session/structured/read/structured-agent-session-read-owner-registry'
 import type { TabsSlice, TabsSliceGet, TabsSliceSet } from './tabs-slice-contract'
 import { collapseGroupLayout } from '../../../../../shared/workspace-layout/tab-group-layout-tree'
-import {
-  findGroupForTab,
-  findTabAndWorktree,
-  pickNextActiveTab,
-  sanitizeRecentTabIds
-} from '../tab-group-state'
+import { findGroupForTab, findTabAndWorktree } from './tab-group-state'
+import { pickNextActiveTab, sanitizeRecentTabIds } from './tab-selection-history'
 import { dedupeTabOrder } from '../../../../../shared/workspace-layout/tab-order'
 import { buildActiveSurfacePatch } from './tabs-surface'
-import { beginStructuredAgentSessionTabClose } from '@/runtime/structured-agent-session-tab-retirement'
+import { beginStructuredAgentSessionTabClose } from '@/runtime/native-chat/tab-retirement/structured-agent-session-tab-retirement'
 import {
   hasStructuredAgentSessionLaunchCancellationTombstone,
   shouldRetainStructuredAgentSessionLaunchTab
 } from '@/lib/agent-session/launch/structured-agent-session-launch-registry'
-import { clearWebSessionFocusIntentIfMatches } from '@/runtime/web-session-focus-intent'
-import { ownsGlobalSelection } from '../../global-selection-owner'
+import { clearWebSessionFocusIntentIfMatches } from '@/runtime/web-session-tabs-sync/navigation/web-session-focus-intent'
+import { ownsGlobalSelection } from '../../workspaces/selection/global-selection-owner'
 import {
   structuredAgentSessionFocusOwner,
   structuredAgentSessionTargetForTab
-} from '@/runtime/structured-agent-session-owner'
+} from '@/runtime/native-chat/session-ownership/structured-agent-session-owner'
 import { omitRecordKeys } from '../worktrees/teardown/record-key-omission'
 import { removeTabsAttention } from '../workspace-attention/subject-attention-transitions'
 import { settleAttentionRemovedBy } from '../workspace-attention/attention-removal-follow-up'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/layout-owner-switch'
 import { closeContentTabThroughLayoutOwner } from './content-tab-close-through-layout-owner'
-import type { TuiAgent } from '../../../../../shared/tui-agent'
-import { isTuiAgent } from '../../../../../shared/tui-agent-config'
+import { isEditorTabContentType } from '../editor/tabs/editor-tab-content-type'
+import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
+import { isTuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent-config'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
 import { forgetDesktopCreatedServerTab } from '@/lib/desktop-created-server-tabs'
 
@@ -43,6 +42,9 @@ export function createTabsCloseActions(
         return null
       }
       const { tab, worktreeId } = found
+      const retireEditor = opts?.editorRetirementHandled
+        ? () => {}
+        : editorTabRetirement(set, get, state, tab)
       forgetDesktopCreatedServerTab(tab.id)
       forgetDesktopCreatedServerTab(tab.entityId)
       const group = findGroupForTab(state.groupsByWorktree, worktreeId, tab.groupId)
@@ -203,7 +205,10 @@ export function createTabsCloseActions(
         ORCA_LAYOUT_OWNER_IS_MAIN &&
         closeContentTabThroughLayoutOwner(get, tab, {
           nextActiveTabId,
-          closeHere,
+          closeHere: () => {
+            closeHere()
+            retireEditor()
+          },
           // A chat tab owns its markers; nothing else retires them.
           ...(tab.contentType === 'agent-session'
             ? {
@@ -215,7 +220,8 @@ export function createTabsCloseActions(
                     { tabsBefore: state }
                   )
               }
-            : {})
+            : {}),
+          ...(isEditorTabContentType(tab.contentType) ? { closed: retireEditor } : {})
         })
       ) {
         if (opts?.recordInteraction !== false) {
@@ -224,6 +230,7 @@ export function createTabsCloseActions(
         return { closedTabId: tabId, wasLastTab, worktreeId }
       }
       closeHere()
+      retireEditor()
       if (opts?.recordInteraction !== false) {
         get().recordFeatureInteraction?.('terminal-tabs')
       }

@@ -12,7 +12,7 @@ import { withWorkspacePathSearchFreshness } from './workspace-path-index-freshne
 
 // Why mocked: parseWslPath only detects WSL on win32, and this cadence must be asserted on any
 // development host.
-vi.mock('../wsl', () => ({
+vi.mock('../wsl/filesystem/unc-path-access', () => ({
   parseWslPath: (windowsPath: string) =>
     windowsPath.startsWith('\\\\wsl') ? { distro: 'Ubuntu', linuxPath: '/home/dev/repo' } : null
 }))

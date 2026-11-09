@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SpoolRecord } from '../../../shared/agent-hook-spool'
+import type { SpoolRecord } from '../../../shared/agent-hook-listener/transport/agent-hook-spool'
 import { spoolReplayIsNewer } from './server-ingest-normalization'
 
 /**

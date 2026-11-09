@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
-import type { CopilotCredentialSource } from './accounts-pane-types'
+import type { CopilotCredentialSource } from './accounts/accounts-pane-types'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 

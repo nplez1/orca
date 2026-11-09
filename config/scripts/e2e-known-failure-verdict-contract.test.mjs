@@ -42,7 +42,14 @@ describe('known-failure verdict wiring', () => {
     // The one report both the verdict and upstream's failure summary read.
     const summary = step('Summarize E2E failures')
     expect(summary.run).toBe(
-      'node config/scripts/ci-e2e-failure-summary.mjs ci-shards/results.json'
+      [
+        'E2E_FAILURE_SUMMARY_SCRIPT=config/scripts/ci/e2e-failures/ci-e2e-failure-summary.mjs',
+        'if [ ! -f "$E2E_FAILURE_SUMMARY_SCRIPT" ]; then',
+        '  E2E_FAILURE_SUMMARY_SCRIPT=config/scripts/ci-e2e-failure-summary.mjs',
+        'fi',
+        'node "$E2E_FAILURE_SUMMARY_SCRIPT" ci-shards/results.json',
+        ''
+      ].join('\n')
     )
     const traces = step('Upload Playwright traces')
     // Why `|| cancelled()`: upstream's "retain cancellation traces" change (#24617) is kept beside the fork's outcome check.

@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { PRInfo } from '../../../../shared/github/pull-request-types'
 import type { Repo } from '../../../../shared/repo-types'
-import { makeWorktree } from '../../store/slices/worktrees-slice-test-fixtures'
-import HostedReviewActions from './HostedReviewActions'
-import type { HostedReviewActionInfo } from './use-hosted-review-actions'
+import { makeWorktree } from '../../store/slices/worktrees/worktree.test-fixture'
+import HostedReviewActions from './hosted-review/provider-actions/HostedReviewActions'
+import type { HostedReviewActionInfo } from './hosted-review/provider-actions/use-hosted-review-actions'
 
 type RecordedHookArgs = { adminBypassRequired: boolean }
 
@@ -13,7 +13,7 @@ type RecordedHookArgs = { adminBypassRequired: boolean }
 const recordedHookArgs: { current: RecordedHookArgs | null } = { current: null }
 
 vi.mock('@/store', () => ({ useAppStore: () => false }))
-vi.mock('./use-hosted-review-actions', () => ({
+vi.mock('./hosted-review/provider-actions/use-hosted-review-actions.ts', () => ({
   useHostedReviewActions: (args: RecordedHookArgs) => {
     recordedHookArgs.current = args
     return {

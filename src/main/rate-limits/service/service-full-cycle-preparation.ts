@@ -46,8 +46,19 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     // Gate only Codex, never siblings, when its runtime is skipped (#STA-4422).
     // Why: resolveCodexHome probes credential homes, so a disabled Codex skips it entirely.
     const codexHome = disabled.has('codex') ? null : await this.resolveCodexHome(codexTarget)
+    const antigravityFetchAllowed =
+      !disabled.has('antigravity') &&
+      (this.antigravityUsageEnabledResolver?.() ?? true) &&
+      (options?.force || !this.shouldSkipAutomatedFetch('antigravity', this.state.antigravity))
+    // A login change seen here invalidates before the baseline below, so this read still counts.
+    const recorder = antigravityFetchAllowed ? this.antigravityAccountUsageRecorder : null
+    const antigravityRead = recorder ? await this.beginAntigravityAccountRead(recorder) : null
+    if (signal.aborted) {
+      return null
+    }
     const previousState = this.state
     const antigravityGeneration = this.antigravityFetchGeneration
+    const antigravityTarget = this.antigravityFetchTarget
     const codexFetchGated = disabled.has('codex') || codexHome?.skip === true
     const codexHomePath = codexHome?.homePath ?? null
     const codexStateBeforeFetch =
@@ -107,10 +118,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxConfigChanged = currentMiniMaxConfigHash !== this.lastMiniMaxConfigHash
     const miniMaxGeneration = this.syncMiniMaxFetchGeneration(currentMiniMaxConfigHash)
 
-    const antigravityFetchAllowed =
-      !disabled.has('antigravity') &&
-      (this.antigravityUsageEnabledResolver?.() ?? true) &&
-      (options?.force || !this.shouldSkipAutomatedFetch('antigravity', previousState.antigravity))
 
     const zcodePlanConfigResult = this.resolveZcodePlanConfig()
     const zcodePlanApiKey = zcodePlanConfigResult.config.apiKey
@@ -164,7 +171,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     // Hidden meters avoid the CLI spawn; the separate promise keeps other providers responsive.
     const antigravityResultPromise = trackSettledProviderResult(
       antigravityFetchAllowed
-        ? fetchAntigravityRateLimits({ signal })
+        ? fetchAntigravityRateLimits({ signal, target: antigravityTarget }).then((limits) =>
+            this.attributeAntigravityReading(antigravityRead, antigravityGeneration, limits)
+          )
         : Promise.resolve(previousState.antigravity ?? antigravityUsageDisabledSnapshot())
     )
 

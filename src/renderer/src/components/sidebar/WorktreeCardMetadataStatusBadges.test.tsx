@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { HostedReviewInfo } from '../../../../shared/hosted-review'
-import { ReviewMergeReadinessBadge } from './WorktreeCardMetadataStatusBadges'
-import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
+import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
+import { ReviewMergeReadinessBadge } from './workspace-card/metadata/WorktreeCardMetadataStatusBadges'
+import type { WorktreeCardPrDisplay } from './workspace-card/review/worktree-card-pr-display'
 
 const PASSING_CHECKS: HostedReviewInfo = {
   provider: 'github',

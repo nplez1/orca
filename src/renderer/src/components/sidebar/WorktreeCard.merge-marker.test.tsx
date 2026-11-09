@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { HostedReviewInfo } from '../../../../shared/hosted-review'
+import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeCardProperty } from '../../../../shared/ui-chrome-types'
@@ -42,7 +42,7 @@ vi.mock('@/store', () => {
   }
 })
 
-vi.mock('@/lib/worktree-activation', () => ({
+vi.mock('@/lib/workspace/activation/worktree-activation.ts', () => ({
   activateAndRevealWorktree: vi.fn()
 }))
 
@@ -52,24 +52,24 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>
 }))
 
-vi.mock('./use-worktree-activity-status', () => ({
+vi.mock('./workspace-card/activity/use-worktree-activity-status.ts', () => ({
   useWorktreeActivityStatus: () => 'active'
 }))
 
-vi.mock('./use-worktree-sleep-state', () => ({
+vi.mock('./workspace-actions/sleep/use-worktree-sleep-state.ts', () => ({
   useIsSleepingWorktree: () => false
 }))
 
-vi.mock('./CacheTimer', () => ({
+vi.mock('./workspace-card/activity/CacheTimer.tsx', () => ({
   default: () => null,
   usePromptCacheCountdownStartedAt: () => null
 }))
 
-vi.mock('./WorktreeCardAgents', () => ({
+vi.mock('./workspace-card/activity/WorktreeCardAgents.tsx', () => ({
   default: () => null
 }))
 
-vi.mock('./WorktreeContextMenu', () => ({
+vi.mock('./workspace-actions/context-menu/WorktreeContextMenu.tsx', () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>,
   CLOSE_ALL_CONTEXT_MENUS_EVENT: 'orca:test-close-context-menus',
   WORKTREE_NATIVE_CONTEXT_MENU_ATTR: 'data-worktree-native-context-menu',
@@ -139,7 +139,7 @@ describe('WorktreeCard merge readiness marker', () => {
   // Why both styles: the review glyph moves between the experimental status lane and the
   // metadata row the default card uses, and the marker is only honest if it follows the glyph.
   it('marks the card review glyph blocked in either card style', async () => {
-    const { default: WorktreeCard } = await import('./WorktreeCard')
+    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
     const renderCard = (nextSettings: Partial<GlobalSettings>): string => {
       settings = nextSettings
       return renderToStaticMarkup(
@@ -163,7 +163,7 @@ describe('WorktreeCard merge readiness marker', () => {
         fetchedAt: Date.now()
       }
     }
-    const { default: WorktreeCard } = await import('./WorktreeCard')
+    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
 
     const markup = renderToStaticMarkup(
       <WorktreeCard worktree={makeWorktree()} repo={makeRepo()} isActive={false} />

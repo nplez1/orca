@@ -9,7 +9,7 @@ import {
   WORKSPACE_PATH_CATALOG_BLOCK_CODE_UNIT_LIMIT,
   WORKSPACE_PATH_CATALOG_BLOCK_PATH_LIMIT
 } from '../../shared/workspace-path-catalog-blocks'
-import { compareFileNames } from '../../shared/file-name-sort'
+import { compareFileNames } from '../../shared/file-listing/file-name-sort'
 import {
   SPILL_BLOCK_FORMAT_VERSION,
   SPILL_DIRECTORY_ENTRY_BYTES,

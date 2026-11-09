@@ -1,14 +1,14 @@
 import type {
   Automation,
   AutomationCreateInput,
-  AutomationRun,
   AutomationUpdateInput
-} from '../../shared/automations-types'
+} from '../../shared/automations/automation-definition'
+import type { AutomationRun } from '../../shared/automations/history/automation-run'
 import {
   buildWorkspaceRunContext,
   type WorkspaceRunContext
-} from '../../shared/task-source-context'
-import type { AutomationDestination } from '../../shared/automation-owner-precondition'
+} from '../../shared/work-items/task-source-context'
+import type { AutomationDestination } from '../../shared/automations/ownership/automation-owner-precondition'
 import type { ProjectHostSetup } from '../../shared/project-types'
 import type { CommandHandler } from '../dispatch'
 import {
@@ -26,7 +26,7 @@ import {
   getOptionalStringFlag,
   getRequiredStringFlag
 } from '../flags'
-import { resolveAutomationDestination } from '../automation-destination'
+import { resolveAutomationDestination, routeAutomationCreate } from '../automation-destination'
 import {
   AUTOMATION_RUNS_PAGE_SIZE,
   automationRunsRpc,
@@ -90,15 +90,15 @@ async function resolveDefaultTarget(
     }
   }
   const workspace = await getOptionalWorktreeSelector(flags, 'workspace', cwd, client)
-  if (repo || workspace) {
-    return { repo, workspace }
-  }
-  if (client.isRemote) {
-    return {}
+  if (repo || workspace || client.isRemote) {
+    return repo || workspace ? { repo, workspace } : {}
   }
   try {
-    return { workspace: await resolveCurrentWorktreeSelector(cwd, client) }
-  } catch {
+    return { workspace: await resolveCurrentWorktreeSelector(cwd, client, 'workspace') }
+  } catch (error) {
+    if (error instanceof RuntimeClientError && error.code === 'selector_ambiguous') {
+      throw error
+    }
     return {}
   }
 }
@@ -199,11 +199,11 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       ...schedule
     } satisfies AutomationCreateParams
     await assertAutomationFieldsSupported(client, create)
-    const destination = await resolveAutomationDestination(client, target)
-    const result = await client.call<{ automation: Automation }>('automation.create', {
-      ...create,
-      ...(destination ? { destination } : {})
-    })
+    const { writer, params } = await routeAutomationCreate(client, target, create)
+    if (writer !== client) {
+      await assertAutomationFieldsSupported(writer, create)
+    }
+    const result = await writer.call<{ automation: Automation }>('automation.create', params)
     printResult(result, json, formatAutomationShow)
   },
   'automations edit': async ({ flags, client, cwd, json }) => {

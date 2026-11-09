@@ -1,4 +1,4 @@
-import type { CacheEntry } from '@/store/github/cache-model'
+import type { CacheEntry } from '../../store/github/cache/cache-model'
 
 /**
  * Why: fetchPRChecks writes the head-sha keyed entry and only reads the legacy

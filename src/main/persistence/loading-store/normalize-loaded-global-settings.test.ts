@@ -1,14 +1,15 @@
-import { newChatPermissionModeForSettings } from '../../../shared/agent-chat-permission-mode'
 import { homedir } from 'node:os'
-import { describe, expect, it, vi } from 'vitest'
+import { expect, it, describe, vi } from 'vitest'
+import { resolveAntigravityChatAuthConfig } from '../../../shared/antigravity-chat-auth-config'
 import { getDefaultPersistedState } from '../../../shared/constants'
+import type { PersistedState } from '../../../shared/persisted-state-types'
 import { normalizeLoadedGlobalSettings } from './normalize-loaded-global-settings'
 import { prepareLoadedTerminalSettings } from './prepare-loaded-terminal-settings'
 import { prepareLoadedProfileSettings } from './prepare-loaded-profile-settings'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
-import type { PersistedState } from '../../../shared/persisted-state-types'
-import { resolveAgentPermission } from '../../../shared/tui-agent-permission-choice'
-import { resolveTuiAgentLaunchArgs } from '../../../shared/tui-agent-launch-defaults'
+import { newChatPermissionModeForSettings } from '../../../shared/agent-launch/permissions/agent-chat-permission-mode'
+import { resolveAgentPermission } from '../../../shared/agent-launch/permissions/tui-agent-permission-choice'
+import { resolveTuiAgentLaunchArgs } from '../../../shared/agent-launch/choices/tui-agent-launch-defaults'
 
 // Simulates a profile created before the fields under test were persisted. A profile written
 // before a field existed has no such key at all, which is the only shape that exercises the
@@ -34,18 +35,21 @@ function normalizeLegacyProfile(
   return normalizeLoadedGlobalSettings(parsed, terminal, profile)
 }
 
-describe('retired setup placement', () => {
-  it.each(['split-vertical', 'split-horizontal', 'new-tab', undefined])(
-    'drops saved setup location %s without changing terminal preferences',
-    (setupScriptLaunchMode) => {
-      const normalized = normalizeLegacyProfile({
-        setupScriptLaunchMode,
-        terminalFocusFollowsMouse: true
-      })
-      expect(normalized).not.toHaveProperty('setupScriptLaunchMode')
-      expect(normalized.terminalFocusFollowsMouse).toBe(true)
-    }
+it('keeps existing Antigravity profiles personal and preserves explicit or malformed saved choices for their owner', () => {
+  expect(resolveAntigravityChatAuthConfig(normalizeLegacyProfile({}).antigravityChatAuth)).toEqual({
+    method: 'oauth-personal'
+  })
+  const enterprise = {
+    method: 'oauth-business',
+    gcpProject: 'enterprise-project',
+    gcpLocation: 'us-central1'
+  }
+  expect(normalizeLegacyProfile({ antigravityChatAuth: enterprise }).antigravityChatAuth).toEqual(
+    enterprise
   )
+  const malformed = normalizeLegacyProfile({ antigravityChatAuth: null }).antigravityChatAuth
+  expect(malformed).toBeNull()
+  expect(() => resolveAntigravityChatAuthConfig(malformed)).toThrow('account settings')
 })
 
 describe('retired Agents sidebar setting', () => {

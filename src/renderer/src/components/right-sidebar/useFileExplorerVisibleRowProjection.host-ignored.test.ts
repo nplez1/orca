@@ -2,11 +2,11 @@
 
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { FileExplorerNameFilterProjectionSource } from './file-explorer-name-filter-projection'
+import type { FileExplorerNameFilterProjectionSource } from './file-explorer/tree/file-explorer-name-filter-projection'
 
 const useFileExplorerIgnoredPathsMock = vi.hoisted(() => vi.fn(() => []))
 
-vi.mock('./use-file-explorer-ignored-paths', async (importOriginal) => {
+vi.mock('./file-explorer/tree/use-file-explorer-ignored-paths.ts', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return { ...actual, useFileExplorerIgnoredPaths: useFileExplorerIgnoredPathsMock }
 })
@@ -16,7 +16,7 @@ vi.mock('@/store', () => ({
     selector({ settings: { showGitIgnoredFiles: true }, updateSettings: vi.fn() })
 }))
 
-import { useFileExplorerVisibleRowProjection } from './useFileExplorerVisibleRowProjection'
+import { useFileExplorerVisibleRowProjection } from './file-explorer/tree/useFileExplorerVisibleRowProjection'
 
 const hostClassifiedNameFilter: FileExplorerNameFilterProjectionSource = {
   query: 'target',

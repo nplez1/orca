@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
 import { JenkinsCheckDetailsError } from '@/lib/check-details-error-action'
-import { ChecksList } from './checks-panel/checks-list'
+import { ChecksList } from './checks-panel/presentation/checks-list'
 import { clearCheckDetailsCache } from '@/components/github/check-details-cache'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -31,7 +31,7 @@ vi.mock('@/store', () => ({
     })
 }))
 
-vi.mock('@/store/selectors', () => ({
+vi.mock('../../../../cli/selectors.ts', () => ({
   useActiveWorktree: () => null
 }))
 

@@ -1,5 +1,5 @@
 import { getRelativePathInsideRoot, joinPath } from '@/lib/path'
-import type { FileExplorerRowProjection } from './file-explorer-row-projection'
+import type { FileExplorerRowProjection } from './file-explorer/tree/file-explorer-row-projection'
 import type { SyntheticTreeEntry } from './file-explorer-name-filter-tree-nodes'
 import {
   getFileExplorerNameFilterTokens,

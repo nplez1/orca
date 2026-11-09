@@ -6,10 +6,11 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PRCheckJob, PRCheckRunDetails } from '../../../../shared/github/check-types'
 import { CheckFailureSummary } from './CheckFailureSummary'
 import { CheckStageTree } from './CheckStageTree'
-import { CheckRunDetailsPanel } from './CheckRunDetailsPanel'
+import { CheckRunDetailsPanel } from './check-details/panel/CheckRunDetailsPanel'
 
 vi.mock('@/i18n/i18n', () => ({
   i18n: { language: 'en' },
+  getIntlLocale: () => 'en',
   translate: (_key: string, fallback: string) => fallback
 }))
 
@@ -17,11 +18,11 @@ vi.mock('@/components/sidebar/CommentMarkdown', () => ({
   default: ({ content }: { content: string }) => content
 }))
 
-vi.mock('@/components/right-sidebar/source-control-fix-split-button', () => ({
+vi.mock('@/components/right-sidebar/source-control/panel/source-control-fix-split-button.tsx', () => ({
   SourceControlFixSplitButton: () => null
 }))
 
-vi.mock('./check-run-details-fix-with-ai', () => ({
+vi.mock('./check-details/actions/check-run-details-fix-with-ai.ts', () => ({
   useCheckRunDetailsFixWithAI: () => ({
     canFixWithAI: false,
     disabledReason: null,

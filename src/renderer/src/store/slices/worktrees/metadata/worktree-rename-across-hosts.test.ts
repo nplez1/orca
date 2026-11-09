@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeWorktree } from '../../worktrees-slice-test-fixtures'
-import { makeDetectedResult } from '../../worktrees-detected-listing-fixtures'
+import { makeWorktree } from '../worktree.test-fixture'
+import { makeDetectedResult } from '../listing/worktrees-detected-listing-fixtures'
 import {
   createTestStore,
   mockApi,
   resetRemoteRuntimeMocks,
   resetWorktreeSliceModuleMemory,
   runtimeEnvironmentCall
-} from '../../worktrees-slice-test-harness'
+} from '../worktrees-slice-test-harness'
 
 const WORKTREE_ID = 'repo1::/path/wt1'
 

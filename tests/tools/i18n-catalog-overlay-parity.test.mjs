@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeCatalogs } from '../../config/scripts/fork-english-catalog.mjs'
+import { mergeCatalogs } from '../../config/scripts/localization/catalog-validation/fork-english-catalog.mjs'
 import {
   mergeLocaleOverlay,
   FORK_OVERLAY_LANGUAGES

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
+import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault/contracts/ai-vault-types'
 
 /** 128 bits of a row's sha256: change detection between two scans, not a security boundary. */
 const ROW_DIGEST_HEX_LENGTH = 32

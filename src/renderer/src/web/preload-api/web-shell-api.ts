@@ -39,8 +39,10 @@ export function createShellApi(): NonNullable<Partial<PreloadApi>['shell']> {
     onContextualLinkRequested: () => () => {},
     markContextualLinkRouterReady: () => {},
     openFilePath: () => Promise.resolve(false),
-    openFileUri: (uri) =>
-      Promise.resolve(window.open(uri, '_blank', 'noopener,noreferrer') as never),
+    openFileUri: (uri) => {
+      window.open(uri, '_blank', 'noopener,noreferrer')
+      return Promise.resolve('opened')
+    },
     pathExists: async (path) => pathExistsOnRuntime(path),
     // Without this the fallback proxy answers `undefined` and the caller's batch rejects.
     pathsExist: (paths) => Promise.all(paths.map((path) => pathExistsOnRuntime(path))),
@@ -50,7 +52,6 @@ export function createShellApi(): NonNullable<Partial<PreloadApi>['shell']> {
     pickImage: () => Promise.resolve(null),
     pickRepoIconImage: () => Promise.resolve(null),
     pickAudio: () => Promise.resolve(null),
-    pickDirectory: () => Promise.resolve(null),
-    copyFile: () => Promise.resolve()
+    pickDirectory: () => Promise.resolve(null)
   }
 }

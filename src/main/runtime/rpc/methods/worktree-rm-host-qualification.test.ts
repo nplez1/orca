@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
-import { WORKTREE_METHODS } from './worktree'
+import { WORKTREE_METHODS } from './workspaces/worktree'
 
 function makeRuntime(repoHostIds: (string | undefined)[] = ['local']): OrcaRuntimeService {
   return {

@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => {
   return { lookup: vi.fn(), repoState }
 })
 
-vi.mock('@/lib/github-work-item-source-lookup', () => ({
+vi.mock('@/lib/work-items/github/github-work-item-source-lookup.ts', () => ({
   lookupGitHubWorkItemForSource: (...args: unknown[]) => mocks.lookup(...args)
 }))
 vi.mock('@/store', () => ({
@@ -28,8 +28,8 @@ vi.mock('@/store', () => ({
     getState: () => mocks.repoState
   })
 }))
-vi.mock('@/components/github-item-dialog/load-item-details/use-github-item-dialog-details', () => ({
-  useGitHubItemDialogDetails: () => ({
+vi.mock('@/components/github-item-dialog/load-item-details/use-github-work-item-details', () => ({
+  useGitHubWorkItemDetails: () => ({
     details: null,
     displayWorkItem: null,
     invalidateCurrentDetailsCache: () => {},

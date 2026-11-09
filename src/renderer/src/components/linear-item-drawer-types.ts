@@ -1,6 +1,6 @@
 import type { LinearIssue } from '../../../shared/linear/issue-types'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
-import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
+import type { RuntimeLinearSettings } from '../runtime/linear/runtime-linear-client'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 
 export type LinearItemDrawerProps = {
   issue: LinearIssue | null

@@ -1,10 +1,10 @@
 import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
 import { useCallback, useEffect, useRef } from 'react'
-import { checksPanelAsyncResultKey } from '../checks-panel-async-result-key'
-import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
+import { checksPanelAsyncResultKey } from './refresh/checks-panel-async-result-key'
+import { loadGitLabJobLogDetails } from '@/runtime/repository-gitlab/gitlab-job-trace-client'
 import { checksPanelLoadErrorMessage } from './checks-panel-forge-owner'
-import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
+import { forgeOwnerHostIdForWorkspace } from '@/runtime/source-control/forge/forge-credential-target'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
 

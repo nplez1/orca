@@ -6,7 +6,10 @@ import {
 } from './linked-issue-repo'
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
-import { makeRepo, makeWorktree } from '../components/worktree-jump-palette-test-fixtures'
+import {
+  makeRepo,
+  makeWorktree
+} from '../components/worktree-jump/worktree-jump-palette-test-fixtures'
 
 function repo(id: string, path: string, overrides: Partial<Repo> = {}): Repo {
   return { ...makeRepo(), id, path, ...overrides }

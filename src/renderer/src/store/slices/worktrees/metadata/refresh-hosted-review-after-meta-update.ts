@@ -1,7 +1,7 @@
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { DetectedWorktreeListResult, Worktree } from '../../../../../../shared/worktree/types'
 import type { AppState } from '../../../types'
-import type { WorktreeMetaUpdateOptions } from '../../worktree-helpers'
+import type { WorktreeMetaUpdateOptions } from './worktree-meta-update-options'
 import { getWorkspaceReviewRefreshHints } from './workspace-attachment-review-selection'
 
 /**

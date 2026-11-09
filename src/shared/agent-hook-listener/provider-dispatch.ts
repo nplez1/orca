@@ -1,8 +1,9 @@
 import { normalizeCompatibleLifecycleEvent } from './providers/compatible-lifecycle-events'
 import { normalizeQoderEvent } from './providers/qoder-events'
-import type { AgentMainAgentStatus, ParsedAgentStatusPayload } from '../agent-status-types'
-import type { AgentHookSource } from '../agent-hook-relay'
-import { readHostTurnSignals } from '../agent-hook-turn-end-timing'
+import type { AgentMainAgentStatus } from '../agent-status/lifecycle/main-agent-status'
+import type { ParsedAgentStatusPayload } from '../agent-status/contracts/agent-status-types'
+import type { AgentHookSource } from './transport/agent-hook-relay'
+import { readHostTurnSignals } from './state/agent-hook-turn-end-timing'
 import type { AgentHookEventPayload } from './listener-event'
 import { readLastCommandCodeUserPromptEntryFromTranscript } from './command-code-transcript'
 import { readGrokHomeEnvelope } from './grok-result-discovery'
@@ -57,6 +58,8 @@ export type ProviderDispatchResult = {
   /** The event the payload was normalized as, which a provider may restate (Codex ended turns). */
   eventName: unknown
   hostTurnSignals: Pick<AgentHookEventPayload, 'stopHookActive' | 'nativeTurnKey'>
+  /** Full reply text this hook carried, outside the cached tool snapshot; refreshes carry none. */
+  replyCandidate: string | undefined
 }
 
 /** Exhaustive provider routing with provider-specific transcript locality and attribution. */
@@ -87,6 +90,7 @@ export function normalizeProviderEvent(input: {
   let promptInteractionKey: string | undefined
   let hasTranscriptPromptEvidence = false
   let payload: ParsedAgentStatusPayload | null
+  state.eventReplyCandidate = undefined
 
   // Why: the pane rule — idle only when the lead is idle AND no descendant is live — is applied
   // here, once, for every provider that does not own a roster. A child's lifecycle event never
@@ -108,7 +112,8 @@ export function normalizeProviderEvent(input: {
       descendantScoped: true,
       eventName,
       // Why empty: a child's stop hook and turn id belong to the child, not to this pane.
-      hostTurnSignals: {}
+      hostTurnSignals: {},
+      replyCandidate: undefined
     }
   }
   if (!ownsDescendants) {
@@ -275,6 +280,8 @@ export function normalizeProviderEvent(input: {
     case 'kiro':
       payload = normalizeKiroEvent(state, eventName, promptText, paneKey, hookPayload)
   }
+  const replyCandidate = state.eventReplyCandidate
+  state.eventReplyCandidate = undefined
 
   // Why: a provider that owns its roster still cannot answer for a child blocked on a human answer —
   // the owning lane drops every event that names a child — so a waiter this lane recorded gates the
@@ -291,6 +298,7 @@ export function normalizeProviderEvent(input: {
     promptInteractionKey,
     hasTranscriptPromptEvidence,
     eventName,
-    hostTurnSignals: readHostTurnSignals(source, hookPayload, promptInteractionKey)
+    hostTurnSignals: readHostTurnSignals(source, hookPayload, promptInteractionKey),
+    replyCandidate
   }
 }

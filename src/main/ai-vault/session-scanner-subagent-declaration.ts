@@ -1,4 +1,4 @@
-import type { AiVaultSessionSubagentInfo } from '../../shared/ai-vault-types'
+import type { AiVaultSessionSubagentInfo } from '../../shared/ai-vault/contracts/ai-vault-types'
 import type { SessionAccumulator } from './session-scanner-types'
 import { asRecord, extractString, sessionIdFromFileName } from './session-scanner-values'
 

@@ -1,7 +1,7 @@
 import type { CreateWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
-import { callRuntimeRpc } from '../../../../runtime/runtime-rpc-client'
 import { refreshEphemeralVmRuntimesAfterMutation } from '@/hooks/useEphemeralVmRuntimes'
+import { callRuntimeRpc } from '../../../../runtime/rpc/calls/runtime-rpc-call'
 import {
   buildRuntimeWorktreeCreateParams,
   type CreateWorktreeCallOptions,

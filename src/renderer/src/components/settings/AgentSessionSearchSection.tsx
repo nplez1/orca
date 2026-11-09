@@ -3,11 +3,15 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   resolveAiVaultSearchSettings,
   type AiVaultSearchSettings
-} from '../../../../shared/ai-vault-search-settings'
+} from '../../../../shared/ai-vault/search/ai-vault-search-settings'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { getAgentSessionSearchSearchEntries } from './agent-session-search-search'
-import { SearchableSetting } from './SearchableSetting'
-import { SettingsRow, SettingsSubsectionHeader, SettingsSwitchRow } from './SettingsFormControls'
+import { SearchableSetting } from './section-layout/SearchableSetting'
+import {
+  SettingsRow,
+  SettingsSubsectionHeader,
+  SettingsSwitchRow
+} from './form-controls/SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
 type AgentSessionSearchSectionProps = {

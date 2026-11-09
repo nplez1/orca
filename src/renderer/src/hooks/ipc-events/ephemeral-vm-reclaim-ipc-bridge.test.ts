@@ -7,9 +7,9 @@ import {
 } from '../../../../shared/execution-host'
 import type { EphemeralVmRuntimeReclaimed } from '../../../../shared/ephemeral-vm-runtime-reclaim'
 import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
-import { makeWorktree } from '../../store/slices/worktrees-slice-test-fixtures'
-import { createTestStore } from '../../store/slices/worktrees-slice-test-harness'
-import type { WorktreeSlice } from '../../store/slices/worktree-helpers'
+import { makeWorktree } from '../../store/slices/worktrees/worktree.test-fixture'
+import { createTestStore } from '../../store/slices/worktrees/worktrees-slice-test-harness'
+import type { WorktreeSlice } from '../../store/slices/worktrees/worktree-slice-contract'
 import {
   forgetReclaimedEphemeralVmWorkspace,
   reconcileReclaimedEphemeralVmWorkspaces,

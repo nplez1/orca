@@ -1,4 +1,4 @@
-import type { AiVaultListSyncDelta, AiVaultSession } from './ai-vault-types'
+import type { AiVaultListSyncDelta, AiVaultSession } from './ai-vault/contracts/ai-vault-types'
 import { sortAiVaultSessionsByRecency } from './ai-vault-session-sort'
 
 /**

@@ -1,6 +1,6 @@
 scripts:
   setup: |
-    node config/scripts/run-internal-dev-setup.mjs
+    node config/scripts/development/setup/run-internal-dev-setup.mjs
     pnpm install
 
 # LOCAL(nplez1): fork-only. Allocates an ephemeral machine per worktree from the team provisioning

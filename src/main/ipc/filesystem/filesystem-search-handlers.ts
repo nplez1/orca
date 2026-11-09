@@ -4,14 +4,14 @@ import {
   isFileNameFilterQueryTooLarge,
   pathMatchesFileNameFilterTokens,
   splitFileNameFilterTokens
-} from '../../../shared/file-name-filter-tokens'
+} from '../../../shared/file-listing/file-name-filter-tokens'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
 import { registerFilesystemContentSearchHandler } from './filesystem-content-search-handler'
 import { registerFilesystemPathSearchHandler } from './filesystem-path-search-handler'
 import { createFilesystemIndexRequestFences } from './filesystem-index-request-fences'
 import { registerWorkspacePathIndexIpc } from './workspace-path-index-ipc'
 import { isWorkspacePathIndexEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
-import { resolveAuthorizedPath } from './filesystem-auth'
+import { resolveAuthorizedPath } from './access/filesystem-auth'
 import { prewarmQuickOpenPathInventory } from '../quick-open-path-inventory'
 
 export function registerFilesystemSearchHandlers(context: FilesystemHandlerContext): void {

@@ -1,7 +1,7 @@
 import type {
   TerminalPreviewConnectResult,
   TerminalPreviewDataPayload
-} from '../../shared/terminal-preview'
+} from '../../shared/terminal/replay/terminal-preview'
 
 export type TerminalPreviewApi = {
   connect: (

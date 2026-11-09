@@ -4,14 +4,14 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveOsOpenedDocuments } from './os-opened-documents'
 
-vi.mock('../ipc/filesystem/filesystem-auth', () => ({
+vi.mock('../ipc/filesystem/access/filesystem-auth', () => ({
   authorizeExternalPath: vi.fn()
 }))
 vi.mock('../ipc/floating-workspace-directory', () => ({
   ensureFloatingWorkspaceDirectory: vi.fn()
 }))
 
-const { authorizeExternalPath } = await import('../ipc/filesystem/filesystem-auth')
+const { authorizeExternalPath } = await import('../ipc/filesystem/access/filesystem-auth')
 const { ensureFloatingWorkspaceDirectory } = await import('../ipc/floating-workspace-directory')
 
 describe('resolveOsOpenedDocuments', () => {

@@ -3,7 +3,7 @@ import {
   getTuiAgentDetectCommands,
   getTuiAgentLaunchCommand,
   TUI_AGENT_CONFIG
-} from './tui-agent-config'
+} from './agent-launch/catalog/tui-agent-config'
 
 // Why this file survives upstream retiring its tui-agent-config suite (#33770): these cases pin the
 // Orca NP overlay, which upstream cannot test and which a silent profile change would break.

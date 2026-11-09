@@ -1,11 +1,11 @@
 import type { Terminal } from '@xterm/xterm'
-import { copyTerminalSelection } from '@/components/terminal-pane/terminal-selection-copy'
 import { suppressTerminalRightClickPtyMouseReport } from '@/components/terminal-pane/terminal-right-click-pty-mouse-suppression'
+import { copyTerminalSelection } from '@/components/terminal-pane/clipboard/terminal-selection-copy'
 import type { PreviewTerminalPasteSource } from './preview-terminal-paste'
 import {
   claimTerminalRightClickPasteMouseDown,
   isTerminalRightClickPasteGesture
-} from '@/components/terminal-pane/terminal-right-click-paste-gesture'
+} from '@/components/terminal-pane/input/paste/terminal-right-click-paste-gesture'
 
 type PreviewRightClickTerminal = Pick<
   Terminal,

@@ -2,7 +2,7 @@ import {
   isScreenInteractivePromptReason,
   type ScreenPromptObservation
 } from '../../shared/agent-screen-prompt'
-import { detectTerminalWaitBlockedReason } from './terminal-wait-detection'
+import { detectTerminalWaitBlockedReason } from './terminal/wait/terminal-wait-detection'
 
 const MAX_TRACKED_PROMPTS = 512
 

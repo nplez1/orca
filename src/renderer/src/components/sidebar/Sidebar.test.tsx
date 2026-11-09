@@ -55,7 +55,7 @@ vi.mock('./SetupScriptPromptCard', () => ({
   default: () => <div data-testid="setup-script-prompt-card" />
 }))
 
-vi.mock('./WorktreeList', () => ({
+vi.mock('./worktree-list/listing/WorktreeList', () => ({
   default: () => <div data-testid="worktree-list" />
 }))
 
@@ -65,7 +65,7 @@ vi.mock('./SidebarToolbar', () => ({
   default: () => <div data-testid="sidebar-toolbar" />
 }))
 
-vi.mock('./WorkspaceKanbanDrawer', () => ({
+vi.mock('./workspace-board/surface/WorkspaceKanbanDrawer', () => ({
   default: ({
     leftSidebarStyle,
     statusBarVisible
@@ -81,7 +81,7 @@ vi.mock('./WorkspaceKanbanDrawer', () => ({
   )
 }))
 
-vi.mock('./useSidebarProjectDrop', () => ({
+vi.mock('./project-admission/drop/useSidebarProjectDrop', () => ({
   useSidebarProjectDrop: () => ({
     dropOwnerRef: mocks.dropOwnerRef,
     dropHandlers: {},
@@ -89,7 +89,7 @@ vi.mock('./useSidebarProjectDrop', () => ({
   })
 }))
 
-vi.mock('./useWorkspaceBoardPanel', () => ({
+vi.mock('./workspace-board/surface/useWorkspaceBoardPanel', () => ({
   useWorkspaceBoardPanel: () => ({
     ...mocks.panel,
     workspaceBoardMenuOpen: false,
@@ -153,63 +153,5 @@ describe('Sidebar', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('does not start a full worktree scan while the startup session is hydrating', () => {
-    setSidebarState(getDefaultSettings(tmpdir()))
-    const fetchAllWorktrees = vi.fn().mockResolvedValue(undefined)
-    mocks.state = {
-      ...mocks.state,
-      fetchAllWorktrees,
-      repos: [],
-      startupWorktreeRefreshCompleted: false
-    }
-    const view = render(sidebarElement())
-
-    mocks.state = { ...mocks.state, repos: [{ id: 'repo-a' }] }
-    view.rerender(sidebarElement())
-    expect(fetchAllWorktrees).not.toHaveBeenCalled()
-
-    mocks.state = { ...mocks.state, startupWorktreeRefreshCompleted: true }
-    view.rerender(sidebarElement())
-    expect(fetchAllWorktrees).not.toHaveBeenCalled()
-
-    mocks.state = { ...mocks.state, repos: [{ id: 'repo-a' }, { id: 'repo-b' }] }
-    view.rerender(sidebarElement())
-    expect(fetchAllWorktrees).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not scan all hosts when runtime connection status flaps', () => {
-    setSidebarState(getDefaultSettings(tmpdir()))
-    const fetchAllWorktrees = vi.fn().mockResolvedValue(undefined)
-    mocks.state = {
-      ...mocks.state,
-      fetchAllWorktrees,
-      runtimeStatusByEnvironmentId: new Map(),
-      startupWorktreeRefreshCompleted: true
-    }
-    const view = render(sidebarElement())
-
-    for (let index = 0; index < 5; index += 1) {
-      mocks.state = {
-        ...mocks.state,
-        runtimeStatusByEnvironmentId: new Map([
-          ['runtime-a', { status: index % 2 === 0 ? 'connected' : null }]
-        ])
-      }
-      view.rerender(sidebarElement())
-    }
-
-    expect(fetchAllWorktrees).not.toHaveBeenCalled()
-  })
-
-  it('detaches the project-drop owner while the sidebar is collapsed', () => {
-    setSidebarState(getDefaultSettings(tmpdir()))
-    const view = render(sidebarElement())
-    expect(mocks.dropOwnerRef).toHaveBeenLastCalledWith(expect.any(HTMLDivElement))
-
-    mocks.state = { ...mocks.state, sidebarOpen: false }
-    view.rerender(sidebarElement())
-    expect(mocks.dropOwnerRef).toHaveBeenLastCalledWith(null)
   })
 })

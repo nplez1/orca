@@ -12,14 +12,14 @@ import {
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
+import { installFakeAppEnvironment } from '../../../config/scripts/test-runtime/environment/vitest-host-ports-setup'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 
 const { authorizeExternalPathMock } = vi.hoisted(() => ({
   authorizeExternalPathMock: vi.fn()
 }))
 
-vi.mock('./filesystem/filesystem-auth', () => ({
+vi.mock('./filesystem/access/filesystem-auth.ts', () => ({
   authorizeExternalPath: authorizeExternalPathMock
 }))
 
@@ -150,8 +150,7 @@ describe('floating workspace directory authorization', () => {
     expect(authorizeExternalPathMock).toHaveBeenCalledWith(canonicalSelectedDir)
   })
 
-  it('stores symlink grants as canonical targets and rejects the link after retargeting', async () => {
-    const store = createStore()
+  it('stores symlink grants as canonical targets and rejects the link after retargeting', async () => {    const store = createStore()
     const originalTarget = path.join(tempRoot, 'original-target')
     const retargetedTarget = path.join(tempRoot, 'retargeted-target')
     const selectedLink = path.join(tempRoot, 'selected-link')

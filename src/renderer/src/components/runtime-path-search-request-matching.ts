@@ -1,4 +1,4 @@
-import { buildExcludePathPrefixes } from '../../../shared/quick-open-filter'
+import { buildExcludePathPrefixes } from '../../../shared/quick-open/quick-open-filter'
 import {
   WORKSPACE_PATH_SEARCH_TRANSPORT_BYTE_CEILINGS,
   type WorkspacePathSearchConsumerSequence,
@@ -6,7 +6,7 @@ import {
   type WorkspacePathSearchResponse,
   type WorkspacePathSearchScopeDescriptor
 } from '../../../shared/workspace-path-search-contract'
-import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
+import type { FileExplorerOperationOwner } from './right-sidebar/file-explorer/tree/file-explorer-types'
 
 export const MAX_WORKSPACE_PATH_SEARCH_PAGE_BYTES = Math.max(
   ...Object.values(WORKSPACE_PATH_SEARCH_TRANSPORT_BYTE_CEILINGS)

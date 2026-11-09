@@ -1,6 +1,6 @@
-import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
-import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments'
+import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments/workspace-attachments'
 
 /** The issue a workspace is linked to, normalized across providers.
  *

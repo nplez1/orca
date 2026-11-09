@@ -1,4 +1,4 @@
-import { materializeOmpFreshConfig } from '../../shared/omp-fresh-config'
+import { materializeOmpFreshConfig } from '../../shared/agent-launch/startup/omp-fresh-config'
 import {
   isManagedPiExtensionInPlace,
   withOrcaManagedPiExtensionMarker,
@@ -21,7 +21,7 @@ import { ORCA_PI_EXTENSION_FILE, getPiTitlebarExtensionSource } from './titlebar
 import {
   isSafeDescendCandidate as sharedIsSafeDescendCandidate,
   safeRemoveOverlay
-} from '../pty/overlay-mirror'
+} from '../pty/scrollback/overlay-mirror'
 import { migrateLegacyOmpOverlayState } from './legacy-omp-overlay-migration'
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 
@@ -82,6 +82,7 @@ export class PiTitlebarExtensionService {
   private safeRemoveOverlay(overlayDir: string, kind: LegacyOverlayAgentKind): void {
     safeRemoveOverlay(overlayDir, this.getOverlayRoot(kind))
   }
+
 
   private writeOmpFallbackStatusExtension(source: string): string | undefined {
     const fallbackDir = join(

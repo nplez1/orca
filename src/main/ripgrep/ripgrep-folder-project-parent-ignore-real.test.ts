@@ -4,7 +4,10 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { runProcessSync } from '@orca/process-host'
 import { spawnBundledRipgrep } from './bundled-ripgrep-spawn'
-import { buildRgArgsForQuickOpen, normalizeQuickOpenRgLine } from '../../shared/quick-open-filter'
+import {
+  buildRgArgsForQuickOpen,
+  normalizeQuickOpenRgLine
+} from '../../shared/quick-open/quick-open-filter'
 
 async function capture(root: string, args: string[]): Promise<string[]> {
   const child = spawnBundledRipgrep(args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })

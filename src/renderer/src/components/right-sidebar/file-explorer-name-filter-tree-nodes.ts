@@ -1,7 +1,7 @@
 import { joinPath } from '@/lib/path'
 import { isWindowsAbsolutePathLike } from '../../../../shared/cross-platform-path'
 import { getUtf8ByteLength } from '../../../../shared/utf8-byte-limits'
-import type { FileExplorerOperationOwner, TreeNode } from './file-explorer-types'
+import type { FileExplorerOperationOwner, TreeNode } from './file-explorer/tree/file-explorer-types'
 import type { AcceptedNameFilterPath } from './file-explorer-name-filter-path-acceptance'
 
 export type SyntheticTreeEntry = {

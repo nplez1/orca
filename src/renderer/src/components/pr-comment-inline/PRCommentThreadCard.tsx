@@ -5,9 +5,9 @@ import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import {
   RightPanelCommentComposer,
   type RightPanelCommentSubmitResult
-} from '@/components/right-sidebar/right-panel-comment-composer'
+} from '../right-sidebar/checks-panel/comments/right-panel-comment-composer'
 import type { PRComment } from '../../../../shared/github/comment-types'
-import { formatPrCommentRelativeTime } from '../../../../shared/pr-comment-time'
+import { formatPrCommentRelativeTime } from '../../../../shared/source-control/review-comments/pr-comment-time'
 import { getDiffCommentLineLabel } from '@/lib/diff-comment-compat'
 import { useCommentCardResize } from '../diff-comments/useCommentCardResize'
 import type { DecoratedDiffComment } from '../diff-comments/decorated-diff-comment'

@@ -1,4 +1,4 @@
-import { compareFileNames } from './file-name-sort'
+import { compareFileNames } from './file-listing/file-name-sort'
 
 /**
  * Bounded result retention for a path scan. Both Quick Open ranking and the Explore name

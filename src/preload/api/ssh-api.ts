@@ -13,7 +13,7 @@ import type {
   SshTargetUpdateInput,
   SshTargetVisibilityInput
 } from '../../shared/ssh-types'
-import type { FilesystemPathFlavor } from '../../shared/filesystem-entry-types'
+import type { FilesystemPathFlavor } from '../../shared/file-access/filesystem-path-flavor'
 
 export type SshApi = {
   listTargets: () => Promise<SshTarget[]>
@@ -38,6 +38,7 @@ export type SshApi = {
   onStateChanged: (
     callback: (data: { targetId: string; state: SshConnectionState }) => void
   ) => () => void
+  onTargetRemoved: (callback: (data: { targetId: string }) => void) => () => void
   addPortForward: (args: {
     targetId: string
     localPort: number

@@ -2,7 +2,7 @@ import { mkdtemp, open, readdir, rm, stat, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { compareFileNames } from '../../shared/file-name-sort'
+import { compareFileNames } from '../../shared/file-listing/file-name-sort'
 import {
   assertWorkspacePathSearchEquivalent,
   runWorkspacePathSearchOracle

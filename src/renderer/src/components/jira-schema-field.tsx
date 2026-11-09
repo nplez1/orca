@@ -14,7 +14,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { translate } from '@/i18n/i18n'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 
 /**
  * One Jira field's control, chosen from its schema. Shared by the create dialog,

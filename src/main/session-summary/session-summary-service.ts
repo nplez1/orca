@@ -7,7 +7,7 @@
 // of this class, and the desktop subscribes to its snapshots — the same code that
 // would run if the user were working on that machine directly. A session on an SSH
 // target folds here, from a fetched copy, because an SSH host runs no Orca server.
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
+import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
 import type {
   SessionSummaryCloseRequest,
   SessionSummaryOpenRequest,

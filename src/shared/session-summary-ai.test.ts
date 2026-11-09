@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCommitMessageAgentSpec } from './commit-message-agent-spec'
+import { getCommitMessageAgentSpec } from './source-control/ai/generation/commit-message-agent-spec'
 import {
   readSessionSummaryDiscoveredModels,
   resolveSessionSummaryAiParams,

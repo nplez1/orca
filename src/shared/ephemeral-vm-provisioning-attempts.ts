@@ -1,8 +1,8 @@
 import { existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { writeSecureJsonFileWithinLimit } from './bounded-secure-json-file'
-import { readNodeFileSyncWithinLimit } from './node-bounded-file-reader'
-import { hardenExistingSecureFile } from './secure-file'
+import { writeSecureJsonFileWithinLimit } from './secure-storage/bounded-secure-json-file'
+import { readNodeFileSyncWithinLimit } from './file-content/node-bounded-file-reader'
+import { hardenExistingSecureFile } from './secure-storage/secure-file'
 
 /**
  * Creates that have been started but have not yet reported.

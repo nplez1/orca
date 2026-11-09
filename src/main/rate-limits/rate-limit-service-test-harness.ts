@@ -17,6 +17,7 @@ import { readCursorAuthSession } from './cursor-auth'
 import { fetchOpenCodeGoUsage } from './opencode-go-usage-source-selection'
 import { fetchZcodeRateLimits } from './zcode-usage-fetcher'
 import { fetchAntigravityRateLimits } from './antigravity-usage-fetcher'
+import { fetchMuseRateLimits } from './muse-usage-fetcher'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { hasDeepSeekApiKey } from '../deepseek/deepseek-api-key-store'
 import { hasFireworksCredentials } from '../fireworks/fireworks-credentials-store'
@@ -133,6 +134,7 @@ export function mockFreshBackgroundProviderFetches(): void {
   vi.mocked(fetchAntigravityRateLimits).mockImplementation(async () =>
     unavailableProvider('antigravity')
   )
+  vi.mocked(fetchMuseRateLimits).mockImplementation(async () => unavailableProvider('muse'))
 }
 
 /** The provider modules a suite must mock before this harness can stub them, with the failure
@@ -157,6 +159,7 @@ function unmockedProviderModules(): string[] {
     ['./opencode-go-usage-source-selection', fetchOpenCodeGoUsage],
     ['./zcode-usage-fetcher', fetchZcodeRateLimits],
     ['./antigravity-usage-fetcher', fetchAntigravityRateLimits],
+    ['./muse-usage-fetcher', fetchMuseRateLimits],
     ['../minimax/minimax-cookie-store', hasMiniMaxSessionCookie],
     ['../deepseek/deepseek-api-key-store', hasDeepSeekApiKey],
     ['../fireworks/fireworks-credentials-store', hasFireworksCredentials],
@@ -200,6 +203,7 @@ export function resetRateLimitProviderMocks(): void {
   vi.mocked(fetchCursorRateLimits).mockResolvedValue(unavailableProvider('cursor'))
   vi.mocked(fetchZcodeRateLimits).mockResolvedValue(unavailableProvider('zcode'))
   vi.mocked(fetchAntigravityRateLimits).mockResolvedValue(unavailableProvider('antigravity'))
+  vi.mocked(fetchMuseRateLimits).mockResolvedValue(unavailableProvider('muse'))
   vi.mocked(hasMiniMaxSessionCookie).mockReturnValue(false)
   vi.mocked(hasDeepSeekApiKey).mockReturnValue(false)
   vi.mocked(hasFireworksCredentials).mockReturnValue(false)

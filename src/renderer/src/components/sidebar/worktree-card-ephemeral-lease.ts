@@ -5,7 +5,7 @@ import {
   useEphemeralVmRuntimes,
   type EphemeralVmRuntimeLease
 } from '@/hooks/useEphemeralVmRuntimes'
-import { useSecondTickNow } from './prompt-cache-countdown-clock'
+import { useSecondTickNow } from './workspace-card/activity/prompt-cache-countdown-clock'
 
 /**
  * The lease for one workspace card.

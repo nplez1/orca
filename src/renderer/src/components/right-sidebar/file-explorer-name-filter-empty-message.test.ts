@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkspacePathSearchResponse } from '../../../../shared/workspace-path-search-contract'
-import { getFileExplorerNameFilterEmptyMessageKind } from './file-explorer-name-filter-projection'
+import { getFileExplorerNameFilterEmptyMessageKind } from './file-explorer/tree/file-explorer-name-filter-projection'
 
 describe('getFileExplorerNameFilterEmptyMessageKind', () => {
   const base = { hasNameFilter: true, hasLoadError: false, truncated: false }

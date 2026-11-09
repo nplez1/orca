@@ -5,7 +5,7 @@ import {
   type HookListenerState
 } from './listener-state'
 import { isNestedPiSessionEvent } from './nested-pi-session-guard'
-import { normalizeAndAccept, PANE_KEY } from '../agent-hook-listener-test-harness'
+import { normalizeAndAccept, PANE_KEY } from './normalization/agent-hook-listener-test-harness'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from '../agent-descendant-roster'
 
 const PARENT_SESSION = {

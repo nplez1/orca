@@ -17,7 +17,7 @@
 
 import { spawn, execFileSync } from 'node:child_process'
 import process from 'node:process'
-import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../../config/scripts/ci-unit-files.mjs'
+import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../../config/scripts/ci/unit-selection/dependency-graph/ci-unit-files.mjs'
 import {
   SECONDS_PER_TEST_FILE,
   droppedTouchedTests,

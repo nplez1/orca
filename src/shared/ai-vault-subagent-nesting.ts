@@ -1,4 +1,4 @@
-import type { AiVaultSession } from './ai-vault-types'
+import type { AiVaultSession } from './ai-vault/contracts/ai-vault-types'
 
 /**
  * Splits a filtered session list into parent rows plus the sub-agent rows that

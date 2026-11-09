@@ -10,35 +10,43 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   getTaskSourceCacheScope,
   type TaskSourceContext
-} from '../../../../shared/task-source-context'
-import type { JiraPatchOptions } from '../../store/slices/jira-slice-contract'
+} from '../../../../shared/work-items/task-source-context'
+import type { JiraPatchOptions } from '../../store/slices/jira/jira-slice-contract'
 import type { AppState } from '../../store/types'
-import { getJiraReadIdentity } from '@/store/slices/jira-read-coordination'
+import { getJiraReadIdentity } from '@/store/slices/jira/jira-read-coordination'
 import type * as I18n from '@/i18n/i18n'
-import type * as RuntimeJiraClient from '@/runtime/runtime-jira-client'
-import { getJiraRuntimeTarget, type RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+import type {
+  jiraAddIssueCommentForTarget,
+  jiraGetIssueForTarget,
+  jiraIssueCommentsForTarget,
+  jiraListEditFieldsForTarget,
+  jiraListPrioritiesForTarget,
+  jiraListTransitionsForTarget,
+  jiraUpdateIssueForTarget
+} from '@/runtime/jira/runtime-jira-detail-client'
+import type { jiraListAssignableUsersForTarget } from '@/runtime/jira/runtime-jira-user-fields-client'
+import { getJiraRuntimeTarget, type RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import JiraIssueWorkspace from '../JiraIssueWorkspace'
 
 const runtimeMocks: {
-  jiraAddIssueCommentForTarget: Mock<typeof RuntimeJiraClient.jiraAddIssueCommentForTarget>
-  jiraGetIssueForTarget: Mock<typeof RuntimeJiraClient.jiraGetIssueForTarget>
-  jiraIssueCommentsForTarget: Mock<typeof RuntimeJiraClient.jiraIssueCommentsForTarget>
-  jiraListAssignableUsersForTarget: Mock<typeof RuntimeJiraClient.jiraListAssignableUsersForTarget>
-  jiraListEditFieldsForTarget: Mock<typeof RuntimeJiraClient.jiraListEditFieldsForTarget>
-  jiraListPrioritiesForTarget: Mock<typeof RuntimeJiraClient.jiraListPrioritiesForTarget>
-  jiraListTransitionsForTarget: Mock<typeof RuntimeJiraClient.jiraListTransitionsForTarget>
-  jiraUpdateIssueForTarget: Mock<typeof RuntimeJiraClient.jiraUpdateIssueForTarget>
+  jiraAddIssueCommentForTarget: Mock<typeof jiraAddIssueCommentForTarget>
+  jiraGetIssueForTarget: Mock<typeof jiraGetIssueForTarget>
+  jiraIssueCommentsForTarget: Mock<typeof jiraIssueCommentsForTarget>
+  jiraListAssignableUsersForTarget: Mock<typeof jiraListAssignableUsersForTarget>
+  jiraListEditFieldsForTarget: Mock<typeof jiraListEditFieldsForTarget>
+  jiraListPrioritiesForTarget: Mock<typeof jiraListPrioritiesForTarget>
+  jiraListTransitionsForTarget: Mock<typeof jiraListTransitionsForTarget>
+  jiraUpdateIssueForTarget: Mock<typeof jiraUpdateIssueForTarget>
 } = vi.hoisted(() => ({
-  jiraAddIssueCommentForTarget: vi.fn<typeof RuntimeJiraClient.jiraAddIssueCommentForTarget>(),
-  jiraGetIssueForTarget: vi.fn<typeof RuntimeJiraClient.jiraGetIssueForTarget>(),
-  jiraIssueCommentsForTarget: vi.fn<typeof RuntimeJiraClient.jiraIssueCommentsForTarget>(),
-  jiraListAssignableUsersForTarget:
-    vi.fn<typeof RuntimeJiraClient.jiraListAssignableUsersForTarget>(),
-  jiraListEditFieldsForTarget: vi.fn<typeof RuntimeJiraClient.jiraListEditFieldsForTarget>(),
-  jiraListPrioritiesForTarget: vi.fn<typeof RuntimeJiraClient.jiraListPrioritiesForTarget>(),
-  jiraListTransitionsForTarget: vi.fn<typeof RuntimeJiraClient.jiraListTransitionsForTarget>(),
-  jiraUpdateIssueForTarget: vi.fn<typeof RuntimeJiraClient.jiraUpdateIssueForTarget>()
+  jiraAddIssueCommentForTarget: vi.fn<typeof jiraAddIssueCommentForTarget>(),
+  jiraGetIssueForTarget: vi.fn<typeof jiraGetIssueForTarget>(),
+  jiraIssueCommentsForTarget: vi.fn<typeof jiraIssueCommentsForTarget>(),
+  jiraListAssignableUsersForTarget: vi.fn<typeof jiraListAssignableUsersForTarget>(),
+  jiraListEditFieldsForTarget: vi.fn<typeof jiraListEditFieldsForTarget>(),
+  jiraListPrioritiesForTarget: vi.fn<typeof jiraListPrioritiesForTarget>(),
+  jiraListTransitionsForTarget: vi.fn<typeof jiraListTransitionsForTarget>(),
+  jiraUpdateIssueForTarget: vi.fn<typeof jiraUpdateIssueForTarget>()
 }))
 
 const store = vi.hoisted(() => ({
@@ -55,7 +63,7 @@ export const editState: { settings: GlobalSettings | null; serverTitle: string }
   serverTitle: 'Old title'
 }
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   ...runtimeMocks,
   jiraGetIssue: (settings: RuntimeJiraSettings, key: string, siteId?: string | null) =>
     runtimeMocks.jiraGetIssueForTarget(getJiraRuntimeTarget(settings), key, siteId),
@@ -88,6 +96,17 @@ vi.mock('@/runtime/runtime-jira-client', () => ({
   jiraListAssignableUsers: async () => [],
   jiraListEditFields: (settings: RuntimeJiraSettings, key: string, siteId?: string | null) =>
     runtimeMocks.jiraListEditFieldsForTarget(getJiraRuntimeTarget(settings), key, siteId)
+}))
+vi.mock('@/runtime/jira/runtime-jira-detail-client', () => ({
+  jiraAddIssueCommentForTarget: runtimeMocks.jiraAddIssueCommentForTarget,
+  jiraGetIssueForTarget: runtimeMocks.jiraGetIssueForTarget,
+  jiraIssueCommentsForTarget: runtimeMocks.jiraIssueCommentsForTarget,
+  jiraListPrioritiesForTarget: runtimeMocks.jiraListPrioritiesForTarget,
+  jiraListTransitionsForTarget: runtimeMocks.jiraListTransitionsForTarget,
+  jiraUpdateIssueForTarget: runtimeMocks.jiraUpdateIssueForTarget
+}))
+vi.mock('@/runtime/jira/runtime-jira-user-fields-client', () => ({
+  jiraListAssignableUsersForTarget: runtimeMocks.jiraListAssignableUsersForTarget
 }))
 vi.mock('@/store', () => ({
   useAppStore: (

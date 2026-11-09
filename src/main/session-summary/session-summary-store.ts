@@ -6,7 +6,7 @@
 // passed in rather than resolved from `app`.
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
+import { durableWriteTempPath, writeFileDurableSync } from '../filesystem/durable-file-write'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { boundSessionSummaryLedgerForStorage } from './session-summary-ledger'
 import type {

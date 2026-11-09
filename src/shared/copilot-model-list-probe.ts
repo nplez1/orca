@@ -1,5 +1,8 @@
-import type { CommitMessageAgentSpec, CommitMessageModel } from './commit-message-agent-spec'
-import { OPENAI_THINKING_LEVELS } from './commit-message-model-parsers'
+import type {
+  CommitMessageAgentSpec,
+  CommitMessageModel
+} from './source-control/ai/generation/commit-message-agent-spec'
+import { OPENAI_THINKING_LEVELS } from './source-control/ai/generation/commit-message-model-parsers'
 import { labelFromModelId } from './model-id-label'
 
 // Why: the Copilot CLI has no `models` subcommand, but `help config` documents the

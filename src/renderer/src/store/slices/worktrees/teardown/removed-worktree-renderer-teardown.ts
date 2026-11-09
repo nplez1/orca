@@ -4,7 +4,7 @@ import {
 } from '../../../../../../shared/execution-host'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import type { WorktreeCatalogVersion } from '../../../../../../shared/worktree/catalog-version'
-import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
+import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
 import { appliedWorktreeCatalogVersionPatch } from '../listing/worktree-catalog-version-state'
 import {
   cleanupEphemeralVmRuntimesForDeleted,
@@ -13,7 +13,7 @@ import {
 import { forgetAgentStartupDeliveriesForTabs } from '@/lib/agent-startup-delivery-guards'
 import { forgetForegroundTerminalTabs } from '@/lib/foreground-terminal-tabs'
 import { requestVirtualizedScrollAnchorRecord } from '@/hooks/requestVirtualizedScrollAnchorRecord'
-import { disposeRemovedWorktreeParkedTerminalWatchers } from '../../../../components/terminal-pane/terminal-parked-watcher-registry'
+import { disposeRemovedWorktreeParkedTerminalWatchers } from '../../../../components/terminal-pane/parking/output-watchers/terminal-parked-watcher-registry'
 import { detachedHeadAutoDerivedDisplayNames } from '../metadata/detached-head-display-name'
 import { applyRemoveWorktreeSuccessState } from './remove-worktree-store-cleanup'
 import { purgeOrphanedRuntimeSshProjects } from './orphaned-runtime-ssh-project-purge'

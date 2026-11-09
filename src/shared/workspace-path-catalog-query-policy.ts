@@ -9,7 +9,7 @@ import {
   WORKSPACE_PATH_CATALOG_FLAGS,
   type WorkspacePathCatalog
 } from './workspace-path-catalog'
-import { shouldExcludeQuickOpenRelPath } from './quick-open-filter'
+import { shouldExcludeQuickOpenRelPath } from './quick-open/quick-open-filter'
 
 export function pathIsInWorkspaceCatalogScope(
   path: string,

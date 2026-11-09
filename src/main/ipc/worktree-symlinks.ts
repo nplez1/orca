@@ -9,7 +9,7 @@ import {
 import {
   findExistingWorktreeSymlinkPaths,
   getSafeRelativePath
-} from '../git/worktree-symlink-detection'
+} from '../git/worktrees/content-paths/worktree-symlink-detection'
 
 export type { WorktreeLinkedPathOptions } from './worktree-path-publisher'
 export { findExistingWorktreeSymlinkPaths, worktreeSymlinkTypeCandidates }

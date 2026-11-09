@@ -4,10 +4,10 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SetStateAction } from 'react'
 import type { PRComment } from '../../../../../shared/github/comment-types'
-import { clearPendingPRCommentAiAck } from '../pr-comments-ai-launch-ack'
-import type { PendingPRCommentAiAck } from '../pr-comments-ai-launch-ack'
-import { PR_COMMENT_AI_FIXING_REPLY } from '../pr-comment-fixing-reply-body'
-import { useChecksPanelAiAcknowledgement } from './use-checks-panel-ai-acknowledgement'
+import { clearPendingPRCommentAiAck } from './comments/pr-comments-ai-launch-ack'
+import type { PendingPRCommentAiAck } from './comments/pr-comments-ai-launch-ack'
+import { PR_COMMENT_AI_FIXING_REPLY } from './comments/pr-comment-fixing-reply-body'
+import { useChecksPanelAiAcknowledgement } from './review-actions/use-checks-panel-ai-acknowledgement'
 
 type AcknowledgementInput = Parameters<typeof useChecksPanelAiAcknowledgement>[0]
 

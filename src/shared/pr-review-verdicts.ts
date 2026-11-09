@@ -1,5 +1,5 @@
 import type { GitHubReviewState, PRComment } from './github/comment-types'
-import { isBotPRComment } from './pr-comment-audience'
+import { isBotPRComment } from './source-control/review-comments/pr-comment-audience'
 
 /**
  * One reviewer's standing decision on a PR, reduced from the review submissions the comments

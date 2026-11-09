@@ -15,7 +15,7 @@ import type {
   SessionSummarySessionRef,
   SessionSummarySnapshot
 } from '../../shared/session-summary-types'
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
+import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
 
 const DEFAULT_POLL_INTERVAL_MS = 600
 const MAX_POLL_RETRIES = 1

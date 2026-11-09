@@ -36,7 +36,7 @@ export const BUILDER_CONFIG = './config/electron-builder.config.cjs'
 // `updater-release-targets.ts` holds RELEASES_REPO, the one declaration every feed URL derives from.
 const FEED_FILES = [
   'src/main/updater-release-targets.ts',
-  'src/main/updater-prerelease-feed.ts',
+  'src/main/updater/releases/updater-prerelease-feed.ts',
   'src/shared/release-channel.ts'
 ]
 const FEED_GLOB = { dir: 'src/main/updater', prefix: 'updater-' }

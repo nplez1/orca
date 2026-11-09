@@ -1,6 +1,6 @@
-import { parsePairingCode } from './pairing'
-import { stripCredentialsFromMessage } from './git-remote-error'
 import { readEphemeralVmLifetime } from './ephemeral-vm-lifetime'
+import { parsePairingCode } from './remote-runtime/pairing/pairing'
+import { stripCredentialsFromMessage } from './git/remotes/git-remote-error'
 import {
   getEphemeralVmRecipeResultConnection,
   type EphemeralVmRecipeConnection,

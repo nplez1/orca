@@ -1,8 +1,8 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
-import { getPrCommentAudienceFilters } from '@/lib/pr-comment-audience-labels'
-import type { PRCommentAudienceFilter } from '../../../../../shared/pr-comment-audience'
-import type { PRCommentPresentationClasses } from '../pr-comment-presentation'
+import { getPrCommentAudienceFilters } from '@/lib/source-control/review/comments/pr-comment-audience-labels'
+import type { PRCommentAudienceFilter } from '../../../../../shared/source-control/review-comments/pr-comment-audience'
+import type { PRCommentPresentationClasses } from './comments/pr-comment-presentation'
 
 /** The All / Humans / Bots switch above the comment list, with each tab's count. */
 export function CommentsAudienceTabs({

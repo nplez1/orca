@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { LoaderCircle } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 
 export type JiraIssueFieldOutcome =
   | { ok: true }

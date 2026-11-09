@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from '
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { compareFileNames } from '../../shared/file-name-sort'
+import { compareFileNames } from '../../shared/file-listing/file-name-sort'
 import { resolveWorkspacePathFoldLocale } from '../../shared/workspace-path-catalog'
 import type {
   WorkspacePathCatalog,

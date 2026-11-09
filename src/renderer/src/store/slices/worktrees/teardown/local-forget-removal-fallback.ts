@@ -18,7 +18,7 @@ import {
   isRuntimeRepoNotFoundError,
   isRuntimeSelectorNotFoundError
 } from '../listing/runtime-worktree-rpc-errors'
-import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
+import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
 import { resolveUnreachableVmRemovalFallback } from './unreachable-vm-workspace-release'
 
 export type LocalForgetRemovalFallback =

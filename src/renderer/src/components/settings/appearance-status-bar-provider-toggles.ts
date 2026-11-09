@@ -1,11 +1,11 @@
 import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
 import { translate } from '@/i18n/i18n'
-import { translateSearchKeyword } from './settings-search-keywords'
-import { getAntigravityStatusBarToggleSearchEntry } from './appearance-status-bar-antigravity-toggle-search'
-import { getGrokStatusBarToggleSearchEntry } from './appearance-status-bar-grok-toggle-search'
-import { getCursorStatusBarToggleSearchEntry } from './appearance-status-bar-cursor-toggle-search'
-import { getZcodeStatusBarToggleSearchEntry } from './appearance-status-bar-zcode-toggle-search'
-import { getMiniMaxStatusBarToggleSearchEntry } from './appearance-status-bar-minimax-toggle-search'
+import { translateSearchKeyword } from './search/settings-search-keywords'
+import { getAntigravityStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-antigravity-toggle-search'
+import { getGrokStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-grok-toggle-search'
+import { getCursorStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-cursor-toggle-search'
+import { getZcodeStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-zcode-toggle-search'
+import { getMiniMaxStatusBarToggleSearchEntry } from './appearance/appearance-status-bar-minimax-toggle-search'
 
 export type StatusBarToggleSearchEntry = {
   id: StatusBarItem

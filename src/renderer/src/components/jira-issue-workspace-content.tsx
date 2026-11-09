@@ -6,6 +6,7 @@ import { JiraIcon } from '@/components/icons/JiraIcon'
 import { CommentComposer } from '@/components/comment-composer'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import type { JiraComment, JiraIssue } from '../../../shared/jira/jira-types'
@@ -57,6 +58,8 @@ export function JiraIssueWorkspaceContent({
   onOpenOrStartWorkspace: (issue: JiraIssue) => void
   actionItems: JiraIssueWorkspaceAction[]
 }): React.JSX.Element {
+  const t = useTranslate()
+  const intlLocale = useIntlLocale()
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_228px]">
       <div className="min-h-0 overflow-y-auto scrollbar-sleek">
@@ -79,7 +82,7 @@ export function JiraIssueWorkspaceContent({
             <span className="text-xs text-muted-foreground">
               {displayed.project.key} ·{' '}
               {displayed.assignee?.displayName ??
-                translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')}
+                t('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')}
             </span>
           </div>
           {displayed.description?.trim() ? (
@@ -90,10 +93,7 @@ export function JiraIssueWorkspaceContent({
             />
           ) : (
             <p className="text-sm italic text-muted-foreground">
-              {translate(
-                'auto.components.JiraIssueWorkspace.c4889a47e4',
-                'No description provided.'
-              )}
+              {t('auto.components.JiraIssueWorkspace.c4889a47e4', 'No description provided.')}
             </p>
           )}
         </section>
@@ -102,7 +102,7 @@ export function JiraIssueWorkspaceContent({
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="text-[13px] font-medium text-foreground">
-                {translate('auto.components.JiraIssueWorkspace.9a980b06b9', 'Comments')}
+                {t('auto.components.JiraIssueWorkspace.9a980b06b9', 'Comments')}
               </span>
               {comments.length > 0 ? (
                 <span className="text-xs text-muted-foreground">{comments.length}</span>
@@ -121,7 +121,7 @@ export function JiraIssueWorkspaceContent({
                 ) : (
                   <RefreshCw className="size-3" />
                 )}
-                {translate('auto.components.JiraIssueWorkspace.5cd09beaf9', 'Retry')}
+                {t('auto.components.JiraIssueWorkspace.5cd09beaf9', 'Retry')}
               </Button>
             ) : null}
           </div>
@@ -135,7 +135,7 @@ export function JiraIssueWorkspaceContent({
             </div>
           ) : comments.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {translate('auto.components.JiraIssueWorkspace.9178090e26', 'No comments yet.')}
+              {t('auto.components.JiraIssueWorkspace.9178090e26', 'No comments yet.')}
             </p>
           ) : (
             <div className="flex flex-col gap-3">
@@ -151,10 +151,10 @@ export function JiraIssueWorkspaceContent({
                     ) : null}
                     <span className="truncate text-[13px] font-semibold text-foreground">
                       {comment.user?.displayName ??
-                        translate('auto.components.JiraIssueWorkspace.666cfdd835', 'Unknown')}
+                        t('auto.components.JiraIssueWorkspace.666cfdd835', 'Unknown')}
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {formatUiRelativeTimeFromDate(comment.createdAt)}
+                      {formatUiRelativeTimeFromDate(comment.createdAt, undefined, intlLocale)}
                     </span>
                   </div>
                   <div className="px-3 py-2">

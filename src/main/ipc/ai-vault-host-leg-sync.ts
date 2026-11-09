@@ -3,10 +3,10 @@ import type {
   AiVaultListSyncDelta,
   AiVaultScanIssue,
   AiVaultSession
-} from '../../shared/ai-vault-types'
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import { applyAiVaultListDelta } from '../../shared/ai-vault-list-sync'
-import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from '../../shared/ai-vault-types'
-import type { AiVaultSessionDepth } from '../../shared/ai-vault-session-depth'
+import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from '../../shared/ai-vault/contracts/ai-vault-types'
+import type { AiVaultSessionDepth } from '../../shared/ai-vault/scanning/ai-vault-session-depth'
 
 /**
  * A host leg's change sync, as a wrapper around the scan the host-leg cache calls.

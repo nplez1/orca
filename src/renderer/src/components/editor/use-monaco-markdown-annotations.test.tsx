@@ -4,12 +4,18 @@ import { useRef } from 'react'
 import { cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { editor as monacoEditor } from 'monaco-editor'
+import { SELF_LOCAL_AUTHORITY } from '../../../../shared/host-authority'
 
 vi.mock('monaco-editor', () => import('monaco-editor/esm/vs/editor/editor.api.js'))
 
 // This suite is about forwarding a line filter, not about which notes a worktree holds.
-vi.mock('@/store/worktree-diff-comments-selector', () => ({
-  selectWorktreeDiffComments: () => []
+// Notes resolve through an owner now, so the view names one with no notes.
+vi.mock('../diff-comments/use-diff-comment-owner', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDiffCommentView: () => ({
+    owner: { kind: 'worktree', worktreeId: 'worktree-1', authority: SELF_LOCAL_AUTHORITY },
+    comments: []
+  })
 }))
 
 const storeFixture = vi.hoisted(() => {
@@ -29,7 +35,8 @@ vi.mock('@/store', () => ({
   useAppStore: (selector: (state: typeof storeFixture) => unknown) => selector(storeFixture)
 }))
 
-import { useMonacoMarkdownAnnotations } from './use-monaco-markdown-annotations'
+import { useMonacoMarkdownAnnotations } from './markdown-source-tools/monaco/use-monaco-markdown-annotations'
+import { NO_RESOURCE_EVIDENCE } from '@/lib/workspace-copy-owner'
 import {
   createFakeDiffCommentEditor,
   type FakeDiffCommentEditor
@@ -63,7 +70,8 @@ function Harness({
     language: 'markdown',
     worktreeId: 'worktree-1',
     markdownAnnotationsEnabled: true,
-    gutterOccupiedLineNumbers
+    gutterOccupiedLineNumbers,
+    noteSource: NO_RESOURCE_EVIDENCE
   })
   return null
 }

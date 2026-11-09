@@ -1,6 +1,12 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 9-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
+import { RelaySessionGenerations } from './server-relay-sessions'
 import { retainHookRootContext } from '../../../shared/agent-hook-listener/pane-provider-session'
 import { deriveCliWriterTopology } from './cli-writer-observation'
-import { previewHookPresence } from '../../../shared/agent-hook-presence-transition'
+import { previewHookPresence } from '../../../shared/agent-hook-listener/presence/agent-hook-presence-transition'
+import {
+  needsHookRootEvidence,
+  readHookProcessVerdict
+} from '../../../shared/agent-hook-listener/presence/agent-hook-owner-presence'
 import {
   reconcileCodexStatusEvent,
   markCodexLeadTurnInterrupted
@@ -8,10 +14,10 @@ import {
 import {
   resolveAgentStatusIdentity,
   shouldSuppressInheritedTerminalStatus
-} from '../../../shared/agent-status-identity'
+} from '../../../shared/agent-status/identity/agent-status-identity'
 import type { EnrichedAgentHookEventPayload, IncomingAgentHookEvent } from './server-types'
-import type { AgentStatusObservationOrigin } from '../../../shared/agent-status-observation'
-import { ClaudeOwedNotificationExpiryTimers } from '../../../shared/claude-owed-notification-expiry-timers'
+import type { AgentStatusObservationOrigin } from '../../../shared/agent-status/contracts/agent-status-observation'
+import { ClaudeOwedNotificationExpiryTimers } from '../../../shared/agent-hook-listener/providers/claude-owed-notification-expiry-timers'
 import { setClaudeMainAgentTurnState } from '../../../shared/agent-hook-listener/providers/claude-roster-state'
 import {
   attachClaudePermissionToolUseId,
@@ -20,7 +26,7 @@ import {
   withHeldChildWaitMainAgent
 } from './server-claude-status-rules'
 import { isForeignTurnHook } from './server-foreign-turn-hook'
-import { resolveCancelVerdictLatch } from './server-cancel-verdict-latch'
+import { resolveCancelVerdictLatch } from '../../../shared/agent-hook-listener/state/agent-hook-cancel-verdict-latch'
 import { AgentHookServerScreenPromptWiring } from './server-screen-prompt-wiring'
 import { claimsPaneAfterExit } from './agent-exit-evidence'
 import { writePiClaudeChildParentMarker } from './pi-claude-child-parent-marker'
@@ -29,6 +35,7 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
   protected readonly claudeOwedNotificationExpiry = new ClaudeOwedNotificationExpiryTimers(
     this.state
   )
+  protected readonly relaySessions = new RelaySessionGenerations()
 
   // Every row mutation passes here, including cancellation and pane moves.
   protected override commitStatusRowMutation(
@@ -39,7 +46,7 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     if (after) {
       this.claudeOwedNotificationExpiry.arm(after.paneKey, (row) => {
         if (this.server) {
-          this.applyNormalizedStatus(row)
+          this.applyRestatedStatus(row)
         }
       })
     }
@@ -55,11 +62,25 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     newRun = false,
     retireBinding = false
   ): EnrichedAgentHookEventPayload | undefined {
+    const restated = this.restatingStatus
+    this.restatingStatus = false
+    const recordedRow = this.state.lastStatusByPaneKey.get(incoming.paneKey)
+    const sender = incoming.agentPresence?.process
     const rootContext = previewHookPresence(
       incoming,
-      this.state.lastStatusByPaneKey.get(incoming.paneKey),
-      origin === 'hook' || origin === 'launch',
-      retireBinding
+      recordedRow,
+      (origin === 'hook' || origin === 'launch') && !restated,
+      retireBinding,
+      // A relay's owner is root proof only with the binding this link issued for the pane; its
+      // PID is never probed here. Without it the baseline never displaces a record.
+      incoming.connectionId
+        ? incoming.rooted && needsHookRootEvidence(recordedRow, sender)
+          ? 'root'
+          : undefined
+        : readHookProcessVerdict(this.state, recordedRow, {
+            paneKey: incoming.paneKey,
+            process: sender
+          })
     )
     const { event: rootIdentityIncoming, statusAdmissionSession } = rootContext
     const transitioned = rootContext.transitioned
@@ -67,7 +88,12 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
       return undefined
     }
     const enrichedTransition = { ...rootIdentityIncoming, ...transitioned }
-    const { authorityRestartId, codexRosterAuthority, ...transitionedPayload } = enrichedTransition
+    const {
+      authorityRestartId,
+      codexRosterAuthority,
+      rooted: _,
+      ...transitionedPayload
+    } = enrichedTransition
     // Why the strip: the marker beside the transcript is the durable half of this link, and a
     // transcript path on every row would ride the persisted snapshot and the renderer fanout for
     // no reader.
@@ -76,7 +102,7 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     if (!this.canWriteLegacyStatusRow(payload)) {
       return undefined
     }
-    if (payload.agentPresence?.ended) {
+    if (rootContext.exited) {
       this.reconcileEndedProcessForPaneKeys([payload.paneKey], {
         preserveResumeIdentity: true,
         endedPresence: payload.agentPresence
@@ -126,7 +152,7 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     )
     const identity = resolveAgentStatusIdentity({
       existing:
-        previous && this.sameTerminalOwner(previous, terminalOwnedPayload)
+        previous && !rootContext.acquired && this.sameTerminalOwner(previous, terminalOwnedPayload)
           ? {
               agentType: previous.payload.agentType,
               state: previous.payload.state,

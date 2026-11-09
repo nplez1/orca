@@ -1,7 +1,7 @@
 import { useAppStore } from '@/store'
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import type { LinearIssue } from '../../../shared/linear/issue-types'
-import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
+import type { RuntimeLinearSettings } from '@/runtime/linear/runtime-linear-client'
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
 import {
   registerLinearIssueConsumer,

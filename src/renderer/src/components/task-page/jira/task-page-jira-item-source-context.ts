@@ -4,7 +4,7 @@ import { getJiraAccountLabel } from '@/lib/jira-account-label'
 import {
   normalizeTaskSourceContext,
   type TaskSourceContext
-} from '../../../../../shared/task-source-context'
+} from '../../../../../shared/work-items/task-source-context'
 
 /** The project a key belongs to, as the issue-key identity check derives it. */
 function projectKeyFromIssueKey(issueKey: string): string {

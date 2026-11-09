@@ -16,8 +16,8 @@ import {
   finalReplayFrame,
   readRuntimeFixture,
   replayTranscript
-} from './agent-transcript-replay-test-harness'
-import { detectTerminalWaitBlockedReason } from './terminal-wait-detection'
+} from './terminal/wait/agent-transcript-replay-test-harness'
+import { detectTerminalWaitBlockedReason } from './terminal/wait/terminal-wait-detection'
 import { CopilotScreenPromptGained } from './copilot-screen-prompt'
 
 describe("Copilot's blocking prompts, from captured transcripts", () => {

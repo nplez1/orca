@@ -1,11 +1,10 @@
 /* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: quick-open file lists are fetched over local or SSH runtime IPC, so loading/error/results track the request lifecycle. */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 import {
   isQuickOpenQueryTooLarge,
   isQuickOpenRemoteQueryTooLarge
-} from '@/components/quick-open-search'
-import type { PathSearchMode } from '../../../shared/quick-open-path-search'
+} from '../../../shared/quick-open/quick-open-path-search'
+import type { PathSearchMode } from '../../../shared/quick-open/quick-open-path-search'
 import type { RuntimeFileListState } from './runtime-file-list-state'
 import { createRuntimePathSearchScheduler } from './runtime-path-search-scheduler'
 import { startRuntimeUnscopedFileListing } from './runtime-file-listing-fallback'
@@ -24,14 +23,16 @@ export type {
   NestedWorktreeExcludeRequest,
   RuntimeFileListTarget
 } from './quick-open-file-list-target'
+
 import { useAppStore } from '@/store'
-import { useKnownWorktreeById, useWorktreesForRepo } from '@/store/selectors'
-import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
+import { useFileListWorktree } from '@/store/workspaces/selection/use-selected-worktree'
+import { useWorktreesForRepo } from '@/store/slices/worktrees/listing/use-worktree-catalog'
+import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer/tree/file-explorer-types'
 import {
-  getFileExplorerOperationOwnerFromState,
   getFileExplorerOwnerUnresolvedMessage,
-  getFileExplorerOperationRoute
-} from '@/components/right-sidebar/file-explorer-operation-owner'
+  getFileExplorerOperationRoute,
+  useFileListOperationOwner
+} from '@/components/right-sidebar/file-explorer/navigation/file-explorer-operation-owner'
 
 export type { RuntimeFileListState }
 
@@ -70,7 +71,7 @@ export function useRuntimeFileListForWorktree({
   recentPaths?: readonly string[]
 }): RuntimeFileListState {
   // Why: folder workspaces live in the known-worktree catalog, not worktreesByRepo.
-  const worktree = useKnownWorktreeById(worktreeId)
+  const worktree = useFileListWorktree(worktreeId)
   const worktreePath = worktree?.path ?? null
   const repoWorktrees = useWorktreesForRepo(worktree?.repoId ?? null)
   const [listing, setListing] = useState(NO_LISTING)
@@ -95,21 +96,7 @@ export function useRuntimeFileListForWorktree({
   )
   const excludeRequest = useKeyedExcludeRequest(target.excludeRequest)
 
-  const operationOwnerState = useAppStore(
-    useShallow((state) => ({
-      settings: state.settings,
-      repos: state.repos,
-      worktreesByRepo: state.worktreesByRepo,
-      detectedWorktreesByRepo: state.detectedWorktreesByRepo,
-      folderWorkspaces: state.folderWorkspaces,
-      projectGroups: state.projectGroups,
-      restoredRuntimeHostIdByWorkspaceSessionKey: state.restoredRuntimeHostIdByWorkspaceSessionKey
-    }))
-  )
-  const operationOwner = useMemo(
-    () => getFileExplorerOperationOwnerFromState(operationOwnerState, worktreeId),
-    [operationOwnerState, worktreeId]
-  )
+  const operationOwner = useFileListOperationOwner(worktreeId)
   const operationOwnerKey = JSON.stringify(operationOwner)
   const operationOwnerRef = useRef(operationOwner)
   operationOwnerRef.current = operationOwner

@@ -1,7 +1,7 @@
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getSecretStore } from '../../shared/secret-store'
-import { readCredentialFileProtection } from '../credential-file-protection'
-import { writeCredentialFileAtomic } from '../integration-credential-file'
+import { writeCredentialFileAtomic } from '../credentials/integration-credential-file'
+import { readCredentialFileProtection } from '../credentials/credential-file-protection'
 import {
   classifyUnenvelopedCredential,
   type SecretAtRestProtection

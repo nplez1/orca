@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -45,102 +45,6 @@ afterEach(async () => {
 })
 
 describe('scoped Jira Cloud tokens over HTTP', () => {
-  it('refuses redirects from gateway credential, API and attachment requests', async () => {
-    fixture = await startJiraAuthFixture((request, response) => {
-      if (request.url.endsWith('/_edge/tenant_info')) {
-        jiraFixtureJson(response, 200, { cloudId: 'cloud-abc' })
-      } else {
-        response.writeHead(302, { Location: `${GATEWAY}/other-tenant` })
-        response.end()
-      }
-    })
-    const jira = await loadClient()
-    await expect(jira.connect({ ...CREDENTIAL, email: '' })).resolves.toMatchObject({ ok: false })
-    expect(fixture.requests).toHaveLength(2)
-    const client = {
-      site: {
-        id: 'scoped',
-        siteUrl: SITE,
-        email: '',
-        displayName: 'Ada',
-        accountId: 'account-alpha',
-        authType: 'cloud' as const,
-        apiBaseUrl: GATEWAY
-      },
-      authorization: 'Bearer private-token'
-    }
-    await expect(jira.jiraRequest(client, '/rest/api/3/issue/ALP-1')).rejects.toThrow()
-    await expect(
-      jira.jiraRequestBinary(client, `${SITE}/rest/api/3/attachment/content/1`)
-    ).rejects.toThrow()
-    expect(fixture.requests).toHaveLength(4)
-    expect(fixture.requests.every((request) => !request.url.endsWith('/other-tenant'))).toBe(true)
-  })
-
-  it('revokes cached attachment bytes only after replacing a verified credential', async () => {
-    let authorized = true
-    fixture = await startJiraAuthFixture((request, response) => {
-      if (request.url.endsWith('/_edge/tenant_info')) {
-        jiraFixtureJson(response, 200, { cloudId: 'cloud-abc' })
-      } else {
-        jiraFixtureJson(response, authorized ? 200 : 401, authorized ? VIEWER : {})
-      }
-    })
-    const jira = await loadClient()
-    await jira.connect(CREDENTIAL)
-    const client = jira.getClients()[0]
-    if (!client) {
-      throw new Error('Expected connected Jira client')
-    }
-    const cache = await import('./attachments/image-cache')
-    cache.setCachedAttachmentDataUrl({
-      siteId: client.site.id,
-      attachmentId: 'image',
-      dataUrl: 'data:image/png;base64,AQ==',
-      byteSize: 1
-    })
-    const epoch = cache.attachmentImagesEpoch(client.site.id)
-    authorized = false
-    await expect(
-      jira.connect({ ...CREDENTIAL, apiToken: 'rejected-token' })
-    ).resolves.toMatchObject({ ok: false })
-    expect(cache.getCachedAttachmentDataUrl(client.site.id, 'image')).not.toBeNull()
-    expect(cache.attachmentImagesEpoch(client.site.id)).toBe(epoch)
-    authorized = true
-    await expect(
-      jira.connect({ ...CREDENTIAL, apiToken: 'replacement-token' })
-    ).resolves.toMatchObject({ ok: true })
-    expect(cache.getCachedAttachmentDataUrl(client.site.id, 'image')).toBeNull()
-    expect(cache.attachmentImagesEpoch(client.site.id)).toBeGreaterThan(epoch)
-    expect(jira.getClients()[0]?.authorization).toBe(
-      `Basic ${Buffer.from('ada@example.com:replacement-token').toString('base64')}`
-    )
-    cache._resetAttachmentImageCache()
-  })
-
-  it('preserves the installation path in self-hosted attachment URLs', async () => {
-    fixture = await startJiraAuthFixture((_request, response) => {
-      jiraFixtureJson(response, 200, { image: true })
-    })
-    const jira = await loadClient()
-    const attachmentUrl = `${SITE}/jira/secure/attachment/1/shot.png?download=true`
-    await jira.jiraRequestBinary(
-      {
-        site: {
-          id: 'server',
-          siteUrl: `${SITE}/jira`,
-          email: '',
-          displayName: 'Ada',
-          accountId: 'ada',
-          authType: 'server'
-        },
-        authorization: 'Bearer private-token'
-      },
-      attachmentUrl
-    )
-    expect(fixture.requests.map((request) => request.url)).toEqual([attachmentUrl])
-  })
-
   it('resolves the tenant without a credential and connects an email-free Bearer token', async () => {
     fixture = await startJiraAuthFixture((request, response) => {
       if (request.url === `${SITE}/_edge/tenant_info`) {

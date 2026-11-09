@@ -2,12 +2,15 @@ import {
   continueMainAgentStatus,
   foldAgentLeadStatus,
   type AgentLeadStatusResolution
-} from '../../agent-lead-status-fold'
+} from '../../agent-status/lifecycle/agent-lead-status-fold'
 import {
   agentChildWorkLiveness,
   agentChildWorkLivenessFromEvidence
-} from '../../agent-status-child-work-liveness'
-import type { AgentStatusState, ParsedAgentStatusPayload } from '../../agent-status-types'
+} from '../../agent-status/child-work/agent-status-child-work-liveness'
+import type {
+  AgentStatusState,
+  ParsedAgentStatusPayload
+} from '../../agent-status/contracts/agent-status-types'
 import type { HookListenerState } from '../listener-state'
 import { readPiScheduledWork, type PiScheduledJob } from '../pi-scheduled-work'
 

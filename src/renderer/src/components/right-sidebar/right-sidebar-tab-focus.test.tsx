@@ -41,7 +41,7 @@ vi.mock('@/store', () => ({
     }
   )
 }))
-vi.mock('@/runtime/mounted-terminal-tab-registry', () => ({
+vi.mock('@/runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-registry.ts', () => ({
   focusRuntimeTerminalSurface: focusRuntime,
   findRegisteredTerminalTab: () => ({
     key: 'wt-1\0tab-1',

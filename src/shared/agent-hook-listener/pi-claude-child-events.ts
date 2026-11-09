@@ -6,7 +6,7 @@ import {
 import { normalizeHookEventName } from './provider-event-names'
 import { readFirstString } from './interactive-tool'
 import { deriveFallbackToolInputPreview, deriveToolInputPreview } from './tool-input-preview'
-import type { AgentHookSource } from '../agent-hook-relay'
+import type { AgentHookSource } from './transport/agent-hook-relay'
 import type { AgentProviderSessionMetadata } from '../agent-session/lifecycle/agent-session-resume'
 import { applyDescendantEventToPane, isRetiredPiClaudeChild } from './descendant-pane-state'
 import { applyPiScheduledWorkHold } from './providers/pi-pane-hold-evidence'

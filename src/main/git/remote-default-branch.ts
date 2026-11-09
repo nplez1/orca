@@ -1,6 +1,6 @@
 import { promptGuardGitEnv } from './command-runner/git-process-env'
 import { gitExecFileAsync } from './runner'
-import { parseRemoteHeadBranch } from '../../shared/git-fork-sync'
+import { parseRemoteHeadBranch } from '../../shared/git/remotes/git-fork-sync'
 
 /** Bounded like the clone itself: a remote that cannot answer HEAD must not stall the create flow. */
 const REMOTE_DEFAULT_BRANCH_TIMEOUT_MS = 15_000

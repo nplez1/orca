@@ -8,6 +8,18 @@
             "subagentSession_other": "{{count}} subagent sessions"
           }
         }
+      },
+      "settings": {
+        "browser": {
+          "search": {
+            "linkRoutingModifier": {
+              "invert": "invert",
+              "modifier": "modifier",
+              "opposite": "opposite",
+              "routing": "routing"
+            }
+          }
+        }
       }
     }
   },

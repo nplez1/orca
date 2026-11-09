@@ -1,10 +1,10 @@
 import type { RuntimeCapability } from '../../shared/protocol-version'
 import { DESKTOP_BROWSER_BRIDGE_RUNTIME_CAPABILITY } from '../../shared/desktop-browser-bridge-protocol'
-import { darkSwitchRuntimeCapabilities } from './dark-switch-runtime-capabilities'
+import { darkSwitchRuntimeCapabilities } from './construction/dark-switch-runtime-capabilities'
 import { MOBILE_WEB_BUNDLE_CAPABILITY } from '../../shared/mobile-web-bundle/mobile-web-bundle-capability'
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../shared/sidebar-inputs-switch'
 import { WORKSPACE_UNREAD_HOST_RAISES_CAPABILITY } from '../../shared/workspace-unread-raise-capability'
-import { loadBundledMobileWebBundle } from './bundled-mobile-web-bundle'
+import { loadBundledMobileWebBundle } from './rpc/methods/mobile-delivery/bundled-mobile-web-bundle'
 import { isDesktopBrowserBridgeHostEnabled } from './desktop-browser-bridge/desktop-browser-bridge-registry'
 
 /** Capabilities that follow how this host is running, not what its build contains. */

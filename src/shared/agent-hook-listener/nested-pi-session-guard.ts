@@ -1,4 +1,4 @@
-import type { AgentHookSource } from '../agent-hook-relay'
+import type { AgentHookSource } from './transport/agent-hook-relay'
 import type { AgentProviderSessionMetadata } from '../agent-session/lifecycle/agent-session-resume'
 import type { AgentHookEventPayload } from './listener-event'
 

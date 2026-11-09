@@ -4,9 +4,9 @@ import {
   readSessionSummaryAiSettings,
   readSessionSummaryDiscoveredModels
 } from '../../../../shared/session-summary-ai'
-import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from '../../../../shared/commit-message-host-key'
-import type { CommitMessageAiModelCapability } from '../../../../shared/commit-message-ai-types'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from '../../../../shared/source-control/ai/generation/commit-message-host-key'
+import type { CommitMessageAiModelCapability } from '../../../../shared/source-control/ai/generation/commit-message-ai-types'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import {
   aiGenerationAgentChangePatch,
   aiGenerationModelChangePatch,

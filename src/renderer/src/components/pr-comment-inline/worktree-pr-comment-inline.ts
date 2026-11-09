@@ -3,16 +3,16 @@ import type { AppState } from '@/store/types'
 import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { useAppStore } from '@/store'
-import { selectWorktreesByRepo } from '@/store/workspace-record-selectors'
-import { findWorktreeById } from '@/store/slices/worktree-helpers'
+import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
+import type { Worktree } from '../../../../shared/worktree/types'
 import {
   getGitHubPRCacheKey,
   getGitHubRepoCacheKey
 } from '../../../../shared/github/github-cache-key'
-import { prCommentsCacheSuffix } from '@/store/github/cache-identity'
+import { prCommentsCacheSuffix } from '../../store/github/cache/cache-identity'
 import { isGitHubPRSuppressed } from '../../../../shared/worktree/github-pr-suppression'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
-import { isStaleMergedGitHubReviewForHead } from '@/store/slices/hosted-review-cache-state'
+import { isStaleMergedGitHubReviewForHead } from '../../store/slices/hosted-review/hosted-review-cache-state'
 import { getPRCommentInlineScope } from './pr-comment-inline-comments'
 import {
   buildPRCommentInlineThreads,
@@ -106,6 +106,19 @@ const NO_REVIEW: WorktreePRCommentInline = {
   commentsHeadSha: null,
   prNumber: null,
   reviewTarget: null
+}
+
+function findWorktreeById(
+  worktreesByRepo: Record<string, Worktree[]>,
+  worktreeId: string
+): Worktree | undefined {
+  for (const worktrees of Object.values(worktreesByRepo)) {
+    const match = worktrees.find((worktree) => worktree.id === worktreeId)
+    if (match) {
+      return match
+    }
+  }
+  return undefined
 }
 
 /**

@@ -5,7 +5,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraConnectionStatus, JiraIssue, JiraUser } from '../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 
 const mocks = vi.hoisted(() => {
@@ -32,7 +32,7 @@ vi.mock('@/store', () => ({
     })
 }))
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraGetIssue: (...args: unknown[]) => mocks.jiraGetIssue(...args),
   jiraIssueComments: (...args: unknown[]) => mocks.jiraIssueComments(...args),
   jiraListAssignableUsers: (...args: unknown[]) => mocks.jiraListAssignableUsers(...args),

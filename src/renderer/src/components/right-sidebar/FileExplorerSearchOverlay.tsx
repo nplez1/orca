@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome-types'
-import { SearchResultsPane } from './SearchResultsPane'
-import type { useFileSearchPanel } from './useFileSearchPanel'
+import { SearchResultsPane } from './file-explorer/content-search/SearchResultsPane'
+import type { useFileSearchPanel } from './file-explorer/content-search/useFileSearchPanel'
 
 /**
  * The search half of the explorer's shared body slot.

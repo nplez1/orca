@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getDefaultSourceControlAiSettings } from '../../shared/source-control-ai-settings'
+import { getDefaultSourceControlAiSettings } from '../../shared/source-control/ai/settings/source-control-ai-settings'
 import type { SessionSummaryAiSettings } from '../../shared/session-summary-ai-types'
 import {
   resolveSessionSummaryFoldParams,

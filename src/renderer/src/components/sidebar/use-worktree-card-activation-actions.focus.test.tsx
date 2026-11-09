@@ -2,8 +2,11 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorktreeCardProps } from './worktree-card-model'
-import { repo, worktree as baseWorktree } from './worktree-list-groups-test-fixtures'
+import type { WorktreeCardProps } from './workspace-card/controller/worktree-card-model'
+import {
+  repo,
+  worktree as baseWorktree
+} from './worktree-list/grouping/worktree-list-groups-test-fixtures'
 
 type PolicyState = {
   activeView: string
@@ -32,12 +35,13 @@ vi.mock('@/store', () => ({
   useAppStore: { getState: () => state, subscribe: () => () => {} }
 }))
 vi.mock('@/lib/sidebar-worktree-activation', () => ({ activateWorktreeFromSidebar }))
-vi.mock('@/runtime/mounted-terminal-tab-registry', () => ({
+vi.mock('@/runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-registry.ts', () => ({
   focusRuntimeTerminalSurface: focusRuntime,
   findRegisteredTerminalTab
 }))
 
-const { useWorktreeCardActivationActions } = await import('./use-worktree-card-activation-actions')
+const { useWorktreeCardActivationActions } =
+  await import('./workspace-card/controller/use-worktree-card-activation-actions')
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
 const worktree: WorktreeCardProps['worktree'] = {

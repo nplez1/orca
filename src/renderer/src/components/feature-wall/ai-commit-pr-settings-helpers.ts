@@ -1,11 +1,18 @@
-import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
+import type { CommitMessageAiSettings } from '../../../../shared/source-control/ai/generation/commit-message-ai-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   getCommitMessageAgentCapability,
   isCustomAgentId,
   type CommitMessageAgentChoice
-} from '../../../../shared/commit-message-agent-spec'
+} from '../../../../shared/source-control/ai/generation/commit-message-agent-spec'
 import { resolveAiGenerationModel, resolveAiGenerationThinking } from '@/lib/ai-generation-settings'
+
+// Upstream's picker modules resolve the shared selection rules under these names.
+export {
+  aiGenerationAgentLabel as commitMessageAgentLabel,
+  resolveAiGenerationModel as resolveCommitMessageSelectedModel,
+  resolveAiGenerationThinking as resolveCommitMessageSelectedThinking
+} from '@/lib/ai-generation-settings'
 
 export const EMPTY_COMMIT_MESSAGE_AI_SETTINGS: CommitMessageAiSettings = {
   enabled: false,

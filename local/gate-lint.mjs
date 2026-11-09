@@ -94,7 +94,7 @@ export function resolveLintSteps(scripts) {
       }
       return { id: nested[1], command, argv: ['pnpm', 'run', nested[1]] }
     }
-    const direct = /^node (config\/scripts\/[\w.-]+\.mjs)(.*)$/.exec(command)
+    const direct = /^node (config\/scripts\/[\w./-]+\.mjs)(.*)$/.exec(command)
     if (direct) {
       // Why the trailing arguments: a `generate-*.mjs --check` step run without its flag writes
       // instead of checking, which would dirty the tree and still exit 0.
@@ -117,7 +117,7 @@ export function resolveLintSteps(scripts) {
  */
 function expandConsolidatedRunner(steps, root) {
   return steps.flatMap((step) => {
-    const script = /^node (config\/scripts\/[\w.-]+\.mjs)$/.exec(step.command)
+    const script = /^node (config\/scripts\/[\w./-]+\.mjs)$/.exec(step.command)
     if (!script || basename(script[1]) !== 'run-lint.mjs') {
       return [step]
     }

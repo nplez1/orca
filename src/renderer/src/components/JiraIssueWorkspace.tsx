@@ -6,25 +6,24 @@ import type { JiraIssue } from '../../../shared/jira/jira-types'
 import {
   getTaskSourceCacheScope,
   type TaskSourceContext
-} from '../../../shared/task-source-context'
+} from '../../../shared/work-items/task-source-context'
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
 } from '@/lib/jira-issue-workspace-attachment'
 import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { JiraIssueMetadataBar, JiraIssueWorkspaceHeader } from './jira-issue-workspace-chrome'
 import { getJiraSelfUser } from './jira-self-user'
 import { JiraIssueCommentComposer, JiraIssueWorkspaceContent } from './jira-issue-workspace-content'
 import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
-import { getJiraRuntimeTarget } from '@/runtime/runtime-jira-target'
+import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
+import { getJiraRuntimeTarget } from '@/runtime/jira/runtime-jira-target'
 import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
-import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
+import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
 
 const EMPTY_ATTACHMENT_INDEX: JiraIssueWorkspaceAttachmentIndex = new Map()
-
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
   /** Workspaces already attached to Jira issues, so the primary action can show the
@@ -58,6 +57,7 @@ export default function JiraIssueWorkspace({
   refreshSignal = 0,
   onSprintChange
 }: JiraIssueWorkspaceProps): React.JSX.Element {
+  const t = useTranslate()
   // Why the bound source: the label resolves `sourceContext` (the detail source, which
   // Cmd-J can set to another host than the task source), so the click must hand the
   // handler the same source or the two can name different workspaces for one link.
@@ -124,13 +124,12 @@ export default function JiraIssueWorkspace({
       >
         <VisuallyHidden.Root asChild>
           <SheetTitle>
-            {displayed?.title ??
-              translate('auto.components.JiraIssueWorkspace.ef21405c6d', 'Jira issue')}
+            {displayed?.title ?? t('auto.components.JiraIssueWorkspace.ef21405c6d', 'Jira issue')}
           </SheetTitle>
         </VisuallyHidden.Root>
         <VisuallyHidden.Root asChild>
           <SheetDescription>
-            {translate(
+            {t(
               'auto.components.JiraIssueWorkspace.857bd2f88f',
               'Preview, edit, and start work from the selected issue.'
             )}

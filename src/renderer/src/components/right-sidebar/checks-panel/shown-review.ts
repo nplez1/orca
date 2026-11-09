@@ -1,5 +1,5 @@
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
-import type { ChecksPanelReview } from '../checks-panel-review'
+import type { ChecksPanelReview } from './checks-panel-review'
 import type { WorkspaceReviewSelection } from '../use-workspace-review-selection'
 import { isChecksPaneReviewProvider, pickShownReview } from '../workspace-review-selection'
 import { gitHubPRInfoFromHostedReview } from '../hosted-review-to-pr-info'

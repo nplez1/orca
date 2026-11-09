@@ -1,5 +1,5 @@
 import type { WorkspacePathSearchOwnerIdentity } from '../../shared/workspace-path-search-contract'
-import { parseWslPath } from '../wsl'
+import { parseWslPath } from '../wsl/filesystem/unc-path-access'
 
 /**
  * WSL roots are validated more often and expire sooner: the watcher polls only two directory

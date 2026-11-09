@@ -48,6 +48,7 @@ function emptyRateLimits(): RateLimitState {
     fireworks: null,
     deepinfra: null,
     copilot: null,
+    muse: null,
     minimaxCookieConfigured: false,
     minimaxApiKeyConfigured: false,
     opencodeGoApiKeyConfigured: false,
@@ -61,7 +62,8 @@ function emptyRateLimits(): RateLimitState {
     claudeTarget: { runtime: 'host', wslDistro: null },
     codexTarget: { runtime: 'host', wslDistro: null },
     inactiveClaudeAccounts: [],
-    inactiveCodexAccounts: []
+    inactiveCodexAccounts: [],
+    antigravityAccounts: []
   }
 }
 

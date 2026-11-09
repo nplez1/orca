@@ -3,9 +3,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
-import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { getWorkspaceAttachmentSourceContext } from '../sidebar/workspace-attachment-source-result'
+import { getWorkspaceAttachmentSourceContext } from '../sidebar/workspace-card/review/workspace-attachment-source-result'
 import IssuePane from './IssuePane'
 
 const mocks = vi.hoisted(
@@ -17,8 +17,10 @@ const mocks = vi.hoisted(
   } => ({ worktree: null, repo: null, jiraSources: [] })
 )
 
-vi.mock('@/store/selectors', () => ({
-  useActiveWorktree: () => mocks.worktree,
+vi.mock('../../store/workspaces/selection/use-selected-worktree', () => ({
+  useActiveWorktree: () => mocks.worktree
+}))
+vi.mock('../../store/repos/use-repository-catalog', () => ({
   useRepoById: () => mocks.repo
 }))
 vi.mock('./GithubLinkedIssuePane', () => ({

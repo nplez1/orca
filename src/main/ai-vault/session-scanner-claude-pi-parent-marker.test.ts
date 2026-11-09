@@ -2,9 +2,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { AiVaultSession } from '../../shared/ai-vault-types'
-import { peekSessionParseCacheEntry } from './session-parse-cache-store'
-import { resetSessionParseCacheForTests } from './session-scanner-parse-cache'
+import type { AiVaultSession } from '../../shared/ai-vault/contracts/ai-vault-types'
+import {
+  peekSessionParseCacheEntry,
+  resetSessionParseCacheForTests
+} from './parse-cache/session-parse-cache-store'
 import { scanAiVaultSessions } from './session-scanner'
 import { isolatedScanRoots, writeJsonlFile } from './session-scanner-test-fixtures'
 

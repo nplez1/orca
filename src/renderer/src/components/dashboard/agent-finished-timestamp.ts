@@ -1,8 +1,8 @@
-import { agentEntryCompletionAt } from '../../../../shared/agent-completion-time'
+import { agentEntryCompletionAt } from '../../../../shared/agent-status/lifecycle/agent-completion-time'
 import {
   agentTurnEndedOnPurpose,
   agentVerdictDisplayMark
-} from '../../../../shared/agent-main-agent-verdict'
+} from '../../../../shared/agent-status/lifecycle/agent-main-agent-verdict'
 import type { DashboardAgentRow } from './useDashboardData'
 
 /**

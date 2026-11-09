@@ -7,8 +7,8 @@ import type { ReadyProjectHostSetupOption } from '@/lib/project-host-setup-optio
 import { useAppStore } from '@/store'
 import { getDefaultSettings } from '../../../shared/constants'
 import { RUNTIME_CAPABILITIES } from '../../../shared/protocol-version'
-import { setLocalRuntimeCapabilitiesForTests } from '@/runtime/local-runtime-capabilities'
-import type { HostStructuredAgentAvailability } from '@/runtime/host-structured-agent-availability'
+import { setLocalRuntimeCapabilitiesForTests } from '../runtime/hosts/capabilities/local-runtime-capabilities'
+import type { HostStructuredAgentAvailability } from '../runtime/native-chat/agent-catalogs/host-structured-agent-availability'
 import type { Worktree } from '../../../shared/worktree/types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import NewWorkspaceComposerModal from './NewWorkspaceComposerModal'
@@ -23,11 +23,11 @@ const mocks = vi.hoisted(() => ({
   availability: vi.fn<() => HostStructuredAgentAvailability>()
 }))
 
-vi.mock('@/runtime/use-host-structured-agent-availability', () => ({
+vi.mock('@/runtime/native-chat/agent-catalogs/use-host-structured-agent-availability.ts', () => ({
   useHostStructuredAgentAvailability: mocks.availability
 }))
 vi.mock('@/components/agent/AgentSettingsDialog', () => ({ default: () => null }))
-vi.mock('@/lib/worktree-activation', () => ({ activateAndRevealWorktree: mocks.activate }))
+vi.mock('@/lib/workspace/activation/worktree-activation.ts', () => ({ activateAndRevealWorktree: mocks.activate }))
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: vi.fn(), info: vi.fn() } }))
 vi.mock('@/hooks/useDetectedAgents', () => ({
   useDetectedAgents: () => ({

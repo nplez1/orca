@@ -7,7 +7,7 @@ import {
   DropdownMenuSubTrigger
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { getWorkspaceStatusVisualMeta } from './workspace-status'
+import { getWorkspaceStatusVisualMeta } from './workspace-status/presentation/workspace-status'
 import { translate } from '@/i18n/i18n'
 
 type SidebarWorkspaceStatusFilterSectionProps = {

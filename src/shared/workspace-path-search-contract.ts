@@ -7,7 +7,7 @@ import {
   QUICK_OPEN_QUERY_MAX_BYTES,
   QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS,
   splitPathQueryTokens
-} from './quick-open-path-search'
+} from './quick-open/quick-open-path-search'
 
 export const WORKSPACE_PATH_SEARCH_LOCAL_QUERY_MAX_UTF8_BYTES = QUICK_OPEN_QUERY_MAX_BYTES
 export const WORKSPACE_PATH_SEARCH_REMOTE_QUERY_MAX_CODE_UNITS =

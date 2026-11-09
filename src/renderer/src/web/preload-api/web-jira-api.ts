@@ -1,8 +1,6 @@
 import type { PreloadApi } from '../../../../preload/api-types'
 import type { JiraMutationResult } from '../../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
-import { readRuntimeJiraPayload } from '../../runtime/runtime-jira-payload-stream'
-import { RuntimeRpcCallError } from '../../runtime/runtime-rpc-result'
 import { assertJiraTransitionFieldsSupported } from '../../runtime/jira-capability-probe'
 import type { JiraCapabilityProbe } from '../../runtime/jira-capability-probe'
 import { foldIssueUpdateForCapabilities } from '../../runtime/runtime-jira-text-fields'
@@ -10,6 +8,8 @@ import { rethrowJiraWriteTimeout } from '../../runtime/jira-write-deadline'
 import { JIRA_WRITE_RPC_TIMEOUT_MS } from '../../../../shared/jira/jira-write-deadline'
 import { callRuntimeResult, getRemoteRuntimeStatus } from './web-runtime-calls'
 import { assertActiveEnvironment, requireActiveEnvironment } from './web-runtime-session'
+import { readRuntimeJiraPayload } from '../../runtime/jira/runtime-jira-payload-stream'
+import { RuntimeRpcCallError } from '../../runtime/rpc/calls/runtime-rpc-result'
 
 const JIRA_NETWORK_TIMEOUT_MS = 30_000
 const JIRA_SETTINGS_TIMEOUT_MS = 15_000

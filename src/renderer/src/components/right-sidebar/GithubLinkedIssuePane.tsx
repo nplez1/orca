@@ -4,12 +4,12 @@ import { GHCommentComposer } from '@/components/github-item-dialog/discuss-item/
 import { GHEditSection } from '@/components/github-item-dialog/edit-item-fields/gh-edit-section'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
-import { useGitHubItemDialogDetails } from '@/components/github-item-dialog/load-item-details/use-github-item-dialog-details'
-import { lookupGitHubWorkItemForSource } from '@/lib/github-work-item-source-lookup'
+import { useGitHubWorkItemDetails } from '@/components/github-item-dialog/load-item-details/use-github-work-item-details'
+import { lookupGitHubWorkItemForSource } from '../../lib/work-items/github/github-work-item-source-lookup'
 import { getGitHubRepoRoutingTarget } from '@/lib/github-source-runtime-context'
 import { findLinkedIssueRepo, linkedIssueRepoIsOffDevice } from '@/lib/linked-issue-repo'
 import { useAppStore } from '@/store'
-import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import { translate } from '@/i18n/i18n'
@@ -200,7 +200,7 @@ function GithubLinkedIssueDetail({
     appendOptimisticComment,
     loading,
     error
-  } = useGitHubItemDialogDetails({
+  } = useGitHubWorkItemDetails({
     workItem,
     repoPath,
     effectiveRepoId: repoId,

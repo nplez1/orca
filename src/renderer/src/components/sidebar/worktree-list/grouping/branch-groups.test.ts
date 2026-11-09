@@ -18,7 +18,7 @@ import {
   remoteWorktree,
   repo,
   worktree
-} from '../../worktree-list-groups-test-fixtures'
+} from './worktree-list-groups-test-fixtures'
 
 const projectRepoMap: ReadonlyMap<string, Repo> = new Map([
   [repo.id, repo],

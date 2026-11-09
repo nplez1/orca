@@ -65,11 +65,16 @@ export type UiWindowApi = {
   maximize: () => void
   isMaximized: () => Promise<boolean>
   onMaximizeChanged: (callback: (isMaximized: boolean) => void) => () => void
+  /** Focused, shown and not minimized, from the window itself. */
+  isWindowActive: () => Promise<boolean>
+  onWindowActiveChanged: (callback: (active: boolean) => void) => () => void
   requestClose: () => void
   popupMenu: () => void
   onWindowCloseRequested: (callback: (data: { isQuitting: boolean }) => void) => () => void
   confirmWindowClose: () => void
   /** Tell main a quit it already started was vetoed here, so it can stand down instead of quitting. */
   cancelQuit: () => void
+  /** The user kept the window after a close request, which also cancels a pending quit. */
+  cancelWindowClose: () => void
   notifyWindowRevealed: () => void
 }

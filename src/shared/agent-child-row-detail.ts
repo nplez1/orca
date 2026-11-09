@@ -5,8 +5,8 @@
  * lists child work reads this vocabulary, so it lives on its own and the builders only choose which
  * of the three shapes a row comes from.
  */
-import type { AgentChildWorkKind } from './agent-status-child-work'
-import type { AgentChildDisplayState } from './agent-status-child-work-display'
+import type { AgentChildWorkKind } from './agent-status/child-work/agent-status-child-work'
+import type { AgentChildDisplayState } from './agent-status/child-work/agent-status-child-work-display'
 
 /** What a child row says beside its name. Surfaces format it; they never decide it. */
 export type AgentChildRowDetail =
@@ -35,13 +35,15 @@ type AgentChildRowDetailSource = {
   settled: boolean
 }
 
-// A role that restates the name adds nothing.
+// A default role or one that restates the name adds nothing.
 function roleDetail(source: AgentChildRowDetailSource): AgentChildRowDetail | null {
   if (source.kind !== 'agent') {
     return null
   }
   const agentType = source.agentType ?? 'unknown'
-  return source.name.trim() === agentType.trim() ? null : { kind: 'role', agentType }
+  return agentType.trim() === 'default' || source.name.trim() === agentType.trim()
+    ? null
+    : { kind: 'role', agentType }
 }
 
 function messageOrRole(source: AgentChildRowDetailSource): AgentChildRowDetail | null {

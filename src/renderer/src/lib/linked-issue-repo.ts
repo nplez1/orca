@@ -1,6 +1,6 @@
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
-import { getGitHubRepoLookupIndex } from '@/store/slices/github-repo-lookup-index'
+import { getGitHubRepoLookupIndex } from '../store/github/repositories/github-repo-lookup-index'
 
 /** The worktree fields the rule reads. Everything that renders or refreshes a workspace's
  *  linked issue resolves its repo through here, so the pane, the sidebar card and the

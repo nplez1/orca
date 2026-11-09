@@ -152,8 +152,10 @@ export const USAGE_PROVIDER_STATE_KEYS: Record<
   copilot: 'copilot',
   grok: 'grok',
   cursor: 'cursor',
-  zcode: 'zcode'
+  zcode: 'zcode',
+  muse: 'muse'
 }
+export type MuseUsageEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {
   provider: ActiveRateLimitProvider
@@ -241,6 +243,7 @@ export type InternalRateLimitState = {
   fireworks: ProviderRateLimits | null
   deepinfra: ProviderRateLimits | null
   copilot: ProviderRateLimits | null
+  muse: ProviderRateLimits | null
 }
 
 export function normalizePollingInterval(ms: number): number {

@@ -28,7 +28,7 @@ describe('computer-use bundle identity', () => {
   })
 
   it('builds the helper Info.plist from the shared identity rather than a second literal', () => {
-    const script = source('config/scripts/build-computer-macos.mjs')
+    const script = source('config/scripts/native-build/macos/build-computer-macos.mjs')
 
     // The env override stays, so a local build can still pick its own signing identity.
     expect(script).toContain('process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID ?? COMPUTER_USE_BUNDLE_ID')
@@ -42,7 +42,7 @@ describe('computer-use bundle identity', () => {
     // rows. Scanning every source file catches the next missed one, however it is spelled.
     expect(swiftSources().join('\n')).not.toContain('com.stablyai.orca')
     for (const path of [
-      'config/scripts/build-computer-macos.mjs',
+      'config/scripts/native-build/macos/build-computer-macos.mjs',
       'config/scripts/computer-use-bundle-identity.mjs',
       'src/main/computer/macos-computer-use-permissions.ts'
     ]) {

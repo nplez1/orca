@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type {
   GitBranchChangeEntry,
   GitBranchCompareSummary
-} from '../../../../shared/git-diff-compare-types'
+} from '../../../../shared/git/diff/git-diff-compare-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import {
   resolvePRCommentCodeSurface,

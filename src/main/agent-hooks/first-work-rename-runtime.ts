@@ -1,14 +1,15 @@
 import { existsSync } from 'node:fs'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
+import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import { resolveWorktreeLayoutMode } from '../../shared/orca-workspace-layout'
 import type { FirstWorkBranchRenameDeps } from './first-work-branch-rename'
 import { rememberBranchRenameFailureOutput } from './branch-rename-failure-output'
 import { renameWorktreeFolderOnFirstWork } from './first-work-folder-rename'
-import { moveWorktree } from '../git/worktree'
+import { moveWorktree } from '../git/worktrees/movement/worktree-move'
 import { isWslMoveFolderWorkspaceBlocked } from '../persistence/moving-wsl-projects/wsl-move-background-backoff'
 import type { Store } from '../persistence/loading-store/store'
-import type { RuntimeStore } from '../runtime/runtime-store-contract'
+import type { RuntimeStore } from '../runtime/construction/runtime-store-contract'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { resolveWorktreeMetaOwner } from '../persistence/host-qualified-worktree-meta'
 
@@ -25,7 +26,9 @@ export function firstWorkRenameDeps(
     | 'getFolderWorkspace'
     | 'updateFolderWorkspace'
   > &
-    Partial<Pick<Store, 'migrateWorktreeIdentity' | 'getWorktreeIdForTab'>>,
+    Partial<
+      Pick<Store, 'migrateWorktreeIdentity' | 'getWorktreeIdForTab' | 'getWorktreeMetaForHost'>
+    >,
   runtime: Pick<
     OrcaRuntimeService,
     | 'getCommitMessageAgentEnvironmentResolvers'
@@ -64,12 +67,16 @@ export function firstWorkRenameDeps(
         : store.getWorktreeMeta(worktreeId)?.pendingFirstAgentMessageRename === true
     },
     canRenameOrcaCreatedBranch: (worktreeId) => {
-      const meta = store.getWorktreeMeta(worktreeId)
+      // Renames run on this host only, so read this host's row, not a same-id twin's.
+      const meta =
+        store.getWorktreeMetaForHost?.(worktreeId, LOCAL_EXECUTION_HOST_ID) ??
+        store.getWorktreeMeta(worktreeId)
       // A creature-like name alone cannot prove Orca owns the branch.
       return (
         !!meta?.orcaCreationSource &&
         meta.preserveBranchOnDelete !== true &&
-        meta.branchNameWasGenerated !== false
+        meta.branchNameWasGenerated !== false &&
+        meta.branchNameIsUserChosen !== true
       )
     },
     setDisplayName: (worktreeId, displayName) => {

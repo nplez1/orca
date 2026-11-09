@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
-import { makePaneKey } from '../../../../shared/stable-pane-id'
-import type { TerminalTab } from '../../../../shared/terminal-tab-types'
+import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
+import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
+import type { TerminalTab } from '../../../../shared/workspace-layout/terminal-tab-types'
 import type { RetainedAgentEntry } from '@/store/slices/agent-status/agent-status-contract'
 import {
   resolveSessionSummarySessionRef,
@@ -64,6 +64,7 @@ function makeState(
     activeWorktreeId: WORKTREE_ID,
     activeTabType: 'terminal',
     activeTabId: TAB_ID,
+    getActiveTab: () => null,
     tabsByWorktree: {
       [WORKTREE_ID]: [makeTab(TAB_ID)],
       [OTHER_WORKTREE_ID]: [makeTab(OTHER_TAB_ID, OTHER_WORKTREE_ID)]

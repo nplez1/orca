@@ -5,8 +5,8 @@ import {
   jiraListEditFields,
   jiraListPriorities,
   jiraListTransitions
-} from '@/runtime/runtime-jira-client'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+} from '../runtime/jira/runtime-jira-client'
+import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import {
   describeJiraSideReadFailure,
   EDIT_FIELDS_READ_FAILED,

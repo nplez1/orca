@@ -15,7 +15,7 @@ export function getVisibleRightSidebarActivityItems(
 ): ActivityBarItem[] {
   return items.filter(
     (item) =>
-      (!item.gitOnly || !isFolder) &&
+      (!item.gitOnly || !isFolder || (isFolderWorkspace && item.id === 'source-control')) &&
       (!item.folderOnly || isFolderWorkspace) &&
       (!item.sshOnly || hasSshHost) &&
       (!item.linkedIssueOnly || hasLinkedIssue)

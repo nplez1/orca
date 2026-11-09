@@ -2,8 +2,11 @@ import { existsSync, readFileSync, unlinkSync } from 'node:fs'
 import type { SFTPWrapper } from 'ssh2'
 
 // Muse allowlists hook environment variables; persist Orca coordinates to preserve attribution.
-import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
+import type {
+  AgentHookInstallState,
+  AgentHookInstallStatus
+} from '../../shared/agent-hook-listener/configuration/agent-hook-types'
 import {
   buildWindowsAgentHookCurlPostCommand,
   writeHooksJson,

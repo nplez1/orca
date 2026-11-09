@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { useAppStore } from '../../store'
-import { selectFloatingWorkspaceHasUnread } from '../../store/selectors'
+import { selectFloatingWorkspaceHasUnread } from '../../store/workspaces/floating/floating-workspace-unread-selector'
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import { normalizeUsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
 import { normalizeStatusBarUsageMode } from '../../../../shared/status-bar-usage-mode'
@@ -14,9 +14,10 @@ import { useStatusBarMenuFocusHandoff } from './ProviderDetailsMenu'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 import { useStatusBarDensity } from './status-bar-density'
 import { getUsageOwnerHostScope, useOwnerUsageRateLimits } from './use-owner-usage-rate-limits'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 export function useStatusBarController(floatingTerminalOpen: boolean) {
+  const t = useTranslate()
   const floatingTerminalShortcut = useShortcutLabel('floatingTerminal.toggle')
   const localRateLimits = useAppStore((s) => s.rateLimits)
   // Why: with a remote account owner the agents run there, so its usage is the one to show.
@@ -127,11 +128,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const anyVisible = hasVisibleUsageMeters || showResourceUsage
 
   const floatingTerminalActionLabel = floatingTerminalOpen
-    ? translate(
-        'auto.components.status.bar.floatingWorkspace.minimize',
-        'Minimize Floating Workspace'
-      )
-    : translate('auto.components.status.bar.floatingWorkspace.show', 'Show Floating Workspace')
+    ? t('auto.components.status.bar.floatingWorkspace.minimize', 'Minimize Floating Workspace')
+    : t('auto.components.status.bar.floatingWorkspace.show', 'Show Floating Workspace')
   const showFloatingWorkspaceAttentionDot = !floatingTerminalOpen && hasFloatingUnread
 
   // Why: the shown accounts are the owning host's; without a scope Settings opens on the default host.
@@ -172,6 +170,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   }
 
   return {
+    antigravityAccounts: rateLimits.antigravityAccounts,
     anyFetching,
     anyVisible,
     barRef,

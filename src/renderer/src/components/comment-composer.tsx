@@ -7,11 +7,11 @@ import { Bold, Code2, Italic, List, LoaderCircle, Quote, Send } from 'lucide-rea
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
-import { RichMarkdownToolbarButton } from '@/components/editor/RichMarkdownToolbarButton'
+import { RichMarkdownToolbarButton } from './editor/rich-markdown/commands/RichMarkdownToolbarButton'
 import {
   getRichMarkdownSpellcheckAttribute,
   useRichMarkdownSpellcheckAttribute
-} from '@/components/editor/rich-markdown-spellcheck'
+} from './editor/rich-markdown/instance/rich-markdown-spellcheck'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'

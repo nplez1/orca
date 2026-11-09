@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
-import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
+import { durableWriteTempPath, writeFileDurableSync } from '../filesystem/durable-file-write'
 import {
   adoptLegacyHomeStore,
   resolveLegacyHomeStore,
@@ -15,8 +15,8 @@ import {
   restrictCredentialFileToOwner,
   readStoredCredentialToken,
   writeEncryptedCredential
-} from '../integration-credential-file'
-import { readCredentialFileProtection } from '../credential-file-protection'
+} from '../credentials/integration-credential-file'
+import { readCredentialFileProtection } from '../credentials/credential-file-protection'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 
 /**

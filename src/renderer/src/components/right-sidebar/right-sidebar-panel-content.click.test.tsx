@@ -38,7 +38,12 @@ afterEach(() => {
 function mountPanel(): HTMLElement {
   act(() =>
     root.render(
-      createElement(RightSidebarPanelContent, { effectiveTab: 'checks', rightSidebarOpen: true })
+      createElement(RightSidebarPanelContent, {
+        effectiveTab: 'checks',
+        rightSidebarOpen: true,
+        focusVaultSearch: false,
+        onVaultSearchFocusHandled: () => {}
+      })
     )
   )
   const panel = container.firstElementChild

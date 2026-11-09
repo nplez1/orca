@@ -74,6 +74,8 @@ export type PRComment = {
    *  predictable naming convention. Absent when the data source can't report it
    *  (non-GitHub fallbacks via `gh pr view`). */
   isBot?: boolean
+  /** True only when the gh account that read the thread wrote it (GraphQL's flag, or its login on REST reads); absent from older hosts. */
+  viewerDidAuthor?: boolean
 }
 
 export type GitHubIssueTimelineTarget = {

@@ -4,7 +4,7 @@ import { notifyWorktreesChanged } from './worktree-remote'
 
 type WorktreeCatalogRemoteClientNotifier = Pick<
   OrcaRuntimeService,
-  'notifyWorktreeCatalogChangedForRemoteClients'
+  'notifyWorktreeCatalogChangedForRemoteClients' | 'notifyGitStatusChangedForRemoteClients'
 >
 
 let remoteClientNotifier: WorktreeCatalogRemoteClientNotifier | null = null
@@ -43,4 +43,15 @@ export function notifyWatchedWorktreeCatalogChanged(
   repoId: string
 ): void {
   notifyWorktreeCatalogChanged(mainWindow, repoId)
+}
+
+export function notifyGitStatusChangedForRemoteClients(
+  repoId: string,
+  worktreePaths: readonly string[] | null
+): void {
+  try {
+    remoteClientNotifier?.notifyGitStatusChangedForRemoteClients(repoId, worktreePaths)
+  } catch (error) {
+    console.error('[worktrees] failed to notify remote clients of git status change', error)
+  }
 }

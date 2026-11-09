@@ -8,12 +8,16 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { SettingsSegmentedControl, SettingsSwitch } from '../settings/SettingsFormControls'
-import { translate } from '@/i18n/i18n'
+import {
+  SettingsSegmentedControl,
+  SettingsSwitch
+} from '../settings/form-controls/SettingsFormControls'
+import { useTranslate } from '@/i18n/use-translate'
 
 /** Board-header settings for the Agent Dashboard, mirroring the workspace
  *  board's settings menu. */
 export function AgentDashboardSettingsMenu(): React.JSX.Element {
+  const t = useTranslate()
   const showIdle = useAppStore((s) => s.settings?.experimentalAgentDashboardShowIdle === true)
   const cardClickAction = useAppStore(
     (s) => s.settings?.experimentalAgentDashboardCardClickAction ?? 'workspace'
@@ -28,7 +32,7 @@ export function AgentDashboardSettingsMenu(): React.JSX.Element {
             <Button
               variant="ghost"
               size="icon-xs"
-              aria-label={translate('dashboardPopout.settingsLabel', 'Agent Dashboard settings')}
+              aria-label={t('dashboardPopout.settingsLabel', 'Agent Dashboard settings')}
               className="text-muted-foreground"
             >
               <Settings className="size-3.5" />
@@ -36,20 +40,20 @@ export function AgentDashboardSettingsMenu(): React.JSX.Element {
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={4}>
-          {translate('dashboardPopout.settingsTooltip', 'Board settings')}
+          {t('dashboardPopout.settingsTooltip', 'Board settings')}
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" sideOffset={8} collisionPadding={8} className="w-72 p-2">
         <div className="flex items-start justify-between gap-3 rounded-md px-1.5 py-1.5">
           <span className="min-w-0 space-y-0.5">
             <span className="block text-[12px] font-medium leading-4 text-foreground">
-              {translate(
+              {t(
                 'auto.components.settings.ExperimentalPane.agentDashboard.clickLabel',
                 'Clicking a card'
               )}
             </span>
             <span className="block text-[11px] leading-4 text-muted-foreground">
-              {translate(
+              {t(
                 'auto.components.settings.ExperimentalPane.agentDashboard.clickCopy',
                 "Open the agent's workspace, or show the live terminal preview first."
               )}
@@ -60,7 +64,7 @@ export function AgentDashboardSettingsMenu(): React.JSX.Element {
           <SettingsSegmentedControl
             value={cardClickAction}
             onChange={(next) => updateSettings({ experimentalAgentDashboardCardClickAction: next })}
-            ariaLabel={translate(
+            ariaLabel={t(
               'auto.components.settings.ExperimentalPane.agentDashboard.clickAriaLabel',
               'Agent Dashboard card click action'
             )}
@@ -69,14 +73,14 @@ export function AgentDashboardSettingsMenu(): React.JSX.Element {
             options={[
               {
                 value: 'workspace',
-                label: translate(
+                label: t(
                   'auto.components.settings.ExperimentalPane.agentDashboard.clickWorkspace',
                   'Open workspace'
                 )
               },
               {
                 value: 'preview',
-                label: translate(
+                label: t(
                   'auto.components.settings.ExperimentalPane.agentDashboard.clickPreview',
                   'Preview'
                 )
@@ -88,10 +92,10 @@ export function AgentDashboardSettingsMenu(): React.JSX.Element {
         <div className="flex items-start justify-between gap-3 rounded-md px-1.5 py-1.5">
           <span className="min-w-0 space-y-0.5">
             <span className="block text-[12px] font-medium leading-4 text-foreground">
-              {translate('dashboardPopout.settings.showIdle', 'Show idle agents')}
+              {t('dashboardPopout.settings.showIdle', 'Show idle agents')}
             </span>
             <span className="block text-[11px] leading-4 text-muted-foreground">
-              {translate(
+              {t(
                 'dashboardPopout.settings.showIdleCopy',
                 'Include agents that have gone quiet for 30 minutes without reporting completion. Hidden by default.'
               )}
@@ -102,7 +106,7 @@ export function AgentDashboardSettingsMenu(): React.JSX.Element {
             onChange={() => {
               void updateSettings({ experimentalAgentDashboardShowIdle: !showIdle })
             }}
-            ariaLabel={translate('dashboardPopout.settings.showIdle', 'Show idle agents')}
+            ariaLabel={t('dashboardPopout.settings.showIdle', 'Show idle agents')}
           />
         </div>
       </DropdownMenuContent>

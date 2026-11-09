@@ -1,5 +1,5 @@
-import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/closed-terminal-tab-tombstones'
-import type { ClosedTerminalTabTombstonesByTabId } from '../../../shared/closed-terminal-tab-tombstones'
+import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/workspace-layout/closed-terminal-tab-tombstones'
+import type { ClosedTerminalTabTombstonesByTabId } from '../../../shared/workspace-layout/closed-terminal-tab-tombstones'
 
 type TabRow = readonly { id: string }[]
 

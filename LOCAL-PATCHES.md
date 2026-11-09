@@ -1383,11 +1383,71 @@ could not split.
 It is fork-local: upstream keeps `pnpm lint`'s exit code and CI is unchanged.
 `tests/tools/lint-gate.test.mjs` covers the chain reader, the per-step failure split and the
 classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: the whole chain is
-~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is now
-**empty**: its two entries were fixed in the tree on 2026-10-29 rather than allowlisted (see
-`local(lint)` below). It is the place a future red on the base branch gets recorded with its evidence
-instead of being re-derived by hand.
+~100–160 s, and a cached verdict would outlive the edit it was computed against. The list was
+**empty** from 2026-10-29, when its two entries were fixed in the tree rather than allowlisted (see
+`local(lint)` below), until the 2026-11-08 sync recorded six (next section). It is the place a red on
+the base branch gets recorded with its evidence instead of being re-derived by hand.
 This file stays the evidence and the JSON the assertion, as with the unit red set.
+
+### `local(lint)`: the 2026-11-08 sync's lint gate — 14 red steps, what moved and why
+
+The merge of upstream `51c77320bc` (1537 commits, merge `8cd6d83db79`) left `gate-lint` at 14 failing
+steps with 201 new reds. Upstream's owner-scoped tree move is the main cause: every ratchet baseline is
+keyed by path, so a moved file shows up twice. Each step was handled as follows.
+
+- **`check-upstream-file-comments`** — re-measured against the new merge base. The total fell
+  6011 → 5413 and was pruned. Upstream's moves re-keyed ~96 per-file maxima, and those were accepted
+  with `--init --accept`. **Not accepted:** growth the pre-sync tip `3f8bbfb269e` already carried
+  against its own baseline, measured at 6161 against 6011: 23 files and 125 lines over their maxima.
+  #277, #281, #283/#286, #287 and #295 added it after the last re-baseline (#273) without `--accept`.
+  Those files keep their pre-growth maxima, and the total is 5269, excluding the 144 such lines still
+  in the tree (6 left with a test upstream deleted). They stay red, and `local/lint-known-red.json`
+  records them per owning PR. Each match pins the exact count, so any further growth is a new red.
+  To clear them: move the prose here or into a fork-owned module (#267's precedent), or accept it.
+- **`check:focus-read-ratchet`** — this growth was real, and it is fixed in the code rather than
+  allowed. The resolution imported the fork's owner-routed `getJiraRuntimeTarget` under upstream's
+  name, `as rowLessSourceTarget`, in `runtime-jira-client`, `-summary-client`, `-user-fields-client`
+  and `jira-collection-read-actions`. The ratchet seeds on that name, so it counted every call, and
+  every caller became a transitive reader: 35 reds. The calls now use the real name, and every Jira row
+  is back to its pre-sync fork count. `--prune` re-keyed the moved overlay rows, and the reasons it
+  dropped are restored. One row was added: `store/slices/store-test-helpers.ts` at 8, the fork's kept
+  copy of a helper upstream renamed (`c231b5d7da8`, now `store/testing/app-store-test-fixture.ts`).
+  Four fork tests still import it, and it has the same count as before the sync.
+- **`check:workspace-path-sync-fs-ratchet`** — four rows re-keyed to their new paths with the same
+  counts. `git/huge-folder-ignore.ts` is fixed rather than baselined. Upstream's rewrite turned
+  `existsSync(full)`, which the lexical gate cannot see, into a visible
+  `existsSync(path.join(worktreePath, name))`. The `stat` that follows already answers that question
+  asynchronously, so the sync probe is removed.
+- **`check:flaky-test-pattern-ratchet`** (the `lint:ast-grep-gates` rows) — four `0` overlay rows
+  re-keyed by `--prune`, with reasons added.
+- **`check:path-literal-ratchet`** — `vitest-node-runtime-files.mjs` named three tests upstream deleted:
+  `git-command-timeout-behavior` (#38233), `shell-startup-feature-channel` (#38943) and
+  `JiraIssueWorkspace.transition-source` (`c10881fa8c8`). The entries and their comment blocks are
+  dropped. Note that #155's Node-only regression test went with the first of these.
+- **`verify:localization-coverage`** — the allowlist's `object-property:error` "Error" row followed
+  `TIMELINE_KIND_LABELS`, which #281 moved from `session-summary-ledger-view.tsx` to
+  `session-summary-evidence-view.tsx`.
+- **`check:code-quality:changed`** — whole-step known red, stale after the push. Until `nplez1/main`
+  is pushed, `origin/HEAD` is the pre-sync tip. The "changed" set is then upstream's 1537 commits
+  (25,053 code files), and `spawnSync` fails with `E2BIG` before reporting anything. The runbook's
+  sync-sized form against `upstream/main` reported 96 findings on 72 distinct lines, and every one of
+  those lines is present verbatim in the pre-sync tree. The post-merge fix-ups ran clean under
+  `ORCA_CODE_QUALITY_BASE=HEAD` (19 files).
+- Fixed in the tree, no baseline involved:
+  - `check:test-file-runners`: the merge dropped `pane-screen-prompt.spec`'s import when
+    `orca-runtime.test.ts` moved to `construction/`, so the spec stopped running. Restored: 600 tests
+    pass.
+  - Generated artifacts regenerated: `verify:localization-catalogs` (protected-copy keys) and
+    `verify:skill-bundle-manifest` / `verify:bundled-skill-guides` (the fork's `orca-computer-use`
+    stub).
+  - `lint:ast-grep-gates`: the fork's path-index worker now spawns through upstream's
+    `spawnWorkerThread`, and upstream's new `PluginAuthor` link declares `data-link-url`.
+  - `check:workspace-record-read-ratchet`: `use-workspace-copy-target` reads through
+    `selectWorktreesByRepo`.
+  - `check-upstream-identity-literals`: upstream's new `updater.check-failure` test now names the
+    fork's feed.
+  - `audit:code-quality:native`: nine duplicate imports the resolution re-rooted onto one module are
+    merged.
 
 ### `local(lint)`: two `fork-comment-ok` markers, and why they are not comments to delete
 
@@ -2444,6 +2504,45 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-11-08 — merge of upstream `51c77320bc` (1537 commits) into the release line, from
+  `3f8bbfb269`** (merge base `0fa5dae2f9`, rollback tag `archive/pre-sync-3f8bbfb269`, merge commit
+  `3b51b396b75`). **1110 conflicted paths, 1239 hunks** —
+  `modify/delete 645, both-rewrote 263, union 154, rename-replay 27, duplicate-tail 17,
+  duplicate-members 3, add/add 1`. Decisions are in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer will
+  want first:
+
+  - **Upstream reorganised the tree into owner-scoped directories this sync** — settings, the backend
+    runtime, the renderer runtime, the sidebar and the terminal pane all moved. That makes the
+    dominant cost *re-homing* rather than merging: 22 source paths upstream deleted were moved rather
+    than dropped, so the fork's delta was re-applied at the new location before the old path was
+    deleted. 9 more upstream deletions have no upstream home and stay fork-only files.
+  - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **197 paths** outright
+    (import-only three-way unions, fork-unchanged, upstream-unchanged). **386 modify/delete** were
+    settled by the ledger and the manifest: 345 upstream-retired tests taken as deletions, 4
+    fork-deleted tests and 6 fork-deleted source paths kept deleted, 4 dashboard-popout files
+    restored. The remaining **527 content conflicts** were resolved in 15 disjoint area batches, each
+    gated on "no conflict marker survives in this batch's files".
+  - **`use-terminal-pane-lifecycle.ts` needed no port.** Upstream moved the focus-sampling code to
+    `terminal-pane/input/focus/use-terminal-foreground-agent-sampling.ts`, which already carries the
+    fork's `recordUiHangOperation` timing — the delta moved with the code.
+  - **`runtime-jira-target.ts` moved to `runtime/jira/`** with its 11 importers, matching upstream's
+    renderer-runtime grouping. `fork-english-catalog.mjs` moved beside its consumer in
+    `localization/catalog-validation/` for the same reason.
+  - **The settings/accounts family was ported as a delta, not a copy.** The fork's intent in that
+    family is one thing — it deletes the per-section header because its own settings navigation
+    provides it — so each file is upstream's version minus a ~10-line block, not the old file
+    reverted over upstream's (~360 changed lines). `getMiniMaxConsoleUrl` and
+    `resolveZcodePlanSite` stay exported because the fork-only `provider-accounts-sections.tsx`
+    calls them.
+  - **Two type gaps the merge exposed, both real:** `PROVIDER_DISPLAY_NAMES` was missing
+    `copilot`/`deepinfra`/`deepseek`/`fireworks` and `USAGE_PROVIDER_IDS` was missing `muse`, so a
+    metered provider could have shipped with a status-bar meter and no way to switch it off.
+  - **Committed with `HUSKY=0`, and why.** `pre-commit` runs `lint-staged`, whose five tools were
+    applied to all 39,553 staged files — the whole upstream delta — and were killed. Its oxlint tool
+    set was run over the 524 files this merge authored instead (clean), and `local/gate-lint.mjs` is
+    the gate of record. The reason is in the merge commit body.
+
 - **2026-11-01 — merge of upstream `0fa5dae2f9` (459 commits) into the release line, from
   `01eac17153`** (merge base `a903985082`, rollback tag `archive/pre-sync-01eac17153`, merge commit
   `7fea08330aa`, then `62107128f7a`, `87421079c3b`). **202 conflicted paths** —
@@ -2545,77 +2644,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     #169 ack toasts the fork rewords retired from every locale so they fall back to the fork's English
     overlay, `subagentSession` collapsed to one base key with `defaultValue_one`, and the dead
     `taskPageJiraBoard.changeStatusFailed` string dropped.
-
-- **2026-10-28 — merge of upstream `f173998203` (838 commits) into the release line, from
-  `7b86cb0846`** (merge base `0571e45107`, rollback tag `archive/pre-sync-7b86cb0846`, merge commit
-  `2fadfe371b`, then `6491bd5e25`, `029137ad95`). **431 conflicted paths, 621 hunks** —
-  `both-rewrote 223, union 86, add/add 72, modify/delete 31, duplicate-tail 11, duplicate-members 3,
-  rename-replay 5`. Upstream's delta is 22,767 files (−404,589/+510,839): a feature wave (WSL host
-  chat, the Jira board rework, team agents) plus **two sweeping test-retirement campaigns**
-  (#33770, #34156, #34161, #34234) and a consolidated `config/scripts/run-lint.mjs` replacing
-  package.json's inline lint chain. Decisions are in
-  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-28 sync"; the
-  ones a reviewer will want first:
-
-  - **Resolved in four tiers.** `conflicts.mjs --apply-proven` proved **255 of 621 hunks** (167 paths
-    written from syntax-tree proof, not judgement). **69 `docs/agents-md-refs/*.md`** were upstream
-    churn — added and deleted again inside the range, absent from both tips — and were removed.
-    **27 deletions** followed `expected-deletions.json` (14, the dashboard/superseded set) and the
-    ledger's retired-test policy (13 colocated suites). The remaining **163 paths** were resolved in
-    13 disjoint batches, each bound to the ledger and the runbook's convergence rules.
-  - **Upstream's consolidated lint runner would have silently dropped three fork ratchets.**
-    `check:process-host-imports`, `check:workspace-path-sync-fs-ratchet` and
-    `check:compat-boundary-imports` are not in upstream's `LINT_STEPS`, so they moved into
-    `FORK_LINT_STEPS` in `local/gate-lint.mjs`. The same file now **expands `LINT_STEPS` back into one
-    gate step each** — read literally the chain is a single `run-lint` step, which loses per-step
-    attribution and `--only` — and fails closed if the runner cannot be parsed.
-  - **Max-lines: thirteen upstream-owned files went over budget with the fork's delta merged in**
-    (1–18 code lines each). Per the ownership rule in § "`local(lint)`" they are **exempted, not
-    split**, each with a directive naming what the fork adds and a baseline row. The
-    `orcad-entry.ts` row had gone stale and was pruned, so the baseline is 24 entries.
-  - **The update feed was broken by the merge and is the reason this sync was worth running.**
-    Upstream's new `fetchLatestStableReleaseTag()` hardcoded `stablyai/orca` in the
-    `releases/latest` URL _and_ in the redirect-pathname regex, so a fork build's stable fallback
-    never matched the fork's own redirect and every background check died in preflight. Both are
-    retargeted to `nplez1/orca`, which the identity sweep cannot see (it reads literals, not regexes).
-  - **i18n needed a real cleanup, not just a regenerate.** 198 catalog keys had no source reference
-    (test-harness fixtures for the retired suites) and nine English entries had drifted from the
-    source copy the catalog renders. Both were retired from every locale, the fork overlay and
-    `locale-ko-key-overrides.json`; one key was **reused for two different sentences** — the fork's
-    "Gemini CLI (legacy)" heading and upstream's "Gemini" label — and the heading took its own key
-    (`AccountsPane.aa4de4475b`). Two toasts the fork rewords (#169 reply-only flow) had upstream
-    translations with different placeholders; those entries are retired so they fall back to English.
-  - **`main` was red before this merge, and the gate is what caught it.** The merge's own resolution
-    was clean, but the unit gate found **140 failures across 25 test files** — mostly expectations
-    that predate the code they assert, from fork PRs #134, #169, #170, #175, #198 and #203, which
-    merged with `pr.yml` disabled and **no unit lane backstopping them**. Three were merge damage in
-    product code: the updater feed above, a dropped latest-consumer refresh ref in
-    `use-checks-panel-ai-acknowledgement.tsx` (a head-churn rerender silently dropped the post-launch
-    refresh), and the AiVault throttle test hook upstream declares in `ai-vault-session-refresh.ts`.
-    Every other failure was a stale expectation now asserting the fork's contract; no test was
-    deleted, skipped or widened. Four reference repairs followed modules the merge moved and two
-    suites needed the WSL gate mocked so they stop spawning a real `wsl.exe` per case.
-  - **Two tooling bugs surfaced only at this size.** `post-sync`'s deletion scan disabled rename
-    detection on our side only, so an upstream _rename_ of a fork-untouched file
-    (`terminal-file-link-detection-ranges.ts`, #33964) read as a fork-only deletion with a lost
-    export; both sides now run `--no-renames`. And `check-flaky-test-pattern-ratchet.mjs` shells out
-    to `git diff` with no `maxBuffer`, so a ~20k-path merge aborts the spawn with `ENOBUFS` before
-    the ratchet can scope itself; it now uses the 256 MB ceiling its sibling `ast-grep-scan.mjs`
-    already had.
-  - **`local/lint-known-red.json` is back to two entries.** Upstream folded
-    `check:flaky-test-pattern-ratchet` into `lint:ast-grep-gates`, so the two #198 foreign reds
-    follow the new step; the bare-`oxlint` entry went stale (the step is green) and was pruned. Three
-    jenkins suites carry a deliberate `// ast-grep-ignore: test-no-in-test-import-actual` with its
-    reason — they redirect the _real_ homedir, which a stubbed `node:os` would not test.
-
-  Verified on `029137ad95`: `Unit gate @029137ad95 (clean): PASS — 135795 passed; 11 failed, all in
-  unit-known-red.json; 0 flaky re-run passed; 0 unexpected; 1616 s`; `lint gate @029137ad95+dirty:
-  PASS — 39 green, 1 failing: 2 known red, 0 new; 40 steps; 96.0 s` (the `+dirty` part is this
-  record); `pnpm tc` clean on node, cli and web. The tagged revision is past the gated one: the
-  follow-up changes are this record, the lint baselines and two test-file comments. **The nightly is
-  green again**: run `40701735011` on `1776dcc575` passed all five shards, the first green night since
-  2026-10-08 — the 10-27/10-28 reds were `main`'s own drift plus one Linux-only assertion this sync
-  repaired (a refused Claude 401 is retryable on every platform, not just darwin).
 
 ### `local(ci)`: release workflow
 
@@ -3162,7 +3190,6 @@ sweep cannot disable them either.
 nightly, no health report and no release lane before anyone noticed, because every detector lives
 inside the thing that was off. The host-side run above is the only one that closes that, and it is a
 launchd job rather than a workflow.
-||||||| parent of 5aae9e8c529 (local(ci): delegate a red nightly to the agent:auto pipeline)
 
 #### The health issue delegates itself (2026-11-08)
 

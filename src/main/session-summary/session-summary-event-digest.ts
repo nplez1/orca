@@ -9,7 +9,7 @@
 // Deterministic and local: line counts, exit codes and the first error line are extracted here, in
 // one pass over text the read already holds. Digesting must not cost a model call per tool event,
 // or the preprocessing would replace the expense it removes.
-import type { TranscriptMessage } from '../ai-vault/session-transcript-consumers'
+import type { TranscriptMessage } from '../ai-vault/transcripts/session-transcript-consumers'
 
 export type SessionSummarySourceEvent = {
   role: 'user' | 'assistant' | 'tool'

@@ -1,3 +1,4 @@
+import type { GhAccountBinding } from '../../shared/github/account-binding'
 import type {
   GetProjectViewTableResult,
   GitHubProjectCommentMutationResult,
@@ -28,7 +29,7 @@ import type {
   UpdateProjectItemFieldArgs,
   UpdatePullRequestBySlugArgs
 } from '../../shared/github/project-request-types'
-import type { TaskSourceContext } from '../../shared/task-source-context'
+import type { TaskSourceContext } from '../../shared/work-items/task-source-context'
 import type { GitHubCommentResult } from '../../shared/github/comment-types'
 import type {
   GitHubAssignableUser,
@@ -75,9 +76,11 @@ export type GithubWorkItemApi = {
   }) => Promise<Omit<GitHubWorkItem, 'repoId'> | null>
   workItemDetails: (
     args: GitHubRepoSelectorArgs & {
+      expectedGhAccount?: GhAccountBinding | null
       number: number
       type?: 'issue' | 'pr'
       ownerRepo?: GitHubOwnerRepo
+      canonical?: boolean
     }
   ) => Promise<GitHubWorkItemDetails | null>
   notifyWorkItemMutated: (args: {
@@ -128,12 +131,14 @@ export type GithubWorkItemApi = {
     }
   ) => Promise<GitHubCommentResult>
   listLabels: (args: {
+    expectedGhAccount?: GhAccountBinding | null
     repoPath: string
     repoId?: string
     sourceContext?: TaskSourceContext | null
     ownerRepo?: GitHubOwnerRepo
   }) => Promise<string[]>
   listAssignableUsers: (args: {
+    expectedGhAccount?: GhAccountBinding | null
     repoPath: string
     repoId?: string
     sourceContext?: TaskSourceContext | null

@@ -2,7 +2,7 @@ import type {
   AutomationOwnerRef,
   StableAutomationAuthorityRef,
   StableAutomationCatalogRef
-} from '../../../../shared/automation-owner-ref'
+} from '../../../../shared/automations/ownership/automation-owner-ref'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 
 /** Authority storage-query health, independent of execution targets; SSH downtime must not prevent listing/editing stored records. */
@@ -56,6 +56,8 @@ export type AutomationHostCatalogEntry = {
   /** The user hid this host from pickers. The entry stays — an automation already
    *  stored on it must still resolve — but it is not offered as a destination. */
   hidden?: boolean
+  /** A desktop SSH host whose managed Orca server owns its automations: that server's self entry. */
+  servedBy?: string
 }
 
 export type AutomationCatalogSshTargetInput = {
@@ -96,6 +98,8 @@ export type AutomationRuntimeAuthorityInput = {
   querySupport: AutomationHostQuerySupport
   ssh: AutomationCatalogSshMirrorInput
   orphanCount?: number
+  /** The desktop SSH target this runtime is the managed Orca server for. */
+  managedSshTargetId?: string
 }
 
 export type AutomationHostCatalogInput = {

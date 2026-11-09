@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { AgentHookSource } from '../../shared/agent-hook-relay'
+import type { AgentHookSource } from '../../shared/agent-hook-listener/transport/agent-hook-relay'
 import { AgentHookServer, _internals } from './server'
 import {
   SCREEN_PROMPT_FAST_RECHECK_COUNT,

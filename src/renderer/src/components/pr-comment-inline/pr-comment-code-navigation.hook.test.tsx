@@ -4,11 +4,15 @@ import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAppStore } from '@/store'
-import type { GitBranchCompareSummary } from '../../../../shared/git-diff-compare-types'
+import type { GitBranchCompareSummary } from '../../../../shared/git/diff/git-diff-compare-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { getPRCommentInlineId } from './pr-comment-inline-threads'
 import { usePRCommentCodeNavigation } from './pr-comment-code-navigation'
-import { flush, mountProbe, unmountProbes } from '../right-sidebar/source-control-hook-test-harness'
+import {
+  flush,
+  mountProbe,
+  unmountProbes
+} from '../right-sidebar/source-control/panel/source-control-hook-test-harness'
 
 const WORKTREE_ID = 'repo-A::/repo/wt'
 const WORKTREE_PATH = '/repo/wt'

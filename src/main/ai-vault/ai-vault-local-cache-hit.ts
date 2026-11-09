@@ -1,8 +1,8 @@
-import type { AiVaultListResult } from '../../shared/ai-vault-types'
+import type { AiVaultListResult } from '../../shared/ai-vault/contracts/ai-vault-types'
 import {
   aiVaultCachedDepthServes,
   type AiVaultSessionDepth
-} from '../../shared/ai-vault-session-depth'
+} from '../../shared/ai-vault/scanning/ai-vault-session-depth'
 
 /** Structurally the caller's cache entry; declared here so upstream's own type declaration stands. */
 type LocalCacheEntry = {

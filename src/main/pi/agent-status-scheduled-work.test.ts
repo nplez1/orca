@@ -1,8 +1,8 @@
 import type { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { normalizeHookPayload } from '../../shared/agent-hook-listener'
-import type { ParsedAgentStatusPayload } from '../../shared/agent-status-types'
-import { PANE_KEY } from '../../shared/agent-hook-listener-test-harness'
+import { normalizeHookPayload } from '../../shared/agent-hook-listener/normalization/normalize-hook-payload'
+import type { ParsedAgentStatusPayload } from '../../shared/agent-status/contracts/agent-status-types'
+import { PANE_KEY } from '../../shared/agent-hook-listener/normalization/agent-hook-listener-test-harness'
 import {
   createHookListenerState,
   seedLegacyAgentStatusForTests

@@ -1,6 +1,6 @@
 import type { WorkspacePathSearchPathSet } from '../../shared/workspace-path-search-contract'
 import type { WorkspacePathSearchInstrumentationEvent } from '../../shared/workspace-path-search-instrumentation'
-import type { buildRgArgsForQuickOpen } from '../../shared/quick-open-filter'
+import type { buildRgArgsForQuickOpen } from '../../shared/quick-open/quick-open-filter'
 import type {
   WorkspacePathCatalogDiscoveryOptions,
   WorkspacePathCatalogDiscoveryResult,

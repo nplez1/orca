@@ -1,11 +1,11 @@
-import { fileListingCancellationError } from '../../shared/file-listing-cancellation'
+import { fileListingCancellationError } from '../../shared/file-listing/file-listing-cancellation'
 import {
   normalizeQuickOpenRgLine,
   shouldExcludeQuickOpenRelPath,
   shouldIncludeQuickOpenPath
-} from '../../shared/quick-open-filter'
-import { getQuickOpenRgOutputMode } from '../../shared/quick-open-ripgrep-output-mode'
-import { RipgrepFilenameDecoder } from '../../shared/ripgrep-filename-decoder'
+} from '../../shared/quick-open/quick-open-filter'
+import { getQuickOpenRgOutputMode } from '../../shared/quick-open/quick-open-ripgrep-output-mode'
+import { RipgrepFilenameDecoder } from '../../shared/ripgrep/ripgrep-filename-decoder'
 import {
   absorbPendingRipgrepSpawnError,
   classifySynchronousRipgrepSpawnFailure,
@@ -17,10 +17,10 @@ import {
   ripgrepMissingCwdError,
   RipgrepLaunchFailureError,
   RipgrepUnavailableError
-} from '../../shared/ripgrep-process-availability'
+} from '../../shared/ripgrep/ripgrep-process-availability'
 import { spawnBundledRipgrep } from '../ripgrep/bundled-ripgrep-spawn'
-import { QuickOpenSubprocessPathAccumulator } from '../../shared/quick-open-subprocess-path-accumulator'
-import { toWindowsWslPath } from '../wsl'
+import { QuickOpenSubprocessPathAccumulator } from '../../shared/quick-open/quick-open-subprocess-path-accumulator'
+import { toWindowsWslPath } from '../../shared/wsl-paths'
 
 /**
  * One bounded ripgrep `--files` walk, streaming each surviving path into `onPath`.

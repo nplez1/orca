@@ -4,7 +4,7 @@ import { act, createElement, Fragment, useState, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { getByRole, getByTestId, queryByTestId } from '@testing-library/dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import { NEW_TAB_HOLD_TO_OPEN_MENU_MS, TabBarNewTabButton } from './TabBarNewTabButton'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })

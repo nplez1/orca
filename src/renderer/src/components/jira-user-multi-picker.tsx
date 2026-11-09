@@ -6,7 +6,7 @@ import { useJiraUserSearch } from '@/components/jira-user-picker'
 import { Button } from '@/components/ui/button'
 import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { jiraSearchUsers, type RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import { jiraSearchUsers, type RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 
 /** The people a draft already names, in draft order. A held accountId the site gives no

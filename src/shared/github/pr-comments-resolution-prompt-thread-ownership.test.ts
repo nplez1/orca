@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildPRCommentsResolutionPrompt } from './pr-comments-resolution-prompt'
+import { buildPRCommentsResolutionPrompt } from '../source-control/review-comments/pr-comments-resolution-prompt'
 
 describe('buildPRCommentsResolutionPrompt thread ownership', () => {
   it('names the reviewer or the user as the one who closes a thread', () => {

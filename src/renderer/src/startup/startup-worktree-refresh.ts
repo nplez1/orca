@@ -1,7 +1,7 @@
 import type { Repo } from '../../../shared/repo-types'
 import { mapWithConcurrency } from '../../../shared/map-with-concurrency'
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
-import { WORKTREE_REFRESH_CONCURRENCY } from '../store/slices/worktrees'
+import { WORKTREE_REFRESH_CONCURRENCY } from '../store/slices/worktrees/listing/worktree-slice-constants'
 import type { AppState } from '../store/types'
 import type { StartupActions } from '../app-shell/startup-actions-selector'
 import { useAppStore } from '../store'
@@ -103,9 +103,12 @@ export async function refreshStartupWorktrees(
   }
   if (!isCancelled()) {
     // Lineage decorates rows; it must not keep discovery feedback pending.
-    void actions.fetchWorktreeLineage().catch((err: unknown) => {
-      console.warn('Startup worktree lineage refresh failed:', err)
-    })
+    // One lineage list per store: the focused store's full list, every other store's cross-machine links.
+    void actions
+      .fetchWorktreeLineage({ crossStoreHostIds: refreshedHosts })
+      .catch((err: unknown) => {
+        console.warn('Startup worktree lineage refresh failed:', err)
+      })
   }
   return catalogsSucceeded ? results : []
 }

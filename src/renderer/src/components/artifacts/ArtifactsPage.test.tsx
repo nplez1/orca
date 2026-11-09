@@ -5,7 +5,6 @@ import type { ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { OrcaProfileAuthStatus } from '../../../../shared/orca-profiles'
 
 const mocks = vi.hoisted(() => ({
   authStatus: {
@@ -35,7 +34,7 @@ const mocks = vi.hoisted(() => ({
 
 // LOCAL(nplez1): #234 routes share links through the in-app router, not the shell bridge.
 const { openAppHttpLink } = vi.hoisted(() => ({ openAppHttpLink: vi.fn() }))
-vi.mock('@/lib/app-http-link-open', async (importOriginal) => ({
+vi.mock('@/lib/browser/navigation/app-http-link-open', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   openAppHttpLink
 }))
@@ -53,7 +52,9 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipContent: ({ children }: { children: ReactNode }) => <div>{children}</div>
 }))
 
-vi.mock('@/runtime/runtime-rpc-client', () => ({ callRuntimeRpc: mocks.rpc }))
+vi.mock('@/runtime/rpc/calls/runtime-rpc-call', () => ({
+  callRuntimeRpc: mocks.rpc
+}))
 
 vi.mock('@/store', () => ({
   useAppStore: Object.assign(
@@ -76,7 +77,6 @@ function storeState(): Record<string, unknown> {
 }
 
 import ArtifactsPage from './ArtifactsPage'
-import { artifactAccountIdentity } from './useArtifactPagination'
 
 describe('ArtifactsPage', () => {
   beforeEach(() => {
@@ -213,50 +213,6 @@ describe('ArtifactsPage', () => {
 
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(mocks.closePage).toHaveBeenCalledOnce()
-  })
-
-  it('explains the agent-first sharing workflow', async () => {
-    mocks.rpc.mockResolvedValue({ status: 'ok', value: { artifacts: [] } })
-    render(<ArtifactsPage />)
-
-    const heading = await screen.findByText('No shared artifacts')
-    expect(heading.parentElement).toHaveClass('flex-1', 'justify-center')
-    expect(
-      screen.getByText(
-        'Open an HTML or Markdown file and select Share as artifact, or ask your agent to share it.'
-      )
-    ).toBeInTheDocument()
-    expect(screen.queryByText(/orca artifacts share/)).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'Open Settings → Artifacts' })
-    ).not.toBeInTheDocument()
-  })
-
-  it('sends the user to Settings instead of an agent when publishing is off', async () => {
-    mocks.settings = { artifactSharingEnabled: false }
-    mocks.rpc.mockResolvedValue({ status: 'ok', value: { artifacts: [] } })
-    render(<ArtifactsPage />)
-
-    await screen.findByText('Publishing is turned off')
-    expect(screen.getByText(/Allow publishing in Settings → Artifacts/)).toBeInTheDocument()
-    expect(
-      screen.queryByText(
-        'Ask your agent to share an HTML or Markdown file, and it will appear here.'
-      )
-    ).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Settings → Artifacts' }))
-    expect(mocks.openSettingsTarget).toHaveBeenCalledWith({ pane: 'artifacts', repoId: null })
-    expect(mocks.openSettingsPage).toHaveBeenCalledOnce()
-  })
-
-  it('keeps the neutral empty state until settings have loaded', async () => {
-    mocks.settings = null
-    mocks.rpc.mockResolvedValue({ status: 'ok', value: { artifacts: [] } })
-    render(<ArtifactsPage />)
-
-    await screen.findByText('No shared artifacts')
-    expect(screen.queryByText('Publishing is turned off')).not.toBeInTheDocument()
   })
 
   it('loads each cursor once and appends the next artifact page', async () => {
@@ -518,64 +474,6 @@ describe('ArtifactsPage', () => {
     })
 
     await waitFor(() => expect(screen.queryByText('Delete me')).not.toBeInTheDocument())
-  })
-
-  it('skips the delete confirmation once the preference is saved', async () => {
-    mocks.settings = { skipDeleteArtifactConfirm: true }
-    mocks.rpc.mockResolvedValue({
-      status: 'ok',
-      value: { artifacts: [artifactListItem('Skip me', 'skip-me')] }
-    })
-    render(<ArtifactsPage />)
-    await screen.findByRole('button', { name: /Skip me/ })
-
-    mocks.rpc.mockResolvedValueOnce({ status: 'ok', value: undefined })
-    await deleteFirstArtifactFromDrawerMenu()
-
-    await waitFor(() => expect(screen.queryByRole('button', { name: /Skip me/ })).toBeNull())
-    expect(mocks.confirm).not.toHaveBeenCalled()
-  })
-
-  it('supplies the confirmation callback that persists the skip preference', async () => {
-    mocks.confirm.mockResolvedValue(true)
-    mocks.rpc.mockResolvedValue({
-      status: 'ok',
-      value: { artifacts: [artifactListItem('Ask me', 'ask-me')] }
-    })
-    render(<ArtifactsPage />)
-    await screen.findByRole('button', { name: /Ask me/ })
-
-    mocks.rpc.mockResolvedValueOnce({ status: 'ok', value: undefined })
-    await deleteFirstArtifactFromDrawerMenu()
-    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledOnce())
-
-    // Why: the dialog owns the checkbox; the page only supplies what to persist when it is checked.
-    const options = mocks.confirm.mock.calls[0]?.[0] as {
-      dontAskAgain?: { onConfirmed: () => void }
-    }
-    expect(mocks.updateSettings).not.toHaveBeenCalled()
-    options.dontAskAgain?.onConfirmed()
-    expect(mocks.updateSettings).toHaveBeenCalledWith({ skipDeleteArtifactConfirm: true })
-  })
-
-  it('treats an organization switch as an account identity change', () => {
-    const status = {
-      activeProfileId: 'profile-a',
-      cloud: {
-        activeOrgId: 'org-a',
-        cloudProfileId: 'cloud-a',
-        email: 'a@example.com',
-        linkedAt: 1,
-        userId: 'user-a'
-      },
-      configured: true,
-      persistence: 'encrypted',
-      state: 'connected'
-    } satisfies OrcaProfileAuthStatus
-
-    expect(artifactAccountIdentity(status)).not.toBe(
-      artifactAccountIdentity({ ...status, cloud: { ...status.cloud, activeOrgId: 'org-b' } })
-    )
   })
 })
 

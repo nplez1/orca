@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import { ownedSourceTarget } from './provider-source-target'
 
 function jiraSource(hostId: TaskSourceContext['hostId']): TaskSourceContext {

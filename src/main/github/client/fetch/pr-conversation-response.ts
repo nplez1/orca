@@ -1,9 +1,13 @@
+import type { Nodes } from 'mdast'
 import { z } from 'zod'
+import remarkParse from 'remark-parse'
+import { unified } from 'unified'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { parseGitHubReviewState } from '../../../../shared/github/comment-types'
 import { isReportableReviewSubmission } from '../../../../shared/pr-review-verdicts'
 import { mapGraphQLReactionGroups } from '../../comment-reactions'
 import { tailDiffHunk } from '../../../../shared/github/pr-comment-diff-hunk'
+import { viewerAuthorship } from '../../../source-control/comment-viewer-authorship'
 
 const commentSchema = z.object({
   id: z.string(),
@@ -16,6 +20,7 @@ const commentSchema = z.object({
   createdAt: z.string(),
   submittedAt: z.string().nullish(),
   url: z.string(),
+  viewerDidAuthor: z.boolean().nullish().catch(undefined),
   reactionGroups: z
     .array(
       z.object({
@@ -88,9 +93,31 @@ function mapGraphQLComment(
     createdAt: comment.submittedAt ?? comment.createdAt,
     url: comment.url,
     isBot: comment.author?.__typename === 'Bot',
+    ...(comment.viewerDidAuthor === true ? { viewerDidAuthor: true } : {}),
     reactionSubjectId: comment.id,
     reactions: mapGraphQLReactionGroups(comment.reactionGroups)
   }
+}
+
+const reviewMarkdown = unified().use(remarkParse)
+
+function hasVisibleReviewBody(body: string | null | undefined): boolean {
+  if (!body?.trim()) {
+    return false
+  }
+  if (!body.includes('<!--')) {
+    return true
+  }
+  const hasVisibleNode = (node: Nodes): boolean => {
+    if ('children' in node) {
+      return node.children.some(hasVisibleNode)
+    }
+    if (node.type === 'html') {
+      return Boolean(node.value.replace(/<!--[\s\S]*?-->/g, '').trim())
+    }
+    return node.type !== 'text' || Boolean(node.value.trim())
+  }
+  return reviewMarkdown.parse(body).children.some(hasVisibleNode)
 }
 
 /** A review carries a verdict whether or not it carries a body, so it maps its own `state`. */
@@ -108,7 +135,7 @@ function reviewIsReportable(
   const body = comment.body ?? ''
   return includeReviewVerdicts
     ? isReportableReviewSubmission(body, parseGitHubReviewState(comment.state))
-    : body.trim().length > 0
+    : hasVisibleReviewBody(body)
 }
 
 export function parsePRConversationResponse(
@@ -187,6 +214,7 @@ const restCommentSchema = z.object({
 export function parseRestPRComments(
   stdout: string,
   reviews: boolean,
+  viewerLogin: string | null,
   options?: { includeReviewVerdicts?: boolean }
 ): PRComment[] {
   return z
@@ -201,6 +229,7 @@ export function parseRestPRComments(
       createdAt: (reviews ? c.submitted_at : c.created_at) ?? '',
       url: c.html_url,
       isBot: c.user?.type === 'Bot',
-      ...(reviews ? { reviewState: parseGitHubReviewState(c.state) } : {})
+      ...(reviews ? { reviewState: parseGitHubReviewState(c.state) } : {}),
+      ...viewerAuthorship(c.user?.login, viewerLogin)
     }))
 }

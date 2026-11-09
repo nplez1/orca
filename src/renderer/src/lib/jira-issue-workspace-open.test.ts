@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
+import type { FolderWorkspace } from '../../../shared/folder-workspaces/folder-workspace-types'
 import type { Worktree } from '../../../shared/worktree/types'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 
@@ -23,7 +23,7 @@ vi.mock('@/store', () => ({
     })
   }
 }))
-vi.mock('@/lib/worktree-activation', () => ({
+vi.mock('@/lib/workspace/activation/worktree-activation.ts', () => ({
   activateAndRevealFolderWorkspace: mocks.activateAndRevealFolderWorkspace,
   activateAndRevealWorktree: mocks.activateAndRevealWorktree
 }))

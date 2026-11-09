@@ -37,13 +37,13 @@ const PROJECT_LINK_SURFACES = [
   '../renderer/src/components/GitHubStarButton.tsx',
   '../renderer/src/components/StarNagCard.tsx',
   '../renderer/src/components/github-project/ProjectViewStates.tsx',
-  '../renderer/src/components/settings/GeneralSupportSection.tsx',
-  '../renderer/src/components/sidebar/SidebarFeedbackDialog.tsx',
+  '../renderer/src/components/settings/general/GeneralSupportSection.tsx',
+  '../renderer/src/components/sidebar/sidebar-feedback/SidebarFeedbackDialog.tsx',
   '../renderer/src/components/sidebar/SidebarSettingsHelpMenu.tsx',
   '../renderer/src/components/star-nag/StarNagToastHost.tsx',
   '../renderer/src/components/stats/ShareUsageButton.tsx',
   '../renderer/src/components/stats/share-card-utils.tsx',
-  '../renderer/src/components/terminal-pane/TerminalErrorToast.tsx'
+  '../renderer/src/components/terminal-pane/errors/TerminalErrorToast.tsx'
 ]
 
 /** A repository named in code: `https://github.com/...` or a bare `<owner>/orca` slug.

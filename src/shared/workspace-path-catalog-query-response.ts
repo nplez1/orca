@@ -1,4 +1,4 @@
-import { shouldExcludeQuickOpenRelPath } from './quick-open-filter'
+import { shouldExcludeQuickOpenRelPath } from './quick-open/quick-open-filter'
 import {
   WORKSPACE_PATH_CATALOG_SCOPE_RULE_VERSION,
   type WorkspacePathCatalogMetadata

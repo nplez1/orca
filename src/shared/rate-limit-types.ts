@@ -86,6 +86,8 @@ export type UsageRateLimitMetadata = {
   unverifiableOwner?: boolean
   /** Renderer-only: set up on this device but not on the remote host that owns usage. Hosts never set it. */
   ownerNotSetUp?: OwnerNotSetUpPlaceholder
+  /** Antigravity: the native login verified before and after the read; id is null for an unsaved login. */
+  account?: { id: string | null; email: string | null }
 }
 
 export type ProviderRateLimits = {
@@ -104,6 +106,7 @@ export type ProviderRateLimits = {
     | 'fireworks'
     | 'deepinfra'
     | 'copilot'
+    | 'muse'
   /** 5-hour session window, null if not available. */
   session: RateLimitWindow | null
   /** 7-day weekly window, null if not available. */
@@ -170,6 +173,16 @@ export type InactiveAccountUsage = {
   isFetching: boolean
 }
 
+/** One saved Antigravity account's last verified reading on the runtime the meter reads. */
+export type AntigravityAccountUsage = {
+  accountId: string
+  email: string | null
+  /** True when this account is the native agy login right now. */
+  active: boolean
+  /** Null until a reading verified as this account succeeded; `updatedAt` is when it was read. */
+  rateLimits: ProviderRateLimits | null
+}
+
 export type GrokAccountStatus = {
   signedIn: boolean
   email: string | null
@@ -204,12 +217,8 @@ export type RateLimitState = {
   fireworks: ProviderRateLimits | null
   deepinfra: ProviderRateLimits | null
   copilot: ProviderRateLimits | null
-  /**
-   * True when a MiniMax session cookie is persisted on disk. The cookie lives
-   * outside GlobalSettings, so this flag is the durable signal that the
-   * status bar uses to keep the MiniMax provider visible across reloads and
-   * between snapshot refreshes.
-   */
+  muse: ProviderRateLimits | null
+  /** Cookie is stored outside GlobalSettings; this durable flag keeps MiniMax visible across reloads/snapshot refreshes. */
   minimaxCookieConfigured: boolean
   /** Expose API-key presence only; main retains the secret. Combined with cookie presence, keeps MiniMax visible across reloads. */
   minimaxApiKeyConfigured: boolean
@@ -240,4 +249,6 @@ export type RateLimitState = {
   codexTarget: RateLimitRuntimeTarget
   inactiveClaudeAccounts: InactiveAccountUsage[]
   inactiveCodexAccounts: InactiveAccountUsage[]
+  /** Saved Antigravity accounts; agy has one shared login, so only the active one is ever read. */
+  antigravityAccounts: AntigravityAccountUsage[]
 }

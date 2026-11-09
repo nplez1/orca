@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
+import type {
+  AiVaultListResult,
+  AiVaultSession
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import { aiVaultPagedListReply } from '../ai-vault/ai-vault-paged-list-reply'
 import { resetAiVaultListSyncStoreForTests } from '../ai-vault/ai-vault-list-sync-store'
 import { parseAiVaultListResult } from '../ai-vault/session-list-result-validation'
-import { resetAiVaultHostLegCacheForTests, scanHostLegWithCache } from './ai-vault-host-leg-cache'
+import {
+  resetAiVaultHostLegCacheForTests,
+  scanHostLegWithCache
+} from './ai-vault/ai-vault-host-leg-cache'
 import {
   hostLegSyncScan,
   resetAiVaultHostLegSyncForTests,

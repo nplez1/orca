@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { Worktree } from '../../../shared/worktree/types'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 
 const state = vi.hoisted(() => {
   const holder: { displayed: JiraIssue | null } = { displayed: null }

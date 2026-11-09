@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiVaultSession } from '../../../../shared/ai-vault-types'
+import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
 
 const callRuntimeResult = vi.hoisted(() => vi.fn())
 vi.mock('./web-runtime-calls', () => ({ callRuntimeResult }))

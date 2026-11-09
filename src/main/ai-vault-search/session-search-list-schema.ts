@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import type { AiVaultSession } from '../../shared/ai-vault-types'
+import type { AiVaultSession } from '../../shared/ai-vault/contracts/ai-vault-types'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import SyncDatabase from '../sqlite/sync-database'
 import {

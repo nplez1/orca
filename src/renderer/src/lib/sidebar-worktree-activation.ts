@@ -2,7 +2,7 @@ import {
   activateAndRevealFolderWorkspace,
   activateAndRevealWorktree,
   type ActivateAndRevealResult
-} from '@/lib/worktree-activation'
+} from '@/lib/workspace/activation/worktree-activation'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'

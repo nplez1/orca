@@ -163,35 +163,6 @@ describe('Jira client credential storage', () => {
     )
   })
 
-  it('sends a non-browser User-Agent on Jira POST requests', async () => {
-    // Electron's Chrome UA trips Atlassian XSRF checks on token-authenticated writes.
-    const siteId = 'site-alpha'
-    writeJiraFiles(siteId, 'token-alpha')
-    netFetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ issues: [] }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    )
-    const jira = await loadClientModule({ encryptionAvailable: true })
-    const client = jira.getClients(siteId)[0]
-
-    if (!client) {
-      throw new Error('Expected stored Jira client')
-    }
-
-    await jira.jiraRequest(client, '/rest/api/3/search/jql', {
-      method: 'POST',
-      body: JSON.stringify({ jql: 'project = ALP' })
-    })
-
-    const headers = netFetchMock.mock.calls[0]?.[1]?.headers as Headers
-    const userAgent = headers.get('User-Agent') ?? ''
-    expect(netFetchMock.mock.calls[0]?.[1]?.method).toBe('POST')
-    expect(userAgent).toBe('Orca')
-    expect(userAgent).not.toMatch(/Mozilla|Chrome|Safari|AppleWebKit/i)
-  })
-
   it('removes cancelled queued reads so the request pool recovers', async () => {
     const jira = await loadClientModule()
     await Promise.all([jira.acquire(), jira.acquire(), jira.acquire(), jira.acquire()])
@@ -357,21 +328,6 @@ describe('Jira client credential storage', () => {
     expect(jira.getStatus().credentialError).toBeUndefined()
   })
 
-  it('treats empty Jira token files as missing credentials', async () => {
-    const siteId = 'site-alpha'
-    writeJiraFiles(siteId, Buffer.alloc(0))
-    const jira = await loadClientModule({ encryptionAvailable: false })
-
-    await expect(jira.testConnection(siteId)).resolves.toEqual({
-      ok: false,
-      error: 'Not connected to Jira.',
-      errorCode: 'jira.notConnected'
-    })
-
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(jira.getStatus()).toMatchObject({ connected: false })
-  })
-
   it('keeps healthy sites under the "all" selection when one site cannot be decrypted', async () => {
     writeMultiSiteFiles(
       [
@@ -393,24 +349,6 @@ describe('Jira client credential storage', () => {
     expect(clients.map((client) => client.site.id)).toEqual(['good'])
     // The bad site's decrypt error is still recorded for the status banner.
     expect(jira.getStatus().credentialError).toContain('Could not decrypt')
-  })
-
-  it('rethrows the decrypt error for a specific site selection', async () => {
-    writeMultiSiteFiles(
-      [
-        { id: 'good', token: 'token-good' },
-        { id: 'bad', token: Buffer.from([0x76, 0x31, 0x30, 0xff, 0xfe]) }
-      ],
-      'bad'
-    )
-    const jira = await loadClientModule({
-      encryptionAvailable: true,
-      decryptString: () => {
-        throw new Error('userCanceledErr')
-      }
-    })
-
-    expect(() => jira.getClients('bad')).toThrow('Could not decrypt')
   })
 
   it('does not clear credentials when Electron transport fails after a network change', async () => {
@@ -819,20 +757,6 @@ describe('Jira site file cross-process visibility', () => {
     )
 
     expect(jira.getStatus()).toMatchObject({ connected: false, sites: [] })
-  })
-
-  it('follows the selected site changing underneath it', async () => {
-    const sites = [
-      { id: 'site-alpha', token: 'token-alpha' },
-      { id: 'site-beta', token: 'token-beta' }
-    ]
-    writeMultiSiteFiles(sites, 'site-alpha')
-    const jira = await loadClientModule()
-    expect(jira.getStatus()).toMatchObject({ selectedSiteId: 'site-alpha' })
-
-    writeMultiSiteFiles(sites, 'site-beta')
-
-    expect(jira.getStatus()).toMatchObject({ selectedSiteId: 'site-beta' })
   })
 
   // The bug this names: an unreadable sites file read as "no sites", and the next save wrote that

@@ -1,8 +1,8 @@
 import {
   createFileExplorerRowProjectionFromParts,
   type FileExplorerRowProjection
-} from './file-explorer-row-projection'
-import type { TreeNode } from './file-explorer-types'
+} from './file-explorer/tree/file-explorer-row-projection'
+import type { TreeNode } from './file-explorer/tree/file-explorer-types'
 import {
   getFileExplorerNameFilterTokens,
   type FileExplorerNameFilterProjectionSource

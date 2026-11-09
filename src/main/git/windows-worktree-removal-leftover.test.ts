@@ -6,12 +6,12 @@ const listWorktreesStrict = vi.hoisted(() => vi.fn())
 const gitExecFileAsync = vi.hoisted(() => vi.fn())
 const unlink = vi.hoisted(() => vi.fn())
 
-vi.mock('../host-tree-removal', () => ({ removeHostCheckout }))
-vi.mock('./worktree-listing', () => ({ listWorktreesStrict }))
-vi.mock('./runner', () => ({ gitExecFileAsync }))
-vi.mock('../asar-transparent-fs', () => ({ unlink }))
+vi.mock('../filesystem/host-tree-removal.ts', () => ({ removeHostCheckout }))
+vi.mock('./worktrees/catalog/worktree-listing.ts', () => ({ listWorktreesStrict }))
+vi.mock('./command-runner/git-exec-file', () => ({ gitExecFileAsync }))
+vi.mock('../filesystem/asar-transparent-fs.ts', () => ({ unlink }))
 
-const { removeWindowsCheckout } = await import('./windows-worktree-removal')
+const { removeWindowsCheckout } = await import('./worktrees/removal/windows-worktree-removal')
 
 const repo = 'C:/code/app'
 const root = 'C:/code/app-build'

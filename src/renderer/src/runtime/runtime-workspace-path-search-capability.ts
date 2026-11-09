@@ -3,7 +3,7 @@ import {
   WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY,
   type WorkspacePathSearchCapabilityDescriptor
 } from '../../../shared/workspace-path-search-contract'
-import { getRuntimeEnvironmentRevision } from './runtime-environment-revision'
+import { getRuntimeEnvironmentRevision } from './rpc/environment-revisions/runtime-environment-revision'
 import {
   clearRuntimeCompatibilityCache,
   getCachedRuntimeEnvironmentStatus,

@@ -3,10 +3,13 @@
 // session-summary.md); a direct-model brain can replace this without touching
 // the fold protocol — it only needs `complete(prompt) -> raw text`.
 import { mkdirSync } from 'node:fs'
-import { getCommitMessageAgentSpec, isCustomAgentId } from '../../shared/commit-message-agent-spec'
-import { planCommitMessageGeneration } from '../../shared/commit-message-plan'
-import type { CommitMessagePlanInput } from '../../shared/commit-message-plan'
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
+import {
+  getCommitMessageAgentSpec,
+  isCustomAgentId
+} from '../../shared/source-control/ai/generation/commit-message-agent-spec'
+import { planCommitMessageGeneration } from '../../shared/source-control/ai/generation/commit-message-plan'
+import type { CommitMessagePlanInput } from '../../shared/source-control/ai/generation/commit-message-plan'
+import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
 import { spawnSourceControlAgent } from '../text-generation/source-control-agent-launch'
 import { killSourceControlAgentProcess } from '../text-generation/source-control-local-process'
 import {

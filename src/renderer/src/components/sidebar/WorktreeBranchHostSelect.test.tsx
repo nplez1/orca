@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorktreeBranchHostSelect } from './WorktreeBranchHostSelect'
 import type { BranchGroupMember } from '../../../../shared/sidebar-list/row-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
-import { remoteWorktree, worktree } from './worktree-list-groups-test-fixtures'
+import {
+  remoteWorktree,
+  worktree
+} from './worktree-list/grouping/worktree-list-groups-test-fixtures'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 

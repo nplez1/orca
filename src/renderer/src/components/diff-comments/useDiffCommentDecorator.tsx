@@ -1,4 +1,10 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s delta rides inside it (+106 code lines), and splitting costs a permanent sync hunk. */
 import { useCallback, useEffect, useRef } from 'react'
+import type { GitHubImageIntake } from '@/components/github/use-github-image-uploads'
+import {
+  diffCommentOwnerKey,
+  type DiffCommentOwner
+} from '@/store/slices/diff-comments/diff-comment-owner'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { createRoot, type Root } from 'react-dom/client'
 import { getCommentBodyLayoutLineCount } from '@/lib/comment-body-line-count'
@@ -22,11 +28,13 @@ import {
 } from './diff-comment-view-zone-entry'
 import type { DiffCommentLineRange, DiffCommentLineTarget } from './diff-comment-line-range'
 import { useDiffCommentDraftZone, type DiffCommentDraft } from './diff-comment-draft-zone'
-import type { RightPanelCommentSubmitResult } from '../right-sidebar/right-panel-comment-composer'
+import type { RightPanelCommentSubmitResult } from '../right-sidebar/checks-panel/comments/right-panel-comment-composer'
 
 export type { DiffCommentDraft }
 
 type DecoratorArgs = {
+  captureCreateComment?: boolean
+  commentOwner?: DiffCommentOwner | null
   editor: monacoEditor.ICodeEditor | null
   // Monaco destroys model-scoped view zones on model swap, so rebuild even though the editor object is stable.
   monacoModelIdentity?: string
@@ -49,6 +57,7 @@ type DecoratorArgs = {
     startLine?: number
     body: string
   }) => Promise<boolean>
+  imageUploadAddress?: GitHubImageIntake['address']
   draftPlaceholder?: string
   draftSubmitLabel?: string
   canOpenDraft?: boolean
@@ -74,6 +83,8 @@ type DecoratorArgs = {
 }
 
 export function useDiffCommentDecorator({
+  captureCreateComment = false,
+  commentOwner = null,
   editor,
   monacoModelIdentity,
   filePath,
@@ -88,6 +99,7 @@ export function useDiffCommentDecorator({
   pendingCommentTarget = null,
   addNoteShortcutEnabled = false,
   onCreateComment,
+  imageUploadAddress,
   draftPlaceholder,
   draftSubmitLabel,
   canOpenDraft,
@@ -102,6 +114,7 @@ export function useDiffCommentDecorator({
   pendingScrollCommentId,
   onPendingScrollConsumed
 }: DecoratorArgs): void {
+  const ownerKey = commentOwner ? diffCommentOwnerKey(commentOwner) : null
   const clearDeliveredDiffComments = useAppStore((s) => s.clearDeliveredDiffComments)
   const activeGroupId = useAppStore((s) =>
     worktreeId ? (s.activeGroupIdByWorktree[worktreeId] ?? worktreeId) : worktreeId
@@ -142,6 +155,8 @@ export function useDiffCommentDecorator({
   })
 
   const { onAddCommentClickRef, isDraftOpen } = useDiffCommentDraftZone({
+    imageUploadAddress,
+    captureCreateComment,
     editor,
     monacoModelIdentity,
     onCreateComment,
@@ -258,7 +273,7 @@ export function useDiffCommentDecorator({
       pendingScrollRef.current = null
       scrollToZoneRef.current = null
     }
-  }, [cancelScrollToZoneFrame, editor, monacoModelIdentity])
+  }, [cancelScrollToZoneFrame, editor, monacoModelIdentity, ownerKey])
 
   useEffect(() => {
     if (!editor) {
@@ -303,6 +318,7 @@ export function useDiffCommentDecorator({
 
     const renderCard = (root: Root, comment: DecoratedDiffComment): void => {
       renderDiffCommentZoneCard(root, comment, {
+        owner: commentOwner,
         worktreeId,
         filePath,
         activeGroupId,
@@ -409,6 +425,8 @@ export function useDiffCommentDecorator({
     activeGroupId,
     cancelScrollToZoneFrame,
     clearDeliveredDiffComments,
+    commentOwner,
+    ownerKey,
     comments,
     editor,
     estimateZoneHeight,

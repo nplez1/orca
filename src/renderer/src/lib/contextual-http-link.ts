@@ -1,4 +1,4 @@
-import { openHttpLink } from './http-link-routing'
+import { openHttpLink } from './browser/navigation/http-link-routing'
 
 export type ContextualHttpLinkOptions = {
   /** Workspace the link opens into; null falls back to the OS browser. */

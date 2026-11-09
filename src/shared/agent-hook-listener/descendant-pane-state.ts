@@ -1,4 +1,4 @@
-import type { AgentHookSource } from '../agent-hook-relay'
+import type { AgentHookSource } from './transport/agent-hook-relay'
 import {
   finishAgentDescendant,
   pruneStaleAgentDescendants,
@@ -6,7 +6,10 @@ import {
   upsertAgentDescendant,
   type AgentDescendantRoster
 } from '../agent-descendant-roster'
-import { normalizeAgentStatusPayload, type ParsedAgentStatusPayload } from '../agent-status-types'
+import {
+  normalizeAgentStatusPayload,
+  type ParsedAgentStatusPayload
+} from '../agent-status/contracts/agent-status-types'
 import type { DescendantEntry, DescendantEventFacts } from './descendant-events'
 import { deleteLegacyAgentStatus, type HookListenerState } from './listener-state'
 import {

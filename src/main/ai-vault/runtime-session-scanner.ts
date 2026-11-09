@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Why: upstream's session scanner plus the fork's paged drain, row-cap
    prune and pairing-revision fencing, which cannot move out without copying upstream's scan body. */
-import { aiVaultScanIssueText } from '../../shared/ai-vault-scan-issue-copy'
-import { AiVaultChatForkSourceSchema } from '../../shared/ai-vault-chat-fork-contract'
+import { aiVaultScanIssueText } from '../../shared/ai-vault/scanning/ai-vault-scan-issue-copy'
+import { AiVaultChatForkSourceSchema } from '../../shared/ai-vault/contracts/ai-vault-chat-fork-contract'
 import { z } from 'zod'
 import {
   AI_VAULT_AGENTS,
@@ -10,31 +10,34 @@ import {
   type AiVaultListArgs,
   type AiVaultListResult,
   type AiVaultSession
-} from '../../shared/ai-vault-types'
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import { toRuntimeExecutionHostId } from '../../shared/execution-host'
-import { listEnvironments, resolveEnvironment } from '../../shared/runtime-environment-store'
+import {
+  listEnvironments,
+  resolveEnvironment
+} from '../../shared/remote-runtime/host-store/runtime-environment-store'
 import { callRuntimeEnvironment } from '../ipc/runtime-environments/runtime-environment-transport-routing'
 import type {
   AiVaultPrepareSessionResumeRequest,
   AiVaultPrepareSessionResumeResult
-} from '../../shared/ai-vault-resume-preparation'
+} from '../../shared/ai-vault/resume/ai-vault-resume-preparation'
 import type {
   AiVaultSessionTitlesArgs,
   AiVaultSessionTitlesResult
-} from '../../shared/ai-vault-session-title'
+} from '../../shared/ai-vault/contracts/ai-vault-session-title'
 import { parseAiVaultListResult } from './session-list-result-validation'
 import { aiVaultPartialListIssue, readAiVaultListPages } from '../../shared/ai-vault-list-pages'
-import { parseAiVaultSessionTitlesResult } from './session-title-result-validation'
-import { isGatedOffWslHost } from '../wsl/wsl-host-gate'
+import { parseAiVaultSessionTitlesResult } from './session-titles/session-title-result-validation'
+import { isGatedOffWslHost } from '../wsl/host-lifecycle/wsl-host-gate'
 import type {
   AiVaultDeleteSessionArgs,
   AiVaultDeleteSessionResult
-} from '../../shared/ai-vault-session-deletion'
+} from '../../shared/ai-vault/contracts/ai-vault-session-deletion'
 import {
   readRuntimeAiVaultDeleteSessionResponse,
   runtimeAiVaultDeleteSessionParams
-} from '../../shared/ai-vault-runtime-session-delete'
-import type { RuntimeAiVaultHostInfo } from '../ipc/ai-vault-runtime-scan'
+} from '../../shared/ai-vault/contracts/ai-vault-runtime-session-delete'
+import type { RuntimeAiVaultHostInfo } from './ai-vault-runtime-scan'
 
 export type RuntimeAiVaultScanOptions = {
   /** One page's request bound. */

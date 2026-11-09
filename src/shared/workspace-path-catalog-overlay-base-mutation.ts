@@ -1,4 +1,4 @@
-import { compareFileNames } from './file-name-sort'
+import { compareFileNames } from './file-listing/file-name-sort'
 import {
   getWorkspacePathCatalogOriginalPath,
   type WorkspacePathCatalog

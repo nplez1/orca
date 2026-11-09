@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
-import { compareFileNames } from './file-name-sort'
+import { compareFileNames } from './file-listing/file-name-sort'
 import type { WorkspacePathSearchInstrumentationEvent } from './workspace-path-search-instrumentation'
 import {
   generatePathMatchCardinalityCatalog,

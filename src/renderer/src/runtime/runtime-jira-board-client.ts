@@ -8,7 +8,7 @@ import type {
 } from '../../../shared/jira/jira-types'
 import { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
 import { callRuntimeRpc } from './runtime-rpc-client'
-import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './runtime-jira-target'
+import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './jira/runtime-jira-target'
 
 export async function jiraListBoards(
   settings: RuntimeJiraSettings,

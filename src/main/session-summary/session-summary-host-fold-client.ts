@@ -14,8 +14,8 @@ import {
   type SessionSummarySessionRef,
   type SessionSummarySnapshot
 } from '../../shared/session-summary-types'
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
-import { isUnknownSessionSearchMethod } from '../../shared/ai-vault-search-client'
+import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
+import { isUnknownSessionSearchMethod } from '../../shared/ai-vault/search/ai-vault-search-client'
 import { coerceRelayedLedger } from './session-summary-relayed-ledger'
 
 export type SessionSummaryHostFoldClient = {

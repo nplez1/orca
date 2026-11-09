@@ -25,13 +25,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeMobileSessionTabsResult } from '../../../shared/runtime-types'
-import {
-  AGENT_STATUS_STALE_AFTER_MS,
-  type AgentStatusEntry
-} from '../../../shared/agent-status-types'
-import { isExplicitAgentStatusFresh } from '@/lib/agent-status'
-import { makePaneKey } from '../../../shared/stable-pane-id'
-import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
+import type { AgentStatusEntry } from '../../../shared/agent-status/contracts/agent-status-types'
+import { AGENT_STATUS_STALE_AFTER_MS } from '../../../shared/agent-status/contracts/agent-status-freshness'
+import { isExplicitAgentStatusFresh } from '@/lib/pane-agent-evidence'
+import { makePaneKey } from '../../../shared/workspace-layout/stable-pane-id'
+import { toWebTerminalSurfaceTabId } from '../../../shared/workspace-layout/terminal-surface-id'
 import { getDefaultSettings } from '../../../shared/constants'
 import type { AppState } from '../store/types'
 import { createTestStore, makeWorktree, seedStore } from '../store/slices/store-test-helpers'
@@ -39,11 +37,11 @@ import {
   markRendererOwnedAgentStatusWrite,
   registerRendererOwnedAgentStatusPane,
   resetRendererOwnedAgentStatusPanesForTests
-} from '../components/terminal-pane/renderer-owned-agent-status-registry'
+} from '../components/terminal-pane/agent-status/renderer-owned-agent-status-registry'
 import { applyWebSessionTabsSnapshot } from './web-session-tabs-sync/snapshot-api'
 import { resetWebSessionTabsSnapshotFreshnessForTests } from './web-session-tabs-sync/tracking-lifecycle'
 import { shouldApplyWebSessionTabsSnapshot } from './web-session-tabs-sync/tracking-decisions'
-import { selectWorktreeAgentActivitySummary } from '../components/sidebar/worktree-agent-activity-summary'
+import { selectWorktreeAgentActivitySummary } from '../components/sidebar/workspace-card/activity/worktree-agent-activity-summary'
 
 vi.mock('../store', () => ({
   useAppStore: {

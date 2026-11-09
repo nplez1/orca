@@ -1,6 +1,6 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { getSettingsFocusedExecutionHostId } from '../../../shared/execution-host'
-import { ipcOrRuntimeTargetForHostId } from '@/runtime/runtime-client-target'
+import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
 type DefaultHostSettings = Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined

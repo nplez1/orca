@@ -4,7 +4,11 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flush, mountProbe, unmountProbes } from '../source-control-hook-test-harness'
+import {
+  flush,
+  mountProbe,
+  unmountProbes
+} from '../source-control/panel/source-control-hook-test-harness'
 import { useChecksPanelReviewData } from './use-checks-panel-review-data'
 import type { PRComment } from '../../../../../shared/github/comment-types'
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'

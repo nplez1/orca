@@ -2,7 +2,7 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import {
   projectPendingWorktreeRemovals,
   type PendingWorktreeRemovals
-} from '../../../worktree-removal-listing'
+} from '../../../workspaces/removal/worktree-removal-listing'
 
 export const WORKTREE_LIST_ALL_CONCURRENCY = 8
 

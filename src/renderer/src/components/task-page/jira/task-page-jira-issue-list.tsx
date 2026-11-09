@@ -10,7 +10,7 @@ import {
   type TaskPageJiraIssueSection
 } from '../../task-page-jira-grouping'
 import type { TaskPageJiraSprintOptions } from '../../task-page-jira-sprint-cell'
-import type { TaskSourceContext } from '../../../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex

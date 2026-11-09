@@ -29,7 +29,7 @@ vi.mock('@/store', () => ({
     })
 }))
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraListBoards: (...args: unknown[]) => mocks.jiraListBoards(...args)
 }))
 

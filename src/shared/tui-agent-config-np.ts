@@ -1,6 +1,6 @@
-import type { TuiAgent } from './tui-agent'
+import type { TuiAgent } from './agent-launch/catalog/tui-agent'
 import { getRelayCliCommandNameForPlatform } from './orca-cli-command-name'
-import type { TuiAgentConfigSource } from './tui-agent-config-types'
+import type { TuiAgentConfigSource } from './agent-launch/catalog/tui-agent-config-types'
 
 // Why: Orca NP's own entries over upstream's table, so upstream table edits still merge in place.
 // `satisfies` rather than an annotation: the literal values must satisfy the config source type without

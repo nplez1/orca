@@ -3,7 +3,7 @@ import {
   NameFilterPathMatcher,
   pathMatchesQueryTokens,
   splitPathQueryTokens
-} from './quick-open-path-search'
+} from './quick-open/quick-open-path-search'
 
 describe('splitPathQueryTokens', () => {
   it('splits on whitespace and lowercases', () => {

@@ -5,19 +5,22 @@ import type {
   WorkspacePathSearchInstrumentationEvent
 } from '../../shared/workspace-path-search-instrumentation'
 import type { WorkspacePathSearchPathSet } from '../../shared/workspace-path-search-contract'
-import { buildExcludePathPrefixes, buildRgArgsForQuickOpen } from '../../shared/quick-open-filter'
+import {
+  buildExcludePathPrefixes,
+  buildRgArgsForQuickOpen
+} from '../../shared/quick-open/quick-open-filter'
 import { WorkspacePathCatalogBuilder } from '../../shared/workspace-path-catalog-builder'
 import {
   WorkspacePathCatalogOverlayBuilder,
   type WorkspacePathCatalogOverlay
 } from '../../shared/workspace-path-catalog-overlay'
 import type { WorkspacePathCatalog } from '../../shared/workspace-path-catalog'
-import { parseWslPath } from '../wsl'
-import { resolveAuthorizedPath } from './filesystem/filesystem-auth'
+import { parseWslPath } from '../wsl/filesystem/unc-path-access'
+import { resolveAuthorizedPath } from './filesystem/access/filesystem-auth'
 import { isFolderProjectRoot } from './folder-project-root'
 import { getLocalGitOptionsForRegisteredWorktree } from './local-worktree-runtime-options'
 import { scanRipgrepPaths } from './quick-open-rg-path-scan'
-import { RipgrepUnavailableError } from '../../shared/ripgrep-process-availability'
+import { RipgrepUnavailableError } from '../../shared/ripgrep/ripgrep-process-availability'
 import { bundledRipgrepUnavailableError } from '../ripgrep/bundled-ripgrep-path'
 import { buildWorkspacePathCatalogInWorker } from './workspace-path-catalog-worker-discovery'
 

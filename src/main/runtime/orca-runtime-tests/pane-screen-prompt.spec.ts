@@ -1,18 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
+import './runtime-test-module-registration.spec'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AgentHookServer } from '../../agent-hooks/server'
 import { buildBody, postHookEvent } from '../../agent-hooks/server.test-fixtures'
 import { wireScreenPromptReader } from '../../agent-hooks/server/server-screen-prompt-wiring'
-import { OrcaRuntimeService } from '../orca-runtime-test-mocks.spec'
-import { readRuntimeFixture } from '../agent-transcript-replay-test-harness'
+import { OrcaRuntimeService } from '../orca-runtime'
+import { spawnedPtyEnv } from '../terminal/launch/spawned-pty-env-fixtures'
+import { readRuntimeFixture } from '../terminal/wait/agent-transcript-replay-test-harness'
 import {
   TEST_WORKTREE_PATH,
   expectStablePaneKeyEnv,
-  spawnedPtyEnv,
   store
-} from '../orca-runtime-test-fixtures.spec'
+} from './orca-runtime-test-fixtures.spec'
 
 /** The visible lines of Copilot's approval dialog from `__fixtures__/copilot-command-prompt`, which
  *  prefixes each captured row with the box's `│` gutter. */

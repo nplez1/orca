@@ -1,6 +1,9 @@
-import type { HostedReviewInfo, HostedReviewProvider } from '../../../../shared/hosted-review'
-import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments'
-import { getWorkspaceAttachmentUrlScope } from '../../../../shared/workspace-attachment-normalization'
+import type {
+  HostedReviewInfo,
+  HostedReviewProvider
+} from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
+import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments/workspace-attachments'
+import { getWorkspaceAttachmentUrlScope } from '../../../../shared/workspace-attachments/workspace-attachment-normalization'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
 
 /** Review providers a workspace can hold an attachment for. Issues are excluded: this is the

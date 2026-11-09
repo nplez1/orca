@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store/types'
 import type { Repo } from '../../../../shared/repo-types'
-import { prCacheKey } from '@/store/github/cache-identity'
-import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
+import { prCacheKey } from '../../store/github/cache/cache-identity'
+import { getHostedReviewCacheKey } from '../../store/slices/hosted-review/hosted-review-cache-identity'
 import {
   createTestStore,
   makePR,
   makePRRefreshWorktree
-} from '@/store/slices/github-slice-test-harness'
+} from '../../store/github/github-slice-test-harness'
 import {
   __clearPostMergeRefreshesForTests,
   POST_MERGE_REFRESH_DEADLINE_MS,

@@ -3,7 +3,7 @@
 // these are facts about the repository rather than about the run.
 import { globSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
+import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci/unit-selection/dependency-graph/ci-unit-files.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 

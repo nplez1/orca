@@ -22,7 +22,7 @@ const UNIT_LANE_ARGS = ['--experimental.recordDependencies=false']
 const INHERITED_APP_ENV = ['ORCA_WSL_HOSTS_GATE_STATE', 'ORCA_INTERNAL_WSL_HOSTS']
 /** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
 const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
-const RUN_VITEST = join(ROOT, 'config', 'scripts', 'run-vitest.mjs')
+const RUN_VITEST = join(ROOT, 'config', 'scripts', 'test-runtime', 'execution-policy', 'run-vitest.mjs')
 
 function childEnv(env) {
   // Why the merge rather than a bare env: PATH and the Bun pin have to survive the overlay.
@@ -92,7 +92,7 @@ export function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests
       {
         label: 'ensure native runtime',
         program: 'node',
-        args: [join(ROOT, 'config', 'scripts', 'ensure-native-runtime.mjs'), '--runtime=node']
+        args: [join(ROOT, 'config', 'scripts', 'native-build', 'node-addons', 'ensure-native-runtime.mjs'), '--runtime=node']
       }
     ]) {
       const step = runStep(

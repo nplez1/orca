@@ -1,4 +1,4 @@
-import { openAppHttpLink } from '@/lib/app-http-link-open'
+import { openAppHttpLink } from '../lib/browser/navigation/app-http-link-open'
 import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'

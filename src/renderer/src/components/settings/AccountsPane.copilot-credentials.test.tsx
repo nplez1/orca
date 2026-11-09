@@ -5,8 +5,8 @@ import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { useAppStore } from '../../store'
-import { AccountsPane } from './AccountsPane'
-import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
+import { AccountsPane } from './accounts/AccountsPane'
+import { LOCAL_SETTINGS_HOST_SCOPE } from './host-scope/settings-host-scope'
 
 const mocks = vi.hoisted(() => ({
   copilotGetStatus: vi.fn(),
@@ -92,6 +92,7 @@ function renderPane(): void {
     React.createElement(AccountsPane, {
       settings: getDefaultSettings('/tmp'),
       updateSettings: vi.fn(),
+      updateSettingsOrThrow: vi.fn(),
       hostScope: LOCAL_SETTINGS_HOST_SCOPE
     })
   )

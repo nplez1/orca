@@ -1,5 +1,5 @@
 import type { FileExplorerNameFilterProjectionSource } from './file-explorer-name-filter-policy'
-import type { FileExplorerRowProjection } from './file-explorer-row-projection'
+import type { FileExplorerRowProjection } from './file-explorer/tree/file-explorer-row-projection'
 
 /** Objects whose identity distinguishes one projection result set from another. */
 type FileExplorerNameFilterProjectionIdentity =

@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import StatusIndicator, { type Status } from './StatusIndicator'
+import StatusIndicator, { type Status } from './workspace-card/surface/StatusIndicator'
 
 // Why this file survives upstream retiring its StatusIndicator suite (#34156): the `setup` state is
 // the fork's, so upstream's removal took the only coverage of it with it.

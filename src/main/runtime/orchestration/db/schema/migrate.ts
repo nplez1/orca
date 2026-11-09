@@ -1,4 +1,4 @@
-import { resolveOrchestrationMigrationStartVersion } from '../../orchestration-schema-version-skew'
+import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import { SCHEMA_VERSION } from '../contract-constants'
 import type Database from '../../../../sqlite/sync-database'
 import type { OrchestrationDb } from '../orchestration-db'

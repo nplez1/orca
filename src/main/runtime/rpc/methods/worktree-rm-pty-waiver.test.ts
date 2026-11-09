@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import type { OrcaRuntimeService } from '../../orca-runtime'
-import { WORKTREE_METHODS } from './worktree'
+import { WORKTREE_METHODS } from './workspaces/worktree'
 
 function makeRuntime(): OrcaRuntimeService {
   return {

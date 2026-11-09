@@ -93,6 +93,7 @@ vi.mock('./cursor-auth', () => ({
 
 vi.mock('./zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
 vi.mock('./antigravity-usage-fetcher', () => ({ fetchAntigravityRateLimits: vi.fn() }))
+vi.mock('./muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
 
 vi.mock('../minimax/minimax-cookie-store', () => ({
   hasMiniMaxSessionCookie: vi.fn(() => false)

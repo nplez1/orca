@@ -1,6 +1,18 @@
 # Branch tracker
 
-Last updated **2026-11-01** — `nplez1/main` merged upstream main @ `0fa5dae2f9` (459 commits) from
+Last updated **2026-11-08** — `nplez1/main` merged upstream main @ `51c77320bc` (1537 commits) from
+`3f8bbfb269` (merge `3b51b396b75`, merge base `0fa5dae2f9`, rollback tag
+`archive/pre-sync-3f8bbfb269`). **1110 conflicted paths, 1239 hunks** —
+`modify/delete 645, both-rewrote 263, union 154, rename-replay 27, duplicate-tail 17,
+duplicate-members 3, add/add 1`. 197 paths were proved mechanically, 386 modify/delete settled by the
+ledger and the manifest (345 of them upstream test retirements, and 22 upstream-moved source paths
+re-homed onto their new owner-scoped locations), and the remaining 527 content conflicts resolved in
+15 area batches. Upstream reorganised the tree into owner-scoped directories this sync, so re-homing
+dominated the cost. Decisions are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md)
+§ "Upstream owner-scoped reorganisation", and the narrative in
+[LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log.
+
+Previous — **2026-11-01** — `nplez1/main` merged upstream main @ `0fa5dae2f9` (459 commits) from
 `01eac17153` (merge `7fea08330aa`, merge base `a903985082`, rollback tag
 `archive/pre-sync-01eac17153`), plus follow-ups `62107128f7a` and `87421079c3b`. **202 conflicted
 paths** — `both-rewrote 101, modify/delete 56, union 37, duplicate-tail 6, duplicate-members 2`.

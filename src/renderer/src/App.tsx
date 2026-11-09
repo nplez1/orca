@@ -9,9 +9,10 @@ import { BrowserPagePrompts } from './components/browser-pane/browser-page-promp
 import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-preference-dialog'
 import { AppLinkContextMenu } from './components/link-actions/AppLinkContextMenu'
 import { SkillFreshnessNudge } from './components/skills/SkillFreshnessNudge'
-import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
-import RunningTerminalCloseDialog from './components/terminal-pane/RunningTerminalCloseDialog'
+import PinnedTabCloseDialog from './components/terminal-pane/layout/close/PinnedTabCloseDialog'
+import RunningTerminalCloseDialog from './components/terminal-pane/layout/close/RunningTerminalCloseDialog'
 import WorktreeBaseFallbackDialog from './components/WorktreeBaseFallbackDialog'
+import AgentWorkspaceTrustDecisionDialog from './components/agent-workspace-trust/AgentWorkspaceTrustDecisionDialog'
 import ClaudeAccountSwitchDialog from './components/ClaudeAccountSwitchDialog'
 import { useUnreadDockBadge } from './hooks/useUnreadDockBadge'
 import { AppBackgroundServices } from './app-shell/AppBackgroundServices'
@@ -43,6 +44,7 @@ import { SpaceWindowStatePublisher } from './components/workspace-space/SpaceWin
 import { useUiHangDiagnostics } from './lib/ui-hang-diagnostics/use-ui-hang-diagnostics'
 import { PlainSshTerminalPanels } from './components/plain-ssh-terminal/PlainSshTerminalPanels'
 import { PluginShotReplayMount } from './components/plugins/view/PluginShotReplayMount'
+import { AddToChatPointMenuHost } from './components/native-chat/selection-quotes/AddToChatMenu'
 import { installActiveWorktreeRemovalSuccessor } from './lib/active-worktree-removal-successor'
 import { useContextualLinkRouter } from './app-shell/use-contextual-link-router'
 
@@ -111,6 +113,7 @@ function App(): React.JSX.Element {
       <TooltipProvider delayDuration={400}>
         <ConfirmationDialogProvider>
           <BrowserPagePrompts />
+          <AddToChatPointMenuHost />
           <LinkRoutingPreferenceDialogProvider>
             <AppBackgroundServices />
             <SpaceWindowStatePublisher />
@@ -133,6 +136,7 @@ function App(): React.JSX.Element {
       </TooltipProvider>
       <SkillFreshnessNudge />
       <WorktreeBaseFallbackDialog />
+      <AgentWorkspaceTrustDecisionDialog />
       <ClaudeAccountSwitchDialog />
       <PinnedTabCloseDialog />
       <RunningTerminalCloseDialog />

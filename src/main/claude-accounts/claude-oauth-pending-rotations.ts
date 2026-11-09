@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { getSecretStore } from '../../shared/secret-store'
-import { writeSecureFile } from '../../shared/secure-file'
+import { writeSecureFile } from '../../shared/secure-storage/secure-file'
 import { adoptLegacyHomeStore } from '../home-directory-migration'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import {

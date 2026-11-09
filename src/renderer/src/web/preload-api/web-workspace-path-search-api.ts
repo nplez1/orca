@@ -1,4 +1,4 @@
-import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
+import { toRuntimeWorktreeSelector } from '../../runtime/rpc/targets/runtime-worktree-selector'
 import type { WorkspacePathSearchApi } from '../../../../preload/api/workspace-path-search-api-types'
 import { callRuntimeResult } from './web-runtime-calls'
 import { resolveRuntimeFilePath } from './web-runtime-worktree-catalog'

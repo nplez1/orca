@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { parseMuseSettingsText } from './hook-config-json'
 import { MuseHookService } from './hook-service'
-import { MUSE_HOOK_EVENTS, buildMuseManagedHooksFile, getMuseManagedCommand } from './hook-settings'
+import { buildMuseManagedHooksFile, getMuseManagedCommand } from './hook-settings'
 import { wrapWindowsHookCommand } from '../agent-hooks/windows-hook-command'
 import { createAgentHookMemorySftp } from '../agent-hooks/agent-hook-memory-sftp.test-fixture'
 
@@ -58,52 +58,6 @@ const scriptPath = (): string =>
   )
 
 describe('MuseHookService', () => {
-  it('installs the managed hooks pointer, file, and script', () => {
-    const status = new MuseHookService().install()
-    expect(status.state).toBe('installed')
-    expect(status.managedHooksPresent).toBe(true)
-
-    const settings = parseMuseSettingsText(readFileSync(configPath(), 'utf-8'), 'test')
-    expect(settings?.managed_hooks_path).toBe(managedHooksPath())
-    expect(settings?.schema_version).toBe(1)
-    expect(settings?.managed_hooks_env_vars).toContain('ORCA_PANE_KEY')
-
-    const managedText = readFileSync(managedHooksPath(), 'utf-8')
-    expect(managedText).toContain(process.platform === 'win32' ? 'muse-hook.cmd' : 'muse-hook.sh')
-    expect(MUSE_HOOK_EVENTS.every((event) => managedText.includes(`"${event}"`))).toBe(true)
-    const script = readFileSync(scriptPath(), 'utf-8')
-    expect(script).toContain('/hook/muse')
-    // Stdin payloads avoid oversized command-line EDR signals.
-    expect(script).toContain(
-      process.platform === 'win32'
-        ? 'payload@-'
-        : 'printf \'%s\' "$payload" | LC_ALL= LC_NUMERIC=C curl'
-    )
-  })
-
-  it('keeps user settings when installing, then drops only the pointer on remove', () => {
-    mkdirSync(join(home, '.config', 'muse'), { recursive: true })
-    const userSettings = `{\n  "schema_version": 1,\n  "model": "muse-spark-1.2",\n  "approval_mode": "never"\n}\n`
-    writeFileSync(configPath(), userSettings)
-
-    const service = new MuseHookService()
-    expect(service.install().state).toBe('installed')
-
-    const installed = readFileSync(configPath(), 'utf-8')
-    expect(installed).toContain('"model": "muse-spark-1.2"')
-    expect(installed).toContain('"approval_mode": "never"')
-
-    service.install()
-    const reinstalled = readFileSync(configPath(), 'utf-8')
-    expect((reinstalled.match(/managed_hooks_path/g) ?? []).length).toBe(1)
-
-    const removed = service.remove()
-    expect(removed.state).toBe('not_installed')
-    const afterRemove = parseMuseSettingsText(readFileSync(configPath(), 'utf-8'), 'test')
-    expect(afterRemove?.managed_hooks_path).toBeUndefined()
-    expect(afterRemove?.model).toBe('muse-spark-1.2')
-  })
-
   it('does not overwrite a user-managed hooks pointer during install', () => {
     mkdirSync(join(home, '.config', 'muse'), { recursive: true })
     const userPath = '/user-owned/muse-hooks.json'

@@ -1,8 +1,8 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { translate } from '@/i18n/i18n'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
-import { SearchableSetting } from './SearchableSetting'
-import { SettingsSwitchRow } from './SettingsFormControls'
+import { SearchableSetting } from './section-layout/SearchableSetting'
+import { SettingsSwitchRow } from './form-controls/SettingsFormControls'
 
 type PRCommentsInlineSettingProps = {
   settings: GlobalSettings

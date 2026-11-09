@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { LinearIssue } from '../../../../shared/linear/issue-types'
-import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type * as I18n from '@/i18n/i18n'
 import { scopedLinearCacheKeyForSource } from '@/store/slices/linear/linear-slice-scope'
 import { LinearLinkedIssuePane } from './LinearLinkedIssuePane'
@@ -61,7 +61,8 @@ vi.mock('@/store', () => {
   return { useAppStore }
 })
 
-vi.mock('@/runtime/runtime-linear-issue-mutations', () => ({
+vi.mock('@/runtime/linear/runtime-linear-issue-client', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   linearGetIssue: (...args: unknown[]) => mocks.linearGetIssue(...args),
   linearIssueComments: (...args: unknown[]) => mocks.linearIssueComments(...args),
   linearUpdateIssue: (...args: unknown[]) => mocks.linearUpdateIssue(...args),

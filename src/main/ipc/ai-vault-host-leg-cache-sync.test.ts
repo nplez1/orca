@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
+import type {
+  AiVaultListResult,
+  AiVaultSession
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import {
   AI_VAULT_CACHE_TTL_MS,
   invalidateAiVaultHostLegCache,
   resetAiVaultHostLegCacheForTests,
   scanHostLegWithCache
-} from './ai-vault-host-leg-cache'
+} from './ai-vault/ai-vault-host-leg-cache'
 import {
   hostLegSyncScan,
   resetAiVaultHostLegSyncForTests,

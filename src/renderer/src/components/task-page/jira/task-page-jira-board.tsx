@@ -3,7 +3,7 @@ import { ArrowRight, ExternalLink, MoveRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -27,7 +27,7 @@ import {
   buildJiraIssueRowWorkspaceAction,
   jiraIssueWorkspaceActionLabel
 } from '../../jira-issue-row-actions'
-import { openAppHttpLink } from '@/lib/app-http-link-open'
+import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
 export function jiraBoardIssueRefKey(issue: Pick<JiraIssue, 'key' | 'siteId'>): string {
   return `${issue.siteId ?? 'site'}:${issue.key}`
@@ -73,6 +73,7 @@ export function TaskPageJiraBoard({
   statusOrder,
   updatingIssueKeys
 }: TaskPageJiraBoardProps): React.JSX.Element {
+  const t = useTranslate()
   const [draggingIssueRefKey, setDraggingIssueRefKey] = useState<string | null>(null)
   const [dragOverSectionKey, setDragOverSectionKey] = useState<string | null>(null)
   const sections = useMemo(
@@ -157,7 +158,7 @@ export function TaskPageJiraBoard({
             <div className="min-h-16 space-y-2 p-2">
               {section.issues.length === 0 ? (
                 <div className="flex h-12 items-center justify-center rounded-md border border-dashed border-border/50 text-2xs text-muted-foreground">
-                  {translate('auto.components.TaskPage.jiraBoardEmptyColumn', 'No issues')}
+                  {t('auto.components.TaskPage.jiraBoardEmptyColumn', 'No issues')}
                 </div>
               ) : null}
               {section.issues.map((issue) => {
@@ -234,7 +235,7 @@ export function TaskPageJiraBoard({
                                 variant="ghost"
                                 size="icon-xs"
                                 disabled={updating}
-                                aria-label={translate('jira.board.moveIssue', 'Move {{key}}', {
+                                aria-label={t('jira.board.moveIssue', 'Move {{key}}', {
                                   key: issue.key
                                 })}
                                 onClick={(event) => event.stopPropagation()}
@@ -267,7 +268,7 @@ export function TaskPageJiraBoard({
                                   event.stopPropagation()
                                   onStartWorkspace(issue)
                                 }}
-                                aria-label={translate(
+                                aria-label={t(
                                   'auto.components.TaskPage.ff90d0abc7',
                                   'Start workspace from {{value0}}',
                                   { value0: issue.key }
@@ -290,7 +291,7 @@ export function TaskPageJiraBoard({
                                   event.stopPropagation()
                                   openAppHttpLink(issue.url, { event })
                                 }}
-                                aria-label={translate(
+                                aria-label={t(
                                   'auto.components.TaskPage.4ac8ff2275',
                                   'Open {{value0}} in Jira',
                                   { value0: issue.key }
@@ -300,7 +301,7 @@ export function TaskPageJiraBoard({
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" sideOffset={6}>
-                              {translate('auto.components.TaskPage.eee68073b2', 'Open in Jira')}
+                              {t('auto.components.TaskPage.eee68073b2', 'Open in Jira')}
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -337,7 +338,7 @@ export function TaskPageJiraBoard({
                           )}
                           <span className="truncate">
                             {issue.assignee?.displayName ??
-                              translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
+                              t('auto.components.TaskPage.42a9160321', 'Unassigned')}
                           </span>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">

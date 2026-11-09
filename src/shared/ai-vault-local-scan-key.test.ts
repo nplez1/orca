@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { aiVaultLocalScanKey } from './ai-vault-local-scan-key'
+import { aiVaultLocalScanKey } from './ai-vault/scanning/ai-vault-local-scan-key'
 
 // Why: the key decides which cached listing a request is served from, so a scope it
 // does not use would either split one answer in two or, worse, unite two answers.

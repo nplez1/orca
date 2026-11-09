@@ -11,12 +11,12 @@ import {
   isCustomAgentId,
   resolveCommitMessageAgentChoice,
   type DefaultTuiAgentPreference
-} from './commit-message-agent-spec'
-import type { ResolvedSourceControlAiGenerationParams } from './source-control-ai'
+} from './source-control/ai/generation/commit-message-agent-spec'
+import type { ResolvedSourceControlAiGenerationParams } from './source-control/ai/source-control-ai-operation-resolution'
 import type { SessionSummaryAiSettings } from './session-summary-ai-types'
-import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from './commit-message-host-key'
-import type { CommitMessageAiModelCapability } from './commit-message-ai-types'
-import type { TuiAgent } from './tui-agent'
+import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from './source-control/ai/generation/commit-message-host-key'
+import type { CommitMessageAiModelCapability } from './source-control/ai/generation/commit-message-ai-types'
+import type { TuiAgent } from './agent-launch/catalog/tui-agent'
 
 export type SessionSummaryAiSettingsInput = {
   sessionSummaryAi?: SessionSummaryAiSettings | null

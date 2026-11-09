@@ -5,7 +5,7 @@ import {
   resolveWorkspacePathFoldLocale,
   workspacePathCatalogPathFlags
 } from '../../shared/workspace-path-catalog'
-import { compareFileNames } from '../../shared/file-name-sort'
+import { compareFileNames } from '../../shared/file-listing/file-name-sort'
 import type { WorkspacePathCatalogBuildRecord } from '../../shared/workspace-path-catalog-builder-collection'
 import type { WorkspacePathSearchPathSet } from '../../shared/workspace-path-search-contract'
 import { isWithinDiskBudget } from './workspace-path-catalog-spill-runs-disk-budget'

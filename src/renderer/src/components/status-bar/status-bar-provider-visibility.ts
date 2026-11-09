@@ -1,6 +1,7 @@
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { USAGE_PROVIDER_IDS } from '../../../../shared/usage-provider-enablement'
+import { hasUsageData as hasUsageWindowData } from '../../../../shared/usage-provider-windows'
 import {
   forkUsageHasData,
   FORK_USAGE_PROVIDER_IDS,
@@ -41,17 +42,14 @@ type UsageProviderSnapshots = {
   grok: ProviderRateLimits | null | undefined
   cursor: ProviderRateLimits | null | undefined
   zcode?: ProviderRateLimits | null
+  muse?: ProviderRateLimits | null
 } & ForkUsageProviderSnapshots
 
 type UsageProviderId = ProviderRateLimits['provider']
 
 export function hasUsageData(provider: ProviderRateLimits): boolean {
   return Boolean(
-    provider.session ||
-    provider.weekly ||
-    provider.fableWeekly ||
-    provider.monthly ||
-    (provider.buckets && provider.buckets.length > 0) ||
+    hasUsageWindowData(provider) ||
     // Why: an allowance-only plan (no percentage window) must still count as data, or
     // a configured enterprise account reads as "No usage data" again; the fork's
     // windowless credits providers join through their mapping.
@@ -59,7 +57,6 @@ export function hasUsageData(provider: ProviderRateLimits): boolean {
     forkUsageHasData(provider)
   )
 }
-
 function isProviderSnapshotPending(provider: ProviderRateLimits | null | undefined): boolean {
   return provider == null || (provider.status === 'fetching' && !hasUsageData(provider))
 }
@@ -210,6 +207,7 @@ export function isUsageEmptyState(
     pendingForBar('grok', providers.grok) ||
     pendingForBar('cursor', providers.cursor) ||
     (providers.zcode !== undefined && pendingForBar('zcode', providers.zcode)) ||
+    (providers.muse !== undefined && pendingForBar('muse', providers.muse)) ||
     FORK_USAGE_PROVIDER_IDS.some((providerId) => pendingForBar(providerId, providers[providerId]))
   ) {
     return false
@@ -226,6 +224,7 @@ export function isUsageEmptyState(
     !isProviderConfigured(providers.grok) &&
     !isProviderConfigured(providers.cursor) &&
     !isProviderConfigured(providers.zcode) &&
+    !isProviderConfigured(providers.muse) &&
     FORK_USAGE_PROVIDER_IDS.every((providerId) => !isProviderConfigured(providers[providerId]))
   )
 }

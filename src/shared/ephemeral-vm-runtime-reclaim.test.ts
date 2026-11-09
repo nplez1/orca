@@ -4,7 +4,8 @@ import {
   EPHEMERAL_VM_RECLAIM_GRACE_MS,
   type EphemeralVmReclaimInput
 } from './ephemeral-vm-runtime-reclaim'
-import { encodePairingOffer, PAIRING_OFFER_VERSION } from './pairing'
+import { encodePairingOffer } from './remote-runtime/pairing/pairing'
+import { PAIRING_OFFER_VERSION } from './remote-runtime/pairing/mobile-relay-pairing-offer'
 
 const RELEASE_AT = '2026-10-13T03:26:41Z'
 const RELEASE_AT_MS = Date.parse(RELEASE_AT)

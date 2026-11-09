@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearStalePRRefreshError, type PRRefreshState } from './pr-refresh-state'
+import { clearStalePRRefreshError, type PRRefreshState } from './refresh/pr-refresh-state'
 
 function errorState(updatedAt: number): PRRefreshState {
   return { status: 'error', reason: 'visible', updatedAt, message: 'boom', errorType: 'network' }

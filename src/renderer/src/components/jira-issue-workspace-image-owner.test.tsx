@@ -4,7 +4,7 @@ import { act, type ComponentProps, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraComment, JiraIssue, JiraTransition } from '../../../shared/jira/jira-types'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { AppState } from '../store/types'
 import type {
@@ -12,7 +12,7 @@ import type {
   JiraIssueWorkspaceContent
 } from './jira-issue-workspace-content'
 import type { JiraIssueMetadataBar } from './jira-issue-workspace-chrome'
-import { getJiraRuntimeTarget, type RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+import { getJiraRuntimeTarget, type RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 
 type PendingRead<T> = {
@@ -58,7 +58,7 @@ vi.mock('@/store', () => {
   }
 })
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
-vi.mock('@/runtime/runtime-jira-client', () => {
+vi.mock('@/runtime/jira/runtime-jira-detail-client', () => {
   function request<T>(
     queue: PendingRead<T>[],
     target: RuntimeClientTarget,
@@ -81,8 +81,6 @@ vi.mock('@/runtime/runtime-jira-client', () => {
       request(boundary.transitions, getJiraRuntimeTarget(settings), key),
     jiraListPrioritiesForTarget: async () => [],
     jiraListPriorities: async () => [],
-    jiraListAssignableUsersForTarget: async () => [],
-    jiraListAssignableUsers: async () => [],
     jiraListEditFields: async () => [],
     jiraUpdateIssueForTarget: async () => ({ ok: true }),
     jiraUpdateIssue: async () => ({ ok: true }),
@@ -90,6 +88,10 @@ vi.mock('@/runtime/runtime-jira-client', () => {
     jiraAddIssueComment: async () => ({ ok: true, id: 'added' })
   }
 })
+vi.mock('@/runtime/jira/runtime-jira-user-fields-client', () => ({
+  jiraListAssignableUsers: async () => [],
+  jiraListAssignableUsersForTarget: async () => []
+}))
 vi.mock('@/components/ui/sheet', () => {
   const Content = ({ children }: { children: ReactNode }) => <div>{children}</div>
   return {
@@ -240,19 +242,6 @@ afterEach(async () => {
 })
 
 describe('Jira issue workspace image ownership', () => {
-  it('keeps explicit ownership without duplicate reads when the default host changes', async () => {
-    const selected = issue()
-    const owner: RuntimeClientTarget = { kind: 'environment', environmentId: 'environment-1' }
-    await render(selected)
-    boundary.settings = { activeRuntimeEnvironmentId: 'environment-2' }
-    await render(selected)
-    for (const reads of [boundary.issues, boundary.comments, boundary.transitions]) {
-      expect(reads).toHaveLength(1)
-      expect(reads[0]?.target).toEqual(owner)
-    }
-    expect(text('image-owner')).toBe(JSON.stringify(owner))
-  })
-
   it('fences late detail, comments and transitions when the same issue switches owners', async () => {
     const selected = issue()
     await render(selected)

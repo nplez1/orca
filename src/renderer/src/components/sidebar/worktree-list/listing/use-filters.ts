@@ -5,13 +5,12 @@ import {
   selectSidebarFilterState,
   sidebarHasActiveFilters,
   sidebarWorkspaceRowFilters
-} from '../../sidebar-filter-actions'
+} from '../controls/sidebar-filter-actions'
 import { useShallow } from 'zustand/react/shallow'
 import type { AppState } from '@/store/types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import {
   activeWorkspaceRowFilterKeys,
-  isSleepingSweepExempt,
   type WorkspaceRowFilters
 } from '../../../../../../shared/workspace-view/workspace-row-filters'
 import { resolveVisibleWorkspaceHostIds } from '../../../../../../shared/workspace-view/workspace-host-visibility'
@@ -37,14 +36,9 @@ import {
   getPairedDeviceIdsByEnvironment,
   isWorkspaceOwnedBySomeoneElse
 } from '../../../../../../shared/workspace-creator-visibility'
+import { createSleepingSweepHiddenCheck } from './sleeping-sweep-visibility'
 import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
-import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
-import {
-  getVisibleWorktreeBrowserActivityTabs,
-  getVisibleWorktreeTerminalActivityTabs,
-  getWorktreeIdsWithStructuredChat
-} from '../../visible-worktree-activity-inputs'
-import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
+import { selectFolderWorkspaces } from '@/store/workspaces/catalog/workspace-record-fields'
 
 export type SidebarWorktreeFilters = ReturnType<typeof useSidebarWorktreeFilters>
 
@@ -101,37 +95,16 @@ const REVEAL_WORKSPACE: Record<keyof WorkspaceRowFilters, (context: RevealContex
     }
   },
   hideSleepingWorkspaces: ({ state, worktree }) => {
-    const agentStatusNow = getAgentStatusEpochNow(state.agentStatusEpoch)
     // Why: an emptied workspace — or the one on screen with nothing to render — is awake with
     // nothing to show, so revealing it must not read as waking a slept one and flip the user's
     // "Hide sleeping" preference off (#96).
     if (
-      isWorkspaceEmptiedOnPurpose(state, worktree.id, agentStatusNow) ||
+      isWorkspaceEmptiedOnPurpose(state, worktree.id, getAgentStatusEpochNow(state.agentStatusEpoch)) ||
       isActiveEmptyWorkspace(state, worktree.id)
     ) {
       return
     }
-    const tabsByWorktree = getVisibleWorktreeTerminalActivityTabs(state.tabsByWorktree)
-    const browserTabsByWorktree = getVisibleWorktreeBrowserActivityTabs(state.browserTabsByWorktree)
-    const liveAgentWorktrees = getWorktreeIdsWithLiveAgent(
-      state.agentStatusByPaneKey,
-      tabsByWorktree,
-      agentStatusNow
-    )
-    if (
-      !isSleepingSweepExempt(worktree.isMainWorktree, state.alwaysShowDefaultBranchWorkspace) &&
-      isInactiveWorkspace(
-        worktree.id,
-        tabsByWorktree,
-        state.ptyIdsByTabId,
-        browserTabsByWorktree,
-        liveAgentWorktrees,
-        getWorktreeIdsWithStructuredChat(
-          state.unifiedTabsByWorktree,
-          state.structuredChatSleptAtByPaneKey
-        )
-      )
-    ) {
+    if (createSleepingSweepHiddenCheck(state)(worktree)) {
       state.setShowSleepingWorkspaces(true)
     }
   },

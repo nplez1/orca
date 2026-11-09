@@ -14,7 +14,7 @@ import {
   getPRCommentsListDisplayModeLabel,
   PR_COMMENT_LIST_DISPLAY_MODES,
   type PRCommentsListDisplayMode
-} from './use-comments-list-state'
+} from './comments/use-comments-list-state'
 
 /** The triage / timeline switch in the comment list header. */
 export function CommentsDisplayModeMenu({

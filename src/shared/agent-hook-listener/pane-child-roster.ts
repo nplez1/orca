@@ -2,10 +2,13 @@ import {
   AGENT_DESCENDANT_QUIET_REAP_MS,
   agentDescendantRosterToSnapshots
 } from '../agent-descendant-roster'
-import { foldAgentLeadStatus } from '../agent-lead-status-fold'
-import { agentChildWorkLiveness } from '../agent-status-child-work-liveness'
-import type { AgentSubagentSnapshot } from '../agent-status-subagent-snapshot'
-import type { AgentStatusState, ParsedAgentStatusPayload } from '../agent-status-types'
+import { foldAgentLeadStatus } from '../agent-status/lifecycle/agent-lead-status-fold'
+import { agentChildWorkLiveness } from '../agent-status/child-work/agent-status-child-work-liveness'
+import type { AgentSubagentSnapshot } from '../agent-status/contracts/agent-status-subagent-snapshot'
+import type {
+  AgentStatusState,
+  ParsedAgentStatusPayload
+} from '../agent-status/contracts/agent-status-types'
 import type { HookListenerState } from './listener-state'
 
 /** A child both rosters name: the tracked entry owns its state and tool line, and the reporting lane

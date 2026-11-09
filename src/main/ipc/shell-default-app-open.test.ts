@@ -2,15 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { normalize, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const { handleMock, openPathMock, realpathMock, showItemInFolderMock, statMock } = vi.hoisted(
-  () => ({
-    handleMock: vi.fn<(channel: string, handler: (...args: unknown[]) => unknown) => void>(),
-    openPathMock: vi.fn(),
-    realpathMock: vi.fn<(path: string) => Promise<string>>(),
-    showItemInFolderMock: vi.fn(),
-    statMock: vi.fn()
-  })
-)
+const {
+  handleMock,
+  inspectLinkedFileMock,
+  openPathMock,
+  realpathMock,
+  showItemInFolderMock,
+  statMock
+} = vi.hoisted(() => ({
+  handleMock: vi.fn<(channel: string, handler: (...args: unknown[]) => unknown) => void>(),
+  inspectLinkedFileMock: vi.fn(),
+  openPathMock: vi.fn(),
+  realpathMock: vi.fn<(path: string) => Promise<string>>(),
+  showItemInFolderMock: vi.fn(),
+  statMock: vi.fn()
+}))
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock, on: vi.fn() },
@@ -23,6 +29,10 @@ vi.mock('node:fs/promises', () => ({
   copyFile: vi.fn(),
   realpath: realpathMock,
   stat: statMock
+}))
+
+vi.mock('./linked-file-inspection', () => ({
+  inspectLinkedFile: inspectLinkedFileMock
 }))
 
 vi.mock('../codex-cli/command', () => ({
@@ -55,6 +65,8 @@ beforeEach(() => {
   showItemInFolderMock.mockReset()
   statMock.mockReset()
   openPathMock.mockResolvedValue('')
+  inspectLinkedFileMock.mockReset()
+  inspectLinkedFileMock.mockResolvedValue('open')
 })
 
 describe('resolveDefaultAppOpenTarget', () => {
@@ -168,7 +180,8 @@ describe('shell handlers that reach the OS default app', () => {
     statMock.mockResolvedValueOnce(fileStats(0o644))
     const uri = pathToFileURL(resolve('docs/guide.command')).toString()
 
-    await expect(getHandler('shell:openFileUri')({}, uri, 'local')).resolves.toBeUndefined()
+    await expect(getHandler('shell:openFileUri')({}, uri, 'local')).resolves.toBe('failed')
+    expect(inspectLinkedFileMock).not.toHaveBeenCalled()
     expect(openPathMock).not.toHaveBeenCalled()
   })
 
@@ -179,7 +192,7 @@ describe('shell handlers that reach the OS default app', () => {
     await expect(getHandler('shell:openFilePath')({}, filePath, 'local')).resolves.toBe(true)
     await expect(
       getHandler('shell:openFileUri')({}, pathToFileURL(filePath).toString(), 'local')
-    ).resolves.toBeUndefined()
+    ).resolves.toBe('opened')
     expect(openPathMock).toHaveBeenCalledTimes(2)
   })
 })

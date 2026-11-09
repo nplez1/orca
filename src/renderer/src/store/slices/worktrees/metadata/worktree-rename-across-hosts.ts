@@ -12,11 +12,11 @@ import {
 } from '../../../../../../shared/worktree/host-context-labels'
 import {
   findIndexedDetectedWorktrees,
-  findIndexedWorktreeOwner,
-  worktreeOwnerHostIds
-} from '@/lib/worktree-runtime-owner-index'
+  findIndexedWorktreeOwner
+} from '../../../../lib/workspace/ownership/worktree-runtime-owner-index'
+import { worktreeOwnerHostIds } from '../../../../lib/workspace/ownership/workspace-catalog-owner-index'
 import type { AppState } from '../../../types'
-import { applyWorktreeUpdates } from '../../worktree-meta-update-application'
+import { applyWorktreeUpdates } from './worktree-meta-update-application'
 import {
   applyDetectedWorktreeUpdates,
   findKnownWorktreeById

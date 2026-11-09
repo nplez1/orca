@@ -25,7 +25,7 @@ import {
   type QuickOpenPathSearchInstrumentationRecord
 } from './workspace-path-search-instrumentation-recorder'
 import { WORKSPACE_PATH_INDEX_ROOT_MEMORY_BUDGET_BYTES } from '../../shared/__fixtures__/workspace-path-memory-measurement'
-import { buildExcludePathPrefixes } from '../../shared/quick-open-filter'
+import { buildExcludePathPrefixes } from '../../shared/quick-open/quick-open-filter'
 import { isWorkspacePathIndexEnabled } from '../workspace-path-index/workspace-path-index-feature-switch'
 
 export type QuickOpenPathInventoryMatch = {

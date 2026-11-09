@@ -1,5 +1,5 @@
 import { wslGatedReadFile } from '../native-chat/wsl-transcript-fs-access'
-import type { AiVaultSessionSubagentInfo } from '../../shared/ai-vault-types'
+import type { AiVaultSessionSubagentInfo } from '../../shared/ai-vault/contracts/ai-vault-types'
 import {
   PI_CLAUDE_PARENT_MARKER_TYPE,
   piClaudeParentMarkerPath

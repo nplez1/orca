@@ -1,6 +1,6 @@
 import { translate } from '@/i18n/i18n'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import type { WorkspaceAttachmentMutation } from '../../../../../../shared/workspace-attachment-mutation'
+import type { WorkspaceAttachmentMutation } from '../../../../../../shared/workspace-attachments/workspace-attachment-mutation'
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
 import type { AppState } from '../../../types'
 import { getFolderWorkspaceMetaUpdates } from '../listing/detected-worktree-meta'

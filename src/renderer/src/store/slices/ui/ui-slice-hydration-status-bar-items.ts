@@ -13,6 +13,7 @@ const DEFAULT_ON_DEEPINFRA_STATUS_BAR_ITEM: StatusBarItem = 'deepinfra'
 const DEFAULT_ON_CURSOR_STATUS_BAR_ITEM: StatusBarItem = 'cursor'
 const DEFAULT_ON_ZCODE_STATUS_BAR_ITEM: StatusBarItem = 'zcode'
 const DEFAULT_ON_COPILOT_STATUS_BAR_ITEM: StatusBarItem = 'copilot'
+const DEFAULT_ON_MUSE_STATUS_BAR_ITEM: StatusBarItem = 'muse'
 
 export function hydrateStatusBarItems(ui: PersistedUIState): StatusBarItem[] {
   let items = migrateStatusBarItems(ui.statusBarItems)
@@ -27,7 +28,8 @@ export function hydrateStatusBarItems(ui: PersistedUIState): StatusBarItem[] {
     ['_deepinfraStatusBarDefaultAdded', DEFAULT_ON_DEEPINFRA_STATUS_BAR_ITEM],
     ['_cursorStatusBarDefaultAdded', DEFAULT_ON_CURSOR_STATUS_BAR_ITEM],
     ['_zcodeStatusBarDefaultAdded', DEFAULT_ON_ZCODE_STATUS_BAR_ITEM],
-    ['_copilotStatusBarDefaultAdded', DEFAULT_ON_COPILOT_STATUS_BAR_ITEM]
+    ['_copilotStatusBarDefaultAdded', DEFAULT_ON_COPILOT_STATUS_BAR_ITEM],
+    ['_museStatusBarDefaultAdded', DEFAULT_ON_MUSE_STATUS_BAR_ITEM]
   ] as const
   for (const [flag, item] of defaults) {
     if (!ui[flag] && !items.includes(item)) {

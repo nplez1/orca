@@ -5,14 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
+import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 import { TaskPageJiraIssueList } from './task-page/jira/task-page-jira-issue-list'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 
 const openUrl = vi.fn()
 const { openAppHttpLink } = vi.hoisted(() => ({ openAppHttpLink: vi.fn() }))
 // LOCAL(nplez1): #234 routes the link through this entry point, not straight to the shell bridge.
-vi.mock('@/lib/app-http-link-open', async (importOriginal) => ({
+vi.mock('@/lib/browser/navigation/app-http-link-open.ts', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   openAppHttpLink
 }))

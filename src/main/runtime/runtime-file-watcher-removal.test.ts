@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createRuntimeFileWatcherRemoval,
   WATCHER_RESTORE_BUDGET_MS
-} from './runtime-file-watcher-removal'
+} from './workspaces/removal/runtime-file-watcher-removal'
 import {
   setWorktreeWatcherRemoval,
   type WorktreeWatcherRemoval
-} from '../ipc/worktree-watcher-removal'
+} from '../workspaces/removal/worktree-watcher-removal'
 
 const fileCommands = {
   closeFileExplorerWatchersForPath: vi.fn(async () => {}),

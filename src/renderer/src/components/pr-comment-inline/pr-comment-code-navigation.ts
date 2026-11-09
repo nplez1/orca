@@ -6,10 +6,10 @@ import { getOpenedEditFileIdAfterOpen } from '@/store/slices/editor/file-ids/edi
 import type {
   GitBranchChangeEntry,
   GitBranchCompareSummary
-} from '../../../../shared/git-diff-compare-types'
+} from '../../../../shared/git/diff/git-diff-compare-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
-import { canUseChangesModeForFile } from '../editor/editor-panel-file-mode'
-import { getCompareBaseCandidateBranchName } from '../../../../shared/source-control-base-ref-resolution'
+import { canUseChangesModeForFile } from '../editor/view-mode/editor-panel-file-mode'
+import { getCompareBaseCandidateBranchName } from '../../../../shared/source-control/decisions/source-control-base-ref-resolution'
 import { getPRCommentInlineId } from './pr-comment-inline-threads'
 import {
   cancelSourceControlEditorRevealFrames,

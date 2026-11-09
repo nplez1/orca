@@ -8,21 +8,21 @@ import {
   githubProjectKeys,
   isPreflightIssueDismissed
 } from './landing-preflight-dismissal'
-import { ShortcutKeyCombo } from './ShortcutKeyCombo'
-import { useShortcutKeyDetails, type ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
+import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 import { hasGitHubBackedProject, type PreflightIssue } from './landing-preflight-issues'
 import { useLandingPreflightRuntime } from './landing-preflight-runtime'
 import { GitHubStarButton } from './GitHubStarButton'
 import { useOrcaStarState } from './orca-star-state'
 import { OrcaBrandMark } from './OrcaBrandMark'
-import { openAppHttpLink } from '@/lib/app-http-link-open'
+import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
+import {
+  LANDING_ACTION_BUTTON_CLASS,
+  LandingShortcutList,
+  type LandingShortcutItem
+} from './landing-layout'
+import { useTranslate } from '@/i18n/use-translate'
 
-type ShortcutItem = {
-  id: string
-  shortcut: ShortcutKeyComboDetails
-  action: string
-}
 
 function dismissedPreflightIssueIds(issues: PreflightIssue[], repos: readonly Repo[]): Set<string> {
   return new Set(
@@ -39,6 +39,7 @@ function PreflightBanner({
   issues: PreflightIssue[]
   repos: readonly Repo[]
 }): React.JSX.Element | null {
+  const t = useTranslate()
   // Recheck dismissals when the GitHub project set changes so expired nudges can reappear.
   const githubKey = githubProjectKeys(repos).join('|')
   const [dismissed, setDismissed] = useState<Set<string>>(() =>
@@ -88,7 +89,7 @@ function PreflightBanner({
             <button
               className="-mr-1 -mt-0.5 shrink-0 rounded p-1 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
               onClick={() => dismiss(issue)}
-              aria-label={translate('auto.components.Landing.preflightDismiss', 'Dismiss')}
+              aria-label={t('auto.components.Landing.preflightDismiss', 'Dismiss')}
             >
               <X className="size-3.5" />
             </button>
@@ -100,18 +101,16 @@ function PreflightBanner({
 }
 
 export default function Landing(): React.JSX.Element {
+  const t = useTranslate()
   const repos = useAppStore((s) => s.repos)
   const openModal = useAppStore((s) => s.openModal)
 
   const createActionLabel =
     repos.length > 0 && repos.every((repo) => isGitRepoKind(repo))
-      ? translate('auto.components.NewWorkspaceComposerModal.createWorktree', 'Create worktree')
-      : translate('auto.components.NewWorkspaceComposerModal.createWorkspace', 'Create workspace')
-  const moveUpLabel = translate('auto.components.Landing.moveUpWorkspace', 'Move up workspace')
-  const moveDownLabel = translate(
-    'auto.components.Landing.moveDownWorkspace',
-    'Move down workspace'
-  )
+      ? t('auto.components.NewWorkspaceComposerModal.createWorktree', 'Create worktree')
+      : t('auto.components.NewWorkspaceComposerModal.createWorkspace', 'Create workspace')
+  const moveUpLabel = t('auto.components.Landing.moveUpWorkspace', 'Move up workspace')
+  const moveDownLabel = t('auto.components.Landing.moveDownWorkspace', 'Move down workspace')
   const hasProjects = repos.length > 0
   const hasGitHubProject = useMemo(() => hasGitHubBackedProject(repos), [repos])
   const showGitHubSupportFooter = repos.length === 0 || hasGitHubProject
@@ -123,7 +122,7 @@ export default function Landing(): React.JSX.Element {
   const createWorktreeShortcut = useShortcutKeyDetails('workspace.create')
   const previousWorktreeShortcut = useShortcutKeyDetails('worktree.navigateUp')
   const nextWorktreeShortcut = useShortcutKeyDetails('worktree.navigateDown')
-  const shortcuts = useMemo<ShortcutItem[]>(() => {
+  const shortcuts = useMemo<LandingShortcutItem[]>(() => {
     return [
       { id: 'create', shortcut: createWorktreeShortcut, action: createActionLabel },
       { id: 'up', shortcut: previousWorktreeShortcut, action: moveUpLabel },
@@ -151,24 +150,21 @@ export default function Landing(): React.JSX.Element {
 
           <p className="text-sm text-muted-foreground text-center">
             {hasProjects
-              ? translate(
+              ? t(
                   'auto.components.Landing.9c00bd4adf',
                   'Select a workspace from the sidebar to begin.'
                 )
-              : translate('auto.components.Landing.cd21242762', 'Add a project to get started.')}
+              : t('auto.components.Landing.cd21242762', 'Add a project to get started.')}
           </p>
 
           <div className="flex items-center justify-center gap-2.5 flex-wrap">
-            <button
-              className="inline-flex items-center gap-1.5 bg-secondary/70 border border-border/80 text-foreground font-medium text-sm px-4 py-2 rounded-md cursor-pointer hover:bg-accent transition-colors"
-              onClick={() => openModal('add-repo')}
-            >
+            <button className={LANDING_ACTION_BUTTON_CLASS} onClick={() => openModal('add-repo')}>
               <FolderPlus className="size-3.5" />
-              {translate('auto.components.Landing.f9eaa9e12d', 'Add project')}
+              {t('auto.components.Landing.f9eaa9e12d', 'Add project')}
             </button>
 
             <button
-              className="inline-flex items-center gap-1.5 bg-secondary/70 border border-border/80 text-foreground font-medium text-sm px-4 py-2 rounded-md cursor-pointer hover:bg-accent transition-colors"
+              className={LANDING_ACTION_BUTTON_CLASS}
               onClick={() => openModal('new-workspace-composer', { telemetrySource: 'unknown' })}
             >
               <GitBranchPlus className="size-3.5" />
@@ -176,18 +172,7 @@ export default function Landing(): React.JSX.Element {
             </button>
           </div>
 
-          <div className="mt-6 w-full max-w-xs space-y-2">
-            {shortcuts.map((shortcut) => (
-              <div key={shortcut.id} className="grid grid-cols-[1fr_auto] items-center gap-3">
-                <span className="text-sm text-muted-foreground">{shortcut.action}</span>
-                <ShortcutKeyCombo
-                  keys={shortcut.shortcut.keys}
-                  doubleTap={shortcut.shortcut.doubleTap}
-                  separatorClassName="mx-0.5 text-[10px] text-muted-foreground"
-                />
-              </div>
-            ))}
-          </div>
+          <LandingShortcutList shortcuts={shortcuts} />
         </div>
       </div>
 

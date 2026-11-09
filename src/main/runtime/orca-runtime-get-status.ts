@@ -1,13 +1,13 @@
 import { BROWSER_GOOGLE_COOKIE_CLEAR_CAPABILITY } from '../../shared/browser-runtime-capabilities'
-import { OrcaRuntimeWithPtyController } from './orca-runtime-pty-controller'
+import { OrcaRuntimeWithPtyController } from './terminal/lifecycle/orca-runtime-pty-controller'
 import type { RuntimeDegradation, RuntimeStatus } from '../../shared/runtime-types'
 import {
   runtimeBrowserCommandsFactoryIsHeadless,
   runtimeBrowserCommandsFactorySupportsGoogleCookieClear,
   runtimeBrowserCommandsFactorySupportsClientHosting,
   runtimeBrowserUnavailableCause
-} from './runtime-browser-commands-factory'
-import { isBrowserIdentityModeStoreInitialized } from '../browser/browser-identity-mode-store'
+} from './browser/installation/runtime-browser-commands-factory'
+import { isBrowserIdentityModeStoreInitialized } from '../browser/identity/browser-identity-mode-store'
 import { servesLocalWslMigrationSource } from '../orcad/orcad-migration-wsl-destination'
 import { ORCAD_MIGRATION_LOCAL_WSL_SOURCE_RUNTIME_CAPABILITY } from '../../shared/orcad-runtime-capabilities'
 import { advertisedOrcadMigrationDestinationCapabilities } from '../orcad/orcad-migration-destination-capabilities'
@@ -23,10 +23,12 @@ import {
   REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,
   RUNTIME_CAPABILITIES,
   RUNTIME_PROTOCOL_VERSION,
-  SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
+  SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY
+} from '../../shared/protocol-version'
+import {
   TERMINAL_PROMPT_DELIVERY_RUNTIME_CAPABILITY,
   TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY
-} from '../../shared/protocol-version'
+} from '../../shared/terminal/runtime-policy/terminal-runtime-capabilities'
 import {
   BROWSER_UNAVAILABLE_ERROR_CODE,
   browserUnavailableMessage
@@ -35,23 +37,23 @@ import {
   RUNTIME_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
   WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
 } from '../../shared/workspace-path-search-capability'
-import { runtimeTerminalDegradation } from './native-terminal-availability'
+import { runtimeTerminalDegradation } from './terminal/launch/native-terminal-availability'
 import { isWindowsProcessStartTimeAvailable } from '../windows/windows-process-table'
-import type { RuntimeWorktreeLifecycleEvent } from './orca-runtime-core'
-import { WORKTREE_CREATE_RESULT_TTL_MS } from './orca-runtime-core'
-import type { RuntimeNotifier } from './runtime-notifier-contract'
+import type { RuntimeWorktreeLifecycleEvent } from './workspaces/lifecycle/worktree-lifecycle-event'
+import { WORKTREE_CREATE_RESULT_TTL_MS } from './workspaces/creation/worktree-create-idempotency'
+import type { RuntimeNotifier } from './client/events/runtime-notifier-contract'
 import type {
   AutomationsChangedPayload,
   RuntimeClientEvent
 } from '../../shared/runtime-client-events'
-import { parsePaneKey } from '../../shared/stable-pane-id'
+import { parsePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import { wakeFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade-wake'
 import { hostModeRuntimeCapabilities } from './runtime-host-mode-capabilities'
-import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidators'
-import { MACHINE_NAME_PUBLISH_WAIT_MS } from './runtime-machine-name'
-import { getManagedServerActions } from './managed-server-actions-registry'
+import { runWorktreeChangeInvalidators } from '../ipc/worktrees/listing/worktree-change-invalidators'
+import { MACHINE_NAME_PUBLISH_WAIT_MS } from './hosts/platform-probe/runtime-machine-name'
+import { getManagedServerActions } from './hosts/management/managed-server-actions-registry'
 import type { WorktreeSortOrderUpdate } from '../../shared/worktree/sort-order-update'
-import { supportsDurableTerminalPromptDelivery } from './durable-terminal-prompt-delivery-support'
+import { supportsDurableTerminalPromptDelivery } from './terminal/input/durable-terminal-prompt-delivery-support'
 
 type RuntimeStatusHost = {
   getAvailableAuthoritativeWindow(): unknown

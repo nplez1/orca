@@ -13,7 +13,7 @@ import {
   createNameFilteredFileExplorerProjection,
   createNameFilteredFileExplorerProjectionInChunks,
   getFileExplorerNameFilterProjectionEstimatedBytes
-} from './file-explorer-name-filter-projection'
+} from './file-explorer/tree/file-explorer-name-filter-projection'
 import {
   recordRendererPathSearchCommit,
   recordRendererPathSearchDuration,

@@ -11,11 +11,12 @@ import {
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import type { AgentHookSource } from '../../shared/agent-hook-relay'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
-import { grantDirAcl, isPermissionError } from '../win32-utils'
+import type { AgentHookSource } from '../../shared/agent-hook-listener/transport/agent-hook-relay'
+import { grantDirAcl } from '../windows/windows-directory-acl'
+import { isPermissionError } from '../filesystem/permission-errors'
 import { resolveHooksJsonWritePath } from './hook-config-write-path'
-import { writeRollingFileBackup } from '../rolling-file-backup'
+import { writeRollingFileBackup } from '../filesystem/rolling-file-backup'
 import { renameOverLockedTarget } from './locked-executable-rename'
 
 export type HookCommandConfig = {

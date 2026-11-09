@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
-import type { UpdaterRendererChannel } from './updater-types'
-import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
-import { INITIAL_UPDATE_STATUS, UpdaterState } from './updater-state'
+import type { UpdaterRendererChannel } from './lifecycle/updater-types'
+import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
+import { INITIAL_UPDATE_STATUS, UpdaterState } from './lifecycle/updater-state'
 
 /** Owns the main-window binding every updater send and window-parented dialog goes through. */
 export abstract class UpdaterWindowBinding extends UpdaterState {
@@ -21,6 +21,10 @@ export abstract class UpdaterWindowBinding extends UpdaterState {
    * landed while the previous window was already gone.
    */
   protected bindMainWindow(mainWindow: BrowserWindow): void {
+    // Why: a window destroyed before setup will never emit `closed` and cannot take the replay.
+    if (mainWindow.isDestroyed()) {
+      return
+    }
     this.mainWindowRef = mainWindow
     mainWindow.once('closed', () => this.releaseMainWindow(mainWindow))
     // Why: only the untouched default is skipped — the renderer already starts from it, while every

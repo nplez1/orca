@@ -1,6 +1,7 @@
 import { posix } from 'node:path'
-import { WORKTREE_ID_SEPARATOR } from '../../shared/worktree/id'
 import { computeWorktreePath, type getWorktreePathSettings } from './worktree-logic'
+import '../../shared/worktree/id'
+import { WORKTREE_ID_SEPARATOR } from '../../shared/terminal/pty/lifecycle/pty-session-id-format'
 
 /** The resolved placement settings, so a caller cannot drop the container name by passing raw
  *  global settings — `ReturnType` keeps this in step with `getWorktreePathSettings`. */

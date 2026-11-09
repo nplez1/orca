@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto'
-import type { AiVaultListResult, AiVaultListSyncDelta } from '../../shared/ai-vault-types'
+import type {
+  AiVaultListResult,
+  AiVaultListSyncDelta
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import {
   retainAiVaultListSnapshot,
   retainedAiVaultListDigests,

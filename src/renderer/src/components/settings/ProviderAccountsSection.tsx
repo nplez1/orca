@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ExternalLink } from 'lucide-react'
-import { openAppHttpLinkFromAnchor } from '@/lib/app-http-link-open'
+import { openAppHttpLinkFromAnchor } from '../../lib/browser/navigation/app-http-link-open'
 import type { DisableableUsageProviderId } from '../../../../shared/usage-provider-enablement'
 import { translate } from '@/i18n/i18n'
 import { Badge } from '../ui/badge'

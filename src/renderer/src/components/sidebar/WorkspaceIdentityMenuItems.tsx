@@ -4,7 +4,7 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import type { AddWorktreeToAnotherHostRefusal } from './worktree-to-host-composer-data'
-import type { WorktreeContextMenuModel } from './use-worktree-context-menu-model'
+import type { WorktreeContextMenuModel } from './workspace-actions/context-menu/use-worktree-context-menu-model'
 
 function getRefusalReason(reason: AddWorktreeToAnotherHostRefusal): string {
   switch (reason) {

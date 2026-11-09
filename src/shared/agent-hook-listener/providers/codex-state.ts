@@ -1,12 +1,13 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 15-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import type { AgentMainAgentStatus, ParsedAgentStatusPayload } from '../../agent-status-types'
-import { isAskUserQuestionTool } from '../../agent-question-answered-intent'
+import type { AgentMainAgentStatus } from '../../agent-status/lifecycle/main-agent-status'
+import type { ParsedAgentStatusPayload } from '../../agent-status/contracts/agent-status-types'
+import { isAskUserQuestionTool } from '../../agent-status/lifecycle/agent-question-answered-intent'
 import {
   continueMainAgentStatus,
   foldAgentLeadStatus,
   mainAgentTurnInterrupted,
   type AgentLeadStatusResolution
-} from '../../agent-lead-status-fold'
+} from '../../agent-status/lifecycle/agent-lead-status-fold'
 import {
   codexRosterChildWorkLiveness,
   codexRosterToSnapshots,
@@ -20,7 +21,8 @@ import {
   type CodexSubagentTranscriptState
 } from '../../codex-subagent-transcript'
 import type { AgentHookEventPayload } from '../listener-event'
-import type { CodexLeadTurnState, HookListenerState } from '../listener-state'
+import type { HookListenerState } from '../listener-state'
+import type { CodexLeadTurnState } from '../main-agent-turn-state'
 
 export function getOrCreateCodexSubagentRoster(
   state: HookListenerState,

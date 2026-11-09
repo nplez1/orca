@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from '../agent-descendant-roster'
-import type { AgentSubagentSnapshot } from '../agent-status-subagent-snapshot'
-import type { ParsedAgentStatusPayload } from '../agent-status-types'
+import type { AgentSubagentSnapshot } from '../agent-status/contracts/agent-status-subagent-snapshot'
+import type { ParsedAgentStatusPayload } from '../agent-status/contracts/agent-status-types'
 import { createHookListenerState } from './listener-state'
 import {
   carriedReportedChildren,

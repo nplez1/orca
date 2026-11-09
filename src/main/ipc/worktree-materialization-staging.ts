@@ -14,7 +14,7 @@ import {
 } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
-import { getSafeRelativePath } from '../git/worktree-symlink-detection'
+import { getSafeRelativePath } from '../git/worktrees/content-paths/worktree-symlink-detection'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import { WorktreeLinkedPathTargetExistsError } from './worktree-apfs-clone'
 

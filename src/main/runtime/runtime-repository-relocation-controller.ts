@@ -12,7 +12,7 @@ import type { Repo } from '../../shared/repo-types'
 import type { RuntimeWorktreePsSummary } from '../../shared/runtime-worktree-contracts'
 import type { RuntimeRepoRelocationResult } from '../../shared/repo-relocation-contracts'
 import { gitExecFileAsync } from '../git/runner'
-import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
+import { invalidateAuthorizedRootsCache } from '../ipc/worktrees/removal/registered-worktree-roots-cache'
 import {
   isCheckoutOutsideProjectFolder,
   planPrimaryCheckoutRelocation,
@@ -23,8 +23,8 @@ import {
   type RelocationOutcome
 } from '../project-folder-relocation'
 import { getRepoDefaultBranchName } from '../source-control/repo-default-branch'
-import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
-import type { RuntimeStore } from './runtime-store-contract'
+import { prepareLocalWorktreeRootForRepo } from '../workspaces/creation/worktree-root-preparation'
+import type { RuntimeStore } from './construction/runtime-store-contract'
 
 /**
  * Only the store members this action needs, so a caller — and a test — need not own the whole

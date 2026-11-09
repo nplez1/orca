@@ -1,6 +1,6 @@
 import type { WorkspacePathCatalog } from './workspace-path-catalog'
 import { getWorkspacePathCatalogOriginalPath } from './workspace-path-catalog'
-import { compareFileNames } from './file-name-sort'
+import { compareFileNames } from './file-listing/file-name-sort'
 
 /** Finds the stable natural-order insertion position for a relative path. */
 export function findWorkspacePathCatalogInsertionRank(

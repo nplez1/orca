@@ -1,6 +1,6 @@
 import { performance, monitorEventLoopDelay } from 'node:perf_hooks'
 import { dirname, join } from 'node:path'
-import { MessageChannel, Worker } from 'node:worker_threads'
+import { MessageChannel, type Worker } from 'node:worker_threads'
 import type {
   WorkspacePathSearchFenceIdentity,
   WorkspacePathSearchOwnerIdentity
@@ -16,6 +16,7 @@ import type { WorkspacePathCatalogProfile } from '../../shared/__fixtures__/work
 import { WorkspacePathIndexAdmission } from './workspace-path-index-admission'
 import { WorkspacePathIndexService } from './workspace-path-index-service'
 import { WorkspacePathIndexWorkerClient } from './workspace-path-index-worker-client'
+import { spawnWorkerThread } from '../worker-threads/worker-thread-spawn'
 import {
   createBenchmarkBuildCallback,
   type BenchmarkBuildObservations
@@ -80,7 +81,7 @@ export async function createWorkspacePathIndexBenchmarkSession(args: {
   let spawnedWorker: Worker | null = null
   const worker = new WorkspacePathIndexWorkerClient({
     workerFactory: () => {
-      spawnedWorker = new Worker(args.workerPath, {
+      spawnedWorker = spawnWorkerThread(args.workerPath, {
         workerData: { memoryPort: memoryChannel.port2 },
         transferList: [memoryChannel.port2]
       })

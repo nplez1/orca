@@ -16,7 +16,7 @@ import {
 } from '@/components/jira-transition-fields-form'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
 import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys

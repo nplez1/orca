@@ -6,6 +6,7 @@ import {
   normalizeRuntimePathForComparison,
   normalizeRuntimePathSeparators
 } from '../../shared/cross-platform-path'
+import { resolveCreatePathAlias } from '../workspaces/creation/worktree-create-in-flight'
 
 export type ClaimedCloneTarget = {
   canCleanup: boolean
@@ -64,6 +65,14 @@ export function deriveValidatedClonePath(args: {
   }
 
   return clonePath
+}
+
+/** Git-registered projects save Git's resolved checkout path, so a folder reached through a
+ *  symlink matches by its resolved spelling as well as the typed one. */
+export async function getSavedProjectPathKeys(path: string): Promise<string[]> {
+  // A clone target may not exist yet (or was deleted); its existing ancestors still resolve.
+  const resolved = await resolveCreatePathAlias(path)
+  return [...new Set([getClonePathComparisonKey(path), getClonePathComparisonKey(resolved)])]
 }
 
 export function getClonePathComparisonKey(clonePath: string): string {

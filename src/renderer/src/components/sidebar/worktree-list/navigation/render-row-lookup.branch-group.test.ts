@@ -5,7 +5,7 @@ import {
   renderRowContainsWorktree
 } from './render-row-lookup'
 import type { WorktreeRow } from '../../../../../../shared/sidebar-list/row-types'
-import { remoteWorktree, worktree } from '../../worktree-list-groups-test-fixtures'
+import { remoteWorktree, worktree } from '../grouping/worktree-list-groups-test-fixtures'
 
 function mergedRow(): WorktreeRow {
   return {

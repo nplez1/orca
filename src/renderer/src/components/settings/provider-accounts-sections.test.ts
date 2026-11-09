@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { USAGE_PROVIDER_IDS } from '../../../../shared/usage-provider-enablement'
 import { getProviderAccountsSections } from './provider-accounts-sections'
-import { getAccountsPaneSearchEntries } from './accounts-search'
-import { matchesSettingsSearch } from './settings-search'
+import { getAccountsPaneSearchEntries } from './accounts/accounts-search'
+import { matchesSettingsSearch } from './search/settings-search'
 
 describe('getProviderAccountsSections', () => {
   it('covers exactly the providers whose usage can be switched off', () => {

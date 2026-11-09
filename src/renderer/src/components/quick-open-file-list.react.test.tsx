@@ -3,25 +3,16 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
+import type { FolderWorkspace } from '../../../shared/folder-workspaces/folder-workspace-types'
 import type { ProjectGroup } from '../../../shared/project-group-types'
 import type { Worktree } from '../../../shared/worktree/types'
 import { folderWorkspaceKey } from '../../../shared/workspace-scope'
-import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open-listing-limits'
+import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open/quick-open-listing-limits'
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import {
-  getRuntimeFileListTarget,
-  getNestedWorktreeExcludeRequest,
-  getNestedWorktreeExcludePaths,
-  isNestedWorktreePath,
-  useRuntimeFileListForWorktree,
-  type RuntimeFileListState
-} from './quick-open-file-list'
-import * as fileListTarget from './quick-open-file-list-target'
-import * as nestedWorktrees from './quick-open-nested-worktrees'
-import { QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS } from './quick-open-search'
+import { useRuntimeFileListForWorktree, type RuntimeFileListState } from './quick-open-file-list'
+import { QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS } from '../../../shared/quick-open/quick-open-path-search'
 
 const listRuntimeFilesMock = vi.hoisted(() => vi.fn())
 const cancelRuntimeFileListMock = vi.hoisted(() => vi.fn())
@@ -230,14 +221,40 @@ afterEach(async () => {
   useAppStore.setState(initialAppState, true)
 })
 
-it('keeps the pure file list functions available through the hook module', () => {
-  expect(getRuntimeFileListTarget).toBe(fileListTarget.getRuntimeFileListTarget)
-  expect(getNestedWorktreeExcludeRequest).toBe(fileListTarget.getNestedWorktreeExcludeRequest)
-  expect(getNestedWorktreeExcludePaths).toBe(nestedWorktrees.getNestedWorktreeExcludePaths)
-  expect(isNestedWorktreePath).toBe(nestedWorktrees.isNestedWorktreePath)
-})
-
 describe('useRuntimeFileListForWorktree', () => {
+  it('settles a Windows folder listing failure and recovers after reopening', async () => {
+    const workspaceKey = folderWorkspaceKey('folder-workspace-1')
+    useAppStore.setState({
+      folderWorkspaces: [makeFolderWorkspace({ folderPath: 'C:\\fixture', connectionId: null })],
+      projectGroups: [makeProjectGroup({ parentPath: 'C:\\fixture', connectionId: null })],
+      repos: [],
+      worktreesByRepo: {}
+    } as Partial<AppState>)
+    listRuntimeFilesMock.mockRejectedValueOnce(new Error('fixture launcher failed'))
+    const states: RuntimeFileListState[] = []
+    const args = {
+      enabled: true,
+      onState: (state: RuntimeFileListState) => states.push(state),
+      worktreeId: workspaceKey
+    }
+    const root = await renderProbe(args)
+    await waitForListRuntimeFilesCall()
+    await flushEffects()
+    expect(states.at(-1)?.loading).toBe(false)
+    expect(states.at(-1)?.loadError).toBe('fixture launcher failed')
+    await act(async () => {
+      root.render(createElement(HookProbe, { ...args, enabled: false }))
+    })
+    listRuntimeFilesMock.mockResolvedValueOnce(['example.txt'])
+    await act(async () => {
+      root.render(createElement(HookProbe, args))
+    })
+    await flushEffects()
+    expect(states.at(-1)?.loading).toBe(false)
+    expect(states.at(-1)?.loadError).toBeNull()
+    expect(states.at(-1)?.files).toEqual(['example.txt'])
+  })
+
   it('lists a repo-less SSH folder workspace after folder metadata hydrates', async () => {
     const states: RuntimeFileListState[] = []
     const workspaceKey = folderWorkspaceKey('folder-workspace-1')

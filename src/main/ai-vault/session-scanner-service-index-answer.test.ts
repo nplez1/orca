@@ -2,19 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AiVaultServiceChildMessage,
   AiVaultServiceParentMessage
-} from './session-scanner-service-protocol'
-import { AI_VAULT_SERVICE_PROTOCOL_VERSION } from './session-scanner-service-protocol'
+} from './scan-service/session-scanner-service-protocol'
+import { AI_VAULT_SERVICE_PROTOCOL_VERSION } from './scan-service/session-scanner-service-protocol'
 
 const scanAiVaultSessions = vi.hoisted(() => vi.fn())
 const listSessions = vi.hoisted(() => vi.fn())
 
 vi.mock('./session-scanner', () => ({ scanAiVaultSessions }))
-vi.mock('./session-scanner-parse-cache', () => ({ invalidateSessionParseCacheEntry: vi.fn() }))
-vi.mock('./session-parse-cache-persistence', () => ({
+vi.mock('./parse-cache/session-scanner-parse-cache.ts', () => ({ invalidateSessionParseCacheEntry: vi.fn() }))
+vi.mock('./parse-cache/session-parse-cache-persistence.ts', () => ({
   flushSessionParseCachePersist: vi.fn(async () => undefined),
   initSessionParseCachePersistence: vi.fn()
 }))
-vi.mock('./session-scanner-service-search', () => ({
+vi.mock('./scan-service/session-scanner-service-search.ts', () => ({
   SessionScannerServiceSearch: class {
     handles(): boolean {
       return false
@@ -119,7 +119,7 @@ beforeEach(async () => {
       Reflect.deleteProperty(process, 'disconnect')
     }
   }
-  await import('./session-scanner-service-entry')
+  await import('./scan-service/session-scanner-service-entry')
   emit({
     type: 'init',
     protocol: AI_VAULT_SERVICE_PROTOCOL_VERSION,

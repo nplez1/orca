@@ -66,6 +66,7 @@ export function useComposerTargetState(
     initialLinkedWorkItem: composerTargetStore.initialLinkedWorkItem,
     initialName: composerTargetStore.initialName,
     initialPrompt: composerTargetStore.initialPrompt,
+    initialNote: composerTargetStore.initialNote,
     initialTaskSourceContext: composerTargetStore.initialTaskSourceContext,
     isProjectGroupTarget: runtimeTargetSelection.isProjectGroupTarget,
     newWorkspaceDraft: composerTargetStore.newWorkspaceDraft,
@@ -85,6 +86,7 @@ export function useComposerTargetState(
   const workspaceIdentityState = useWorkspaceIdentityState({
     initialBaseBranch: composerTargetStore.initialBaseBranch,
     initialBranchNameOverride: composerTargetStore.initialBranchNameOverride,
+    initialParentWorktreeId: composerTargetStore.initialParentWorktreeId,
     initialLinearBranchName: sourceContextState.initialLinearBranchName,
     initialLinkedWorkItem: composerTargetStore.initialLinkedWorkItem,
     linkedWorkItem: sourceContextState.linkedWorkItem,

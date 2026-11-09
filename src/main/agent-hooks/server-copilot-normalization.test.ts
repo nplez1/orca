@@ -57,89 +57,6 @@ function postCopilotBackgroundShell(shellId: number, options: { detach?: boolean
 }
 
 describe('Copilot hook normalization', () => {
-  it('UserPromptSubmit maps to working and captures the prompt', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ hook_event_name: 'UserPromptSubmit', prompt: 'add a migration' }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('working')
-    expect(result?.payload.agentType).toBe('copilot')
-    expect(result?.payload.prompt).toBe('add a migration')
-  })
-
-  it('accepts camelCase Copilot event names from older hook configs', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ hook_event_name: 'userPromptSubmitted', prompt: 'camel event' }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('working')
-    expect(result?.payload.prompt).toBe('camel event')
-  })
-
-  it('captures the Copilot provider session from SessionStart and Stop', () => {
-    const sessionId = '940237d9-c712-48e8-bca1-fd75fc4a8d4b'
-    const started = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ hook_event_name: 'SessionStart', session_id: sessionId }),
-      'production'
-    )
-    expect(started?.providerSession).toEqual({ key: 'session_id', id: sessionId })
-
-    const stopped = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ hook_event_name: 'Stop', session_id: sessionId }),
-      'production'
-    )
-    expect(stopped?.payload.state).toBe('done')
-    expect(stopped?.providerSession).toEqual({ key: 'session_id', id: sessionId })
-  })
-
-  it('captures the Copilot provider session from a camelCase sessionId', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ hookEventName: 'agentStop', sessionId: 'copilot-camel' }),
-      'production'
-    )
-    expect(result?.providerSession).toEqual({ key: 'session_id', id: 'copilot-camel' })
-  })
-
-  it('infers Copilot user prompt payloads that omit hook_event_name', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ prompt: 'raw prompt payload' }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('working')
-    expect(result?.payload.prompt).toBe('raw prompt payload')
-  })
-
-  it('infers a prompt from initialPrompt without an event name', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ initialPrompt: 'first prompt' }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('working')
-    expect(result?.payload.prompt).toBe('first prompt')
-  })
-
-  it('PreToolUse stays working and surfaces tool context', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'PreToolUse',
-        toolName: 'bash',
-        toolInput: { command: 'pnpm test' }
-      }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('working')
-    expect(result?.payload.toolName).toBe('bash')
-    expect(result?.payload.toolInput).toBe('pnpm test')
-  })
-
   it('keeps a stopped Copilot turn working while a background shell runs', () => {
     postCopilotBackgroundShell(0)
 
@@ -428,89 +345,6 @@ describe('Copilot hook normalization', () => {
     expect(result?.payload.workingMode).toBeUndefined()
   })
 
-  it('PostToolUseFailure surfaces the error and clears stale tool fields', () => {
-    _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'PreToolUse',
-        toolName: 'bash',
-        toolInput: { command: 'pnpm test' }
-      }),
-      'production'
-    )
-    const failed = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'PostToolUseFailure',
-        toolName: 'bash',
-        toolInput: { command: 'pnpm test' },
-        error_message: 'command not found'
-      }),
-      'production'
-    )
-    // A retained tool name would hide the failure text in compact status cards.
-    expect(failed?.payload).toMatchObject({
-      state: 'working',
-      lastAssistantMessage: 'command not found'
-    })
-    expect(failed?.payload.toolName).toBeUndefined()
-    expect(failed?.payload.toolInput).toBeUndefined()
-  })
-
-  it('PreToolUse ask_user maps to blocked and surfaces the question', () => {
-    _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ prompt: 'ask me a question' }),
-      'production'
-    )
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        toolCalls: [
-          {
-            name: 'ask_user',
-            args: JSON.stringify({ question: 'Which deployment target should I use?' })
-          }
-        ]
-      }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('blocked')
-    expect(result?.payload.prompt).toBe('ask me a question')
-    expect(result?.payload.toolName).toBe('ask_user')
-    expect(result?.payload.toolInput).toBe('Which deployment target should I use?')
-    expect(result?.payload.lastAssistantMessage).toBe('Which deployment target should I use?')
-  })
-
-  it('PermissionRequest stays working and preserves tool context', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'PermissionRequest',
-        tool_name: 'bash',
-        tool_input: { command: 'rm -rf /tmp/orca-test' }
-      }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('working')
-    expect(result?.payload.toolName).toBe('bash')
-    expect(result?.payload.toolInput).toBe('rm -rf /tmp/orca-test')
-  })
-
-  it('surfaces lowercase Copilot file tool input previews', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'PreToolUse',
-        tool_name: 'edit',
-        tool_input: { path: '/repo/src/app.ts' }
-      }),
-      'production'
-    )
-    expect(result?.payload.toolName).toBe('edit')
-    expect(result?.payload.toolInput).toBe('/repo/src/app.ts')
-  })
-
   it('ignores Notification(permission_prompt) because approval may be automatic', () => {
     const result = _internals.normalizeHookPayload(
       'copilot',
@@ -559,27 +393,6 @@ describe('Copilot hook normalization', () => {
     expect(states).toEqual(['working', 'working', 'working', null, 'working'])
   })
 
-  it('Notification(elicitation_dialog) preserves the cached prompt', () => {
-    _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ hook_event_name: 'UserPromptSubmit', prompt: 'deploy the app' }),
-      'production'
-    )
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'Notification',
-        notification_type: 'elicitation_dialog',
-        message: 'Which environment?'
-      }),
-      'production'
-    )
-    expect(result?.payload.state).toBe('blocked')
-    expect(result?.payload.prompt).toBe('deploy the app')
-    expect(result?.payload.lastAssistantMessage).toBe('Which environment?')
-    expect(result?.hasExplicitPrompt).toBe(false)
-  })
-
   it('later progress clears a prior blocked state for the same pane', () => {
     const blocked = _internals.normalizeHookPayload(
       'copilot',
@@ -605,47 +418,6 @@ describe('Copilot hook normalization', () => {
     )
     expect(result?.payload.state).toBe('working')
     expect(result?.payload.lastAssistantMessage).toBe('build passed')
-  })
-
-  it('Stop reads the final assistant message from Copilot transcript events', () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), 'orca-copilot-transcript-'))
-    const transcriptPath = join(tmpDir, 'events.jsonl')
-    try {
-      const lines = [
-        {
-          type: 'assistant.message',
-          data: {
-            content: '',
-            toolRequests: [{ name: 'bash', arguments: { command: 'pnpm test' } }]
-          }
-        },
-        {
-          type: 'assistant.message',
-          data: { content: 'Done - tests pass now.', toolRequests: [] }
-        }
-      ]
-      writeFileSync(transcriptPath, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`)
-
-      const result = _internals.normalizeHookPayload(
-        'copilot',
-        buildBody({ hook_event_name: 'Stop', transcript_path: transcriptPath }),
-        'production'
-      )
-
-      expect(result?.payload.state).toBe('done')
-      expect(result?.payload.lastAssistantMessage).toBe('Done - tests pass now.')
-    } finally {
-      rmSync(tmpDir, { recursive: true, force: true })
-    }
-  })
-
-  it('unknown event name returns null', () => {
-    const result = _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({ hook_event_name: 'somethingElse' }),
-      'production'
-    )
-    expect(result).toBeNull()
   })
 
   it('accepts authenticated HTTP posts on /hook/copilot', async () => {

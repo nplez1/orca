@@ -1,15 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { isDotfileRelativePath } from './file-explorer-entries'
-import type { DirCache, TreeNode } from './file-explorer-types'
+import { isDotfileRelativePath } from './file-explorer/tree/file-explorer-entries'
+import type { DirCache, TreeNode } from './file-explorer/tree/file-explorer-types'
 import {
   createFileExplorerRowProjectionFromParts,
   type FileExplorerRowProjection
-} from './file-explorer-row-projection'
-import { isPathIgnored } from './status-display'
+} from './file-explorer/tree/file-explorer-row-projection'
+import { isPathIgnored } from '../../lib/git-path-decoration'
 import {
   createNameFilteredFileExplorerProjection,
   type FileExplorerNameFilterProjectionSource
-} from './file-explorer-name-filter-projection'
+} from './file-explorer/tree/file-explorer-name-filter-projection'
 
 export type VisibleFileExplorerRowProjectionOptions = {
   ignoredSet: Set<string>

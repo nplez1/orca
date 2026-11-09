@@ -1,5 +1,5 @@
-import { resetAiVaultSessionResultCacheForTest } from './ai-vault-session-result-cache'
-import { resetAgentSessionIdsRefreshKeys } from './ai-vault-agent-session-refresh-key'
+import { resetAiVaultSessionResultCacheForTest } from './ai-vault/scanning/ai-vault-session-result-cache'
+import { resetAgentSessionIdsRefreshKeys } from './ai-vault/scanning/ai-vault-agent-session-refresh-key'
 
 // In-app session creation bypasses the cache so the new session appears promptly.
 // Keep the budget at module scope so tab remounts cannot amplify full scans.

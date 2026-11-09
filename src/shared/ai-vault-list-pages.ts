@@ -4,10 +4,10 @@ import {
   type AiVaultListArgs,
   type AiVaultListResult,
   type AiVaultScanIssue
-} from './ai-vault-types'
+} from './ai-vault/contracts/ai-vault-types'
 import type { ExecutionHostId } from './execution-host'
-import { aiVaultScanIssueText } from './ai-vault-scan-issue-copy'
-import { describeAiVaultScanError } from './ai-vault-scan-error-message'
+import { aiVaultScanIssueText } from './ai-vault/scanning/ai-vault-scan-issue-copy'
+import { describeAiVaultScanError } from './ai-vault/scanning/ai-vault-scan-error-message'
 
 /**
  * A remote reply carries at most 4 MiB, so a listing with thousands of rows never fits one frame.

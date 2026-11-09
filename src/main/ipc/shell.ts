@@ -1,13 +1,15 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 18-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { translateMain } from '../i18n/main-i18n'
-import { ipcMain, shell, dialog } from 'electron'
-import { constants, copyFile, readFile, stat } from 'node:fs/promises'
-import { basename, extname, isAbsolute, normalize, posix, win32 } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { BrowserWindow, ipcMain, shell } from 'electron'
+import { showSingleFlightOpenDialog } from './single-flight-open-dialog'
+import { readFile, stat } from 'node:fs/promises'
+import { basename, extname, posix, win32 } from 'node:path'
 import type {
   ShellOpenExternalEditorRequest,
   ShellOpenExternalEditorResult,
+  ShellOpenFileResult,
   ShellOpenLocalPathResult
-} from '../../shared/shell-open-types'
+} from '../../shared/shell/opening/shell-open-types'
 import { MAX_REPO_ICON_UPLOAD_BYTES } from '../../shared/repo-icon'
 import {
   repoIconPickFailure,
@@ -18,8 +20,9 @@ import {
   EXTERNAL_EDITOR_CLI_COMMAND,
   launchExternalEditor,
   resolveExternalEditorLaunchSpec
-} from '../external-editor-launch'
-import { resolveRemoteSshEditorLaunchSpec } from '../remote-ssh-editor-launch'
+} from '../external-editors/external-editor-launch'
+import { resolveRemoteSshEditorLaunchSpec } from '../external-editors/remote-ssh-editor-launch'
+import { resolveOpenInEditorCommand } from '../external-editors/open-in-editor-command'
 import { toSshExecutionHostId } from '../../shared/execution-host'
 import {
   isEditorSshHostForOwner,
@@ -29,12 +32,14 @@ import {
 import {
   isLocallyOwned,
   resolveDefaultAppOpenTarget,
-  resolveOwnedPathTarget
+  resolveOwnedPathTarget,
+  localFileUriPath
 } from './shell-owned-path-target'
 import {
   registerContextualLinkRouterHandshake,
   relayContextualLink
 } from '../window/contextual-link-relay'
+import { inspectLinkedFile } from './linked-file-inspection'
 import { registerShellPathExistenceHandlers } from './shell-path-existence-handlers'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
@@ -59,11 +64,19 @@ async function openInFileManager(
   }
 }
 
+type ShellHandlerStore = Pick<Store, 'getSshTarget'> & {
+  getSettings: () => Pick<ReturnType<Store['getSettings']>, 'openInApplications'>
+}
+
 async function openInExternalEditor(
-  store: Pick<Store, 'getSshTarget'>,
+  store: ShellHandlerStore,
   request: ShellOpenExternalEditorRequest,
   listRuntimeEnvironments: ListRuntimeEnvironments
 ): Promise<ShellOpenExternalEditorResult> {
+  const command = resolveOpenInEditorCommand(request, store.getSettings().openInApplications)
+  if (command === null) {
+    return { ok: false, reason: 'launch-failed' }
+  }
   const connectionId = request.connectionId?.trim()
   if (connectionId) {
     const sshTarget = store.getSshTarget(connectionId)
@@ -81,7 +94,7 @@ async function openInExternalEditor(
     if (!posix.isAbsolute(request.path) && !win32.isAbsolute(request.path)) {
       return { ok: false, reason: 'not-absolute' }
     }
-    const remoteLaunch = resolveRemoteSshEditorLaunchSpec(request.command, request.path, sshTarget)
+    const remoteLaunch = resolveRemoteSshEditorLaunchSpec(command, request.path, sshTarget)
     if (!remoteLaunch.ok) {
       return remoteLaunch
     }
@@ -99,7 +112,7 @@ async function openInExternalEditor(
   }
   try {
     // VS Code and Cursor derive --remote wsl+<distro> from UNC paths.
-    await launchExternalEditor(resolveExternalEditorLaunchSpec(request.command, target.path))
+    await launchExternalEditor(resolveExternalEditorLaunchSpec(command, target.path))
     return { ok: true }
   } catch {
     return { ok: false, reason: 'launch-failed' }
@@ -116,26 +129,43 @@ function httpUrl(rawUrl: string): string | null {
   }
 }
 
-async function openWithSystemDefault(pathValue: string, ownerHostId: unknown): Promise<boolean> {
+/**
+ * Open a linked file with the OS default app unless that would run it. Launchable binaries and
+ * bundles are revealed; launchable text (scripts) is revealed too, or with `textInEditor` left to
+ * the caller to show in Orca. Main decides; the renderer only learns the outcome.
+ */
+async function openWithSystemDefault(
+  pathValue: string,
+  ownerHostId: unknown,
+  textInEditor: boolean
+): Promise<ShellOpenFileResult> {
   if (!isLocallyOwned(ownerHostId)) {
-    return false
+    return 'failed'
   }
   // Why not `validateLocalPathTarget`: this handler is reachable from a markdown link, so the file
   // type decides whether the OS may execute it.
   const target = await resolveDefaultAppOpenTarget(pathValue)
   if (!target.ok) {
-    return false
+    return 'failed'
   }
   try {
+    const action = await inspectLinkedFile(target.path)
+    if (action === 'view-as-text' && textInEditor) {
+      return 'open-in-editor'
+    }
+    if (action !== 'open') {
+      shell.showItemInFolder(target.path)
+      return 'revealed'
+    }
     const errorMessage = await shell.openPath(target.path)
-    return errorMessage.length === 0
+    return errorMessage.length === 0 ? 'opened' : 'failed'
   } catch {
-    return false
+    return 'failed'
   }
 }
 
 export function registerShellHandlers(
-  store: Pick<Store, 'getSshTarget'>,
+  store: ShellHandlerStore,
   listRuntimeEnvironments: ListRuntimeEnvironments = listAppRuntimeEnvironments
 ): void {
   ipcMain.handle(
@@ -186,50 +216,31 @@ export function registerShellHandlers(
   ipcMain.handle(
     'shell:openFilePath',
     async (_event, filePath: string, ownerHostId: unknown): Promise<boolean> =>
-      openWithSystemDefault(filePath, ownerHostId)
+      (await openWithSystemDefault(filePath, ownerHostId, false)) !== 'failed'
   )
 
-  ipcMain.handle('shell:openFileUri', async (_event, rawUri: string, ownerHostId: unknown) => {
-    if (!isLocallyOwned(ownerHostId)) {
-      return
+  ipcMain.handle(
+    'shell:openFileUri',
+    async (_event, rawUri: string, ownerHostId: unknown): Promise<ShellOpenFileResult> => {
+      const filePath = localFileUriPath(rawUri)
+      // Callers of this channel show `open-in-editor` results in an Orca editor tab.
+      return filePath === null ? 'failed' : openWithSystemDefault(filePath, ownerHostId, true)
     }
-    let parsed: URL
-    try {
-      parsed = new URL(rawUri)
-    } catch {
-      return
-    }
-
-    if (parsed.protocol !== 'file:') {
-      return
-    }
-
-    if (parsed.hostname && parsed.hostname !== 'localhost') {
-      return
-    }
-
-    let filePath: string
-    try {
-      filePath = fileURLToPath(parsed)
-    } catch {
-      return
-    }
-
-    // Owner and file type are both decided inside; this handler is the markdown-link route, so
-    // nothing it forwards may be executable.
-    await openWithSystemDefault(filePath, ownerHostId)
-  })
+  )
 
   registerShellPathExistenceHandlers()
 
   ipcMain.handle(
     'shell:pickDirectory',
-    async (_event, args: { defaultPath?: string }): Promise<string | null> => {
-      const result = await dialog.showOpenDialog({
-        defaultPath: args.defaultPath,
-        // macOS creation-enabled pickers can create typed prefixes; this picker grants existing folders only.
-        properties: ['openDirectory']
-      })
+    async (event, args: { defaultPath?: string }): Promise<string | null> => {
+      const result = await showSingleFlightOpenDialog(
+        {
+          defaultPath: args.defaultPath,
+          // macOS creation-enabled pickers can create typed prefixes; this picker grants existing folders only.
+          properties: ['openDirectory']
+        },
+        BrowserWindow.fromWebContents(event.sender)
+      )
       if (result.canceled || result.filePaths.length === 0) {
         return null
       }
@@ -238,10 +249,13 @@ export function registerShellHandlers(
   )
 
   // Native dialogs avoid Electron prompt/file-input reliability issues.
-  ipcMain.handle('shell:pickAttachment', async (): Promise<string | null> => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile']
-    })
+  ipcMain.handle('shell:pickAttachment', async (event): Promise<string | null> => {
+    const result = await showSingleFlightOpenDialog(
+      {
+        properties: ['openFile']
+      },
+      BrowserWindow.fromWebContents(event.sender)
+    )
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
@@ -249,39 +263,48 @@ export function registerShellHandlers(
   })
 
   // Keep single-file callers, including interpreter selection, on pickAttachment.
-  ipcMain.handle('shell:pickAttachments', async (): Promise<string[]> => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile', 'multiSelections']
-    })
+  ipcMain.handle('shell:pickAttachments', async (event): Promise<string[]> => {
+    const result = await showSingleFlightOpenDialog(
+      {
+        properties: ['openFile', 'multiSelections']
+      },
+      BrowserWindow.fromWebContents(event.sender)
+    )
     return result.canceled ? [] : result.filePaths
   })
 
-  ipcMain.handle('shell:pickImage', async (): Promise<string | null> => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [
-        {
-          name: translateMain('native.dialog.images', 'Images'),
-          extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']
-        }
-      ]
-    })
+  ipcMain.handle('shell:pickImage', async (event): Promise<string | null> => {
+    const result = await showSingleFlightOpenDialog(
+      {
+        properties: ['openFile'],
+        filters: [
+          {
+            name: translateMain('native.dialog.images', 'Images'),
+            extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']
+          }
+        ]
+      },
+      BrowserWindow.fromWebContents(event.sender)
+    )
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
     return result.filePaths[0]
   })
 
-  ipcMain.handle('shell:pickRepoIconImage', async (): Promise<RepoIconPickResult> => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [
-        {
-          name: translateMain('native.dialog.repoIconImages', 'Repo icon images'),
-          extensions: ['png']
-        }
-      ]
-    })
+  ipcMain.handle('shell:pickRepoIconImage', async (event): Promise<RepoIconPickResult> => {
+    const result = await showSingleFlightOpenDialog(
+      {
+        properties: ['openFile'],
+        filters: [
+          {
+            name: translateMain('native.dialog.repoIconImages', 'Repo icon images'),
+            extensions: ['png']
+          }
+        ]
+      },
+      BrowserWindow.fromWebContents(event.sender)
+    )
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
@@ -305,33 +328,22 @@ export function registerShellHandlers(
     }
   })
 
-  ipcMain.handle('shell:pickAudio', async (): Promise<string | null> => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [
-        {
-          name: translateMain('native.dialog.audio', 'Audio'),
-          extensions: ['ogg', 'mp3', 'wav', 'm4a', 'aac', 'flac']
-        }
-      ]
-    })
+  ipcMain.handle('shell:pickAudio', async (event): Promise<string | null> => {
+    const result = await showSingleFlightOpenDialog(
+      {
+        properties: ['openFile'],
+        filters: [
+          {
+            name: translateMain('native.dialog.audio', 'Audio'),
+            extensions: ['ogg', 'mp3', 'wav', 'm4a', 'aac', 'flac']
+          }
+        ]
+      },
+      BrowserWindow.fromWebContents(event.sender)
+    )
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
     return result.filePaths[0]
   })
-
-  // Relative image links keep Markdown small and portable.
-  ipcMain.handle(
-    'shell:copyFile',
-    async (_event, args: { srcPath: string; destPath: string }): Promise<void> => {
-      const src = normalize(args.srcPath)
-      const dest = normalize(args.destPath)
-      if (!isAbsolute(src) || !isAbsolute(dest)) {
-        throw new Error('Both source and destination must be absolute paths')
-      }
-      // Reject name collisions even if renderer deconfliction missed one; never overwrite existing data.
-      await copyFile(src, dest, constants.COPYFILE_EXCL)
-    }
-  )
 }

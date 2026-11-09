@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { APP_DISPLAY_NAME } from '../../../../shared/app-display-name'
 import type { AppMemory, UsageValues } from '../../../../shared/process-stats-types'
 import type { Metric } from './resource-usage-merge-types'
@@ -156,6 +156,7 @@ export function AppSection({
   isCollapsed: boolean
   onToggle: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <div className="border-t border-border/50">
       <div className="flex items-center">
@@ -165,11 +166,8 @@ export function AppSection({
           className="pl-2 py-2 pr-0.5 transition-colors hover:bg-muted/50"
           aria-label={
             isCollapsed
-              ? translate(
-                  'auto.components.status.bar.ResourceUsageStatusSegment.e419d27083',
-                  'Expand Orca'
-                )
-              : translate(
+              ? t('auto.components.status.bar.ResourceUsageStatusSegment.e419d27083', 'Expand Orca')
+              : t(
                   'auto.components.status.bar.ResourceUsageStatusSegment.53dd5560ae',
                   'Collapse Orca'
                 )
@@ -196,14 +194,11 @@ export function AppSection({
       {!isCollapsed && (
         <div className="border-t border-border/30">
           <AppSubRow
-            label={translate(
-              'auto.components.status.bar.ResourceUsageStatusSegment.81cd37af99',
-              'Main'
-            )}
+            label={t('auto.components.status.bar.ResourceUsageStatusSegment.81cd37af99', 'Main')}
             values={app.main}
           />
           <AppSubRow
-            label={translate(
+            label={t(
               'auto.components.status.bar.ResourceUsageStatusSegment.d406915b78',
               'Renderer'
             )}
@@ -211,10 +206,7 @@ export function AppSection({
           />
           {(app.other.cpu > 0 || app.other.memory > 0) && (
             <AppSubRow
-              label={translate(
-                'auto.components.status.bar.ResourceUsageStatusSegment.0f9e50eb07',
-                'Other'
-              )}
+              label={t('auto.components.status.bar.ResourceUsageStatusSegment.0f9e50eb07', 'Other')}
               values={app.other}
             />
           )}

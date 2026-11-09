@@ -1,29 +1,32 @@
 import { OrcaRuntimeWithOnPtyData } from '../output/pty-output-ingestion'
-import {
-  WAIT_BLOCKED_CHECK_MIN_INTERVAL_MS,
-  WAIT_BLOCKED_KEYWORD_CARRY_CHARS,
-  WAIT_BLOCKED_KEYWORD_PATTERN
-} from '../../orca-runtime-postlude'
+
 import {
   appendWaitBlockedCarry,
   createWaitBlockedCheckState,
   readWaitBlockedCarry,
   resetWaitBlockedCarry,
   type WaitBlockedCheckState
-} from '../../wait-blocked-check-state'
+} from './wait-blocked-check-state'
 import {
   computeTerminalTailWaitState,
   tailGainedNewerBlockedReason
-} from '../../terminal-wait-tail-state'
+} from './terminal-wait-tail-state'
 import { ownRetainedString } from '../../../../shared/own-retained-string'
 import { isScreenInteractivePromptReason } from '../../../../shared/agent-screen-prompt'
-import type { ProcessedAgentStatusChunk } from '../../../../shared/agent-status-osc'
-import { createTerminalAgentStatusProcessor } from '../../../../shared/terminal-agent-status-processor'
-import type { RuntimePtyTitleTrackerEntry } from '../../runtime-terminal-state-records'
+import type { ProcessedAgentStatusChunk } from '../../../../shared/agent-status/transport/agent-status-osc'
+import { createTerminalAgentStatusProcessor } from '../../../../shared/program-status/terminal-agent-status-processor'
+import type { RuntimePtyTitleTrackerEntry } from '../records/runtime-terminal-state-records'
 
 import type { OrcaRuntimeWithRecordAgentPromptLifecycleState } from '../output/terminal-output-generation'
 import type { OrcaRuntimeWithEmitDaemonPtyTransientFact } from '../output/terminal-transient-facts'
 import type { OrcaRuntimeWithGetUnpersistedTrackedTitleForPty } from '../output/terminal-title-tracker'
+const WAIT_BLOCKED_CHECK_MIN_INTERVAL_MS = 50
+
+// New-chunk/short-carry prompt matches bypass throttling so blocked status publishes immediately.
+const WAIT_BLOCKED_KEYWORD_PATTERN =
+  /press enter|press t to trust|do you trust|trust this|trusted workspace|permission required|requires permission|allow once|allow always|update available|choose working directory|codex just got an upgrade|hooks need review/
+
+const WAIT_BLOCKED_KEYWORD_CARRY_CHARS = 31
 
 const COPILOT_DIALOG_CANDIDATE =
   /do you want to run this command|do you want to allow this access|tell copilot what to do|copilot needs information|ctrl\+d decline/

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { HostedReviewInfo } from '../../../../shared/hosted-review'
+import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import { gitHubPRInfoFromHostedReview } from './hosted-review-to-pr-info'
 
 function makeReview(overrides: Partial<HostedReviewInfo> = {}): HostedReviewInfo {

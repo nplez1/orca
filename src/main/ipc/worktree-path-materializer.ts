@@ -18,7 +18,7 @@ import {
 } from './worktree-path-publisher'
 import { targetExists } from './worktree-materialization-staging'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
-import { getSafeRelativePath } from '../git/worktree-symlink-detection'
+import { getSafeRelativePath } from '../git/worktrees/content-paths/worktree-symlink-detection'
 
 const APFS_PATH_MATERIALIZATION_CONCURRENCY = 4
 

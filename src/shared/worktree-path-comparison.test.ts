@@ -4,7 +4,7 @@ import {
   areWorktreePathsEqual,
   dedupeWorktreesByPath
 } from './worktree-path-comparison'
-import * as upstreamComparison from '../main/git/worktree-path-comparison'
+import * as upstreamComparison from '../main/git/worktrees/catalog/worktree-path-comparison'
 
 // Every path flavour the two consumers of this module compare: project-folder placement compares
 // container names and roots, relocation compares a repo path with its container.

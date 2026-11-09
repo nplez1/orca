@@ -29,7 +29,8 @@ export function getUsageProviderAccountsSectionId(
       return 'accounts-copilot'
     case 'antigravity':
     case 'kimi':
-      // fork-comment-ok: both have account sections now, but nothing in them signs in from this row.
+    case 'muse':
+      // These CLIs keep their own credentials; Orca has no account settings for them.
       return null
     case 'zcode':
       return 'accounts-zcode'

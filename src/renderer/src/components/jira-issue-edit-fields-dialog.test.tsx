@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraCreateField, JiraEditableField, JiraIssue } from '../../../shared/jira/jira-types'
 import { JiraIssueEditFieldsDialog } from './jira-issue-edit-fields-dialog'
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraSearchUsers: vi.fn().mockResolvedValue([])
 }))
 

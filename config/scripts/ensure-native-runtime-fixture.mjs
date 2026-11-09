@@ -4,19 +4,22 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { copyScriptWithLocalModules } from './script-module-dependencies.mjs'
+import { copyScriptWithLocalModules } from './test-fixtures/script-copy-closure/script-module-dependencies.mjs'
 
-const sourceScriptPath = fileURLToPath(new URL('./ensure-native-runtime.mjs', import.meta.url))
+const sourceScriptPath = fileURLToPath(
+  new URL('./native-build/node-addons/ensure-native-runtime.mjs', import.meta.url)
+)
+const SCRIPT_DIR_SEGMENTS = ['config', 'scripts', 'native-build', 'node-addons']
 // Fixture import walk misses createRequire CJS edges; name siblings explicitly or temp project cannot load.
 const REQUIRED_CJS_SIBLINGS = [
   'node-pty-job-ownership.cjs',
-  'windows-process-tree-creation-time.cjs'
+  '../windows/windows-process-tree-creation-time.cjs'
 ]
 
 export function mkTempProject() {
   const projectDir = mkdtempSync(join(tmpdir(), 'orca-native-runtime-'))
   // Copy walked windows-process-tree-gyp-rebuild dependency or every case fails before its intended check.
-  copyScriptWithLocalModules(sourceScriptPath, join(projectDir, 'config', 'scripts'))
+  copyScriptWithLocalModules(sourceScriptPath, join(projectDir, ...SCRIPT_DIR_SEGMENTS))
   const processPackage = join(projectDir, 'node_modules', '@orca', 'process-host')
   mkdirSync(processPackage, { recursive: true })
   writeFileSync(
@@ -35,8 +38,8 @@ export function runProcessSync(options) {
   )
   for (const name of REQUIRED_CJS_SIBLINGS) {
     copyFileSync(
-      fileURLToPath(new URL(`./${name}`, import.meta.url)),
-      join(projectDir, 'config', 'scripts', name)
+      fileURLToPath(new URL(`./native-build/node-addons/${name}`, import.meta.url)),
+      join(projectDir, ...SCRIPT_DIR_SEGMENTS, name)
     )
   }
   return projectDir

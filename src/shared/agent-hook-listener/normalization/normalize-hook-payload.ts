@@ -1,0 +1,373 @@
+/* eslint-disable max-lines -- Why: upstream's listener plus the fork's pre-admit and post-gate
+   guards. Moving them out is not possible without copying upstream's compact steps (plan §5.6). */
+import { readHookAgentProcess } from '../../agent-status/process/agent-process-presence'
+import { isInheritedHookStatus } from '../presence/agent-hook-presence-transition'
+import { readHookProcessAdmission } from '../presence/agent-hook-owner-presence'
+import { normalizeAgentStatusPayload } from '../../agent-status/contracts/agent-status-types'
+import type { AgentMainAgentStatus } from '../../agent-status/lifecycle/main-agent-status'
+import type { AgentHookSource } from '../transport/agent-hook-relay'
+import {
+  canAcceptClaudeCompactCompletion,
+  isClaudeCompactCompletionConsumed,
+  markClaudeCompactCompletionConsumed
+} from '../providers/claude-compact-completion'
+import { isProcessExitSessionEnd, parseHookEnvelope } from '../hook-envelope'
+import { readFirstString } from '../interactive-tool'
+import type { AgentHookEventPayload } from '../listener-event'
+import { normalizeClaudePromptId, normalizeGrokPromptId } from '../listener-limits'
+import type { HookListenerState } from '../listener-state'
+import { extractPromptText } from '../prompt-fields'
+import { gatePaneStateOnDescendants } from '../descendant-pane-state'
+import { admitNestedAgentPost } from '../pi-claude-child-events'
+import { normalizeProviderEvent } from '../provider-dispatch'
+import { hasExplicitUserPrompt } from '../provider-event-routing'
+import { hasExplicitAmpPrompt } from '../providers/amp-events'
+import {
+  isOpenCodeSharedServerPost,
+  resolveOpenCodeSharedServerEnvelope,
+  suppressOpenCodeSharedServerPost,
+  trackOpenCodePaneLaunchToken
+} from '../opencode-session-registry'
+import { claudeRowHasUnlistedLiveWork } from '../providers/claude-pane-hold-evidence'
+import {
+  applyPiScheduledWorkHold,
+  recordPiScheduledWork
+} from '../providers/pi-pane-hold-evidence'
+import { readString } from '../tool-input-preview'
+import { readClaudeBatchSettledRequests } from '../claude-settled-permission-requests'
+import { withClaudeToolRequestId } from '../claude-tool-request-identity'
+import { hasSeparateHookSessionAdmission, readPaneSessionContext } from '../pane-provider-session'
+/** Canonical transport-agnostic normalization entry shared by main and relay listeners. */
+
+export function normalizeHookPayload(
+  state: HookListenerState,
+  source: AgentHookSource,
+  body: unknown,
+  expectedEnv: string,
+  options: {
+    deferCompactOwnershipToClient?: boolean
+    previousOpenCodeMainAgent?: AgentMainAgentStatus
+    bindingStatusByPaneKey?: ReadonlyMap<string, AgentHookEventPayload>
+    admitOpenCodeTui?: (
+      identity: Pick<
+        AgentHookEventPayload,
+        'paneKey' | 'launchToken' | 'hookEventName' | 'hasExplicitPrompt'
+      >
+    ) => boolean | 'preserve-poster'
+  } = {}
+): AgentHookEventPayload | null {
+  const envelope = parseHookEnvelope(state, source, body, expectedEnv)
+  if (!envelope) {
+    return null
+  }
+  const {
+    record,
+    eventName,
+    paneKey: stampedPaneKey,
+    hookPayloadRecord,
+    tabId: stampedTabId,
+    worktreeId: stampedWorktreeId,
+    launchToken: stampedLaunchToken
+  } = envelope
+  if (source === 'claude') {
+    state.claudeUnconfirmedRestoredStatusPaneKeys.delete(stampedPaneKey)
+  }
+  const sessions = readPaneSessionContext(state, source, envelope, eventName)
+  const { providerSession, statusAdmissionSession } = sessions
+  if (source === 'opencode' && record.opencodeTui === 1 && !providerSession) {
+    return null
+  }
+  if (suppressOpenCodeSharedServerPost(state, source, record, providerSession?.id)) {
+    return null
+  }
+  const extractedPrompt = extractPromptText(hookPayloadRecord)
+  // A TUI's physical launch must pass the host fence before borrowing its creator's identity.
+  const tuiAdmission =
+    source === 'opencode' && record.opencodeTui === 1 && isOpenCodeSharedServerPost(source, record)
+      ? options.admitOpenCodeTui?.({
+          paneKey: stampedPaneKey,
+          launchToken: stampedLaunchToken,
+          hookEventName: typeof eventName === 'string' ? eventName : undefined,
+          hasExplicitPrompt: hasExplicitUserPrompt(
+            source,
+            eventName,
+            extractedPrompt,
+            extractedPrompt.text
+          )
+        })
+      : undefined
+  if (tuiAdmission === false) {
+    return null
+  }
+  // Rewrite frozen OpenCode1 server stamps before status/routing/fences use the wrong pane (#21359).
+  const stamped = {
+    paneKey: stampedPaneKey,
+    tabId: stampedTabId,
+    worktreeId: stampedWorktreeId,
+    launchToken: stampedLaunchToken
+  }
+  const { paneKey, tabId, worktreeId, launchToken } =
+    tuiAdmission === 'preserve-poster'
+      ? stamped
+      : resolveOpenCodeSharedServerEnvelope({
+          state,
+          source,
+          stamped,
+          sessionId: providerSession?.id,
+          body: record
+        })
+  // Track only resolved tokens or stale shared-server stamps can poison the live pane cache.
+  if (tuiAdmission !== 'preserve-poster') {
+    trackOpenCodePaneLaunchToken(state, paneKey, launchToken)
+  }
+  const providerPromptId =
+    source === 'claude'
+      ? normalizeClaudePromptId(hookPayloadRecord.prompt_id)
+      : source === 'grok'
+        ? normalizeGrokPromptId(hookPayloadRecord.promptId ?? hookPayloadRecord.prompt_id)
+        : undefined
+  const compactTrigger =
+    source === 'claude' &&
+    (eventName === 'PreCompact' || eventName === 'PostCompact') &&
+    (hookPayloadRecord.trigger === 'manual' || hookPayloadRecord.trigger === 'auto')
+      ? hookPayloadRecord.trigger
+      : undefined
+  // Reject malformed Claude compacts without suppressing other providers' normalizers.
+  if (
+    source === 'claude' &&
+    (eventName === 'PreCompact' || eventName === 'PostCompact') &&
+    compactTrigger === undefined
+  ) {
+    return null
+  }
+  const previousStatus = state.lastStatusByPaneKey.get(paneKey)
+  // Why first: a pane can host two nested agents — a pi session nested inside its own, and the
+  // claude CLI child that run started — and neither may reach a provider fold as the pane's agent.
+  const nested = admitNestedAgentPost({
+    state,
+    source,
+    paneKey,
+    eventName,
+    hookPayload: hookPayloadRecord,
+    providerSession,
+    previousStatus,
+    paneSource: previousStatus?.source ?? source,
+    coords: { tabId, worktreeId, launchToken }
+  })
+  // Why a refusal is safe here: it is gated on a live child run of THIS pane, so it can only last
+  // as long as that run — a lost `session_start` costs the new session its posts until the child it
+  // is unrelated to finishes, not forever.
+  if (nested.kind !== 'pass') {
+    return nested.kind === 'refuse' ? null : nested.event
+  }
+  const agentProcess = readHookAgentProcess(source, record.agentProcess)
+  const admissionStatus =
+    hasSeparateHookSessionAdmission(source) && options.bindingStatusByPaneKey
+      ? options.bindingStatusByPaneKey.get(paneKey)
+      : previousStatus
+  // A relay's provider view lags its committed rows; process evidence reads the committed one.
+  const processAdmission = readHookProcessAdmission(
+    state,
+    options.bindingStatusByPaneKey ?? state.lastStatusByPaneKey,
+    { paneKey, worktreeId, process: agentProcess }
+  )
+  if (
+    processAdmission.refused ||
+    isInheritedHookStatus(
+      {
+        paneKey,
+        worktreeId,
+        connectionId: null,
+        providerSession: providerSession ?? undefined,
+        statusAdmissionSession,
+        agentPresence: agentProcess ? { agent: source, process: agentProcess } : undefined,
+        payload: { agentType: source, state: 'working', prompt: '' }
+      },
+      admissionStatus,
+      processAdmission.verdict
+    )
+  ) {
+    return null
+  }
+  // Only manual PostCompact clears a turn; auto compaction must not consume its ownership slot.
+  const isCompactCompletion =
+    source === 'claude' && eventName === 'PostCompact' && compactTrigger === 'manual'
+  if (isCompactCompletion) {
+    // Relay restarts/evictions lose ownership evidence; defer the guard to client ingest, which owns pane retirement and hydrated rows.
+    if (options.deferCompactOwnershipToClient !== true) {
+      if (
+        isClaudeCompactCompletionConsumed(
+          state.claudeConsumedCompactPromptIdByPaneKey,
+          paneKey,
+          providerPromptId
+        ) ||
+        !canAcceptClaudeCompactCompletion(previousStatus, {
+          source,
+          connectionId: null,
+          providerPromptId,
+          providerSession: providerSession ?? undefined
+        })
+      ) {
+        return null
+      }
+      markClaudeCompactCompletionConsumed(
+        state.claudeConsumedCompactPromptIdByPaneKey,
+        paneKey,
+        providerPromptId
+      )
+    }
+    // Compacts have no prompt; retain the summarized turn's label.
+    if (previousStatus?.payload.prompt && !state.lastPromptByPaneKey.has(paneKey)) {
+      state.lastPromptByPaneKey.set(paneKey, previousStatus.payload.prompt)
+    }
+  }
+
+  const agentPresence = agentProcess
+    ? { agent: source, process: agentProcess, sessionOwner: true as const }
+    : undefined
+  if (agentPresence && isProcessExitSessionEnd(eventName, hookPayloadRecord)) {
+    const payload =
+      previousStatus?.payload ??
+      normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: source })
+    if (!payload) {
+      return null
+    }
+    return {
+      paneKey,
+      source,
+      launchToken,
+      tabId,
+      worktreeId,
+      connectionId: null,
+      providerSession: providerSession ?? undefined,
+      hookEventName: 'SessionEnd',
+      agentPresence: { ...agentPresence, ended: true as const },
+      payload
+    }
+  }
+
+  const promptText = extractedPrompt.text
+  // Name a Claude PermissionRequest's request once, so the listener and every receiver settle the same one.
+  const providerHookPayload =
+    source === 'claude'
+      ? withClaudeToolRequestId(state, paneKey, eventName, hookPayloadRecord)
+      : hookPayloadRecord
+  const dispatched = normalizeProviderEvent({
+    state,
+    source,
+    eventName,
+    promptText,
+    paneKey,
+    hookPayload: providerHookPayload,
+    envelope: record,
+    extractedPrompt,
+    previousOpenCodeMainAgent: options.previousOpenCodeMainAgent
+  })
+  const providerSessionOnly =
+    (source === 'pi' || source === 'prime-agent' || source === 'jcode') &&
+    eventName === 'session_start' &&
+    providerSession !== null
+  // A transcript session_start carries resume identity while idle; receivers discard the placeholder row.
+  // Why also a session-less pi: `pi --no-session` still owns the pane, and a pane with no row at all
+  // has nothing for a title wait to repaint, so an idle dialog it opens never reaches Needs You
+  // (#231).
+  const sessionPlaceholder =
+    (providerSessionOnly || (source === 'pi' && eventName === 'session_start')) &&
+    !dispatched.payload
+      ? normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: source })
+      : null
+  // Why: a session_start is this lane's descendant-scope reset, so it is also the one place the
+  // pane's own verdict can be re-established — otherwise the next child event reads the absence of
+  // a verdict as `working`. Gating the placeholder does that, and recomputes the hold from the live
+  // child set this same post carried, which is what a resume republishes for a session still held.
+  const heldPlaceholder =
+    sessionPlaceholder !== null
+      ? gatePaneStateOnDescendants(state, paneKey, sessionPlaceholder)
+      : null
+  // Why a session boundary, and only on a still-idle row: this reports a session start, not a turn
+  // that ended — without the flag a relaunch over a crashed `working` row reads as a finished turn,
+  // and an automation's "turn done since dispatchedAt" check can pass before the turn has started.
+  // A row the gate turned live IS a turn, and clients without the session-boundary capability drop
+  // a flagged tab's whole status, so the flag must not ride on it.
+  const gatedPlaceholder =
+    heldPlaceholder?.state === 'done'
+      ? { ...heldPlaceholder, sessionBoundary: true }
+      : heldPlaceholder
+  const transportPayload = dispatched.payload ?? gatedPlaceholder
+  // Why here, once, after the gate and the placeholder: the gate records the lead's own verdict before
+  // any fold consumes it, and every republish path — a finished turn, a descendant draining, a resumed
+  // session's placeholder — passes through this line with the inventory this post carries.
+  if (source === 'pi') {
+    recordPiScheduledWork(state, paneKey, hookPayloadRecord)
+  }
+  const piHeldPayload =
+    source === 'pi' ? applyPiScheduledWorkHold(state, paneKey, transportPayload) : transportPayload
+  // Why: an identity-only record is what discards a status row, so it is only right while there is
+  // no state to publish. A resume whose children are still live does have one, and publishing it is
+  // how the pane gets its hold back instead of waiting for the next child event to describe one.
+  const providerSessionOnlyRecord =
+    providerSessionOnly && (piHeldPayload?.subagents?.length ?? 0) === 0
+  const restoredUnconfirmed =
+    source === 'claude' && state.claudeUnconfirmedRestoredStatusPaneKeys.delete(paneKey)
+  if (!piHeldPayload) {
+    return null
+  }
+  const grokActiveTurn = source === 'grok' ? state.grokActiveTurnByPaneKey.get(paneKey) : undefined
+  const claudeBatchSettledRequests =
+    source === 'claude' && eventName === 'PostToolBatch'
+      ? readClaudeBatchSettledRequests(hookPayloadRecord)
+      : undefined
+
+  return {
+    paneKey,
+    source,
+    agentPresence,
+    launchToken,
+    tabId,
+    worktreeId,
+    // Normalization is transport-agnostic; only ingestRemote knows the mux identity to stamp.
+    connectionId: null,
+    ...(restoredUnconfirmed ? { restoredUnconfirmed: true } : {}),
+    // Why: nothing on a descendant's event describes the pane's own turn — counting a child's
+    // prompt as a user submit would move turn-scoped state (telemetry, permission stickiness)
+    // on the parent.
+    hasExplicitPrompt: dispatched.descendantScoped
+      ? undefined
+      : source === 'amp'
+        ? hasExplicitAmpPrompt(eventName, promptText, hookPayloadRecord)
+          ? true
+          : undefined
+        : hasExplicitUserPrompt(
+            source,
+            dispatched.eventName,
+            extractedPrompt,
+            dispatched.resolvedPromptText,
+            dispatched.hasTranscriptPromptEvidence
+          ),
+    promptInteractionKey: dispatched.promptInteractionKey,
+    hookEventName: typeof dispatched.eventName === 'string' ? dispatched.eventName : undefined,
+    providerPromptId:
+      source === 'grok' ? (grokActiveTurn?.promptId ?? providerPromptId) : providerPromptId,
+    grokPromptBoundary: grokActiveTurn ? true : undefined,
+    compactTrigger,
+    toolUseId: readFirstString(providerHookPayload, ['tool_use_id', 'toolUseId']),
+    toolAgentId: readFirstString(hookPayloadRecord, ['agent_id', 'agentId']),
+    teammateName:
+      source === 'claude' && eventName === 'TeammateIdle'
+        ? readString(hookPayloadRecord, 'teammate_name')
+        : undefined,
+    toolAgentType: readString(hookPayloadRecord, 'agent_type'),
+    ...(source === 'claude'
+      ? {
+          claudeRunningNonAgentTask: claudeRowHasUnlistedLiveWork(state, paneKey)
+        }
+      : {}),
+    ...(claudeBatchSettledRequests ? { claudeSettledRequests: claudeBatchSettledRequests } : {}),
+    ...(providerSession ? { providerSession } : {}),
+    ...(statusAdmissionSession ? { statusAdmissionSession } : {}),
+    ...(providerSessionOnlyRecord ? { providerSessionOnly: true } : {}),
+    ...dispatched.hostTurnSignals,
+    ...(dispatched.replyCandidate ? { replyCandidate: dispatched.replyCandidate } : {}),
+    payload: piHeldPayload
+  }
+}

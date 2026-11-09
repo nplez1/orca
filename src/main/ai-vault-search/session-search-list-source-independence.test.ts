@@ -1,10 +1,10 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import { resetSessionParseCacheForTests } from '../ai-vault/session-scanner-parse-cache'
-import { resetTranscriptConsumersForTests } from '../ai-vault/session-transcript-consumers'
+import { resetSessionParseCacheForTests } from '../ai-vault/parse-cache/session-parse-cache-store'
+import { resetTranscriptConsumersForTests } from '../ai-vault/transcripts/session-transcript-consumers'
 import { scanAiVaultSessions } from '../ai-vault/session-scanner'
-import { SessionScannerServiceSearch } from '../ai-vault/session-scanner-service-search'
+import { SessionScannerServiceSearch } from '../ai-vault/scan-service/session-scanner-service-search'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { SessionSearchInstance } from './session-search-instance'
 import {

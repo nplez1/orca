@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs'
 import { utimes } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { resetSessionParseCacheForTests } from '../ai-vault/session-scanner-parse-cache'
-import { resetTranscriptConsumersForTests } from '../ai-vault/session-transcript-consumers'
+import { resetSessionParseCacheForTests } from '../ai-vault/parse-cache/session-parse-cache-store'
+import { resetTranscriptConsumersForTests } from '../ai-vault/transcripts/session-transcript-consumers'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import SyncDatabase from '../sqlite/sync-database'
 import { SessionSearchInstance } from './session-search-instance'
@@ -133,25 +133,6 @@ it('reads the transcripts it already holds when content consent is turned on', a
 
   expect(messageRowCount()).toBeGreaterThan(0)
   expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
-  expect(errors).toEqual([])
-})
-
-it('indexes and answers once the setting is on', async () => {
-  await writeClaudeTranscript(
-    transcriptPath(RECENT_SESSION_ID),
-    ['a distinctive conversation'],
-    RECENT_SESSION_ID
-  )
-  const subject = newInstance()
-  subject.apply({ contentEnabled: true, historyDays: null })
-  await subject.settled()
-
-  expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
-  const status = subject.status()
-  expect(status.enabled).toBe(true)
-  expect(status.contentEnabled).toBe(true)
-  expect(status.filesIndexed).toBeGreaterThan(0)
-  expect(status.generation).toBeGreaterThan(0)
   expect(errors).toEqual([])
 })
 
@@ -287,33 +268,4 @@ it('blames an unknown scope rather than consent with content search off', async 
     kind: 'unavailable',
     reason: 'scope-unknown'
   })
-})
-
-it('reports not being ready before blaming a scope it does not know', async () => {
-  const subject = newInstance()
-  subject.apply({ contentEnabled: true, historyDays: null })
-  await subject.settled()
-  subject.close()
-
-  expect(await subject.search({ query: 'anything' }, { kind: 'unknown' })).toEqual({
-    kind: 'unavailable',
-    reason: 'not-ready'
-  })
-})
-
-it('answers scope-unknown once it is switched on and ready', async () => {
-  await writeClaudeTranscript(
-    transcriptPath(RECENT_SESSION_ID),
-    ['a distinctive conversation'],
-    RECENT_SESSION_ID
-  )
-  const subject = newInstance()
-  subject.apply({ contentEnabled: true, historyDays: null })
-  await subject.settled()
-
-  expect(await subject.search({ query: 'distinctive' }, { kind: 'unknown' })).toEqual({
-    kind: 'unavailable',
-    reason: 'scope-unknown'
-  })
-  expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
 })

@@ -5,8 +5,8 @@ import {
   getFileExplorerNameFilterProjectionCacheKey,
   shouldBuildNameFilterProjectionInChunks,
   type FileExplorerNameFilterProjectionSource
-} from './file-explorer-name-filter-projection'
-import type { FileExplorerRowProjection } from './file-explorer-row-projection'
+} from './file-explorer/tree/file-explorer-name-filter-projection'
+import type { FileExplorerRowProjection } from './file-explorer/tree/file-explorer-row-projection'
 import {
   markRendererPathSearchProjectionReady,
   recordRendererPathSearchDuration,

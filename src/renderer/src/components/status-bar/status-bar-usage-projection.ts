@@ -1,7 +1,7 @@
 import type { ProviderRateLimits, RateLimitState } from '../../../../shared/rate-limit-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
 import { isOwnerNotSetUpPlaceholder } from './owner-usage-rate-limits'
@@ -48,6 +48,7 @@ export function getStatusBarUsageProjection({
     deepinfra,
     copilot
   } = rateLimits
+  const muse = rateLimits.muse
 
   // Why: a bar is earned by a live snapshot or durable Settings setup; detection-gating hides per-CLI bars when the agent isn't on PATH.
   // Why: Antigravity has no persisted credential, so a checked status item + detected CLI is the durable "show its slot" signal.
@@ -79,6 +80,7 @@ export function getStatusBarUsageProjection({
   const visibleGrok = getVisibleUsageProvider('grok', grok, usageSettings)
   const visibleCursor = getVisibleUsageProvider('cursor', cursor, usageSettings)
   const visibleZcode = getVisibleUsageProvider('zcode', zcode, usageSettings)
+  const visibleMuse = getVisibleUsageProvider('muse', muse, usageSettings)
   const showClaude =
     visibleClaude !== null &&
     statusBarItems.includes('claude') &&
@@ -125,6 +127,10 @@ export function getStatusBarUsageProjection({
     // Why: a saved GLM Coding Plan key is a durable setup without the CLI on PATH, mirroring the
     // Antigravity exemption above.
     (rateLimits.zcodePlanApiKeyConfigured || isStatusBarItemAvailable('zcode', detectedAgentIds))
+  const showMuse =
+    visibleMuse !== null &&
+    statusBarItems.includes('muse') &&
+    isStatusBarItemAvailable('muse', detectedAgentIds)
   // Why: OpenCode Go is web/cookie-auth, not a CLI on PATH, so detection-gating doesn't apply.
   const visibleOpencodeGo = getVisibleUsageProvider('opencode-go', opencodeGo, usageSettings)
   const showOpencodeGo = visibleOpencodeGo !== null && statusBarItems.includes('opencode-go')
@@ -140,6 +146,7 @@ export function getStatusBarUsageProjection({
     showGrok ||
     showCursor ||
     showZcode ||
+    showMuse ||
     showDeepSeek ||
     showFireworks ||
     showDeepInfra ||
@@ -157,6 +164,7 @@ export function getStatusBarUsageProjection({
       grok,
       cursor,
       zcode,
+      muse,
       deepseek,
       fireworks,
       deepinfra,
@@ -177,6 +185,7 @@ export function getStatusBarUsageProjection({
     grok?.status === 'fetching' ||
     cursor?.status === 'fetching' ||
     zcode?.status === 'fetching' ||
+    muse?.status === 'fetching' ||
     deepseek?.status === 'fetching' ||
     fireworks?.status === 'fetching' ||
     deepinfra?.status === 'fetching' ||
@@ -195,6 +204,7 @@ export function getStatusBarUsageProjection({
     showGrok ? visibleGrok : null,
     showCursor ? visibleCursor : null,
     showZcode ? visibleZcode : null,
+    showMuse ? visibleMuse : null,
     showDeepSeek ? visibleDeepSeek : null,
     showFireworks ? visibleFireworks : null,
     showDeepInfra ? visibleDeepInfra : null,

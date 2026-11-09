@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { AiVaultSession } from '../../../../shared/ai-vault-types'
+import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
 import { aiVaultSubagentParentKey } from '../../../../shared/ai-vault-subagent-nesting'
-import type { AiVaultSessionListGroup } from './ai-vault-session-filters'
-import { buildVaultListRows, type AiVaultListRow } from './ai-vault-virtual-rows'
+import type { AiVaultSessionListGroup } from './ai-vault/session-list/ai-vault-session-filters'
+import {
+  buildVaultListRows,
+  type AiVaultListRow
+} from './ai-vault/session-list/ai-vault-virtual-rows'
 
 function session(sessionId: string, parentSessionId?: string): AiVaultSession {
   return {

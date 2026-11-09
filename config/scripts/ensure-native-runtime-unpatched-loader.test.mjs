@@ -20,7 +20,14 @@ describe('ensure-native-runtime unpatched node-pty loader', () => {
       const declaredStoreDir = mkTempProject()
 
       try {
-        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+        const scriptPath = join(
+          projectDir,
+          'config',
+          'scripts',
+          'native-build',
+          'node-addons',
+          'ensure-native-runtime.mjs'
+        )
         const logPath = join(projectDir, 'native-runtime.log')
         const markerPath = join(projectDir, 'rebuilt.marker')
         writeNodePtyPatchFile(projectDir)
@@ -60,7 +67,14 @@ describe('ensure-native-runtime unpatched node-pty loader', () => {
       const projectDir = mkTempProject()
 
       try {
-        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+        const scriptPath = join(
+          projectDir,
+          'config',
+          'scripts',
+          'native-build',
+          'node-addons',
+          'ensure-native-runtime.mjs'
+        )
         writeNodePtyPatchFile(projectDir)
         writeUnpatchedNodePtyLoader(projectDir, { declaredStore: join(projectDir, 'node_modules') })
 
@@ -89,7 +103,14 @@ describe('ensure-native-runtime unpatched node-pty loader', () => {
       const projectDir = mkTempProject()
 
       try {
-        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+        const scriptPath = join(
+          projectDir,
+          'config',
+          'scripts',
+          'native-build',
+          'node-addons',
+          'ensure-native-runtime.mjs'
+        )
         writeNodePtyPatchFile(projectDir)
         writeUnpatchedNodePtyLoader(projectDir)
         writeFileSync(join(projectDir, 'node_modules', '.modules.yaml'), '{ not json')
@@ -118,7 +139,14 @@ describe('ensure-native-runtime unpatched node-pty loader', () => {
       const projectDir = mkTempProject()
 
       try {
-        const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+        const scriptPath = join(
+          projectDir,
+          'config',
+          'scripts',
+          'native-build',
+          'node-addons',
+          'ensure-native-runtime.mjs'
+        )
         const logPath = join(projectDir, 'native-runtime.log')
         writeUnpatchedNodePtyLoader(projectDir)
         writeFakeNodeGyp(projectDir)

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraCreateField } from '../../../shared/jira/jira-types'
 import { JiraSchemaFieldControl } from './jira-schema-field'
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraSearchUsers: vi.fn().mockResolvedValue([])
 }))
 

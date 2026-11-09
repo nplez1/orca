@@ -2,22 +2,6 @@
   "schemaVersion": 3,
   "skills": [
     {
-      "name": "computer-use",
-      "sourcePath": "skills/computer-use",
-      "packageDigest": "20069587fc2dba8afb54748609e412dc5d38c470b87bd558c02e6cbf601af9b0",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "size": 3231,
-          "executable": false,
-          "classification": "text",
-          "exactSha256": "5fde7b0cabe06864ed83ed8f7a10df2745f217994d6158d6a4109a13f18cea55",
-          "textNormalizedSha256": "5fde7b0cabe06864ed83ed8f7a10df2745f217994d6158d6a4109a13f18cea55",
-          "identitySha256": "5fde7b0cabe06864ed83ed8f7a10df2745f217994d6158d6a4109a13f18cea55"
-        }
-      ]
-    },
-    {
       "name": "jira-tickets",
       "sourcePath": "skills/jira-tickets",
       "packageDigest": "cae17d94b23cb59d23045d12dc10c42654eaec56d38b35e3667dc74bde9aa13e",
@@ -62,6 +46,22 @@
           "exactSha256": "1b759fedc591bed05501a661e8f0bcd697d1f4a1e08a16d41fa7b034c7d78a5b",
           "textNormalizedSha256": "1b759fedc591bed05501a661e8f0bcd697d1f4a1e08a16d41fa7b034c7d78a5b",
           "identitySha256": "1b759fedc591bed05501a661e8f0bcd697d1f4a1e08a16d41fa7b034c7d78a5b"
+        }
+      ]
+    },
+    {
+      "name": "orca-computer-use",
+      "sourcePath": "skills/orca-computer-use",
+      "packageDigest": "0febf021a36cc891e8dff8a5316ef320dc166b449762086ac4f889701c04e776",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 3241,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "6e682057006acb534144d6e9f2f0ac1981baaa2a5f00d5ca38fa8997cc7f8a39",
+          "textNormalizedSha256": "6e682057006acb534144d6e9f2f0ac1981baaa2a5f00d5ca38fa8997cc7f8a39",
+          "identitySha256": "6e682057006acb534144d6e9f2f0ac1981baaa2a5f00d5ca38fa8997cc7f8a39"
         }
       ]
     },
@@ -164,16 +164,16 @@
     {
       "name": "orchestration",
       "sourcePath": "skills/orchestration",
-      "packageDigest": "d31e26dc3699d9f264b7e4761bea8c75e2db11d977135859c9e7b8e75c2cb0c4",
+      "packageDigest": "557cc2528a3c7f04e0bf522ad7260ed42345440c8465723e5576dc21e726f2d2",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 5365,
+          "size": 4290,
           "executable": false,
           "classification": "text",
-          "exactSha256": "735c14eb9f82798263c591e6c1134412c79ac6d8d7fe0ab394cc89385e015805",
-          "textNormalizedSha256": "735c14eb9f82798263c591e6c1134412c79ac6d8d7fe0ab394cc89385e015805",
-          "identitySha256": "735c14eb9f82798263c591e6c1134412c79ac6d8d7fe0ab394cc89385e015805"
+          "exactSha256": "e6287f989966971799a23f363ecb8ddd1af57eba8884df772677bcafa62c673f",
+          "textNormalizedSha256": "e6287f989966971799a23f363ecb8ddd1af57eba8884df772677bcafa62c673f",
+          "identitySha256": "e6287f989966971799a23f363ecb8ddd1af57eba8884df772677bcafa62c673f"
         }
       ]
     }

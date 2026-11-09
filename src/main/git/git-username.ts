@@ -1,8 +1,8 @@
 import { extractExecError, ghExecFileAsync, gitExecFileAsync } from './runner'
-import { parseHostedRemote } from './hosted-remote-url'
-import { resolveDefaultBaseRefViaExec } from './repo'
 import type { GhAccountBinding } from '../../shared/github/account-binding'
-import { createGitConfigSnapshotRunner } from '../../shared/git-config-snapshot-runner'
+import { parseHostedRemote } from './remotes/hosted-remote-url'
+import { resolveDefaultBaseRefViaExec } from '../../shared/git/refs/git-default-base-ref'
+import { createGitConfigSnapshotRunner } from '../../shared/git/commands/git-config-snapshot-runner'
 
 type GitUsernameRunner = ReturnType<typeof createGitConfigSnapshotRunner>
 

@@ -7,10 +7,11 @@ import type {
 } from '../../../../shared/rate-limit-types'
 import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-factory'
 import { translate } from '@/i18n/i18n'
+import type { Translate } from '@/i18n/use-translate'
 import {
   createPendingProviderSnapshot,
-  hasUsageData,
   hasUsageProviderSettingsForProvider,
+  hasUsageData,
   isProviderConfigured
 } from './status-bar-provider-visibility'
 import { describeOwnerNotSetUp } from './owner-not-set-up-copy'
@@ -52,7 +53,8 @@ const USAGE_PROVIDER_IDS: Record<UsageProviderKey, ProviderRateLimits['provider'
   deepseek: 'deepseek',
   fireworks: 'fireworks',
   deepinfra: 'deepinfra',
-  copilot: 'copilot'
+  copilot: 'copilot',
+  muse: 'muse'
 }
 
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the keys of a Record<UsageProviderKey, …>.
@@ -68,14 +70,18 @@ function mapProviders(
   >
 }
 
-function describeUnverifiableOwner(ownerLabel: string, reason: OwnerUsageFailureReason): string {
+function describeUnverifiableOwner(
+  ownerLabel: string,
+  reason: OwnerUsageFailureReason,
+  t: Translate = translate
+): string {
   return reason === 'usage-not-published'
-    ? translate(
+    ? t(
         'auto.components.status.bar.tooltip.remoteOwnerNoUsage',
         'Usage unavailable — {{server}} does not report usage. Update Orca on that host.',
         { server: ownerLabel }
       )
-    : translate(
+    : t(
         'auto.components.status.bar.tooltip.remoteOwnerUnreachable',
         'Usage unavailable — cannot reach {{server}}',
         { server: ownerLabel }
@@ -97,7 +103,8 @@ function adoptRemoteRateLimits(remote: RateLimitState): RateLimitState {
     claudeTarget: partial.claudeTarget ?? { runtime: 'host', wslDistro: null },
     codexTarget: partial.codexTarget ?? { runtime: 'host', wslDistro: null },
     inactiveClaudeAccounts: partial.inactiveClaudeAccounts ?? [],
-    inactiveCodexAccounts: partial.inactiveCodexAccounts ?? []
+    inactiveCodexAccounts: partial.inactiveCodexAccounts ?? [],
+    antigravityAccounts: partial.antigravityAccounts ?? []
   }
 }
 
@@ -130,7 +137,8 @@ const NOT_SET_UP_NEEDS_REASON: ReadonlySet<UsageProviderKey> = new Set([
   'minimax',
   'zcode',
   'cursor',
-  'antigravity'
+  'antigravity',
+  'muse'
 ])
 
 /** Null may mean an unfinished or skipped fetch; only positive absence can establish missing host setup. */
@@ -214,7 +222,8 @@ const ACCOUNT_OWNED_PROVIDERS: ReadonlySet<UsageProviderKey> = new Set(['claude'
 
 export function resolveOwnerUsageRateLimits(
   local: RateLimitState,
-  owner: OwnerUsageState
+  owner: OwnerUsageState,
+  t?: Translate
 ): RateLimitState {
   if (owner.kind === 'local') {
     return local
@@ -228,7 +237,7 @@ export function resolveOwnerUsageRateLimits(
       mapProviders((key) => createPendingProviderSnapshot(USAGE_PROVIDER_IDS[key]))
     )
   }
-  const message = describeUnverifiableOwner(owner.ownerLabel, owner.reason)
+  const message = describeUnverifiableOwner(owner.ownerLabel, owner.reason, t)
   const base = owner.lastKnown ? adoptRemoteRateLimits(owner.lastKnown) : null
   const stamp = (key: UsageProviderKey): ProviderRateLimits =>
     ownerPlaceholderSnapshot(key, message, { unverifiableOwner: true })

@@ -8,7 +8,7 @@ import type {
 } from '../../shared/workspace-path-search-instrumentation'
 import type { WorkspacePathCatalogGeneration } from '../../shared/workspace-path-catalog'
 import { workspacePathIndexConsumerKey } from './workspace-path-index-lease'
-import type { WorkerThreadFactory } from '../lazy-worker-thread-host'
+import type { WorkerThreadFactory } from '../worker-threads/worker-thread-transport'
 import type {
   WorkspacePathIndexBuildWorkerResult,
   WorkspacePathIndexDeltaMutation

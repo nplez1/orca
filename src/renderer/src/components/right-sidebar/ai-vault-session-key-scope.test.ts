@@ -1,14 +1,14 @@
 import { beforeEach, expect, it } from 'vitest'
-import type { AiVaultSession } from '../../../../shared/ai-vault-types'
-import { aiVaultSessionKeyScopePaths } from './ai-vault-session-limit'
+import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
+import { aiVaultSessionKeyScopePaths } from './ai-vault/session-list/ai-vault-session-limit'
 import {
   cacheAiVaultSessionList,
   readCachedAiVaultSessionList
-} from './ai-vault-session-list-request'
+} from './ai-vault/scanning/ai-vault-session-list-request'
 import {
   aiVaultSessionResultCacheKey,
   resetAiVaultSessionResultCacheForTest
-} from './ai-vault-session-result-cache'
+} from './ai-vault/scanning/ai-vault-session-result-cache'
 
 function session(sessionId: string): AiVaultSession {
   return {

@@ -1,20 +1,22 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s reapWorktreeSetupRunnerState hook rides inside it, and splitting costs a permanent sync hunk. */
 import { OrcaRuntimeWithOnClientDisconnected } from '../layout/terminal-client-disconnect'
-import type { PtyIncarnationId } from '../../../../shared/pty-incarnation'
-import type { TerminalExitCause } from '../../../../shared/terminal-exit-cause'
+import type { PtyIncarnationId } from '../../../../shared/terminal/pty/lifecycle/pty-incarnation'
+
 import {
+  type TerminalExitCause,
   OPERATOR_CLOSE_EXIT_CAUSE,
   resolveUnreportedExitCause
-} from '../../../../shared/terminal-exit-cause'
-import { SSH_EXIT_UNCONFIRMED_REASON } from '../../../../shared/pty-liveness-verdict'
-import type { RetiredTerminalSurface } from '../../mobile-session-terminal-retirement'
-import { parsePaneKey } from '../../../../shared/stable-pane-id'
+} from '../../../../shared/terminal/pty/lifecycle/terminal-exit-cause'
+import { SSH_EXIT_UNCONFIRMED_REASON } from '../../../../shared/terminal/pty/lifecycle/pty-liveness-verdict'
+import type { PtyLivenessVerdict } from '../../../../shared/terminal/pty/lifecycle/pty-liveness-verdict'
+import type { RetiredTerminalSurface } from '../surface/mobile-session-terminal-retirement'
+import { parsePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
 import { advertisedUrlWatcher } from '../../../ports/advertised-url-watcher'
-import type { PtyLivenessVerdict } from '../../../../shared/pty-liveness-verdict'
+
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import { exitedSplitPaneFacts } from './exited-split-pane-rule'
 import { closedPaneOfExitedPty, type ClosedPaneOfExit } from './closed-pane-of-exited-pty'
-import type { RuntimePtyWorktreeRecord } from '../../runtime-terminal-state-records'
+import type { RuntimePtyWorktreeRecord } from '../records/runtime-terminal-state-records'
 
 export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDisconnected {
   protected abstract pruneDisconnectedPtyRecords(): void
@@ -31,6 +33,8 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
   protected abstract resolvePtyExitWaiters(pty: RuntimePtyWorktreeRecord, ptyId: string): void
 
   protected abstract cancelPendingDriverMutations(ptyId: string): void
+
+  protected abstract dropLayoutQueue(ptyId: string): void
 
   protected abstract rememberPtyLivenessVerdict(ptyId: string, verdict: PtyLivenessVerdict): void
 
@@ -182,7 +186,7 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
       this.mobileDisplayModes.delete(ptyId)
       this.resizeListeners.delete(ptyId)
       this.lastRendererSizes.delete(ptyId)
-      this.recentPtyOutputById.delete(ptyId)
+      this.releaseRecentPtyOutput(ptyId, pty)
       this.launchComposerReadyByPtyId.delete(ptyId)
       this.setupCompletionTokenByPtyId.delete(ptyId)
       this.reapWorktreeSetupRunnerState(ptyId)
@@ -194,8 +198,7 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
       this.providerModeTrackersByPtyId.delete(ptyId)
       this.providerModeSnapshotScansByPtyId.delete(ptyId)
       this.providerBufferAcquisitionsByPtyId.delete(ptyId)
-      this.providerVisibleStateByPtyId.delete(ptyId)
-      this.providerVisibleRetryAtByPtyId.delete(ptyId)
+      this.forgetProviderVisibleState(ptyId)
       this.agentPromptExplicitStatusFloorByPtyId.delete(ptyId)
       this.ptyLifecycleGenerationById.delete(ptyId)
       this.agentStatusOscProcessorsByPtyId.delete(ptyId)
@@ -212,9 +215,8 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
       if (exitedTeamLeaderHandle) {
         this.claudeAgentTeams.removeTeamForLeaderHandle(exitedTeamLeaderHandle)
       }
-      // Queued layout work rechecks missing layout and refuses pty-exited after cleanup.
       this.layouts.delete(ptyId)
-      this.layoutQueues.delete(ptyId)
+      this.dropLayoutQueue(ptyId)
       this.freshSubscribeGuard.delete(ptyId)
       this.cancelPendingDriverMutations(ptyId)
       // Cold restore can reuse ids during delayed Enter; revoke it before it injects into a replacement.
@@ -240,7 +242,7 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
       // Clear and notify driver state so dead panes cannot retain mobile lock banners.
       this.terminalDrivers.clear(ptyId)
       this.remoteDesktopFloor.clearPty(ptyId)
-      this.disposeHeadlessTerminal(ptyId)
+      this.disposeHeadlessTerminalOnExit(ptyId)
       this.trustDialogStatus.forget(ptyId)
       if (processDeathCertified) {
         // The bounded verdict register also fences late graphs after the PTY record was pruned.

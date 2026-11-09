@@ -10,14 +10,14 @@ import {
 import { createPartialWorkspacePathSearchResponse } from '../../../shared/workspace-path-search-response'
 import { parseWorkspacePathSearchWireResponse } from '../../../shared/workspace-path-search-wire-response'
 import { toFilePathSearchResult } from '../../../shared/workspace-path-search-file-result'
-import { buildExcludePathPrefixes } from '../../../shared/quick-open-filter'
-import type { RuntimeFileOperationArgs } from './runtime-file-client-types'
+import { buildExcludePathPrefixes } from '../../../shared/quick-open/quick-open-filter'
+import type { RuntimeFileOperationArgs } from './files/runtime-file-client-types'
 import type { RuntimeClientTarget } from './runtime-rpc-client'
 import { callRuntimeRpc, RuntimeRpcCallError } from './runtime-rpc-client'
 import { readRuntimeWorkspacePathSearchCapability } from './runtime-workspace-path-search-capability'
-import { createBrowserUuid } from '@/lib/browser-uuid'
-import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
-import { searchLegacyQuickOpenInventory } from './runtime-legacy-quick-open-inventory'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import { toRuntimeWorktreeSelector } from './rpc/targets/runtime-worktree-selector'
+import { searchLegacyQuickOpenInventory } from './files/search/runtime-legacy-quick-open-inventory'
 
 export async function searchRuntimeNameFilterPaths(
   context: RuntimeFileOperationArgs,

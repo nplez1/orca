@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useForceReconnect } from '../transport/host-client-hooks'
-import { useWorkspaceClient } from '../transport/use-workspace-client'
-import { getWorktreeLabel } from '../session/worktree-label'
+import { useForceReconnect } from '../transport/connection/host-client-hooks'
+import { useWorkspaceClient } from '../worktree/use-workspace-client'
+import { getWorktreeLabel } from '../worktree/worktree-label'
 import { useMobileGitRequests } from './use-mobile-git-requests'
 import { useMobileSourceControlLoaders } from './use-mobile-source-control-loaders'
 import { useMobileSourceControlOpeners } from './use-mobile-source-control-openers'
@@ -15,8 +15,7 @@ import { useMobileSourceControlKeyboardLift } from './use-mobile-source-control-
 import type { RuntimeGitLocalBranches } from '../../../src/shared/runtime-types'
 import {
   buildMobileBranchCompareSection,
-  canOpenMobileBranchCompareDiff,
-  formatMobileBranchCompareSummary
+  canOpenMobileBranchCompareDiff
 } from './mobile-branch-compare'
 
 import {
@@ -69,6 +68,7 @@ export function useMobileSourceControlState(params: MobileSourceControlStatePara
   }, [recordCommitFailure])
 
   const loaders = useMobileSourceControlLoaders({
+    hostId,
     client,
     connState,
     statusIdentityKey,
@@ -89,9 +89,6 @@ export function useMobileSourceControlState(params: MobileSourceControlStatePara
     () => buildMobileBranchCompareSection(branchCompareResult?.entries ?? []),
     [branchCompareResult, t]
   )
-  const branchCompareSummaryText = branchCompareResult
-    ? formatMobileBranchCompareSummary(branchCompareResult.summary)
-    : null
   const branchCompareCanOpen = branchCompareResult
     ? canOpenMobileBranchCompareDiff(branchCompareResult.summary)
     : false
@@ -124,12 +121,6 @@ export function useMobileSourceControlState(params: MobileSourceControlStatePara
   const branchLabel = formatBranchLabel(status?.branch, status?.head)
   const upstream = status?.upstreamStatus
   const upstreamKnown = upstream !== undefined
-  const syncLabel =
-    upstream && upstream.hasUpstream
-      ? t('sourceControl.state.syncStatus', '{{ahead}} ahead, {{behind}} behind', upstream)
-      : upstream && !upstream.hasUpstream
-        ? t('sourceControl.state.noUpstream', 'No upstream')
-        : null
 
   const { sendGitRequest, sendCommitRequest, runGitSyncSteps } = useMobileGitRequests({
     client,
@@ -214,7 +205,7 @@ export function useMobileSourceControlState(params: MobileSourceControlStatePara
     insets,
     router,
     setRootRef,
-    worktreeLabel,
+    worktreeLabel: status ? branchLabel : worktreeLabel,
     screenState,
     branchCompareState,
     busyAction,
@@ -239,7 +230,6 @@ export function useMobileSourceControlState(params: MobileSourceControlStatePara
     status,
     sections,
     branchCompareResult,
-    branchCompareSummaryText,
     branchEntries,
     shouldShowBranchCompareSection,
     hasVisibleChanges,
@@ -249,11 +239,11 @@ export function useMobileSourceControlState(params: MobileSourceControlStatePara
     unstagedCount,
     branchLabel,
     upstreamKnown,
-    syncLabel,
     primaryActionArgs,
     createPrAction,
     loadStatus,
     rebaseBaseRef: loaders.rebaseBaseRef,
+    refreshing: loaders.refreshing,
     openDiffForFile,
     ...runners
   }

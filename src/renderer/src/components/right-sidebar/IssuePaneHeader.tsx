@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Ellipsis, Link, LoaderCircle, RefreshCw, Unlink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,9 +30,12 @@ function IssuePaneEditableTitle({
   onCommit: (title: string) => void
 }): React.JSX.Element {
   const [draft, setDraft] = useState(title)
-  useEffect(() => {
+  const [draftTitle, setDraftTitle] = useState(title)
+  // Adjusting during render rather than in an effect: the draft follows the prop without a second pass.
+  if (title !== draftTitle) {
+    setDraftTitle(title)
     setDraft(title)
-  }, [title])
+  }
 
   return (
     <div className="mt-1.5 flex items-center gap-1">

@@ -312,9 +312,11 @@ Associez l'app mobile Orca à Orca NP pour surveiller et piloter vos agents depu
 
 - **Issues &amp; idées Orca NP :** [Ouvrez une issue](https://github.com/nplez1/orca/issues) pour tout ce qui est propre à ce fork.
 - **Communauté upstream :** les canaux d'Orca upstream couvrent tout ce dont ce fork hérite — [Discord](https://discord.gg/fzjDKHxv8Q), [@orca_build sur X](https://x.com/orca_build) et les [issues upstream](https://github.com/stablyai/orca/issues) pour les bugs qui se reproduisent aussi dans Orca officiel.
-- **Groupe WeChat upstream :** le groupe 11 est complet. Scannez pour rejoindre le groupe WeChat 12 de la communauté Orca.
+- **Groupe WeChat upstream :** Scannez pour rejoindre un groupe WeChat de la communauté Orca. Si un groupe est complet, rejoignez-en un autre.
 
   <img src="../assets/wechat-qr-group14.jpg" alt="QR code du groupe WeChat de la communauté Orca" width="160" />
+  <img src="../assets/wechat-qr-group15.jpg" alt="QR code du groupe WeChat de la communauté Orca" width="160" />
+  <img src="../assets/wechat-qr-group16.jpg" alt="QR code du groupe WeChat de la communauté Orca" width="160" />
 
 - **Docs :** [onorca.dev/docs](https://www.onorca.dev/docs) documente Orca upstream.
 - **Soutenez-nous :** [Mettez une star](https://github.com/nplez1/orca) sur ce repo pour suivre le fork, ou sur [upstream](https://github.com/stablyai/orca).

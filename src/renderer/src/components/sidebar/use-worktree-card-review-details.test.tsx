@@ -3,11 +3,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, renderHook } from '@testing-library/react'
 import { useAppStore } from '@/store'
-import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache-identity'
+import { issueCacheKey as getIssueCacheKey } from '../../store/github/cache/cache-identity'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { makeRepo, makeWorktree } from '../worktree-jump-palette-test-fixtures'
-import { useWorktreeCardReviewDetails } from './use-worktree-card-review-details'
+import { makeRepo, makeWorktree } from '../worktree-jump/worktree-jump-palette-test-fixtures'
+import { useWorktreeCardReviewDetails } from './workspace-card/details/use-worktree-card-review-details'
 
 const initialState = useAppStore.getInitialState()
 

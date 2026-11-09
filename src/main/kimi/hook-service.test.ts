@@ -2,17 +2,17 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   readdirSync,
   rmSync,
   statSync,
-  writeFileSync
+  writeFileSync,
+  readFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { wrapPosixHookCommand, wrapWindowsHookCommand } from '../agent-hooks/installer-utils'
-import { getManagedCommand, KimiHookService } from './hook-service'
+import { KimiHookService, getManagedCommand } from './hook-service'
+import { wrapWindowsHookCommand, wrapPosixHookCommand } from '../agent-hooks/installer-utils'
 import { buildManagedKimiHooksBlock, KIMI_HOOK_EVENTS } from './kimi-hook-config-toml'
 
 // Isolate homedir (HOME/USERPROFILE) and KIMI_CODE_HOME so installs cannot touch real configs.

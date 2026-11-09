@@ -1,16 +1,16 @@
-import type { TuiAgent } from '../../../../shared/tui-agent'
-import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selection'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
+import { normalizeDisabledTuiAgents } from '../../../../shared/agent-launch/catalog/tui-agent-selection'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import {
   selectFolderWorkspaces,
-  selectWorktreesByRepo,
-  type WorkspaceRecordState
-} from '../workspace-record-selectors'
+  selectWorktreesByRepo
+} from '../workspaces/catalog/workspace-record-fields'
+import type { WorkspaceRecordState } from '../workspaces/selection/workspace-host-target'
 import {
   getRuntimeAgentInventoryEnvironmentId,
   getRuntimeAgentInventoryWorktreeId,
   getRuntimeAgentInventoryKey
-} from './runtime-agent-inventory-key'
+} from './agent-inventory/runtime-agent-inventory-key'
 
 /** The cached per-host inventories an enable re-reads, plus the local workspaces that name them. */
 export type AgentInventoryRefreshState = WorkspaceRecordState & {

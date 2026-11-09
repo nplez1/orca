@@ -6,7 +6,7 @@ import type {
   DeepInfraCredentialSectionModel,
   DeepSeekCredentialSectionModel,
   FireworksCredentialSectionModel
-} from './accounts-pane-types'
+} from './accounts/accounts-pane-types'
 import { createCopilotCredentialActions } from './accounts-pane-copilot-actions'
 import { createDeepInfraCredentialActions } from './accounts-pane-deepinfra-actions'
 import { createDeepSeekCredentialActions } from './accounts-pane-deepseek-actions'

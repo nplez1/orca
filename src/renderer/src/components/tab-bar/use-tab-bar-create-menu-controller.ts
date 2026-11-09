@@ -1,13 +1,13 @@
 import type { TabBarCreateMenuController as SharedTabBarCreateMenuController } from './tab-bar-create-menu-contract'
 import { useAgentLaunchPickerInventorySource } from '../agent/use-agent-launch-picker-inventory'
-import type { AgentPickerEntry } from '../../../../shared/agent-launch-picker'
 import { useEffect, useMemo, useState } from 'react'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import { launchDefaultAgentInNewTab } from './launch-default-agent-in-new-tab'
 import { useNewTabMenuFocusHandoff } from './new-tab-menu-focus-handoff'
+import type { AgentPickerEntry } from '../../../../shared/agent-launch/picker/agent-launch-picker'
 import type { WindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
 import { useTabAgentMenuLaunch } from './QuickLaunchButton'
-import { requestNativeChatComposerFocus } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
+import { requestNativeChatComposerFocus } from '@/components/native-chat/composer/focus/native-chat-composer-focus-intent'
 import { useNewTabAgentMenuRows } from './use-new-tab-agent-menu-rows'
 import type { AgentDetectionTarget } from '@/hooks/useDetectedAgents'
 import type { TabAgentLaunchOption } from './tab-agent-launch-options'
@@ -185,14 +185,13 @@ export function useTabBarCreateMenuController({
     onFocusChat: (tabId) =>
       queueFocusAfterNewTabMenuClose(() => requestNativeChatComposerFocus(tabId), true)
   })
-  const launchAgentFromNewTabEntry = (option: TabAgentLaunchOption): void => {
+  const launchAgentFromNewTabEntry = (option: TabAgentLaunchOption) => {
     if (option.row) {
-      if (option.setup) {
-        launchAgentRow(option.row, option.setup, option.pickerEntry)
-      } else {
-        launchAgentRow(option.row)
-      }
+      return option.setup
+        ? launchAgentRow(option.row, option.setup, option.pickerEntry)
+        : launchAgentRow(option.row)
     }
+    return false
   }
   const launchDefaultAgentFromSplitButton = (agent: TuiAgent): void => {
     launchDefaultAgentInNewTab(agent, {
@@ -210,11 +209,13 @@ export function useTabBarCreateMenuController({
     window.addEventListener('blur', dismiss)
     return () => window.removeEventListener('blur', dismiss)
   }, [newTabMenuOpen])
-  useEffect(() => {
+  const [prevNewTabMenuOpen, setPrevNewTabMenuOpen] = useState(newTabMenuOpen)
+  if (prevNewTabMenuOpen !== newTabMenuOpen) {
+    setPrevNewTabMenuOpen(newTabMenuOpen)
     if (!newTabMenuOpen) {
       setCreateMenuQuery('')
     }
-  }, [newTabMenuOpen])
+  }
   return {
     agentMenu,
     agentPickerInventory,

@@ -1,4 +1,4 @@
-import type { AiVaultServicePendingCall } from './session-scanner-service-client-state'
+import type { AiVaultServicePendingCall } from './scan-service/session-scanner-service-client-state'
 
 /**
  * Names the transcripts in flight when the scanner child faults.

@@ -1,7 +1,7 @@
 import type { SFTPWrapper } from 'ssh2'
 
-import type { AgentHookInstallStatus } from '../../shared/agent-hook-types'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
+import type { AgentHookInstallStatus } from '../../shared/agent-hook-listener/configuration/agent-hook-types'
 import { wrapPosixHookCommand } from '../agent-hooks/installer-utils'
 import {
   readHooksJsonRemote,

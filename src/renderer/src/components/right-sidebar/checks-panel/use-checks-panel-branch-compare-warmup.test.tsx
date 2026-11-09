@@ -8,10 +8,10 @@ const mocks = vi.hoisted(() => ({
   getRuntimeRepoBaseRefDefault: vi.fn()
 }))
 
-vi.mock('@/runtime/runtime-git-diff-client', () => ({
+vi.mock('@/runtime/source-control/git/runtime-git-diff-client.ts', () => ({
   getRuntimeGitBranchCompare: mocks.getRuntimeGitBranchCompare
 }))
-vi.mock('@/runtime/runtime-repo-client', () => ({
+vi.mock('@/runtime/source-control/references/runtime-repo-client.ts', () => ({
   getRuntimeRepoBaseRefDefault: mocks.getRuntimeRepoBaseRefDefault,
   // Why the inline watcher: the module factory replaces the whole module, so the real
   // `watchRuntimeRepoBaseRefDefault` wrapper is gone and the hook would call undefined.
@@ -28,15 +28,19 @@ vi.mock('@/runtime/runtime-repo-client', () => ({
   }
 }))
 vi.mock('@/lib/connection-context', () => ({ getConnectionId: () => null }))
-vi.mock('../worktree-git-owner-target', () => ({
+vi.mock('../source-control/sync/worktree-git-owner-target.ts', () => ({
   // SAFETY: the hook only forwards this value into the mocked RPC context.
   getWorktreeGitOwnerTarget: () => ({ kind: 'local' }) as const
 }))
 
 import { useAppStore } from '@/store'
-import type { GitBranchCompareSummary } from '../../../../../shared/git-diff-compare-types'
+import type { GitBranchCompareSummary } from '../../../../../shared/git/diff/git-diff-compare-types'
 import { useChecksPanelBranchCompareWarmup } from './use-checks-panel-branch-compare-warmup'
-import { flush, mountProbe, unmountProbes } from '../source-control-hook-test-harness'
+import {
+  flush,
+  mountProbe,
+  unmountProbes
+} from '../source-control/panel/source-control-hook-test-harness'
 
 const WORKTREE_ID = 'worktree-A'
 const REPO_ID = 'repo-A'

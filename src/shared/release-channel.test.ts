@@ -1,19 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
-  findInstallerAssetName,
   getPlatformUpdateManifestName,
   getReleaseNotesUrlForVersion,
   getReleaseRepoForChannel,
-  getVersionChannel,
   hasDedicatedReleaseRepo,
   hasInstallableArtifactForPlatform,
   isAdhocVersion,
-  isChannelSupportedOnPlatform,
   isDailyVersion,
   isHourlyVersion,
   parseAdhocVersionStamp,
   parseDailyVersionStamp,
-  parseDevBuildStamp,
   parseHourlyVersionStamp,
   requiresManualDevChannelInstall,
   sortReleaseBuildsNewestFirst,
@@ -23,16 +19,6 @@ import {
 import { compareAppVersions } from './app-version'
 
 describe('release channel', () => {
-  it('classifies versions by channel', () => {
-    expect(getVersionChannel('1.4.160')).toBe('stable')
-    expect(getVersionChannel('v1.4.160')).toBe('stable')
-    expect(getVersionChannel('1.4.160-rc.3')).toBe('rc')
-    expect(getVersionChannel('1.4.160-hourly.202607281400')).toBe('hourly')
-    expect(getVersionChannel('1.4.160-daily.202607281300')).toBe('daily')
-    expect(getVersionChannel('1.4.160-adhoc.20260728140533')).toBe('adhoc')
-    expect(getVersionChannel('not-a-version')).toBeNull()
-  })
-
   // Upstream keeps hourly tags out of the main repo because its releases atom feed exposes only the
   // 10 newest entries, so 24 hourly tags a day would evict every stable/RC entry.
   // LOCAL(nplez1): this fork publishes a single stream, so the dev channels resolve to it too. They
@@ -75,25 +61,6 @@ describe('release channel', () => {
     expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/nplez1/orca/releases')
   })
 
-  it('round-trips an hourly version stamp as UTC', () => {
-    const version = '1.4.160-hourly.202607281405'
-    expect(isHourlyVersion(version)).toBe(true)
-    expect(parseHourlyVersionStamp(version)?.toISOString()).toBe('2026-07-28T14:05:00.000Z')
-  })
-
-  it('round-trips a daily version stamp as UTC', () => {
-    const version = '1.4.160-daily.202607281300'
-    expect(isDailyVersion(version)).toBe(true)
-    expect(parseDailyVersionStamp(version)?.toISOString()).toBe('2026-07-28T13:00:00.000Z')
-  })
-
-  it('rejects malformed hourly identifiers', () => {
-    expect(isHourlyVersion('1.4.160-hourly')).toBe(false)
-    expect(isHourlyVersion('1.4.160-hourly.2026')).toBe(false)
-    expect(isHourlyVersion('1.4.160-rc.3')).toBe(false)
-    expect(parseHourlyVersionStamp('1.4.160-rc.3')).toBeNull()
-  })
-
   // Reject garbage-prefix versions and Date.UTC’s normalization of impossible dates (February 30→March 2).
   it('rejects a bad base version and impossible calendar stamps', () => {
     expect(parseHourlyVersionStamp('not-a-version-hourly.202601010000')).toBeNull()
@@ -107,13 +74,6 @@ describe('release channel', () => {
     )
     expect(parseDailyVersionStamp('1.4.160-daily.202602300000')).toBeNull()
     expect(parseDailyVersionStamp('not-a-version-daily.202601010000')).toBeNull()
-  })
-
-  // Concurrent adhoc branches can build within a minute; second-resolution tags avoid collisions.
-  it('round-trips an adhoc version stamp as UTC, to the second', () => {
-    const version = '1.4.160-adhoc.20260728140533'
-    expect(isAdhocVersion(version)).toBe(true)
-    expect(parseAdhocVersionStamp(version)?.toISOString()).toBe('2026-07-28T14:05:33.000Z')
   })
 
   it('keeps the dev stamp formats from matching each other', () => {
@@ -132,30 +92,6 @@ describe('release channel', () => {
     expect(parseAdhocVersionStamp('1.4.160-adhoc.20260101250000')).toBeNull()
     expect(parseAdhocVersionStamp('1.4.160-adhoc.20260101000060')).toBeNull()
     expect(parseAdhocVersionStamp('not-a-version-adhoc.20260101000000')).toBeNull()
-  })
-
-  // Picker rows need timestamp parsing without knowing the dev channel; missing cases would show opaque tails.
-  it('reads the build timestamp of any dev channel', () => {
-    expect(parseDevBuildStamp('1.4.160-hourly.202607281405')?.toISOString()).toBe(
-      '2026-07-28T14:05:00.000Z'
-    )
-    expect(parseDevBuildStamp('1.4.160-daily.202607281300')?.toISOString()).toBe(
-      '2026-07-28T13:00:00.000Z'
-    )
-    expect(parseDevBuildStamp('1.4.160-adhoc.20260728140533')?.toISOString()).toBe(
-      '2026-07-28T14:05:33.000Z'
-    )
-    expect(parseDevBuildStamp('1.4.160-rc.3')).toBeNull()
-    expect(parseDevBuildStamp('1.4.160')).toBeNull()
-  })
-
-  // Dev workflows publish macOS/Windows only; picker and update checks must not offer uninstallable Linux channels.
-  it('offers the dev channels on macOS and Windows but not Linux', () => {
-    for (const channel of ['hourly', 'daily', 'adhoc'] as const) {
-      expect(isChannelSupportedOnPlatform(channel, 'darwin')).toBe(true)
-      expect(isChannelSupportedOnPlatform(channel, 'win32')).toBe(true)
-      expect(isChannelSupportedOnPlatform(channel, 'linux')).toBe(false)
-    }
   })
 
   // Installed signed Windows apps reject unsigned dev installers via baked-in publisherName; future builds cannot fix them.
@@ -178,19 +114,6 @@ describe('release channel', () => {
 
     expect(manual('stable', 'rc')).toBe(false)
     expect(manual('rc', 'stable')).toBe(false)
-  })
-
-  // macOS dev builds remain signed/notarized, so in-app entry works.
-  it('never requires a manual install off Windows', () => {
-    for (const platform of ['darwin', 'linux'] as const) {
-      expect(
-        requiresManualDevChannelInstall({
-          platform,
-          runningChannel: 'stable',
-          targetChannel: 'adhoc'
-        })
-      ).toBe(false)
-    }
   })
 
   it('detects an installable artifact from the platform update manifest', () => {
@@ -231,27 +154,6 @@ describe('release channel', () => {
         'arm64'
       )
     ).toBe(true)
-  })
-
-  it('finds the directly runnable installer for a platform', () => {
-    const assets = [
-      'latest.yml',
-      'orca-windows-setup.exe',
-      'orca-macos-arm64.dmg',
-      'orca-linux.AppImage'
-    ]
-    expect(findInstallerAssetName('win32', assets)).toBe('orca-windows-setup.exe')
-    expect(findInstallerAssetName('darwin', assets)).toBe('orca-macos-arm64.dmg')
-    expect(findInstallerAssetName('linux', assets)).toBe('orca-linux.AppImage')
-    expect(findInstallerAssetName('win32', ['latest.yml'])).toBeNull()
-    expect(findInstallerAssetName('freebsd', assets)).toBeNull()
-  })
-
-  it('offers stable and rc on every platform', () => {
-    for (const platform of ['darwin', 'linux', 'win32'] as const) {
-      expect(isChannelSupportedOnPlatform('stable', platform)).toBe(true)
-      expect(isChannelSupportedOnPlatform('rc', platform)).toBe(true)
-    }
   })
 
   // Timestamp tails distinguish consecutive hourlies; keep picker ordering chronological.

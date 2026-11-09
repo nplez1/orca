@@ -2,16 +2,16 @@ import { toast } from 'sonner'
 
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
+import { selectFolderWorkspaces } from '@/store/workspaces/catalog/workspace-record-fields'
 import {
   activateAndRevealFolderWorkspace,
   activateAndRevealWorktree
-} from '@/lib/worktree-activation'
-import { folderWorkspaceToWorktree } from '../../../shared/folder-workspace-worktree'
+} from './workspace/activation/worktree-activation'
+import { folderWorkspaceToWorktree } from '../../../shared/folder-workspaces/folder-workspace-worktree'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import { findJiraIssueWorkspaceAttachmentForIssue } from '@/lib/jira-issue-workspace-attachment'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import type { Worktree } from '../../../shared/worktree/types'
 
 /**

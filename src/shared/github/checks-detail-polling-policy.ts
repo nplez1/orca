@@ -1,11 +1,11 @@
 import type { PRCheckDetail } from './check-types'
 import type { CheckStatus } from './pull-request-types'
-import type { HostedReviewState } from '../hosted-review'
+import type { HostedReviewState } from '../source-control/hosted-review/hosted-review-contracts'
 import {
   FOCUSED_CHECKS_REFRESH_INTERVAL_MS,
   reviewRefreshIntervalMs
 } from '../review-refresh-policy'
-import { summarizeProviderChecks } from '../provider-check-summary'
+import { summarizeProviderChecks } from '../source-control/checks/provider-check-summary'
 
 /** Ceiling for the focused loop while a run's rows repeat read after read. */
 const STUCK_RUN_BACKOFF_MAX_MS = 30_000
@@ -82,15 +82,20 @@ export class ChecksDetailPollingPolicy {
     this.signature = ''
   }
 
-  accept(checks: readonly PRCheckDetail[]): string {
-    this.status = detailedChecksStatus(checks)
+  accept(checks: readonly PRCheckDetail[], pipelineCheck: PRCheckDetail | null = null): string {
+    // A GitLab parent pipeline's own status decides cadence; a partial job page cannot settle it.
+    const settledChecks = pipelineCheck ? [pipelineCheck] : checks
+    this.status = detailedChecksStatus(settledChecks)
     // Why: "unfinished" for the focused loop is the shared classifier's pending count, not the
     // status above — an approval-pending suite is `pending` there and must not keep a 10s loop.
-    this.liveRun = checks.length > 0 ? summarizeProviderChecks(checks).pending > 0 : undefined
+    this.liveRun =
+      settledChecks.length > 0 ? summarizeProviderChecks(settledChecks).pending > 0 : undefined
     this.hasDetails = true
     this.failing = false
     const signature = JSON.stringify(
-      checks.map((check) => `${check.name}:${check.status}:${check.conclusion}`)
+      [...(pipelineCheck ? [pipelineCheck] : []), ...checks].map(
+        (check) => `${check.name}:${check.status}:${check.conclusion}`
+      )
     )
     this.unchangedReads = signature === this.signature ? this.unchangedReads + 1 : 0
     this.signature = signature

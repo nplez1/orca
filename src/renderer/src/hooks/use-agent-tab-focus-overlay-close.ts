@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import { shouldPreserveEditableFocus } from '@/components/terminal-pane/pane-helpers'
+import { shouldPreserveEditableFocus } from '@/lib/editable-focus-preservation'
 import { restoreAgentTabFocusAfterGesture } from '@/lib/agent-tab-focus-policy'
 import { isImeOwnedKeyboardEvent } from '@/lib/ime-composition-keyboard-event'
 import { overlayLeftDom, visibleOverlayElements } from '@/lib/visible-overlay'

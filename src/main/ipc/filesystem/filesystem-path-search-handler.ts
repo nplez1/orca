@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 import { ipcMain } from 'electron'
-import { buildExcludePathPrefixes } from '../../../shared/quick-open-filter'
+import { buildExcludePathPrefixes } from '../../../shared/quick-open/quick-open-filter'
 import {
   WORKSPACE_PATH_SEARCH_TRANSPORT_BYTE_CEILINGS,
   validateWorkspacePathSearchQuery,
@@ -16,10 +16,10 @@ import {
 import { toFilePathSearchResult } from '../../../shared/workspace-path-search-file-result'
 import { WORKSPACE_PATH_INDEX_ROOT_MEMORY_BUDGET_BYTES } from '../../../shared/__fixtures__/workspace-path-memory-measurement'
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
-import type { PathSearchMode } from '../../../shared/quick-open-path-search'
-import { resolveQuickOpenResultLimit } from '../../../shared/quick-open-listing-limits'
+import type { PathSearchMode } from '../../../shared/quick-open/quick-open-path-search'
+import { resolveQuickOpenResultLimit } from '../../../shared/quick-open/quick-open-listing-limits'
 import { searchQuickOpenFilePaths } from './filesystem-search-file-paths'
-import { resolveAuthorizedPath } from './filesystem-auth'
+import { resolveAuthorizedPath } from './access/filesystem-auth'
 import { recordQuickOpenPathSearchFallback } from '../quick-open-path-inventory'
 import { WORKSPACE_PATH_INDEX_LISTING_POLICY_VERSION } from '../../workspace-path-index/workspace-path-index-runtime'
 import type { WorkspacePathIndexService } from '../../workspace-path-index/workspace-path-index-service'

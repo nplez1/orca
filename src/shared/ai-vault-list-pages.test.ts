@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AiVaultListArgs, AiVaultListResult, AiVaultSession } from './ai-vault-types'
-import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from './ai-vault-types'
+import type {
+  AiVaultListArgs,
+  AiVaultListResult,
+  AiVaultSession
+} from './ai-vault/contracts/ai-vault-types'
+import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from './ai-vault/contracts/ai-vault-types'
 import {
   AI_VAULT_LIST_CHANGING_SCAN_MESSAGE,
   AI_VAULT_LIST_DEADLINE_MESSAGE,

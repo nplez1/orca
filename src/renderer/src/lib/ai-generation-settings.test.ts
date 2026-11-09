@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getCommitMessageAgentCapability } from '../../../shared/commit-message-agent-spec'
-import type { CommitMessageModelCapability } from '../../../shared/commit-message-agent-spec'
+import { getCommitMessageAgentCapability } from '../../../shared/source-control/ai/generation/commit-message-agent-spec'
+import type { CommitMessageModelCapability } from '../../../shared/source-control/ai/generation/commit-message-agent-spec'
 import {
   resolveAiGenerationSelection,
   type AiGenerationSettingsConfig

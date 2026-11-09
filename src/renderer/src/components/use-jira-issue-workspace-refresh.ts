@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
-import { jiraGetIssue } from '@/runtime/runtime-jira-client'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+import { jiraGetIssue } from '../runtime/jira/runtime-jira-client'
+import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import {
   mergeJiraIssueHydration,
   type EditableJiraIssueField

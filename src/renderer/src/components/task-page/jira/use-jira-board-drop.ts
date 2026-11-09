@@ -11,8 +11,8 @@ import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys
 } from '../../../../../shared/jira/jira-transition-fields'
-import { jiraListTransitions } from '@/runtime/runtime-jira-client'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import { jiraListTransitions } from '../../../runtime/jira/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 import { useJiraBoardTransitionMove } from './use-jira-board-transition-move'

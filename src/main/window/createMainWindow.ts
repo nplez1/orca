@@ -1,11 +1,11 @@
 import { app, BrowserWindow, nativeTheme, powerMonitor, screen } from 'electron'
 import { release } from 'node:os'
 import { join } from 'node:path'
-import { getAppIconPath } from '../app-icon'
+import { getAppIconPath } from './desktop-integration/app-icon'
 import { browserManager } from '../browser/browser-manager'
-import { getBrowserClientHostId } from '../browser/browser-client-host-id'
 import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
-import { formatBrowserClientHostIdArgument } from '../../shared/browser-client-host-id-argument'
+import { getBrowserClientHostId } from '../browser/client-hosts/lifecycle/browser-client-host-id'
+import { formatBrowserClientHostIdArgument } from '../../shared/browser/client-hosting/browser-client-host-id-argument'
 import { formatWindowMaterialArgument, resolveWindowMaterial } from '../../shared/window-material'
 import { windowMaterialOptions } from './window-material-options'
 import { rememberWindowMaterial } from './window-material-suppression'
@@ -24,8 +24,9 @@ import { mainWindowLoadErrorCode } from './main-window-load-error-code'
 import { installMainWindowFocusLifecycle } from './main-window-focus-lifecycle'
 import { installMainWindowShortcutRouting } from './main-window-shortcut-routing'
 import { installMainWindowStateLifecycle } from './main-window-state-lifecycle'
+import { installMainWindowActivityRelay } from './main-window-activity'
 import { stopHiddenWindowFramePumpOnShow } from './hidden-window-frame-pump'
-import { wslHostsWindowArguments } from '../wsl/wsl-host-gate'
+import { wslHostsWindowArguments } from '../wsl/host-lifecycle/wsl-host-gate'
 import {
   formatHiddenWindowFramePumpArgument,
   shouldPumpHiddenWindowFrames
@@ -41,8 +42,8 @@ import {
 } from './main-window-visual-lifecycle'
 import { installMainWindowWebviewSecurity } from './main-window-webview-security'
 import { rectHasVisibleAreaOnAnyDisplay } from './window-bounds-validation'
-import { installWindowsPathRegistryChangeListener } from '../pty/windows-path-registry-change'
 import { installUiHangWindowObserver } from './ui-hang-window-observer'
+import { installWindowsPathRegistryChangeListener } from '../pty/environment/windows-path-registry-change'
 import { recordAgentSessionRuntimeEnd } from '../runtime/agent-session/records/agent-session-runtime-end-record'
 
 export { WINDOW_QUIT_RENDERER_ACK_TIMEOUT_MS }
@@ -209,6 +210,7 @@ export function createMainWindow(
     store
   })
   installMainWindowWebviewSecurity(mainWindow)
+  const activity = installMainWindowActivityRelay(mainWindow)
   if (pumpHiddenFrames) {
     stopHiddenWindowFramePumpOnShow(mainWindow)
   }
@@ -235,6 +237,7 @@ export function createMainWindow(
     closeWorkspaceSpaceWindow()
     state.clearInitialRevealFallbackTimer()
     closeLifecycle.dispose()
+    activity.dispose()
     focus.dispose()
     browserManager.setDictationShortcutForwardingPredicate(null)
     powerMonitor.removeListener('resume', onSystemResume)

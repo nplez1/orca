@@ -1,7 +1,9 @@
 import type { WebContents } from 'electron'
-import { beginWatcherInstall } from '../../watcher-removal-gate'
-import type { LocalWatcherInstallToken } from './filesystem-watcher-lifecycle-state'
-import { watcherLifecycleState } from './filesystem-watcher-lifecycle-state'
+import { beginWatcherInstall } from '../../../workspaces/removal/watcher-removal-gate'
+import {
+  type LocalWatcherInstallToken,
+  watcherLifecycleState
+} from './filesystem-watcher-lifecycle-state'
 import { getLocalWatcherRoot } from './filesystem-watcher-paths'
 import {
   addCancelledInstallWaiter,

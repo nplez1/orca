@@ -6,7 +6,7 @@ import {
   parseEphemeralVmRecipeResult,
   type EphemeralVmRecipeResult
 } from '../shared/ephemeral-vm-recipes'
-import { writeSecureFile } from '../shared/secure-file'
+import { writeSecureFile } from '../shared/secure-storage/secure-file'
 import { redactEphemeralVmRecipeDiagnosticText } from '../shared/ephemeral-vm-recipe-diagnostics'
 import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lifetime'
 import { runEphemeralVmRecipeExtend } from '../shared/ephemeral-vm-recipe-extend-runner'

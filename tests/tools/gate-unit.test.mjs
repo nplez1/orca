@@ -452,9 +452,9 @@ describe('what a flaky pass is allowed to waive', () => {
     // A hand list missed exactly these the first time: re-seating tests into the node-runtime pool is
     // a harness change no test file mentions.
     for (const imported of [
-      'config/scripts/vitest-runtime-sequencer.mjs',
-      'config/scripts/vitest-node-runtime-files.mjs',
-      'config/scripts/vitest-node-runtime-pool.ts'
+      'config/scripts/test-runtime/execution-policy/vitest-runtime-sequencer.mjs',
+      'config/scripts/test-runtime/sqlite-admission/vitest-node-runtime-files.mjs',
+      'config/scripts/test-runtime/node-worker/vitest-node-runtime-pool.ts'
     ]) {
       expect(sharedHarnessPaths()).toContain(imported)
       expect(flakeWaiver('src/main/foo.test.ts', new Set([imported]), noSource)).toEqual({

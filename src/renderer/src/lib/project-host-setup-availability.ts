@@ -2,7 +2,7 @@ import {
   parseExecutionHostId,
   type ExecutionHostId
 } from '../../../shared/execution-host'
-import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host-registry'
+import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host/execution-host-registry-entry'
 import { isHostLocalProjectId } from '../../../shared/project-host-setup-projection'
 import {
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
@@ -10,11 +10,15 @@ import {
 } from '../../../shared/protocol-version'
 import type { ProjectHostSetup } from '../../../shared/project-types'
 import { translate } from '@/i18n/i18n'
+import type { Translate } from '@/i18n/use-translate'
 
 /** Why a host cannot take this project at all, from the host's own state. */
-export function getHostSetupUnavailableDetail(host: ExecutionHostRegistryEntry): string | null {
+export function getHostSetupUnavailableDetail(
+  host: ExecutionHostRegistryEntry,
+  t: Translate = translate
+): string | null {
   if (host.health === 'blocked') {
-    return translate(
+    return t(
       'auto.components.settings.RepositoryPane.hostSetupBlockedVersion',
       'Orca server version is incompatible'
     )
@@ -23,7 +27,7 @@ export function getHostSetupUnavailableDetail(host: ExecutionHostRegistryEntry):
     return null
   }
   if (!host.capabilities) {
-    return translate(
+    return t(
       'auto.components.settings.RepositoryPane.hostSetupCheckingCapability',
       'Checking host capabilities'
     )
@@ -32,7 +36,7 @@ export function getHostSetupUnavailableDetail(host: ExecutionHostRegistryEntry):
     !host.capabilities.includes(PROJECT_HOST_SETUP_RUNTIME_CAPABILITY) ||
     !host.capabilities.includes(WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY)
   ) {
-    return translate(
+    return t(
       'auto.components.settings.RepositoryPane.hostSetupMissingCapability',
       'Update Orca on this host to set up projects'
     )

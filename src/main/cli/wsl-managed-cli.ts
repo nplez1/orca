@@ -3,9 +3,9 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { windowsPowerShellPath } from '@orca/process-host/windows-system-binary'
-import { writeShellWrapperFiles } from '../shell-wrapper-file-writer'
 import { getBundledLauncherPath } from './bundled-cli-launcher-path'
 import { DEV_COMMAND_NAME, CLI_COMMAND_NAME } from './cli-install-constants'
+import { writeShellWrapperFiles } from '../pty/shell-startup/shell-wrapper-file-writer'
 import { buildColocatedWslLauncher, buildWslBridgeScript } from './wsl-cli-scripts'
 
 /**

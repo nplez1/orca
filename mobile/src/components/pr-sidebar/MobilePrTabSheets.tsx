@@ -1,49 +1,81 @@
-import { useState } from 'react'
-import { Text, TextInput, View } from 'react-native'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Text, View } from 'react-native'
 import { GitMerge } from 'lucide-react-native'
-import { colors } from '../../theme/mobile-theme'
 import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { Translate } from '../../i18n/mobile-i18n'
 import type { GitHubPRMergeMethod } from '../../../../src/shared/github/pull-request-types'
 import { resolveGitHubPRMergeMethods } from '../../../../src/shared/github/pull-request-merge-methods'
-import { KeyedBottomDrawer } from '../keyed-bottom-drawer'
+import { KeyedBottomDrawer } from '../bottom-drawer/keyed-bottom-drawer'
 import { SheetHeader } from '../nav-bar/SheetHeader'
 import { SheetPrimaryButton } from '../SheetPrimaryButton'
 import { ListGroup, ListRow } from '../list/ListGroup'
 import { ConfirmModal } from '../ConfirmModal'
 import { presentPrMerge, resolveMobileAdminMergeBypassRequired } from './pr-actions-state'
-import { PrCreateSheet } from './PrCreateSheet'
+import { PrCreateSheet, type PrCreateKept } from './PrCreateSheet'
 import { PrReviewersSheet } from './PrReviewersSheet'
-import { livePrDetails, readyPrData, type MobilePrTab, type PrTabSheet } from './use-mobile-pr-tab'
+import {
+  livePrDetails,
+  readyPrData,
+  type MobilePrTab,
+  type PrTabSheetRequest
+} from './use-mobile-pr-tab'
 import { prSheetStyles as sheetStyles } from './pr-tab-styles'
+import { FieldTextInput } from '../composer-input/FieldTextInput'
+
+type PrEditKept = { key: string; base: string; text: string }
 
 // Sheets for the PR tab's decisions; one Modal swaps between them so iOS never stacks presentations.
 export function MobilePrTabSheets({ tab }: { tab: MobilePrTab }) {
   useMobileColorScheme()
   const t = useMobileTranslation()
+  // Each sheet unmounts on Cancel; typed text waits here for the next open.
+  const [createKept, setCreateKept] = useState<PrCreateKept | null>(null)
+  const [titleKept, setTitleKept] = useState<PrEditKept | null>(null)
+  const [bodyKept, setBodyKept] = useState<PrEditKept | null>(null)
   return (
     <>
       <KeyedBottomDrawer
-        sheet={tab.sheet}
-        sheetKey={(sheet: PrTabSheet) => sheet}
+        sheet={tab.sheetRequest}
+        // Each opened request is its own presentation, so a PR switch never refreshes one sheet into another PR's.
+        sheetKey={(request: PrTabSheetRequest) => `${request.kind}\u0000${request.id}`}
         onClose={tab.closeSheet}
         onAfterClose={tab.onSheetAfterClose}
         dismissible={!tab.creatingPr}
         dragContentToDismiss={false}
       >
-        {(sheet) => {
-          switch (sheet) {
+        {(request) => {
+          // An outgoing request whose PR departed renders nothing; it never sees the new PR's actions.
+          if (!tab.sheetInScope(request)) {
+            return null
+          }
+          switch (request.kind) {
             case 'merge':
-              return <PrMergeSheet tab={tab} />
+              return <PrMergeSheet tab={tab} request={request} />
             case 'reviewers':
-              return <PrReviewersSheet tab={tab} />
+              return <PrReviewersSheet tab={tab} request={request} />
             case 'editTitle':
-              return <PrEditTextSheet tab={tab} field="title" />
+              return (
+                <PrEditTextSheet
+                  tab={tab}
+                  request={request}
+                  field="title"
+                  kept={titleKept}
+                  onKeep={setTitleKept}
+                />
+              )
             case 'editDescription':
-              return <PrEditTextSheet tab={tab} field="body" />
+              return (
+                <PrEditTextSheet
+                  tab={tab}
+                  request={request}
+                  field="body"
+                  kept={bodyKept}
+                  onKeep={setBodyKept}
+                />
+              )
             case 'createPr':
-              return <PrCreateSheet tab={tab} />
+              return <PrCreateSheet tab={tab} kept={createKept} onKeep={setCreateKept} />
           }
         }}
       </KeyedBottomDrawer>
@@ -79,7 +111,7 @@ function mergeMethodCopy(
 }
 
 // Lists only the methods the repo allows, starting on its default; mobile used to merge with the default only.
-function PrMergeSheet({ tab }: { tab: MobilePrTab }) {
+function PrMergeSheet({ tab, request }: { tab: MobilePrTab; request: PrTabSheetRequest }) {
   useMobileColorScheme()
   const t = useMobileTranslation()
   const data = readyPrData(tab)
@@ -100,13 +132,17 @@ function PrMergeSheet({ tab }: { tab: MobilePrTab }) {
   const adminBypassRequired = resolveMobileAdminMergeBypassRequired(pr)
   const awaitingBypassConfirm = adminBypassRequired && !bypassConfirmed
   const run = async () => {
+    // A click from an outgoing presentation sends nothing.
+    if (!tab.ownsSheet(request)) {
+      return
+    }
     if (awaitingBypassConfirm) {
       setBypassConfirmed(true)
       return
     }
     setSubmitted(true)
     if (await tab.actions.merge(method, adminBypassRequired)) {
-      tab.closeSheetIf('merge')
+      tab.closeSheetIf(request)
     }
   }
   return (
@@ -164,18 +200,59 @@ function PrMergeSheet({ tab }: { tab: MobilePrTab }) {
   )
 }
 
-function PrEditTextSheet({ tab, field }: { tab: MobilePrTab; field: 'title' | 'body' }) {
+function PrEditTextSheet({
+  tab,
+  request,
+  field,
+  kept,
+  onKeep
+}: {
+  tab: MobilePrTab
+  request: PrTabSheetRequest
+  field: 'title' | 'body'
+  kept: PrEditKept | null
+  onKeep: (kept: PrEditKept | null) => void
+}) {
   useMobileColorScheme()
   const t = useMobileTranslation()
   const data = readyPrData(tab)
   const details = livePrDetails(data?.details ?? null)
   const current =
     field === 'title' ? (details?.item.title ?? data?.pr.title ?? '') : (details?.body ?? '')
-  const [draft, setDraft] = useState(current)
+  const keepKey = request.scope.resource
+  // An edit typed against text the PR still has comes back; once the PR text changes it would revert someone's edit.
+  const [base] = useState(current)
+  const [draft, setDraft] = useState(() =>
+    kept && kept.key === keepKey && kept.base === current ? kept.text : current
+  )
+  // Closing keeps a changed, unsaved draft for the next open, and drops this PR's kept one otherwise.
+  const savedRef = useRef(false)
+  const closeRef = useRef({ keepKey, base, draft, kept, onKeep })
+  useLayoutEffect(() => {
+    closeRef.current = { keepKey, base, draft, kept, onKeep }
+  })
+  useEffect(
+    () => () => {
+      const close = closeRef.current
+      if (!close.keepKey) {
+        return
+      }
+      if (!savedRef.current && close.draft !== close.base) {
+        close.onKeep({ key: close.keepKey, base: close.base, text: close.draft })
+      } else if (close.kept?.key === close.keepKey) {
+        close.onKeep(null)
+      }
+    },
+    []
+  )
   const { textAction } = tab
   const save = async () => {
+    if (!tab.ownsSheet(request)) {
+      return
+    }
     if (await textAction.save(field, draft, current)) {
-      tab.closeSheetIf(field === 'title' ? 'editTitle' : 'editDescription')
+      savedRef.current = true
+      tab.closeSheetIf(request)
     }
   }
   const cancel = () => {
@@ -200,14 +277,15 @@ function PrEditTextSheet({ tab, field }: { tab: MobilePrTab; field: 'title' | 'b
         }}
       />
       <View style={sheetStyles.body}>
-        <TextInput
+        <FieldTextInput
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(value) => {
+            textAction.touch()
+            setDraft(value)
+          }}
           editable={!textAction.saving}
           autoFocus
           multiline={field === 'body'}
-          placeholderTextColor={colors.textMuted}
-          selectionColor={colors.accentBlue}
           style={[sheetStyles.field, field === 'body' && sheetStyles.multiline]}
         />
         {textAction.error ? <Text style={sheetStyles.error}>{textAction.error}</Text> : null}
@@ -255,14 +333,7 @@ function PrTabConfirm({ tab, t }: { tab: MobilePrTab; t: Translate }) {
       message={copy.message}
       confirmLabel={copy.confirmLabel}
       destructive={tab.confirm === 'close'}
-      onConfirm={() => {
-        if (tab.confirm === 'unlink') {
-          void tab.unlink()
-        } else if (tab.confirm) {
-          tab.actions.updateState(tab.confirm === 'close' ? 'closed' : 'open')
-        }
-        tab.setConfirm(null)
-      }}
+      onConfirm={tab.runConfirm}
       onCancel={() => tab.setConfirm(null)}
     />
   )

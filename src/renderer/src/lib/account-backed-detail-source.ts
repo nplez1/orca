@@ -1,9 +1,9 @@
 import {
   ACCOUNT_BACKED_TASK_SOURCE_PROJECT_ID,
   normalizeTaskSourceContext,
-  type TaskProvider,
   type TaskSourceContext
-} from '../../../shared/task-source-context'
+} from '../../../shared/work-items/task-source-context'
+import type { TaskProvider } from '../../../shared/work-items/task-providers'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 
 /**

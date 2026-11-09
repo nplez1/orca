@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import {
   enablesNewTuiAgents,
   refreshDetectedAgentInventories,
   type AgentInventoryRefreshState
 } from './agent-enablement-redetection'
-import { getRuntimeAgentInventoryKey } from './runtime-agent-inventory-key'
-import { makeWorktree } from './worktrees-slice-test-fixtures'
-import { makeFolderWorkspace } from '@/components/sidebar/folder-workspace-composer-submit-fixtures'
+import { getRuntimeAgentInventoryKey } from './agent-inventory/runtime-agent-inventory-key'
+import { makeWorktree } from './worktrees/worktree.test-fixture'
+import { makeFolderWorkspace } from '../../components/sidebar/workspace-creation/folder/folder-workspace-composer-submit-fixtures'
 
 function makeRefreshState(overrides: Partial<AgentInventoryRefreshState> = {}): {
   state: AgentInventoryRefreshState

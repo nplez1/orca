@@ -1,11 +1,11 @@
 // Session summary: a materialized view over an agent session's transcript,
 // folded only while the user reads the summary pane. See docs/reference/session-summary.md.
-import type { AgentStatusState, AgentType } from './agent-status-types'
+import type { AgentStatusState, AgentType } from './agent-status/contracts/agent-status-types'
 import {
   normalizeAgentProviderSession,
   type AgentProviderSessionMetadata
 } from './agent-session/lifecycle/agent-session-resume'
-import type { ResolvedSourceControlAiGenerationParams } from './source-control-ai'
+import type { ResolvedSourceControlAiGenerationParams } from './source-control/ai/source-control-ai-operation-resolution'
 
 export const SESSION_SUMMARY_TIMELINE_KINDS = [
   'milestone',

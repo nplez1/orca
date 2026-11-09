@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
-import { BrowserLinkRoutingSetting } from './BrowserLinkRoutingSetting'
+import { BrowserLinkRoutingSetting } from './browser/routing/BrowserLinkRoutingSetting'
 
 const fake = vi.hoisted(() => ({ query: '' }))
 

@@ -1,8 +1,8 @@
-import { NameFilterPathMatcher } from '../../../../shared/quick-open-path-search'
+import { NameFilterPathMatcher } from '../../../../shared/quick-open/quick-open-path-search'
 import {
   buildExcludePathPrefixes,
   shouldExcludeQuickOpenRelPath
-} from '../../../../shared/quick-open-filter'
+} from '../../../../shared/quick-open/quick-open-filter'
 import type { FilePathSearchResult } from '../../../../shared/file-path-search-result'
 import {
   WORKSPACE_PATH_SEARCH_LOCAL_EXPLORER_MAX_PAGE_PATHS,
@@ -16,10 +16,10 @@ import { parseWorkspacePathSearchWireResponse } from '../../../../shared/workspa
 import { toFilePathSearchResult } from '../../../../shared/workspace-path-search-file-result'
 import { RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR } from '../../../../shared/workspace-path-search-capability'
 import { readWebWorkspacePathSearchCapability } from './web-workspace-path-search-capability'
-import type { RuntimeFileListResult } from '../../../../shared/runtime-types'
+import type { RuntimeFileListResult } from '../../../../shared/file-listing/runtime-file-list'
 import { callRuntimeResult } from './web-runtime-calls'
-import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
-import { createBrowserUuid } from '@/lib/browser-uuid'
+import { toRuntimeWorktreeSelector } from '../../runtime/rpc/targets/runtime-worktree-selector'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../../shared/non-secure-context-uuid'
 
 export async function searchWebWorkspaceNameFilter(args: {
   worktree: { id: string; path: string }

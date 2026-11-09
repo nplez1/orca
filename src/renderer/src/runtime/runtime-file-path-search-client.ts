@@ -1,20 +1,20 @@
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
-import type { PathSearchMode } from '../../../shared/quick-open-path-search'
+import type { PathSearchMode } from '../../../shared/quick-open/quick-open-path-search'
 import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
 import { validateWorkspacePathSearchQuery } from '../../../shared/workspace-path-search-contract'
-import type { RuntimeFileListResult } from '../../../shared/runtime-types'
+import type { RuntimeFileListResult } from '../../../shared/file-listing/runtime-file-list'
 import {
   buildExcludePathPrefixes,
   shouldExcludeQuickOpenRelPath
-} from '../../../shared/quick-open-filter'
-import type { RuntimeFileOperationArgs } from './runtime-file-client-types'
+} from '../../../shared/quick-open/quick-open-filter'
+import type { RuntimeFileOperationArgs } from './files/runtime-file-client-types'
 import {
   hasCachedLegacyQuickOpenInventory,
   searchLegacyQuickOpenInventory
-} from './runtime-legacy-quick-open-inventory'
+} from './files/search/runtime-legacy-quick-open-inventory'
 import { callRuntimeRpc, RuntimeRpcCallError } from './runtime-rpc-client'
 import { searchRuntimeNameFilterPaths } from './runtime-workspace-path-search-client'
-import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
+import { toRuntimeWorktreeSelector } from './rpc/targets/runtime-worktree-selector'
 
 const QUICK_OPEN_REMOTE_UPDATE_REQUIRED_MESSAGE =
   'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'

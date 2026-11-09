@@ -2,9 +2,9 @@ import {
   isScreenInteractivePromptReason,
   type ScreenPromptObservation
 } from '../../../../shared/agent-screen-prompt'
-import { OrcaRuntimeWithAgentPromptRequestCorrelation } from '../../orca-runtime-agent-prompt-request-correlation'
-import { detectTerminalWaitBlockedReason } from '../../terminal-wait-detection'
-import { getPiStateTitleStatus } from '../../../../shared/pi-state-title-marker'
+import { OrcaRuntimeWithAgentPromptRequestCorrelation } from '../input/orca-runtime-agent-prompt-request-correlation'
+import { detectTerminalWaitBlockedReason } from './terminal-wait-detection'
+import { getPiStateTitleStatus } from '../../../../shared/agent-status/title/providers/pi-state-title-marker'
 import { PiAskDialogScreenGained } from '../../pi-ask-dialog-screen'
 import { CopilotScreenPromptGained } from '../../copilot-screen-prompt'
 

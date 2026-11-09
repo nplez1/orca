@@ -19,6 +19,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 describe('window-close-request-coordinator', () => {
   const confirmWindowClose = vi.fn()
   const cancelQuit = vi.fn()
+  const cancelWindowClose = vi.fn()
   const unregisterFns: (() => void)[] = []
 
   const addGuard = (guard: () => boolean | Promise<boolean>): void => {
@@ -28,13 +29,12 @@ describe('window-close-request-coordinator', () => {
   beforeEach(() => {
     confirmWindowClose.mockClear()
     cancelQuit.mockClear()
+    cancelWindowClose.mockClear()
     vi.mocked(toast.error).mockClear()
     // Without a rich close handler, dispatch uses only this preload fallback surface.
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the coordinator reads only api.ui.
-    const windowTarget = new EventTarget() as EventTarget & {
-      api: { ui: { confirmWindowClose: () => void; cancelQuit: () => void } }
-    }
-    windowTarget.api = { ui: { confirmWindowClose, cancelQuit } }
+    const windowTarget = Object.assign(new EventTarget(), {
+      api: { ui: { confirmWindowClose, cancelWindowClose, cancelQuit } }
+    })
     ;(globalThis as unknown as { window: typeof windowTarget }).window = windowTarget
   })
 
@@ -55,6 +55,7 @@ describe('window-close-request-coordinator', () => {
 
     expect(beforeUnload).toHaveBeenCalledTimes(1)
     expect(confirmWindowClose).not.toHaveBeenCalled()
+    expect(cancelWindowClose).toHaveBeenCalledTimes(1)
     expect(toast.error).not.toHaveBeenCalled()
     expect(isWindowCloseCheckpointInProgress()).toBe(false)
   })
@@ -97,6 +98,7 @@ describe('window-close-request-coordinator', () => {
     await dispatchWindowCloseRequest({ isQuitting: true })
 
     expect(confirmWindowClose).not.toHaveBeenCalled()
+    expect(cancelWindowClose).toHaveBeenCalledTimes(1)
     expect(handler).not.toHaveBeenCalled()
     expect(toast.error).not.toHaveBeenCalled()
     // Main latched `isQuitting` in before-quit; a silent veto left it latched (A6).

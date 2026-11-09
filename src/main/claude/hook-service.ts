@@ -4,10 +4,13 @@ import {
   listClaudeProfileHomes,
   listClaudeProfileHomesAsync
 } from '../claude-accounts/claude-profile-homes'
-import type { AgentHookSource } from '../../shared/agent-hook-relay'
+import type { AgentHookSource } from '../../shared/agent-hook-listener/transport/agent-hook-relay'
 import type { SFTPWrapper } from 'ssh2'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
-import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import type {
+  AgentHookInstallState,
+  AgentHookInstallStatus
+} from '../../shared/agent-hook-listener/configuration/agent-hook-types'
 import {
   buildManagedCommandHook,
   readHooksJson,
@@ -25,7 +28,7 @@ import {
   removeClaudeAgentViewRemote,
   refreshClaudeAgentView,
   removeClaudeAgentView
-} from './agent-view-install'
+} from './agent-view/agent-view-install'
 import {
   getWindowsClaudeHookExecutablePath,
   getWindowsClaudeHookFileStatus,
@@ -100,7 +103,8 @@ export class ClaudeHookService {
       source: this.options.source,
       skipWhenDevinImportsClaude: this.options.agent === 'claude',
       skipWhenGrokImportsClaude: this.options.agent === 'claude',
-      skipWhenCursorImportsClaude: this.options.agent === 'claude'
+      skipWhenCursorImportsClaude: this.options.agent === 'claude',
+      decidesPreToolUse: this.options.agent === 'claude'
     })
   }
 

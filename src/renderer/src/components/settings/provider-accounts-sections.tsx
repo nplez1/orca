@@ -18,8 +18,8 @@ import {
   DeepSeekIcon,
   FireworksIcon
 } from '../status-bar/fork-usage-providers'
-import type { SettingsSearchEntry } from './settings-search'
-import type { AccountsPaneSectionModel } from './accounts-pane-types'
+import type { SettingsSearchEntry } from './search/settings-search'
+import type { AccountsPaneSectionModel } from './accounts/accounts-pane-types'
 import type { ProviderAccountsIcon } from './ProviderAccountsSection'
 import { ProviderHeaderLink } from './ProviderAccountsSection'
 import {
@@ -34,27 +34,34 @@ import {
   getAccountsGrokSearchEntries,
   getAccountsKimiSearchEntries,
   getAccountsMiniMaxSearchEntries,
+  getAccountsMuseSearchEntries,
   getAccountsOpencodeSearchEntries,
   getAccountsZcodePlanSearchEntries
-} from './accounts-search'
-import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
-import type { UsageCredentialHost } from './usage-credential-host'
-import type { UsageHostSettingsModel } from './use-usage-host-settings'
-import { renderClaudeAccountsSection } from './accounts-pane-claude-section'
-import { renderCodexAccountsSection } from './accounts-pane-codex-section'
+} from './accounts/accounts-search'
+import { getAccountsClaudeSearchEntries } from './accounts/accounts-claude-search'
+import type { UsageCredentialHost } from './accounts/usage/usage-credential-host'
+import type { UsageHostSettingsModel } from './accounts/usage/use-usage-host-settings'
+import { renderClaudeAccountsSection } from './accounts/claude/accounts-pane-claude-section'
+import { renderCodexAccountsSection } from './accounts/codex/accounts-pane-codex-section'
 import {
   renderGeminiAccountsSection,
   renderOpenCodeAccountsSection
-} from './accounts-pane-provider-setting-sections'
-import { AntigravityAccountsSection } from './AntigravityAccountsSection'
-import { MiniMaxAccountsSection, getMiniMaxConsoleUrl } from './MiniMaxAccountsSection'
+} from './accounts/providers/accounts-pane-provider-setting-sections'
+import { AntigravityAccountsSection } from './accounts/providers/AntigravityAccountsSection'
+import {
+  MiniMaxAccountsSection,
+  getMiniMaxConsoleUrl
+} from './accounts/usage/MiniMaxAccountsSection'
 import { renderDeepSeekAccountsSection } from './accounts-pane-deepseek-section'
 import { renderDeepInfraAccountsSection } from './accounts-pane-deepinfra-section'
 import { renderFireworksAccountsSection } from './accounts-pane-fireworks-section'
 import { renderCopilotAccountsSection } from './accounts-pane-copilot-section'
-import { GrokAccountsSection } from './GrokAccountsSection'
-import { CursorAccountsSection } from './CursorAccountsSection'
-import { ZcodePlanAccountsSection, resolveZcodePlanSite } from './ZcodePlanAccountsSection'
+import { GrokAccountsSection } from './accounts/providers/GrokAccountsSection'
+import { CursorAccountsSection } from './accounts/providers/CursorAccountsSection'
+import {
+  ZcodePlanAccountsSection,
+  resolveZcodePlanSite
+} from './accounts/usage/ZcodePlanAccountsSection'
 
 export type ProviderAccountsSectionContext = {
   model: AccountsPaneSectionModel
@@ -102,6 +109,7 @@ const AntigravityIcon: ProviderAccountsIcon = ({ size }) => (
   <AgentIcon agent="antigravity" size={size} />
 )
 const ZcodeIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="zcode" size={size} />
+const MuseIcon: ProviderAccountsIcon = ({ size }) => <AgentIcon agent="muse" size={size} />
 
 export const getProviderAccountsSections = createLocalizedCatalog(
   (): ProviderAccountsSectionEntry[] => [
@@ -370,6 +378,17 @@ export const getProviderAccountsSections = createLocalizedCatalog(
           usageSettings={usageHostSettings}
         />
       )
+    },
+    {
+      id: 'muse',
+      title: translate('auto.lib.agent.catalog.muse_label', 'Muse'),
+      // Why no body: Muse quota comes from the Muse CLI's own sign-in.
+      description: translate(
+        'settings.appearance.statusBar.museToggleDescription',
+        'Show Muse subscription quota from the Muse CLI.'
+      ),
+      Icon: MuseIcon,
+      searchEntries: getAccountsMuseSearchEntries
     }
   ]
 )

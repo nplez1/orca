@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
 import { WORKSPACE_PATH_CATALOG_FLAGS } from '../../shared/workspace-path-catalog'
-import { compareFileNames } from '../../shared/file-name-sort'
+import { compareFileNames } from '../../shared/file-listing/file-name-sort'
 import type { WorkspacePathSpillRecord } from './workspace-path-catalog-spill'
 import { checkSpillCancelled, type RunFile } from './workspace-path-catalog-spill-runs-file-writer'
 import { RunCursor } from './workspace-path-catalog-spill-runs-run-cursor'

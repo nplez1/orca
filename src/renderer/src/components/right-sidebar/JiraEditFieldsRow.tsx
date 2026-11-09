@@ -10,7 +10,7 @@ import {
   type JiraIssueFieldOutcome
 } from '@/components/jira-issue-edit-fields-dialog'
 import { translate } from '@/i18n/i18n'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 
 /** Property row plus its dialog, so the pane keeps only the row. */

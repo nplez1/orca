@@ -12,11 +12,12 @@ import { JiraIssueAssigneeControl } from '@/components/jira-issue-assignee-contr
 import { JiraSprintPicker, backlogLabel, sprintTriggerLabel } from '@/components/jira-sprint-picker'
 import { JiraIssueStoryPointsControl } from '@/components/jira-issue-story-points-control'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import { JiraIssueTransitionControl } from './jira-issue-transition-control'
+import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import type {
   JiraEditableField,
   JiraIssue,
@@ -45,6 +46,8 @@ export function JiraIssueWorkspaceHeader({
   onOpenOrStartWorkspace: (issue: JiraIssue) => void
   onClose: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
+  const intlLocale = useIntlLocale()
   return (
     <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
       <div className="flex items-start gap-3">
@@ -53,7 +56,7 @@ export function JiraIssueWorkspaceHeader({
             <span className="font-mono">{displayed.key}</span>
             {displayed.siteName ? <span>{displayed.siteName}</span> : null}
             <span>{displayed.project.key}</span>
-            <span>{formatUiRelativeTimeFromDate(displayed.updatedAt)}</span>
+            <span>{formatUiRelativeTimeFromDate(displayed.updatedAt, undefined, intlLocale)}</span>
             {issueLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
           </div>
           <h2 className="mt-1 text-xl font-semibold leading-tight text-foreground">
@@ -81,7 +84,7 @@ export function JiraIssueWorkspaceHeader({
               size="icon-sm"
               className="shrink-0"
               onClick={onClose}
-              aria-label={translate(
+              aria-label={t(
                 'auto.components.JiraIssueWorkspace.76513c7898',
                 'Close Jira issue preview'
               )}
@@ -90,7 +93,7 @@ export function JiraIssueWorkspaceHeader({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
-            {translate('auto.components.JiraIssueWorkspace.7a96985ca0', 'Close')}
+            {t('auto.components.JiraIssueWorkspace.7a96985ca0', 'Close')}
           </TooltipContent>
         </Tooltip>
       </div>

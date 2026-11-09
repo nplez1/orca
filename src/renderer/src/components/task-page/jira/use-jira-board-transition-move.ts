@@ -7,8 +7,8 @@ import type {
   JiraTransition
 } from '../../../../../shared/jira/jira-types'
 import type { JiraTransitionSubmitOutcome } from '../../jira-transition-fields-form'
-import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import { jiraUpdateIssue } from '../../../runtime/jira/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 

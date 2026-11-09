@@ -9,11 +9,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import { getDefaultSettings } from '../../../../shared/constants'
-import type { KnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
-import { createCompatibleRuntimeStatusResponseIfNeeded } from '../../runtime/runtime-compatibility-test-fixture'
+import type { KnownRuntimeEnvironment } from '../../../../shared/remote-runtime/host-catalog/runtime-environments'
+import { createCompatibleRuntimeStatusResponseIfNeeded } from '../../runtime/rpc/testing/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 import { createTestStore, makeLayout, makeTab, makeWorktree, seedStore } from './store-test-helpers'
-import { createStoreCascadesMockApi } from './store-cascades-test-harness'
+import { createStoreCascadesMockApi } from '../testing/app-store-cascade-api.test-fixture'
 import { resolveUnreachableVmRemovalFallback } from './worktrees/teardown/unreachable-vm-workspace-release'
 import type * as AgentStatusModule from '@/lib/agent-status'
 
@@ -21,7 +21,7 @@ vi.mock('sonner', () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn(), warning: vi.fn() }
 }))
 
-vi.mock('@/components/terminal-pane/pty-dispatcher', () => ({
+vi.mock('@/components/terminal-pane/pty-transport/delivery/pty-dispatcher.ts', () => ({
   restorePtyDataHandlersAfterFailedShutdown: vi.fn(),
   unregisterPtyDataHandlers: vi.fn(() => [])
 }))

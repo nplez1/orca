@@ -1,7 +1,7 @@
 import type { WorkspacePathSearchPathSet } from './workspace-path-search-contract'
 import type { WorkspacePathCatalogOverlay } from './workspace-path-catalog-overlay'
-import { compareFileNames } from './file-name-sort'
-import { shouldIncludeQuickOpenPath } from './quick-open-filter'
+import { compareFileNames } from './file-listing/file-name-sort'
+import { shouldIncludeQuickOpenPath } from './quick-open/quick-open-filter'
 import type { WorkspacePathCatalogTrigramPostings } from './workspace-path-catalog-trigram'
 import {
   getWorkspacePathCatalogBlockPath,

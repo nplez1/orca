@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, renderHook } from '@testing-library/react'
 import { useAppStore } from '@/store'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { makeWorktree } from '../worktree-jump-palette-test-fixtures'
-import { useWorktreeCardLinkedDetails } from './use-worktree-card-linked-details'
+import { makeWorktree } from '../worktree-jump/worktree-jump-palette-test-fixtures'
+import { useWorktreeCardLinkedDetails } from './workspace-card/details/use-worktree-card-linked-details'
 
 const initialState = useAppStore.getInitialState()
 

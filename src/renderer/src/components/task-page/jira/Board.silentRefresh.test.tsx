@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   jiraUpdateIssue: vi.fn()
 }))
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraGetBoardOverview: (...args: unknown[]) => mocks.jiraGetBoardOverview(...args),
   jiraListBoardIssues: (...args: unknown[]) => mocks.jiraListBoardIssues(...args),
   jiraListTransitions: (...args: unknown[]) => mocks.jiraListTransitions(...args),

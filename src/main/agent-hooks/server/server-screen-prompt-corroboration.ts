@@ -3,7 +3,7 @@ import {
   needsScreenPromptCorroboration,
   type ScreenPromptObservation
 } from '../../../shared/agent-screen-prompt'
-import { CodexSubagentPollScheduler } from '../../../shared/codex-subagent-poll-scheduler'
+import { CodexSubagentPollScheduler } from '../../../shared/agent-hook-listener/transcripts/codex-subagent-poll-scheduler'
 import type { AgentHookEventPayload } from '../../../shared/agent-hook-listener/listener-event'
 import type { EnrichedAgentHookEventPayload } from './server-types'
 

@@ -1,4 +1,4 @@
-import type { CommitMessageAiSettings } from './commit-message-ai-types'
+import type { CommitMessageAiSettings } from './source-control/ai/generation/commit-message-ai-types'
 
 /**
  * Agent, model, and thinking level for the session-summary fold.

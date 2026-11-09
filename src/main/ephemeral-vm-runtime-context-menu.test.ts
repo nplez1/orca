@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({
   getRuntimeRecipeContext: mocks.getRuntimeRecipeContext
 }))
-vi.mock('../shared/runtime-environment-store', () => ({
+vi.mock('../shared/remote-runtime/host-store/runtime-environment-store.ts', () => ({
   listEnvironments: mocks.listEnvironments
 }))
 

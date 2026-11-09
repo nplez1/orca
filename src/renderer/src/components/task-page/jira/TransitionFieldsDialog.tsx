@@ -11,7 +11,7 @@ import {
 } from '@/components/jira-transition-fields-form'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
 
 export type JiraTransitionFieldsRequest = {
   issue: JiraIssue

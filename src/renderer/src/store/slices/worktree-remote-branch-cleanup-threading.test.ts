@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { RemoteBranchCleanup } from '../../../../shared/worktree/remote-branch-removal'
-import { makeWorktree } from './worktrees-slice-test-fixtures'
+import { makeWorktree } from './worktrees/worktree.test-fixture'
 import {
   createTestStore,
   mockApi,
   resetRemoteRuntimeMocks,
   resetWorktreeSliceModuleMemory,
   runtimeEnvironmentCall
-} from './worktrees-slice-test-harness'
+} from './worktrees/worktrees-slice-test-harness'
 
 vi.mock('sonner', () => ({
   toast: {

@@ -21,13 +21,13 @@ export function useSourceControlReviewContext(panelState: SourceControlPanelStat
     activeWorktree,
     activeWorktreeId,
     branchName,
-    createPrIntentCurrentTargetRef,
     ensureHostedReviewPushTarget,
     hostedReviewCacheKey,
     hostedReviewEntry,
     hostedReviewEntryData,
     isBranchVisible,
     isFolder,
+    operationStore,
     remoteStatus,
     settings,
     worktreePath
@@ -88,8 +88,8 @@ export function useSourceControlReviewContext(panelState: SourceControlPanelStat
     activeRepoId,
     activeWorktreeId,
     branchName,
-    createPrIntentCurrentTargetRef,
     effectiveBaseRef,
+    operationStore,
     worktreePath
   })
   const linkedReviews = useSourceControlLinkedReviews({

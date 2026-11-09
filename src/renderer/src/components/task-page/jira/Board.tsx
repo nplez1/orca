@@ -25,7 +25,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { translate } from '@/i18n/i18n'
-import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
+import { jiraUpdateIssue } from '../../../runtime/jira/runtime-jira-client'
 import { toast } from 'sonner'
 import { LoaderCircle } from 'lucide-react'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'

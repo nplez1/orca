@@ -6,7 +6,7 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane, PaneManager } from '@/lib/pane-manager/pane-manager'
-import { useTerminalContextMenuTrigger } from './use-terminal-context-menu-trigger'
+import { useTerminalContextMenuTrigger } from './context-menu/use-terminal-context-menu-trigger'
 
 type TestTerminal = {
   element: HTMLDivElement

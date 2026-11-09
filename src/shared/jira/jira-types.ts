@@ -1,5 +1,5 @@
 import type { SecretAtRestProtection } from '../secret-at-rest-protection'
-import type { TaskProviderErrorCode } from '../task-provider-failure'
+import type { TaskProviderErrorCode } from '../work-items/task-provider-failure'
 // Cloud uses email/token Basic auth and REST v3; Server/Data Center uses PAT Bearer auth and REST v2. Legacy absent values mean cloud.
 export type JiraAuthType = 'cloud' | 'server'
 

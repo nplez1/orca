@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { HostedReviewInfo } from '../../../../shared/hosted-review'
+import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type { PRInfo } from '../../../../shared/github/pull-request-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -48,7 +48,7 @@ vi.mock('@/store', () => {
   }
 })
 
-vi.mock('@/lib/worktree-activation', () => ({
+vi.mock('@/lib/workspace/activation/worktree-activation.ts', () => ({
   activateAndRevealWorktree: vi.fn()
 }))
 
@@ -58,24 +58,24 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>
 }))
 
-vi.mock('./use-worktree-activity-status', () => ({
+vi.mock('./workspace-card/activity/use-worktree-activity-status.ts', () => ({
   useWorktreeActivityStatus: () => 'active'
 }))
 
-vi.mock('./use-worktree-sleep-state', () => ({
+vi.mock('./workspace-actions/sleep/use-worktree-sleep-state.ts', () => ({
   useIsSleepingWorktree: () => false
 }))
 
-vi.mock('./CacheTimer', () => ({
+vi.mock('./workspace-card/activity/CacheTimer.tsx', () => ({
   default: () => null,
   usePromptCacheCountdownStartedAt: () => null
 }))
 
-vi.mock('./WorktreeCardAgents', () => ({
+vi.mock('./workspace-card/activity/WorktreeCardAgents.tsx', () => ({
   default: () => null
 }))
 
-vi.mock('./WorktreeContextMenu', () => ({
+vi.mock('./workspace-actions/context-menu/WorktreeContextMenu.tsx', () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>,
   WORKTREE_NATIVE_CONTEXT_MENU_ATTR: 'data-worktree-native-context-menu',
   WORKTREE_CONTEXT_MENU_SCOPE_ATTR: 'data-orca-context-menu-scope'
@@ -178,7 +178,7 @@ describe('WorktreeCard review state follows the Checks pane source', () => {
     prCache = {
       [PR_KEY]: { data: makePRInfo(), fetchedAt: 100 }
     }
-    const { default: WorktreeCard } = await import('./WorktreeCard')
+    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
 
     const markup = renderToStaticMarkup(
       <WorktreeCard worktree={makeWorktree()} repo={makeRepo()} isActive={false} />
@@ -191,7 +191,7 @@ describe('WorktreeCard review state follows the Checks pane source', () => {
   it('shows the merged PR when the hosted-review cache has no review for the branch', async () => {
     hostedReviewCache = { [HOSTED_KEY]: { data: null, fetchedAt: 900 } }
     prCache = { [PR_KEY]: { data: makePRInfo(), fetchedAt: 100 } }
-    const { default: WorktreeCard } = await import('./WorktreeCard')
+    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
 
     const markup = renderToStaticMarkup(
       <WorktreeCard worktree={makeWorktree()} repo={makeRepo()} isActive={false} />
@@ -214,7 +214,7 @@ describe('WorktreeCard review state follows the Checks pane source', () => {
         fetchedAt: 900
       }
     }
-    const { default: WorktreeCard } = await import('./WorktreeCard')
+    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
 
     const markup = renderToStaticMarkup(
       <WorktreeCard worktree={makeWorktree()} repo={makeRepo()} isActive={false} />
@@ -235,7 +235,7 @@ describe('WorktreeCard review state follows the Checks pane source', () => {
     prCache = {
       [PR_KEY]: { data: makePRInfo({ headSha: 'old-head' }), fetchedAt: 100 }
     }
-    const { default: WorktreeCard } = await import('./WorktreeCard')
+    const { default: WorktreeCard } = await import('./workspace-card/surface/WorktreeCard')
 
     const markup = renderToStaticMarkup(
       <WorktreeCard

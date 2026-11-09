@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TEST_REPO, makeWorktree } from './worktrees-slice-test-fixtures'
+import { TEST_REPO } from '../repos/repo.test-fixture'
+import { makeWorktree } from './worktrees/worktree.test-fixture'
 import {
   createTestStore,
   mockApi,
   resetRemoteRuntimeMocks,
   resetWorktreeSliceModuleMemory
-} from './worktrees-slice-test-harness'
+} from './worktrees/worktrees-slice-test-harness'
 
 vi.mock('sonner', () => ({
   toast: {

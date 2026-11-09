@@ -6,8 +6,8 @@ import { isAgentSessionHandleProvider } from '../../../../shared/agent-session/l
 import {
   DEFAULT_DISABLED_TUI_AGENTS,
   filterEnabledTuiAgents
-} from '../../../../shared/tui-agent-selection'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+} from '../../../../shared/agent-launch/catalog/tui-agent-selection'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 
 /** The preferred agent when it is enabled and detected on this worktree's host, else null. */
 export function resolveLaunchableDefaultAgent(

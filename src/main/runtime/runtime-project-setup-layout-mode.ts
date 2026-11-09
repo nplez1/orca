@@ -1,13 +1,13 @@
-import type { RuntimeStore } from './runtime-store-contract'
+import type { RuntimeStore } from './construction/runtime-store-contract'
 import type { Repo } from '../../shared/repo-types'
 import {
   layoutModeNestsWorkspaces,
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
 } from '../../shared/orca-workspace-layout'
-import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
-import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../ipc/worktree-base-directory-watcher'
-import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
+import { invalidateAuthorizedRootsCache } from '../ipc/worktrees/removal/registered-worktree-roots-cache'
+import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../ipc/worktrees/creation/worktree-base-directory-watcher'
+import { prepareLocalWorktreeRootForRepo } from '../workspaces/creation/worktree-root-preparation'
 
 export type ProjectSetupLayoutModeDeps = {
   getStore: () => RuntimeStore | null

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react'
-import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client-types'
+import type { RuntimeFileOperationArgs } from '../runtime/files/runtime-file-client-types'
 import type { listRuntimeFiles } from '@/runtime/runtime-file-client'
-import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
+import { runtimeTargetForOwnerEnvironment } from '../runtime/rpc/targets/runtime-client-target'
 import {
   mergeQuickOpenRecentCandidates,
   useQuickOpenRecentCache

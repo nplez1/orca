@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AiVaultSession } from './ai-vault-types'
+import type { AiVaultSession } from './ai-vault/contracts/ai-vault-types'
 import { aiVaultSubagentParentKey, nestAiVaultSubagentSessions } from './ai-vault-subagent-nesting'
 
 function session(fields: Partial<AiVaultSession> & { sessionId: string }): AiVaultSession {

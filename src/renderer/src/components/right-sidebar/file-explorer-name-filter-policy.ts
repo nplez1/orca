@@ -1,14 +1,14 @@
-import { normalizeRelativePath } from '@/lib/path'
+import { normalizeRelativePath } from '../../../../shared/cross-platform-path'
 import {
   FILE_NAME_FILTER_QUERY_MAX_BYTES,
   isFileNameFilterQueryTooLarge,
   pathMatchesFileNameFilterTokens,
   splitFileNameFilterTokens
-} from '../../../../shared/file-name-filter-tokens'
+} from '../../../../shared/file-listing/file-name-filter-tokens'
 import type { WorkspacePathSearchResponse } from '../../../../shared/workspace-path-search-contract'
 import type { WorkspacePathSearchCorrelationId } from '../../../../shared/workspace-path-search-instrumentation'
-import type { FileExplorerOperationOwner } from './file-explorer-types'
-import { isDotfileRelativePath } from './file-explorer-entries'
+import type { FileExplorerOperationOwner } from './file-explorer/tree/file-explorer-types'
+import { isDotfileRelativePath } from './file-explorer/tree/file-explorer-entries'
 
 export type FileExplorerNameFilterProjectionSource = {
   query: string

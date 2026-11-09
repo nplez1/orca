@@ -20,8 +20,8 @@ vi.mock('./claude/claude-folder-trust-file', () => ({
 import {
   applyWorkspaceTrustOnThisHost,
   type WorkspaceTrustHost
-} from './execution-host-workspace-trust'
-import { SHORT_AGENT_TRUST_WRITE_DEADLINE_MS } from './agent-trust-write-deadline'
+} from './agent-launch/trust/execution-host-workspace-trust'
+import { SHORT_AGENT_TRUST_WRITE_DEADLINE_MS } from './agent-launch/trust/agent-trust-write-deadline'
 
 const HOST: WorkspaceTrustHost = {
   homes: ['/home/me'],

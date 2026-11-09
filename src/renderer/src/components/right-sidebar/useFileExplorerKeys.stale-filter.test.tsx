@@ -3,9 +3,9 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
-import { createFileExplorerRowProjection } from './file-explorer-row-projection'
-import type { TreeNode } from './file-explorer-types'
-import { useFileExplorerKeys } from './useFileExplorerKeys'
+import { createFileExplorerRowProjection } from './file-explorer/tree/file-explorer-row-projection'
+import type { TreeNode } from './file-explorer/tree/file-explorer-types'
+import { useFileExplorerKeys } from './file-explorer/selection/useFileExplorerKeys'
 
 const initialAppState = useAppStore.getInitialState()
 const staleNode: TreeNode = {

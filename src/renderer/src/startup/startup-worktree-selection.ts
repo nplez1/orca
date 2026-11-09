@@ -1,5 +1,5 @@
 import type { Repo } from '../../../shared/repo-types'
-import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
+import type { WorkspaceSessionState } from '../../../shared/workspace-session/workspace-session-state-types'
 import {
   getRepoExecutionHostId,
   parseExecutionHostId,
@@ -8,7 +8,7 @@ import {
 import {
   collectActiveWorktreeHydrationRepoIdsFromSession,
   collectWorktreeHydrationRepoIdsFromSession
-} from '../lib/workspace-session-hydration-keys'
+} from '../lib/workspace/persistence/workspace-session-hydration-keys'
 
 export function selectStartupHydrationRepos(
   repos: readonly Repo[],

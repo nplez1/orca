@@ -4,7 +4,7 @@ import {
   isActiveEmptyWorkspace,
   isWorkspaceEmptiedOnPurpose
 } from './workspace-emptied-on-purpose'
-import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/closed-terminal-tab-tombstones'
+import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/workspace-layout/closed-terminal-tab-tombstones'
 
 const WT = 'repo1::/path/wt1'
 const NOW = 10_000

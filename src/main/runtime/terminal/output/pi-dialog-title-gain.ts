@@ -1,5 +1,5 @@
-import type { AgentStatus } from '../../../../shared/agent-detection'
-import { getPiStateTitleStatus } from '../../../../shared/pi-state-title-marker'
+import type { AgentStatus } from '../../../../shared/agent-status/title/agent-title-core'
+import { getPiStateTitleStatus } from '../../../../shared/agent-status/title/providers/pi-state-title-marker'
 
 /** Tells the hook store the moment a pi pane's own title claims a dialog.
  *

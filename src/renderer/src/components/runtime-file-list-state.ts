@@ -1,6 +1,6 @@
 import type { WorkspacePathSearchResponse } from '../../../shared/workspace-path-search-contract'
 import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
-import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
+import type { FileExplorerOperationOwner } from './right-sidebar/file-explorer/tree/file-explorer-types'
 
 export type RuntimeFileListState = {
   files: string[]

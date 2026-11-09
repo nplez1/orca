@@ -1,44 +1,35 @@
-import { useLinearIssueResult } from '@/hooks/linear-issue-committed-state'
 // @vitest-environment happy-dom
+import { useLinearIssueResult } from '@/hooks/linear-issue-committed-state'
+import { PaginationBar } from '../../src/renderer/src/components/task-page/PaginationBar'
 import {
   reads,
   task,
   store,
-  views,
   listArgs,
   read,
   wire,
-  response,
   fixture,
-  display,
   loadingHook,
   source
 } from '../../src/renderer/src/components/task-page/linear/task-page-linear-refresh-test-fixtures'
-import { TaskPageLinearIssueTable } from '../../src/renderer/src/components/task-page/linear/IssueTable'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import type { TaskPageComposerActionsModel } from '../../src/renderer/src/components/task-page/use-task-page-composer-actions'
 import { useState } from 'react'
-import { workspaceFromLinearData } from '../../src/main/linear/linear-workspace-record'
-import { credentialDecryptionMessage } from '../../src/shared/integration-credential-errors'
-import { writeLinearIssue } from '@/lib/linear-issue-write'
+import { writeLinearIssue } from '@/lib/work-items/linear/linear-issue-write'
 import { defaultScopeHost } from '@/lib/default-creation-host'
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
-import { pendingLinearIssueWrites } from '@/store/slices/linear/linear-issue-publication'
-import { PaginationBar } from '../../src/renderer/src/components/task-page/PaginationBar'
+import { pendingLinearIssueWrites } from '@/store/slices/linear/linear-issue-write-publication'
 import { useTaskPageLinearListProjectionPrelude } from '../../src/renderer/src/components/task-page/linear/use-task-page-linear-list-projection'
 import type { LinearIssue } from '../../src/shared/linear/issue-types'
-import type { TaskSourceContext } from '../../src/shared/task-source-context'
+import type { TaskSourceContext } from '../../src/shared/work-items/task-source-context'
 import { useTaskPageLinearInOrcaEffects } from '../../src/renderer/src/components/task-page/linear/use-task-page-linear-in-orca-effects'
 import { useTaskPageDetailRouting } from '../../src/renderer/src/components/task-page/use-task-page-detail-routing'
 import { useLinearIssueWorkspaceDetail } from '../../src/renderer/src/components/linear-issue-workspace-detail-state'
-import { assert, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { assert, afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor, render, fireEvent, screen } from '@testing-library/react'
-import { deferred } from '../../src/renderer/src/store/slices/linear-slice-test-harness'
+import { deferred } from '../../src/renderer/src/store/slices/linear/linear-slice-test-harness'
 import { clearLinearRequestMaps } from '../../src/renderer/src/store/slices/linear/linear-slice-request-state'
 import { useTaskPageLinearListSelectionPrelude } from '../../src/renderer/src/components/task-page/linear/use-task-page-linear-list-selection'
-import { LinearStateCell } from '../../src/renderer/src/components/task-page/linear/task-page-linear-issue-model'
-import { getTaskSourceCacheScope } from '../../src/shared/task-source-context'
 import { useTaskPageLinearListEffects } from '../../src/renderer/src/components/task-page/linear/use-task-page-linear-list-effects'
+import { getTaskSourceCacheScope } from '../../src/shared/work-items/task-source-context'
 
 const cacheTime = Date.parse('2026-01-01T00:00:00Z')
 beforeEach(() => {
@@ -46,169 +37,6 @@ beforeEach(() => {
   vi.setSystemTime(cacheTime)
 })
 afterEach(() => vi.useRealTimers())
-
-describe('Linear refresh row authority', () => {
-  it.each(views)(
-    '%s displays a successful refresh over expired detail and unrelated search copies',
-    async (view) => {
-      const s = store()
-      s.setState({
-        linearIssueCache: { 'w::DAT-124': { data: task(), fetchedAt: 1 } },
-        linearSearchCache: { 'w::search::old-query::36': { data: [task()], fetchedAt: 1 } }
-      })
-      wire(view).mockResolvedValue(response(view, 'Done'))
-      const result = await read(s, view)
-      assert(result !== null)
-      const rows = Array.isArray(result) ? result : result.items
-      expect(rows[0].state.name).toBe('Done')
-      expect(display(s, rows, view).result.current.displayedLinearIssues[0].state.name).toBe('Done')
-    }
-  )
-})
-
-it.each(['connect', 'test'] as const)(
-  '%s acknowledgement without a revision retires the sole workspace decrypt error in Tasks selection',
-  async (action) => {
-    const s = store()
-    reads.list.mockResolvedValue(response('list', 'In Review'))
-    const result = await s.getState().listLinearIssues(listArgs, { force: true })
-    assert(result !== null)
-    const { items } = result
-    const workspace = workspaceFromLinearData(
-      { displayName: 'User', email: null },
-      { id: 'w', name: 'Acme' }
-    )
-    const message = credentialDecryptionMessage('Linear')
-    s.setState({
-      linearStatus: {
-        connected: true,
-        viewer: workspace,
-        workspaces: [{ ...workspace, credentialRevision: 1 }],
-        activeWorkspaceId: 'w',
-        selectedWorkspaceId: 'w',
-        credentialError: message
-      }
-    })
-    const acknowledgement = { ok: true, viewer: workspace, workspace }
-    reads[action].mockResolvedValue(acknowledgement)
-    function Tasks() {
-      const linearStatus = s((state) => state.linearStatus)
-      const model = { ...fixture(s, items), linearStatus }
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: existing fixture supplies all exercised selection fields; unrelated full-page services are absent.
-      const selection = useTaskPageLinearListSelectionPrelude(model as never)
-      return (
-        <>
-          <output data-testid="account-error">{selection.activeLinearIssueError}</output>
-          <output data-testid="account-rows">
-            {selection.displayedLinearIssues.map((row) => row.state.name).join(',')}
-          </output>
-        </>
-      )
-    }
-    render(<Tasks />)
-    expect(screen.getByTestId('account-error').textContent).toBe(message)
-    expect(screen.getByTestId('account-rows').textContent).toBe('In Review')
-    await act(async () => {
-      const result =
-        action === 'connect'
-          ? await s.getState().connectLinear('fixture-token')
-          : await s.getState().testLinearConnection('w')
-      expect(result).toEqual(acknowledgement)
-    })
-    expect(screen.getByTestId('account-error').textContent).toBe('')
-    expect(screen.getByTestId('account-rows').textContent).toBe('In Review')
-    expect(reads.list).toHaveBeenCalledTimes(1)
-    expect(workspace).not.toHaveProperty('credentialRevision')
-  }
-)
-
-describe('Linear refresh failure', () => {
-  it.each(['list', 'search'] as const)(
-    '%s shows failure while retaining rows, then clears it on successful retry',
-    async (kind) => {
-      const s = store()
-      const query = kind === 'search' ? 'DAT-124' : ''
-      const runtime = kind === 'search' ? reads.search : reads.list
-      runtime.mockResolvedValue(response(kind, 'In Review'))
-      await read(s, kind)
-      runtime.mockRejectedValueOnce(new Error('raw provider private diagnostic'))
-      const hook = loadingHook(s, query)
-      await waitFor(() =>
-        expect(hook.result.current.error).toBe('Unable to load Linear issues. Try again.')
-      )
-      expect(hook.result.current.rows[0].state.name).toBe('In Review')
-      const table = () => {
-        const model = {
-          selectedLinearWorkspaceId: 'w',
-          linearTaskSourceContext: null,
-          selectedLinearIssueId: null,
-          openLinearDetailPage: vi.fn(),
-          linearIssueAttachmentIndex: new Map(),
-          effectiveLinearDisplayProperties: new Set(['state']),
-          linearIssueGridStyle: {},
-          linearIssueListRows: hook.result.current.displayed.map((issue) => ({
-            type: 'issue',
-            issue
-          })),
-          handleOpenOrUseLinearItem: vi.fn()
-        }
-        // SAFETY: this is every input read by the actual Tasks table; loader and selection above are production.
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every rendered Tasks table input is supplied; unrelated page actions are not exercised.
-        const tableModel = model as unknown as TaskPageComposerActionsModel
-        return (
-          <TooltipProvider>
-            <TaskPageLinearIssueTable model={tableModel} />
-          </TooltipProvider>
-        )
-      }
-      const visible = render(table())
-      expect(
-        screen.getAllByRole('button', { name: /Change Linear state from In Review/ })
-      ).toHaveLength(2)
-      runtime.mockResolvedValue(response(kind, 'Done'))
-      hook.rerender({ nonce: 1 })
-      await waitFor(() => expect(hook.result.current.rows[0].state.name).toBe('Done'))
-      expect(hook.result.current.error).toBeNull()
-      visible.rerender(table())
-      expect(screen.getAllByRole('button', { name: /Change Linear state from Done/ })).toHaveLength(
-        2
-      )
-    }
-  )
-})
-
-it('keeps a filtered status-cell success through invalidation and rolls back a later failed edit', async () => {
-  const s = store()
-  s.setState({ recordFeatureInteraction: vi.fn() })
-  reads.list.mockResolvedValue({ items: [task()] })
-  const filter = { stateIds: ['review'], priorities: [], assignee: null, labelIds: [] }
-  const hook = loadingHook(s, '', { linearAttributeFilter: filter })
-  await waitFor(() => expect(reads.list).toHaveBeenCalled())
-  const pending = deferred<{ ok: boolean }>()
-  reads.update.mockReturnValueOnce(pending.promise).mockResolvedValueOnce({ ok: false })
-  const cell = render(<LinearStateCell issue={task()} />)
-  fireEvent.click(screen.getByRole('button', { name: /Change Linear state from/ }))
-  fireEvent.click(screen.getByRole('button', { name: 'Done' }))
-  await waitFor(() => expect(hook.result.current.rows[0].state.name).toBe('Done'))
-  reads.list.mockResolvedValue({ items: [task('Done')] })
-  await act(async () => {
-    pending.resolve({ ok: true })
-    await pending.promise
-  })
-  expect(reads.list).toHaveBeenCalledTimes(2)
-  expect(hook.result.current.rows[0].state.name).toBe('Done')
-  // A separate failed edit starts from the last provider-confirmed row.
-  cell.unmount()
-  reads.list.mockResolvedValue({ items: [task()] })
-  await act(async () => {
-    await s.getState().listLinearIssues({ ...listArgs, attributeFilter: filter }, { force: true })
-  })
-  render(<LinearStateCell issue={task()} />)
-  fireEvent.click(screen.getByRole('button', { name: /Change Linear state from/ }))
-  fireEvent.click(screen.getByRole('button', { name: 'Done' }))
-  await waitFor(() => expect(hook.result.current.rows[0].state.name).toBe('In Review'))
-  expect(reads.update).toHaveBeenCalledTimes(2)
-})
 
 it('retains ordered linked source provenance when two hosts return the same UUID', async () => {
   const s = store()

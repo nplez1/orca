@@ -1,14 +1,14 @@
-import { paneIsCoveredByNativeChat } from '@/components/terminal-pane/native-chat-covered-pane'
-import { requestNativeChatComposerFocus } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
-import { shouldPreserveEditableFocus } from '@/components/terminal-pane/pane-helpers'
-import { refreshTerminalImeInputContext } from '@/components/terminal-pane/terminal-ime-input-context-refresh'
+import { paneIsCoveredByNativeChat } from '../components/terminal-pane/chat/native-chat-covered-pane'
+import { requestNativeChatComposerFocus } from '../components/native-chat/composer/focus/native-chat-composer-focus-intent'
+import { shouldPreserveEditableFocus } from '@/lib/editable-focus-preservation'
+import { refreshTerminalImeInputContext } from '../components/terminal-pane/input/ime/terminal-ime-input-context-refresh'
 import {
   findRegisteredTerminalTab,
   focusRuntimeTerminalSurface
-} from '@/runtime/mounted-terminal-tab-registry'
+} from '../runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-registry'
 import { hasVisibleOverlay } from '@/lib/visible-overlay'
 import { useAppStore } from '@/store'
-import { isEventTargetInsideCurrentTarget } from '@/components/sidebar/worktree-card-dom-events'
+import { isEventTargetInsideCurrentTarget } from '../components/sidebar/workspace-card/controller/worktree-card-dom-events'
 
 /**
  * One policy for where keyboard focus belongs after a pointer gesture.

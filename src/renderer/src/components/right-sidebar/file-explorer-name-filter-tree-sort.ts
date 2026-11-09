@@ -1,5 +1,5 @@
-import { compareFileNames } from '../../../../shared/file-name-sort'
-import type { TreeNode } from './file-explorer-types'
+import { compareFileNames } from '../../../../shared/file-listing/file-name-sort'
+import type { TreeNode } from './file-explorer/tree/file-explorer-types'
 import type { SyntheticTreeEntry } from './file-explorer-name-filter-tree-nodes'
 
 function compareSyntheticTreeEntries(a: SyntheticTreeEntry, b: SyntheticTreeEntry): number {

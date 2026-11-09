@@ -8,7 +8,7 @@ import {
   onEphemeralVmRuntimesPublished,
   refreshEphemeralVmRuntimes
 } from '@/hooks/useEphemeralVmRuntimes'
-import type { WorktreeSlice } from '../../store/slices/worktree-helpers'
+import type { WorktreeSlice } from '../../store/slices/worktrees/worktree-slice-contract'
 import { useAppStore } from '../../store'
 
 /**

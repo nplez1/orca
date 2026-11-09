@@ -1,18 +1,18 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { durableWriteTempPath, writeFileDurableSync } from '../durable-file-write'
+import { durableWriteTempPath, writeFileDurableSync } from '../filesystem/durable-file-write'
 import {
   adoptLegacyHomeStore,
   resolveLegacyHomeStore,
   type LegacyHomeStoreAdoption
 } from '../home-directory-migration'
-import { writeEncryptedCredential } from '../integration-credential-file'
-import { readCredentialFileProtection } from '../credential-file-protection'
+import { writeEncryptedCredential } from '../credentials/integration-credential-file'
+import { readCredentialFileProtection } from '../credentials/credential-file-protection'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 import type { JiraSite, JiraSiteSelection } from '../../shared/jira/jira-types'
-import { createIntegrationStateFileCache } from '../integration-state-file-cache'
+import { createIntegrationStateFileCache } from '../credentials/integration-state-file-cache'
 import { isJiraGatewayBaseUrl } from './gateway-base-url'
-import { createIntegrationTokenFileCache } from '../integration-token-file-cache'
+import { createIntegrationTokenFileCache } from '../credentials/integration-token-file-cache'
 
 export type JiraSiteFile = {
   version: 1

@@ -4,7 +4,8 @@ import { ChevronDown, CircleAlert, ExternalLink, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import { useTranslate } from '@/i18n/use-translate'
+import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys
@@ -20,7 +21,7 @@ import type {
   JiraMutationResult,
   JiraTransition
 } from '../../../shared/jira/jira-types'
-import { openAppHttpLink } from '@/lib/app-http-link-open'
+import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
 type Props = {
   issue: JiraIssue
@@ -46,6 +47,7 @@ export function JiraIssueTransitionControl({
   onRetry,
   onTransition
 }: Props): React.JSX.Element {
+  const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<JiraTransition | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -138,7 +140,7 @@ export function JiraIssueTransitionControl({
         <Button
           variant="secondary"
           size="sm"
-          aria-label={translate('jira.transitions.changeStatus', 'Change status: {{status}}', {
+          aria-label={t('jira.transitions.changeStatus', 'Change status: {{status}}', {
             status: issue.status.name
           })}
           aria-invalid={Boolean(error)}
@@ -159,15 +161,15 @@ export function JiraIssueTransitionControl({
           {error ? (
             <>
               <p className="text-xs text-destructive" role="alert">
-                {translate('jira.transitions.loadError', 'Could not load status changes.')} {error}
+                {t('jira.transitions.loadError', 'Could not load status changes.')} {error}
               </p>
               <Button variant="secondary" size="sm" onClick={onRetry} disabled={loading}>
-                {translate('jira.transitions.retry', 'Retry')}
+                {t('jira.transitions.retry', 'Retry')}
               </Button>
             </>
           ) : loading ? (
             <p className="text-xs text-muted-foreground" role="status">
-              {translate('jira.transitions.loading', 'Loading status changes…')}
+              {t('jira.transitions.loading', 'Loading status changes…')}
             </p>
           ) : null}
           {requirement?.kind === 'form' && selected ? (
@@ -188,7 +190,7 @@ export function JiraIssueTransitionControl({
           ) : error || loading ? null : selected && submitError ? null : transitions.length ===
             0 ? (
             <p className="text-xs text-muted-foreground">
-              {translate('jira.transitions.empty', 'No status changes available.')}
+              {t('jira.transitions.empty', 'No status changes available.')}
             </p>
           ) : (
             <div className="flex flex-col gap-1">
@@ -214,7 +216,7 @@ export function JiraIssueTransitionControl({
           {submitError ? (
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={reset} disabled={busy}>
-                {translate('jira.transitions.back', 'Back')}
+                {t('jira.transitions.back', 'Back')}
               </Button>
               <Button
                 variant="secondary"
@@ -223,7 +225,7 @@ export function JiraIssueTransitionControl({
                 onClick={(event) => openAppHttpLink(issue.url, { event })}
               >
                 <ExternalLink className="size-3" />
-                {translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}
+                {t('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}
               </Button>
             </div>
           ) : null}

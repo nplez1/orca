@@ -38,15 +38,15 @@ export const SHARED_TEST_INPUTS = [
   'config/vitest.config.ts',
   // Not an import the parser sees: the config loads it through `createRequire(import.meta.url)(…)`.
   'config/dark-build-switches.cjs',
-  'config/scripts/run-vitest.mjs',
+  'config/scripts/test-runtime/execution-policy/run-vitest.mjs',
   // Why a directory: the runner's one bare import is the whole process-host package, and a trailing
   // slash couples to any file in it.
   'src/packages/process-host/',
-  'config/scripts/vitest-real-agent-home-write-guard.ts',
-  'config/scripts/vitest-bun-node-builtins.ts',
-  'config/scripts/vitest-dom-setup.ts',
-  'config/scripts/vitest-host-ports-setup.ts',
-  'config/scripts/vitest-caller-identity-env-setup.ts',
+  'config/scripts/test-runtime/environment/vitest-real-agent-home-write-guard.ts',
+  'config/scripts/test-runtime/environment/vitest-bun-node-builtins.ts',
+  'config/scripts/test-runtime/dom/vitest-dom-setup.ts',
+  'config/scripts/test-runtime/environment/vitest-host-ports-setup.ts',
+  'config/scripts/test-runtime/environment/vitest-caller-identity-env-setup.ts',
   'package.json',
   'pnpm-lock.yaml'
 ]
@@ -55,7 +55,7 @@ export const SHARED_TEST_INPUTS = [
 // selection actually lives, and a hand list went stale the first time (it missed the node-runtime
 // pool, the sequencer and the runtime file set, so a branch that re-seated tests into that pool could
 // still waive its own flake).
-const HARNESS_ROOT_FILES = ['config/vitest.config.ts', 'config/scripts/run-vitest.mjs']
+const HARNESS_ROOT_FILES = ['config/vitest.config.ts', 'config/scripts/test-runtime/execution-policy/run-vitest.mjs']
 
 export function importSpecifiers(source) {
   const specifiers = []

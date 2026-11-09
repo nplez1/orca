@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeAgentStatusPayload } from '../../agent-status-types'
+import { normalizeAgentStatusPayload } from '../../agent-status/contracts/agent-status-types'
 import { createHookListenerState } from '../listener-state'
 import { readPiScheduledWork } from '../pi-scheduled-work'
 import {

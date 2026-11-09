@@ -3,8 +3,8 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { HostedReviewInfo } from '../../../../../shared/hosted-review'
-import { ChecksPanelReviewHeader } from './review-header'
+import type { HostedReviewInfo } from '../../../../../shared/source-control/hosted-review/hosted-review-contracts'
+import { ChecksPanelReviewHeader } from './presentation/review-header'
 
 afterEach(cleanup)
 

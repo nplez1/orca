@@ -11,9 +11,10 @@ vi.mock('../ipc/filesystem/filesystem-search-file-paths', async (importOriginal)
 import type { WorkspacePathSearchScopeDescriptor } from '../../shared/workspace-path-search-contract'
 import type * as FilesystemPathSearchModule from '../ipc/filesystem/filesystem-search-file-paths'
 import {
-  createRuntimeFileCommands,
-  useRuntimeFileCommandsLifecycle
-} from './orca-runtime-files-test-harness'
+  createRuntimeFileHost,
+  useRuntimeFileHostLifecycle
+} from './files/runtime-file-host.test-fixture'
+import { RuntimeFileCommandsWithWorkspacePathSearch } from './runtime-file-commands-workspace-path-search'
 
 function scope(): WorkspacePathSearchScopeDescriptor {
   return {
@@ -25,7 +26,7 @@ function scope(): WorkspacePathSearchScopeDescriptor {
 }
 
 describe('runtime forwarding of negotiated workspace path search', () => {
-  useRuntimeFileCommandsLifecycle()
+  useRuntimeFileHostLifecycle()
 
   // Why reset between cases: the suite asserts `not.toHaveBeenCalled()` on the local walk, and this
   // config does not clear mocks, so a call carried over from an earlier case would hide a regression.
@@ -128,3 +129,8 @@ describe('runtime forwarding of negotiated workspace path search', () => {
     )
   })
 })
+
+function createRuntimeFileCommands(options?: Parameters<typeof createRuntimeFileHost>[0]) {
+  const { host, store } = createRuntimeFileHost(options)
+  return { commands: new RuntimeFileCommandsWithWorkspacePathSearch(host), store }
+}

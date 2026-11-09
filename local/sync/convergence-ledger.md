@@ -22,6 +22,30 @@ Rules for using it:
 
 ---
 
+## Upstream owner-scoped reorganisation (2026-11-08 sync)
+
+**Paths:** `src/main/**`, `src/renderer/src/**`, `src/shared/**`, `config/scripts/**`
+
+**Resolution:** manual — re-home, do not revert.
+
+**Decision:** upstream reorganised its tree into owner-scoped directories in the 2026-11-08 sync
+(`refactor: organize X by defining owner`, `group settings owners`, `organize backend runtime by
+defining owner`). When a file the fork modified was *moved* rather than dropped, the fork’s delta is
+re-applied at the new location and the old path deleted. The resolution must **not** be the old file
+copied over upstream’s new one.
+
+**Why:** the settings/accounts family is the worked example. The fork’s intent there is a single
+deletion — no per-section header, because the fork’s own settings navigation provides it — so the port
+is upstream’s file minus a ~10-line block. Copying the old file over it changed ~360 lines and dropped
+upstream’s `SettingsGroup` title/description/action shape, which would re-conflict at every later
+sync. The same rule produced the `runtime-jira-target.ts` move into `runtime/jira/` (with its 11
+importers) and `fork-english-catalog.mjs` beside its consumer in `localization/catalog-validation/`.
+
+**Do not:** delete a moved path before its delta is re-applied somewhere. 22 paths were re-homed; 9
+had no upstream home and stay fork-only files.
+
+---
+
 ## SSH relay removal: upstream's orcad model wins
 
 **Paths:** `src/relay/**`, `src/wsl-guest/**`, `src/shared/ssh-ai-vault-relay.ts`, `src/main/providers/ssh-filesystem-*.ts`, `src/main/runtime/runtime-file-commands-search-remote-quick-*`, `src/main/runtime/runtime-file-commands-workspace-path-search.ts`, `src/main/ipc/filesystem/filesystem-remote-path-search.ts`, `src/main/providers/ssh-filesystem-provider-crud.ts`, `src/main/ai-vault/remote-session-scanner-*.ts`

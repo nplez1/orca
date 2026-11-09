@@ -31,6 +31,11 @@ const badgeVariants = cva(
           'h-4 gap-1 rounded border-status-warning-border bg-status-warning-background px-1.5 text-[9px] font-medium leading-none text-status-warning [&>svg]:size-2.5',
         statusDanger:
           'h-4 gap-1 rounded border-destructive/25 bg-destructive/5 px-1.5 text-[9px] font-medium leading-none text-destructive [&>svg]:size-2.5',
+        /** A task label inside a dense reference row's metadata line. */
+        referenceLabel: 'h-3.5 border-border px-1 py-0 text-3xs font-normal text-muted-foreground',
+        /** An uppercase kind label set before a banner title; takes its color from the parent. */
+        paneLabel:
+          'h-4 border-current/30 px-1.5 py-0 align-[1px] text-3xs font-semibold tracking-wider uppercase',
         /** A skill or file sitting inline in the chat message box, ringed while selected. */
         promptPill:
           'max-w-full border-border bg-secondary px-1.5 py-0 align-baseline text-muted-foreground data-[selected=true]:ring-1 data-[selected=true]:ring-ring'

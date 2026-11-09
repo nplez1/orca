@@ -1,5 +1,5 @@
 import type { TransferListItem } from 'node:worker_threads'
-import type { WorkerRequestTransport } from './lazy-worker-thread-host'
+import type { WorkerRequestTransport } from './worker-threads/worker-thread-transport'
 
 type ConcurrentCall<TRequest, TResponse> = {
   request: TRequest

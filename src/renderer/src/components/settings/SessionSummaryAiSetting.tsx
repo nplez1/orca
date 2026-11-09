@@ -3,7 +3,7 @@ import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { translate } from '@/i18n/i18n'
 import { AiGenerationFields } from './ai-generation-fields'
-import { SearchableSetting } from './SearchableSetting'
+import { SearchableSetting } from './section-layout/SearchableSetting'
 import { useSessionSummaryAiSettings } from './use-session-summary-ai-settings'
 
 /** Settings → Agents: which agent and model fold a session summary.

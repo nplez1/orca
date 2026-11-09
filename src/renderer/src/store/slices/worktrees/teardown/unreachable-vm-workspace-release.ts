@@ -19,7 +19,7 @@ import {
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import { isRemoteRuntimeUnreachableMessage } from '../../../../../../shared/remote-runtime/remote-runtime-client-error-classification'
-import { isEphemeralVmRuntimeEnvironment } from '../../../../../../shared/runtime-environments'
+import { isEphemeralVmRuntimeEnvironment } from '../../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import {
   ARCHIVE_HOOK_FAILED_REMOVAL_PREFIX,
   ARCHIVE_HOOK_OVERRIDE_HINT

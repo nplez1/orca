@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-client'
 import {
   patchTaskPageJiraBoardCache,

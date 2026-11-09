@@ -4,7 +4,7 @@ import {
   type EphemeralVmRuntimeRecord
 } from '../shared/ephemeral-vm-runtimes'
 import { getEphemeralVmRecipeResultConnection } from '../shared/ephemeral-vm-recipes'
-import { listEnvironments } from '../shared/runtime-environment-store'
+import { listEnvironments } from '../shared/remote-runtime/host-store/runtime-environment-store'
 import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
 import {
   runEphemeralVmRecipeContextMenuItem,

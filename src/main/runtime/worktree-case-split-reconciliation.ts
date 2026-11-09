@@ -5,11 +5,11 @@ import {
   type ExecutionHostId
 } from '../../shared/execution-host'
 import type { Repo } from '../../shared/repo-types'
-import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
+import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'
 import { composeWorktreeId, splitWorktreeId } from '../../shared/worktree/id'
 import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 import type { WorktreeMeta } from '../../shared/worktree/meta-types'
-import type { RuntimeStore } from './runtime-store-contract'
+import type { RuntimeStore } from './construction/runtime-store-contract'
 import {
   moveSessionToSurvivor,
   planWorktreeCaseSplitMerge,

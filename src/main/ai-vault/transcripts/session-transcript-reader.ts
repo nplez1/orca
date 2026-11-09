@@ -1,0 +1,255 @@
+import { createHash } from 'node:crypto'
+import { readTranscriptSlice } from '../../native-chat/wsl-transcript-fs-access'
+import type { AiVaultSession } from '../../../shared/ai-vault/contracts/ai-vault-types'
+import { parseAgentSessionFile } from '../session-scanner-agent-parser'
+import { consumeCompleteJsonlLines } from '../session-scanner-jsonl-reader'
+import type { ResumableSessionParseState, SessionFileCandidate } from '../session-scanner-types'
+import {
+  invalidateSessionParseCacheEntry,
+  type SessionParseResumePoint
+} from '../parse-cache/session-parse-cache-store'
+import { TranscriptMessageChannel } from './session-transcript-channel'
+import { hasTranscriptConsumers, transcriptResumableOffsets } from './session-transcript-consumers'
+import {
+  mergeSkippedTranscriptRecords,
+  type SkippedTranscriptRecord
+} from './session-transcript-record-budget'
+import { throwIfAiVaultScanCancelled } from '../ai-vault-scan-cancellation'
+
+type TranscriptSessionEnrichment = {
+  /** Complete consumer metadata before committing; the returned fold stays unmodified. */
+  sessionForConsumers?: (session: AiVaultSession | null) => Promise<AiVaultSession | null>
+  /**
+   * Tag this read, so a consumer accepts only a read it started.
+   *
+   * Why: consumers are registered process-wide and match on the file path, which two folds of one
+   * session satisfy at the same time — a second fold would enlist the first one's consumer and
+   * interleave both streams into one collection.
+   */
+  readToken?: string
+}
+
+const NEWLINE_BYTE = 0x0a
+
+export type TranscriptReadStats = {
+  incremental: number
+  fullParses: number
+  // Count excluded transcripts separately from incremental reads; no bytes were consumed.
+  earlyStopped: number
+  bytesRead: number
+}
+
+export type ResumableTranscriptRead = {
+  session: AiVaultSession | null
+  resume: SessionParseResumePoint
+}
+
+/** Drop the reader-owned resume point so lagging consumers can receive a full replacement stream. */
+export function requestWholeTranscriptRead(path: string): void {
+  invalidateSessionParseCacheEntry(path)
+}
+
+/** Resume append-only transcripts only while the recorded offset remains on a valid line boundary. */
+export async function readResumableTranscript(
+  args: TranscriptSessionEnrichment & {
+    candidate: SessionFileCandidate
+    platform: NodeJS.Platform
+    resume: SessionParseResumePoint | null
+    stateFactory: (messages: TranscriptMessageChannel) => ResumableSessionParseState
+    stats?: TranscriptReadStats
+    signal?: AbortSignal
+    /** One record was too large to hold and was skipped; reported in file order. */
+    onSkippedRecord?: (record: SkippedTranscriptRecord) => void
+    /**
+     * Publish an unterminated final line to consumers instead of withholding it.
+     *
+     * Why: a consumer that commits a cursor must never see a record whose newline has not arrived,
+     * because the next append would hand it the same record again. A whole-file reader has no such
+     * cursor — it re-reads from the start every time — and withholding the tail would silently drop
+     * the last message of a transcript an agent is still writing, which is the common case.
+     */
+    includeTrailingPartialLine?: boolean
+  }
+): Promise<ResumableTranscriptRead> {
+  const { file } = args.candidate
+  const resume = args.resume
+  const canResume =
+    resume !== null &&
+    typeof file.sizeBytes === 'number' &&
+    file.sizeBytes >= resume.byteOffset &&
+    file.mtimeMs >= resume.mtimeMs &&
+    // A changed timestamp without growth signals a rewrite, even at a valid line boundary.
+    (file.mtimeMs === resume.mtimeMs || file.sizeBytes > (resume.sizeBytes ?? resume.byteOffset)) &&
+    (resume.byteOffset === 0 ||
+      (await endsWithNewlineAt(file.path, resume.byteOffset, args.signal)))
+
+  // Isolate cached state so failed reads cannot double-count lines on retry.
+  const channel = canResume ? resume.channel : new TranscriptMessageChannel()
+  const state = canResume ? resume.state.clone() : args.stateFactory(channel)
+  const startOffset = canResume ? resume.byteOffset : 0
+  const stoppedBeforeRead = state.shouldStop?.() === true
+  if (args.stats) {
+    if (stoppedBeforeRead) {
+      args.stats.earlyStopped++
+    } else if (canResume) {
+      args.stats.incremental++
+    } else {
+      args.stats.fullParses++
+    }
+  }
+
+  // Hash only for consumers: they compare prefixes after a restart drops this resume point.
+  const prefixHash = canResume
+    ? (resume.prefixHash?.copy() ?? null)
+    : hasTranscriptConsumers()
+      ? createHash('sha256')
+      : null
+  const prefixOffsets =
+    !canResume && prefixHash ? nonEmpty(transcriptResumableOffsets(args.candidate)) : undefined
+  channel.beginRead({
+    candidate: args.candidate,
+    mode: canResume ? 'append' : 'replace',
+    previousByteOffset: startOffset,
+    ...(args.readToken === undefined ? {} : { readToken: args.readToken }),
+    identity: () => state.identity?.() ?? null,
+    prefixOffsets
+  })
+  try {
+    const readResult = await consumeCompleteJsonlLines({
+      path: file.path,
+      start: startOffset,
+      prefixHash,
+      prefixCheckpoints: prefixOffsets && {
+        offsets: prefixOffsets,
+        reached: (offset, digest) => channel.prefixReached(offset, digest)
+      },
+      onLine: (line) => state.consumeLine(line),
+      // Preserve `this` for parsers that implement these hooks as methods.
+      onLineBytes: state.consumeLineBytes?.bind(state),
+      shouldStop: state.shouldStop?.bind(state),
+      ...(args.onSkippedRecord ? { onSkippedRecord: args.onSkippedRecord } : {}),
+      signal: args.signal
+    })
+    if (args.stats) {
+      args.stats.bytesRead += readResult.bytesRead
+    }
+
+    state.touchFile(file)
+
+    // Show an unterminated tail without caching or publishing it until the line is complete.
+    let displayState = state
+    if (readResult.trailingPartialLine !== null) {
+      const partialLine = readResult.trailingPartialLine
+      displayState = state.clone()
+      const consume = (): void => {
+        displayState.consumeLine(partialLine)
+      }
+      if (args.includeTrailingPartialLine) {
+        consume()
+      } else {
+        channel.mute(consume)
+      }
+    }
+
+    const session = await displayState.finalize(args.platform)
+    const consumerSession = args.sessionForConsumers
+      ? await args.sessionForConsumers(session)
+      : session
+    throwIfAiVaultScanCancelled(args.signal)
+    channel.finishRead({
+      session: consumerSession,
+      byteOffset: readResult.consumedThrough,
+      incomplete: false,
+      prefixHash: readResult.prefixHash?.copy().digest('hex')
+    })
+    return {
+      session,
+      resume: {
+        state,
+        byteOffset: readResult.consumedThrough,
+        mtimeMs: file.mtimeMs,
+        sizeBytes: file.sizeBytes,
+        channel,
+        // Retain earlier skips only for append reads; replacements revisit those records.
+        skippedRecords: mergeSkippedTranscriptRecords(
+          canResume ? resume.skippedRecords : [],
+          readResult.skippedRecords
+        ),
+        prefixHash: readResult.prefixHash ?? null
+      }
+    }
+  } catch (error) {
+    channel.finishRead({
+      session: null,
+      byteOffset: startOffset,
+      incomplete: true,
+      cancelled: args.signal?.aborted === true
+    })
+    throw error
+  }
+}
+
+/** Rewritten document formats always publish a whole-file replacement with no resume cursor. */
+export async function readWholeTranscript(
+  args: TranscriptSessionEnrichment & {
+    candidate: SessionFileCandidate
+    platform: NodeJS.Platform
+    stats?: TranscriptReadStats
+    signal?: AbortSignal
+    onSkippedRecords?: (records: SkippedTranscriptRecord[]) => void
+  }
+): Promise<AiVaultSession | null> {
+  const { file } = args.candidate
+  if (args.stats) {
+    args.stats.fullParses++
+    args.stats.bytesRead += file.sizeBytes ?? 0
+  }
+  const channel = new TranscriptMessageChannel()
+  channel.beginRead({
+    candidate: args.candidate,
+    mode: 'replace',
+    previousByteOffset: 0,
+    ...(args.readToken === undefined ? {} : { readToken: args.readToken })
+  })
+  try {
+    const session = await parseAgentSessionFile(
+      args.candidate,
+      args.platform,
+      channel,
+      args.signal,
+      args.onSkippedRecords
+    )
+    const consumerSession = args.sessionForConsumers
+      ? await args.sessionForConsumers(session)
+      : session
+    throwIfAiVaultScanCancelled(args.signal)
+    channel.finishRead({
+      session: consumerSession,
+      byteOffset: file.sizeBytes ?? 0,
+      incomplete: false
+    })
+    return session
+  } catch (error) {
+    channel.finishRead({
+      session: null,
+      byteOffset: 0,
+      incomplete: true,
+      cancelled: args.signal?.aborted === true
+    })
+    throw error
+  }
+}
+
+function nonEmpty(offsets: ReadonlySet<number>): ReadonlySet<number> | undefined {
+  return offsets.size > 0 ? offsets : undefined
+}
+
+// Heuristic: a growing rewrite can preserve this newline and evade detection until cache invalidation.
+async function endsWithNewlineAt(
+  path: string,
+  offset: number,
+  signal?: AbortSignal
+): Promise<boolean> {
+  const slice = await readTranscriptSlice(path, offset - 1, 1, 'scan', signal)
+  return slice.length === 1 && slice[0] === NEWLINE_BYTE
+}

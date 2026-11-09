@@ -28,18 +28,18 @@ const mocks = vi.hoisted(() => {
 })
 
 vi.mock('@/store', () => ({ useAppStore: { getState: () => mocks.state } }))
-vi.mock('@/runtime/mounted-terminal-tab-registry', () => ({
+vi.mock('@/runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-registry.ts', () => ({
   findRegisteredTerminalTab: mocks.findRegisteredTerminalTab,
   focusRuntimeTerminalSurface: mocks.focusRuntimeTerminalSurface
 }))
-vi.mock('@/components/terminal-pane/native-chat-covered-pane', () => ({
+vi.mock('@/components/terminal-pane/chat/native-chat-covered-pane.ts', () => ({
   paneIsCoveredByNativeChat: mocks.paneIsCoveredByNativeChat,
   focusNativeChatCover: vi.fn(() => false)
 }))
-vi.mock('@/components/native-chat/use-native-chat-composer-reveal-focus', () => ({
+vi.mock('@/components/native-chat/composer/focus/native-chat-composer-focus-intent.ts', () => ({
   requestNativeChatComposerFocus: mocks.requestNativeChatComposerFocus
 }))
-vi.mock('@/components/terminal-pane/terminal-ime-input-context-refresh', () => ({
+vi.mock('@/components/terminal-pane/input/ime/terminal-ime-input-context-refresh.ts', () => ({
   refreshTerminalImeInputContext: mocks.refreshTerminalImeInputContext
 }))
 

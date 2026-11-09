@@ -2,7 +2,7 @@ import type {
   WorkspacePathSearchCorrelationId,
   WorkspacePathSearchInstrumentationEvent
 } from './workspace-path-search-instrumentation'
-import { compareFileNames } from './file-name-sort'
+import { compareFileNames } from './file-listing/file-name-sort'
 import { workspacePathCatalogBuildFits } from './workspace-path-catalog-builder-publication'
 import type {
   WorkspacePathCatalogBuildRecord,

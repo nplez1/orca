@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../shared/jira/jira-types'
-import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import { JiraLinkedIssuePane } from './JiraLinkedIssuePane'
 
 const mocks = vi.hoisted(() => ({
@@ -31,7 +31,7 @@ vi.mock('@/store', () => ({
     })
 }))
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraGetIssue: (...args: unknown[]) => mocks.jiraGetIssue(...args),
   jiraIssueComments: (...args: unknown[]) => mocks.jiraIssueComments(...args),
   jiraListAssignableUsers: (...args: unknown[]) => mocks.jiraListAssignableUsers(...args),

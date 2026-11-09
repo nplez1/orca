@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultWorkspaceSession } from '../../shared/constants'
-import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
+import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'
 import type { HostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 import type { WorktreeMeta } from '../../shared/worktree/meta-types'
-import type { TerminalTab } from '../../shared/terminal-tab-types'
+import type { TerminalTab } from '../../shared/workspace-layout/terminal-tab-types'
 import {
   reconcileWorktreeCaseSplits,
   resetWorktreeCaseSplitRefusalsForTests,

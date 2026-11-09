@@ -1,6 +1,10 @@
 import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import { durableWriteTempPath, renameDurable, writeTempFileDurable } from '../durable-file-write'
+import {
+  durableWriteTempPath,
+  renameDurable,
+  writeTempFileDurable
+} from '../filesystem/durable-file-write'
 import {
   WORKSPACE_PATH_CATALOG_CHECKPOINT_MANIFEST_FILE,
   type WorkspacePathCatalogCheckpointManifest,

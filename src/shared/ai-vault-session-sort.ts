@@ -1,4 +1,4 @@
-import type { AiVaultSession } from './ai-vault-types'
+import type { AiVaultSession } from './ai-vault/contracts/ai-vault-types'
 
 /** The instant a listing orders by: when the session last changed. */
 export function aiVaultSessionSortTime(

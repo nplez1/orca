@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { searchRuntimeFilePaths } from './runtime-file-path-search-client'
-import { runtimeTargetForOwnerEnvironment } from './runtime-client-target'
+import { runtimeTargetForOwnerEnvironment } from './rpc/targets/runtime-client-target'
 import {
   fsSearch,
   runtimeEnvironmentCall,
   runtimeEnvironmentTransportCall,
   installRuntimeFileClientEnvironment
-} from './runtime-file-client-test-harness'
+} from './files/runtime-file-client-test-harness'
 import {
   RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
   WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
@@ -17,7 +17,7 @@ import {
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
   RUNTIME_PROTOCOL_VERSION
 } from '../../../shared/protocol-version'
-import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
+import { replaceRuntimeEnvironmentRevisions } from './rpc/environment-revisions/runtime-environment-revision'
 
 installRuntimeFileClientEnvironment()
 

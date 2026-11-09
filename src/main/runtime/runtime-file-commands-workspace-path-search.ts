@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { buildExcludePathPrefixes } from '../../shared/quick-open-filter'
+import { buildExcludePathPrefixes } from '../../shared/quick-open/quick-open-filter'
 import {
   WORKSPACE_PATH_SEARCH_TRANSPORT_BYTE_CEILINGS,
   validateWorkspacePathSearchQuery,
@@ -14,7 +14,7 @@ import {
 } from '../../shared/workspace-path-search-response'
 import { limitWorkspacePathSearchResponseBySerializedBytes } from '../../shared/workspace-path-search-transport-budget'
 import { searchQuickOpenFilePaths } from '../ipc/filesystem/filesystem-search-file-paths'
-import { parseWslPath } from '../wsl'
+import { parseWslPath } from '../wsl/filesystem/unc-path-access'
 import { runtimeFileRouteForTarget } from './files/file-target'
 import { RuntimeFileSearch } from './files/search/file-search'
 import type { RuntimeFileCommandHost } from './files/file-command-host'

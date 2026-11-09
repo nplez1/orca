@@ -2,10 +2,10 @@ import { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { confirmUnsavedDiscard } from '@/store/slices/worktrees/teardown/removed-workspace-unsaved-files'
 import type { WorktreeRemovalTarget } from '../../../../shared/worktree/removal'
-import type { WorktreeDeleteIdentity } from './worktree-delete-request'
-import { runDialogForceDelete } from './delete-worktree-dialog-force-delete'
-import { runLineageDeleteAll } from './delete-worktree-lineage-delete-all'
-import { runWorktreeDeletesInParallel } from './delete-worktree-flow'
+import type { WorktreeDeleteIdentity } from './workspace-actions/deletion/worktree-delete-request'
+import { runDialogForceDelete } from './workspace-actions/deletion/delete-worktree-dialog-force-delete'
+import { runLineageDeleteAll } from './workspace-actions/deletion/delete-worktree-lineage-delete-all'
+import { runWorktreeDeletesInParallel } from './workspace-actions/deletion/worktree-delete-execution'
 
 type RemoveWorktreeForDialog = Parameters<typeof runDialogForceDelete>[0]['removeWorktree']
 type UnsavedTargets = Parameters<typeof confirmUnsavedDiscard>[1]

@@ -4,8 +4,8 @@
 // which host folds) while this is the chapter that can fail: a transcript read, a model
 // extract, or a write. Nothing is applied on failure, and completed chunk extracts are
 // kept so a retry resumes instead of restarting.
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
-import type { AgentType } from '../../shared/agent-status-types'
+import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
+import type { AgentType } from '../../shared/agent-status/contracts/agent-status-types'
 import type {
   SessionSummaryLedger,
   SessionSummarySessionRef,

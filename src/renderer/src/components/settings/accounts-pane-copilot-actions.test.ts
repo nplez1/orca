@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
-import type { CopilotCredentialSource } from './accounts-pane-types'
+import type { CopilotCredentialSource } from './accounts/accounts-pane-types'
 import { createCopilotCredentialActions } from './accounts-pane-copilot-actions'
 
 const toastMocks = vi.hoisted(() => ({

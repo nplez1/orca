@@ -1,5 +1,5 @@
-import type { GitCommandRunner } from '../git-effective-upstream'
-import { resolveEffectiveGitUpstreamForBranchName } from '../git-effective-upstream'
+import type { GitCommandRunner } from '../git/remotes/git-effective-upstream'
+import { resolveEffectiveGitUpstreamForBranchName } from '../git/remotes/git-effective-upstream'
 
 /**
  * `git push --delete` is unconditional on the server — there is no remote equivalent of

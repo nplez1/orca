@@ -322,6 +322,622 @@
       "status": "expected-deletion",
       "supersededBy": "removed with the helper it belonged to, which upstream s retainHookRootContext supersedes",
       "reason": "The helper this member belonged to was deleted because upstream s retainHookRootContext covers the same case."
+    },
+    {
+      "path": "config/scripts/check-flaky-test-pattern-ratchet.mjs",
+      "symbol": "OVERLAY_PATH",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this const with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "config/scripts/check-flaky-test-pattern-ratchet.mjs",
+      "symbol": "git.maxBuffer",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "config/scripts/check-flaky-test-pattern-ratchet.mjs",
+      "symbol": "main.overlayPath",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/main/runtime/runtime-managed-worktree-create-types.ts",
+      "symbol": "RuntimeManagedWorktreeCreateArgs.exactBranchName",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/main/runtime/workspaces/creation/runtime-managed-worktree-create-types.ts",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/main/runtime/workspaces/creation/runtime-managed-worktree-create-types.ts"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "symbol": "RELEASES_API_URL",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this const with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "symbol": "GitHubReleaseListEntry",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this type with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "symbol": "GitHubReleaseListEntry.tag_name",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "symbol": "GitHubReleaseListEntry.draft",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "symbol": "GitHubReleaseListEntry.assets",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "symbol": "fetchReleaseListTags",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "symbol": "fetchReleaseAtomTags",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/editor/diff-viewer-props.ts",
+      "symbol": "DiffViewerProps.oldPath",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/editor/diff-viewer-props.ts",
+      "symbol": "DiffViewerProps.showReviewThreads",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/ai-vault-session-filters.ts",
+      "symbol": "NO_SUBAGENT_CHILDREN",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this const with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/ai-vault-session-filters.ts",
+      "symbol": "useAiVaultPanelSessions.childrenByParentId",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/ai-vault-session-filters.ts",
+      "symbol": "useAiVaultPanelSessions.hiddenSubagentCount",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "ChecksPanelReviewSelectionInput.githubFallback",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "gitHubReviewNumberPassesGates",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this type with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput.prEntry",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput.hostedEntry",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "WorkspaceReviewStateInput.currentHeadOid",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.hostedReview",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.pr",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.githubFallback",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedPR",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.suppressedGitHubPR",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedGitLabMR",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedBitbucketPR",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedAzureDevOpsPR",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel-review.ts",
+      "symbol": "selectWorkspaceReviewState.linkedGiteaPR",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/BrowserLinkRoutingSetting.tsx",
+      "symbol": "LinkDefaultDestination",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this type with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/MiniMaxAccountsSection.tsx",
+      "symbol": "getMiniMaxConsoleUrl",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/TasksPane.tsx",
+      "symbol": "TasksPaneProps.updateSettingsOrThrow",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ZcodePlanAccountsSection.tsx",
+      "symbol": "resolveZcodePlanSite",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/browser-link-routing-copy.ts",
+      "symbol": "getLinkRoutingDestinationKeywords",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/browser-link-routing-copy.ts",
+      "symbol": "getLinkRoutingModifierSearchEntry",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/browser-link-routing-copy.ts",
+      "symbol": "getLinkRoutingModifierSearchEntry.title",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/browser-link-routing-copy.ts",
+      "symbol": "getLinkRoutingModifierSearchEntry.description",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/browser-link-routing-copy.ts",
+      "symbol": "getLinkRoutingModifierSearchEntry.description.openLinksInApp",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/browser-link-routing-copy.ts",
+      "symbol": "getLinkRoutingModifierSearchEntry.description.isMac",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/browser-link-routing-copy.ts",
+      "symbol": "getLinkRoutingModifierSearchEntry.keywords",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCardMetadataStatusBadges.tsx",
+      "symbol": "ReviewMergeReadinessBadge",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx",
+      "symbol": "getReviewStateLabel",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/components/sidebar/workspace-card/surface/WorktreeCardStatusSlot.tsx",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/components/sidebar/workspace-card/surface/WorktreeCardStatusSlot.tsx"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx",
+      "symbol": "getReviewChecksLabel",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/components/sidebar/workspace-card/surface/WorktreeCardStatusSlot.tsx",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/components/sidebar/workspace-card/surface/WorktreeCardStatusSlot.tsx"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx",
+      "symbol": "getReviewMergeReason",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/components/sidebar/workspace-card/surface/WorktreeCardStatusSlot.tsx",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/components/sidebar/workspace-card/surface/WorktreeCardStatusSlot.tsx"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeReferenceStack.tsx",
+      "symbol": "mergeVerdictSuffix",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/compute-visible-worktrees.ts",
+      "symbol": "VisibleWorktreeOptions.hiddenWorkspaceStatusIds",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/components/sidebar/worktree-list/listing/compute-visible-worktrees.ts",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/components/sidebar/worktree-list/listing/compute-visible-worktrees.ts"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-card-presentation.tsx",
+      "symbol": "buildWorktreeCardPresentation.showBranchHostSelect",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-review-helpers.tsx",
+      "symbol": "MERGE_MARKER_TONE",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this const with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-review-helpers.tsx",
+      "symbol": "MERGE_MARKER_TONE.checking",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-review-helpers.tsx",
+      "symbol": "MERGE_MARKER_TONE.waiting",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-review-helpers.tsx",
+      "symbol": "MERGE_MARKER_TONE.blocked",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-review-helpers.tsx",
+      "symbol": "ReviewIconWithMergeMarker",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/lib/github-work-item-source-lookup.ts",
+      "symbol": "GitHubWorkItemLookupArgs.target",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/lib/github-work-item-source-lookup.ts",
+      "symbol": "GitHubWorkItemDetailsLookupArgs.target",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/lib/github-work-item-source-lookup.ts",
+      "symbol": "workItemTarget",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-jira-client.ts",
+      "symbol": "jiraListEditFields",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/runtime/jira/runtime-jira-client.ts",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/runtime/jira/runtime-jira-client.ts"
+    },
+    {
+      "path": "src/renderer/src/store/github/slice-types.ts",
+      "symbol": "GitHubSlice.retractStalePRRefreshError",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/store/slices/github-checks.ts",
+      "symbol": "syncHostedReviewStatus",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/store/slices/github.ts",
+      "symbol": "createGitHubSlice.retractStalePRRefreshError",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/main/runtime/rpc/methods/source-control/github/github.ts",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/main/runtime/rpc/methods/source-control/github/github.ts"
+    },
+    {
+      "path": "src/renderer/src/store/slices/settings.ts",
+      "symbol": "applySettingsUpdates",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/store/slices/ssh.ts",
+      "symbol": "SshSlice.hiddenSshTargetIds",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/store/slices/ssh.ts",
+      "symbol": "createSshSlice.hiddenSshTargetIds",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/store/slices/ssh.ts",
+      "symbol": "createSshSlice.setSshTargetsMetadata.hiddenSshTargetIds",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktree-helpers.ts",
+      "symbol": "WorktreeSlice.hydrateCachedWorktrees",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/shared/ai-vault-session-filters.ts",
+      "symbol": "aiVaultHostListQuery",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/shared/ai-vault-session-filters.ts",
+      "symbol": "aiVaultSessionsMatchingQuery",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/shared/ai-vault-session-filters.ts",
+      "symbol": "termsMatch",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this function with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/shared/hosted-review.ts",
+      "symbol": "HostedReviewInfo.viewerCanMergeAsAdmin",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.config",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.selectPortalRoot",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.activeCapability",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.activeModel",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.isCustom",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.unsupportedAgentLabel",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.onAgentChange",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.onModelChange",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.onThinkingChange",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.onCustomCommandChange",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved in upstream’s owner-scoped reorganisation",
+      "reason": "The 2026-11-08 sync re-homed this member with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-jira-client.ts",
+      "symbol": "jiraListEditFieldsForTarget",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/runtime/jira/runtime-jira-client.ts",
+      "reason": "The 2026-11-08 sync re-homed this re-export with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/runtime/jira/runtime-jira-client.ts"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-jira-client.ts",
+      "symbol": "jiraGetBoardOverview",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/runtime/jira/runtime-jira-client.ts",
+      "reason": "The 2026-11-08 sync re-homed this re-export with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/runtime/jira/runtime-jira-client.ts"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-jira-client.ts",
+      "symbol": "jiraGetIssueSprintAssignment",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/runtime/jira/runtime-jira-client.ts",
+      "reason": "The 2026-11-08 sync re-homed this re-export with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/runtime/jira/runtime-jira-client.ts"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-jira-client.ts",
+      "symbol": "jiraListBoardIssues",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/runtime/jira/runtime-jira-client.ts",
+      "reason": "The 2026-11-08 sync re-homed this re-export with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/runtime/jira/runtime-jira-client.ts"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-jira-client.ts",
+      "symbol": "jiraListBoards",
+      "status": "expected-deletion",
+      "supersededBy": "the file moved to src/renderer/src/runtime/jira/runtime-jira-client.ts",
+      "reason": "The 2026-11-08 sync re-homed this re-export with its file: upstream reorganised the tree into owner-scoped directories, so the old path no longer exists and the name is on a line the fork did not add. Relocation, not a lost fork capability. evidence: src/renderer/src/runtime/jira/runtime-jira-client.ts"
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.agentSelectValue",
+      "status": "expected-deletion",
+      "supersededBy": "moved to AiGenerationSelectProps in the same file",
+      "reason": "The 2026-11-08 merge split this file's props: `agentSelectValue` now lives on `AiGenerationSelectProps` (the selects used when there are no picker entries) rather than on `AiGenerationFieldsProps`. It is still declared, still passed by SessionSummaryAiSetting.tsx and still asserted by ai-generation-fields.test.tsx — a rename within the file, not a lost fork capability."
+    },
+    {
+      "path": "src/renderer/src/components/settings/ai-generation-fields.tsx",
+      "symbol": "AiGenerationFieldsProps.activeThinking",
+      "status": "expected-deletion",
+      "supersededBy": "moved to AiGenerationSelectProps in the same file",
+      "reason": "The 2026-11-08 merge split this file's props: `activeThinking` now lives on `AiGenerationSelectProps` (the selects used when there are no picker entries) rather than on `AiGenerationFieldsProps`. It is still declared, still passed by SessionSummaryAiSetting.tsx and still asserted by ai-generation-fields.test.tsx — a rename within the file, not a lost fork capability."
     }
   ]
 }

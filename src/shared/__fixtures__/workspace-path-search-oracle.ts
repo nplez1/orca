@@ -13,14 +13,14 @@ import {
   buildExcludePathPrefixes,
   shouldExcludeQuickOpenRelPath,
   shouldIncludeQuickOpenPath
-} from '../quick-open-filter'
+} from '../quick-open/quick-open-filter'
 import {
   isQuickOpenQueryTooLarge,
   NameFilterPathMatcher,
   pathMatchesQueryTokens,
   splitPathQueryTokens
-} from '../quick-open-path-search'
-import { compareFileNames } from '../file-name-sort'
+} from '../quick-open/quick-open-path-search'
+import { compareFileNames } from '../file-listing/file-name-sort'
 
 export const WORKSPACE_PATH_SEARCH_ORACLE_MAX_PAGE_PATHS = 5_000
 

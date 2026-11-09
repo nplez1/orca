@@ -2,8 +2,8 @@ import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript-api'
-import { readTrackedSources, runCountRatchet } from './ratchet-baseline.mjs'
-import { isTestOnlySourcePath } from './test-only-source-path.mjs'
+import { readTrackedSources, runCountRatchet } from './static-analysis/ratchet-baseline/ratchet-baseline.mjs'
+import { isTestOnlySourcePath } from './static-analysis/process-boundaries/test-only-source-path.mjs'
 
 // Ratchet for synchronous `fs` probes on a workspace or repository path in Electron main.
 //

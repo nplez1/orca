@@ -4,12 +4,12 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraUser } from '../../../shared/jira/jira-types'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { JiraUserMultiPicker, jiraHeldUsers } from './jira-user-multi-picker'
 
 const { jiraSearchUsersMock } = vi.hoisted(() => ({ jiraSearchUsersMock: vi.fn() }))
 
-vi.mock('@/runtime/runtime-jira-client', () => ({ jiraSearchUsers: jiraSearchUsersMock }))
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({ jiraSearchUsers: jiraSearchUsersMock }))
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback

@@ -4,10 +4,13 @@ import type { JenkinsServerSummary } from '../../../../shared/jenkins-servers'
 import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { readIpcErrorMessage } from '@/lib/ipc-error'
-import { IntegrationCardDetails, IntegrationCardShell } from './integration-card-shell'
+import {
+  IntegrationCardDetails,
+  IntegrationCardShell
+} from '../integrations/presentation/integration-card-shell'
 import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import { cn } from '@/lib/utils'
-import { useIntegrationSubordinateRowClass } from './integration-card-presentation'
+import { useIntegrationSubordinateRowClass } from '../integrations/presentation/integration-card-presentation'
 import { JenkinsServerDialog } from './jenkins-server-dialog'
 import { translate } from '@/i18n/i18n'
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import { runtimeHostIdFromEnvironmentId } from '../../../../shared/task-source-context'
+import { runtimeHostIdFromEnvironmentId } from '../../../../shared/work-items/task-source-context'
 import type {
   JiraBoard,
   JiraBoardSelection,
@@ -13,15 +13,15 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { toast } from 'sonner'
-import { jiraListBoards, type RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
-import { SearchableSetting } from './SearchableSetting'
+import { jiraListBoards, type RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
+import { SearchableSetting } from './section-layout/SearchableSetting'
 import {
   boardOptionValue,
   boardSelectionOptionValue,
   buildJiraBoardOptions
 } from './jira-settings-combobox-options'
 import { SETTINGS_COMBOBOX_NONE, SettingsCombobox } from './SettingsCombobox'
-import { getTasksPaneSearchKeywords } from './tasks-search'
+import { getTasksPaneSearchKeywords } from './tasks/tasks-search'
 
 type JiraBoardSettingsProps = {
   settings: GlobalSettings

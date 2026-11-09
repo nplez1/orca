@@ -78,6 +78,7 @@ export async function dispatchWindowCloseRequest(data: { isQuitting: boolean }):
   try {
     if (!(await runWindowCloseGuards())) {
       reportQuitCancelledIfQuitting(data)
+      window.api.ui.cancelWindowClose()
       return
     }
   } finally {
@@ -96,4 +97,5 @@ export async function dispatchWindowCloseRequest(data: { isQuitting: boolean }):
   }
   showShutdownCheckpointFailureToast()
   reportQuitCancelledIfQuitting(data)
+  window.api.ui.cancelWindowClose()
 }

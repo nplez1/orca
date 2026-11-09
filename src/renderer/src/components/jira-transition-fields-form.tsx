@@ -13,8 +13,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
 import { buildJiraCreateSubmission } from '@/components/task-page/jira/task-page-jira-create-fields'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { getCommentBodySubmitState } from '@/lib/comment-body-submit-state'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { isJiraUserField, resolveJiraFieldControlKind } from '../../../shared/jira-field-rendering'
 import {
   buildResolutionFieldValue,
@@ -86,6 +87,7 @@ export function JiraTransitionFieldsForm({
   const [drafts, setDrafts] = useState<Record<string, string>>(() => ({}))
   const [selectedUsers, setSelectedUsers] = useState<Record<string, JiraUser | null>>({})
   const [selectedUserLists, setSelectedUserLists] = useState<Record<string, JiraUser[]>>({})
+  const t = useTranslate()
   const [resolution, setResolution] = useState('')
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -262,7 +264,7 @@ export function JiraTransitionFieldsForm({
           <Select value={resolutionDraft} onValueChange={setResolution} disabled={pending}>
             <SelectTrigger id="jira-transition-resolution" className="w-full" autoFocus>
               <SelectValue
-                placeholder={translate('jira.transitions.chooseResolution', 'Choose a resolution')}
+                placeholder={t('jira.transitions.chooseResolution', 'Choose a resolution')}
               />
             </SelectTrigger>
             <SelectContent>
@@ -288,7 +290,7 @@ export function JiraTransitionFieldsForm({
       {requirement.commentRequired ? (
         <div className="space-y-2">
           <Label htmlFor="jira-transition-comment">
-            {translate('jira.transitions.comment', 'Comment')}
+            {t('jira.transitions.comment', 'Comment')}
           </Label>
           <Textarea
             id="jira-transition-comment"
@@ -326,10 +328,10 @@ export function JiraTransitionFieldsForm({
       ) : null}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onBack} disabled={pending}>
-          {translate('jira.transitions.back', 'Back')}
+          {t('jira.transitions.back', 'Back')}
         </Button>
         <Button type="submit" size="sm" disabled={pending || !canSubmit}>
-          {translate('jira.transitions.apply', 'Change status')}
+          {t('jira.transitions.apply', 'Change status')}
         </Button>
       </div>
     </form>

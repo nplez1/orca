@@ -1,10 +1,10 @@
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import type { PreservedBranchCleanup } from '../../../../../../shared/preserved-branch-cleanup'
+import type { PreservedBranchCleanup } from '../../../../../../shared/git/branches/preserved-branch-cleanup'
 import type {
   RemoveWorktreeResult,
   PreservedWorktreeBranch
 } from '../../../../../../shared/worktree/create-types'
-import type { RendererRemoveWorktreeResult } from '../../renderer-remove-worktree-result'
+import type { RendererRemoveWorktreeResult } from './renderer-remove-worktree-result'
 
 /**
  * How a removal reports a preserved branch back to its caller and remembers how to delete it later.

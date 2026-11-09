@@ -1,7 +1,7 @@
 import type { CliInstallStatus } from '../../shared/cli-install-types'
 import { getBridgePathFromCommandPath, getPosixDirname } from './wsl-cli-scripts'
-import { quotePosixShellDoubleQuotedApostrophe } from '../../shared/shell-argument-quoting'
 import { CLI_COMMAND_NAME } from './cli-install-constants'
+import { quotePosixShellDoubleQuotedApostrophe } from '../../shared/shell/launch/shell-argument-quoting'
 
 /**
  * The command this build registers in the WSL guest. Why not upstream's `orca-ide`: an official

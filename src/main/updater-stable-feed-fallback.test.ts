@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { installNetRequestFetchAdapter } from './updater-net-request.fixture'
+import { installNetRequestFetchAdapter } from './updater/testing/updater-net-request.fixture'
 
 const originalPlatform = process.platform
 const originalArch = process.arch
@@ -51,7 +51,8 @@ describe('latest stable release fallback', () => {
       Object.defineProperty(process, 'platform', { value: platform })
       Object.defineProperty(process, 'arch', { value: arch })
       serveLatestRelease()
-      const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+      const { fetchLatestStableReleaseTag } =
+        await import('./updater/releases/updater-prerelease-feed')
 
       await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.241')
       expect(netFetchMock).toHaveBeenCalledWith(
@@ -75,7 +76,8 @@ describe('latest stable release fallback', () => {
     '/nplez1/orca/releases/latest'
   ])('rejects an invalid fallback redirect %s before probing assets', async (location) => {
     serveLatestRelease(location)
-    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+    const { fetchLatestStableReleaseTag } =
+      await import('./updater/releases/updater-prerelease-feed')
 
     await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
     expect(netFetchMock).toHaveBeenCalledTimes(1)
@@ -88,7 +90,8 @@ describe('latest stable release fallback', () => {
   it('accepts the fork’s own -np. release line, which releases/latest resolves to', async () => {
     Object.defineProperty(process, 'platform', { value: 'darwin' })
     serveLatestRelease('/nplez1/orca/releases/tag/v1.4.214-np.41')
-    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+    const { fetchLatestStableReleaseTag } =
+      await import('./updater/releases/updater-prerelease-feed')
 
     await expect(fetchLatestStableReleaseTag()).resolves.toBe('v1.4.214-np.41')
   })
@@ -103,14 +106,16 @@ describe('latest stable release fallback', () => {
       }
       return respond?.(url)
     })
-    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+    const { fetchLatestStableReleaseTag } =
+      await import('./updater/releases/updater-prerelease-feed')
 
     await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
   })
 
   it('keeps a network failure retryable instead of returning a moving URL', async () => {
     netFetchMock.mockRejectedValueOnce(new Error('network unavailable'))
-    const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
+    const { fetchLatestStableReleaseTag } =
+      await import('./updater/releases/updater-prerelease-feed')
     await expect(fetchLatestStableReleaseTag()).resolves.toBeNull()
 
     serveLatestRelease('https://github.com/nplez1/orca/releases/tag/v1.4.241')

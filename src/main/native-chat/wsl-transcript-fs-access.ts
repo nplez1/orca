@@ -5,7 +5,7 @@ import { StringDecoder } from 'node:string_decoder'
 import {
   NodeFileReadTooLargeError,
   readNodeFileWithinLimit
-} from '../../shared/node-bounded-file-reader'
+} from '../../shared/file-content/node-bounded-file-reader'
 import { isWslUncPath } from '../../shared/wsl-paths'
 import { runWslTranscriptFsTask, type WslTranscriptFsTaskPriority } from './wsl-transcript-fs-gate'
 import {

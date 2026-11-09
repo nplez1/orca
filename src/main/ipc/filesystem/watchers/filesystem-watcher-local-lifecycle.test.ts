@@ -25,7 +25,7 @@ vi.mock('./filesystem-watcher-wsl', () => ({
 
 // The install path asks WSL whether the distro runs before spawning a watcher; the fixture must
 // not reach the real wsl.exe (absent off Windows, where a failed probe blocks the install).
-vi.mock('../../../wsl/wsl-unc-access-gate', () => ({
+vi.mock('../../../wsl/filesystem/wsl-unc-access-gate.ts', () => ({
   noteWslDistroMayHaveStopped: vi.fn(),
   blockedWslDistroForPath: vi.fn(async () => null)
 }))
@@ -48,7 +48,7 @@ import {
   resetWatcherChildRegistryForTest,
   WatcherChildCapacityError
 } from '../watcher-process/parcel-watcher-child-registry'
-import { acquireWatcherRemovalGate } from '../../watcher-removal-gate'
+import { acquireWatcherRemovalGate } from '../../../workspaces/removal/watcher-removal-gate'
 
 type HandlerMap = Record<string, (_event: unknown, args: unknown) => unknown>
 

@@ -48,6 +48,7 @@ export function useTerminalEditorCloseFoundation(
       showShutdownCheckpointFailureToast()
       // Why: main latched `isQuitting` before this veto and only `will-prevent-unload` used to clear it.
       reportQuitCancelled()
+      window.api.ui.cancelWindowClose()
       return
     }
     window.api.ui.confirmWindowClose()

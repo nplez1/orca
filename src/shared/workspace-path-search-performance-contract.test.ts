@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { QUICK_OPEN_LISTING_MAX_RESULTS } from './quick-open-listing-limits'
-import { NameFilterPathMatcher } from './quick-open-path-search'
+import { QUICK_OPEN_LISTING_MAX_RESULTS } from './quick-open/quick-open-listing-limits'
+import { NameFilterPathMatcher } from './quick-open/quick-open-path-search'
 import {
   WORKSPACE_PATH_SEARCH_LOCAL_EXPLORER_MAX_PAGE_PATHS,
   WORKSPACE_PATH_SEARCH_LOCAL_QUERY_MAX_UTF8_BYTES,

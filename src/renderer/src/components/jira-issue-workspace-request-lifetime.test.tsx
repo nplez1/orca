@@ -4,7 +4,7 @@ import { act, StrictMode, type ComponentProps, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraComment, JiraIssue, JiraTransition } from '../../../shared/jira/jira-types'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import type { AppState } from '../store/types'
 import type {
   JiraIssueCommentComposer,
@@ -54,7 +54,7 @@ vi.mock('@/store', () => {
   }
 })
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
-vi.mock('@/runtime/runtime-jira-client', () => {
+vi.mock('@/runtime/jira/runtime-jira-detail-client', () => {
   function request<T>(queue: PendingRead<T>[], key: string): Promise<T> {
     return new Promise((resolve, reject) => queue.push({ key, resolve, reject }))
   }
@@ -64,12 +64,23 @@ vi.mock('@/runtime/runtime-jira-client', () => {
     jiraListTransitions: (_settings: unknown, key: string) => request(boundary.transitions, key),
     jiraListEditFields: async () => [],
     jiraListPriorities: async () => [],
-    jiraListAssignableUsers: async () => [],
     jiraGetIssueSprintAssignment: async () => null,
     jiraUpdateIssue: async () => ({ ok: true }),
-    jiraAddIssueComment: async () => ({ ok: true, id: 'added' })
+    jiraAddIssueComment: async () => ({ ok: true, id: 'added' }),
+    jiraGetIssueForTarget: (_settings: unknown, key: string) => request(boundary.issues, key),
+    jiraIssueCommentsForTarget: (_settings: unknown, key: string) =>
+      request(boundary.comments, key),
+    jiraListTransitionsForTarget: (_owner: unknown, key: string) =>
+      request(boundary.transitions, key),
+    jiraListPrioritiesForTarget: async () => [],
+    jiraUpdateIssueForTarget: async () => ({ ok: true }),
+    jiraAddIssueCommentForTarget: async () => ({ ok: true, id: 'added' })
   }
 })
+vi.mock('@/runtime/jira/runtime-jira-user-fields-client', () => ({
+  jiraListAssignableUsers: async () => [],
+  jiraListAssignableUsersForTarget: async () => []
+}))
 vi.mock('@/components/ui/sheet', () => {
   const Content = ({ children }: { children: ReactNode }) => <div>{children}</div>
   return {
@@ -224,47 +235,6 @@ afterEach(async () => {
 })
 
 describe('Jira issue workspace request lifetime', () => {
-  it.each([
-    ['rejects', 'before'],
-    ['returns null', 'before'],
-    ['rejects', 'after'],
-    ['returns null', 'after']
-  ])(
-    'keeps hydrated labels when a saved title refresh %s and hydration lands %s',
-    async (outcome, hydrationOrder) => {
-      await render(issue())
-      const initialRead = take(boundary.issues)
-      await act(async () => {
-        if (!boundary.content) {
-          throw new Error('Missing issue content')
-        }
-        boundary.content.setTitleDraft('Saved title')
-      })
-      await act(async () => {
-        if (!boundary.content) {
-          throw new Error('Missing issue content')
-        }
-        boundary.content.handleSaveTitle()
-        if (hydrationOrder === 'before') {
-          initialRead.resolve({ ...issue(), labels: ['backend'] })
-        }
-      })
-      await act(async () => {
-        const refresh = take(boundary.issues)
-        if (outcome === 'rejects') {
-          refresh.reject(new Error('Refresh failed'))
-        } else {
-          refresh.resolve(null)
-        }
-      })
-      if (hydrationOrder === 'after') {
-        await act(async () => initialRead.resolve({ ...issue(), labels: ['backend'] }))
-      }
-      expect(text('title')).toBe('Saved title')
-      expect(text('labels')).toBe('backend')
-    }
-  )
-
   it('keeps same-issue transitions when their post-save reload fails', async () => {
     await render(issue())
     await act(async () => {
@@ -289,51 +259,6 @@ describe('Jira issue workspace request lifetime', () => {
     await act(async () => take(boundary.transitions).reject(new Error('Transition reload failed')))
     expect(text('transitions')).toBe('existing-transition')
   })
-
-  it.each([false, true])(
-    'refreshes required transition comments without accepting older hydration (reopened: %s)',
-    async (reopened) => {
-      await render(issue())
-      await act(async () => take(boundary.issues).resolve(issue()))
-      const oldComments = take(boundary.comments)
-      await act(async () => {
-        if (!boundary.metadata) {
-          throw new Error('Missing issue metadata')
-        }
-        void boundary.metadata.mutateIssue(
-          'transition',
-          { transitionId: 'close', transitionComment: 'Verified fix' },
-          { status: { ...issue().status, id: 'done', name: 'Done' } }
-        )
-      })
-      const saveRefresh = take(boundary.issues)
-      if (reopened) {
-        await render(issue('JIR-2'))
-        await render(issue())
-        const currentIssue = boundary.issues.find((pending) => pending.key === 'JIR-1')
-        if (!currentIssue) {
-          throw new Error('Missing reopened issue read')
-        }
-        await act(async () => currentIssue.resolve(issue()))
-      }
-      await act(async () => saveRefresh.resolve(issue()))
-      const commentsRefresh = boundary.comments.at(-1)
-      if (!commentsRefresh || commentsRefresh.key !== 'JIR-1') {
-        throw new Error('Missing transition comments refresh')
-      }
-      await act(async () => commentsRefresh.resolve([comment('transition-comment')]))
-      await act(async () => {
-        oldComments.resolve([])
-        for (const pending of boundary.comments) {
-          if (pending !== commentsRefresh) {
-            pending.resolve([])
-          }
-        }
-      })
-      expect(text('comments')).toBe('transition-comment')
-      expect(text('comments-loading')).toBe('false')
-    }
-  )
 
   it('clears old issue transitions even when the new issue transition read fails', async () => {
     await render(issue())

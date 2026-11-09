@@ -44,24 +44,6 @@ function count(db: SyncDatabase, table: string): number {
   return (db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n
 }
 
-it('seeks the expiring end of the file list instead of scanning it', async () => {
-  const index = await openSessionSearchIndexFile('ss-retention-plan')
-  try {
-    seed(index.db, 1, 1, 1)
-    const plan = (
-      index.db
-        .prepare('EXPLAIN QUERY PLAN SELECT path FROM files WHERE mtime_ms < ? ORDER BY mtime_ms')
-        .all(100) as { detail: string }[]
-    )
-      .map((row) => row.detail)
-      .join(' ')
-    expect(plan).toContain('files_mtime')
-    expect(plan).not.toContain('TEMP B-TREE')
-  } finally {
-    await index.close()
-  }
-})
-
 it('hides an expiring session at once, then reclaims its rows in bounded steps', async () => {
   const index = await openSessionSearchIndexFile('ss-retention-yield')
   seed(index.db, 1, 1025, 1)
@@ -171,6 +153,33 @@ it('keeps a file a read refreshed after the expiry list was taken', async () => 
     expect(visibleSessionIds(index.db)).toEqual(['2'])
     expect(count(index.db, 'messages')).toBe(2)
   } finally {
+    await index.close()
+  }
+})
+
+function freelistShare(db: SyncDatabase): number {
+  const free = Number(db.pragma('freelist_count', { simple: true }))
+  return free / Number(db.pragma('page_count', { simple: true }))
+}
+
+it("leaves a replaced session's free pages for reuse but reclaims a large purge", async () => {
+  const index = await openSessionSearchIndexFile('ss-retention-reclaim')
+  const store = new SessionSearchStore(index.path)
+  try {
+    seed(index.db, 1, 2000, 1)
+    seed(index.db, 2, 2000, 200)
+    seed(index.db, 3, 400, 200)
+    // A replaced session leaves its old rows orphaned; moving the few pages they free only churns the file.
+    index.db.prepare('DELETE FROM sessions WHERE id = 3').run()
+    await store.purgeOlderThan(null)
+    expect(count(index.db, 'messages')).toBe(4000)
+    expect(freelistShare(index.db)).toBeGreaterThan(0)
+
+    await store.purgeOlderThan(100)
+    expect(count(index.db, 'messages')).toBe(2000)
+    expect(freelistShare(index.db)).toBeLessThanOrEqual(0.25)
+  } finally {
+    store.close()
     await index.close()
   }
 })

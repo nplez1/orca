@@ -77,6 +77,8 @@ export type RepoHookSettings = {
 export type PersistedTrustedOrcaHookEntry = {
   contentHash: string
   approvedAt: number
+  /** Earlier approvals, newest first, so switching between branches' scripts doesn't re-prompt. */
+  previousContentHashes?: string[]
 }
 
 export type PersistedTrustedOrcaHookRepo = {

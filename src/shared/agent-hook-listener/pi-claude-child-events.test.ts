@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createHookListenerState, type HookListenerState } from './listener-state'
 import { findPiClaudeChild } from './pi-claude-child-events'
-import { normalizeAndAccept, PANE_KEY } from '../agent-hook-listener-test-harness'
+import { normalizeAndAccept, PANE_KEY } from './normalization/agent-hook-listener-test-harness'
 
 const PARENT_SESSION = {
   session_id: 'pi-parent-session',

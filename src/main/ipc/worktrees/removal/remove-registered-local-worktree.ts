@@ -3,31 +3,27 @@ import type { Repo } from '../../../../shared/repo-types'
 import {
   nativeWindowsMarkerMissing,
   usesNativeWindowsRemoval
-} from '../../../git/windows-worktree-removal'
+} from '../../../git/worktrees/removal/windows-worktree-removal'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { RemoveWorktreeResult } from '../../../../shared/worktree/create-types'
 import type { GitPushTarget, GitWorktreeInfo } from '../../../../shared/worktree/types'
 import { assertWorktreeUnlockedForRemoval } from '../../../../shared/worktree/removal'
-import type { LocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
-import {
-  listWorktreesStrict as listGitWorktreesStrict,
-  removeWorktree
-} from '../../../git/worktree'
-import { getConfiguredWorktreeIncludePaths } from '../../../git/worktree-include-file'
-import { getWorktreeSharedLinkPaths } from '../../../git/worktree-shared-directories'
-import { recoverPartialLocalWorktreeRemoval } from '../../../local-worktree-removal-recovery'
+import type { LocalProjectWorktreeGitOptions } from '../../../workspaces/execution-host/project-runtime-git-options'
+import { listWorktreesStrict as listGitWorktreesStrict } from '../../../git/worktrees/catalog/worktree-listing'
+import { removeWorktree } from '../../../git/worktrees/removal/worktree-removal'
+import { getConfiguredWorktreeIncludePaths } from '../../../git/worktrees/content-paths/worktree-include-file'
+import { getWorktreeSharedLinkPaths } from '../../../git/worktrees/content-paths/worktree-shared-directories'
+import { recoverPartialLocalWorktreeRemoval } from '../../../workspaces/removal/local-worktree-removal-recovery'
 import { withWorktreeRemoveStageSpan } from '../../../observability/instrumentation'
-import { assertNestedWorktreeRemovalApproval } from '../../../nested-worktree-removal-plan'
-import { findRegisteredDeletableWorktree } from '../../../worktree-removal-safety'
-import { CLIENT_REMOVAL_HOME } from '../../../worktree-removal-home-guard'
+import { assertNestedWorktreeRemovalApproval } from '../../../workspaces/removal/nested-worktree-removal-plan'
+import { findRegisteredDeletableWorktree } from '../../../workspaces/removal/worktree-removal-safety'
+import { CLIENT_REMOVAL_HOME } from '../../../workspaces/removal/worktree-removal-home-guard'
 import { cleanupUnusedWorktreePushTargetRemote } from '../../worktree-remote'
-import {
-  findExistingWorktreeSymlinkPaths,
-  removeWorktreeLinkedPaths
-} from '../../worktree-symlinks'
+import { findExistingWorktreeSymlinkPaths } from '../../../git/worktrees/content-paths/worktree-symlink-detection'
+import { removeWorktreeLinkedPaths } from '../../worktree-symlinks'
 import { removeStaleWorktreeMaterializationStagingDirectories } from '../../worktree-materialization-staging'
-import { invalidateAuthorizedRootsCacheForRepo } from '../../registered-worktree-roots-scoped-invalidation'
-import { runWorktreeChangeInvalidators } from '../../worktree-change-invalidators'
+import { invalidateAuthorizedRootsCacheForRepo } from './registered-worktree-roots-scoped-invalidation'
+import { runWorktreeChangeInvalidators } from '../listing/worktree-change-invalidators'
 import { formatWorktreeRemovalError, isOrphanedWorktreeError } from '../../worktree-logic'
 import type { RemoveWorktreeArgs } from '../ipc-context-schemas'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
@@ -43,7 +39,7 @@ import {
 import {
   removesInBackground,
   startBackgroundWorktreeRemoval
-} from '../../../worktree-background-removal'
+} from '../../../workspaces/removal/worktree-background-removal'
 
 export async function removeRegisteredLocalWorktree(
   context: WorktreeIpcContext,

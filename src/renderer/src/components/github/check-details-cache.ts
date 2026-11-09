@@ -1,7 +1,7 @@
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
-import type { CacheEntry } from '@/store/github/cache-model'
-import { isFresh, evictStaleEntries } from '@/store/github/cache-policy'
-import { PR_CHECKS_CACHE_TTL_MS } from '@/store/github/cache-identity'
+import type { CacheEntry } from '../../store/github/cache/cache-model'
+import { isFresh, evictStaleEntries } from '../../store/github/cache/cache-policy'
+import { PR_CHECKS_CACHE_TTL_MS } from '../../store/github/cache/cache-identity'
 
 /**
  * The build behind a check, independent of the key a surface files it under.

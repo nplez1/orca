@@ -7,7 +7,7 @@ import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemera
 import { resolveEphemeralHostLease } from './HostSectionHeader'
 
 // Why: the header's menu reaches the whole app store, and this suite only exercises the lease label.
-vi.mock('../../HostSectionHeaderMenu', () => ({ HostSectionHeaderMenu: () => null }))
+vi.mock('./HostSectionHeaderMenu.tsx', () => ({ HostSectionHeaderMenu: () => null }))
 
 const RUNTIME_HOST_ID = toRuntimeExecutionHostId('env-vm')
 const SSH_HOST_ID = toSshExecutionHostId('vm-target-1')

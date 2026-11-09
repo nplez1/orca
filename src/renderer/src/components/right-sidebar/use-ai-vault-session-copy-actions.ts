@@ -2,8 +2,8 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { formatClipboardFilePath } from '@/lib/clipboard-file-path'
-import { openAiVaultSessionLogInOrca } from './ai-vault-session-log-open'
-import type { AiVaultSession } from '../../../../shared/ai-vault-types'
+import { openAiVaultSessionLogInOrca } from './ai-vault/session-actions/ai-vault-session-log-open'
+import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
 
 export type AiVaultSessionCopyActions = {
   copySessionId: (session: AiVaultSession) => void

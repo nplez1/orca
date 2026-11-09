@@ -10,7 +10,7 @@ import {
   updateEphemeralVmRuntimeStatus
 } from '../shared/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
-import { isRuntimeHostContactRevoked } from '../shared/runtime-host-status'
+import { isRuntimeHostContactRevoked } from '../shared/remote-runtime/host-status/runtime-host-status'
 import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm/runtime-environment-release'
 import { clearRuntimeEnvironmentCapabilityEvidence } from './ipc/runtime-environments/runtime-environment-capability-evidence'
 import { clearRuntimeEnvironmentManualDisconnect } from './ipc/runtime-environments/runtime-environment-manual-disconnect'

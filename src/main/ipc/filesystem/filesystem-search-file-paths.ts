@@ -1,26 +1,26 @@
 import { sep } from 'node:path'
 import type { Store } from '../../persistence/loading-store/store'
-import type { RuntimeStore } from '../../runtime/runtime-store-contract'
+import type { RuntimeStore } from '../../runtime/construction/runtime-store-contract'
 import type { WorkspacePathSearchQueryMetrics } from '../../../shared/workspace-path-search-instrumentation'
 import { hasDotfileAncestry } from '../../../shared/workspace-path-catalog'
-import { fileListingCancellationError } from '../../../shared/file-listing-cancellation'
+import { fileListingCancellationError } from '../../../shared/file-listing/file-listing-cancellation'
 import {
   buildExcludePathPrefixes,
   buildRgArgsForQuickOpen
-} from '../../../shared/quick-open-filter'
+} from '../../../shared/quick-open/quick-open-filter'
 import {
   isQuickOpenQueryTooLarge,
   NameFilterPathMatcher,
   QuickOpenPathRanker,
   type PathSearchMatcher,
   type PathSearchMode
-} from '../../../shared/quick-open-path-search'
+} from '../../../shared/quick-open/quick-open-path-search'
 import {
   RipgrepLaunchFailureError,
   RipgrepUnavailableError
-} from '../../../shared/ripgrep-process-availability'
+} from '../../../shared/ripgrep/ripgrep-process-availability'
 import { resolveBundledRipgrepWslRouting } from '../../ripgrep/bundled-ripgrep-wsl-routing'
-import { resolveAuthorizedPath } from './filesystem-auth'
+import { resolveAuthorizedPath } from './access/filesystem-auth'
 import { isFolderProjectRoot } from '../folder-project-root'
 import { getLocalGitOptionsForRegisteredWorktree } from '../local-worktree-runtime-options'
 import { scanRipgrepPaths } from '../quick-open-rg-path-scan'

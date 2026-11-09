@@ -14,7 +14,7 @@ import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
 } from '../shared/ephemeral-vm-runtime-store'
-import { updateEnvironmentFromPairingCode } from '../shared/runtime-environment-store'
+import { updateEnvironmentFromPairingCode } from '../shared/remote-runtime/host-store/runtime-environment-store'
 import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
 import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environments/runtime-environments'
 import {

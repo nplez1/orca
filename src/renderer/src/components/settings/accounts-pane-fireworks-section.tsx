@@ -4,8 +4,8 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { SearchableSetting } from './SearchableSetting'
-import type { AccountsPaneSectionModel } from './accounts-pane-types'
+import { SearchableSetting } from './section-layout/SearchableSetting'
+import type { AccountsPaneSectionModel } from './accounts/accounts-pane-types'
 import { translate } from '@/i18n/i18n'
 
 export function renderFireworksAccountsSection(model: AccountsPaneSectionModel): React.JSX.Element {

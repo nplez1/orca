@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../shared/quick-open-listing-limits'
+import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../shared/quick-open/quick-open-listing-limits'
 import {
   clearQuickOpenPathInventories,
   clearQuickOpenPathSearchInstrumentation,

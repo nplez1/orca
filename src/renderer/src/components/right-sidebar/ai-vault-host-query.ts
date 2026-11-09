@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { aiVaultHostListQuery } from '../../../../shared/ai-vault-session-filters'
+import { aiVaultHostListQuery } from '../../../../shared/ai-vault/session-display/ai-vault-session-filters'
 
 /**
  * How long typing settles before the search leaves for the host.

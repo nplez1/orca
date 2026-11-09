@@ -13,23 +13,28 @@ import { createTabsSplitRatioActions } from './tabs-split-ratio-actions'
 import { createTabsBranchGroupHostActions } from './tabs-branch-group-host-actions'
 import { createTabsDragPreviewActions } from './tabs-drag-preview-actions'
 import { createTabsSessionActions } from './tabs-session-actions'
+import { pruneSplitLandingGroupsOnGroupRemoval } from './split-landing-groups'
 
-export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, get) => ({
-  unifiedTabsByWorktree: {},
-  groupsByWorktree: {},
-  activeGroupIdByWorktree: {},
-  layoutByWorktree: {},
-  branchGroupHostByKey: {},
-  ...createTabsCreateActions(set, get),
-  ...createTabsFocusActions(set, get),
-  ...createTabsCloseActions(set, get),
-  ...createTabsBulkCloseActions(set, get),
-  ...createTabsLabelActions(set, get),
-  ...createTabsGroupActions(set, get),
-  ...createTabsMoveActions(set, get),
-  ...createTabsDropActions(set, get),
-  ...createTabsSplitRatioActions(set),
-  ...createTabsBranchGroupHostActions(set),
-  ...createTabsDragPreviewActions(set),
-  ...createTabsSessionActions(set, get)
-})
+export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, get, api) => {
+  pruneSplitLandingGroupsOnGroupRemoval(api)
+  return {
+    unifiedTabsByWorktree: {},
+    groupsByWorktree: {},
+    activeGroupIdByWorktree: {},
+    splitLandingGroupIds: {},
+    layoutByWorktree: {},
+    branchGroupHostByKey: {},
+    ...createTabsCreateActions(set, get),
+    ...createTabsFocusActions(set, get),
+    ...createTabsCloseActions(set, get),
+    ...createTabsBulkCloseActions(set, get),
+    ...createTabsLabelActions(set, get),
+    ...createTabsGroupActions(set, get),
+    ...createTabsMoveActions(set, get),
+    ...createTabsDropActions(set, get),
+    ...createTabsSplitRatioActions(set),
+    ...createTabsBranchGroupHostActions(set),
+    ...createTabsDragPreviewActions(set),
+    ...createTabsSessionActions(set, get)
+  }
+}

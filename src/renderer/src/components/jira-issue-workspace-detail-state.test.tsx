@@ -33,7 +33,7 @@ vi.mock('@/store', () => ({
     selector({ settings: null, patchJiraIssue: mocks.patchJiraIssue })
 }))
 
-vi.mock('@/runtime/runtime-jira-client', () => ({
+vi.mock('@/runtime/jira/runtime-jira-client.ts', () => ({
   jiraGetIssue: (...args: unknown[]) => mocks.jiraGetIssue(...args),
   jiraGetIssueSprintAssignment: (...args: unknown[]) => mocks.jiraGetIssueSprintAssignment(...args),
   jiraIssueComments: (...args: unknown[]) => mocks.jiraIssueComments(...args),

@@ -1,11 +1,12 @@
-import type { WorktreeSlice } from '../../worktree-helpers'
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 1-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
+import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
+import type { WorktreeSlice } from '../worktree-slice-contract'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
-import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import { parseExecutionHostId } from '../../../../../../shared/execution-host'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
-import { runtimeTargetForOwnerEnvironment } from '../../../../runtime/runtime-client-target'
-import { forgetHugeRepoWarningDismissalsForWorktrees } from '@/lib/source-control-huge-repo-warning-dismissals'
+import { runtimeTargetForOwnerEnvironment } from '../../../../runtime/rpc/targets/runtime-client-target'
+import { forgetHugeRepoWarningDismissalsForWorktrees } from '@/lib/source-control/warnings/source-control-huge-repo-warning-dismissals'
 import { forgetWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import { readIpcErrorDetail } from '@/lib/ipc-error'
 import { isArchiveHookRemovalError } from '../../../../../../shared/worktree/archive-hook-removal-gate'
@@ -22,18 +23,21 @@ import {
   getLockedWorktreeRemovalReason,
   isLockedWorktreeRemovalError
 } from '../../../../../../shared/worktree/removal'
-import { preservedBranchCleanupKey } from '../../../../../../shared/preserved-branch-cleanup'
+import { preservedBranchCleanupKey } from '../../../../../../shared/git/branches/preserved-branch-cleanup'
 import { getWorktreeDeleteStateKey } from './worktree-delete-state'
 import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
 import { pruneHostedReviewLinkMutationGenerations } from '../metadata/hosted-review-link-mutation'
 import { rememberAuthoritativelyRemovedWorktrees } from '../listing/authoritative-worktree-removal-memory'
 import { recordRemovedWorktreeSnapshotPrune } from './removed-worktree-snapshot-prune'
-import { clearSessionCommitDraftForWorktree } from '@/lib/source-control-commit-draft-session'
+import { retireRemovedWorktreeCommitDrafts } from '@/lib/source-control/drafts/source-control-commit-draft-session'
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
 import { tearDownRemovedWorktreeRendererState } from './removed-worktree-renderer-teardown'
 import { buildWorktreeRemovalSuccessResult } from './worktree-removal-result'
 import { showWorktreeRemovalWarningToast } from '@/components/sidebar/worktree-removal-warning-toast'
-import { captureWorktreeStateBeforeRemoval } from './worktree-state-before-removal'
+import {
+  captureWorktreeStateBeforeRemoval,
+  retireWorktreeDraftOwners
+} from './worktree-state-before-removal'
 import { resolveWorktreeRemovalPreference } from './worktree-removal-preference'
 import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
 import { resolveLocalForgetRemovalFallback } from './local-forget-removal-fallback'
@@ -64,10 +68,9 @@ export function createRemoveWorktree(
       removalRoute,
       hostId,
       removalGenerationGuard,
-      sameIdSurvivingHostId: catalogSameIdSurvivingHostId
+      sameIdSurvivingHostId: catalogSurvivorHostId
     } = start
-    const sameIdSurvivingHostId =
-      catalogSameIdSurvivingHostId ?? options?.sameIdSurvivingHostId ?? null
+    const sameIdSurvivingHostId = catalogSurvivorHostId ?? options?.sameIdSurvivingHostId ?? null
     const deleteStateKey = getWorktreeDeleteStateKey(get(), worktreeId, requiredExecutionHostId)
     set((s) => ({
       deleteStateByWorktreeId: {
@@ -100,7 +103,7 @@ export function createRemoveWorktree(
         worktreeId,
         requiredExecutionHostId
       )
-      const beforeRemoval = captureWorktreeStateBeforeRemoval(get(), worktreeId, hostId)
+      let beforeRemoval = captureWorktreeStateBeforeRemoval(get(), worktreeId, hostId)
       if (!policy.forgetLocalOnly) {
         removalGenerationGuard?.assertCurrent()
       }
@@ -159,6 +162,9 @@ export function createRemoveWorktree(
         unreachableOrcaMachine = fallback.unreachableOrcaMachine
       }
 
+      retireRemovedWorktreeCommitDrafts(worktreeId, requiredExecutionHostId ?? hostId)
+      beforeRemoval = retireWorktreeDraftOwners(beforeRemoval)
+
       if (!snapshotPruneHandledByLocalMain) {
         await recordRemovedWorktreeSnapshotPrune({
           worktreeId,
@@ -185,7 +191,7 @@ export function createRemoveWorktree(
             options?.ignoreWorkspaceCleanupScanSurvivors === true
           )
           if (sameIdStillSurvives) {
-            return completeSameIdHostScopedRemoval({
+            return await completeSameIdHostScopedRemoval({
               set,
               get,
               worktreeId,
@@ -239,8 +245,6 @@ export function createRemoveWorktree(
       if (unreachableOrcaMachine) {
         reportMachine(runtimeCleanup)
       }
-      // Why: Source Control may be unmounted during deletion, so it can't be the only stale-draft cleanup path.
-      clearSessionCommitDraftForWorktree(worktreeId)
       const preservedBranch = removalResult?.preservedBranch
       const cleanup = preservedBranch
         ? {

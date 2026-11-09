@@ -3,25 +3,25 @@ import { ALL_EXECUTION_HOSTS_SCOPE } from '../../shared/execution-host'
 // Why this path: upstream moved the mixin into the construction module, and this is a
 // type-only import, so the cycle with host-services' value import of this file is erased.
 import type { OrcaRuntimeWithPreservedBranchCleanup } from './construction/runtime-host-services'
-import { RuntimeAccountController } from './runtime-account-controller'
-import { RuntimeAiVaultCommands } from './runtime-ai-vault-commands'
-import { RuntimeMobileDictationController } from './runtime-mobile-dictation-controller'
-import { RuntimeMobileSpeechCatalog } from './runtime-mobile-speech-catalog'
-import { RuntimeNestedRepoImport } from './runtime-nested-repo-import'
-import { RuntimeProjectGroupController } from './runtime-project-group-controller'
-import { RuntimeProjectHostSetupController } from './runtime-project-host-setup-controller'
-import { RuntimeRepositoryCloneController } from './runtime-repository-clone-controller'
-import { RuntimeRepositoryForkBackfill } from './runtime-repository-fork-backfill'
-import { RuntimeRepositoryRefQueries } from './runtime-repository-ref-queries'
-import { RuntimeRepositoryRegistrationController } from './runtime-repository-registration-controller'
+import { RuntimeAccountController } from './agent-session/environment/runtime-account-controller.ts'
+import { RuntimeAiVaultCommands } from './integrations/ai-vault/runtime-ai-vault-commands.ts'
+import { RuntimeMobileDictationController } from './speech/runtime-mobile-dictation-controller.ts'
+import { RuntimeMobileSpeechCatalog } from './speech/runtime-mobile-speech-catalog.ts'
+import { RuntimeNestedRepoImport } from './repositories/runtime-nested-repo-import.ts'
+import { RuntimeProjectGroupController } from './repositories/runtime-project-group-controller.ts'
+import { RuntimeProjectHostSetupController } from './repositories/runtime-project-host-setup-controller.ts'
+import { RuntimeRepositoryCloneController } from './repositories/runtime-repository-clone-controller.ts'
+import { RuntimeRepositoryForkBackfill } from './repositories/runtime-repository-fork-backfill.ts'
+import { RuntimeRepositoryRefQueries } from './repositories/runtime-repository-ref-queries.ts'
+import { RuntimeRepositoryRegistrationController } from './repositories/runtime-repository-registration-controller.ts'
 import { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
-import { RuntimeRepositorySettingsController } from './runtime-repository-settings-controller'
-import { RuntimeRepositorySparsePresets } from './runtime-repository-sparse-presets'
-import { RuntimeServerEnvironmentCommands } from './runtime-server-environment-commands'
-import { RuntimeWorkspaceSessionController } from './runtime-workspace-session-controller'
-import { ClaudeAgentTeamsService } from './claude-agent-teams-service'
-import { teardownFolderWorkspacePtys } from './folder-workspace-pty-teardown'
-import { countRepoTerminalsNotKnownExited } from './project-removal-impact'
+import { RuntimeRepositorySettingsController } from './repositories/runtime-repository-settings-controller.ts'
+import { RuntimeRepositorySparsePresets } from './repositories/runtime-repository-sparse-presets.ts'
+import { RuntimeServerEnvironmentCommands } from './files/server-browse/runtime-server-environment-commands.ts'
+import { RuntimeWorkspaceSessionController } from './workspaces/session-hosts/runtime-workspace-session-controller.ts'
+import { ClaudeAgentTeamsService } from './terminal/agent-teams/claude-agent-teams-service.ts'
+import { teardownFolderWorkspacePtys } from './workspaces/removal/folder-workspace-pty-teardown.ts'
+import { countRepoTerminalsNotKnownExited } from './workspaces/removal/project-removal-impact.ts'
 
 export function installOrcaRuntimeOwnedControllers(
   runtime: OrcaRuntimeWithPreservedBranchCleanup
@@ -65,12 +65,15 @@ export function installOrcaRuntimeOwnedControllers(
         worktreeId,
         connectionId
       ),
-    cleanupRemovedFolderWorkspaceState: (worktreeId) => {
-      if (runtime.store) {
-        runtime.removeWorktreeMetadataAndHistory(runtime.store, worktreeId)
-      }
-      // Why every host after the local-only hub: this store mints folder ids, so none is shared.
-      runtime.dropAgentStatusForRemovedWorktreeFn?.(worktreeId, ALL_EXECUTION_HOSTS_SCOPE)
+    cleanupRemovedFolderWorkspaceState: (worktreeId): void | Promise<void> => {
+      // Retire runs after the awaited store cleanup, so the delete cannot
+      // report before the Codex pretrust purge lands; failures degrade here.
+      const cleanup =
+        runtime.store && runtime.removeWorktreeMetadataAndHistory(runtime.store, worktreeId)
+      return Promise.resolve(cleanup).then(() => {
+        // Why every host after the local-only hub: this store mints folder ids, so none is shared.
+        runtime.dropAgentStatusForRemovedWorktreeFn?.(worktreeId, ALL_EXECUTION_HOSTS_SCOPE)
+      })
     }
   })
 

@@ -1,10 +1,10 @@
 import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime/remote-runtime-tailscale-hint'
 import { isRemoteRuntimeUnreachableMessage } from '../../../shared/remote-runtime/remote-runtime-client-error-classification'
-import { classifyRuntimeEnvironmentHost } from '../../../shared/runtime-environment-host-kind'
+import { classifyRuntimeEnvironmentHost } from '../../../shared/remote-runtime/host-catalog/runtime-environment-host-kind'
 import {
   isEphemeralVmRuntimeEnvironment,
   type KnownRuntimeEnvironment
-} from '../../../shared/runtime-environments'
+} from '../../../shared/remote-runtime/host-catalog/runtime-environments'
 
 const EPHEMERAL_VM_ENDPOINT_HINT =
   'Orca created this VM, so this is not a network setup problem: Settings → Ephemeral VMs shows its state and can release the machine.'
@@ -27,7 +27,7 @@ function withEphemeralVmUnreachableHint(message: string): string {
 }
 
 export function withRuntimeUnreachableHint(
-  environment: Pick<KnownRuntimeEnvironment, 'orcadDeployment' | 'source'>,
+  environment: Pick<KnownRuntimeEnvironment, 'orcadDeployment' | 'source' | 'sshAccess'>,
   message: string,
   endpoint: string | null | undefined
 ): string {
@@ -38,6 +38,9 @@ export function withRuntimeUnreachableHint(
   switch (host.kind) {
     case 'network':
       return withRemoteRuntimeTailscaleHint(message, endpoint)
+    case 'ssh':
+      // An SSH tunnel already crosses networks; Tailscale cannot help it.
+      return message
     case 'wsl':
       // Why not Tailscale: a WSL host is a distro on this computer, reached over wsl.exe.
       return isRemoteRuntimeUnreachableMessage(message)

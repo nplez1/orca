@@ -3,11 +3,11 @@ import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
 import { withBrowserPaneUiRuntimeRpcSource } from '../../../shared/runtime-rpc-feature-interaction-source'
-import { assertRuntimeStatusCompatible } from './runtime-protocol-compat'
-import { createRuntimeRpcAbortError } from './abortable-runtime-environment-call'
-import { callRuntimeEnvironmentWithRevision } from './runtime-rpc-environment-call'
-import { unwrapRuntimeRpcResult } from './runtime-rpc-result'
-import { captureRuntimeEnvironmentRequestRevision } from './runtime-environment-revision'
+import { assertRuntimeStatusCompatible } from './rpc/compatibility/runtime-protocol-compat'
+import { createRuntimeRpcAbortError } from './rpc/calls/abortable-runtime-environment-call'
+import { callRuntimeEnvironmentWithRevision } from './rpc/calls/runtime-rpc-environment-call'
+import { unwrapRuntimeRpcResult } from './rpc/calls/runtime-rpc-result'
+import { captureRuntimeEnvironmentRequestRevision } from './rpc/environment-revisions/runtime-environment-revision'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import {
   RUNTIME_CAPABILITY_STATUS_TTL_MS,
@@ -16,7 +16,7 @@ import {
   invalidateWorkspacePathSearchCapabilitiesForReplacement,
   rememberRuntimeEnvironmentCompatibility,
   runtimeCompatibilityChecks
-} from './runtime-compatibility-cache'
+} from './rpc/compatibility/runtime-compatibility-cache'
 
 export {
   clearRecentRuntimeCompatibilityFailure,
@@ -26,9 +26,9 @@ export {
   markRuntimeEnvironmentCompatible,
   peekRuntimeEnvironmentCapability,
   subscribeRuntimeWorkspacePathSearchCapabilityInvalidation
-} from './runtime-compatibility-cache'
+} from './rpc/compatibility/runtime-compatibility-cache'
 export { type RuntimeClientTarget } from '../../../shared/runtime-client-target'
-export { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './runtime-rpc-result'
+export { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './rpc/calls/runtime-rpc-result'
 export { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
 
 export async function callRuntimeRpc<TResult>(

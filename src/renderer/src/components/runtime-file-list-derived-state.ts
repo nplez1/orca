@@ -1,8 +1,8 @@
-import type { PathSearchMode } from '../../../shared/quick-open-path-search'
+import type { PathSearchMode } from '../../../shared/quick-open/quick-open-path-search'
 import {
   getFileExplorerListUnavailableMessage,
   getFileExplorerOwnerUnresolvedMessage
-} from './right-sidebar/file-explorer-operation-owner'
+} from './right-sidebar/file-explorer/navigation/file-explorer-operation-owner'
 import { NO_LISTING, type RuntimeFileListing } from './runtime-path-search-request'
 import { MAX_WORKSPACE_PATH_SEARCH_PAGE_BYTES } from './runtime-path-search-request-matching'
 
@@ -98,10 +98,11 @@ export function resolveRuntimeFileListDerivedState(args: {
     !remoteQueryTooLarge
   const querySchedulerScope = pathSearchEnabled ? requestScopeKey : null
   // Why: the browse listing starts in an effect, so the render before it must already read as
-  // loading — an empty `files` array otherwise reads as a settled "no files match".
+  // loading — an empty `files` array otherwise reads as a settled "no files match". A failed
+  // listing records no request key, so its error is what settles it.
   const loading =
     visibleLoadingRequestKey === requestKey ||
-    (browseListingPending && listing.requestKey !== requestKey)
+    (browseListingPending && listing.requestKey !== requestKey && loadError === null)
   // Why: a workspace with no listable path is unavailable, not an empty result set. The
   // query-scoped path skips the listing effect, so the reason must be derived here.
   const targetUnavailable = enabled && (!targetCanList || !operationRouteAvailable)

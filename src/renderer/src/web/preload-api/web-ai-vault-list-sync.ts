@@ -1,4 +1,7 @@
-import type { AiVaultListResult, AiVaultSession } from '../../../../shared/ai-vault-types'
+import type {
+  AiVaultListResult,
+  AiVaultSession
+} from '../../../../shared/ai-vault/contracts/ai-vault-types'
 import { applyAiVaultListDelta } from '../../../../shared/ai-vault-list-sync'
 
 /**

@@ -8,7 +8,7 @@ import {
   getGitHubPRCacheKey,
   getGitHubRepoCacheKey
 } from '../../../../shared/github/github-cache-key'
-import { prCommentsCacheSuffix } from '@/store/github/cache-identity'
+import { prCommentsCacheSuffix } from '../../store/github/cache/cache-identity'
 import type { AppState } from '@/store/types'
 import {
   buildPRCommentInlineFromComments,

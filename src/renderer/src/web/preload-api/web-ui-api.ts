@@ -1,7 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s web preload additions ride inside it, and splitting costs a permanent sync hunk. */
 import { subscribeWebWorkspaceSleep } from './web-workspace-sleep-notices'
-import type { AgentSessionAttachmentClipboardTarget } from '../../../../shared/agent-session/agent-session-attachments'
-import { saveClipboardImageAsWebAgentSessionAttachment } from './web-agent-session-attachment-upload'
 import { savePastedTextAsWebAgentSessionAttachment } from './web-pasted-text-upload'
 import { createWebExplorerRootSync } from './web-explorer-root-sync'
 import { createWebJiraFilterStateApi } from './web-jira-filter-state-api'
@@ -14,9 +12,8 @@ import { omitPairingLocalUiFields } from '../../../../shared/pairing-local-ui-fi
 import type { PairedUiState } from '../../../../shared/pairing-local-ui-fields'
 import {
   clipboardHasImage,
-  readClipboardImagePngBase64,
   readClipboardImageThumbnail,
-  saveClipboardImageAsTempFileInRuntime,
+  saveWebClipboardImageAsTempFile,
   writeWebClipboardImage,
   writeWebClipboardText
 } from './web-clipboard-api'
@@ -153,29 +150,7 @@ export function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
       ),
     readSelectionClipboardText: () =>
       Promise.reject(new Error('Selection clipboard is unavailable in the web client')),
-    saveClipboardImageAsTempFile: async (args?: {
-      connectionId?: string | null
-      runtimeEnvironmentId?: string | null
-      agentSessionAttachment?: AgentSessionAttachmentClipboardTarget
-    }) => {
-      if (!requireActiveEnvironmentOrNull()) {
-        return null
-      }
-      const contentBase64 = await readClipboardImagePngBase64()
-      if (!contentBase64) {
-        return null
-      }
-      if (args?.agentSessionAttachment) {
-        if (!args.runtimeEnvironmentId) {
-          throw new Error('A chat attachment needs the server the chat runs on.')
-        }
-        return saveClipboardImageAsWebAgentSessionAttachment(contentBase64, {
-          ...args.agentSessionAttachment,
-          environmentId: args.runtimeEnvironmentId
-        })
-      }
-      return saveClipboardImageAsTempFileInRuntime(contentBase64, args)
-    },
+    saveClipboardImageAsTempFile: saveWebClipboardImageAsTempFile,
     savePastedTextAsFile: savePastedTextAsWebAgentSessionAttachment,
     clipboardHasImage,
     // Browsers expose copied files only inside a paste event.
@@ -205,6 +180,7 @@ export function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
       zoomLevel = level
     },
     isMaximized: () => Promise.resolve(false),
+    isWindowActive: () => Promise.resolve(document.hasFocus()),
     onOpenSettings: () => noopUnsubscribe,
     // Why: the web client has no native tray/menu bar, so it never queues an open-settings or quit request.
     consumePendingOpenSettings: () => Promise.resolve(false),
@@ -247,6 +223,7 @@ export function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onRequestTabClose: () => noopUnsubscribe,
     replyTabClose: () => {},
     onBrowserPageTabShortcut: () => noopUnsubscribe,
+    onToggleProjectsCollapse: () => noopUnsubscribe,
     onFocusBrowserAddressBar: () => noopUnsubscribe,
     onShowBrowserHistory: () => noopUnsubscribe,
     onFindInBrowserPage: () => noopUnsubscribe,
@@ -274,6 +251,8 @@ export function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     replyAgentLaunchTabPublish: () => {},
     onRevealTerminalPane: () => noopUnsubscribe,
     replyTerminalPaneReveal: () => {},
+    onApplyAgentPaneActivity: () => noopUnsubscribe,
+    replyAgentPaneActivity: () => {},
     onSplitTerminal: () => noopUnsubscribe,
     onRenameTerminal: () => noopUnsubscribe,
     onSetPaneTitle: () => noopUnsubscribe,
@@ -307,11 +286,13 @@ export function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     minimize: () => {},
     maximize: () => {},
     onMaximizeChanged: () => noopUnsubscribe,
+    onWindowActiveChanged: () => noopUnsubscribe,
     requestClose: () => {},
     popupMenu: () => {},
     onWindowCloseRequested: () => noopUnsubscribe,
     confirmWindowClose: () => {},
     cancelQuit: () => {},
+    cancelWindowClose: () => {},
     notifyWindowRevealed: () => {}
   }
 }

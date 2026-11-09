@@ -1,11 +1,11 @@
 import { antigravityUsageDisabledSnapshot } from '../antigravity-usage-snapshot'
-import { RateLimitServiceFetchPolicy } from './service-fetch-policy'
+import { RateLimitServiceAntigravityAccounts } from './service-antigravity-accounts'
 import type { InternalRateLimitState, ProviderRateLimits } from './service-types'
 
 /** The two pieces of fetch-cycle bookkeeping a full cycle needs but that carry no
  *  provider logic of their own: which in-flight fetch each generation stamp
  *  belongs to, and the state a cycle publishes while every provider is fetching. */
-export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceFetchPolicy {
+export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAntigravityAccounts {
   /** Bump a provider's fetch generation when its credential fingerprint moved, and
    *  answer the generation an in-flight fetch is stamped with. A stale response
    *  whose stamp no longer matches is discarded by the apply phase. */

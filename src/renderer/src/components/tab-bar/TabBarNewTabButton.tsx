@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
 import { translate } from '@/i18n/i18n'
 import { useTabBarDefaultAgent } from './use-tab-bar-default-agent'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 
 /** How long the primary control must be held before the create menu opens. */
 export const NEW_TAB_HOLD_TO_OPEN_MENU_MS = 350
@@ -70,6 +70,7 @@ function PlainNewTabTrigger(): React.JSX.Element {
           <button
             type="button"
             data-testid="new-tab-button"
+            data-contextual-tour-target="tab-create-menu"
             className={PLAIN_BUTTON_CLASS}
             style={NO_DRAG_STYLE}
             // Why: with no launchable agent this is the "+" E2E matches by its exact "New tab" name; the
@@ -158,6 +159,7 @@ function SplitNewTabTrigger({
             <button
               type="button"
               data-testid="new-tab-menu-trigger"
+              data-contextual-tour-target="tab-create-menu"
               className={SPLIT_CHEVRON_CLASS}
               aria-label={moreOptionsLabel}
             >

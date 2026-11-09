@@ -2,10 +2,10 @@
 
 import { cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { HostedReviewInfo } from '../../../../shared/hosted-review'
+import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type { WorkspaceAttachment } from '../../../../shared/worktree/types'
-import { makeRepo } from '../sidebar/worktree-list-lineage-card-test-fixtures'
-import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
+import { makeRepo } from '../sidebar/worktree-list/listing/worktree-list-lineage-card-test-fixtures'
+import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 
 const store = vi.hoisted(() => {
   const selections: Record<string, string> = {}
@@ -30,11 +30,11 @@ vi.mock('@/lib/provider-runtime-context', () => ({
   getProviderRuntimeContextKey: () => 'runtime'
 }))
 
-vi.mock('@/runtime/runtime-environment-revision', () => ({
+vi.mock('@/runtime/rpc/environment-revisions/runtime-environment-revision.ts', () => ({
   getRuntimeEnvironmentRevision: () => 0
 }))
 
-vi.mock('../sidebar/workspace-reference-review-source', () => ({
+vi.mock('../sidebar/workspace-card/review/workspace-reference-review-source.ts', () => ({
   canReadWorkspaceReferenceReview: () => true
 }))
 

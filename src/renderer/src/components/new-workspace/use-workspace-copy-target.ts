@@ -7,6 +7,7 @@ import {
   type ProjectHostSetupOption
 } from '@/lib/project-host-setup-options'
 import { useAppStore } from '@/store'
+import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 import { isLockedSourceHostTarget } from './locked-target-host'
 
 /** How a project reached a host inside this composer; only our own clone makes the clone the copy. */
@@ -125,7 +126,9 @@ export function useWorkspaceCopyTarget(input: WorkspaceCopyTargetInput): Workspa
     await store.fetchWorktrees(selectedReadyOption.repoId, { executionHostId: hostId })
     // Why the primary checkout: a fresh clone has exactly one, so it identifies the checkout this
     // flow created without comparing path spellings Windows, symlinks and WSL report differently.
-    const landed = (useAppStore.getState().worktreesByRepo[selectedReadyOption.repoId] ?? []).find(
+    const landed = (
+      selectWorktreesByRepo(useAppStore.getState())[selectedReadyOption.repoId] ?? []
+    ).find(
       (worktree) =>
         worktree.isMainWorktree === true &&
         branchName(worktree.branch ?? '') === branchName(lockedWorkspaceBranch) &&

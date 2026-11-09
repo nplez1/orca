@@ -1,5 +1,5 @@
 import { CheckCircle2, CircleDashed, MinusCircle, XCircle } from 'lucide-react'
-import type { StepOutcome } from '../../../shared/pr-check-step-status'
+import type { StepOutcome } from '../../../shared/source-control/checks/pr-check-step-status'
 
 /**
  * The outcome glyph for one check step or CI stage.

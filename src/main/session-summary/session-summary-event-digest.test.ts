@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TranscriptMessage } from '../ai-vault/session-transcript-consumers'
+import type { TranscriptMessage } from '../ai-vault/transcripts/session-transcript-consumers'
 import { createSessionSummaryEventDigester } from './session-summary-event-digest'
 
 function call(text: string): TranscriptMessage {

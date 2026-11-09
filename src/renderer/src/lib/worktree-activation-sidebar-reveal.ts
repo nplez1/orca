@@ -1,9 +1,9 @@
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { Worktree } from '../../../shared/worktree/types'
-import { revealRepoInProjectFilter } from '@/components/sidebar/project-filter-reveal'
+import { revealRepoInProjectFilter } from '../components/sidebar/worktree-list/controls/project-filter-reveal'
 import { isDetachedHeadWorkspace } from '../../../shared/worktree/workspace-kinds'
 import type { useAppStore } from '@/store'
-import type { PendingSidebarWorktreeReveal } from '@/store/slices/ui'
+import type { PendingSidebarWorktreeReveal } from '../store/slices/ui/ui-slice-contract-core'
 
 type SidebarRevealState = ReturnType<typeof useAppStore.getState>
 

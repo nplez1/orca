@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store'
-import type { HostedReviewInfo } from '../../../../shared/hosted-review'
+import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
@@ -15,8 +15,8 @@ import {
   getWorkspaceReferenceRequest,
   getWorkspaceReferenceRuntimeVersion,
   type WorkspaceReferenceRequest
-} from '../sidebar/workspace-reference-details'
-import { canReadWorkspaceReferenceReview } from '../sidebar/workspace-reference-review-source'
+} from '../sidebar/workspace-card/review/workspace-reference-details'
+import { canReadWorkspaceReferenceReview } from '../sidebar/workspace-card/review/workspace-reference-review-source'
 
 /** The linked-review hint that names this entry's review to the host lookup.
  *

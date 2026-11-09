@@ -1,5 +1,5 @@
-import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+import { jiraUpdateIssue } from '../runtime/jira/runtime-jira-client'
+import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import type { JiraFieldErrors, JiraIssue } from '../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
 

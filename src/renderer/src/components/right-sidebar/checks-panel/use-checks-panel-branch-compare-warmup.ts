@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { getConnectionId } from '@/lib/connection-context'
-import { getRuntimeGitBranchCompare } from '@/runtime/runtime-git-diff-client'
+import { getRuntimeGitBranchCompare } from '../../../runtime/source-control/git/runtime-git-diff-client'
 import { useAppStore } from '@/store'
-import { getWorktreeGitOwnerTarget } from '../worktree-git-owner-target'
+import { getWorktreeGitOwnerTarget } from '../source-control/sync/worktree-git-owner-target'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import { useSourceControlBaseRefDefault } from '../source-control/sync/use-base-ref-default'
 import {
   resolveSourceControlBaseRef,
   resolveSourceControlCompareBaseRef
-} from '../../../../../shared/source-control-base-ref-resolution'
+} from '../../../../../shared/source-control/decisions/source-control-base-ref-resolution'
 
 /**
  * Keeps the worktree's branch compare warm while the Checks pane is showing.

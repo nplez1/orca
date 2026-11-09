@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store'
-import type { RightPanelCommentSubmitResult } from '../right-sidebar/right-panel-comment-composer'
+import type { RightPanelCommentSubmitResult } from '../right-sidebar/checks-panel/comments/right-panel-comment-composer'
 import { normalizePRCommentPath } from './pr-comment-inline-comments'
 import type { PRCommentInlineThread } from './pr-comment-inline-threads'
 import type { WorktreePRCommentInline } from './worktree-pr-comment-inline'

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getCommitMessageAgentCapability,
   type CommitMessageModelCapability
-} from '../../../../shared/commit-message-agent-spec'
+} from '../../../../shared/source-control/ai/generation/commit-message-agent-spec'
 import type { AiGenerationSettingsConfig } from '@/lib/ai-generation-settings'
 import { AiGenerationFields } from './ai-generation-fields'
 

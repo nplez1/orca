@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { UiHangDiagnosticsStatus } from '../../../../shared/ui-hang-diagnostics-types'
 import { translate } from '@/i18n/i18n'
-import { SearchableSetting } from './SearchableSetting'
-import { SettingsSwitchRow } from './SettingsFormControls'
-import { getAdvancedSearchEntry } from './advanced-search'
+import { SearchableSetting } from './section-layout/SearchableSetting'
+import { SettingsSwitchRow } from './form-controls/SettingsFormControls'
+import { getAdvancedSearchEntry } from './advanced/advanced-search'
 
 type UiHangDiagnosticsSettingProps = {
   enabled: boolean

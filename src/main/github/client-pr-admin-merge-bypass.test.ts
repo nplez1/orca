@@ -1,3 +1,5 @@
+import type * as GitExecFileModule from '../git/command-runner/git-exec-file'
+import type * as GhExecFileModule from '../git/command-runner/gh-exec-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as GithubApiRepositoryModule from './github-api-repository'
 import type * as GitHubEnterpriseRepositoryModule from './github-enterprise-repository'
@@ -9,6 +11,14 @@ const { clientMocks, moduleMocks } = await vi.hoisted(async () => {
 
 vi.mock('./gh-utils', () => moduleMocks.ghUtilsModuleMock(clientMocks))
 vi.mock('../git/runner', () => moduleMocks.gitRunnerModuleMock(clientMocks))
+vi.mock('../git/command-runner/git-exec-file', async (importOriginal) => ({
+  ...(await importOriginal<typeof GitExecFileModule>()),
+  gitExecFileAsync: clientMocks.gitExecFileAsyncMock
+}))
+vi.mock('../git/command-runner/gh-exec-file', async (importOriginal) => ({
+  ...(await importOriginal<typeof GhExecFileModule>()),
+  ghExecFileAsync: clientMocks.ghExecFileAsyncMock
+}))
 vi.mock('./local-git-config-signature', () =>
   moduleMocks.localGitConfigSignatureModuleMock(clientMocks)
 )
@@ -26,10 +36,16 @@ vi.mock('./github-api-repository', async (importOriginal) =>
 )
 
 import { mergePR } from './client'
-import { resetGraphQLRateLimitGuardMocks } from './client-test-harness'
+import {
+  installIndependentCheckFixtures,
+  resetGraphQLRateLimitGuardMocks
+} from './client-test-harness'
 import { viewerMergePrivilegeCache } from './client/lookup/pr-viewer-merge-privilege'
 
 const { ghExecFileAsyncMock } = clientMocks
+
+const metadataRequests = vi.fn()
+const unexpectedChecks: string[][] = []
 
 const REPOSITORY = { owner: 'stablyai', repo: 'orca', host: 'github.com' }
 
@@ -60,7 +76,9 @@ function mockPRRequiringApproval(args: {
     baseRefOid: 'base-oid',
     headRefOid: 'head-oid'
   }
-  ghExecFileAsyncMock
+  // Through the metadata seam: the PR lookup's independent check fetch is answered by the fixture,
+  // so it cannot consume the repository-metadata or viewer-probe responses below.
+  metadataRequests
     .mockResolvedValueOnce({ stdout: JSON.stringify({ stack: null }) })
     .mockResolvedValueOnce({ stdout: JSON.stringify(prView) })
     // Repository merge metadata, then the viewer-scoped bypass probe.
@@ -91,10 +109,14 @@ function mergeArgs(): string[] | undefined {
 describe('GitHub admin merge bypass', () => {
   beforeEach(() => {
     resetGraphQLRateLimitGuardMocks(clientMocks)
+    installIndependentCheckFixtures(clientMocks, metadataRequests, unexpectedChecks)
     viewerMergePrivilegeCache.clear()
   })
 
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => {
+    expect(unexpectedChecks).toEqual([])
+    vi.restoreAllMocks()
+  })
 
   it('merges with admin privileges when the caller confirmed the bypass', async () => {
     mockPRRequiringApproval({

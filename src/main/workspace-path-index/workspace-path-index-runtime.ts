@@ -17,7 +17,7 @@ import {
   WorkspacePathIndexWorkerClient
 } from './workspace-path-index-worker-client'
 import { WorkspacePathIndexService } from './workspace-path-index-service'
-import { resolveAuthorizedPath } from '../ipc/filesystem/filesystem-auth'
+import { resolveAuthorizedPath } from '../ipc/filesystem/access/filesystem-auth'
 import {
   workspacePathIndexFreshnessDeadlineForOwner,
   workspacePathIndexValidationIntervalForOwner

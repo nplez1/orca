@@ -1,8 +1,11 @@
-import type { AiVaultListArgs, AiVaultListResult } from '../../shared/ai-vault-types'
+import type {
+  AiVaultListArgs,
+  AiVaultListResult
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import {
   aiVaultAppliedScopePaths,
   type AiVaultSessionDepth
-} from '../../shared/ai-vault-session-depth'
+} from '../../shared/ai-vault/scanning/ai-vault-session-depth'
 import { hostLegSyncScan, type AiVaultHostLegSyncBasis } from './ai-vault-host-leg-sync'
 
 /**

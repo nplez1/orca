@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
+import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
 import { createAgentCliSessionFoldBrain } from './session-summary-agent-cli-fold-brain'
 
 function brain(resolveParams: () => ResolvedSourceControlAiGenerationParams | null, cwd: string) {

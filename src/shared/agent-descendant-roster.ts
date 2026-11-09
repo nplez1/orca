@@ -2,9 +2,9 @@ import {
   AGENT_MODEL_MAX_LENGTH,
   AGENT_STATUS_TOOL_INPUT_MAX_LENGTH,
   AGENT_TYPE_MAX_LENGTH,
-  type AgentSubagentSnapshot
-} from './agent-status-types'
-import { normalizeOptionalField } from './agent-status-field-normalization'
+  normalizeOptionalField
+} from './agent-status/contracts/agent-status-field-normalization'
+import type { AgentSubagentSnapshot } from './agent-status/contracts/agent-status-subagent-snapshot'
 
 /** Live descendants (subagents, spawned threads, async child runs) of one pane's
  *  lead agent session, keyed by the provider-assigned child id.

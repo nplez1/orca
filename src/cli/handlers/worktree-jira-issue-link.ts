@@ -6,11 +6,11 @@ import { buildJiraWorkspaceSource } from '../../shared/new-workspace/workspace-s
 import {
   ACCOUNT_BACKED_TASK_SOURCE_PROJECT_ID,
   normalizeTaskSourceContext
-} from '../../shared/task-source-context'
-import { workspaceAttachmentReferenceLabel } from '../../shared/workspace-attachments'
+} from '../../shared/work-items/task-source-context'
+import { workspaceAttachmentReferenceLabel } from '../../shared/workspace-attachments/workspace-attachments'
 import type { JiraConnectionStatus, JiraIssue, JiraSite } from '../../shared/jira/jira-types'
-import type { TaskProvider } from '../../shared/task-providers'
-import type { TaskSourceContext } from '../../shared/task-source-context'
+import type { TaskProvider } from '../../shared/work-items/task-providers'
+import type { TaskSourceContext } from '../../shared/work-items/task-source-context'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 import type { RuntimeWorktreeRecord } from '../../shared/runtime-types'
 import { RuntimeClientError } from '../runtime-client'

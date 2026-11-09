@@ -1,17 +1,17 @@
-import { resolveTuiAgentLaunchEnv } from '../../../shared/tui-agent-launch-defaults'
+import { resolveTuiAgentLaunchEnv } from '../../../shared/agent-launch/choices/tui-agent-launch-defaults'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { StructuredAgentId } from '../../../shared/agent-session/lifecycle/agent-session-provider-handle'
-import type { RuntimeWorkspaceCatalog } from './workspace-catalog'
+import type { RuntimeWorkspaceCatalog } from './catalog/workspace-catalog'
 import type { OrcaRuntimeWithRefreshPtyWorktreeRecordsFromController } from '../terminal/lifecycle/pty-worktree-refresh'
-import type { RuntimeAccountController } from '../runtime-account-controller'
+import type { RuntimeAccountController } from '../agent-session/environment/runtime-account-controller'
 import type { OrcaRuntimeWithPruneMobileSessionTabGroupLayout } from '../session-lifecycle/projection/prune-mobile-session-tab-group-layout'
 import type { OrcaRuntimeWithGetStructuredAgentSessionCreateSupport } from '../session-tabs/structured-session-create-support'
-import type { OrcaRuntimeWithGetPtyRecordForPaneKey } from '../orchestration/terminal-pane-mail-routing'
+import type { OrcaRuntimeWithGetPtyRecordForPaneKey } from '../orchestration/mailbox/routing/terminal-pane-mail-routing'
 import { OrcaRuntimeWithSetupRunnerState } from '../orca-runtime-setup-runner-state'
 import type { AgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-record'
 import type { Repo } from '../../../shared/repo-types'
-import { escalateChatWorkerError } from '../orchestration/chat-worker-error-escalation'
-import type { StructuredAgentSessionRequestFailure } from '../../native-chat/agent-session-wire/structured-agent-session-request-failures'
+import { escalateChatWorkerError } from '../orchestration/workers/turn-stops/chat-worker-error-escalation'
+import type { StructuredAgentSessionRequestFailure } from '../../native-chat/agent-session-wire/observations/structured-agent-session-request-failures'
 
 /** Members the worktree listing reads from later runtime layers; declarations only. */
 export abstract class OrcaRuntimeWithWorktreePsDependencies extends OrcaRuntimeWithSetupRunnerState {

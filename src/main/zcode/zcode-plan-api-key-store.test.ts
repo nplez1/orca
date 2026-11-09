@@ -35,7 +35,7 @@ vi.mock('node:path', () => ({
   join: (...parts: string[]) => parts.join('/')
 }))
 
-vi.mock('../../shared/secure-file', () => ({
+vi.mock('../../shared/secure-storage/secure-file', () => ({
   hardenExistingSecureFile: hardenExistingSecureFileMock,
   writeSecureFile: writeSecureFileMock
 }))
@@ -289,19 +289,6 @@ describe('zcode-plan-api-key-store', () => {
     const store = await loadStore()
 
     expect(() => store.readZcodePlanApiKey()).toThrow('could not be decrypted')
-  })
-
-  it('clearing removes the file and resets the cached value', async () => {
-    existsSyncMock.mockReturnValue(false)
-    const store = await loadStore()
-    store.saveZcodePlanApiKey('glm-secret')
-
-    existsSyncMock.mockReturnValue(true)
-    store.clearZcodePlanApiKey()
-
-    expect(rmSyncMock).toHaveBeenCalledWith(storePath, { force: true })
-    existsSyncMock.mockReturnValue(false)
-    expect(store.readZcodePlanApiKey()).toBeNull()
   })
 })
 

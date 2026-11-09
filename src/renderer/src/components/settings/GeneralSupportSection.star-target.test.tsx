@@ -3,7 +3,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository'
-import { GeneralSupportSection } from './GeneralSupportSection'
+import { GeneralSupportSection } from './general/GeneralSupportSection'
 
 const checkOrcaStarred = vi.fn()
 const starOrca = vi.fn()

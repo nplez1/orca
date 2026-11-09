@@ -1,11 +1,12 @@
 import { useSyncExternalStore } from 'react'
 import type { AgentSessionHandleProvider } from '../../../../../shared/agent-session/lifecycle/agent-session-provider-handle'
-import type { TuiAgent } from '../../../../../shared/tui-agent'
+import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
 import { structuredLaunchesHoldingIdentity } from './structured-agent-session-launch-holders'
 import {
   structuredLaunchIdentity,
   subscribeStructuredAgentLaunchStatus,
   structuredLaunchStates,
+  structuredAgentSessionLaunchHasRetainedInput,
   type StructuredAgentLaunchStatus
 } from './structured-agent-session-launch-registry'
 
@@ -18,7 +19,14 @@ export function getStructuredAgentLaunchStatus(
   // A failed chat is not, nor an unconfirmed or retried blank one: a new launch opens its own chat.
   const identity = structuredLaunchIdentity(worktreeId, agent)
   const states = structuredLaunchesHoldingIdentity(
-    (candidate) => candidate === identity || candidate.startsWith(`${identity}:resume:`)
+    (candidate) =>
+      candidate === identity ||
+      candidate.startsWith(`${identity}:resume:`) ||
+      candidate.startsWith(`${identity}:fork:`)
+  ).filter(
+    (state) =>
+      !state.operationEnded &&
+      !structuredAgentSessionLaunchHasRetainedInput(worktreeId, state.intent.sessionId)
   )
   if (states.length === 0) {
     return 'idle'

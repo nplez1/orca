@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
+import type {
+  AiVaultListResult,
+  AiVaultSession
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import { pageAiVaultListResult } from './session-list-page-bounds'
 
 const SCANNED_AT = '2026-07-27T00:00:00.000Z'

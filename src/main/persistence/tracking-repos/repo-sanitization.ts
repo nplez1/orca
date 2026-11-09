@@ -1,11 +1,13 @@
 import type { RepoProjectHostSetupMethod } from '../../../shared/project-types'
 import { isWorktreeSharedDirectoriesMode, type Repo } from '../../../shared/repo-types'
-import type { GitRemoteIdentity } from '../../../shared/git-remote-identity'
+import { editorFormatterSchema } from '../../../shared/editor-formatter'
+import type { GitRemoteIdentity } from '../../../shared/git/remotes/git-remote-identity'
 import { normalizeRepoBadgeColor } from '../../../shared/repo-badge-color'
 import { sanitizeRepoIcon } from '../../../shared/repo-icon'
 import { normalizeGhAccountBinding } from '../../../shared/github/account-binding'
 import { normalizeJiraProjectReference } from '../../../shared/jira/jira-project-reference'
 import type { GhAccountBinding } from '../../../shared/github/account-binding'
+import { sanitizeAgentWorkspaceTrustDecision } from '../../../shared/agent-launch/permissions/agent-workspace-trust-decision'
 import {
   normalizeCustomWorktreeVisibilitySources,
   normalizeWorktreeVisibilitySourcePreferences
@@ -99,6 +101,7 @@ export function sanitizeRepoUpdatesForPersistence<
     Pick<
       Repo,
       | 'badgeColor'
+      | 'editorFormatter'
       | 'repoIcon'
       | 'upstream'
       | 'gitRemoteIdentity'
@@ -106,6 +109,7 @@ export function sanitizeRepoUpdatesForPersistence<
       | 'projectHostSetupMethod'
       | 'forkSyncMode'
       | 'sharedDirectoriesMode'
+      | 'agentWorkspaceTrust'
       | 'defaultJiraProject'
       | 'customWorktreeVisibilitySources'
       | 'worktreeVisibilitySourcePreferences'
@@ -115,6 +119,9 @@ export function sanitizeRepoUpdatesForPersistence<
   }
 >(updates: T): T {
   const sanitized = { ...updates }
+  if ('editorFormatter' in sanitized && sanitized.editorFormatter !== undefined) {
+    sanitized.editorFormatter = editorFormatterSchema.parse(sanitized.editorFormatter)
+  }
   if ('defaultJiraProject' in sanitized) {
     const reference = normalizeJiraProjectReference(sanitized.defaultJiraProject)
     if (reference === undefined) {
@@ -185,6 +192,14 @@ export function sanitizeRepoUpdatesForPersistence<
       delete sanitized.sharedDirectoriesMode
     } else {
       sanitized.sharedDirectoriesMode = mode
+    }
+  }
+  if ('agentWorkspaceTrust' in sanitized) {
+    const agentWorkspaceTrust = sanitizeAgentWorkspaceTrustDecision(sanitized.agentWorkspaceTrust)
+    if (agentWorkspaceTrust === undefined) {
+      delete sanitized.agentWorkspaceTrust
+    } else {
+      sanitized.agentWorkspaceTrust = agentWorkspaceTrust
     }
   }
   // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
