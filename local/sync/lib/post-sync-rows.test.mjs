@@ -18,6 +18,7 @@ test('the range checks the audit named are rows, not a tool somebody has to reme
     'fork-symbol-survival',
     'dangling-references',
     'repo-lint',
+    'fork-invariants',
     'typecheck'
   ]) {
     assert.ok(ids.includes(id), id)

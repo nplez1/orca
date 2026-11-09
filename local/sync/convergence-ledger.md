@@ -30,7 +30,7 @@ Rules for using it:
 
 **Decision:** upstream reorganised its tree into owner-scoped directories in the 2026-11-08 sync
 (`refactor: organize X by defining owner`, `group settings owners`, `organize backend runtime by
-defining owner`). When a file the fork modified was *moved* rather than dropped, the fork’s delta is
+defining owner`). When a file the fork modified was _moved_ rather than dropped, the fork’s delta is
 re-applied at the new location and the old path deleted. The resolution must **not** be the old file
 copied over upstream’s new one.
 
@@ -472,19 +472,33 @@ really installs.
 **Do not:** rename the URL scheme, or sweep the relay shim to `orca-np`; **and never hand-edit the
 sweep's subjects** — run `node local/sync/identity-sweep.mjs --fix` on a clean tree and review the
 diff (it reports `N fixable`, which must be 0). A hook test that writes `~/.orca` fails against this
-build, it does not merely read oddly.
+build, it does not merely read oddly. Never leave `getSharedManagedScriptPath` (upstream moves it to
+`agent-hooks/installation/scripts/managed-hook-script-path.ts`) or `wrapRuntimeHomeHookCommand`
+(`installation/commands/`) on a literal `.orca`: both arrive as new files with no conflict, and the
+`fork-invariants` post-sync row is the only thing that fails on them — fork issue #299.
 
 **Tooling:** `node local/sync/identity-sweep.mjs` reports every remaining violation (allowlisted
 cases are in that script).
 
 **The one deliberate `~/.orca` exception (2026-10-09 sync):** the managed-hook install lock parent
-in `managed-hook-install-lock.ts` stays the literal `.orca` (and `managed-hook-runtime.test.ts`
-asserts both `.orca` and `.orca-np`), because that lock is a **cross-install mutex over the shared
-`~/.claude` hooks**: an official Orca install manages the same hook files, so both must contend on
-one lock path. The fork renamed its own home, not this mutex. This has now been "repaired" twice —
-`identity-sweep.mjs` reports the literal, and a 2026-10-09 resolution changed it to
-`HOME_DIRECTORY_NAME` and swept the test with it, which broke
-`codex-state-db-backfill-recovery.test.ts`. **Do not sweep this one.**
+in `managed-hook-install-lock.ts` stays the literal `.orca` (asserted by
+`managed-hook-install-lock.test.ts`, which `identity-sweep.mjs` allowlists for it at any depth under
+`agent-hooks/`), because that lock is a **cross-install mutex over the shared `~/.claude` hooks**: an
+official Orca install manages the same hook files, so both must contend on one lock path. The fork
+renamed its own home, not this mutex. This has now been "repaired" twice — `identity-sweep.mjs`
+reports the literal, and a 2026-10-09 resolution changed it to `HOME_DIRECTORY_NAME` and swept the
+test with it, which broke `codex-state-db-backfill-recovery.test.ts`. **Do not sweep this one.**
+
+**The hook _script_ path is the opposite case (fork issue #299).** `getSharedManagedScriptPath` must
+resolve under `HOME_DIRECTORY_NAME`. Upstream extracts it into
+`agent-hooks/installation/scripts/managed-hook-script-path.ts` with a literal `.orca`, and the new
+file merges with **no conflict** — the fork's own `installer-utils.ts` is a modify/delete, but the
+addition arrives silently, and the sweep reports it as a report-only `home-dir-reader` finding that
+exits 0. Re-point that file at `HOME_DIRECTORY_NAME` when it appears, and keep
+`wrapRuntimeHomeHookCommand` on the constant too: upstream renames it into
+`agent-hooks/installation/commands/` with `.orca` in all three of its branches. Both are pinned by
+`tests/tools/fork-invariants.test.mjs`, which the `fork-invariants` post-sync row runs before the
+push — a computed import is invisible to the reverse-import selector, so nothing else would.
 
 ---
 

@@ -3580,6 +3580,8 @@ each now carries the identity, and each is pinned by a test rather than by a com
 | `linux.executableName` (desktop entry, icons, mime xml) | `orca-np`                                                                  | same file                                                          |
 | Linux CLI profile                                       | `~/.config/orca-np`                                                        | `src/cli/runtime/metadata.test.ts`                                 |
 | agent-hook entry matcher                                | `.orca-np` only                                                            | `src/main/agent-hooks/managed-command-matcher-legacy-home.test.ts` |
+| shared managed-hook script path                         | `~/.orca-np/agent-hooks/<script>`                                          | `tests/tools/fork-invariants.test.mjs`                             |
+| managed-hook command (posix, cmd, PowerShell)           | the same `~/.orca-np/agent-hooks/<script>`                                 | same file                                                          |
 | launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `src/cli/runtime/serve-service-unit.test.ts`                       |
 | WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl-cli-installer.test.ts`                           |
 | `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts`           |
@@ -3597,6 +3599,30 @@ Three couplings that only show up in the built artifact:
 - **`src/shared/appimage-cache-identity.ts` recognises both executable names.** An AppImage generation
   cached by an earlier build still runs as `orca-ide`, so keying the cache layout on one name would
   drop its lease and its update handoff.
+
+#### The shared hook script path is pinned by behaviour, not by file (`2026-11-09`, fork issue #299)
+
+Upstream extracted `getSharedManagedScriptPath` out of `installer-utils.ts` into
+`agent-hooks/installation/scripts/managed-hook-script-path.ts` with a literal `join(homedir(), '.orca',
+'agent-hooks', …)`, so the next sync re-introduces the collision **without a conflict**: the new file
+is an add, and this fork's copy of the old one is a modify/delete. Nothing else catches it —
+`fork-symbol-survival` reads the name as relocated and only asks for review, and the identity sweep
+reports the literal as a report-only `home-dir-reader` finding and exits 0 (its allowlist entry is
+scoped to the install-lock **test**, which is a different file). At sync time, point that file at
+`HOME_DIRECTORY_NAME`. The pin is `tests/tools/fork-invariants.test.mjs`, which finds the module that
+_defines_ the resolver by search rather than importing a known path, so the assertion survives the
+relocation instead of failing on it. It also fails if `HOME_DIRECTORY_NAME` itself is reverted,
+because the resolved path must not carry `LEGACY_HOME_DIRECTORY_NAME`.
+
+The same test pins `wrapRuntimeHomeHookCommand`, the reader rather than the writer: upstream renames
+it into `agent-hooks/installation/commands/` with `.orca` in all three of its branches, and a reverted
+reader runs the official install's scripts. A computed import is invisible to the reverse-import
+selector, so `local/sync` runs the test itself as the `fork-invariants` post-sync row — otherwise the
+first run to go red would be the nightly, after the merge is already pushed.
+
+The identity sweep's allowlist entry for the lock is depth-independent for the same reason: upstream
+re-homed `managed-hook-install-lock.test.ts` under `agent-hooks/installation/locking/`, where a fixed
+path pattern stops matching and the lock's `.orca` reads as an unfixed literal.
 
 Two upgrade costs, both accepted deliberately rather than migrated:
 

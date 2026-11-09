@@ -9,6 +9,7 @@
 import {
   TYPE_CHECK_COMMAND,
   conflictMarkers,
+  forkInvariants,
   localizationCatalog,
   repoLint,
   typecheck
@@ -70,6 +71,12 @@ export function postSyncRows({ tip, source, problem, options }) {
       'fork identity sweep',
       'the named paths carry upstream identity (bundle id, app name, data dir) that the fork must own',
       identitySweep
+    ],
+    [
+      'fork-invariants',
+      'fork identity anchors still resolve to this build, not an official install',
+      'upstream extracts an anchor into a new file that carries the official name and nothing conflicts; point it at the fork constant before pushing',
+      forkInvariants
     ],
     [
       'lost-content',
