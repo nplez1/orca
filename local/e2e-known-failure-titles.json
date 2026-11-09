@@ -6,7 +6,17 @@
     "The verdict step only runs in this fork; upstream keeps Playwright's own exit code.",
     "Each entry records how many of the sampled scheduled runs hit it, and `owner` is `upstream` only",
     "when the same title failed in an upstream scheduled run as well. Remove an entry when the verdict",
-    "step warns that it passed."
+    "step warns that it passed.",
+    "",
+    "Each entry names a cause as well as a title: `match` is a regex tested against the first line of the",
+    "failure's message (ANSI stripped, the reporter's `Error: ` prefix removed), and an entry that cannot",
+    "pin one says `\"flaky\": true` instead. That field is not a mute button — it is the declared statement",
+    "that the failure text was never captured, or has been seen to vary, so only the title is known. A",
+    "title whose cause was observed gets a `match` built from it, unioned across every shape observed, and",
+    "a genuinely new cause then reads as unexpected. `local/lib/known-red.mjs` is the one matcher that",
+    "enforces this, and `local/check-e2e-known-failure-titles.mjs` reports an entry with neither field as a",
+    "problem.",
+    "2026-11-09 (#317): pruned 2 entries whose spec file no longer exists — upstream deleted both tests (tests/e2e/plugin-startup-budget.spec.ts in 8fb8e6ef0f2, #37421; tests/e2e/sidebar-measured-row-scroll.spec.ts in e98c6a439ac, #38030). A title for a deleted spec can never match, and the verdict only reports a stale entry that passed, so both would have sat here for ever. The contract test now fails when an entry names a file this tree does not have."
   ],
   "recordedAt": "2026-09-27",
   "sampledRuns": {
@@ -19,210 +29,224 @@
       "title": "panel consent enables real local transcript search; clearing restores history",
       "owner": "unattributed",
       "observedForkRuns": 2,
-      "observedUpstreamRuns": 0
+      "observedUpstreamRuns": 0,
+      "flaky": true
     },
     {
       "file": "tests/e2e/browser-address-bar-narrow-toolbar.spec.ts",
-      "title": "Browser address bar in a narrow toolbar \u203a focusing the squeezed address bar expands a typable field that navigates",
+      "title": "Browser address bar in a narrow toolbar › focusing the squeezed address bar expands a typable field that navigates",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "match": "^expect\\(received\\)\\.toBeLessThan\\(expected\\)"
     },
     {
       "file": "tests/e2e/browser-floating-shortcut-scope.spec.ts",
-      "title": "floating browser shortcut scope \u203a chrome shortcuts act only in the pane that owns the key press \u203a keys pressed in the split browser chrome",
+      "title": "floating browser shortcut scope › chrome shortcuts act only in the pane that owns the key press › keys pressed in the split browser chrome",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "flaky": true
     },
     {
       "file": "tests/e2e/browser-pointer-input-dispatch.spec.ts",
       "title": "dispatches coordinate pointer input fast enough for real gestures",
       "owner": "upstream",
       "observedForkRuns": 4,
-      "observedUpstreamRuns": 7
+      "observedUpstreamRuns": 7,
+      "match": "^\\{\"evalControl\":"
     },
     {
       "file": "tests/e2e/combined-diff-invalidation-freeze-repro.spec.ts",
-      "title": "Combined diff invalidation freeze repro (STA-3420) \u203a a rebase-style burst of external file changes keeps the diff responsive and loaded",
+      "title": "Combined diff invalidation freeze repro (STA-3420) › a rebase-style burst of external file changes keeps the diff responsive and loaded",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 2
+      "observedUpstreamRuns": 2,
+      "match": "^Test timeout of \\d+ms exceeded\\.$"
     },
     {
       "file": "tests/e2e/combined-diff-scroll-restore.spec.ts",
-      "title": "Combined diff scroll restore \u203a keeps the visible section anchored after switching tabs",
+      "title": "Combined diff scroll restore › keeps the visible section anchored after switching tabs",
       "owner": "unattributed",
       "observedForkRuns": 1,
-      "observedUpstreamRuns": 0
+      "observedUpstreamRuns": 0,
+      "match": "^expect\\(received\\)\\.toBeLessThan\\(expected\\)"
     },
     {
       "file": "tests/e2e/completed-worker-retirement-resume.spec.ts",
       "title": "completed background worker terminal-close-cli retires resume authority before first activation",
       "owner": "upstream",
       "observedForkRuns": 11,
-      "observedUpstreamRuns": 8
+      "observedUpstreamRuns": 8,
+      "match": "^expect\\(received\\)\\.(?:toHaveLength|toEqual)\\(expected\\)"
     },
     {
       "file": "tests/e2e/daemon-generation-legacy-close-safety.spec.ts",
       "title": "close-intent negotiation preserves legacy behavior while protecting capable viewers across daemon generations",
       "owner": "upstream",
       "observedForkRuns": 11,
-      "observedUpstreamRuns": 8
+      "observedUpstreamRuns": 8,
+      "match": "^DaemonProtocolError: Cannot find package 'node-pty' imported from "
     },
     {
       "file": "tests/e2e/headless-paired-remote-terminal-retention-memory.spec.ts",
       "title": "ordinary-parks paired terminals against an isolated headless Orca host",
       "owner": "upstream",
       "observedForkRuns": 1,
-      "observedUpstreamRuns": 3
+      "observedUpstreamRuns": 3,
+      "match": "^expect\\(received\\)\\.toBeLessThanOrEqual\\(expected\\)"
     },
     {
       "file": "tests/e2e/live-background-terminal-mount-authority.spec.ts",
       "title": "adopts runtime-owned agent and Setup PTYs on first mount",
       "owner": "upstream",
       "observedForkRuns": 12,
-      "observedUpstreamRuns": 7
+      "observedUpstreamRuns": 7,
+      "match": "^(?:expect\\(received\\)\\.(?:toHaveLength|toEqual)\\(expected\\)|expect\\(locator\\)\\.toContainText\\(expected\\) failed|terminal_surface_ownership_unavailable)"
     },
     {
       "file": "tests/e2e/native-chat-history-prepend-anchor.spec.ts",
-      "title": "Native chat transcript anchoring \u203a keeps the visible transcript row at the same viewport offset",
+      "title": "Native chat transcript anchoring › keeps the visible transcript row at the same viewport offset",
       "owner": "upstream",
       "observedForkRuns": 4,
-      "observedUpstreamRuns": 5
+      "observedUpstreamRuns": 5,
+      "match": "^expect\\(locator\\)\\.toBeAttached\\(\\) failed"
     },
     {
       "file": "tests/e2e/native-chat-message-rail.spec.ts",
-      "title": "Native chat message rail \u203a previews prompts and jumps without following later output",
+      "title": "Native chat message rail › previews prompts and jumps without following later output",
       "owner": "upstream",
       "observedForkRuns": 12,
-      "observedUpstreamRuns": 8
+      "observedUpstreamRuns": 8,
+      "match": "^expect\\(locator\\)\\.toBeFocused\\(\\) failed"
     },
     {
       "file": "tests/e2e/paired-client-hosted-browser-restart-survival.spec.ts",
       "title": "keeps a client-hosted browser tab across a paired runtime restart",
       "owner": "unattributed",
       "observedForkRuns": 1,
-      "observedUpstreamRuns": 0
+      "observedUpstreamRuns": 0,
+      "flaky": true
     },
     {
       "file": "tests/e2e/paired-remote-browser-link-open-routing.spec.ts",
       "title": "opens a remote pane link on the pane runtime and refuses to fall back to the client",
       "owner": "unattributed",
       "observedForkRuns": 2,
-      "observedUpstreamRuns": 0
+      "observedUpstreamRuns": 0,
+      "flaky": true
     },
     {
       "file": "tests/e2e/paired-remote-split-pane-host-retired-ghost.spec.ts",
       "title": "removes the pane a paired remote host retired instead of leaving a dead ghost",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "flaky": true
     },
     {
       "file": "tests/e2e/paired-remote-terminal-parked-reveal-interactivity.spec.ts",
       "title": "paired client keeps revealed remote terminals interactive",
       "owner": "upstream",
       "observedForkRuns": 12,
-      "observedUpstreamRuns": 8
-    },
-    {
-      "file": "tests/e2e/plugin-startup-budget.spec.ts",
-      "title": "keeps real Electron launch stable with 20 approved inert plugins",
-      "owner": "upstream",
-      "observedForkRuns": 0,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 8,
+      "match": "^(?:cold|reconnect)-parked: revealed pane was not interactive"
     },
     {
       "file": "tests/e2e/setup-script-import.spec.ts",
-      "title": "Setup script import prompt \u203a imports cmux setup commands through the prompt UI",
+      "title": "Setup script import prompt › imports cmux setup commands through the prompt UI",
       "owner": "unattributed",
       "observedForkRuns": 1,
-      "observedUpstreamRuns": 0
-    },
-    {
-      "file": "tests/e2e/sidebar-measured-row-scroll.spec.ts",
-      "title": "keeps a collapsed group visible when an idle card below it grows",
-      "owner": "upstream",
-      "observedForkRuns": 12,
-      "observedUpstreamRuns": 8
+      "observedUpstreamRuns": 0,
+      "flaky": true
     },
     {
       "file": "tests/e2e/source-control-commit-message-ai.spec.ts",
-      "title": "Source Control AI commit messages \u203a substitutes the workspace-linked issue into the commit-message recipe",
+      "title": "Source Control AI commit messages › substitutes the workspace-linked issue into the commit-message recipe",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "flaky": true
     },
     {
       "file": "tests/e2e/tasks-page.spec.ts",
-      "title": "Tasks page \u203a GitHub search waits for idle, keeps rows visible, and Enter does not double-fetch",
+      "title": "Tasks page › GitHub search waits for idle, keeps rows visible, and Enter does not double-fetch",
       "owner": "unattributed",
       "observedForkRuns": 1,
-      "observedUpstreamRuns": 0
+      "observedUpstreamRuns": 0,
+      "flaky": true
     },
     {
       "file": "tests/e2e/terminal-column-desync-repro.spec.ts",
-      "title": "Terminal column desync repro \u203a PTY columns re-sync after the terminal is resized while hidden",
+      "title": "Terminal column desync repro › PTY columns re-sync after the terminal is resized while hidden",
       "owner": "unattributed",
       "observedForkRuns": 3,
-      "observedUpstreamRuns": 0
+      "observedUpstreamRuns": 0,
+      "match": "^expect\\(received\\)\\.toBe\\(expected\\) // Object\\.is equality"
     },
     {
       "file": "tests/e2e/terminal-hidden-view-parking.spec.ts",
-      "title": "Terminal hidden view parking \u203a reproduces a static frame byte-for-byte across 25 park/reveal cycles",
+      "title": "Terminal hidden view parking › reproduces a static frame byte-for-byte across 25 park/reveal cycles",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 2
+      "observedUpstreamRuns": 2,
+      "match": "^terminal tab [0-9a-f-]+ did not park \\(pane manager still mounted\\)"
     },
     {
       "file": "tests/e2e/terminal-link-click-ownership.spec.ts",
-      "title": "terminal link click ownership \u203a a plain click stays child-owned when link actions are disabled",
+      "title": "terminal link click ownership › a plain click stays child-owned when link actions are disabled",
       "owner": "upstream",
       "observedForkRuns": 12,
-      "observedUpstreamRuns": 8
+      "observedUpstreamRuns": 8,
+      "match": "^expect\\(locator\\)\\.toHaveCount\\(expected\\) failed"
     },
     {
       "file": "tests/e2e/terminal-linux-direct-ime-commit.spec.ts",
       "title": "Linux direct IME punctuation reaches the PTY before and after composition",
       "owner": "upstream",
       "observedForkRuns": 5,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "flaky": true
     },
     {
       "file": "tests/e2e/terminal-shortcuts.spec.ts",
-      "title": "Terminal Shortcuts \u203a Shift+Enter follows the pane Kitty keyboard state",
+      "title": "Terminal Shortcuts › Shift+Enter follows the pane Kitty keyboard state",
       "owner": "upstream",
       "observedForkRuns": 4,
-      "observedUpstreamRuns": 4
+      "observedUpstreamRuns": 4,
+      "match": "^expect\\(received\\)\\.toBe\\(expected\\) // Object\\.is equality"
     },
     {
       "file": "tests/e2e/terminal-tab-close-restart-persistence.spec.ts",
       "title": "durable whole-tab close removes a split tab across restart",
       "owner": "upstream",
       "observedForkRuns": 1,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "match": "^Expected 2 visible terminal panes"
     },
     {
       "file": "tests/e2e/worktree-scroll-to-current.spec.ts",
-      "title": "Reveal active workspace button \u203a clears sidebar filters before revealing a hidden current workspace",
+      "title": "Reveal active workspace button › clears sidebar filters before revealing a hidden current workspace",
       "owner": "upstream",
       "observedForkRuns": 12,
-      "observedUpstreamRuns": 7
+      "observedUpstreamRuns": 7,
+      "match": "^TimeoutError: locator\\.click: Timeout \\d+ms exceeded\\.$"
     },
     {
       "file": "tests/e2e/worktree.spec.ts",
-      "title": "Create Workspace \u203a names the workspace after the PR title when the pasted URL suggestion is selected",
+      "title": "Create Workspace › names the workspace after the PR title when the pasted URL suggestion is selected",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "flaky": true
     },
     {
       "file": "tests/e2e/worktree.spec.ts",
-      "title": "Create Workspace \u203a reuses a resolved pasted GitHub URL when quick create submits",
+      "title": "Create Workspace › reuses a resolved pasted GitHub URL when quick create submits",
       "owner": "upstream",
       "observedForkRuns": 0,
-      "observedUpstreamRuns": 1
+      "observedUpstreamRuns": 1,
+      "flaky": true
     }
   ]
 }

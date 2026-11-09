@@ -16,6 +16,8 @@ import { join, isAbsolute, resolve } from 'node:path'
 export const GATE_INPUT_PATHS = [
   'local/gate-unit.mjs',
   'local/unit-gate-judgement.mjs',
+  // Why the shared matcher: it decides what the verdict absorbs, so a change to it changes the answer.
+  'local/lib/known-red.mjs',
   'local/unit-lane-files.mjs',
   'local/unit-suite-run.mjs',
   'local/gate-flake-coupling.mjs',

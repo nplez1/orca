@@ -23,6 +23,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
+import { compileMatch } from './lib/known-red.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'lint-known-red.json')
@@ -268,18 +269,42 @@ export function unaccountedFailureLines(output, accounted = []) {
   return [...new Set(lines)]
 }
 
-/** Whether a failure line is covered by a known-red entry. An entry without `match` covers all. */
+/**
+ * Whether a failure line is covered by a known-red entry.
+ *
+ * Why `wholeStep` rather than "no match": a missing `match` used to mean the broadest possible entry,
+ * which also masked a new failure in that step. It is now the explicit, rarer form — the only way to
+ * allowlist a step whose output the parser could not split into lines.
+ */
 export function matchesEntry(line, entry) {
-  if (!entry.match) {
-    return true
+  // Why `false` rather than a throw: the problem is reported by `entryProblem`, and a throw inside the
+  // line loop would abandon every remaining step. Why `false` rather than `true` for the match-less
+  // case: that form has to be asked for with `wholeStep`, and silently absorbing is the looseness this
+  // rule exists to remove.
+  const { regex, problem } = compileMatch(entry.match)
+  if (problem !== null) {
+    return false
   }
-  try {
-    return new RegExp(entry.match).test(line)
-  } catch (error) {
-    throw new Error(
-      `known-red entry has an unusable match ${JSON.stringify(entry.match)}: ${error.message}`
-    )
+  return regex !== null && regex.test(line)
+}
+
+/** The reason an entry cannot be judged, or null. Every entry has to say exactly what it covers. */
+export function entryProblem(entry) {
+  const { problem } = compileMatch(entry.match)
+  if (problem) {
+    return `${entry.step}: ${problem}`
   }
+  if (entry.match === undefined || entry.match === null) {
+    return entry.wholeStep === true
+      ? null
+      : `${entry.step}: a known-red entry has neither a match nor wholeStep: true, so it would allowlist the whole step`
+  }
+  // Why the pair is a problem: `wholeStep` wins in `classifyRun`, so the narrower `match` would read as
+  // a limit that is not in force.
+  if (entry.wholeStep === true) {
+    return `${entry.step}: a known-red entry has both a match and wholeStep: true, so the match does not apply`
+  }
+  return null
 }
 
 /**
@@ -309,7 +334,7 @@ export function classifyRun(results, entries, chainSteps = results.map((result) 
     }
     const stepEntries = entries.filter((entry) => entry.step === result.id)
     // A whole-step entry allows every failure in it and nothing outside it.
-    const wholeStep = stepEntries.find((entry) => !entry.match)
+    const wholeStep = stepEntries.find((entry) => entry.wholeStep === true)
     if (wholeStep) {
       known.push({ step: result.id, line: '(whole step)', entry: wholeStep })
       matchedEntries.add(wholeStep)
@@ -350,7 +375,10 @@ export function classifyRun(results, entries, chainSteps = results.map((result) 
       seenSteps.has(entry.step) && !matchedEntries.has(entry) && !unparsedSteps.has(entry.step)
   )
   const staleSteps = entries.filter((entry) => !chain.has(entry.step))
-  return { known, unexpected, staleEntries, staleSteps }
+  // Why here rather than in `matchesEntry`: a throw inside the line loop names one entry and stops the
+  // gate, while a problem reaches the summary and lets every step be reported.
+  const entryProblems = entries.map(entryProblem).filter(Boolean)
+  return { known, unexpected, staleEntries, staleSteps, entryProblems }
 }
 
 function readManifest(path) {
@@ -423,7 +451,7 @@ function main(argv = process.argv.slice(2)) {
     }
   }
 
-  const { known, unexpected, staleEntries, staleSteps } = classifyRun(
+  const { known, unexpected, staleEntries, staleSteps, entryProblems } = classifyRun(
     results,
     entries,
     steps.map((step) => step.id)
@@ -453,6 +481,9 @@ function main(argv = process.argv.slice(2)) {
   for (const { step, line } of unexpected) {
     console.error(`::error::new lint red ${step}: ${line}`)
   }
+  for (const problem of entryProblems) {
+    console.error(`::error::unusable known-red entry: ${problem}`)
+  }
   // Why not ::error:: here: a stale entry is not a failure, and the runner reads that prefix as one.
   for (const entry of staleEntries) {
     console.log(
@@ -462,7 +493,7 @@ function main(argv = process.argv.slice(2)) {
   for (const entry of staleSteps) {
     console.error(`known-red entry for a step that no longer exists: ${entry.step}`)
   }
-  if (unexpected.length > 0 || staleSteps.length > 0) {
+  if (unexpected.length > 0 || staleSteps.length > 0 || entryProblems.length > 0) {
     console.error(`lint gate @${revision}${dirty ? '+dirty' : ''}: FAIL — ${summary}`)
     if (unexpected.length > 0) {
       console.error(

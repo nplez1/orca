@@ -2,151 +2,30 @@
 // function here is pure over data the gate already holds, which is what makes it testable without
 // a suite run. `local/gate-unit.mjs` runs the suite; this file decides what its report means.
 
-import { resolve } from 'node:path'
+// The matcher and the report walker moved to `local/lib/known-red.mjs` (#317): four judges used to
+// own their own copy and they drifted, so every caller now shares one rule. The exports below stay
+// here because this module is where the gate's judgement has always been imported from.
+import {
+  collectCases,
+  judgeEntries,
+  judgeUnhandled,
+  normaliseEntries,
+  repoPath
+} from './lib/known-red.mjs'
 
-const ROOT = resolve(import.meta.dirname, '..')
-
-export function repoPath(name) {
-  // Why both sides: Vitest reports forward-slash names even on Windows, where ROOT is backslashed.
-  // Why the separator: `…/issue-151-x` must not read as inside `…/issue-151`.
-  const root = `${ROOT.replaceAll('\\', '/').replace(/\/$/, '')}/`
-  const normalised = String(name ?? '').replaceAll('\\', '/')
-  return normalised.startsWith(root) ? normalised.slice(root.length) : normalised
-}
-
-function firstLine(message) {
-  const line = String(message ?? '')
-    .replace(/^Error:\s*/, '')
-    .split('\n')[0]
-    .trim()
-  return line.length > 200 ? `${line.slice(0, 200)}…` : line
-}
-
-/**
- * Vitest's JSON reporter is jest-shaped: one entry per file in `testResults`, one per case in
- * `assertionResults`. A file can fail without a failing assertion (collect/import error), so that
- * is recorded as a `(suite)` failure rather than being lost.
- */
-export function collectCases(report) {
-  const failures = []
-  const passes = []
-  for (const file of report.testResults ?? []) {
-    const path = repoPath(file.name)
-    let sawFailedCase = false
-    for (const assertion of file.assertionResults ?? []) {
-      const test = String(assertion.fullName || assertion.title || '(unnamed)')
-      if (assertion.status === 'failed') {
-        sawFailedCase = true
-        failures.push({ file: path, test, detail: firstLine(assertion.failureMessages) })
-      } else if (assertion.status === 'passed') {
-        passes.push({ file: path, test })
-      }
-    }
-    // Why the message on its own: an afterAll or teardown error is not the failure a named entry
-    // accounts for, so absorbing the row must not absorb this red beside it — the rule
-    // `check-unit-shard-verdict.mjs` already applies to a shard.
-    if (file.status === 'failed' && (file.message || !sawFailedCase)) {
-      failures.push({
-        file: path,
-        test: '(suite)',
-        detail: firstLine(file.message) || 'the file failed without a failing case'
-      })
-    }
-  }
-  return { failures, passes }
-}
-
-export function judge(entries, failures, passes) {
-  const known = []
-  const unexpected = []
-  for (const failure of failures) {
-    const entry = entries.find((candidate) => entryMatchesFailure(candidate, failure))
-    if (entry) {
-      known.push({ failure, entry })
-    } else {
-      unexpected.push(failure)
-    }
-  }
-  // Why the failure set is consulted: a file-level entry matches one failing case while other
-  // cases in the same file pass, which must not read as "this entry is stale".
-  const matched = new Set(known.map((item) => item.entry.key))
-  const stale = entries.filter(
-    (entry) =>
-      !matched.has(entry.key) &&
-      passes.some(
-        (pass) => pass.file === entry.file && (entry.test === null || entry.test === pass.test)
-      )
-  )
-  // Why not "the file did not fail": with a named entry, a renamed or deleted case is unmatched and
-  // not stale while its file still reds elsewhere — the entry has gone dead, and nothing else says so.
-  const staleKeys = new Set(stale.map((entry) => entry.key))
-  const unseen = entries.filter((entry) => !matched.has(entry.key) && !staleKeys.has(entry.key))
-  return { known, unexpected, stale, unseen }
-}
-
-/**
- * An unhandled error is a claim about the run, not about one test, so it is matched by headline and
- * collapsed: one suite can raise the same rejection 28 times, and 28 identical lines is noise.
- */
-export function judgeUnhandled(headlines, entries) {
-  const declared = Array.isArray(entries) ? entries : []
-  const counts = new Map()
-  for (const headline of headlines) {
-    counts.set(headline, (counts.get(headline) ?? 0) + 1)
-  }
-  const known = []
-  const blocking = []
-  // A headline can carry a machine-specific path (a pnpm store location, a dev-server URL), so an
-  // entry may declare a `match` regex source instead of an exact `headline`.
-  const matchers = declared.map((candidate) =>
-    typeof candidate.match === 'string' ? { candidate, regex: new RegExp(candidate.match) } : null
-  )
-  const matches = (candidate, headline) =>
-    typeof candidate.match === 'string'
-      ? matchers.find((m) => m.candidate === candidate).regex.test(headline)
-      : String(candidate.headline) === headline
-  for (const [headline, count] of counts) {
-    const entry = declared.find((candidate) => matches(candidate, headline))
-    if (entry) {
-      known.push({ ...entry, headline, count })
-    } else {
-      blocking.push({ headline, count })
-    }
-  }
-  return { known, blocking }
-}
-
-/** Entries are file-level (`*` or absent) unless they name a test. */
-export function allowlistEntries(manifest) {
-  const entries = Array.isArray(manifest.entries) ? manifest.entries : []
-  return entries.map((entry) => {
-    const file = String(entry.file).replaceAll('\\', '/')
-    const test = entry.test === undefined || entry.test === '*' ? null : String(entry.test)
-    return {
-      file,
-      test,
-      class: String(entry.class ?? 'unclassified'),
-      owner: String(entry.owner ?? 'unattributed'),
-      flaky: entry.flaky === true,
-      // Why it throws: an invalid regex must not become an entry that silently never matches.
-      match: entry.match === undefined ? null : new RegExp(String(entry.match)),
-      key: test === null ? `${file} › *` : `${file} › ${test}`
-    }
-  })
-}
+export { collectCases, judgeUnhandled, repoPath }
 
 /**
  * Why a `match` regex: an allowlisted test can start failing for a different reason, and matching on
  * the name alone then keeps calling that new failure known. `lint-gate` already works this way.
  */
-function entryMatchesFailure(entry, failure) {
-  if (entry.file !== failure.file) {
-    return false
-  }
-  if (entry.test !== null && entry.test !== failure.test) {
-    return false
-  }
-  return entry.match === null || entry.match.test(String(failure.detail ?? ''))
+export function judge(entries, failures, passes) {
+  return judgeEntries(entries, failures, passes)
+}
+
+/** Entries are file-level (`*` or absent) unless they name a test. */
+export function allowlistEntries(manifest) {
+  return normaliseEntries(manifest).entries
 }
 
 /**
@@ -155,6 +34,7 @@ function entryMatchesFailure(entry, failure) {
 export const NO_RERUN = Object.freeze({
   complete: false,
   failures: new Set(),
+  failureDetails: new Map(),
   passes: new Set(),
   filePassed: false
 })
@@ -166,11 +46,13 @@ export const NO_RERUN = Object.freeze({
  */
 export function reportForFile(report, file) {
   const cases = collectCases(report ?? {})
+  const own = cases.failures.filter((failure) => failure.file === file)
   return {
     complete: true,
-    failures: new Set(
-      cases.failures.filter((failure) => failure.file === file).map((failure) => failure.test)
-    ),
+    failures: new Set(own.map((failure) => failure.test)),
+    // Why the text as well as the name: an entry pins a cause, so a re-run whose allowlisted test failed
+    // for a new one is not a re-run the allowlist covers.
+    failureDetails: new Map(own.map((failure) => [failure.test, failure.detail])),
     passes: new Set(cases.passes.filter((pass) => pass.file === file).map((pass) => pass.test)),
     filePassed: (report?.testResults ?? []).some(
       (entry) => repoPath(entry.name) === file && entry.status === 'passed'
@@ -201,7 +83,7 @@ export function rerunReportsFor(report, files) {
 export function reproducedFailures(
   failures,
   rerun,
-  { known = new Set(), fileCovered = false } = {}
+  { known = new Set(), covered = null, fileCovered = false } = {}
 ) {
   if (!rerun.complete) {
     return failures
@@ -217,6 +99,13 @@ export function reproducedFailures(
       // run, so a test that only appears in isolation was never judged against the allowlist. Waiving
       // the row would pass a real red nobody read. A file-level entry covers every case, so there the
       // named failures are known and the row alone is what is being waived.
+      // Why `covered` when the caller has entries: a name in `known` may have failed for a cause its
+      // entry does not describe, and waiving the row would pass that red unread. Why it also beats
+      // `fileCovered`: a file-level entry can pin a cause too, and `entryMatchesFailure` already reads a
+      // `test: null` entry as covering anything in the file — short-circuiting here skipped that check.
+      if (covered !== null) {
+        return [...rerun.failures].some((test) => !covered(test, rerun.failureDetails?.get(test)))
+      }
       return fileCovered ? false : [...rerun.failures].some((test) => !known.has(test))
     }
     return (

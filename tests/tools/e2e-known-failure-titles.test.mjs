@@ -17,10 +17,30 @@ const STEP_TITLE = 'keys pressed in the split browser chrome'
  * Mirrors the JSON reporter's shape: `test.status` is an outcome category, the run status lives in
  * `results[].status`, and `spec.ok` is false only for an `unexpected` outcome.
  */
-function spec({ file, title, status, error, stepTitle, expectedStatus = 'passed' }) {
+function spec({
+  file,
+  title,
+  status,
+  error,
+  stepTitle,
+  expectedStatus = 'passed',
+  neverRan = false
+}) {
   const result = { status, steps: stepTitle ? [{ title: stepTitle, steps: [] }] : [] }
   if (error) {
     result.error = { message: error }
+  }
+  // A spec Playwright never started: the suite reports it with no results at all and no failure, which
+  // is exactly the shape that used to read as neither failed nor passed.
+  if (neverRan) {
+    return {
+      file,
+      title,
+      line: 94,
+      column: 7,
+      ok: true,
+      tests: [{ status: 'skipped', expectedStatus, results: [] }]
+    }
   }
   const testStatus = expectedStatus === 'passed' && status !== 'passed' ? 'unexpected' : 'expected'
   return {
@@ -44,17 +64,21 @@ function fileSuite(file, { specs = [], describes = [] }) {
 
 const dirs = []
 
-function run(report, titles, outcome = 'success') {
+function run(report, titles, outcome = 'success', { selected = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'known-failures-'))
   dirs.push(dir)
   const reportPath = join(dir, 'report.json')
   const titlesPath = join(dir, 'titles.json')
   writeFileSync(reportPath, JSON.stringify(report))
   writeFileSync(titlesPath, JSON.stringify({ titles }))
+  const args = [SCRIPT, reportPath, titlesPath, outcome]
+  if (selected !== null) {
+    const selectedPath = join(dir, 'selected.txt')
+    writeFileSync(selectedPath, selected)
+    args.push('--selected', selectedPath)
+  }
   try {
-    const stdout = execFileSync(process.execPath, [SCRIPT, reportPath, titlesPath, outcome], {
-      encoding: 'utf8'
-    })
+    const stdout = execFileSync(process.execPath, args, { encoding: 'utf8' })
     return { status: 0, stdout, stderr: '' }
   } catch (error) {
     return { status: error.status, stdout: String(error.stdout), stderr: String(error.stderr) }
@@ -168,7 +192,8 @@ it('exits 0 for a recorded failure and 1 for an unrecorded one', () => {
       title: 'New tab works',
       owner: 'upstream',
       observedForkRuns: 12,
-      observedUpstreamRuns: 8
+      observedUpstreamRuns: 8,
+      match: '^boom$'
     }
   ]
   const recorded = run(
@@ -187,6 +212,9 @@ it('exits 0 for a recorded failure and 1 for an unrecorded one', () => {
   )
   expect(recorded.status).toBe(0)
   expect(recorded.stdout).toContain('::notice::known failure (upstream)')
+  // Why the counts: the notice line is the evidence for the entry, so a trimmed entry printing
+  // `undefined fork / undefined upstream` would erase it.
+  expect(recorded.stdout).toContain('in 12 fork / 8 upstream sampled run(s)')
   expect(recorded.stdout).toContain('1 known, 0 unexpected')
 
   const unrecorded = run(
@@ -261,4 +289,135 @@ it('needs the step outcome as an argument, so a run cannot be judged without one
   }
   expect(failure?.status).toBe(2)
   expect(String(failure?.stderr)).toContain('OUTCOME')
+})
+
+// --- #317: the selected-spec check, and a cause on every recorded title -------------------------
+
+const recorded = (overrides = {}) => ({
+  file: 'tests/e2e/tabs.spec.ts',
+  title: 'New tab works',
+  owner: 'upstream',
+  observedForkRuns: 4,
+  observedUpstreamRuns: 2,
+  match: '^expect\\(received\\)\\.toBe\\(expected\\)',
+  ...overrides
+})
+
+const tabsReport = (specOverrides) => ({
+  suites: [
+    fileSuite('tabs.spec.ts', {
+      specs: [
+        spec({
+          file: 'tabs.spec.ts',
+          title: 'New tab works',
+          status: 'failed',
+          error: 'Error: expect(received).toBe(expected) // Object.is equality',
+          ...specOverrides
+        })
+      ]
+    })
+  ],
+  errors: []
+})
+
+it('fails a selected spec that produced no result at all (#317)', () => {
+  // The shape an interrupted Playwright run leaves: the spec was selected, it never started, and
+  // nothing in the report says so — which is how a run with one known failure could still pass.
+  const verdict = run(tabsReport({ neverRan: true }), [recorded()], 'failure', {
+    selected: 'tabs.spec.ts\n'
+  })
+  expect(verdict.status).toBe(1)
+  expect(verdict.stdout).toContain('selected spec never ran')
+  expect(verdict.stdout).toContain('none of its tests declared a skip')
+})
+
+it('accepts a selected spec whose tests declare a skip, because 179 spec files do that', () => {
+  const verdict = run(
+    tabsReport({ neverRan: true, expectedStatus: 'skipped' }),
+    [recorded()],
+    'success',
+    { selected: 'tabs.spec.ts\n' }
+  )
+  expect(verdict.status).toBe(0)
+  expect(verdict.stdout).not.toContain('selected spec never ran')
+})
+
+it('fails when a selected spec file is absent from the report', () => {
+  const verdict = run(tabsReport(), [recorded()], 'failure', {
+    selected: 'tabs.spec.ts\nother.spec.ts\n'
+  })
+  expect(verdict.status).toBe(1)
+  expect(verdict.stdout).toContain('selected spec file never ran: tests/e2e/other.spec.ts')
+})
+
+it('fails when the report names a spec file the shard was not selected to run', () => {
+  const verdict = run(tabsReport(), [recorded()], 'failure', { selected: 'other.spec.ts\n' })
+  expect(verdict.status).toBe(1)
+  expect(verdict.stdout).toContain('was not selected to run: tests/e2e/tabs.spec.ts')
+})
+
+it('fails when the named selection cannot be read, and when it is empty', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'known-failures-'))
+  dirs.push(dir)
+  const reportPath = join(dir, 'report.json')
+  const titlesPath = join(dir, 'titles.json')
+  writeFileSync(reportPath, JSON.stringify(tabsReport()))
+  writeFileSync(titlesPath, JSON.stringify({ titles: [recorded()] }))
+  const attempt = (selectedPath) => {
+    try {
+      execFileSync(
+        process.execPath,
+        [SCRIPT, reportPath, titlesPath, 'failure', '--selected', selectedPath],
+        {
+          encoding: 'utf8'
+        }
+      )
+      return { status: 0, stdout: '' }
+    } catch (error) {
+      return { status: error.status, stdout: String(error.stdout), stderr: String(error.stderr) }
+    }
+  }
+  const missing = attempt(join(dir, 'absent.txt'))
+  expect(missing.status).toBe(1)
+  expect(missing.stderr).toContain('cannot read the selection')
+  const emptyPath = join(dir, 'empty.txt')
+  writeFileSync(emptyPath, '\n\n')
+  const empty = attempt(emptyPath)
+  expect(empty.status).toBe(1)
+  expect(empty.stderr).toContain('names no spec file')
+})
+
+it('reports a listed spec that failed for a new cause as its own problem (#317)', () => {
+  const verdict = run(
+    tabsReport({ error: 'Error: TypeError: totally new bug' }),
+    [recorded()],
+    'failure',
+    { selected: 'tabs.spec.ts\n' }
+  )
+  expect(verdict.status).toBe(1)
+  expect(verdict.stdout).toContain('listed spec failed for a new cause')
+  expect(verdict.stdout).toContain('TypeError: totally new bug')
+})
+
+it('refuses a recorded title that can neither pin a cause nor say it is flaky', () => {
+  const withoutMatch = recorded()
+  delete withoutMatch.match
+  const verdict = run(tabsReport(), [withoutMatch], 'failure', { selected: 'tabs.spec.ts\n' })
+  expect(verdict.status).toBe(1)
+  expect(verdict.stdout).toContain('has no match and is not flaky')
+})
+
+it('lets a flaky title absorb any cause, which is what an intermittent upstream red needs', () => {
+  const flaky = recorded({ flaky: true })
+  delete flaky.match
+  const verdict = run(
+    tabsReport({ error: 'Error: whatever it was this time' }),
+    [flaky],
+    'failure',
+    {
+      selected: 'tabs.spec.ts\n'
+    }
+  )
+  expect(verdict.status).toBe(0)
+  expect(verdict.stdout).toContain('1 known, 0 unexpected')
 })

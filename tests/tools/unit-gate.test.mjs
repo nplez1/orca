@@ -263,6 +263,30 @@ describe('the isolated re-run', () => {
     expect(reproducedFailures(suite, found, { fileCovered: true })).toHaveLength(0)
   })
 
+  it('does not waive a suite error whose re-run failed an allowlisted test for a new cause', () => {
+    // Why the cause and not only the name: an entry pins one, and a re-run whose allowlisted test broke
+    // differently is a red the allowlist does not cover (#317).
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
+    const found = rerun({
+      failures: new Set(['foo']),
+      failureDetails: new Map([['foo', 'TypeError: totally new bug']])
+    })
+    const covered = (test, detail) => test === 'foo' && String(detail).startsWith('known failure')
+    expect(reproducedFailures(suite, found, { known: new Set(['foo']), covered })).toHaveLength(1)
+    const matching = rerun({
+      failures: new Set(['foo']),
+      failureDetails: new Map([['foo', 'known failure']])
+    })
+    expect(reproducedFailures(suite, matching, { known: new Set(['foo']), covered })).toHaveLength(
+      0
+    )
+    // Why `covered` beats `fileCovered`: a file-level entry can pin a cause too, and short-circuiting on
+    // it waived a row whose re-run failed for a cause the entry does not describe.
+    expect(
+      reproducedFailures(suite, found, { known: new Set(['foo']), covered, fileCovered: true })
+    ).toHaveLength(1)
+  })
+
   it('reads one file out of a report the selector over-matched', () => {
     const report = {
       numTotalTests: 2,
@@ -463,6 +487,26 @@ describe('the known-red manifest', () => {
       expect(keys.has(key), `${key} is listed twice`).toBe(false)
       keys.add(key)
     }
+  })
+
+  it("names only titles the nightly red set's own file can still produce, and only files it has", () => {
+    // Why the nightly set as well: it is the manifest the shard verdict reads on every Linux run, and
+    // nothing static covered it — upstream moved one entry's file on 2026-11-05 and the entry went on
+    // naming a path no report contains, so the red it exists to absorb was not absorbed at all (#317).
+    const nightly = JSON.parse(
+      readFileSync(join(ROOT, 'local/nightly-linux-known-red.json'), 'utf8')
+    )
+    const problems = []
+    for (const entry of nightly.entries ?? []) {
+      if (!existsSync(join(ROOT, entry.file))) {
+        problems.push(`${entry.file}: no such file`)
+        continue
+      }
+      if (!titleExistsInSource(entry.test, sourceWithImportedCases(entry.file))) {
+        problems.push(`${entry.file} › ${entry.test}: the file cannot produce this name`)
+      }
+    }
+    expect(problems).toEqual([])
   })
 
   it('closes the arithmetic of the run it was reconciled with', () => {

@@ -62,6 +62,7 @@ import {
   reproducedFailures,
   unexplainedSuiteExit
 } from './unit-gate-judgement.mjs'
+import { entryMatchProblems, entryMatchesFailure, normaliseUnhandled } from './lib/known-red.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
@@ -216,7 +217,19 @@ function reportResult(result) {
       `  known (${entry.class}, ${entry.owner}${entry.flaky ? ', flaky' : ''}): ${item.failure.file} › ${item.failure.test} — ${item.failure.detail}`
     )
   }
+  // Why one line per failure: a drifted failure is also an unexpected one, and printing both said the
+  // same failure twice. The drift is the more useful half, so it replaces the generic row.
+  const driftOf = new Map(
+    (result.drifted ?? []).map(({ failure, entry }) => [`${failure.file} › ${failure.test}`, entry])
+  )
   for (const failure of result.unexpected.slice(0, MAX_SUMMARY_LIST)) {
+    const drift = driftOf.get(`${failure.file} › ${failure.test}`)
+    if (drift) {
+      console.log(
+        `  NEW CAUSE: ${failure.file} › ${failure.test} — ${failure.detail || 'no message'}, which its entry's match ${JSON.stringify(drift.matchSource)} does not describe`
+      )
+      continue
+    }
     const why = failure.notWaived
       ? ` — FLAKY in isolation, but ${failure.notWaived} is in this branch diff`
       : ` — ${failure.detail}`
@@ -316,6 +329,13 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   })
 
   const problems = []
+  // Why at the top: a manifest entry that cannot pin a cause is a problem with the run's verdict
+  // whatever the suite did, and it is the looseness #317 is about.
+  problems.push(...entryMatchProblems(entries))
+  const { entries: unhandledEntries, problems: unhandledEntryProblems } = normaliseUnhandled(
+    manifest.unhandledErrors
+  )
+  problems.push(...unhandledEntryProblems)
   if (run.outcome !== 'complete') {
     problems.push(`the suite did not run to completion: ${run.outcome}`)
   }
@@ -340,6 +360,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   let counts = { passed: 0, failed: 0, known: 0 }
   let known = []
   let unexpected = []
+  let drifted = []
   let stale = []
   let unseen = []
   if (report) {
@@ -351,6 +372,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     const judged = judge(entries, cases.failures, cases.passes)
     known = judged.known
     unexpected = judged.unexpected
+    drifted = judged.drifted
     stale = judged.stale
     unseen = prunableEntries(judged.unseen, report, {
       full: fullRun,
@@ -385,7 +407,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   const tolerated = unhandled.headlines.filter((headline) => headline === TOLERATED_UNHANDLED_ERROR)
   const judgedUnhandled = judgeUnhandled(
     unhandled.headlines.filter((headline) => headline !== TOLERATED_UNHANDLED_ERROR),
-    manifest.unhandledErrors
+    unhandledEntries
   )
   for (const item of judgedUnhandled.blocking) {
     problems.push(`unhandled error (×${item.count}): ${item.headline}`)
@@ -437,6 +459,8 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     const reproduced = new Set(
       reproducedFailures(failures, rerun, {
         known: new Set(fileEntries.map((entry) => entry.test).filter(Boolean)),
+        covered: (test, detail) =>
+          fileEntries.some((entry) => entryMatchesFailure(entry, { file, test, detail })),
         fileCovered: fileEntries.some((entry) => entry.test === null)
       }).map((failure) => failure.test)
     )
@@ -460,6 +484,15 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     }
   }
 
+  // Why the filter, and why by key rather than by object: a drifted failure also goes through the
+  // isolation re-run above, and one that passes there is waived as a load flake — printing NEW CAUSE for
+  // it would name a cause the gate then excused. A failure the branch diff refuses is pushed as a copy
+  // (`{...failure, notWaived}`), so identity would drop exactly the row where the cause matters most.
+  const blockingKeys = new Set(blocking.map((failure) => `${failure.file} › ${failure.test}`))
+  drifted = drifted.filter((item) =>
+    blockingKeys.has(`${item.failure.file} › ${item.failure.test}`)
+  )
+
   const exitCode = blocking.length === 0 && problems.length === 0 ? 0 : 1
   return {
     revision,
@@ -470,6 +503,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     counts,
     known,
     unexpected: blocking,
+    drifted,
     flaky,
     stale,
     unseen,

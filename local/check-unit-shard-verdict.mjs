@@ -35,7 +35,15 @@
  *          [--known-red PATH] [--assignment PATH]
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { entryFileMatches, entryMatchesFailure } from './lib/linux-parity.mjs'
+import {
+  SUITE_FAILURE,
+  collectCases,
+  entryMatchProblems,
+  judgeEntries,
+  normaliseEntries,
+  normaliseUnhandled,
+  unhandledEntryMatches
+} from './lib/known-red.mjs'
 import { reportFileSetProblem } from './unit-gate-judgement.mjs'
 
 // Why not the shared stripAnsiEscapeSequences: that helper is TypeScript and CI runs this script
@@ -56,29 +64,6 @@ const FAILING_TEST_LIMIT = 5
 export const DEFAULT_KNOWN_RED = 'local/nightly-linux-known-red.json'
 
 /**
- * An unhandled error is a claim about the run, not about a test, and its headline can carry a
- * machine-specific path (a pnpm store location, a dev-server URL). So a manifest entry may give a
- * `match` regex source instead of an exact `headline`; either form tolerates the headline.
- */
-function entryMatcher(entry) {
-  return typeof entry?.match === 'string'
-    ? new RegExp(entry.match)
-    : new RegExp(`^${String(entry?.headline ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
-}
-
-export function unhandledMatchers(manifest) {
-  const declared = Array.isArray(manifest) ? manifest : []
-  return declared.map(entryMatcher)
-}
-
-export function toleratedUnhandled(headline, matchers = []) {
-  if (headline === TOLERATED_UNHANDLED_ERROR) {
-    return true
-  }
-  return matchers.some((matcher) => matcher.test(headline))
-}
-
-/**
  * Whether a tolerated headline can account for a non-zero exit, and the entry that tolerated it.
  *
  * Why an entry may say it cannot: a worker that died can lose tests inside a file the report still
@@ -91,7 +76,7 @@ export function unhandledExplanation(headline, entries = []) {
     return { tolerated: true, explainsFailure: true, entry: null }
   }
   const entry = (Array.isArray(entries) ? entries : []).find((candidate) =>
-    entryMatcher(candidate).test(headline)
+    unhandledEntryMatches(candidate, headline)
   )
   return {
     tolerated: entry !== undefined,
@@ -182,11 +167,6 @@ export function declaredUnhandledEntries(manifest) {
   return Array.isArray(manifest?.unhandledErrors) ? manifest.unhandledErrors : []
 }
 
-/** One matcher for both this shard verdict and the cross-shard checker, so the two always agree. */
-function matchingEntry(knownRed, file, test) {
-  return knownRed.find((entry) => entryMatchesFailure(entry, { file, test }))
-}
-
 /** Vitest prints its own count; a mismatch means the log shape moved, so the verdict fails closed. */
 export function collectUnhandledErrors(logText) {
   const lines = String(logText).replace(ANSI, '').split('\n')
@@ -218,38 +198,6 @@ export function collectUnhandledErrors(logText) {
   return { sectionPresent, declaredCount, headlines }
 }
 
-function failingTestNames(report) {
-  const names = []
-  for (const file of report.testResults ?? []) {
-    for (const assertion of file.assertionResults ?? []) {
-      if (assertion.status === 'failed') {
-        names.push({ file: file.name, test: assertion.fullName || assertion.title })
-      }
-    }
-  }
-  return names
-}
-
-// Why: a file whose import or `beforeAll` threw reports every test skipped, so no `failing:` line
-// names it and the shard reads as red with no culprit.
-function failedFilesWithoutFailingTest(report) {
-  const failures = []
-  for (const file of report.testResults ?? []) {
-    if (file.status !== 'failed') {
-      continue
-    }
-    // Why a message counts even when a row failed too: an afterAll or teardown error is not the
-    // failure the entry accounts for, so absorbing the row must not absorb this red beside it.
-    const hasFailingTest = (file.assertionResults ?? []).some(
-      (assertion) => assertion.status === 'failed'
-    )
-    if (file.message || !hasFailingTest) {
-      failures.push({ file: file.name, detail: file.message || '' })
-    }
-  }
-  return failures
-}
-
 /**
  * The verdict's inputs are the JSON report (what the tests did), the captured run log (which
  * unhandled errors were raised) and the test step's own outcome (so a failure the report cannot
@@ -263,11 +211,15 @@ export function decideUnitShardVerdict({
   unhandledErrors = [],
   assignedFiles
 }) {
-  const unhandledMatcherList = unhandledMatchers(unhandledErrors)
-  const problems = []
+  const { entries: knownRedEntries, problems: knownRedProblems } = normaliseEntries(knownRed)
+  const { entries: unhandledEntries, problems: unhandledProblems } =
+    normaliseUnhandled(unhandledErrors)
+  const problems = [...knownRedProblems, ...unhandledProblems]
+  // Why here as well as in the gate: this manifest is read on every nightly, so an entry that cannot
+  // pin a cause is a verdict problem, not a detail of the gate's own reading of a different manifest.
+  problems.push(...entryMatchProblems(knownRedEntries))
   const tolerated = []
   const absorbed = []
-  const absorbedEntries = new Set()
   const prunable = []
   let report = null
 
@@ -282,7 +234,11 @@ export function decideUnitShardVerdict({
   if (report) {
     const totalTests = Number(report.numTotalTests) || 0
     const declaredFailedTests = Number(report.numFailedTests) || 0
-    const failingTests = failingTestNames(report)
+    const cases = collectCases(report)
+    // Why the split: `numFailedTests` counts cases, and a file-level row is not one of them. A named
+    // entry must never absorb the row either — a red that happened outside any test is a red the
+    // entry cannot account for.
+    const failingTests = cases.failures.filter((failure) => failure.test !== SUITE_FAILURE)
     if (totalTests === 0) {
       problems.push('the report holds no tests, so the shard cannot be judged green')
     }
@@ -324,51 +280,41 @@ export function decideUnitShardVerdict({
         `the report declares ${declaredFailedTests} failing test(s) but lists ${failingTests.length}; failing closed`
       )
     }
+    const judged = judgeEntries(knownRedEntries, cases.failures, cases.passes)
     const unexpected = []
-    for (const { file, test } of failingTests) {
-      const entry = matchingEntry(knownRed, file, test)
-      if (entry) {
-        absorbed.push(`${file} › ${test} [${entry.class}]`)
-        absorbedEntries.add(entry)
-      } else {
-        unexpected.push(`${file} › ${test}`)
-      }
-    }
-    for (const name of unexpected.slice(0, FAILING_TEST_LIMIT)) {
-      problems.push(`failing: ${name}`)
-    }
-    if (unexpected.length > FAILING_TEST_LIMIT) {
-      problems.push(`and ${unexpected.length - FAILING_TEST_LIMIT} more unexpected failure(s)`)
-    }
-    const fileLevelFailures = failedFilesWithoutFailingTest(report)
-    for (const { file, detail } of fileLevelFailures) {
-      const entry = matchingEntry(knownRed, file, null)
-      if (entry) {
-        absorbed.push(`${file} [${entry.class}]`)
-        absorbedEntries.add(entry)
-      } else {
-        const why = detail ? ` — ${detail.split('\n')[0].slice(0, 160)}` : ''
-        problems.push(`failing file (no test accounts for it): ${file}${why}`)
-      }
-    }
-    for (const entry of knownRed) {
-      // Why a passed row is required: a file that crashed before this test ran, or a test that was
-      // renamed or skipped, is not evidence the entry can go. Only "it ran and passed" is.
-      const passed = (report.testResults ?? []).some(
-        (file) =>
-          entryFileMatches(entry, file.name) &&
-          (file.assertionResults ?? []).some(
-            (assertion) =>
-              assertion.status === 'passed' &&
-              entryMatchesFailure(entry, {
-                file: file.name,
-                test: assertion.fullName || assertion.title
-              })
-          )
+    for (const { failure, entry } of judged.known) {
+      absorbed.push(
+        failure.test === SUITE_FAILURE
+          ? `${failure.file} [${entry.class}]`
+          : `${failure.file} › ${failure.test} [${entry.class}]`
       )
-      if (passed && !absorbedEntries.has(entry)) {
-        prunable.push(`${entry.file}${entry.test ? ` › ${entry.test}` : ''}`)
-      }
+    }
+    for (const failure of judged.unexpected) {
+      unexpected.push(failure)
+    }
+    const named = unexpected.filter((failure) => failure.test !== SUITE_FAILURE)
+    const fileLevel = unexpected.filter((failure) => failure.test === SUITE_FAILURE)
+    for (const failure of named.slice(0, FAILING_TEST_LIMIT)) {
+      problems.push(`failing: ${failure.file} › ${failure.test}`)
+    }
+    if (named.length > FAILING_TEST_LIMIT) {
+      problems.push(`and ${named.length - FAILING_TEST_LIMIT} more unexpected failure(s)`)
+    }
+    for (const failure of fileLevel) {
+      const why = failure.detail ? ` — ${failure.detail.split('\n')[0].slice(0, 160)}` : ''
+      problems.push(`failing file (no test accounts for it): ${failure.file}${why}`)
+    }
+    // Why its own line: this is the failure mode #317 is about — the test is listed, it failed, and the
+    // cause is not the one the entry pins. The generic `failing:` line above does not say that.
+    for (const { failure, entry } of judged.drifted) {
+      problems.push(
+        `listed test failed for a new cause: ${failure.file} › ${failure.test} — ${failure.detail || 'no message'}, which its entry's match ${JSON.stringify(entry.matchSource)} does not describe`
+      )
+    }
+    // Why identity rather than the absorbing match: a test that ran and passed is the only evidence an
+    // entry can go, and an entry that pins a cause must still be retirable.
+    for (const entry of judged.stale) {
+      prunable.push(`${entry.file}${entry.test ? ` › ${entry.test}` : ''}`)
     }
   }
 
@@ -379,7 +325,10 @@ export function decideUnitShardVerdict({
     )
   }
   for (const headline of unhandled.headlines) {
-    if (toleratedUnhandled(headline, unhandledMatcherList)) {
+    if (
+      headline === TOLERATED_UNHANDLED_ERROR ||
+      unhandledEntries.some((entry) => unhandledEntryMatches(entry, headline))
+    ) {
       tolerated.push(headline)
     } else {
       problems.push(`unhandled error: ${headline}`)
@@ -393,7 +342,7 @@ export function decideUnitShardVerdict({
     // lose tests inside a file the report still lists, which the file set cannot see. A bystander
     // teardown error does not rule that out, so only an absorbed red may account for the exit.
     const unexplained = tolerated.filter(
-      (headline) => !unhandledExplanation(headline, unhandledErrors).explainsFailure
+      (headline) => !unhandledExplanation(headline, unhandledEntries).explainsFailure
     )
     if (unexplained.length > 0) {
       problems.push(
@@ -520,6 +469,7 @@ function main() {
 
   const manifest = loadKnownRed(knownRedPath)
   const unhandledErrors = declaredUnhandledEntries(manifest)
+  const { entries: unhandledEntries } = normaliseUnhandled(unhandledErrors)
   const verdict = decideUnitShardVerdict({
     reportText,
     logText,
@@ -529,7 +479,7 @@ function main() {
     assignedFiles: assignmentPath === null ? undefined : loadAssignment(assignmentPath)
   })
   for (const headline of verdict.tolerated) {
-    const { entry } = unhandledExplanation(headline, unhandledErrors)
+    const { entry } = unhandledExplanation(headline, unhandledEntries)
     // Why the class rather than the teardown-race text for every headline: a pool crash is not
     // vitest-dev/vitest#11153, and naming it as such is how a crash stopped being visible.
     console.log(

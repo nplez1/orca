@@ -40,7 +40,8 @@ function manifestOf(entries) {
 const ENTRY = {
   file: 'src/main/thing.test.ts',
   test: 'the Mac-bound case',
-  class: 'sqlite-binding'
+  class: 'sqlite-binding',
+  match: '^cannot add rowid alias'
 }
 
 function indexFor(reports) {
@@ -279,8 +280,9 @@ test('formatParity separates failed from absent in its verdict line', () => {
 // whether a nightly's *other* reds are accounted for, not whether this Mac's claim transfers.
 const RED_SET_ENTRY = {
   file: 'src/main/daemon/daemon-race.test.ts',
-  test: 'serializes concurrent checkpoints',
+  test: 'DaemonPtyAdapter history recovery serializes concurrent checkpoints',
   class: 'upstream-daemon-disconnect-race',
+  match: '^DaemonConnectionLostError: Disconnected$',
   evidence: 'failed on Linux twice and passed 3/3 on the Mac'
 }
 
@@ -294,7 +296,7 @@ test('judgeLinuxFailures passes when the only red is a listed one', () => {
       status: 'failed',
       assertions: [
         assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'failed', [
-          'DaemonConnectionLostError: Disconnected'
+          'DaemonConnectionLostError: Disconnected\n  at disconnectOnly (src/main/daemon/client.ts:292)'
         ])
       ]
     })
@@ -303,8 +305,41 @@ test('judgeLinuxFailures passes when the only red is a listed one', () => {
   assert.equal(result.ok, true)
   assert.equal(result.allowlisted.length, 1)
   assert.equal(result.stale.length, 0)
-  // Matched on a substring of the full name, because Vitest prefixes it with the describe block.
+  // The entry stores the full Vitest name, describe chain included, and the cause it pins.
   assert.equal(result.allowlisted[0].class, 'upstream-daemon-disconnect-race')
+})
+
+test('a listed test that fails for a new cause is unexpected, and its entry is not prunable', () => {
+  const index = linuxIndex([
+    fileResult('src/main/daemon/daemon-race.test.ts', {
+      status: 'failed',
+      assertions: [
+        assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'failed', [
+          'TypeError: totally new bug'
+        ])
+      ]
+    })
+  ])
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
+  assert.equal(result.ok, false)
+  assert.equal(result.allowlisted.length, 0)
+  assert.equal(result.unexpected.length, 1)
+  // Why drifted rather than unseen: the test is still red, so calling the entry prunable would delete
+  // a live entry the first full run after a new cause appeared.
+  assert.equal(result.drifted.length, 1)
+  assert.equal(result.stale.length, 0)
+  assert.match(
+    formatLinuxFailures(result, { allowlistPath: 'a.json', reportCount: 1 }).join('\n'),
+    /NEW CAUSE/
+  )
+})
+
+test('an entry without a match is a problem, so a new cause cannot be absorbed', () => {
+  const { match, ...unmatched } = RED_SET_ENTRY
+  assert.ok(match)
+  const result = judgeLinuxFailures(manifestOf([unmatched]), linuxIndex([]))
+  assert.equal(result.ok, false)
+  assert.match(result.problems.join(' '), /has no match and is not flaky/)
 })
 
 test('judgeLinuxFailures fails on a red no entry accounts for', () => {
@@ -329,7 +364,7 @@ test('a file-level failure is never absorbed by a name-matching entry', () => {
   ])
   const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
   assert.equal(result.ok, false)
-  assert.equal(result.unexpected[0].test, null)
+  assert.equal(result.unexpected[0].test, '(suite)')
   // The entry matched no failure, so it is reported as prunable rather than as a false pass.
   assert.equal(result.stale.length, 1)
 })
@@ -338,7 +373,9 @@ test('a listed test that passed is prunable, reported but not enforced', () => {
   const index = linuxIndex([
     fileResult('src/main/daemon/daemon-race.test.ts', {
       status: 'passed',
-      assertions: [assertion('serializes concurrent checkpoints', 'passed')]
+      assertions: [
+        assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'passed')
+      ]
     })
   ])
   const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
@@ -387,7 +424,13 @@ test('a sibling whose title contains the listed one is not absorbed', () => {
   const index = linuxIndex([
     fileResult('src/main/daemon/daemon-race.test.ts', {
       status: 'failed',
-      assertions: [assertion('serializes concurrent checkpoints under load', 'failed', ['boom'])]
+      assertions: [
+        assertion(
+          'DaemonPtyAdapter history recovery serializes concurrent checkpoints under load',
+          'failed',
+          ['DaemonConnectionLostError: Disconnected']
+        )
+      ]
     })
   ])
   const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
@@ -400,26 +443,47 @@ test('a suite error alongside the listed failure is not absorbed by the entry', 
     fileResult('src/main/daemon/daemon-race.test.ts', {
       status: 'failed',
       message: 'Error: afterAll hook timed out',
-      assertions: [assertion('serializes concurrent checkpoints', 'failed', ['boom'])]
+      assertions: [
+        assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'failed', [
+          'DaemonConnectionLostError: Disconnected'
+        ])
+      ]
     })
   ])
   const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
   assert.equal(result.ok, false)
   assert.equal(result.allowlisted.length, 1)
   assert.equal(result.unexpected.length, 1)
-  assert.equal(result.unexpected[0].test, null)
+  assert.equal(result.unexpected[0].test, '(suite)')
 })
 
-test('a short title whose full name carries a describe prefix is still found', () => {
-  // The Mac allowlist stores Vitest's full name; a red-set entry stores the bare title. Matching the
-  // name exactly read a test that passed as absent, and told the operator to keep a prunable entry.
+test('a bare title no longer identifies a test whose report name carries the describe prefix', () => {
+  // Why this is the point of #317: the suffix match that used to absorb this is what let one entry
+  // absorb every sibling whose title merely ended the same way. The manifest stores the full name.
+  const bare = { ...RED_SET_ENTRY, test: 'serializes concurrent checkpoints' }
+  const result = judgeLinuxFailures(
+    manifestOf([bare]),
+    linuxIndex([
+      fileResult('src/main/daemon/daemon-race.test.ts', {
+        status: 'passed',
+        assertions: [
+          assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'passed')
+        ]
+      })
+    ])
+  )
+  assert.equal(result.stale.length, 1)
+  assert.equal(result.stale[0].status, 'absent')
+})
+
+test('a full name that passed is reported prunable', () => {
   const result = judgeLinuxFailures(
     manifestOf([RED_SET_ENTRY]),
     linuxIndex([
       fileResult('src/main/daemon/daemon-race.test.ts', {
         status: 'passed',
         assertions: [
-          assertion('DaemonPtyAdapter recovery serializes concurrent checkpoints', 'passed')
+          assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'passed')
         ]
       })
     ])
@@ -439,7 +503,9 @@ test('stale tells a passed entry apart from one that never ran', () => {
     linuxIndex([
       fileResult('src/main/daemon/daemon-race.test.ts', {
         status: 'passed',
-        assertions: [assertion('serializes concurrent checkpoints', 'passed')]
+        assertions: [
+          assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'passed')
+        ]
       })
     ])
   )
