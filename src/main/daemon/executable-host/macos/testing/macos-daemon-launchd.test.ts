@@ -281,6 +281,7 @@ it('waits out a running job left under the pre-rename label without booting it o
 
   expect(retirementClock.now - startedAt).toBe(DAEMON_SHUTDOWN_TIMEOUT_MS + 2_000)
   expect(launchctlCalls('bootout')).toHaveLength(0)
+  expect(handle).not.toBeNull()
   expect(job).toMatchObject({ Label: macDaemonJobLabel(state.root) })
   await handle?.shutdown()
 })
