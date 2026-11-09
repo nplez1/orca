@@ -2234,7 +2234,9 @@ row), a report declaring more failures than it lists, an unhandled error other t
 teardown race, and a shard that failed with nothing to explain it. It cannot see a describe-level hook
 failure that Vitest attributes to a suite rather than to the file's `message`, because
 `numFailedTestSuites` counts failing describes as well as files (2 for one failing file, measured) and
-would red every night.
+would red every night. Two more inputs are never absorbed since #314: a report that does not name every
+file the shard was assigned, and a failed shard whose only explanation is a tolerated worker crash — see
+§ `local(unit-ci)`: the Vitest worker teardown race.
 
 The night's verdict is still the cross-shard checker's, not the shard's: `--failures` insists on one
 report per declared shard and fails a red that no entry accounts for. What the shard-level change buys
@@ -2908,6 +2910,26 @@ What it deliberately does not do:
   format change fails closed rather than skipping errors it could not parse.
 - Upstream is untouched: the wiring is guarded on `github.repository` there, and Vitest's exit code
   stays in charge.
+
+**The report is judged against the shard's assignment, not on its own (#314).** A report only proves
+what ran, and a worker that died takes its file out of it — so a shard could read green over whatever
+survived. `--assignment ci-shards/unit-assignment.json` names the manifest `TimingSequencer` writes from
+the same plan it hands Vitest (`config/scripts/ci/sharding/ci-unit-sequencer.mjs`), and the verdict now
+fails on any assigned file the report does not list, and on any file the report lists that this shard
+was not assigned. That second half is what catches a manifest left by another run, shard or revision,
+which a missing-file check alone would read as a subset. `runId` / `runAttempt` are compared for the
+same reason — the default `blacksmith-*` runner may reuse a workspace, where `ubuntu-24.04-arm` does
+not. A named assignment that is missing, malformed, out of range, empty or stale fails closed; the flag
+is pinned by `config/scripts/unit-shard-verdict-contract.test.mjs`, so dropping it turns the unit lane
+red instead of silently skipping the check.
+
+**A tolerated crash cannot be the only explanation for a failed shard.** `unhandledErrors` entries may
+declare `"explainsFailure": false`, and the `pool-crash` entry does: a worker that died can lose tests
+inside a file the report still lists, which the file set cannot see, so a crash is tolerable only
+beside a known red that already explains the exit. The field defaults to `true`, so the two other
+run-level headlines keep their current standing, and the manifest's own value is pinned by a test in
+`tests/tools/unit-shard-verdict.test.mjs`. The `::warning::` line names the entry's class rather than
+the teardown race, which is how a pool crash stopped being visible in the log.
 
 Remove this patch — the `continue-on-error`, the report arguments, the verdict step and the script —
 once Vitest closes #11153.

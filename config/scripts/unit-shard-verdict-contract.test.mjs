@@ -37,8 +37,11 @@ describe('unit shard verdict wiring', () => {
       "${{ github.repository != 'stablyai/orca' && steps.run-unit-shard.outcome != 'skipped' }}"
     )
     expect(verdict.run).toBe(
-      'node local/check-unit-shard-verdict.mjs ci-shards/unit-report.json ci-shards/unit-shard.log "${{ steps.run-unit-shard.outcome }}"'
+      'node local/check-unit-shard-verdict.mjs ci-shards/unit-report.json ci-shards/unit-shard.log "${{ steps.run-unit-shard.outcome }}" --assignment ci-shards/unit-assignment.json'
     )
+    // Why pinned separately: the flag is what makes a file a crashed worker dropped a red shard,
+    // and the manifest is written by the sequencer the test step runs (`ORCA_BALANCE_UNIT_SHARDS`).
+    expect(verdict.run).toContain('--assignment ci-shards/unit-assignment.json')
   })
 
   it('archives the report and log the verdict reads', () => {
