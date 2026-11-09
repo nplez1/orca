@@ -12,7 +12,8 @@ import { readClaudeUsageFromCli, type ClaudeUsageProbeDeps } from './claude-cli-
  */
 export async function readActiveClaudeUsageFromProbe(
   options: ClaudeRateLimitFetchOptions | undefined,
-  deps?: ClaudeUsageProbeDeps
+  deps?: ClaudeUsageProbeDeps,
+  oauthToken?: string | null
 ): Promise<ProviderRateLimits | null> {
   const authPreparation = options?.authPreparation
   if (!options?.allowUsagePanelSupplement || authPreparation?.usageError) {
@@ -27,6 +28,7 @@ export async function readActiveClaudeUsageFromProbe(
   const reading = await readClaudeUsageFromCli(
     {
       envPatch: authPreparation?.envPatch,
+      ...(oauthToken ? { oauthToken } : {}),
       ...(options.signal ? { signal: options.signal } : {})
     },
     deps
@@ -73,9 +75,10 @@ export function claudeUsageEndpointGatedResult(
 }
 
 /** True while a provider's open Retry-After must block its whole lane. */
-export function retryAfterBlocksProviderLane(provider: ProviderRateLimits['provider']): boolean {
-  // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
-  // Why never Claude: the header probe answers without the endpoint and needs no platform, so an
-  // endpoint Retry-After gates that one request and never the lane.
-  return provider !== 'claude'
+export function retryAfterBlocksProviderLane(
+  provider: ProviderRateLimits['provider'],
+  probeAvailable: boolean
+): boolean {
+  // The probe never asks the endpoint, so its Retry-After only gates the endpoint, not the lane.
+  return !(provider === 'claude' && probeAvailable)
 }

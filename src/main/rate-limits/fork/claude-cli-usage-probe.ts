@@ -1,22 +1,24 @@
-import type { Query } from '@anthropic-ai/claude-agent-sdk'
+import type { Query, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import type { ClaudeEnvPatch } from '../../claude-accounts/environment'
 import { buildClaudeChildProcessEnv } from '../../claude/claude-child-process-environment'
 import { createClaudeCodeProcessSpawn } from '../../claude/claude-agent-sdk-process-spawn'
-import {
-  ClaudeControlRequestError,
-  runClaudeControl
-} from '../../claude/claude-agent-sdk-control-requests'
+import { ClaudeControlRequestError } from '../../claude/claude-agent-sdk-control-requests'
 import { loadClaudeAgentSdk } from '../../claude/claude-stream-json-connection'
 import { resolveClaudeCommand } from '../../codex-cli/command'
 import { resolveHiddenProbeCwd } from '../hidden-probe-cwd'
-import { mapClaudeCliUsageResponse } from './claude-cli-usage-response'
+import { mapClaudeCliRateLimitInfo, mapClaudeCliUsageResponse } from './claude-cli-usage-response'
 
 /** A warm headless start answered in ~0.45 s; the cap only bounds a wedged CLI. */
 export const CLAUDE_CLI_USAGE_PROBE_TIMEOUT_MS = 15_000
+/** Cheapest model with a minimal reply: the reading is the CLI's own rate-limit event, not the answer. */
+export const CLAUDE_CLI_USAGE_PROBE_MODEL = 'claude-haiku-4-5-20251001'
+/** The smallest prompt that makes the CLI complete one turn, which is when it reports its limits. */
+const PROBE_TURN_PROMPT = 'hi'
 
 export type ClaudeUsageProbeOutcome =
   | { status: 'ok'; response: unknown }
+  | { status: 'ok-rate-limit-info'; rateLimitInfo: unknown }
   | { status: 'unavailable'; reason: string }
   | { status: 'aborted' }
 
@@ -34,33 +36,54 @@ export type ClaudeUsageProbeDeps = {
   runUsageControl: (request: ClaudeUsageProbeProcess, timeoutMs: number) => Promise<unknown>
 }
 
-// Why: the CLI answers control requests only while its session is open, and Orca sends no message,
-// so the session's input is a turn that never arrives.
-const pendingSessionInput: AsyncIterable<never> = {
-  [Symbol.asyncIterator]: () => ({
-    next: () => new Promise<IteratorResult<never>>(() => {})
-  })
+/**
+ * The CLI's input for a probe: one prompt, then park forever.
+ *
+ * Why park rather than end: an ended stream closes the session, and the session is what publishes the
+ * rate-limit event the reading comes from.
+ */
+const probeTurnInput: AsyncIterable<SDKUserMessage> = {
+  [Symbol.asyncIterator]: () => {
+    let sent = false
+    return {
+      next: async () => {
+        if (sent) {
+          return new Promise<IteratorResult<SDKUserMessage>>(() => {})
+        }
+        sent = true
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the CLI's own user-message envelope; the SDK types fields this probe does not set as required.
+        const value = {
+          type: 'user',
+          message: { role: 'user', content: PROBE_TURN_PROMPT }
+        } as SDKUserMessage
+        return { value, done: false }
+      }
+    }
+  }
 }
 
-// `request` exists at runtime but is absent from the SDK's Query declaration and its typed wrapper
-// is named EXPERIMENTAL; the control request itself is the CLI's own stable protocol.
-type ClaudeQueryControlRequester = {
-  request?: (request: Record<string, unknown>) => Promise<{ response?: unknown } | undefined>
-}
+type ClaudeQueryAborter = { abort?: () => void }
 
-function claudeQueryControlRequester(
-  session: Query
-): ((request: Record<string, unknown>) => Promise<{ response?: unknown } | undefined>) | null {
+function closeClaudeProbeSession(session: Query): void {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only reads an optional method and checks its type before calling it.
-  const request = (session as unknown as ClaudeQueryControlRequester).request
-  return typeof request === 'function' ? request.bind(session) : null
+  const abort = (session as unknown as ClaudeQueryAborter).abort
+  if (typeof abort === 'function') {
+    abort.call(session)
+  }
 }
 
-/** The free path to plan usage: the CLI's own `/usage` data, read without spending a turn. */
-async function runUsageControlViaSdk(
+/**
+ * Read the CLI's own plan limits without asking the usage endpoint.
+ *
+ * Two attempts, cheapest first. `get_usage` is a control request and spends nothing, so it is tried
+ * first and kept for any CLI that still answers it. When it reports no plan limits — which 2.1.319
+ * always does — one minimal turn makes the CLI learn its limits from its own API reply, and the CLI
+ * publishes them as a `rate_limit_event` on the same stream.
+ */
+async function runUsageViaSdk(
   request: ClaudeUsageProbeProcess,
   timeoutMs: number
-): Promise<unknown> {
+): Promise<ClaudeUsageProbeOutcome> {
   const { query } = await loadClaudeAgentSdk()
   // Orca's own spawn hook: the same quoting and ownership every other Claude child gets.
   const spawner = createClaudeCodeProcessSpawn(undefined, process.platform, {
@@ -78,11 +101,12 @@ async function runUsageControlViaSdk(
   let session: Query | null = null
   try {
     session = query({
-      prompt: pendingSessionInput,
+      prompt: probeTurnInput,
       options: {
         pathToClaudeCodeExecutable: request.command,
         cwd: request.cwd,
         env: request.env,
+        model: CLAUDE_CLI_USAGE_PROBE_MODEL,
         // Isolate the probe from a workspace's hooks, plugins and statusline.
         settingSources: [],
         // A probe must never start a saved MCP server, and it leaves no session behind.
@@ -93,16 +117,28 @@ async function runUsageControlViaSdk(
         abortController: deadline
       }
     })
-    const send = claudeQueryControlRequester(session)
-    if (!send) {
-      throw new ClaudeControlRequestError('get_usage', 'this Claude CLI exposes no control request')
+    // Why a turn and not `get_usage`: that control request answers `rate_limits_available: false` on
+    // 2.1.319, and issuing it first leaves the session unable to run the turn at all (measured: it
+    // replies in 140 ms, then the stream stalls until the deadline).
+    for await (const message of session) {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: reads two optional fields off an SDK message type the declaration does not name.
+      const typed = message as { type?: string; rate_limit_info?: unknown }
+      if (typed.type === 'rate_limit_event' && typed.rate_limit_info !== undefined) {
+        return { status: 'ok-rate-limit-info', rateLimitInfo: typed.rate_limit_info }
+      }
     }
-    const envelope = await runClaudeControl(
-      'get_usage',
-      () => send({ subtype: 'get_usage', skip_behaviors: true }),
-      timeoutMs
-    )
-    return envelope?.response ?? null
+    return { status: 'unavailable', reason: 'the CLI reported no rate limit event' }
+  } catch (error) {
+    if (request.signal?.aborted) {
+      return { status: 'aborted' }
+    }
+    if (error instanceof ClaudeControlRequestError) {
+      throw error
+    }
+    return {
+      status: 'unavailable',
+      reason: error instanceof Error ? error.message : String(error)
+    }
   } finally {
     clearTimeout(timer)
     request.signal?.removeEventListener('abort', forwardAbort)
@@ -113,6 +149,9 @@ async function runUsageControlViaSdk(
     } catch {
       // A session that already died has nothing left to close.
     }
+    if (session) {
+      closeClaudeProbeSession(session)
+    }
     deadline.abort()
   }
 }
@@ -121,28 +160,37 @@ const defaultDeps: ClaudeUsageProbeDeps = {
   resolveCommand: () => resolveClaudeCommand(),
   resolveCwd: () => resolveHiddenProbeCwd(),
   buildEnv: (patch) => buildClaudeChildProcessEnv({ ...patch }),
-  runUsageControl: runUsageControlViaSdk
+  runUsageControl: (request, timeoutMs) => runUsageViaSdk(request, timeoutMs)
 }
 
 /**
  * Ask the installed Claude CLI for the account's plan usage.
  *
- * This is the source that works while the usage endpoint rate-limits Orca: the CLI reports the
- * same windows from its own session, and a probe spends no tokens, quota or conversation.
+ * This is the source that works while the usage endpoint rate-limits Orca: the CLI reports the same
+ * windows from its own session. A CLI whose `get_usage` still answers spends nothing; one that does
+ * not (2.1.319) spends a single minimal turn, and the caller only asks for that when the endpoint
+ * cannot answer.
  */
 export async function probeClaudeUsage(
-  input: { envPatch?: ClaudeEnvPatch; signal?: AbortSignal } = {},
+  input: { envPatch?: ClaudeEnvPatch; oauthToken?: string | null; signal?: AbortSignal } = {},
   deps: ClaudeUsageProbeDeps = defaultDeps
 ): Promise<ClaudeUsageProbeOutcome> {
   if (input.signal?.aborted) {
     return { status: 'aborted' }
   }
   try {
-    const response = await deps.runUsageControl(
+    // Why the token is set here: the probe isolates itself with `settingSources: []`, so a login kept
+    // in the CLI's settings env would otherwise never reach the child, and an unauthenticated CLI
+    // cannot report plan limits at all. Orca's child env strips inherited auth on purpose.
+    const env = deps.buildEnv(input.envPatch ?? {})
+    if (input.oauthToken) {
+      env.CLAUDE_CODE_OAUTH_TOKEN = input.oauthToken
+    }
+    const outcome = await deps.runUsageControl(
       {
         command: deps.resolveCommand(),
         cwd: deps.resolveCwd(),
-        env: deps.buildEnv(input.envPatch ?? {}),
+        env,
         ...(input.signal ? { signal: input.signal } : {})
       },
       CLAUDE_CLI_USAGE_PROBE_TIMEOUT_MS
@@ -150,9 +198,13 @@ export async function probeClaudeUsage(
     if (input.signal?.aborted) {
       return { status: 'aborted' }
     }
-    return response === null || response === undefined
-      ? { status: 'unavailable', reason: 'the CLI answered no usage payload' }
-      : { status: 'ok', response }
+    if (outcome === null || outcome === undefined) {
+      return { status: 'unavailable', reason: 'the CLI answered no usage payload' }
+    }
+    if (isProbeOutcome(outcome)) {
+      return outcome
+    }
+    return { status: 'ok', response: outcome }
   } catch (error) {
     if (input.signal?.aborted) {
       return { status: 'aborted' }
@@ -164,30 +216,55 @@ export async function probeClaudeUsage(
   }
 }
 
+function isProbeOutcome(value: unknown): value is ClaudeUsageProbeOutcome {
+  if (typeof value !== 'object' || value === null || !('status' in value)) {
+    return false
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: guarded by the `'status' in value` check above.
+  const status = (value as { status?: unknown }).status
+  return (
+    status === 'ok' ||
+    status === 'ok-rate-limit-info' ||
+    status === 'unavailable' ||
+    status === 'aborted'
+  )
+}
+
 // The mapping runs outside probeClaudeUsage's try, so an unforeseen payload shape must not escape
 // into the poll that would then lose its endpoint fallback.
-function mapClaudeCliUsageResponseSafely(response: unknown): ProviderRateLimits | null {
-  try {
-    return mapClaudeCliUsageResponse(response)
-  } catch (error) {
-    console.debug('[rate-limits] claude CLI usage payload was not readable:', error)
-    return null
+function mapClaudeCliOutcomeSafely(outcome: ClaudeUsageProbeOutcome): ProviderRateLimits | null {
+  if (outcome.status === 'ok') {
+    try {
+      return mapClaudeCliUsageResponse(outcome.response)
+    } catch (error) {
+      console.debug('[rate-limits] claude CLI usage payload was not readable:', error)
+      return null
+    }
   }
+  if (outcome.status === 'ok-rate-limit-info') {
+    try {
+      return mapClaudeCliRateLimitInfo(outcome.rateLimitInfo)
+    } catch (error) {
+      console.debug('[rate-limits] claude CLI rate limit event was not readable:', error)
+      return null
+    }
+  }
+  return null
 }
 
 /** Probe the CLI and map what it reports, or null when this account cannot be read that way. */
 export async function readClaudeUsageFromCli(
-  input: { envPatch?: ClaudeEnvPatch; signal?: AbortSignal } = {},
+  input: { envPatch?: ClaudeEnvPatch; oauthToken?: string | null; signal?: AbortSignal } = {},
   deps: ClaudeUsageProbeDeps = defaultDeps
 ): Promise<ProviderRateLimits | null> {
   const outcome = await probeClaudeUsage(input, deps)
-  if (outcome.status !== 'ok') {
+  if (outcome.status !== 'ok' && outcome.status !== 'ok-rate-limit-info') {
     if (outcome.status === 'unavailable') {
       console.debug('[rate-limits] claude CLI usage probe unavailable:', outcome.reason)
     }
     return null
   }
-  const mapped = mapClaudeCliUsageResponseSafely(outcome.response)
+  const mapped = mapClaudeCliOutcomeSafely(outcome)
   if (!mapped) {
     console.debug('[rate-limits] claude CLI usage probe reported no plan limits')
   }

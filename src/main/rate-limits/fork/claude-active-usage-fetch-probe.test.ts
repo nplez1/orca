@@ -3,17 +3,6 @@ import { fetchActiveClaudeRateLimits } from '../claude-active-usage-fetch'
 import { fetchClaudeOAuthUsage } from '../claude-oauth-usage-request'
 import { readClaudeOAuthCredentials } from '../claude-oauth-credentials'
 import { readClaudeUsageFromCli } from './claude-cli-usage-probe'
-import { probeClaudeUsageHeaders } from './claude-header-usage-probe'
-
-const headerReading = {
-  provider: 'claude' as const,
-  session: { usedPercent: 51, windowMinutes: 300, resetsAt: null, resetDescription: null },
-  weekly: { usedPercent: 14, windowMinutes: 10_080, resetsAt: null, resetDescription: null },
-  updatedAt: 1,
-  error: null,
-  status: 'ok' as const,
-  usageMetadata: { source: 'cli' as const, attemptedSources: ['cli' as const] }
-}
 
 const cliReading = {
   provider: 'claude' as const,
@@ -32,8 +21,6 @@ vi.mock('../claude-oauth-credentials', () => ({
   resolveClaudeOAuthCredentialReadOptions: () => undefined
 }))
 vi.mock('./claude-cli-usage-probe', () => ({ readClaudeUsageFromCli: vi.fn() }))
-// Why: the header probe reaches the real network, which a unit test must never do.
-vi.mock('./claude-header-usage-probe', () => ({ probeClaudeUsageHeaders: vi.fn() }))
 vi.mock('../../claude-accounts/claude-profile-installed-router', () => ({
   getClaudeProfileRouter: () => undefined,
   getClaudeWslProfileRouter: () => undefined
@@ -63,7 +50,6 @@ const profileOptions = {
 beforeEach(() => {
   vi.mocked(fetchClaudeOAuthUsage).mockReset()
   vi.mocked(readClaudeUsageFromCli).mockReset().mockResolvedValue(null)
-  vi.mocked(probeClaudeUsageHeaders).mockReset().mockResolvedValue(null)
   vi.mocked(readClaudeOAuthCredentials)
     .mockReset()
     .mockResolvedValue({
@@ -75,7 +61,8 @@ beforeEach(() => {
 })
 
 describe('Claude usage without a running session', () => {
-  it('answers from the CLI probe instead of the rate-limited usage endpoint', async () => {
+  it('answers from the CLI probe once the endpoint refuses', async () => {
+    vi.mocked(fetchClaudeOAuthUsage).mockRejectedValueOnce(new Error('Rate limited'))
     vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
 
     const result = await fetchActiveClaudeRateLimits({
@@ -86,8 +73,6 @@ describe('Claude usage without a running session', () => {
     expect(result.session?.usedPercent).toBe(31)
     expect(result.usageMetadata?.source).toBe('cli')
     expect(result.usageMetadata?.authProvenance).toBe('profile:a')
-    // The whole point: the endpoint that answers 429 was never asked.
-    expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
   })
 
   it('carries an open endpoint wait through a probe reading that answers', async () => {
@@ -175,6 +160,7 @@ describe('Claude usage without a running session', () => {
     const result = await fetchActiveClaudeRateLimits({
       ...profileOptions,
       allowUsagePanelSupplement: true,
+      usageEndpointRetryAtMs: OPEN_ENDPOINT_GATE,
       signal: controller.signal
     })
 
@@ -183,51 +169,9 @@ describe('Claude usage without a running session', () => {
   })
 })
 
-describe('Claude usage read from the API rate-limit headers', () => {
-  it('answers before any CLI start or endpoint request', async () => {
-    vi.mocked(probeClaudeUsageHeaders).mockResolvedValue(headerReading)
-
-    const result = await fetchActiveClaudeRateLimits({
-      ...profileOptions,
-      allowUsagePanelSupplement: true
-    })
-
-    expect(result.session?.usedPercent).toBe(51)
-    expect(result.usageMetadata?.source).toBe('cli')
-    // Why: the CLI control request answers no rate limits on 2.1.319 and the endpoint answers 429.
-    expect(readClaudeUsageFromCli).not.toHaveBeenCalled()
-    expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
-  })
-
-  it('keeps the account attribution on a header reading', async () => {
-    vi.mocked(probeClaudeUsageHeaders).mockResolvedValue(headerReading)
-
-    const result = await fetchActiveClaudeRateLimits({
-      ...profileOptions,
-      allowUsagePanelSupplement: true
-    })
-
-    expect(result.usageMetadata?.credentialSource).toBe('scoped-keychain')
-    expect(result.usageMetadata?.authProvenance).toBe('profile:a')
-  })
-
-  it('answers from the headers while the endpoint Retry-After is open', async () => {
-    vi.mocked(probeClaudeUsageHeaders).mockResolvedValue(headerReading)
-
-    const result = await fetchActiveClaudeRateLimits({
-      ...profileOptions,
-      allowUsagePanelSupplement: true,
-      usageEndpointRetryAtMs: OPEN_ENDPOINT_GATE
-    })
-
-    expect(result.status).toBe('ok')
-    // Why carried: a header reading must not licence the request the endpoint asked Orca to hold.
-    expect(result.usageMetadata?.retryAtMs).toBe(OPEN_ENDPOINT_GATE)
-    expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
-  })
-
-  it('falls back to the CLI probe when the headers carry no plan window', async () => {
-    vi.mocked(probeClaudeUsageHeaders).mockResolvedValue(null)
+describe('Claude usage when the endpoint cannot answer', () => {
+  it('answers from the CLI probe after the endpoint refuses, without a token refresh', async () => {
+    vi.mocked(fetchClaudeOAuthUsage).mockRejectedValueOnce(new Error('Rate limited'))
     vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
 
     const result = await fetchActiveClaudeRateLimits({
@@ -235,19 +179,24 @@ describe('Claude usage read from the API rate-limit headers', () => {
       allowUsagePanelSupplement: true
     })
 
+    expect(fetchClaudeOAuthUsage).toHaveBeenCalledTimes(1)
     expect(result.session?.usedPercent).toBe(31)
+    expect(result.usageMetadata?.source).toBe('cli')
   })
 
-  it('asks for no headers when the account has no token to spend', async () => {
-    vi.mocked(readClaudeOAuthCredentials).mockResolvedValue({
-      token: null,
-      hasRefreshableCredentials: true,
-      source: 'scoped-keychain'
+  it('asks the endpoint first so a healthy one keeps the spend cap and credits it alone reports', async () => {
+    vi.mocked(fetchClaudeOAuthUsage).mockResolvedValue({
+      ...cliReading,
+      usageMetadata: { source: 'oauth', attemptedSources: ['oauth'] }
     })
-    vi.mocked(probeClaudeUsageHeaders).mockResolvedValue(null)
 
-    await fetchActiveClaudeRateLimits({ ...profileOptions, allowUsagePanelSupplement: true })
+    const result = await fetchActiveClaudeRateLimits({
+      ...profileOptions,
+      allowUsagePanelSupplement: true
+    })
 
-    expect(probeClaudeUsageHeaders).not.toHaveBeenCalled()
+    expect(fetchClaudeOAuthUsage).toHaveBeenCalledTimes(1)
+    expect(readClaudeUsageFromCli).not.toHaveBeenCalled()
+    expect(result.usageMetadata?.source).toBe('oauth')
   })
 })

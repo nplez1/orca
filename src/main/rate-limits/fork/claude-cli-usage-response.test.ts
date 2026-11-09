@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapClaudeCliUsageResponse } from './claude-cli-usage-response'
+import { mapClaudeCliRateLimitInfo, mapClaudeCliUsageResponse } from './claude-cli-usage-response'
 
 // Shape captured from `claude` 2.1.316's get_usage control reply on a Max 5x seat.
 function cliReply(overrides: Record<string, unknown> = {}): unknown {
@@ -114,5 +114,48 @@ describe('mapClaudeCliUsageResponse', () => {
     expect(mapped?.weekly).toBeNull()
     expect(mapped?.monthly?.usedPercent).toBe(50)
     expect(mapped?.monthly?.windowMinutes).toBe(43_200)
+  })
+})
+
+describe('the CLI rate limit event a turn publishes', () => {
+  // Captured from Claude CLI 2.1.319 `--output-format stream-json` on 2026-11-09.
+  const event = {
+    status: 'allowed',
+    resetsAt: 1794232800,
+    rateLimitType: 'five_hour',
+    overageStatus: 'rejected',
+    overageDisabledReason: 'org_level_disabled',
+    isUsingOverage: false,
+    unifiedWindows: {
+      five_hour: { utilization: 0.02, resetsAt: 1794232800, status: 'allowed' },
+      seven_day: { utilization: 0.15, resetsAt: 1794499200, status: 'allowed' }
+    }
+  }
+
+  it('maps both plan windows from the event', () => {
+    const mapped = mapClaudeCliRateLimitInfo(event)
+
+    expect(mapped?.status).toBe('ok')
+    expect(mapped?.session?.usedPercent).toBeCloseTo(2)
+    expect(mapped?.session?.windowMinutes).toBe(300)
+    expect(mapped?.session?.resetsAt).toBe(1_794_232_800_000)
+    expect(mapped?.weekly?.usedPercent).toBeCloseTo(15)
+    expect(mapped?.weekly?.resetsAt).toBe(1_794_499_200_000)
+    expect(mapped?.usageMetadata?.source).toBe('cli')
+  })
+
+  it('reads the fraction as a fraction at the cap, not as a bare percentage', () => {
+    const mapped = mapClaudeCliRateLimitInfo({
+      unifiedWindows: { five_hour: { utilization: 1.05, resetsAt: 1794232800 } }
+    })
+
+    expect(mapped?.session?.usedPercent).toBe(100)
+  })
+
+  it('reports nothing when the event carries no window', () => {
+    expect(mapClaudeCliRateLimitInfo({ status: 'allowed' })).toBeNull()
+    expect(mapClaudeCliRateLimitInfo({ unifiedWindows: {} })).toBeNull()
+    expect(mapClaudeCliRateLimitInfo(null)).toBeNull()
+    expect(mapClaudeCliRateLimitInfo('allowed')).toBeNull()
   })
 })

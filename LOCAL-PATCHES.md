@@ -293,7 +293,6 @@ running app. Convenience only — not for upstream.
 Anchor: `src/main/rate-limits/fork/claude-cli-usage-probe.ts`,
 `src/main/rate-limits/fork/claude-cli-usage-response.ts`,
 `src/main/rate-limits/fork/claude-active-usage-probe.ts`,
-`src/main/rate-limits/fork/claude-header-usage-probe.ts`,
 `src/main/rate-limits/claude-active-usage-fetch.ts` (the probe-first hunks),
 `src/main/rate-limits/claude-oauth-credentials.ts` (the `settings-env` source),
 `src/main/rate-limits/service/service-fetch-policy.ts`,
@@ -356,35 +355,53 @@ no tokens; the 15-minute cadence is upstream's, not a new timer. It does write t
 `.claude.json` (Claude Code's own bookkeeping, with its rotating `.claude.json.backup.*`), which is
 the same write a session start makes.
 
-**The CLI probe went dead, so the headers answer instead (2026-11-09).** On Claude CLI 2.1.319 the
-`get_usage` control request still exists and still answers — with `rate_limits_available: false` and
-`subscription_type: null`, even on a fresh session and again after a real API turn that cost $0.065.
-So the probe returned `null` on every poll, the fetch fell through to `GET /api/oauth/usage`, and that
-endpoint answered **429 with `retry-after: 3593`** — measured on this machine the same minute. The
-status bar could then only move when a session posted a live receipt, which is exactly the "open a
-session and say hello" symptom. Two independent defects, both fixed here:
+**The CLI probe went dead; a turn makes the CLI report again (2026-11-09).** On Claude CLI 2.1.319
+the `get_usage` control request still answers — with `rate_limits_available: false` and
+`subscription_type: null`, cold and again after a real API turn. So the probe returned `null` on every
+poll, the fetch fell through to `GET /api/oauth/usage`, and that endpoint answered **429 with
+`retry-after: 3593`** — measured on this machine the same minute. The status bar could then only move
+when a session posted a live receipt, which is the "open a session and say hello" symptom.
 
-- **A second proactive source: the API's own unified rate-limit headers.** `fork/claude-header-usage-probe.ts`
-  posts the smallest possible completion (`max_tokens: 1`, haiku) and reads
-  `anthropic-ratelimit-unified-5h-utilization` / `-5h-reset` / `-7d-utilization` / `-7d-reset` off the
-  reply. Measured 2026-11-09 08:26Z: `5h 0.51 / 7d 0.14`, resets `1794213600` / `1794499200`, HTTP 200
-  in ~180 ms. These are the same numbers Claude Code feeds its statusline, which is why a session could
-  show usage Orca could not. It runs **before** the CLI probe because it costs one HTTP round trip
-  instead of a process start, it needs no platform gate (no PTY, no CLI), and it is read from a 429
-  reply too — the window is in the headers, not the body. `max_tokens: 0` is accepted by the API and
-  returns `output_tokens: 0`; `1` is used so an account that rejects zero is still covered. Cost per
-  poll is ~9 tokens against a window of hundreds of thousands, so the 15-minute cadence is noise. The
-  reading carries an open endpoint `Retry-After` forward, so answering from headers never licences the
-  request the endpoint asked Orca to hold.
-- **The login is where the CLI keeps it, not only where Orca looked.** `readClaudeOAuthCredentials`
-  read the keychain and `.credentials.json`; this machine's login is `env.CLAUDE_CODE_OAUTH_TOKEN` in
-  `~/.claude/settings.json`, with no keychain item and no credentials file at all. Every read therefore
-  reported `missing-credentials` / "No subscription plan — API key billing", which is also what hid the
-  bar entirely (an `unavailable` Claude snapshot renders no segment). A third source, `settings-env`,
-  now reads `settings.local.json` then `settings.json` under the same resolved config dir. It accepts
-  `ANTHROPIC_AUTH_TOKEN` only when it starts `sk-ant-oat`, because that key also carries plain API keys
-  and those have no plan. It reports `hasRefreshableCredentials: false` and no `refreshTarget` on
-  purpose: the login belongs to the CLI's settings file, which Orca must never rewrite.
+Three changes, and one deliberately rejected:
+
+- **A turn is what makes the CLI report.** The CLI publishes `rate_limit_event.rate_limit_info` on its
+  own stream when it completes a turn: `unifiedWindows.{five_hour,seven_day}` with a 0–1 `utilization`
+  and an epoch-seconds `resetsAt`. Captured on 2.1.319 2026-11-09: `five_hour 0.02 / seven_day 0.15`.
+  The probe now sends one minimal prompt (`hi`, haiku) and reads that event, so **the Claude app makes
+  the call itself** — no inference from Orca, no impersonated client, nothing for a subscription-credential
+  policy to object to. Measured through Orca's own spawn hook: 3.9 s wall, `session 2% / weekly 15%`,
+  ~$0.0026 and 73 tokens for the turn.
+- **`get_usage` is no longer tried first, and that is a measurement, not a preference.** Asking it costs
+  nothing and answers in 140 ms — but issuing it leaves the session unable to run the turn at all: the
+  stream then stalls until the deadline (measured twice, 60 s and 15 s budgets). One phase, one timeout.
+- **The probe must be handed the login.** It isolates itself with `settingSources: []`, which also hides
+  a login kept in the CLI's settings env, and `buildClaudeChildProcessEnv` strips inherited auth on
+  purpose. Without the token the child is unauthenticated and reports no limits — the first rewrite
+  timed out at 15 s for exactly this. `oauthToken` now travels into the child env.
+- **Rejected: reading the API's rate-limit headers from an Orca-issued completion.** It works (a
+  `max_tokens: 1` completion returns `anthropic-ratelimit-unified-{5h,7d}-utilization`), and it is
+  cheaper in tokens, but it sends _inference_ with a subscription token from a client posing as
+  `claude-code/2.1.0`. That is the use Anthropic restricts for third-party tools, and the worst case is
+  account action. It also starts the 5-hour window on Orca's clock instead of the user's first message.
+  Recorded here so a later reader does not "simplify" the probe back into it.
+
+**The endpoint is asked first, the probe second.** The endpoint is the sanctioned source and the only
+one carrying `fableWeekly` / `extraUsage` / `monthly`, so a healthy endpoint must never be shadowed by a
+probe reading that has none of them. The probe answers when the endpoint cannot: held by its own
+`Retry-After`, or refused. That also means a turn is spent only while the endpoint is throttled.
+
+**The login is where the CLI keeps it, not only where Orca looked.** `readClaudeOAuthCredentials` read
+the keychain and `.credentials.json`; this machine's login is `env.CLAUDE_CODE_OAUTH_TOKEN` in
+`~/.claude/settings.json`, with no keychain item and no credentials file at all. Every read therefore
+reported `missing-credentials` / "No subscription plan — API key billing", which is also what hid the
+segment entirely (an `unavailable` Claude snapshot renders no segment). A third source, `settings-env`,
+now reads `settings.local.json` then `settings.json` under the same resolved config dir — the order
+the code applies, and note that `settings.local.json` is Claude Code's project-scope file, so it only
+wins where it exists. It accepts `ANTHROPIC_AUTH_TOKEN` only when it starts `sk-ant-oat`, because that
+key also carries plain API keys and those have no plan. It reports `hasRefreshableCredentials: false`
+and no `refreshTarget` on purpose: the login belongs to the CLI's settings file, which Orca must never
+rewrite. The CLI itself prefers an environment token over its stored keychain login, so an account with
+both shows the keychain account's usage here — rare, and recorded rather than inverted.
 
 **Polling no longer requires a focused window.** `shouldBackgroundPoll` returned
 `isVisible() && !isMinimized() && isFocused()`. A serve-mode host keeps its window hidden
@@ -394,18 +411,18 @@ the M5-host symptom. The gate is now "the window exists and is not destroyed"; t
 Orca is focused, backgrounded or headless. Activation still refreshes immediately.
 
 **Tests that hold the line.** `fork/claude-cli-usage-response.test.ts` pins the payload mapping against
-a captured 2.1.316 reply; `fork/claude-cli-usage-probe.test.ts` pins command/cwd/env, the abort paths
-and the "no payload is not a reading" rule; `fork/claude-active-usage-fetch-probe.test.ts` pins
+a captured 2.1.316 reply and the `rate_limit_event` mapping against a captured 2.1.319 event;
+`fork/claude-cli-usage-probe.test.ts` pins command/cwd/env, the token handed to the child, the abort
+paths and the "no payload is not a reading" rule; `fork/claude-active-usage-fetch-probe.test.ts` pins
 probe-first (the endpoint is never called), the open `Retry-After` (the endpoint is not called but the
 fetch still reports the wait), the WSL/`usageError`/opt-out cases; `fork/service-claude-usage-probe.test.ts`
 pins that a `Retry-After` no longer freezes a lane on activation _or_ on the timer, and that the next
 fetch still receives the open wait (a user refresh receives `null`) — both plumbing hunks fail if
 dropped; `fork/claude-inactive-account-usage.test.ts` pins that a saved-account preview never probes;
-`fork/claude-header-usage-probe.test.ts` pins the header mapping (fraction vs percentage, a 429 reply
-still answering, the body always drained) and that the probe orders ahead of both the CLI and the
-endpoint; `fork/claude-settings-env-credentials.test.ts` pins the source order
-(keychain → `.credentials.json` → `settings.json` → `settings.local.json`) and that a plain API key in
-`ANTHROPIC_AUTH_TOKEN` is never taken as a plan login.
+`fork/claude-settings-env-credentials.test.ts` pins the source order (keychain → `.credentials.json` →
+`settings.local.json` → `settings.json`) and that a plain API key in `ANTHROPIC_AUTH_TOKEN` is never
+taken as a plan login; `fork/service-background-polling.test.ts` pins that the timer polls while the
+window is unfocused, hidden and minimized, and stops only when the window is gone.
 The upstream suites that described the endpoint-only platform (win32) now say so through
 `EndpointOnlyClaudeService`, which is the one behaviour split worth reading twice.
 

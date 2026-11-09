@@ -113,3 +113,63 @@ describe('readClaudeUsageFromCli', () => {
     ).toBeNull()
   })
 })
+
+describe('the turn a CLI with no usable get_usage has to spend', () => {
+  it('hands the child the login, because the probe isolates itself from settings', async () => {
+    const runUsageControl = runner(async () => ({
+      status: 'ok-rate-limit-info',
+      rateLimitInfo: { unifiedWindows: { five_hour: { utilization: 0.5 } } }
+    }))
+
+    const outcome = await probeClaudeUsage(
+      { envPatch: { CLAUDE_CONFIG_DIR: '/Users/x/.claude' }, oauthToken: 'sk-ant-oat01-token' },
+      deps(runUsageControl)
+    )
+
+    expect(outcome).toEqual({
+      status: 'ok-rate-limit-info',
+      rateLimitInfo: { unifiedWindows: { five_hour: { utilization: 0.5 } } }
+    })
+    const [request] = runUsageControl.mock.calls[0]
+    expect(request.env.CLAUDE_CODE_OAUTH_TOKEN).toBe('sk-ant-oat01-token')
+    expect(request.env.CLAUDE_CONFIG_DIR).toBe('/Users/x/.claude')
+  })
+
+  it('leaves the child without a token when the account has none', async () => {
+    const runUsageControl = runner(async () => null)
+
+    await probeClaudeUsage({}, deps(runUsageControl))
+
+    expect(runUsageControl.mock.calls[0][0].env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
+  })
+
+  it('maps a rate-limit event onto a reading the status bar can render', async () => {
+    const reading = await readClaudeUsageFromCli(
+      { oauthToken: 'sk-ant-oat01-token' },
+      deps(
+        runner(async () => ({
+          status: 'ok-rate-limit-info',
+          rateLimitInfo: {
+            unifiedWindows: {
+              five_hour: { utilization: 0.4, resetsAt: 1_794_232_800 },
+              seven_day: { utilization: 0.12, resetsAt: 1_794_499_200 }
+            }
+          }
+        }))
+      )
+    )
+
+    expect(reading?.session?.usedPercent).toBeCloseTo(40)
+    expect(reading?.weekly?.usedPercent).toBeCloseTo(12)
+    expect(reading?.usageMetadata?.source).toBe('cli')
+  })
+
+  it('reports no reading when the event carries no plan window', async () => {
+    expect(
+      await readClaudeUsageFromCli(
+        {},
+        deps(runner(async () => ({ status: 'ok-rate-limit-info', rateLimitInfo: {} })))
+      )
+    ).toBeNull()
+  })
+})

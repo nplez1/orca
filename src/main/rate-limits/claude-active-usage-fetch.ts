@@ -19,7 +19,6 @@ import {
   openEndpointRetryAtMs,
   readActiveClaudeUsageFromProbe
 } from './fork/claude-active-usage-probe'
-import { probeClaudeUsageHeaders } from './fork/claude-header-usage-probe'
 
 const SIGN_IN_AGAIN = 'Sign in again to use this account.'
 
@@ -50,28 +49,19 @@ export async function fetchActiveClaudeRateLimits(
     credentialSource: credentials.source,
     authProvenance: options?.authPreparation?.provenance ?? 'system'
   }
-  // fork-comment-ok: fork-only source, ordered ahead of the CLI probe; see LOCAL-PATCHES.md `local(usage)`.
-  if (credentials.token) {
-    const fromHeaders = await probeClaudeUsageHeaders(credentials.token, options?.signal)
-    if (fromHeaders) {
-      const retryAtMs = openEndpointRetryAtMs(options)
-      return {
-        ...fromHeaders,
-        usageMetadata: {
-          ...fromHeaders.usageMetadata,
-          ...metadata,
-          ...(retryAtMs ? { retryAtMs } : {})
-        }
-      }
+  // fork-comment-ok: fork-only source ordering; see LOCAL-PATCHES.md `local(usage)`.
+  // Why the endpoint is asked before the CLI probe: the endpoint is the sanctioned source and the
+  // only one carrying `fableWeekly` / `extraUsage` / `monthly`, so a healthy endpoint must not be
+  // shadowed. The probe answers when the endpoint cannot — held by its own Retry-After, or refused.
+  const gatedRetryAtMs = openEndpointRetryAtMs(options)
+  if (gatedRetryAtMs !== null) {
+    const probed = await readActiveClaudeUsageFromProbe(options, undefined, credentials.token)
+    if (probed) {
+      return probed
     }
-  }
-  if (options?.signal?.aborted) {
-    return abortedClaudeRateLimitResult()
-  }
-  // fork-comment-ok: the plan reading the endpoint's rate limit cannot take away (local(usage)).
-  const probed = await readActiveClaudeUsageFromProbe(options)
-  if (probed) {
-    return probed
+    if (options?.signal?.aborted) {
+      return abortedClaudeRateLimitResult()
+    }
   }
   if (options?.signal?.aborted) {
     return abortedClaudeRateLimitResult()
@@ -106,9 +96,9 @@ export async function fetchActiveClaudeRateLimits(
       attemptedSources: []
     })
   }
-  const gatedRetryAtMs = endpointRetryAtMs(options)
-  if (gatedRetryAtMs !== null) {
-    return claudeUsageEndpointGatedResult(metadata, gatedRetryAtMs)
+  const refreshGateMs = endpointRetryAtMs(options)
+  if (refreshGateMs !== null) {
+    return claudeUsageEndpointGatedResult(metadata, refreshGateMs)
   }
   // Why: a stored refresh token is the login; exchange it before asking for a sign-in.
   const outcome = await refreshStoredClaudeLogin(credentials, null)
@@ -136,6 +126,17 @@ async function readClaudeUsage(
   try {
     return await fetchClaudeOAuthUsage(token, options?.signal)
   } catch (error) {
+    if (options?.signal?.aborted) {
+      return abortedClaudeRateLimitResult()
+    }
+    // fork-comment-ok: the CLI reports the plan windows without the endpoint (local(usage)).
+    const probed = await readActiveClaudeUsageFromProbe(options, undefined, credentials.token)
+    if (probed) {
+      return probed
+    }
+    if (options?.signal?.aborted) {
+      return abortedClaudeRateLimitResult()
+    }
     const classification = classifyClaudeOAuthUsageError(error)
     if (!classification.shouldAttemptCredentialRefresh) {
       return usageFailureResult(error, classification.failureKind, metadata)
