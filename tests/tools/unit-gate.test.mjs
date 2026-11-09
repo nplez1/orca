@@ -465,6 +465,26 @@ describe('the known-red manifest', () => {
     }
   })
 
+  it("names only titles the nightly red set's own file can still produce, and only files it has", () => {
+    // Why the nightly set as well: it is the manifest the shard verdict reads on every Linux run, and
+    // nothing static covered it — upstream moved one entry's file on 2026-11-05 and the entry went on
+    // naming a path no report contains, so the red it exists to absorb was not absorbed at all (#317).
+    const nightly = JSON.parse(
+      readFileSync(join(ROOT, 'local/nightly-linux-known-red.json'), 'utf8')
+    )
+    const problems = []
+    for (const entry of nightly.entries ?? []) {
+      if (!existsSync(join(ROOT, entry.file))) {
+        problems.push(`${entry.file}: no such file`)
+        continue
+      }
+      if (!titleExistsInSource(entry.test, sourceWithImportedCases(entry.file))) {
+        problems.push(`${entry.file} › ${entry.test}: the file cannot produce this name`)
+      }
+    }
+    expect(problems).toEqual([])
+  })
+
   it('closes the arithmetic of the run it was reconciled with', () => {
     const run = manifest.observedRun
     expect(run.allowlisted + run.upstreamQuarantined + run.fixed).toBe(run.failingRecords)

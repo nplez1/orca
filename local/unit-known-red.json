@@ -29,7 +29,7 @@
     "An entry may carry a `match` regex, tested against the first line of the failure message. It is",
     "what stops an allowlisted test from covering a NEW failure under the same name: without it the",
     "entry matches on file and title alone, so a passed-in reason stays \"known\" for as long as the",
-    "title does. A `match` is only added where the failure text was observed to carry that signature."
+    "Every entry must carry a `match` regex unless it is `flaky: true`: a listed test that starts failing for a different reason is then a new red rather than a known one, and `local/lib/known-red.mjs` reports an entry with neither field as a problem (#317). `match` is tested against the first line of the failure message, ANSI-stripped and with the reporter's leading `Error: ` removed, capped at 200 characters. `flaky: true` is the declared exemption for a red whose text was never captured or has been seen to vary; it is not a mute button, and the gate reports it as such in its summary."
   ],
   "recordedAt": "2026-10-25",
   "observedRun": {

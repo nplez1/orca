@@ -62,6 +62,7 @@ import {
   reproducedFailures,
   unexplainedSuiteExit
 } from './unit-gate-judgement.mjs'
+import { entryMatchProblems, normaliseUnhandled } from './lib/known-red.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
@@ -222,6 +223,11 @@ function reportResult(result) {
       : ` — ${failure.detail}`
     console.log(`  UNEXPECTED: ${failure.file} › ${failure.test}${why}`)
   }
+  for (const { failure, entry } of result.drifted ?? []) {
+    console.log(
+      `  NEW CAUSE: ${failure.file} › ${failure.test} — ${failure.detail || 'no message'}, which its entry's match ${JSON.stringify(entry.matchSource)} does not describe`
+    )
+  }
   if (result.unexpected.length > MAX_SUMMARY_LIST) {
     console.log(`  …and ${result.unexpected.length - MAX_SUMMARY_LIST} more unexpected failure(s)`)
   }
@@ -316,6 +322,13 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   })
 
   const problems = []
+  // Why at the top: a manifest entry that cannot pin a cause is a problem with the run's verdict
+  // whatever the suite did, and it is the looseness #317 is about.
+  problems.push(...entryMatchProblems(entries))
+  const { entries: unhandledEntries, problems: unhandledEntryProblems } = normaliseUnhandled(
+    manifest.unhandledErrors
+  )
+  problems.push(...unhandledEntryProblems)
   if (run.outcome !== 'complete') {
     problems.push(`the suite did not run to completion: ${run.outcome}`)
   }
@@ -340,6 +353,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   let counts = { passed: 0, failed: 0, known: 0 }
   let known = []
   let unexpected = []
+  let drifted = []
   let stale = []
   let unseen = []
   if (report) {
@@ -351,6 +365,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     const judged = judge(entries, cases.failures, cases.passes)
     known = judged.known
     unexpected = judged.unexpected
+    drifted = judged.drifted
     stale = judged.stale
     unseen = prunableEntries(judged.unseen, report, {
       full: fullRun,
@@ -385,7 +400,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
   const tolerated = unhandled.headlines.filter((headline) => headline === TOLERATED_UNHANDLED_ERROR)
   const judgedUnhandled = judgeUnhandled(
     unhandled.headlines.filter((headline) => headline !== TOLERATED_UNHANDLED_ERROR),
-    manifest.unhandledErrors
+    unhandledEntries
   )
   for (const item of judgedUnhandled.blocking) {
     problems.push(`unhandled error (×${item.count}): ${item.headline}`)
@@ -470,6 +485,7 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     counts,
     known,
     unexpected: blocking,
+    drifted,
     flaky,
     stale,
     unseen,

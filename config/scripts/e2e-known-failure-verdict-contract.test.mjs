@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
@@ -36,8 +36,10 @@ describe('known-failure verdict wiring', () => {
     )
     // Why the outcome argument: the verdict reads the report, and a report alone cannot tell an empty
     // shard or a Playwright exit with no spec behind it apart from a green run (#210 G7).
+    // Why `--selected`: a report alone cannot tell a shard that ran everything from one that was
+    // interrupted partway, and a spec with no result used to read as neither failed nor passed (#317).
     expect(verdict.run).toBe(
-      'node local/check-e2e-known-failure-titles.mjs ci-shards/results.json local/e2e-known-failure-titles.json ${{ steps.run-e2e.outcome }}'
+      'node local/check-e2e-known-failure-titles.mjs ci-shards/results.json local/e2e-known-failure-titles.json ${{ steps.run-e2e.outcome }} --selected ci-shards/selected.txt'
     )
     // The one report both the verdict and upstream's failure summary read.
     const summary = step('Summarize E2E failures')
@@ -72,9 +74,24 @@ describe('known-failure verdict wiring', () => {
       expect(entry.title.length).toBeGreaterThan(0)
       expect(['upstream', 'unattributed']).toContain(entry.owner)
       expect(entry.observedForkRuns + entry.observedUpstreamRuns).toBeGreaterThan(0)
+      // Why: a title with neither field absorbs any failure of that spec, which is the looseness
+      // #317 removed. `match` pins an observed cause; `flaky: true` declares there is none to pin.
+      expect(
+        typeof entry.match === 'string' || entry.flaky === true,
+        `${entry.file} › ${entry.title} has neither a match nor flaky: true`
+      ).toBe(true)
+      if (typeof entry.match === 'string') {
+        expect(() => new RegExp(entry.match), `${entry.file} has an unusable match`).not.toThrow()
+      }
     }
     expect(new Set(manifest.titles.map((entry) => `${entry.file} › ${entry.title}`)).size).toBe(
       manifest.titles.length
     )
+  })
+
+  it('names only spec files this tree still has, so a rename cannot silently un-record a red', () => {
+    for (const entry of manifest.titles) {
+      expect(existsSync(join(projectDir, entry.file)), `${entry.file} does not exist`).toBe(true)
+    }
   })
 })

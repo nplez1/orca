@@ -12,12 +12,19 @@
  * it. Both fail closed here, the way `check-unit-shard-verdict.mjs` judges a shard.
  *
  * Usage: node local/check-e2e-known-failure-titles.mjs REPORT.json TITLES.json OUTCOME
- *         (OUTCOME is the run step's `outcome`: success or failure)
+ *          [--selected PATH]
+ *         (OUTCOME is the run step's `outcome`: success or failure; PATH is the shard's
+ *         `ci-shards/selected.txt`, which is what makes a spec that never ran a failure)
  */
 import { readFileSync } from 'node:fs'
+import {
+  entryMatchProblems,
+  failureDetail,
+  judgeEntries,
+  normaliseEntries
+} from './lib/known-red.mjs'
 
 const FAILED_STATUSES = new Set(['failed', 'timedOut', 'interrupted'])
-const ERROR_EXCERPT_CHARS = 240
 /** `file › describe › … › title`, stable across the line shifts an upstream edit causes. */
 export function specKey(spec, suiteTitlePath) {
   const file = String(spec.file).replaceAll('\\', '/')
@@ -61,20 +68,30 @@ function errorExcerpt(spec) {
     for (const result of test.results ?? []) {
       const message = result.error?.message ?? result.errors?.[0]?.message
       if (message) {
-        const firstLine = String(message).trim().split('\n')[0]
-        return firstLine.length > ERROR_EXCERPT_CHARS
-          ? `${firstLine.slice(0, ERROR_EXCERPT_CHARS)}…`
-          : firstLine
+        // Why the shared helper: Playwright's error text carries SGR colour codes, and a `match`
+        // regex is written against the readable line.
+        return failureDetail(message)
       }
     }
   }
   return (spec.tests ?? []).map((test) => test.status).join(', ') || 'no result recorded'
 }
 
+/**
+ * Whether every test of a spec was declared skipped, which is the only shape that explains a spec with
+ * no result. A `test.skip()` inside a body still produces a `skipped` result, so it is not this.
+ */
+function declaredSkip(spec) {
+  const tests = spec.tests ?? []
+  return tests.length > 0 && tests.every((test) => test.expectedStatus === 'skipped')
+}
+
 export function collectOutcomes(report) {
   const failures = new Map()
   const passed = new Set()
   const seen = new Set()
+  const executed = new Set()
+  const notRun = new Set()
   // Why: the list reporter appends the step a test died in to its title, so a title copied out of a
   // CI log has to resolve back to the spec that owns it or the entry would never match.
   const aliasToKey = new Map()
@@ -93,10 +110,18 @@ export function collectOutcomes(report) {
         aliasToKey.set(stepKey, key)
       }
       const statuses = runStatuses(spec)
+      if (statuses.length > 0) {
+        executed.add(key)
+      }
       if (specFailed(spec)) {
         failures.set(key, errorExcerpt(spec))
       } else if (statuses.includes('passed')) {
         passed.add(key)
+      } else if (statuses.length === 0 && !declaredSkip(spec)) {
+        // Why this is the hole #317 names: a spec that produced no result at all was expected to run
+        // and did not — the shape a Playwright run interrupted partway leaves behind. A spec whose
+        // every test is declared `test.skip()` is a legitimate skip and is not listed here.
+        notRun.add(key)
       }
     }
     for (const child of suite.suites ?? []) {
@@ -110,32 +135,124 @@ export function collectOutcomes(report) {
     failures,
     passed,
     seen,
+    executed,
+    notRun,
     aliasToKey,
     globalErrors: (report.errors ?? []).map((error) => String(error.message ?? error))
   }
 }
 
+/**
+ * `file › describe › … › title` split at the first separator: a spec key is a file plus the rest, and a
+ * file path never contains ` › `.
+ */
+export function splitKey(key) {
+  const at = key.indexOf(' › ')
+  return at === -1 ? { file: key, test: '' } : { file: key.slice(0, at), test: key.slice(at + 3) }
+}
+
+/**
+ * What the recorded titles mean against this report, through the same matcher the unit manifests use:
+ * identity is the spec key, and the cause is the entry's `match` tested against the error excerpt.
+ */
 export function judge(known, outcomes) {
+  // Why the alias is resolved on the entry rather than the failure: a title copied out of a CI log
+  // names the step the test died in, and the failure is keyed by the spec that owns it.
+  const entries = [...known].map(([key, entry]) => ({
+    ...entry,
+    ...splitKey(outcomes.aliasToKey.get(key) ?? key),
+    key
+  }))
+  const failures = [...outcomes.failures].map(([key, detail]) => ({ ...splitKey(key), detail }))
+  const passes = [...outcomes.passed].map((key) => splitKey(key))
+  const judged = judgeEntries(entries, failures, passes)
+  const ownerOf = (failure) => `${failure.file} › ${failure.test}`
   const knownByKey = new Map()
-  const stale = []
-  for (const [key, entry] of known) {
-    const owner = outcomes.aliasToKey.get(key) ?? key
-    if (outcomes.failures.has(owner)) {
-      knownByKey.set(owner, entry)
-    } else if (outcomes.passed.has(owner)) {
-      stale.push(key)
-    }
+  for (const { failure, entry } of judged.known) {
+    knownByKey.set(ownerOf(failure), known.get(entry.key) ?? entry)
   }
   return {
     knownByKey,
-    unexpected: [...outcomes.failures].filter(([key]) => !knownByKey.has(key)),
-    quarantined: [...outcomes.failures].filter(([key]) => knownByKey.has(key)),
-    stale
+    unexpected: judged.unexpected.map((failure) => [ownerOf(failure), failure.detail]),
+    quarantined: judged.known.map(({ failure }) => [ownerOf(failure), failure.detail]),
+    stale: judged.stale.map((entry) => entry.key),
+    drifted: judged.drifted.map(({ failure, entry }) => [ownerOf(failure), failure.detail, entry])
   }
 }
 
+/** The manifest's titles as entries, keyed the way a spec key is spelled. */
 export function titleKeys(manifest) {
-  return new Map(manifest.titles.map((entry) => [`${entry.file} › ${entry.title}`, entry]))
+  const { entries } = normaliseEntries(
+    (manifest.titles ?? []).map((title) => ({ ...title, test: title.title }))
+  )
+  return new Map(entries.map((entry) => [entry.key, entry]))
+}
+
+/** A spec file as the report and `selected.txt` both spell it. */
+export function e2eFileKey(file) {
+  const normalised = String(file ?? '')
+    .replaceAll('\\', '/')
+    .replace(/^\.\//, '')
+  if (normalised.startsWith('tests/e2e/')) {
+    return normalised
+  }
+  return normalised.startsWith('e2e/') ? `tests/${normalised}` : `tests/e2e/${normalised}`
+}
+
+/**
+ * The specs a shard was told to run, from `ci-shards/selected.txt` — the file the workflow hands
+ * Playwright as `--test-list`, so it is the same selection the report should describe.
+ */
+export function selectedFiles(text) {
+  return new Set(
+    String(text)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map(e2eFileKey)
+  )
+}
+
+/**
+ * Whether the report describes the selection.
+ *
+ * Why this is not "every selected spec must run": 179 of this repo's 587 e2e spec files call
+ * `test.skip`, and a platform-conditional skip is legitimate. The shapes that are not are a selected
+ * file the report never mentions, a spec that produced no result at all while none of its tests
+ * declared a skip — which is what an interrupted run leaves behind, and what let a run with one known
+ * failure pass after a timeout — and a spec from a file the selection does not name.
+ */
+export function expectedSpecProblems({ selected, outcomes }) {
+  if (selected === null) {
+    return []
+  }
+  const problems = []
+  const files = new Set()
+  for (const key of outcomes.seen) {
+    files.add(splitKey(key).file)
+  }
+  // Why only "absent": a file whose specs are all declared skips legitimately produces no result on
+  // this platform, and the per-spec rule below already catches a spec that was expected to run.
+  for (const file of selected) {
+    if (!files.has(file)) {
+      problems.push(
+        `selected spec file never ran: ${file} — the shard was assigned it and the report holds no spec from it`
+      )
+    }
+  }
+  for (const key of outcomes.notRun) {
+    problems.push(
+      `selected spec never ran: ${key} — it produced no result and none of its tests declared a skip`
+    )
+  }
+  for (const file of files) {
+    if (!selected.has(file)) {
+      problems.push(
+        `the report names specs from a file this shard was not selected to run: ${file} — selected.txt does not describe this run`
+      )
+    }
+  }
+  return problems
 }
 
 /**
@@ -145,7 +262,7 @@ export function titleKeys(manifest) {
  * to pass, which accepted a zero-spec report and a Playwright exit that no spec explained. Both are
  * the shape of a run that proved nothing, so both fail closed.
  */
-export function decideE2eVerdict({ known, outcomes, outcome }) {
+export function decideE2eVerdict({ known, outcomes, outcome, selected = null }) {
   const problems = []
   if (outcomes.seen.size === 0) {
     problems.push('the report holds no specs, so the run cannot be judged green')
@@ -154,6 +271,9 @@ export function decideE2eVerdict({ known, outcomes, outcome }) {
     problems.push(`unknown test-step outcome "${outcome}"`)
   }
   const judged = judge(known, outcomes)
+  // Why the manifest is judged here too: a title with no `match` and no `flaky: true` absorbs any
+  // failure of that spec, which is the looseness #317 is about.
+  problems.push(...entryMatchProblems([...known.values()]))
   for (const message of outcomes.globalErrors) {
     problems.push(`the report carried a global error: ${String(message).split('\n')[0]}`)
   }
@@ -162,6 +282,12 @@ export function decideE2eVerdict({ known, outcomes, outcome }) {
       `unexpected E2E failure (not in e2e-known-failure-titles.json): ${key} — ${detail}`
     )
   }
+  for (const [key, detail, entry] of judged.drifted) {
+    problems.push(
+      `listed spec failed for a new cause: ${key} — ${detail}, which its entry's match ${JSON.stringify(entry.matchSource)} does not describe`
+    )
+  }
+  problems.push(...expectedSpecProblems({ selected, outcomes }))
   // Why: a known failure explains the non-zero exit, which is the whole point of this lane. Nothing
   // in the report explaining it is the case a green verdict used to cover.
   if (outcome === 'failure' && outcomes.failures.size === 0 && outcomes.globalErrors.length === 0) {
@@ -178,17 +304,55 @@ function readJson(path) {
   }
 }
 
+function parseArgs(argv) {
+  const positional = []
+  let selectedPath = null
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === '--selected') {
+      // Why a missing value is a usage error rather than "no flag": the caller asked for the selection
+      // to be judged, and silently judging nothing is the hole the flag exists to close.
+      if (argv[index + 1] === undefined) {
+        console.error('usage: --selected needs a path')
+        process.exit(2)
+      }
+      selectedPath = argv[(index += 1)]
+    } else {
+      positional.push(argv[index])
+    }
+  }
+  return { positional, selectedPath }
+}
+
 function main() {
-  const [reportPath, titlesPath, outcome] = process.argv.slice(2)
+  const { positional, selectedPath } = parseArgs(process.argv.slice(2))
+  const [reportPath, titlesPath, outcome] = positional
   if (!reportPath || !titlesPath || outcome === undefined) {
     console.error(
-      'usage: check-e2e-known-failure-titles.mjs REPORT.json TITLES.json OUTCOME (success|failure)'
+      'usage: check-e2e-known-failure-titles.mjs REPORT.json TITLES.json OUTCOME (success|failure)' +
+        ' [--selected PATH]'
     )
     process.exit(2)
   }
   const known = titleKeys(readJson(titlesPath))
   const outcomes = collectOutcomes(readJson(reportPath))
-  const verdict = decideE2eVerdict({ known, outcomes, outcome })
+  // Why a named path that cannot be read is fatal while an absent flag is not: the workflow passes it,
+  // and a shard that was told what to run cannot be judged green without it.
+  let selected = null
+  if (selectedPath !== null) {
+    try {
+      selected = selectedFiles(readFileSync(selectedPath, 'utf8'))
+    } catch (error) {
+      console.error(`cannot read the selection at ${selectedPath}: ${error.message}`)
+      process.exit(1)
+    }
+    if (selected.size === 0) {
+      console.error(
+        `the selection at ${selectedPath} names no spec file, so nothing proves what this shard should have run`
+      )
+      process.exit(1)
+    }
+  }
+  const verdict = decideE2eVerdict({ known, outcomes, outcome, selected })
   const { knownByKey, unexpected, quarantined, stale } = verdict
 
   console.log(

@@ -2238,13 +2238,11 @@ Three fixes with one cause: a signal that was **absent** was read as a signal th
   or a test, and the runs that carried them had 0 unexpected named failures — which is the standard
   they must keep: if a run ever reports one of these _and_ an unexpected failure, the failure is the
   finding, not the headline.
-- `local/unit-known-red.json` entries carry an optional `match` regex, tested against the first line
-  of the failure. Without it an entry matched on file and title alone, so an allowlisted test that
-  started failing for a **new** reason stayed "known" for as long as its title did. 9 of the current 17
-  are pinned, each to a signature the failure text actually carried in the `8da9849c43` run; the rest
-  keep matching on title alone because their text is a generic deep-equality diff, and guessing a
-  signature there would turn a known red into an unexpected one. (Counts move as entries are pruned; the
-  file is the number, not this line.)
+- `local/unit-known-red.json` entries carry a `match` regex, tested against the first line of the
+  failure, and **every entry needs one** unless it declares `flaky: true` — see § `local(ci)`: one
+  known-red matcher (#317), which is where that rule and its enforcement live now. When the field was
+  optional, an entry matched on file and title alone, so an allowlisted test that started failing for a
+  **new** reason stayed "known" for as long as its title did.
 - `config/scripts/check-changed.mjs` resolved its base as `origin/main`, which on this fork is
   **upstream's mirror** — so the pre-handoff gate diffed the fork's whole 2,846-file delta instead of
   the branch's own. `origin/HEAD` now comes first, as it already does in the sibling
@@ -2355,7 +2353,8 @@ file-level failure (a `beforeAll` or import error with no assertion rows) can ne
 name-matching entry.
 
 Its first entry is `daemon-pty-adapter-history-recovery.test.ts › serializes concurrent keepHistory and
-disconnectOnly checkpoints`, which failed on Linux in **both** runs — the 04:53Z schedule
+disconnectOnly checkpoints` (the name is Vitest's full one, describe chain included, since #317), which
+failed on Linux in **both** runs — the 04:53Z schedule
 (`40485647652`) and this dispatch — with `DaemonConnectionLostError: Disconnected` out of
 `disconnectOnly()`, while passing 3/3 on this Mac. Every file in that stack is upstream-owned with zero
 fork hunks, so it is upstream's race under Linux runner timing, and the entry records its exit condition
@@ -2382,6 +2381,65 @@ skipped as intended, and **four files failed across four shards** (shard 3 green
 entries passed on Linux** (22/23 pruned entries passed; one absent because it is a macOS-only bundle
 test). So the Mac red set transfers clean, and the four failures are branch gap plus one upstream flake —
 no environment class of Linux's own, the same conclusion the dispatch reached.
+
+### `local(ci)`: one known-red matcher (#317)
+
+Four judges decided what a listed red covers, and they had drifted apart. `local/gate-unit.mjs` honoured
+an entry's `match` and compared the test name exactly. `local/check-unit-shard-verdict.mjs` — the script
+that decides a nightly shard — **ignored `match` entirely** and accepted any test name that merely
+_ended_ with the entry's title, so a `TypeError: totally new bug` in an allowlisted test was absorbed as
+known. `local/check-e2e-known-failure-titles.mjs` matched a title with no notion of a cause at all. And
+`local/gate-lint.mjs` read a missing `match` as the broadest possible entry, so one forgotten field
+allowlisted a whole step. Two report walkers (`collectCases` and the shard verdict's
+`failingTestNames`/`failedFilesWithoutFailingTest`) and two unhandled-error matchers had the same
+problem: the shard's walker never read `failureMessages`, so there was no text for a `match` to test.
+
+`local/lib/known-red.mjs` is now the one matcher. A listed failure is absorbed only when the file matches
+by `/`-bounded suffix (a report names `/home/runner/work/orca/orca/src/a.ts`, the manifest `src/a.ts`),
+the test name matches **exactly** — the suffix match is gone — and the entry's `match` matches the
+failure's first line, ANSI-stripped with the reporter's leading `Error: ` removed. Every entry in
+`entries` must carry a `match` unless it is `flaky: true`; a missing or unusable one is a named verdict
+problem at every call site, and an unusable one absorbs nothing rather than everything. `flaky` used to
+be a display label and is now the declared exemption from pinning a cause. `unhandledErrors` entries must
+name a cause by `match` or an exact `headline`, with no `flaky` exemption: those are claims about the run,
+not about a test. The lint gate keeps its whole-step form, but says so explicitly with
+`"wholeStep": true`.
+
+A third bucket came out of the two-way match. An entry whose test failed for a cause its `match` does not
+describe is **`drifted`**: unexpected — the verdict fails — but not `unseen`, which a full run reports as
+prunable. Without it the first new cause would have proposed deleting a live entry.
+
+Two manifests changed in the same commit, as `AGENTS.md` requires:
+
+- `local/nightly-linux-known-red.json`: the one entry named
+  `src/main/daemon/daemon-pty-adapter-history-recovery.test.ts`, and upstream's `2f217b4d0dd`
+  (#38462) moved the file to `src/main/daemon/providers/adapter/testing/` on 2026-11-05. A
+  `/`-bounded suffix match cannot pair those, so the entry had been matching **nothing** — the red it
+  exists to absorb was not being absorbed at all. It now carries the real path, Vitest's full name, and
+  `match: "^DaemonConnectionLostError: Disconnected out of disconnectOnly\\(\\)"`, which is the
+  signature its own `evidence` field has quoted since 2026-10-27. Nothing static covered that manifest;
+  `tests/tools/unit-gate.test.mjs` now checks that every entry names a file this tree has and a full name
+  that file can still produce.
+- `local/e2e-known-failure-titles.json`: 30 titles, none with a cause. 19 now carry a `match` built from
+  the `::notice::known failure … — <detail>` lines of the eleven retained scheduled runs
+  (2026-09-27 … 2026-10-08, runs `36346182978`…`37848060391`), unioned across every shape observed for
+  that title; 11 have no retained observation and declare `flaky: true` instead, which is a claim a
+  reader can check rather than the previous silence. Two further entries were **pruned**: their spec
+  files no longer exist — `plugin-startup-budget.spec.ts` deleted in `8fb8e6ef0f2` (#37421) and
+  `sidebar-measured-row-scroll.spec.ts` in `e98c6a439ac` (#38030) — and the verdict only reports a stale
+  entry that _passed_, so both would have sat there for ever. The contract test now fails on an entry
+  whose file is gone.
+
+The e2e lane also gained the expected-spec check it never had. `decideE2eVerdict` could not tell a shard
+that ran its whole selection from one that was interrupted partway: a spec with no result at all was
+neither failed nor passed, so a run with one known failure could pass after a timeout. The verdict step
+now passes `--selected ci-shards/selected.txt` — the same file it hands Playwright as `--test-list` — and
+fails when a selected file is absent from the report, when a spec produced no result while none of its
+tests declared a skip, or when the report names a file the selection does not. It is deliberately **not**
+"every selected spec must run": 179 of this repo's 587 e2e spec files call `test.skip`, and a
+platform-conditional skip is legitimate. The mechanism is **SUSPECTED, not reproduced**: this config sets
+no Playwright `globalTimeout`, and the job's `timeout-minutes` kills the verdict step with the run. What
+the check closes is an interrupted run that still finishes the step.
 
 ### `local(ci)`: four new upstream workflows arrived active, and one was deleting the release line's caches
 

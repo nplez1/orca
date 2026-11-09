@@ -94,7 +94,9 @@ describe('the exit a verdict composes', () => {
     const { result } = gateRun({
       report: failingReport,
       run: { status: 1 },
-      entries: [{ file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream' }]
+      entries: [
+        { file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream', match: '^boom$' }
+      ]
     })
     expect(result.counts).toEqual({ passed: 0, failed: 1, known: 1 })
     expect(result.unexpected).toEqual([])
@@ -108,7 +110,9 @@ describe('the exit a verdict composes', () => {
     const { result } = gateRun({
       report: failingReport,
       run: { status: 1 },
-      entries: [{ file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream' }],
+      entries: [
+        { file: SUITE_FILE, test: 'one', class: 'known', owner: 'upstream', match: '^boom$' }
+      ],
       sources: { runnable: () => [SUITE_FILE, 'src/main/b.test.ts'] }
     })
     expect(result.unexpected).toEqual([])
@@ -198,7 +202,7 @@ describe('the exit a verdict composes', () => {
     writeFileSync(
       allowlist,
       JSON.stringify({
-        entries: [{ file: SUITE_FILE, test: '*', class: 'x', owner: 'y' }]
+        entries: [{ file: SUITE_FILE, test: '*', class: 'x', owner: 'y', match: '^boom$' }]
       })
     )
     const reportPath = join(dir, 'report.json')

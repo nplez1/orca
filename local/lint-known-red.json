@@ -12,7 +12,7 @@
     "`step` is the package.json script name (or the literal command, for a bare `oxlint` step).",
     "`match` is an optional regex against one failure line. The ratchets print one `::error::` line or",
     "one `file: N unit(s), baseline allows M.` row per offending entry, so a narrow regex allowlists",
-    "that entry alone. An entry with no `match` allowlists the whole step, which is the coarse option —",
+    "`match` is a regex against one failure line, and every entry needs one. An entry that means to allowlist an entire step says `\"wholeStep\": true` — the only form that can cover a step whose output the parser could not split into lines, and deliberately explicit, because a missing `match` used to mean the same thing by accident and masked every new failure in that step (#317). An entry with neither is reported as a problem and fails the gate.",
     "prefer `match` for a ratchet, because a whole-step entry also masks a NEW failure in that step.",
     "A step that prints `::error file=X::text` is matched as `X: text`, so an entry can name one file;",
     "the text alone is the same for every file those ratchets report.",

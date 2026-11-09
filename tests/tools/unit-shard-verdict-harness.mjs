@@ -39,28 +39,52 @@ export function report({
   failedSuites = 0,
   failing = [],
   passing = [],
-  fileLevelFailures = []
+  fileLevelFailures = [],
+  suiteMessages = []
 } = {}) {
+  // Why two channels: `failing`'s third element is the assertion's failure message, which is what a
+  // `match` regex reads, while `suiteMessages` is the file-level message Vitest records for an
+  // afterAll/teardown error — a red beside the row, not the row itself.
+  const results = [
+    ...failing.map(([name, fullName, message]) => ({
+      name,
+      status: 'failed',
+      assertionResults: [
+        {
+          status: 'failed',
+          title: fullName,
+          fullName,
+          ...(message ? { failureMessages: [message] } : {})
+        }
+      ]
+    })),
+    ...passing.map(([name, fullName = 'passes']) => ({
+      name,
+      status: 'passed',
+      assertionResults: [{ status: 'passed', title: fullName, fullName }]
+    })),
+    ...fileLevelFailures.map((entry) =>
+      Array.isArray(entry)
+        ? { name: entry[0], status: 'failed', message: entry[1], assertionResults: [] }
+        : { name: entry, status: 'failed', assertionResults: [] }
+    )
+  ]
+  for (const [name, message] of suiteMessages) {
+    const existing = results.find((result) => result.name === name)
+    if (existing) {
+      existing.message = message
+      existing.status = 'failed'
+    } else {
+      results.push({ name, status: 'failed', message, assertionResults: [] })
+    }
+  }
   return JSON.stringify({
     numTotalTestSuites: failedSuites + passing.length + fileLevelFailures.length + 1,
     numFailedTestSuites: failedSuites + fileLevelFailures.length,
     numTotalTests: totalTests,
     numFailedTests: failedTests,
     success: failedTests === 0 && failedSuites === 0,
-    testResults: [
-      ...failing.map(([name, fullName, message]) => ({
-        name,
-        status: 'failed',
-        ...(message ? { message } : {}),
-        assertionResults: [{ status: 'failed', title: fullName, fullName }]
-      })),
-      ...passing.map(([name, fullName = 'passes']) => ({
-        name,
-        status: 'passed',
-        assertionResults: [{ status: 'passed', title: fullName, fullName }]
-      })),
-      ...fileLevelFailures.map((name) => ({ name, status: 'failed', assertionResults: [] }))
-    ]
+    testResults: results
   })
 }
 

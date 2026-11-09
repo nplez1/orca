@@ -153,11 +153,18 @@ it('lets a pool crash stand beside an absorbed known red that already explains t
     reportText: report({
       failedTests: 1,
       failedSuites: 1,
-      failing: [['src/a.test.ts', 'serializes both']]
+      failing: [['src/a.test.ts', 'serializes both', 'Error: Disconnected out of disconnectOnly()']]
     }),
     logText: log({ errors: [POOL_CRASH] }),
     outcome: 'failure',
-    knownRed: [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }],
+    knownRed: [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ],
     unhandledErrors: [POOL_CRASH_ENTRY]
   })
 
@@ -209,10 +216,21 @@ it('exits non-zero for a real failure and names it', () => {
 
 it('exits zero when the only failure is a listed known red, and names the entry', () => {
   const result = run(
-    report({ failedTests: 1, failedSuites: 1, failing: [['src/a.test.ts', 'serializes both']] }),
+    report({
+      failedTests: 1,
+      failedSuites: 1,
+      failing: [['src/a.test.ts', 'serializes both', 'Error: Disconnected out of disconnectOnly()']]
+    }),
     log(),
     'failure',
-    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ]
   )
 
   expect(result.status).toBe(0)
@@ -229,13 +247,20 @@ it('still exits non-zero for an unlisted failure beside a listed one', () => {
       failedTests: 2,
       failedSuites: 2,
       failing: [
-        ['src/a.test.ts', 'serializes both'],
+        ['src/a.test.ts', 'serializes both', 'Error: Disconnected out of disconnectOnly()'],
         ['src/b.test.ts', 'adds the total']
       ]
     }),
     log(),
     'failure',
-    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ]
   )
 
   expect(result.status).toBe(1)
@@ -248,7 +273,14 @@ it('notes a listed entry whose file passed here, so a stale entry can be pruned'
     report({ passing: [['src/a.test.ts', 'DaemonPtyAdapter recovery serializes both']] }),
     log(),
     'success',
-    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'DaemonPtyAdapter recovery serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ]
   )
 
   expect(result.status).toBe(0)
@@ -260,7 +292,14 @@ it('does not call an entry prunable when its file ran but the test never did', (
     report({ passing: [['src/a.test.ts', 'some other test']] }),
     log(),
     'success',
-    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ]
   )
 
   expect(result.status).toBe(0)
@@ -269,9 +308,19 @@ it('does not call an entry prunable when its file ran but the test never did', (
 
 it('does not let a named entry absorb a file-level failure in the same file', () => {
   // The tolerated test did not fail here, so something before or outside it did — a new red.
-  const result = run(report({ fileLevelFailures: ['src/a.test.ts'] }), log(), 'failure', [
-    { file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }
-  ])
+  const result = run(
+    report({ fileLevelFailures: [['src/a.test.ts', 'Error: connect ECONNREFUSED']] }),
+    log(),
+    'failure',
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ]
+  )
 
   expect(result.status).toBe(1)
   expect(result.stdout).toContain(
@@ -280,9 +329,12 @@ it('does not let a named entry absorb a file-level failure in the same file', ()
 })
 
 it('lets a whole-file entry absorb a file-level failure', () => {
-  const result = run(report({ fileLevelFailures: ['src/a.test.ts'] }), log(), 'failure', [
-    { file: 'src/a.test.ts', test: null, class: 'env-bound' }
-  ])
+  const result = run(
+    report({ fileLevelFailures: [['src/a.test.ts', 'Error: connect ECONNREFUSED']] }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: null, class: 'env-bound', match: '^connect ECONNREFUSED' }]
+  )
 
   expect(result.status).toBe(0)
   expect(result.stdout).toContain('tolerated a known Linux red')
@@ -296,11 +348,21 @@ it('still fails when a known red and a file-level error land in the same file', 
     report({
       failedTests: 1,
       failedSuites: 1,
-      failing: [['src/a.test.ts', 'serializes both', 'Error: afterAll hook timed out']]
+      failing: [
+        ['src/a.test.ts', 'serializes both', 'Error: Disconnected out of disconnectOnly()']
+      ],
+      suiteMessages: [['src/a.test.ts', 'Error: afterAll hook timed out']]
     }),
     log(),
     'failure',
-    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ]
   )
 
   expect(result.status).toBe(1)
@@ -313,23 +375,115 @@ it('absorbs a red whose full name carries the describe prefix, as Vitest reports
     report({
       failedTests: 1,
       failedSuites: 1,
-      failing: [['src/a.test.ts', 'DaemonPtyAdapter recovery serializes both']]
+      failing: [
+        ['src/a.test.ts', 'DaemonPtyAdapter recovery serializes both', 'Error: Disconnected']
+      ]
     }),
     log(),
     'failure',
-    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'DaemonPtyAdapter recovery serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected$'
+      }
+    ]
   )
 
   expect(result.status).toBe(0)
   expect(result.stdout).toContain('[upstream-race]')
 })
 
-it('lets a whole-file entry absorb failing rows too, not only a file-level error', () => {
+it('does not absorb a red whose entry stores only the bare title (#317)', () => {
+  // Why: the suffix match that used to absorb this is what let one entry cover every sibling whose
+  // title ended the same way. The manifest stores Vitest's full name instead.
   const result = run(
-    report({ failedTests: 1, failedSuites: 1, failing: [['src/a.test.ts', 'anything at all']] }),
+    report({
+      failedTests: 1,
+      failedSuites: 1,
+      failing: [
+        ['src/a.test.ts', 'DaemonPtyAdapter recovery serializes both', 'Error: Disconnected']
+      ]
+    }),
     log(),
     'failure',
-    [{ file: 'src/a.test.ts', test: null, class: 'env-bound' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected$'
+      }
+    ]
+  )
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain(
+    '::error::unit shard: failing: src/a.test.ts › DaemonPtyAdapter recovery serializes both'
+  )
+})
+
+it('reports a listed test that failed for a new cause as its own problem', () => {
+  const result = run(
+    report({
+      failedTests: 1,
+      failedSuites: 1,
+      failing: [['src/a.test.ts', 'serializes both', 'Error: TypeError: totally new bug']]
+    }),
+    log(),
+    'failure',
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected out of disconnectOnly\\(\\)'
+      }
+    ]
+  )
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain('::error::unit shard: listed test failed for a new cause')
+  expect(result.stdout).toContain('TypeError: totally new bug')
+  // Not prunable: the test is still red, so the entry is still doing work.
+  expect(result.stdout).not.toContain('may be prunable')
+})
+
+it('refuses to judge a manifest entry that cannot pin a cause', () => {
+  const result = run(
+    report({ passing: [['src/a.test.ts', 'serializes both']] }),
+    log(),
+    'success',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain('has no match and is not flaky')
+})
+
+it('refuses an entry whose match is not a usable regex', () => {
+  const result = run(
+    report({ passing: [['src/a.test.ts', 'serializes both']] }),
+    log(),
+    'success',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race', match: '(' }]
+  )
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain('unusable match')
+})
+
+it('lets a whole-file entry absorb failing rows too, not only a file-level error', () => {
+  const result = run(
+    report({
+      failedTests: 1,
+      failedSuites: 1,
+      failing: [['src/a.test.ts', 'anything at all', 'Error: keychain unavailable']]
+    }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: null, class: 'env-bound', match: '^keychain unavailable' }]
   )
 
   expect(result.status).toBe(0)
@@ -358,11 +512,18 @@ it('does not read a shared filename in a sibling directory as the listed file', 
     report({
       failedTests: 1,
       failedSuites: 1,
-      failing: [['src/other/a.test.ts', 'serializes both']]
+      failing: [['src/other/a.test.ts', 'serializes both', 'Error: Disconnected']]
     }),
     log(),
     'failure',
-    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+    [
+      {
+        file: 'src/a.test.ts',
+        test: 'serializes both',
+        class: 'upstream-race',
+        match: '^Disconnected$'
+      }
+    ]
   )
 
   expect(result.status).toBe(1)

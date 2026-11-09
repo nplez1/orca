@@ -335,6 +335,7 @@ jobs:
         run: >-
           node local/check-e2e-known-failure-titles.mjs ci-shards/results.json
           local/e2e-known-failure-titles.json ${{ steps.run-e2e.outcome }}
+          --selected ci-shards/selected.txt
 
       - name: Summarize E2E failures
         if: always()

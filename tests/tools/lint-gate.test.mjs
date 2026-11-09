@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   classifyRun,
+  entryProblem,
   extractFailureLines,
   FORK_LINT_STEPS,
   matchesEntry,
@@ -187,8 +188,8 @@ describe('the verdict a run produces', () => {
     expect(verdict.unexpected).toEqual([{ step: 'check:other-ratchet', line: 'entry b' }])
   })
 
-  it('allows a whole step only when the entry names no line', () => {
-    const whole = entry({})
+  it('allows a whole step only when the entry says so', () => {
+    const whole = entry({ wholeStep: true })
     expect(matchesEntry('anything at all', whole)).toBe(true)
     expect(matchesEntry('anything at all', entry({ match: '^entry a$' }))).toBe(false)
     const verdict = classifyRun(
@@ -197,6 +198,26 @@ describe('the verdict a run produces', () => {
     )
     expect(verdict.known).toHaveLength(1)
     expect(verdict.unexpected).toEqual([])
+    expect(verdict.entryProblems).toEqual([])
+  })
+
+  it('refuses an entry that names neither a line nor a whole step (#317)', () => {
+    // Why: a missing `match` used to mean the broadest possible entry, so one forgotten field masked
+    // every new failure in that step. The form has to be asked for.
+    const accidental = entry({})
+    expect(entryProblem(accidental)).toContain('neither a match nor wholeStep: true')
+    const verdict = classifyRun(
+      [{ id: 'check:other-ratchet', exitCode: 1, output: 'a wall of compiler text' }],
+      [accidental]
+    )
+    // The step still fails on its own output; the entry problem is the second reason it must not pass.
+    expect(verdict.unexpected).toHaveLength(1)
+    expect(verdict.entryProblems).toHaveLength(1)
+  })
+
+  it('refuses an entry whose match is not a usable regex', () => {
+    expect(entryProblem(entry({ match: '(' }))).toContain('unusable match')
+    expect(() => matchesEntry('x', entry({ match: '(' }))).toThrow(/unusable match/)
   })
 
   it('reports a step that failed without any parseable line, so a crash is never allowed', () => {

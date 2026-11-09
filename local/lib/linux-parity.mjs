@@ -23,20 +23,32 @@
 // When any of these is missing the check fails closed: structural gaps become problems, and an
 // entry the reports cannot account for is `absent`, which exits non-zero — never a silent pass.
 
-import { allowlistEntries } from '../unit-gate-judgement.mjs'
+import {
+  SUITE_FAILURE,
+  entryMatchProblems,
+  failureDetail,
+  judgeEntries,
+  normaliseEntries
+} from './known-red.mjs'
 
 const PASSED = 'passed'
 const FAILED = 'failed'
 const ABSENT = 'absent'
 
-function firstLine(message) {
-  const line = String(message ?? '')
-    .split('\n')[0]
-    .trim()
-  return line.length > 200 ? `${line.slice(0, 200)}…` : line
-}
-
 const normalisePath = (name) => String(name ?? '').replaceAll('\\', '/')
+
+/** Every passing assertion in the index, which is what makes an entry prunable. */
+function passesOf(index) {
+  const passes = []
+  for (const [path, file] of index.files) {
+    for (const assertion of file.assertions) {
+      if (assertion.status === PASSED) {
+        passes.push({ file: path, test: assertion.test })
+      }
+    }
+  }
+  return passes
+}
 
 function mergeFileStatus(current, next) {
   if (current === FAILED || next === FAILED) {
@@ -67,12 +79,12 @@ export function indexShardReports(reports) {
       }
       const seen = files.get(path) ?? { status: null, message: '', assertions: [] }
       seen.status = mergeFileStatus(seen.status, file.status ?? null)
-      seen.message = seen.message || firstLine(file.message)
+      seen.message = seen.message || failureDetail(file.message)
       for (const assertion of file.assertionResults ?? []) {
         seen.assertions.push({
           test: String(assertion.fullName || assertion.title || '(unnamed)'),
           status: String(assertion.status ?? 'unknown'),
-          detail: firstLine(assertion.failureMessages)
+          detail: failureDetail(assertion.failureMessages)
         })
       }
       files.set(path, seen)
@@ -209,21 +221,25 @@ export function judgeParityEntry(entry, index) {
  * for the next prune, not a claim this check may fail.
  */
 export function judgeParity(manifest, index) {
-  const rows = allowlistEntries(manifest).map((entry) => judgeParityEntry(entry, index))
-  const prunedRows = allowlistEntries({ entries: manifest.prunedSince ?? [] }).map((entry) =>
-    judgeParityEntry(entry, index)
+  const { entries, problems: entryProblems } = normaliseEntries(manifest)
+  const rows = entries.map((entry) => judgeParityEntry(entry, index))
+  // Why the pruned set is normalised but not checked: `prunedSince` is a historical record no judge
+  // absorbs through, so requiring a `match` there would force invented regexes on dead entries.
+  const prunedRows = normaliseEntries({ entries: manifest.prunedSince ?? [] }).entries.map(
+    (entry) => judgeParityEntry(entry, index)
   )
   const counts = { passed: 0, failed: 0, absent: 0 }
   for (const row of rows) {
     counts[row.status] += 1
   }
+  const problems = [...index.problems, ...entryProblems, ...entryMatchProblems(entries)]
   return {
     rows,
     pruned: prunedRows,
     counts,
     total: rows.length,
-    problems: index.problems,
-    ok: rows.every((row) => row.status === PASSED) && index.problems.length === 0
+    problems,
+    ok: rows.every((row) => row.status === PASSED) && problems.length === 0
   }
 }
 
@@ -269,59 +285,6 @@ export function formatParity(result, { allowlistPath, reportCount }) {
 }
 
 /**
- * A red-set entry matches a failure when the file matches by `/`-bounded suffix and the test name is
- * the entry's name or its last segment — not a bare substring, or one entry absorbs every sibling whose
- * title happens to contain it.
- */
-/** Why the path separator: a report carries `/home/runner/.../src/a.ts`, the manifest `src/a.ts`. */
-export function entryFileMatches(entry, reportPath) {
-  return reportPath === entry.file || reportPath.endsWith(`/${entry.file}`)
-}
-
-export function entryMatchesFailure(entry, failure) {
-  if (!entryFileMatches(entry, failure.file)) {
-    return false
-  }
-  // A whole-file entry absorbs anything in that file; a named entry never absorbs a file-level
-  // failure, which is a red that happened outside any test.
-  if (entry.test === null) {
-    return true
-  }
-  if (failure.test === null) {
-    return false
-  }
-  return failure.test === entry.test || failure.test.endsWith(` ${entry.test}`)
-}
-
-/**
- * What a red-set entry did on Linux, matched the way failures are matched. `judgeParityEntry` is not
- * used here on purpose: it compares the name exactly, because the Mac allowlist stores Vitest's full
- * name including the describe prefix, while a red-set entry stores the bare title — so an entry whose
- * test passed read as `absent` and told the operator to keep an entry that could be pruned.
- */
-function entryOutcome(entry, index) {
-  const paths = reportPathsFor(index.files, entry.file)
-  if (paths.length === 0) {
-    return { status: ABSENT, detail: 'no shard report collected this file' }
-  }
-  const rows = paths.flatMap((path) =>
-    index.files
-      .get(path)
-      .assertions.filter((assertion) =>
-        entryMatchesFailure(entry, { file: path, test: assertion.test })
-      )
-      .map((assertion) => ({ ...assertion, path }))
-  )
-  if (rows.some((row) => row.status === 'failed')) {
-    return { status: FAILED, detail: `${rows[0].path}: the listed red still fails` }
-  }
-  if (rows.some((row) => row.status === 'passed')) {
-    return { status: PASSED, detail: '' }
-  }
-  return { status: ABSENT, detail: `${entry.file} ran but reported no test of this name` }
-}
-
-/**
  * The complement of `judgeParity`. Parity asks whether this Mac's red set holds on Linux; this asks
  * whether anything else is red there, against `local/nightly-linux-known-red.json`. Without it a
  * nightly is red forever on one upstream race, which teaches everyone to ignore red.
@@ -339,21 +302,28 @@ function entryOutcome(entry, index) {
  */
 export function judgeLinuxFailures(manifest, index, { reports = [], expectedReports = null } = {}) {
   const problems = [...index.problems]
-  const entries = Array.isArray(manifest?.entries) ? manifest.entries : null
-  if (entries === null) {
+  const declaredEntries = Array.isArray(manifest?.entries) ? manifest.entries : null
+  if (declaredEntries === null) {
     problems.push('the Linux red set has no `entries` array')
   }
-  for (const entry of entries ?? []) {
-    if (typeof entry.file !== 'string' || entry.file === '') {
+  const { entries, problems: entryProblems } = normaliseEntries(declaredEntries ?? [])
+  problems.push(...entryProblems)
+  for (const entry of entries) {
+    if (entry.file === '') {
       problems.push('a Linux red-set entry has no file path')
     }
-    if (typeof entry.test !== 'string' || entry.test === '') {
+    if (entry.test === null) {
       problems.push(`${entry.file}: a Linux red-set entry has no test name`)
     }
-    if (typeof entry.evidence !== 'string' || entry.evidence === '') {
-      problems.push(`${entry.file}: a Linux red-set entry claims a red with no evidence`)
+  }
+  for (const declared of declaredEntries ?? []) {
+    if (typeof declared.evidence !== 'string' || declared.evidence === '') {
+      problems.push(`${declared.file}: a Linux red-set entry claims a red with no evidence`)
     }
   }
+  // Why here as well as in the gate: an entry that cannot pin a cause is a manifest problem whichever
+  // manifest it is in, and the shard verdict reads this one on every nightly.
+  problems.push(...entryMatchProblems(entries))
 
   const failures = []
   let failingFileCount = 0
@@ -370,32 +340,28 @@ export function judgeLinuxFailures(manifest, index, { reports = [], expectedRepo
       if (file.message || failedAssertions.length === 0) {
         failures.push({
           file: path,
-          // Why null rather than a sentinel string: `entryMatchesFailure` reads null as "file-level",
-          // and a sentinel is only safe until an entry's title happens to end with it.
-          test: null,
+          // Why the sentinel rather than null: it is `SUITE_FAILURE`, the marker `collectCases` uses, so
+          // a named entry can never identify it — an entry's title would have to be `(suite)` itself.
+          test: SUITE_FAILURE,
           detail: file.message || '(no message, and no failing test row)'
         })
       }
     }
   }
 
-  const allowlisted = []
-  const unexpected = []
-  for (const failure of failures) {
-    const entry = (entries ?? []).find((candidate) => entryMatchesFailure(candidate, failure))
-    if (entry) {
-      allowlisted.push({ ...failure, class: entry.class ?? 'unclassified' })
-    } else {
-      unexpected.push(failure)
-    }
-  }
-
+  const judged = judgeEntries(entries, failures, passesOf(index))
+  const allowlisted = judged.known.map(({ failure, entry }) => ({ ...failure, class: entry.class }))
+  const unexpected = judged.unexpected
   // Why judgeParityEntry for the leftovers: "no matching failure" is not the same as "passed" — a file
   // that never ran leaves no evidence either way, and calling that prunable would invite deleting a
   // real entry the night a shard failed to upload. A matched entry is never stale by definition.
-  const stale = (entries ?? [])
-    .filter((entry) => !allowlisted.some((row) => entryMatchesFailure(entry, row)))
-    .map((entry) => ({ entry, ...entryOutcome(entry, index) }))
+  // Why both buckets: `stale` is an entry whose test passed (prunable), `unseen` one whose test the
+  // reports never mention (keep it — a shard that failed to upload leaves no evidence either way).
+  // This check reports both, because for a Linux red set "no evidence" is as actionable as "prunable".
+  const stale = [...judged.stale, ...judged.unseen].map((entry) => ({
+    entry,
+    ...judgeParityEntry(entry, index)
+  }))
 
   const declaredFailures = reports.reduce(
     (sum, report) => sum + (Number(report?.report?.numFailedTests) || 0),
@@ -440,10 +406,11 @@ export function judgeLinuxFailures(manifest, index, { reports = [], expectedRepo
   return {
     allowlisted,
     unexpected,
+    drifted: judged.drifted,
     stale,
     notes,
     failureCount: failures.length,
-    total: (entries ?? []).length,
+    total: entries.length,
     problems,
     ok: unexpected.length === 0 && problems.length === 0
   }
@@ -457,12 +424,17 @@ export function formatLinuxFailures(result, { allowlistPath, reportCount }) {
   ]
   for (const row of result.allowlisted) {
     lines.push(
-      `  known      ${row.test ?? '(file-level failure)'} — ${row.file.split('/src/').pop()} [${row.class}]`
+      `  known      ${row.test === SUITE_FAILURE ? '(file-level failure)' : row.test} — ${row.file.split('/src/').pop()} [${row.class}]`
     )
   }
   for (const row of result.unexpected) {
     lines.push(
-      `  UNEXPECTED ${row.test ?? '(file-level failure)'} — ${row.file.split('/src/').pop()}${row.detail ? ` — ${row.detail}` : ''}`
+      `  UNEXPECTED ${row.test === SUITE_FAILURE ? '(file-level failure)' : row.test} — ${row.file.split('/src/').pop()}${row.detail ? ` — ${row.detail}` : ''}`
+    )
+  }
+  for (const { failure, entry } of result.drifted ?? []) {
+    lines.push(
+      `  NEW CAUSE  ${failure.test} — ${failure.file.split('/src/').pop()} failed as ${failure.detail || '(no message)'}, which its entry's match ${JSON.stringify(entry.matchSource)} does not describe`
     )
   }
   for (const { entry, status } of result.stale) {
