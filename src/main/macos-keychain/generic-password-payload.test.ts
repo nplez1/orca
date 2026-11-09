@@ -139,11 +139,13 @@ describe('keychain writes', () => {
   })
 
   it('falls back to argv one byte past the `security -i` line limit', async () => {
-    const atLimit = JSON.stringify({ claudeAiOauth: { refreshToken: 'r'.repeat(1986) } })
-    await writeKeychainPassword('svc', 'acctss', atLimit)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const overLimit = JSON.stringify({ claudeAiOauth: { refreshToken: 'r'.repeat(1986) } })
+    await writeKeychainPassword('svc', 'acctss', overLimit)
     const spec = runProcessMock.mock.calls[0][0]
     expect(spec.args[0]).toBe('add-generic-password')
     expect(spec.input).toBeUndefined()
+    warn.mockRestore()
   })
 
   it('rejects an item name that would break the command line', async () => {
