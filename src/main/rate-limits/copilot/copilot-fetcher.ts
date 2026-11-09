@@ -67,18 +67,18 @@ function isGhRateLimitFailure(error: unknown, stderr: string): boolean {
 
 /** gh prints response headers only with `-i`, so the breaker's own wait is often the only one known. */
 function rateLimitedResult(error: unknown, stderr: string): GhApiResult {
+  const now = Date.now()
   const breakerRetryAtMs =
     typeof error === 'object' && error !== null && 'retryAtMs' in error
       ? error.retryAtMs
       : undefined
-  const retryAfterMs = capUsageRetryAfterMs(parseRetryAfterMs(stderr))
-  const retryAtMs =
-    typeof breakerRetryAtMs === 'number'
-      ? breakerRetryAtMs
-      : retryAfterMs === null
-        ? undefined
-        : Date.now() + retryAfterMs
-  return { status: 'rate-limited', ...(retryAtMs === undefined ? {} : { retryAtMs }) }
+  const remainingMs =
+    typeof breakerRetryAtMs === 'number' && breakerRetryAtMs > now
+      ? breakerRetryAtMs - now
+      : parseRetryAfterMs(stderr)
+  // Why capped: a corrupt wait from either source must not gate the provider indefinitely.
+  const cappedMs = capUsageRetryAfterMs(remainingMs)
+  return { status: 'rate-limited', ...(cappedMs === null ? {} : { retryAtMs: now + cappedMs }) }
 }
 
 async function ghApiJson(path: string, token: string, signal?: AbortSignal): Promise<GhApiResult> {

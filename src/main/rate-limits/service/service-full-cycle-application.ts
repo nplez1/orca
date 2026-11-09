@@ -287,8 +287,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     })
   }
 
-  /** A gated provider made no request, so it keeps its snapshot; otherwise the reading
-   *  is applied as a fresh credential's or through the shared stale policy. */
+  /** A gated provider made no request, so it keeps the state it already has; otherwise the
+   *  reading is applied as a fresh credential's or through the shared stale policy. */
   private applyForkProviderResult(args: {
     gated: boolean
     applies: boolean
@@ -297,10 +297,9 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     previous: ProviderRateLimits | null
     current: ProviderRateLimits | null
   }): ProviderRateLimits | null {
-    if (args.gated) {
-      return args.previous
-    }
-    if (!args.applies) {
+    // Why `current` and not `previous`: a credential saved mid-cycle must not be overwritten
+    // by the old key's snapshot, and a gated cycle leaves `current` equal to `previous`.
+    if (args.gated || !args.applies) {
       return args.current
     }
     return args.configChanged ? args.fresh : this.applyStalePolicy(args.fresh, args.previous)

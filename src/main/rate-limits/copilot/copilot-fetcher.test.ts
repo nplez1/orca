@@ -437,6 +437,35 @@ describe('fetchCopilotRateLimits', () => {
     })
   })
 
+  it('caps a corrupt Retry-After so it cannot gate Copilot indefinitely', async () => {
+    ghExecFileAsyncMock.mockRejectedValueOnce(
+      ghCliError('gh: Too Many Requests (HTTP 429)\nRetry-After: 999999999')
+    )
+
+    const result = await fetchCopilotRateLimits(requestOptions())
+
+    expect(result.usageMetadata?.retryAtMs).toBe(FROZEN_NOW + 24 * 60 * 60 * 1000)
+  })
+
+  it('takes the wait a tripped gh breaker already knows', async () => {
+    // Why: the breaker blocks the spawn before gh runs, so its text carries no Retry-After.
+    ghExecFileAsyncMock.mockRejectedValueOnce(
+      Object.assign(
+        new Error('GitHub API rate limit exceeded (core); retrying in ~120s without spawning gh.'),
+        {
+          stderr: 'GitHub API rate limit exceeded (core)',
+          ghRateLimitBlocked: true,
+          retryAtMs: FROZEN_NOW + 120_000
+        }
+      )
+    )
+
+    const result = await fetchCopilotRateLimits(requestOptions())
+
+    expect(result.usageMetadata?.failureKind).toBe('rate-limited')
+    expect(result.usageMetadata?.retryAtMs).toBe(FROZEN_NOW + 120_000)
+  })
+
   it('maps a primary rate-limit 403 to rate-limited instead of a scope problem', async () => {
     // Why: a primary limit is a 403, so status alone would tell the user to fix a permission.
     ghExecFileAsyncMock.mockRejectedValueOnce(
