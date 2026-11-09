@@ -308,6 +308,24 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
+### nplez1/issue-314 — the unit shard verdict's file set (fork issue #314)
+
+- **Why:** `local/check-unit-shard-verdict.mjs` judged a shard by its Vitest JSON report alone, and a
+  worker that dies takes its file out of that report — so a crashed or truncated shard read green while
+  it gates the nightly and every release. It also let _any_ tolerated unhandled headline explain a
+  failed shard, and `local/nightly-linux-known-red.json` tolerates a node-runtime pool crash.
+- **Shape:** `--assignment ci-shards/unit-assignment.json` — the manifest `TimingSequencer` writes from
+  the same plan it hands Vitest — fails any assigned file the report omits and any file the report names
+  that the shard was not assigned, paired by the longest shared `/`-bounded suffix so a downloaded
+  artifact's `/home/runner/…` paths still pair. `runId`/`runAttempt` guard staleness. `unhandledErrors`
+  entries may declare `"explainsFailure": false`, which the pool-crash entry does, so a crash fails the
+  shard unless an absorbed known red accounts for the exit. `unit-shard-verdict-contract.test.mjs` pins
+  the workflow's exact verdict command.
+- **Verified:** `pnpm tc` clean; the focused suites; `check:code-quality:changed` clean; unit gate PASS
+  on the head (`47269 passed; 0 failed`); shards 1, 3, 8 and 12 of nightly `42625461117` replayed green
+  against their real assignments, and shard 4 of `42218349740` still reds on its own test.
+  Reviewed by Opus 5.5, high: R1 clean after 1 SHOULD-FIX, 4 MINOR and 4 NIT, delta clean on R2.
+
 ### nplez1/bug-a-windows-workspace-whose-checkout-folder-ca — issue #275
 
 - **Why:** on Windows a checkout folder that could not be deleted (the reported case: a debug build
