@@ -430,9 +430,9 @@ export function changedPathsIn(range, gitRun = git) {
  * config every project reads, and the two `src` trees every process imports. Why this list and not
  * `selectUnitFiles` for the whole decision: that needs the reverse-import graph over 34k files
  * (globs plus the TypeScript API), which costs ~8 s in a PR opener and would answer "run all 13,064
- * files" for nearly every input. `unitRuntimeInputs` is the cheap half of it — a walk over the 46
- * files a test worker loads before the test file — so a `src/main` file a setup file imports is
- * caught here instead of being read as targeted (#316).
+ * files" for nearly every input. `unitRuntimeInputs` is the cheap half of it — a walk over the few
+ * dozen files a test worker loads before the test file — so a `src/main` file a setup file imports
+ * is caught here instead of being read as targeted (#316).
  * Measured on the last 40 commits, `src/shared` or `src/packages` changes in 15 of them, so this
  * keeps the full gate on the ~37% of changes with real blast radius and drops it from the rest.
  */
@@ -458,8 +458,8 @@ const TARGETED_PATHS = [
 
 /**
  * Why the closure is checked at all: no path rule can express "a unit setup file imports this", and
- * such a file loads in every test worker, so a change to it can break any test. The closure is 46
- * files, 20 of them under `src`, and it comes from CI's own selector so there is one definition.
+ * such a file loads in every test worker, so a change to it can break any test. The closure comes
+ * from CI's own selector, so "global input" has one definition rather than two.
  */
 function isGlobalChange(path, runtimeInputs) {
   if (GLOBAL_CHANGE_PATHS.some((global) => path === global || path.startsWith(global))) {
@@ -480,7 +480,7 @@ function isGlobalChange(path, runtimeInputs) {
  * Fails closed: no changed-path evidence means the full gate, because a silent skip is the failure
  * mode this boundary exists to prevent.
  */
-export function needsFullUnitGate(changedPaths, runtimeInputs = unitRuntimeInputs()) {
+export function needsFullUnitGate(changedPaths, runtimeInputs = null) {
   if (!Array.isArray(changedPaths)) {
     return { required: true, why: 'no changed-path evidence, so the change is unproven' }
   }
@@ -490,7 +490,17 @@ export function needsFullUnitGate(changedPaths, runtimeInputs = unitRuntimeInput
   if (paths.length === 0) {
     return { required: true, why: 'no changed-path evidence, so the change is unproven' }
   }
-  const global = paths.filter((path) => isGlobalChange(path, runtimeInputs))
+  let inputs = runtimeInputs
+  if (inputs === null) {
+    // Why a catch: an unreadable tree cannot prove a path targeted, and aborting would take `--dry-run`
+    // down with it instead of reporting the refusal it exists to report.
+    try {
+      inputs = unitRuntimeInputs()
+    } catch (error) {
+      return { required: true, why: `the unit runtime closure is unreadable (${error.message})` }
+    }
+  }
+  const global = paths.filter((path) => isGlobalChange(path, inputs))
   if (global.length > 0) {
     const more = global.length > 1 ? ` (+${global.length - 1} more)` : ''
     return { required: true, why: `${global[0]}${more} is a global input` }

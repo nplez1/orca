@@ -1819,12 +1819,19 @@ serialised by the queue, not uncapped. One part of the original claim survives: 
 worker — but it sits in `src/main`, which every path rule above reads as targeted, so gate 1 skipped
 the suite for it. CI's selector never had this gap: `selectUnitFiles` asks whether any transitive
 consumer of a changed file `isUnitRuntimeEntryPoint`, and a setup file is one. The classification now
-comes from that same side: `config/scripts/ci/unit-selection/ci-unit-runtime-inputs.mjs` owns the
-entry-point set and walks the imports of those files transitively (46 files, 20 of them under `src`),
+comes from that same side: `config/scripts/ci/unit-selection/ci-unit-runtime-inputs.mjs` walks the
+imports of the runtime entry points transitively (46 files on this revision, 19 of them under `src`),
 and `open-pr.mjs` treats anything in that walk as global. Two definitions of "global input" was the
-defect; one definition is the fix, and it fails closed in the same direction CI does. The walk costs
-~180 ms against the ~8 s a full graph build takes, which is why the reverse-import graph is still not
-used here.
+defect; one definition is the fix. The walk costs ~30 ms against the ~8 s a full graph build takes,
+which is why the reverse-import graph is still not used here, and an unreadable tree is reported as
+"closure unreadable" rather than aborting, so `--dry-run` still reports a refusal.
+
+**Upstream files this touches, for the next sync:** `ci-unit-selection.mjs` gains `export` on
+`RUNTIME_ENTRY_POINTS` and `isUnitRuntimeEntryPoint` (the selector keeps owning the definition; the
+new module imports it), and `ci-unit-dependency-graph.mjs` gains three exports —
+`unitLocalImportPath`, `unitImportCandidatePaths`, `unitSourceImports` — which are the resolution and
+parse the graph already did, extracted so the walk resolves imports the same way instead of
+re-implementing it. No behaviour changes in either file.
 
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 

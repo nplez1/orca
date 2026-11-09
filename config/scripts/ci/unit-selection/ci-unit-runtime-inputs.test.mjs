@@ -44,3 +44,24 @@ it('walks the imports of the files a setup file imports, not just its direct imp
     'src/main/startup/phases.ts'
   ])
 })
+
+it('keeps a barrel directory out of the closure and follows its index instead', () => {
+  // Why: the empty resolution suffix makes the bare path a candidate, so without a file check the
+  // directory is queued and then read as a file — which throws out of the PR opener.
+  const sources = new Map([
+    [
+      'config/scripts/test-runtime/environment/vitest-orcad-feature-readiness-reset.ts',
+      "import { value } from '../../../../src/main/barrel'"
+    ],
+    ['src/main/barrel/index.ts', "export { value } from './value'"],
+    ['src/main/barrel/value.ts', 'export const value = 1']
+  ])
+  const directories = new Set(['src/main/barrel'])
+  const inputs = unitRuntimeInputs({
+    root: tempRoot(),
+    entries: ['config/scripts/test-runtime/environment/vitest-orcad-feature-readiness-reset.ts'],
+    has: (file) => !directories.has(file) && sources.has(file),
+    read: (file) => sources.get(file)
+  })
+  expect([...inputs].sort()).toEqual(['src/main/barrel/index.ts', 'src/main/barrel/value.ts'])
+})
