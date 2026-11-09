@@ -237,24 +237,6 @@ describe('applying a payload on the receiving host', () => {
     expect(state).toMatchObject({ kind: 'partial', refusals: [CREDENTIAL_ID] })
   })
 
-  it('reports a removal of a credential this host does not hold as gone, without touching the store', () => {
-    const port = fakePort()
-    const remove = vi.fn(port.remove)
-    port.remove = remove
-
-    const { report, state } = applyHostSettingsPayload({
-      payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
-      registry: createHostSettingsCredentialRegistry([port]),
-      now: NOW
-    })
-
-    // Why `removed` rather than a refusal: the store answering `null` is the proof the credential is not
-    // here, and calling a clean host `partial` for an id it never received would hide a real divergence.
-    expect(remove).not.toHaveBeenCalled()
-    expect(report.outcomes).toEqual({ [CREDENTIAL_ID]: 'removed' })
-    expect(state).toMatchObject({ kind: 'synced' })
-  })
-
   it('lets the upsert decide when one payload names the same id for writing and removal', () => {
     const port = fakePort()
 

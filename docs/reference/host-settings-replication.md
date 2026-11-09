@@ -27,11 +27,15 @@ partially synced. Two exclusions exist so a transient local fault cannot look li
 
 An id the main cannot read is carried against a host only when that host already held it as a replica.
 Recording an unreadable id the host never received would claim a credential the user supplied on the
-host, and the next removal would then delete it. Two costs follow, both narrow: a replica that went
-unreadable and was then revoked while the main was restarted stays on the host until its next
-reconnect, whose snapshot sweeps it from the host's own record; and a replica whose host lost that
-record cannot be reached by a removal at all, because a removal carries no value that could prove where
-the copy came from.
+host, and the next removal would then delete it. The narrow cost: a replica that was unreadable when
+the main started and was then revoked before that host reconnected stays on the host until its next
+reconnect, whose snapshot sweeps it from the host's own record.
+
+A host that has lost its own record is the mirror case, resolved the other way. Nothing on it can be
+shown to be replication's, and a removal names an id the main once put here, so the main's removal list
+is the only evidence left — skipping it would leave a credential the user revoked on this host for good.
+The one exposure that leaves is a main still on a build that carried every unreadable id, naming an id
+the host entered itself; upgrading the main closes it.
 
 Whatever deletes credentials on a host must go through the same gate. `revokeReplicatedCredential`
 (which has no transport yet) must not delete an id the host reported as its own, or the ledger's
