@@ -1,6 +1,5 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import type { ZcodePlanSite } from '../../../shared/zcode-plan-sites'
-import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
 import type {
   ClaudeAccountSelectionTarget,
@@ -134,27 +133,8 @@ export type GeminiCliOAuthEnabledResolver = () => boolean
 
 export type AntigravityUsageEnabledResolver = () => boolean
 
-/** Disableable provider id → its slot in `InternalRateLimitState` (only OpenCode Go differs). */
-export const USAGE_PROVIDER_STATE_KEYS: Record<
-  DisableableUsageProviderId,
-  keyof InternalRateLimitState
-> = {
-  claude: 'claude',
-  codex: 'codex',
-  gemini: 'gemini',
-  antigravity: 'antigravity',
-  'opencode-go': 'opencodeGo',
-  kimi: 'kimi',
-  minimax: 'minimax',
-  deepseek: 'deepseek',
-  fireworks: 'fireworks',
-  deepinfra: 'deepinfra',
-  copilot: 'copilot',
-  grok: 'grok',
-  cursor: 'cursor',
-  zcode: 'zcode',
-  muse: 'muse'
-}
+export { USAGE_PROVIDER_STATE_KEYS } from '../../../shared/usage-providers/usage-provider-readouts'
+
 export type MuseUsageEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {

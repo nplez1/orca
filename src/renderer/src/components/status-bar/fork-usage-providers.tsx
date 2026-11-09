@@ -1,6 +1,15 @@
 import React from 'react'
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
+import {
+  FORK_USAGE_PROVIDER_IDS,
+  isForkUsageProvider,
+  type ForkUsageProviderId
+} from '../../../../shared/usage-providers/usage-provider-manifest'
 import { hasCreditsData } from './provider-credits-format'
+
+// Why re-exported: the fork id set lives in the manifest, so main and the renderer
+// cannot disagree about which providers this fork added.
+export { FORK_USAGE_PROVIDER_IDS, isForkUsageProvider, type ForkUsageProviderId }
 
 // Why: the official DeepSeek whale, taken verbatim from deepseek.com. It is a single
 // currentColor path, so it inlines like the Claude/OpenAI marks and inherits the
@@ -112,8 +121,6 @@ export function DeepInfraIcon({ size = 14 }: { size?: number }): React.JSX.Eleme
   )
 }
 
-export type ForkUsageProviderId = 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot'
-
 export type ForkUsageProviderSettings = {
   /** Widened to string so any provider id (including Kimi/Antigravity) can be checked. */
   disabledUsageProviders?: readonly string[]
@@ -135,12 +142,13 @@ export type ForkUsageProviderSnapshots = {
   copilot: ProviderRateLimits | null | undefined
 }
 
+// Why the presence flag and the pending skeleton are not here: both are readout
+// facts the manifest owns, so a fork provider cannot describe a shape main does not
+// produce. What stays is the presentation, which only the renderer has.
 type ForkUsageProviderEntry = {
   label: string
   badgeLetter: string
   Icon: (props: { size?: number }) => React.JSX.Element
-  settingsFlag: Exclude<keyof ForkUsageProviderSettings, 'disabledUsageProviders'>
-  pendingReadout: Partial<ProviderRateLimits>
   hasData: (provider: ProviderRateLimits) => boolean
 }
 
@@ -149,27 +157,18 @@ export const FORK_USAGE_PROVIDERS: Record<ForkUsageProviderId, ForkUsageProvider
     label: 'DeepSeek',
     badgeLetter: 'D',
     Icon: DeepSeekIcon,
-    settingsFlag: 'deepseekApiKeyConfigured',
-    // Why: DeepSeek has no windows; its readout is the credits field.
-    pendingReadout: { credits: null },
     hasData: hasCreditsData
   },
   fireworks: {
     label: 'Fireworks.ai',
     badgeLetter: 'F',
     Icon: FireworksIcon,
-    settingsFlag: 'fireworksApiKeyConfigured',
-    // Why: Fireworks has no windows; its readout is the credits field.
-    pendingReadout: { credits: null },
     hasData: hasCreditsData
   },
   deepinfra: {
     label: 'DeepInfra',
     badgeLetter: 'I',
     Icon: DeepInfraIcon,
-    settingsFlag: 'deepinfraApiKeyConfigured',
-    // Why: DeepInfra has no windows; its readout is the remaining balance.
-    pendingReadout: { credits: null },
     hasData: hasCreditsData
   },
   copilot: {
@@ -178,29 +177,10 @@ export const FORK_USAGE_PROVIDERS: Record<ForkUsageProviderId, ForkUsageProvider
     label: 'GitHub Copilot',
     badgeLetter: 'P',
     Icon: CopilotIcon,
-    settingsFlag: 'copilotTokenConfigured',
-    // Why: Copilot reports a monthly allowance rather than a quota window.
-    pendingReadout: { monthly: null, allowance: null },
     // Why not `hasUsageData`: that module imports this one, so reusing it would cycle. The allowance is
     // Copilot's own readout, so it is the field that has to be present before the row counts as data.
     hasData: (provider) => provider.allowance != null
   }
-}
-
-export const FORK_USAGE_PROVIDER_IDS: readonly ForkUsageProviderId[] = [
-  'deepseek',
-  'fireworks',
-  'deepinfra',
-  'copilot'
-]
-
-export function isForkUsageProvider(provider: string): provider is ForkUsageProviderId {
-  return (
-    provider === 'deepseek' ||
-    provider === 'fireworks' ||
-    provider === 'deepinfra' ||
-    provider === 'copilot'
-  )
 }
 
 export function forkUsageHasData(provider: ProviderRateLimits): boolean {

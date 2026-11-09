@@ -8,6 +8,7 @@ import type {
 } from '../../../shared/rate-limit-types'
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import { USAGE_PROVIDER_IDS } from '../../../shared/usage-provider-enablement'
+import { usageProviderPendingReadout } from '../../../shared/usage-providers/usage-provider-readouts'
 import type { AntigravityAccountUsageRecorder } from '../antigravity-account-usage'
 import {
   type ActiveRateLimitProvider,
@@ -43,14 +44,7 @@ export function disabledUsageProviderSnapshot(
     provider,
     session: null,
     weekly: null,
-    ...(provider === 'opencode-go' ? { monthly: null } : {}),
-    ...(provider === 'gemini' || provider === 'cursor' || provider === 'antigravity'
-      ? { buckets: [] }
-      : {}),
-    ...(provider === 'deepseek' || provider === 'fireworks' || provider === 'deepinfra'
-      ? { credits: null }
-      : {}),
-    ...(provider === 'copilot' ? { monthly: null, allowance: null } : {}),
+    ...usageProviderPendingReadout(provider),
     updatedAt: Date.now(),
     error: null,
     status: 'unavailable'

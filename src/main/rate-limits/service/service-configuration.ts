@@ -11,6 +11,7 @@ import { hasDeepInfraApiKey } from '../../deepinfra/deepinfra-api-key-store'
 import { hasFireworksCredentials } from '../../fireworks/fireworks-credentials-store'
 import { hasCopilotCredentials } from '../../copilot-credentials/copilot-credentials-store'
 import { getCachedCopilotGhCredentials } from '../copilot/copilot-gh-credentials'
+import { disabledUsageProviderFlagOverrides } from '../../../shared/usage-providers/usage-provider-readouts'
 import { RateLimitServiceAccountRefresh } from './service-account-refresh'
 import type { AntigravityAccountUsageRecorder } from '../antigravity-account-usage'
 import {
@@ -224,6 +225,7 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
         : hasCopilotCredentials() || getCachedCopilotGhCredentials()?.status === 'ok',
       grokAuthConfigured: this.grokAuthConfigured,
       cursorAuthConfigured: this.cursorAuthConfigured,
+      ...disabledUsageProviderFlagOverrides(disabled),
       claudeTarget: this.claudeFetchTarget,
       codexTarget: this.codexFetchTarget,
       inactiveClaudeAccounts: this.buildInactiveArray(

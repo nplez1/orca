@@ -2724,6 +2724,41 @@ it stayed behind, saying of itself "delete the entry and this section". Both are
 were fixed in the tree with fake timers rather than allowlisted, so nothing in the file covers a whole
 step — or any step at all. The file keeps its note and its mechanism for the next base-branch red.
 
+### `local(usage)`: one manifest classifies a usage provider, and a test proves it (#320)
+
+Anchor: `src/shared/usage-providers/usage-provider-manifest.ts`,
+`src/shared/usage-providers/usage-provider-manifest.conformance.test.ts`,
+`src/main/host-sync/usage-provider-credential-census.test.ts`,
+`src/renderer/src/components/status-bar/fork-usage-providers.tsx`.
+
+**The symptom.** The conventions a provider must satisfy were spread across ad-hoc lists, and each one
+could miss a provider upstream adds in a sync: its enablement switch, its credential replication, its
+status-bar wiring, its "key configured" flag. Two of the lists had already gone stale —
+`isSignInSavedHereOnly` still claimed MiniMax and ZCode were local-only after both keys moved onto
+host-settings ports, and no list at all covered the credential stores, so an upstream
+`foo-api-key-store.ts` would never have been replicated and nothing would have said so.
+
+**What the fork does.** One entry per provider, typed
+`as const satisfies Record<ProviderRateLimits['provider'], UsageProviderManifestEntry>`, so a provider
+added to the union fails `pnpm tc` here before it can reach a status bar unclassified. Three
+type-level never-checks cover the other direction: a `RateLimitState` slot, a presence flag or a
+manifest field that exists on one side only. The fork id set, the fork literal unions, the readout
+skeleton both snapshot builders spread, the remote-host flag defaults and `isSignInSavedHereOnly` are
+all derived from it.
+
+- **The halves a type cannot see are tests.** `usage-provider-manifest.conformance.test.ts` holds the
+  manifest to `USAGE_PROVIDER_IDS`, the default status bar, the wire `StatusBarItem` enum and the empty
+  state's slots and flags; `usage-provider-credential-census.test.ts` walks `src/main` for credential
+  stores and fails on one that neither an entry nor its exemption list names. That walk is the check
+  that catches an upstream-added provider.
+- **It lives in `src/shared`, so it is a gate-1 global input.** Both halves are fork-owned files; the
+  hunks in upstream files are one call to a manifest helper each, with no rationale comment — the
+  ratchet in `local/check-upstream-file-comments.mjs` counts them.
+- **What it does not do.** It records that the MiniMax session cookie, the Fireworks key/account
+  envelope and the Copilot token/enterprise envelope are `local-only`; it does not replicate them. Each
+  needs its own adapter and its own review, and `docs/reference/host-settings-replication.md` now says
+  so instead of claiming every provider credential travels.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream
@@ -2752,6 +2787,12 @@ After a sync, confirm the fork still behaves:
 pnpm typecheck
 node -e "require('./config/electron-builder.config.cjs')"   # config still loads
 ```
+
+**A provider upstream adds is a `tc` failure until it is classified** — that is the point of
+`src/shared/usage-providers/usage-provider-manifest.ts` (#320). Give it an entry there (its slot, its
+presence flags, its pending readout, its credential and the host-settings port if it has one), and add
+its store to `usage-provider-credential-census.test.ts`'s exemption list if it is not a usage
+credential. Do not "fix" the failure by widening a list somewhere else; the manifest is the list.
 
 Then check the update path still points at this fork:
 

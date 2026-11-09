@@ -1,4 +1,5 @@
 import { antigravityUsageDisabledSnapshot } from '../antigravity-usage-snapshot'
+import type { ForkUsageStateKey } from '../../../shared/usage-providers/usage-provider-manifest'
 import { RateLimitServiceAntigravityAccounts } from './service-antigravity-accounts'
 import type { InternalRateLimitState, ProviderRateLimits } from './service-types'
 
@@ -92,10 +93,7 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAn
     codexFetchGated: boolean
     codexStateBeforeFetch: ProviderRateLimits | null
     antigravityUsageEnabled: boolean
-    changed: Record<
-      'opencodeGo' | 'minimax' | 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot' | 'zcode',
-      boolean
-    >
+    changed: Record<'opencodeGo' | 'minimax' | 'zcode' | ForkUsageStateKey, boolean>
   }): void {
     const {
       previousState,

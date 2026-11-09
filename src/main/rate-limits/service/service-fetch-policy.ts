@@ -11,6 +11,7 @@ import {
   type ProviderRateLimits
 } from './service-types'
 import type { RateLimitWindow } from '../../../shared/rate-limit-types'
+import type { ForkUsageProviderId } from '../../../shared/usage-providers/usage-provider-manifest'
 import {
   isSameClaudeUsageWindow,
   isStaleClaudeUsageWindow,
@@ -48,7 +49,7 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
 
   // Why: an unreadable API-key file must surface as that provider's own error rather than aborting every other provider's refresh.
   protected getApiKeyCredentialError(
-    provider: 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot',
+    provider: ForkUsageProviderId,
     message: string
   ): ProviderRateLimits {
     return {

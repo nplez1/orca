@@ -3,6 +3,7 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
 import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
+import { usageProviderConfiguredFlagDefaults } from '../../../../shared/usage-providers/usage-provider-readouts'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
 import { isOwnerNotSetUpPlaceholder } from './owner-usage-rate-limits'
 
@@ -60,16 +61,7 @@ export function getStatusBarUsageProjection({
   const usageSettings = {
     ...settings,
     antigravityUsageConfigured,
-    minimaxCookieConfigured: rateLimits.minimaxCookieConfigured,
-    minimaxApiKeyConfigured: rateLimits.minimaxApiKeyConfigured,
-    opencodeGoApiKeyConfigured: rateLimits.opencodeGoApiKeyConfigured,
-    grokAuthConfigured: rateLimits.grokAuthConfigured,
-    cursorAuthConfigured: rateLimits.cursorAuthConfigured,
-    deepseekApiKeyConfigured: rateLimits.deepseekApiKeyConfigured,
-    fireworksApiKeyConfigured: rateLimits.fireworksApiKeyConfigured,
-    deepinfraApiKeyConfigured: rateLimits.deepinfraApiKeyConfigured,
-    copilotTokenConfigured: rateLimits.copilotTokenConfigured,
-    zcodePlanApiKeyConfigured: rateLimits.zcodePlanApiKeyConfigured
+    ...usageProviderConfiguredFlagDefaults(rateLimits)
   }
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)

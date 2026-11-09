@@ -3,10 +3,16 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { USAGE_PROVIDER_IDS } from '../../../../shared/usage-provider-enablement'
 import { hasUsageData as hasUsageWindowData } from '../../../../shared/usage-provider-windows'
 import {
+  USAGE_PROVIDER_MANIFEST,
+  USAGE_PROVIDER_MANIFEST_IDS
+} from '../../../../shared/usage-providers/usage-provider-manifest'
+import {
+  usageProviderConfiguredFlags,
+  usageProviderPendingNeedsSetup,
+  usageProviderPendingReadout
+} from '../../../../shared/usage-providers/usage-provider-readouts'
+import {
   forkUsageHasData,
-  FORK_USAGE_PROVIDER_IDS,
-  FORK_USAGE_PROVIDERS,
-  isForkUsageProvider,
   type ForkUsageProviderSettings,
   type ForkUsageProviderSnapshots
 } from './fork-usage-providers'
@@ -114,30 +120,21 @@ export function hasUsageProviderSettingsForProvider(
   }
   if (providerId === 'opencode-go') {
     return (
-      Boolean(settings.opencodeSessionCookie?.trim()) ||
-      settings.opencodeGoApiKeyConfigured === true
+      Boolean(settings.opencodeSessionCookie?.trim()) || hasConfiguredFlag(providerId, settings)
     )
   }
   if (providerId === 'antigravity') {
     // The agy probe needs only the PATH-gated checked item, independent of Gemini OAuth.
     return settings.antigravityUsageConfigured === true
   }
-  if (providerId === 'minimax') {
-    return settings.minimaxCookieConfigured === true || settings.minimaxApiKeyConfigured === true
-  }
-  if (providerId === 'grok') {
-    return settings.grokAuthConfigured === true
-  }
-  if (providerId === 'cursor') {
-    return settings.cursorAuthConfigured === true
-  }
-  if (providerId === 'zcode') {
-    return settings.zcodePlanApiKeyConfigured === true
-  }
-  if (isForkUsageProvider(providerId)) {
-    return settings[FORK_USAGE_PROVIDERS[providerId].settingsFlag] === true
-  }
-  return false
+  return hasConfiguredFlag(providerId, settings)
+}
+
+function hasConfiguredFlag(
+  providerId: ProviderRateLimits['provider'],
+  settings: Partial<UsageProviderSettings>
+): boolean {
+  return usageProviderConfiguredFlags(providerId).some((flag) => settings[flag] === true)
 }
 
 export function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRateLimits {
@@ -145,13 +142,7 @@ export function createPendingProviderSnapshot(providerId: UsageProviderId): Prov
     provider: providerId,
     session: null,
     weekly: null,
-    ...(providerId === 'opencode-go' ? { monthly: null } : {}),
-    // Bucket-backed providers need bucket-shaped pending skeletons to avoid layout changes on their first reading.
-    ...(providerId === 'gemini' || providerId === 'cursor' || providerId === 'antigravity'
-      ? { buckets: [] }
-      : {}),
-    // Why: the fork's windowless readouts need their own pending nulls (credits vs allowance).
-    ...(isForkUsageProvider(providerId) ? FORK_USAGE_PROVIDERS[providerId].pendingReadout : {}),
+    ...usageProviderPendingReadout(providerId),
     updatedAt: 0,
     error: null,
     status: 'fetching'
@@ -185,46 +176,27 @@ export function isUsageEmptyState(
   if (!settings) {
     return false
   }
-  // System-default Claude/Codex have no saved account row; wait for snapshots before proposing setup.
-  const antigravitySnapshotPending =
-    hasUsageProviderSettingsForProvider('antigravity', settings) &&
-    isProviderSnapshotPending(providers.antigravity)
   // Why: a disabled provider's null snapshot is not "pending" — it will never
   // settle, so it must not hold the setup CTA back forever.
-  const pendingForBar = (
-    providerId: UsageProviderId,
-    provider: ProviderRateLimits | null | undefined
-  ): boolean =>
-    !isUsageProviderDisabledForBar(providerId, settings) && isProviderSnapshotPending(provider)
-  if (
-    pendingForBar('claude', providers.claude) ||
-    pendingForBar('codex', providers.codex) ||
-    pendingForBar('gemini', providers.gemini) ||
-    pendingForBar('opencode-go', providers.opencodeGo) ||
-    pendingForBar('kimi', providers.kimi) ||
-    antigravitySnapshotPending ||
-    pendingForBar('minimax', providers.minimax) ||
-    pendingForBar('grok', providers.grok) ||
-    pendingForBar('cursor', providers.cursor) ||
-    (providers.zcode !== undefined && pendingForBar('zcode', providers.zcode)) ||
-    (providers.muse !== undefined && pendingForBar('muse', providers.muse)) ||
-    FORK_USAGE_PROVIDER_IDS.some((providerId) => pendingForBar(providerId, providers[providerId]))
-  ) {
+  const pendingForBar = (providerId: ProviderRateLimits['provider']): boolean => {
+    const stateKey = USAGE_PROVIDER_MANIFEST[providerId].stateKey
+    return (
+      providers[stateKey] !== undefined &&
+      !isUsageProviderDisabledForBar(providerId, settings) &&
+      !(
+        usageProviderPendingNeedsSetup(providerId) &&
+        !hasUsageProviderSettingsForProvider(providerId, settings)
+      ) &&
+      isProviderSnapshotPending(providers[stateKey])
+    )
+  }
+  if (USAGE_PROVIDER_MANIFEST_IDS.some((providerId) => pendingForBar(providerId))) {
     return false
   }
   return (
     !hasUsageProviderSettings(settings) &&
-    !isProviderConfigured(providers.claude) &&
-    !isProviderConfigured(providers.codex) &&
-    !isProviderConfigured(providers.gemini) &&
-    !isProviderConfigured(providers.opencodeGo) &&
-    !isProviderConfigured(providers.kimi) &&
-    !isProviderConfigured(providers.antigravity) &&
-    !isProviderConfigured(providers.minimax) &&
-    !isProviderConfigured(providers.grok) &&
-    !isProviderConfigured(providers.cursor) &&
-    !isProviderConfigured(providers.zcode) &&
-    !isProviderConfigured(providers.muse) &&
-    FORK_USAGE_PROVIDER_IDS.every((providerId) => !isProviderConfigured(providers[providerId]))
+    USAGE_PROVIDER_MANIFEST_IDS.every(
+      (providerId) => !isProviderConfigured(providers[USAGE_PROVIDER_MANIFEST[providerId].stateKey])
+    )
   )
 }
