@@ -67,7 +67,9 @@ const ALLOWLIST = [
   [
     /^\.orca$/,
     'the managed-hook install lock is a cross-install mutex over the shared `~/.claude` hooks, so it stays at `~/.orca` while the fork\u2019s home is `~/.orca-np`.',
-    /main\/agent-hooks\/managed-hook-(?:runtime|install-lock)\.test\.ts$/
+    // Why depth-independent: upstream re-homes these under `agent-hooks/installation/locking/` and
+    // will nest them again; a fixed depth stops matching and the lock path reads as an unfixed literal.
+    /main\/agent-hooks\/(?:[\w-]+\/)*managed-hook-(?:runtime|install-lock)\.test\.ts$/
   ]
 ]
 
