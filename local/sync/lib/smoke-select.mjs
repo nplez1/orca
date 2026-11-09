@@ -13,7 +13,11 @@
 // 526-file baseline is one aggregate, so every file is priced the same; it orders a smoke run
 // against the full gate, it does not predict one file.
 import { posix } from 'node:path'
-import { branchCoupledPaths, sharedHarnessPaths } from '../../gate-flake-coupling.mjs'
+import {
+  branchCoupledPaths,
+  isSharedHarnessPath,
+  sharedHarnessPaths
+} from '../../gate-flake-coupling.mjs'
 
 export const TEST_FILE_SUFFIX = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 
@@ -86,13 +90,16 @@ export function droppedTouchedTests({ diffFiles, candidates, treeTestFiles }) {
  * the smoke run's claim is weakened no matter how many tests it selects; the selector reports it
  * rather than expanding to the whole suite (§6.1 priced the smoke run without that expansion, and
  * AGENTS.md already makes such a diff a full-gate change).
+ *
+ * Why the coupling module answers per path: the runtime-entry-point half is not a list, and asking the
+ * waiver's own rule is what keeps this report and the gate's refusal from disagreeing.
  */
 export function harnessCoupling(diffFiles, sharedPaths = sharedHarnessPaths()) {
   const diffSet = new Set(diffFiles)
   const exact = sharedPaths.filter((path) => !path.endsWith('/') && diffSet.has(path))
-  const prefixes = sharedPaths.filter((path) => path.endsWith('/'))
-  const rooted = diffFiles.filter((file) => prefixes.some((prefix) => file.startsWith(prefix)))
-  return [...new Set([...exact, ...rooted])]
+  return [
+    ...new Set([...exact, ...diffFiles.filter((file) => isSharedHarnessPath(file, sharedPaths))])
+  ]
 }
 
 export function estimateSeconds(count) {

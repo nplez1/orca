@@ -9,7 +9,7 @@ const RUNTIME_ENTRY_POINTS = new Set([
   ...UNIT_SETUP_FILES
 ])
 
-function isUnitRuntimeEntryPoint(file) {
+export function isUnitRuntimeEntryPoint(file) {
   return (
     RUNTIME_ENTRY_POINTS.has(file) ||
     (/^config\/scripts\/(?:test-runtime\/environment\/|test-runtime\/execution-policy\/|test-runtime\/dom\/|test-runtime\/module-cache\/|test-runtime\/node-worker\/|test-runtime\/sqlite-admission\/)?vitest[^/]*\.(?:ts|mjs)$/.test(

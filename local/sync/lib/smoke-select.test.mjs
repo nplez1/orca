@@ -135,6 +135,12 @@ test('harnessCoupling matches exact paths and trailing-slash directory prefixes'
     ['config/vitest.config.ts', 'src/packages/process-host/host-pool.ts']
   )
   assert.deepEqual(harnessCoupling(['src/a/b.ts'], shared), [])
+  // A runtime entry point the shared list has not learned: the waiver refuses that diff, so this report
+  // must name it too or the two disagree about the same branch.
+  assert.deepEqual(
+    harnessCoupling(['config/scripts/test-runtime/environment/vitest-new-guard.ts'], shared),
+    ['config/scripts/test-runtime/environment/vitest-new-guard.ts']
+  )
 })
 
 test('the timing estimate is the plan §6.1 flat rate', () => {

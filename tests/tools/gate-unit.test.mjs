@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { UNIT_SETUP_FILES } from '../../config/scripts/ci/unit-selection/dependency-graph/ci-unit-files.mjs'
 import {
   SHARED_TEST_INPUTS,
   branchCoupledPaths,
@@ -420,6 +421,44 @@ describe('what a flaky pass is allowed to waive', () => {
         matched: shared
       })
     }
+  })
+
+  it('derives the setup files from UNIT_SETUP_FILES, so a new one needs no edit here', () => {
+    // #315: the hand copy fell three setup files behind, so a branch that edited one of them had its
+    // own load-only failure waived as "not ours" — the waiver certifying the opposite of the diff.
+    // Why `arrayContaining`: it is the assertion the spread has to satisfy, and a hand copy fails it the
+    // moment the selector's list grows.
+    expect(SHARED_TEST_INPUTS).toEqual(expect.arrayContaining(UNIT_SETUP_FILES))
+    // Why each one: every setup file couples through the list, not only the three the copy had.
+    for (const setup of UNIT_SETUP_FILES) {
+      expect(flakeWaiver('src/main/foo.test.ts', new Set([setup]), noSource)).toEqual({
+        inDiff: true,
+        matched: setup
+      })
+    }
+  })
+
+  it('couples a runtime entry point the list has not learned yet', () => {
+    // The predicate is the half a list cannot be: the selector's runtime-entry-point rule re-seats every
+    // test, so a branch that adds one is coupled before anyone extends UNIT_SETUP_FILES.
+    for (const entry of [
+      'config/scripts/test-runtime/environment/vitest-some-new-guard.ts',
+      'config/scripts/test-runtime/dom/vitest-another-setup.mjs'
+    ]) {
+      expect(SHARED_TEST_INPUTS).not.toContain(entry)
+      expect(flakeWaiver('src/main/foo.test.ts', new Set([entry]), noSource)).toEqual({
+        inDiff: true,
+        matched: entry
+      })
+    }
+    // A harness test is not an entry point, which is the selector's own rule rather than a second one.
+    expect(
+      flakeWaiver(
+        'src/main/foo.test.ts',
+        new Set(['config/scripts/vitest-harness.test.mjs']),
+        noSource
+      )
+    ).toEqual({ inDiff: false, matched: null })
   })
 
   it('reads a build-only package.json change as no harness coupling', () => {

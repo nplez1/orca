@@ -1398,8 +1398,25 @@ Limits, recorded rather than hidden: imports are followed one level, and a works
 (`@orca/…`) other than process-host is skipped rather than guessed. Each can only waive a flake a branch
 caused, never refuse one it did not.
 
+**The setup-file half of that list is derived, not copied (#315).** `SHARED_TEST_INPUTS` spreads
+`UNIT_SETUP_FILES`, and the match also asks `isUnitRuntimeEntryPoint` — the shard selector's own rule,
+which is what couples a setup file before the list learns it. Neither is duplicated: the list stays in
+`config/scripts/ci/unit-selection/dependency-graph/ci-unit-files.mjs` and the predicate stays in
+`config/scripts/ci/unit-selection/ci-unit-selection.mjs`, whose only fork edit is the word `export` on
+that one line — nothing moved, so an upstream edit to the regex still merges cleanly. The hand copy had
+fallen three setup files behind (`vitest-real-agent-cli-guard.ts`, `vitest-inherited-git-env-setup.ts`,
+`vitest-orcad-feature-readiness-reset.ts`), which is the wrong direction for this rule to be wrong in: a
+branch that edited one of them had its own load-only failure waived as "FLAKY, not ours".
+`local/sync/lib/smoke-select.mjs` asks the same `isSharedHarnessPath`, so its harness report names the
+same paths the waiver refuses (the waiver additionally narrows a scripts-only `package.json` diff, which
+is a judgement about the diff rather than about the path). Both upstream files are gate inputs
+(`GATE_INPUT_PATHS`), so a tree whose answer differs from the commit's — an in-progress sync,
+`--allow-dirty` — does not reuse a verdict computed against another list or another regex.
+
 **Tests.** `tests/tools/gate-unit.test.mjs` (24 cases) covers the fail-closed rules, the record and reuse
-decisions, the summary line and the coupling rule; `tests/tools/open-pr.test.mjs` gains the case its
+decisions, the summary line and the coupling rule, and pins the derived harness list — a superset of
+`UNIT_SETUP_FILES` plus a runtime entry point the list has not learned — so the list cannot go stale
+silently again; `tests/tools/open-pr.test.mjs` gains the case its
 fixtures needed for the gate-inputs contract. #178 had already added `tests/tools/unit-gate.test.mjs` for
 the judgement module, so those cases are not duplicated here.
 
