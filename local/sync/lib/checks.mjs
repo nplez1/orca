@@ -1,11 +1,8 @@
-// Gates the sync tools share: conflict markers, the derived localization catalog, `pnpm tc`, and the
-// fork-invariants test. Pre-sync proves the *starting* tip is green and post-sync proves the *merged*
-// tip is, and every one of these means something in both positions.
-//
-// Why shared: pre-sync proves the *starting* tip is green and post-sync proves the *merged* tip
-// is, and the two only mean something together. If one scanned a different directory set, or
-// treated git grep's exit 1 as a failure, the pair's signal would be unusable in exactly the
-// situation it was built for.
+// The spawned gates: conflict markers, the derived localization catalog, `pnpm tc`, `oxlint`, and the
+// fork-invariants test. Post-sync runs all of them; pre-sync runs the subset that means something
+// before the merge. Why one module: the pair only means something together — if one scanned a
+// different directory set, or treated git grep's exit 1 as a failure, the two tools' signal would be
+// unusable in exactly the situation it was built for.
 //
 // These return a `{ status, summary, details }` outcome; the calling tool owns the check's title,
 // its remediation text and its place in the report, so the two tools can describe the same gate

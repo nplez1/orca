@@ -472,7 +472,10 @@ really installs.
 **Do not:** rename the URL scheme, or sweep the relay shim to `orca-np`; **and never hand-edit the
 sweep's subjects** — run `node local/sync/identity-sweep.mjs --fix` on a clean tree and review the
 diff (it reports `N fixable`, which must be 0). A hook test that writes `~/.orca` fails against this
-build, it does not merely read oddly.
+build, it does not merely read oddly. Never leave `getSharedManagedScriptPath` (upstream moves it to
+`agent-hooks/installation/scripts/managed-hook-script-path.ts`) or `wrapRuntimeHomeHookCommand`
+(`installation/commands/`) on a literal `.orca`: both arrive as new files with no conflict, and the
+`fork-invariants` post-sync row is the only thing that fails on them — fork issue #299.
 
 **Tooling:** `node local/sync/identity-sweep.mjs` reports every remaining violation (allowlisted
 cases are in that script).
