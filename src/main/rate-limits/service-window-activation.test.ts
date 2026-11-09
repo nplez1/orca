@@ -184,4 +184,39 @@ describe('RateLimitService', () => {
       vi.useRealTimers()
     }
   })
+
+  // fork-comment-ok: switched-off providers are fork-only, so this regression has no upstream home.
+  // #300: a switched-off slot is forced null on every push, which made every focus refetch everything.
+  it('does not refetch every provider on focus while one provider is switched off', async () => {
+    vi.useFakeTimers()
+    try {
+      mockFreshBackgroundProviderFetches()
+      vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => okProvider('claude', 12))
+      const service = new RateLimitService({
+        isUsageProviderDisabled: (providerId) => providerId === 'gemini'
+      })
+      const window = new FakeRateLimitWindow()
+      service.attach(asRateLimitWindow(window))
+      service.start({ fetchImmediately: false })
+
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(1)
+      expect(fetchCodexRateLimits).toHaveBeenCalledTimes(1)
+
+      window.emit('focus')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(1)
+      expect(fetchCodexRateLimits).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1)
+      window.emit('focus')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(2)
+      expect(fetchCodexRateLimits).toHaveBeenCalledTimes(2)
+
+      service.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
