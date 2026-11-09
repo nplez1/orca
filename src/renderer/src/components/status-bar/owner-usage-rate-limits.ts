@@ -6,6 +6,11 @@ import type {
   UsageRateLimitMetadata
 } from '../../../../shared/rate-limit-types'
 import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-factory'
+import {
+  USAGE_PROVIDER_BY_STATE_KEY,
+  isUsageProviderSignInLocalOnly,
+  usageProviderConfiguredFlagDefaults
+} from '../../../../shared/usage-providers/usage-provider-readouts'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 import {
@@ -34,31 +39,10 @@ export type OwnerUsageState =
 /** A host that answers without usage is reachable, so "cannot reach" would be false. */
 export type OwnerUsageFailureReason = 'unreachable' | 'usage-not-published'
 
-type UsageProviderKey = {
-  [K in keyof RateLimitState]-?: RateLimitState[K] extends ProviderRateLimits | null ? K : never
-}[keyof RateLimitState]
-
-// Why a Record: a new provider is a compile error here, not a silent leak of local numbers.
-const USAGE_PROVIDER_IDS: Record<UsageProviderKey, ProviderRateLimits['provider']> = {
-  claude: 'claude',
-  codex: 'codex',
-  gemini: 'gemini',
-  opencodeGo: 'opencode-go',
-  kimi: 'kimi',
-  antigravity: 'antigravity',
-  minimax: 'minimax',
-  grok: 'grok',
-  cursor: 'cursor',
-  zcode: 'zcode',
-  deepseek: 'deepseek',
-  fireworks: 'fireworks',
-  deepinfra: 'deepinfra',
-  copilot: 'copilot',
-  muse: 'muse'
-}
+type UsageProviderKey = keyof typeof USAGE_PROVIDER_BY_STATE_KEY
 
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the keys of a Record<UsageProviderKey, …>.
-const USAGE_PROVIDER_KEYS = Object.keys(USAGE_PROVIDER_IDS) as UsageProviderKey[]
+const USAGE_PROVIDER_KEYS = Object.keys(USAGE_PROVIDER_BY_STATE_KEY) as UsageProviderKey[]
 
 function mapProviders(
   build: (key: UsageProviderKey) => ProviderRateLimits | null
@@ -94,12 +78,7 @@ function adoptRemoteRateLimits(remote: RateLimitState): RateLimitState {
   return {
     ...remote,
     ...mapProviders((key) => partial[key] ?? null),
-    minimaxCookieConfigured: partial.minimaxCookieConfigured === true,
-    minimaxApiKeyConfigured: partial.minimaxApiKeyConfigured === true,
-    opencodeGoApiKeyConfigured: partial.opencodeGoApiKeyConfigured === true,
-    grokAuthConfigured: partial.grokAuthConfigured === true,
-    cursorAuthConfigured: partial.cursorAuthConfigured === true,
-    zcodePlanApiKeyConfigured: partial.zcodePlanApiKeyConfigured === true,
+    ...usageProviderConfiguredFlagDefaults(partial),
     claudeTarget: partial.claudeTarget ?? { runtime: 'host', wslDistro: null },
     codexTarget: partial.codexTarget ?? { runtime: 'host', wslDistro: null },
     inactiveClaudeAccounts: partial.inactiveClaudeAccounts ?? [],
@@ -116,15 +95,14 @@ function isSetUpHere(local: RateLimitState, key: UsageProviderKey): boolean {
   const provider = local[key]
   return (
     (provider != null && (isProviderConfigured(provider) || hasUsageData(provider))) ||
-    hasUsageProviderSettingsForProvider(USAGE_PROVIDER_IDS[key], local)
+    hasUsageProviderSettingsForProvider(USAGE_PROVIDER_BY_STATE_KEY[key], local)
   )
 }
 
-// Why: these credentials live in this device's safe storage, so the host cannot reuse them.
+// Why the manifest: replication moved several keys onto host-settings ports, so a hand-written
+// list goes stale in the direction that matters — claiming a host cannot use a key it now receives.
 function isSignInSavedHereOnly(local: RateLimitState, key: UsageProviderKey): boolean {
-  return key === 'minimax'
-    ? local.minimaxApiKeyConfigured || local.minimaxCookieConfigured
-    : key === 'zcode' && local.zcodePlanApiKeyConfigured === true
+  return isUsageProviderSignInLocalOnly(local, USAGE_PROVIDER_BY_STATE_KEY[key])
 }
 
 // Only explicit setup failures qualify; unavailable can also mean an old CLI or an account switch without a reading.
@@ -151,7 +129,7 @@ function isMissingOnHost(remote: RateLimitState, key: UsageProviderKey): boolean
   return (
     (failureKind ? NOT_SET_UP_FAILURE_KINDS.has(failureKind) : !NOT_SET_UP_NEEDS_REASON.has(key)) &&
     // Why: a signed-in Grok account with no quota is also `unavailable`; its flag is not.
-    !hasUsageProviderSettingsForProvider(USAGE_PROVIDER_IDS[key], remote)
+    !hasUsageProviderSettingsForProvider(USAGE_PROVIDER_BY_STATE_KEY[key], remote)
   )
 }
 
@@ -190,7 +168,7 @@ function ownerPlaceholderSnapshot(
   usageMetadata: UsageRateLimitMetadata
 ): ProviderRateLimits {
   return {
-    ...createPendingProviderSnapshot(USAGE_PROVIDER_IDS[key]),
+    ...createPendingProviderSnapshot(USAGE_PROVIDER_BY_STATE_KEY[key]),
     error,
     usageMetadata,
     status: 'error'
@@ -234,7 +212,7 @@ export function resolveOwnerUsageRateLimits(
   // Why: nothing of the viewer's (numbers or setup flags) may stand in for the remote host.
   if (owner.kind === 'remote-pending') {
     return createEmptyRateLimitState(
-      mapProviders((key) => createPendingProviderSnapshot(USAGE_PROVIDER_IDS[key]))
+      mapProviders((key) => createPendingProviderSnapshot(USAGE_PROVIDER_BY_STATE_KEY[key]))
     )
   }
   const message = describeUnverifiableOwner(owner.ownerLabel, owner.reason, t)

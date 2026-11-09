@@ -72,12 +72,19 @@ before the pin moves — see the credential-replication epic (H2).
 
 ## Field disposition
 
-| Field                       | Disposition                                                                                                            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| provider credentials        | replicated; only ids in the host's replicated record may be removed, or any id the main names when that record is lost |
-| `unreadable` credential ids | reported by the main, never deleted here                                                                               |
-| settings / UI state         | not replicated by this path                                                                                            |
-| revision, `syncedAt`        | host-local ledger, written after an applied payload                                                                    |
+| Field                             | Disposition                                                                                                                                                                                                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| provider credentials              | replicated for the keys a host-settings port carries; only ids in the host's replicated record may be removed, or any id the main names when that record is lost                                                                                                      |
+| provider credentials with no port | **not** replicated — the MiniMax session cookie, the Fireworks key-plus-account envelope, and the Copilot token-plus-enterprise envelope; each needs its own adapter, and each is recorded as `local-only` in `src/shared/usage-providers/usage-provider-manifest.ts` |
+| `unreadable` credential ids       | reported by the main, never deleted here                                                                                                                                                                                                                              |
+| settings / UI state               | not replicated by this path                                                                                                                                                                                                                                           |
+| revision, `syncedAt`              | host-local ledger, written after an applied payload                                                                                                                                                                                                                   |
+
+**Which provider keys travel is a list, not a guess.** The five ports in
+`src/main/host-sync/host-settings-api-key-ports.ts` are claimed one-for-one by an entry in
+`src/shared/usage-providers/usage-provider-manifest.ts`, and `usage-provider-credential-census.test.ts`
+fails when a provider store exists that no entry claims — so a provider added upstream cannot be
+silently un-replicated. Read the manifest, not this table, for the current answer.
 
 Nothing else about the host's own stores is read or written; the host's local values for anything
 outside this contract are the user's and are left alone.

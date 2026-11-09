@@ -12,6 +12,7 @@ import {
 import { disabledUsageProviderSnapshot } from '../service/service-state'
 import { usageCredentialFingerprint } from './usage-credential-fingerprint'
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
+import type { ForkUsageProviderId } from '../../../shared/usage-providers/usage-provider-manifest'
 import type {
   CopilotResolvedConfig,
   DeepInfraResolvedConfig,
@@ -55,10 +56,7 @@ export type ForkProviderCycleInput = {
     deepInfra: string
     copilot: string
   }) => ForkProviderCycleGenerations
-  apiKeyCredentialError: (
-    provider: 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot',
-    message: string
-  ) => ProviderRateLimits
+  apiKeyCredentialError: (provider: ForkUsageProviderId, message: string) => ProviderRateLimits
 }
 
 export type ForkProviderCycleSlot = {
@@ -83,7 +81,7 @@ export type ForkProviderCycleSettled = {
   copilot: ProviderRateLimits
 }
 
-type ForkProviderId = 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot'
+type ForkProviderId = ForkUsageProviderId
 
 function trackForkProviderFetch(
   provider: ForkProviderId,
