@@ -292,29 +292,29 @@
       "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
       "symbol": "SETTINGS_FIELDS_REPLICATED_TO_HOSTS",
       "status": "expected-deletion",
-      "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts so the disposition table fits the max-lines cap without exempting a fork-owned file (tests/tools/max-lines-policy.test.mjs)",
-      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+      "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts so the disposition table fits the max-lines cap without exempting a fork-owned file (local/max-lines-exemption.test.mjs)",
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by local/max-lines-exemption.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
     },
     {
       "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
       "symbol": "SETTINGS_FIELDS_REPLICATED_ONLY_IF_EMPTY",
       "status": "expected-deletion",
       "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts, same split",
-      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by local/max-lines-exemption.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
     },
     {
       "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
       "symbol": "SETTINGS_FIELDS_HOST_LOCAL",
       "status": "expected-deletion",
       "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts, same split",
-      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by local/max-lines-exemption.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
     },
     {
       "path": "src/main/orca-profiles/host-sync-settings-disposition.ts",
       "symbol": "settingsFieldsWith",
       "status": "expected-deletion",
       "supersededBy": "relocated to src/main/orca-profiles/host-sync-settings-fields.ts, same split",
-      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by tests/tools/max-lines-policy.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
+      "reason": "The derived SETTINGS_FIELDS_* exports moved to a sibling so the disposition table itself fits the 300-line cap; exempting a fork-owned file is forbidden by local/max-lines-exemption.test.mjs, and splitting the table instead reported 284 symbol relocations. Same behaviour, one import path changed."
     },
     {
       "path": "src/shared/agent-hook-listener/providers/codex-state.ts",
