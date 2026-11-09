@@ -36,7 +36,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Whether a fire is still due `elapsedMs` after the post that carried it. Past the grace nothing
  *  refreshed the inventory, so the evidence is stale and must hold nothing. A job that arms no fire
- *  time — a self-paced loop waiting for its next wakeup — has nothing to age against and stays. */
+ *  time — a self-paced loop waiting for its next wakeup — is live on this test alone; the inventory's
+ *  own age is what bounds it (`piScheduledWorkIsLive`). */
 function piScheduledFireIsLive(nextInMs: number | undefined, elapsedMs = 0): boolean {
   return nextInMs === undefined || nextInMs - elapsedMs >= -PI_SCHEDULED_WORK_LATE_MS
 }

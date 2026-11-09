@@ -850,9 +850,11 @@ missing evidence class, not a new state. It mirrors Claude's session cron, one l
   a day out.
 - `src/shared/agent-hook-listener/providers/pi-pane-hold-evidence.ts` — the pi lane's pane-hold fold,
   the analogue of `resolveClaudePaneStatus` and the seam `#283` adds its child-work input to. Applied
-  at **one** place, `agent-hook-listener.ts`, after `gatePaneStateOnDescendants` and after the session
-  placeholder: the gate records the lead's own verdict, so a fold applied before it would teach the
-  gate that a finished turn was working. The inventory is cached per pane
+  at **two** places — `normalization/normalize-hook-payload.ts` for the pane's own posts, and
+  `pi-claude-child-events.ts` for a claude child's republish, which builds the row outside that
+  normalizer — and both run after `gatePaneStateOnDescendants` and after the session placeholder: the
+  gate records the lead's own verdict, so a fold applied before it would teach the gate that a
+  finished turn was working. The inventory is cached per pane
   (`piScheduledWorkByPaneKey`) because a republish can be triggered by something carrying no inventory
   at all — a descendant draining, a resumed session's placeholder — and reading absence there would
   drop a hold nothing has cleared.
