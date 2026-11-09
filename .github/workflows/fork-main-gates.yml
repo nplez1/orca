@@ -38,6 +38,20 @@ jobs:
         with:
           native-runtime: node
 
+      # Why: the max-lines exemption test compares the baseline against the upstream commit this fork's
+      # sync is keyed to, recorded in `local/upstream-file-comments-baseline.json`. A CI checkout has no
+      # upstream ref at all, and the test fails rather than skipping when that commit is absent.
+      - name: Fetch the recorded upstream sync base
+        run: |
+          base=$(node -p 'require("./local/upstream-file-comments-baseline.json").base')
+          git fetch --depth=1 origin "$base"
+
+      # Why: the fork's own `node --test` files sit outside `UNIT_INCLUDE`, so no unit lane collects them
+      # and a broken `local/sync/lib` assertion used to sit on the release line until someone ran the
+      # release gate by hand.
+      - name: Fork-local tooling tests
+        run: node local/run-fork-tests.mjs
+
       # The repo-wide rule set, unchanged from `pnpm lint`, one step per rule family so
       # the failing family is named without reading a log.
       - name: Repo-wide lint

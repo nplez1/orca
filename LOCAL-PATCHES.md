@@ -2444,6 +2444,42 @@ tests declared a skip, or when the report names a file the selection does not. I
 platform-conditional skip is legitimate. The mechanism is **SUSPECTED, not reproduced**: this config sets
 no Playwright `globalTimeout`, and the job's `timeout-minutes` kills the verdict step with the run. What
 the check closes is an interrupted run that still finishes the step.
+### `local(ci)`: the fork's own tooling tests now run in CI, against the recorded sync base (#318)
+
+The fork's 17 `local/**/*.test.mjs` files sat outside `UNIT_INCLUDE`, so no unit lane collected them:
+the only thing that ran them was `gate-unit.mjs`'s fork step, i.e. a release gate somebody had to start
+by hand. A broken `local/sync/lib` assertion could therefore live on the release line indefinitely, and
+`check-test-file-runners` printed the entry as `Manual only, no CI job` — a line that was honest and
+stayed true because nothing changed.
+
+- **`node local/run-fork-tests.mjs`** is the lane's command, in `fork-main-gates.yml` (release line) and
+  in `fork-pr-gates.yml`'s `changed-lines` job (before the merge, which is the only place a red is
+  cheap). A script rather than the glob in the workflow: `node --test` given a quoted glob **exits 0
+  when the pattern matches nothing** (measured), so a lane that silently proved nothing would be the
+  same class of defect as the one this closes. An empty match is exit 2, the refusal `gate-unit.mjs`
+  already makes for its own fork step. The runner entry in `check-test-file-runners.mjs` loses
+  `manual: true` and names both workflows, so the drift check now fails if the command leaves one.
+- **`tests/tools/max-lines-policy.test.mjs` is gone; the rule lives in `local/max-lines-exemption.test.mjs`.**
+  The old test tried `origin/main`, then fell back to `origin/HEAD` — which on this fork resolves to
+  `origin/nplez1/main`, where every path "exists upstream", so the rule checked nothing. It also
+  `skipIf`-ed silently in a CI checkout, which has neither ref. The comparison is now the **recorded
+  sync base**, `local/upstream-file-comments-baseline.json` `.base` — the same record
+  `check-upstream-file-comments.mjs` already falls back to, rewritten by the runbook's `--init` step.
+  Never a ref tip: `upstream/main` today (`6530fd17772`) no longer carries two baseline rows upstream
+  moved after the 2026-11-08 sync (`ssh/connection/ssh-connection-store.ts` → `ssh/targets/`,
+  `ssh/ssh-channel-multiplexer.ts` → `ssh/protocol/`), so a tip-based ruler reports two upstream-owned
+  files as fork-owned. All 73 rows exist at the recorded base `51c77320bc`. A missing base **fails**
+  with `git fetch --depth=1 origin <sha>` instead of skipping, and both lanes run that fetch before the
+  tests. The test left the Vitest inventory and joined the fork-local lane, which runs on PRs: coverage
+  went up, not down (`pr.yml` is disabled here and the unit suite is nightly-only).
+- **`unit-suite-run.mjs` has tests**, which is what found the last one: a nested `node --test` run under
+  a test runner reports its failures to the parent over IPC and **exits 0**, so `NODE_TEST_CONTEXT` is
+  now cleared for every spawn alongside the app's own inherited env. A gate started from inside a test
+  would otherwise have read a failing suite as a pass. `runSuite` takes a `forkProgram` seam so the
+  ENOENT case is reachable; timeout and a non-zero fork step use real spawns.
+
+The five `local/sync/*.mjs` entry points stay untested on purpose: they export nothing and are argument
+parsing over `lib/` modules that are covered.
 
 ### `local(ci)`: four new upstream workflows arrived active, and one was deleting the release line's caches
 

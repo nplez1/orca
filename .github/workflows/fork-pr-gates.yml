@@ -79,3 +79,18 @@ jobs:
       # lines: a finding on code the PR did not touch is debt on the base, not this change's problem.
       - name: Changed-lines code quality
         run: pnpm run check:code-quality:changed
+
+      # Why: the max-lines exemption test compares the baseline against the upstream commit this fork's
+      # sync is keyed to, recorded in `local/upstream-file-comments-baseline.json`. A CI checkout has no
+      # upstream ref at all, and the test fails rather than skipping when that commit is absent.
+      - name: Fetch the recorded upstream sync base
+        run: |
+          base=$(node -p 'require("./local/upstream-file-comments-baseline.json").base')
+          git fetch --depth=1 origin "$base"
+
+      # Why here and not only on the release line: the fork's `node --test` files are outside
+      # `UNIT_INCLUDE`, so no unit lane collects them, and a release-line-only lane reports a broken
+      # `local/sync/lib` assertion after the merge rather than before it. This job already has Node 24,
+      # so the step costs about two seconds.
+      - name: Fork-local tooling tests
+        run: node local/run-fork-tests.mjs

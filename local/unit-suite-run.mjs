@@ -24,7 +24,10 @@ const INHERITED_APP_ENV = [
   'ORCA_INTERNAL_WSL_HOSTS',
   // Why: a pane exports this, and the codex-shell preflight then adds an SSH-marker flag that two
   // exact-args cases assert against — a red about the pane, not the tree (see LOCAL-PATCHES.md).
-  'ORCA_REMOTE_VIEWER_CLIPBOARD'
+  'ORCA_REMOTE_VIEWER_CLIPBOARD',
+  // Why: under a test runner a nested `node --test` reports its failures to the parent over IPC and
+  // exits 0, so a failing suite would read as a pass — the one thing a gate must never do.
+  'NODE_TEST_CONTEXT'
 ]
 /** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
 const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
@@ -67,7 +70,10 @@ function runStep(label, program, args, logFd, timeoutMs, env) {
   }
 }
 
-export function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
+export function runSuite(
+  { reportPath, logPath, timeoutMs, vitestArgs, forkTests },
+  { forkProgram = process.execPath } = {}
+) {
   const logFd = openSync(logPath, 'w')
   let elapsedMs = 0
   let forkTestsPassed = true
@@ -79,7 +85,9 @@ export function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests
         ? { status: 0, timedOut: false, elapsedMs: 0 }
         : runStep(
             'fork-local tests',
-            process.execPath,
+            // Why a parameter: a spawn that never starts (ENOENT) is the one failure a test cannot reach
+            // while the program is `process.execPath`.
+            forkProgram,
             ['--test', ...forkTests],
             logFd,
             Math.min(timeoutMs, FORK_TEST_TIMEOUT_MS)
