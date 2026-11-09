@@ -189,8 +189,11 @@ describe('the verdict a run produces', () => {
   })
 
   it('allows a whole step only when the entry says so', () => {
+    // `matchesEntry` answers only "does this line match this entry's pattern", so a whole-step entry has
+    // no pattern to match and says so; `classifyRun` is what gives it the whole step.
     const whole = entry({ wholeStep: true })
-    expect(matchesEntry('anything at all', whole)).toBe(true)
+    expect(matchesEntry('anything at all', whole)).toBe(false)
+    expect(entryProblem(whole)).toBeNull()
     expect(matchesEntry('anything at all', entry({ match: '^entry a$' }))).toBe(false)
     const verdict = classifyRun(
       [{ id: 'check:other-ratchet', exitCode: 1, output: 'a wall of compiler text' }],
@@ -215,9 +218,15 @@ describe('the verdict a run produces', () => {
     expect(verdict.entryProblems).toHaveLength(1)
   })
 
-  it('refuses an entry whose match is not a usable regex', () => {
+  it('refuses an entry whose match is not a usable regex, and absorbs nothing', () => {
     expect(entryProblem(entry({ match: '(' }))).toContain('unusable match')
-    expect(() => matchesEntry('x', entry({ match: '(' }))).toThrow(/unusable match/)
+    expect(matchesEntry('x', entry({ match: '(' }))).toBe(false)
+  })
+
+  it('refuses an entry that names both a line and a whole step', () => {
+    expect(entryProblem(entry({ match: '^entry a$', wholeStep: true }))).toContain(
+      'the match does not apply'
+    )
   })
 
   it('reports a step that failed without any parseable line, so a crash is never allowed', () => {

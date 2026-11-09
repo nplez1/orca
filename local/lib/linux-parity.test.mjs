@@ -282,7 +282,7 @@ const RED_SET_ENTRY = {
   file: 'src/main/daemon/daemon-race.test.ts',
   test: 'DaemonPtyAdapter history recovery serializes concurrent checkpoints',
   class: 'upstream-daemon-disconnect-race',
-  match: '^DaemonConnectionLostError: Disconnected out of disconnectOnly\\(\\)',
+  match: '^DaemonConnectionLostError: Disconnected$',
   evidence: 'failed on Linux twice and passed 3/3 on the Mac'
 }
 
@@ -296,7 +296,7 @@ test('judgeLinuxFailures passes when the only red is a listed one', () => {
       status: 'failed',
       assertions: [
         assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'failed', [
-          'DaemonConnectionLostError: Disconnected out of disconnectOnly() at the test\n  at nowhere'
+          'DaemonConnectionLostError: Disconnected\n  at disconnectOnly (src/main/daemon/client.ts:292)'
         ])
       ]
     })
@@ -428,7 +428,7 @@ test('a sibling whose title contains the listed one is not absorbed', () => {
         assertion(
           'DaemonPtyAdapter history recovery serializes concurrent checkpoints under load',
           'failed',
-          ['DaemonConnectionLostError: Disconnected out of disconnectOnly()']
+          ['DaemonConnectionLostError: Disconnected']
         )
       ]
     })
@@ -445,7 +445,7 @@ test('a suite error alongside the listed failure is not absorbed by the entry', 
       message: 'Error: afterAll hook timed out',
       assertions: [
         assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'failed', [
-          'DaemonConnectionLostError: Disconnected out of disconnectOnly()'
+          'DaemonConnectionLostError: Disconnected'
         ])
       ]
     })

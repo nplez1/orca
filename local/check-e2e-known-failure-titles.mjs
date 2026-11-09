@@ -25,10 +25,15 @@ import {
 } from './lib/known-red.mjs'
 
 const FAILED_STATUSES = new Set(['failed', 'timedOut', 'interrupted'])
+/** How many unstarted specs the verdict names before summarising the rest. */
+const NOT_RUN_LIMIT = 8
 /** `file › describe › … › title`, stable across the line shifts an upstream edit causes. */
 export function specKey(spec, suiteTitlePath) {
   const file = String(spec.file).replaceAll('\\', '/')
-  const fileKey = file.includes('/') ? file : `tests/e2e/${file}`
+  // Why the shared normaliser: `selected.txt` names `x.spec.ts` relative to `tests/e2e/`, and the two
+  // sides of the expected-spec check have to build the same key or a spec in a subdirectory reads as
+  // both "never ran" and "not selected".
+  const fileKey = e2eFileKey(file)
   // Why: the JSON reporter's top-level suite title is the spec's own file name, so keeping it
   // would duplicate the file and never match a recorded title.
   const describes = suiteTitlePath[0] === spec.file ? suiteTitlePath.slice(1) : suiteTitlePath
@@ -180,12 +185,17 @@ export function judge(known, outcomes) {
   }
 }
 
-/** The manifest's titles as entries, keyed the way a spec key is spelled. */
+/**
+ * The manifest's titles as entries, keyed the way a spec key is spelled.
+ *
+ * Why the raw title is spread back over the normalised one: `normaliseEntries` keeps a fixed shape, and
+ * the notice line this verdict prints quotes `observedForkRuns`/`observedUpstreamRuns` as the evidence
+ * for the entry — the fields that say how often it has been seen. Dropping them prints `undefined`.
+ */
 export function titleKeys(manifest) {
-  const { entries } = normaliseEntries(
-    (manifest.titles ?? []).map((title) => ({ ...title, test: title.title }))
-  )
-  return new Map(entries.map((entry) => [entry.key, entry]))
+  const titles = manifest.titles ?? []
+  const { entries } = normaliseEntries(titles.map((title) => ({ ...title, test: title.title })))
+  return new Map(entries.map((entry, index) => [entry.key, { ...titles[index], ...entry }]))
 }
 
 /** A spec file as the report and `selected.txt` both spell it. */
@@ -240,10 +250,16 @@ export function expectedSpecProblems({ selected, outcomes }) {
       )
     }
   }
-  for (const key of outcomes.notRun) {
+  // Why the cap: an interrupted shard leaves one row per unstarted spec, and a wall of them buries the
+  // failure list above it.
+  const notRun = [...outcomes.notRun]
+  for (const key of notRun.slice(0, NOT_RUN_LIMIT)) {
     problems.push(
       `selected spec never ran: ${key} — it produced no result and none of its tests declared a skip`
     )
+  }
+  if (notRun.length > NOT_RUN_LIMIT) {
+    problems.push(`and ${notRun.length - NOT_RUN_LIMIT} more selected spec(s) that never ran`)
   }
   for (const file of files) {
     if (!selected.has(file)) {

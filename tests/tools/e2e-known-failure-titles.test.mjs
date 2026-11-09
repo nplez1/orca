@@ -212,6 +212,9 @@ it('exits 0 for a recorded failure and 1 for an unrecorded one', () => {
   )
   expect(recorded.status).toBe(0)
   expect(recorded.stdout).toContain('::notice::known failure (upstream)')
+  // Why the counts: the notice line is the evidence for the entry, so a trimmed entry printing
+  // `undefined fork / undefined upstream` would erase it.
+  expect(recorded.stdout).toContain('in 12 fork / 8 upstream sampled run(s)')
   expect(recorded.stdout).toContain('1 known, 0 unexpected')
 
   const unrecorded = run(

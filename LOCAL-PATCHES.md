@@ -2416,15 +2416,19 @@ Two manifests changed in the same commit, as `AGENTS.md` requires:
   (#38462) moved the file to `src/main/daemon/providers/adapter/testing/` on 2026-11-05. A
   `/`-bounded suffix match cannot pair those, so the entry had been matching **nothing** — the red it
   exists to absorb was not being absorbed at all. It now carries the real path, Vitest's full name, and
-  `match: "^DaemonConnectionLostError: Disconnected out of disconnectOnly\\(\\)"`, which is the
-  signature its own `evidence` field has quoted since 2026-10-27. Nothing static covered that manifest;
+  `match: "^DaemonConnectionLostError: Disconnected$"` — the whole message, which
+  `src/main/daemon/transport/client/daemon-client.ts:283` raises as `rejectAll('Disconnected')`. The
+  entry's own `evidence` had quoted `DaemonConnectionLostError: Disconnected` and then, in prose,
+  "out of `disconnectOnly()`"; only the quoted part is the error text, and a `match` written from the
+  sentence rather than the message would have drifted on the next recurrence. Nothing static covered that manifest;
   `tests/tools/unit-gate.test.mjs` now checks that every entry names a file this tree has and a full name
   that file can still produce.
-- `local/e2e-known-failure-titles.json`: 30 titles, none with a cause. 19 now carry a `match` built from
-  the `::notice::known failure … — <detail>` lines of the eleven retained scheduled runs
-  (2026-09-27 … 2026-10-08, runs `36346182978`…`37848060391`), unioned across every shape observed for
-  that title; 11 have no retained observation and declare `flaky: true` instead, which is a claim a
-  reader can check rather than the previous silence. Two further entries were **pruned**: their spec
+- `local/e2e-known-failure-titles.json`: 30 titles, none with a cause. 17 of the 28 that remain carry a
+  `match` built from the `::notice::known failure … — <detail>` lines of the eleven retained scheduled
+  runs (2026-09-27 … 2026-10-08, runs `36346182978`…`37848060391`), unioned across every shape observed
+  for that title; 11 have no retained observation and declare `flaky: true` instead, which is a claim a
+  reader can check rather than the previous silence. The remaining two of the 19 observed shapes were on
+  the entries pruned below. Two further entries were **pruned**: their spec
   files no longer exist — `plugin-startup-budget.spec.ts` deleted in `8fb8e6ef0f2` (#37421) and
   `sidebar-measured-row-scroll.spec.ts` in `e98c6a439ac` (#38030) — and the verdict only reports a stale
   entry that _passed_, so both would have sat there for ever. The contract test now fails on an entry

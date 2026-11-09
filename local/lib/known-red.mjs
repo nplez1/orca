@@ -45,7 +45,10 @@ const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
  * the cause and is kept.
  */
 export function failureDetail(message) {
-  const line = String(message ?? '')
+  // Why the first element: `assertionResults[].failureMessages` is an array, and `String([a, b])` joins
+  // it with a comma — which breaks a `$`-anchored `match` on the first message.
+  const text = Array.isArray(message) ? (message[0] ?? '') : (message ?? '')
+  const line = String(text)
     .replace(ANSI, '')
     .replace(/^Error:\s*/, '')
     .split('\n')[0]
@@ -97,12 +100,11 @@ export function normaliseEntries(manifest) {
         ? null
         : String(entry.test)
     const key = test === null ? `${file} › *` : `${file} › ${test}`
+    // Why not pushed into `problems` here: `entryMatchProblems` is the one reporter, so a caller that
+    // runs both does not print the same problem twice.
     const compiled = compileMatch(entry?.match)
     const match = compiled.regex
     const matchProblem = compiled.problem === null ? null : `${key}: ${compiled.problem}`
-    if (matchProblem !== null) {
-      problems.push(matchProblem)
-    }
     return {
       file,
       test,
@@ -280,6 +282,11 @@ export function normaliseUnhandled(manifest) {
 }
 
 export function unhandledEntryMatches(entry, headline) {
+  // Why nothing matches when the entry named a cause it cannot test: the same rule the test entries
+  // follow, so an unusable regex never becomes a broad absorber.
+  if (entry.matchProblem) {
+    return false
+  }
   if (entry.match !== null && entry.match !== undefined) {
     return entry.match.test(headline)
   }

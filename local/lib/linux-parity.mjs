@@ -274,12 +274,16 @@ export function formatParity(result, { allowlistPath, reportCount }) {
     lines.push(`  problem: ${problem}`)
   }
   const { passed, failed, absent } = result.counts
+  // Why the problem count is in the verdict line: a manifest hygiene problem fails this check too, and
+  // "0 failed and 0 absent" alone reads as a parity failure nobody can find.
+  const problemNote = result.problems.length > 0 ? `, and ${result.problems.length} problem(s)` : ''
   lines.push(
     result.ok
       ? `parity: PASS — all ${result.total} Mac-allowlisted entries passed on Linux`
       : `parity: FAIL — ${failed} failed and ${absent} absent of ${result.total} Mac-allowlisted ` +
-          `entries on Linux (${passed} passed); a failed entry is a real bug or a red that is not ` +
-          `Mac-bound, an absent entry is a claim no shard report can back`
+          `entries on Linux (${passed} passed)${problemNote}; a failed entry is a real bug or a red ` +
+          `that is not Mac-bound, an absent entry is a claim no shard report can back, and a problem ` +
+          `is a manifest this check cannot read`
   )
   return lines
 }
@@ -312,7 +316,7 @@ export function judgeLinuxFailures(manifest, index, { reports = [], expectedRepo
     if (entry.file === '') {
       problems.push('a Linux red-set entry has no file path')
     }
-    if (entry.test === null) {
+    if (entry.test === null || entry.test === '') {
       problems.push(`${entry.file}: a Linux red-set entry has no test name`)
     }
   }

@@ -263,6 +263,25 @@ describe('the isolated re-run', () => {
     expect(reproducedFailures(suite, found, { fileCovered: true })).toHaveLength(0)
   })
 
+  it('does not waive a suite error whose re-run failed an allowlisted test for a new cause', () => {
+    // Why the cause and not only the name: an entry pins one, and a re-run whose allowlisted test broke
+    // differently is a red the allowlist does not cover (#317).
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
+    const found = rerun({
+      failures: new Set(['foo']),
+      failureDetails: new Map([['foo', 'TypeError: totally new bug']])
+    })
+    const covered = (test, detail) => test === 'foo' && String(detail).startsWith('known failure')
+    expect(reproducedFailures(suite, found, { known: new Set(['foo']), covered })).toHaveLength(1)
+    const matching = rerun({
+      failures: new Set(['foo']),
+      failureDetails: new Map([['foo', 'known failure']])
+    })
+    expect(reproducedFailures(suite, matching, { known: new Set(['foo']), covered })).toHaveLength(
+      0
+    )
+  })
+
   it('reads one file out of a report the selector over-matched', () => {
     const report = {
       numTotalTests: 2,

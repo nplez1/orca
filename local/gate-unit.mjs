@@ -62,7 +62,7 @@ import {
   reproducedFailures,
   unexplainedSuiteExit
 } from './unit-gate-judgement.mjs'
-import { entryMatchProblems, normaliseUnhandled } from './lib/known-red.mjs'
+import { entryMatchProblems, entryMatchesFailure, normaliseUnhandled } from './lib/known-red.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
@@ -452,6 +452,8 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     const reproduced = new Set(
       reproducedFailures(failures, rerun, {
         known: new Set(fileEntries.map((entry) => entry.test).filter(Boolean)),
+        covered: (test, detail) =>
+          fileEntries.some((entry) => entryMatchesFailure(entry, { file, test, detail })),
         fileCovered: fileEntries.some((entry) => entry.test === null)
       }).map((failure) => failure.test)
     )
@@ -474,6 +476,11 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
       }
     }
   }
+
+  // Why the filter: a drifted failure also goes through the isolation re-run above, and one that passes
+  // there is waived as a load flake. Printing NEW CAUSE for it would name a cause the gate then excused.
+  const blockingSet = new Set(blocking)
+  drifted = drifted.filter((item) => blockingSet.has(item.failure))
 
   const exitCode = blocking.length === 0 && problems.length === 0 ? 0 : 1
   return {

@@ -72,6 +72,9 @@ describe('known-failure verdict wiring', () => {
     for (const entry of manifest.titles) {
       expect(entry.file).toMatch(/^tests\/e2e\/[^/]+\.spec\.ts$/)
       expect(entry.title.length).toBeGreaterThan(0)
+      // Why: `*` is the file-level form in the unit manifests, and a title of `*` would turn one spec
+      // entry into a whole-file one.
+      expect(entry.title).not.toBe('*')
       expect(['upstream', 'unattributed']).toContain(entry.owner)
       expect(entry.observedForkRuns + entry.observedUpstreamRuns).toBeGreaterThan(0)
       // Why: a title with neither field absorbs any failure of that spec, which is the looseness

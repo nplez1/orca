@@ -34,6 +34,7 @@ export function allowlistEntries(manifest) {
 export const NO_RERUN = Object.freeze({
   complete: false,
   failures: new Set(),
+  failureDetails: new Map(),
   passes: new Set(),
   filePassed: false
 })
@@ -45,11 +46,13 @@ export const NO_RERUN = Object.freeze({
  */
 export function reportForFile(report, file) {
   const cases = collectCases(report ?? {})
+  const own = cases.failures.filter((failure) => failure.file === file)
   return {
     complete: true,
-    failures: new Set(
-      cases.failures.filter((failure) => failure.file === file).map((failure) => failure.test)
-    ),
+    failures: new Set(own.map((failure) => failure.test)),
+    // Why the text as well as the name: an entry pins a cause, so a re-run whose allowlisted test failed
+    // for a new one is not a re-run the allowlist covers.
+    failureDetails: new Map(own.map((failure) => [failure.test, failure.detail])),
     passes: new Set(cases.passes.filter((pass) => pass.file === file).map((pass) => pass.test)),
     filePassed: (report?.testResults ?? []).some(
       (entry) => repoPath(entry.name) === file && entry.status === 'passed'
@@ -80,7 +83,7 @@ export function rerunReportsFor(report, files) {
 export function reproducedFailures(
   failures,
   rerun,
-  { known = new Set(), fileCovered = false } = {}
+  { known = new Set(), covered = null, fileCovered = false } = {}
 ) {
   if (!rerun.complete) {
     return failures
@@ -96,7 +99,11 @@ export function reproducedFailures(
       // run, so a test that only appears in isolation was never judged against the allowlist. Waiving
       // the row would pass a real red nobody read. A file-level entry covers every case, so there the
       // named failures are known and the row alone is what is being waived.
-      return fileCovered ? false : [...rerun.failures].some((test) => !known.has(test))
+      // Why `covered` when the caller has entries: a name in `known` may have failed for a cause its
+      // entry does not describe, and waiving the row would pass that red unread.
+      const allowlisted = (test) =>
+        covered === null ? known.has(test) : covered(test, rerun.failureDetails?.get(test))
+      return fileCovered ? false : [...rerun.failures].some((test) => !allowlisted(test))
     }
     return (
       !rerun.passes.has(failure.test) ||

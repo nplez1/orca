@@ -206,10 +206,9 @@ describe('the manifest rule', () => {
 
   it('reports an unusable regex as a problem and absorbs nothing', () => {
     const { entries, problems } = normaliseEntries([{ ...ENTRY, match: '(' }])
-    expect(problems).toHaveLength(1)
-    expect(problems[0]).toContain('unusable match')
-    // One problem, not two: the entry is not reported a second time for "no match".
-    expect(entryMatchProblems(entries)).toEqual(problems)
+    // One problem, not two: `normaliseEntries` keeps it on the entry and `entryMatchProblems` reports it.
+    expect(problems).toEqual([])
+    expect(entryMatchProblems(entries)).toEqual([expect.stringContaining('unusable match')])
     expect(compileMatch('(').regex).toBeNull()
     expect(entryMatchesFailure(entries[0], { file: FILE, test: TEST, detail: 'x' })).toBe(false)
   })
@@ -234,6 +233,9 @@ describe('the manifest rule', () => {
     expect(
       judgeUnhandled(['Canceled: Canceled', 'Exact headline', 'Something else'], entries).blocking
     ).toEqual([{ headline: 'Something else', count: 1 }])
+    // An entry that names a cause it cannot test absorbs nothing, not even by its headline.
+    const broken = normaliseUnhandled([{ match: '(', headline: 'Exact headline' }]).entries
+    expect(judgeUnhandled(['Exact headline'], broken).blocking).toHaveLength(1)
   })
 
   it('holds every manifest in this tree to it', () => {
