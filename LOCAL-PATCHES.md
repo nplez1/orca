@@ -955,23 +955,24 @@ Generated from those sources, so never edited directly: `skills/*/SKILL.md` and
 `src/cli/bundled-skill-guides.ts` (`pnpm run generate:bundled-skill-guides`), and
 `resources/skills/current-manifest.json` (`pnpm run generate:skill-bundle-manifest`).
 
-Tests that go red if a sync restores upstream's names:
-`src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts` and
-`src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts` (packaged / dev `ORCA_CLI_COMMAND`),
-`src/main/pty/wsl-orca-env.test.ts` (the WSL lane's bare registered name) and
-`src/main/skills/skill-lock-sources.test.ts` (the lock reader); `src/cli/skills.test.ts` covers the CLI's
-skill listing and not the install rail.
-`pnpm lint` gates the generated content through `verify:bundled-skill-guides` and
-`verify:skill-bundle-manifest`, so a hand-edited stub or a stale manifest fails there.
+Tests that go red if a sync restores upstream's names: `tests/tools/fork-invariants.test.mjs` — the
+pane's `BROWSER`, which resolves from the launcher the pane actually has (pinned through the dev
+launch, the one branch whose name differs per build). `pnpm lint` gates the generated content through
+`verify:bundled-skill-guides` and `verify:skill-bundle-manifest`, so a hand-edited stub or a stale
+manifest fails there.
 
-`ORCA_SKILLS_REPOSITORY_URL` has no test of its own: it appears in one source file and in no test, so the
-install rail's bytes rest on `verify:bundled-skill-guides`. Three paths this section named before
-2026-10-29 do not exist — `src/shared/agent-feature-install-commands.test.ts` and
+`ORCA_SKILLS_REPOSITORY_URL` is pinned by `tests/tools/fork-invariants.test.mjs`, which asserts the
+install rail's tree URL names `nplez1/orca` at the build commit. Seven paths this section used to cite
+no longer exist: `src/shared/agent-feature-install-commands.test.ts` and
 `src/shared/skill-freshness.test.ts` were retired on 2026-10-27 — and the `isOrcaSkillLockSource`
-predicate they covered is gone; see the lock paragraph above. The two PTY environment test paths this
-section also named moved into `src/main/ipc/pty/`, where the tests above now live.
-`src/main/skills/skill-update-run.test.ts` was retired on the same date; nothing replaced it, so the
-paths above are the whole of what a sync can turn red here.
+predicate they covered is gone; see the lock paragraph above — and
+`src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts`,
+`src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts`, `src/main/pty/wsl-orca-env.test.ts`,
+`src/main/skills/skill-lock-sources.test.ts` and `src/main/skills/skill-update-run.test.ts` were
+deleted upstream (bulk test removals, fork issue #312). The pane `BROWSER` is the one of those the
+fork-invariants test now owns; nothing replaced the rest, so this section is the whole of what a sync
+can turn red on skill names. `src/cli/skills.test.ts` covers the CLI's skill listing, not the install
+rail.
 
 Not covered, deliberately: `~/.agents/.skill-lock.json` on an existing machine still records
 `stablyai/orca` until the next update rewrites it, and `src/renderer/src/i18n/locales/*.json` keep a
@@ -3527,11 +3528,13 @@ electron-builder's `sanitizeFileName` keeps spaces, and only the directory name 
 
 Four couplings that stay as upstream has them, each for a reason:
 
-- **`linux.executableName: 'orca-ide'`** and the bundled launcher file `resources/bin/orca-ide`.
-  `LINUX_CLI_COMMAND_NAME` and the AppImage cache layout resolve that exact path, and the _installed_
-  command is already `orca-np` (`CLI_COMMAND_NAME`) — so renaming the in-bundle file would touch
-  app-side CLI registration and its AppImage tests for no gain. The directory differs from an
-  official install's, so nothing collides. Pinned by `config/scripts/electron-builder-config.test.mjs`.
+- **`linux.executableName: 'orca-ide'`** in the base config, and the bundled launcher file
+  `resources/bin/orca-ide`. `LINUX_CLI_COMMAND_NAME` and the AppImage cache layout resolve that exact
+  path, and the _installed_ command is already `orca-np` (`CLI_COMMAND_NAME`) — so renaming the
+  in-bundle file would touch app-side CLI registration and its AppImage tests for no gain. The base
+  config keeps upstream's value byte-identically because the overlay overrides it to `orca-np`, which
+  is what pins it (`config/scripts/electron-builder-np-config.test.mjs`); the in-bundle launcher file
+  is pinned by `src/main/cli/packaged-cli-assets.test.ts`.
 - **The AppImage artifact name** (`orca-linux[-arm64].AppImage`).
   `config/scripts/static-appimage-package-contract.cjs` derives the artifact's target architecture
   from that exact name, and the PR lane runs it as `dist/orca-linux.AppImage`.
@@ -3545,9 +3548,9 @@ Four couplings that stay as upstream has them, each for a reason:
   `/opt/${sanitizedProductName}`, so the only lever is the discovery list in the two packaging
   scripts — not a `productName` change, which would move the macOS bundle and the Windows app too.
 
-Files touched by the rename, so a sync can recheck them: `config/electron-builder.config.cjs`,
+Files touched by the rename, so a sync can recheck them: `config/electron-builder.np.config.cjs`,
 `resources/linux/packaging/after-install.sh`, `resources/linux/packaging/after-remove.sh`,
-`config/scripts/electron-builder-config.test.mjs`, and the two package-name literals in
+`config/scripts/electron-builder-np-config.test.mjs`, and the two package-name literals in
 `.github/workflows/pr.yml`'s "Verify root-package marker payloads" step.
 
 Consequences to expect on first run of a renamed build: it cannot read an official install's data,
@@ -3579,10 +3582,11 @@ TS readers: `src/main/startup/dev-instance-identity.ts`, plus the display slots 
 `AutomationRunDetailsPage.tsx`, `web-app-api.ts` and `web-runtime-environment.ts`.
 
 Two readers cannot import TypeScript and therefore keep a literal: `productName` in
-`config/electron-builder.config.cjs` and `DEV_BUNDLE_DISPLAY_NAME` in
-`config/scripts/dev-electron-bundle-identity.mjs`. Each is pinned to the constant by a test
-(`electron-builder-config.test.mjs`, `dev-electron-bundle-identity.test.ts`), so a rename that misses
-one fails there instead of shipping a build whose window disagrees with its own bundle name.
+`config/electron-builder.np.config.cjs` and `DEV_BUNDLE_DISPLAY_NAME` in
+`config/scripts/development/electron-bundle-cache/dev-electron-bundle-identity.mjs`. Each is pinned
+to the literal by a test (`electron-builder-np-config.test.mjs`,
+`tests/tools/fork-invariants.test.mjs`), so a rename that misses one fails there instead of shipping
+a build whose window disagrees with its own bundle name.
 
 Deliberately unchanged, and why each is not a copy to collapse:
 
@@ -3616,12 +3620,18 @@ each now carries the identity, and each is pinned by a test rather than by a com
 | agent-hook entry matcher                                | `.orca-np` only                                                            | `src/main/agent-hooks/managed-command-matcher-legacy-home.test.ts` |
 | shared managed-hook script path                         | `~/.orca-np/agent-hooks/<script>`                                          | `tests/tools/fork-invariants.test.mjs`                             |
 | managed-hook command (posix, cmd, PowerShell)           | the same `~/.orca-np/agent-hooks/<script>`                                 | same file                                                          |
-| launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `src/cli/runtime/serve-service-unit.test.ts`                       |
+| launchd label / systemd unit / serve logs               | `com.nplez1.orca.serve`, `orca-np-serve.service`, `~/Library/Logs/orca-np` | `tests/tools/fork-invariants.test.mjs`                             |
 | WSL guest command + bridge                              | `~/.local/bin/orca-np`, `~/.local/share/orca-np/orca-wsl-bridge.ps1`       | `src/main/cli/wsl-cli-installer.test.ts`                           |
-| `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `src/main/ipc/pty/pty-spawn-env-terminal-basics.test.ts`           |
-| dev profile fallback                                    | `orca-np-dev`                                                              | `src/cli/runtime/launch-user-data-path.test.ts`                    |
+| `BROWSER` in a pane                                     | the resolved launcher's basename                                           | `tests/tools/fork-invariants.test.mjs`                             |
+| dev profile fallback                                    | `orca-np-dev`                                                              | same file                                                          |
 | `serve service install` default command                 | `orca-np`                                                                  | `src/cli/handlers/serve-service.test.ts`                           |
 | serve park/ack coordination root                        | `Application Support/orca-np`                                              | `src/shared/serve-bundle-coordination.test.ts`                     |
+| bundle id (`np.appId`, notification pane, TCC trust)    | `com.nplez1.orca`                                                          | `tests/tools/fork-invariants.test.mjs`                             |
+| app name / AppUserModelId / dev bundle plist            | `Orca NP`, `Orca NP Dev`, `com.nplez1.orca.dev`                            | same file                                                          |
+| release feed, downloads and skills repository           | `nplez1/orca`                                                              | same file                                                          |
+| Developer ID team (`ORCA_MAC_TEAM_ID`)                  | `APPLE_TEAM_ID` when set                                                   | same file                                                          |
+| Linux install symlink                                   | `/usr/bin/orca-np`, from `after-install.sh`                                | same file                                                          |
+| managed-hook install lock                               | `~/.orca` (shared cross-install mutex, deliberately not renamed)           | same file                                                          |
 
 Three couplings that only show up in the built artifact:
 
