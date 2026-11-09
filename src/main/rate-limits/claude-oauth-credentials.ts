@@ -43,15 +43,7 @@ const schema = z.object({
     .optional()
 })
 
-// fork-comment-ok: fork-only source; the why must sit above the code a sync rewrites.
-/**
- * A login Claude Code keeps in its own settings env rather than the keychain.
- *
- * Measured on this machine 2026-11-09: `~/.claude/settings.json` carries
- * `env.CLAUDE_CODE_OAUTH_TOKEN`, the keychain holds no `Claude Code-credentials` item and there is no
- * `.credentials.json` — so every Orca usage read reported "No subscription plan — API key billing"
- * while the CLI itself was signed in. Only an OAuth token qualifies; an API key here is not a plan.
- */
+// fork-comment-ok: fork-only source; see LOCAL-PATCHES.md `local(usage)`.
 const settingsEnvSchema = z.object({
   env: z
     .object({
@@ -74,7 +66,6 @@ export function parseClaudeSettingsEnvToken(raw: string): string | null {
     if (oauthToken) {
       return oauthToken
     }
-    // Why the prefix test: ANTHROPIC_AUTH_TOKEN also carries plain API keys, which have no plan.
     const authToken = settingsEnvToken(env?.ANTHROPIC_AUTH_TOKEN)
     return authToken?.startsWith(OAUTH_TOKEN_PREFIX) ? authToken : null
   } catch {
@@ -85,12 +76,11 @@ export function parseClaudeSettingsEnvToken(raw: string): string | null {
 async function readClaudeSettingsEnvCredentials(
   configDir: string
 ): Promise<ClaudeOAuthCredentialReadResult | null> {
-  // Why this order: settings.local.json overrides settings.json, the way the CLI applies them.
+  // fork-comment-ok: settings.local.json wins over settings.json, as the CLI applies them.
   for (const name of ['settings.local.json', 'settings.json']) {
     try {
       const token = parseClaudeSettingsEnvToken(await readFile(path.join(configDir, name), 'utf8'))
       if (token) {
-        // No refresh token: the login belongs to the CLI's settings, which Orca must never rewrite.
         return { token, hasRefreshableCredentials: false, source: 'settings-env' }
       }
     } catch {

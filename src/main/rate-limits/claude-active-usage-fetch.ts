@@ -50,14 +50,10 @@ export async function fetchActiveClaudeRateLimits(
     credentialSource: credentials.source,
     authProvenance: options?.authPreparation?.provenance ?? 'system'
   }
-  // fork-comment-ok: fork-only source ordering; the why must sit above the code a sync rewrites.
-  // Why before the CLI probe: one completion's headers are cheaper than a process start, and the
-  // CLI's own `get_usage` control request answers `rate_limits_available: false` on 2.1.319.
+  // fork-comment-ok: fork-only source, ordered ahead of the CLI probe; see LOCAL-PATCHES.md `local(usage)`.
   if (credentials.token) {
     const fromHeaders = await probeClaudeUsageHeaders(credentials.token, options?.signal)
     if (fromHeaders) {
-      // Why carry it: the endpoint's wait is the endpoint's, so a header reading must not licence
-      // the request the endpoint asked Orca to hold.
       const retryAtMs = openEndpointRetryAtMs(options)
       return {
         ...fromHeaders,
