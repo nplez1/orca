@@ -13,6 +13,8 @@ export type ClaudeOAuthCredentialSource =
   | 'scoped-keychain'
   | 'legacy-keychain'
   | 'credentials-file'
+  // fork-comment-ok: fork-only source; a login kept in the CLI's own settings env.
+  | 'settings-env'
   | 'none'
 export type ClaudeOAuthCredentialReadResult = {
   token: string | null
@@ -40,6 +42,53 @@ const schema = z.object({
     })
     .optional()
 })
+
+// fork-comment-ok: fork-only source; see LOCAL-PATCHES.md `local(usage)`.
+const settingsEnvSchema = z.object({
+  env: z
+    .object({
+      CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(),
+      ANTHROPIC_AUTH_TOKEN: z.string().optional()
+    })
+    .optional()
+})
+const OAUTH_TOKEN_PREFIX = 'sk-ant-oat'
+
+function settingsEnvToken(raw: string | undefined): string | null {
+  const candidate = raw?.trim()
+  return candidate ? candidate : null
+}
+
+export function parseClaudeSettingsEnvToken(raw: string): string | null {
+  try {
+    const env = settingsEnvSchema.parse(JSON.parse(raw)).env
+    const oauthToken = settingsEnvToken(env?.CLAUDE_CODE_OAUTH_TOKEN)
+    if (oauthToken) {
+      return oauthToken
+    }
+    const authToken = settingsEnvToken(env?.ANTHROPIC_AUTH_TOKEN)
+    return authToken?.startsWith(OAUTH_TOKEN_PREFIX) ? authToken : null
+  } catch {
+    return null
+  }
+}
+
+async function readClaudeSettingsEnvCredentials(
+  configDir: string
+): Promise<ClaudeOAuthCredentialReadResult | null> {
+  // fork-comment-ok: settings.local.json wins over settings.json, as the CLI applies them.
+  for (const name of ['settings.local.json', 'settings.json']) {
+    try {
+      const token = parseClaudeSettingsEnvToken(await readFile(path.join(configDir, name), 'utf8'))
+      if (token) {
+        return { token, hasRefreshableCredentials: false, source: 'settings-env' }
+      }
+    } catch {
+      // An unreadable or absent settings file is simply not this source.
+    }
+  }
+  return null
+}
 export function parseClaudeOAuthCredentialsJson(
   raw: string,
   source: ClaudeOAuthCredentialSource,
@@ -117,19 +166,36 @@ export async function readClaudeOAuthCredentials(
   if (keychain.token) {
     return keychain
   }
-  const credentialsPath = path.join(
-    options?.credentialsFileConfigDir ?? path.join(homedir(), '.claude'),
-    '.credentials.json'
-  )
+  const configDir = options?.credentialsFileConfigDir ?? path.join(homedir(), '.claude')
+  const credentialsPath = path.join(configDir, '.credentials.json')
+  let file: ClaudeOAuthCredentialReadResult | null = null
+  let fileMissing = false
+  let fileUnreadable = false
   try {
-    return parseClaudeOAuthCredentialsJson(
+    file = parseClaudeOAuthCredentialsJson(
       await readFile(credentialsPath, 'utf8'),
       'credentials-file',
-      { kind: 'file', path: credentialsPath }
+      {
+        kind: 'file',
+        path: credentialsPath
+      }
     )
   } catch (error) {
-    return isDefinitiveAbsence(error) ? keychain : { ...keychain, unavailable: true }
+    fileMissing = isDefinitiveAbsence(error)
+    fileUnreadable = !fileMissing
   }
+  if (file?.token) {
+    return file
+  }
+  // fork-comment-ok: fork-only source ordering; the settings env is the CLI's own login, read last.
+  const settingsEnv = await readClaudeSettingsEnvCredentials(configDir)
+  if (settingsEnv) {
+    return settingsEnv
+  }
+  if (fileUnreadable) {
+    return { ...keychain, unavailable: true }
+  }
+  return fileMissing ? keychain : (file ?? keychain)
 }
 export function resolveClaudeOAuthCredentialReadOptions(
   authPreparation?: ClaudeRuntimeAuthPreparation

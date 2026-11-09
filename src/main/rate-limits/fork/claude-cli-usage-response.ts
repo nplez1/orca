@@ -7,6 +7,68 @@ const SESSION_WINDOW_MINUTES = 300
 const WEEKLY_WINDOW_MINUTES = 10_080
 const FABLE_MODEL_NAME = 'fable'
 
+/**
+ * The CLI's own report of its plan windows, published as `rate_limit_event.rate_limit_info`.
+ *
+ * `utilization` is a 0–1 **fraction** here, unlike the usage endpoint's 0–100 `utilization` — hence
+ * the multiply in `cliWindowInput`. `resetsAt` is epoch seconds. Both windows live under
+ * `unifiedWindows`; a reply that omits it (an older CLI) reports only the representative window it
+ * last hit.
+ */
+type CliUnifiedWindow = {
+  utilization?: number
+  resetsAt?: number | string
+  status?: string
+}
+
+type CliRateLimitInfo = {
+  status?: string
+  resetsAt?: number | string
+  rateLimitType?: string
+  unifiedWindows?: {
+    five_hour?: CliUnifiedWindow | null
+    seven_day?: CliUnifiedWindow | null
+  } | null
+}
+
+function cliWindowInput(window: CliUnifiedWindow | null | undefined): ClaudeUsageWindowInput {
+  return {
+    utilization: typeof window?.utilization === 'number' ? window.utilization * 100 : undefined,
+    resets_at: window?.resetsAt
+  }
+}
+
+/**
+ * Map the CLI's `rate_limit_event` onto the provider snapshot the status bar renders.
+ *
+ * Null means the event carries no plan window — an API-key or Bedrock/Vertex account, or a CLI that
+ * reports only a status. The reading is the CLI's own, so it needs no endpoint and no token from Orca.
+ */
+export function mapClaudeCliRateLimitInfo(info: unknown): ProviderRateLimits | null {
+  const root = record(info)
+  if (!root) {
+    return null
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the CLI's own event shape; every field below is re-checked by the mappers.
+  const rateLimitInfo = root as CliRateLimitInfo
+  const unified = rateLimitInfo.unifiedWindows
+  const session = mapClaudeUsageWindow(cliWindowInput(unified?.five_hour), SESSION_WINDOW_MINUTES)
+  const weekly = mapClaudeUsageWindow(cliWindowInput(unified?.seven_day), WEEKLY_WINDOW_MINUTES)
+  if (!session && !weekly) {
+    return null
+  }
+  return {
+    provider: 'claude',
+    session,
+    weekly,
+    fableWeekly: null,
+    updatedAt: Date.now(),
+    error: null,
+    status: 'ok',
+    usageMetadata: { source: 'cli', attemptedSources: ['cli'] }
+  }
+}
+
 type CliScopedLimit = {
   kind?: string
   percent?: number

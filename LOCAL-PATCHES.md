@@ -293,7 +293,8 @@ running app. Convenience only — not for upstream.
 Anchor: `src/main/rate-limits/fork/claude-cli-usage-probe.ts`,
 `src/main/rate-limits/fork/claude-cli-usage-response.ts`,
 `src/main/rate-limits/fork/claude-active-usage-probe.ts`,
-`src/main/rate-limits/claude-active-usage-fetch.ts` (one probe-first hunk),
+`src/main/rate-limits/claude-active-usage-fetch.ts` (the endpoint-first hunks),
+`src/main/rate-limits/claude-oauth-credentials.ts` (the `settings-env` source),
 `src/main/rate-limits/service/service-fetch-policy.ts`,
 `src/main/rate-limits/service/service-polling.ts`,
 `src/main/rate-limits/service/service-provider-cycles.ts`,
@@ -354,14 +355,99 @@ no tokens; the 15-minute cadence is upstream's, not a new timer. It does write t
 `.claude.json` (Claude Code's own bookkeeping, with its rotating `.claude.json.backup.*`), which is
 the same write a session start makes.
 
+**The CLI probe went dead; a turn makes the CLI report again (2026-11-09).** On Claude CLI 2.1.319
+the `get_usage` control request still answers — with `rate_limits_available: false` and
+`subscription_type: null`, cold and again after a real API turn. So the probe returned `null` on every
+poll, the fetch fell through to `GET /api/oauth/usage`, and that endpoint answered **429 with
+`retry-after: 3593`** — measured on this machine the same minute. The status bar could then only move
+when a session posted a live receipt, which is the "open a session and say hello" symptom.
+
+Three changes, and one deliberately rejected:
+
+- **A turn is what makes the CLI report.** The CLI publishes `rate_limit_event.rate_limit_info` on its
+  own stream when it completes a turn: `unifiedWindows.{five_hour,seven_day}` with a 0–1 `utilization`
+  and an epoch-seconds `resetsAt`. Captured on 2.1.319 2026-11-09: `five_hour 0.02 / seven_day 0.15`.
+  The probe now sends one minimal prompt (`hi`, haiku) and reads that event, so **the Claude app makes
+  the call itself** — Orca sends no inference of its own, there is no impersonated client, and nothing
+  for a subscription-credential policy to object to. Measured through Orca's own spawn hook: 3.9 s wall, `session 2% / weekly 15%`,
+  ~$0.0026 and 73 tokens for the turn.
+- **`get_usage` is no longer tried first, and that is a measurement, not a preference.** Asking it costs
+  nothing and answers in 140 ms — but issuing it leaves the session unable to run the turn at all: the
+  stream then stalls until the deadline (measured twice, 60 s and 15 s budgets). One phase, one timeout.
+- **The probe must be handed the login.** It isolates itself with `settingSources: []`, which also hides
+  a login kept in the CLI's settings env, and `buildClaudeChildProcessEnv` strips inherited auth on
+  purpose. Without the token the child is unauthenticated and reports no limits — the first rewrite
+  timed out at 15 s for exactly this. `oauthToken` now travels into the child env.
+- **Rejected: reading the API's rate-limit headers from an Orca-issued completion.** It works (a
+  `max_tokens: 1` completion returns `anthropic-ratelimit-unified-{5h,7d}-utilization`), and it is
+  cheaper in tokens, but it sends _inference_ with a subscription token from a client posing as
+  `claude-code/2.1.0`. That is the use Anthropic restricts for third-party tools, and the worst case is
+  account action. Recorded here so a later reader does not "simplify" the probe back into it.
+
+**Accepted cost, stated plainly: a probe turn is inference, so it counts as activity in the 5-hour
+window.** While the endpoint is throttled the poll spends one small turn (~73 tokens, ~$0.0026) per
+interval, which means a window is effectively always running and a user's first real message lands
+inside one Orca opened rather than starting the clock itself. The rejected header approach had the same
+consequence, and this is not a reason to prefer it — it is the price of freshness while the sanctioned
+endpoint refuses to answer. It stops the moment the endpoint answers again, because the endpoint is
+asked first, and it never happens on a refusal the probe does not answer (`missing-scope`, `network`).
+
+**The endpoint is asked first, the probe second.** The endpoint is the sanctioned source and the only
+one carrying `fableWeekly` / `extraUsage` / `monthly`, so a healthy endpoint must never be shadowed by a
+probe reading that has none of them. The probe answers when the endpoint cannot: held by its own
+`Retry-After`, or refused — but **only for a refusal a turn can outlast**: `rate-limited` and `server`.
+`missing-scope` is excluded because it is permanent for a `claude setup-token` login (the usual value of
+`CLAUDE_CODE_OAUTH_TOKEN`, and so of the `settings-env` source), and probing it would spend a billed turn
+on every poll forever. For that same reason a `settings-env` login refused with `missing-scope` reports
+`unavailable` rather than an error: the base showed no segment for it, and an error row that never clears
+is worse than the calm absence it replaced. A refusal's own `Retry-After` is carried onto the probe reading it caused, or the
+next poll asks the endpoint again inside its own wait, which is what keeps a 429 window alive.
+
+**The login is where the CLI keeps it, not only where Orca looked.** `readClaudeOAuthCredentials` read
+the keychain and `.credentials.json`; this machine's login is `env.CLAUDE_CODE_OAUTH_TOKEN` in
+`~/.claude/settings.json`, with no keychain item and no credentials file at all. Every read therefore
+reported `missing-credentials` / "No subscription plan — API key billing", which is also what hid the
+segment entirely (an `unavailable` Claude snapshot renders no segment). A third source, `settings-env`,
+now reads `settings.local.json` then `settings.json` under the same resolved config dir — the order
+the code applies, and note that `settings.local.json` is Claude Code's project-scope file, so it only
+wins where it exists. It accepts `ANTHROPIC_AUTH_TOKEN` only when it starts `sk-ant-oat`, because that
+key also carries plain API keys and those have no plan. It reports `hasRefreshableCredentials: false`
+and no `refreshTarget` on purpose: the login belongs to the CLI's settings file, which Orca must never
+rewrite. The CLI itself prefers an environment token over its stored keychain login, so an account with
+both shows the keychain account's usage here — rare, and recorded rather than inverted. The same ordering
+means a keychain or `.credentials.json` login holding only a refresh token (no access token) loses to a
+settings-env token, where before Orca would have refreshed the stored login; that account still reads
+correctly, it just reads the settings login. `settings.local.json` is Claude Code's project-scope file,
+so for the System Default config dir it only applies to `cwd ~` — it is read first because that is the
+order the CLI applies them, not because it is a user-scope override.
+
+**Polling no longer requires a focused window, and the sync changed what that buys.** When this was
+written, `shouldBackgroundPoll` returned `isVisible() && !isMinimized() && isFocused()`, and a serve-mode
+host keeps its window hidden (`applyServeDesktopWindowActivationPolicy`) — so a remote host **never
+polled usage at all**. The `51c77320bc` sync brought upstream #37633 (`688adc4b4c2`), which adds
+`usageViewers > 0`: a paired client's `accounts.subscribe` stream registers as a viewer, so a remote host
+someone is watching already polls. **The M5-host symptom is upstream's now.** What this hunk still adds is
+polling for a desktop window nobody is watching — hidden or unfocused — so the numbers are already fresh
+when the user looks rather than refreshed on focus.
+
+That costs a probe turn per interval while the endpoint is throttled (see the cost note above), so it is
+a deliberate trade and the one piece of this patch a later reader may reasonably revert: delete the
+`return true` hunk, `fork/service-background-polling.test.ts` and this paragraph, and `usageViewers`
+covers the watched case on its own.
+
 **Tests that hold the line.** `fork/claude-cli-usage-response.test.ts` pins the payload mapping against
-a captured 2.1.316 reply; `fork/claude-cli-usage-probe.test.ts` pins command/cwd/env, the abort paths
-and the "no payload is not a reading" rule; `fork/claude-active-usage-fetch-probe.test.ts` pins
-probe-first (the endpoint is never called), the open `Retry-After` (the endpoint is not called but the
-fetch still reports the wait), the WSL/`usageError`/opt-out cases; `fork/service-claude-usage-probe.test.ts`
+a captured 2.1.316 reply and the `rate_limit_event` mapping against a captured 2.1.319 event;
+`fork/claude-cli-usage-probe.test.ts` pins command/cwd/env, the token handed to the child, the abort
+paths and the "no payload is not a reading" rule; `fork/claude-active-usage-fetch-probe.test.ts` pins
+endpoint-first (a healthy endpoint is never shadowed by a probe reading), the open `Retry-After`
+(the endpoint is not called but the fetch still reports the wait), the WSL/`usageError`/opt-out cases; `fork/service-claude-usage-probe.test.ts`
 pins that a `Retry-After` no longer freezes a lane on activation _or_ on the timer, and that the next
 fetch still receives the open wait (a user refresh receives `null`) — both plumbing hunks fail if
-dropped; `fork/claude-inactive-account-usage.test.ts` pins that a saved-account preview never probes.
+dropped; `fork/claude-inactive-account-usage.test.ts` pins that a saved-account preview never probes;
+`fork/claude-settings-env-credentials.test.ts` pins the source order (keychain → `.credentials.json` →
+`settings.local.json` → `settings.json`) and that a plain API key in `ANTHROPIC_AUTH_TOKEN` is never
+taken as a plan login; `fork/service-background-polling.test.ts` pins that the timer polls while the
+window is unfocused, hidden and minimized, and stops only when the window is gone.
 The upstream suites that described the endpoint-only platform (win32) now say so through
 `EndpointOnlyClaudeService`, which is the one behaviour split worth reading twice.
 
@@ -1379,6 +1465,14 @@ stale and `--prune` drops it. Each ratchet prints one line per offending entry, 
 `match` regex that allowlists that entry alone instead of the whole step — a whole-step entry also
 masks a new failure inside it, and only a whole-step entry may cover a step whose output the parser
 could not split.
+
+**Known red as of the 51c77320bc sync.** `check-upstream-file-comments` fails on the base commit
+`f4337166d22` with no changes from any branch — a detached worktree there measured 5414 fork comment
+lines against its 5269 baseline. The sync re-baselined the per-file maxima but not the total its own
+resolution added, and it renamed files the older entries pin (`git/worktrees/removal/*`,
+`ai-vault/transcripts/*`, `filesystem/host-tree-removal.ts`), so those rows no longer line up with
+their files. The entry pins the exact total, so any further growth is a new red; the real fix is a
+re-baseline with `--init --accept` in the sync that caused it, or moving that prose into this file.
 
 It is fork-local: upstream keeps `pnpm lint`'s exit code and CI is unchanged.
 `tests/tools/lint-gate.test.mjs` covers the chain reader, the per-step failure split and the

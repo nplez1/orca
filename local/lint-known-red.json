@@ -70,10 +70,10 @@
     },
     {
       "step": "check-upstream-file-comments",
-      "match": "^5413 fork comment lines in total, baseline 5269$",
-      "class": "fork-comment-growth-pre-sync",
-      "owner": "#277, #281, #283/#286, #287, #295",
-      "evidence": "The total red the per-file entries above add up to: 5413 measured against the new merge base, 5269 = 5413 minus the 144 pre-sync fork growth lines still in the tree (150 at the pre-sync tip, 6 of them in src/main/ipc/worktrees-create-metadata-persistence.test.ts, which upstream deleted). Pinned to the exact numbers, so any movement in the total is a new red.",
+      "match": "^5414 fork comment lines in total, baseline 5269$",
+      "class": "fork-comment-total-growth",
+      "owner": "fork sync 07239b228d6 (Merge upstream/main 51c77320bc, 1537 commits)",
+      "evidence": "The total moved 5413 -> 5414 after the 51c77320bc sync, and no per-file row explains it: measured identically at origin/nplez1/main (f4337166d22) in a detached worktree with no changes from any branch, and on the branch itself (5414 both, --verbose, zero per-file findings in rate-limits). So the base is the red, not the branch under it. Of the 145 lines over baseline, 144 belong to the per-file rows above and were added by the five fork PRs they name; this row covers the remaining line the sync itself added without re-baselining the total. Fix by re-baselining with --init --accept in the sync that caused it, or by moving that prose into LOCAL-PATCHES.md. The match pins the exact total, so any further growth is a new red.",
       "flaky": false
     }
   ]

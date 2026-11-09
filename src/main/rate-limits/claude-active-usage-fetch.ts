@@ -1,4 +1,8 @@
-import type { ProviderRateLimits, UsageRateLimitMetadata } from '../../shared/rate-limit-types'
+import type {
+  ProviderRateLimits,
+  UsageRateLimitFailureKind,
+  UsageRateLimitMetadata
+} from '../../shared/rate-limit-types'
 import {
   refreshClaudeOAuthCredentials,
   type ClaudeOAuthRefreshOutcome
@@ -16,10 +20,22 @@ import { abortedClaudeRateLimitResult, makeClaudeUsageResult } from './claude-us
 import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../shared/claude-profile-routing'
 import {
   claudeUsageEndpointGatedResult,
+  openEndpointRetryAtMs,
   readActiveClaudeUsageFromProbe
 } from './fork/claude-active-usage-probe'
 
 const SIGN_IN_AGAIN = 'Sign in again to use this account.'
+
+// fork-comment-ok: which refusals a probe turn can outlast (local(usage)).
+/**
+ * Only transient refusals: a throttle or a server fault clears, so a turn spent now buys a reading.
+ * `missing-scope`, `network` and `unknown` would otherwise spend a billed turn on every poll forever,
+ * and `missing-scope` is permanent for a `claude setup-token` login.
+ */
+const PROBE_ANSWERS_FAILURE: ReadonlySet<UsageRateLimitFailureKind> = new Set([
+  'rate-limited',
+  'server'
+])
 
 /**
  * Usage observes the account and never refreshes on a timer.
@@ -41,20 +57,30 @@ export async function fetchActiveClaudeRateLimits(
   if (options?.signal?.aborted) {
     return abortedClaudeRateLimitResult()
   }
-  // fork-comment-ok: the plan reading the endpoint's rate limit cannot take away (local(usage)).
-  const probed = await readActiveClaudeUsageFromProbe(options)
-  if (probed) {
-    return probed
-  }
-  if (options?.signal?.aborted) {
-    return abortedClaudeRateLimitResult()
-  }
   const credentials = await readClaudeOAuthCredentials(
     resolveClaudeOAuthCredentialReadOptions(options?.authPreparation)
   )
   const metadata = {
     credentialSource: credentials.source,
     authProvenance: options?.authPreparation?.provenance ?? 'system'
+  }
+  // fork-comment-ok: fork-only source ordering; see LOCAL-PATCHES.md `local(usage)`.
+  // Why the endpoint is asked before the CLI probe: the endpoint is the sanctioned source and the
+  // only one carrying `fableWeekly` / `extraUsage` / `monthly`, so a healthy endpoint must not be
+  // shadowed. The probe answers when the endpoint cannot — held by its own Retry-After, or refused.
+  const gatedRetryAtMs = openEndpointRetryAtMs(options)
+  // fork-comment-ok: an API-key account has no plan, so a turn spent here would be billed for a reading it cannot produce.
+  if (gatedRetryAtMs !== null && (credentials.token || credentials.hasRefreshableCredentials)) {
+    const probed = await readActiveClaudeUsageFromProbe(options, undefined, probeToken(credentials))
+    if (probed) {
+      return probed
+    }
+    if (options?.signal?.aborted) {
+      return abortedClaudeRateLimitResult()
+    }
+  }
+  if (options?.signal?.aborted) {
+    return abortedClaudeRateLimitResult()
   }
   // System Default without login may be an API-key/non-Claude user, not a signed-out account.
   if (
@@ -86,9 +112,9 @@ export async function fetchActiveClaudeRateLimits(
       attemptedSources: []
     })
   }
-  const gatedRetryAtMs = endpointRetryAtMs(options)
-  if (gatedRetryAtMs !== null) {
-    return claudeUsageEndpointGatedResult(metadata, gatedRetryAtMs)
+  const refreshGateMs = openEndpointRetryAtMs(options)
+  if (refreshGateMs !== null) {
+    return claudeUsageEndpointGatedResult(metadata, refreshGateMs)
   }
   // Why: a stored refresh token is the login; exchange it before asking for a sign-in.
   const outcome = await refreshStoredClaudeLogin(credentials, null)
@@ -109,15 +135,41 @@ async function readClaudeUsage(
   options: ClaudeRateLimitFetchOptions | undefined,
   refreshedAlready = false
 ): Promise<ProviderRateLimits> {
-  const gatedRetryAtMs = endpointRetryAtMs(options)
+  const gatedRetryAtMs = openEndpointRetryAtMs(options)
   if (gatedRetryAtMs !== null) {
     return claudeUsageEndpointGatedResult(metadata, gatedRetryAtMs)
   }
   try {
     return await fetchClaudeOAuthUsage(token, options?.signal)
   } catch (error) {
+    if (options?.signal?.aborted) {
+      return abortedClaudeRateLimitResult()
+    }
     const classification = classifyClaudeOAuthUsageError(error)
+    // fork-comment-ok: a refused token must not be handed to the probe; the refresh is what fixes the account.
     if (!classification.shouldAttemptCredentialRefresh) {
+      // fork-comment-ok: the probe answers only for a refusal a turn can outlast (local(usage)).
+      if (PROBE_ANSWERS_FAILURE.has(classification.failureKind)) {
+        const probed = await readActiveClaudeUsageFromProbe(
+          options,
+          undefined,
+          probeToken(credentials)
+        )
+        if (probed) {
+          return withEndpointWait(probed, error)
+        }
+        if (options?.signal?.aborted) {
+          return abortedClaudeRateLimitResult()
+        }
+      }
+      // fork-comment-ok: a setup token has no profile scope, so this refusal is permanent (local(usage)).
+      if (classification.failureKind === 'missing-scope' && credentials.source === 'settings-env') {
+        return makeClaudeUsageResult('unavailable', 'No subscription plan — API key billing', {
+          ...metadata,
+          failureKind: 'missing-scope',
+          attemptedSources: ['oauth']
+        })
+      }
       return usageFailureResult(error, classification.failureKind, metadata)
     }
     // Why: a token this poll already spent is not spent again.
@@ -135,10 +187,20 @@ async function readClaudeUsage(
   }
 }
 
-function endpointRetryAtMs(options: ClaudeRateLimitFetchOptions | undefined): number | null {
-  // fork-comment-ok: an open Retry-After gates the endpoint request only, never the CLI probe.
-  const retryAtMs = options?.usageEndpointRetryAtMs
-  return retryAtMs && retryAtMs > Date.now() ? retryAtMs : null
+// fork-comment-ok: only a settings-env login has to be injected (local(usage)).
+function probeToken(credentials: ClaudeOAuthCredentialReadResult): string | null {
+  return credentials.source === 'settings-env' ? credentials.token : null
+}
+
+// fork-comment-ok: the refusal's own Retry-After must survive onto the reading it caused (local(usage)).
+function withEndpointWait(reading: ProviderRateLimits, error: unknown): ProviderRateLimits {
+  const retryAfterMs = error instanceof OAuthUsageError ? error.retryAfterMs : null
+  return retryAfterMs
+    ? {
+        ...reading,
+        usageMetadata: { ...reading.usageMetadata, retryAtMs: Date.now() + retryAfterMs }
+      }
+    : reading
 }
 
 function refreshStoredClaudeLogin(

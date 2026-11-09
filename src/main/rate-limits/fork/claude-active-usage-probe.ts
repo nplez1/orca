@@ -12,7 +12,8 @@ import { readClaudeUsageFromCli, type ClaudeUsageProbeDeps } from './claude-cli-
  */
 export async function readActiveClaudeUsageFromProbe(
   options: ClaudeRateLimitFetchOptions | undefined,
-  deps?: ClaudeUsageProbeDeps
+  deps?: ClaudeUsageProbeDeps,
+  oauthToken?: string | null
 ): Promise<ProviderRateLimits | null> {
   const authPreparation = options?.authPreparation
   if (!options?.allowUsagePanelSupplement || authPreparation?.usageError) {
@@ -27,6 +28,7 @@ export async function readActiveClaudeUsageFromProbe(
   const reading = await readClaudeUsageFromCli(
     {
       envPatch: authPreparation?.envPatch,
+      ...(oauthToken ? { oauthToken } : {}),
       ...(options.signal ? { signal: options.signal } : {})
     },
     deps
@@ -36,8 +38,7 @@ export async function readActiveClaudeUsageFromProbe(
   }
   // Why keep it: the endpoint's wait is still the endpoint's, and carrying it means a probe that
   // fails inside that window cannot spend the request the endpoint asked Orca to hold.
-  const openRetryAtMs = options.usageEndpointRetryAtMs
-  const retryAtMs = openRetryAtMs && openRetryAtMs > Date.now() ? openRetryAtMs : null
+  const retryAtMs = openEndpointRetryAtMs(options)
   return {
     ...reading,
     usageMetadata: {
@@ -46,6 +47,14 @@ export async function readActiveClaudeUsageFromProbe(
       authProvenance: authPreparation?.provenance ?? 'system'
     }
   }
+}
+
+/** The endpoint's own Retry-After, while it is still open. */
+export function openEndpointRetryAtMs(
+  options: ClaudeRateLimitFetchOptions | undefined
+): number | null {
+  const retryAtMs = options?.usageEndpointRetryAtMs
+  return retryAtMs && retryAtMs > Date.now() ? retryAtMs : null
 }
 
 /**

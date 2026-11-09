@@ -118,7 +118,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxConfigChanged = currentMiniMaxConfigHash !== this.lastMiniMaxConfigHash
     const miniMaxGeneration = this.syncMiniMaxFetchGeneration(currentMiniMaxConfigHash)
 
-
     const zcodePlanConfigResult = this.resolveZcodePlanConfig()
     const zcodePlanApiKey = zcodePlanConfigResult.config.apiKey
     // Hash credentials because only changes matter, never retain the raw key here.

@@ -61,11 +61,12 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return false
     }
-    // UI-only polling pauses while inactive to save CLI/API budget; activation refreshes it.
-    if (!this.mainWindow.isVisible() || this.mainWindow.isMinimized()) {
-      return false
-    }
-    return this.mainWindow.isFocused()
+    // fork-comment-ok: an unwatched desktop window polls too; see LOCAL-PATCHES.md `local(usage)`.
+    // Why beyond upstream: `usageViewers` covers a watched host, so what this adds is a hidden or
+    // unfocused desktop window — fresh numbers before the user looks, at one probe turn per interval
+    // while the usage endpoint is throttled. Deliberately revertible; the paragraph in LOCAL-PATCHES
+    // names the three things to delete.
+    return true
   }
 
   protected getActiveProviderState(): ActiveProviderState[] {

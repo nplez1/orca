@@ -2,7 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchActiveClaudeRateLimits } from '../claude-active-usage-fetch'
 import { fetchClaudeOAuthUsage } from '../claude-oauth-usage-request'
 import { readClaudeOAuthCredentials } from '../claude-oauth-credentials'
+import { refreshClaudeOAuthCredentials } from '../../claude-accounts/claude-oauth-token-refresh'
+import { OAuthUsageError } from '../claude-oauth-usage-error'
 import { readClaudeUsageFromCli } from './claude-cli-usage-probe'
+
+const RETRY_AFTER_MS = 3_593_000
+
+/** The shape the endpoint's own 429 produces; a plain Error classifies as `unknown`, not rate-limited. */
+function rateLimitedError(retryAfterMs: number | null = null): OAuthUsageError {
+  return new OAuthUsageError('Rate limited. Please try again later.', 429, true, retryAfterMs)
+}
 
 const cliReading = {
   provider: 'claude' as const,
@@ -21,6 +30,9 @@ vi.mock('../claude-oauth-credentials', () => ({
   resolveClaudeOAuthCredentialReadOptions: () => undefined
 }))
 vi.mock('./claude-cli-usage-probe', () => ({ readClaudeUsageFromCli: vi.fn() }))
+vi.mock('../../claude-accounts/claude-oauth-token-refresh', () => ({
+  refreshClaudeOAuthCredentials: vi.fn()
+}))
 vi.mock('../../claude-accounts/claude-profile-installed-router', () => ({
   getClaudeProfileRouter: () => undefined,
   getClaudeWslProfileRouter: () => undefined
@@ -61,7 +73,8 @@ beforeEach(() => {
 })
 
 describe('Claude usage without a running session', () => {
-  it('answers from the CLI probe instead of the rate-limited usage endpoint', async () => {
+  it('answers from the CLI probe once the endpoint refuses', async () => {
+    vi.mocked(fetchClaudeOAuthUsage).mockRejectedValueOnce(rateLimitedError())
     vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
 
     const result = await fetchActiveClaudeRateLimits({
@@ -72,8 +85,6 @@ describe('Claude usage without a running session', () => {
     expect(result.session?.usedPercent).toBe(31)
     expect(result.usageMetadata?.source).toBe('cli')
     expect(result.usageMetadata?.authProvenance).toBe('profile:a')
-    // The whole point: the endpoint that answers 429 was never asked.
-    expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
   })
 
   it('carries an open endpoint wait through a probe reading that answers', async () => {
@@ -161,10 +172,99 @@ describe('Claude usage without a running session', () => {
     const result = await fetchActiveClaudeRateLimits({
       ...profileOptions,
       allowUsagePanelSupplement: true,
+      usageEndpointRetryAtMs: OPEN_ENDPOINT_GATE,
       signal: controller.signal
     })
 
     expect(result.error).toBe('Rate-limit fetch aborted')
     expect(fetchClaudeOAuthUsage).not.toHaveBeenCalled()
+  })
+})
+
+describe('Claude usage when the endpoint cannot answer', () => {
+  it('carries the refusal own Retry-After onto the probe reading', async () => {
+    vi.mocked(fetchClaudeOAuthUsage).mockRejectedValueOnce(rateLimitedError(RETRY_AFTER_MS))
+    vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
+
+    const result = await fetchActiveClaudeRateLimits({
+      ...profileOptions,
+      allowUsagePanelSupplement: true
+    })
+
+    expect(result.session?.usedPercent).toBe(31)
+    // Why: without this the next poll asks the endpoint again inside its own wait, which is what
+    // keeps a 429 window alive. Measured against the reading's own stamp, never the test's clock.
+    expect((result.usageMetadata?.retryAtMs ?? 0) - result.updatedAt).toBeGreaterThanOrEqual(
+      RETRY_AFTER_MS - 1
+    )
+  })
+
+  it('hands a settings-env login to the child, which cannot see the settings file itself', async () => {
+    vi.mocked(readClaudeOAuthCredentials).mockResolvedValue({
+      token: 'sk-ant-oat01-settings',
+      hasRefreshableCredentials: false,
+      source: 'settings-env'
+    })
+    vi.mocked(fetchClaudeOAuthUsage).mockRejectedValueOnce(rateLimitedError())
+    vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
+
+    await fetchActiveClaudeRateLimits({ ...profileOptions, allowUsagePanelSupplement: true })
+
+    expect(vi.mocked(readClaudeUsageFromCli).mock.calls[0][0]?.oauthToken).toBe(
+      'sk-ant-oat01-settings'
+    )
+  })
+
+  it('spends no turn on a refusal a probe cannot outlast', async () => {
+    vi.mocked(fetchClaudeOAuthUsage).mockRejectedValueOnce(
+      new OAuthUsageError('This token lacks the user:profile scope.', 403, true, null)
+    )
+    vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
+
+    const result = await fetchActiveClaudeRateLimits({
+      ...profileOptions,
+      allowUsagePanelSupplement: true
+    })
+
+    expect(readClaudeUsageFromCli).not.toHaveBeenCalled()
+    expect(result.usageMetadata?.failureKind).toBe('missing-scope')
+  })
+
+  it('reaches the refresh on a refused token without spending a turn first', async () => {
+    vi.mocked(fetchClaudeOAuthUsage)
+      .mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+      .mockRejectedValueOnce(rateLimitedError(RETRY_AFTER_MS))
+    vi.mocked(refreshClaudeOAuthCredentials).mockResolvedValue({
+      status: 'refreshed',
+      accessToken: 'sk-ant-oat01-refreshed',
+      exchanged: false
+    })
+    vi.mocked(readClaudeUsageFromCli).mockResolvedValue(cliReading)
+
+    const result = await fetchActiveClaudeRateLimits({
+      ...profileOptions,
+      allowUsagePanelSupplement: true
+    })
+
+    // Why: the refused token is never handed to the CLI, which prefers an env token over its own login.
+    expect(readClaudeUsageFromCli).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(readClaudeUsageFromCli).mock.calls[0][0]?.oauthToken).toBeUndefined()
+    expect(result.session?.usedPercent).toBe(31)
+  })
+
+  it('asks the endpoint first so a healthy one keeps the spend cap and credits it alone reports', async () => {
+    vi.mocked(fetchClaudeOAuthUsage).mockResolvedValue({
+      ...cliReading,
+      usageMetadata: { source: 'oauth', attemptedSources: ['oauth'] }
+    })
+
+    const result = await fetchActiveClaudeRateLimits({
+      ...profileOptions,
+      allowUsagePanelSupplement: true
+    })
+
+    expect(fetchClaudeOAuthUsage).toHaveBeenCalledTimes(1)
+    expect(readClaudeUsageFromCli).not.toHaveBeenCalled()
+    expect(result.usageMetadata?.source).toBe('oauth')
   })
 })
