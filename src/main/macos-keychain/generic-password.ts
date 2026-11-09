@@ -1,6 +1,10 @@
 import { execFile } from 'node:child_process'
+import { runProcess } from '@orca/process-host'
 
 const KEYCHAIN_COMMAND_TIMEOUT_MS = 3_000
+const SECURITY_BINARY = '/usr/bin/security'
+const SECURITY_INTERACTIVE_MAX_LINE_BYTES = 4096
+const UNSAFE_KEYCHAIN_NAME = /[\r\n"\\]/
 
 type SecurityCommandResult = {
   stdout: string
@@ -110,16 +114,49 @@ export async function writeKeychainPassword(
   if (process.platform !== 'darwin') {
     throw new Error('Writing a macOS Keychain item is only supported on macOS.')
   }
-  await execSecurityCommand([
-    'add-generic-password',
-    '-U',
-    '-s',
-    service,
-    '-a',
-    account,
-    '-X',
-    encodeKeychainPayload(contents)
-  ])
+  if (UNSAFE_KEYCHAIN_NAME.test(service) || UNSAFE_KEYCHAIN_NAME.test(account)) {
+    throw new Error('The macOS Keychain item name is invalid.')
+  }
+  const encoded = encodeKeychainPayload(contents)
+  const line = `add-generic-password -U -s "${service}" -a "${account}" -X "${encoded}"\n`
+  const interactive = Buffer.byteLength(line) <= SECURITY_INTERACTIVE_MAX_LINE_BYTES
+  if (!interactive) {
+    console.warn(
+      `[macos-keychain] item payload (${Buffer.byteLength(encoded)} bytes) exceeds the security -i line limit; writing via argv`
+    )
+  }
+  await writeKeychainItem(
+    interactive
+      ? ['-i']
+      : ['add-generic-password', '-U', '-s', service, '-a', account, '-X', encoded],
+    interactive ? line : undefined,
+    `${service}/${account}`
+  )
+}
+
+async function writeKeychainItem(
+  args: string[],
+  input: string | undefined,
+  item: string
+): Promise<void> {
+  let code: number | null = null
+  try {
+    const result = await runProcess({
+      program: SECURITY_BINARY,
+      args,
+      input,
+      timeoutMs: KEYCHAIN_COMMAND_TIMEOUT_MS,
+      maxOutputBytes: 64 * 1024
+    })
+    if (result.code === 0 && !result.timedOut && !result.signal && !result.outputTruncated) {
+      return
+    }
+    code = result.code
+  } catch {
+    code = null
+  }
+  const failure = new Error(`Could not write macOS Keychain item ${item}.`)
+  throw code === null ? failure : Object.assign(failure, { code })
 }
 
 export async function readKeychainPassword(
