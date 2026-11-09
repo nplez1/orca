@@ -194,6 +194,7 @@ describe('applying a payload on the receiving host', () => {
     const { report, state } = applyHostSettingsPayload({
       payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
       registry: createHostSettingsCredentialRegistry([port]),
+      replicatedIds: [CREDENTIAL_ID],
       now: NOW
     })
 
@@ -209,11 +210,64 @@ describe('applying a payload on the receiving host', () => {
     const { report, state } = applyHostSettingsPayload({
       payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
       registry: createHostSettingsCredentialRegistry([port]),
+      replicatedIds: [CREDENTIAL_ID],
       now: NOW
     })
 
     expect(report.outcomes).toEqual({ [CREDENTIAL_ID]: 'removalUnverified' })
     expect(state).toMatchObject({ kind: 'partial', refusals: [CREDENTIAL_ID] })
+  })
+
+  it('leaves a value the user entered on this host alone when a removal names it', () => {
+    const port = fakePort({ existing: { payload: 'mine', protection: 'sealed' } })
+    const remove = vi.fn(port.remove)
+    port.remove = remove
+
+    const { report, state } = applyHostSettingsPayload({
+      payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
+      registry: createHostSettingsCredentialRegistry([port]),
+      now: NOW
+    })
+
+    // Why the value stands: this host's owner supplied it, so the main deleting its own copy is not a
+    // licence to delete this one.
+    expect(port.held.payload).toBe('mine')
+    expect(remove).not.toHaveBeenCalled()
+    expect(report.outcomes).toEqual({ [CREDENTIAL_ID]: 'keptHostValue' })
+    expect(state).toMatchObject({ kind: 'partial', refusals: [CREDENTIAL_ID] })
+  })
+
+  it('reports a removal of a credential this host does not hold as gone, without touching the store', () => {
+    const port = fakePort()
+    const remove = vi.fn(port.remove)
+    port.remove = remove
+
+    const { report, state } = applyHostSettingsPayload({
+      payload: payload({ upserts: [], removals: [CREDENTIAL_ID] }),
+      registry: createHostSettingsCredentialRegistry([port]),
+      now: NOW
+    })
+
+    // Why `removed` rather than a refusal: the store answering `null` is the proof the credential is not
+    // here, and calling a clean host `partial` for an id it never received would hide a real divergence.
+    expect(remove).not.toHaveBeenCalled()
+    expect(report.outcomes).toEqual({ [CREDENTIAL_ID]: 'removed' })
+    expect(state).toMatchObject({ kind: 'synced' })
+  })
+
+  it('lets the upsert decide when one payload names the same id for writing and removal', () => {
+    const port = fakePort()
+
+    const { report } = applyHostSettingsPayload({
+      payload: payload({ upserts: [credential()], removals: [CREDENTIAL_ID] }),
+      registry: createHostSettingsCredentialRegistry([port]),
+      now: NOW
+    })
+
+    // Why the write wins: reporting the removal as the host's own value would drop the id from the
+    // record of what replication put here, orphaning the copy that was just written.
+    expect(port.held.payload).toBe('incoming-key')
+    expect(report.outcomes).toEqual({ [CREDENTIAL_ID]: 'applied' })
   })
 
   it('resolves an id to the most specific adapter when kinds share a prefix', () => {

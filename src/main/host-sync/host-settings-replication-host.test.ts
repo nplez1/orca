@@ -427,8 +427,42 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
   })
 
+  it('leaves a key the user entered here when a delta names it for removal', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings({
+      ids: [],
+      revision: 1,
+      syncedAt: NOW,
+      mainFingerprint: null,
+      mainDeviceId: null
+    })
+    const port = fakePort()
+    port.held.set(CREDENTIAL_ID, 'sk-host-own')
+
+    // The main's copy of this id went unreadable during an earlier push, so its record named the id and
+    // the delta that follows its deletion lists it for removal — but this host's value was never its.
+    const result = applyHostSettingsReplication(
+      { ...snapshot(2, [], [CREDENTIAL_ID]), baseRevision: 1 },
+      { registry: registry(port), holdings, now: NOW }
+    )
+
+    expect(port.held.get(CREDENTIAL_ID)).toBe('sk-host-own')
+    expect(result).toMatchObject({
+      decision: 'applied',
+      report: { outcomes: { [CREDENTIAL_ID]: 'keptHostValue' } }
+    })
+    expect(holdings.read().ids).toEqual([])
+  })
+
   it('keeps going when one removal fails, and does not claim it is gone', () => {
-    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    // Seeded as a delta on a host that holds both: a snapshot with seeded ids would sweep them a second
+    // time, so the removal this test is about would run twice.
+    const holdings = createInMemoryHostSettingsReplicationHoldings({
+      ids: [CREDENTIAL_ID, 'api-key:other'],
+      revision: 1,
+      syncedAt: NOW,
+      mainFingerprint: null,
+      mainDeviceId: null
+    })
     const stubborn = credential({ id: 'api-key:other' })
     const port = fakePort()
     port.held.set(CREDENTIAL_ID, 'old')
@@ -441,7 +475,7 @@ describe('applying a payload on the host', () => {
     }
 
     const result = applyHostSettingsReplication(
-      { ...snapshot(1, [], [CREDENTIAL_ID, 'api-key:other']) },
+      { ...snapshot(2, [], [CREDENTIAL_ID, 'api-key:other']), baseRevision: 1 },
       { registry: registry(port), holdings, now: NOW }
     )
 

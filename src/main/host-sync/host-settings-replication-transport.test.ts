@@ -75,7 +75,122 @@ function acceptingTransport(
   }
 }
 
+/**
+ * A main-side port whose credential can become unreadable, the way a locked keyring makes it.
+ *
+ * Why the switch rather than a fixed port: the issue's repro needs the id present in `unreadable` while
+ * absent from `upserts`, which is exactly what a main that cannot read its own keyring reports.
+ */
+function readablePort(state: {
+  value: string | null
+  readable: boolean
+}): HostSettingsCredentialPort {
+  return {
+    kind: CREDENTIAL_ID,
+    canSeal: () => true,
+    unreadableIds: () => (state.value !== null && !state.readable ? [CREDENTIAL_ID] : []),
+    protectionOf: () => (state.value === null ? null : 'sealed'),
+    list: () =>
+      state.value === null || !state.readable
+        ? []
+        : [
+            {
+              id: CREDENTIAL_ID,
+              kind: CREDENTIAL_ID,
+              label: 'DeepSeek API key',
+              protection: 'sealed',
+              onlyIfEmpty: false,
+              payload: state.value
+            }
+          ],
+    apply: () => {},
+    remove: () => {}
+  }
+}
+
+/**
+ * A host as a build before this fix behaves: it keeps a value it already holds, and deletes whatever
+ * `removals` names.
+ *
+ * Why model the old behaviour instead of the fixed one: the main must not rely on a host filtering its
+ * own removals, because a host still on the older build does not.
+ */
+function olderHostTransport(host: { value: string | null }): HostSettingsReplicationTransport & {
+  sent: HostSettingsReplicationPayload[]
+} {
+  const sent: HostSettingsReplicationPayload[] = []
+  return {
+    sent,
+    send: async (_environmentId, payload) => {
+      sent.push(payload)
+      const outcomes: Record<string, HostSettingsApplyOutcome> = {}
+      for (const credential of payload.upserts) {
+        if (host.value === null) {
+          host.value = credential.payload
+          outcomes[credential.id] = 'applied'
+        } else {
+          outcomes[credential.id] = 'keptHostValue'
+        }
+      }
+      for (const id of payload.removals) {
+        host.value = null
+        outcomes[id] = 'removed'
+      }
+      return {
+        kind: 'applied',
+        report: { revision: payload.revision, outcomes },
+        state: { kind: 'synced', revision: payload.revision, syncedAt: 1 }
+      }
+    }
+  }
+}
+
 describe('publishing to a paired host', () => {
+  it('never names an unreadable credential the host did not take, so the host keeps its own', async () => {
+    const main: { value: string | null; readable: boolean } = { value: 'sk-main', readable: true }
+    const host: { value: string | null } = { value: 'sk-host-own' }
+    const transport = olderHostTransport(host)
+    const publisher = createHostSettingsReplicationPublisher({
+      ports: [readablePort(main)],
+      transport
+    })
+
+    await publisher.publish(HOST, 'attach')
+    // The main's keyring locks, so it can name the id but not read it.
+    main.readable = false
+    await publisher.publish(HOST, 'changed')
+    // The user then deletes the credential on the main, and the next delta is what carries the removal.
+    main.value = null
+    await publisher.publish(HOST, 'changed')
+
+    // Why this must stay empty: the host's value is the user's own, and a host on the older build deletes
+    // whatever a removal names — which is the issue's repro.
+    expect(transport.sent[2]?.removals).toEqual([])
+    expect(host.value).toBe('sk-host-own')
+  })
+
+  it('still names an unreadable credential the host does hold, so a later deletion reaches it', async () => {
+    const main: { value: string | null; readable: boolean } = { value: 'sk-main', readable: true }
+    const host: { value: string | null } = { value: null }
+    const transport = olderHostTransport(host)
+    const publisher = createHostSettingsReplicationPublisher({
+      ports: [readablePort(main)],
+      transport
+    })
+
+    await publisher.publish(HOST, 'attach')
+    expect(host.value).toBe('sk-main')
+    main.readable = false
+    await publisher.publish(HOST, 'changed')
+    main.value = null
+    await publisher.publish(HOST, 'changed')
+
+    // Why the removal must still travel: dropping every unreadable id would leave a revoked credential on
+    // a host that really holds it, which is the loss the carry exists to prevent.
+    expect(transport.sent[2]?.removals).toEqual([CREDENTIAL_ID])
+    expect(host.value).toBeNull()
+  })
+
   it('sends a snapshot when a host has just been attached', async () => {
     const transport = acceptingTransport()
     const publisher = createHostSettingsReplicationPublisher({ ports: [port(true)], transport })

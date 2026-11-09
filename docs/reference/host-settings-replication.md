@@ -17,11 +17,25 @@ what the "pin" does and does not protect. The implementation is
 ## What a host will and will not delete
 
 A removal deletes only ids in the host's own _replicated_ record. A credential the user entered on this
-host is not in that record, so replication never removes it. Two exclusions exist so a transient local
-fault cannot look like a deliberate removal:
+host is not in that record, so replication never removes it: the removal is reported `keptHostValue` and
+the value stands. A removal naming an id the host holds nothing under is reported `removed` — the store
+answering with nothing is the proof — so a stale record on the main cannot make a clean host look
+partially synced. Two exclusions exist so a transient local fault cannot look like a deliberate removal:
 
 - `unreadable` credentials (a locked keyring) are never treated as absent;
 - a snapshot's stranded sweep skips them for the same reason.
+
+An id the main cannot read is carried against a host only when that host already held it as a replica.
+Recording an unreadable id the host never received would claim a credential the user supplied on the
+host, and the next removal would then delete it. Two costs follow, both narrow: a replica that went
+unreadable and was then revoked while the main was restarted stays on the host until its next
+reconnect, whose snapshot sweeps it from the host's own record; and a replica whose host lost that
+record cannot be reached by a removal at all, because a removal carries no value that could prove where
+the copy came from.
+
+Whatever deletes credentials on a host must go through the same gate. `revokeReplicatedCredential`
+(which has no transport yet) must not delete an id the host reported as its own, or the ledger's
+willingness to list too much would turn into deleting the user's key.
 
 ## What the pin does
 
