@@ -57,6 +57,9 @@ export function applyHostSettingsPayload(input: {
    * entered on this machine — and overwriting it with the main's value makes the id a replicated
    * holding, so the main's later revocation deletes a credential the host's owner supplied. Only the
    * host knows which of its own values came from a push, so `onlyIfEmpty` cannot express this.
+   *
+   * Why it gates removals as well as writes: deleting on the main's word is only safe for the ids on
+   * this list, so a removal naming anything else leaves the host's own value alone.
    */
   replicatedIds?: readonly string[]
 }): { report: HostSettingsApplyReport; state: HostSettingsSyncState } {
@@ -132,9 +135,22 @@ export function applyHostSettingsPayload(input: {
   }
 
   for (const id of payload.removals) {
+    // Why the upsert settles a payload that names one id in both lists: the write already happened, and
+    // reporting it as the host's own value would drop the id from its record and orphan the main's copy.
+    if (outcomes[id] !== undefined) {
+      continue
+    }
     const port = registry.forCredentialId(id)
     if (!port) {
       outcomes[id] = 'refusedUnknownKind'
+      continue
+    }
+    // Why the record decides rather than the payload: a value the user entered on this host was never
+    // replication's, so the main naming it for removal must not delete it. A host that holds nothing
+    // under the id is the other half of the same test — the store answering `null` is the proof it is
+    // gone, which keeps a stale main record from making an otherwise clean host report `partial`.
+    if (!replicated.has(id)) {
+      outcomes[id] = port.protectionOf(id) === null ? 'removed' : 'keptHostValue'
       continue
     }
     // Why per removal: an unlink can fail for reasons that have nothing to do with us — EBUSY under a

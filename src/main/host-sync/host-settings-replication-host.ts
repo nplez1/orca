@@ -173,6 +173,9 @@ export function applyHostSettingsReplication(
     contractPayload.baseRevision === null
       ? record.ids.filter((id) => !incoming.has(id) && !unreadable.has(id))
       : []
+  // The same condition `recoverReplicatedIds` treats as unknown provenance: nothing on this host can be
+  // shown to be replication's, so the main's own record is the only evidence there is.
+  const recordProvenanceUnknown = record.ids.length === 0 && record.revision === null
 
   const { report, state } = applyHostSettingsPayload({
     payload:
@@ -181,8 +184,18 @@ export function applyHostSettingsReplication(
         : { ...contractPayload, removals: [...contractPayload.removals, ...stranded] },
     registry,
     // Why the record rather than the payload: it is the only list of what replication put here, and a
-    // value on the host that is not in it is the user's own — see `applyHostSettingsPayload`.
-    replicatedIds: [...record.ids, ...recoverReplicatedIds(registry, contractPayload, record)],
+    // value on the host that is not in it is the user's own — see `applyHostSettingsPayload`, which gates
+    // a deletion on this list as well as an overwrite.
+    //
+    // Why a removal counts as replicated when this host has no record at all: a corrupt holdings file
+    // reads back empty, and a removal names an id the main once put here, so refusing it would leave a
+    // credential the user revoked on this host for good. An honest main of this build cannot name an id
+    // it never sent, because it records a holding only for what this host reported taking.
+    replicatedIds: [
+      ...record.ids,
+      ...recoverReplicatedIds(registry, contractPayload, record),
+      ...(recordProvenanceUnknown ? contractPayload.removals : [])
+    ],
     now: options.now ?? Date.now()
   })
 

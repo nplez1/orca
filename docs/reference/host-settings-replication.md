@@ -16,12 +16,34 @@ what the "pin" does and does not protect. The implementation is
 
 ## What a host will and will not delete
 
-A removal deletes only ids in the host's own _replicated_ record. A credential the user entered on this
-host is not in that record, so replication never removes it. Two exclusions exist so a transient local
-fault cannot look like a deliberate removal:
+A removal deletes only ids in the host's own _replicated_ record — or, when this host has no record at
+all, any id the main names for removal (below). A credential the user entered on this host is not in
+that record, so replication never removes it: the removal is reported `keptHostValue` and the value
+stands. A removal naming an id the host holds nothing under is reported `removed` — the store answering
+with nothing is the proof — so a stale record on the main cannot make a clean host look partially
+synced. Two exclusions exist so a transient local fault cannot look like a deliberate removal:
 
 - `unreadable` credentials (a locked keyring) are never treated as absent;
 - a snapshot's stranded sweep skips them for the same reason.
+
+An id the main cannot read is carried against a host only when that host already held it as a replica.
+Recording an unreadable id the host never received would claim a credential the user supplied on the
+host, and the next removal would then delete it. The narrow cost: a replica that was unreadable when
+the main started and was then revoked before that host reconnected stays on the host until its next
+reconnect, whose snapshot sweeps it from the host's own record.
+
+A host that has lost its own record is the mirror case, resolved the other way. Nothing on it can be
+shown to be replication's, and a removal names an id the main once put here, so the main's removal list
+is the only evidence left — skipping it would leave a credential the user revoked on this host for good.
+Two exposures remain, both requiring a second fault: a main still on a build that carried every
+unreadable id, naming an id the host entered itself (upgrading the main closes it); and a record lost
+while the main's keyring was locked, where the snapshot that arrives names the credential `unreadable`
+rather than absent, so nothing is removed and the revision it stamps makes the record look known from
+then on.
+
+Whatever deletes credentials on a host must go through the same gate. `revokeReplicatedCredential`
+(which has no transport yet) must not delete an id the host reported as its own, or the ledger's
+willingness to list too much would turn into deleting the user's key.
 
 ## What the pin does
 
@@ -50,12 +72,12 @@ before the pin moves — see the credential-replication epic (H2).
 
 ## Field disposition
 
-| Field                       | Disposition                                                         |
-| --------------------------- | ------------------------------------------------------------------- |
-| provider credentials        | replicated; only ids in the host's replicated record may be removed |
-| `unreadable` credential ids | reported by the main, never deleted here                            |
-| settings / UI state         | not replicated by this path                                         |
-| revision, `syncedAt`        | host-local ledger, written after an applied payload                 |
+| Field                       | Disposition                                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| provider credentials        | replicated; only ids in the host's replicated record may be removed, or any id the main names when that record is lost |
+| `unreadable` credential ids | reported by the main, never deleted here                                                                               |
+| settings / UI state         | not replicated by this path                                                                                            |
+| revision, `syncedAt`        | host-local ledger, written after an applied payload                                                                    |
 
 Nothing else about the host's own stores is read or written; the host's local values for anything
 outside this contract are the user's and are left alone.

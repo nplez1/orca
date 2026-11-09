@@ -385,6 +385,28 @@ describe('applying a payload on the host', () => {
     expect(port.held.get(CREDENTIAL_ID)).toBe('sk-host-own')
   })
 
+  it('still deletes a replica it holds when its own record was lost', () => {
+    const port = fakePort()
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    applyHostSettingsReplication(snapshot(1), { registry: registry(port), holdings, now: NOW })
+    // A corrupt holdings file reads back empty, so nothing here can be shown to be replication's.
+    holdings.write(EMPTY_HOST_SETTINGS_REPLICATION_RECORD)
+
+    const result = applyHostSettingsReplication(snapshot(2, [], [CREDENTIAL_ID]), {
+      registry: registry(port),
+      holdings,
+      now: NOW
+    })
+
+    // Why the removal must land: a removal names an id the main once put here, so skipping it would leave
+    // a credential the user revoked on this host for good — the same loss `recoverReplicatedIds` prevents.
+    expect(port.held.has(CREDENTIAL_ID)).toBe(false)
+    expect(result).toMatchObject({
+      decision: 'applied',
+      report: { outcomes: { [CREDENTIAL_ID]: 'removed' } }
+    })
+  })
+
   it('recognises its own replicated copy when the holdings record was lost', () => {
     const port = fakePort()
     // A corrupt or unwritten holdings file reads back empty, so nothing on the host looks replicated.
@@ -427,8 +449,42 @@ describe('applying a payload on the host', () => {
     expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
   })
 
+  it('leaves a key the user entered here when a delta names it for removal', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings({
+      ids: [],
+      revision: 1,
+      syncedAt: NOW,
+      mainFingerprint: null,
+      mainDeviceId: null
+    })
+    const port = fakePort()
+    port.held.set(CREDENTIAL_ID, 'sk-host-own')
+
+    // The main's copy of this id went unreadable during an earlier push, so its record named the id and
+    // the delta that follows its deletion lists it for removal — but this host's value was never its.
+    const result = applyHostSettingsReplication(
+      { ...snapshot(2, [], [CREDENTIAL_ID]), baseRevision: 1 },
+      { registry: registry(port), holdings, now: NOW }
+    )
+
+    expect(port.held.get(CREDENTIAL_ID)).toBe('sk-host-own')
+    expect(result).toMatchObject({
+      decision: 'applied',
+      report: { outcomes: { [CREDENTIAL_ID]: 'keptHostValue' } }
+    })
+    expect(holdings.read().ids).toEqual([])
+  })
+
   it('keeps going when one removal fails, and does not claim it is gone', () => {
-    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    // A delta on a host that holds both, which is what a real sender produces: a snapshot would name the
+    // same id twice — once from the sweep, once from the removal — and lean on the receiver's dedupe.
+    const holdings = createInMemoryHostSettingsReplicationHoldings({
+      ids: [CREDENTIAL_ID, 'api-key:other'],
+      revision: 1,
+      syncedAt: NOW,
+      mainFingerprint: null,
+      mainDeviceId: null
+    })
     const stubborn = credential({ id: 'api-key:other' })
     const port = fakePort()
     port.held.set(CREDENTIAL_ID, 'old')
@@ -441,7 +497,7 @@ describe('applying a payload on the host', () => {
     }
 
     const result = applyHostSettingsReplication(
-      { ...snapshot(1, [], [CREDENTIAL_ID, 'api-key:other']) },
+      { ...snapshot(2, [], [CREDENTIAL_ID, 'api-key:other']), baseRevision: 1 },
       { registry: registry(port), holdings, now: NOW }
     )
 
