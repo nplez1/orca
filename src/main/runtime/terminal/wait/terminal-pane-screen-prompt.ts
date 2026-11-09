@@ -90,22 +90,25 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
         this.piAskDialogs.forget(ptyId)
         return null
       }
-      const card = this.readPiCardStamp(ptyId)
-      return { ...(card ?? this.piAskDialogs.observeClaim(ptyId)), current: true }
-    } catch {
-      return undefined
-    }
-  }
-
-  /** The card's own first-seen stamp, or null when the grid shows a footer this reader does not
-   *  know - which is no longer a reason to withhold the wait, only a reason to date it differently. */
-  private readPiCardStamp(ptyId: string): ScreenPromptObservation | null {
-    try {
       const screen = this.readRuledScreen(ptyId)
       const lines = screen ? screen.lines : this.readLiveTerminalScreenLines(ptyId)
-      return this.piAskDialogs.observe(ptyId, lines) ?? null
+      const card = this.piAskDialogs.observe(ptyId, lines)
+      if (card) {
+        return { ...card, current: true }
+      }
+      // Why the alternate screen is the second witness: pi paints a card there and leaves it when the
+      // card closes, which is what separates a dialog whose footer this reader has never measured
+      // from a marker that has not caught up with its own close - an answered card, or a pi killed
+      // with one up. The marker alone would start a wait on a pane already back at its prompt, and a
+      // wait the pane never earned is #136 in miniature.
+      if (screen && !screen.alternateScreen) {
+        return undefined
+      }
+      // No grid to read the mode from (a pane whose size the runtime does not know yet): the marker
+      // is the only witness there is.
+      return { ...this.piAskDialogs.observeClaim(ptyId), current: true }
     } catch {
-      return null
+      return undefined
     }
   }
 
