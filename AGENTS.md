@@ -114,8 +114,9 @@ nightly `fork-main-tests.yml` lane plus the release gate (`~/Code/orca/AGENTS.md
 the cross-worktree file; this repo's `AGENTS.md` has no such section). The script
 requires a cached unit-gate PASS for this exact revision (`orca-queue node local/gate-unit.mjs` writes
 one per revision) only when a changed path is a **global input** — `package.json`, the lockfiles,
-`config/**`, a root `tsconfig*.json`, `src/packages/**`, `src/shared/**`, or anything outside the
-source, test, doc, fork-tooling and workflow trees. An ordinary `src/` change is verified by its
+`config/**`, a root `tsconfig*.json`, `src/packages/**`, `src/shared/**`, a file a unit setup file
+imports (it loads in every test worker, so it is global whatever its path says), or anything outside
+the source, test, doc, fork-tooling and workflow trees. An ordinary `src/` change is verified by its
 targeted tests, and the script prints `gate 1 not required` instead of demanding a suite run. Measured
 on the last 40 commits, 15 touched `src/shared` or `src/packages`, so roughly a third of changes still
 carry the full gate — the third with the blast radius.

@@ -1789,8 +1789,10 @@ What replaced it:
 - **`local/open-pr.mjs`:** `needsFullUnitGate(changedPaths)` decides whether gate 1 still demands a
   cached PASS. It fails closed (no changed-path evidence ⇒ full gate) and calls a path global when it
   is `package.json`, a lockfile, `config/**`, a root `tsconfig*.json`, `src/packages/**`,
-  `src/shared/**`, or outside the source/test/doc/fork-tooling/workflow trees. Why a fixed list rather
-  than `selectUnitFiles`: that needs the reverse-import graph — globs plus the TypeScript API — which
+  `src/shared/**`, outside the source/test/doc/fork-tooling/workflow trees, or **in the closure
+  `unitRuntimeInputs` walks from the unit runtime entry points** (see the #316 correction below). Why
+  a fixed list rather than `selectUnitFiles`: that needs the reverse-import graph — globs plus the
+  TypeScript API — which
   costs minutes in a PR opener and answers "run all 13,064 files" for nearly every input. Measured on
   the last 40 commits, 15 touch `src/shared` or `src/packages`, so the gate still applies to ~37% of
   changes: the ones with real cross-process blast radius.
@@ -1810,6 +1812,19 @@ is real and the export stays. Two corrections to how that was first written down
 The gate is
 serialised by the queue, not uncapped. One part of the original claim survives: the fork's custom
 `node-runtime` pool never reads `maxWorkers` itself.
+
+**Correction (2026-11-09, #316): the fixed path list had a hole, and a closure closes it.**
+`config/scripts/test-runtime/environment/vitest-orcad-feature-readiness-reset.ts` imports
+`src/main/runtime/rpc/orcad-feature-readiness.ts`, so that source file loads in **every** unit test
+worker — but it sits in `src/main`, which every path rule above reads as targeted, so gate 1 skipped
+the suite for it. CI's selector never had this gap: `selectUnitFiles` asks whether any transitive
+consumer of a changed file `isUnitRuntimeEntryPoint`, and a setup file is one. The classification now
+comes from that same side: `config/scripts/ci/unit-selection/ci-unit-runtime-inputs.mjs` owns the
+entry-point set and walks the imports of those files transitively (46 files, 20 of them under `src`),
+and `open-pr.mjs` treats anything in that walk as global. Two definitions of "global input" was the
+defect; one definition is the fix, and it fails closed in the same direction CI does. The walk costs
+~180 ms against the ~8 s a full graph build takes, which is why the reverse-import graph is still not
+used here.
 
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 

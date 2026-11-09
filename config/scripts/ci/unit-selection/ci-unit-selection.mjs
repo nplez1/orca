@@ -3,7 +3,9 @@ import { balanceFiles } from '../sharding/ci-shard-assignment.mjs'
 import { UNIT_SETUP_FILES } from './dependency-graph/ci-unit-files.mjs'
 import { FULL_SHARD_COUNT } from './ci-unit-matrix.mjs'
 
-const RUNTIME_ENTRY_POINTS = new Set([
+// Why exported: `local/open-pr.mjs` asks the same question through `unitRuntimeInputs`, so the set of
+// files that load before every unit test has one definition instead of two (#316).
+export const RUNTIME_ENTRY_POINTS = new Set([
   'config/vitest.config.ts',
   'config/scripts/test-runtime/execution-policy/run-vitest.mjs',
   ...UNIT_SETUP_FILES

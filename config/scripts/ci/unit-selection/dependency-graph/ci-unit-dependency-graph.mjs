@@ -17,7 +17,7 @@ const RESOLUTION_SUFFIXES = [
   ...SOURCE_EXTENSIONS.map((extension) => `/index.${extension}`)
 ]
 
-function localPath(file, specifier) {
+export function unitLocalImportPath(file, specifier) {
   if (specifier.startsWith('.')) {
     return posix.join(posix.dirname(file), specifier)
   }
@@ -28,6 +28,23 @@ function localPath(file, specifier) {
     return `src/renderer/src/${specifier.slice(2)}`
   }
   return null
+}
+
+/** Every source path one resolved import path could name, since resolution differs across runtimes. */
+export function unitImportCandidatePaths(path) {
+  const candidates = RESOLUTION_SUFFIXES.map((suffix) => path + suffix)
+  if (/\.(?:[mc]?js|jsx)$/.test(path)) {
+    candidates.push(path.replace(/js(x?)$/, 'ts$1'))
+    if (path.endsWith('.js')) {
+      candidates.push(`${path.slice(0, -3)}.tsx`)
+    }
+  }
+  return candidates
+}
+
+/** The specifiers a source imports, from the same parse the graph is built with. */
+export function unitSourceImports(source) {
+  return ts.preProcessFile(source, true, true).importedFiles.map((imported) => imported.fileName)
 }
 
 export function buildUnitDependencyGraph(
@@ -59,17 +76,11 @@ export function buildUnitDependencyGraph(
         opaque.add(file)
       }
       const workspaceSource = workspace.resolve(imported.fileName)
-      const path = workspaceSource?.file ?? localPath(file, imported.fileName)
+      const path = workspaceSource?.file ?? unitLocalImportPath(file, imported.fileName)
       if (path === null) {
         continue
       }
-      const candidates = RESOLUTION_SUFFIXES.map((suffix) => path + suffix)
-      if (/\.(?:[mc]?js|jsx)$/.test(path)) {
-        candidates.push(path.replace(/js(x?)$/, 'ts$1'))
-        if (path.endsWith('.js')) {
-          candidates.push(`${path.slice(0, -3)}.tsx`)
-        }
-      }
+      const candidates = unitImportCandidatePaths(path)
       if (sources.has(`${path}/package.json`)) {
         opaque.add(file)
         unresolved.add(file)
