@@ -39,6 +39,9 @@ function showOptions(cardProps: readonly WorktreeCardProperty[]): WorkspaceCardS
 export function buildWorkspaceCardFacts(card: WorktreeCardController): WorkspaceCardFacts {
   const { worktree, repo, hoverReview } = card
   const runtimeHost = !repo?.connectionId && card.parsedRepoHost?.kind === 'runtime'
+  // Why: the card names its host through the dropdown once a branch spans hosts, so the group is a fact.
+  const hostGroup = card.branchGroup ?? []
+  const selectedHostId = card.selectedBranchHostId ?? hostGroup[0]?.hostId
   return {
     ws: {
       id: worktree.id,
@@ -65,7 +68,15 @@ export function buildWorkspaceCardFacts(card: WorktreeCardController): Workspace
     host: {
       kind: repo?.connectionId ? 'ssh' : runtimeHost ? 'runtime' : 'local',
       contextLabel: card.hostContextLabel || null,
-      runtimeDisconnected: card.isRuntimeDisconnected
+      runtimeDisconnected: card.isRuntimeDisconnected,
+      group:
+        hostGroup.length > 1
+          ? hostGroup.map((member) => ({
+              hostId: member.hostId,
+              label: member.hostLabel,
+              selected: member.hostId === selectedHostId
+            }))
+          : []
     },
     git: {
       conflictOperation: card.conflictOperation ?? null,

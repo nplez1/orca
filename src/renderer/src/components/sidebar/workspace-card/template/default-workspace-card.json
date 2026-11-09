@@ -11,6 +11,7 @@
     "metaRepo": "vars.classic && repo != null && !place.hideRepoBadge && !vars.pinnedRepo",
     "hostLabel": "options.show.host ? host.contextLabel : null",
     "hostBadge": "vars.hostLabel != null && (!vars.compact || place.showProjectName)",
+    "branchHostSelect": "len(host.group) > 1",
     "metaRow": "!vars.compact",
     "detachedInMeta": "vars.metaRow && !vars.folder && ws.detachedHead",
     "branch": "!vars.folder && len(ws.branch) > 0 && !vars.newStyle && (!vars.compact || ws.branch != ws.name)",
@@ -25,7 +26,7 @@
     "titleIndicators": "!vars.classic && vars.indicators",
     "hasMetaRow": "vars.metaRow ? vars.metaRepo || vars.hostBadge || vars.folderInMeta || vars.branch || vars.identityInMeta || vars.detachedInMeta || vars.conflict || git.cacheTimerActive || vars.metaIndicators : vars.conflict || git.cacheTimerActive",
     "star": "vars.compact && ws.isMain && !vars.folder",
-    "headerActions": "vars.star || place.deleteQuickAction",
+    "headerActions": "vars.star || place.deleteQuickAction || vars.branchHostSelect",
     "inlineAgents": "options.show.inlineAgents && !vars.compact",
     "title": "trim(ws.title)",
     "hoverBranch": "vars.newStyle ? ws.identity : vars.compact && vars.branch ? ws.branch : null",
@@ -99,6 +100,7 @@
                 "inset": "end"
               },
               "children": [
+                { "el": "BranchHostSelect", "when": "vars.branchHostSelect" },
                 { "el": "PrimaryStar", "when": "vars.star" },
                 { "el": "DeleteQuickAction", "when": "place.deleteQuickAction" }
               ]
