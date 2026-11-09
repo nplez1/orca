@@ -67,9 +67,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       ? null
       : this.getCodexProvenance(codexTarget, codexHomePath)
     const openCodeGoConfig = this.resolveOpenCodeGoConfig()
-    // Why a call-site gate for this one provider: its config resolver cannot say "switched off",
-    // because this fetcher treats an empty settings key as "look elsewhere" and resolves OpenCode's
-    // own credential store and environment, then can make the request. UpdateState nulling the result
+    // Why a call-site gate here: its config resolver cannot say "switched off", because this
+    // fetcher treats an empty settings key as "look elsewhere" and resolves OpenCode's own
+    // credential store and environment, then can make the request. UpdateState nulling the result
     // afterwards is too late — the read already happened.
     const openCodeGoDisabled = this.isUsageProviderDisabled('opencode-go')
     const cookie = openCodeGoConfig.sessionCookie
