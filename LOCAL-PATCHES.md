@@ -398,7 +398,9 @@ probe reading that has none of them. The probe answers when the endpoint cannot:
 `Retry-After`, or refused — but **only for a refusal a turn can outlast**: `rate-limited` and `server`.
 `missing-scope` is excluded because it is permanent for a `claude setup-token` login (the usual value of
 `CLAUDE_CODE_OAUTH_TOKEN`, and so of the `settings-env` source), and probing it would spend a billed turn
-on every poll forever. A refusal's own `Retry-After` is carried onto the probe reading it caused, or the
+on every poll forever. For that same reason a `settings-env` login refused with `missing-scope` reports
+`unavailable` rather than an error: the base showed no segment for it, and an error row that never clears
+is worse than the calm absence it replaced. A refusal's own `Retry-After` is carried onto the probe reading it caused, or the
 next poll asks the endpoint again inside its own wait, which is what keeps a 429 window alive.
 
 **The login is where the CLI keeps it, not only where Orca looked.** `readClaudeOAuthCredentials` read

@@ -194,7 +194,7 @@ describe('Claude usage when the endpoint cannot answer', () => {
     expect(result.session?.usedPercent).toBe(31)
     // Why: without this the next poll asks the endpoint again inside its own wait, which is what
     // keeps a 429 window alive.
-    expect(result.usageMetadata?.retryAtMs).toBeGreaterThan(Date.parse('2020-01-01T00:00:00Z'))
+    expect(result.usageMetadata?.retryAtMs).toBeGreaterThanOrEqual(Date.now() + RETRY_AFTER_MS - 1)
   })
 
   it('hands a settings-env login to the child, which cannot see the settings file itself', async () => {

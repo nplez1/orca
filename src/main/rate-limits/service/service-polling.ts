@@ -61,10 +61,11 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return false
     }
-    // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
-    // Why no visibility/focus gate: a serve-mode host keeps its window hidden, so upstream's
-    // "pause while inactive" rule meant a remote host never polled usage at all — its numbers only
-    // moved when a session posted a live receipt. Usage is polled on the timer, focused or not.
+    // fork-comment-ok: an unwatched desktop window polls too; see LOCAL-PATCHES.md `local(usage)`.
+    // Why beyond upstream: `usageViewers` covers a watched host, so what this adds is a hidden or
+    // unfocused desktop window — fresh numbers before the user looks, at one probe turn per interval
+    // while the usage endpoint is throttled. Deliberately revertible; the paragraph in LOCAL-PATCHES
+    // names the three things to delete.
     return true
   }
 

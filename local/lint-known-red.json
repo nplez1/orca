@@ -6,13 +6,13 @@
     "",
     "An entry is a claim that a red is not this branch's to fix: it arrives through a merge of someone",
     "else's work, or it is a fork-owned file upstream will rename out from under the fix. Record the",
-    "evidence in LOCAL-PATCHES.md and keep this file the assertion \u2014 both change in the same commit.",
+    "evidence in LOCAL-PATCHES.md and keep this file the assertion — both change in the same commit.",
     "No entry belongs here merely because the fix is inconvenient.",
     "",
     "`step` is the package.json script name (or the literal command, for a bare `oxlint` step).",
     "`match` is an optional regex against one failure line. The ratchets print one `::error::` line or",
     "one `file: N unit(s), baseline allows M.` row per offending entry, so a narrow regex allowlists",
-    "that entry alone. An entry with no `match` allowlists the whole step, which is the coarse option \u2014",
+    "that entry alone. An entry with no `match` allowlists the whole step, which is the coarse option —",
     "prefer `match` for a ratchet, because a whole-step entry also masks a NEW failure in that step.",
     "A step that prints `::error file=X::text` is matched as `X: text`, so an entry can name one file;",
     "the text alone is the same for every file those ratchets report.",
@@ -25,12 +25,12 @@
     "2026-10-28 sync: upstream folded `check:flaky-test-pattern-ratchet` into `lint:ast-grep-gates`,",
     "so the two #198 entries follow that step. The bare `oxlint` entry went stale and was pruned.",
     "",
-    "2026-10-29: the two #198 entries were fixed in the tree \u2014 fake timers in `check-details-cache`,",
-    "`advanceTimersByTimeAsync` in `checks-list-expanded-details` \u2014 and pruned with them. `entries` is",
+    "2026-10-29: the two #198 entries were fixed in the tree — fake timers in `check-details-cache`,",
+    "`advanceTimersByTimeAsync` in `checks-list-expanded-details` — and pruned with them. `entries` is",
     "empty on purpose: an empty list is what this mechanism is aiming at.",
     "",
     "2026-11-09: one whole-step entry for `check:code-quality:changed`, which a sync merge cannot pass before",
-    "it is pushed \u2014 see LOCAL-PATCHES.md \u00a7 `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
+    "it is pushed — see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
     "the first run after `git push origin nplez1/main`; prune it then.",
     "The `check-upstream-file-comments` entries are the same sync's: fork-comment growth that five fork PRs had already put on the base branch before the merge. They are recorded, not accepted; see their evidence."
   ],
@@ -71,9 +71,9 @@
     {
       "step": "check-upstream-file-comments",
       "match": "^5414 fork comment lines in total, baseline 5269$",
-      "class": "fork-comment-growth-pre-sync",
+      "class": "fork-comment-total-growth",
       "owner": "fork sync 07239b228d6 (Merge upstream/main 51c77320bc, 1537 commits)",
-      "evidence": "The total moved 5413 -> 5414 after the 51c77320bc sync and no per-file row explains it: measured identically at origin/nplez1/main (f4337166d22) in a detached worktree with no changes from any branch, and on the branch itself (5414 both, --verbose, 0 per-file findings in rate-limits), so this is a base red and not the branch under it. The sync re-baselined the per-file maxima but not the total its own resolution added. Fix by re-baselining with --init --accept in the sync that caused it, or by moving that prose into LOCAL-PATCHES.md. The match pins the exact total, so any further growth is a new red.",
+      "evidence": "The total moved 5413 -> 5414 after the 51c77320bc sync, and no per-file row explains it: measured identically at origin/nplez1/main (f4337166d22) in a detached worktree with no changes from any branch, and on the branch itself (5414 both, --verbose, zero per-file findings in rate-limits). So the base is the red, not the branch under it. Of the 145 lines over baseline, 144 belong to the per-file rows above and were added by the five fork PRs they name; this row covers the remaining line the sync itself added without re-baselining the total. Fix by re-baselining with --init --accept in the sync that caused it, or by moving that prose into LOCAL-PATCHES.md. The match pins the exact total, so any further growth is a new red.",
       "flaky": false
     }
   ]

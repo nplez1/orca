@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildClaudeChildProcessEnv } from '../../claude/claude-child-process-environment'
 import {
   probeClaudeUsage,
@@ -185,17 +185,24 @@ describe('the probe session loop', () => {
     }
   }
 
-  /** Stand in for the SDK: a session that yields `messages`, then ends. */
-  async function* session(messages: unknown[]): AsyncGenerator<unknown> {
+  /**
+   * Stand in for the SDK: yield `messages`, then park.
+   *
+   * Why park rather than end: the real session never ends, because the probe's input waits forever.
+   * A generator that finished would let `for await` exit on its own, so a missing `break` on `result`
+   * would still pass — the test would guard nothing.
+   */
+  async function* parkedSession(messages: unknown[]): AsyncGenerator<unknown> {
     for (const message of messages) {
       yield message
     }
+    await new Promise(() => {})
   }
 
   function withFakeSdk(messages: unknown[]) {
     vi.doMock('../../claude/claude-stream-json-connection', () => ({
       loadClaudeAgentSdk: async () => ({
-        query: () => Object.assign(session(messages), { close: vi.fn() })
+        query: () => Object.assign(parkedSession(messages), { close: vi.fn() })
       })
     }))
     vi.doMock('../../claude/claude-agent-sdk-process-spawn', () => ({
@@ -203,15 +210,18 @@ describe('the probe session loop', () => {
     }))
   }
 
+  afterEach(() => {
+    vi.doUnmock('../../claude/claude-stream-json-connection')
+    vi.doUnmock('../../claude/claude-agent-sdk-process-spawn')
+    vi.resetModules()
+  })
+
   it('reads the event when it arrives before the turn ends', async () => {
     vi.resetModules()
     withFakeSdk([{ type: 'assistant' }, rle, { type: 'result' }])
     const { readClaudeUsageFromCli: fresh } = await import('./claude-cli-usage-probe')
 
     expect((await fresh())?.session?.usedPercent).toBeCloseTo(30)
-    vi.doUnmock('../../claude/claude-stream-json-connection')
-    vi.doUnmock('../../claude/claude-agent-sdk-process-spawn')
-    vi.resetModules()
   })
 
   it('gives up as soon as the turn ends without an event, rather than waiting out the deadline', async () => {
@@ -221,10 +231,7 @@ describe('the probe session loop', () => {
 
     const startedAt = performance.now()
     expect(await fresh()).toBeNull()
-    // Why: the deadline is 15 s; a turn that already ended must not be waited on.
+    // Why: the deadline is 15 s and the session never ends, so only the `result` break gets here.
     expect(performance.now() - startedAt).toBeLessThan(5_000)
-    vi.doUnmock('../../claude/claude-stream-json-connection')
-    vi.doUnmock('../../claude/claude-agent-sdk-process-spawn')
-    vi.resetModules()
   })
 })

@@ -162,6 +162,14 @@ async function readClaudeUsage(
           return abortedClaudeRateLimitResult()
         }
       }
+      // fork-comment-ok: a setup token has no profile scope, so this refusal is permanent (local(usage)).
+      if (classification.failureKind === 'missing-scope' && credentials.source === 'settings-env') {
+        return makeClaudeUsageResult('unavailable', 'No subscription plan — API key billing', {
+          ...metadata,
+          failureKind: 'missing-scope',
+          attemptedSources: ['oauth']
+        })
+      }
       return usageFailureResult(error, classification.failureKind, metadata)
     }
     // Why: a token this poll already spent is not spent again.
