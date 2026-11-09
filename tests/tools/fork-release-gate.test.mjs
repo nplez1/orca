@@ -42,7 +42,13 @@ describe('the release dispatch is gated on test evidence', () => {
     expect(with_.run_relay_integration).toBe(nightly.run_relay_integration)
     // The shard plan is the workflow's own job, so it is the plan every other lane runs.
     expect(RELEASE.jobs['unit-tests'].with.shards).toContain('needs.unit-plan.outputs.shards')
-    expect(runScripts(RELEASE).join('\n')).toContain('config/scripts/ci-unit-plan.mjs')
+    // Path-agnostic on purpose: upstream moves these scripts, and the claim is that the release
+    // plans its shards with the nightly's planner, not with a lookalike that happens to exist.
+    const nightlyPlan = runScripts(readWorkflow('.github/workflows/fork-main-tests.yml')).find(
+      (script) => script.includes('ci-unit-plan.mjs')
+    )
+    expect(nightlyPlan, 'the nightly must plan its shards with ci-unit-plan.mjs').toBeDefined()
+    expect(runScripts(RELEASE).join('\n')).toContain(nightlyPlan)
   })
 
   it('calls a workflow that can actually be called', () => {
