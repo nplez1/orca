@@ -77,6 +77,11 @@ export class PiAskDialogScreenGained {
       this.forget(ptyId)
       return null
     }
+    return { reason: 'agent-interactive-prompt', since: this.stamp(ptyId, now) }
+  }
+
+  /** First sighting wins, so a later read cannot restate an old wait as new. */
+  private stamp(ptyId: string, now: number): number {
     const since = this.sinceByPtyId.get(ptyId) ?? now
     // Why the cap: a pane killed with its card up never reports a clear, and a pty id is never
     // reused, so without one the map grows by a number per pane for the life of the process.
@@ -87,7 +92,19 @@ export class PiAskDialogScreenGained {
       }
     }
     this.sinceByPtyId.set(ptyId, since)
-    return { reason: 'agent-interactive-prompt', since }
+    return since
+  }
+
+  /** The pane's own marker claims a dialog, whether or not the grid shows a footer this reader
+   *  knows. `π !` is pi's live claim, painted for exactly as long as a dialog holds the pane and
+   *  never for scrollback, so it is the witness the footer vocabulary was only ever a proxy for.
+   *
+   *  Why this exists: an unrecognised footer used to answer "cannot see it", and holding a wait
+   *  does nothing for a row that already reads `working` - so every footer pi had not painted yet
+   *  left a displaced ask card on Working until the next hook, which an unanswered card never
+   *  sends (#227, and again when Pi-Bolt changed its card footers). */
+  observeClaim(ptyId: string, now = Date.now()): ScreenPromptObservation {
+    return { reason: 'agent-interactive-prompt', since: this.stamp(ptyId, now) }
   }
 
   /** Drops a pane's stamp without reading its grid - the pane's own title withdrew the claim. */

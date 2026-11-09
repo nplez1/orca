@@ -76,11 +76,10 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
   /** Why the title as well as the grid: pi prints its own card footer when it narrates about one, so
    *  the footer alone would read a transcript line as a dialog. `π !` is pi's own claim, painted by
    *  the titlebar extension for exactly as long as a dialog holds the pane and never for scrollback.
-   *  Why the ruled grid first: it refuses a grid painted for another size (a resize, a reflow, a
-   *  provider-restored suffix), and holding the wait is right there - releasing on a garbled grid
-   *  would flap the row. The live projection is the fallback only for a pane whose size the runtime
-   *  does not know yet (a restored pane reconnecting), where no other read is possible and a mis-read
-   *  costs one tick; a pane whose size IS known and whose grid is still refused stays "cannot see it".
+   *  Why the marker decides and the grid only dates it: the footer vocabulary is measured against
+   *  one card build at a time, and every wording pi had not painted yet read "no card" - while a
+   *  hold is not a rescue, because the row this lane exists for already reads `working` and stays
+   *  there for as long as the card stands (#227, and again when Pi-Bolt changed its footers).
    *  Why `current`: the pane's own marker outranks the gained stamp - a card the pane still claims
    *  cannot be scrollback, and the store must not reject it on a turn clock it could not pin. */
   private readPiAskDialogPrompt(handle: string): ScreenPromptObservation | null | undefined {
@@ -91,22 +90,22 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
         this.piAskDialogs.forget(ptyId)
         return null
       }
-      const screen = this.readRuledScreen(ptyId)
-      if (!screen && this.getTerminalSize(ptyId)) {
-        return undefined
-      }
-      const lines = screen ? screen.lines : this.readLiveTerminalScreenLines(ptyId)
-      const card = this.piAskDialogs.observe(ptyId, lines)
-      if (card) {
-        return { ...card, current: true }
-      }
-      // Why "cannot see it": the pane's own marker still claims a dialog, and a footer this reader
-      // has not learned (a collapsed card, one clipped by pane width) is an unreadable grid, not
-      // evidence the dialog is gone. Holding the wait is right; releasing it is a Working tab over
-      // a card a person still has to answer.
-      return undefined
+      const card = this.readPiCardStamp(ptyId)
+      return { ...(card ?? this.piAskDialogs.observeClaim(ptyId)), current: true }
     } catch {
       return undefined
+    }
+  }
+
+  /** The card's own first-seen stamp, or null when the grid shows a footer this reader does not
+   *  know - which is no longer a reason to withhold the wait, only a reason to date it differently. */
+  private readPiCardStamp(ptyId: string): ScreenPromptObservation | null {
+    try {
+      const screen = this.readRuledScreen(ptyId)
+      const lines = screen ? screen.lines : this.readLiveTerminalScreenLines(ptyId)
+      return this.piAskDialogs.observe(ptyId, lines) ?? null
+    } catch {
+      return null
     }
   }
 
