@@ -1,12 +1,16 @@
 import { readdirSync } from 'node:fs'
 import { win32 } from 'node:path'
+import {
+  WINDOWS_APP_EXECUTABLE_NAME,
+  WINDOWS_UNINSTALLER_NAME
+} from '../../fork/install-layout-names'
 
-const UNINSTALLER_NAME = 'Uninstall Orca.exe'
+const UNINSTALLER_NAME = WINDOWS_UNINSTALLER_NAME
 const INSTALL_DIRECTORIES = new Set(['locales', 'resources'])
 // Exact names for Electron's non-binary top-level files: a broad .txt/.json/.html/.log match would
 // let user documents pass, and the next RMDir /r of InstallLocation would delete them.
 const INSTALL_FILES = new Set([
-  'orca.exe',
+  WINDOWS_APP_EXECUTABLE_NAME.toLowerCase(),
   UNINSTALLER_NAME.toLowerCase(),
   'icudtl.dat',
   'license.electron.txt',

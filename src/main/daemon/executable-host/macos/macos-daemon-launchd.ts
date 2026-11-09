@@ -17,7 +17,7 @@ import {
   DAEMON_V8_FLAGS,
   type DaemonChildSpawnOptions
 } from '../../launch/daemon-launched-child-spawn'
-import { macDaemonJobLabel } from './macos-daemon-job-label'
+import { macDaemonJobLabel, legacyMacDaemonJobLabel } from './macos-daemon-job-label'
 import type { DaemonProcessHandle } from '../../launch/daemon-spawner'
 import { DAEMON_SHUTDOWN_TIMEOUT_MS } from '../../launch/daemon-shutdown-deadline'
 import {
@@ -140,6 +140,7 @@ export async function launchMacDaemonFromStableBundle(
   const label = macDaemonJobLabel(options.userDataPath)
   const domain = `gui/${process.getuid?.()}`
   const service = `${domain}/${label}`
+  const legacyService = `${domain}/${legacyMacDaemonJobLabel(options.userDataPath)}`
   // Reserve time after preparation for bootstrap and readiness.
   const remainingMs = deadlineMs - BOOTSTRAP_TIMEOUT_MS - STARTUP_TIMEOUT_MS - Date.now()
   const prepareSignal = remainingMs > 0 ? AbortSignal.timeout(remainingMs) : AbortSignal.abort()
@@ -173,6 +174,7 @@ export async function launchMacDaemonFromStableBundle(
       'A macOS terminal service from an earlier launch is still registered. Restart terminals from Settings → Manage Sessions.'
     )
   }
+  await releaseMacDaemonJob(legacyService)
   // Remove the plist after bootstrap because its inherited environment may contain credentials.
   const jobPath = join(bundle.directory, `launch-${options.launchNonce}.plist`)
   const removeJobFile = (): Promise<void> => rm(jobPath, { force: true }).catch(() => {})

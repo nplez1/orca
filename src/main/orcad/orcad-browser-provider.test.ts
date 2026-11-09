@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runProcess, spawnProcess } from '@orca/process-host'
 import { agentBrowserCommandOf } from '../browser/agent-browser/agent-browser-bridge-test-harness'
 import {
+  installedElectronCandidates,
   resolveInstalledElectronExecutable,
   resolveOrcadBrowserProvider
 } from './orcad-browser-provider'
+import { installedAppExecutableCandidates } from '../fork/install-layout-names'
 import {
   runtimeBrowserUnavailableCause,
   setRuntimeBrowserUnavailableCause
@@ -92,6 +94,17 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(root, { recursive: true, force: true })
+})
+
+describe('installedElectronCandidates', () => {
+  it('is the fork install layout, so orcad never starts an official Orca', () => {
+    const environment = { LOCALAPPDATA: 'C:\\Local', ProgramFiles: 'C:\\Program Files' }
+    for (const platform of ['darwin', 'win32', 'linux'] as const) {
+      expect(installedElectronCandidates(platform, '/home/dev', environment)).toEqual(
+        installedAppExecutableCandidates(platform, '/home/dev', environment)
+      )
+    }
+  })
 })
 
 describe.skipIf(process.platform === 'win32')('resolveInstalledElectronExecutable', () => {

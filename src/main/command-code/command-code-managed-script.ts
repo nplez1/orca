@@ -5,6 +5,11 @@ import {
   buildPosixHookSpoolLines,
   buildWindowsHookEnvironmentGuardLines
 } from '../agent-hooks/hook-stdin-contract'
+import {
+  HOOK_ENDPOINT_APP_DATA_DIRECTORY_NAMES,
+  HOOK_ENDPOINT_SHARED_DEV_PROFILE_DIRECTORY_NAME,
+  HOOK_ENDPOINT_WORKTREE_PROFILE_DIRECTORY_NAME
+} from '../fork/install-layout-names'
 
 export type CommandCodeManagedScriptTarget = 'local' | 'posix'
 
@@ -22,10 +27,13 @@ export function buildCommandCodeManagedScript(
       'exit /b 0',
       ':sourceEndpointByPort',
       'if not defined APPDATA exit /b 0',
-      'if exist "%APPDATA%\\orca-dev\\agent-hooks" for /r "%APPDATA%\\orca-dev\\agent-hooks" %%F in (endpoint.cmd) do call :maybeSourceEndpoint "%%~fF"',
+      ...HOOK_ENDPOINT_APP_DATA_DIRECTORY_NAMES.map(
+        (name) =>
+          `if "%ORCA_AGENT_HOOK_TOKEN%"=="" if exist "%APPDATA%\\${name}\\agent-hooks" for /r "%APPDATA%\\${name}\\agent-hooks" %%F in (endpoint.cmd) do call :maybeSourceEndpoint "%%~fF"`
+      ),
+      `if exist "%APPDATA%\\${HOOK_ENDPOINT_SHARED_DEV_PROFILE_DIRECTORY_NAME}\\agent-hooks" for /r "%APPDATA%\\${HOOK_ENDPOINT_SHARED_DEV_PROFILE_DIRECTORY_NAME}\\agent-hooks" %%F in (endpoint.cmd) do call :maybeSourceEndpoint "%%~fF"`,
       // Per-worktree `pnpm dev` profiles live one level down; FOR /R cannot take a FOR variable as its root.
-      'if "%ORCA_AGENT_HOOK_TOKEN%"=="" if exist "%APPDATA%\\orca-dev-wt" for /d %%P in ("%APPDATA%\\orca-dev-wt\\*") do call :scanEndpointDir "%%~fP\\agent-hooks"',
-      'if "%ORCA_AGENT_HOOK_TOKEN%"=="" if exist "%APPDATA%\\orca\\agent-hooks" for /r "%APPDATA%\\orca\\agent-hooks" %%F in (endpoint.cmd) do call :maybeSourceEndpoint "%%~fF"',
+      `if "%ORCA_AGENT_HOOK_TOKEN%"=="" if exist "%APPDATA%\\${HOOK_ENDPOINT_WORKTREE_PROFILE_DIRECTORY_NAME}" for /d %%P in ("%APPDATA%\\${HOOK_ENDPOINT_WORKTREE_PROFILE_DIRECTORY_NAME}\\*") do call :scanEndpointDir "%%~fP\\agent-hooks"`,
       'exit /b 0',
       ':scanEndpointDir',
       'if not "%ORCA_AGENT_HOOK_TOKEN%"=="" exit /b 0',
@@ -108,14 +116,18 @@ export function buildCommandCodeManagedScript(
     '# Recover stripped token metadata by matching the preserved loopback port.',
     'if [ -z "$ORCA_AGENT_HOOK_TOKEN" ] && [ -n "$ORCA_AGENT_HOOK_PORT" ]; then',
     '  for endpoint in \\',
-    '    "$HOME/Library/Application Support/orca-dev/agent-hooks"/*/endpoint.env \\',
-    '    "$HOME/Library/Application Support/orca-dev/agent-hooks/endpoint.env" \\',
-    '    "${XDG_CONFIG_HOME:-$HOME/.config}/orca-dev/agent-hooks"/*/endpoint.env \\',
-    '    "${XDG_CONFIG_HOME:-$HOME/.config}/orca-dev/agent-hooks/endpoint.env" \\',
-    '    "$HOME/Library/Application Support/orca-dev-wt"/*/agent-hooks/*/endpoint.env \\',
-    '    "${XDG_CONFIG_HOME:-$HOME/.config}/orca-dev-wt"/*/agent-hooks/*/endpoint.env \\',
-    '    "$HOME/Library/Application Support/orca/agent-hooks/endpoint.env" \\',
-    '    "${XDG_CONFIG_HOME:-$HOME/.config}/orca/agent-hooks/endpoint.env"; do',
+    ...HOOK_ENDPOINT_APP_DATA_DIRECTORY_NAMES.flatMap((name) => [
+      `    "$HOME/Library/Application Support/${name}/agent-hooks"/*/endpoint.env \\`,
+      `    "$HOME/Library/Application Support/${name}/agent-hooks/endpoint.env" \\`,
+      `    "${'${XDG_CONFIG_HOME:-$HOME/.config}'}/${name}/agent-hooks"/*/endpoint.env \\`,
+      `    "${'${XDG_CONFIG_HOME:-$HOME/.config}'}/${name}/agent-hooks/endpoint.env" \\`
+    ]),
+    `    "$HOME/Library/Application Support/${HOOK_ENDPOINT_WORKTREE_PROFILE_DIRECTORY_NAME}"/*/agent-hooks/*/endpoint.env \\`,
+    `    "${'${XDG_CONFIG_HOME:-$HOME/.config}'}/${HOOK_ENDPOINT_WORKTREE_PROFILE_DIRECTORY_NAME}"/*/agent-hooks/*/endpoint.env \\`,
+    `    "$HOME/Library/Application Support/${HOOK_ENDPOINT_SHARED_DEV_PROFILE_DIRECTORY_NAME}/agent-hooks"/*/endpoint.env \\`,
+    `    "$HOME/Library/Application Support/${HOOK_ENDPOINT_SHARED_DEV_PROFILE_DIRECTORY_NAME}/agent-hooks/endpoint.env" \\`,
+    `    "${'${XDG_CONFIG_HOME:-$HOME/.config}'}/${HOOK_ENDPOINT_SHARED_DEV_PROFILE_DIRECTORY_NAME}/agent-hooks"/*/endpoint.env \\`,
+    `    "${'${XDG_CONFIG_HOME:-$HOME/.config}'}/${HOOK_ENDPOINT_SHARED_DEV_PROFILE_DIRECTORY_NAME}/agent-hooks/endpoint.env"; do`,
     '    [ -r "$endpoint" ] || continue',
     '    endpoint_port=$(sed -n "s/^ORCA_AGENT_HOOK_PORT=//p" "$endpoint" | head -n 1)',
     '    if [ "$endpoint_port" = "$ORCA_AGENT_HOOK_PORT" ]; then',

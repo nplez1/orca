@@ -288,6 +288,13 @@ Two measured facts about what the overlay actually serves, both checked 2026-10-
 `config/scripts/rebuild-and-relaunch-installed-macos-arm64.sh`: build locally and install over the
 running app. Convenience only — not for upstream.
 
+Re-pointed at this build in issue #302, and the `package.json` entry restored with it: the entry was
+dropped by merge `7c0a53a148e`, which left the script orphaned, and the script still staged
+`dist/mac-arm64/Orca.app` over `/Applications/Orca.app` and quit `com.stablyai.orca` — running it
+would have quit and replaced an **official** Orca install. It now stages `dist/mac-arm64/Orca NP.app`
+over `/Applications/Orca NP.app`, quits only `com.nplez1.orca`, matches the process
+`/Applications/Orca NP.app/Contents/MacOS/Orca NP`, and smoke-checks `/usr/local/bin/orca-np`.
+
 ### `local(usage)`: Claude usage is read from the CLI, not only from a rate-limited endpoint
 
 Anchor: `src/main/rate-limits/fork/claude-cli-usage-probe.ts`,
@@ -3723,3 +3730,61 @@ What is deliberately left alone, because either side of the pair is indistinguis
   default directory, which is the collision this fix removes. Only a fresh install lands in
   `Programs\orca-np`. Uninstalling the old copy (or clearing its `InstallLocation` value) is a manual
   step, and the release notes for the first build carrying this say so.
+
+#### The install layout resolves from one module (2026-11-09, fork issue #302)
+
+Six paths still named an official Orca install, so each either found nothing or acted on the other
+app: orcad's Electron browser host (`/Applications/Orca.app/Contents/MacOS/Orca`,
+`Programs\Orca\Orca.exe`, `/opt/Orca/orca-ide`), the Windows updater's moved-install check
+(`Uninstall Orca.exe`, `orca.exe`), the Command Code hook's endpoint recovery (`orca`, `orca-dev`), the
+packaged macOS terminal daemon's launchd label (`com.stablyai.orca.terminal.*`), the `local(dev)`
+rebuild helper, and the local-build update reader, which unzipped `Orca.app/Contents/Resources/…` out
+of a zip this build had written as `Orca NP.app/…` and so never recognised its own artifact.
+`src/main/fork/install-layout-names.ts` derives every one of them from constants this fork already
+had, and each upstream file calls it rather than carrying a literal — which is also why the rationale
+is here and not above their code (the rule at the top of this file).
+
+| Name                               | Value                                               | Follows                               | Pinned by                                            |
+| ---------------------------------- | --------------------------------------------------- | ------------------------------------- | ---------------------------------------------------- |
+| macOS bundle + its executable      | `Orca NP.app`, `Contents/MacOS/Orca NP`             | `productName`                         | `install-layout-names.test.ts`, np config test       |
+| Windows executable + uninstaller   | `Orca NP.exe`, `Uninstall Orca NP.exe`              | `win.executableName`                  | same                                                 |
+| Windows per-user install directory | `%LOCALAPPDATA%\Programs\orca-np`                   | `extraMetadata.name`                  | same                                                 |
+| Linux payload directory + binary   | `/opt/Orca NP`, `orca-np`                           | `productName`, `linux.executableName` | same                                                 |
+| terminal-daemon launchd label      | `com.nplez1.orca.terminal.<hash>.v<n>`              | the appId                             | `config/scripts/electron-builder-np-config.test.mjs` |
+| Command Code endpoint recovery     | `orca-np`, `orca-np-dev`, `orca-dev`, `orca-dev-wt` | `app-directory-names.ts`              | `command-code-managed-script.test.ts`                |
+
+
+Six things a reader will otherwise get wrong:
+
+- **The Windows install directory is the package name, not the product name.** NSIS's `APP_FILENAME`
+  is `appInfo.sanitizedName` for a one-click per-user install (`getWindowsInstallationDirName`), so it
+  is `orca-np` even though the executable inside is `Orca NP.exe`. The two names differ on purpose and
+  a future `oneClick`/`perMachine` change would move the directory to `Orca NP` — which is why the
+  candidate list derives it rather than repeating it.
+- **The browser host has no fallback to an official install.** orcad spawns the resolved binary with
+  `--serve`, so a candidate naming the other app starts the other app's browser host — the defect
+  itself. When this build is not installed the resolver answers `null`, which the caller already
+  handles as "no Electron provider".
+- **The launchd label moved, and the old one is retired rather than migrated.** The job already
+  declares itself to launchd under `com.nplez1.orca` through `AssociatedBundleIdentifiers`, and the
+  terminal-host helper's `CFBundleIdentifier` is asserted equal to the appId, so the label was the
+  last place naming the other app. The label's profile hash is `sha256(resolve(userDataPath))`, and
+  this build's `userData` is `appData/orca-np`, so a `com.stablyai.orca.terminal.<hash>` job can only
+  be one of our own earlier builds. That one is released (booted out if stopped) once per profile
+  before bootstrap; a legacy job that is still *running* is left alone, because booting out a live
+  daemon would kill the user's terminals — the new job then finds the endpoint taken and falls back to
+  the fork launcher, which adopts it, exactly as a same-label upgrade does.
+- **`orca-dev` and `orca-dev-wt` stay in the hook's recovery list.** They are still this fork's dev
+  profile roots (`SHARED_DEV_PROFILE_DIR_NAME`, `WORKTREE_DEV_PROFILES_DIR_NAME` in
+  `dev-instance-isolation.mjs`); only upstream's packaged `orca` root left the list, because adopting
+  another install's endpoint when the two happen to share a loopback port would post our hook to the
+  other app.
+- **`docs/agents-md-refs/macos-daemon-tcc-attribution.md` still describes upstream's label.** It is
+  upstream's design note, and its `AssociatedBundleIdentifiers` sentence was already wrong for this
+  build before the label moved; the fork's record is this section, not an edited upstream doc.
+- **A pre-rename Windows install is deliberately not a browser-host candidate.** An install made
+  before the package rename keeps updating in place at `%LOCALAPPDATA%\Programs\orca\Orca.exe` (see
+  the upgrade note above), but that path is exactly where an official Orca install lives, and the
+  command alone cannot tell them apart. Resolving it is the defect this change removes, so such a
+  machine falls back to `ORCA_BROWSER_EXECUTABLE` until it reinstalls.
+

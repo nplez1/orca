@@ -1,7 +1,6 @@
 import { access, mkdir, open, realpath } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { homedir } from 'node:os'
-import { posix, win32 } from 'node:path'
 import {
   setRuntimeBrowserUnavailableCause,
   type RuntimeBrowserCommandsFactory,
@@ -12,6 +11,7 @@ import type { ExternalChromiumLaunch } from './external-chromium-browser-session
 import { resolveOrcadAgentBrowserBinary } from './orcad-agent-browser-binary'
 import { ElectronServeBrowserProcess } from './electron-serve-browser-process'
 import { openOrcadBrowserInstallPark } from './orcad-browser-install-park'
+import { installedAppExecutableCandidates } from '../fork/install-layout-names'
 import { errorMessage } from '../../shared/error-message'
 
 export type OrcadBrowserProvider = {
@@ -73,27 +73,7 @@ export function installedElectronCandidates(
   homePath: string,
   environment: NodeJS.ProcessEnv
 ): string[] {
-  const joinPath = platform === 'win32' ? win32.join : posix.join
-  if (platform === 'darwin') {
-    return [
-      '/Applications/Orca.app/Contents/MacOS/Orca',
-      joinPath(homePath, 'Applications', 'Orca.app', 'Contents', 'MacOS', 'Orca')
-    ]
-  }
-  if (platform === 'win32') {
-    return [
-      ...(environment.LOCALAPPDATA
-        ? [joinPath(environment.LOCALAPPDATA, 'Programs', 'Orca', 'Orca.exe')]
-        : []),
-      ...(environment.ProgramFiles ? [joinPath(environment.ProgramFiles, 'Orca', 'Orca.exe')] : [])
-    ]
-  }
-  return [
-    joinPath(homePath, '.local', 'bin', 'orca-ide'),
-    '/usr/local/bin/orca-ide',
-    '/usr/bin/orca-ide',
-    '/opt/Orca/orca-ide'
-  ]
+  return installedAppExecutableCandidates(platform, homePath, environment)
 }
 
 async function isScriptShim(path: string): Promise<boolean> {
