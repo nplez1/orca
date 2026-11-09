@@ -100,10 +100,13 @@ export function reproducedFailures(
       // the row would pass a real red nobody read. A file-level entry covers every case, so there the
       // named failures are known and the row alone is what is being waived.
       // Why `covered` when the caller has entries: a name in `known` may have failed for a cause its
-      // entry does not describe, and waiving the row would pass that red unread.
-      const allowlisted = (test) =>
-        covered === null ? known.has(test) : covered(test, rerun.failureDetails?.get(test))
-      return fileCovered ? false : [...rerun.failures].some((test) => !allowlisted(test))
+      // entry does not describe, and waiving the row would pass that red unread. Why it also beats
+      // `fileCovered`: a file-level entry can pin a cause too, and `entryMatchesFailure` already reads a
+      // `test: null` entry as covering anything in the file — short-circuiting here skipped that check.
+      if (covered !== null) {
+        return [...rerun.failures].some((test) => !covered(test, rerun.failureDetails?.get(test)))
+      }
+      return fileCovered ? false : [...rerun.failures].some((test) => !known.has(test))
     }
     return (
       !rerun.passes.has(failure.test) ||

@@ -217,16 +217,23 @@ function reportResult(result) {
       `  known (${entry.class}, ${entry.owner}${entry.flaky ? ', flaky' : ''}): ${item.failure.file} › ${item.failure.test} — ${item.failure.detail}`
     )
   }
+  // Why one line per failure: a drifted failure is also an unexpected one, and printing both said the
+  // same failure twice. The drift is the more useful half, so it replaces the generic row.
+  const driftOf = new Map(
+    (result.drifted ?? []).map(({ failure, entry }) => [`${failure.file} › ${failure.test}`, entry])
+  )
   for (const failure of result.unexpected.slice(0, MAX_SUMMARY_LIST)) {
+    const drift = driftOf.get(`${failure.file} › ${failure.test}`)
+    if (drift) {
+      console.log(
+        `  NEW CAUSE: ${failure.file} › ${failure.test} — ${failure.detail || 'no message'}, which its entry's match ${JSON.stringify(drift.matchSource)} does not describe`
+      )
+      continue
+    }
     const why = failure.notWaived
       ? ` — FLAKY in isolation, but ${failure.notWaived} is in this branch diff`
       : ` — ${failure.detail}`
     console.log(`  UNEXPECTED: ${failure.file} › ${failure.test}${why}`)
-  }
-  for (const { failure, entry } of result.drifted ?? []) {
-    console.log(
-      `  NEW CAUSE: ${failure.file} › ${failure.test} — ${failure.detail || 'no message'}, which its entry's match ${JSON.stringify(entry.matchSource)} does not describe`
-    )
   }
   if (result.unexpected.length > MAX_SUMMARY_LIST) {
     console.log(`  …and ${result.unexpected.length - MAX_SUMMARY_LIST} more unexpected failure(s)`)
@@ -477,10 +484,14 @@ export function evaluate(options, { reportPath, logPath, dir, sources = {} } = {
     }
   }
 
-  // Why the filter: a drifted failure also goes through the isolation re-run above, and one that passes
-  // there is waived as a load flake. Printing NEW CAUSE for it would name a cause the gate then excused.
-  const blockingSet = new Set(blocking)
-  drifted = drifted.filter((item) => blockingSet.has(item.failure))
+  // Why the filter, and why by key rather than by object: a drifted failure also goes through the
+  // isolation re-run above, and one that passes there is waived as a load flake — printing NEW CAUSE for
+  // it would name a cause the gate then excused. A failure the branch diff refuses is pushed as a copy
+  // (`{...failure, notWaived}`), so identity would drop exactly the row where the cause matters most.
+  const blockingKeys = new Set(blocking.map((failure) => `${failure.file} › ${failure.test}`))
+  drifted = drifted.filter((item) =>
+    blockingKeys.has(`${item.failure.file} › ${item.failure.test}`)
+  )
 
   const exitCode = blocking.length === 0 && problems.length === 0 ? 0 : 1
   return {

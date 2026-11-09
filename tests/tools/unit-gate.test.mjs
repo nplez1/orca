@@ -280,6 +280,11 @@ describe('the isolated re-run', () => {
     expect(reproducedFailures(suite, matching, { known: new Set(['foo']), covered })).toHaveLength(
       0
     )
+    // Why `covered` beats `fileCovered`: a file-level entry can pin a cause too, and short-circuiting on
+    // it waived a row whose re-run failed for a cause the entry does not describe.
+    expect(
+      reproducedFailures(suite, found, { known: new Set(['foo']), covered, fileCovered: true })
+    ).toHaveLength(1)
   })
 
   it('reads one file out of a report the selector over-matched', () => {
