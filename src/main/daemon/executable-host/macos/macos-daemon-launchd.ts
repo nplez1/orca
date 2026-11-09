@@ -174,7 +174,7 @@ export async function launchMacDaemonFromStableBundle(
       'A macOS terminal service from an earlier launch is still registered. Restart terminals from Settings → Manage Sessions.'
     )
   }
-  await releaseMacDaemonJob(legacyService)
+  await releaseMacDaemonJob(legacyService, releaseByMs)
   // Remove the plist after bootstrap because its inherited environment may contain credentials.
   const jobPath = join(bundle.directory, `launch-${options.launchNonce}.plist`)
   const removeJobFile = (): Promise<void> => rm(jobPath, { force: true }).catch(() => {})

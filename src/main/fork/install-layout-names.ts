@@ -44,13 +44,26 @@ export const WINDOWS_APP_EXECUTABLE_NAME = `${APP_DISPLAY_NAME}.exe`
 /** `Uninstall Orca NP.exe` — NSIS derives it from the same name. */
 export const WINDOWS_UNINSTALLER_NAME = `Uninstall ${APP_DISPLAY_NAME}.exe`
 
-/** The package name NSIS uses for the install directory (`extraMetadata.name`). */
+/**
+ * The package name NSIS uses for the install directory: `extraMetadata.name`, which the overlay sets
+ * to the CLI command name.
+ */
 export const WINDOWS_INSTALL_DIRECTORY_NAME = CLI_COMMAND_NAME
+
+/**
+ * `%LOCALAPPDATA%\Programs\orca` — where builds from before the package rename install, and where
+ * NSIS keeps updating them in place because the appId did not change.
+ *
+ * Why it is still a candidate: such an install runs *this* build, so the executable inside it is
+ * `Orca NP.exe`. It cannot be confused with the official install's copy in the same folder, whose
+ * executable is `Orca.exe` — the name inside is what tells them apart.
+ */
+export const WINDOWS_LEGACY_INSTALL_DIRECTORY_NAME = 'orca'
 
 /** `/opt/<this>` — FpmTarget stages the deb/rpm payload under the sanitized product name. */
 export const LINUX_INSTALL_DIRECTORY_NAME = APP_DISPLAY_NAME
 
-/** `linux.executableName`, i.e. `/opt/Orca NP/orca-np`. */
+/** `linux.executableName`, i.e. `/opt/Orca NP/orca-np`. It is the package name, as on Windows. */
 export const LINUX_APP_EXECUTABLE_NAME = CLI_COMMAND_NAME
 
 /**
@@ -129,14 +142,14 @@ export function installedAppExecutableCandidates(
   if (platform === 'win32') {
     return [
       ...(environment.LOCALAPPDATA
-        ? [
+        ? [WINDOWS_INSTALL_DIRECTORY_NAME, WINDOWS_LEGACY_INSTALL_DIRECTORY_NAME].map((directory) =>
             joinPath(
-              environment.LOCALAPPDATA,
+              environment.LOCALAPPDATA as string,
               'Programs',
-              WINDOWS_INSTALL_DIRECTORY_NAME,
+              directory,
               WINDOWS_APP_EXECUTABLE_NAME
             )
-          ]
+          )
         : []),
       ...(environment.ProgramFiles
         ? [

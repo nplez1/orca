@@ -17,6 +17,7 @@ describe('installedAppExecutableCandidates', () => {
       })
     ).toEqual([
       'C:\\Users\\dev\\AppData\\Local\\Programs\\orca-np\\Orca NP.exe',
+      'C:\\Users\\dev\\AppData\\Local\\Programs\\orca\\Orca NP.exe',
       'C:\\Program Files\\orca-np\\Orca NP.exe'
     ])
   })

@@ -3770,10 +3770,11 @@ Six things a reader will otherwise get wrong:
   terminal-host helper's `CFBundleIdentifier` is asserted equal to the appId, so the label was the
   last place naming the other app. The label's profile hash is `sha256(resolve(userDataPath))`, and
   this build's `userData` is `appData/orca-np`, so a `com.stablyai.orca.terminal.<hash>` job can only
-  be one of our own earlier builds. That one is released (booted out if stopped) once per profile
-  before bootstrap; a legacy job that is still *running* is left alone, because booting out a live
-  daemon would kill the user's terminals — the new job then finds the endpoint taken and falls back to
-  the fork launcher, which adopts it, exactly as a same-label upgrade does.
+  be one of our own earlier builds — an official install's `userData` hashes differently. That job is
+  released before bootstrap inside the same deadline that reserves time for bootstrap and startup:
+  booted out if it is stopped, waited out if it is still running, and left alone if it outlives the
+  deadline, because booting out a live daemon would kill the user's terminals. This costs one extra
+  `launchctl print` per launch, for a label that is almost always missing.
 - **`orca-dev` and `orca-dev-wt` stay in the hook's recovery list.** They are still this fork's dev
   profile roots (`SHARED_DEV_PROFILE_DIR_NAME`, `WORKTREE_DEV_PROFILES_DIR_NAME` in
   `dev-instance-isolation.mjs`); only upstream's packaged `orca` root left the list, because adopting
@@ -3782,9 +3783,11 @@ Six things a reader will otherwise get wrong:
 - **`docs/agents-md-refs/macos-daemon-tcc-attribution.md` still describes upstream's label.** It is
   upstream's design note, and its `AssociatedBundleIdentifiers` sentence was already wrong for this
   build before the label moved; the fork's record is this section, not an edited upstream doc.
-- **A pre-rename Windows install is deliberately not a browser-host candidate.** An install made
-  before the package rename keeps updating in place at `%LOCALAPPDATA%\Programs\orca\Orca.exe` (see
-  the upgrade note above), but that path is exactly where an official Orca install lives, and the
-  command alone cannot tell them apart. Resolving it is the defect this change removes, so such a
-  machine falls back to `ORCA_BROWSER_EXECUTABLE` until it reinstalls.
+- **A pre-rename Windows install is a candidate, keyed on the executable name.** An install made
+  before the package rename keeps updating in place under `%LOCALAPPDATA%\Programs\orca` (see the
+  upgrade note above), but it runs `Orca NP.exe` there, because `win.executableName` became the
+  product name in `ddc2a7827fe` — before the package rename in `b883bff3c8f`. The official install's
+  copy in that same folder is `Orca.exe`, so the name inside the folder is what separates them and the
+  legacy directory is safe to resolve. Only a build older than both (executable `Orca.exe`) stays
+  unreachable, and that one is indistinguishable from the official app by design.
 

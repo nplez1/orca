@@ -1,12 +1,20 @@
+import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 import { stringify } from 'yaml'
-import type { LocalBuildCompatibility } from '../../shared/local-build-compatibility'
+import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
+import {
+  LOCAL_BUILD_COMPATIBILITY_FILENAME,
+  type LocalBuildCompatibility
+} from '../../shared/local-build-compatibility'
 import { loadLocalBuildCandidate } from './local-build-candidate'
 import { startLocalBuildFeed } from './local-build-feed-server'
+
+const run = promisify(execFile)
 
 const tempDirectories: string[] = []
 
@@ -75,6 +83,46 @@ describe('loadLocalBuildCandidate', () => {
       })
     ).rejects.toThrow('regular files, not links')
   })
+
+  // Why: the zip is rooted at the bundle name, so a path naming upstream's bundle reads nothing and
+  // every local build is rejected as "predates local switching".
+  it.skipIf(process.platform !== 'darwin')(
+    'reads the compatibility file out of a zip rooted at this build’s bundle',
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'orca-local-build-zip-'))
+      tempDirectories.push(directory)
+      const resources = join(directory, 'stage', `${APP_DISPLAY_NAME}.app`, 'Contents', 'Resources')
+      await mkdir(resources, { recursive: true })
+      await writeFile(
+        join(resources, LOCAL_BUILD_COMPATIBILITY_FILENAME),
+        JSON.stringify(compatibility())
+      )
+      const artifactPath = join(directory, 'orca-macos-arm64.zip')
+      await run('zip', ['-qr', artifactPath, `${APP_DISPLAY_NAME}.app`], {
+        cwd: join(directory, 'stage')
+      })
+      const content = await readFile(artifactPath)
+      const manifestPath = join(directory, 'latest-mac.yml')
+      await writeFile(
+        manifestPath,
+        stringify({
+          version: compatibility().version,
+          files: [
+            {
+              url: 'orca-macos-arm64.zip',
+              sha512: createHash('sha512').update(content).digest('base64'),
+              size: content.length
+            }
+          ]
+        })
+      )
+
+      const candidate = await loadLocalBuildCandidate(manifestPath, 'arm64')
+      await candidate.close()
+
+      expect(candidate.version).toBe(compatibility().version)
+    }
+  )
 
   it('serves the same artifact descriptor that passed validation', async () => {
     const { artifactPath, directory, manifestPath } = await fixture()

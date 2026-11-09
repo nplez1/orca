@@ -33,7 +33,7 @@ function makeFolder(files: string[], directories: string[] = []): string {
   return folder
 }
 
-// Top-level files of a real Orca NP per-user install.
+// Top-level files of a real 1.4.245 per-user install.
 const INSTALLED_LAYOUT = [
   'chrome_100_percent.pak',
   'chrome_200_percent.pak',

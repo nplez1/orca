@@ -13,7 +13,6 @@ export function macDaemonJobLabel(
   return macDaemonJobLabelWith(MAC_DAEMON_JOB_LABEL_PREFIX, userDataPath, protocolVersion)
 }
 
-/** The label builds before the appId rename registered; retired once per profile at launch. */
 export function legacyMacDaemonJobLabel(
   userDataPath: string,
   protocolVersion = PROTOCOL_VERSION
