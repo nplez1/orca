@@ -127,6 +127,39 @@ describe('applyPiScheduledWorkHold', () => {
     expect(applyPiScheduledWorkHold(state, PANE, payload('done'))?.workingMode).toBeUndefined()
   })
 
+  it('ages the hold out from the inventory’s receipt, so an extension that died cannot pin the badge', () => {
+    const state = createHookListenerState()
+    const received = 1_700_000_000_000
+    recordPiScheduledWork(
+      state,
+      PANE,
+      field([{ id: 'loop-1', kind: 'live', next_in_ms: 60_000 }]),
+      received
+    )
+
+    // Why the grace: the extension re-checks at nextAt + 30s, so a republish this soon is still live.
+    expect(applyPiScheduledWorkHold(state, PANE, payload('done'), received + 180_000)?.state).toBe(
+      'working'
+    )
+    // One millisecond later nothing has refreshed the evidence, so the hold is gone — and forgotten.
+    expect(applyPiScheduledWorkHold(state, PANE, payload('done'), received + 180_001)?.state).toBe(
+      'done'
+    )
+    expect(state.piScheduledWorkByPaneKey.has(PANE)).toBe(false)
+  })
+
+  it('keeps holding a job that arms no fire time, however stale the inventory is', () => {
+    // Why: a self-paced loop waiting for its next wakeup publishes no `next_in_ms`, so there is no
+    // clock to age it against — aging is per job, and only a fire time can expire.
+    const state = createHookListenerState()
+    const received = 1_700_000_000_000
+    recordPiScheduledWork(state, PANE, field([{ id: 'loop-1', kind: 'live' }]), received)
+
+    expect(
+      applyPiScheduledWorkHold(state, PANE, payload('done'), received + 30 * 24 * 3600_000)?.state
+    ).toBe('working')
+  })
+
   it('reads a live child off the payload rather than earning the monitoring badge', () => {
     const state = createHookListenerState()
     recordPiScheduledWork(state, PANE, field([{ id: 'loop-1', kind: 'live' }]))

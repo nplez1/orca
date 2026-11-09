@@ -1,7 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createHookListenerState, type HookListenerState } from './listener-state'
+import {
+  clearAllListenerCaches,
+  createHookListenerState,
+  deleteLegacyAgentStatus,
+  movePaneCacheState,
+  type HookListenerState
+} from './listener-state'
 import { findPiClaudeChild } from './pi-claude-child-events'
+import { normalizeHookPayload } from './normalization/normalize-hook-payload'
 import { normalizeAndAccept, PANE_KEY } from './normalization/agent-hook-listener-test-harness'
+import { recordPiScheduledWork } from './providers/pi-pane-hold-evidence'
+
+const MOVED_PANE_KEY = 'tab-2:22222222-2222-4222-8222-222222222222'
 
 const PARENT_SESSION = {
   session_id: 'pi-parent-session',
@@ -241,5 +251,69 @@ describe('a claude session the pane cannot attribute', () => {
 
     expect(normalizeAndAccept(state, 'claude', claudeChildEvent('SessionEnd'))).toBeNull()
     expect(state.lastStatusByPaneKey.get(PANE_KEY)?.payload.agentType).toBe('pi')
+  })
+
+  it('carries that fence to the pane’s new key when the pane is re-keyed', () => {
+    // Why: a re-key moves every other pane-scoped map. Losing this one drops the fence on the new
+    // key — so a spooled hook from the retired child is adopted as the moved pane's own agent —
+    // while the old key keeps a fence that can no longer match anything.
+    publishParentWithClaudeChild(state, CHILD_CONVERSATION)
+    normalizeAndAccept(state, 'pi', {
+      hook_event_name: 'tool_execution_end',
+      ...PARENT_SESSION,
+      subagent_runs: []
+    })
+
+    movePaneCacheState(state, PANE_KEY, MOVED_PANE_KEY)
+    // Why the row goes: the fence is for the post that outlives its row, and a live row's own
+    // inherited-owner guard would refuse this post anyway and hide what is being asserted.
+    deleteLegacyAgentStatus(state, MOVED_PANE_KEY)
+
+    expect(
+      normalizeHookPayload(
+        state,
+        'claude',
+        { paneKey: MOVED_PANE_KEY, payload: claudeChildEvent('PreToolUse') },
+        'production'
+      )
+    ).toBeNull()
+    expect(state.retiredPiClaudeChildrenByPaneKey.has(PANE_KEY)).toBe(false)
+  })
+
+  it('forgets every retired child when the listener drops its caches', () => {
+    publishParentWithClaudeChild(state, CHILD_CONVERSATION)
+    normalizeAndAccept(state, 'pi', {
+      hook_event_name: 'tool_execution_end',
+      ...PARENT_SESSION,
+      subagent_runs: []
+    })
+
+    clearAllListenerCaches(state)
+    expect(state.retiredPiClaudeChildrenByPaneKey.size).toBe(0)
+  })
+})
+
+describe('a scheduled-work hold across a child republish', () => {
+  it('is not re-armed from an inventory nothing has refreshed', () => {
+    // Why: this is the republish the issue names — the extension died, so no post carries the
+    // inventory again, and the child's own event is what would re-apply the stale hold.
+    const state = createHookListenerState()
+    publishParentWithClaudeChild(state, CHILD_CONVERSATION)
+    recordPiScheduledWork(
+      state,
+      PANE_KEY,
+      { scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 60_000 }] } },
+      Date.now() - 200_000
+    )
+
+    const event = normalizeAndAccept(
+      state,
+      'claude',
+      claudeChildEvent('PreToolUse', { tool_name: 'Read' })
+    )
+
+    // The live child still holds the pane; the expired inventory is not what holds it.
+    expect(event?.payload.state).toBe('working')
+    expect(state.piScheduledWorkByPaneKey.has(PANE_KEY)).toBe(false)
   })
 })

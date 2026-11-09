@@ -11,6 +11,13 @@ export type PiScheduledJob = {
   nextInMs?: number
 }
 
+/** What a pane was last told is armed, and when that post arrived: the fire times are relative to it,
+ *  so the hold ages from the receipt rather than from whenever the row is next republished. */
+export type PiScheduledWorkInventory = {
+  jobs: readonly PiScheduledJob[]
+  receivedAt: number
+}
+
 /** The wire field is a claim on the row, so it is bounded rather than trusted. */
 export const PI_SCHEDULED_WORK_MAX_JOBS = 20
 /** A fire later than the extension's own 7-day loop TTL is a broken clock, not a schedule. */
@@ -20,6 +27,19 @@ const PI_SCHEDULED_WORK_LATE_MS = 2 * 60 * 1000
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/** Whether a fire is still due `elapsedMs` after the post that carried it. Past the grace nothing
+ *  refreshed the inventory, so the evidence is stale and must hold nothing. A job that arms no fire
+ *  time — a self-paced loop waiting for its next wakeup — has nothing to age against and stays. */
+function piScheduledFireIsLive(nextInMs: number | undefined, elapsedMs = 0): boolean {
+  return nextInMs === undefined || nextInMs - elapsedMs >= -PI_SCHEDULED_WORK_LATE_MS
+}
+
+/** Whether any of the inventory is still armed at `now`. */
+export function piScheduledWorkIsLive(inventory: PiScheduledWorkInventory, now: number): boolean {
+  const elapsedMs = now - inventory.receivedAt
+  return inventory.jobs.some((job) => piScheduledFireIsLive(job.nextInMs, elapsedMs))
 }
 
 function readJobs(value: unknown): PiScheduledJob[] | null {
@@ -42,11 +62,9 @@ function readJobs(value: unknown): PiScheduledJob[] | null {
     if (nextInMs !== undefined && (typeof nextInMs !== 'number' || !Number.isFinite(nextInMs))) {
       continue
     }
-    // Why: a fire still due, or due within the grace the extension's own timer allows, is live work; one
-    // long overdue means nothing refreshed the inventory, and a hold must not outlive its evidence.
     if (
       typeof nextInMs === 'number' &&
-      (nextInMs < -PI_SCHEDULED_WORK_LATE_MS || nextInMs > PI_SCHEDULED_WORK_MAX_NEXT_MS)
+      (!piScheduledFireIsLive(nextInMs) || nextInMs > PI_SCHEDULED_WORK_MAX_NEXT_MS)
     ) {
       continue
     }

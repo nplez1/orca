@@ -12,7 +12,7 @@ import type {
   ParsedAgentStatusPayload
 } from '../../agent-status/contracts/agent-status-types'
 import type { HookListenerState } from '../listener-state'
-import { readPiScheduledWork, type PiScheduledJob } from '../pi-scheduled-work'
+import { piScheduledWorkIsLive, readPiScheduledWork } from '../pi-scheduled-work'
 
 /** Everything that can hold a Pi pane whose lead turn is over. */
 type PiPaneHoldEvidence = {
@@ -47,14 +47,17 @@ export function resolvePiPaneStatus(
 export function recordPiScheduledWork(
   state: HookListenerState,
   paneKey: string,
-  hookPayload: Record<string, unknown>
+  hookPayload: Record<string, unknown>,
+  now = Date.now()
 ): void {
   const jobs = readPiScheduledWork(hookPayload)
   if (jobs === null || jobs.length === 0) {
     state.piScheduledWorkByPaneKey.delete(paneKey)
     return
   }
-  state.piScheduledWorkByPaneKey.set(paneKey, jobs)
+  // Why the receipt: every fire in the inventory is relative to this post, so this is the only clock
+  // the hold can be aged against when something else republishes the pane.
+  state.piScheduledWorkByPaneKey.set(paneKey, { jobs, receivedAt: now })
 }
 
 /** Hold a finished Pi turn open while its session still has scheduled work armed.
@@ -79,7 +82,14 @@ export function applyPiScheduledWorkHold(
     return payload
   }
   const previousMainAgent = state.lastStatusByPaneKey.get(paneKey)?.payload.mainAgent
-  const jobs: readonly PiScheduledJob[] = state.piScheduledWorkByPaneKey.get(paneKey) ?? []
+  const inventory = state.piScheduledWorkByPaneKey.get(paneKey)
+  const scheduledWork = inventory !== undefined && piScheduledWorkIsLive(inventory, now)
+  // Why: a hold must not outlive its evidence. An inventory whose fires have all passed is stale —
+  // nothing refreshed it — and until it is retired here it keeps claiming the pane through
+  // `paneHasStateClaims`, so this apply is the place that forgets it.
+  if (inventory !== undefined && !scheduledWork) {
+    state.piScheduledWorkByPaneKey.delete(paneKey)
+  }
   const resolution = resolvePiPaneStatus(payload.state, {
     // Why from the payload: the descendant gate has already folded the pane's one child roster into
     // `state`, and this fold reads that roster back so agent work outranks the monitoring badge
@@ -88,7 +98,7 @@ export function applyPiScheduledWorkHold(
       agentChildWorkLiveness(
         payload.subagents?.map((child) => ({ kind: 'agent' as const, state: child.state }))
       ) !== null,
-    scheduledWork: jobs.length > 0
+    scheduledWork
   })
   if (resolution.stateName === payload.state) {
     return payload

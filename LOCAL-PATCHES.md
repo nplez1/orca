@@ -692,7 +692,9 @@ the next post from the new session is adopted once the child it is unrelated to 
 A child's own stream that arrives after its row has gone is refused too, for five minutes and only
 on the conversation it reported: a spooled hook, or a retirement that beat the process, would
 otherwise be read as the pane's own agent — ending its presence on a `SessionEnd`, relabelling it on
-a `Stop`.
+a `Stop`. That fence is pane-scoped state like every other, so it rides a pane re-key
+(`movePaneCacheState`) and dies with the listener's caches (`clearAllListenerCaches`); before #311 it
+did neither, so a re-keyed pane lost the fence on its new key and kept a dead one on the old.
 
 **The child's own stream was refused, so the row had nothing to say.** `isInheritedPaneOwnerEvent`
 correctly refuses a second agent in an active pane, which meant the child's tool, model and wait
@@ -837,7 +839,12 @@ missing evidence class, not a new state. It mirrors Claude's session cron, one l
   the lead's refreshes at a bus that serves no loops.
 - `src/shared/agent-hook-listener/pi-scheduled-work.ts` — the wire reader. Relative `next_in_ms`, so a
   relayed or SSH pane's clock skew cannot move the hold; bounded to 20 jobs; a fire more than two
-  minutes overdue means nothing refreshed the evidence, so it holds nothing.
+  minutes overdue means nothing refreshed the evidence, so it holds nothing. That rule is judged
+  twice: on arrival, and again whenever the hold is applied, against the receipt time the cached
+  inventory now carries (`receivedAt`, `piScheduledWorkIsLive`). Without the second judgement a
+  cached hold never aged — the extension dying without posting again left the pane `monitoring`
+  until upstream's 30-minute decay (#311). A job that arms no `next_in_ms` (a self-paced loop
+  waiting for its next wakeup) has no clock to age against and still holds.
 - `src/shared/agent-hook-listener/providers/pi-pane-hold-evidence.ts` — the pi lane's pane-hold fold,
   the analogue of `resolveClaudePaneStatus` and the seam `#283` adds its child-work input to. Applied
   at **one** place, `agent-hook-listener.ts`, after `gatePaneStateOnDescendants` and after the session
