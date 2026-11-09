@@ -148,16 +148,21 @@ describe('applyPiScheduledWorkHold', () => {
     expect(state.piScheduledWorkByPaneKey.has(PANE)).toBe(false)
   })
 
-  it('keeps holding a job that arms no fire time, however stale the inventory is', () => {
-    // Why: a self-paced loop waiting for its next wakeup publishes no `next_in_ms`, so there is no
-    // clock to age it against — aging is per job, and only a fire time can expire.
+  it('believes an inventory the extension is still restating, and drops one it has stopped', () => {
+    // Why: a self-paced loop arms no fire time, so the inventory's age is the only clock there is.
+    // The extension restates a held row every 10 minutes and re-checks every minute, so silence past
+    // that is the extension going quiet, not the loop staying armed.
     const state = createHookListenerState()
     const received = 1_700_000_000_000
     recordPiScheduledWork(state, PANE, field([{ id: 'loop-1', kind: 'live' }]), received)
 
-    expect(
-      applyPiScheduledWorkHold(state, PANE, payload('done'), received + 30 * 24 * 3600_000)?.state
-    ).toBe('working')
+    const stillRestated = received + 13 * 60_000
+    expect(applyPiScheduledWorkHold(state, PANE, payload('done'), stillRestated)?.state).toBe(
+      'working'
+    )
+    expect(applyPiScheduledWorkHold(state, PANE, payload('done'), stillRestated + 1)?.state).toBe(
+      'done'
+    )
   })
 
   it('reads a live child off the payload rather than earning the monitoring badge', () => {

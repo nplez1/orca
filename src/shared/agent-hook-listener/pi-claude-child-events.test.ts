@@ -290,6 +290,15 @@ describe('a claude session the pane cannot attribute', () => {
 
     clearAllListenerCaches(state)
     expect(state.retiredPiClaudeChildrenByPaneKey.size).toBe(0)
+    // The fence died with the caches, so nothing refuses that child's stream any more.
+    expect(
+      normalizeHookPayload(
+        state,
+        'claude',
+        { paneKey: PANE_KEY, payload: claudeChildEvent('PreToolUse') },
+        'production'
+      )
+    ).not.toBeNull()
   })
 })
 

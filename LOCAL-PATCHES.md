@@ -843,8 +843,11 @@ missing evidence class, not a new state. It mirrors Claude's session cron, one l
   twice: on arrival, and again whenever the hold is applied, against the receipt time the cached
   inventory now carries (`receivedAt`, `piScheduledWorkIsLive`). Without the second judgement a
   cached hold never aged — the extension dying without posting again left the pane `monitoring`
-  until upstream's 30-minute decay (#311). A job that arms no `next_in_ms` (a self-paced loop
-  waiting for its next wakeup) has no clock to age against and still holds.
+  until upstream's 30-minute decay (#311). The receipt also bounds the inventory itself at 13
+  minutes: the extension's key excludes the countdown, so a fire that merely moves posts nothing and
+  the 10-minute restatement is the only freshness signal there is. That bound is what ages the job
+  shapes with no fire time to age against — a self-paced loop waiting for its next wakeup, a cold job
+  a day out.
 - `src/shared/agent-hook-listener/providers/pi-pane-hold-evidence.ts` — the pi lane's pane-hold fold,
   the analogue of `resolveClaudePaneStatus` and the seam `#283` adds its child-work input to. Applied
   at **one** place, `agent-hook-listener.ts`, after `gatePaneStateOnDescendants` and after the session

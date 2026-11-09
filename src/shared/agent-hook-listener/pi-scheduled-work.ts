@@ -24,6 +24,11 @@ export const PI_SCHEDULED_WORK_MAX_JOBS = 20
 const PI_SCHEDULED_WORK_MAX_NEXT_MS = 8 * 24 * 60 * 60 * 1000
 /** A fire this far overdue means nothing refreshed the inventory, so the evidence is stale. */
 const PI_SCHEDULED_WORK_LATE_MS = 2 * 60 * 1000
+/** How long a cached inventory is believed at all. The extension restates a held row every 10 minutes
+ *  and re-checks every minute (`agent-status-scheduled-work-source.ts`), and its key excludes the
+ *  countdown, so a fire that merely moves posts nothing — the restatement is the only freshness
+ *  signal there is, and an inventory this old came from an extension that stopped posting. */
+const PI_SCHEDULED_WORK_MAX_AGE_MS = 10 * 60 * 1000 + 60 * 1000 + PI_SCHEDULED_WORK_LATE_MS
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -36,9 +41,14 @@ function piScheduledFireIsLive(nextInMs: number | undefined, elapsedMs = 0): boo
   return nextInMs === undefined || nextInMs - elapsedMs >= -PI_SCHEDULED_WORK_LATE_MS
 }
 
-/** Whether any of the inventory is still armed at `now`. */
+/** Whether any of the inventory is still armed at `now`: a fire that is not long overdue, on an
+ *  inventory the pane's extension is still restating. The age bounds every job shape, including the
+ *  ones that carry no fire time to age against. */
 export function piScheduledWorkIsLive(inventory: PiScheduledWorkInventory, now: number): boolean {
   const elapsedMs = now - inventory.receivedAt
+  if (elapsedMs > PI_SCHEDULED_WORK_MAX_AGE_MS) {
+    return false
+  }
   return inventory.jobs.some((job) => piScheduledFireIsLive(job.nextInMs, elapsedMs))
 }
 
