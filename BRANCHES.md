@@ -1,7 +1,7 @@
 # Branch tracker
 
 Last updated **2026-11-08** — `nplez1/main` merged upstream main @ `51c77320bc` (1537 commits) from
-`3f8bbfb269` (merge `3b51b396b75`, merge base `0fa5dae2f9`, rollback tag
+`3f8bbfb269` (merge `5a02a4c8406`, merge base `0fa5dae2f9`, rollback tag
 `archive/pre-sync-3f8bbfb269`). **1110 conflicted paths, 1239 hunks** —
 `modify/delete 645, both-rewrote 263, union 154, rename-replay 27, duplicate-tail 17,
 duplicate-members 3, add/add 1`. 197 paths were proved mechanically, 386 modify/delete settled by the

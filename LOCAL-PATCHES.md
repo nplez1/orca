@@ -1391,7 +1391,7 @@ This file stays the evidence and the JSON the assertion, as with the unit red se
 
 ### `local(lint)`: the 2026-11-08 sync's lint gate — 14 red steps, what moved and why
 
-The merge of upstream `51c77320bc` (1537 commits, merge `8cd6d83db79`) left `gate-lint` at 14 failing
+The merge of upstream `51c77320bc` (1537 commits, merge `5a02a4c8406`) left `gate-lint` at 14 failing
 steps with 201 new reds. Upstream's owner-scoped tree move is the main cause: every ratchet baseline is
 keyed by path, so a moved file shows up twice. Each step was handled as follows.
 
@@ -2506,7 +2506,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
 
 - **2026-11-08 — merge of upstream `51c77320bc` (1537 commits) into the release line, from
   `3f8bbfb269`** (merge base `0fa5dae2f9`, rollback tag `archive/pre-sync-3f8bbfb269`, merge commit
-  `3b51b396b75`). **1110 conflicted paths, 1239 hunks** —
+  `5a02a4c8406`). **1110 conflicted paths, 1239 hunks** —
   `modify/delete 645, both-rewrote 263, union 154, rename-replay 27, duplicate-tail 17,
   duplicate-members 3, add/add 1`. Decisions are in
   [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer will
@@ -2514,7 +2514,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
 
   - **Upstream reorganised the tree into owner-scoped directories this sync** — settings, the backend
     runtime, the renderer runtime, the sidebar and the terminal pane all moved. That makes the
-    dominant cost *re-homing* rather than merging: 22 source paths upstream deleted were moved rather
+    dominant cost _re-homing_ rather than merging: 22 source paths upstream deleted were moved rather
     than dropped, so the fork's delta was re-applied at the new location before the old path was
     deleted. 9 more upstream deletions have no upstream home and stay fork-only files.
   - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **197 paths** outright
