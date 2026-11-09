@@ -1441,6 +1441,14 @@ stale and `--prune` drops it. Each ratchet prints one line per offending entry, 
 masks a new failure inside it, and only a whole-step entry may cover a step whose output the parser
 could not split.
 
+**Known red as of the 51c77320bc sync.** `check-upstream-file-comments` fails on the base commit
+`f4337166d22` with no changes from any branch — a detached worktree there measured 5414 fork comment
+lines against its 5269 baseline. The sync re-baselined the per-file maxima but not the total its own
+resolution added, and it renamed files the older entries pin (`git/worktrees/removal/*`,
+`ai-vault/transcripts/*`, `filesystem/host-tree-removal.ts`), so those rows no longer line up with
+their files. The entry pins the exact total, so any further growth is a new red; the real fix is a
+re-baseline with `--init --accept` in the sync that caused it, or moving that prose into this file.
+
 It is fork-local: upstream keeps `pnpm lint`'s exit code and CI is unchanged.
 `tests/tools/lint-gate.test.mjs` covers the chain reader, the per-step failure split and the
 classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: the whole chain is
