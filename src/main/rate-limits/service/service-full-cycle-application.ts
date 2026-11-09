@@ -210,16 +210,17 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     if (shouldApplyAntigravity) {
       this.trackActiveFailureStreak('antigravity', antigravity)
     }
-    if (shouldApplyDeepSeek) {
+    // Why not gated: no request was made, so the failure streak must not grow on the old snapshot.
+    if (shouldApplyDeepSeek && !forkProviderCycle.deepSeek.fetchGated) {
       this.trackActiveFailureStreak('deepseek', deepseek)
     }
-    if (shouldApplyFireworks) {
+    if (shouldApplyFireworks && !forkProviderCycle.fireworks.fetchGated) {
       this.trackActiveFailureStreak('fireworks', fireworks)
     }
-    if (shouldApplyDeepInfra) {
+    if (shouldApplyDeepInfra && !forkProviderCycle.deepInfra.fetchGated) {
       this.trackActiveFailureStreak('deepinfra', deepinfra)
     }
-    if (shouldApplyCopilot) {
+    if (shouldApplyCopilot && !forkProviderCycle.copilot.fetchGated) {
       this.trackActiveFailureStreak('copilot', copilot)
     }
     this.updateState({
@@ -239,26 +240,38 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         : hasKnownProvenanceChange(previousState.antigravity, antigravity)
           ? antigravity
           : this.applyStalePolicy(antigravity, previousState.antigravity),
-      deepseek: shouldApplyDeepSeek
-        ? forkProviderCycle.deepSeek.configChanged
-          ? deepseek
-          : this.applyStalePolicy(deepseek, previousState.deepseek)
-        : this.state.deepseek,
-      fireworks: shouldApplyFireworks
-        ? forkProviderCycle.fireworks.configChanged
-          ? fireworks
-          : this.applyStalePolicy(fireworks, previousState.fireworks)
-        : this.state.fireworks,
-      deepinfra: shouldApplyDeepInfra
-        ? forkProviderCycle.deepInfra.configChanged
-          ? deepinfra
-          : this.applyStalePolicy(deepinfra, previousState.deepinfra)
-        : this.state.deepinfra,
-      copilot: shouldApplyCopilot
-        ? forkProviderCycle.copilot.configChanged
-          ? copilot
-          : this.applyStalePolicy(copilot, previousState.copilot)
-        : this.state.copilot
+      deepseek: this.applyForkProviderResult({
+        gated: forkProviderCycle.deepSeek.fetchGated,
+        applies: shouldApplyDeepSeek,
+        configChanged: forkProviderCycle.deepSeek.configChanged,
+        fresh: deepseek,
+        previous: previousState.deepseek,
+        current: this.state.deepseek
+      }),
+      fireworks: this.applyForkProviderResult({
+        gated: forkProviderCycle.fireworks.fetchGated,
+        applies: shouldApplyFireworks,
+        configChanged: forkProviderCycle.fireworks.configChanged,
+        fresh: fireworks,
+        previous: previousState.fireworks,
+        current: this.state.fireworks
+      }),
+      deepinfra: this.applyForkProviderResult({
+        gated: forkProviderCycle.deepInfra.fetchGated,
+        applies: shouldApplyDeepInfra,
+        configChanged: forkProviderCycle.deepInfra.configChanged,
+        fresh: deepinfra,
+        previous: previousState.deepinfra,
+        current: this.state.deepinfra
+      }),
+      copilot: this.applyForkProviderResult({
+        gated: forkProviderCycle.copilot.fetchGated,
+        applies: shouldApplyCopilot,
+        configChanged: forkProviderCycle.copilot.configChanged,
+        fresh: copilot,
+        previous: previousState.copilot,
+        current: this.state.copilot
+      })
     })
 
     // Published separately so a slow Muse CLI never delays the sibling batch above.
@@ -272,6 +285,22 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       ...this.state,
       muse: this.applyStalePolicy(muse, museBeforeFetch)
     })
+  }
+
+  /** A gated provider made no request, so it keeps its snapshot; otherwise the reading
+   *  is applied as a fresh credential's or through the shared stale policy. */
+  private applyForkProviderResult(args: {
+    gated: boolean
+    applies: boolean
+    configChanged: boolean
+    fresh: ProviderRateLimits
+    previous: ProviderRateLimits | null
+    current: ProviderRateLimits | null
+  }): ProviderRateLimits | null {
+    if (args.gated || !args.applies) {
+      return args.current
+    }
+    return args.configChanged ? args.fresh : this.applyStalePolicy(args.fresh, args.previous)
   }
 
   // Started before the shared preparation awaits; a hidden meter or a switched-off provider skips the spawn.

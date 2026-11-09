@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UsageRateLimitFailureKind } from '../../../shared/rate-limit-types'
 
 type GhResult = { stdout: string; stderr: string }
-type GhCallOptions = { env?: NodeJS.ProcessEnv }
+type GhCallOptions = { env?: NodeJS.ProcessEnv; signal?: AbortSignal }
 
 const { ghExecFileAsyncMock } = vi.hoisted(() => ({
   ghExecFileAsyncMock: vi.fn<(args: string[], options?: GhCallOptions) => Promise<GhResult>>()
@@ -420,6 +420,50 @@ describe('fetchCopilotRateLimits', () => {
     expect(result.status).toBe('error')
     expect(result.usageMetadata?.failureKind).toBe('usage-unavailable')
     expect(result.error).toContain('400')
+  })
+
+  it('maps a 429 to rate-limited and carries the Retry-After gh printed', async () => {
+    ghExecFileAsyncMock.mockRejectedValueOnce(
+      ghCliError('gh: Too Many Requests (HTTP 429)\nRetry-After: 30')
+    )
+
+    const result = await fetchCopilotRateLimits(requestOptions())
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata).toEqual({
+      failureKind: 'rate-limited',
+      source: 'web',
+      retryAtMs: FROZEN_NOW + 30_000
+    })
+  })
+
+  it('maps a primary rate-limit 403 to rate-limited instead of a scope problem', async () => {
+    // Why: a primary limit is a 403, so status alone would tell the user to fix a permission.
+    ghExecFileAsyncMock.mockRejectedValueOnce(
+      ghCliError('gh: API rate limit exceeded for user ID 1234. (HTTP 403)')
+    )
+
+    const result = await fetchCopilotRateLimits(requestOptions())
+
+    expect(result.usageMetadata?.failureKind).toBe('rate-limited')
+    expect(result.error).not.toMatch(/enterprise billing permissions/i)
+  })
+
+  it('passes the cycle signal to gh and reports an abort as a network failure', async () => {
+    const controller = new AbortController()
+    ghExecFileAsyncMock.mockImplementationOnce(async () => {
+      controller.abort()
+      throw Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' })
+    })
+
+    const result = await fetchCopilotRateLimits({
+      ...requestOptions(),
+      signal: controller.signal
+    })
+
+    expect(callOptions(0)?.signal).toBe(controller.signal)
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata?.failureKind).toBe('network')
   })
 
   it('treats a gh failure with no HTTP status as a CLI error, not as a server error', async () => {

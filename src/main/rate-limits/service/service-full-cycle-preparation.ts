@@ -85,6 +85,15 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
     const forkProviderCycle = prepareForkProviderCycle({
       disabled,
+      signal,
+      force: options?.force === true,
+      previous: {
+        deepseek: previousState.deepseek,
+        fireworks: previousState.fireworks,
+        deepinfra: previousState.deepinfra,
+        copilot: previousState.copilot
+      },
+      isRetryAfterActive: (limits) => this.isRetryAfterActive(limits),
       resolveConfigs: () => ({
         deepSeek: this.resolveDeepSeekConfig(),
         fireworks: this.resolveFireworksConfig(),
@@ -146,6 +155,13 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         deepinfra: forkProviderCycle.deepInfra.configChanged,
         copilot: forkProviderCycle.copilot.configChanged,
         zcode: zcodeConfigChanged
+      },
+      // Why: a gated provider makes no request, so a "fetching" chip would never settle.
+      gated: {
+        deepseek: forkProviderCycle.deepSeek.fetchGated,
+        fireworks: forkProviderCycle.fireworks.fetchGated,
+        deepinfra: forkProviderCycle.deepInfra.fetchGated,
+        copilot: forkProviderCycle.copilot.fetchGated
       }
     })
 

@@ -47,7 +47,10 @@ export function makeCopilotUnavailable(error: string): ProviderRateLimits {
 
 export function makeCopilotError(
   error: string,
-  failureKind: NonNullable<ProviderRateLimits['usageMetadata']>['failureKind'] = 'usage-unavailable'
+  failureKind: NonNullable<
+    ProviderRateLimits['usageMetadata']
+  >['failureKind'] = 'usage-unavailable',
+  retryAtMs?: number
 ): ProviderRateLimits {
   return {
     provider: 'copilot',
@@ -56,7 +59,7 @@ export function makeCopilotError(
     updatedAt: Date.now(),
     error,
     status: 'error',
-    usageMetadata: { failureKind, source: 'web' }
+    usageMetadata: { failureKind, source: 'web', ...(retryAtMs === undefined ? {} : { retryAtMs }) }
   }
 }
 

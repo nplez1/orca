@@ -1,5 +1,6 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
-import { extractExecError } from '../../git/exec-error'
+import { extractExecError, parseRetryAfterMs } from '../../git/exec-error'
+import { isGhPrimaryRateLimitStderr } from '../../git/gh-rate-limit-breaker'
 import { ghExecFileAsync } from '../../git/command-runner/gh-exec-file'
 import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-fallback'
 import {
@@ -27,6 +28,8 @@ import {
 // Why: these billing endpoints are version-gated; earlier versions do not expose them.
 const GITHUB_API_VERSION = '2026-03-10'
 const HTTP_STATUS_IN_GH_ERROR = /\(HTTP (\d{3})\)/
+// Why: GitHub reports a secondary rate limit as 403 with this text, and 429 for the same thing.
+const GH_SECONDARY_RATE_LIMIT = /secondary rate limit/i
 // Why bounded: an enterprise holds few budgets, so this only covers a pathological
 // list rather than paging forever inside a poll cycle.
 const MAX_BUDGET_PAGES = 5
@@ -36,24 +39,39 @@ export type FetchCopilotRateLimitsOptions = {
   token: string
   enterpriseSlug: string
   source?: 'enterprise-billing' | 'user-entitlement'
+  signal?: AbortSignal
 }
 
 type GhApiResult =
   | { status: 'ok'; payload: unknown }
   | { status: 'http-error'; httpStatus: number }
+  | { status: 'rate-limited'; retryAtMs?: number }
   | { status: 'parse-error' }
   | { status: 'cli-missing' }
   | { status: 'cli-error'; message: string }
+  | { status: 'aborted' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-async function ghApiJson(path: string, token: string): Promise<GhApiResult> {
+/** The breaker's own error never reached the API, so its text carries no `(HTTP nnn)`. */
+function isGhRateLimitFailure(error: unknown, stderr: string): boolean {
+  return (
+    (typeof error === 'object' && error !== null && 'ghRateLimitBlocked' in error) ||
+    isGhPrimaryRateLimitStderr(stderr) ||
+    GH_SECONDARY_RATE_LIMIT.test(stderr)
+  )
+}
+
+async function ghApiJson(path: string, token: string, signal?: AbortSignal): Promise<GhApiResult> {
   try {
     const { stdout } = await ghExecFileAsync(
       ['api', path, '-H', `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`],
-      token ? { env: { ...process.env, GH_TOKEN: token } } : {}
+      {
+        ...(token ? { env: { ...process.env, GH_TOKEN: token } } : {}),
+        ...(signal ? { signal } : {})
+      }
     )
     try {
       return { status: 'ok', payload: JSON.parse(stdout) }
@@ -64,9 +82,28 @@ async function ghApiJson(path: string, token: string): Promise<GhApiResult> {
     if (isHostCommandMissing(error, 'gh')) {
       return { status: 'cli-missing' }
     }
+    // Why: an aborted cycle is not a GitHub failure, and its text must not be shown as one.
+    if (signal?.aborted) {
+      return { status: 'aborted' }
+    }
     // gh reports the API status inside its error text, e.g. "gh: Not Found (HTTP 404)".
     const { stderr } = extractExecError(error)
+    // Why before the status: a primary limit is a 403, which would otherwise read as a scope problem.
+    if (isGhRateLimitFailure(error, stderr)) {
+      const retryAfterMs = parseRetryAfterMs(stderr)
+      return {
+        status: 'rate-limited',
+        ...(retryAfterMs === null ? {} : { retryAtMs: Date.now() + retryAfterMs })
+      }
+    }
     const statusMatch = HTTP_STATUS_IN_GH_ERROR.exec(stderr)
+    if (statusMatch?.[1] === '429') {
+      const retryAfterMs = parseRetryAfterMs(stderr)
+      return {
+        status: 'rate-limited',
+        ...(retryAfterMs === null ? {} : { retryAtMs: Date.now() + retryAfterMs })
+      }
+    }
     return statusMatch
       ? { status: 'http-error', httpStatus: Number(statusMatch[1]) }
       : { status: 'cli-error', message: stderr.trim() }
@@ -98,6 +135,16 @@ function makeCopilotFailure(
       'cli-unavailable'
     )
   }
+  if (failure.status === 'aborted') {
+    return makeCopilotError(`Reading ${what} was cancelled`, 'network')
+  }
+  if (failure.status === 'rate-limited') {
+    return makeCopilotError(
+      'GitHub is rate limiting Copilot usage reads right now',
+      'rate-limited',
+      failure.retryAtMs
+    )
+  }
   if (failure.httpStatus === 401) {
     return makeCopilotError(`GitHub rejected the token while reading ${what}`, 'stale-token')
   }
@@ -123,8 +170,11 @@ function makeCopilotFailure(
   return makeCopilotError(`GitHub returned ${failure.httpStatus} for ${what}`)
 }
 
-async function fetchCopilotUserEntitlement(token: string): Promise<ProviderRateLimits> {
-  const result = await ghApiJson('/copilot_internal/user', token)
+async function fetchCopilotUserEntitlement(
+  token: string,
+  signal?: AbortSignal
+): Promise<ProviderRateLimits> {
+  const result = await ghApiJson('/copilot_internal/user', token, signal)
   if (result.status !== 'ok') {
     return makeCopilotFailure('your Copilot entitlement', result, 'user-entitlement')
   }
@@ -151,13 +201,15 @@ function usageItems(payload: unknown): Record<string, unknown>[] {
 
 async function findAiCreditBudget(
   enterpriseSlug: string,
-  token: string
+  token: string,
+  signal?: AbortSignal
 ): Promise<ProviderRateLimits | { budget: CopilotBudget }> {
   const collected: CopilotBudget[] = []
   for (let page = 1; page <= MAX_BUDGET_PAGES; page += 1) {
     const result = await ghApiJson(
       `/enterprises/${encodeURIComponent(enterpriseSlug)}/settings/billing/budgets?per_page=100&page=${page}`,
-      token
+      token,
+      signal
     )
     if (result.status !== 'ok') {
       return makeCopilotFailure('the AI-credit budget', result)
@@ -184,7 +236,7 @@ export async function fetchCopilotRateLimits(
     const token = options.token?.trim() ?? ''
     const enterpriseSlug = options.enterpriseSlug?.trim() ?? ''
     if (options.source === 'user-entitlement') {
-      return await fetchCopilotUserEntitlement(token)
+      return await fetchCopilotUserEntitlement(token, options.signal)
     }
     if (!token && !enterpriseSlug) {
       return makeCopilotUnavailable(
@@ -195,7 +247,7 @@ export async function fetchCopilotRateLimits(
       return makeCopilotUnavailable('No GitHub enterprise selected for Copilot usage')
     }
 
-    const budgetResult = await findAiCreditBudget(enterpriseSlug, token)
+    const budgetResult = await findAiCreditBudget(enterpriseSlug, token, options.signal)
     if ('provider' in budgetResult) {
       return budgetResult
     }
@@ -209,7 +261,8 @@ export async function fetchCopilotRateLimits(
     const now = new Date()
     const usage = await ghApiJson(
       `/enterprises/${encodeURIComponent(enterpriseSlug)}/settings/billing/ai_credit/usage?year=${now.getUTCFullYear()}&month=${now.getUTCMonth() + 1}`,
-      token
+      token,
+      options.signal
     )
     if (usage.status !== 'ok') {
       return makeCopilotFailure('this month’s AI-credit usage', usage)

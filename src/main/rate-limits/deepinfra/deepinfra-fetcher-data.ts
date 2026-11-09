@@ -39,7 +39,8 @@ export function makeDeepInfraUnavailable(error: string): ProviderRateLimits {
 
 export function makeDeepInfraError(
   error: string,
-  failureKind: DeepInfraFailureKind
+  failureKind: DeepInfraFailureKind,
+  retryAtMs?: number
 ): ProviderRateLimits {
   return {
     provider: 'deepinfra',
@@ -48,7 +49,7 @@ export function makeDeepInfraError(
     updatedAt: Date.now(),
     error,
     status: 'error',
-    usageMetadata: { failureKind, source: 'web' }
+    usageMetadata: { failureKind, source: 'web', ...(retryAtMs === undefined ? {} : { retryAtMs }) }
   }
 }
 

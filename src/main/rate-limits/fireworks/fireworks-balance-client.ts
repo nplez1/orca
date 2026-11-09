@@ -40,7 +40,12 @@ function readHeaderText(value: string | string[] | undefined): string | undefine
   return Array.isArray(value) ? value[0] : value
 }
 
-function callGateway(method: string, apiKey: string, body: Buffer): Promise<GrpcResponse> {
+function callGateway(
+  method: string,
+  apiKey: string,
+  body: Buffer,
+  signal?: AbortSignal
+): Promise<GrpcResponse> {
   return new Promise((resolve, reject) => {
     const client = http2.connect(GATEWAY_ORIGIN)
     const chunks: Buffer[] = []
@@ -48,12 +53,22 @@ function callGateway(method: string, apiKey: string, body: Buffer): Promise<Grpc
     let trailers: http2.IncomingHttpHeaders = {}
     let settled = false
 
+    const onAbort = (): void => {
+      finish(() => {
+        client.destroy()
+        const error = new Error(`Fireworks ${method} aborted`)
+        error.name = 'AbortError'
+        reject(error)
+      })
+    }
+
     const finish = (run: () => void): void => {
       if (settled) {
         return
       }
       settled = true
       clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
       run()
     }
 
@@ -63,6 +78,13 @@ function callGateway(method: string, apiKey: string, body: Buffer): Promise<Grpc
         reject(new Error(`Fireworks ${method} timed out after ${BALANCE_TIMEOUT_MS}ms`))
       })
     }, BALANCE_TIMEOUT_MS)
+
+    // Why: an aborted cycle must not hold this socket open until the timeout.
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
 
     client.on('error', (error) => {
       finish(() => reject(error))
@@ -125,12 +147,14 @@ function unframeGrpcMessage(payload: Buffer): Buffer | null {
 export async function fetchFireworksBalance(args: {
   apiKey: string
   accountId: string
+  signal?: AbortSignal
 }): Promise<MoneyAmount | null> {
   try {
     const response = await callGateway(
       'GetBalance',
       args.apiKey,
-      encodeGetBalanceRequest(`accounts/${args.accountId}`)
+      encodeGetBalanceRequest(`accounts/${args.accountId}`),
+      args.signal
     )
     if (response.grpcStatus !== GRPC_STATUS_OK) {
       recordSwallowedFailure(

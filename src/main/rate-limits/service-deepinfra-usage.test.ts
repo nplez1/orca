@@ -134,7 +134,10 @@ describe('RateLimitService DeepInfra usage', () => {
     await service.refresh()
 
     expect(fetchDeepInfraRateLimits).toHaveBeenCalledTimes(1)
-    expect(fetchDeepInfraRateLimits).toHaveBeenCalledWith({ apiKey: 'sk-deepinfra-balance-key' })
+    expect(fetchDeepInfraRateLimits).toHaveBeenCalledWith({
+      apiKey: 'sk-deepinfra-balance-key',
+      signal: expect.any(AbortSignal)
+    })
 
     const state = service.getState()
     expect(state.deepinfra?.status).toBe('ok')
@@ -214,7 +217,10 @@ describe('RateLimitService DeepInfra usage', () => {
     const pendingState = service.getState()
     expect(pendingState.deepinfra?.status).toBe('fetching')
     expect(pendingState.deepinfra?.credits).toBeUndefined()
-    expect(fetchDeepInfraRateLimits).toHaveBeenLastCalledWith({ apiKey: 'sk-deepinfra-account-b' })
+    expect(fetchDeepInfraRateLimits).toHaveBeenLastCalledWith({
+      apiKey: 'sk-deepinfra-account-b',
+      signal: expect.any(AbortSignal)
+    })
 
     pending.resolve(creditsProvider('deepinfra', 'balance'))
     await secondRefresh

@@ -81,7 +81,8 @@ export function makeFireworksUnavailable(error: string): ProviderRateLimits {
 
 export function makeFireworksError(
   error: string,
-  failureKind: FireworksFailureKind
+  failureKind: FireworksFailureKind,
+  retryAtMs?: number
 ): ProviderRateLimits {
   return {
     provider: 'fireworks',
@@ -91,7 +92,7 @@ export function makeFireworksError(
     updatedAt: Date.now(),
     error,
     status: 'error',
-    usageMetadata: { failureKind, source: 'web' }
+    usageMetadata: { failureKind, source: 'web', ...(retryAtMs === undefined ? {} : { retryAtMs }) }
   }
 }
 

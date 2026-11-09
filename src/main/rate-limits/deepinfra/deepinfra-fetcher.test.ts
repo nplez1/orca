@@ -246,6 +246,21 @@ describe('fetchDeepInfraRateLimits', () => {
     expect(result.usageMetadata?.failureKind).toBe('parse')
   })
 
+  it('reports a 429 with Retry-After as rate-limited and carries the wait', async () => {
+    netFetchMock.mockResolvedValueOnce(
+      new Response('', { status: 429, headers: { 'retry-after': '90' } })
+    )
+
+    const result = await fetchDeepInfraRateLimits({ apiKey: API_KEY })
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata).toEqual({
+      failureKind: 'rate-limited',
+      source: 'web',
+      retryAtMs: FIXED_NOW + 90_000
+    })
+  })
+
   it('reports a transport failure as a network failure', async () => {
     netFetchMock.mockRejectedValueOnce(new Error('socket hang up'))
 

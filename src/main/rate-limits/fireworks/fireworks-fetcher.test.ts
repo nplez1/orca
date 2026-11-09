@@ -359,6 +359,21 @@ describe('fetchFireworksRateLimits', () => {
     expect(result.credits).toBeNull()
   })
 
+  it('classifies a 429 on the billing summary as rate-limited and carries the wait', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(accountsResponse({ name: 'accounts/acct-429' }))
+      .mockResolvedValueOnce(new Response('', { status: 429, headers: { 'retry-after': '60' } }))
+
+    const result = await fetchFireworksRateLimits({ apiKey: 'fw-key-429' })
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata).toEqual({
+      failureKind: 'rate-limited',
+      source: 'web',
+      retryAtMs: FROZEN_NOW + 60_000
+    })
+  })
+
   it('classifies a transport throw as a network error', async () => {
     netFetchMock.mockRejectedValueOnce(new Error('socket hang up'))
 

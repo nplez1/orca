@@ -1,5 +1,9 @@
 import { getMainHttpClient } from '../../network/http-client'
+import { abortSignalWithTimeout } from '../../lib/abort-signal-with-timeout'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import { parseUsageRetryAfterMs } from '../usage-retry-after'
+import { classifyThrownUsageRequestError } from '../usage-request-failure-kind'
+import { usageCredentialFingerprint } from '../fork/usage-credential-fingerprint'
 import {
   FIREWORKS_API_BASE_URL,
   FIREWORKS_REQUEST_TIMEOUT_MS,
@@ -21,7 +25,7 @@ import { fetchFireworksBalance } from './fireworks-balance-client'
 
 // Why: Fireworks publishes no endpoint that maps an API key to a single account
 // id, so the id is discovered once per key and reused; a poll cycle then costs
-// one request instead of two.
+// one request instead of two. Keyed by a fingerprint so the raw key is not retained.
 const discoveredAccountIdsByApiKey = new Map<string, string>()
 
 // Why: `pageSize` is capped at 200 (default 50). A key addresses one account, so
@@ -30,7 +34,7 @@ const FIREWORKS_ACCOUNTS_PAGE_SIZE = 200
 
 type FireworksJsonResult =
   | { status: 'ok'; payload: unknown }
-  | { status: 'http-error'; httpStatus: number }
+  | { status: 'http-error'; httpStatus: number; retryAtMs?: number }
   | { status: 'parse-error' }
   | { status: 'network-error'; message: string }
 
@@ -40,6 +44,7 @@ export type FetchFireworksRateLimitsOptions = {
   apiKey: string
   /** User-supplied account ID; when set it always wins over discovery. */
   accountIdOverride?: string | null
+  signal?: AbortSignal
 }
 
 function readErrorMessage(error: unknown): string {
@@ -53,14 +58,26 @@ function readErrorMessage(error: unknown): string {
 async function getFireworksJson(args: {
   path: string
   apiKey: string
+  signal?: AbortSignal
 }): Promise<FireworksJsonResult> {
   try {
     const response = await getMainHttpClient().fetch(`${FIREWORKS_API_BASE_URL}${args.path}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${args.apiKey}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(FIREWORKS_REQUEST_TIMEOUT_MS)
+      // Why the caller's signal: an aborted cycle must not leave the request running to its timeout.
+      signal: abortSignalWithTimeout(args.signal, FIREWORKS_REQUEST_TIMEOUT_MS)
     })
     if (!response.ok) {
+      // Why: a 429 is the endpoint asking Orca to stop, so the poll gate needs the wait it asked for.
+      if (response.status === 429) {
+        const nowMs = Date.now()
+        const retryAfterMs = parseUsageRetryAfterMs(response.headers.get('retry-after'), nowMs)
+        return {
+          status: 'http-error',
+          httpStatus: response.status,
+          ...(retryAfterMs === null ? {} : { retryAtMs: nowMs + retryAfterMs })
+        }
+      }
       return { status: 'http-error', httpStatus: response.status }
     }
     try {
@@ -79,6 +96,13 @@ function makeFireworksFailureResponse(failure: FireworksJsonFailure): ProviderRa
       return makeFireworksError(
         `Fireworks rejected the API key (HTTP ${failure.httpStatus}) — check it in Settings.`,
         'missing-credentials'
+      )
+    }
+    if (failure.httpStatus === 429) {
+      return makeFireworksError(
+        'Fireworks billing is rate limited right now',
+        'rate-limited',
+        failure.retryAtMs
       )
     }
     return makeFireworksError(
@@ -125,17 +149,20 @@ type FireworksAccountResolution =
 async function resolveFireworksAccountId(args: {
   apiKey: string
   accountIdOverride: string | null
+  signal?: AbortSignal
 }): Promise<FireworksAccountResolution> {
   if (args.accountIdOverride) {
     return { status: 'ok', accountId: args.accountIdOverride }
   }
-  const discovered = discoveredAccountIdsByApiKey.get(args.apiKey)
+  const cacheKey = usageCredentialFingerprint(args.apiKey)
+  const discovered = discoveredAccountIdsByApiKey.get(cacheKey)
   if (discovered) {
     return { status: 'ok', accountId: discovered }
   }
   const result = await getFireworksJson({
     path: `/v1/accounts?pageSize=${FIREWORKS_ACCOUNTS_PAGE_SIZE}`,
-    apiKey: args.apiKey
+    apiKey: args.apiKey,
+    signal: args.signal
   })
   if (result.status !== 'ok') {
     return { status: 'error', rateLimits: makeFireworksFailureResponse(result) }
@@ -150,7 +177,7 @@ async function resolveFireworksAccountId(args: {
       )
     }
   }
-  discoveredAccountIdsByApiKey.set(args.apiKey, accountId)
+  discoveredAccountIdsByApiKey.set(cacheKey, accountId)
   return { status: 'ok', accountId }
 }
 
@@ -169,7 +196,11 @@ export async function fetchFireworksRateLimits(
       return makeFireworksUnavailable('Fireworks API key not configured')
     }
     const accountIdOverride = options.accountIdOverride?.trim() || null
-    const resolved = await resolveFireworksAccountId({ apiKey, accountIdOverride })
+    const resolved = await resolveFireworksAccountId({
+      apiKey,
+      accountIdOverride,
+      signal: options.signal
+    })
     if (resolved.status === 'error') {
       return resolved.rateLimits
     }
@@ -177,16 +208,20 @@ export async function fetchFireworksRateLimits(
     // Why in parallel: the gateway balance is an extra round trip, and neither call
     // depends on the other's result, so serialising them would just add latency.
     const [result, balance] = await Promise.all([
-      getFireworksJson({ path: summaryPath, apiKey }),
+      getFireworksJson({ path: summaryPath, apiKey, signal: options.signal }),
       // Why the catch: the balance readout is best-effort bonus data from an
       // internal API, so it must never be able to fail the whole provider.
-      fetchFireworksBalance({ apiKey, accountId: resolved.accountId }).catch(() => null)
+      fetchFireworksBalance({
+        apiKey,
+        accountId: resolved.accountId,
+        signal: options.signal
+      }).catch(() => null)
     ])
     if (result.status !== 'ok') {
       // Why: a cached id can go stale if the account is renamed or removed; drop
       // it so the next cycle rediscovers instead of failing forever.
       if (result.status === 'http-error' && result.httpStatus === 404) {
-        discoveredAccountIdsByApiKey.delete(apiKey)
+        discoveredAccountIdsByApiKey.delete(usageCredentialFingerprint(apiKey))
       }
       return makeFireworksFailureResponse(result)
     }
@@ -199,6 +234,6 @@ export async function fetchFireworksRateLimits(
     }
     return makeFireworksSuccess(spend.amount, balance)
   } catch (error) {
-    return makeFireworksError(readErrorMessage(error), 'unknown')
+    return makeFireworksError(readErrorMessage(error), classifyThrownUsageRequestError(error))
   }
 }
