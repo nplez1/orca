@@ -1,4 +1,6 @@
-// Gates both sync tools share: conflict markers, the derived localization catalog, and pnpm tc.
+// Gates the sync tools share: conflict markers, the derived localization catalog, `pnpm tc`, and the
+// fork-invariants test. Pre-sync proves the *starting* tip is green and post-sync proves the *merged*
+// tip is, and every one of these means something in both positions.
 //
 // Why shared: pre-sync proves the *starting* tip is green and post-sync proves the *merged* tip
 // is, and the two only mean something together. If one scanned a different directory set, or
@@ -116,6 +118,32 @@ export function typecheck(options) {
     return { status: STATUS.skipped, summary: 'skipped by --skip-typecheck', details: [] }
   }
   const result = run(pnpmCommand(), ['tc'], { cwd: repoRoot() })
+  return {
+    status: result.ok ? STATUS.passed : STATUS.failed,
+    summary: result.ok ? 'clean' : `failed (exit ${result.code ?? 'did not run'})`,
+    details: result.ok ? [] : tailText(`${result.stdout}\n${result.stderr}`, 40)
+  }
+}
+
+/**
+ * The identity anchors upstream relocated or whose owning test it deleted, pinned by a fork-owned test
+ * that finds its subject by search. Why a spawned run and not a scan: the failure it catches is an
+ * upstream *addition* carrying the official name, which no conflict prompts and no path allowlist
+ * covers, and its computed import is invisible to the reverse-import selector.
+ */
+export const FORK_INVARIANTS = 'tests/tools/fork-invariants.test.mjs'
+
+export function forkInvariants() {
+  if (!existsSync(path.join(repoRoot(), FORK_INVARIANTS))) {
+    return {
+      status: STATUS.unavailable,
+      summary: `${FORK_INVARIANTS} is not present in this worktree`,
+      details: []
+    }
+  }
+  const result = run(pnpmCommand(), ['test', FORK_INVARIANTS, '--maxWorkers=2'], {
+    cwd: repoRoot()
+  })
   return {
     status: result.ok ? STATUS.passed : STATUS.failed,
     summary: result.ok ? 'clean' : `failed (exit ${result.code ?? 'did not run'})`,
