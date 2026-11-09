@@ -4,6 +4,7 @@ import {
   USAGE_PROVIDER_IDS,
   type DisableableUsageProviderId
 } from '../../shared/usage-provider-enablement'
+import { usageProviderConfiguredFlags } from '../../shared/usage-providers/usage-provider-readouts'
 import { RateLimitService } from './service'
 import {
   MIN_REFETCH_MS,
@@ -168,8 +169,6 @@ type ProviderEnablementWiring = {
   query: ProviderQuery
   /** Every local credential the fetch cycle or `getState()` would otherwise read. */
   credentialReads: (() => Mock)[]
-  /** `getState()` flags that report a local credential's presence. */
-  credentialFlags: (keyof RateLimitState)[]
 }
 
 /** The injected credential resolvers, one spy each, so a read is observable as a call. */
@@ -232,30 +231,25 @@ function providerWiring(
   return {
     claude: {
       query: skipped(() => vi.mocked(fetchClaudeRateLimits)),
-      credentialReads: [() => spies.claudeAuthPreparation],
-      credentialFlags: []
+      credentialReads: [() => spies.claudeAuthPreparation]
     },
     codex: {
       query: skipped(() => vi.mocked(fetchCodexRateLimits)),
-      credentialReads: [() => spies.codexHomePath],
-      credentialFlags: []
+      credentialReads: [() => spies.codexHomePath]
     },
     // Why an off-flag rather than a skip: Gemini's fetcher takes the opt-in as its own gate,
     // so the call site always invokes it and passes the switch's state through.
     gemini: {
       query: { kind: 'off-flag', mock: () => vi.mocked(fetchGeminiRateLimits) },
-      credentialReads: [],
-      credentialFlags: []
+      credentialReads: []
     },
     'opencode-go': {
       query: skipped(() => vi.mocked(fetchOpenCodeGoUsage)),
-      credentialReads: [() => spies.openCodeGoConfig, () => spies.openCodeGoApiKey],
-      credentialFlags: ['opencodeGoApiKeyConfigured']
+      credentialReads: [() => spies.openCodeGoConfig, () => spies.openCodeGoApiKey]
     },
     kimi: {
       query: skipped(() => vi.mocked(fetchKimiRateLimits)),
-      credentialReads: [() => spies.kimiHome],
-      credentialFlags: []
+      credentialReads: [() => spies.kimiHome]
     },
     minimax: {
       query: skipped(() => vi.mocked(fetchMiniMaxRateLimits)),
@@ -263,43 +257,35 @@ function providerWiring(
         () => spies.miniMaxConfig,
         () => vi.mocked(hasMiniMaxSessionCookie),
         () => vi.mocked(hasMiniMaxApiKey)
-      ],
-      credentialFlags: ['minimaxCookieConfigured', 'minimaxApiKeyConfigured']
+      ]
     },
     grok: {
       query: skipped(() => vi.mocked(fetchGrokRateLimits)),
-      credentialReads: [() => vi.mocked(readGrokAuthSession)],
-      credentialFlags: ['grokAuthConfigured']
+      credentialReads: [() => vi.mocked(readGrokAuthSession)]
     },
     antigravity: {
       query: skipped(() => vi.mocked(fetchAntigravityRateLimits)),
-      credentialReads: [() => spies.antigravityAccountUsage.begin],
-      credentialFlags: []
+      credentialReads: [() => spies.antigravityAccountUsage.begin]
     },
     cursor: {
       query: skipped(() => vi.mocked(fetchCursorRateLimits)),
-      credentialReads: [() => vi.mocked(readCursorAuthSession)],
-      credentialFlags: ['cursorAuthConfigured']
+      credentialReads: [() => vi.mocked(readCursorAuthSession)]
     },
     zcode: {
       query: skipped(() => vi.mocked(fetchZcodeRateLimits)),
-      credentialReads: [() => spies.zcodePlanConfig, () => vi.mocked(hasZcodePlanApiKey)],
-      credentialFlags: ['zcodePlanApiKeyConfigured']
+      credentialReads: [() => spies.zcodePlanConfig, () => vi.mocked(hasZcodePlanApiKey)]
     },
     deepseek: {
       query: skipped(() => vi.mocked(fetchDeepSeekRateLimits)),
-      credentialReads: [() => spies.deepSeekConfig, () => vi.mocked(hasDeepSeekApiKey)],
-      credentialFlags: ['deepseekApiKeyConfigured']
+      credentialReads: [() => spies.deepSeekConfig, () => vi.mocked(hasDeepSeekApiKey)]
     },
     fireworks: {
       query: skipped(() => vi.mocked(fetchFireworksRateLimits)),
-      credentialReads: [() => spies.fireworksConfig, () => vi.mocked(hasFireworksCredentials)],
-      credentialFlags: ['fireworksApiKeyConfigured']
+      credentialReads: [() => spies.fireworksConfig, () => vi.mocked(hasFireworksCredentials)]
     },
     deepinfra: {
       query: skipped(() => vi.mocked(fetchDeepInfraRateLimits)),
-      credentialReads: [() => spies.deepInfraConfig, () => vi.mocked(hasDeepInfraApiKey)],
-      credentialFlags: ['deepinfraApiKeyConfigured']
+      credentialReads: [() => spies.deepInfraConfig, () => vi.mocked(hasDeepInfraApiKey)]
     },
     copilot: {
       query: skipped(() => vi.mocked(fetchCopilotRateLimits)),
@@ -308,14 +294,12 @@ function providerWiring(
         () => vi.mocked(readCopilotGhCredentialsForCycle),
         () => vi.mocked(hasCopilotCredentials),
         () => vi.mocked(getCachedCopilotGhCredentials)
-      ],
-      credentialFlags: ['copilotTokenConfigured']
+      ]
     },
     // Why only the fetch: the Muse CLI spawn is both the query and the credential read.
     muse: {
       query: skipped(() => vi.mocked(fetchMuseRateLimits)),
-      credentialReads: [],
-      credentialFlags: []
+      credentialReads: []
     }
   }
 }
@@ -339,11 +323,17 @@ function configureLiveProviderAccess(service: RateLimitService, spies: Credentia
   service.setMuseUsageEnabledResolver(() => true)
 }
 
-function expectProviderNotQueried(wiring: ProviderEnablementWiring, state: RateLimitState): void {
+function expectProviderNotQueried(
+  wiring: ProviderEnablementWiring,
+  provider: DisableableUsageProviderId,
+  state: RateLimitState
+): void {
   for (const read of wiring.credentialReads) {
     expect(read()).not.toHaveBeenCalled()
   }
-  for (const flag of wiring.credentialFlags) {
+  // Why from the manifest: the flags a provider owns are classified there, so this table
+  // must not keep a second copy that a new provider could miss.
+  for (const flag of usageProviderConfiguredFlags(provider)) {
     expect(state[flag]).toBe(false)
   }
   if (wiring.query.kind === 'skipped') {
@@ -464,7 +454,7 @@ async function verifySwitchHonored(
 
     const state = service.getState()
     for (const provider of disabledProviders) {
-      expectProviderNotQueried(wiring[provider], state)
+      expectProviderNotQueried(wiring[provider], provider, state)
       expect(stateSlot(state, provider)).toBeNull()
     }
     // The switch turns off those providers, not the cycle: every sibling still queries.
@@ -486,7 +476,7 @@ async function verifySwitchHonored(
     expect(service.fetchAllCalls).toBe(2)
     await service.inFlight
     for (const provider of disabledProviders) {
-      expectProviderNotQueried(wiring[provider], service.getState())
+      expectProviderNotQueried(wiring[provider], provider, service.getState())
       expect(stateSlot(service.getState(), provider)).toBeNull()
     }
   } finally {
