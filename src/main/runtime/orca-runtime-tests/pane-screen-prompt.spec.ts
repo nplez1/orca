@@ -218,10 +218,11 @@ const PI_ASK_CARD = [
 ].join('\r\n')
 
 const PI_NEEDS_INPUT_TITLE = '\x1b]0;\u03c0 ! worker\x07'
+const PI_WORKING_TITLE = '\x1b]0;\u03c0 : worker\x07'
+const PI_IDLE_TITLE = '\x1b]0;\u03c0 > worker\x07'
 
-/** A card whose footer this reader has no anchor for: Pi-Bolt 1.1.7's multi-select wording, taken
- *  from the running build. Nothing here is a card to the footer vocabulary - no cancel half, comma
- *  separators - and it is still a dialog a person has to answer. */
+/** Pi-Bolt 1.1.7's multi-select footer, taken from the running build: no cancel half and comma
+ *  separators, so no anchor matches it - and it is still a dialog a person has to answer. */
 const PI_UNMEASURED_CARD = [
   ' Ask Colours',
   ' \u276f [ ] Blue',
@@ -229,8 +230,6 @@ const PI_UNMEASURED_CARD = [
   ' Space to toggle, Enter to confirm, a to select all, n to select none, i to invert, l to toggle latest;',
   ''
 ].join('\r\n')
-const PI_WORKING_TITLE = '\x1b]0;\u03c0 : worker\x07'
-const PI_IDLE_TITLE = '\x1b]0;\u03c0 > worker\x07'
 
 async function piTerminalRuntime(
   deps: { onPaneScreenPromptGained?: (paneKey: string) => void } = {}
@@ -296,9 +295,6 @@ describe('the ask card a pi pane is holding', () => {
   })
 
   it('reads a wait for a footer this reader has never seen', async () => {
-    // Why: the footer vocabulary is measured against one card build at a time, and every wording
-    // pi has not painted yet read "no card" - which is how a displaced ask card went back to
-    // Working after Pi-Bolt changed its card footers. The marker is the witness; the footer is not.
     const { runtime, paneKey, flush } = await piTerminalRuntime()
     runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_UNMEASURED_CARD, 1_000)
     await flush()
@@ -306,6 +302,18 @@ describe('the ask card a pi pane is holding', () => {
       reason: 'agent-interactive-prompt',
       current: true
     })
+  })
+
+  it('releases on a withdrawn marker even while the card is still painted', async () => {
+    // Why: the marker is now the only clear, so a marker that withdraws under a still-painted card
+    // must release - otherwise answering a card whose repaint lags its close pins Needs You.
+    const { runtime, paneKey, flush } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', PI_NEEDS_INPUT_TITLE + PI_ASK_CARD, 1_000)
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).not.toBeNull()
+    runtime.onPtyData('pty-screen', PI_WORKING_TITLE, 2_000)
+    await flush()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
   })
 
   it('ends the wait once the pane withdraws its own claim', async () => {
@@ -341,10 +349,9 @@ describe('the ask card a pi pane is holding', () => {
   })
 
   it('answers a wait for a footer it cannot read, rather than only holding one', async () => {
-    // Why a wait and not `undefined`: holding was the half-fix. It keeps a wait that already exists,
-    // but the row this lane is for is already `working` - a later post displaced the hook's wait -
-    // so "cannot see it" left it on Working for as long as the card stood. The pane's `π !` is its
-    // own claim that a dialog is open; the footer is only the vocabulary we happened to measure.
+    // Why a wait and not `undefined`: holding keeps a wait that already exists, and the row this
+    // lane is for already reads `working` - so "cannot see it" left it on Working for as long as
+    // the card stood. The pane's `π !` is its own claim that a dialog is open; the footer is not.
     const { runtime, paneKey, flush } = await piTerminalRuntime()
     runtime.onPtyData(
       'pty-screen',

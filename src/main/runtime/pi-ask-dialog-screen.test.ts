@@ -81,11 +81,14 @@ describe('pi ask-card gained stamp', () => {
     expect(gained.observe('pty-1', CARD_GRID, 9_000)?.since).toBe(1_000)
   })
 
-  it('forgets the card once the grid no longer holds it', () => {
+  it('keeps the stamp when the grid stops showing the card, because the marker owns the clear', () => {
+    // Why: the marker is the authority on whether a dialog is still open. Clearing on an absent
+    // footer would reset `since` on every read of a card this reader cannot recognise - the very
+    // case the claim answers - turning the stamp into "the last time we looked".
     const gained = new PiAskDialogScreenGained()
     gained.observe('pty-1', CARD_GRID, 1_000)
     expect(gained.observe('pty-1', [' done, 42 tests passed'], 5_000)).toBeNull()
-    expect(gained.observe('pty-1', CARD_GRID, 7_000)?.since).toBe(7_000)
+    expect(gained.observe('pty-1', CARD_GRID, 7_000)?.since).toBe(1_000)
   })
 
   it('answers unreadable for a grid it does not have, which is not an empty one', () => {

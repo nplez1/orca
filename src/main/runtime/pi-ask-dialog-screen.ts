@@ -57,14 +57,16 @@ export function showsPiAskDialogScreen(lines: readonly string[]): boolean {
  * replaces the `waiting` row the card earned. When the card appeared is therefore the stamp that says
  * "this dialog predates the claim that the pane is working".
  *
- * Why absence clears: a card that leaves the grid was answered, cancelled, or scrolled away, and a
- * wait must never outlive the dialog that justified it.
+ * Why absence no longer clears: the pane's own marker is the authority on whether a dialog is still
+ * open, and it is the caller that reads it. Clearing here would reset the stamp on every read of a
+ * card this reader cannot recognise - the case the claim exists for - so `since` would be "the last
+ * time we looked" rather than when the dialog appeared.
  */
 export class PiAskDialogScreenGained {
   private readonly sinceByPtyId = new Map<string, number>()
 
   /** The card the pane's grid holds, `null` when it holds none, and `undefined` when the grid could
-   *  not be read — "cannot see it" is not "no dialog", and only the caller knows which to believe. */
+   *  not be read. Neither answer clears the pane's stamp: the marker's withdrawal does. */
   observe(
     ptyId: string,
     lines: readonly string[] | null,
@@ -74,7 +76,6 @@ export class PiAskDialogScreenGained {
       return undefined
     }
     if (!showsPiAskDialogScreen(lines)) {
-      this.forget(ptyId)
       return null
     }
     return { reason: 'agent-interactive-prompt', since: this.stamp(ptyId, now) }
@@ -107,7 +108,7 @@ export class PiAskDialogScreenGained {
     return { reason: 'agent-interactive-prompt', since: this.stamp(ptyId, now) }
   }
 
-  /** Drops a pane's stamp without reading its grid - the pane's own title withdrew the claim. */
+  /** Drops a pane's stamp: the pane's own title withdrew the claim, which is the only clear now. */
   forget(ptyId: string): void {
     this.sinceByPtyId.delete(ptyId)
   }
