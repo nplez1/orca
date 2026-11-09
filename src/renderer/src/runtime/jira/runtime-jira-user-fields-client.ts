@@ -16,6 +16,7 @@ import { callRuntimeRpc } from '../rpc/calls/runtime-rpc-call'
 import { isRuntimeProviderSearchQueryWithinLimit } from '../issue-search/runtime-provider-search-bounds'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './runtime-jira-target'
 import { foldTextFieldsForTarget } from '../runtime-jira-text-fields'
+import { JIRA_WRITE_RPC_TIMEOUT_MS } from '../../../../shared/jira/jira-write-deadline'
 
 export async function jiraCreateIssue(
   settings: RuntimeJiraSettings,
@@ -36,7 +37,9 @@ export async function jiraCreateIssue(
     : args
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraCreateIssueResult>(target, 'jira.createIssue', adjustedArgs, {
-        timeoutMs: 30_000
+        // Why above the host's own deadline: the host's verdict on a create it aborted
+        // says the issue may exist, and the client's generic timeout would hide it.
+        timeoutMs: JIRA_WRITE_RPC_TIMEOUT_MS
       })
     : window.api.jira.createIssue(adjustedArgs)
 }
