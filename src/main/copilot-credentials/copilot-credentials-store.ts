@@ -22,7 +22,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parseCopilotCredentials(payload: string): CopilotCredentials {
-  const parsed: unknown = JSON.parse(payload)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(payload)
+  } catch {
+    // Why: JSON.parse quotes the start of its input, and that input is the token.
+    throw new Error('GitHub Copilot credentials payload is not valid JSON')
+  }
   if (
     !isRecord(parsed) ||
     typeof parsed.token !== 'string' ||

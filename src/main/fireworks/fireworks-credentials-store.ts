@@ -24,7 +24,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parseFireworksCredentials(payload: string): FireworksCredentials {
-  const parsed: unknown = JSON.parse(payload)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(payload)
+  } catch {
+    // Why: JSON.parse quotes the start of its input, and that input is the key.
+    throw new Error(`${FIREWORKS_CREDENTIALS_LABEL} payload is not valid JSON`)
+  }
   if (!isRecord(parsed) || typeof parsed.apiKey !== 'string' || !parsed.apiKey.trim()) {
     throw new Error('malformed Fireworks credentials payload')
   }

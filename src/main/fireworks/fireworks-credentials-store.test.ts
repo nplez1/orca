@@ -208,10 +208,12 @@ describe('fireworks-credentials-store', () => {
     )
   })
 
-  it('throws the decrypt error for a malformed JSON payload and logs it', async () => {
+  it('throws the decrypt error for a malformed JSON payload and logs no part of it', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     existsSyncMock.mockReturnValue(true)
-    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'not-json-at-all')))
+    readFileSyncMock.mockReturnValue(
+      Buffer.from(envelope('plaintext', 'fw_live_9f8e7d6c5b4a4e2d is not json'))
+    )
     const store = await loadStore()
     expect(() => store.readFireworksCredentials()).toThrow(
       'Fireworks credentials could not be decrypted'
@@ -220,6 +222,13 @@ describe('fireworks-credentials-store', () => {
       '[fireworks] failed to decode/decrypt credentials',
       expect.any(Error)
     )
+    const logged = error.mock.calls
+      .map((call) =>
+        call[1] instanceof Error ? `${call[1].message}\n${call[1].stack ?? ''}` : String(call[1])
+      )
+      .join('\n')
+    expect(logged).toContain('Fireworks credentials payload is not valid JSON')
+    expect(logged).not.toContain('fw_live_9f')
     error.mockRestore()
   })
 
