@@ -147,7 +147,7 @@ describe('session-summary fold brain', () => {
     expect(readdirSync(root)).toEqual([SESSION_SUMMARY_FOLD_CWD_DIR_NAME])
   })
 
-  it('leaves no directory behind when the agent cannot start', async () => {
+  it('leaves the working directory empty when the agent cannot start', async () => {
     const root = scratchRoot()
 
     await expect(

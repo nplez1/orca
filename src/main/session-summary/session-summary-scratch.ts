@@ -28,8 +28,11 @@ export const SESSION_SUMMARY_SCRATCH_MAX_AGE_MS = 60 * 60_000
  *
  * Why one stable path rather than a fresh random one per call: the Claude CLI keys
  * `~/.claude/projects/<cwd>` by the working directory, so a random cwd per call would leave a
- * ~150 KB session file behind for every chunk of every fold. The directory is emptied instead, which
- * is what keeps a previous call's content out of this one.
+ * ~150 KB session file behind for every chunk of every fold. Emptying it instead separates
+ * successive calls; the fold's concurrent chunks deliberately share the one directory.
+ *
+ * A userData override that points into a shared directory gives up the parent protection this
+ * relies on — the leaf is verified, its ancestors are not.
  */
 export function prepareSessionSummaryFoldCwd(root: string): string {
   const dir = join(root, SESSION_SUMMARY_FOLD_CWD_DIR_NAME)
