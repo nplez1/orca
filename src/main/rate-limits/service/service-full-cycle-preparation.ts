@@ -246,15 +246,19 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         disabled.has('kimi')
           ? Promise.resolve(this.disabledUsageProviderSnapshot('kimi'))
           : this.fetchKimiWithResolvedHome(),
-        miniMaxConfigResult.error
-          ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
-          : fetchMiniMaxRateLimits({
-              cookie: miniMaxCookie,
-              groupId: miniMaxGroupId,
-              models: miniMaxModels,
-              endpointMode: miniMaxEndpoint,
-              apiKey: miniMaxApiKey
-            })
+        // Why a call-site gate, like OpenCode Go: an emptied config still enters the fetcher,
+        // so the switch would be enforced by that fetcher's own short-circuit, not by the switch.
+        disabled.has('minimax')
+          ? Promise.resolve(this.disabledUsageProviderSnapshot('minimax'))
+          : miniMaxConfigResult.error
+            ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
+            : fetchMiniMaxRateLimits({
+                cookie: miniMaxCookie,
+                groupId: miniMaxGroupId,
+                models: miniMaxModels,
+                endpointMode: miniMaxEndpoint,
+                apiKey: miniMaxApiKey
+              })
       ])
 
     if (signal.aborted) {
