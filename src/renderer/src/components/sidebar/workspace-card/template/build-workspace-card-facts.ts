@@ -1,5 +1,6 @@
 import { getWorkspaceAttachments } from '../../../../../../shared/workspace-attachments/workspace-attachments'
 import type { WorktreeCardProperty } from '../../../../../../shared/ui-chrome-types'
+import { resolveEphemeralVmLeaseIndicator } from '../../ephemeral-vm-lease-presentation'
 import type {
   WorkspaceCardFacts,
   WorkspaceCardShowOptions
@@ -41,7 +42,6 @@ export function buildWorkspaceCardFacts(card: WorktreeCardController): Workspace
   const runtimeHost = !repo?.connectionId && card.parsedRepoHost?.kind === 'runtime'
   // Why: the card names its host through the dropdown once a branch spans hosts, so the group is a fact.
   const hostGroup = card.branchGroup ?? []
-  const selectedHostId = card.selectedBranchHostId ?? hostGroup[0]?.hostId
   return {
     ws: {
       id: worktree.id,
@@ -71,12 +71,9 @@ export function buildWorkspaceCardFacts(card: WorktreeCardController): Workspace
       runtimeDisconnected: card.isRuntimeDisconnected,
       group:
         hostGroup.length > 1
-          ? hostGroup.map((member) => ({
-              hostId: member.hostId,
-              label: member.hostLabel,
-              selected: member.hostId === selectedHostId
-            }))
-          : []
+          ? hostGroup.map((member) => ({ hostId: member.hostId, label: member.hostLabel }))
+          : [],
+      lease: resolveEphemeralVmLeaseIndicator(card.ephemeralLease) !== null
     },
     git: {
       conflictOperation: card.conflictOperation ?? null,

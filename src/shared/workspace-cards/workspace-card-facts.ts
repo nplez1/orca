@@ -26,8 +26,6 @@ export type WorkspaceCardHostMember = {
   hostId: string
   /** The host label the dropdown row shows. */
   label: string
-  /** The member this card currently draws. */
-  selected: boolean
 }
 
 /** What a card template can read about one workspace. Host-neutral: SSH and server workspaces
@@ -66,6 +64,8 @@ export type WorkspaceCardFacts = {
     /** Every host's checkout of this branch, local-first; empty for an ordinary card. A merged
      *  card names its host through this list, so it carries no `contextLabel` of its own. */
     group: readonly WorkspaceCardHostMember[]
+    /** A lease is counting down on this card's host, so the card shows its deadline. */
+    lease: boolean
   }
   git: {
     /** `merge`, `rebase`, `cherry-pick`, `revert` or `unknown` while one is in progress. */

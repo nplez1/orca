@@ -16,13 +16,22 @@ import { DEFAULT_WORKTREE_CARD_PROPERTIES } from '../../../../../../shared/workt
 import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/row-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import WorktreeCard from '../surface/WorktreeCard'
+import type { EphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
+import { resolveEphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
 
 type Mocks = {
   state: Record<string, unknown>
   cacheStartedAt: number | null
   deleteModifier: boolean
+  lease: EphemeralVmRuntimeLease | null
 }
-const mocks = vi.hoisted((): Mocks => ({ state: {}, cacheStartedAt: null, deleteModifier: false }))
+const mocks = vi.hoisted((): Mocks => ({
+  state: {},
+  cacheStartedAt: null,
+  deleteModifier: false,
+  lease: null
+}))
 
 vi.mock('@/store', () => {
   const getState = () => mocks.state
@@ -73,6 +82,9 @@ vi.mock(
 vi.mock('../../workspace-actions/context-menu/WorktreeContextMenu', () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>
 }))
+vi.mock('../../worktree-card-ephemeral-lease', () => ({
+  useWorktreeCardEphemeralLease: () => mocks.lease
+}))
 
 const LOCAL: ExecutionHostId = 'local'
 const REMOTE: ExecutionHostId = 'ssh:gpu-vm'
@@ -108,6 +120,34 @@ function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
     ...overrides
   }
 }
+
+const NOW_MS = Date.parse('2026-10-13T00:00:00Z')
+const HOUR_MS = 60 * 60 * 1000
+
+/** A live lease with three hours left, so the badge's own label is the assertion. */
+function leaseWithThreeHoursLeft(): EphemeralVmRuntimeLease {
+  const record: EphemeralVmRuntimeRecord = {
+    id: 'runtime-1',
+    recipeId: 'recipe-1',
+    status: 'running',
+    cleanupStatus: 'not_started',
+    createdAt: NOW_MS,
+    updatedAt: NOW_MS,
+    recipeResult: {
+      schemaVersion: 1,
+      pairingCode: 'pair-1',
+      projectRoot: '/repo',
+      userData: { releaseAt: new Date(NOW_MS + 3 * HOUR_MS).toISOString() }
+    }
+  }
+  const lease = resolveEphemeralVmRuntimeLease(record, NOW_MS)
+  if (!lease) {
+    throw new Error('fixture lease did not resolve')
+  }
+  return lease
+}
+
+const lease = leaseWithThreeHoursLeft()
 
 const members: BranchGroupMember[] = [
   { worktree: makeWorktree(), repo, hostId: LOCAL, hostLabel: 'Local Mac' },
@@ -203,15 +243,32 @@ describe('the live workspace card and its host', () => {
     expect(onSelectBranchHost).toHaveBeenCalledWith(GROUP_KEY, REMOTE)
   })
 
-  it('leaves a single-host card without a host switcher', () => {
-    const { container } = renderCard()
+  it('leaves a branch checked out on one host without a switcher', () => {
+    const { container } = renderCard({
+      branchGroup: [members[0]],
+      selectedBranchHostId: LOCAL,
+      branchGroupKey: GROUP_KEY
+    })
 
     expect(container.querySelector('[data-branch-host-select]')).toBeNull()
   })
 
-  it('still labels a cross-host card that is not a same-branch merge', () => {
-    const { container } = renderCard({ hostContextLabel: 'GPU VM' })
+  it('keeps the ephemeral host lease on a classic card', () => {
+    mocks.lease = lease
+    const { container } = renderCard()
 
-    expect(container.textContent).toContain('GPU VM')
+    expect(container.textContent).toContain('Exp 3h')
+  })
+
+  it('keeps the ephemeral host lease beside the switcher on a grouped card', () => {
+    mocks.lease = lease
+    const { container } = renderCard({
+      branchGroup: members,
+      selectedBranchHostId: LOCAL,
+      branchGroupKey: GROUP_KEY
+    })
+
+    expect(container.textContent).toContain('Exp 3h')
+    expect(hostSelectLabel(container)).toContain('Local Mac')
   })
 })

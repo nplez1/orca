@@ -22,8 +22,9 @@
     "details": "links.count > 0 || (options.show.issue && links.issue) || (options.show.linearIssue && links.linearIssue) || (options.show.jiraIssue && links.jiraIssue) || (!vars.newStyle && options.show.pr && review != null) || (options.show.comment && vars.hasComment) || (options.show.automation && provenance.automation) || (options.show.cli && provenance.cli)",
     "ports": "options.show.ports && ports.count > 0",
     "indicators": "vars.details || vars.ports",
+    "lease": "host.lease",
     "metaIndicators": "vars.classic && vars.indicators",
-    "titleIndicators": "!vars.classic && vars.indicators",
+    "titleIndicators": "vars.lease || (!vars.classic && vars.indicators)",
     "hasMetaRow": "vars.metaRow ? vars.metaRepo || vars.hostBadge || vars.folderInMeta || vars.branch || vars.identityInMeta || vars.detachedInMeta || vars.conflict || git.cacheTimerActive || vars.metaIndicators : vars.conflict || git.cacheTimerActive",
     "star": "vars.compact && ws.isMain && !vars.folder",
     "headerActions": "vars.star || place.deleteQuickAction || vars.branchHostSelect",
@@ -84,7 +85,7 @@
                     "gap": "sm",
                     "inset": "end"
                   },
-                  "children": [{ "el": "Indicators" }]
+                  "children": [{ "el": "Lease", "when": "vars.lease" }, { "el": "Indicators" }]
                 }
               ]
             },

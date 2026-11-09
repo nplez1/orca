@@ -1,5 +1,7 @@
 import React from 'react'
 import { LinearAgentSkillSetupPrompt } from '../../LinearAgentSkillSetupPrompt'
+import { EphemeralVmLeaseBadge } from '../../EphemeralVmLeaseBadge'
+import { resolveEphemeralVmLeaseIndicator } from '../../ephemeral-vm-lease-presentation'
 import type { WorktreeCardController } from '../controller/use-worktree-card-controller'
 import WorktreeCardAgents from '../activity/WorktreeCardAgents'
 import {
@@ -94,6 +96,10 @@ export const CARD_ACTIVITY_PARTS = {
     ) : (
       content
     )
+  }),
+  Lease: part([], (_props, _children, card) => {
+    const indicator = resolveEphemeralVmLeaseIndicator(card.ephemeralLease)
+    return indicator ? <EphemeralVmLeaseBadge indicator={indicator} /> : null
   }),
   DetailsHover: part(['branchName', 'workspaceTitle'], detailsHover)
 }
