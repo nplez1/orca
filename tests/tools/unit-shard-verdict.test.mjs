@@ -133,8 +133,8 @@ it('does not let a tolerated pool crash explain a failed shard on its own', () =
 })
 
 it('does not let a bystander tolerated error explain a shard that also crashed', () => {
-  // The BLOCKER shape review found: a crash beside a benign teardown headline used to read as
-  // explained, because only "every tolerated headline" was consulted, not the crash itself.
+  // Why: a crash beside a benign teardown headline used to read as explained, because only "every
+  // tolerated headline" was consulted, not the crash itself.
   const verdict = decide({
     logText: log({ errors: [POOL_CRASH, CANCELED] }),
     outcome: 'failure',

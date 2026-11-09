@@ -157,8 +157,9 @@ export function readShardAssignment(text, { runId = null, runAttempt = null } = 
       problem: `the shard assignment selects shard ${assignment?.selectedShard}, which is not one of its ${shards.length} shard(s)`
     }
   }
-  // Why: the default runner can reuse a workspace, so a manifest left by an earlier run or attempt
-  // would otherwise be judged against this run's report.
+  // Why defence in depth rather than a measured failure: `actions/checkout` cleans `ci-shards/` and
+  // one job sees one run id on every runner this fork uses, but a manifest from an earlier run would
+  // otherwise be judged against this run's report.
   for (const [key, current] of [
     ['runId', runId],
     ['runAttempt', runAttempt]
