@@ -4,9 +4,10 @@
 // test worker — was classified targeted and skipped the gate (#316).
 //
 // Why a walk and not `buildUnitDependencyGraph`: the graph reads 34k sources (~8 s) and only this
-// direction is needed, which is 46 files. Two edges of the graph are deliberately not walked, and
-// neither can hide a file today: ownership-declared inputs (no record belongs to an entry point) and
-// workspace `manifest` edges (those manifests live under `src/packages`, global by path already).
+// direction is needed, which is a few dozen files. Two edges of the graph are deliberately not
+// walked, and neither can hide a file today: ownership-declared inputs (no record belongs to an
+// entry point) and workspace `manifest` edges (those manifests live under `src/packages`, global by
+// path already).
 import { globSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -61,9 +62,13 @@ function walkRuntimeInputs({ root, has, read, entries }) {
 function isReadableFile(root, file) {
   try {
     return statSync(join(root, file), { throwIfNoEntry: false })?.isFile() === true
-  } catch {
-    // A candidate below a file (`x.mjs/index.ts`) is ENOTDIR, which `throwIfNoEntry` does not suppress.
-    return false
+  } catch (error) {
+    // Why only ENOTDIR: a candidate below a file (`x.mjs/index.ts`) is not a file either, but any
+    // other stat error means the tree is unreadable, and answering "not a file" would fail open.
+    if (error.code === 'ENOTDIR') {
+      return false
+    }
+    throw error
   }
 }
 
