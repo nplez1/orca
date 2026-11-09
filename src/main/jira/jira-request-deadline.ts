@@ -3,15 +3,22 @@
  *  the session, and four of them stop every Jira call in the app. */
 export const JIRA_REQUEST_TIMEOUT_MS = 30_000
 
-/** Says the read may simply be retried; nothing was written, so nothing is in doubt. */
+/** Says the request may simply be retried; nothing was written, so nothing is in doubt. */
 export const JIRA_REQUEST_TIMEOUT_MESSAGE = 'Jira did not answer in time. Try again.'
 
-/** Request fields Orca reads before handing the rest to `fetch`. */
-export type JiraRequestInit = RequestInit & {
-  /** Opts a non-idempotent write out of the transport deadline. An aborted create can
-   *  still have landed server-side, so the user has to be told it may have worked
-   *  before any retry — a blind abort would invite a duplicate. */
-  noDefaultDeadline?: boolean
+/** A request the transport gave up on. Typed so a caller that must not swallow a stall —
+ *  one board's sprint list, say — can tell this apart from that board's own failure. */
+export class JiraRequestTimeoutError extends Error {
+  constructor() {
+    super(JIRA_REQUEST_TIMEOUT_MESSAGE)
+    this.name = 'JiraRequestTimeoutError'
+  }
+}
+
+function createAbortError(): Error {
+  const error = new Error('Jira request aborted')
+  error.name = 'AbortError'
+  return error
 }
 
 /** Runs one request under a deadline that settles the promise itself.
@@ -33,24 +40,40 @@ export async function withJiraRequestDeadline<T>(
     timer = setTimeout(() => {
       timedOut = true
       controller.abort()
-      reject(new Error(JIRA_REQUEST_TIMEOUT_MESSAGE))
+      reject(new JiraRequestTimeoutError())
     }, JIRA_REQUEST_TIMEOUT_MS)
   })
+  // Why the caller's abort is raced too: a stall in the proxy probe would otherwise
+  // ignore the caller's deadline and answer it with the transport's verdict instead.
+  let stopListening: (() => void) | undefined
+  const callerAbort = callerSignal
+    ? new Promise<never>((_resolve, reject) => {
+        if (callerSignal.aborted) {
+          reject(createAbortError())
+          return
+        }
+        const onAbort = (): void => reject(createAbortError())
+        callerSignal.addEventListener('abort', onAbort, { once: true })
+        stopListening = () => callerSignal.removeEventListener('abort', onAbort)
+      })
+    : undefined
   const work = run(signal)
   // Why: the deadline may win the race, and the request nobody waits on any more must
   // not reach the process as an unhandled rejection when it eventually settles.
   work.catch(() => {})
+  const racing: Promise<T>[] = callerAbort ? [work, expiry, callerAbort] : [work, expiry]
   try {
-    return await Promise.race([work, expiry])
+    return await Promise.race(racing)
   } catch (error) {
     // Why `timedOut` rather than `signal.aborted`: a caller's own deadline can abort the
     // combined signal, and its verdict on what happened has to reach it unchanged.
     if (timedOut) {
-      throw new Error(JIRA_REQUEST_TIMEOUT_MESSAGE)
+      throw new JiraRequestTimeoutError()
     }
     throw error
   } finally {
     clearTimeout(timer)
+    stopListening?.()
     controller.abort()
   }
 }

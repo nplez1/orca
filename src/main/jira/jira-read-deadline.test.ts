@@ -49,17 +49,40 @@ function makeEntry(): JiraClientForSite {
   }
 }
 
+function abortError(): Error {
+  return Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' })
+}
+
 /** A connection nobody answers, the way a VPN drop or a black-holed proxy behaves. */
 function hungFetch(_url: string, init?: RequestInit): Promise<Response> {
   return new Promise((_resolve, reject) => {
-    const abort = (): void =>
-      reject(Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }))
+    const abort = (): void => reject(abortError())
     if (init?.signal?.aborted) {
       abort()
       return
     }
     init?.signal?.addEventListener('abort', abort, { once: true })
   })
+}
+
+/** A connection that answers, slowly enough for a whole-read deadline to fire first. */
+function slowFetch(
+  delayMs: number,
+  body: (url: string) => unknown
+): (url: string, init?: RequestInit) => Promise<Response> {
+  return (url, init) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve(jsonResponse(body(url))), delayMs)
+      const abort = (): void => {
+        clearTimeout(timer)
+        reject(abortError())
+      }
+      if (init?.signal?.aborted) {
+        abort()
+        return
+      }
+      init?.signal?.addEventListener('abort', abort, { once: true })
+    })
 }
 
 function jsonResponse(body: unknown): Response {
@@ -69,10 +92,9 @@ function jsonResponse(body: unknown): Response {
   })
 }
 
-async function flushMicrotasks(): Promise<void> {
-  for (let tick = 0; tick < 25; tick += 1) {
-    await Promise.resolve()
-  }
+/** Lets the promise chain reach the network without moving the fake clock. */
+async function settle(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0)
 }
 
 beforeEach(() => {
@@ -97,7 +119,7 @@ describe('Jira read deadlines', () => {
     const hung = Array.from({ length: 4 }, () => getBoardOverview('42', 'site-1'))
     // Attached before the deadline fires: an unawaited rejection reads as unhandled.
     const hungOutcomes = Promise.allSettled(hung)
-    await flushMicrotasks()
+    await settle()
     // Every one of the four global slots is now held by a connection that never answers.
     expect(fetchMock).toHaveBeenCalledTimes(4)
 
@@ -105,14 +127,16 @@ describe('Jira read deadlines', () => {
       (value) => ({ ok: true as const, value }),
       (error: unknown) => ({ ok: false as const, error })
     )
-    await flushMicrotasks()
+    await settle()
     expect(fetchMock).toHaveBeenCalledTimes(4)
 
     // The fifth answers as soon as it is let through; the four never do.
     fetchMock.mockImplementation(async (url: string) =>
-      new URL(url).pathname.endsWith('/configuration')
-        ? jsonResponse({ columnConfig: { columns: [] } })
-        : jsonResponse({ id: 42, name: 'Payments', type: 'kanban' })
+      jsonResponse(
+        new URL(url).pathname.endsWith('/configuration')
+          ? { columnConfig: { columns: [] } }
+          : { id: 42, name: 'Payments', type: 'kanban' }
+      )
     )
     await vi.advanceTimersByTimeAsync(JIRA_REQUEST_TIMEOUT_MS)
 
@@ -134,6 +158,29 @@ describe('Jira read deadlines', () => {
     expect(fetchMock).toHaveBeenCalledTimes(6)
   })
 
+  it('bounds one slow board overview as a whole, not just each request', async () => {
+    const { JIRA_WHOLE_READ_DEADLINE_MS } = await import('./jira-read-failure')
+    const { getBoardOverview } = await import('./jira-board-queries')
+    // 25 s per request: each is inside the transport deadline, three are not.
+    fetchMock.mockImplementation(
+      slowFetch(25_000, (url) => {
+        const path = new URL(url).pathname
+        if (path.endsWith('/configuration')) {
+          return { columnConfig: { columns: [] } }
+        }
+        return path.endsWith('/sprint')
+          ? { values: [], isLast: true }
+          : { id: 42, name: 'Payments', type: 'scrum' }
+      })
+    )
+
+    const overview = getBoardOverview('42', 'site-1')
+    const outcome = expect(overview).rejects.toThrow('board overview request timed out')
+    await vi.advanceTimersByTimeAsync(JIRA_WHOLE_READ_DEADLINE_MS)
+    await outcome
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
   it('times out a read that stalls before fetch is ever called', async () => {
     const { JIRA_REQUEST_TIMEOUT_MS, JIRA_REQUEST_TIMEOUT_MESSAGE } =
       await import('./jira-request-deadline')
@@ -148,6 +195,21 @@ describe('Jira read deadlines', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('bounds the credential check that connect holds a slot for', async () => {
+    const { JIRA_REQUEST_TIMEOUT_MS } = await import('./jira-request-deadline')
+    const { requestWithCredentials } = await import('./authenticated-request')
+
+    const read = requestWithCredentials(
+      'https://example.atlassian.net',
+      'ada@example.com',
+      'token',
+      '/rest/api/3/myself'
+    )
+    const outcome = expect(read).rejects.toThrow('did not answer in time')
+    await vi.advanceTimersByTimeAsync(JIRA_REQUEST_TIMEOUT_MS)
+    await outcome
+  })
+
   it('honours a caller signal rather than its own deadline', async () => {
     const { jiraRequest } = await import('./authenticated-request')
     const controller = new AbortController()
@@ -158,9 +220,24 @@ describe('Jira read deadlines', () => {
     await outcome
   })
 
-  it('leaves a create unbounded so a blind retry cannot duplicate the issue', async () => {
+  it('does not offer a shortened sprint list when a board stalls', async () => {
+    const { JIRA_REQUEST_TIMEOUT_MS } = await import('./jira-request-deadline')
+    const { getIssueSprintAssignment } = await import('./jira-sprint-queries')
+    fetchMock.mockImplementation((url: string) =>
+      new URL(url).pathname.includes('/issue/')
+        ? Promise.resolve(jsonResponse({ fields: {} }))
+        : hungFetch(url)
+    )
+
+    const assignment = getIssueSprintAssignment({ key: 'ABC-1', siteId: 'site-1', boardId: '42' })
+    const outcome = expect(assignment).rejects.toThrow('did not answer in time')
+    await vi.advanceTimersByTimeAsync(JIRA_REQUEST_TIMEOUT_MS)
+    await outcome
+  })
+
+  it('bounds a create and warns that the issue may exist anyway', async () => {
+    const { JIRA_REQUEST_TIMEOUT_MS } = await import('./jira-request-deadline')
     const { createIssue } = await import('./jira-issue-mutations')
-    let settled = false
 
     const created = createIssue({
       siteId: 'site-1',
@@ -168,17 +245,14 @@ describe('Jira read deadlines', () => {
       issueTypeId: 'story',
       title: 'Move payments work'
     })
-    void created.then(
-      () => {
-        settled = true
-      },
-      () => {
-        settled = true
-      }
+    const settled = created.then(
+      (value) => value,
+      (error: unknown) => error
     )
-    await vi.advanceTimersByTimeAsync(120_000)
+    await vi.advanceTimersByTimeAsync(JIRA_REQUEST_TIMEOUT_MS)
 
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(settled).toBe(false)
+    const result = await settled
+    expect(result).toMatchObject({ ok: false })
+    expect(JSON.stringify(result)).toContain('may have been created')
   })
 })

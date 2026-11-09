@@ -18,6 +18,15 @@ import {
   JIRA_WRITE_FETCH_TIMEOUT_MS,
   JIRA_WRITE_TIMEOUT_MESSAGE
 } from '../../shared/jira/jira-write-deadline'
+import { JiraRequestTimeoutError } from './jira-request-deadline'
+
+/** Reported when a create's transport deadline fired: the issue may exist anyway. */
+const JIRA_CREATE_TIMEOUT_MESSAGE =
+  'Jira did not answer in time, so the issue may have been created. Check the project before retrying.'
+
+/** The same for a comment, which a retry would post twice. */
+const JIRA_COMMENT_TIMEOUT_MESSAGE =
+  'Jira did not answer in time, so the comment may have been posted. Reload the issue before retrying.'
 
 /** Cloud uses accountId; Server/DC uses username, stored in mapUser's accountId slot. */
 export function userFieldRef(site: JiraSite, id: string | null): JiraRecord {
@@ -129,10 +138,6 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
       `${apiBasePath(entry.site)}/issue`,
       {
         method: 'POST',
-        // Why no transport deadline: an aborted create may still have landed, and this
-        // path has no "check before retrying" verdict to offer — a blind retry would
-        // duplicate the issue.
-        noDefaultDeadline: true,
         body: JSON.stringify({ fields })
       }
     )
@@ -141,6 +146,9 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
     if (isAuthError(error)) {
       clearToken(entry.site.id)
       throw error
+    }
+    if (error instanceof JiraRequestTimeoutError) {
+      return taskProviderFailure('jira.createFailed', JIRA_CREATE_TIMEOUT_MESSAGE)
     }
     return error instanceof Error
       ? { ok: false, error: error.message }
@@ -280,9 +288,6 @@ export async function addIssueComment(
       `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/comment`,
       {
         method: 'POST',
-        // Why no transport deadline: an aborted comment may still have landed, and a
-        // retry would post it twice.
-        noDefaultDeadline: true,
         // Why the branch: only Orca's own composer writes Markdown, and only it
         // may be reinterpreted — a body from the CLI or an already-wiki body must
         // reach Jira exactly as it was typed.
@@ -299,6 +304,9 @@ export async function addIssueComment(
     if (isAuthError(error)) {
       clearToken(entry.site.id)
       throw error
+    }
+    if (error instanceof JiraRequestTimeoutError) {
+      return taskProviderFailure('jira.commentFailed', JIRA_COMMENT_TIMEOUT_MESSAGE)
     }
     return error instanceof Error
       ? { ok: false, error: error.message }

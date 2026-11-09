@@ -4,6 +4,7 @@ import { jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { clearToken, getSingleClient, isAuthError } from './client'
 import { JIRA_AGILE_API, mapJiraSprint, mapJiraSprintField } from './jira-agile-api'
 import { JIRA_WHOLE_READ_DEADLINE_MS, withJiraQueuedDeadline } from './jira-read-failure'
+import { JiraRequestTimeoutError } from './jira-request-deadline'
 import { asRecord, fetchPagedRecords, type JiraRecord } from './jira-record-pages'
 
 const SPRINT_PAGE_SIZE = 50
@@ -93,10 +94,10 @@ export async function getIssueSprintAssignment(request: {
             listed.push(...(await fetchBoardSprints(entry, boardId, signal)))
           } catch (error) {
             // Why: a board that will not list sprints — a Kanban board, or one the user
-            // can no longer see — must not hide what the remaining boards offer. The
-            // deadline is the exception: swallowing it would offer a shortened list as
-            // if it were every sprint the issue could move to.
-            if (isAuthError(error) || signal.aborted) {
+            // can no longer see — must not hide what the remaining boards offer. A stall
+            // is the exception: swallowing it would offer a shortened list as if it were
+            // every sprint the issue could move to.
+            if (isAuthError(error) || error instanceof JiraRequestTimeoutError || signal.aborted) {
               throw error
             }
             recordSwallowedFailure('jira', error, 'board sprint list unavailable')

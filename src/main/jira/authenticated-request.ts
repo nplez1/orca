@@ -3,7 +3,7 @@ import { getMainHttpClient } from '../network/http-client'
 import { withSpan } from '../observability/tracer'
 import type { JiraAuthType, JiraSite } from '../../shared/jira/jira-types'
 import { isJiraGatewayBaseUrl } from './gateway-base-url'
-import { withJiraRequestDeadline, type JiraRequestInit } from './jira-request-deadline'
+import { withJiraRequestDeadline } from './jira-request-deadline'
 import {
   readFetchResponseBytesWithinLimit,
   readFetchResponseJsonWithinLimit
@@ -239,11 +239,10 @@ async function toJiraError(
 export async function jiraRequest<T>(
   client: JiraClientForSite,
   path: string,
-  init?: JiraRequestInit,
+  init?: RequestInit,
   maxResponseBytes?: number
 ): Promise<T> {
-  const { noDefaultDeadline, ...requestInit } = init ?? {}
-  const headers = new Headers(requestInit.headers)
+  const headers = new Headers(init?.headers)
   headers.set('Accept', 'application/json')
   headers.set('Content-Type', 'application/json')
   headers.set('User-Agent', JIRA_API_USER_AGENT)
@@ -251,7 +250,7 @@ export async function jiraRequest<T>(
   const url = `${apiBaseUrl(client.site)}${path}`
   const send = async (signal: AbortSignal | undefined): Promise<T> => {
     const response = await jiraFetch(url, {
-      ...requestInit,
+      ...init,
       headers,
       ...(signal ? { signal } : {}),
       ...(isJiraGatewayBaseUrl(apiBaseUrl(client.site)) ? { redirect: 'error' as const } : {})
@@ -267,8 +266,7 @@ export async function jiraRequest<T>(
     }
     return (await response.json()) as T
   }
-  const callerSignal = requestInit.signal ?? undefined
-  return noDefaultDeadline ? send(callerSignal) : withJiraRequestDeadline(callerSignal, send)
+  return withJiraRequestDeadline(init?.signal ?? undefined, send)
 }
 
 function resolveBinaryRequestUrl(site: JiraSite, pathOrUrl: string): URL {
