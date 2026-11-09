@@ -173,3 +173,58 @@ describe('the turn a CLI with no usable get_usage has to spend', () => {
     ).toBeNull()
   })
 })
+
+describe('the probe session loop', () => {
+  const rle = {
+    type: 'rate_limit_event',
+    rate_limit_info: {
+      unifiedWindows: {
+        five_hour: { utilization: 0.3, resetsAt: 1_794_232_800 },
+        seven_day: { utilization: 0.1, resetsAt: 1_794_499_200 }
+      }
+    }
+  }
+
+  /** Stand in for the SDK: a session that yields `messages`, then ends. */
+  async function* session(messages: unknown[]): AsyncGenerator<unknown> {
+    for (const message of messages) {
+      yield message
+    }
+  }
+
+  function withFakeSdk(messages: unknown[]) {
+    vi.doMock('../../claude/claude-stream-json-connection', () => ({
+      loadClaudeAgentSdk: async () => ({
+        query: () => Object.assign(session(messages), { close: vi.fn() })
+      })
+    }))
+    vi.doMock('../../claude/claude-agent-sdk-process-spawn', () => ({
+      createClaudeCodeProcessSpawn: () => ({ spawn: vi.fn() })
+    }))
+  }
+
+  it('reads the event when it arrives before the turn ends', async () => {
+    vi.resetModules()
+    withFakeSdk([{ type: 'assistant' }, rle, { type: 'result' }])
+    const { readClaudeUsageFromCli: fresh } = await import('./claude-cli-usage-probe')
+
+    expect((await fresh())?.session?.usedPercent).toBeCloseTo(30)
+    vi.doUnmock('../../claude/claude-stream-json-connection')
+    vi.doUnmock('../../claude/claude-agent-sdk-process-spawn')
+    vi.resetModules()
+  })
+
+  it('gives up as soon as the turn ends without an event, rather than waiting out the deadline', async () => {
+    vi.resetModules()
+    withFakeSdk([{ type: 'result' }])
+    const { readClaudeUsageFromCli: fresh } = await import('./claude-cli-usage-probe')
+
+    const startedAt = performance.now()
+    expect(await fresh()).toBeNull()
+    // Why: the deadline is 15 s; a turn that already ended must not be waited on.
+    expect(performance.now() - startedAt).toBeLessThan(5_000)
+    vi.doUnmock('../../claude/claude-stream-json-connection')
+    vi.doUnmock('../../claude/claude-agent-sdk-process-spawn')
+    vi.resetModules()
+  })
+})

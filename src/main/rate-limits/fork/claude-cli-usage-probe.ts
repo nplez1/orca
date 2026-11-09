@@ -3,13 +3,14 @@ import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import type { ClaudeEnvPatch } from '../../claude-accounts/environment'
 import { buildClaudeChildProcessEnv } from '../../claude/claude-child-process-environment'
 import { createClaudeCodeProcessSpawn } from '../../claude/claude-agent-sdk-process-spawn'
-import { ClaudeControlRequestError } from '../../claude/claude-agent-sdk-control-requests'
 import { loadClaudeAgentSdk } from '../../claude/claude-stream-json-connection'
 import { resolveClaudeCommand } from '../../codex-cli/command'
 import { resolveHiddenProbeCwd } from '../hidden-probe-cwd'
 import { mapClaudeCliRateLimitInfo, mapClaudeCliUsageResponse } from './claude-cli-usage-response'
 
-/** A warm headless start answered in ~0.45 s; the cap only bounds a wedged CLI. */
+/**
+ * A probe turn measured 3.9 s end to end through Orca's spawn hook; the cap only bounds a wedged CLI.
+ */
 export const CLAUDE_CLI_USAGE_PROBE_TIMEOUT_MS = 15_000
 /**
  * Cheapest model with a minimal reply: the reading is the CLI's own rate-limit event, not the answer.
@@ -125,9 +126,6 @@ async function runUsageViaSdk(
   } catch (error) {
     if (request.signal?.aborted) {
       return { status: 'aborted' }
-    }
-    if (error instanceof ClaudeControlRequestError) {
-      throw error
     }
     return {
       status: 'unavailable',

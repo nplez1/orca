@@ -368,8 +368,8 @@ Three changes, and one deliberately rejected:
   own stream when it completes a turn: `unifiedWindows.{five_hour,seven_day}` with a 0–1 `utilization`
   and an epoch-seconds `resetsAt`. Captured on 2.1.319 2026-11-09: `five_hour 0.02 / seven_day 0.15`.
   The probe now sends one minimal prompt (`hi`, haiku) and reads that event, so **the Claude app makes
-  the call itself** — no inference from Orca, no impersonated client, nothing for a subscription-credential
-  policy to object to. Measured through Orca's own spawn hook: 3.9 s wall, `session 2% / weekly 15%`,
+  the call itself** — Orca sends no inference of its own, there is no impersonated client, and nothing
+  for a subscription-credential policy to object to. Measured through Orca's own spawn hook: 3.9 s wall, `session 2% / weekly 15%`,
   ~$0.0026 and 73 tokens for the turn.
 - **`get_usage` is no longer tried first, and that is a measurement, not a preference.** Asking it costs
   nothing and answers in 140 ms — but issuing it leaves the session unable to run the turn at all: the
@@ -382,13 +382,24 @@ Three changes, and one deliberately rejected:
   `max_tokens: 1` completion returns `anthropic-ratelimit-unified-{5h,7d}-utilization`), and it is
   cheaper in tokens, but it sends _inference_ with a subscription token from a client posing as
   `claude-code/2.1.0`. That is the use Anthropic restricts for third-party tools, and the worst case is
-  account action. It also starts the 5-hour window on Orca's clock instead of the user's first message.
-  Recorded here so a later reader does not "simplify" the probe back into it.
+  account action. Recorded here so a later reader does not "simplify" the probe back into it.
+
+**Accepted cost, stated plainly: a probe turn is inference, so it counts as activity in the 5-hour
+window.** While the endpoint is throttled the poll spends one small turn (~73 tokens, ~$0.0026) per
+interval, which means a window is effectively always running and a user's first real message lands
+inside one Orca opened rather than starting the clock itself. The rejected header approach had the same
+consequence, and this is not a reason to prefer it — it is the price of freshness while the sanctioned
+endpoint refuses to answer. It stops the moment the endpoint answers again, because the endpoint is
+asked first, and it never happens on a refusal the probe does not answer (`missing-scope`, `network`).
 
 **The endpoint is asked first, the probe second.** The endpoint is the sanctioned source and the only
 one carrying `fableWeekly` / `extraUsage` / `monthly`, so a healthy endpoint must never be shadowed by a
 probe reading that has none of them. The probe answers when the endpoint cannot: held by its own
-`Retry-After`, or refused. That also means a turn is spent only while the endpoint is throttled.
+`Retry-After`, or refused — but **only for a refusal a turn can outlast**: `rate-limited` and `server`.
+`missing-scope` is excluded because it is permanent for a `claude setup-token` login (the usual value of
+`CLAUDE_CODE_OAUTH_TOKEN`, and so of the `settings-env` source), and probing it would spend a billed turn
+on every poll forever. A refusal's own `Retry-After` is carried onto the probe reading it caused, or the
+next poll asks the endpoint again inside its own wait, which is what keeps a 429 window alive.
 
 **The login is where the CLI keeps it, not only where Orca looked.** `readClaudeOAuthCredentials` read
 the keychain and `.credentials.json`; this machine's login is `env.CLAUDE_CODE_OAUTH_TOKEN` in
@@ -401,14 +412,26 @@ wins where it exists. It accepts `ANTHROPIC_AUTH_TOKEN` only when it starts `sk-
 key also carries plain API keys and those have no plan. It reports `hasRefreshableCredentials: false`
 and no `refreshTarget` on purpose: the login belongs to the CLI's settings file, which Orca must never
 rewrite. The CLI itself prefers an environment token over its stored keychain login, so an account with
-both shows the keychain account's usage here — rare, and recorded rather than inverted.
+both shows the keychain account's usage here — rare, and recorded rather than inverted. The same ordering
+means a keychain or `.credentials.json` login holding only a refresh token (no access token) loses to a
+settings-env token, where before Orca would have refreshed the stored login; that account still reads
+correctly, it just reads the settings login. `settings.local.json` is Claude Code's project-scope file,
+so for the System Default config dir it only applies to `cwd ~` — it is read first because that is the
+order the CLI applies them, not because it is a user-scope override.
 
-**Polling no longer requires a focused window.** `shouldBackgroundPoll` returned
-`isVisible() && !isMinimized() && isFocused()`. A serve-mode host keeps its window hidden
-(`applyServeDesktopWindowActivationPolicy`), so upstream's "pause while inactive" rule meant a remote
-host **never polled usage at all** — its numbers could only move from a live session receipt, which is
-the M5-host symptom. The gate is now "the window exists and is not destroyed"; the timer polls whether
-Orca is focused, backgrounded or headless. Activation still refreshes immediately.
+**Polling no longer requires a focused window, and the sync changed what that buys.** When this was
+written, `shouldBackgroundPoll` returned `isVisible() && !isMinimized() && isFocused()`, and a serve-mode
+host keeps its window hidden (`applyServeDesktopWindowActivationPolicy`) — so a remote host **never
+polled usage at all**. The `51c77320bc` sync brought upstream #37633 (`688adc4b4c2`), which adds
+`usageViewers > 0`: a paired client's `accounts.subscribe` stream registers as a viewer, so a remote host
+someone is watching already polls. **The M5-host symptom is upstream's now.** What this hunk still adds is
+polling for a desktop window nobody is watching — hidden or unfocused — so the numbers are already fresh
+when the user looks rather than refreshed on focus.
+
+That costs a probe turn per interval while the endpoint is throttled (see the cost note above), so it is
+a deliberate trade and the one piece of this patch a later reader may reasonably revert: delete the
+`return true` hunk, `fork/service-background-polling.test.ts` and this paragraph, and `usageViewers`
+covers the watched case on its own.
 
 **Tests that hold the line.** `fork/claude-cli-usage-response.test.ts` pins the payload mapping against
 a captured 2.1.316 reply and the `rate_limit_event` mapping against a captured 2.1.319 event;
