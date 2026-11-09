@@ -3,8 +3,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { LOCALES_DIR, localeDriftReport } from './locale-drift.mjs'
-import { git, gitText, repoRoot } from './run.mjs'
+import { LOCALES_DIR, localeDrift, localeDriftReport } from './locale-drift.mjs'
+import { git, gitText } from './run.mjs'
 import { tempGitRepo } from './temp-git-repo.mjs'
 
 const base = 'deadbeef00deadbeef00deadbeef00deadbeef00'
@@ -54,13 +54,20 @@ function diff(repo, from) {
   return out.split('\0').filter(Boolean)
 }
 
-test('the real tree can place the ruler, or says why it cannot', () => {
-  const merged = gitText(['merge-base', 'HEAD', 'upstream/main'])
-  if (merged === null) {
-    // A clone without the upstream remote is the unavailable case the row reports as N/A.
-    assert.equal(git(['rev-parse', '--verify', 'upstream/main']).ok, false)
-    return
+test('the row itself reads the tree, and reports one of its three verdicts', () => {
+  // The row is the only place the ruler is resolved, so it has to be called at least once: a test that
+  // re-implements the git read passes with the row pointed at the wrong ref.
+  const outcome = localeDrift()
+  assert.ok(['passed', 'failed', 'unavailable'].includes(outcome.status), outcome.status)
+  assert.ok(Array.isArray(outcome.details))
+  if (outcome.status === 'passed') {
+    assert.match(outcome.summary, /byte-identical to upstream/)
   }
-  assert.equal(typeof repoRoot(), 'string')
-  assert.match(merged, /^[0-9a-f]{40}$/)
+  const merged = gitText(['merge-base', 'HEAD', 'upstream/main'])
+  if (merged !== null) {
+    // The row measures the merge base, so a clone that has the remote must not report N/A.
+    assert.notEqual(outcome.status, 'unavailable')
+  } else {
+    assert.equal(git(['rev-parse', '--verify', 'upstream/main']).ok, false)
+  }
 })

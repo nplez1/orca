@@ -24,16 +24,28 @@ import { STATUS, gitText, repoRoot, splitNul } from './run.mjs'
 
 const TEST_PATH =
   /^(?:src|config|tests|mobile|native|resources|local|docs|scripts|\.github)\/[\w./*+@-]+\.(?:test|spec)\.[cm]?[jt]sx?$/
+// `file.test.ts:32` names the same file; the line is a reading aid, and an anchored test that ignored
+// it would skip every citation written that way.
+const LINE_SUFFIX = /:\d+(?:-\d+)?$/
+// Trailing sentence punctuation, never the dot of an extension.
+const TRAILING = /[),;]+$/
 const PNPM_RUN = /`pnpm run ([a-z][\w:-]*)`/g
 const NAMED_SCRIPT = /`([a-z][\w:-]*)` (?:npm )?script\b/g
 
-/** `**` and `*` over a path, anchored: a citation is a whole path, not a fragment of one. */
+/**
+ * `**` and `*` over a path, anchored: a citation is a whole path, not a fragment of one. `**\/` maps
+ * to `(?:.*\/)?` rather than `.*`, so `src/**\/a.test.ts` cannot match `src/xa.test.ts` — a rotted
+ * glob that reads as present is the failure this row exists to catch.
+ */
 function globToRegExp(pattern) {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
   const body = escaped
-    .replace(/\*\*\/?/g, '\u0000')
+    .replace(/\*\*\//g, '\u0000')
+    .replace(/\*\*/g, '\u0001')
     .replace(/\*/g, '[^/]*')
     .split('\u0000')
+    .join('(?:.*/)?')
+    .split('\u0001')
     .join('.*')
   return new RegExp(`^${body}$`)
 }
@@ -42,9 +54,13 @@ export function extractCitedGuards(markdown) {
   const paths = new Set()
   const scripts = new Set()
   for (const match of markdown.matchAll(/`([^`\n]+)`/g)) {
-    const token = match[1].trim()
-    if (TEST_PATH.test(token)) {
-      paths.add(token)
+    // Every word, so a path inside a cited command (`pnpm test src/a/b.test.ts`) is read too: that is
+    // the shape the ledger uses for a guard it runs rather than merely names.
+    for (const word of match[1].trim().split(/\s+/)) {
+      const candidate = word.replace(LINE_SUFFIX, '').replace(TRAILING, '').replace(/^\.\//, '')
+      if (TEST_PATH.test(candidate)) {
+        paths.add(candidate)
+      }
     }
   }
   for (const pattern of [PNPM_RUN, NAMED_SCRIPT]) {

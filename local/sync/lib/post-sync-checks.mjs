@@ -165,7 +165,7 @@ export function updaterFeed() {
   if (result.upstream.length > 0) {
     return {
       status: STATUS.failed,
-      summary: `${result.upstream.length} line(s) under ${FEED_TREE}/ name upstream's repository`,
+      summary: `${result.upstream.length} line(s) in the scanned files name upstream's repository`,
       details
     }
   }

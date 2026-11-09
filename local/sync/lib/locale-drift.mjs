@@ -42,6 +42,16 @@ export function localeDriftReport({ base, changed }) {
  * orphan tombstones live in `i18n/fork/*.json`.
  */
 export function localeDrift() {
+  // A moved or deleted locales directory makes the diff empty at both ends, which is the shape of the
+  // bug this row exists for: a check that passes because it scanned nothing.
+  const present = gitText(['ls-tree', '-r', '--name-only', 'HEAD', '--', LOCALES_DIR])
+  if (present === null || present.trim() === '') {
+    return {
+      status: STATUS.failed,
+      summary: `${LOCALES_DIR}/ has no tracked file at HEAD, so the rule cannot be checked`,
+      details: ['upstream may have moved the catalogs; point LOCALES_DIR at their new home']
+    }
+  }
   const base = gitText(['merge-base', 'HEAD', UPSTREAM_REF])
   if (!base) {
     return {

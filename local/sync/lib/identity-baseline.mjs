@@ -44,9 +44,9 @@ export function buildBaseline(reportOnly, { base, accepted = null, note }) {
 }
 
 /**
- * `counts` is the frozen baseline's per-rule-per-file counts; a rule that has never been seen is not
- * a violation on its own, because a new *rule* in the sweep is a change to the sweep, not to the repo.
- * A new file under a known rule is the regression this exists for.
+ * `counts` is the frozen baseline's per-rule-per-file counts. A rule the baseline has never seen fails
+ * on its pairs, not on the rule existing: adding a rule to the sweep is a change to the sweep, and
+ * what matters is the findings that rule then makes in files the baseline did not know about.
  */
 export function compareIdentityBaseline({ baseline, reportOnly }) {
   const { rules: current, total } = summarizeReportOnly(reportOnly)
@@ -101,6 +101,23 @@ export function readIdentityBaseline(root) {
   } catch (error) {
     return { baseline: null, problem: `${BASELINE_PATH} is not valid JSON: ${error.message}` }
   }
+}
+
+/**
+ * Whether a baseline rewrite may proceed without `--accept`. A pair that appeared and a pair whose
+ * count grew are both new findings, and neither may be recorded silently — including by `--prune`,
+ * whose whole claim is that it only ever lowers. A shrink is not growth: it is what prune is for.
+ */
+export function rewriteRefusal({ mode, comparison }) {
+  const appeared = comparison.appeared.length
+  const grown = comparison.grown.length
+  if (appeared === 0 && grown === 0) {
+    return null
+  }
+  const what = `${appeared} new and ${grown} grown rule/file pair(s)`
+  return mode === 'prune'
+    ? `--baseline-prune would record ${what}, and it only ever lowers. Fix them, or run --baseline-init --accept <reason> when they are not this branch\u2019s to fix.`
+    : `${what} need --accept <reason>: the baseline may only absorb growth someone signed for.`
 }
 
 /** What a reader of the report needs: which pairs moved, and what to do about each. */

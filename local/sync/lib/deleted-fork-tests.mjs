@@ -38,7 +38,15 @@ export const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 export function forkModifiedTests({ changed, presentAtHead }) {
   const modified = [...changed].filter((file) => TEST_FILE.test(file)).sort()
   const gone = modified.filter((file) => !presentAtHead.has(file))
-  return { modified, gone }
+  // A file upstream moved rather than retired shows up here as gone, so the report separates the two:
+  // a same-basename file at HEAD may or may not carry the fork's cases, and saying which are which is
+  // the reviewer's job, not a guess this can make.
+  const basenames = new Set()
+  for (const file of presentAtHead) {
+    basenames.add(file.slice(file.lastIndexOf('/') + 1))
+  }
+  const moved = gone.filter((file) => basenames.has(file.slice(file.lastIndexOf('/') + 1)))
+  return { modified, gone, moved }
 }
 
 export function buildBaseline(gone, { base, tip, accepted, note }) {
@@ -85,9 +93,11 @@ export function readBaseline(root) {
   }
 }
 
-export function describeComparison(comparison, { total }) {
+export function describeComparison(comparison, { total, moved = [] }) {
   return [
-    `${total} fork-modified test file(s) are gone at HEAD`,
+    moved.length === 0
+      ? `${total} fork-modified test file(s) are gone at HEAD`
+      : `${total} fork-modified test file(s) are gone at HEAD, ${moved.length} of them with a same-named file elsewhere — check whether the fork's cases moved with it`,
     ...(comparison.bound
       ? []
       : [
@@ -156,11 +166,19 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     presentAtHead: new Set(splitNul(listing))
   })
   const previous = readBaseline(where).baseline
-  const grew = previous !== null && gone.length > (previous.total ?? 0)
-  if (grew && accepted === null) {
+  // A count comparison across two ranges proves nothing: the next sync loses a different set, so
+  // "300 is fewer than 449" would rebaseline silently. The test is the same one the row runs — a
+  // baseline bound to another range records nothing, so every path is new.
+  const comparison =
+    previous === null
+      ? null
+      : compareDeletedForkTests({ baseline: previous, gone, range: { base: pinned.base, tip } })
+  const unrecorded = comparison !== null && (!comparison.bound || comparison.appeared.length > 0)
+  if (unrecorded && accepted === null) {
     process.stderr.write(
-      `deleted-fork-tests: the baseline may only shrink — ${gone.length} path(s) against a recorded ` +
-        `${previous.total}. Pass --accept <reason> when the growth is not this branch's to fix.\n`
+      `deleted-fork-tests: refusing to record unrecorded loss — ` +
+        `${comparison.bound ? `${comparison.appeared.length} path(s) this range did not have before` : `the baseline was written for ${previous.base.slice(0, 10)}/${previous.tip.slice(0, 10)}, not this range`}. ` +
+        'Pass --accept <reason> when the loss is not this branch\u2019s to fix.\n'
     )
     return 1
   }
@@ -180,8 +198,8 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     `deleted-fork-tests: wrote ${BASELINE_PATH} — ${gone.length} path(s)` +
       `${previous ? ` (was ${previous.total})` : ''}\n`
   )
-  if (grew) {
-    process.stdout.write(`deleted-fork-tests: accepted growth — ${accepted}\n`)
+  if (unrecorded) {
+    process.stdout.write(`deleted-fork-tests: accepted — ${accepted}\n`)
   }
   return 0
 }
@@ -248,7 +266,7 @@ export function upstreamDeletedForkTests(tip, source, problem = null) {
       details: []
     }
   }
-  const { modified, gone } = forkModifiedTests({
+  const { modified, gone, moved } = forkModifiedTests({
     changed,
     presentAtHead: new Set(splitNul(listing))
   })
@@ -275,7 +293,7 @@ export function upstreamDeletedForkTests(tip, source, problem = null) {
       : `${comparison.appeared.length} fork-modified test file(s) gone at HEAD and not recorded`,
     details: [
       `${modified.length} test file(s) the fork modified between ${oldBase.slice(0, 10)} and the pre-sync tip`,
-      ...describeComparison(comparison, { total: gone.length })
+      ...describeComparison(comparison, { total: gone.length, moved })
     ]
   }
 }

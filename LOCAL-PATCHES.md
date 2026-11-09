@@ -98,9 +98,9 @@ this fork is cosmetically described as a dev build, which is harmless and unreac
 Tests that pin the re-pointed URLs and the single-stream mapping:
 `src/main/updater/updater.check-preflight.test.ts`, `src/main/updater/updater.prerelease-fallback.test.ts` and
 `src/main/updater-stable-feed-fallback.test.ts`. They assert this fork's repo path, so a sync that
-restores upstream's expectations turns them red again. `updater-release-builds` lost its test when the
-module moved into `updater/releases/` in the 2026-11-08 sync, so it is covered only through the three
-above.
+restores upstream's expectations turns them red again. `updater-release-builds` lost its test to
+upstream's bulk test removals in the 2026-11-08 sync (the module itself moved into `updater/releases/`),
+so it is covered only through the three above.
 
 **The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
 `ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that
@@ -986,9 +986,10 @@ fork-invariants test now owns; nothing replaced the rest, so this section is the
 can turn red on skill names. `src/cli/skills.test.ts` covers the CLI's skill listing, not the install
 rail.
 
-**A path here is in backticks only while it must exist.** `local/sync/lib/cited-guards.mjs` resolves
-every backticked test path and package script in this file, and post-sync's `cited-guards` row fails on
-one that does not — so a retired path is written plain, as history.
+**A repo-relative path here is in backticks only while it must exist.** `local/sync/lib/cited-guards.mjs`
+resolves every backticked test path and package script in this file, and post-sync's `cited-guards` row
+fails on one that does not — so a retired path is written plain, as history. A bare file name is not
+resolved: the ledger uses those as prose, and only a path from the repo root can be checked.
 
 Not covered, deliberately: `~/.agents/.skill-lock.json` on an existing machine still records
 `stablyai/orca` until the next update rewrites it, and `src/renderer/src/i18n/locales/*.json` keep a
@@ -1162,8 +1163,9 @@ cause — a suppressed red is also an unexamined one, which is what this sweep c
   `/private/var/folders/…`, and fsevents reports the resolved spelling while the paths the code
   registers keep the unresolved one. The reclaim entry's own diagnosis was right and is fixed as it
   described. Three sites:
-  - `config/scripts/process-host-dev-rebuild.test.ts:32` and
-    `config/scripts/main-entry-facade.test.ts:10` built their fixture root from raw `tmpdir()`, so
+  - `config/scripts/desktop-distribution/runtime-verification/process-host-dev-rebuild.test.ts:32`
+    and `config/scripts/desktop-build/output-contracts/main-entry-facade.test.ts:10` built their
+    fixture root from raw `tmpdir()`, so
     every registered watch path and the child's own `__dirname` disagreed. Both now realpath the
     `mkdtemp` result, the idiom 11 other files in this tree already use.
   - `config/build-plugins/process-host-dev-rebuild.ts:87` created its private watch-signal directory
@@ -2144,8 +2146,7 @@ Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted
 `"off"` in the four overrides that carried 300/400/600/800. That worked and cost more than it saved:
 with the rule off, two of upstream's own coverage tests fail (they assert the installed oxlint still
 flags an over-budget file), and the ratchet script — whose whole job is to freeze who may bypass the
-rule — becomes inert. Those two tests were retired with the script's move to
-`config/scripts/static-analysis/ratchets/source-budget/check-max-lines-ratchet.mjs` in the 2026-11-08
+rule — becomes inert. Those two tests were deleted by upstream's bulk test removals in the 2026-11-08
 sync, so nothing pins the rule today. So the fork was paying four changed lines in a file upstream owns _and_ a red gate, to
 avoid an exemption list.
 
@@ -2451,8 +2452,9 @@ now asks for the upstream fix, or five consecutive green scheduled nights.
 **Confirmed on the revision this record lands on:** run `40797794635` on `fdd5850d0f` (dispatch,
 2026-10-29T01:01Z) — `plan` green, all five test shards green, `relay integration` skipped as intended,
 and the daemon entry passing rather than absorbed. The `##[error]` lines a green run carries are expected
-noise, not reds: `src/entry.ts(1,14): error TS2322` is the broken fixture
-`config/scripts/build-cli.test.mjs:171` writes and then asserts the compiler reports, and
+noise, not reds: `src/entry.ts(1,14): error TS2322` is the broken fixture the
+`build-cli` suite writes and then asserts the compiler reports (that suite has since been retired
+upstream), and
 `cannot read report.json: ENOENT` is `tests/tools/unit-shard-verdict.test.mjs` (23 cases, green)
 exercising its own error paths. `Unable to download artifact(s): unit-selection-attempt-1` is the
 optional artifact a fresh dispatch has none of. That run also paid the sweep's bill: the three cold
@@ -2540,7 +2542,8 @@ were defects **in the tests**, and both are fixed, so the three entries are remo
   `workspaces/workspace-removal.ts:87`, before that map is reached. The same defect exists on
   `upstream/main` today.
 
-`pnpm test src/main/runtime/orca-runtime.test.ts` — before: 2 failed and 1 unhandled error; after:
+`pnpm test src/main/runtime/construction/orca-runtime.test.ts` — before: 2 failed and 1 unhandled
+error; after:
 `1520 passed | 3 skipped`, green on three consecutive runs. Every cached verdict under `orca-gate/`
 mentions `selector_not_found`, so this was persistent rather than a one-off.
 
@@ -3384,17 +3387,20 @@ Pinning the status quo is not approving it, and the table could not tell the dif
   the host, which is the only vantage point that can see an absence of runs as an absence.
 
 **The cron removal broke an upstream test, and the PR gate did not run it.**
-A test in what is now `config/scripts/node-server/qualification/node-server-change-scope.mjs` pinned
-`workflow.on.schedule` for `node-server-tests.yml` at one entry; deleting the cron made that
-`Target cannot be null or undefined`. That assertion went with the 2026-11-08 sync, so nothing pins the
-cron's absence today.
+An upstream test pinned `workflow.on.schedule` for `node-server-tests.yml` at one entry, and the fork
+re-pointed it at its own truth (`not.toHaveProperty('schedule')`) with the reason inline. Deleting the
+cron made the original assertion fail with `Target cannot be null or undefined`.
 It reached `nplez1/main` because every path #288 touched — `local/`, `tests/`, `.github/`, `*.md` — is
 in `open-pr.mjs`'s `TARGETED_PATHS`, so gate 1 read "not required" and no suite ran; the first run to
-see it was the 2026-11-08 dispatch, shard 12/12. The assertion now pins the fork's truth
-(`not.toHaveProperty('schedule')`) with the reason inline. The lesson is not "run the suite more" — the
-classification was right about every path it looked at. It is that a **workflow file is a global input
-when a test parses it**, which no path rule can express, so the `config/scripts` consumers are where to
-look after any workflow edit.
+see it was the 2026-11-08 dispatch, shard 12/12.
+**That guard is gone now.** Upstream retired the test in the 2026-11-08 sync — its module is
+`config/scripts/node-server/qualification/node-server-change-scope.mjs`, and no assertion about
+`schedule` survives there — so nothing pins the cron's absence any more. `FORK_SCHEDULES` in
+`check-actions-enablement.mjs` is what is left, and it is a different check: it reports an enabled
+workflow whose cron has no allowlist entry, not a cron that has gone missing.
+The lesson is not "run the suite more" — the classification was right about every path it looked at. It
+is that a **workflow file is a global input when a test parses it**, which no path rule can express, so
+the `config/scripts` consumers are where to look after any workflow edit.
 
 **Why this is not just "we deleted two lines".** The next upstream sync can put either cron back, and
 it will: those are upstream's files. `FORK_SCHEDULES` is what makes the reintroduction a report rather

@@ -25,7 +25,8 @@ import {
   BASELINE_PATH,
   buildBaseline,
   compareIdentityBaseline,
-  readIdentityBaseline
+  readIdentityBaseline,
+  rewriteRefusal
 } from './lib/identity-baseline.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
@@ -331,8 +332,10 @@ Baseline
   ${BASELINE_PATH} freezes the report-only findings per rule and per file. The gate
   (post-sync's identity-sweep row) fails on a new pair, on a count above its frozen value, and on a
   total that moved at all — so the set may only shrink, and only through --baseline-prune.
-  --baseline-init   rewrite it at the current scan; growth needs --accept <reason>, which is recorded
-  --baseline-prune  lower every count and the total to the current scan, which refuses to raise them
+  --baseline-init   rewrite it at the current scan; a new or grown rule/file pair needs --accept
+                    <reason>, which is recorded in the file
+  --baseline-prune  lower every count and the total to the current scan; it refuses to raise either,
+                    and refuses to record a pair it has never seen
 
 Exit status
   non-zero only when a fixable finding remains. Report-only findings are informational by
@@ -430,56 +433,38 @@ function writeBaseline(reportOnly, { accepted = null }) {
 
 /**
  * `--baseline-init` may absorb growth only with a written reason, and `--baseline-prune` may only
- * lower: the point of a ratchet is that slack freed by a fix cannot be spent somewhere else.
+ * lower. Both refusals come from `rewriteRefusal`, so a pair that appeared or grew is never recorded
+ * silently by either — the prune path is the one that used to, because it only compared totals.
  */
 function baselineCommand({ init, reportOnly, accept }) {
   const { baseline: previous, problem } = readIdentityBaseline(REPO_ROOT)
-  if (init) {
-    const next = buildBaseline(reportOnly, { base: mergeBase(), accepted: accept, note: '' })
-    // Growth is judged per pair as well as in total: a total that fell while a new file appeared is
-    // still a new finding, and recording it silently is what this ratchet exists to prevent.
-    const appeared =
-      previous === null ? [] : compareIdentityBaseline({ baseline: previous, reportOnly }).appeared
-    const grew = previous !== null && (next.total > previous.total || appeared.length > 0)
-    if (grew && !accept) {
-      process.stderr.write(
-        `identity-sweep: refusing to record new findings — this scan has ${appeared.length} ` +
-          `rule/file pair(s) the baseline has never seen (${next.total} finding(s) against a ` +
-          `recorded ${previous.total}). Pass --accept <reason> when the growth is not this ` +
-          'branch\u2019s to fix.\n'
-      )
-      return 1
-    }
-    const written = writeBaseline(reportOnly, { accepted: accept })
-    process.stdout.write(
-      `identity-sweep: wrote ${BASELINE_PATH} — ${written.total} report-only finding(s)` +
-        `${previous ? ` (was ${previous.total})` : ''}\n`
-    )
-    if (grew) {
-      process.stdout.write(`identity-sweep: accepted growth — ${accept}\n`)
-    }
-    return 0
+  const comparison =
+    previous === null ? null : compareIdentityBaseline({ baseline: previous, reportOnly })
+  const refusal =
+    comparison === null ? null : rewriteRefusal({ mode: init ? 'init' : 'prune', comparison })
+  if (refusal !== null && !(init && accept)) {
+    process.stderr.write(`identity-sweep: ${refusal}\n`)
+    return 1
   }
-  if (previous === null) {
+  if (!init && previous === null) {
     process.stderr.write(
       `identity-sweep: --baseline-prune needs an existing baseline (${problem}). ` +
         'Run --baseline-init first.\n'
     )
     return 1
   }
-  const comparison = compareIdentityBaseline({ baseline: previous, reportOnly })
-  if (comparison.total > previous.total) {
-    process.stderr.write(
-      `identity-sweep: --baseline-prune does not raise the total — this scan has ` +
-        `${comparison.total}, baseline ${previous.total}\n`
-    )
-    return 1
-  }
-  const written = writeBaseline(reportOnly, { accepted: previous.accepted ?? null })
+  const written = writeBaseline(reportOnly, {
+    accepted: init ? accept : (previous?.accepted ?? null)
+  })
+  const verb = init ? 'wrote' : 'pruned'
   process.stdout.write(
-    `identity-sweep: pruned ${BASELINE_PATH} — ${written.total} report-only finding(s)` +
-      `${comparison.stale.length > 0 ? `, ${comparison.stale.length} stale entr(ies) dropped` : ''}\n`
+    `identity-sweep: ${verb} ${BASELINE_PATH} — ${written.total} report-only finding(s)` +
+      `${previous ? ` (was ${previous.total})` : ''}` +
+      `${comparison !== null && comparison.stale.length > 0 ? `, ${comparison.stale.length} stale entr(ies) dropped` : ''}\n`
   )
+  if (init && refusal !== null) {
+    process.stdout.write(`identity-sweep: accepted growth — ${accept}\n`)
+  }
   return 0
 }
 

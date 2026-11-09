@@ -13,6 +13,7 @@ import {
   compareIdentityBaseline,
   describeComparison,
   readIdentityBaseline,
+  rewriteRefusal,
   summarizeReportOnly
 } from './identity-baseline.mjs'
 
@@ -48,13 +49,13 @@ test('a finding in a file the baseline has never seen fails, and names rule and 
   )
 })
 
-test('a new rule is not a violation on its own, because the sweep changed and the repo did not', () => {
+test('a rule the baseline has never seen fails on its pairs, not on the rule existing', () => {
   const baseline = baselineFor([hit('home-dir-unknown', 'src/a.ts')])
   const comparison = compareIdentityBaseline({
     baseline,
     reportOnly: [hit('home-dir-unknown', 'src/a.ts'), hit('brand-new-rule', 'src/b.ts')]
   })
-  // The pair is new, so it fails — but the failure is the pair, not the rule's existence.
+  // The pair is new, so it fails — and what the report names is the pair, not the rule.
   assert.equal(comparison.appeared.length, 1)
   assert.equal(comparison.appeared[0].rule, 'brand-new-rule')
 })
@@ -108,4 +109,30 @@ test('a missing or malformed baseline is a problem, never "no findings"', () => 
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('a rewrite may not absorb a new or grown pair without a reason, in either mode', () => {
+  const baseline = baselineFor([hit('home-dir-reader', 'src/a.ts')])
+  const comparison = compareIdentityBaseline({
+    baseline,
+    reportOnly: [hit('home-dir-reader', 'src/a.ts'), hit('home-dir-reader', 'src/a.ts')]
+  })
+  // A count that grew is growth even though no new pair appeared.
+  assert.match(rewriteRefusal({ mode: 'init', comparison }), /1 grown rule\/file pair/)
+  assert.match(rewriteRefusal({ mode: 'prune', comparison }), /only ever lowers/)
+
+  // And a new pair is growth even when the total fell, which is what prune used to record.
+  const fell = compareIdentityBaseline({
+    baseline: baselineFor([hit('home-dir-reader', 'src/a.ts'), hit('bundle-id', 'src/b.ts')]),
+    reportOnly: [hit('home-dir-reader', 'src/a.ts'), hit('bundle-id', 'src/new.ts')]
+  })
+  assert.equal(fell.total, fell.totalAllowed)
+  assert.match(rewriteRefusal({ mode: 'prune', comparison: fell }), /1 new and 0 grown/)
+
+  // A pure shrink is what prune exists for, so it is never a refusal.
+  const shrunk = compareIdentityBaseline({
+    baseline: baselineFor([hit('home-dir-reader', 'src/a.ts'), hit('bundle-id', 'src/b.ts')]),
+    reportOnly: [hit('home-dir-reader', 'src/a.ts')]
+  })
+  assert.equal(rewriteRefusal({ mode: 'prune', comparison: shrunk }), null)
 })

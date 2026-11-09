@@ -2,6 +2,7 @@
   "note": "Fork-modified test files that are gone at HEAD after a sync (deleted by upstream, or by the resolution). Bound to one sync range: a baseline whose base/tip do not match the range being checked records nothing. Regenerate with `node local/sync/lib/deleted-fork-tests.mjs --baseline-init [--accept <reason>]`.",
   "base": "51c77320bc3302923ad4e194de7edacb2a91b6b6",
   "tip": "3f8bbfb269e4d48ab394a951a9a294fa60de05c2",
+  "accepted": "First baseline for this range: the 2026-11-08 sync (base 51c77320bc, pre-sync tip 3f8bbfb269e) left 449 fork-modified test files absent at HEAD, 176 of which have a same-named file elsewhere. 345 upstream test retirements were already settled by local/sync/expected-deletions.json and BRANCHES.md for this sync; this record makes the set checkable rather than re-deciding it. A later range must re-earn its own set.",
   "total": 449,
   "files": {
     "config/scripts/agent-state-rules-bundle.test.mjs": true,

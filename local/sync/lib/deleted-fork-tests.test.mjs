@@ -84,3 +84,13 @@ test('the baseline records the range it was measured against', () => {
   assert.equal(baseline.total, 1)
   assert.deepEqual(baseline.files, { 'src/main/a.test.ts': true })
 })
+
+test('a gone path with a same-named file elsewhere is reported apart from a true deletion', () => {
+  const { gone, moved } = forkModifiedTests({
+    changed: ['config/scripts/a.test.mjs', 'src/main/b.test.ts', 'src/main/c.test.ts'],
+    presentAtHead: new Set(['config/scripts/deep/a.test.mjs', 'src/main/c.test.ts'])
+  })
+  assert.deepEqual(gone, ['config/scripts/a.test.mjs', 'src/main/b.test.ts'])
+  // `a.test.mjs` moved into a subdirectory; `b.test.ts` has no same-named survivor.
+  assert.deepEqual(moved, ['config/scripts/a.test.mjs'])
+})

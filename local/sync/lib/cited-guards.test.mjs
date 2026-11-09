@@ -57,8 +57,20 @@ test('a bare colon token is not a script citation, and a pnpm verb is not one ei
   assert.equal(result.checkedPaths, 0)
 })
 
-test('a citation inside a longer command is not a path citation', () => {
-  // `pnpm test src/main/thing.test.ts` is a command, not a bare path, so it is not extracted — the
-  // shape has to be the path itself or the row would read every command line in the file.
-  assert.equal(resolve('`pnpm test src/main/gone.test.ts`').checkedPaths, 0)
+test('a path inside a cited command is read, because that is how the ledger cites a guard it runs', () => {
+  const result = resolve('`pnpm test src/main/gone.test.ts`')
+  assert.deepEqual(result.missingPaths, ['src/main/gone.test.ts'])
+  assert.equal(result.checkedPaths, 1)
+})
+
+test('a line or range suffix names the file, not a different citation', () => {
+  assert.deepEqual(resolve('`src/main/thing.test.ts:32`').missingPaths, [])
+  assert.deepEqual(resolve('`src/main/thing.test.ts:32-40`').missingPaths, [])
+  assert.deepEqual(resolve('`src/main/gone.test.ts:7`').missingPaths, ['src/main/gone.test.ts'])
+})
+
+test('a `**` glob cannot match a path that skipped the directory it stands for', () => {
+  // `src/**/a.test.ts` must not match `src/xa.test.ts`, which is the shape a rotted glob hides behind.
+  assert.deepEqual(resolve('`src/**/a.test.ts`').missingPaths, ['src/**/a.test.ts'])
+  assert.deepEqual(resolve('`src/**/thing.test.ts`').missingPaths, [])
 })

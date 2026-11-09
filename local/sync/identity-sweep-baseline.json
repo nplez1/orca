@@ -1,6 +1,7 @@
 {
   "note": "Report-only identity findings (LOCAL-PATCHES.md, local(identity)). Frozen per rule and per file; the set may only shrink, and only through --baseline-prune. Regenerate with `node local/sync/identity-sweep.mjs --baseline-init [--accept <reason>]`.",
   "base": "51c77320bc3302923ad4e194de7edacb2a91b6b6",
+  "accepted": "2026-11-08 sync base 51c77320bc, re-measured after #337 (d34532a2b47) moved the install-layout names into src/main/fork/install-layout-names.ts. That commit retired 26 rule/file pairs (command-code-managed-script.ts, orcad-browser-provider.ts, windows-update-install-directory.{ts,test.ts}, macos-daemon-job-label.ts, rebuild-and-relaunch-installed-macos-arm64.sh) and introduced 10 (install-layout-names.{ts,test.ts}, command-code-managed-script.test.ts), so the total fell 717 -> 701. None of those files is touched by this branch; the growth is not this branch's to fix, and the shrink cannot be pruned past the new pairs without dropping the ratchet.",
   "total": 701,
   "rules": {
     "app-data-root": {
