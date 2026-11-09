@@ -189,8 +189,8 @@ export function applyHostSettingsReplication(
     //
     // Why a removal counts as replicated when this host has no record at all: a corrupt holdings file
     // reads back empty, and a removal names an id the main once put here, so refusing it would leave a
-    // credential the user revoked on this host for good. The main cannot abuse that by naming an id it
-    // never sent, because it records a holding only for what this host reported taking.
+    // credential the user revoked on this host for good. An honest main of this build cannot name an id
+    // it never sent, because it records a holding only for what this host reported taking.
     replicatedIds: [
       ...record.ids,
       ...recoverReplicatedIds(registry, contractPayload, record),
