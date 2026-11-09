@@ -21,6 +21,11 @@ export const FORK_RUNTIME_REQUIRED_RELATIVE_PATH = path.join(
   'fork',
   'en-runtime-required.json'
 )
+export const FORK_EN_OVERRIDES_RELATIVE_PATH = path.join(
+  I18N_RELATIVE_DIR,
+  'fork',
+  'en.overrides.json'
+)
 
 /** The fork overlay for one locale; English keeps the historical `fork/en.json` path. */
 export function forkLocaleCatalogRelativePath(locale) {
@@ -59,6 +64,82 @@ export function mergeCatalogs(base, overlay) {
   return merged
 }
 
+/**
+ * Every way an English overlay can override upstream without the manifest agreeing with it.
+ *
+ * The manifest's key set must equal the override set, or it drifts: an override nobody recorded is
+ * shadowing that upstream cannot report, and a record nobody overrides is a claim about a value the
+ * app no longer serves.
+ */
+export function collectOverlayOverrideDrift(overlay, upstreamCatalog, manifest) {
+  const drift = {
+    structural: [],
+    unrecorded: [],
+    reworded: [],
+    removed: [],
+    stale: [],
+    noop: []
+  }
+  const overridden = new Set()
+
+  const walk = (node, upstreamNode, prefix) => {
+    for (const [key, value] of Object.entries(node)) {
+      const pathKey = prefix ? `${prefix}.${key}` : key
+      const upstreamValue =
+        isPlainObject(upstreamNode) && Object.hasOwn(upstreamNode, key)
+          ? upstreamNode[key]
+          : undefined
+      // A tombstone is checked against upstream by `reportStaleTombstones` instead.
+      if (value === null) {
+        continue
+      }
+      if (isPlainObject(value)) {
+        if (typeof upstreamValue === 'string') {
+          drift.structural.push(pathKey)
+          continue
+        }
+        walk(value, upstreamValue, pathKey)
+        continue
+      }
+      overridden.add(pathKey)
+      if (upstreamValue === undefined) {
+        if (Object.hasOwn(manifest, pathKey)) {
+          drift.removed.push(pathKey)
+        }
+        continue
+      }
+      if (typeof upstreamValue !== 'string') {
+        drift.structural.push(pathKey)
+        continue
+      }
+      if (upstreamValue === value) {
+        drift.noop.push(pathKey)
+        continue
+      }
+      if (!Object.hasOwn(manifest, pathKey)) {
+        drift.unrecorded.push({ key: pathKey, upstream: upstreamValue })
+        continue
+      }
+      if (manifest[pathKey] !== upstreamValue) {
+        drift.reworded.push({
+          key: pathKey,
+          recorded: manifest[pathKey],
+          upstream: upstreamValue,
+          fork: value
+        })
+      }
+    }
+  }
+
+  walk(overlay, upstreamCatalog, '')
+  for (const key of Object.keys(manifest)) {
+    if (!overridden.has(key)) {
+      drift.stale.push(key)
+    }
+  }
+  return drift
+}
+
 /** Dot paths of every tombstone in an overlay, so a dead one cannot outlive the key it deletes. */
 export function collectCatalogTombstones(overlay, prefix = '') {
   const paths = []
@@ -87,6 +168,11 @@ async function readOptionalCatalog(filePath) {
 /** The overlay sits beside a surface's own catalogs, so a surface without one merges to upstream's file. */
 export function forkOverlayDirectoryRelativePath(surface) {
   return path.join(path.dirname(surface.localesDir), 'fork')
+}
+
+/** Records what upstream said when the fork overrode a key, so a later upstream reword cannot pass unseen. */
+export function forkOverrideManifestRelativePath(surface) {
+  return path.join(forkOverlayDirectoryRelativePath(surface), 'en.overrides.json')
 }
 
 export async function hasForkOverlayForSurface(root, surface) {
@@ -123,9 +209,11 @@ export async function writeForkRuntimeRequiredCatalogForSurface(root, surface, c
 }
 
 export async function readForkEnglishCatalogForSurface(root, surface) {
-  return readOptionalCatalog(
-    path.join(root, forkOverlayDirectoryRelativePath(surface), 'en.json')
-  )
+  return readOptionalCatalog(path.join(root, forkOverlayDirectoryRelativePath(surface), 'en.json'))
+}
+
+export async function readForkEnglishOverridesForSurface(root, surface) {
+  return readOptionalCatalog(path.join(root, forkOverrideManifestRelativePath(surface)))
 }
 
 export async function readForkLocaleCatalogForSurface(root, surface, locale) {

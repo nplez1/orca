@@ -10,9 +10,12 @@ import ts from 'typescript-api'
 
 import {
   collectCatalogTombstones,
+  collectOverlayOverrideDrift,
+  forkOverrideManifestRelativePath,
   hasForkOverlayForSurface,
   mergeCatalogs,
   readForkEnglishCatalogForSurface,
+  readForkEnglishOverridesForSurface,
   readForkLocaleCatalogForSurface,
   writeMissingEnglishEntriesForSurface
 } from './fork-english-catalog.mjs'
@@ -294,6 +297,68 @@ function reportStaleTombstones(overlay, upstreamCatalog, label) {
   console.error(`${label} tombstones keys upstream no longer ships:`)
   console.error(formatMissingKeys('stale', stale.slice(0, 20)))
   console.error('Delete those entries; every tombstone must name a key upstream still ships.')
+  return 1
+}
+
+function limitLines(lines) {
+  const shown = lines.slice(0, 20)
+  if (lines.length > 20) {
+    shown.push(`...and ${lines.length - 20} more`)
+  }
+  return shown.join('\n')
+}
+
+function describeRecordedOverride(entry) {
+  return `${entry.key}\n  recorded: ${JSON.stringify(entry.recorded)}\n  upstream: ${JSON.stringify(entry.upstream)}\n  fork: ${JSON.stringify(entry.fork)}`
+}
+
+// Why: the overlay silently wins over upstream's copy, so an override nobody recorded is a reword
+// nobody sees (LOCAL-PATCHES § local(i18n)).
+function reportOverrideDrift(drift, manifestLabel) {
+  const blocks = [
+    {
+      heading: 'en.json overlay replaces a different shape upstream ships:',
+      lines: drift.structural.map((key) => `structural: ${key}`),
+      remedy: 'Rewrite the overlay entry so it overrides one upstream string instead of a subtree.'
+    },
+    {
+      heading: `en.json overlay overrides keys ${manifestLabel} does not record:`,
+      lines: drift.unrecorded.map(
+        (entry) => `unrecorded: ${entry.key}\n  upstream: ${JSON.stringify(entry.upstream)}`
+      ),
+      remedy: `Record each key's upstream value in ${manifestLabel}, or drop the key from the overlay.`
+    },
+    {
+      heading: 'Upstream reworded keys the fork overrides:',
+      lines: drift.reworded.map((entry) => `reworded: ${describeRecordedOverride(entry)}`),
+      remedy: `Keep the fork wording and record upstream's new value in ${manifestLabel}, or drop the override.`
+    },
+    {
+      heading: `Upstream no longer ships keys ${manifestLabel} records:`,
+      lines: drift.removed.map((key) => `removed upstream: ${key}`),
+      remedy: "Delete those entries; the fork's copy is a plain addition now."
+    },
+    {
+      heading: `${manifestLabel} records keys the overlay no longer overrides:`,
+      lines: drift.stale.map((key) => `stale override record: ${key}`),
+      remedy: 'Delete those entries; a record must name a key the overlay still overrides.'
+    },
+    {
+      heading: "en.json overlay repeats upstream's value instead of overriding it:",
+      lines: drift.noop.map((key) => `no-op override: ${key}`),
+      remedy: `Delete those entries from the overlay, and their records from ${manifestLabel}.`
+    }
+  ]
+  const failing = blocks.filter((block) => block.lines.length > 0)
+  if (failing.length === 0) {
+    return 0
+  }
+  for (const { heading, lines, remedy } of failing) {
+    console.error(heading)
+    console.error(limitLines(lines))
+    console.error(remedy)
+    console.error('')
+  }
   return 1
 }
 
@@ -590,6 +655,18 @@ export async function main(
     ? await readForkEnglishCatalogForSurface(root, surface)
     : {}
   if (reportStaleTombstones(forkEnglishCatalog, upstreamCatalog, 'en.json overlay') !== 0) {
+    return 1
+  }
+  const overrideManifest = forkOverlay
+    ? await readForkEnglishOverridesForSurface(root, surface)
+    : {}
+  const overrideManifestLabel = forkOverrideManifestRelativePath(surface).split(path.sep).join('/')
+  if (
+    reportOverrideDrift(
+      collectOverlayOverrideDrift(forkEnglishCatalog, upstreamCatalog, overrideManifest),
+      overrideManifestLabel
+    ) !== 0
+  ) {
     return 1
   }
   const catalog = mergeCatalogs(upstreamCatalog, forkEnglishCatalog)

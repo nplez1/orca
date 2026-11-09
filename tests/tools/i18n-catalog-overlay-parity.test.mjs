@@ -10,7 +10,9 @@ import {
 const OVERLAY_FILES = Object.keys(import.meta.glob('../../src/renderer/src/i18n/fork/*.json')).map(
   (path) => path.slice(path.lastIndexOf('/') + 1, -'.json'.length)
 )
-const ENGLISH_OVERLAYS = new Set(['en', 'en-runtime-required'])
+// `en` and `en-runtime-required` are verifier-only, and `en.overrides` is the override manifest, not
+// a locale overlay.
+const ENGLISH_FORK_FILES = new Set(['en', 'en-runtime-required', 'en.overrides'])
 
 // Two files implement the overlay rule: the verifiers read through the Node one, the app through the
 // renderer one, and they cannot share a module across the TS/mjs boundary. Parity is asserted rather
@@ -30,7 +32,7 @@ const CASES = [
 
 describe('overlay merge parity', () => {
   it('wires every locale overlay file into the runtime map', () => {
-    const onDisk = OVERLAY_FILES.filter((locale) => !ENGLISH_OVERLAYS.has(locale)).sort()
+    const onDisk = OVERLAY_FILES.filter((locale) => !ENGLISH_FORK_FILES.has(locale)).sort()
     expect([...FORK_OVERLAY_LANGUAGES].sort()).toEqual(onDisk)
   })
 
