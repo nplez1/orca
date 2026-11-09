@@ -359,6 +359,42 @@ describe('fetchFireworksRateLimits', () => {
     expect(result.credits).toBeNull()
   })
 
+  it('classifies a 429 on the billing summary as rate-limited and carries the wait', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(accountsResponse({ name: 'accounts/acct-429' }))
+      .mockResolvedValueOnce(new Response('', { status: 429, headers: { 'retry-after': '60' } }))
+
+    const result = await fetchFireworksRateLimits({ apiKey: 'fw-key-429' })
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata).toEqual({
+      failureKind: 'rate-limited',
+      source: 'web',
+      retryAtMs: FROZEN_NOW + 60_000
+    })
+  })
+
+  it('cancels the request when the caller aborts the cycle', async () => {
+    const controller = new AbortController()
+    netFetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      const signal = init.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      })
+    })
+
+    const pending = fetchFireworksRateLimits({
+      apiKey: 'fw-key-abort',
+      signal: controller.signal
+    })
+    controller.abort()
+    const result = await pending
+
+    expect(netFetchMock.mock.calls[0][1].signal.aborted).toBe(true)
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata).toEqual({ failureKind: 'network', source: 'web' })
+  })
+
   it('classifies a transport throw as a network error', async () => {
     netFetchMock.mockRejectedValueOnce(new Error('socket hang up'))
 

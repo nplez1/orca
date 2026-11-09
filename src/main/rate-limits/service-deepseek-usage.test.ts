@@ -137,7 +137,10 @@ describe('RateLimitService DeepSeek usage', () => {
     await service.refresh()
 
     expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(1)
-    expect(fetchDeepSeekRateLimits).toHaveBeenCalledWith({ apiKey: 'sk-deepseek-balance-key' })
+    expect(fetchDeepSeekRateLimits).toHaveBeenCalledWith({
+      apiKey: 'sk-deepseek-balance-key',
+      signal: expect.any(AbortSignal)
+    })
 
     const state = service.getState()
     expect(state.deepseek?.status).toBe('ok')
@@ -219,7 +222,10 @@ describe('RateLimitService DeepSeek usage', () => {
     const pendingState = service.getState()
     expect(pendingState.deepseek?.status).toBe('fetching')
     expect(pendingState.deepseek?.credits).toBeUndefined()
-    expect(fetchDeepSeekRateLimits).toHaveBeenLastCalledWith({ apiKey: 'sk-deepseek-account-b' })
+    expect(fetchDeepSeekRateLimits).toHaveBeenLastCalledWith({
+      apiKey: 'sk-deepseek-account-b',
+      signal: expect.any(AbortSignal)
+    })
 
     pending.resolve(creditsProvider('deepseek', 'balance'))
     await secondRefresh

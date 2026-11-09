@@ -200,13 +200,15 @@ export function notifyGhPrimaryRateLimit(bucket: GhRateLimitBucket, scope = DEFA
 export function createGhRateLimitBlockedError(
   bucket: GhRateLimitBucket,
   blockedUntilMs: number
-): Error & { stderr: string; ghRateLimitBlocked: true } {
+): Error & { stderr: string; ghRateLimitBlocked: true; retryAtMs: number } {
   const resetsIn = Math.max(1, Math.ceil((blockedUntilMs - Date.now()) / 1000))
   // Match classifyGhError's rate_limited classification rather than HTTP 403 permission_denied.
   const message = `GitHub API rate limit exceeded (${bucket}); retrying in ~${resetsIn}s without spawning gh.`
   return Object.assign(new Error(message), {
     stderr: message,
-    ghRateLimitBlocked: true as const
+    ghRateLimitBlocked: true as const,
+    // Why: the breaker knows the wait, so a caller reading the failure can honour it.
+    retryAtMs: blockedUntilMs
   })
 }
 

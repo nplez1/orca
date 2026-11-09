@@ -85,6 +85,15 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
     const forkProviderCycle = prepareForkProviderCycle({
       disabled,
+      signal,
+      force: options?.force === true,
+      previous: {
+        deepseek: previousState.deepseek,
+        fireworks: previousState.fireworks,
+        deepinfra: previousState.deepinfra,
+        copilot: previousState.copilot
+      },
+      isRetryAfterActive: (limits) => this.isRetryAfterActive(limits),
       resolveConfigs: () => ({
         deepSeek: this.resolveDeepSeekConfig(),
         fireworks: this.resolveFireworksConfig(),

@@ -1,5 +1,7 @@
 import { getMainHttpClient } from '../../network/http-client'
+import { abortSignalWithTimeout } from '../../lib/abort-signal-with-timeout'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import { classifyThrownUsageRequestError } from '../usage-request-failure-kind'
 import {
   DEEPINFRA_API_BASE_URL,
   DEEPINFRA_CHECKLIST_PATH,
@@ -9,7 +11,7 @@ import {
 } from './deepinfra-fetcher-data'
 import { parseDeepInfraChecklistResponse } from './deepinfra-fetcher-parse'
 
-export type FetchDeepInfraRateLimitsOptions = { apiKey: string }
+export type FetchDeepInfraRateLimitsOptions = { apiKey: string; signal?: AbortSignal }
 
 /**
  * DeepInfra's remaining credit balance, from the billing checklist the dashboard
@@ -33,12 +35,13 @@ export async function fetchDeepInfraRateLimits(
       {
         method: 'GET',
         headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
-        signal: AbortSignal.timeout(DEEPINFRA_REQUEST_TIMEOUT_MS)
+        // Why the caller's signal: an aborted cycle must not leave the request running to its timeout.
+        signal: abortSignalWithTimeout(options.signal, DEEPINFRA_REQUEST_TIMEOUT_MS)
       }
     )
     return await parseDeepInfraChecklistResponse(response)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'DeepInfra billing request failed'
-    return makeDeepInfraError(message, 'network')
+    return makeDeepInfraError(message, classifyThrownUsageRequestError(error))
   }
 }

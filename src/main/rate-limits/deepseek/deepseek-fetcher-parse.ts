@@ -1,4 +1,6 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import { parseUsageRetryAfterMs } from '../usage-retry-after'
+import { classifyThrownUsageRequestError } from '../usage-request-failure-kind'
 import {
   buildDeepSeekCredits,
   makeDeepSeekError,
@@ -8,11 +10,20 @@ import {
 // Why: split out of deepseek-fetcher.ts so the transport file stays a thin
 // fetch + catch. Pure Response → ProviderRateLimits translation; no I/O.
 
-function classifyDeepSeekHttpError(response: Response): ProviderRateLimits | null {
+function classifyDeepSeekHttpError(response: Response, nowMs: number): ProviderRateLimits | null {
   if (response.status === 401 || response.status === 403) {
     return makeDeepSeekError(
       `DeepSeek API key rejected (HTTP ${response.status})`,
       'missing-credentials'
+    )
+  }
+  // Why: a 429 is the endpoint asking Orca to stop, so the poll gate needs the wait it asked for.
+  if (response.status === 429) {
+    const retryAfterMs = parseUsageRetryAfterMs(response.headers.get('retry-after'), nowMs)
+    return makeDeepSeekError(
+      'DeepSeek balance is rate limited right now',
+      'rate-limited',
+      retryAfterMs === null ? undefined : nowMs + retryAfterMs
     )
   }
   if (!response.ok) {
@@ -24,7 +35,7 @@ function classifyDeepSeekHttpError(response: Response): ProviderRateLimits | nul
 export async function parseDeepSeekBalanceResponse(
   response: Response
 ): Promise<ProviderRateLimits> {
-  const httpError = classifyDeepSeekHttpError(response)
+  const httpError = classifyDeepSeekHttpError(response, Date.now())
   if (httpError) {
     return httpError
   }
@@ -37,7 +48,8 @@ export async function parseDeepSeekBalanceResponse(
     payload = value
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Invalid DeepSeek balance response'
-    return makeDeepSeekError(message, 'parse')
+    // Why: an abort mid-body is a network failure, not an unreadable payload.
+    return makeDeepSeekError(message, classifyThrownUsageRequestError(error))
   }
   const credits = buildDeepSeekCredits(payload)
   if (!credits) {

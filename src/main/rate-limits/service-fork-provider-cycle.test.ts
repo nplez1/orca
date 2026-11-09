@@ -8,9 +8,12 @@ import { fetchFireworksRateLimits } from './fireworks/fireworks-fetcher'
 import { fetchCopilotRateLimits } from './copilot/copilot-fetcher'
 import { readCopilotGhCredentialsForCycle } from './copilot/copilot-gh-credentials'
 import {
+  asRateLimitWindow,
   creditsProvider,
   deferred,
+  FakeRateLimitWindow,
   flushMicrotasks,
+  mockFreshBackgroundProviderFetches,
   okProvider,
   resetRateLimitProviderMocks
 } from './rate-limit-service-test-harness'
@@ -153,5 +156,116 @@ describe('RateLimitService fork provider sibling cycle', () => {
     expect(service.getState().deepseek).toBeNull()
     expect(service.getState().fireworks).toBeNull()
     expect(service.getState().copilot).toBeNull()
+  })
+
+  describe('an open Retry-After', () => {
+    const RETRY_AFTER_MS = 60 * 60 * 1000
+
+    function rateLimitedDeepSeek(): ProviderRateLimits {
+      return {
+        provider: 'deepseek',
+        session: null,
+        weekly: null,
+        updatedAt: Date.now(),
+        error: 'DeepSeek balance is rate limited right now',
+        status: 'error',
+        usageMetadata: {
+          failureKind: 'rate-limited',
+          source: 'web',
+          retryAtMs: Date.now() + RETRY_AFTER_MS
+        }
+      }
+    }
+
+    it('is not asked again by the next poll', async () => {
+      vi.useFakeTimers()
+      try {
+        mockFreshBackgroundProviderFetches()
+        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => okProvider('claude', 3))
+        vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
+        const service = new RateLimitService()
+        service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
+        service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
+        service.start()
+
+        await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
+
+        // Why the control: the second cycle did run, and only the gated provider was skipped.
+        expect(fetchFireworksRateLimits).toHaveBeenCalledTimes(2)
+        expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(1)
+        expect(service.getState().deepseek?.usageMetadata?.failureKind).toBe('rate-limited')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('expires, so a later poll asks again', async () => {
+      vi.useFakeTimers()
+      try {
+        mockFreshBackgroundProviderFetches()
+        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => okProvider('claude', 3))
+        vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
+        const service = new RateLimitService()
+        service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
+        service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
+        service.start()
+
+        // One minute past the wait: the next poll must not stay held forever.
+        await vi.advanceTimersByTimeAsync(RETRY_AFTER_MS + 60_000)
+
+        expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('keeps a key saved mid-cycle instead of the old snapshot', async () => {
+      vi.useFakeTimers()
+      try {
+        mockFreshBackgroundProviderFetches()
+        const heldClaude = deferred<ProviderRateLimits>()
+        let holdClaude = false
+        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () =>
+          holdClaude ? heldClaude.promise : okProvider('claude', 3)
+        )
+        vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
+        const service = new RateLimitService()
+        service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
+        await service.refresh()
+
+        // Claude is now stale, so the activation plan runs a full, unforced cycle.
+        vi.setSystemTime(Date.now() + 6 * 60 * 1000)
+        holdClaude = true
+        const cycle = service.refreshIfStale()
+        await flushMicrotasks()
+        service.invalidateDeepSeekCredentialState()
+        heldClaude.resolve(okProvider('claude', 4))
+        await cycle
+
+        // Why: the old key's rate-limited snapshot must not overwrite the new key's placeholder.
+        expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(1)
+        expect(service.getState().deepseek?.status).toBe('fetching')
+        expect(service.getState().deepseek?.updatedAt).toBe(0)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('is passed by a user-triggered refresh', async () => {
+      vi.useFakeTimers()
+      try {
+        mockFreshBackgroundProviderFetches()
+        vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
+        const service = new RateLimitService()
+        service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
+
+        await service.refresh()
+        await service.refresh()
+
+        expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

@@ -36,7 +36,8 @@ export function makeDeepSeekUnavailable(error: string): ProviderRateLimits {
 
 export function makeDeepSeekError(
   error: string,
-  failureKind: NonNullable<UsageRateLimitMetadata['failureKind']>
+  failureKind: NonNullable<UsageRateLimitMetadata['failureKind']>,
+  retryAtMs?: number
 ): ProviderRateLimits {
   return {
     provider: 'deepseek',
@@ -45,7 +46,7 @@ export function makeDeepSeekError(
     updatedAt: Date.now(),
     error,
     status: 'error',
-    usageMetadata: { failureKind, source: 'web' }
+    usageMetadata: { failureKind, source: 'web', ...(retryAtMs === undefined ? {} : { retryAtMs }) }
   }
 }
 

@@ -142,7 +142,8 @@ describe('RateLimitService Fireworks usage', () => {
     expect(fetchFireworksRateLimits).toHaveBeenCalledTimes(1)
     expect(fetchFireworksRateLimits).toHaveBeenCalledWith({
       apiKey: 'fw-api-key-1234',
-      accountIdOverride: null
+      accountIdOverride: null,
+      signal: expect.any(AbortSignal)
     })
 
     const state = service.getState()
@@ -232,7 +233,8 @@ describe('RateLimitService Fireworks usage', () => {
     expect(pendingState.fireworks?.credits).toBeUndefined()
     expect(fetchFireworksRateLimits).toHaveBeenLastCalledWith({
       apiKey: 'fw-api-key-account-b',
-      accountIdOverride: null
+      accountIdOverride: null,
+      signal: expect.any(AbortSignal)
     })
 
     pending.resolve(creditsProvider('fireworks', 'spend'))
@@ -266,7 +268,8 @@ describe('RateLimitService Fireworks usage', () => {
     expect(pendingState.fireworks?.credits).toBeUndefined()
     expect(fetchFireworksRateLimits).toHaveBeenLastCalledWith({
       apiKey: 'fw-api-key-1234',
-      accountIdOverride: 'acct-42'
+      accountIdOverride: 'acct-42',
+      signal: expect.any(AbortSignal)
     })
 
     pending.resolve(creditsProvider('fireworks', 'spend'))

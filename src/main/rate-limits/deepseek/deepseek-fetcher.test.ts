@@ -339,6 +339,39 @@ describe('fetchDeepSeekRateLimits', () => {
     expect(result.error).toMatch(/500/)
   })
 
+  it('classifies a 429 with Retry-After as rate-limited and carries the wait', async () => {
+    netFetchMock.mockResolvedValueOnce(
+      new Response('', { status: 429, headers: { 'retry-after': '120' } })
+    )
+
+    const result = await fetchDeepSeekRateLimits({ apiKey: API_KEY })
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata).toEqual({
+      failureKind: 'rate-limited',
+      source: 'web',
+      retryAtMs: FIXED_NOW + 120_000
+    })
+  })
+
+  it('cancels the request when the caller aborts the cycle', async () => {
+    const controller = new AbortController()
+    netFetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      const signal = init.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      })
+    })
+
+    const pending = fetchDeepSeekRateLimits({ apiKey: API_KEY, signal: controller.signal })
+    controller.abort()
+    const result = await pending
+
+    expect(netFetchMock.mock.calls[0][1].signal.aborted).toBe(true)
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata?.failureKind).toBe('network')
+  })
+
   it('classifies a transport throw as a network failure', async () => {
     netFetchMock.mockRejectedValueOnce(new Error('socket hang up'))
 

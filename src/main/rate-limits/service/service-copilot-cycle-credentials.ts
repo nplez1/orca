@@ -1,3 +1,4 @@
+import { usageCredentialFingerprint } from '../fork/usage-credential-fingerprint'
 import type { CopilotGhCredentialsResult } from '../copilot/copilot-gh-credentials'
 import type { CopilotResolvedConfig } from './service-types'
 
@@ -47,5 +48,6 @@ function copilotConfigHash(
   source: string,
   error: string | null
 ): string {
-  return `${token}|${enterpriseSlug}|${source}|${error ?? ''}`
+  // Why hashed: the hash is only compared, so the raw token never has to be retained here.
+  return `${usageCredentialFingerprint(token)}|${enterpriseSlug}|${source}|${error ?? ''}`
 }

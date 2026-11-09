@@ -1,5 +1,7 @@
 import { getMainHttpClient } from '../../network/http-client'
+import { abortSignalWithTimeout } from '../../lib/abort-signal-with-timeout'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import { classifyThrownUsageRequestError } from '../usage-request-failure-kind'
 import { makeDeepSeekError, makeDeepSeekUnavailable } from './deepseek-fetcher-data'
 import { parseDeepSeekBalanceResponse } from './deepseek-fetcher-parse'
 
@@ -8,7 +10,7 @@ import { parseDeepSeekBalanceResponse } from './deepseek-fetcher-parse'
 const DEEPSEEK_BALANCE_URL = 'https://api.deepseek.com/user/balance'
 const API_TIMEOUT_MS = 10_000
 
-export type FetchDeepSeekRateLimitsOptions = { apiKey: string }
+export type FetchDeepSeekRateLimitsOptions = { apiKey: string; signal?: AbortSignal }
 
 /**
  * Read-only DeepSeek prepaid balance. Never throws: every failure path returns
@@ -29,11 +31,12 @@ export async function fetchDeepSeekRateLimits(
     // desktop client is the same default-session fetch, proxy guard included.
     const response = await getMainHttpClient().fetch(DEEPSEEK_BALANCE_URL, {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(API_TIMEOUT_MS)
+      // Why the caller's signal: an aborted cycle must not leave the request running to its timeout.
+      signal: abortSignalWithTimeout(options.signal, API_TIMEOUT_MS)
     })
     return await parseDeepSeekBalanceResponse(response)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'DeepSeek balance request failed'
-    return makeDeepSeekError(message, 'network')
+    return makeDeepSeekError(message, classifyThrownUsageRequestError(error))
   }
 }
