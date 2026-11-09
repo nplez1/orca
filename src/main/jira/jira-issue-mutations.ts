@@ -101,7 +101,11 @@ function describeUpdateFailure(error: unknown): JiraMutationResult {
 /** The deadline's own abort, which says the write may still land: a plain failure
  *  would make the caller roll back a field Jira may have just saved. */
 function isWriteDeadlineAbort(error: unknown, signal: AbortSignal): boolean {
-  return signal.aborted || (error instanceof Error && error.name === 'AbortError')
+  return (
+    signal.aborted ||
+    error instanceof JiraRequestTimeoutError ||
+    (error instanceof Error && error.name === 'AbortError')
+  )
 }
 
 /** Creates an issue, shaping the customFields keys named by `userFieldKeys`. */
@@ -148,7 +152,9 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
       throw error
     }
     if (error instanceof JiraRequestTimeoutError) {
-      return taskProviderFailure('jira.createFailed', JIRA_CREATE_TIMEOUT_MESSAGE)
+      // Why no error code: a code makes the surface render its own "Failed to create
+      // issue." copy, which reads as a safe retry — the one thing this is not.
+      return { ok: false, error: JIRA_CREATE_TIMEOUT_MESSAGE }
     }
     return error instanceof Error
       ? { ok: false, error: error.message }
@@ -306,7 +312,7 @@ export async function addIssueComment(
       throw error
     }
     if (error instanceof JiraRequestTimeoutError) {
-      return taskProviderFailure('jira.commentFailed', JIRA_COMMENT_TIMEOUT_MESSAGE)
+      return { ok: false, error: JIRA_COMMENT_TIMEOUT_MESSAGE }
     }
     return error instanceof Error
       ? { ok: false, error: error.message }

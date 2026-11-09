@@ -210,6 +210,16 @@ describe('Jira read deadlines', () => {
     await outcome
   })
 
+  it('bounds the cloud-ID lookup, which reaches fetch without jiraRequest', async () => {
+    const { JIRA_REQUEST_TIMEOUT_MS } = await import('./jira-request-deadline')
+    const { resolveJiraGatewayBaseUrl } = await import('./cloud-gateway')
+
+    const lookup = resolveJiraGatewayBaseUrl('https://example.atlassian.net')
+    const outcome = expect(lookup).rejects.toThrow('did not answer in time')
+    await vi.advanceTimersByTimeAsync(JIRA_REQUEST_TIMEOUT_MS)
+    await outcome
+  })
+
   it('honours a caller signal rather than its own deadline', async () => {
     const { jiraRequest } = await import('./authenticated-request')
     const controller = new AbortController()
@@ -251,8 +261,10 @@ describe('Jira read deadlines', () => {
     )
     await vi.advanceTimersByTimeAsync(JIRA_REQUEST_TIMEOUT_MS)
 
-    const result = await settled
-    expect(result).toMatchObject({ ok: false })
-    expect(JSON.stringify(result)).toContain('may have been created')
+    // No error code: the surfaces would swap this warning for "Failed to create issue."
+    await expect(settled).resolves.toEqual({
+      ok: false,
+      error: expect.stringContaining('may have been created')
+    })
   })
 })

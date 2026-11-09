@@ -30,6 +30,10 @@ export async function withJiraRequestDeadline<T>(
   callerSignal: AbortSignal | undefined,
   run: (signal: AbortSignal) => Promise<T>
 ): Promise<T> {
+  // Why: the proxy probe costs a round trip, and there is nothing to probe for.
+  if (callerSignal?.aborted) {
+    throw createAbortError()
+  }
   const controller = new AbortController()
   const signal = callerSignal
     ? AbortSignal.any([callerSignal, controller.signal])
@@ -48,10 +52,6 @@ export async function withJiraRequestDeadline<T>(
   let stopListening: (() => void) | undefined
   const callerAbort = callerSignal
     ? new Promise<never>((_resolve, reject) => {
-        if (callerSignal.aborted) {
-          reject(createAbortError())
-          return
-        }
         const onAbort = (): void => reject(createAbortError())
         callerSignal.addEventListener('abort', onAbort, { once: true })
         stopListening = () => callerSignal.removeEventListener('abort', onAbort)
