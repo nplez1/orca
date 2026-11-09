@@ -230,18 +230,27 @@ orphans all live in `src/renderer/src/i18n/fork/`:
   reference for upstream's key, and `verify:localization-extraction` fails on any key no source
   references — so before the overlay existed, deleting the feature _forced_ deleting upstream's
   entries and rewriting ~21–25 hunks per catalog.
-- `mergeCatalogs` (`config/scripts/fork-english-catalog.mjs`) and `mergeLocaleOverlay`
+- `mergeCatalogs` (`config/scripts/localization/catalog-validation/fork-english-catalog.mjs`) and
+  `mergeLocaleOverlay`
   (`src/renderer/src/i18n/fork-catalog-overlay.ts`) are the same rule on the Node and renderer sides;
   `tests/tools/i18n-catalog-overlay-parity.test.mjs` fails if they drift.
 
-Two failure modes a sync can produce here, both loud by design: a tombstone whose key upstream has
-**deleted** makes `verify:localization-catalogs` fail until the tombstone is removed, and a fork
-string upstream has **added under the same key** has to move out of the overlay. Both are reported by
-name.
+**Every non-null overlay entry upstream also ships is recorded in `fork/en.overrides.json`** — the
+upstream English value at the time the fork overrode it — and `verify:localization-catalogs` fails when
+the two disagree (issue #323). Six classes, each reported by name: an override upstream ships that the
+manifest does not record (`unrecorded` — this is also how upstream adding a key the fork already added
+announces itself), a recorded key whose upstream value changed (`reworded`), a recorded key upstream no
+longer ships (`removed upstream`), a record the overlay no longer overrides (`stale override record`),
+an overlay entry byte-identical to upstream's (`no-op override` — not an override, delete it), and an
+overlay entry that replaces an upstream string with a subtree or the reverse (`structural`). A
+tombstone whose key upstream deleted is the same idea for `null` leaves. `--fix` never writes the
+manifest: recording upstream's value is a human claim, and auto-recording it would let a reword heal
+itself silently.
 
-Anchors: `src/renderer/src/i18n/{i18n.ts,fork-catalog-overlay.ts,fork/*.json}`,
-`config/scripts/fork-english-catalog.mjs`, `config/scripts/verify-localization-catalog*.mjs`,
-`config/scripts/verify-localization-extraction.mjs`.
+Anchors: `src/renderer/src/i18n/{i18n.ts,fork-catalog-overlay.ts,fork/*.json,fork/en.overrides.json}`,
+`config/scripts/localization/catalog-validation/fork-english-catalog.mjs`,
+`config/scripts/localization/catalog-validation/verify-localization-catalog*.mjs`,
+`config/scripts/localization/source-extraction/verify-localization-extraction.mjs`.
 
 Not covered, deliberately: **the main process does not read the overlays.** `src/main/i18n/main-i18n.ts`
 imports `locales/*.json` directly, so a fork string used by a menu, tray or dialog would silently fall
@@ -249,8 +258,9 @@ back to English. Nothing is lost today — every non-null overlay entry is rende
 string that needs main-process copy belongs in `src/main`'s own catalog, not in the overlay.
 
 Tests that pin the mechanism: `config/scripts/localization/catalog-validation/fork-english-catalog.test.mjs`,
-`src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the overlay-fetch-failure path),
-`tests/tools/i18n-catalog-overlay-parity.test.mjs`.
+`config/scripts/localization/catalog-validation/verify-localization-catalog.test.mjs` (one fixture per
+override-drift class), `src/renderer/src/i18n/fork-catalog-overlay.test.ts` (including the
+overlay-fetch-failure path), `tests/tools/i18n-catalog-overlay-parity.test.mjs`.
 
 **Orphaned keys are tombstoned, never deleted (2026-10-31).** The section above described the rule;
 this is the first commit that applies it to the keys a dropped feature orphans. 27 upstream keys the
@@ -2444,6 +2454,7 @@ tests declared a skip, or when the report names a file the selection does not. I
 platform-conditional skip is legitimate. The mechanism is **SUSPECTED, not reproduced**: this config sets
 no Playwright `globalTimeout`, and the job's `timeout-minutes` kills the verdict step with the run. What
 the check closes is an interrupted run that still finishes the step.
+
 ### `local(ci)`: the fork's own tooling tests now run in CI, against the recorded sync base (#318)
 
 The fork's 17 `local/**/*.test.mjs` files sat outside `UNIT_INCLUDE`, so no unit lane collected them:

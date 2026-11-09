@@ -4,7 +4,10 @@ import path from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { FORK_EN_CATALOG_RELATIVE_PATH } from './fork-english-catalog.mjs'
+import {
+  FORK_EN_CATALOG_RELATIVE_PATH,
+  FORK_EN_OVERRIDES_RELATIVE_PATH
+} from './fork-english-catalog.mjs'
 import { main as verifyLocalizationCatalog } from './verify-localization-catalog.mjs'
 
 function writeJson(filePath, value) {
@@ -15,7 +18,21 @@ function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, 'utf8'))
 }
 
-function makeProject({ sourceText, enCatalog = {}, esCatalog = {} }) {
+function readIfPresent(filePath) {
+  try {
+    return readFileSync(filePath, 'utf8')
+  } catch {
+    return undefined
+  }
+}
+
+function makeProject({
+  sourceText,
+  enCatalog = {},
+  esCatalog = {},
+  forkEnCatalog,
+  overridesManifest
+}) {
   const root = mkdtempSync(path.join(tmpdir(), 'orca-localization-catalog-'))
   const rendererDir = path.join(root, 'src', 'renderer', 'src', 'components')
   const mainDir = path.join(root, 'src', 'main')
@@ -29,6 +46,15 @@ function makeProject({ sourceText, enCatalog = {}, esCatalog = {} }) {
   writeFileSync(path.join(mainDir, 'empty.ts'), 'export {}\n', 'utf8')
   writeJson(path.join(localesDir, 'en.json'), enCatalog)
   writeJson(path.join(localesDir, 'es.json'), esCatalog)
+
+  if (forkEnCatalog !== undefined || overridesManifest !== undefined) {
+    const forkDir = path.join(root, path.dirname(FORK_EN_CATALOG_RELATIVE_PATH))
+    mkdirSync(forkDir, { recursive: true })
+    writeJson(path.join(root, FORK_EN_CATALOG_RELATIVE_PATH), forkEnCatalog ?? {})
+    if (overridesManifest !== undefined) {
+      writeJson(path.join(root, FORK_EN_OVERRIDES_RELATIVE_PATH), overridesManifest)
+    }
+  }
 
   return { root, localesDir }
 }
@@ -139,6 +165,82 @@ describe('verify-localization-catalog', () => {
       expect(report).toHaveBeenCalledWith('- es.json:5 auto.example.greeting')
     } finally {
       report.mockRestore()
+    }
+  })
+
+  it("accepts an override the manifest records at upstream's current value", async () => {
+    const { root } = makeProject({
+      sourceText: 'export {}\n',
+      enCatalog: { auto: { example: { greeting: 'Hello' } } },
+      forkEnCatalog: { auto: { example: { greeting: 'Hi' } } },
+      overridesManifest: { 'auto.example.greeting': 'Hello' }
+    })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await expect(verifyLocalizationCatalog(root, { fix: false })).resolves.toBe(0)
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+  it.each([
+    {
+      case: 'upstream adds a key the overlay also adds',
+      enCatalog: { auto: { example: { greeting: 'Hello' } } },
+      forkEnCatalog: { auto: { example: { greeting: 'Hi' } } },
+      expected: 'unrecorded: auto.example.greeting'
+    },
+    {
+      case: 'upstream rewords an overridden key',
+      enCatalog: { auto: { example: { greeting: 'Hello there' } } },
+      forkEnCatalog: { auto: { example: { greeting: 'Hi' } } },
+      overridesManifest: { 'auto.example.greeting': 'Hello' },
+      expected: 'reworded: auto.example.greeting'
+    },
+    {
+      case: 'upstream removes an overridden key',
+      enCatalog: { auto: { example: { other: 'Other' } } },
+      forkEnCatalog: { auto: { example: { greeting: 'Hi' } } },
+      overridesManifest: { 'auto.example.greeting': 'Hello' },
+      expected: 'removed upstream: auto.example.greeting'
+    },
+    {
+      case: 'the overlay stops overriding a recorded key',
+      enCatalog: { auto: { example: { greeting: 'Hello' } } },
+      forkEnCatalog: {},
+      overridesManifest: { 'auto.example.greeting': 'Hello' },
+      expected: 'stale override record: auto.example.greeting'
+    },
+    {
+      case: 'the overlay repeats upstream word for word',
+      enCatalog: { auto: { example: { greeting: 'Hello' } } },
+      forkEnCatalog: { auto: { example: { greeting: 'Hello' } } },
+      overridesManifest: { 'auto.example.greeting': 'Hello' },
+      expected: 'no-op override: auto.example.greeting'
+    },
+    {
+      case: 'the overlay replaces an upstream string with a subtree',
+      enCatalog: { auto: { example: 'Flat' } },
+      forkEnCatalog: { auto: { example: { greeting: 'Hi' } } },
+      expected: 'structural: auto.example'
+    }
+  ])('fails when $case', async ({ enCatalog, forkEnCatalog, overridesManifest, expected }) => {
+    const { root } = makeProject({
+      sourceText: 'export {}\n',
+      enCatalog,
+      forkEnCatalog,
+      overridesManifest
+    })
+    const overlayPath = path.join(root, FORK_EN_CATALOG_RELATIVE_PATH)
+    const manifestPath = path.join(root, FORK_EN_OVERRIDES_RELATIVE_PATH)
+    const before = [readIfPresent(overlayPath), readIfPresent(manifestPath)]
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(verifyLocalizationCatalog(root, { fix: true })).resolves.toBe(1)
+      expect(error.mock.calls.flat().join('\n')).toContain(expected)
+      expect([readIfPresent(overlayPath), readIfPresent(manifestPath)]).toEqual(before)
+    } finally {
+      error.mockRestore()
     }
   })
 })
