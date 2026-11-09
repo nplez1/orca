@@ -219,6 +219,38 @@ describe('RateLimitService fork provider sibling cycle', () => {
       }
     })
 
+    it('keeps a key saved mid-cycle instead of the old snapshot', async () => {
+      vi.useFakeTimers()
+      try {
+        mockFreshBackgroundProviderFetches()
+        const heldClaude = deferred<ProviderRateLimits>()
+        let holdClaude = false
+        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () =>
+          holdClaude ? heldClaude.promise : okProvider('claude', 3)
+        )
+        vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
+        const service = new RateLimitService()
+        service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
+        await service.refresh()
+
+        // Claude is now stale, so the activation plan runs a full, unforced cycle.
+        vi.setSystemTime(Date.now() + 6 * 60 * 1000)
+        holdClaude = true
+        const cycle = service.refreshIfStale()
+        await flushMicrotasks()
+        service.invalidateDeepSeekCredentialState()
+        heldClaude.resolve(okProvider('claude', 4))
+        await cycle
+
+        // Why: the old key's rate-limited snapshot must not overwrite the new key's placeholder.
+        expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(1)
+        expect(service.getState().deepseek?.status).toBe('fetching')
+        expect(service.getState().deepseek?.updatedAt).toBe(0)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('is passed by a user-triggered refresh', async () => {
       vi.useFakeTimers()
       try {

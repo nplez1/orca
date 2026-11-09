@@ -466,6 +466,20 @@ describe('fetchCopilotRateLimits', () => {
     expect(result.usageMetadata?.retryAtMs).toBe(FROZEN_NOW + 120_000)
   })
 
+  it('caps the wait a tripped gh breaker knows too', async () => {
+    ghExecFileAsyncMock.mockRejectedValueOnce(
+      Object.assign(new Error('GitHub API rate limit exceeded (core)'), {
+        stderr: 'GitHub API rate limit exceeded (core)',
+        ghRateLimitBlocked: true,
+        retryAtMs: FROZEN_NOW + 48 * 60 * 60 * 1000
+      })
+    )
+
+    const result = await fetchCopilotRateLimits(requestOptions())
+
+    expect(result.usageMetadata?.retryAtMs).toBe(FROZEN_NOW + 24 * 60 * 60 * 1000)
+  })
+
   it('maps a primary rate-limit 403 to rate-limited instead of a scope problem', async () => {
     // Why: a primary limit is a 403, so status alone would tell the user to fix a permission.
     ghExecFileAsyncMock.mockRejectedValueOnce(
