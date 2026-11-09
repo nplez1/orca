@@ -172,9 +172,11 @@ jobs:
       # Why the report is the verdict's input, not Vitest's exit code: one tolerated teardown race
       # must not fail the shard, while a test failure, another unhandled error, or a missing report
       # still must, so a crashed or timed-out run cannot pass as green.
+      # Why the assignment as well: the report only proves what ran, and a worker that died takes its
+      # file out of it, so the sequencer's own manifest is what says which files this shard owed.
       - name: Verdict on the unit shard
         if: ${{ github.repository != 'stablyai/orca' && steps.run-unit-shard.outcome != 'skipped' }}
-        run: node local/check-unit-shard-verdict.mjs ci-shards/unit-report.json ci-shards/unit-shard.log "${{ steps.run-unit-shard.outcome }}"
+        run: node local/check-unit-shard-verdict.mjs ci-shards/unit-report.json ci-shards/unit-shard.log "${{ steps.run-unit-shard.outcome }}" --assignment ci-shards/unit-assignment.json
 
       - name: Seal unit module cache
         id: module-cache-seal

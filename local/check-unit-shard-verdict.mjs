@@ -11,6 +11,13 @@
  * ran no tests, and a failed shard with no tolerated race all still fail — so a crashed, timed-out
  * or genuinely red shard cannot pass as green.
  *
+ * A report is not evidence of coverage on its own: a worker that dies takes its file out of the
+ * report, and the report over whatever ran still reads green. So `--assignment` names the manifest
+ * `TimingSequencer` wrote from the same plan it handed Vitest, and the verdict fails on any assigned
+ * file the report does not list, and on any file the report lists that the shard was not assigned.
+ * A tolerated worker crash also cannot explain a failed shard by itself: a crash can lose tests
+ * inside a file that is still listed, which the file set cannot see.
+ *
  * Upstream's own runs never call this: `.github/workflows/unit-tests.yml` guards it on
  * `github.repository` and leaves Vitest's exit code in charge there.
  *
@@ -24,10 +31,12 @@
  * the file's `message`. `numFailedTestSuites` counts failing describes as well as failing files (2 for
  * one failing file, measured), so it cannot be used to catch that without failing every night.
  *
- * Usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME [--known-red PATH]
+ * Usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME
+ *          [--known-red PATH] [--assignment PATH]
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { entryFileMatches, entryMatchesFailure } from './lib/linux-parity.mjs'
+import { reportFileSetProblem } from './unit-gate-judgement.mjs'
 
 // Why not the shared stripAnsiEscapeSequences: that helper is TypeScript and CI runs this script
 // under plain node. The reporter only colours with SGR codes, so `ESC[…m` is the whole alphabet.
@@ -51,13 +60,15 @@ export const DEFAULT_KNOWN_RED = 'local/nightly-linux-known-red.json'
  * machine-specific path (a pnpm store location, a dev-server URL). So a manifest entry may give a
  * `match` regex source instead of an exact `headline`; either form tolerates the headline.
  */
+function entryMatcher(entry) {
+  return typeof entry?.match === 'string'
+    ? new RegExp(entry.match)
+    : new RegExp(`^${String(entry?.headline ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+}
+
 export function unhandledMatchers(manifest) {
   const declared = Array.isArray(manifest) ? manifest : []
-  return declared.map((entry) =>
-    typeof entry?.match === 'string'
-      ? new RegExp(entry.match)
-      : new RegExp(`^${String(entry?.headline ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
-  )
+  return declared.map(entryMatcher)
 }
 
 export function toleratedUnhandled(headline, matchers = []) {
@@ -65,6 +76,106 @@ export function toleratedUnhandled(headline, matchers = []) {
     return true
   }
   return matchers.some((matcher) => matcher.test(headline))
+}
+
+/**
+ * Whether a tolerated headline can account for a non-zero exit, and the entry that tolerated it.
+ *
+ * Why an entry may say it cannot: a worker that died can lose tests inside a file the report still
+ * lists, so a crash explains nothing on its own — it is only tolerable beside an absorbed red that
+ * already explains the exit. The teardown race is different: it is raised after the file's tests
+ * finished, so it accounts for the exit and nothing else.
+ */
+export function unhandledExplanation(headline, entries = []) {
+  if (headline === TOLERATED_UNHANDLED_ERROR) {
+    return { tolerated: true, explainsFailure: true, entry: null }
+  }
+  const entry = (Array.isArray(entries) ? entries : []).find((candidate) =>
+    entryMatcher(candidate).test(headline)
+  )
+  return {
+    tolerated: entry !== undefined,
+    explainsFailure: entry?.explainsFailure !== false,
+    entry: entry ?? null
+  }
+}
+
+/**
+ * Files the report names that this shard was never assigned, and the pairing both directions need:
+ * a report names `/home/runner/work/orca/orca/src/a.test.ts` while the assignment says
+ * `src/a.test.ts`, and neither side knows where the other ran. The longest shared `/`-bounded suffix
+ * is the match — the same rule `entryFileMatches` applies to a red, and why a sibling directory
+ * (`src/other/a.test.ts`) never pairs with `src/a.test.ts`.
+ */
+export function matchAssignedFiles(report, assignedFiles) {
+  const assigned = new Set(assignedFiles)
+  const matched = new Map()
+  const unassigned = new Set()
+  for (const file of report?.testResults ?? []) {
+    const path = String(file?.name ?? '').replaceAll('\\', '/')
+    const suffixes = [path]
+    for (let at = path.indexOf('/'); at !== -1; at = path.indexOf('/', at + 1)) {
+      suffixes.push(path.slice(at + 1))
+    }
+    // Why the `/`: a suffix is only a path match at a separator, so `…/src/a.test.ts` never pairs
+    // with an assigned `a.test.ts`. Every `UNIT_INCLUDE` glob is two directories deep, so an
+    // assigned file always has one; the whole path is accepted as-is for a report that is already
+    // repo-relative.
+    const match =
+      suffixes.find(
+        (suffix, depth) => (depth === 0 || suffix.includes('/')) && assigned.has(suffix)
+      ) ?? null
+    matched.set(path, match)
+    if (match === null) {
+      unassigned.add(path)
+    }
+  }
+  return { matched, unassigned: [...unassigned].sort() }
+}
+
+/**
+ * The files a shard was assigned, from the manifest `TimingSequencer` writes. Returns `{ files }` or
+ * `{ problem }`: every way of not knowing the assignment is a failure, never a skipped check.
+ */
+export function readShardAssignment(text, { runId = null, runAttempt = null } = {}) {
+  let assignment
+  try {
+    assignment = JSON.parse(String(text))
+  } catch {
+    return {
+      problem:
+        'the shard assignment is unreadable, so nothing proves which files this shard should have run'
+    }
+  }
+  const shards = assignment?.shards
+  if (!Array.isArray(shards) || shards.length === 0) {
+    return { problem: 'the shard assignment holds no shards, so it proves nothing about this one' }
+  }
+  const selected = Number(assignment?.selectedShard)
+  if (!Number.isInteger(selected) || selected < 1 || selected > shards.length) {
+    return {
+      problem: `the shard assignment selects shard ${assignment?.selectedShard}, which is not one of its ${shards.length} shard(s)`
+    }
+  }
+  // Why defence in depth rather than a measured failure: `actions/checkout` cleans `ci-shards/` and
+  // one job sees one run id on every runner this fork uses, but a manifest from an earlier run would
+  // otherwise be judged against this run's report.
+  for (const [key, current] of [
+    ['runId', runId],
+    ['runAttempt', runAttempt]
+  ]) {
+    const recorded = assignment?.[key]
+    if (recorded != null && current != null && String(recorded) !== String(current)) {
+      return {
+        problem: `the shard assignment is from ${key} ${recorded}, not this one (${current}); a stale manifest does not describe this run`
+      }
+    }
+  }
+  const files = shards[selected - 1]?.files
+  if (!Array.isArray(files) || files.some((file) => typeof file !== 'string' || file === '')) {
+    return { problem: `the shard assignment for shard ${selected} has no usable file list` }
+  }
+  return { files }
 }
 
 export function declaredUnhandledEntries(manifest) {
@@ -149,7 +260,8 @@ export function decideUnitShardVerdict({
   logText,
   outcome,
   knownRed = [],
-  unhandledErrors = []
+  unhandledErrors = [],
+  assignedFiles
 }) {
   const unhandledMatcherList = unhandledMatchers(unhandledErrors)
   const problems = []
@@ -173,6 +285,37 @@ export function decideUnitShardVerdict({
     const failingTests = failingTestNames(report)
     if (totalTests === 0) {
       problems.push('the report holds no tests, so the shard cannot be judged green')
+    }
+    // Why the assignment is the yardstick: a worker that died takes its file out of the report, and
+    // a report over whatever ran still reads green. Only the plan Vitest was given says what ran.
+    if (Array.isArray(assignedFiles)) {
+      if (assignedFiles.length === 0) {
+        problems.push(
+          'the shard assignment gives this shard no files, so nothing proves what it should have run'
+        )
+      } else {
+        const { matched, unassigned } = matchAssignedFiles(report, assignedFiles)
+        // Why the pairing happens here rather than inside the shared check: `reportFileSetProblem`
+        // resolves a report path against the judging process's own checkout, and this verdict has to
+        // judge a report produced somewhere else too — a downloaded artifact names
+        // `/home/runner/work/orca/orca/...`, which is no path on the machine reading it. Pairing
+        // first keeps the gate's wording and costs it nothing.
+        const paired = [...matched]
+          .filter(([, file]) => file !== null)
+          .map(([, file]) => ({ name: file }))
+        const missing = reportFileSetProblem({ testResults: paired }, assignedFiles)
+        if (missing) {
+          problems.push(missing)
+        }
+        // Why the other direction: a manifest from another run, shard or revision can be a subset of
+        // this one, and then a missing-file check alone reads it as the whole assignment.
+        if (unassigned.length > 0) {
+          const more = unassigned.length > 12 ? ` …and ${unassigned.length - 12} more` : ''
+          problems.push(
+            `the report names ${unassigned.length} file(s) this shard was not assigned, so the assignment does not describe this run: ${unassigned.slice(0, 12).join(', ')}${more}`
+          )
+        }
+      }
     }
     // Why fail closed on a mismatch: a row the report counts but does not list is a red whose name
     // nobody sees, and a listed row the report does not count means the shape moved under us.
@@ -245,13 +388,20 @@ export function decideUnitShardVerdict({
 
   if (outcome !== 'success' && outcome !== 'failure') {
     problems.push(`unknown test-step outcome "${outcome}"`)
-  } else if (
-    outcome === 'failure' &&
-    problems.length === 0 &&
-    tolerated.length === 0 &&
-    absorbed.length === 0
-  ) {
-    problems.push('the shard failed without the tolerated Vitest teardown race')
+  } else if (outcome === 'failure' && problems.length === 0 && absorbed.length === 0) {
+    // Why any crash fails the shard, even beside another tolerated headline: a worker that died can
+    // lose tests inside a file the report still lists, which the file set cannot see. A bystander
+    // teardown error does not rule that out, so only an absorbed red may account for the exit.
+    const unexplained = tolerated.filter(
+      (headline) => !unhandledExplanation(headline, unhandledErrors).explainsFailure
+    )
+    if (unexplained.length > 0) {
+      problems.push(
+        `the shard failed and nothing absorbed accounts for its worker crash, which can lose tests the report still lists: ${unexplained.join('; ')}`
+      )
+    } else if (tolerated.length === 0) {
+      problems.push('the shard failed without the tolerated Vitest teardown race')
+    }
   }
 
   return { ok: problems.length === 0, tolerated, absorbed, prunable, problems }
@@ -269,21 +419,26 @@ function readOrReport(path) {
 function parseArgs(argv) {
   const positional = []
   let knownRedPath = null
+  let assignmentPath = null
   for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] === '--known-red') {
+    if (argv[index] === '--known-red' || argv[index] === '--assignment') {
       // Why a missing value is a usage error rather than "no flag": the caller asked for a manifest
-      // and silently got none, which is the difference between judging against the red set and not.
+      // and silently got none, which is the difference between judging against it and not.
       if (argv[index + 1] === undefined) {
-        console.error('usage: --known-red needs a path')
+        console.error(`usage: ${argv[index]} needs a path`)
         process.exit(2)
       }
-      knownRedPath = argv[index + 1]
+      if (argv[index] === '--known-red') {
+        knownRedPath = argv[index + 1]
+      } else {
+        assignmentPath = argv[index + 1]
+      }
       index += 1
     } else {
       positional.push(argv[index])
     }
   }
-  return { positional, knownRedPath }
+  return { positional, knownRedPath, assignmentPath }
 }
 
 /**
@@ -304,6 +459,17 @@ function loadKnownRed(knownRedPath) {
     if (!Array.isArray(parsed.entries)) {
       throw new Error('no entries array')
     }
+    // Why: an entry that says `"explainsFailure": "no"` would read as `true` and silently restore
+    // the crash hole this field exists to close.
+    const unhandled = declaredUnhandledEntries(parsed)
+    if (
+      unhandled.some(
+        (entry) =>
+          entry?.explainsFailure !== undefined && typeof entry.explainsFailure !== 'boolean'
+      )
+    ) {
+      throw new Error('an unhandledErrors entry has a non-boolean explainsFailure')
+    }
     return parsed
   } catch (error) {
     console.log(`::error::unit shard: cannot read the known-red manifest ${path}: ${error.message}`)
@@ -311,12 +477,38 @@ function loadKnownRed(knownRedPath) {
   }
 }
 
+/**
+ * Why an absent flag skips the check but a named path never does: this script also runs on this Mac
+ * and in its own unit tests, where no shard assignment exists. A caller that names an assignment is
+ * asking for the file set to be judged, so anything short of a usable one fails closed.
+ */
+function loadAssignment(assignmentPath) {
+  let text
+  try {
+    text = readFileSync(assignmentPath, 'utf8')
+  } catch (error) {
+    console.log(
+      `::error::unit shard: cannot read the shard assignment ${assignmentPath}: ${error.message}`
+    )
+    process.exit(1)
+  }
+  const { files, problem } = readShardAssignment(text, {
+    runId: process.env.GITHUB_RUN_ID ?? null,
+    runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null
+  })
+  if (problem) {
+    console.log(`::error::unit shard: ${problem} (${assignmentPath})`)
+    process.exit(1)
+  }
+  return files
+}
+
 function main() {
-  const { positional, knownRedPath } = parseArgs(process.argv.slice(2))
+  const { positional, knownRedPath, assignmentPath } = parseArgs(process.argv.slice(2))
   const [reportPath, logPath, outcome] = positional
   if (!reportPath || !logPath || outcome === undefined) {
     console.error(
-      'usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME [--known-red PATH]'
+      'usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME [--known-red PATH] [--assignment PATH]'
     )
     process.exit(2)
   }
@@ -327,16 +519,23 @@ function main() {
   }
 
   const manifest = loadKnownRed(knownRedPath)
+  const unhandledErrors = declaredUnhandledEntries(manifest)
   const verdict = decideUnitShardVerdict({
     reportText,
     logText,
     outcome,
     knownRed: Array.isArray(manifest) ? manifest : manifest.entries,
-    unhandledErrors: declaredUnhandledEntries(manifest)
+    unhandledErrors,
+    assignedFiles: assignmentPath === null ? undefined : loadAssignment(assignmentPath)
   })
   for (const headline of verdict.tolerated) {
+    const { entry } = unhandledExplanation(headline, unhandledErrors)
+    // Why the class rather than the teardown-race text for every headline: a pool crash is not
+    // vitest-dev/vitest#11153, and naming it as such is how a crash stopped being visible.
     console.log(
-      `::warning::unit shard tolerated the Vitest worker teardown race (vitest-dev/vitest#11153): ${headline}`
+      entry === null
+        ? `::warning::unit shard tolerated the Vitest worker teardown race (vitest-dev/vitest#11153): ${headline}`
+        : `::warning::unit shard tolerated a listed run-level error [${entry.class ?? 'unclassified'}]: ${headline}`
     )
   }
   for (const entry of verdict.absorbed) {
