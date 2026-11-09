@@ -13,7 +13,7 @@ import { JIRA_AGILE_API, JIRA_CLOUD_SOFTWARE_API } from './jira-agile-api'
 import { ISSUE_LIST_FIELDS, mapJiraIssue } from './jira-issue-mapping'
 import { agileFieldIdList, getBoardJiraFieldSelection } from './jira-agile-fields'
 import { fetchBoardSprints } from './jira-sprint-queries'
-import { withJiraQueuedDeadline } from './jira-read-failure'
+import { JIRA_WHOLE_READ_DEADLINE_MS, withJiraQueuedDeadline } from './jira-read-failure'
 import {
   asFiniteNumber,
   asIdentifier,
@@ -135,38 +135,41 @@ export async function getBoardOverview(
 ): Promise<JiraBoardOverview> {
   const entry = getSingleClient(siteId)
   const encodedBoardId = encodeURIComponent(boardId)
-  await acquire()
-  try {
-    const boardRecord = await jiraRequest<unknown>(
-      entry,
-      `${JIRA_AGILE_API}/board/${encodedBoardId}`
-    )
-    const board = mapBoard(boardRecord, entry.site.id, entry.site.displayName)
-    if (!board) {
-      throw new Error('Jira returned an invalid board.')
+  // Why one deadline over the whole read: three round trips each bounded on their own
+  // still add up, and a stalled board is what leaves the board pane loading.
+  return withJiraQueuedDeadline('board overview', JIRA_WHOLE_READ_DEADLINE_MS, async (signal) => {
+    try {
+      const boardRecord = await jiraRequest<unknown>(
+        entry,
+        `${JIRA_AGILE_API}/board/${encodedBoardId}`,
+        { signal }
+      )
+      const board = mapBoard(boardRecord, entry.site.id, entry.site.displayName)
+      if (!board) {
+        throw new Error('Jira returned an invalid board.')
+      }
+      const configuration = await jiraRequest<unknown>(
+        entry,
+        `${JIRA_AGILE_API}/board/${encodedBoardId}/configuration`,
+        { signal }
+      )
+      // Why: one request serves both the sprint tab (active sprints) and the sprint
+      // picker (anything an issue can be moved into), so the future sprints a
+      // backlog item would go to cost no extra round trip.
+      const sprints = board.type === 'scrum' ? await fetchBoardSprints(entry, boardId, signal) : []
+      return {
+        board,
+        columns: mapBoardColumns(configuration),
+        activeSprints: sprints.filter((sprint) => sprint.state === 'active'),
+        sprints
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        clearToken(entry.site.id)
+      }
+      throw error
     }
-    const configuration = await jiraRequest<unknown>(
-      entry,
-      `${JIRA_AGILE_API}/board/${encodedBoardId}/configuration`
-    )
-    // Why: one request serves both the sprint tab (active sprints) and the sprint
-    // picker (anything an issue can be moved into), so the future sprints a
-    // backlog item would go to cost no extra round trip.
-    const sprints = board.type === 'scrum' ? await fetchBoardSprints(entry, boardId) : []
-    return {
-      board,
-      columns: mapBoardColumns(configuration),
-      activeSprints: sprints.filter((sprint) => sprint.state === 'active'),
-      sprints
-    }
-  } catch (error) {
-    if (isAuthError(error)) {
-      clearToken(entry.site.id)
-    }
-    throw error
-  } finally {
-    release()
-  }
+  })
 }
 
 export async function listBoardIssues(

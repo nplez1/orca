@@ -3,6 +3,7 @@ import { getMainHttpClient } from '../network/http-client'
 import { withSpan } from '../observability/tracer'
 import type { JiraAuthType, JiraSite } from '../../shared/jira/jira-types'
 import { isJiraGatewayBaseUrl } from './gateway-base-url'
+import { withJiraRequestDeadline, type JiraRequestInit } from './jira-request-deadline'
 import {
   readFetchResponseBytesWithinLimit,
   readFetchResponseJsonWithinLimit
@@ -136,18 +137,21 @@ export async function requestWithCredentials(
   headers.set('Content-Type', 'application/json')
   headers.set('User-Agent', JIRA_API_USER_AGENT)
   headers.set('Authorization', authHeader(email, apiToken, authType))
-  const response = await jiraFetch(`${siteUrl}${path}`, {
-    ...init,
-    headers,
-    ...(isJiraGatewayBaseUrl(siteUrl) ? { redirect: 'error' as const } : {})
+  return withJiraRequestDeadline(init?.signal ?? undefined, async (signal) => {
+    const response = await jiraFetch(`${siteUrl}${path}`, {
+      ...init,
+      headers,
+      signal,
+      ...(isJiraGatewayBaseUrl(siteUrl) ? { redirect: 'error' as const } : {})
+    })
+    if (!response.ok) {
+      throw await toJiraError(response, `${siteUrl}${path}`)
+    }
+    if (response.status === 204) {
+      return null
+    }
+    return response.json()
   })
-  if (!response.ok) {
-    throw await toJiraError(response, `${siteUrl}${path}`)
-  }
-  if (response.status === 204) {
-    return null
-  }
-  return response.json()
 }
 
 type JiraErrorDetail = {
@@ -235,30 +239,36 @@ async function toJiraError(
 export async function jiraRequest<T>(
   client: JiraClientForSite,
   path: string,
-  init?: RequestInit,
+  init?: JiraRequestInit,
   maxResponseBytes?: number
 ): Promise<T> {
-  const headers = new Headers(init?.headers)
+  const { noDefaultDeadline, ...requestInit } = init ?? {}
+  const headers = new Headers(requestInit.headers)
   headers.set('Accept', 'application/json')
   headers.set('Content-Type', 'application/json')
   headers.set('User-Agent', JIRA_API_USER_AGENT)
   headers.set('Authorization', client.authorization)
   const url = `${apiBaseUrl(client.site)}${path}`
-  const response = await jiraFetch(url, {
-    ...init,
-    headers,
-    ...(isJiraGatewayBaseUrl(apiBaseUrl(client.site)) ? { redirect: 'error' as const } : {})
-  })
-  if (!response.ok) {
-    throw await toJiraError(response, url, maxResponseBytes)
+  const send = async (signal: AbortSignal | undefined): Promise<T> => {
+    const response = await jiraFetch(url, {
+      ...requestInit,
+      headers,
+      ...(signal ? { signal } : {}),
+      ...(isJiraGatewayBaseUrl(apiBaseUrl(client.site)) ? { redirect: 'error' as const } : {})
+    })
+    if (!response.ok) {
+      throw await toJiraError(response, url, maxResponseBytes)
+    }
+    if (response.status === 204) {
+      return null as T
+    }
+    if (maxResponseBytes !== undefined) {
+      return readFetchResponseJsonWithinLimit<T>(response, maxResponseBytes)
+    }
+    return (await response.json()) as T
   }
-  if (response.status === 204) {
-    return null as T
-  }
-  if (maxResponseBytes !== undefined) {
-    return readFetchResponseJsonWithinLimit<T>(response, maxResponseBytes)
-  }
-  return (await response.json()) as T
+  const callerSignal = requestInit.signal ?? undefined
+  return noDefaultDeadline ? send(callerSignal) : withJiraRequestDeadline(callerSignal, send)
 }
 
 function resolveBinaryRequestUrl(site: JiraSite, pathOrUrl: string): URL {

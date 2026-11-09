@@ -129,6 +129,10 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
       `${apiBasePath(entry.site)}/issue`,
       {
         method: 'POST',
+        // Why no transport deadline: an aborted create may still have landed, and this
+        // path has no "check before retrying" verdict to offer — a blind retry would
+        // duplicate the issue.
+        noDefaultDeadline: true,
         body: JSON.stringify({ fields })
       }
     )
@@ -276,6 +280,9 @@ export async function addIssueComment(
       `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/comment`,
       {
         method: 'POST',
+        // Why no transport deadline: an aborted comment may still have landed, and a
+        // retry would post it twice.
+        noDefaultDeadline: true,
         // Why the branch: only Orca's own composer writes Markdown, and only it
         // may be reinterpreted — a body from the CLI or an already-wiki body must
         // reach Jira exactly as it was typed.
