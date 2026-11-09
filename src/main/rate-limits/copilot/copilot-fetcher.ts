@@ -3,6 +3,7 @@ import { extractExecError, parseRetryAfterMs } from '../../git/exec-error'
 import { isGhPrimaryRateLimitStderr } from '../../git/gh-rate-limit-breaker'
 import { ghExecFileAsync } from '../../git/command-runner/gh-exec-file'
 import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-fallback'
+import { capUsageRetryAfterMs } from '../usage-retry-after'
 import {
   buildCopilotEntitlementSnapshot,
   buildCopilotSnapshot,
@@ -64,6 +65,22 @@ function isGhRateLimitFailure(error: unknown, stderr: string): boolean {
   )
 }
 
+/** gh prints response headers only with `-i`, so the breaker's own wait is often the only one known. */
+function rateLimitedResult(error: unknown, stderr: string): GhApiResult {
+  const breakerRetryAtMs =
+    typeof error === 'object' && error !== null && 'retryAtMs' in error
+      ? error.retryAtMs
+      : undefined
+  const retryAfterMs = capUsageRetryAfterMs(parseRetryAfterMs(stderr))
+  const retryAtMs =
+    typeof breakerRetryAtMs === 'number'
+      ? breakerRetryAtMs
+      : retryAfterMs === null
+        ? undefined
+        : Date.now() + retryAfterMs
+  return { status: 'rate-limited', ...(retryAtMs === undefined ? {} : { retryAtMs }) }
+}
+
 async function ghApiJson(path: string, token: string, signal?: AbortSignal): Promise<GhApiResult> {
   try {
     const { stdout } = await ghExecFileAsync(
@@ -90,19 +107,11 @@ async function ghApiJson(path: string, token: string, signal?: AbortSignal): Pro
     const { stderr } = extractExecError(error)
     // Why before the status: a primary limit is a 403, which would otherwise read as a scope problem.
     if (isGhRateLimitFailure(error, stderr)) {
-      const retryAfterMs = parseRetryAfterMs(stderr)
-      return {
-        status: 'rate-limited',
-        ...(retryAfterMs === null ? {} : { retryAtMs: Date.now() + retryAfterMs })
-      }
+      return rateLimitedResult(error, stderr)
     }
     const statusMatch = HTTP_STATUS_IN_GH_ERROR.exec(stderr)
     if (statusMatch?.[1] === '429') {
-      const retryAfterMs = parseRetryAfterMs(stderr)
-      return {
-        status: 'rate-limited',
-        ...(retryAfterMs === null ? {} : { retryAtMs: Date.now() + retryAfterMs })
-      }
+      return rateLimitedResult(error, stderr)
     }
     return statusMatch
       ? { status: 'http-error', httpStatus: Number(statusMatch[1]) }

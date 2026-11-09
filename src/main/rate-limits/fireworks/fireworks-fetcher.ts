@@ -82,8 +82,11 @@ async function getFireworksJson(args: {
     }
     try {
       return { status: 'ok', payload: await response.json() }
-    } catch {
-      return { status: 'parse-error' }
+    } catch (error) {
+      // Why: an abort mid-body is a network failure, not an unreadable payload.
+      return classifyThrownUsageRequestError(error) === 'parse'
+        ? { status: 'parse-error' }
+        : { status: 'network-error', message: readErrorMessage(error) }
     }
   } catch (error) {
     return { status: 'network-error', message: readErrorMessage(error) }
@@ -234,6 +237,7 @@ export async function fetchFireworksRateLimits(
     }
     return makeFireworksSuccess(spend.amount, balance)
   } catch (error) {
-    return makeFireworksError(readErrorMessage(error), classifyThrownUsageRequestError(error))
+    // Why 'unknown': the transport already turns its own failures into data, so this is a bug here.
+    return makeFireworksError(readErrorMessage(error), 'unknown')
   }
 }

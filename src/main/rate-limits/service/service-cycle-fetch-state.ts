@@ -1,26 +1,11 @@
 import { antigravityUsageDisabledSnapshot } from '../antigravity-usage-snapshot'
 import { RateLimitServiceAntigravityAccounts } from './service-antigravity-accounts'
-import type {
-  ActiveRateLimitProvider,
-  InternalRateLimitState,
-  ProviderRateLimits
-} from './service-types'
+import type { InternalRateLimitState, ProviderRateLimits } from './service-types'
 
 /** The two pieces of fetch-cycle bookkeeping a full cycle needs but that carry no
  *  provider logic of their own: which in-flight fetch each generation stamp
  *  belongs to, and the state a cycle publishes while every provider is fetching. */
 export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAntigravityAccounts {
-  /** A gated provider makes no request this cycle, so it keeps its snapshot instead of a chip. */
-  private withFetchingStatusUnlessGated(
-    current: ProviderRateLimits | null,
-    provider: ActiveRateLimitProvider,
-    gated: boolean
-  ): ProviderRateLimits {
-    if (gated && current) {
-      return current
-    }
-    return this.withFetchingStatus(current, provider)
-  }
   /** Bump a provider's fetch generation when its credential fingerprint moved, and
    *  answer the generation an in-flight fetch is stamped with. A stale response
    *  whose stamp no longer matches is discarded by the apply phase. */
@@ -111,16 +96,13 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAn
       'opencodeGo' | 'minimax' | 'deepseek' | 'fireworks' | 'deepinfra' | 'copilot' | 'zcode',
       boolean
     >
-    /** Fork API-key providers held by their endpoint's Retry-After; they make no request. */
-    gated: Record<'deepseek' | 'fireworks' | 'deepinfra' | 'copilot', boolean>
   }): void {
     const {
       previousState,
       codexFetchGated,
       codexStateBeforeFetch,
       antigravityUsageEnabled,
-      changed,
-      gated
+      changed
     } = args
     this.updateState({
       ...previousState,
@@ -142,16 +124,16 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAn
         : this.withFetchingStatus(previousState.minimax, 'minimax'),
       deepseek: changed.deepseek
         ? this.withFetchingStatus(null, 'deepseek')
-        : this.withFetchingStatusUnlessGated(previousState.deepseek, 'deepseek', gated.deepseek),
+        : this.withFetchingStatus(previousState.deepseek, 'deepseek'),
       fireworks: changed.fireworks
         ? this.withFetchingStatus(null, 'fireworks')
-        : this.withFetchingStatusUnlessGated(previousState.fireworks, 'fireworks', gated.fireworks),
+        : this.withFetchingStatus(previousState.fireworks, 'fireworks'),
       deepinfra: changed.deepinfra
         ? this.withFetchingStatus(null, 'deepinfra')
-        : this.withFetchingStatusUnlessGated(previousState.deepinfra, 'deepinfra', gated.deepinfra),
+        : this.withFetchingStatus(previousState.deepinfra, 'deepinfra'),
       copilot: changed.copilot
         ? this.withFetchingStatus(null, 'copilot')
-        : this.withFetchingStatusUnlessGated(previousState.copilot, 'copilot', gated.copilot),
+        : this.withFetchingStatus(previousState.copilot, 'copilot'),
       grok: this.withFetchingStatus(previousState.grok, 'grok'),
       cursor: this.withFetchingStatus(previousState.cursor, 'cursor'),
       zcode: changed.zcode

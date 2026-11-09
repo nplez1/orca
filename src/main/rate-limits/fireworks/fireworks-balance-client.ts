@@ -40,12 +40,22 @@ function readHeaderText(value: string | string[] | undefined): string | undefine
   return Array.isArray(value) ? value[0] : value
 }
 
+function abortError(method: string): Error {
+  const error = new Error(`Fireworks ${method} aborted`)
+  error.name = 'AbortError'
+  return error
+}
+
 function callGateway(
   method: string,
   apiKey: string,
   body: Buffer,
   signal?: AbortSignal
 ): Promise<GrpcResponse> {
+  // Why before connecting: an already-aborted cycle must not open a socket at all.
+  if (signal?.aborted) {
+    return Promise.reject(abortError(method))
+  }
   return new Promise((resolve, reject) => {
     const client = http2.connect(GATEWAY_ORIGIN)
     const chunks: Buffer[] = []
@@ -56,9 +66,7 @@ function callGateway(
     const onAbort = (): void => {
       finish(() => {
         client.destroy()
-        const error = new Error(`Fireworks ${method} aborted`)
-        error.name = 'AbortError'
-        reject(error)
+        reject(abortError(method))
       })
     }
 
@@ -80,10 +88,6 @@ function callGateway(
     }, BALANCE_TIMEOUT_MS)
 
     // Why: an aborted cycle must not hold this socket open until the timeout.
-    if (signal?.aborted) {
-      onAbort()
-      return
-    }
     signal?.addEventListener('abort', onAbort, { once: true })
 
     client.on('error', (error) => {

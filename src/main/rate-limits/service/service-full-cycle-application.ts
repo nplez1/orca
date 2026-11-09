@@ -297,7 +297,10 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     previous: ProviderRateLimits | null
     current: ProviderRateLimits | null
   }): ProviderRateLimits | null {
-    if (args.gated || !args.applies) {
+    if (args.gated) {
+      return args.previous
+    }
+    if (!args.applies) {
       return args.current
     }
     return args.configChanged ? args.fresh : this.applyStalePolicy(args.fresh, args.previous)

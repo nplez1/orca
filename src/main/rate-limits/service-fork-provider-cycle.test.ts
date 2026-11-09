@@ -167,7 +167,7 @@ describe('RateLimitService fork provider sibling cycle', () => {
         session: null,
         weekly: null,
         updatedAt: Date.now(),
-        error: 'DeepSeek is rate limiting usage checks right now',
+        error: 'DeepSeek balance is rate limited right now',
         status: 'error',
         usageMetadata: {
           failureKind: 'rate-limited',
@@ -194,6 +194,26 @@ describe('RateLimitService fork provider sibling cycle', () => {
         expect(fetchFireworksRateLimits).toHaveBeenCalledTimes(2)
         expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(1)
         expect(service.getState().deepseek?.usageMetadata?.failureKind).toBe('rate-limited')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('expires, so a later poll asks again', async () => {
+      vi.useFakeTimers()
+      try {
+        mockFreshBackgroundProviderFetches()
+        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => okProvider('claude', 3))
+        vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
+        const service = new RateLimitService()
+        service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
+        service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
+        service.start()
+
+        // One minute past the wait: the next poll must not stay held forever.
+        await vi.advanceTimersByTimeAsync(RETRY_AFTER_MS + 60_000)
+
+        expect(fetchDeepSeekRateLimits).toHaveBeenCalledTimes(2)
       } finally {
         vi.useRealTimers()
       }
