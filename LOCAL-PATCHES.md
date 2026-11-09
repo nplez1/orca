@@ -2791,10 +2791,11 @@ fork inherits upstream's remote-owner handling instead of re-deriving it. `T ext
 ForkStatusBarUsage` on the merge is what makes an upstream rename of one of those six keys a `pnpm tc`
 failure rather than a silently unmerged field.
 
-**That file has three code lines of headroom.** It sits at 297 of its 300-line `max-lines` budget
-(`skipComments`, `skipBlankLines`), and this seam spends two of them. A future fork addition there has
-one line left; the next one has to be a fork-owned module, not a fourth line — the ratchet in
-`config/max-lines-baseline.txt` may only shrink, so a `max-lines` disable is not an option.
+**That file has three code lines of headroom left.** Upstream sits at 295 of its 300-line `max-lines`
+budget (`skipComments`, `skipBlankLines`) and this seam spends two, so 297. Any further fork addition
+there belongs in a fork-owned module, not a fourth line: the ratchet in
+`config/max-lines-baseline.txt` may only shrink, so a `max-lines` disable is not an option. It is also
+a sync hazard — upstream growing that file by more than three lines breaks the budget on the merge.
 
 - **`ForkUsageProviderSnapshots`' four slots are optional now** (`fork-usage-providers.tsx`). Upstream's
   body cannot name the fork's slots, so requiring them made its `isUsageEmptyState` call a typecheck

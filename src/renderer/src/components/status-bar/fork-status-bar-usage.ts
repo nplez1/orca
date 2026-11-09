@@ -1,5 +1,9 @@
 import type { ProviderRateLimits, RateLimitState } from '../../../../shared/rate-limit-types'
 import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
+import {
+  FORK_USAGE_PROVIDER_IDS,
+  USAGE_PROVIDER_MANIFEST
+} from '../../../../shared/usage-providers/usage-provider-manifest'
 import { usageProviderConfiguredFlagDefaults } from '../../../../shared/usage-providers/usage-provider-readouts'
 import {
   getVisibleUsageProvider,
@@ -37,32 +41,29 @@ export type ForkStatusBarUsageInputs = {
  * The merge is one-directional, so a value the fork does not understand survives a sync: it only
  * ever widens `anyFetching`, `hasVisibleUsageMeters` and `anyVisible`, and only ever narrows
  * `isEmptyUsageState`.
+ *
+ * Every fork provider is read off the manifest rather than named here, so a fifth one cannot reach
+ * the empty state without also reaching the roster.
  */
 export function withForkStatusBarUsage<T extends ForkStatusBarUsage>(
   controller: T,
   inputs: ForkStatusBarUsageInputs
 ): T {
-  const { deepseek, fireworks, deepinfra, copilot } = inputs.rateLimits
   // Why: these keys are not in GlobalSettings, so main publishes their presence once per poll.
   const settings = { ...inputs.settings, ...usageProviderConfiguredFlagDefaults(inputs.rateLimits) }
-  const visible = (
-    item: StatusBarItem,
-    provider: ProviderRateLimits | null
-  ): ProviderRateLimits | null =>
+  const snapshots = FORK_USAGE_PROVIDER_IDS.map(
+    (providerId) => inputs.rateLimits[USAGE_PROVIDER_MANIFEST[providerId].stateKey]
+  )
+  const forkProviders = FORK_USAGE_PROVIDER_IDS.map((providerId, index) => {
+    const provider = getVisibleUsageProvider(providerId, snapshots[index], settings)
     // Why no PATH gate: every fork provider is an API key or a token, so no installed CLI decides it.
-    provider !== null && inputs.statusBarItems.includes(item) ? provider : null
-  const forkProviders = [
-    visible('deepseek', getVisibleUsageProvider('deepseek', deepseek, settings)),
-    visible('fireworks', getVisibleUsageProvider('fireworks', fireworks, settings)),
-    visible('deepinfra', getVisibleUsageProvider('deepinfra', deepinfra, settings)),
-    visible('copilot', getVisibleUsageProvider('copilot', copilot, settings))
-  ].filter((provider): provider is ProviderRateLimits => provider !== null)
+    return provider !== null && inputs.statusBarItems.includes(providerId) ? provider : null
+  }).filter((provider): provider is ProviderRateLimits => provider !== null)
   const hasVisibleUsageMeters = controller.hasVisibleUsageMeters || forkProviders.length > 0
   const isEmptyUsageState =
     controller.isEmptyUsageState && isUsageEmptyState(inputs.rateLimits, settings)
   const anyFetching =
-    controller.anyFetching ||
-    [deepseek, fireworks, deepinfra, copilot].some((provider) => provider?.status === 'fetching')
+    controller.anyFetching || snapshots.some((provider) => provider?.status === 'fetching')
 
   return {
     ...controller,
@@ -70,8 +71,8 @@ export function withForkStatusBarUsage<T extends ForkStatusBarUsage>(
     anyVisible: hasVisibleUsageMeters || controller.anyVisible,
     hasVisibleUsageMeters,
     isEmptyUsageState,
-    // Why concat then sort: upstream's chips keep their order, and the bar collapses from the end,
-    // so a placeholder still gives way before a live meter.
+    // Why concat then sort: upstream's chips keep their order, and the bar collapses chips from the
+    // end, so a placeholder still gives way before a live meter.
     rosterProviders: [...controller.rosterProviders, ...forkProviders].sort(
       (a, b) => Number(isOwnerNotSetUpPlaceholder(a)) - Number(isOwnerNotSetUpPlaceholder(b))
     ),

@@ -63,8 +63,12 @@ const FORK_ITEMS: ForkStatusBarUsageInputs['statusBarItems'] = [
   'copilot'
 ]
 
-function merge(rateLimits: RateLimitState, overrides: Partial<ForkStatusBarUsageInputs> = {}) {
-  return withForkStatusBarUsage(NO_UPSTREAM_USAGE, {
+function merge(
+  rateLimits: RateLimitState,
+  overrides: Partial<ForkStatusBarUsageInputs> = {},
+  controller: ForkStatusBarUsage = NO_UPSTREAM_USAGE
+) {
+  return withForkStatusBarUsage(controller, {
     rateLimits,
     settings: {},
     statusBarItems: FORK_ITEMS,
@@ -78,6 +82,21 @@ function merge(rateLimits: RateLimitState, overrides: Partial<ForkStatusBarUsage
 describe('withForkStatusBarUsage', () => {
   it('leaves upstream’s numbers alone when no fork provider is configured', () => {
     expect(merge(settled())).toStrictEqual(NO_UPSTREAM_USAGE)
+  })
+
+  it('carries an upstream verdict the fork cannot see through unchanged', () => {
+    // Why this shape: a controller with no fork provider to add is the one case where every merged
+    // value must be upstream's own, including the ones the fork never computes.
+    const upstreamMeters = {
+      ...NO_UPSTREAM_USAGE,
+      anyFetching: true,
+      anyVisible: true,
+      hasVisibleUsageMeters: true,
+      isEmptyUsageState: false,
+      showEmptyUsageCta: false
+    }
+
+    expect(merge(settled(), {}, upstreamMeters)).toStrictEqual(upstreamMeters)
   })
 
   it('counts a fork provider’s reading as a meter and puts it in the roster', () => {
