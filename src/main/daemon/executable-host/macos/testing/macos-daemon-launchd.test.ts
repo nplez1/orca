@@ -70,7 +70,8 @@ vi.mock('../../../transport/client/daemon-client', () => ({
 }))
 
 import { launchMacDaemonFromStableBundle } from '../macos-daemon-launchd'
-import { macDaemonJobLabel } from '../macos-daemon-job-label'
+import { legacyMacDaemonJobLabel, macDaemonJobLabel } from '../macos-daemon-job-label'
+import { DAEMON_SHUTDOWN_TIMEOUT_MS } from '../../../launch/daemon-shutdown-deadline'
 import type { DaemonChildSpawnOptions } from '../../../launch/daemon-launched-child-spawn'
 import { PROTOCOL_VERSION } from '../../../protocol/daemon-protocol-version'
 
@@ -81,9 +82,15 @@ const missing = {
   code: 113,
   stderr: 'Could not find service "x" in domain for user gui: 501'
 }
+const stopped = { ...ok, stdout: 'gui/501/x = {\n\tstate = not running\n}\n' }
 const lsofUnused = { ...ok, code: 1 }
 
-type Launchctl = { bootstrap: ProcessResult; bootout: ProcessResult; print: ProcessResult[] }
+type Launchctl = {
+  bootstrap: ProcessResult
+  bootout: ProcessResult
+  print: ProcessResult[]
+  legacyPrint: ProcessResult
+}
 let launchctl: Launchctl
 let job: unknown
 let jobMode = 0
@@ -96,6 +103,7 @@ const roomyDeadline = (): number => Date.now() + 60_000
 const helperExec = (): string => join(copyDir, 'MacOS', 'orca-terminal-host')
 const helperEntry = (): string => join(copyDir, 'daemon-entry.js')
 const service = (): string => `gui/501/${macDaemonJobLabel(state.root)}`
+const legacyService = (): string => `gui/501/${legacyMacDaemonJobLabel(state.root)}`
 const launchctlCalls = (verb: string): ProcessSpec[] =>
   runProcessMock.mock.calls
     .map(([spec]) => spec)
@@ -161,7 +169,7 @@ beforeEach(async () => {
   ensureWithinMock.mockReset().mockResolvedValue(undefined)
   disconnectMock.mockReset()
   recoverMock.mockReset().mockResolvedValue(false)
-  launchctl = { bootstrap: ok, bootout: ok, print: [missing] }
+  launchctl = { bootstrap: ok, bootout: ok, print: [missing], legacyPrint: missing }
   job = undefined
   runProcessMock.mockReset().mockImplementation(async (spec) => {
     const path = spec.args?.at(-1) ?? ''
@@ -176,12 +184,19 @@ beforeEach(async () => {
     if (spec.program === '/bin/launchctl') {
       const verb = spec.args?.[0]
       if (verb === 'print') {
+        if (spec.args?.[1] === legacyService()) {
+          return launchctl.legacyPrint
+        }
         return (
           (launchctl.print.length > 1 ? launchctl.print.shift() : launchctl.print[0]) ?? missing
         )
       }
       if (verb === 'bootout' && launchctl.bootout.code === 0) {
-        launchctl.print = [missing]
+        if (spec.args?.[1] === legacyService()) {
+          launchctl.legacyPrint = missing
+        } else if (spec.args?.[1] === service()) {
+          launchctl.print = [missing]
+        }
       }
       return verb === 'bootstrap' ? launchctl.bootstrap : launchctl.bootout
     }
@@ -247,6 +262,28 @@ it('launches the copied helper on plain Node and leaves no inherited credentials
   await handle?.shutdown()
   expect(launchctlCalls('bootout').map((spec) => spec.args?.[1])).toEqual([service()])
   expect(await exists(copyDir)).toBe(true)
+})
+
+it('boots out a stopped job left under the pre-rename label', async () => {
+  launchctl.legacyPrint = stopped
+  const handle = await launchMacDaemonFromStableBundle(options, roomyDeadline())
+
+  expect(handle).not.toBeNull()
+  expect(launchctlCalls('bootout').map((spec) => spec.args?.[1])).toEqual([legacyService()])
+  expect(job).toMatchObject({ Label: macDaemonJobLabel(state.root) })
+  await handle?.shutdown()
+})
+
+it('waits out a running job left under the pre-rename label without booting it out', async () => {
+  const startedAt = beginRetirementClock()
+  launchctl.legacyPrint = running
+  const handle = await launchMacDaemonFromStableBundle(options, roomyDeadline())
+
+  expect(retirementClock.now - startedAt).toBe(DAEMON_SHUTDOWN_TIMEOUT_MS + 2_000)
+  expect(launchctlCalls('bootout')).toHaveLength(0)
+  expect(handle).not.toBeNull()
+  expect(job).toMatchObject({ Label: macDaemonJobLabel(state.root) })
+  await handle?.shutdown()
 })
 
 it.each([

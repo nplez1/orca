@@ -4,6 +4,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { buildLinuxElectronBuilderArgs } from './desktop-distribution/linux/build-linux-local.mjs'
 import { APP_DISPLAY_NAME } from '../../src/shared/app-display-name'
+import {
+  LINUX_APP_EXECUTABLE_NAME,
+  MAC_APP_BUNDLE_NAME,
+  MAC_APP_EXECUTABLE_NAME,
+  MAC_DAEMON_JOB_LABEL_PREFIX,
+  WINDOWS_APP_EXECUTABLE_NAME,
+  WINDOWS_INSTALL_DIRECTORY_NAME,
+  WINDOWS_UNINSTALLER_NAME
+} from '../../src/main/fork/install-layout-names'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const require = createRequire(import.meta.url)
@@ -139,6 +148,19 @@ describe('Orca NP electron-builder overlay', () => {
     expect({ ...np.linux, executableName: release.linux.executableName }).toEqual(release.linux)
     // The in-bundle CLI launcher keeps its own name; it is a different file from the executable.
     expect(np.linux.extraResources).toEqual(release.linux.extraResources)
+  })
+
+  // Why: the install-layout names the app resolves at runtime are derived from these fields, so a
+  // drift here leaves a path pointing at an official install — the defect issue #302 fixed.
+  it('agrees with the install-layout names the running app resolves', () => {
+    expect(np.productName).toBe(MAC_APP_EXECUTABLE_NAME)
+    expect(MAC_APP_BUNDLE_NAME).toBe(`${np.productName}.app`)
+    expect(np.win.executableName).toBe(APP_DISPLAY_NAME)
+    expect(WINDOWS_APP_EXECUTABLE_NAME).toBe(`${np.win.executableName}.exe`)
+    expect(WINDOWS_UNINSTALLER_NAME).toBe(`Uninstall ${np.win.executableName}.exe`)
+    expect(WINDOWS_INSTALL_DIRECTORY_NAME).toBe(np.extraMetadata.name)
+    expect(LINUX_APP_EXECUTABLE_NAME).toBe(np.linux.executableName)
+    expect(MAC_DAEMON_JOB_LABEL_PREFIX).toBe(`${np.appId}.terminal`)
   })
 
   // Why: a sync that takes upstream's side of a build line would silently ship Orca's identity.
