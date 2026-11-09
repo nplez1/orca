@@ -37,6 +37,11 @@ const SOURCE_FILE = /\.[cm]?[jt]sx?$/
 export const FORK_SLUG = 'nplez1/orca'
 export const BUILDER_CONFIG = './config/electron-builder.config.cjs'
 
+// The upstream main repo. Not a substring test: `stablyai/orca-hourly` and its daily and adhoc
+// siblings are different repositories, kept on purpose in `release-channel.ts` because the fork
+// routes every channel to its own repo rather than deleting the dev-channel names. It matches the
+// slug as a string, so an `owner: 'stablyai', repo: 'orca'` object form would not be caught; nothing
+// in the updater writes one, and a regex guessing at it would be the kind of pattern nobody reads.
 export const UPSTREAM_SLUG = /stablyai\/orca(?![\w-])/
 // The tree upstream keeps reorganising: `updater/lifecycle/`, `updater/releases/` and four more
 // levels appeared in the 2026-11-08 sync, which is how a top-level-only glob stopped finding them.

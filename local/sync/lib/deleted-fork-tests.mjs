@@ -187,10 +187,14 @@ async function main(argv = process.argv.slice(2), root = process.cwd()) {
     'resolution). Bound to one sync range: a baseline whose base/tip do not match the range being ' +
     'checked records nothing. Regenerate with `node local/sync/lib/deleted-fork-tests.mjs ' +
     '--baseline-init [--accept <reason>]`.'
+  // Re-running on the same range is the documented way to lock in a shrink, and it passes no
+  // `--accept`; dropping the reason that is already recorded would lose it for good, because this
+  // tool has no prune mode to carry it forward.
+  const keptReason = accepted ?? (comparison?.bound ? (previous.accepted ?? null) : null)
   const baseline = buildBaseline(gone, {
     base: pinned.base,
     tip,
-    accepted,
+    accepted: keptReason,
     note
   })
   writeFileSync(path.join(where, BASELINE_PATH), `${JSON.stringify(baseline, null, 2)}\n`)

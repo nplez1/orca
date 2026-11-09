@@ -45,7 +45,14 @@ export function localeDrift() {
   // A moved or deleted locales directory makes the diff empty at both ends, which is the shape of the
   // bug this row exists for: a check that passes because it scanned nothing.
   const present = gitText(['ls-tree', '-r', '--name-only', 'HEAD', '--', LOCALES_DIR])
-  if (present === null || present.trim() === '') {
+  if (present === null) {
+    return {
+      status: STATUS.failed,
+      summary: `git ls-tree failed for ${LOCALES_DIR}/, so the rule cannot be checked`,
+      details: ['an unreadable tree is not an empty one']
+    }
+  }
+  if (present.trim() === '') {
     return {
       status: STATUS.failed,
       summary: `${LOCALES_DIR}/ has no tracked file at HEAD, so the rule cannot be checked`,

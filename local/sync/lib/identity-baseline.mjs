@@ -111,10 +111,15 @@ export function readIdentityBaseline(root) {
 export function rewriteRefusal({ mode, comparison }) {
   const appeared = comparison.appeared.length
   const grown = comparison.grown.length
-  if (appeared === 0 && grown === 0) {
+  // `over` covers a baseline whose recorded total sits below the sum of its own counts: no pair moved,
+  // and a rewrite would still raise the total the help text promises prune never raises.
+  if (appeared === 0 && grown === 0 && !comparison.over) {
     return null
   }
-  const what = `${appeared} new and ${grown} grown rule/file pair(s)`
+  const what =
+    appeared === 0 && grown === 0
+      ? `a total of ${comparison.total} against a frozen ${comparison.totalAllowed}`
+      : `${appeared} new and ${grown} grown rule/file pair(s)`
   return mode === 'prune'
     ? `--baseline-prune would record ${what}, and it only ever lowers. Fix them, or run --baseline-init --accept <reason> when they are not this branch\u2019s to fix.`
     : `${what} need --accept <reason>: the baseline may only absorb growth someone signed for.`
