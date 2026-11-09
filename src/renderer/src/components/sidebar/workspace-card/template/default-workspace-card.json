@@ -85,7 +85,10 @@
                     "gap": "sm",
                     "inset": "end"
                   },
-                  "children": [{ "el": "Lease", "when": "vars.lease" }, { "el": "Indicators" }]
+                  "children": [
+                    { "el": "Lease", "when": "vars.lease" },
+                    { "el": "Indicators", "when": "!vars.classic && vars.indicators" }
+                  ]
                 }
               ]
             },

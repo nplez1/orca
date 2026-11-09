@@ -7,7 +7,7 @@
  */
 import React, { type ReactNode } from 'react'
 
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, render, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Repo } from '../../../../../../shared/repo-types'
@@ -202,6 +202,7 @@ beforeEach(() => {
   mocks.state = stateFor()
   mocks.cacheStartedAt = null
   mocks.deleteModifier = false
+  mocks.lease = null
 })
 afterEach(cleanup)
 
@@ -257,6 +258,15 @@ describe('the live workspace card and its host', () => {
     mocks.lease = lease
     const { container } = renderCard()
 
+    expect(container.textContent).toContain('Exp 3h')
+  })
+
+  it('draws a classic card’s details once, in the meta row, beside the lease', () => {
+    mocks.lease = lease
+    const { container } = renderCard({ worktree: makeWorktree({ comment: 'needs review' }) })
+
+    // Classic keeps details in the meta row; the title row exists only for the lease.
+    expect(within(container).queryAllByText('Workspace notes')).toHaveLength(1)
     expect(container.textContent).toContain('Exp 3h')
   })
 
