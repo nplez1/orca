@@ -19,10 +19,23 @@ const UNIT_LANE_ARGS = ['--experimental.recordDependencies=false']
  *  inherited value over the gate env. The store's fail-closed cases then invert and their three tests
  *  red — reproduced in isolation, green with this var cleared. A verdict must not depend on which
  *  shell started the gate, so the suite runs in a neutral gate. */
-const INHERITED_APP_ENV = ['ORCA_WSL_HOSTS_GATE_STATE', 'ORCA_INTERNAL_WSL_HOSTS']
+const INHERITED_APP_ENV = [
+  'ORCA_WSL_HOSTS_GATE_STATE',
+  'ORCA_INTERNAL_WSL_HOSTS',
+  // Why: a pane exports this, and the codex-shell preflight then adds an SSH-marker flag that two
+  // exact-args cases assert against — a red about the pane, not the tree (see LOCAL-PATCHES.md).
+  'ORCA_REMOTE_VIEWER_CLIPBOARD'
+]
 /** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
 const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
-const RUN_VITEST = join(ROOT, 'config', 'scripts', 'test-runtime', 'execution-policy', 'run-vitest.mjs')
+const RUN_VITEST = join(
+  ROOT,
+  'config',
+  'scripts',
+  'test-runtime',
+  'execution-policy',
+  'run-vitest.mjs'
+)
 
 function childEnv(env) {
   // Why the merge rather than a bare env: PATH and the Bun pin have to survive the overlay.
@@ -92,7 +105,17 @@ export function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests
       {
         label: 'ensure native runtime',
         program: 'node',
-        args: [join(ROOT, 'config', 'scripts', 'native-build', 'node-addons', 'ensure-native-runtime.mjs'), '--runtime=node']
+        args: [
+          join(
+            ROOT,
+            'config',
+            'scripts',
+            'native-build',
+            'node-addons',
+            'ensure-native-runtime.mjs'
+          ),
+          '--runtime=node'
+        ]
       }
     ]) {
       const step = runStep(

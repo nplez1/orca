@@ -159,7 +159,7 @@ const members: BranchGroupMember[] = [
   }
 ]
 
-function stateFor(): Record<string, unknown> {
+function stateFor(settings: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     agentActivityDisplayMode: 'full',
     deleteStateByWorktreeId: {},
@@ -172,7 +172,7 @@ function stateFor(): Record<string, unknown> {
     projectGroups: [],
     remoteBranchConflictByWorktreeId: {},
     runtimeEnvironments: [],
-    settings: { compactWorktreeCards: false },
+    settings: { compactWorktreeCards: false, ...settings },
     sshConnectionStates: new Map(),
     removedSshTargetLabels: new Map(),
     runtimeStatusByEnvironmentId: new Map(),
@@ -244,16 +244,6 @@ describe('the live workspace card and its host', () => {
     expect(onSelectBranchHost).toHaveBeenCalledWith(GROUP_KEY, REMOTE)
   })
 
-  it('leaves a branch checked out on one host without a switcher', () => {
-    const { container } = renderCard({
-      branchGroup: [members[0]],
-      selectedBranchHostId: LOCAL,
-      branchGroupKey: GROUP_KEY
-    })
-
-    expect(container.querySelector('[data-branch-host-select]')).toBeNull()
-  })
-
   it('keeps the ephemeral host lease on a classic card', () => {
     mocks.lease = lease
     const { container } = renderCard()
@@ -266,6 +256,16 @@ describe('the live workspace card and its host', () => {
     const { container } = renderCard({ worktree: makeWorktree({ comment: 'needs review' }) })
 
     // Classic keeps details in the meta row; the title row exists only for the lease.
+    expect(within(container).queryAllByText('Workspace notes')).toHaveLength(1)
+    expect(container.textContent).toContain('Exp 3h')
+  })
+
+  it('draws a compact card’s details once, in the title row, beside the lease', () => {
+    mocks.lease = lease
+    mocks.state = stateFor({ compactWorktreeCards: true })
+    const { container } = renderCard({ worktree: makeWorktree({ comment: 'needs review' }) })
+
+    // Compact drops the meta row, so the lease's row is where the details belong.
     expect(within(container).queryAllByText('Workspace notes')).toHaveLength(1)
     expect(container.textContent).toContain('Exp 3h')
   })

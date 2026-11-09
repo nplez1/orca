@@ -1714,6 +1714,28 @@ names are exactly the 31 failures, with no wildcard left to absorb an unknown on
 revision that ships is in the PR body, because `local/open-pr.mjs` now requires a cached PASS for the
 exact head revision and this file changing is what changes that revision's cache key.
 
+**2026-11-09 — the first red of this class was the agent's own pane, and the fix was the gate's env.**
+`codex-shell-launch-preflight`'s two `keeps a user alias named codex working in {zsh,bash}` cases red
+on a full run of `62e54e53ee`, and on `d8bcf47d2cc` when that single file runs there (no gate verdict
+is cached for the base, so the claim is about the file, not a full run — the branch touches nothing in
+`src/main/pty`, and `git diff --stat` proves it). The cause is ambient: an Orca pane exports
+`ORCA_REMOTE_VIEWER_CLIPBOARD=1`, the case inherits `...process.env` without clearing that key (it
+clears `CODEX_COMMAND_IDENTITY_ENV_KEYS` only), so `getPosixCodexShellLaunchPreflight` adds
+`-c shell_environment_policy.set.SSH_CONNECTION=''` and the exact-args assertion sees it.
+`ORCA_REMOTE_VIEWER_CLIPBOARD= pnpm test <that file>` passes 8/8, which is the whole diagnosis.
+
+**Recorded as entries first, which did not work, and that is the useful part.** Both cases were added
+to `local/unit-known-red.json` pinned by a `match` on the SSH flag — and the entry could never fire:
+Vitest abbreviates the compared values, so the failure's first line is
+`launched args=[-c shell_envir…' to be 'launched args=[--alias-flag] …`, and the flag's name is cut off
+before the text a `match` would test. Worse, had it matched, it would have absorbed any other break in
+the same assertion, since every failure in that case reaches it. The red is not a property of a test;
+it is a property of the shell that started the gate, which is exactly what `INHERITED_APP_ENV` in
+`local/unit-suite-run.mjs` already exists for (the two WSL gate vars are there for the same reason).
+So `ORCA_REMOTE_VIEWER_CLIPBOARD` joined that list and the entries were removed — one place, no
+allowlist growth, and the upstream test file is untouched. **A `match` can only pin what Vitest prints;
+when the signature is inside an abbreviated value, scrub the env instead.**
+
 ### `local(test)`: gate 1 asks for the full suite only when the change is global
 
 The full unit suite moved off the PR boundary. Requiring it per branch is what produced 257 gate

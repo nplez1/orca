@@ -40,7 +40,6 @@ function showOptions(cardProps: readonly WorktreeCardProperty[]): WorkspaceCardS
 export function buildWorkspaceCardFacts(card: WorktreeCardController): WorkspaceCardFacts {
   const { worktree, repo, hoverReview } = card
   const runtimeHost = !repo?.connectionId && card.parsedRepoHost?.kind === 'runtime'
-  // Why: the card names its host through the dropdown once a branch spans hosts, so the group is a fact.
   const hostGroup = card.branchGroup ?? []
   return {
     ws: {

@@ -21,10 +21,8 @@ export type WorkspaceCardShowOptions = {
   host: boolean
 }
 
-/** One host's checkout of a branch a merged card stands in for (Group by branch). */
 export type WorkspaceCardHostMember = {
   hostId: string
-  /** The host label the dropdown row shows. */
   label: string
 }
 
@@ -61,10 +59,7 @@ export type WorkspaceCardFacts = {
     /** The host label the list shows beside cards from another host, if any. */
     contextLabel: string | null
     runtimeDisconnected: boolean
-    /** Every host's checkout of this branch, local-first; empty for an ordinary card. A merged
-     *  card names its host through this list, so it carries no `contextLabel` of its own. */
     group: readonly WorkspaceCardHostMember[]
-    /** A lease is counting down on this card's host, so the card shows its deadline. */
     lease: boolean
   }
   git: {
