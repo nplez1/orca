@@ -293,7 +293,7 @@ running app. Convenience only — not for upstream.
 Anchor: `src/main/rate-limits/fork/claude-cli-usage-probe.ts`,
 `src/main/rate-limits/fork/claude-cli-usage-response.ts`,
 `src/main/rate-limits/fork/claude-active-usage-probe.ts`,
-`src/main/rate-limits/claude-active-usage-fetch.ts` (the probe-first hunks),
+`src/main/rate-limits/claude-active-usage-fetch.ts` (the endpoint-first hunks),
 `src/main/rate-limits/claude-oauth-credentials.ts` (the `settings-env` source),
 `src/main/rate-limits/service/service-fetch-policy.ts`,
 `src/main/rate-limits/service/service-polling.ts`,
@@ -414,8 +414,8 @@ Orca is focused, backgrounded or headless. Activation still refreshes immediatel
 a captured 2.1.316 reply and the `rate_limit_event` mapping against a captured 2.1.319 event;
 `fork/claude-cli-usage-probe.test.ts` pins command/cwd/env, the token handed to the child, the abort
 paths and the "no payload is not a reading" rule; `fork/claude-active-usage-fetch-probe.test.ts` pins
-probe-first (the endpoint is never called), the open `Retry-After` (the endpoint is not called but the
-fetch still reports the wait), the WSL/`usageError`/opt-out cases; `fork/service-claude-usage-probe.test.ts`
+endpoint-first (a healthy endpoint is never shadowed by a probe reading), the open `Retry-After`
+(the endpoint is not called but the fetch still reports the wait), the WSL/`usageError`/opt-out cases; `fork/service-claude-usage-probe.test.ts`
 pins that a `Retry-After` no longer freezes a lane on activation _or_ on the timer, and that the next
 fetch still receives the open wait (a user refresh receives `null`) — both plumbing hunks fail if
 dropped; `fork/claude-inactive-account-usage.test.ts` pins that a saved-account preview never probes;

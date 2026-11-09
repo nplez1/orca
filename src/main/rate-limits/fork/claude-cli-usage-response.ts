@@ -10,9 +10,10 @@ const FABLE_MODEL_NAME = 'fable'
 /**
  * The CLI's own report of its plan windows, published as `rate_limit_event.rate_limit_info`.
  *
- * `utilization` is the same 0–1 fraction the usage endpoint's `five_hour`/`seven_day` objects carry,
- * and `resetsAt` is epoch **seconds**. Both windows live under `unifiedWindows`; a reply that omits
- * it (an older CLI) reports only the single representative window it last hit.
+ * `utilization` is a 0–1 **fraction** here, unlike the usage endpoint's 0–100 `utilization` — hence
+ * the multiply in `cliWindowInput`. `resetsAt` is epoch seconds. Both windows live under
+ * `unifiedWindows`; a reply that omits it (an older CLI) reports only the representative window it
+ * last hit.
  */
 type CliUnifiedWindow = {
   utilization?: number

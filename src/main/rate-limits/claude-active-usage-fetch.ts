@@ -54,7 +54,9 @@ export async function fetchActiveClaudeRateLimits(
   // only one carrying `fableWeekly` / `extraUsage` / `monthly`, so a healthy endpoint must not be
   // shadowed. The probe answers when the endpoint cannot — held by its own Retry-After, or refused.
   const gatedRetryAtMs = openEndpointRetryAtMs(options)
-  if (gatedRetryAtMs !== null) {
+  // Why the login check: an API-key account has no plan, so a turn spent here would be billed for a
+  // reading it cannot produce.
+  if (gatedRetryAtMs !== null && (credentials.token || credentials.hasRefreshableCredentials)) {
     const probed = await readActiveClaudeUsageFromProbe(options, undefined, credentials.token)
     if (probed) {
       return probed
@@ -129,16 +131,19 @@ async function readClaudeUsage(
     if (options?.signal?.aborted) {
       return abortedClaudeRateLimitResult()
     }
-    // fork-comment-ok: the CLI reports the plan windows without the endpoint (local(usage)).
-    const probed = await readActiveClaudeUsageFromProbe(options, undefined, credentials.token)
-    if (probed) {
-      return probed
-    }
-    if (options?.signal?.aborted) {
-      return abortedClaudeRateLimitResult()
-    }
     const classification = classifyClaudeOAuthUsageError(error)
+    // Why skip on a refreshable refusal: the probe would be handed the token that was just refused,
+    // and the CLI prefers an env token over its own keychain login, so it would fail for 15 s before
+    // the refresh that actually fixes the account. The refreshed token is probed on the retry.
     if (!classification.shouldAttemptCredentialRefresh) {
+      // fork-comment-ok: the CLI reports the plan windows without the endpoint (local(usage)).
+      const probed = await readActiveClaudeUsageFromProbe(options, undefined, token)
+      if (probed) {
+        return probed
+      }
+      if (options?.signal?.aborted) {
+        return abortedClaudeRateLimitResult()
+      }
       return usageFailureResult(error, classification.failureKind, metadata)
     }
     // Why: a token this poll already spent is not spent again.

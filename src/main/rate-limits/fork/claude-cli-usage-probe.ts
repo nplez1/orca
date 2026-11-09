@@ -11,8 +11,11 @@ import { mapClaudeCliRateLimitInfo, mapClaudeCliUsageResponse } from './claude-c
 
 /** A warm headless start answered in ~0.45 s; the cap only bounds a wedged CLI. */
 export const CLAUDE_CLI_USAGE_PROBE_TIMEOUT_MS = 15_000
-/** Cheapest model with a minimal reply: the reading is the CLI's own rate-limit event, not the answer. */
-export const CLAUDE_CLI_USAGE_PROBE_MODEL = 'claude-haiku-4-5-20251001'
+/**
+ * Cheapest model with a minimal reply: the reading is the CLI's own rate-limit event, not the answer.
+ * Why the CLI alias and not a dated id: a retired id would make every poll stall to the deadline.
+ */
+export const CLAUDE_CLI_USAGE_PROBE_MODEL = 'haiku'
 /** The smallest prompt that makes the CLI complete one turn, which is when it reports its limits. */
 const PROBE_TURN_PROMPT = 'hi'
 
@@ -62,23 +65,11 @@ const probeTurnInput: AsyncIterable<SDKUserMessage> = {
   }
 }
 
-type ClaudeQueryAborter = { abort?: () => void }
-
-function closeClaudeProbeSession(session: Query): void {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only reads an optional method and checks its type before calling it.
-  const abort = (session as unknown as ClaudeQueryAborter).abort
-  if (typeof abort === 'function') {
-    abort.call(session)
-  }
-}
-
 /**
  * Read the CLI's own plan limits without asking the usage endpoint.
  *
- * Two attempts, cheapest first. `get_usage` is a control request and spends nothing, so it is tried
- * first and kept for any CLI that still answers it. When it reports no plan limits — which 2.1.319
- * always does — one minimal turn makes the CLI learn its limits from its own API reply, and the CLI
- * publishes them as a `rate_limit_event` on the same stream.
+ * One minimal turn makes the CLI learn its limits from its own API reply, and the CLI publishes them
+ * as a `rate_limit_event` on the same stream.
  */
 async function runUsageViaSdk(
   request: ClaudeUsageProbeProcess,
@@ -121,10 +112,13 @@ async function runUsageViaSdk(
     // 2.1.319, and issuing it first leaves the session unable to run the turn at all (measured: it
     // replies in 140 ms, then the stream stalls until the deadline).
     for await (const message of session) {
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: reads two optional fields off an SDK message type the declaration does not name.
-      const typed = message as { type?: string; rate_limit_info?: unknown }
-      if (typed.type === 'rate_limit_event' && typed.rate_limit_info !== undefined) {
-        return { status: 'ok-rate-limit-info', rateLimitInfo: typed.rate_limit_info }
+      if (message.type === 'rate_limit_event') {
+        return { status: 'ok-rate-limit-info', rateLimitInfo: message.rate_limit_info }
+      }
+      // Why stop here: a turn that ends without the event (a 401, an API-key login, a dead model,
+      // no network) will never publish one, so waiting out the deadline only stalls the poll.
+      if (message.type === 'result') {
+        break
       }
     }
     return { status: 'unavailable', reason: 'the CLI reported no rate limit event' }
@@ -149,9 +143,6 @@ async function runUsageViaSdk(
     } catch {
       // A session that already died has nothing left to close.
     }
-    if (session) {
-      closeClaudeProbeSession(session)
-    }
     deadline.abort()
   }
 }
@@ -167,9 +158,8 @@ const defaultDeps: ClaudeUsageProbeDeps = {
  * Ask the installed Claude CLI for the account's plan usage.
  *
  * This is the source that works while the usage endpoint rate-limits Orca: the CLI reports the same
- * windows from its own session. A CLI whose `get_usage` still answers spends nothing; one that does
- * not (2.1.319) spends a single minimal turn, and the caller only asks for that when the endpoint
- * cannot answer.
+ * windows from its own session, so the Claude app makes the call and Orca only reads what it says.
+ * The caller only asks for that turn when the endpoint cannot answer.
  */
 export async function probeClaudeUsage(
   input: { envPatch?: ClaudeEnvPatch; oauthToken?: string | null; signal?: AbortSignal } = {},
