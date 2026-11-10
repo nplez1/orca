@@ -25,7 +25,8 @@ export const LOCAL_FORK_REF = `refs/heads/${FORK_BRANCH}`
 export const ORIGIN_FORK_REF = `refs/remotes/origin/${FORK_BRANCH}`
 export const UPSTREAM_REF = 'refs/remotes/upstream/main'
 export const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
-export const BACKUP_REF = 'backup/nplez1-main-pre-sync' // The release line merges; a feature branch or a `local(...)` series rebases (see the runbook's "Two
+export const BACKUP_REF = 'backup/nplez1-main-pre-sync'
+// The release line merges; a feature branch or a `local(...)` series rebases (see the runbook's "Two
 // shapes, one decision"). `pre-sync.mjs --rebase` selects the second procedure.
 export const MERGE_COMMAND = `git checkout ${FORK_BRANCH} && git merge upstream/main`
 export const REBASE_COMMAND = `git checkout ${FORK_BRANCH} && GIT_EDITOR=true git rebase upstream/main`
@@ -60,9 +61,18 @@ function forkBranch() {
       details: []
     }
   }
-  // PR branches are cut from origin/main, which is this fork's own line, so that range is the one
-  // that isolates them.
-  const base = refExists(ORIGIN_MAIN_REF) ? 'origin/main' : 'upstream/main'
+  // Why upstream's tip and not `origin/main`: this gate asks whether the branch carries `local(`
+  // commits *of this fork's line*, which is what a sync run from the wrong branch would drag along.
+  // `origin/main` is the fork line itself since the 2026-11-09 rename, so measuring against it would
+  // pass any PR branch cut from the release line — the case this refuses.
+  const base = refExists(UPSTREAM_REF) ? 'upstream/main' : null
+  if (base === null) {
+    return {
+      status: STATUS.failed,
+      summary: `on ${branch} (not the sync branch), and ${UPSTREAM_REF} is not fetched`,
+      details: ['git fetch upstream, then run this again']
+    }
+  }
   const lines = (gitText(['log', '--format=%h %s', '--grep', '^local(', `${base}..HEAD`]) ?? '')
     .split('\n')
     .filter(Boolean)

@@ -3,7 +3,8 @@
 Entries moved verbatim out of [LOCAL-PATCHES.md](../../LOCAL-PATCHES.md) § Sync log, which keeps the
 three most recent inline so that section stays readable. Same text and same order; newest first.
 
-Entries dated before the 2026-11-09 rename say `nplez1/main` for what is today `main`.
+Entries dated before the 2026-11-09 rename have been rewritten to say `main`; where one reads oddly
+for the topology it was written in (a `main` that mirrored upstream), its date is the explanation.
 
 - **2026-10-28 — merge of upstream `f173998203` (838 commits) into the release line, from
   `7b86cb0846`** (merge base `0571e45107`, rollback tag `archive/pre-sync-7b86cb0846`, merge commit

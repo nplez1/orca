@@ -63,8 +63,8 @@ const UPSTREAM = 'stablyai/orca'
 const FORK_BASE = 'main'
 const UPSTREAM_BASE = 'main'
 
-// Why a remote per target: `origin` tracks only `refs/heads/nplez1/*`, so validating an upstream
-// base against it reports "not a descendant" for what is really a wrong-remote lookup.
+// Why a remote per target: the two remotes carry different lines, so validating a base against the
+// wrong one reports "not a descendant" for what is really a wrong-remote lookup.
 export const TARGETS = {
   fork: { repository: FORK, base: FORK_BASE, remote: 'origin' },
   upstream: { repository: UPSTREAM, base: UPSTREAM_BASE, remote: 'upstream' }

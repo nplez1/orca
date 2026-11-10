@@ -68,7 +68,8 @@ export const REQUIRED = [
   // ordinary PR and covers the one class of change a unit lane cannot see.
   '.github/workflows/dependency-security.yml',
   // Why: mobile parity is first-class in `AGENTS.md` and no PR lane here covered it. Its `push: [main]`
-  // leg targets the upstream mirror branch, so that leg only re-tests upstream's own code.
+  // leg is path-gated, and `main` is this fork's own line since the 2026-11-09 rename — so that leg now
+  // re-tests the release line where it used to re-test the upstream mirror.
   '.github/workflows/mobile.yml',
   // Why: the headless/remote server path is first-class too. Its `fast_runners` input defaults to true
   // for dispatch and call, so a manual dispatch lands on `blacksmith-*` labels this fork lacks; PR and

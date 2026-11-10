@@ -138,11 +138,15 @@ describe('resolvePRCommentCodeSurface', () => {
   })
 
   it('accepts a base whose local remote ref carries a namespace the provider does not name', () => {
-    // The fork's reviews target `main` on the provider, while the worktree pins `origin/main`.
+    // The fork's reviews target `main` on the provider, while the worktree pins a remote-tracking ref.
+    // Why the third case: `refs/remotes/upstream/main` reduces to `main`, which matches by equality, so
+    // the `endsWith('/…')` arm needs a ref whose own branch name still carries a leading segment — the
+    // shape the fork's `origin/nplez1/main` used to have before the 2026-11-09 rename.
     for (const baseRef of [
       'origin/main',
       'refs/remotes/origin/main',
-      'refs/remotes/upstream/main'
+      'refs/remotes/upstream/main',
+      'refs/remotes/origin/team/main'
     ]) {
       expect(
         resolvePRCommentCodeSurface({

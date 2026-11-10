@@ -940,7 +940,7 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
   including fork PR branches, and the observed result was policy work committed there _without_ the
   label at least five times (#146, #130, #142, #177, #52) — an unlabelled fork-only change riding a
   fork PR is worse than the mistake the hook guarded. It now allows `local(` on any branch carrying
-  `main` in its history and still refuses anything cut from `origin/main`.
+  `main` in its history and still refuses anything cut from `upstream/main`.
 
 ---
 

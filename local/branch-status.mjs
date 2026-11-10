@@ -304,9 +304,6 @@ async function upstreamPullRequests(branches) {
 }
 
 function deltaFor(branch, parent) {
-  if (branch === parent) {
-    return '(base)'
-  }
   if (git(['rev-parse', '--verify', '--quiet', `${branch}^{commit}`]) === null) {
     return 'not local'
   }
@@ -327,7 +324,12 @@ export async function readPullRequests(
   branches,
   { readForkPrs = forkPullRequests, readUpstreamPrs = upstreamPullRequests } = {}
 ) {
-  const upstreamBound = branches.filter((branch) => !branch.startsWith(FORK_NAMESPACE))
+  // Why the fork line is not upstream-bound: it is this fork's own head, so its PRs are the fork's
+  // list. Asking upstream for `--head main` matches any upstream PR whose head branch is called
+  // `main` — someone else's work, shown on this fork's release-line row.
+  const upstreamBound = branches.filter(
+    (branch) => branch !== FORK_BASE && !branch.startsWith(FORK_NAMESPACE)
+  )
   const [forkRows, upstreamRows] = await Promise.all([
     readForkPrs(),
     readUpstreamPrs(upstreamBound)

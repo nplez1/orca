@@ -1,8 +1,10 @@
 # Local patches on `main`
 
 **Naming, 2026-11-09:** the release line was renamed `nplez1/main` → `main`; the old `main` (an
-upstream mirror) is retired, so `main` on both remotes is this fork's own line. Entries below dated
-before that name `nplez1/main`, or treat `origin/main` as upstream — both are historical.
+upstream mirror) is retired, so `main` on both remotes is this fork's own line. Entries here have been
+rewritten to the new name — where an older one reads oddly for the topology it was written in (a
+`main` that mirrored upstream), its date is the explanation. `nplez1/main` survives only in the
+known-red JSONs' evidence strings, which quote the refs their runs actually used.
 
 This branch is upstream `main` plus a small, deliberate set of changes that exist **only here**.
 They are never proposed upstream, and they must never reach an upstream-bound PR branch.
@@ -2476,8 +2478,9 @@ stayed true because nothing changed.
   `manual: true` and becomes one row per workflow, so removing the step from either one is drift.
 - **The max-lines exemption rule moved out of the Vitest inventory**, from the retired
   tests/tools/max-lines-policy.test.mjs to `local/max-lines-exemption.test.mjs`.
-  The old test tried `origin/main`, then fell back to `origin/HEAD` — which at the time resolved to the
-  upstream mirror, where every path "exists upstream", so the rule checked nothing. It also
+  The old test tried `origin/main`, then fell back to `origin/HEAD` — which resolves to this fork's
+  default branch, not upstream's, so the base it compared against was a tree that carries every fork
+  path. "Every path exists upstream" made the rule check nothing. It also
   `skipIf`-ed silently in a CI checkout, which has neither ref. The comparison is now the **recorded
   sync base**, `local/upstream-file-comments-baseline.json` `.base` — the same record
   `check-upstream-file-comments.mjs` already falls back to, rewritten by the runbook's `--init` step.
@@ -2507,9 +2510,11 @@ with no diff a reader could see. These four came in with upstream's `d9a7aa89c8`
 
 - **`ci-branch-cache-sweep.yml` — the one that made this more than tidying drift.** Its keep-set is
   `new Set(['refs/heads/main'])`, and this fork's default branch was then **`nplez1/main`**
-  (`gh api repos/nplez1/orca --jq .default_branch`), so the release line was what it swept. Its only run,
+  (`gh api repos/nplez1/orca --jq .default_branch`) — so on this fork the branch it was told to keep
+  was the upstream mirror, not the release line. Its only run,
   `40762364436` (2026-10-28T20:20Z), logged `Removed 28 idle branch caches (9.39 GB)` and all 28 were
-  `refs/heads/main`, including `node-cache-*`, `electron-builder-*`,
+  `refs/heads/main` — the branch its own keep-set names, which is the part that does not add up and is
+  recorded here rather than explained away. They included `node-cache-*`, `electron-builder-*`,
   `electron-package-Linux-ARM64-43.8.1`, `native-modules-*`, `pnpm-lockfile-verified-*` and a `bun-`
   key. It ran every three hours. The damage is checkable
   from the other side: the confirmation run below reports `Cache not found for input keys:` for
@@ -3366,6 +3371,15 @@ What neither fixes: a run started by the push itself, before the sweep reaches i
 seconds now instead of unlimited, and it is closed properly only by not mirroring upstream `main` at
 all, which upstream-bound branches still need.
 
+**One consequence of the 2026-11-09 rename, recorded because nothing else would say it.** `main` is now
+the release line, so every upstream lane that guards on `github.ref == 'refs/heads/main'` or triggers on
+`push: [main]` runs against the fork's own tree where it used to run against the mirror. Three do, all
+enabled: `mobile.yml`'s path-gated push leg, `install-node-dependencies/action.yml`'s pnpm verification
+cache save on any non-PR run, and `node-server-tests.yml`'s cache save on a dispatch from `main`. The
+first is a real cost worth knowing (a fork-line push that touches `mobile/**` or the runtime paths it
+names now runs that lane); the other two are cache writes and are the behaviour their `if:` guards
+asked for. `unit-tests.yml`'s leg stays inert, because `module_cache` defaults to `off`.
+
 #### Six lanes enabled on 2026-10-31 (audit #221 C4 follow-up)
 
 The premise is settled above: standard runners bill nothing on a public repository, so enablement is a
@@ -3536,8 +3550,8 @@ suffix would be strictly stronger, and is the change to make if this ever misses
 **Deferred, recorded so a later reader does not assume them done.** Nothing checks that every caller of
 a workflow with an accepted input default (`unit-tests.yml`'s `runner`) actually passes it, so a new
 caller that omits the input would pass statically — the run-status check catches the wedged result in
-production instead. The mirror push evaluates upstream's copy of each file, which this scan never
-reads. `/jobs` is read one page.
+production instead. The push that publishes a sync evaluates upstream's copy of each file — that was
+the mirror push, and it is the release-line push now — which this scan never reads. `/jobs` is read one page.
 
 #### GitHub disabled Actions for inherited crons (2026-11-06)
 

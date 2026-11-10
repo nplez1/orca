@@ -130,6 +130,22 @@ it('queries PR state on both repos and shows which repo a PR lives in', () => {
   expect(formatPullRequest(undefined)).toBe('-')
 })
 
+it('asks the fork for the release line, and never asks upstream for a PR headed `main`', async () => {
+  let askedUpstream = null
+  const { pullRequests } = await readPullRequests([FORK_BASE, 'fix/cli-symlink-world-readable'], {
+    readForkPrs: async () => parsePullRequestRows('main\t7\tMERGED', 'nplez1/orca'),
+    readUpstreamPrs: async (branches) => {
+      askedUpstream = branches
+      return new Map()
+    }
+  })
+
+  // Why: `gh pr list --repo stablyai/orca --head main` matches a stranger's PR by bare head name, so
+  // the release line would show someone else's work as its own.
+  expect(askedUpstream).toEqual(['fix/cli-symlink-world-readable'])
+  expect(formatPullRequest(pullRequests.get(FORK_BASE))).toBe('#7 merged (fork)')
+})
+
 it('reports the PR columns even when a gh query fails', async () => {
   const partial = await readPullRequests(['nplez1/Hide-hosts'], {
     readForkPrs: async () => null,

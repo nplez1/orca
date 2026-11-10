@@ -31,7 +31,7 @@ not exist as a separable thing**, so nothing rebases it. No patch ref has ever b
 product line imports the identity modules across ~50 commits and shares 35 files with it, so a
 series cut on those boundaries would not apply to any tree. `local/sync/curate.mjs` planned that
 series for the rebase era and is retired. Rebase survives only where it is still honest: short-lived
-feature branches, and an upstream-bound branch, which is cut from `origin/main`. The deciding cost is
+feature branches, and an upstream-bound branch, which is cut from `upstream/main`. The deciding cost is
 repeated resolution, not a measured speedup:
 
 - A rebase stops once per commit _per collision_, so the same file stops it several times and each

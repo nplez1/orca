@@ -1,8 +1,9 @@
 # Branch tracker
 
 **Naming, 2026-11-09:** the fork's release line was renamed `nplez1/main` → `main`, and the old `main`
-— an unmaintained mirror of upstream — was retired. Entries dated before that say `nplez1/main` or
-`origin/main` for what is today `main` / `origin/main`; `upstream/main` has always meant upstream's.
+— an unmaintained mirror of upstream — was retired. Entries in this file have been rewritten to the new
+name; where an older entry reads oddly for the topology it was written in (a `main` that mirrored
+upstream), the date on it is the explanation. `upstream/main` has always meant upstream's.
 
 Last updated **2026-11-08** — `main` merged upstream main @ `51c77320bc` (1537 commits) from
 `3f8bbfb269` (merge `5a02a4c8406`, merge base `0fa5dae2f9`, rollback tag
@@ -149,7 +150,7 @@ depends on, and what is blocking it.** If the two disagree, the script is right.
 ## Dependency graph
 
 ```text
-origin/main
+upstream/main
 ├── fix/cli-symlink-world-readable          ← PR #20813 (closed 2026-10-16)
 ├── fix/copilot-background-work
 ├── fix/repo-catalog-connection-fence
