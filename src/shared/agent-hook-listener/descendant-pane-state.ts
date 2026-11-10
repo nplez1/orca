@@ -136,7 +136,8 @@ export function applyDescendantEventToPane(
     payload,
     effectiveLeadState,
     children,
-    facts.kind === 'child' && facts.waiting === true
+    facts.kind === 'child' && facts.waiting === true,
+    { previousMainAgent: state.lastStatusByPaneKey.get(paneKey)?.payload.mainAgent, now }
   )
 }
 
@@ -252,7 +253,10 @@ export function gatePaneStateOnDescendants(
   if (children.length === 0) {
     return payload
   }
-  return resolvePaneHold(payload, payload.state, children)
+  return resolvePaneHold(payload, payload.state, children, false, {
+    previousMainAgent: state.lastStatusByPaneKey.get(paneKey)?.payload.mainAgent,
+    now
+  })
 }
 
 /** Whether a child this lane knows about is blocked on a human answer. Only the narrow grok reader

@@ -686,6 +686,39 @@ Anchors:
   `providers/pi-pane-hold-evidence.test.ts`, and the carry-forward case in
   `pi-claude-child-events.test.ts`.
 
+**Addendum 2026-11-10 — a held row states the lead's verdict, so terminal status cannot settle it
+(#197).** #283 made the row and its children agree, but the row it published still said nothing about
+the lead: `mainAgent` was absent, and every reader that keys on it then read a held `working` as a
+working lead. The one that matters is `programStatusHookYieldEndsAt`: it lets the pane's own terminal
+status (OSC 7501) take the row once the hooks go quiet, and the only way a held row opts out is
+`isAgentStatusHeldOpenByChildWork` — `mainAgent.state === 'done'` with a row that is not `done`.
+`applyPiScheduledWorkHold` publishes exactly that for the monitoring badge, which is why a
+scheduled-work hold survived the window and a child hold did not.
+
+The symptom is the report's, both halves from one cause. A pi turn ends under a live child; the pane
+is held `working` and posts nothing while the lead is idle; pi's TUI settles the moment the turn ends,
+so after `HOOK_SILENCE_BEFORE_PROGRAM_STATUS_FALLBACK_MS` (2 min) the terminal report takes the pane.
+The row it publishes carries no `subagents`, so the pane reads `done` **and** the child's row
+disappears, while a 250 s tool is still running — the reported window almost exactly.
+
+The fix is one line of policy: `resolvePaneHold` publishes `mainAgent` (the lead's verdict it folded
+against, dated by `turnCompletedAt` and carried across re-holds the way `applyPiScheduledWorkHold`
+already does) whenever it holds a `done` lead open. It applies to every provider on this fold — pi and
+the grok child question — and the held row keeps the lead's vocabulary, so a held `waiting` still
+reads `waiting`. Nothing changes for a lead that is still working: a hold over one asserts nothing a
+`mainAgent` reader needs.
+
+Anchors:
+
+- `src/shared/agent-hook-listener/pane-child-roster.ts` — `resolvePaneHold`'s `held` input and the
+  `mainAgent` it publishes.
+- `src/shared/agent-hook-listener/descendant-pane-state.ts` — both call sites hand it the cached row's
+  `mainAgent` and the publication's own clock.
+- Tests: `agent-hook-listener-descendant-lifecycle.test.ts` § "a row held open by a live child states
+  the lead verdict (#197)" (the held row, the drained row, and one start clock across republishes) and
+  `main/agent-hooks/server/program-status/hook-precedence.test.ts`, which is the first test over
+  `programStatusHookYieldEndsAt` at all and pins both the opt-out and the ordinary 2-minute lapse.
+
 ### `local(agents)`: a claude CLI child is not a second session
 
 A pi session can dispatch a subagent through the `claude` CLI (`pi-subagents` → `claude --print`).

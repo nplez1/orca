@@ -15,6 +15,7 @@ import {
 import type { AgentHookSource } from './agent-hook-listener/transport/agent-hook-relay'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from './agent-descendant-roster'
 import { foldMainAgentWithRowChildWork } from './agent-hook-listener/state/agent-hook-row-child-work-fold'
+import { isAgentStatusHeldOpenByChildWork } from './agent-status/lifecycle/agent-lead-status-fold'
 
 /** Every case drives `normalizeHookPayload`, the entry both the main process and the relay
  *  call, so a fix that never reaches production wiring cannot pass here. */
@@ -627,6 +628,43 @@ describe('descendant lifecycle never settles the pane', () => {
     it('ignores an absent set, so a pane without the plugin keeps its own verdict', () => {
       publish('pi', { hook_event_name: 'tool_execution_end' })
       expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
+    })
+  })
+
+  describe('a row held open by a live child states the lead verdict (#197)', () => {
+    const CHILD = { id: 'run-1', agent_type: 'researcher', description: 'trace the writer' }
+
+    it('publishes the finished lead on the row its child holds open', () => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      const ended = publish('pi', { hook_event_name: 'agent_end' })
+
+      expect(ended?.payload.state).toBe('working')
+      // Why the lead's own verdict has to ride the held row: every reader that keys on `mainAgent`
+      // — hook precedence over the pane's terminal status above all — otherwise reads the held
+      // `working` as a working lead and settles the pane once the hooks go quiet.
+      expect(ended?.payload.mainAgent).toEqual(expect.objectContaining({ state: 'done' }))
+      expect(isAgentStatusHeldOpenByChildWork(ended!.payload)).toBe(true)
+    })
+
+    it('drops the lead verdict with the hold, so the settled row is plain done', () => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      publish('pi', { hook_event_name: 'agent_end' })
+      const drained = publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
+
+      expect(drained?.payload.state).toBe('done')
+      expect(drained?.payload.mainAgent).toBeUndefined()
+    })
+
+    it('keeps one start clock across republishes of the same finished turn', () => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      const first = publish('pi', { hook_event_name: 'agent_end', turn_completed_at: 1_700 })
+      const second = publish('pi', { hook_event_name: 'subagents_update', subagent_runs: [CHILD] })
+
+      expect(first?.payload.mainAgent?.stateStartedAt).toBe(1_700)
+      expect(second?.payload.mainAgent?.stateStartedAt).toBe(1_700)
     })
   })
 })
