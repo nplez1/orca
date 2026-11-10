@@ -14,8 +14,10 @@ import {
   markInputQuietSchedulerInput,
   resetInputQuietSchedulerForTest
 } from '@/lib/input-quiet-scheduler'
-import { useAiVaultSessionRefresh } from './ai-vault-session-refresh'
-import { resetAiVaultForcedRescanThrottleForTest } from '../../ai-vault-forced-rescan-throttle'
+import {
+  resetAiVaultForcedRescanThrottleForTest,
+  useAiVaultSessionRefresh
+} from './ai-vault-session-refresh'
 
 import type { AgentSessionStatusEvent } from '../../../../../../shared/agent-session/agent-session-wire'
 import { resetStructuredAgentSessionStatusFeedsForTests } from '@/runtime/native-chat/status/structured-agent-session-status-feed'

@@ -24,20 +24,23 @@ import { useAiVaultAssociationObservation } from './ai-vault-association-observa
 import { createNonSecureContextUuid as createBrowserUuid } from '../../../../../../shared/non-secure-context-uuid'
 import {
   markForcedRescanSpent,
-  resetAiVaultForcedRescanThrottleForTest as resetThrottleForTest
-} from '../../ai-vault-forced-rescan-throttle'
-import { resetAiVaultForcedRescanBudgetForTest } from './ai-vault-forced-rescan-budget'
+  resetAiVaultForcedRescanBudgetForTest
+} from './ai-vault-forced-rescan-budget'
+import { resetAiVaultSessionResultCacheForTest } from './ai-vault-session-result-cache'
+import { resetAgentSessionIdsRefreshKeys } from './ai-vault-agent-session-refresh-key'
 import type {
   AiVaultListResult,
   AiVaultSession
 } from '../../../../../../shared/ai-vault/contracts/ai-vault-types'
 import { isAiVaultScanCancelledError } from '../../../../../../shared/ai-vault/contracts/ai-vault-types'
 
-// Why a wrapper: upstream's suites import this name here and its own copy reset upstream's budget;
-// the fork's throttle holds the state this hook's manual-refresh mark spends. Both lanes start clean.
+// Why a wrapper: upstream's suites import this name here. There is one budget module now — the mark
+// this hook makes on a manual refresh and the claim every automatic rescan takes read the same state,
+// which is the fork's rule — so a clean lane is that budget plus the caches it guards.
 export function resetAiVaultForcedRescanThrottleForTest(): void {
   resetAiVaultForcedRescanBudgetForTest()
-  resetThrottleForTest()
+  resetAgentSessionIdsRefreshKeys()
+  resetAiVaultSessionResultCacheForTest()
 }
 
 type ConditionalSnapshot = AiVaultConditionalSnapshot & { scopeKey: string }

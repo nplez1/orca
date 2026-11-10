@@ -67,6 +67,30 @@ export const getGeneralConfirmationSearchEntries = createLocalizedCatalog(() => 
       )
     ]
   },
+  remoteBranch: {
+    id: 'general-delete-remote-branch-on-workspace-delete',
+    title: translate(
+      'auto.components.settings.GeneralWorkspaceSettingsSection.deleteRemoteBranchOnWorkspaceDelete',
+      'Delete Remote Branch By Default'
+    ),
+    description: translate(
+      'auto.components.settings.GeneralWorkspaceSettingsSection.deleteRemoteBranchOnWorkspaceDeleteRowDescription',
+      'Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('settings.general.search.keywords.confirmations', 'confirmations'),
+      ...translateSearchKeyword('auto.components.settings.general.search.84c67d0108', 'delete'),
+      ...translateSearchKeyword('settings.general.search.keywords.branch', 'branch'),
+      ...translateSearchKeyword('settings.general.search.keywords.remote', 'remote'),
+      ...translateSearchKeyword('settings.general.search.keywords.origin', 'origin'),
+      ...translateSearchKeyword('auto.components.settings.general.search.df10666259', 'worktree'),
+      ...translateSearchKeyword('auto.components.settings.general.search.7baf524b04', 'workspace'),
+      translate(
+        'auto.components.settings.GeneralWorkspaceSettingsSection.deleteRemoteBranchOnWorkspaceDelete',
+        'Delete Remote Branch By Default'
+      )
+    ]
+  },
   automation: {
     id: 'general-skip-delete-automation-confirm',
     title: translate('settings.general.confirmations.automation', 'Deleting an automation'),

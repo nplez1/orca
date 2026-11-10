@@ -19,6 +19,11 @@ export function aiVaultForcedRescanDelay(): number {
   return lastForcedRescanAt + FORCED_RESCAN_MIN_INTERVAL_MS - Date.now()
 }
 
+/** A manual force scan counts against the budget, so an automatic rescan cannot follow it. */
+export function markForcedRescanSpent(): void {
+  lastForcedRescanAt = Date.now()
+}
+
 export function resetAiVaultForcedRescanBudgetForTest(): void {
   lastForcedRescanAt = 0
 }

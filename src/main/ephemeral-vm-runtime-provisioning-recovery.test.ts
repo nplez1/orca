@@ -107,6 +107,24 @@ describe('flagging a create that never reported', () => {
     expect(warn).not.toHaveBeenCalled()
   })
 
+  // Why this is the case that matters after the 2026-11-10 merge: the merged create writes upstream's
+  // write-ahead `provisioning` record under the same instance id BEFORE the fork's attempt row, so a
+  // shared id no longer means the create reported. Keying on the id alone silently dropped the fork's
+  // flag for exactly the create it exists for — one killed mid-flight.
+  it('still flags the attempt when the record is only the write-ahead row', () => {
+    const userDataPath = makeDir('orca-vm-recovery-write-ahead-')
+    upsertEphemeralVmProvisioningAttempt(userDataPath, attempt())
+    const { recipeResult: _unreported, ...writeAhead } = runtimeRecord('orca-instance-1')
+    upsertEphemeralVmRuntime(userDataPath, { ...writeAhead, status: 'provisioning' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    const interrupted = flagInterruptedEphemeralVmProvisioning({ userDataPath, now: NOW_MS })
+
+    expect(interrupted).toHaveLength(1)
+    expect(interrupted[0]).toMatchObject({ instanceId: 'orca-instance-1', interruptedAt: NOW_MS })
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
   it('reports an already-flagged attempt without warning about it a second time', () => {
     const userDataPath = makeDir('orca-vm-recovery-repeat-')
     upsertEphemeralVmProvisioningAttempt(userDataPath, attempt())

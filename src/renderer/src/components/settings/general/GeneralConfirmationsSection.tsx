@@ -41,6 +41,14 @@ export function GeneralConfirmationsSection({
         updateSettings({ skipDeleteWorktreeConfirm: !settings.skipDeleteWorktreeConfirm })
     },
     {
+      ...entries.remoteBranch,
+      checked: settings.deleteRemoteBranchOnWorkspaceDelete,
+      onChange: () =>
+        updateSettings({
+          deleteRemoteBranchOnWorkspaceDelete: !settings.deleteRemoteBranchOnWorkspaceDelete
+        })
+    },
+    {
       ...entries.automation,
       checked: !settings.skipDeleteAutomationConfirm,
       onChange: () =>

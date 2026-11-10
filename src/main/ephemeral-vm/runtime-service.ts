@@ -72,11 +72,12 @@ export async function provisionEphemeralVmRuntime(
 ): Promise<ProvisionEphemeralVmRuntimeResult> {
   const writeAhead = beginEphemeralVmProvisioning(args)
   const { instanceId } = writeAhead
-  // The fork's own bounded attempts store, read by its startup reconcile; upstream's write-ahead
-  // record above stays the durable one.
-  recordEphemeralVmProvisioningAttempt(args, instanceId, writeAhead.createdAt)
   beginEphemeralVmProvisioningInFlight(instanceId)
   try {
+    // The fork's own bounded attempts store, read by its startup reconcile; upstream's write-ahead
+    // record above stays the durable one. Inside the `try` so a failed write still releases the
+    // in-flight id and removes the unlaunched record through the catch below.
+    recordEphemeralVmProvisioningAttempt(args, instanceId, writeAhead.createdAt)
     const start = await new ShellRecipeDriver(args.recipe, args.repoPath).runCreate({
       context: {
         projectId: args.projectId,
@@ -99,10 +100,11 @@ export async function provisionEphemeralVmRuntime(
     if (!start.ok) {
       await persistFailedEphemeralVmStart(args, writeAhead, start)
       endEphemeralVmProvisioning(args, writeAhead)
-      // Why an aborted create keeps its row: the kill lands after the release, so the destroy it
-      // started may never have finished and the user never saw the failure. The row is what a later
-      // startup has to go on, and only a failure the user actually saw may drop it.
-      if (!start.aborted) {
+      // Why only a killed create that reported nothing keeps its row: the kill lands after the
+      // release, so a destroy it started may never have finished and the user never saw the failure.
+      // An abort that returned a result ran that cleanup, and one that never spawned never made a
+      // machine — both leave nothing for a later startup to warn about.
+      if (!(start.aborted && writeAhead.launched && !start.recipeResult)) {
         forgetEphemeralVmProvisioningAttempt(args.userDataPath, instanceId)
       }
       return { ok: false, start }

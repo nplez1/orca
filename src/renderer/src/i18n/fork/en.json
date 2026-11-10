@@ -503,7 +503,9 @@
           "b266f3f40e": "One folder per project",
           "f9b2070017": "Workspace Layout",
           "ba3480642f": "Nest Workspaces",
-          "a8ce626e4b": null
+          "a8ce626e4b": null,
+          "deleteRemoteBranchOnWorkspaceDelete": "Delete Remote Branch By Default",
+          "deleteRemoteBranchOnWorkspaceDeleteRowDescription": "Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone."
         },
         "JiraBoardSettings": {
           "chooseBoard": "Choose a board",
@@ -1355,6 +1357,15 @@
       "modelsUnavailable": "Couldn't list this agent's models — using its built-in list.",
       "refreshModels": "Refresh models",
       "title": "Session summaries"
+    },
+    "general": {
+      "search": {
+        "keywords": {
+          "branch": "branch",
+          "remote": "remote",
+          "origin": "origin"
+        }
+      }
     }
   },
   "terminal": {

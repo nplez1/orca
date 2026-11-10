@@ -56,7 +56,13 @@ function reconcileInterruptedProvisioning(args: {
   if (attempts.length === 0) {
     return []
   }
-  const runtimeIds = new Set(listEphemeralVmRuntimes(args.userDataPath).map((entry) => entry.id))
+  // Why keyed on the result rather than on the id: the merged create writes upstream's write-ahead
+  // `provisioning` record under the SAME id before the fork's attempt row, so "a runtime record shares
+  // this id" is now always true and the fork's flag would never fire for a create killed mid-flight.
+  // A record carrying a `recipeResult` is the one thing only a create that actually reported produces.
+  const reported = new Map(
+    listEphemeralVmRuntimes(args.userDataPath).map((entry) => [entry.id, entry] as const)
+  )
   const interrupted: EphemeralVmProvisioningAttempt[] = []
   for (const attempt of attempts) {
     // Why: handler registration re-runs on macOS re-activation, and a create started from the previous
@@ -65,7 +71,7 @@ function reconcileInterruptedProvisioning(args: {
     if (isEphemeralVmProvisioningInFlight(attempt.instanceId)) {
       continue
     }
-    if (runtimeIds.has(attempt.instanceId)) {
+    if (reported.get(attempt.instanceId)?.recipeResult) {
       // Why dropped silently: the create did report. The app died between persisting the runtime and
       // clearing this row, so the host is already tracked and nothing is at risk.
       removeEphemeralVmProvisioningAttempt(args.userDataPath, attempt.instanceId)

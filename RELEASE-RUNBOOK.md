@@ -115,11 +115,43 @@ shard verdict as the nightly) and every artifact leg waits for it. So a dispatch
 with no test evidence, and there is no flag to skip it. If a shard is red there, the fix is the one
 above — fix it, or classify it in `local/nightly-linux-known-red.json` with evidence — not a retry.
 
+## Step 1.6 — the review gate, before the dispatch
+
+**Why this is a step and not a note.** On 2026-11-10 this release shipped after a review that had spawned six
+slices and received findings from three. The reviewer returned "done", the summary said "three slices
+completed", and nothing anywhere could tell a half-read resolution from a fully read one — so the dispatch
+took a third of its review. Two of the six defects that review did find were invisible to `pnpm tc` (one sat
+in a `@ts-nocheck` file), which is exactly the class a review exists for and a green suite cannot see.
+
+`local/open-pr.mjs` already refuses a PR body without a review claim. The release had no equivalent, and
+`gh workflow run` accepts any state of the tree — so the gate is now mechanical, and **`gh workflow run
+fork-release.yml` is no longer the way to release.**
+
+```bash
+node local/release-review-gate.mjs      # REFUSE until every slice of the review has a verdict
+```
+
+Completeness is a manifest, not a claim: `local/sync/release-review/<revision>.json`, committed, listing
+every slice with its verdict and its unresolved count. A slice that was dispatched and never answered is
+recorded `"no-report"` and **fails** — silence is the failure this gate was built for, so it may not be
+represented by an absent field. A waiver clears silent slices and never the reviewer, because the reviewer
+is a fact about which review happened.
+
+```bash
+node local/release-review-gate.mjs --print > local/sync/release-review/$(git rev-parse HEAD).json
+```
+
 ## Step 2 — publish the first signed release
 
 ```bash
-gh workflow run fork-release.yml --repo nplez1/orca --ref main
+node local/dispatch-release.mjs                     # gate, then dispatch
+node local/dispatch-release.mjs --dry-run           # inspect the preconditions, dispatch nothing
+node local/dispatch-release.mjs -f version_suffix=np.50
+node local/dispatch-release.mjs --waive-review "<why>"   # records the reason; never silent
 ```
+
+It refuses on four preconditions, cheapest first: the review of this exact revision is complete; the tree
+is clean; HEAD is `origin/main`; and the Actions fleet is swept. Nothing is dispatched on a refusal.
 
 The version is stamped `<package.json version>-np.<run number>` by the workflow. That suffix matters
 twice: it keeps fork releases strictly newer than each other, and it makes a fork build identifiable
