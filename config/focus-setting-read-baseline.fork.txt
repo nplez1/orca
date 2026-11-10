@@ -22,7 +22,6 @@
 1 src/renderer/src/components/right-sidebar/use-workspace-review-selection.ts # transitive reader: getWorkspaceReferenceRuntimeVersion folds getProviderRuntimeContextKey(null) into the hosted-review cache key, and null is this app rather than the focused host. Reusing the sidebar card's key is the point, so this is not routing
 1 src/renderer/src/components/settings/JiraBoardSettings.tsx # settings scope: the default Jira board is a global setting, so the pane's board list belongs to the focused host's Jira account, and the memo keys on that host id alone (2026-10-16 owner-routing migration)
 0 src/renderer/src/components/sidebar/workspace-board/projection/workspace-board-task-status-sync.ts # fork has 0 where upstream allows 4; lowered by a fork prune
-0 src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts
 10 src/renderer/src/components/task-page/TaskPage.tsx # 10 where upstream allows 9: the merge added one transitive reader under the page. The page routes by the row s owner; the extra is a composition-root reader. Follow-up: re-route it and lower this row
 1 src/renderer/src/components/task-page/jira/IssueAssigneeField.tsx # fork has 1 where upstream allows 2; lowered by a fork prune
 0 src/renderer/src/components/task-page/jira/task-page-jira-status-order.ts
@@ -74,3 +73,6 @@
 8 src/renderer/src/store/slices/linear/linear.ts # 8 where upstream allows 11: the merge restored readers the fork had pruned to 4. Still below upstream. Follow-up: re-prune
 4 src/renderer/src/store/slices/settings/create-settings-slice.ts # fork has 4 where upstream allows 5; lowered by a fork prune
 8 src/renderer/src/store/slices/store-test-helpers.ts # fork-retained test helper: upstream renamed it to store/testing/app-store-test-fixture.ts (c231b5d7da8, excluded as test support) and dropped its row; four fork tests still import this copy, same 8 as before the 2026-11-08 sync
+
+1 src/renderer/src/components/sidebar/worktree-list/listing/create-sidebar-host-options-selector.ts # the sidebar host-option selector resolves the default creation host for a host that has no source row; extracted here by the 2026-11-10 max-lines split
+1 src/renderer/src/components/sidebar/worktree-list/listing/use-window-list-model.ts # the window list model resolves the default creation host for a host with no source row, same rule as the selector beside it
