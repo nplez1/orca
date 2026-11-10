@@ -31,7 +31,9 @@
  *   run that is already going.
  *
  * Exit codes: 0 clean, 1 drift or an unverifiable entry, 2 cannot reach the API — "cannot tell" is
- * never a pass.
+ * never a pass — and 3 a finding only a person may resolve (a required or fork-owned lane is active with
+ * no entry, so the sweep will not touch it and widening the list would hide it). `local/ci-health-report.mjs`
+ * reads those codes: 1 delegates to the autonomous pipeline, 2 and 3 do not.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -360,35 +362,43 @@ export function judgeEnablement(
     }
   }
 
-  // A file a sync cannot have added. Enabling one is always a deliberate act here, so its being active
-  // without an entry is a decision for a person and never something a sweep may revert.
-  const forkOwnedDrift = drift
-    .filter((entry) => isForkOwnedPath(entry.path))
-    .map((entry) => ({ path: entry.path, id: entry.id }))
-  const requiredUnpinned = unpinned.filter((entry) => required.includes(entry.path))
+  // A candidate the sweep must not act on, and why. Two kinds, one accounting rule so neither can be
+  // dropped from `problems` by being excluded from `disableTargets`:
+  //
+  // - a required lane. Disabling the watchdog that reports the problem is worse than the problem, and
+  //   REQUIRED already means "disabled is drift", so turning one off would manufacture the drift it
+  //   exists to prevent;
+  // - a fork-owned file. A sync cannot add one, so an enabled one with no entry is a person's decision.
+  const needsDecision = []
+  const sweepable = (path, why) => {
+    if (!required.includes(path) && !isForkOwnedPath(path)) {
+      return true
+    }
+    needsDecision.push({
+      path,
+      why,
+      kind: isForkOwnedPath(path) ? 'fork-owned' : 'required'
+    })
+    return false
+  }
 
-  // Everything `--fix` is allowed to turn off. A required lane is never in here: disabling the
-  // watchdog that reports the problem is worse than the problem, and REQUIRED already means "disabled
-  // is drift", so turning one off would manufacture the drift it exists to prevent. That covers a
-  // dropped pin as well as a changed trigger — otherwise one deleted `EXPECTED_TRIGGERS` row is enough
-  // for the sweep to disarm the lane that reports it.
   const disableTargets = [
     ...drift
-      .filter((entry) => !isForkOwnedPath(entry.path))
+      .filter((entry) => sweepable(entry.path, "active but not on the fork's live list"))
       .map((entry) => ({
         path: entry.path,
         id: entry.id,
         why: "active but not on the fork's live list"
       })),
     ...triggerDrift
-      .filter((entry) => !required.includes(entry.path))
+      .filter((entry) => sweepable(entry.path, 'its triggers changed shape'))
       .map((entry) => ({
         path: entry.path,
         id: byPath.get(entry.path)?.id ?? null,
         why: 'its triggers changed shape'
       })),
     ...unpinned
-      .filter((entry) => !required.includes(entry.path))
+      .filter((entry) => sweepable(entry.path, 'active with no pinned triggers'))
       .map((entry) => ({
         path: entry.path,
         id: byPath.get(entry.path)?.id ?? null,
@@ -396,11 +406,11 @@ export function judgeEnablement(
       }))
   ]
 
+  // Why `requiredTriggerDrift` is not added here: a required lane that changed shape is already in
+  // `needsDecision`, and one finding counted twice would report a single file as two problems.
   const problems =
     disableTargets.length +
-    forkOwnedDrift.length +
-    requiredUnpinned.length +
-    requiredTriggerDrift.length +
+    needsDecision.length +
     missing.length +
     stale.length +
     unreadable.length +
@@ -421,8 +431,7 @@ export function judgeEnablement(
     forbiddenTriggers,
     unreadable,
     disableTargets,
-    forkOwnedDrift,
-    requiredUnpinned,
+    needsDecision,
     ok: problems === 0
   }
 }
@@ -440,14 +449,12 @@ export function residualProblems({ verdict, fix = false, disabled = [], failed =
   const outstanding = verdict.disableTargets.filter((target) => !handled.has(target.path)).length
   return (
     outstanding +
-    verdict.forkOwnedDrift.length +
-    verdict.requiredUnpinned.length +
+    verdict.needsDecision.length +
     verdict.missing.length +
     verdict.stale.length +
     verdict.unreadable.length +
     verdict.unapprovedRunners.length +
     verdict.forbiddenTriggers.length +
-    verdict.requiredTriggerDrift.length +
     verdict.inheritedSchedules.length
   )
 }
@@ -580,11 +587,14 @@ function report(verdict, fix) {
   for (const w of verdict.drift) {
     console.log(`  DRIFT    active but not on the fork's live list: ${w.path} — ${w.name}`)
   }
-  for (const f of verdict.forkOwnedDrift) {
-    console.log(`  DECIDE   active with no entry, and a sync cannot have added it: ${f.path}`)
-  }
-  for (const u of verdict.requiredUnpinned) {
-    console.log(`  UNPINNED required but no triggers pinned, so its shape is unproven: ${u.path}`)
+  for (const d of verdict.needsDecision) {
+    console.log(
+      `  DECIDE   ${
+        d.kind === 'fork-owned'
+          ? 'a sync cannot have enabled this, so a person decides'
+          : 'required, so the sweep will not disarm it'
+      }: ${d.path} (${d.why})`
+    )
   }
   for (const m of verdict.missing) {
     console.log(`  MISSING  required but ${m.state}: ${m.path}`)
@@ -608,8 +618,9 @@ function report(verdict, fix) {
   if (verdict.actionsDisabled) {
     console.log(`  DISABLED ${verdict.actionsDisabled.reason}`)
   }
+  const decided = new Set(verdict.needsDecision.map((entry) => entry.path))
   for (const u of verdict.unpinned) {
-    if (!verdict.requiredUnpinned.some((entry) => entry.path === u.path)) {
+    if (!decided.has(u.path)) {
       console.log(`  UNPINNED active but no triggers pinned, so its shape is unproven: ${u.path}`)
     }
   }
@@ -671,11 +682,11 @@ function report(verdict, fix) {
           'decision in LOCAL-PATCHES.md § local(ci)'
       )
     }
-    if (verdict.forkOwnedDrift.length > 0) {
+    if (verdict.needsDecision.some((entry) => entry.kind === 'fork-owned')) {
       console.log(
-        '  decide   a fork-owned lane is enabled with no entry: add it to REQUIRED or ALLOWED_INERT ' +
-          'with its triggers pinned, in the commit that enabled it, or disable it. The sweep will not ' +
-          'do it for you — a sync cannot have turned this one on, so it was a person.'
+        '  escalate a fork-owned lane is enabled with no entry, and a sync cannot have turned it on — ' +
+          'a person decides whether it belongs here. Do not disable it to make this check green, and do ' +
+          'not widen REQUIRED to hide it.'
       )
     }
     for (const path of failed) {
@@ -714,8 +725,12 @@ function main() {
     facts: readFacts(Object.keys(EXPECTED_TRIGGERS), ROOT)
   })
   verdict.actionsDisabled = actionsEnabled
-  if (report(verdict, fix) > 0) {
-    process.exit(1)
+  const residual = report(verdict, fix)
+  if (residual > 0) {
+    // 3 rather than 1 when something needs a person: 1 means "a scoped defect the pipeline may take on",
+    // and neither available action is that — disabling a fork-owned lane undoes a person's decision, and
+    // widening the list hides the finding. `local/ci-health-report.mjs` withholds `agent:auto` on 3.
+    process.exit(verdict.needsDecision.length > 0 ? 3 : 1)
   }
   console.log('  OK')
 }

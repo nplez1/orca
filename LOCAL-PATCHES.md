@@ -3370,18 +3370,27 @@ that existed before it ran unattended:
 
 - **`refs/heads/main` only** (`maySweep`). A `workflow_dispatch` runs the tree of the ref it was
   dispatched on, and a branch cut before a lane joined `REQUIRED` reads that lane as drift — so a
-  dispatch from any other ref would have switched off lanes the release line needs.
-- **Never a `REQUIRED` lane.** The unpinned case was unfiltered in `disableTargets`, so one deleted
-  `EXPECTED_TRIGGERS` row was enough for the watchdog to disable itself. It is now reported as
-  `UNPINNED required …` and stays outstanding.
+  dispatch from any other ref would have switched off lanes the release line needs. A refused `--fix`
+  now says so, because otherwise a branch dispatch reads as an ordinary report-only run.
+- **Never a `REQUIRED` lane, by any of the three routes into `disableTargets`** — drift, a changed
+  trigger shape, and unpinned. Only the last two needed a filter. Unpinned is a guard rather than a
+  live path: a deleted `EXPECTED_TRIGGERS` row makes the file `UNKNOWN`, because the facts are seeded
+  from that table, so the reachable version of this was a required _callee_ (`node-server-tests.yml`,
+  through `qualified-orcad-template.yml`) whose row someone removed. The exclusion is one filter, not
+  a new mechanism.
 - **Never a fork-owned file** (`.github/workflows/fork-*.yml`, `local/**`). A sync cannot add one, so
-  an active fork-owned lane with no entry is a person's decision: it is reported as `DECIDE` and
-  delegated, never reverted.
+  an active fork-owned lane with no entry is a person's decision: it is reported as `DECIDE`, and the
+  check exits **3** instead of 1. That code is what withholds `agent:auto` — 1 means "a scoped defect
+  the pipeline may take on", and the only two things an agent could do here are the two this section
+  forbids: disable a lane someone enabled on purpose, or widen the list to hide the finding.
 
-A night that heals itself reports clean, so the close comment names what the sweep disabled. Root
-cause was not fixed here: `local/sync/publish-sync.mjs` already sweeps after its own push, so either
-the 11-10 sync did not use it or its sweep failed and nobody acted. The daily sweep is the backstop for
-every route that skips it — a gatekeeper merge, a hand push, a sync that did not use that script.
+A night that heals itself reports clean, so the close comment names what the sweep disabled. When no
+issue was open — the ordinary case, because the sweep usually runs before the red ever reaches one —
+the record is the run log plus the workflows' own `disabled_manually` state, which `gh api
+repos/nplez1/orca/actions/workflows` answers at any time. Root cause was not fixed here:
+`local/sync/publish-sync.mjs` already sweeps after its own push, so either the 11-10 sync did not use it
+or its sweep failed and nobody acted. The daily sweep is the backstop for every route that skips it — a
+gatekeeper merge, a hand push, a sync that did not use that script.
 
 #### The cost premise was wrong, and the PR lane that follows from it (audit #221 C2)
 

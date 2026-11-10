@@ -38,8 +38,10 @@ permissions:
   # say "off" (`LOCAL-PATCHES.md` § local(ci)). The lane therefore runs the enablement check with
   # `--fix`, which needs `actions: write` to disable a file and to cancel a run it had already started.
   # Not reachable from untrusted input: this workflow has no `pull_request` trigger and takes no
-  # payload, so the token is only ever used by code on the ref it checked out. `--fix` is refused off
-  # `refs/heads/main` inside `local/ci-health-report.mjs` (`maySweep`), so a dispatch from an older
+  # payload, so the token is only ever used by code on the ref it checked out. All three checks run on
+  # this one token and only the enablement check uses the write scope; minting a second read-only token
+  # for the other two would buy nothing while all three are this fork's own scripts. `--fix` is refused
+  # off `refs/heads/main` inside `local/ci-health-report.mjs` (`maySweep`), so a dispatch from an older
   # branch cannot switch off a lane that branch predates.
   actions: write
   issues: write
@@ -67,8 +69,9 @@ jobs:
       # `--fix` lets the enablement check clear inherited drift itself. What it may disable is decided
       # in `local/check-actions-enablement.mjs`: never a `REQUIRED` lane, and never a fork-owned one
       # (`.github/workflows/fork-*.yml`), because a sync cannot have added those — a person did, so a
-      # person decides. What it disabled is quoted into the close comment on the issue, so a night that
-      # healed itself still leaves a record.
+      # person decides (that case exits 3, which withholds `agent:auto`). What it disabled is quoted into
+      # the close comment when an issue was open; when none was, the run log and the workflows' own
+      # `disabled_manually` state are the record.
       - name: Run the health checks and report
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

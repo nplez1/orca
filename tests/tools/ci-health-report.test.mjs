@@ -152,6 +152,26 @@ describe('the delegation to the agent pipeline', () => {
     })
   })
 
+  // Exit 3 is the check saying the only remedy is one a person must choose: disable a lane someone
+  // enabled on purpose, or widen the list the issue forbids widening. An agent may do neither.
+  it('withholds the label when the only red needs a person, even beside a delegable red', () => {
+    const alone = judgeDelegation([
+      check('check-actions-enablement', 3),
+      check('check-nightly-liveness', 0)
+    ])
+    const beside = judgeDelegation([
+      check('check-actions-enablement', 3),
+      check('check-nightly-liveness', 1)
+    ])
+
+    expect(alone.delegate).toBe(false)
+    expect(alone.reason).toContain('decision only a person can make')
+    expect(beside.delegate).toBe(false)
+    expect(
+      judgeHealth([check('check-actions-enablement', 3), check('check-nightly-liveness', 0)])
+    ).toMatchObject({ ok: false, code: 1 })
+  })
+
   it('tells the reader in the issue body whether it was delegated', () => {
     expect(
       judgeHealth([check('check-actions-enablement', 1), check('check-nightly-liveness', 0)]).body
@@ -303,6 +323,7 @@ describe('the sweep', () => {
     // A dispatch runs the tree of the ref it was dispatched on, and that tree may predate a lane
     // joining REQUIRED — the sweep would then disable a lane the release line needs.
     expect(maySweep({ fix: true, dryRun: false, ref: 'refs/heads/nplez1/issue-349' })).toBe(false)
+    expect(maySweep({ fix: true, dryRun: false, ref: 'refs/tags/v1.4.254' })).toBe(false)
     expect(maySweep({ fix: false, dryRun: false, ref: 'refs/heads/main' })).toBe(false)
     expect(maySweep({ fix: true, dryRun: true, ref: 'refs/heads/main' })).toBe(false)
     // No ref at all is a person at a terminal, not a lane.
@@ -314,6 +335,7 @@ describe('the sweep', () => {
       'check-actions: 81 workflows on nplez1/orca, 18 active',
       "  DRIFT    active but not on the fork's live list: .github/workflows/x.yml — X",
       "  disabled .github/workflows/x.yml (active but not on the fork's live list)",
+      '  DISABLED Actions is disabled for nplez1/orca, so no lane here can run at all',
       '  OK'
     ].join('\n')
     const checks = [

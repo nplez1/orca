@@ -81,6 +81,19 @@ export const AGENT_AUTO_LABEL = 'agent:auto'
  * auto-merge pointed at it would be guessing at what to fix.
  */
 export function judgeDelegation(checks) {
+  // Exit 3 first, and it wins over a delegable red: the finding is a lane someone enabled on purpose, or
+  // a required lane with no pin. Neither available action is one an agent may take — disabling a
+  // fork-owned lane undoes a person's decision, and widening `REQUIRED` hides the finding the issue
+  // forbids hiding — so this is a decision, not a scoped defect.
+  const undecided = checks.filter((check) => check.code === 3)
+  if (undecided.length > 0) {
+    return {
+      delegate: false,
+      reason:
+        `${undecided.map((check) => check.name).join(', ')} needs a decision only a person can make` +
+        ' — the sweep will not touch a required or fork-owned lane'
+    }
+  }
   const red = checks.filter((check) => check.code === 1)
   if (red.length > 0) {
     return {
@@ -143,7 +156,8 @@ export function issueLabels(issue) {
 const EXIT_MEANING = {
   0: 'clean',
   1: 'attention needed',
-  2: 'could not tell'
+  2: 'could not tell',
+  3: 'needs a decision'
 }
 
 /** Keep the issue readable: a check's output is quoted, but never unbounded. */
@@ -184,7 +198,7 @@ export function judgeHealth(checks, { runUrl = null } = {}) {
           '',
           'Making the checks green by widening an allowlist is not a fix. Adding a red to',
           '`local/nightly-linux-known-red.json`, or editing `REQUIRED` / `EXPECTED_TRIGGERS` in',
-          '`local/check-actions-enablement.mjs`, hides the finding instead of clearing it and is a',
+          '`local/actions-enablement-contract.mjs`, hides the finding instead of clearing it and is a',
           'blocking review comment.',
           ''
         ]
@@ -274,8 +288,12 @@ export function disabledBySweep(checks) {
 }
 
 /**
- * What to say when closing the issue. A self-healed night reports clean, so this is the only place the
- * record of what the sweep turned off survives — the job log keeps it for 90 days, the issue forever.
+ * What to say when closing the issue.
+ *
+ * A self-healed night reports clean, so this is where the record lands **when an issue was open**. When
+ * none was — the ordinary case, because the sweep usually runs before the red ever reaches an issue —
+ * the record is the run log plus the workflows' own `disabled_manually` state, which
+ * `gh api repos/<repo>/actions/workflows` answers at any time.
  */
 export function closeComment(checks) {
   const closed = 'All fork health checks are clean again.'
@@ -288,7 +306,7 @@ export function closeComment(checks) {
     '',
     'The enablement sweep disabled these on the way — a sync enables every workflow file it adds, and',
     "nothing that is not on the fork's live list may stay on. Add one back to `REQUIRED` in",
-    '`local/check-actions-enablement.mjs` if it belongs there:',
+    '`local/actions-enablement-contract.mjs` if it belongs there:',
     '',
     ...disabled.map((path) => `- \`${path}\``)
   ].join('\n')
@@ -418,11 +436,16 @@ function writeBody(args, body) {
 
 function main() {
   const dryRun = process.argv.includes('--dry-run')
-  const fix = maySweep({
-    fix: process.argv.includes('--fix'),
-    dryRun,
-    ref: process.env.GITHUB_REF
-  })
+  const fixRequested = process.argv.includes('--fix')
+  const fix = maySweep({ fix: fixRequested, dryRun, ref: process.env.GITHUB_REF })
+  if (fixRequested && !fix) {
+    // Said out loud: a dispatch from a branch otherwise reads as an ordinary report-only run, and the
+    // reader would think the sweep ran and found nothing.
+    const why = dryRun
+      ? '--dry-run'
+      : `ref ${process.env.GITHUB_REF ?? '(none)'} is not refs/heads/main`
+    console.error(`ci-health: not sweeping — ${why}`)
+  }
   const runUrl =
     process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${REPO}/actions/runs/${process.env.GITHUB_RUN_ID}`
