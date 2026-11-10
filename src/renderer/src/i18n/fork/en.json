@@ -494,7 +494,8 @@
         "GeneralEditorSettingsSection": {
           "34155c6ed5": "Draw each review thread below its commented line, with reply and resolve controls. When off, the thread stays reachable from a small marker in the gutter.",
           "7fea4145c9": "Show GitHub review threads on the lines they were left on in the code.",
-          "9c020a16db": "PR Comments Inline"
+          "9c020a16db": "PR Comments Inline",
+          "4edc104f0f": "Markdown Review Notes"
         },
         "GeneralWorkspaceSettingsSection": {
           "0cda18153c": "Where each project's main checkout and its workspaces are created.",
