@@ -43,6 +43,55 @@ const NO_REPORT = 'no-report'
 
 export const manifestPath = (revision) => join(MANIFEST_DIR, `${revision}.json`)
 
+/**
+ * Paths a commit may touch without voiding the review it follows. The manifest records a revision, so
+ * committing the manifest moves HEAD past the revision it names — a fixed point is impossible. The PR
+ * gate already answers this: a later commit voids the review only if it changes code inside the
+ * reviewed range, and commits that touch only docs do not. Same rule here.
+ */
+const REVIEW_NEUTRAL = [/^local\/sync\/release-review\//, /\.md$/]
+
+/** True when every path could be committed after a review without invalidating it. */
+export function reviewNeutralOnly(paths) {
+  return paths.every((path) => REVIEW_NEUTRAL.some((pattern) => pattern.test(path)))
+}
+
+function gitOut(args) {
+  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim()
+}
+
+/**
+ * The revision whose manifest governs `revision`: that revision itself, or the newest ancestor that
+ * has one when every commit since touched only docs and review records. Null when none applies.
+ */
+export function reviewedRevision(revision) {
+  if (existsSync(join(repoRoot, manifestPath(revision)))) {
+    return { revision, behind: [] }
+  }
+  let shas
+  try {
+    shas = gitOut(['rev-list', '--max-count=25', revision]).split('\n').filter(Boolean)
+  } catch {
+    return null
+  }
+  for (const sha of shas.slice(1)) {
+    if (!existsSync(join(repoRoot, manifestPath(sha)))) {
+      continue
+    }
+    let touched
+    try {
+      touched = gitOut(['diff', '--name-only', sha, revision]).split('\n').filter(Boolean)
+    } catch {
+      return null
+    }
+    const blocking = touched.filter((path) => !reviewNeutralOnly([path]))
+    // Why stop at the first manifest-bearing ancestor: an earlier one would silently accept a range
+    // that carries code, and the nearest is the review this release is actually standing on.
+    return blocking.length ? null : { revision: sha, behind: touched }
+  }
+  return null
+}
+
 function reviewerProblem(reviewer) {
   if (!reviewer || typeof reviewer !== 'object') {
     return `no reviewer recorded; the gate requires ${REVIEWER.name} at ${REVIEWER.thinking}`
@@ -106,10 +155,6 @@ export function validateManifest(manifest, { revision } = {}) {
   return problems
 }
 
-function git(args) {
-  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim()
-}
-
 function main(argv) {
   const args = new Map()
   for (let i = 0; i < argv.length; i += 1) {
@@ -122,13 +167,13 @@ function main(argv) {
   }
   let revision
   try {
-    revision = args.get('revision') ?? git(['rev-parse', 'HEAD'])
+    revision = args.get('revision') ?? gitOut(['rev-parse', 'HEAD'])
   } catch {
     console.error('release-review-gate: not a git repository')
     return 2
   }
 
-  const path = join(repoRoot, manifestPath(revision))
+  const found = args.get('print') ? { revision, behind: [] } : reviewedRevision(revision)
   if (args.get('print')) {
     console.log(
       JSON.stringify(
@@ -164,7 +209,7 @@ function main(argv) {
     return 0
   }
 
-  if (!existsSync(path)) {
+  if (!found) {
     console.error(`release-review-gate: REFUSE — no review manifest for ${revision.slice(0, 12)}`)
     console.error(`  expected: ${manifestPath(revision)}`)
     console.error(
@@ -173,6 +218,8 @@ function main(argv) {
     return 1
   }
 
+  const reviewed = found.revision
+  const path = join(repoRoot, manifestPath(reviewed))
   let manifest
   try {
     manifest = JSON.parse(readFileSync(path, 'utf8'))
@@ -183,12 +230,12 @@ function main(argv) {
     return 1
   }
 
-  const problems = validateManifest(manifest, { revision })
+  const problems = validateManifest(manifest, { revision: reviewed })
   const slices = Array.isArray(manifest.slices) ? manifest.slices : []
   const reported = slices.filter((slice) => slice?.verdict === REPORTED).length
   if (problems.length) {
     console.error(
-      `release-review-gate: REFUSE — the review of ${revision.slice(0, 12)} is not complete (${reported}/${slices.length} slices reported)`
+      `release-review-gate: REFUSE — the review of ${reviewed.slice(0, 12)} is not complete (${reported}/${slices.length} slices reported)`
     )
     for (const problem of problems) {
       console.error(`  - ${problem}`)
@@ -204,8 +251,13 @@ function main(argv) {
 
   const waived = Boolean(manifest.waiver?.reason)
   console.log(
-    `release-review-gate: PASS — ${reported}/${slices.length} slices reported, ${REVIEWER.name} at ${REVIEWER.thinking}, revision ${revision.slice(0, 12)}`
+    `release-review-gate: PASS — ${reported}/${slices.length} slices reported, ${REVIEWER.name} at ${REVIEWER.thinking}, revision ${reviewed.slice(0, 12)}`
   )
+  if (found.behind.length) {
+    console.log(
+      `  reviewed ${reviewed.slice(0, 12)}; ${found.behind.length} doc/review-record commit(s) since, which do not void it: ${found.behind.join(', ')}`
+    )
+  }
   if (waived) {
     console.log(`  WAIVED: ${manifest.waiver.reason}`)
   }

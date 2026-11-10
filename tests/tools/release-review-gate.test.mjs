@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { REVIEWER } from '../../local/pr-body-claims.mjs'
-import { validateManifest } from '../../local/release-review-gate.mjs'
+import { validateManifest, reviewNeutralOnly } from '../../local/release-review-gate.mjs'
 
 const REVISION = '0e24285da2b3fa18b4abc7ae84dbb959f399cb97'
 
@@ -75,6 +75,27 @@ describe('release review gate', () => {
     expect(validateManifest(manifest([]), { revision: REVISION })).toEqual([
       'no slices recorded: a review with no slice list cannot be shown to be complete'
     ])
+  })
+
+  // Why: the manifest names a revision, so committing it moves HEAD past what it records — a fixed
+  // point is impossible. The PR gate's rule answers it (a later commit voids the review only if it
+  // changes code), and these pin the boundary, because widening it would let a release stand on a
+  // review of code it no longer matches.
+  it('lets docs and review records follow the reviewed revision', () => {
+    expect(reviewNeutralOnly(['local/sync/release-review/abc.json', 'RELEASE-RUNBOOK.md'])).toBe(
+      true
+    )
+  })
+
+  it('voids the review when any code changed after it', () => {
+    expect(reviewNeutralOnly(['local/sync/release-review/abc.json', 'src/main/a.ts'])).toBe(false)
+    expect(reviewNeutralOnly(['src/renderer/src/x.tsx'])).toBe(false)
+  })
+
+  // Why a gate file is not a doc: `local/` holds the gates themselves, so a change there is a change
+  // to how releases are judged, not a record of one.
+  it('does not treat the gate scripts themselves as review-neutral', () => {
+    expect(reviewNeutralOnly(['local/release-review-gate.mjs'])).toBe(false)
   })
 
   it('refuses a missing manifest outright', () => {
