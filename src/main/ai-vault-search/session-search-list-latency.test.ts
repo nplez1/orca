@@ -197,12 +197,11 @@ function measuredMs(run: () => unknown): number {
 
 describe('the query plan', () => {
   // Both assertions drop the retention window the panel passes, because that
-  // window rewrites the plan wholesale: its `id IN (SELECT … FROM files …)`
-  // becomes the driver and `sessions` is reached by rowid seek instead. What
-  // these two guard is the index the shape itself chooses — the scope's
-  // `sessions_cwd_key` range and the unscoped `updated_at` order. The
-  // retention-bearing plan, which is the one production uses, is characterized
-  // in its own test below.
+  // window rewrites the plan wholesale: a per-row `EXISTS` probe over `files`
+  // joins the driver instead of the shape choosing it. What these two guard is
+  // the index the shape itself chooses — the scope's `sessions_cwd_key` range and
+  // the unscoped `updated_at` order. The retention-bearing plans, which are the
+  // ones production uses, are characterized in their own tests below.
   it('lists newest-first from sessions_updated_at, without scanning sessions', () => {
     list({ limit: 100, retentionCutoffMs: null })
     const plan = queryPlan(plannedDb().lastSessionSelect())
@@ -220,30 +219,36 @@ describe('the query plan', () => {
     expectSessionsIndex(plan, 'sessions_cwd_key', `the scoped list for ${SCOPE}`)
   })
 
-  it('finds the retention-bearing plan driven by files_mtime, not by sessions', () => {
-    // A finding, recorded rather than wished away. The panel always passes a
-    // cutoff, and that cutoff re-plans the list: SQLite walks `files_mtime`,
-    // seeks `sessions` by rowid, and sorts — so the LIMIT cannot stop early,
-    // because the sort sits between it and the rows. It is still index-driven
-    // (not the full scan plus sort this file exists to catch), and the measured
-    // 10k-row cost is in the test below. If `sessions_updated_at` ever appears
-    // in this plan the finding is fixed: delete this test and fold the retention
-    // window into the two assertions above.
+  it('keeps the retention-bearing unscoped list on sessions_updated_at, without a sort', () => {
+    // The old shape of this test recorded a finding: the cutoff re-planned the
+    // list around `files_mtime`, so the LIMIT could not stop early because a sort
+    // sat between it and the rows. The cutoff is now a per-row `EXISTS` probe on
+    // `files(session_row_id, mtime_ms)`, which leaves the newest-first index as the
+    // driver and the order already satisfied. If `files_mtime` reappears as a plan
+    // step here, that regression is back.
+    list({ limit: 100 })
+    const plan = queryPlan(plannedDb().lastSessionSelect())
+
+    expectSessionsIndex(plan, 'sessions_updated_at', 'the retention-bearing unscoped list')
+    expectNoSort(plan, 'the retention-bearing unscoped list')
+  })
+
+  it('characterizes the retention-bearing scoped list: scope ranges, then a sort', () => {
+    // A scope makes the `sessions_cwd_key` arms the driver, so the rows arrive out
+    // of order and the LIMIT cannot stop early. Still index-driven, and never the
+    // full scan of `sessions` this file exists to catch.
     list({ limit: 100, scopePaths: [SCOPE] })
     const plan = queryPlan(plannedDb().lastSessionSelect())
 
-    expect(
-      plan.some((line) => line.includes('INDEX files_mtime')),
-      `expected the retention window to drive the plan from files_mtime; plan was:\n  ${plan.join('\n  ')}`
-    ).toBe(true)
-    expect(
-      plan.some((line) => line.includes('INTEGER PRIMARY KEY')),
-      `expected the retention window to reach sessions by rowid; plan was:\n  ${plan.join('\n  ')}`
-    ).toBe(true)
+    expectSessionsIndex(plan, 'sessions_cwd_key', `the retention-bearing scoped list for ${SCOPE}`)
     expect(
       plan.some((line) => line.startsWith('SCAN sessions')),
       `expected no full scan of sessions; plan was:\n  ${plan.join('\n  ')}`
     ).toBe(false)
+    expect(
+      plan.some((line) => line.startsWith('USE TEMP B-TREE')),
+      `expected the scoped retention list to sort; plan was:\n  ${plan.join('\n  ')}`
+    ).toBe(true)
   })
 })
 

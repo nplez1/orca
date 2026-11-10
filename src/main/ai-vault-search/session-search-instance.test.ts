@@ -96,7 +96,7 @@ it('indexes the history list but keeps no conversation text while content is off
   // consent decision. Content is what needs one.
   expect(subject.running).toBe(true)
   expect(existsSync(harness.databasePath)).toBe(true)
-  expect(subject.status()).toMatchObject({ enabled: true, contentEnabled: false })
+  expect(await subject.status()).toMatchObject({ enabled: true, contentEnabled: false })
   const listed = subject.listSessions({
     limit: 50,
     scopePaths: [],
@@ -180,7 +180,7 @@ it('releases the writer claim when closed so a new instance can open it', async 
   await first.settled()
   expect(first.running).toBe(true)
 
-  first.close()
+  await first.close()
   expect(first.running).toBe(false)
   // The index is left on disk: closing is not a deletion.
   expect(existsSync(harness.databasePath)).toBe(true)

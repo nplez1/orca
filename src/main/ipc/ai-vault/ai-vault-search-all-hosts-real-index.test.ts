@@ -229,7 +229,7 @@ it('reports an unreachable host, keeps hasMore, and picks it up on the retry', a
 it('keeps answering from the metadata tier when a host has content search off', async () => {
   hosts[2]!.instance.apply({ contentEnabled: false, historyDays: null })
   await hosts[2]!.instance.settled()
-  expect(hosts[2]!.instance.status()).toMatchObject({ enabled: true, contentEnabled: false })
+  expect(await hosts[2]!.instance.status()).toMatchObject({ enabled: true, contentEnabled: false })
   const { keys } = await paginate(5, 'relevance')
   expect(new Set(keys).size).toBe(keys.length)
   expect([...keys].sort()).toEqual(everyKey().sort())

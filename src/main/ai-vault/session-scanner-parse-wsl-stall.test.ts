@@ -151,8 +151,10 @@ describe('AI Vault session parse with a stalled WSL transcript body read', () =>
     await vi.advanceTimersByTimeAsync(100)
     expect(result).toBe('cancelled')
     expect(finishes).toHaveBeenNthCalledWith(1, expect.objectContaining({ cancelled: true }))
-    expect(nextMessageCount).toBe(2)
+    // The next read is admitted only when the cancelled holder leaves the per-file lane, so the
+    // settled parse is what makes its message count observable.
     await next
+    expect(nextMessageCount).toBe(2)
     expect(finishes).toHaveBeenCalledTimes(2)
     readdir.mockRestore()
   })

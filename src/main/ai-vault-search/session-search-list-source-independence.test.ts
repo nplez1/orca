@@ -1,3 +1,4 @@
+import './session-search-worker.test-fixture'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it } from 'vitest'
@@ -36,7 +37,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  instance?.close()
+  await instance?.close()
   resetTranscriptConsumersForTests()
   resetSessionParseCacheForTests()
   await harness.cleanup()
@@ -78,7 +79,7 @@ it('serves preview turns from the parse cache rather than the transcript', async
   await writeClaudeTranscript(transcript, ['a distinctive opening turn'], SESSION_ID)
 
   const child = new SessionScannerServiceSearch()
-  child.apply({
+  await child.apply({
     databasePath: harness.databasePath,
     roots: harness.roots,
     settings: { contentEnabled: true, historyDays: null }
@@ -118,7 +119,7 @@ async function openScopedListChild(): Promise<SessionScannerServiceSearch> {
   )
 
   const child = new SessionScannerServiceSearch()
-  child.apply({
+  await child.apply({
     databasePath: harness.databasePath,
     roots: harness.roots,
     settings: { contentEnabled: true, historyDays: null }

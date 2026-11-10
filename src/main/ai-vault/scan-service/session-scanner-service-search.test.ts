@@ -1,3 +1,4 @@
+import '../../ai-vault-search/session-search-worker.test-fixture'
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
@@ -153,7 +154,11 @@ it('withdraws content consent without a respawn and keeps answering', async () =
   // The metadata index is not a consent decision, so search still answers — it
   // matches titles and paths rather than message bodies. What the withdrawal
   // stops is content being stored at all.
-  expect(await searchStatus()).toMatchObject({ enabled: true, contentEnabled: false })
+  // The entry applies a settings change asynchronously, so the withdrawal lands
+  // a turn after the message rather than inside it.
+  await vi.waitFor(async () =>
+    expect(await searchStatus()).toMatchObject({ enabled: true, contentEnabled: false })
+  )
   expect((await searchSessions('distinctive')).kind).not.toBe('unavailable')
   // Re-consenting reuses the index that was left on disk rather than rebuilding it.
   emit({ type: 'sessionSearch', init: searchInit(true) })
@@ -181,7 +186,7 @@ let listHarness: {
 
 afterEach(async () => {
   vi.restoreAllMocks()
-  listHarness?.service.close()
+  await listHarness?.service.close()
   await listHarness?.harness.cleanup()
   listHarness = null
 })
@@ -193,7 +198,7 @@ async function openListService(
   // Before `apply()`, so the opening sweep cannot miss what the test wrote.
   await prepare(harness)
   const service = new SessionScannerServiceSearch()
-  service.apply({
+  await service.apply({
     databasePath: harness.databasePath,
     settings: { contentEnabled: true, historyDays: null },
     roots: harness.roots

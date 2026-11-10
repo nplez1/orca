@@ -52,10 +52,14 @@ it('registers an in-process service for a host with no scanner child', async () 
 
   // Content-off, not absent: the caller can tell "this host stores no message
   // bodies" from "this host has no index at all", which is what no-service means.
-  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
-    enabled: true,
-    contentEnabled: false
-  })
+  // The install applies its settings asynchronously, so an index is live a turn
+  // after the install returns rather than inside it.
+  await vi.waitFor(async () =>
+    expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+      enabled: true,
+      contentEnabled: false
+    })
+  )
   expect(await searchSessionService({ query: 'ledger' }, 'relay')).not.toEqual({
     kind: 'unavailable',
     reason: 'no-service'
@@ -107,25 +111,32 @@ it('re-applies content consent on an in-process host without reinstalling the se
     settings: { contentEnabled: false, historyDays: null }
   })
   // Metadata is not a consent decision, so a host with content off still answers — from titles
-  // and paths rather than message bodies.
-  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
-    enabled: true,
-    contentEnabled: false
-  })
+  // and paths rather than message bodies. `apply` is asynchronous, so each consent
+  // write settles a turn after the call.
+  await vi.waitFor(async () =>
+    expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+      enabled: true,
+      contentEnabled: false
+    })
+  )
   expect(await searchSessionService({ query: 'ledger' }, 'relay')).not.toMatchObject({
     kind: 'unavailable',
     reason: 'disabled'
   })
 
   installed?.apply?.({ contentEnabled: true, historyDays: null })
-  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
-    enabled: true,
-    contentEnabled: true
-  })
+  await vi.waitFor(async () =>
+    expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+      enabled: true,
+      contentEnabled: true
+    })
+  )
 
   installed?.apply?.({ contentEnabled: false, historyDays: null })
-  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
-    enabled: true,
-    contentEnabled: false
-  })
+  await vi.waitFor(async () =>
+    expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+      enabled: true,
+      contentEnabled: false
+    })
+  )
 })
