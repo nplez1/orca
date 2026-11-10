@@ -130,7 +130,11 @@ it('finds controls across General destinations and opens the actual setting for 
     target: { value: 'folder per project' }
   })
   fireEvent.click(await screen.findByRole('button', { name: /Folder per project/ }))
-  expect(await screen.findByRole('switch', { name: 'Folder per project' })).toBeTruthy()
+  // The nesting setting is a three-way layout control, not a switch; activating its result must
+  // still land on the real control inside the nesting anchor.
+  const layout = await screen.findByRole('radiogroup', { name: 'Workspace Layout' })
+  expect(layout.closest('#general-workspace-nesting')).toBeTruthy()
+  expect(screen.getAllByRole('radio')).toHaveLength(3)
   fireEvent.change(screen.getByRole('textbox', { name: 'Search settings' }), {
     target: { value: 'minimap' }
   })

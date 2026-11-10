@@ -57,7 +57,9 @@ vi.mock('./workspace-card/activity/use-worktree-activity-status.ts', () => ({
 }))
 
 vi.mock('./workspace-actions/sleep/use-worktree-sleep-state.ts', () => ({
-  useIsSleepingWorktree: () => false
+  useIsSleepingWorktree: () => false,
+  // The status slot reads the selector through one shallow subscription, not the hook.
+  selectIsSleepingWorktree: () => false
 }))
 
 vi.mock('./workspace-card/activity/CacheTimer.tsx', () => ({

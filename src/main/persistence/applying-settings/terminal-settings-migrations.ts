@@ -59,8 +59,10 @@ export function buildWorkspaceDirHistoryForUpdate(
   }
   const nextPath = updates.workspaceDir ?? current.workspaceDir
   const nextNestWorkspaces = updates.nestWorkspaces ?? current.nestWorkspaces
+  // An update carrying only a path keeps the layout the host already uses: deriving the mode from
+  // the legacy boolean alone would read it as repo-nested and log a history entry for every save.
   const nextMode = resolveWorktreeLayoutMode({
-    worktreeLayoutMode: updates.worktreeLayoutMode ?? undefined,
+    worktreeLayoutMode: updates.worktreeLayoutMode ?? current.worktreeLayoutMode,
     nestWorkspaces: nextNestWorkspaces
   })
   if (

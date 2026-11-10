@@ -108,7 +108,7 @@ describe('floating workspace trust on load', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().floatingTerminalCwd).toBe('~')
+    expect(store.getSettings().floatingTerminalCwd).toBe('')
     // File authorization reads the cwd on every check, so it must keep working for this profile.
     expect(getFloatingWorkspaceFileRoots(store).exactRoots).toEqual([])
   })

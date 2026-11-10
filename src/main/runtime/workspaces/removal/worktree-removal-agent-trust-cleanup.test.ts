@@ -57,7 +57,9 @@ describe('worktree removal drops the workspace trust Orca wrote', () => {
       settingsPath,
       JSON.stringify({ theme: 'dark', trustedWorkspaces: ['/home/me/app'] })
     )
-    markAntigravityWorkspaceTrusted(PROJECT, agyHome)
+    // Await: the grant records its ownership ledger asynchronously, and afterEach restores the
+    // inherited userData path, which would send that late write to the real app data directory.
+    await markAntigravityWorkspaceTrusted(PROJECT, agyHome)
 
     await purgeWithMeta()(WORKTREE_ID)
 
@@ -72,7 +74,9 @@ describe('worktree removal drops the workspace trust Orca wrote', () => {
     const settingsPath = join(agyHome, '.gemini', 'antigravity-cli', 'settings.json')
     mkdirSync(join(agyHome, '.gemini', 'antigravity-cli'), { recursive: true })
     writeFileSync(settingsPath, JSON.stringify({ trustedWorkspaces: [PROJECT] }))
-    markAntigravityWorkspaceTrusted(PROJECT, agyHome)
+    // Await: the grant records its ownership ledger asynchronously, and afterEach restores the
+    // inherited userData path, which would send that late write to the real app data directory.
+    await markAntigravityWorkspaceTrusted(PROJECT, agyHome)
 
     await purgeWithMeta()(WORKTREE_ID)
 
