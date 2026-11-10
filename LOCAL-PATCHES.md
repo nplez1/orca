@@ -999,9 +999,9 @@ src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts, src/main/pty/wsl-orca-
 src/main/skills/skill-lock-sources.test.ts and src/main/skills/skill-update-run.test.ts were deleted
 upstream (bulk test removals, fork issue #312). The pane `BROWSER` is the one of those the
 fork-invariants test now owns; nothing replaced the rest, so this section is the whole of what a sync
-can turn red on skill names. `src/cli/skills.test.ts` covered the CLI's skill listing and was retired
-with upstream's bulk test removals in the 2026-11-10 sync; no listing test replaced it, so that
-coverage is a known gap rather than a guard (see the sync log's coverage-debt line).
+can turn red on skill names. The CLI's own skill-listing test was retired with upstream's bulk test
+removals in the 2026-11-10 sync and nothing replaced it, so that coverage is a known gap rather than
+a guard (see the sync log's coverage-debt line).
 
 **A repo-relative path here is in backticks only while it must exist.** `local/sync/lib/cited-guards.mjs`
 resolves every backticked test path and package script in this file, and post-sync's `cited-guards` row

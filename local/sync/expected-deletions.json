@@ -942,6 +942,125 @@
       "status": "expected-deletion",
       "supersededBy": "resumeEphemeralVmWorkspace in lib/workspace/activation/sidebar-worktree-activation.ts",
       "reason": "Upstream renamed wake to resume when it moved the file into lib/workspace/activation/. The fork’s synchronous ActivateAndRevealResult | false contract was re-applied at the new path."
+    },
+    {
+      "path": "src/main/agent-hooks/installer-utils.ts",
+      "symbol": "ManagedCommandMatcherOptions",
+      "status": "expected-deletion",
+      "supersededBy": "agent-hooks/installation/commands/managed-hook-command-matching.ts",
+      "reason": "Upstream moved the managed-command matcher into installation/commands/; the fork’s options type went with it."
+    },
+    {
+      "path": "src/main/agent-hooks/installer-utils.ts",
+      "symbol": "WINDOWS_HOOK_AGENT_PROCESS_VAR",
+      "status": "expected-deletion",
+      "supersededBy": "agent-hooks/installation/commands/windows-agent-hook-post-command.ts",
+      "reason": "Upstream moved the Windows hook process variable onto the post-command module; the fork’s const is re-homed there."
+    },
+    {
+      "path": "src/main/ai-vault-search/session-search-engine.ts",
+      "symbol": "SessionSearchEngine.metadataText",
+      "status": "expected-deletion",
+      "supersededBy": "buildMetadataRankedPage in session-search-hit-builder.ts",
+      "reason": "Extracted by the 2026-11-10 sync’s max-lines split, behaviour unchanged."
+    },
+    {
+      "path": "src/main/ai-vault/runtime-session-scanner.ts",
+      "symbol": "runtimeListPageParams.scopePaths",
+      "status": "expected-deletion",
+      "supersededBy": "boundedAiVaultScopeArgs in the same file",
+      "reason": "Upstream bounded the scope-path list; the property moved onto the bounding helper, which truncates and reports scopePathsTruncated."
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "provisionEphemeralVmRuntime",
+      "status": "expected-deletion",
+      "supersededBy": "provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "The 2026-11-10 convergence left ONE create function (upstream’s) in runtime-service.ts; the fork’s attempt row is written by it. evidence: convergence-ledger.md Ephemeral VM"
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "startProvisionedRuntime.ok",
+      "status": "expected-deletion",
+      "supersededBy": "provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Removed with the fork’s separate start helper by the VM convergence."
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "startProvisionedRuntime.start",
+      "status": "expected-deletion",
+      "supersededBy": "provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Removed with the fork’s separate start helper by the VM convergence."
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "startProvisionedRuntime.runtime",
+      "status": "expected-deletion",
+      "supersededBy": "provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Removed with the fork’s separate start helper by the VM convergence."
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "finishFailedProvisioning.ok",
+      "status": "expected-deletion",
+      "supersededBy": "provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Removed with the fork’s separate failure helper by the VM convergence."
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "finishFailedProvisioning.start",
+      "status": "expected-deletion",
+      "supersededBy": "provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Removed with the fork’s separate failure helper by the VM convergence."
+    },
+    {
+      "path": "src/main/rate-limits/claude-usage-fetch-options.ts",
+      "symbol": "ClaudeRateLimitFetchOptions.usageEndpointRetryAtMs",
+      "status": "expected-deletion",
+      "supersededBy": "rate-limits/providers/claude/claude-usage-fetch-options.ts",
+      "reason": "Moved with the rate-limits providers/ reorganisation; the property is declared on the new options type."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-configuration.ts",
+      "symbol": "RateLimitServiceConfiguration.setDeepSeekConfigResolver",
+      "status": "expected-deletion",
+      "supersededBy": "setDeepSeekConfigResolver in rate-limits/service/rate-limit-service.ts",
+      "reason": "Moved with the rate-limits service/ reorganisation; the fork’s deepseek provider stayed flat, the setter moved onto the service."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-configuration.ts",
+      "symbol": "RateLimitServiceConfiguration.setFireworksConfigResolver",
+      "status": "expected-deletion",
+      "supersededBy": "setFireworksConfigResolver in rate-limits/service/rate-limit-service.ts",
+      "reason": "Moved with the rate-limits service/ reorganisation."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-configuration.ts",
+      "symbol": "RateLimitServiceConfiguration.setDeepInfraConfigResolver",
+      "status": "expected-deletion",
+      "supersededBy": "setDeepInfraConfigResolver in rate-limits/service/rate-limit-service.ts",
+      "reason": "Moved with the rate-limits service/ reorganisation."
+    },
+    {
+      "path": "src/main/rate-limits/service/service-configuration.ts",
+      "symbol": "RateLimitServiceConfiguration.setCopilotConfigResolver",
+      "status": "expected-deletion",
+      "supersededBy": "setCopilotConfigResolver in rate-limits/service/rate-limit-service.ts",
+      "reason": "Moved with the rate-limits service/ reorganisation."
+    },
+    {
+      "path": "src/renderer/src/components/settings/virtual-machines/runtimes/EphemeralVmRuntimesSection.tsx",
+      "symbol": "getEphemeralVmExtendDurations",
+      "status": "expected-deletion",
+      "supersededBy": "ephemeral-vm-runtimes-section-state.ts in the same directory",
+      "reason": "Extracted by the 2026-11-10 sync’s max-lines split, behaviour unchanged."
+    },
+    {
+      "path": "src/renderer/src/components/settings/virtual-machines/runtimes/EphemeralVmRuntimesSection.tsx",
+      "symbol": "getExtendedEphemeralVmLeaseDeadline",
+      "status": "expected-deletion",
+      "supersededBy": "ephemeral-vm-runtimes-section-state.ts in the same directory",
+      "reason": "Extracted by the 2026-11-10 sync’s max-lines split, behaviour unchanged."
     }
   ]
 }
