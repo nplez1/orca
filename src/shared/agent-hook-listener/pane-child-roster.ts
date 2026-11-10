@@ -2,7 +2,11 @@ import {
   AGENT_DESCENDANT_QUIET_REAP_MS,
   agentDescendantRosterToSnapshots
 } from '../agent-descendant-roster'
-import { foldAgentLeadStatus } from '../agent-status/lifecycle/agent-lead-status-fold'
+import {
+  continueMainAgentStatus,
+  foldAgentLeadStatus
+} from '../agent-status/lifecycle/agent-lead-status-fold'
+import type { AgentMainAgentStatus } from '../agent-status/lifecycle/main-agent-status'
 import { agentChildWorkLiveness } from '../agent-status/child-work/agent-status-child-work-liveness'
 import type { AgentSubagentSnapshot } from '../agent-status/contracts/agent-status-subagent-snapshot'
 import type {
@@ -89,19 +93,35 @@ export function carriedReportedChildren(
   return reported.children
 }
 
+/** The outcome a previous `done` verdict already stated, when it stated one. */
+function previousDoneOutcome(previous: AgentMainAgentStatus | undefined): {
+  outcome?: AgentMainAgentStatus['outcome']
+} {
+  return previous?.state === 'done' && previous.outcome !== undefined
+    ? { outcome: previous.outcome }
+    : {}
+}
+
 /** Publish one row from one child roster: the state and the child list a reader renders come out of
  *  the same list, through the same fold every other lane uses.
  *
  *  `workingMode`, `sessionBoundary` and `interrupted` are the fold's to write. A row the fold no
  *  longer holds as a monitor must not keep the badge, and a boundary or an interrupt describes a row
  *  that is still settling — a client without the boundary capability drops a flagged tab's whole
- *  status, so neither flag may ride on a row the fold turned live. */
+ *  status, so neither flag may ride on a row the fold turned live.
+ *
+ *  A row the fold held open publishes the lead's own verdict as `mainAgent`. Readers that key on it —
+ *  `programStatusHookYieldEndsAt` above all — otherwise read the held state as a working lead, hand
+ *  the pane to its terminal status once the hooks go quiet, and the pane reads `done` beside a child
+ *  that is still running while its row disappears (#197). */
 export function resolvePaneHold(
   payload: ParsedAgentStatusPayload,
   leadState: AgentStatusState,
   children: readonly AgentSubagentSnapshot[],
   /** A wait this lane recorded for a provider that owns its own roster, which lists no child row. */
-  waitingWithoutChildRow = false
+  waitingWithoutChildRow = false,
+  /** The held row's own history: the lead verdict last published for it, and the clock to date it by. */
+  held: { previousMainAgent?: AgentMainAgentStatus; now?: number } = {}
 ): ParsedAgentStatusPayload {
   const resolution = foldAgentLeadStatus({
     leadState,
@@ -116,6 +136,35 @@ export function resolvePaneHold(
     workingMode: resolution.workingMode,
     sessionBoundary: resolution.stateName === 'done' ? payload.sessionBoundary : undefined,
     interrupted: resolution.stateName === 'done' ? payload.interrupted : undefined,
-    subagents: children.length > 0 ? [...children] : undefined
+    subagents: children.length > 0 ? [...children] : undefined,
+    // Why only a finished lead: a hold over a lead that is still working asserts nothing a reader
+    // needs, and every consumer of `mainAgent` asks the same question — was this turn over?
+    ...(leadState === 'done' && resolution.stateName !== 'done'
+      ? {
+          // Why the payload's own verdict first: a provider that owns its roster (grok) states the
+          // outcome and the turn's own end here, and replacing it would drop both.
+          mainAgent:
+            payload.mainAgent?.state === 'done'
+              ? payload.mainAgent
+              : continueMainAgentStatus(
+                  held.previousMainAgent,
+                  {
+                    state: 'done',
+                    // Why the previous verdict's outcome rides too: this call site builds a fresh
+                    // payload with no `mainAgent`, so a re-hold of a verdict a roster-owning lane
+                    // already stated (grok's failed turn, asked about again) would otherwise drop
+                    // the outcome the first hold carried.
+                    ...previousDoneOutcome(held.previousMainAgent),
+                    // Why the turn's own completion time and nothing else: a re-hold of the same
+                    // finished turn keeps its clock through the previous `done` row, and a row
+                    // whose lead was not done cannot date this one.
+                    ...(payload.turnCompletedAt !== undefined
+                      ? { stateStartedAt: payload.turnCompletedAt }
+                      : {})
+                  },
+                  held.now ?? Date.now()
+                )
+        }
+      : {})
   }
 }

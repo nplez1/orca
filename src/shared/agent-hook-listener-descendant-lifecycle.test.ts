@@ -15,6 +15,7 @@ import {
 import type { AgentHookSource } from './agent-hook-listener/transport/agent-hook-relay'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from './agent-descendant-roster'
 import { foldMainAgentWithRowChildWork } from './agent-hook-listener/state/agent-hook-row-child-work-fold'
+import { isAgentStatusHeldOpenByChildWork } from './agent-status/lifecycle/agent-lead-status-fold'
 
 /** Every case drives `normalizeHookPayload`, the entry both the main process and the relay
  *  call, so a fix that never reaches production wiring cannot pass here. */
@@ -287,6 +288,39 @@ describe('descendant lifecycle never settles the pane', () => {
         publish('grok', { hookEventName: 'SubagentStop', subagentType: 'x', subagentId: 'sub-1' })
           ?.payload.state
       ).toBeUndefined()
+    })
+
+    it('keeps the verdict grok stated on the row its waiting child holds open', () => {
+      startTurn()
+      publish('grok', {
+        hookEventName: 'pre_tool_use',
+        subagentType: 'x',
+        subagentId: 'sub-1',
+        toolName: 'ask_user_question',
+        toolInput: { question: 'which one?' }
+      })
+
+      const failed = publish('grok', { hookEventName: 'stop_failure', reason: 'end_turn' })
+      expect(failed?.payload.state).toBe('waiting')
+      // Why: grok states the turn's own verdict, and holding its row open must not replace it.
+      // Losing `outcome` would make a failed turn read as a clean one for as long as the child waits.
+      expect(failed?.payload.mainAgent).toEqual(
+        expect.objectContaining({ state: 'done', outcome: 'failure' })
+      )
+
+      // A second question arrives as the child's own event, which builds a fresh payload: the verdict
+      // has to survive that path too, or the row loses its failure while the child is still waiting.
+      const askedAgain = publish('grok', {
+        hookEventName: 'pre_tool_use',
+        subagentType: 'x',
+        subagentId: 'sub-1',
+        toolName: 'ask_user_question',
+        toolInput: { question: 'and this one?' }
+      })
+      expect(askedAgain?.payload.state).toBe('waiting')
+      expect(askedAgain?.payload.mainAgent).toEqual(
+        expect.objectContaining({ state: 'done', outcome: 'failure' })
+      )
     })
   })
 
@@ -627,6 +661,51 @@ describe('descendant lifecycle never settles the pane', () => {
     it('ignores an absent set, so a pane without the plugin keeps its own verdict', () => {
       publish('pi', { hook_event_name: 'tool_execution_end' })
       expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
+    })
+  })
+
+  describe('a row held open by a live child states the lead verdict (#197)', () => {
+    const CHILD = { id: 'run-1', agent_type: 'researcher', description: 'trace the writer' }
+
+    it('publishes the finished lead on the row its child holds open', () => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      const ended = publish('pi', { hook_event_name: 'agent_end' })
+
+      expect(ended?.payload.state).toBe('working')
+      // Why the lead's own verdict has to ride the held row: every reader that keys on `mainAgent`
+      // — hook precedence over the pane's terminal status above all — otherwise reads the held
+      // `working` as a working lead and settles the pane once the hooks go quiet.
+      expect(ended?.payload.mainAgent).toEqual(expect.objectContaining({ state: 'done' }))
+      expect(isAgentStatusHeldOpenByChildWork(ended!.payload)).toBe(true)
+    })
+
+    it('keeps one start clock across republishes of the same finished turn', () => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      const first = publish('pi', { hook_event_name: 'agent_end', turn_completed_at: 1_700 })
+      const second = publish('pi', { hook_event_name: 'subagents_update', subagent_runs: [CHILD] })
+
+      expect(first?.payload.mainAgent?.stateStartedAt).toBe(1_700)
+      expect(second?.payload.mainAgent?.stateStartedAt).toBe(1_700)
+    })
+
+    it('keeps that clock through a child’s own event, which carries no completion time', () => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      expect(
+        publish('pi', { hook_event_name: 'agent_end', turn_completed_at: 1_700 })?.payload.mainAgent
+          ?.stateStartedAt
+      ).toBe(1_700)
+
+      // Why: the descendant lane rebuilds the row from the lead's verdict alone, so it has no
+      // completion time of its own to date with — the cached verdict is the only clock it can keep.
+      const fromChild = publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [CHILD]
+      })
+      expect(fromChild?.payload.state).toBe('working')
+      expect(fromChild?.payload.mainAgent?.stateStartedAt).toBe(1_700)
     })
   })
 })
