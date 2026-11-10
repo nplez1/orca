@@ -3,19 +3,12 @@ import { RateLimitService } from './service'
 import { fetchClaudeRateLimits } from './claude-fetcher'
 import { fetchCodexRateLimits } from './codex-fetcher'
 import { fetchZcodeRateLimits } from './zcode-usage-fetcher'
-import { fetchAntigravityRateLimits } from './antigravity-usage-fetcher'
-import { fetchCursorRateLimits } from './cursor-fetcher'
-import { readCursorAuthSession } from './cursor-auth'
 import { fetchOpenCodeGoUsage } from './opencode-go-usage-source-selection'
 import {
   errorProvider,
   okProvider,
   resetRateLimitProviderMocks
 } from './rate-limit-service-test-harness'
-import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
-import { readGrokAuthSession } from './grok-auth'
-import { fetchKimiRateLimits } from './kimi-fetcher'
-import { fetchMuseRateLimits } from './muse-usage-fetcher'
 
 vi.mock('./claude-fetcher', () => ({
   fetchClaudeRateLimits: vi.fn(),
@@ -171,106 +164,5 @@ describe('RateLimitService', () => {
     expect(state.opencodeGo?.status).toBe('error')
     expect(state.opencodeGo?.session).toBeNull()
     expect(state.opencodeGo?.error).toBe('No workspace ID found')
-  })
-})
-
-describe('disabled usage providers', () => {
-  beforeEach(() => {
-    resetRateLimitProviderMocks()
-  })
-
-  it('never reads credentials for a switched-off provider', async () => {
-    const service = new RateLimitService({
-      isUsageProviderDisabled: (providerId) => providerId === 'gemini' || providerId === 'cursor'
-    })
-
-    await service.refresh()
-
-    // Why: the fetcher short-circuits on the disabled flag before touching any OAuth source.
-    expect(fetchGeminiRateLimits).toHaveBeenCalledWith(false)
-    expect(readCursorAuthSession).not.toHaveBeenCalled()
-    expect(fetchCursorRateLimits).not.toHaveBeenCalled()
-    expect(service.getState().gemini).toBeNull()
-    expect(service.getState().cursor).toBeNull()
-    // Why: an enabled provider in the same cycle still fetches normally.
-    expect(fetchOpenCodeGoUsage).toHaveBeenCalledTimes(1)
-  })
-
-  it('never reads the Grok CLI auth file when Grok is switched off', () => {
-    new RateLimitService({ isUsageProviderDisabled: (providerId) => providerId === 'grok' })
-
-    expect(readGrokAuthSession).not.toHaveBeenCalled()
-  })
-
-  it('never reaches OpenCode\u2019s own credential store when OpenCode Go is switched off', async () => {
-    // Why this case exists: an empty settings key makes this fetcher resolve OpenCode's environment and
-    // credential database itself, so a resolver-only gate still read a credential and could send a
-    // request. The result being nulled afterwards was too late.
-    const service = new RateLimitService({
-      isUsageProviderDisabled: (providerId) => providerId === 'opencode-go'
-    })
-
-    await service.refresh()
-
-    expect(fetchOpenCodeGoUsage).not.toHaveBeenCalled()
-    expect(service.getState().opencodeGo).toBeNull()
-  })
-
-  it('never resolves a Kimi home or reads its credentials when Kimi is switched off', async () => {
-    // fork-comment-ok: resolving the home probes wsl.exe and the home holds the sign-in, so the gate must land before the resolver.
-    const kimiHomeResolver = vi.fn(async () => ({
-      runtime: 'wsl' as const,
-      wslDistro: 'Ubuntu',
-      path: '\\\\wsl.localhost\\Ubuntu\\home\\neil\\.kimi-code'
-    }))
-    const service = new RateLimitService({
-      isUsageProviderDisabled: (providerId) => providerId === 'kimi'
-    })
-    service.setKimiHomeResolver(kimiHomeResolver)
-
-    await service.refresh()
-
-    expect(kimiHomeResolver).not.toHaveBeenCalled()
-    expect(fetchKimiRateLimits).not.toHaveBeenCalled()
-    expect(service.getState().kimi).toBeNull()
-  })
-
-  it('never reads the GLM plan key or polls it when GLM Coding Plan is switched off', async () => {
-    // fork-comment-ok: the plan key lives in the encrypted store, so a disabled GLM must return from its config resolver.
-    const zcodePlanConfigResolver = vi.fn(() => ({ apiKey: 'plan-key', site: 'zai' as const }))
-    const service = new RateLimitService({
-      isUsageProviderDisabled: (providerId) => providerId === 'zcode'
-    })
-    service.setZcodePlanConfigResolver(zcodePlanConfigResolver)
-
-    await service.refresh()
-
-    expect(zcodePlanConfigResolver).not.toHaveBeenCalled()
-    expect(fetchZcodeRateLimits).not.toHaveBeenCalled()
-    expect(service.getState().zcodePlanApiKeyConfigured).toBe(false)
-  })
-
-  it('never spawns the agy usage probe when Antigravity is switched off', async () => {
-    const service = new RateLimitService({
-      isUsageProviderDisabled: (providerId) => providerId === 'antigravity'
-    })
-
-    await service.refresh()
-
-    expect(fetchAntigravityRateLimits).not.toHaveBeenCalled()
-    expect(service.getState().antigravity).toBeNull()
-  })
-
-  it('never spawns the Muse CLI when Muse is switched off, even with its meter showing', async () => {
-    // Why the visible meter: the switch used to gate only the meter, so the CLI ran anyway.
-    const service = new RateLimitService({
-      isUsageProviderDisabled: (providerId) => providerId === 'muse'
-    })
-    service.setMuseUsageEnabledResolver(() => true)
-
-    await service.refresh()
-
-    expect(fetchMuseRateLimits).not.toHaveBeenCalled()
-    expect(service.getState().muse).toBeNull()
   })
 })

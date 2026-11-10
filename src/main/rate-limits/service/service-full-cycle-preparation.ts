@@ -67,9 +67,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       ? null
       : this.getCodexProvenance(codexTarget, codexHomePath)
     const openCodeGoConfig = this.resolveOpenCodeGoConfig()
-    // Why a call-site gate for this one provider: the other disabled providers are gated inside their
-    // resolvers, but this fetcher treats an empty settings key as "look elsewhere" and resolves OpenCode's
-    // own credential store and environment, then can make the request. UpdateState nulling the result
+    // Why a call-site gate here: its config resolver cannot say "switched off", because this
+    // fetcher treats an empty settings key as "look elsewhere" and resolves OpenCode's own
+    // credential store and environment, then can make the request. UpdateState nulling the result
     // afterwards is too late — the read already happened.
     const openCodeGoDisabled = this.isUsageProviderDisabled('opencode-go')
     const cookie = openCodeGoConfig.sessionCookie
@@ -246,15 +246,19 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         disabled.has('kimi')
           ? Promise.resolve(this.disabledUsageProviderSnapshot('kimi'))
           : this.fetchKimiWithResolvedHome(),
-        miniMaxConfigResult.error
-          ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
-          : fetchMiniMaxRateLimits({
-              cookie: miniMaxCookie,
-              groupId: miniMaxGroupId,
-              models: miniMaxModels,
-              endpointMode: miniMaxEndpoint,
-              apiKey: miniMaxApiKey
-            })
+        // Why a call-site gate, like OpenCode Go: an emptied config still enters the fetcher,
+        // so the switch would be enforced by that fetcher's own short-circuit, not by the switch.
+        disabled.has('minimax')
+          ? Promise.resolve(this.disabledUsageProviderSnapshot('minimax'))
+          : miniMaxConfigResult.error
+            ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
+            : fetchMiniMaxRateLimits({
+                cookie: miniMaxCookie,
+                groupId: miniMaxGroupId,
+                models: miniMaxModels,
+                endpointMode: miniMaxEndpoint,
+                apiKey: miniMaxApiKey
+              })
       ])
 
     if (signal.aborted) {
