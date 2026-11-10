@@ -502,7 +502,8 @@
           "9285cedcf2": "Flat",
           "b266f3f40e": "One folder per project",
           "f9b2070017": "Workspace Layout",
-          "ba3480642f": "Nest Workspaces"
+          "ba3480642f": "Nest Workspaces",
+          "a8ce626e4b": null
         },
         "JiraBoardSettings": {
           "chooseBoard": "Choose a board",
@@ -731,7 +732,12 @@
             "54b1acf24f": "Codex Usage",
             "5bfb874d05": "Gemini Usage",
             "bc046e7899": "OpenCode Go Usage",
-            "3a6c028ea8": "Kimi Usage"
+            "3a6c028ea8": "Kimi Usage",
+            "931c53cd16": null,
+            "585be839e9": null,
+            "20e7d30150": null,
+            "40c10c4deb": null,
+            "c29089716e": null
           }
         },
         "experimental": {

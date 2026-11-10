@@ -87,7 +87,7 @@ describe('this build home', () => {
   })
 
   it('keeps the managed-hook install lock on the shared ~/.orca', () => {
-    const lock = source('src/main/agent-hooks/managed-hook-install-lock.ts')
+    const lock = source('src/main/agent-hooks/installation/locking/managed-hook-install-lock.ts')
     // Why not HOME_DIRECTORY_NAME: this is a cross-install mutex over the shared `~/.claude` hooks, so
     // it stays where an official install's installer looks. Moving it to `.orca-np` lets the two
     // installers rewrite one another's hook entries concurrently.

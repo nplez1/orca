@@ -26,7 +26,7 @@ vi.mock('@/store', () => ({
     })
 }))
 
-vi.mock('@/lib/provider-runtime-context', () => ({
+vi.mock('@/runtime/hosts/observations/provider-runtime-context', () => ({
   getProviderRuntimeContextKey: () => 'runtime'
 }))
 

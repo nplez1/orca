@@ -9,7 +9,7 @@ import {
 } from './jira-issue-row-actions'
 import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
 
-vi.mock('@/lib/jira-issue-key-casing', () => ({
+vi.mock('@/lib/work-items/jira/jira-issue-key-casing', () => ({
   getJiraIssueKeyCasingSeedOptions: () => ({})
 }))
 

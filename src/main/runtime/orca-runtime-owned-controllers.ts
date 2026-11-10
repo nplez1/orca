@@ -36,7 +36,8 @@ export function installOrcaRuntimeOwnedControllers(
     getStore: () => runtime.store,
     listRepos: () => runtime.listRepos(),
     addRepo: (path, kind, hostId) => runtime.addRepo(path, kind, hostId),
-    cloneRepo: (url, destination, hostId) => runtime.cloneRepo(url, destination, hostId),
+    cloneRepo: (args) =>
+      runtime.cloneRepo(args.url, args.destination, args.hostId, args.folderName),
     invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
     invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
     notifyReposChanged: () => runtime.notifyReposChanged(),

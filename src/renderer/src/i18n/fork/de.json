@@ -29,6 +29,18 @@
               "popout": null
             }
           }
+        },
+        "GeneralWorkspaceSettingsSection": {
+          "a8ce626e4b": null
+        },
+        "appearance": {
+          "search": {
+            "931c53cd16": null,
+            "585be839e9": null,
+            "20e7d30150": null,
+            "40c10c4deb": null,
+            "c29089716e": null
+          }
         }
       },
       "GitHubItemDialog": {

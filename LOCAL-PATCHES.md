@@ -831,7 +831,7 @@ Anchors, both on upstream-owned files and marked `LOCAL(nplez1)`:
   `src/shared/claude-background-task-status.test.ts` (the Claude and Grok lane helpers plus the six
   shell/watcher stories; the `main-agent-status-parity` companion suite was retired in the 2026-11-08
   sync),
-  `src/main/agent-hooks/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
+  `src/main/agent-hooks/server/testing/providers/grok/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
   `server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`, plus the four
   upstream helper-settlement suites that assert the badge directly
   (`claude-helper-kill.test.ts`, `claude-helper-checkpoints.test.ts`,
@@ -999,8 +999,9 @@ src/main/ipc/pty/pty-daemon-spawn-agent-home-env.test.ts, src/main/pty/wsl-orca-
 src/main/skills/skill-lock-sources.test.ts and src/main/skills/skill-update-run.test.ts were deleted
 upstream (bulk test removals, fork issue #312). The pane `BROWSER` is the one of those the
 fork-invariants test now owns; nothing replaced the rest, so this section is the whole of what a sync
-can turn red on skill names. `src/cli/skills.test.ts` covers the CLI's skill listing, not the install
-rail.
+can turn red on skill names. `src/cli/skills.test.ts` covered the CLI's skill listing and was retired
+with upstream's bulk test removals in the 2026-11-10 sync; no listing test replaced it, so that
+coverage is a known gap rather than a guard (see the sync log's coverage-debt line).
 
 **A repo-relative path here is in backticks only while it must exist.** `local/sync/lib/cited-guards.mjs`
 resolves every backticked test path and package script in this file, and post-sync's `cited-guards` row
@@ -2460,7 +2461,7 @@ prunable. Without it the first new cause would have proposed deleting a live ent
 Two manifests changed in the same commit, as `AGENTS.md` requires:
 
 - `local/nightly-linux-known-red.json`: the one entry named
-  `src/main/daemon/daemon-pty-adapter-history-recovery.test.ts`, and upstream's `2f217b4d0dd`
+  `src/main/daemon/providers/adapter/testing/daemon-pty-adapter-history-recovery.test.ts`, and upstream's `2f217b4d0dd`
   (#38462) moved the file to `src/main/daemon/providers/adapter/testing/` on 2026-11-05. A
   `/`-bounded suffix match cannot pair those, so the entry had been matching **nothing** — the red it
   exists to absorb was not being absorbed at all. It now carries the real path, Vitest's full name, and

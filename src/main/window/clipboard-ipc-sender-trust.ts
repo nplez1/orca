@@ -1,6 +1,5 @@
 import type { IpcMainInvokeEvent, WebContents } from 'electron'
 import { isTrustedMainRendererSender } from '../ipc/main-renderer-sender-trust'
-import { isDashboardPopoutRenderer } from './dashboard-popout-window'
 
 let trustedClipboardRendererWebContentsId: number | null = null
 
@@ -15,8 +14,9 @@ export function assertTrustedClipboardSender(event: IpcMainInvokeEvent): void {
 }
 
 export function assertTrustedClipboardTextSender(event: IpcMainInvokeEvent): void {
-  // Dashboard popouts need text clipboard authority only; never extend it to images, files or remote operations.
-  if (!isTrustedClipboardRenderer(event.sender) && !isDashboardPopoutRenderer(event.sender)) {
+  // Why no pop-out admission: the fork deleted that surface, and dead code has no business adding
+  // an admission to a clipboard trust check (local/sync/expected-deletions.json, dashboard-delivery).
+  if (!isTrustedClipboardRenderer(event.sender)) {
     throw new Error('Unauthorized clipboard IPC sender')
   }
 }

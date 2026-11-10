@@ -18,7 +18,8 @@
           "0cda18153c": "Where each project's main checkout and its workspaces are created.",
           "9285cedcf2": "Flat",
           "b266f3f40e": "One folder per project",
-          "f9b2070017": "Workspace Layout"
+          "f9b2070017": "Workspace Layout",
+          "a8ce626e4b": null
         },
         "OpenAiTranscriptionKeyDialog": {
           "d246b2bdb3": "ローカルランタイムキーは、利用可能な場合は Electron 暗号化ストレージを使用して ~/.orca-np に保存されます。"
@@ -41,6 +42,15 @@
             "agentDashboard": {
               "popout": null
             }
+          }
+        },
+        "appearance": {
+          "search": {
+            "931c53cd16": null,
+            "585be839e9": null,
+            "20e7d30150": null,
+            "40c10c4deb": null,
+            "c29089716e": null
           }
         }
       },

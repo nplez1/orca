@@ -900,6 +900,48 @@
       "status": "expected-deletion",
       "supersededBy": "`FEED_TREE` plus `git ls-files -- src/main/updater` in the same file",
       "reason": "Removed by #313 on purpose: `FEED_GLOB` encoded a non-recursive `readdirSync` over the top level of `src/main/updater/`, and that glob is why the check passed while upstream moved the feed anchors into `lifecycle/` and `releases/`. The scan now reads every tracked file under the tree, so there is nothing left for the constant to hold."
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "startProvisionedRuntime",
+      "status": "expected-deletion",
+      "supersededBy": "upstream provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "The 2026-11-10 sync converged both sides’ \"record the VM create before the spawn\" work onto ONE create function (upstream’s), which also writes the fork’s bounded attempt row. The fork’s separate start helper has no caller left. evidence: convergence-ledger.md Ephemeral VM"
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "finishFailedProvisioning",
+      "status": "expected-deletion",
+      "supersededBy": "upstream provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Same convergence: failure finishing moved into the single create function, which keeps the fork’s attempt row on an unexpected throw and clears it on success. evidence: convergence-ledger.md Ephemeral VM"
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "forgetProvisioningAttempt",
+      "status": "expected-deletion",
+      "supersededBy": "upstream provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Same convergence: the attempt row is cleared inside the single create function rather than by a separate helper. evidence: convergence-ledger.md Ephemeral VM"
+    },
+    {
+      "path": "src/main/ephemeral-vm/runtime-provisioning.ts",
+      "symbol": "recordProvisioningAttempt",
+      "status": "expected-deletion",
+      "supersededBy": "upstream provisionEphemeralVmRuntime in runtime-service.ts",
+      "reason": "Same convergence: the attempt row is written inside the single create function. evidence: convergence-ledger.md Ephemeral VM"
+    },
+    {
+      "path": "src/main/github/client/fetch/pr-conversation-response.ts",
+      "symbol": "reviewIsReportable",
+      "status": "expected-deletion",
+      "supersededBy": "reviewRowIsReportable in the same file",
+      "reason": "Renamed by upstream’s extraction; the fork’s keep-rule is preserved through the shared isReportableReviewSubmission predicate, which the renamed function calls for both the GraphQL and REST paths."
+    },
+    {
+      "path": "src/renderer/src/lib/sidebar-worktree-activation.ts",
+      "symbol": "wakeEphemeralVmWorkspace",
+      "status": "expected-deletion",
+      "supersededBy": "resumeEphemeralVmWorkspace in lib/workspace/activation/sidebar-worktree-activation.ts",
+      "reason": "Upstream renamed wake to resume when it moved the file into lib/workspace/activation/. The fork’s synchronous ActivateAndRevealResult | false contract was re-applied at the new path."
     }
   ]
 }

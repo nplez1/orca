@@ -10,5 +10,7 @@ export const WORKER_THREAD_ENTRY_NAMES = [
   ...(['usage-scan', 'workspace-space-scan'] as const).map((n) => `${n}-worker-entry` as const),
   'claude-profile-setup-worker-entry',
   ...(['backup', 'writer'] as const).map((kind) => `profile-state-${kind}-worker-entry` as const),
-  'plugin-source-transpile-worker-entry'
+  'plugin-source-transpile-worker-entry',
+  // Fork entry: it is a rollup input, so it needs the same no-require('electron') scan.
+  'workspace-path-index-worker-entry'
 ] as const
