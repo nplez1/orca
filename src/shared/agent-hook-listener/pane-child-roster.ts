@@ -132,16 +132,24 @@ export function resolvePaneHold(
     // needs, and every consumer of `mainAgent` asks the same question — was this turn over?
     ...(leadState === 'done' && resolution.stateName !== 'done'
       ? {
-          mainAgent: continueMainAgentStatus(
-            held.previousMainAgent,
-            {
-              state: 'done',
-              // Why the turn's own completion time: a re-hold of the same finished turn must keep its
-              // clock, or the turn-news listener reads a fresh stamp as a turn that just ended.
-              stateStartedAt: payload.turnCompletedAt ?? held.previousMainAgent?.stateStartedAt
-            },
-            held.now ?? Date.now()
-          )
+          // Why the payload's own verdict first: a provider that owns its roster (grok) states the
+          // outcome and the turn's own end here, and replacing it would drop both.
+          mainAgent:
+            payload.mainAgent?.state === 'done'
+              ? payload.mainAgent
+              : continueMainAgentStatus(
+                  held.previousMainAgent,
+                  {
+                    state: 'done',
+                    // Why the turn's own completion time and nothing else: a re-hold of the same
+                    // finished turn keeps its clock through the previous `done` row, and a row
+                    // whose lead was not done cannot date this one.
+                    ...(payload.turnCompletedAt !== undefined
+                      ? { stateStartedAt: payload.turnCompletedAt }
+                      : {})
+                  },
+                  held.now ?? Date.now()
+                )
         }
       : {})
   }

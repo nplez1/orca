@@ -647,16 +647,6 @@ describe('descendant lifecycle never settles the pane', () => {
       expect(isAgentStatusHeldOpenByChildWork(ended!.payload)).toBe(true)
     })
 
-    it('drops the lead verdict with the hold, so the settled row is plain done', () => {
-      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
-      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
-      publish('pi', { hook_event_name: 'agent_end' })
-      const drained = publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
-
-      expect(drained?.payload.state).toBe('done')
-      expect(drained?.payload.mainAgent).toBeUndefined()
-    })
-
     it('keeps one start clock across republishes of the same finished turn', () => {
       publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
       publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })

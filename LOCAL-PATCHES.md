@@ -703,21 +703,33 @@ disappears, while a 250 s tool is still running — the reported window almost e
 
 The fix is one line of policy: `resolvePaneHold` publishes `mainAgent` (the lead's verdict it folded
 against, dated by `turnCompletedAt` and carried across re-holds the way `applyPiScheduledWorkHold`
-already does) whenever it holds a `done` lead open. It applies to every provider on this fold — pi and
-the grok child question — and the held row keeps the lead's vocabulary, so a held `waiting` still
-reads `waiting`. Nothing changes for a lead that is still working: a hold over one asserts nothing a
-`mainAgent` reader needs.
+already does) whenever it holds a `done` lead open. A provider that already stated a `done` verdict
+on the payload — grok's gated child question, which carries `outcome` and the turn's own end — keeps
+its own, so nothing a roster-owning lane said is replaced. It applies to every provider on this fold,
+and the held row keeps the lead's vocabulary, so a held `waiting` still reads `waiting`. Nothing
+changes for a lead that is still working: a hold over one asserts nothing a `mainAgent` reader needs.
+
+Three things this deliberately does not change, all stated so the next reader does not re-derive
+them. A `waiting` or `blocked` program-status proposal can still take a held row after the silence
+window — a needs-you signal should win, and the cost is that its row carries no children, which for
+pi needs a child dialog under a finished lead. A cancelled turn's held row publishes `mainAgent`
+without `outcome: 'cancellation'`, so a turn-news listener can announce a cancelled turn as finished;
+carrying the outcome is more than one hunk and is left as a follow-up. And the hold has no escape
+hatch of its own — a pi that stays alive but stops reporting a dead child pins the row until its next
+hook post or the 30-minute display decay, the same exposure the scheduled-work hold and Claude's
+child roster already carry.
 
 Anchors:
 
 - `src/shared/agent-hook-listener/pane-child-roster.ts` — `resolvePaneHold`'s `held` input and the
-  `mainAgent` it publishes.
+  `mainAgent` it publishes, keeping a `done` verdict the payload already states.
 - `src/shared/agent-hook-listener/descendant-pane-state.ts` — both call sites hand it the cached row's
   `mainAgent` and the publication's own clock.
 - Tests: `agent-hook-listener-descendant-lifecycle.test.ts` § "a row held open by a live child states
-  the lead verdict (#197)" (the held row, the drained row, and one start clock across republishes) and
-  `main/agent-hooks/server/program-status/hook-precedence.test.ts`, which is the first test over
-  `programStatusHookYieldEndsAt` at all and pins both the opt-out and the ordinary 2-minute lapse.
+  the lead verdict (#197)" (the held row's shape and one start clock across republishes), and
+  `main/agent-hooks/server/testing/providers/pi/server-pi-subagent-hold-precedence.test.ts`, which is
+  the regression: on the unfixed code the pane reads `done` one millisecond past the silence window,
+  with the child's row gone.
 
 ### `local(agents)`: a claude CLI child is not a second session
 
