@@ -23,20 +23,40 @@ export const REVIEWER = {
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+/** A spelling with its spaces loosened, so `Fable 5.2` also matches `Fable  5.2`. */
+const spaced = (text) => escapeRegExp(text).replace(/\s+/g, '\\s+')
+
 /**
  * The claim shape, built from `REVIEWER`: the backend spelling (`claude/fable`) or the body spelling
- * with a dotted version (`Fable 5.2`), followed by the reasoning level it ran at. Both spellings are
- * accepted because both are how the reviewer is invoked and how a body reports it.
+ * (`Fable 5.2`), followed by the reasoning level it ran at. Both spellings are accepted because both
+ * are how the reviewer is invoked and how a body reports it.
+ *
+ * Why the whole name rather than a family word plus a loose version: a reviewer whose name is not
+ * shaped `<Word> <N.N>` (`GPT-5.5`, `Claude Opus 5.5`) would generate a regex that refuses its own
+ * claim line, and matching the name whole also pins the version — `Fable 4` is not this reviewer.
  */
 export const REVIEWER_CLAIM = new RegExp(
-  `^(?:${REVIEWER.provider}[-/]${escapeRegExp(REVIEWER.alias)}|` +
-    `${escapeRegExp(REVIEWER.name.split(/\s+/)[0])}\\s+\\d+\\.\\d+)\\b[\\s\\S]*\\b` +
-    `${escapeRegExp(REVIEWER.thinking)}\\b`,
+  `^(?:${spaced(REVIEWER.provider)}[-/]${spaced(REVIEWER.alias)}|${spaced(REVIEWER.name)})\\b` +
+    `[\\s\\S]*\\b${escapeRegExp(REVIEWER.thinking)}\\b`,
   'i'
 )
 
 /** The line a PR body is expected to carry, and the one `open-pr.mjs` prints when it refuses one. */
 export const REVIEW_CLAIM_EXAMPLE = `Reviewed by ${REVIEWER.name}, ${REVIEWER.thinking}: R1 (2 blocking fixed), delta clean on R2`
+
+// Why a throw at import: a `REVIEWER` whose own claim line its regex refuses would make the gate
+// reject every PR body while the refusal names the reviewer it wants — a gate failing on the exact
+// line it prints. That is a misconfigured constant, not a review, so it fails here instead.
+for (const own of [
+  `${REVIEWER.name}, ${REVIEWER.thinking}`,
+  `${REVIEWER.provider}/${REVIEWER.alias}, ${REVIEWER.thinking}`
+]) {
+  if (!REVIEWER.thinking || !REVIEWER_CLAIM.test(own)) {
+    throw new Error(
+      `pr-body-claims: REVIEWER ${JSON.stringify(REVIEWER)} builds a regex that refuses its own "${own}"`
+    )
+  }
+}
 
 /** Wording that names a finding without claiming it was closed. */
 export const OPEN_VERDICT_WORDS =

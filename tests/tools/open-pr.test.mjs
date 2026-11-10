@@ -45,6 +45,8 @@ const REVIEWER_NAME = REVIEWER.name.split(/\s+/)[0]
 const OTHER_LEVEL = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'].find(
   (level) => level !== REVIEWER.thinking
 )
+/** The reviewer's own name with a version appended, which the trailing word boundary refuses. */
+const WRONG_VERSION = `${REVIEWER.name}9`
 
 /** A claim line in the accepted shape, so swapping the reviewer rewrites no case below. */
 const reviewed = (rounds, reviewer = `${REVIEWER.name}, ${REVIEWER.thinking}`) =>
@@ -494,7 +496,7 @@ it('refuses a review claim whose verdicts are still open', () => {
 it('names what a refused review claim is missing', () => {
   expect(reviewClaim(`Reviewed by ${REVIEWER.name}: R1 (2 blocking fixed)`)).toMatchObject({
     ok: false,
-    reason: expect.stringContaining(`${REVIEWER.name} at ${REVIEWER.thinking} reasoning`)
+    reason: expect.stringContaining('as the reviewer')
   })
   expect(
     reviewClaim(reviewed('R1 (2 blocking fixed)', `someone, ${REVIEWER.thinking}`))
@@ -554,12 +556,14 @@ it('accepts the claim shapes a real review produces, including a delta round', (
 
 it('requires the reviewer AGENTS.md names, version and reasoning included', () => {
   for (const claim of [
-    // The reviewer this gate used before `REVIEWER` named another: a swap has to fail loudly.
-    'Reviewed by Opus 5.5, high: R1 clean',
-    // The right family without a dotted version.
-    `Reviewed by ${REVIEWER_NAME} 4, ${REVIEWER.thinking}: R1 clean`,
+    // A reviewer of the right shape at the right level, but not the one `REVIEWER` names.
+    reviewed('R1 clean', `Nobody 9.9, ${REVIEWER.thinking}`),
+    // A version that starts with the reviewer's own name, which the whole-name match refuses.
+    `Reviewed by ${WRONG_VERSION}, ${REVIEWER.thinking}: R1 clean`,
     // The right reviewer at a level it did not run at.
     reviewed('R1 clean', `${REVIEWER.name}, ${OTHER_LEVEL}`),
+    // The right model behind the wrong backend spelling.
+    reviewed('R1 clean', `${REVIEWER.provider}/not-${REVIEWER.alias}, ${REVIEWER.thinking}`),
     reviewed('R1 clean', `a strong model, ${REVIEWER.thinking}`),
     reviewed('R1 clean', `gpt-5, ${REVIEWER.thinking}`)
   ]) {

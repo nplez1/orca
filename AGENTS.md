@@ -104,12 +104,9 @@ and an upstream head carrying any `local(` commit — or any fork-owned path (`l
 outright.
 
 **Both PR gates are read by that script.** It refuses any PR whose body has no review claim line. The
-reviewer and the reasoning level that line must name come from `REVIEWER` in
-`local/pr-body-claims.mjs`, which also exports the example:
-
-```
-Reviewed by Fable 5.2, medium: R1 (2 blocking fixed), delta clean on R2
-```
+reviewer, the reasoning level and the shape of that line all come from `REVIEWER` and
+`REVIEW_CLAIM_EXAMPLE` in `local/pr-body-claims.mjs` — the script prints the example it wants when it
+refuses a body, so there is no copy of it here to go stale.
 
 Gate 1 is **diff-scope dependent**, because the full unit suite moved off the PR boundary and onto the
 nightly `fork-main-tests.yml` lane plus the release gate (`~/Code/orca/AGENTS.md` § Verification tiers —
