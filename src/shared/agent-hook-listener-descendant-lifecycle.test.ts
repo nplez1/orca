@@ -689,5 +689,23 @@ describe('descendant lifecycle never settles the pane', () => {
       expect(first?.payload.mainAgent?.stateStartedAt).toBe(1_700)
       expect(second?.payload.mainAgent?.stateStartedAt).toBe(1_700)
     })
+
+    it('keeps that clock through a child’s own event, which carries no completion time', () => {
+      publish('pi', { hook_event_name: 'before_agent_start', prompt: 'delegate' })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      expect(
+        publish('pi', { hook_event_name: 'agent_end', turn_completed_at: 1_700 })?.payload.mainAgent
+          ?.stateStartedAt
+      ).toBe(1_700)
+
+      // Why: the descendant lane rebuilds the row from the lead's verdict alone, so it has no
+      // completion time of its own to date with — the cached verdict is the only clock it can keep.
+      const fromChild = publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [CHILD]
+      })
+      expect(fromChild?.payload.state).toBe('working')
+      expect(fromChild?.payload.mainAgent?.stateStartedAt).toBe(1_700)
+    })
   })
 })
