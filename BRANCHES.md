@@ -331,6 +331,27 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
+### nplez1/issue-352 — pi's folder-trust prompt blocked a new worktree (fork issue #352, PR #353)
+
+- **Why:** the first pi launched into a brand-new worktree blocked on pi's interactive “Trust project
+  folder?” dialog, so an orchestrated launch (`worktree create --agent pi`, `agent launch`, the
+  `agent:auto` driver) stalled with nobody to answer it. Pi gates project-local resources (`.pi`
+  settings and extensions, a project `.agents/skills`) on a decision stored per canonical path in
+  `~/.pi/agent/trust.json`, so a child worktree prompts even under a trusted parent — and every
+  worktree here carries `.agents/skills`, which is one of the gated resources.
+- **Shape:** pi's own `--approve` (per run, persists nothing) is spliced into the launch command at PTY
+  spawn in `spawn-options-assembly.ts`, gated by `preTrustsAgentLaunch` — the same decision that writes
+  the other agents' trust artifacts — and narrowed to a worktree whose root holds the agent's start
+  folder. The once-per-repository consent prompt gained `agentLaunchDependsOnWorkspaceTrust`, so it
+  asks for an agent whose launch _reads_ the answer, not only for one whose trust Orca pre-writes;
+  without that, pi would have gone from “pi asks every time” to “nobody asks”.
+- **Base:** `nplez1/main`, as every fork PR here is. `local/open-pr.mjs` still defaults to `main`, so
+  pass `--base nplez1/main` or retarget afterwards — #353 was opened against `main` and bounced on it.
+- **Verified:** `pnpm tc` clean; focused suites green (19 spawn/argv + 6 renderer-prompt);
+  `check:code-quality:changed` clean; unit gate PASS on the head. Reviewed by `claude/opus`, high: R1
+  (1 SHOULD-FIX fixed), delta clean on R2; `claude/fable`, medium: R1 clean, its 4 MINORs recorded in
+  the PR body as known fail-closed limits.
+
 ### nplez1/issue-314 — the unit shard verdict's file set (fork issue #314)
 
 - **Why:** `local/check-unit-shard-verdict.mjs` judged a shard by its Vitest JSON report alone, and a
