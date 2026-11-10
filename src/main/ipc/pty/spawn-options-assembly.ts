@@ -10,7 +10,10 @@ import { prepareOpenCodePtyLaunch } from '../../opencode/opencode-pty-launch'
 import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../../pty/shell-startup/legacy-terminal-shim-dir'
 import { PI_PROCESS_OWNER_ENV_KEYS } from '../../pty/shell-startup/pi-process-owner-env'
 import { planCodexNoDaemonLaunch } from '../../pty/shell-startup/codex-no-daemon-launch-command'
-import { applyAgentWorkspaceTrustToSpawn } from '../../agent-launch/trust/agent-workspace-trust-spawn'
+import {
+  applyAgentWorkspaceTrustToSpawn,
+  withAgentWorkspaceTrustLaunchArgs
+} from '../../agent-launch/trust/agent-workspace-trust-spawn'
 import type { PtySpawnOptions } from '../../providers/pty-provider-contract'
 import type { CodexAccountSelectionTarget } from '../../codex-accounts/runtime-selection'
 import { getStartupTerminalIngressIntent } from '../terminal-startup-color-query-replies'
@@ -175,6 +178,22 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   if (!connectionId && !input.isDaemonHostSpawn) {
     spawnOptions.codexHomePathOverride = { value: input.selectedCodexHomePath }
   }
+  // One input for both trust steps: the write and the launch args answer to the same decision.
+  const trustInput = {
+    launchAgent: args.launchAgent,
+    worktreeId: args.worktreeId,
+    trustWorktreeId: args.trustWorktreeId,
+    skipForThisLaunch: args.skipAgentWorkspaceTrust === true,
+    cwd: input.cwd,
+    store: input.store,
+    isFreshLaunch: !input.preAdoptedStablePane && launchCommand !== undefined,
+    settings: input.getSettings?.(),
+    env,
+    claudeAuth: input.claudeAuth,
+    wslDistro: input.expectedWslDistro,
+    connectionId: connectionId ?? null,
+    codexHome: input.selectedCodexHomePath
+  }
   const noDaemonLaunch = planCodexNoDaemonLaunch({
     command: launchCommand,
     executesOnThisHost: !connectionId && input.codexRuntime !== 'wsl',
@@ -185,7 +204,9 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   })
   const command = noDaemonLaunch ? await noDaemonLaunch : launchCommand
   if (command !== undefined) {
-    spawnOptions.command = command
+    // Why not `launchCommand`: callers keep that one as the session's command, so the flag belongs
+    // to this spawn alone.
+    spawnOptions.command = withAgentWorkspaceTrustLaunchArgs({ ...trustInput, command, shell })
   }
   if (args.commandDelivery !== undefined) {
     spawnOptions.commandDelivery = args.commandDelivery
@@ -206,22 +227,7 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   if (startupIngress) {
     spawnOptions.startupIngress = startupIngress
   }
-  const trustWrite = applyAgentWorkspaceTrustToSpawn({
-    launchAgent: args.launchAgent,
-    worktreeId: args.worktreeId,
-    trustWorktreeId: args.trustWorktreeId,
-    skipForThisLaunch: args.skipAgentWorkspaceTrust === true,
-    cwd: input.cwd,
-    store: input.store,
-    isFreshLaunch: !input.preAdoptedStablePane && launchCommand !== undefined,
-    settings: input.getSettings?.(),
-    env,
-    claudeAuth: input.claudeAuth,
-    wslDistro: input.expectedWslDistro,
-    connectionId: connectionId ?? null,
-    codexHome: input.selectedCodexHomePath,
-    spawnOptions
-  })
+  const trustWrite = applyAgentWorkspaceTrustToSpawn({ ...trustInput, spawnOptions })
   if (trustWrite) {
     await trustWrite
   }
