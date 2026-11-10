@@ -22,6 +22,7 @@ import {
 } from '../applying-settings/terminal-settings-migrations'
 import {
   canonicalizePersistedFloatingWorkspaceDirectory,
+  canonicalTrustedFloatingTerminalCwd,
   normalizeFloatingWorkspaceTrustedCwds
 } from '../restoring-sessions/floating-workspace-normalization'
 
@@ -154,13 +155,13 @@ export function prepareLoadedTerminalSettings(
   // Why: before the floating workspace had its own folder, '' and '~' both meant "the default" (home).
   // Only a real custom path survives; the rest move to the floating-workspace folder, which also
   // fixes profiles whose floating terminals opened in whatever project $HOME held.
-  const migratedFloatingTerminalCwd =
+  const configuredFloatingTerminalCwd =
     typeof rawFloatingTerminalCwd === 'string' &&
     rawFloatingTerminalCwd.trim().length > 0 &&
     rawFloatingTerminalCwd.trim() !== '~'
       ? rawFloatingTerminalCwd
       : defaults.settings.floatingTerminalCwd
-  if (migratedFloatingTerminalCwd !== rawFloatingTerminalCwd) {
+  if (configuredFloatingTerminalCwd !== rawFloatingTerminalCwd) {
     markNeedsSave()
   }
   const normalizedFloatingTerminalTrustedCwds = normalizeFloatingWorkspaceTrustedCwds(
@@ -189,6 +190,18 @@ export function prepareLoadedTerminalSettings(
     }
   }
   if (normalizedFloatingTerminalTrustedCwds.changed) {
+    markNeedsSave()
+  }
+  // Why: settings are raw JSON here; a malformed cwd falls back to the default instead of failing reads.
+  const migratedFloatingTerminalCwd =
+    typeof configuredFloatingTerminalCwd === 'string'
+      ? canonicalTrustedFloatingTerminalCwd(
+          configuredFloatingTerminalCwd,
+          migratedFloatingTerminalTrustedCwds,
+          homeDir
+        )
+      : defaults.settings.floatingTerminalCwd
+  if (migratedFloatingTerminalCwd !== configuredFloatingTerminalCwd) {
     markNeedsSave()
   }
   return {

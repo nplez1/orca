@@ -10,7 +10,7 @@ import {
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
-} from '@/lib/jira-issue-workspace-attachment'
+} from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
 import { useTranslate } from '@/i18n/use-translate'
 import { JiraIssueMetadataBar, JiraIssueWorkspaceHeader } from './jira-issue-workspace-chrome'
@@ -19,7 +19,7 @@ import { JiraIssueCommentComposer, JiraIssueWorkspaceContent } from './jira-issu
 import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import { getJiraRuntimeTarget } from '@/runtime/jira/runtime-jira-target'
-import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
+import { getEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
 

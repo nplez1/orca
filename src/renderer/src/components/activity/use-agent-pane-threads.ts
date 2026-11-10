@@ -1,7 +1,8 @@
 import { useDeferredValue, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store'
 import { useStructuredChatTabNames } from '@/runtime/native-chat/naming/structured-chat-name-observation'
-import { buildActivityEvents, createActivityEventBuildCache } from './activity-event-builder'
+import { buildActivityEvents } from './activity-event-builder'
+import { createActivityEventBuildCache } from '@/components/activity/activity-event-build-cache'
 import { freshActivityLiveAgentState } from './activity-event-state'
 import {
   useAgentPaneThreadsDefaultHostId,
@@ -67,6 +68,7 @@ export function useAllAgentPaneThreads({ badgeOnly = false }: { badgeOnly?: bool
         )
       ) {
         eventBuildCacheRef.current.panes.clear()
+        eventBuildCacheRef.current.tabs = undefined
         return EMPTY_ACTIVITY_BUILD
       }
       // Global history caps affect live-thread unread and search state.
@@ -221,10 +223,11 @@ export function useAgentPaneThreads(args: {
     const matchesSearchQuery =
       normalizedQuery === null ? null : createActivityThreadSearchMatcher(normalizedQuery)
     return scopeVisibleThreads.filter((thread) => {
-      // Why: keep the just-selected thread visible after auto-mark-read flips it to read, else unread-only mode makes the clicked row vanish from the list.
+      // Keep live agents and the selected row visible after marking read; migration blocks are unavailable.
       if (
         readFilter === 'unread' &&
         !thread.unread &&
+        (thread.currentAgentState === null || thread.migrationUnsupportedPtyId !== undefined) &&
         thread.paneKey !== effectiveSelectedPaneKey
       ) {
         return false

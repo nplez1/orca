@@ -6,8 +6,8 @@ import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { parseMuseSettingsText } from './hook-config-json'
 import { MuseHookService } from './hook-service'
 import { buildMuseManagedHooksFile, getMuseManagedCommand } from './hook-settings'
-import { wrapWindowsHookCommand } from '../agent-hooks/windows-hook-command'
-import { createAgentHookMemorySftp } from '../agent-hooks/agent-hook-memory-sftp.test-fixture'
+import { wrapWindowsHookCommand } from '../agent-hooks/installation/commands/windows-hook-command'
+import { createAgentHookMemorySftp } from '../agent-hooks/installation/remote/testing/agent-hook-memory-sftp.test-fixture'
 
 // Isolate managed scripts and Muse settings from real HOME/XDG configuration.
 let home: string

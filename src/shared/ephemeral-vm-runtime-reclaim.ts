@@ -76,7 +76,13 @@ export function decideEphemeralVmRuntimeReclaim(args: {
   ) {
     return { reclaim: false, reason: 'already-reclaimed' }
   }
-  const read = readEphemeralVmLifetime(args.runtime.recipeResult.userData)
+  // Why a skip: a write-ahead record has no create result yet, so there is no provider deadline to
+  // compare against and nothing this sweep could reclaim.
+  const recipeResult = args.runtime.recipeResult
+  if (!recipeResult) {
+    return { reclaim: false, reason: 'no-provider-deadline' }
+  }
+  const read = readEphemeralVmLifetime(recipeResult.userData)
   if (!read.ok || !read.lifetime) {
     return { reclaim: false, reason: 'no-provider-deadline' }
   }

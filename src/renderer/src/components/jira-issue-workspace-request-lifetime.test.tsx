@@ -10,7 +10,7 @@ import type {
   JiraIssueCommentComposer,
   JiraIssueWorkspaceContent
 } from './jira-issue-workspace-content'
-import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import type { JiraIssueMetadataBar } from './jira-issue-workspace-chrome'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 

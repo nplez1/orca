@@ -17,7 +17,7 @@ import type { FileExplorerRowProjection } from './file-explorer-row-projection'
 import type { useFileExplorerSelection } from '../selection/useFileExplorerSelection'
 import type { useFileExplorerTree } from './useFileExplorerTree'
 import type { useFileExplorerTreePaneState } from './use-file-explorer-tree-pane-state'
-import type { WslHostUnavailableReason } from '../../../../lib/wsl-host-availability'
+import type { WslHostUnavailableReason } from '../../../../runtime/hosts/wsl/wsl-host-availability'
 import type { StoppedWslHost } from '../../../wsl-host-stopped/use-stopped-wsl-host'
 
 type FileExplorerFilesTreePaneProps = {
@@ -165,20 +165,14 @@ export function FileExplorerFilesTreePane({
   const wslHostStopped = hasError && stoppedWslHost !== null
   const emptyMessage =
     emptyMessageKind === 'stale'
-      ? t(
-          'auto.components.right.sidebar.FileExplorerNameFilter.updating',
-          'Updating file list'
-        )
+      ? t('auto.components.right.sidebar.FileExplorerNameFilter.updating', 'Updating file list')
       : emptyMessageKind === 'partial-scan'
         ? t(
             'auto.components.right.sidebar.FileExplorer.filterScannedPartialWorkspace',
             'Only part of this workspace was searched — add more of the name to narrow it down'
           )
         : emptyMessageKind === 'no-match'
-          ? t(
-              'auto.components.right.sidebar.FileExplorer.2f4483d6c4',
-              'No files match this filter'
-            )
+          ? t('auto.components.right.sidebar.FileExplorer.2f4483d6c4', 'No files match this filter')
           : undefined
 
   return (

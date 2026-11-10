@@ -3,10 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { normalizeHookPayload } from '../../shared/agent-hook-listener/normalization/normalize-hook-payload'
 import type { ParsedAgentStatusPayload } from '../../shared/agent-status/contracts/agent-status-types'
 import { PANE_KEY } from '../../shared/agent-hook-listener/normalization/agent-hook-listener-test-harness'
-import {
-  createHookListenerState,
-  seedLegacyAgentStatusForTests
-} from '../../shared/agent-hook-listener/listener-state'
+import { createHookListenerState } from '../../shared/agent-hook-listener/listener-state'
+import { seedLegacyAgentStatusForTests } from '../../shared/agent-hook-listener/legacy-agent-status-test-seed'
 import {
   createAgentStatusExtensionHarness,
   type HookContext

@@ -15,7 +15,7 @@ import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rp
 import { createTestStore, makeLayout, makeTab, makeWorktree, seedStore } from './store-test-helpers'
 import { createStoreCascadesMockApi } from '../testing/app-store-cascade-api.test-fixture'
 import { resolveUnreachableVmRemovalFallback } from './worktrees/teardown/unreachable-vm-workspace-release'
-import type * as AgentStatusModule from '@/lib/agent-status'
+import type * as AgentStatusModule from '@/lib/agent-status/aggregation/worktree-agent-status'
 
 vi.mock('sonner', () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn(), warning: vi.fn() }
@@ -26,7 +26,7 @@ vi.mock('@/components/terminal-pane/pty-transport/delivery/pty-dispatcher.ts', (
   unregisterPtyDataHandlers: vi.fn(() => [])
 }))
 
-vi.mock('@/lib/agent-status', async (importOriginal) => {
+vi.mock('@/lib/agent-status/aggregation/worktree-agent-status', async (importOriginal) => {
   const actual = await importOriginal<typeof AgentStatusModule>()
   return {
     ...actual,

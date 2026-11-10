@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as AgentHookServerModule from '../agent-hooks/server'
+import type * as AgentHookServerModule from '../agent-hooks/server/agent-hook-server'
 import { makePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import { startFirstWindowStartupServices } from '../startup/first-window-startup-services'
 
@@ -45,9 +45,11 @@ vi.mock('electron', () => ({
 
 vi.mock('../startup/main-process-state', () => ({ mainProcessState }))
 
-vi.mock('../agent-hooks/server', async () => {
+vi.mock('../agent-hooks/server/agent-hook-server', async () => {
   // Use the real pane-key validator so invalid-input coverage tracks its constraints.
-  const actual = await vi.importActual<typeof AgentHookServerModule>('../agent-hooks/server')
+  const actual = await vi.importActual<typeof AgentHookServerModule>(
+    '../agent-hooks/server/agent-hook-server'
+  )
   return {
     ...actual,
     agentHookServer: {
@@ -64,7 +66,7 @@ vi.mock('../agent-hooks/server', async () => {
   }
 })
 
-vi.mock('../agent-hooks/migration-unsupported-pty-state', () => ({
+vi.mock('../agent-hooks/observations/migration-unsupported-pty-state', () => ({
   clearMigrationUnsupportedPtysByTabPrefix,
   clearMigrationUnsupportedPtysForPaneKey,
   getMigrationUnsupportedPtySnapshot: vi.fn(() => [])

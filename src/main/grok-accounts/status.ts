@@ -1,5 +1,8 @@
 import type { GrokAccountStatus } from '../../shared/rate-limit-types'
-import { isGrokAccessTokenFresh, readGrokAuthSession } from '../rate-limits/grok-auth'
+import {
+  isGrokAccessTokenFresh,
+  readGrokAuthSession
+} from '../rate-limits/providers/grok/grok-auth'
 
 /** Status reported without touching ~/.grok/auth.json when the user disabled Grok. */
 export function disabledGrokAccountStatus(): GrokAccountStatus {

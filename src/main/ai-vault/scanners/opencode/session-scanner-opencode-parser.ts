@@ -1,3 +1,4 @@
+import { throwIfAiVaultScanCancelled, waitForAiVaultScan } from '../../ai-vault-scan-cancellation'
 import { wslGatedReaddir, wslGatedReadFile } from '../../../native-chat/wsl-transcript-fs-access'
 import { WslTranscriptFsError } from '../../../native-chat/wsl-transcript-fs-error'
 import { join } from 'node:path'
@@ -32,8 +33,10 @@ export async function parseOpenCodeSessionFile(
   messages?: TranscriptMessageSink,
   signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
-  const raw: unknown = JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal))
-  const record = asRecord(raw)
+  const parsed: unknown = JSON.parse(
+    await waitForAiVaultScan(wslGatedReadFile(file.path, 'utf-8', 'scan', signal), signal)
+  )
+  const record = asRecord(parsed)
   if (!record) {
     return null
   }
@@ -54,8 +57,9 @@ async function readOpenCodeMessagesInOrder(
 ): Promise<Record<string, unknown>[]> {
   let entries
   try {
-    entries = await wslGatedReaddir(messageDir, 'scan', signal)
+    entries = await waitForAiVaultScan(wslGatedReaddir(messageDir, 'scan', signal), signal)
   } catch (error) {
+    throwIfAiVaultScanCancelled(signal)
     // Propagate WSL refusal so an unreachable message directory is not cached as an empty transcript.
     if (error instanceof WslTranscriptFsError) {
       throw error
@@ -69,11 +73,15 @@ async function readOpenCodeMessagesInOrder(
     }
     let message: Record<string, unknown> | null = null
     try {
-      const raw: unknown = JSON.parse(
-        await wslGatedReadFile(join(messageDir, entry.name), 'utf-8', 'scan', signal)
+      const parsed: unknown = JSON.parse(
+        await waitForAiVaultScan(
+          wslGatedReadFile(join(messageDir, entry.name), 'utf-8', 'scan', signal),
+          signal
+        )
       )
-      message = asRecord(raw)
+      message = asRecord(parsed)
     } catch (error) {
+      throwIfAiVaultScanCancelled(signal)
       // Skip malformed live writes, but propagate WSL refusal so incomplete transcripts remain retryable.
       if (error instanceof WslTranscriptFsError) {
         throw error
@@ -108,6 +116,7 @@ export async function consumeOpenCodeMessages(
     join(storageRoot, 'message', sessionId),
     signal
   )) {
+    await waitForAiVaultScan(accumulator.messages.drain?.() ?? Promise.resolve(), signal)
     const role = extractString(message.role)
     if (role === 'user' || role === 'assistant') {
       accumulator.messageCount++

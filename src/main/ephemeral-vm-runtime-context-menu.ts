@@ -35,6 +35,14 @@ export async function runEphemeralVmRuntimeContextMenuItem(
 ): Promise<EphemeralVmRuntimeContextMenuItemRun> {
   const resolved = getRuntimeRecipeContext(args.store, args.userDataPath, args.runtimeId)
   const runtime = resolved.runtime
+  // Why a throw: the item's hook is handed the create's result to address the same machine, so a
+  // write-ahead record with no result yet has nothing to run an item against.
+  const recipeResult = runtime.recipeResult
+  if (!recipeResult) {
+    throw new Error(
+      'This host has no recorded recipe result, so its context menu has nothing to run.'
+    )
+  }
   // Why the same predicate the menu hides on: an action the user can see must either run or explain
   // itself, and a released host — or one whose destroy is in flight — is not somewhere to launch into.
   if (!isEphemeralVmHostActionable(runtime)) {
@@ -48,15 +56,15 @@ export async function runEphemeralVmRuntimeContextMenuItem(
   const hostName = resolveEphemeralVmRuntimeHostName(args.userDataPath, runtime)
 
   const run = await runEphemeralVmRecipeContextMenuItem({
-    repoPath: resolved.repo.repo.path,
+    repoPath: resolved.repoPath,
     // Why the record first: the hook that runs for a click is the one the recipe declared when
     // this host was created, so a later orca.yaml edit cannot redirect an existing workspace's menu.
     // Why no fallback to the recipe read now: the renderer only offers what the record holds, so a
     // recipe the host never snapshotted was never offered — and main must accept exactly what the
     // menu shows.
     recipe: { ...resolved.recipe, contextMenuItems: runtime.contextMenuItems ?? [] },
-    context: contextFromRuntime(resolved.repo.repo.path, runtime),
-    recipeResult: runtime.recipeResult,
+    context: contextFromRuntime(resolved.repoPath, runtime),
+    recipeResult,
     itemId: args.itemId,
     hostName,
     workspacePath,
@@ -88,7 +96,11 @@ export function resolveEphemeralVmRuntimeHostName(
   userDataPath: string,
   runtime: EphemeralVmRuntimeRecord
 ): string {
-  const connection = getEphemeralVmRecipeResultConnection(runtime.recipeResult)
+  const recipeResult = runtime.recipeResult
+  if (!recipeResult) {
+    return ''
+  }
+  const connection = getEphemeralVmRecipeResultConnection(recipeResult)
   if (connection.type === 'ssh') {
     return connection.target.label
   }

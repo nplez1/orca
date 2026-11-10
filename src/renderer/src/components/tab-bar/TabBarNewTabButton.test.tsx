@@ -48,7 +48,7 @@ vi.mock('@/lib/agent-session/launch/structured-agent-session-launch-status', () 
   useStructuredAgentLaunchStatus: vi.fn(() => harness.structuredLaunchStatus)
 }))
 
-vi.mock('@/lib/agent-catalog', () => ({
+vi.mock('@/lib/agent-catalog/agent-catalog', () => ({
   getAgentCatalog: () => [
     { id: 'claude', label: 'Claude' },
     { id: 'codex', label: 'Codex' }

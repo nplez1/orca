@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../../shared/execution-host'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { branchName } from '@/lib/git-utils'
+import { branchName } from '@/lib/source-control/branches/branch-name'
 import {
   getProjectHostSetupSelectionKey,
   type ProjectHostSetupOption

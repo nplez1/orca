@@ -13,7 +13,7 @@ export const getStatusBarToggles = createLocalizedCatalog(
     getMuseStatusBarToggleSearchEntry(),
     {
       id: 'ssh',
-      title: translate('auto.components.settings.appearance.search.57fb424c56', 'Remote Hosts'),
+      title: translate('auto.components.settings.appearance.search.20b33a61c8', 'Remote hosts'),
       description: translate(
         'auto.components.settings.appearance.search.f17d66d0d2',
         'Show remote host connection status in the status bar.'
@@ -41,7 +41,7 @@ export const getStatusBarToggles = createLocalizedCatalog(
     },
     {
       id: 'resource-usage',
-      title: translate('auto.components.settings.appearance.search.7cf005b29f', 'Resource Manager'),
+      title: translate('auto.components.settings.appearance.search.b8dc238d07', 'Resource manager'),
       description: translate(
         'auto.components.settings.appearance.search.81ef5abc2f',
         'Show CPU, memory, terminal sessions, and workspace disk usage in the status bar.'

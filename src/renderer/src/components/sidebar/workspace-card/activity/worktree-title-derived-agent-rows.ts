@@ -6,7 +6,8 @@ import {
   isCursorAgentTitle
 } from '../../../../../../shared/agent-status/title/agent-title-core'
 
-import { classifyTitleActivity, resolveTitleActivityLabel } from '@/lib/pane-agent-evidence'
+import { detectAgentStatusFromTitle } from '../../../../../../shared/agent-status/title/agent-title-status'
+import { getAgentLabel } from '../../../../../../shared/agent-status/title/agent-title-identity'
 import { tabHasLivePty } from '../../../../../../shared/tab-has-live-pty'
 import type {
   AgentStatusEntry,
@@ -169,8 +170,8 @@ function buildTitleDerivedAgentRow(args: {
   // Claude management and Cursor’s status-less native titles still identify idle panes without claiming active work.
   const titleStatus = isClaudeAgentsTitle
     ? 'idle'
-    : (classifyTitleActivity(title) ?? (isCursorAgentTitle(title) ? 'idle' : null))
-  const label = isClaudeAgentsTitle ? 'Claude Code' : resolveTitleActivityLabel(title)
+    : (detectAgentStatusFromTitle(title) ?? (isCursorAgentTitle(title) ? 'idle' : null))
+  const label = isClaudeAgentsTitle ? 'Claude Code' : getAgentLabel(title)
   if (!isTerminalLeafId(args.leafId)) {
     return null
   }
@@ -271,7 +272,7 @@ export function resolveAgentTypeFromTerminalTitle(
     return null
   }
   const normalizedTitle = normalizeCompatibleAgentTitleForOwner(title, ownerAgentType, options)
-  const label = resolveTitleActivityLabel(normalizedTitle)
+  const label = getAgentLabel(normalizedTitle)
   return label
     ? (resolveCompatibleAgentTypeForOwner(
         resolveTitleDerivedAgentType(normalizedTitle, label, ownerAgentType),

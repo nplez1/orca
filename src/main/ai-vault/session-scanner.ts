@@ -1,4 +1,7 @@
-import type { AiVaultListResult, AiVaultScanIssue } from '../../shared/ai-vault/contracts/ai-vault-types'
+import type {
+  AiVaultListResult,
+  AiVaultScanIssue
+} from '../../shared/ai-vault/contracts/ai-vault-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { withSpan } from '../observability/tracer'
 import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
@@ -23,6 +26,11 @@ import {
 } from './scanners/cursor/session-scanner-cursor-chat-meta'
 import type { AiVaultScanOptions } from './session-scanner-types'
 import { clampPositiveInteger } from './session-scanner-values'
+import { scopeOnlyScan } from './session-scope-cwd'
+import {
+  aiVaultSessionInScope,
+  createAiVaultScopeCwdMatcher
+} from '../../shared/ai-vault/scanning/ai-vault-scope-cwd-match'
 import { throwIfAiVaultScanCancelled } from './ai-vault-scan-cancellation'
 import { DEFAULT_AI_VAULT_SCAN_LIMIT } from '../../shared/ai-vault/scanning/ai-vault-session-depth'
 import { withDevinSessionsDbScan } from './scanners/devin/session-scanner-devin-db'
@@ -30,7 +38,7 @@ import { withOpenCodeSqliteScanScope } from './scanners/opencode/sqlite/session-
 
 const SESSION_PARSE_CANDIDATE_MULTIPLIER = 2
 
-/** Return recency-capped sessions plus recovered in-scope sessions, deduplicated and sorted. */
+/** Return recency-capped sessions plus recovered in-scope sessions (only those for scopeOnly), deduplicated and sorted. */
 export async function scanAiVaultSessions(
   options: AiVaultScanOptions = {}
 ): Promise<AiVaultListResult> {
@@ -77,9 +85,11 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
         throwIfAiVaultScanCancelled(options.signal)
         noteAiVaultScanReading(options.signal)
 
+        const scopeOnly = scopeOnlyScan(options)
         const parsedSessions = await parseSessionCandidates({
           candidates: parseCandidates,
-          limit,
+          // Scope-only parses the whole window: its in-scope rows must not depend on bucket agents' rows.
+          limit: scopeOnly ? Number.POSITIVE_INFINITY : limit,
           platform,
           executionHostId,
           issues,
@@ -89,16 +99,21 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
           settled: (candidate, parsed) => workload?.settle(candidate, 'global', parsed)
         })
 
-        const cappedSessions = sortAiVaultSessionsByRecency(
-          dedupeScannedSessions(parsedSessions)
-        ).slice(0, limit)
+        const recentSessions = sortAiVaultSessionsByRecency(dedupeScannedSessions(parsedSessions))
+        // Scope-only keeps the recency pass for agents without cwd buckets, but returns only its in-scope rows.
+        const inScope = scopeOnly ? createAiVaultScopeCwdMatcher(options.scopePaths ?? []) : null
+        const cappedSessions = inScope
+          ? recentSessions.filter((session) => aiVaultSessionInScope(inScope, session))
+          : recentSessions.slice(0, limit)
 
         const scopeSessions = await scanInScopeSessions({
           inventory,
           discoveries,
           options,
           limit,
-          alreadyParsedFilePaths: new Set(cappedSessions.map((session) => session.filePath)),
+          alreadyParsedFilePaths: new Set(
+            (scopeOnly ? recentSessions : cappedSessions).map((session) => session.filePath)
+          ),
           platform,
           executionHostId,
           issues,

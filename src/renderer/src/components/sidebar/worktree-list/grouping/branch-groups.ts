@@ -6,7 +6,7 @@ import {
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import { isDetachedHeadWorkspace } from '../../../../../../shared/worktree/workspace-kinds'
-import { branchName } from '../../../../lib/git-utils'
+import { branchName } from '../../../../lib/source-control/branches/branch-name'
 import {
   composeWorktreeHostIdentity,
   getWorktreeHostIdentity

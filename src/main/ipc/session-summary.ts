@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
-import { agentHookServer } from '../agent-hooks/server'
+import { agentHookServer } from '../agent-hooks/server/agent-hook-server'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import {
   isSessionSummaryCloseRequest,

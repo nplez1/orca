@@ -111,22 +111,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   emit({ type: 'sessionSearch', init: searchInit(false) })
+  await searchStatus()
   process.send = originalSend
   await harness.cleanup()
-})
-
-it('answers a search and a reconcile over the protocol', async () => {
-  expect(await call({ type: 'request', operation: 'searchReconcile' })).toEqual({
-    operation: 'searchReconcile',
-    value: null,
-    type: 'result',
-    id: expect.any(Number)
-  })
-  const response = await searchSessions('distinctive')
-  expect(response.kind).toBe('results')
-  if (response.kind === 'results') {
-    expect(response.hits.map((hit) => hit.sessionId)).toEqual([SESSION_ID])
-  }
 })
 
 it('discovers a new root through the parent exchange on manual reconciliation', async () => {
@@ -170,6 +157,7 @@ it('withdraws content consent without a respawn and keeps answering', async () =
   expect((await searchSessions('distinctive')).kind).not.toBe('unavailable')
   // Re-consenting reuses the index that was left on disk rather than rebuilding it.
   emit({ type: 'sessionSearch', init: searchInit(true) })
+  await call({ type: 'request', operation: 'searchReconcile' })
   expect((await searchSessions('distinctive')).kind).toBe('results')
 })
 

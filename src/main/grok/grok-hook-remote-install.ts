@@ -2,12 +2,12 @@ import type { SFTPWrapper } from 'ssh2'
 
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import type { AgentHookInstallStatus } from '../../shared/agent-hook-listener/configuration/agent-hook-types'
-import { wrapPosixHookCommand } from '../agent-hooks/installer-utils'
+import { wrapPosixHookCommand } from '../agent-hooks/installation/commands/posix-hook-command'
 import {
   readHooksJsonRemote,
-  writeHooksJsonRemote,
-  writeManagedScriptRemote
-} from '../agent-hooks/installer-utils-remote'
+  writeHooksJsonRemote
+} from '../agent-hooks/installation/configuration/hooks-json-remote'
+import { writeManagedScriptRemote } from '../agent-hooks/installation/scripts/managed-script-write-remote'
 import { buildInstalledGrokConfig } from './grok-hook-config'
 import { GROK_HOME_ENVELOPE_MAX_LENGTH } from './windows-grok-hook-script'
 

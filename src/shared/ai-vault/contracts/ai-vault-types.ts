@@ -260,6 +260,8 @@ export type AiVaultListArgs = {
    * queries are the client's own business (`aiVaultHostListQuery` empties them).
    */
   query?: string
+  /** Return only scopePaths sessions, without the global recency pass. Older hosts ignore it; clients still filter. */
+  scopeOnly?: boolean
   executionHostScope?: ExecutionHostScope
   requestToken?: string
   /**
@@ -269,6 +271,21 @@ export type AiVaultListArgs = {
   paged?: boolean
   /** Row offset inside the sorted list; read only when `paged` is set. */
   offset?: number
+}
+
+/** Cap scope paths for a host; a capped scope can't answer alone, so it drops scopeOnly. */
+export function boundedAiVaultScopeArgs(
+  scopePaths: readonly string[] | undefined,
+  scopeOnly: boolean | undefined
+): Pick<AiVaultListArgs, 'scopePaths' | 'scopeOnly'> {
+  if (!scopePaths) {
+    return {}
+  }
+  return scopeOnly === true &&
+    scopePaths.length > 0 &&
+    scopePaths.length <= AI_VAULT_SCOPE_PATHS_MAX_COUNT
+    ? { scopePaths, scopeOnly: true }
+    : { scopePaths: scopePaths.slice(0, AI_VAULT_SCOPE_PATHS_MAX_COUNT) }
 }
 
 export type AiVaultListResult = {

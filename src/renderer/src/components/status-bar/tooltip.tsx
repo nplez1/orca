@@ -3,7 +3,7 @@ import {
   formatResetCountdown,
   formatResetDuration
 } from '../../../../shared/rate-limit-reset-format'
-import { AgentIcon } from '@/lib/agent-catalog'
+import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
 import { FORK_USAGE_PROVIDERS, isForkUsageProvider } from './fork-usage-providers'
 import { creditsItemRows, describeCredits } from './provider-credits-format'
@@ -24,6 +24,7 @@ import {
 } from '../../../../shared/usage-percentage-display'
 import { formatUsagePercentageLabel } from './usage-percentage-label'
 import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
+import { recomputeOn } from '@/lib/recompute-on'
 import { barColor, ProviderExtraUsageSection } from './provider-extra-usage-section'
 
 export {
@@ -306,9 +307,11 @@ export function ProviderPanel({
     )
   }
 
-  const updatedAgo = p.updatedAt
+  const updatedAt = p.updatedAt
+  // Why: both labels read Date.now(); recomputeOn ties React Compiler's cache to the clock tick.
+  const updatedAgo = updatedAt
     ? t('auto.components.status.bar.tooltip.updatedAgo', 'Updated {{time}}', {
-        time: formatTimeAgo(p.updatedAt, t)
+        time: recomputeOn([now], () => formatTimeAgo(updatedAt, t))
       })
     : t('auto.components.status.bar.tooltip.notYetUpdated', 'Not yet updated')
   const resetCreditCount =
@@ -317,7 +320,9 @@ export function ProviderPanel({
       : null
   const resetCreditExpiry =
     resetCreditCount != null
-      ? formatResetCreditExpiry(p.rateLimitResetCredits?.nextExpiresAt, resetCreditCount, t)
+      ? recomputeOn([now], () =>
+          formatResetCreditExpiry(p.rateLimitResetCredits?.nextExpiresAt, resetCreditCount, t)
+        )
       : null
   const credits = p.credits ?? null
   const creditItems = credits ? creditsItemRows(credits) : []
@@ -360,7 +365,10 @@ export function ProviderPanel({
           // Why: an exhausted-but-configured balance must stay visible and say
           // why calls fail; status stays 'ok' by design for exactly this case.
           <div className={`text-[11px] font-medium ${warningClass}`}>
-            {t('auto.components.status.bar.tooltip.df60b41813', 'Balance cannot fund further calls')}
+            {t(
+              'auto.components.status.bar.tooltip.df60b41813',
+              'Balance cannot fund further calls'
+            )}
           </div>
         ) : null}
       </>

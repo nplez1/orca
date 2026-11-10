@@ -5,7 +5,7 @@ import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
-} from '@/lib/jira-issue-workspace-attachment'
+} from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
 import { JiraAttachedWorkspaceChip } from './JiraAttachedWorkspaceChip'
 import { getJiraStatusTone } from './task-page-jira-status-tone'

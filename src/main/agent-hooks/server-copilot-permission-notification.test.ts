@@ -3,8 +3,8 @@ import {
   normalizeCopilotEventName,
   resolveCopilotEventName
 } from '../../shared/agent-hook-listener/providers/copilot-tool-fields'
-import { _internals } from './server'
-import { buildBody } from './server.test-fixtures'
+import { _internals } from './server/agent-hook-server'
+import { buildBody } from './server/testing/server.test-fixtures'
 
 vi.mock('../telemetry/client', () => ({ track: vi.fn() }))
 vi.mock('../telemetry/cohort-classifier', () => ({ getCohortAtEmit: vi.fn(() => null) }))

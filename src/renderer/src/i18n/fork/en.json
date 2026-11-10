@@ -494,16 +494,15 @@
         "GeneralEditorSettingsSection": {
           "34155c6ed5": "Draw each review thread below its commented line, with reply and resolve controls. When off, the thread stays reachable from a small marker in the gutter.",
           "7fea4145c9": "Show GitHub review threads on the lines they were left on in the code.",
-          "9c020a16db": "PR Comments Inline"
+          "9c020a16db": "PR Comments Inline",
+          "4edc104f0f": "Markdown Review Notes"
         },
         "GeneralWorkspaceSettingsSection": {
           "0cda18153c": "Where each project's main checkout and its workspaces are created.",
           "9285cedcf2": "Flat",
           "b266f3f40e": "One folder per project",
-          "deleteRemoteBranchOnWorkspaceDelete": "Delete Remote Branch By Default",
-          "deleteRemoteBranchOnWorkspaceDeleteDescription": "Pre-check the remote-branch option in the delete-workspace dialog. The branch is always kept when its local copy is kept.",
-          "deleteRemoteBranchOnWorkspaceDeleteRowDescription": "Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone.",
-          "f9b2070017": "Workspace Layout"
+          "f9b2070017": "Workspace Layout",
+          "ba3480642f": "Nest Workspaces"
         },
         "JiraBoardSettings": {
           "chooseBoard": "Choose a board",
@@ -727,7 +726,13 @@
           "transcript": "transcript"
         },
         "appearance": {
-          "search": {}
+          "search": {
+            "9dc15020d7": "Claude Usage",
+            "54b1acf24f": "Codex Usage",
+            "5bfb874d05": "Gemini Usage",
+            "bc046e7899": "OpenCode Go Usage",
+            "3a6c028ea8": "Kimi Usage"
+          }
         },
         "experimental": {
           "search": {
@@ -775,6 +780,9 @@
         "RepositoryPane": {
           "projectNeedsRemote": "Add a remote to this project first",
           "projectSetupNeedsServer": "Set this project up from a Remote Orca Server on that host"
+        },
+        "CliSection": {
+          "9fd4023db0": "Show in File Manager"
         }
       },
       "sidebar": {

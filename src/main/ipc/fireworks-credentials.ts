@@ -6,7 +6,7 @@ import {
   saveFireworksCredentials
 } from '../fireworks/fireworks-credentials-store'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
-import type { RateLimitService } from '../rate-limits/service'
+import type { RateLimitService } from '../rate-limits/service/rate-limit-service'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 export type FireworksCredentialsStatus = {

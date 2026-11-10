@@ -37,7 +37,7 @@ import {
   isWorkspaceOwnedBySomeoneElse
 } from '../../../../../../shared/workspace-creator-visibility'
 import { createSleepingSweepHiddenCheck } from './sleeping-sweep-visibility'
-import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
+import { getAgentStatusEpochNow } from '@/lib/agent-status/evidence/agent-status-epoch-clock'
 import { selectFolderWorkspaces } from '@/store/workspaces/catalog/workspace-record-fields'
 
 export type SidebarWorktreeFilters = ReturnType<typeof useSidebarWorktreeFilters>
@@ -99,7 +99,11 @@ const REVEAL_WORKSPACE: Record<keyof WorkspaceRowFilters, (context: RevealContex
     // nothing to show, so revealing it must not read as waking a slept one and flip the user's
     // "Hide sleeping" preference off (#96).
     if (
-      isWorkspaceEmptiedOnPurpose(state, worktree.id, getAgentStatusEpochNow(state.agentStatusEpoch)) ||
+      isWorkspaceEmptiedOnPurpose(
+        state,
+        worktree.id,
+        getAgentStatusEpochNow(state.agentStatusEpoch)
+      ) ||
       isActiveEmptyWorkspace(state, worktree.id)
     ) {
       return

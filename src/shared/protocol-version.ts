@@ -1,4 +1,7 @@
-import { PROJECT_ROOT_ORDER_RUNTIME_CAPABILITY } from './project-group-order-capability'
+import {
+  PROJECT_GROUP_UPDATE_MANY_RUNTIME_CAPABILITY,
+  PROJECT_ROOT_ORDER_RUNTIME_CAPABILITY
+} from './project-group-order-capability'
 import { EMULATOR_RUNTIME_CAPABILITIES } from './emulator-runtime-capabilities'
 import { ACCOUNT_RUNTIME_CAPABILITIES } from './account-runtime-capabilities'
 import { HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY } from './host-settings-replication'
@@ -14,7 +17,7 @@ import {
   AUTOMATION_RUNTIME_CAPABILITIES,
   AUTOMATION_RUNTIME_CLIENT_CAPABILITIES
 } from './automations/automation-runtime-capabilities'
-import { BROWSER_RUNTIME_CAPABILITIES } from './browser-runtime-capabilities'
+import { BROWSER_RUNTIME_CAPABILITIES } from './browser/runtime/browser-runtime-capabilities'
 import {
   DEVICE_KEY_RUNTIME_CAPABILITIES,
   E2EE_V2_TOKEN_CAPABILITIES_RUNTIME_CAPABILITY
@@ -45,8 +48,6 @@ import {
 } from './worktree-runtime-capabilities'
 
 // Why stars: importers keep reading every capability from here while each area owns its module.
-
-export * from './browser-runtime-capabilities'
 
 export * from './host-runtime-capabilities'
 
@@ -103,6 +104,7 @@ export const RUNTIME_CAPABILITIES = /* @__PURE__ */ (() =>
     ...AUTOMATION_RUNTIME_CAPABILITIES,
     ...WORKTREE_RUNTIME_CAPABILITIES,
     PROJECT_ROOT_ORDER_RUNTIME_CAPABILITY,
+    PROJECT_GROUP_UPDATE_MANY_RUNTIME_CAPABILITY,
     ...PREFLIGHT_RUNTIME_CAPABILITIES,
     ...WORKSPACE_PORTS_RUNTIME_CAPABILITIES,
     ...SESSION_TABS_RUNTIME_CAPABILITIES,

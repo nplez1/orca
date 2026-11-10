@@ -23,6 +23,12 @@ import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-r
 import { formatEphemeralVmDeadline } from './ephemeral-vm-lease-presentation'
 
 function describeExtendSuccess(runtime: EphemeralVmRuntimeRecord): string {
+  if (!runtime.recipeResult) {
+    return translate(
+      'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extended',
+      'Lease extended'
+    )
+  }
   const read = readEphemeralVmLifetime(runtime.recipeResult.userData)
   if (!read.ok || !read.lifetime) {
     return translate(

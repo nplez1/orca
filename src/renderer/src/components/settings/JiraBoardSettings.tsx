@@ -7,7 +7,7 @@ import type {
   JiraSiteSelection
 } from '../../../../shared/jira/jira-types'
 import { Button } from '@/components/ui/button'
-import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
+import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'

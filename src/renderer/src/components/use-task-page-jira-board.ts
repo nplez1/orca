@@ -10,7 +10,7 @@ import {
   issueMatchesTaskPageJiraBoardQuery,
   type TaskPageJiraBoardFilter
 } from './task-page-jira-board-model'
-import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
+import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
 import { useTaskPageJiraBoardPages } from './use-task-page-jira-board-pages'
 import {
   patchTaskPageJiraBoardCache,

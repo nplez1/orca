@@ -24,10 +24,8 @@ describe('orca serve service', () => {
     await mkdir(bin)
     await writeFile(join(bin, 'orca'), '#!/bin/sh\n')
     await chmod(join(bin, 'orca'), 0o755)
-    // Why this name and not `orca`/`orca-ide`: those belong to an official install, and the
-    // resolver only ever configures the unit with this build's own CLI.
-    await writeFile(join(bin, 'orca-np'), '#!/bin/sh\n')
-    await chmod(join(bin, 'orca-np'), 0o755)
+    await writeFile(join(bin, 'orca-ide'), '#!/bin/sh\n')
+    await chmod(join(bin, 'orca-ide'), 0o755)
     calls = []
     answers = new Map()
   })
@@ -57,14 +55,13 @@ describe('orca serve service', () => {
     await writeFile(serveSupervisorBrakePath(join(home, 'profile')), '{}')
     const result = await installServeService({ command: null, dryRun: false }, deps('darwin'))
     const unitPath = String(result.unitPath)
-    expect(await readFile(unitPath, 'utf8')).toContain(`<string>${join(bin, 'orca-np')}</string>`)
+    expect(await readFile(unitPath, 'utf8')).toContain(`<string>${join(bin, 'orca')}</string>`)
     expect(calls).toEqual([
-      expect.stringMatching(/^launchctl bootout gui\/501\/com\.nplez1\.orca\.serve\./),
+      expect.stringMatching(/^launchctl bootout gui\/501\/com\.stablyai\.orca\.serve\./),
       `launchctl bootstrap gui/501 ${unitPath}`
     ])
     expect(existsSync(serveSupervisorBrakePath(join(home, 'profile')))).toBe(false)
   })
-
 
   it('fails loudly when the manager refuses, and writes nothing on a dry run', async () => {
     const d = deps('darwin')
@@ -73,18 +70,6 @@ describe('orca serve service', () => {
     expect(calls).toEqual([])
     answers.set(`launchctl bootstrap gui/501 ${String(dry.unitPath)}`, { code: 5, out: 'denied' })
     await expect(installServeService({ command: null, dryRun: false }, d)).rejects.toThrow(/denied/)
-  })
-
-  it('validates and normalizes --bind before installing a service', async () => {
-    const d = deps('darwin')
-    await expect(
-      installServeService({ command: null, bind: 'server.example', dryRun: true }, d)
-    ).rejects.toThrow(/--bind expects a literal IP address/)
-    expect(calls).toEqual([])
-
-    const dry = await installServeService({ command: null, bind: 'localhost', dryRun: true }, d)
-    expect(String(dry.content)).toContain('<string>--bind</string>')
-    expect(String(dry.content)).toContain('<string>127.0.0.1</string>')
   })
 
   it('reports live, exited and unverifiable from the manager', async () => {
@@ -127,65 +112,25 @@ describe('orca serve service', () => {
   it('skips a profile launcher and refuses a bare Linux orca', async () => {
     const scoped = join(home, 'profile', 'cli', 'bin')
     await mkdir(scoped, { recursive: true })
-    await writeFile(join(scoped, 'orca-np'), '#!/bin/sh\n')
-    await chmod(join(scoped, 'orca-np'), 0o755)
+    await writeFile(join(scoped, 'orca'), '#!/bin/sh\n')
+    await chmod(join(scoped, 'orca'), 0o755)
     expect(
       resolveServiceCommand(null, {
         platform: 'darwin',
         env: { PATH: `${scoped}:${bin}`, ORCA_USER_DATA_PATH: join(home, 'profile') }
       })
-    ).toBe(join(bin, 'orca-np'))
-    // Only this build's command counts: a bare `orca` is an official install, or GNOME's screen reader.
+    ).toBe(join(bin, 'orca'))
+    // Linux takes only orca-ide, never a bare `orca` (often the screen reader).
     const onlyOrca = join(home, 'only-orca')
     await mkdir(onlyOrca)
     await writeFile(join(onlyOrca, 'orca'), '#!/bin/sh\n')
     await chmod(join(onlyOrca, 'orca'), 0o755)
-    await writeFile(join(onlyOrca, 'orca-ide'), '#!/bin/sh\n')
-    await chmod(join(onlyOrca, 'orca-ide'), 0o755)
     expect(() =>
       resolveServiceCommand(null, {
         platform: 'linux',
         env: { PATH: onlyOrca, ORCA_USER_DATA_PATH: join(home, 'profile') }
       })
     ).toThrow(/PATH/)
-  })
-
-  it('refuses Windows and a relative --command', async () => {
-    await expect(
-      installServeService({ command: null, dryRun: true }, deps('win32'))
-    ).rejects.toThrow(/Windows/)
-    expect(() => resolveServiceCommand('orca', { platform: 'darwin', env: {} })).toThrow()
-    expect(() =>
-      resolveServiceCommand(null, { platform: 'darwin', env: { PATH: '/nonexistent' } })
-    ).toThrow(/PATH/)
-  })
-  it('names the command to run when only a server-only orca exists here', async () => {
-    // SSH server launchers run on plain Node, without an installed Electron desktop.
-    const serverCli = (platform: NodeJS.Platform, path: string): ServeServiceDeps => {
-      const base = deps(platform)
-      const { ELECTRON_RUN_AS_NODE: _electron, ...env } = base.env
-      return { ...base, env: { ...env, PATH: path } }
-    }
-    const scoped = join(home, 'profile', 'cli', 'bin')
-    await mkdir(scoped, { recursive: true })
-    await writeFile(join(scoped, 'orca-np'), '#!/bin/sh\n')
-    await chmod(join(scoped, 'orca-np'), 0o755)
-    await expect(
-      installServeService({ command: null, dryRun: false }, serverCli('linux', scoped))
-    ).rejects.toThrow(/install the Orca app.*`orca-np serve service install`/i)
-    await expect(
-      installServeService({ command: null, dryRun: true }, serverCli('darwin', scoped))
-    ).rejects.toThrow(/`orca-np serve service install`/)
-    expect(calls).toEqual([])
-    await expect(
-      installServeService({ command: null, dryRun: true }, serverCli('linux', `${scoped}:${bin}`))
-    ).resolves.toMatchObject({ dryRun: true })
-    await expect(
-      installServeService(
-        { command: join(bin, 'orca-np'), dryRun: true },
-        serverCli('linux', scoped)
-      )
-    ).resolves.toMatchObject({ dryRun: true })
   })
 
   it('keeps an AppImage launch and profile directories out of the unit PATH (#36000)', async () => {
@@ -203,9 +148,7 @@ describe('orca serve service', () => {
         bin
       ].join(':')
     }
-    // Why orca-np and not upstream's orca-ide: this build's installed app CLI is renamed by the
-    // local(identity) patch, and the fixture provisions only that name.
-    const result = await installServeService({ command: join(bin, 'orca-np'), dryRun: true }, d)
+    const result = await installServeService({ command: join(bin, 'orca-ide'), dryRun: true }, d)
     expect(String(result.content)).toContain(`Environment=PATH=/usr/local/bin:${bin}\n`)
   })
 

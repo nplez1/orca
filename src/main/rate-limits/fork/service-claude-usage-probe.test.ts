@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
-import { RateLimitService } from '../service'
-import { fetchClaudeRateLimits } from '../claude-fetcher'
+import { RateLimitService } from '../service/rate-limit-service'
+import { fetchActiveClaudeRateLimits } from '../providers/claude/claude-active-usage-fetch'
 import {
   asRateLimitWindow,
   errorProvider,
@@ -9,24 +9,31 @@ import {
   mockFreshBackgroundProviderFetches,
   okProvider,
   resetRateLimitProviderMocks
-} from '../rate-limit-service-test-harness'
+} from '../service/rate-limit-service-test-harness'
 
-vi.mock('../claude-fetcher', () => ({
-  fetchClaudeRateLimits: vi.fn(),
-  fetchManagedAccountUsage: vi.fn()
+vi.mock('../providers/claude/claude-active-usage-fetch', () => ({
+  fetchActiveClaudeRateLimits: vi.fn()
 }))
 
-vi.mock('../codex-fetcher', () => ({
+vi.mock('../providers/claude/claude-managed-account-usage', () => ({
+  fetchInactiveClaudeAccountUsage: vi.fn()
+}))
+
+vi.mock('../providers/codex/codex-fetcher', () => ({
   consumeCodexRateLimitResetCredit: vi.fn(),
   fetchCodexRateLimits: vi.fn()
 }))
-vi.mock('../gemini-usage-fetcher', () => ({ fetchGeminiRateLimits: vi.fn() }))
-vi.mock('../kimi-fetcher', () => ({ fetchKimiRateLimits: vi.fn() }))
-vi.mock('../opencode-go-usage-source-selection', () => ({ fetchOpenCodeGoUsage: vi.fn() }))
-vi.mock('../zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
-vi.mock('../antigravity-usage-fetcher', () => ({ fetchAntigravityRateLimits: vi.fn() }))
-vi.mock('../muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
-vi.mock('../minimax/minimax-fetcher', () => ({ fetchMiniMaxRateLimits: vi.fn() }))
+vi.mock('../providers/gemini/gemini-usage-fetcher', () => ({ fetchGeminiRateLimits: vi.fn() }))
+vi.mock('../providers/kimi/kimi-fetcher', () => ({ fetchKimiRateLimits: vi.fn() }))
+vi.mock('../providers/opencode-go/opencode-go-usage-source-selection', () => ({
+  fetchOpenCodeGoUsage: vi.fn()
+}))
+vi.mock('../providers/zcode/zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
+vi.mock('../providers/antigravity/antigravity-usage-fetcher', () => ({
+  fetchAntigravityRateLimits: vi.fn()
+}))
+vi.mock('../providers/muse/muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
+vi.mock('../providers/minimax/minimax-fetcher', () => ({ fetchMiniMaxRateLimits: vi.fn() }))
 vi.mock('../deepseek/deepseek-fetcher', () => ({ fetchDeepSeekRateLimits: vi.fn() }))
 vi.mock('../fireworks/fireworks-fetcher', () => ({ fetchFireworksRateLimits: vi.fn() }))
 vi.mock('../deepinfra/deepinfra-fetcher', () => ({ fetchDeepInfraRateLimits: vi.fn() }))
@@ -46,10 +53,12 @@ vi.mock('../../../main/deepinfra/deepinfra-api-key-store', () => ({
 vi.mock('../../../main/fireworks/fireworks-credentials-store', () => ({
   hasFireworksCredentials: vi.fn(() => false)
 }))
-vi.mock('../grok-fetcher', () => ({ fetchGrokRateLimits: vi.fn() }))
-vi.mock('../cursor-fetcher', () => ({ fetchCursorRateLimits: vi.fn() }))
-vi.mock('../cursor-auth', () => ({ readCursorAuthSession: vi.fn() }))
-vi.mock('../grok-auth', () => ({ readGrokAuthSession: vi.fn(() => ({ status: 'missing' })) }))
+vi.mock('../providers/grok/grok-fetcher', () => ({ fetchGrokRateLimits: vi.fn() }))
+vi.mock('../providers/cursor/cursor-fetcher', () => ({ fetchCursorRateLimits: vi.fn() }))
+vi.mock('../providers/cursor/cursor-auth', () => ({ readCursorAuthSession: vi.fn() }))
+vi.mock('../providers/grok/grok-auth', () => ({
+  readGrokAuthSession: vi.fn(() => ({ status: 'missing' }))
+}))
 vi.mock('../../minimax/minimax-cookie-store', () => ({
   hasMiniMaxSessionCookie: vi.fn(() => false)
 }))
@@ -78,7 +87,7 @@ describe('Claude usage polling', () => {
   it('refreshes Claude on activation while the endpoint Retry-After is still open', async () => {
     vi.useFakeTimers()
     try {
-      vi.mocked(fetchClaudeRateLimits)
+      vi.mocked(fetchActiveClaudeRateLimits)
         .mockResolvedValueOnce(rateLimited())
         .mockResolvedValue(cliReading(31))
 
@@ -95,7 +104,7 @@ describe('Claude usage polling', () => {
       await vi.advanceTimersByTimeAsync(0)
 
       // Why: the probe answers without the endpoint, so its Retry-After cannot freeze the lane.
-      expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(2)
+      expect(fetchActiveClaudeRateLimits).toHaveBeenCalledTimes(2)
       expect(service.getState().claude?.status).toBe('ok')
       expect(service.getState().claude?.session?.usedPercent).toBe(31)
       expect(service.getState().claude?.usageMetadata?.source).toBe('cli')
@@ -110,7 +119,7 @@ describe('Claude usage polling', () => {
     vi.useFakeTimers()
     try {
       const retryAtMs = Date.now() + 40 * 60 * 1000
-      vi.mocked(fetchClaudeRateLimits)
+      vi.mocked(fetchActiveClaudeRateLimits)
         .mockResolvedValueOnce(rateLimited(retryAtMs))
         .mockResolvedValue(cliReading(12))
 
@@ -120,7 +129,7 @@ describe('Claude usage polling', () => {
       service.start({ fetchImmediately: false })
       await vi.advanceTimersByTimeAsync(1000)
 
-      expect(vi.mocked(fetchClaudeRateLimits).mock.calls[0]?.[0]).toEqual(
+      expect(vi.mocked(fetchActiveClaudeRateLimits).mock.calls[0]?.[0]).toEqual(
         expect.objectContaining({
           allowUsagePanelSupplement: true,
           usageEndpointRetryAtMs: null
@@ -132,7 +141,7 @@ describe('Claude usage polling', () => {
 
       // Why the second call: with the probe in play the fetch must still be told the wait is open,
       // so a probe that cannot answer does not spend the request the endpoint refused.
-      expect(vi.mocked(fetchClaudeRateLimits).mock.calls[1]?.[0]).toEqual(
+      expect(vi.mocked(fetchActiveClaudeRateLimits).mock.calls[1]?.[0]).toEqual(
         expect.objectContaining({ usageEndpointRetryAtMs: retryAtMs })
       )
 
@@ -146,7 +155,7 @@ describe('Claude usage polling', () => {
     vi.useFakeTimers()
     try {
       const retryAtMs = Date.now() + 40 * 60 * 1000
-      vi.mocked(fetchClaudeRateLimits)
+      vi.mocked(fetchActiveClaudeRateLimits)
         .mockResolvedValueOnce(rateLimited(retryAtMs))
         .mockResolvedValue(cliReading(12))
 
@@ -155,7 +164,7 @@ describe('Claude usage polling', () => {
       expect(service.getState().claude?.usageMetadata?.retryAtMs).toBe(retryAtMs)
 
       await service.refresh()
-      expect(vi.mocked(fetchClaudeRateLimits).mock.calls[1]?.[0]).toEqual(
+      expect(vi.mocked(fetchActiveClaudeRateLimits).mock.calls[1]?.[0]).toEqual(
         expect.objectContaining({ usageEndpointRetryAtMs: null })
       )
 
@@ -168,7 +177,7 @@ describe('Claude usage polling', () => {
   it('recovers on the next timer cycle after the endpoint rate limited the previous one', async () => {
     vi.useFakeTimers()
     try {
-      vi.mocked(fetchClaudeRateLimits)
+      vi.mocked(fetchActiveClaudeRateLimits)
         .mockResolvedValueOnce(rateLimited())
         .mockResolvedValue(cliReading(27))
 
@@ -180,7 +189,7 @@ describe('Claude usage polling', () => {
 
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
 
-      expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(2)
+      expect(fetchActiveClaudeRateLimits).toHaveBeenCalledTimes(2)
       expect(service.getState().claude?.status).toBe('ok')
       expect(service.getState().claude?.session?.usedPercent).toBe(27)
 
@@ -194,7 +203,9 @@ describe('Claude usage polling', () => {
     vi.useFakeTimers()
     try {
       let checks = 0
-      vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => cliReading(++checks * 10))
+      vi.mocked(fetchActiveClaudeRateLimits).mockImplementation(async () =>
+        cliReading(++checks * 10)
+      )
 
       const service = new RateLimitService()
       service.attach(asRateLimitWindow(new FakeRateLimitWindow()))
@@ -203,7 +214,7 @@ describe('Claude usage polling', () => {
       expect(service.getState().claude?.session?.usedPercent).toBe(10)
 
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
-      expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(2)
+      expect(fetchActiveClaudeRateLimits).toHaveBeenCalledTimes(2)
       expect(service.getState().claude?.session?.usedPercent).toBe(20)
 
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000)

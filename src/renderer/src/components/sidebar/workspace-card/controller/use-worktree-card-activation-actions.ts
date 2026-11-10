@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
 import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-diagnostics'
-import { activateWorktreeFromSidebar } from '@/lib/sidebar-worktree-activation'
 import { queueWorkspaceActivationTerminalFocus } from '../../../../lib/workspace/activation/workspace-activation-terminal-focus'
 import { restoreAgentTabFocusAfterGesture } from '@/lib/agent-tab-focus-policy'
+import { activateWorktreeFromSidebar } from '@/lib/workspace/activation/sidebar-worktree-activation'
 import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
 import {
   noteWorktreeRowHoverEnd,

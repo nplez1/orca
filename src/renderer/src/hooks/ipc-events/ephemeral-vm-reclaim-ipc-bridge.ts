@@ -3,7 +3,7 @@ import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-r
 import {
   getWorktreeOperationOwnerHostIds,
   type WorktreeOperationRouteState
-} from '@/lib/worktree-operation-route'
+} from '@/lib/workspace/ownership/worktree-operation-route'
 import {
   onEphemeralVmRuntimesPublished,
   refreshEphemeralVmRuntimes

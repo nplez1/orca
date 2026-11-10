@@ -23,7 +23,7 @@ const { activateWorktreeFromSidebar } = vi.hoisted(() => ({
   activateWorktreeFromSidebar: vi.fn()
 }))
 
-vi.mock('@/lib/sidebar-worktree-activation', () => ({
+vi.mock('@/lib/workspace/activation/sidebar-worktree-activation', () => ({
   activateWorktreeFromSidebar
 }))
 

@@ -31,6 +31,7 @@ import { extractMessageText, normalizeTitleText } from '../../session-scanner-te
 import { extractString, parseJsonObject } from '../../session-scanner-values'
 
 type ParserSessionOptions = {
+  signal?: AbortSignal
   executionHostId?: ExecutionHostId
   executionHostPlatform?: NodeJS.Platform | null
 }
@@ -180,7 +181,8 @@ export async function finalizeClaudeSessionParseState(
       : null
   if (ownsTranscriptDisk) {
     snapshot.accumulator.subagentTranscriptCount = await countSubagentTranscripts(
-      snapshot.accumulator.filePath
+      snapshot.accumulator.filePath,
+      options.signal
     )
   }
   // A rename (custom-title) or Claude's generated name is the session's own; prompts and metadata are stand-ins.

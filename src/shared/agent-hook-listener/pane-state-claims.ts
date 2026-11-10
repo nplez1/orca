@@ -14,6 +14,7 @@ export function paneHasStateClaims(state: HookListenerState, paneKey: string): b
     state.codexLeadStateByPaneKey.has(paneKey) ||
     state.copilotBackgroundWorkByPaneKey.has(paneKey) ||
     state.descendantRosterByPaneKey.has(paneKey) ||
-    state.piScheduledWorkByPaneKey.has(paneKey)
+    state.piScheduledWorkByPaneKey.has(paneKey) ||
+    state.codexAsyncQuestionsByPaneKey.has(paneKey)
   )
 }

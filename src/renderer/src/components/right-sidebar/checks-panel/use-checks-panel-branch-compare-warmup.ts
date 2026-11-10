@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { getConnectionId } from '@/lib/connection-context'
+import { getConnectionId } from '@/lib/workspace/ownership/connection-context'
 import { getRuntimeGitBranchCompare } from '../../../runtime/source-control/git/runtime-git-diff-client'
 import { useAppStore } from '@/store'
 import { getWorktreeGitOwnerTarget } from '../source-control/sync/worktree-git-owner-target'

@@ -15,9 +15,8 @@ import {
   buildAiVaultSessionProjectById
 } from '../scope/ai-vault-session-projects'
 import { useAiVaultSessionLaunchActions } from '../session-actions/ai-vault-session-launch-actions'
-import { useAiVaultSessionCopyActions } from '../../use-ai-vault-session-copy-actions'
-import { revealAiVaultSessionPath } from '../session-actions/ai-vault-session-path-actions'
 import { useAiVaultOriginalPaneActions } from '../session-actions/ai-vault-original-pane-actions'
+import { useAiVaultSessionRowHandlers } from '../session-actions/use-ai-vault-session-row-handlers'
 import { useTranslate } from '@/i18n/use-translate'
 import { AiVaultPanelHeader } from './AiVaultPanelHeader'
 import {
@@ -161,7 +160,7 @@ export default function AiVaultPanel({
     scanResult,
     sessions: history,
     loadedSessionLimit
-  } = useAiVaultSessionRefresh(scopePaths, executionHostScope, sessionLimit)
+  } = useAiVaultSessionRefresh(scopePaths, executionHostScope, sessionLimit, scope !== 'all')
   // Send scope identity: the host owns project worktree enumeration, and hundreds of paths cannot fit a request.
   const searchWithin = useMemo(
     () =>
@@ -180,6 +179,7 @@ export default function AiVaultPanel({
   )
   const requestedScanKey = aiVaultLocalScanKey({
     scopePaths,
+    scopeOnly: scope !== 'all',
     includeAntigravityIdeSessions: true,
     limit: sessionLimit === 'unlimited' ? undefined : sessionLimit,
     unlimited: sessionLimit === 'unlimited'
@@ -208,8 +208,7 @@ export default function AiVaultPanel({
     repos,
     allWorktrees,
     workspaceId: effectiveActiveWorktreeId,
-    resumeTargetState,
-    settings
+    resumeTargetState
   })
   const launchActions = useAiVaultSessionLaunchActions({
     activeWorktree: activeWorktree ?? null,
@@ -254,7 +253,12 @@ export default function AiVaultPanel({
     refresh,
     onDeleted: search.onDeleted
   })
-  const sessionCopyActions = useAiVaultSessionCopyActions()
+  const rowHandlers = useAiVaultSessionRowHandlers({
+    jumpToOriginalPane: paneActions.jumpToOriginalPane,
+    onSessionOpened,
+    copyResumeCommand: launchActions.copyResumeCommand,
+    requestDelete
+  })
 
   return (
     <div
@@ -353,31 +357,13 @@ export default function AiVaultPanel({
             keyboardRef={keyboardRows ? listKeyboardRef : undefined}
             query={query}
             resumeHere={resumeHere}
-            onJumpToOriginalPane={(session) =>
-              void paneActions.jumpToOriginalPane(session).then((opened) => {
-                if (opened) {
-                  onSessionOpened?.()
-                }
-              })
-            }
             onJumpToWorktree={paneActions.jumpToWorktree}
             onResume={launchActions.handleResume}
             getSessionResumeInChat={getSessionResumeInChat}
             onContinueInNewSession={launchActions.handleContinueInNewSession}
             onResumeInNewChat={launchActions.handleResumeInNewChat}
             onResumeInNewCli={launchActions.handleResumeInNewCli}
-            onCopyResume={(session, worktreeId) =>
-              void launchActions.copyResumeCommand(session, worktreeId)
-            }
-            onCopyId={sessionCopyActions.copySessionId}
-            onCopyPath={sessionCopyActions.copySessionPath}
-            onOpenLog={sessionCopyActions.openSessionLog}
-            onRevealLog={sessionCopyActions.revealSessionLog}
-            onOpenCwd={sessionCopyActions.openSessionCwd}
-            onRevealArtifacts={(session) =>
-              void revealAiVaultSessionPath(session, session.antigravityArtifactPath ?? null)
-            }
-            onRequestDelete={(session) => void requestDelete(session)}
+            {...rowHandlers}
           />
         )}
         {!searching && (

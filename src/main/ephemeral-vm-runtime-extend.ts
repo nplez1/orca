@@ -78,6 +78,12 @@ async function extendLocked(
 ): Promise<EphemeralVmRuntimeRecord> {
   const resolved = getRuntimeRecipeContext(args.store, args.userDataPath, args.runtimeId)
   const existing = resolved.runtime
+  // Why a throw: the extend hook is handed the create's result to address the same machine, so a
+  // write-ahead record with no result yet is not something that can be extended.
+  const recipeResult = existing.recipeResult
+  if (!recipeResult) {
+    throw new Error('This host has no recorded recipe result, so its lease cannot be extended.')
+  }
   const lifetime = resolveRequestedEphemeralVmExtendDuration(existing, args.lifetime)
   if (!lifetime) {
     throw new Error(
@@ -96,13 +102,13 @@ async function extendLocked(
   const hookTimeoutMs = args.hookTimeoutMs ?? EPHEMERAL_VM_EXTEND_HOOK_TIMEOUT_MS
   const deadline = AbortSignal.timeout(hookTimeoutMs)
   const extend = await runEphemeralVmRecipeExtend({
-    repoPath: resolved.repo.repo.path,
+    repoPath: resolved.repoPath,
     // Why the command comes from the snapshot rather than `resolved.recipe`: the hook that extends
     // this lease is the one the recipe declared when it bought the lease, so a later orca.yaml edit
     // cannot redirect an extension at a different script.
     recipe: { ...resolved.recipe, ...(existing.extend ? { extend: existing.extend } : {}) },
-    context: contextFromRuntime(resolved.repo.repo.path, existing),
-    recipeResult: existing.recipeResult,
+    context: contextFromRuntime(resolved.repoPath, existing),
+    recipeResult,
     lifetime,
     signal: args.signal ? AbortSignal.any([args.signal, deadline]) : deadline
   })
@@ -131,13 +137,19 @@ async function extendLocked(
       'This host was released while its lease was being extended, so the new deadline was not applied.'
     )
   }
+  // Why a throw: the hook's answer is compared against the result it was handed, so a record that lost
+  // its result mid-flight cannot be reconciled against it.
+  const afterHookRecipeResult = afterHook.recipeResult
+  if (!afterHookRecipeResult) {
+    throw new Error('This host has no recorded recipe result, so its extension cannot be applied.')
+  }
 
   // Why the shared rule: an answer that loses the deadline would leave a lease the user just paid for
   // with no countdown and no reconciliation. Refusing keeps the record's earlier deadline, so the
   // sweep may release this host before the user retries — acceptable, because a release destroys
   // nothing and the action is retryable against a record that still parses.
   const lostLifetimeError = getEphemeralVmLifetimeLossError(
-    afterHook.recipeResult,
+    afterHookRecipeResult,
     extend.result,
     'Extend'
   )
@@ -145,7 +157,7 @@ async function extendLocked(
     throw new Error(lostLifetimeError)
   }
 
-  const connectionChanged = !connectionsEqual(afterHook.recipeResult, extend.result)
+  const connectionChanged = !connectionsEqual(afterHookRecipeResult, extend.result)
   const updated = updateEphemeralVmRuntimeStatus(args.userDataPath, afterHook.id, {
     recipeResult: extend.result,
     updatedAt: Date.now()
@@ -194,7 +206,11 @@ async function reattachEphemeralVmRuntime(args: {
   userDataPath: string
   runtime: EphemeralVmRuntimeRecord
 }): Promise<EphemeralVmRuntimeRecord> {
-  const connection = getEphemeralVmRecipeResultConnection(args.runtime.recipeResult)
+  const recipeResult = args.runtime.recipeResult
+  if (!recipeResult) {
+    throw new Error('This host has no recorded recipe result to reattach.')
+  }
+  const connection = getEphemeralVmRecipeResultConnection(recipeResult)
   if (connection.type === 'ssh') {
     // Why disconnect first: the target registry reuses a live connection for a target id, so a
     // provider that moved the host would otherwise keep serving the old machine under the new lease.
@@ -210,7 +226,7 @@ async function reattachEphemeralVmRuntime(args: {
     })
   }
   const environmentId = args.runtime.runtimeEnvironmentId
-  const pairingCode = getEphemeralVmRecipeResultPairingCode(args.runtime.recipeResult)
+  const pairingCode = getEphemeralVmRecipeResultPairingCode(recipeResult)
   if (!environmentId || !pairingCode) {
     throw new Error(
       'Extend changed the host connection but returned no Orca Server pairing code to reattach it with.'

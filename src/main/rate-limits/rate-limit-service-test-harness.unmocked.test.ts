@@ -2,7 +2,7 @@
 // importing the harness WITHOUT mocking any provider module. Every other suite in this
 // directory mocks them, which is what the guard is there to require.
 import { describe, expect, it } from 'vitest'
-import { resetRateLimitProviderMocks } from './rate-limit-service-test-harness'
+import { resetRateLimitProviderMocks } from './service/rate-limit-service-test-harness'
 
 describe('resetRateLimitProviderMocks without provider mocks', () => {
   it('names the modules the suite must mock, instead of failing on a real fetcher', () => {

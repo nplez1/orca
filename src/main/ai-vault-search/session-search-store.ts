@@ -1,4 +1,18 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 35-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
+import { ensureSessionSearchQuerySchema } from './session-search-query-schema'
+import type {
+  SessionSearchFileRow,
+  SessionSearchFileState,
+  SessionSearchResumableCursor,
+  SessionSearchStateCounts
+} from './session-search-store-types'
+export type {
+  SessionSearchFileRow,
+  SessionSearchFileState,
+  SessionSearchResumableCursor,
+  SessionSearchStateCounts,
+  SessionSearchIndexStore
+} from './session-search-store-types'
 import type SyncDatabase from '../sqlite/sync-database'
 import { asRecord } from '../ai-vault/session-scanner-record-value'
 import type { SessionFileCandidate } from '../ai-vault/session-scanner-types'
@@ -14,30 +28,30 @@ import {
   type SessionSearchFileWrite
 } from './session-search-index-writer'
 import { deleteExpiredSearchFiles, drainOrphanedMessages } from './session-search-retention-delete'
+import { reportSessionSearchBackgroundError } from './session-search-trace'
 import { openSessionSearchDatabase } from './session-search-schema'
 
-/** Due files need a full reread; failed reads track counts and mtime to bound retries. */
-export type SessionSearchFileState = 'current' | 'due' | 'failed'
-
-export type SessionSearchFileRow = {
-  path: string
-  identity: SessionSearchFileIdentity
-  mtimeMs: number
-  sizeBytes: number | null
-  state: SessionSearchFileState
-  failCount: number
-  failedMtimeMs: number | null
+/**
+ * The content consent the owning instance recorded for this index, for the
+ * processes that open the database after it: the writer and the query engine
+ * both run in workers told the path, not the setting. Absent means no instance
+ * recorded one — a store or engine opened by a test or a tool — so the
+ * primitive's own default stands.
+ */
+export function readSessionSearchContentConsent(db: SyncDatabase): boolean {
+  try {
+    const row = asRecord(db.prepare("SELECT value FROM meta WHERE key = 'content_consent'").get())
+    return row?.value === undefined ? true : row.value === '1'
+  } catch {
+    return true
+  }
 }
 
-export type SessionSearchResumableCursor = { byteOffset: number; prefixHash: string }
-
-export type SessionSearchStateCounts = {
-  current: number
-  due: number
-  failed: number
-  /** Session counts distinguish indexed content from files that have only been discovered. */
-  sessionsByAgent: Record<string, number>
-  messages: number
+/** Record consent where every later opener of this database can read it. */
+export function writeSessionSearchContentConsent(db: SyncDatabase, enabled: boolean): void {
+  db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES ('content_consent', ?)").run(
+    enabled ? '1' : '0'
+  )
 }
 
 export class SessionSearchStore {
@@ -56,20 +70,27 @@ export class SessionSearchStore {
         '[ai-vault-search] index write failed:',
         error instanceof Error ? error.name : 'IndexError'
       ),
-    /** The content tier; see SessionSearchIndexWriter's constructor for why it defaults on. */
-    storeContent = true
+    private readonly onMessagesChanged: (delta: number) => void = () => undefined,
+    /**
+     * The content tier; see SessionSearchIndexWriter's constructor for why it defaults on.
+     * Absent defers to the consent the instance that owns this index recorded.
+     */
+    storeContent?: boolean
   ) {
     this.db = openSessionSearchDatabase(path)
+    ensureSessionSearchQuerySchema(this.db)
+    const content = storeContent ?? readSessionSearchContentConsent(this.db)
     // Why here and not at the caller: which tier the rows were decoded under is a
     // fact about the rows, so the store is what keeps it true across a consent change.
-    if (storeContent && !this.contentRowsIndexed()) {
+    if (content && !this.contentRowsIndexed()) {
       this.adoptContentTier()
     }
     this.writer = new SessionSearchIndexWriter(
       this.db,
       SESSION_SEARCH_COMMIT_CHARS,
       () => this.scheduleOrphanDrain(),
-      storeContent
+      onMessagesChanged,
+      content
     )
   }
 
@@ -88,11 +109,11 @@ export class SessionSearchStore {
     try {
       while (this.drainRequested && !this.closed) {
         this.drainRequested = false
-        await drainOrphanedMessages(this.db, () => this.closed)
+        await drainOrphanedMessages(this.db, () => this.closed, undefined, this.onMessagesChanged)
       }
     } catch (error) {
       if (!this.closed) {
-        this.onError(error)
+        reportSessionSearchBackgroundError(this.onError, error)
       }
     } finally {
       this.draining = false
@@ -110,11 +131,6 @@ export class SessionSearchStore {
 
   get retentionCutoff(): number | null {
     return this.retentionCutoffMs
-  }
-
-  /** Sidebar reads also reach the consumer, so enforce retention beyond the indexer’s own decisions. */
-  private withinRetention(candidate: SessionFileCandidate): boolean {
-    return this.retentionCutoffMs === null || candidate.file.mtimeMs >= this.retentionCutoffMs
   }
 
   indexedFile(path: string, identity: SessionSearchFileIdentity): SessionSearchIndexedFile | null {
@@ -194,9 +210,14 @@ export class SessionSearchStore {
     candidate: SessionFileCandidate,
     mode: 'replace' | 'append',
     previousByteOffset: number,
-    identity?: () => TranscriptSessionIdentity | null
+    identity?: () => TranscriptSessionIdentity | null,
+    _indexing?: boolean,
+    _signal?: AbortSignal
   ): SessionSearchFileWrite | null {
-    if (this.closed || !this.withinRetention(candidate)) {
+    if (
+      this.closed ||
+      (this.retentionCutoffMs !== null && candidate.file.mtimeMs < this.retentionCutoffMs)
+    ) {
       return null
     }
     try {
@@ -339,7 +360,9 @@ export class SessionSearchStore {
     for (const row of rows) {
       counts[row.state] = Number(row.n)
     }
-    counts.messages = this.messageCount()
+    counts.messages = Number(
+      asRecord(this.db.prepare('SELECT count(*) AS n FROM messages').get())?.n ?? 0
+    )
     return counts
   }
 
@@ -357,14 +380,6 @@ export class SessionSearchStore {
     return counts
   }
 
-  private messageCount(): number {
-    const row: unknown = this.db.prepare('SELECT count(*) AS n FROM messages').get()
-    if (row && typeof row === 'object' && 'n' in row && typeof row.n === 'number') {
-      return row.n
-    }
-    return 0
-  }
-
   /** Only proven deletion permits removal; unreadable sources retain their indexed rows. */
   removeFile(path: string): void {
     try {
@@ -379,8 +394,12 @@ export class SessionSearchStore {
       await deleteExpiredSearchFiles(
         this.db,
         cutoffMs,
-        () => this.closed || signal?.aborted === true
+        () => this.closed || signal?.aborted === true,
+        undefined,
+        this.onMessagesChanged,
+        false
       )
+      this.scheduleOrphanDrain()
     } catch (error) {
       if (!this.closed) {
         this.onError(error)

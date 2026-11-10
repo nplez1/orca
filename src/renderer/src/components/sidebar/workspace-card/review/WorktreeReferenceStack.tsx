@@ -47,10 +47,14 @@ function singleReferenceLabel(
           ? t('auto.components.sidebar.WorktreeCardMeta.3f2649eeb8', 'Linked issue #{{value0}}', {
               value0: item.number
             })
-          : t('auto.components.sidebar.WorktreeCardMeta.3ea2702e62', 'Linked {{value0}} #{{value1}}', {
-              value0: item.type === 'mr' ? 'MR' : 'PR',
-              value1: item.number
-            })
+          : t(
+              'auto.components.sidebar.WorktreeCardMeta.3ea2702e62',
+              'Linked {{value0}} #{{value1}}',
+              {
+                value0: item.type === 'mr' ? 'MR' : 'PR',
+                value1: item.number
+              }
+            )
   return (
     label +
     mergeVerdictSuffix(workspaceReferenceReview(item, details[getWorkspaceAttachmentKey(item)]))
@@ -177,7 +181,7 @@ export function WorktreeReferenceStack({
       </span>
       {items.length > 1 ? (
         <span
-          className="workspace-reference-stack-count icon-superscript-count"
+          className="workspace-reference-stack-count z-3 text-3xs leading-none font-medium text-muted-foreground"
           data-reference-count=""
           data-multiple-digits={items.length > 9}
           aria-hidden

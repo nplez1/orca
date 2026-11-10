@@ -1,6 +1,6 @@
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
-import { taskSourceRuntimeTarget } from './task-source-runtime-target'
+import { taskSourceRuntimeTarget } from './work-items/task-source-runtime-target'
 
 /**
  * A provider source whose owner is already decided: the row's own task source, or an explicit

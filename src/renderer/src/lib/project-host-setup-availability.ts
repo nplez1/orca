@@ -1,7 +1,4 @@
-import {
-  parseExecutionHostId,
-  type ExecutionHostId
-} from '../../../shared/execution-host'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host/execution-host-registry-entry'
 import { isHostLocalProjectId } from '../../../shared/project-host-setup-projection'
 import {
@@ -54,6 +51,12 @@ export function getHostHealthUnavailableDetail(
       return 'Connect this host to set up projects'
     case 'error':
       return 'Host connection needs attention'
+    case 'provisioning':
+      return 'Starting the host VM'
+    case 'waking':
+      return 'Waking the host VM'
+    case 'suspended':
+      return 'Host VM is suspended'
     case 'available':
     case 'blocked':
     case 'local':

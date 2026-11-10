@@ -3,12 +3,17 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
+import type {
+  EphemeralVmProvisionedRuntimeRecord,
+  EphemeralVmRuntimeRecord
+} from '../../../../shared/ephemeral-vm-runtimes'
 import { EphemeralVmRuntimeRow } from './virtual-machines/runtimes/EphemeralVmRuntimeRow'
 
 const roots: Root[] = []
 
-function makeRuntime(overrides: Partial<EphemeralVmRuntimeRecord> = {}): EphemeralVmRuntimeRecord {
+function makeRuntime(
+  overrides: Partial<EphemeralVmProvisionedRuntimeRecord> = {}
+): EphemeralVmProvisionedRuntimeRecord {
   return {
     id: 'runtime-1',
     recipeId: 'cloud-sandbox',
@@ -28,10 +33,10 @@ function makeRuntime(overrides: Partial<EphemeralVmRuntimeRecord> = {}): Ephemer
 }
 
 function withLease(
-  runtime: EphemeralVmRuntimeRecord,
+  runtime: EphemeralVmProvisionedRuntimeRecord,
   releaseAtMs: number,
   provider?: string
-): EphemeralVmRuntimeRecord {
+): EphemeralVmProvisionedRuntimeRecord {
   return {
     ...runtime,
     recipeResult: {
@@ -67,6 +72,7 @@ function renderRow(
         onStopCleanup={vi.fn()}
         onCopyCleanupCommand={vi.fn()}
         onExtendLifetime={vi.fn()}
+        onForget={vi.fn()}
       />
     )
   })

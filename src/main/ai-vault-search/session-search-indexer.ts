@@ -10,7 +10,8 @@ import { SessionSearchDirectoryListings } from './session-search-directory-listi
 import { registerSessionSearchIndexConsumer } from './session-search-index-consumer'
 import { runSessionSearchPass } from './session-search-pass'
 import { isWallClockJump, sessionSearchHistoryCutoffMs } from './session-search-retention-policy'
-import { SessionSearchStore, type SessionSearchStateCounts } from './session-search-store'
+import type { SessionSearchStateCounts } from './session-search-store'
+import { SessionSearchWorkerStore } from './session-search-worker-store'
 import type { SessionSearchDegradedRoot } from './session-search-degraded-roots'
 import { SessionSearchWorkLoop } from './session-search-work-loop'
 
@@ -47,7 +48,7 @@ export class SessionSearchIndexer {
   private readonly onError: (error: unknown) => void
 
   private readonly loop: SessionSearchWorkLoop
-  private readonly store: SessionSearchStore
+  private readonly store: SessionSearchWorkerStore
   private readonly unregister: () => void
   /** Null means unobserved; an empty set records a real pass. */
   private previousRootsWithFiles: ReadonlySet<string> | null = null
@@ -91,18 +92,10 @@ export class SessionSearchIndexer {
         `SessionSearchIndexer: ${options.databasePath} already has a live indexer; close it first`
       )
     }
-    // Store, registration and indexer share one lifetime, which is what makes
-    // the object immutable: there is no second open to get out of step with.
-    // Claimed only once the store is open, because a construction that throws
-    // has no `close()` to release the claim: registering first would leave the
-    // path owned by an object that does not exist, and every later attempt at
-    // it -- including the one that fixes whatever broke the open -- would be
-    // refused for the life of the process.
-    this.store = new SessionSearchStore(
-      options.databasePath,
-      onError,
-      options.contentEnabled !== false
-    )
+    // Claim ownership before async initialization so another indexer cannot race the writer open.
+    this.store = new SessionSearchWorkerStore(options.databasePath, onError, () => {
+      this.sweepNext = true
+    })
     liveIndexerPaths.add(this.ownershipPath)
     this.store.setRetentionCutoffMs(this.cutoffMs())
     this.unregister = registerSessionSearchIndexConsumer(this.store)
@@ -155,6 +148,10 @@ export class SessionSearchIndexer {
     }
   }
 
+  generation(): number {
+    return this.store.generation
+  }
+
   status(): SessionSearchIndexStatus {
     // Use cached counts after close to avoid reading a shut database.
     const settled = (this.closed ? this.lastCounts : this.readCounts()) ?? {
@@ -177,9 +174,9 @@ export class SessionSearchIndexer {
     }
   }
 
-  close(): void {
+  close(): Promise<void> {
     if (this.closed) {
-      return
+      return this.store.retired()
     }
     // Preserve final counts for status calls after the store closes.
     this.lastCounts = this.readCounts() ?? this.lastCounts
@@ -189,10 +186,24 @@ export class SessionSearchIndexer {
     this.unregister()
     this.store.close()
     liveIndexerPaths.delete(this.ownershipPath)
+    return this.store.retired()
+  }
+
+  async initialize(): Promise<void> {
+    try {
+      await this.store.prepare()
+    } catch (error) {
+      await this.close()
+      throw error
+    }
+  }
+
+  retired(): Promise<void> {
+    return this.store.retired()
   }
 
   settled(): Promise<void> {
-    return this.loop.settled
+    return this.loop.settled.then(() => this.store.flush())
   }
 
   private readCounts(): SessionSearchStateCounts | null {

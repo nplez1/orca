@@ -19,12 +19,11 @@ import {
   ipcOrRuntimeTargetForHostId,
   runtimeTargetEnvironmentId
 } from '@/runtime/rpc/targets/runtime-client-target'
-import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import { TaskPageJiraBoard } from './Board'
 import { TaskPageJiraBoardUnavailableNotice } from './BoardUnavailableNotice'
 import { useJiraBoardMode } from './use-jira-board-mode'
-
+import { getEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 export function TaskPageJiraContent({
   model
 }: {

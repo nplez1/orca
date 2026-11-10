@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { SpawnedProcess } from '@orca/process-host/process-spec'
+import type { ChildProcess } from 'node:child_process'
 import type { DescendantSnapshot } from '../pty/process-retirement/pty-descendant-termination'
 import { createClaudeChildTreeReaper } from './claude-agent-sdk-exit-proof'
 import { parseUtcLstart } from '../../shared/ps-lstart-time'
@@ -12,7 +12,7 @@ const ROOT_STARTED_AT = 'Mon Jan 1 00:00:00 2026'
 const ROOT_FORK_MS = parseUtcLstart(ROOT_STARTED_AT)
 
 function mockChild(): EventEmitter &
-  Pick<SpawnedProcess, 'pid' | 'kill' | 'stdin'> & { kill: ReturnType<typeof vi.fn> } {
+  Pick<ChildProcess, 'pid' | 'kill' | 'stdin'> & { kill: ReturnType<typeof vi.fn> } {
   return Object.assign(new EventEmitter(), {
     pid: ROOT_PID,
     stdin: new PassThrough(),
@@ -37,6 +37,7 @@ describe('Claude root kill fallback', () => {
     // An ambiguous capture second must not block termination through Node's root handle.
     const child = mockChild()
     const tree = createClaudeChildTreeReaper(child, {
+      site: 'claude-structured-child-close',
       platform: 'linux',
       exited: () => false,
       captureDescendants: vi.fn(async () => posixSnapshot({ capturedAtMs: ROOT_FORK_MS + 300 }))
@@ -65,6 +66,7 @@ describe('Claude root kill fallback', () => {
         })
       )
     const tree = createClaudeChildTreeReaper(child, {
+      site: 'claude-structured-child-close',
       platform: 'linux',
       exited: () => false,
       captureDescendants,
@@ -80,6 +82,7 @@ describe('Claude root kill fallback', () => {
   it('keeps an observed live descendant through the root kill', async () => {
     const child = mockChild()
     const tree = createClaudeChildTreeReaper(child, {
+      site: 'claude-structured-child-close',
       platform: 'linux',
       exited: () => false,
       captureDescendants: vi.fn(async () =>
@@ -99,6 +102,7 @@ describe('Claude root kill fallback', () => {
   it('kills the root when no POSIX snapshot could be read', async () => {
     const child = mockChild()
     const tree = createClaudeChildTreeReaper(child, {
+      site: 'claude-structured-child-close',
       platform: 'linux',
       exited: () => false,
       captureDescendants: vi.fn(async () => null),
@@ -112,6 +116,7 @@ describe('Claude root kill fallback', () => {
   it('never signals a root the reaper already saw exit', async () => {
     const child = mockChild()
     const tree = createClaudeChildTreeReaper(child, {
+      site: 'claude-structured-child-close',
       platform: 'linux',
       exited: () => true,
       captureDescendants: vi.fn(async () => null)

@@ -34,7 +34,9 @@ const findRegisteredTerminalTab = vi.fn()
 vi.mock('@/store', () => ({
   useAppStore: { getState: () => state, subscribe: () => () => {} }
 }))
-vi.mock('@/lib/sidebar-worktree-activation', () => ({ activateWorktreeFromSidebar }))
+vi.mock('@/lib/workspace/activation/sidebar-worktree-activation', () => ({
+  activateWorktreeFromSidebar
+}))
 vi.mock('@/runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-registry.ts', () => ({
   focusRuntimeTerminalSurface: focusRuntime,
   findRegisteredTerminalTab

@@ -108,6 +108,7 @@ export const AI_VAULT_METHODS = [
             unlimited: params.unlimited,
             force: params.force,
             scopePaths: params.scopePaths,
+            scopeOnly: params.scopeOnly,
             includeAntigravityIdeSessions: params.includeAntigravityIdeSessions
           },
           signal

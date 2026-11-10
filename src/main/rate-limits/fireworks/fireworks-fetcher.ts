@@ -1,8 +1,8 @@
 import { getMainHttpClient } from '../../network/http-client'
 import { abortSignalWithTimeout } from '../../lib/abort-signal-with-timeout'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
-import { parseUsageRetryAfterMs } from '../usage-retry-after'
-import { classifyThrownUsageRequestError } from '../usage-request-failure-kind'
+import { parseUsageRetryAfterMs } from '../providers/usage-retry-after'
+import { classifyThrownUsageRequestError } from '../providers/usage-request-failure-kind'
 import { usageCredentialFingerprint } from '../fork/usage-credential-fingerprint'
 import {
   FIREWORKS_API_BASE_URL,

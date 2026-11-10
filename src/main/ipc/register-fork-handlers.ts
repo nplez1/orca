@@ -1,5 +1,5 @@
 import type { Store } from '../persistence/loading-store/store'
-import type { RateLimitService } from '../rate-limits/service'
+import type { RateLimitService } from '../rate-limits/service/rate-limit-service'
 import { registerCopilotCredentialsHandlers } from './copilot-credentials'
 import { registerDeepInfraCredentialsHandlers } from './deepinfra-credentials'
 import { registerDeepSeekCredentialsHandlers } from './deepseek-credentials'

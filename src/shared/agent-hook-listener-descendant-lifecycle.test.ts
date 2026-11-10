@@ -4,9 +4,9 @@ import {
   createHookListenerState,
   deleteLegacyAgentStatus,
   movePaneCacheState,
-  seedLegacyAgentStatusForTests,
   type HookListenerState
 } from './agent-hook-listener/listener-state'
+import { seedLegacyAgentStatusForTests } from './agent-hook-listener/legacy-agent-status-test-seed'
 import { paneHasStateClaims } from './agent-hook-listener/pane-state-claims'
 import {
   normalizeAndAccept,

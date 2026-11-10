@@ -1,5 +1,4 @@
 import type SyncDatabase from '../sqlite/sync-database'
-import type { TranscriptMessageRole } from '../ai-vault/transcripts/session-transcript-consumers'
 import { sliceAtCodeUnitLimit } from '../ai-vault/session-scanner-text-normalization'
 import {
   hasAiVaultSearchQueryOperators,
@@ -9,14 +8,16 @@ import {
 import { matchesAiVaultQueryOperators } from '../../shared/ai-vault/session-display/ai-vault-session-filters'
 import {
   SESSION_SEARCH_QUERY_MAX_LENGTH,
-  type SessionSearchHit,
   type SessionSearchRequest,
   type SessionSearchResponse,
-  type SessionSearchScope,
-  type SessionSearchSourcePresence
+  type SessionSearchScope
 } from './session-search-engine-types'
 import { resolveSessionSearchLimit } from '../../shared/ai-vault/search/ai-vault-search-limit'
-import { readIndexGeneration, readIndexIncarnation } from './session-search-index-generation'
+import {
+  readIndexContentRevision,
+  readIndexGeneration,
+  readIndexIncarnation
+} from './session-search-index-generation'
 import {
   rankSessionHits,
   type MessageRow,
@@ -24,32 +25,31 @@ import {
   type SessionRow
 } from './session-search-hit-ranking'
 import {
-  SessionSearchCursorError,
   decodeSessionSearchCursor,
   encodeSessionSearchCursor,
   sessionSearchPageKey
 } from './session-search-page-cursor'
-import { planSessionSearchQuery } from './session-search-query-planner'
 import {
-  SessionSearchRetrieval,
-  type RetrievalScope,
-  type Retrieved
-} from './session-search-retrieval'
+  SESSION_SEARCH_MAX_CANDIDATES,
+  decodeRankedSessionSearchCursor,
+  encodeRankedSessionSearchCursor,
+  type SessionSearchRankedCursor
+} from './session-search-ranked-cursor'
+import { planSessionSearchQuery } from './session-search-query-planner'
+import { SessionSearchRetrieval, type RetrievalScope } from './session-search-retrieval'
 import { SessionSearchMetadataRetrieval } from './session-search-metadata-retrieval'
+import {
+  buildMetadataRankedPage,
+  buildSessionSearchHits,
+  type RankedPage
+} from './session-search-hit-builder'
+import { readSessionSearchContentConsent } from './session-search-store'
+
 import { sessionRowFilter } from './session-search-row-filter'
 import { ensureSessionSearchQuerySchema } from './session-search-query-schema'
-import { EMPTY_SNIPPET, sessionSearchSnippet } from './session-search-snippet'
-import { sessionSourcePresence } from './session-search-source-presence'
 
 /** Candidate-limit tuning and measurements: docs/reference/agent-session-search-query-tuning.md. */
 export const SESSION_SEARCH_CANDIDATE_LIMIT_DEFAULT = 600
-
-type RankedPage = {
-  ranked: RankedSession[]
-  retrieved: Retrieved | null
-  /** Retrieval stopped at a candidate or operator-scan limit. */
-  incomplete: boolean
-}
 
 export type SessionSearchEngineOptions = {
   sessionCandidateLimit?: number
@@ -62,7 +62,7 @@ export type SessionSearchEngineOptions = {
   contentEnabled?: boolean
 }
 
-/** Use independent statements to avoid pinning WAL; reject pages whose content generation changes. */
+/** One page reads one WAL snapshot; later page requests still validate their generation. */
 export class SessionSearchEngine {
   private readonly retrieval: SessionSearchRetrieval
   private readonly metadataRetrieval: SessionSearchMetadataRetrieval
@@ -73,10 +73,14 @@ export class SessionSearchEngine {
     private readonly db: SyncDatabase,
     private readonly options: SessionSearchEngineOptions = {}
   ) {
-    this.candidateLimit = options.sessionCandidateLimit ?? SESSION_SEARCH_CANDIDATE_LIMIT_DEFAULT
-    // Default on: an engine that was not told otherwise is the content tier, as
-    // it was before the tier split, so nothing calling it silently changes tier.
-    this.contentEnabled = options.contentEnabled ?? true
+    this.candidateLimit = Math.min(
+      SESSION_SEARCH_MAX_CANDIDATES,
+      options.sessionCandidateLimit ?? SESSION_SEARCH_CANDIDATE_LIMIT_DEFAULT
+    )
+    // Default on: an engine that was not told otherwise takes the consent the
+    // index recorded, so a worker opened without the setting still answers from
+    // the metadata surface while content is off.
+    this.contentEnabled = options.contentEnabled ?? readSessionSearchContentConsent(db)
     // Installed here and not on the first search, so the generation triggers are
     // watching before anything this engine will be asked to page over is
     // written, and so retrieval below prepares against tables that exist.
@@ -90,6 +94,18 @@ export class SessionSearchEngine {
   }
 
   search(request: SessionSearchRequest): SessionSearchResponse {
+    this.db.exec('BEGIN')
+    try {
+      const result = this.readPage(request)
+      this.db.exec('COMMIT')
+      return result
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  private readPage(request: SessionSearchRequest): SessionSearchResponse {
     const startedAt = performance.now()
     ensureSessionSearchQuerySchema(this.db)
     const generation = readIndexGeneration(this.db)
@@ -107,6 +123,23 @@ export class SessionSearchEngine {
     }
     // Reject invalid cursors before paying for retrieval.
     const pageKey = sessionSearchPageKey(request)
+    const frozen = request.cursor
+      ? decodeRankedSessionSearchCursor(
+          request.cursor,
+          generation,
+          readIndexContentRevision(this.db, generation),
+          pageKey,
+          incarnation
+        )
+      : null
+    if (frozen) {
+      const limit = resolveSessionSearchLimit(request.limit)
+      const page = this.retrieval.hydrate(
+        frozen.hits.slice(frozen.o, frozen.o + limit),
+        retrievalScope
+      )
+      return this.frozenPage(frozen, page, scope, limit, startedAt)
+    }
     const offset = request.cursor
       ? decodeSessionSearchCursor(request.cursor, generation, pageKey, incarnation)
       : 0
@@ -118,41 +151,80 @@ export class SessionSearchEngine {
     } else if (this.contentEnabled) {
       rankedPage = this.text(plan, retrievalScope, sort)
     } else {
-      rankedPage = this.metadataText(plan, retrievalScope)
+      rankedPage = buildMetadataRankedPage(this.metadataRetrieval, plan, retrievalScope)
     }
     const { ranked, retrieved, incomplete } = rankedPage
 
     const limit = resolveSessionSearchLimit(request.limit)
-    const page = ranked.slice(offset, offset + limit)
-    const hits = this.hits(page, scope, retrieved)
-    const actualGeneration = readIndexGeneration(this.db)
-    if (actualGeneration !== generation) {
-      throw new SessionSearchCursorError('stale-generation', actualGeneration, generation)
+    const snapshot: SessionSearchRankedCursor = {
+      v: 2,
+      i: incarnation,
+      g: generation,
+      r: readIndexContentRevision(this.db, generation),
+      k: pageKey,
+      o: offset,
+      hits: ranked.map((entry) => ({
+        s: entry.session.id,
+        m: entry.message?.rowid ?? null,
+        score: entry.score,
+        d: entry.duplicateCount
+      })),
+      retrieval: retrieved
+        ? {
+            plan: retrieved.plan,
+            route: retrieved.route,
+            ...(retrieved.repairedTerms ? { repairedTerms: retrieved.repairedTerms } : {})
+          }
+        : null,
+      incomplete,
+      queryTruncated: capped.length < request.query.length || plan.truncated
     }
-    const hasMore = ranked.length > offset + limit
-    const response: SessionSearchResponse = {
+    return this.frozenPage(
+      snapshot,
+      ranked.slice(offset, offset + limit),
+      scope,
+      limit,
+      startedAt,
+      !!request.cursor
+    )
+  }
+
+  private frozenPage(
+    frozen: SessionSearchRankedCursor,
+    page: RankedSession[],
+    scope: SessionSearchScope,
+    limit: number,
+    startedAt: number,
+    legacy = false
+  ): SessionSearchResponse {
+    const hits = buildSessionSearchHits(this.db, page, scope, frozen.retrieval)
+    const next = frozen.o + limit
+    const hasMore = next < frozen.hits.length
+    return {
       hits,
       planner: {
-        route: retrieved?.route ?? 'or',
+        route: frozen.retrieval?.route ?? 'or',
         tier: scope,
-        ...(retrieved?.repairedTerms ? { repairedTerms: retrieved.repairedTerms } : {})
+        ...(frozen.retrieval?.repairedTerms
+          ? { repairedTerms: frozen.retrieval.repairedTerms }
+          : {})
       },
       page: {
         hasMore,
         cursor: hasMore
-          ? encodeSessionSearchCursor(generation, offset + limit, pageKey, incarnation)
+          ? legacy
+            ? encodeSessionSearchCursor(frozen.g, next, frozen.k, frozen.i)
+            : encodeRankedSessionSearchCursor({ ...frozen, o: next })
           : null
       },
       truncated: {
-        // Retrieval alone can distinguish an exhausted scan budget from no matching rows.
-        candidates: incomplete,
-        snippets: hits.filter((hit) => hit.evidence?.snippetTruncated).length,
-        query: capped.length < request.query.length || plan.truncated
+        candidates: frozen.incomplete,
+        query: frozen.queryTruncated,
+        snippets: hits.filter((hit) => hit.evidence?.snippetTruncated).length
       },
-      generation,
+      generation: frozen.g,
       durationMs: performance.now() - startedAt
     }
-    return response
   }
 
   /** Operator-only queries use newest order and the same fork folding as text queries. */
@@ -170,84 +242,22 @@ export class SessionSearchEngine {
     sort: 'relevance' | 'newest'
   ): RankedPage {
     const retrieved = this.retrieval.run(plan, scope)
-    const best = new Map<number, MessageRow>(retrieved.rows.map((row) => [row.session_row_id, row]))
+    const best = new Map<number, MessageRow>()
+    for (const row of retrieved.rows) {
+      const previous = best.get(row.session_row_id)
+      if (
+        !previous ||
+        row.score > previous.score ||
+        (row.score === previous.score && row.rowid < previous.rowid)
+      ) {
+        best.set(row.session_row_id, row)
+      }
+    }
+    const ranked = rankSessionHits(retrieved.sessions, best, sort)
     return {
-      ranked: rankSessionHits(retrieved.sessions, best, sort),
+      ranked: ranked.slice(0, this.candidateLimit),
       retrieved,
-      incomplete: retrieved.incomplete
-    }
-  }
-
-  /**
-   * The metadata tier's answer: titles, paths, branches and agent names, with no
-   * transcript text behind them. Reached only when content is not consented to,
-   * where the content ladder would answer every text query with nothing.
-   */
-  private metadataText(
-    plan: ReturnType<typeof planSessionSearchQuery>,
-    scope: RetrievalScope
-  ): RankedPage {
-    const found = this.metadataRetrieval.run(plan, scope)
-    return {
-      // `message: null` is what keeps evidence out of a metadata hit: the hit
-      // builder only reads a row when it has a message to snippet from, so a
-      // metadata snippet is never fabricated here.
-      ranked: found.matches.map((match) => ({
-        session: match.session,
-        message: null,
-        score: match.score,
-        duplicateCount: 1
-      })),
-      // No rows, and the ones the content path would rank by are absent on
-      // purpose: bm25 already ordered this list in SQL.
-      retrieved: {
-        sessions: found.matches.map((match) => match.session),
-        rows: [],
-        incomplete: found.incomplete,
-        route: found.route,
-        plan: found.plan
-      },
-      incomplete: found.incomplete
-    }
-  }
-
-  /** Snippets and source presence are paid for by the page, never by the list. */
-  private hits(
-    page: readonly RankedSession[],
-    scope: SessionSearchScope,
-    retrieved: Retrieved | null
-  ): SessionSearchHit[] {
-    const presence = sessionSourcePresence(
-      this.db,
-      page.map((entry) => entry.session.id)
-    )
-    return page.map((entry) => this.hit(entry, scope, retrieved, presence))
-  }
-
-  private hit(
-    entry: RankedSession,
-    scope: SessionSearchScope,
-    retrieved: Retrieved | null,
-    presence: ReadonlyMap<number, SessionSearchSourcePresence>
-  ): SessionSearchHit {
-    const { session, message } = entry
-    const snippet =
-      message && retrieved
-        ? sessionSearchSnippet(this.db, scope, message.rowid, retrieved.plan, retrieved.route)
-        : EMPTY_SNIPPET
-    return {
-      ...sessionFields(session),
-      score: entry.score,
-      ...(entry.duplicateCount > 1 ? { duplicateCount: entry.duplicateCount } : {}),
-      source: presence.get(session.id) ?? 'unverifiable',
-      evidence: message
-        ? {
-            role: message.role as TranscriptMessageRole,
-            timestamp: message.ts,
-            snippet: snippet.text,
-            ...(snippet.truncated ? { snippetTruncated: true } : {})
-          }
-        : null
+      incomplete: retrieved.incomplete || ranked.length >= this.candidateLimit
     }
   }
 }
@@ -262,21 +272,4 @@ function operatorPredicate(split: AiVaultSearchQuerySplit): (session: SessionRow
       { cwd: session.cwd, filePath: session.file_path },
       { repoTerms: split.repoTerms, pathTerms: split.pathTerms }
     )
-}
-
-function sessionFields(
-  session: SessionRow
-): Omit<SessionSearchHit, 'score' | 'evidence' | 'source' | 'duplicateCount'> {
-  return {
-    agent: session.agent,
-    sessionId: session.session_id,
-    filePath: session.file_path,
-    codexHome: session.codex_home,
-    title: session.title,
-    cwd: session.cwd,
-    branch: session.branch,
-    updatedAt: session.updated_at,
-    messageCount: session.message_count,
-    resumeCommand: session.resume_command
-  }
 }

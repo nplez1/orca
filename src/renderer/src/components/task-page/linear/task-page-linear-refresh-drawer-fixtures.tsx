@@ -1,4 +1,4 @@
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import { LinearIssueTextEditor } from '../../LinearIssueTextEditor'
 import { useLinearIssueEditController } from '../../linear-item-drawer-edit-controller'
 import type { LinearEditState } from '../../linear-item-drawer-types'

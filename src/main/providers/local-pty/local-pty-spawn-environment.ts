@@ -19,6 +19,7 @@ import { removeUnspecifiedPaneIdentityEnv } from './local-pty-launch-context'
 import type { LocalPtyLaunchPlan } from './local-pty-launch-plan'
 import type { LocalPtyProviderOptions } from './local-pty-provider-types'
 import type { PtySpawnOptions } from '../pty-provider-contract'
+import { stripInheritedClaudeSessionEnv } from '../../../shared/agent-launch/startup/claude-parent-session-env'
 
 /** Pane ownership must be fresh even when Orca itself was launched inside an agent. */
 export function buildLocalPtySpawnEnvironment(args: {
@@ -80,6 +81,7 @@ export function buildInheritedLocalPtyEnvironment(
   removeAppImageRuntimeEnv(spawnEnv)
   removeChromiumDisabledSessionBus(spawnEnv)
   removeInheritedNoColor(spawnEnv)
+  stripInheritedClaudeSessionEnv(spawnEnv, { launchEnv: explicitEnv, envToDelete })
   for (const key of envToDelete) {
     delete spawnEnv[key]
   }
@@ -99,6 +101,10 @@ export function enforceLocalPtySpawnEnvironmentOverrides(
   finalEnv: Record<string, string>
 ): void {
   stripPiProcessOwnerEnv(finalEnv)
+  stripInheritedClaudeSessionEnv(finalEnv, {
+    launchEnv: spawn.env,
+    envToDelete: spawn.envToDelete
+  })
   for (const key of spawn.envToDelete ?? []) {
     delete finalEnv[key]
   }

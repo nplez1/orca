@@ -10,7 +10,7 @@ import {
   resolveGhCopilotCredentials,
   type CopilotGhCredentialsResult
 } from '../rate-limits/copilot/copilot-gh-credentials'
-import type { RateLimitService } from '../rate-limits/service'
+import type { RateLimitService } from '../rate-limits/service/rate-limit-service'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 /** Where Copilot usage credentials came from, so the pane can explain itself. */

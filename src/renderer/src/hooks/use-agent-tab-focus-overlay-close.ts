@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 
-import { shouldPreserveEditableFocus } from '@/lib/editable-focus-preservation'
+import { shouldPreserveEditableFocus } from '@/lib/text-input/focus/editable-focus-preservation'
 import { restoreAgentTabFocusAfterGesture } from '@/lib/agent-tab-focus-policy'
-import { isImeOwnedKeyboardEvent } from '@/lib/ime-composition-keyboard-event'
+import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-keyboard-event'
 import { overlayLeftDom, visibleOverlayElements } from '@/lib/visible-overlay'
 
 /**

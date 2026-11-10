@@ -4,7 +4,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
-import { WorktreeSymlinksSection } from './repository/execution/WorktreeSymlinksSection'
+import { WorktreeSymlinksSection } from './repository/worktrees/WorktreeSymlinksSection'
 
 vi.mock('../../store', () => ({
   useAppStore: (selector: (state: { settingsSearchQuery: string }) => unknown) =>

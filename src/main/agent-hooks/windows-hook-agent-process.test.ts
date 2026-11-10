@@ -3,7 +3,7 @@ import {
   buildWindowsAgentHookCurlPostCommand,
   buildWindowsAgentHookPostCommand,
   WINDOWS_HOOK_AGENT_PROCESS_VAR
-} from './installer-utils'
+} from './installation/commands/windows-agent-hook-post-command'
 
 /**
  * Why the field exists: nothing sent the agent's process on Windows, so `hasOtherAgentProcessOwner`

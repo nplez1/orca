@@ -18,7 +18,7 @@ import {
   readCachedCheckDetails,
   rememberCheckDetails
 } from '@/components/github/check-details-cache'
-import { getGitHubRuntimeRepoId } from '@/lib/github-source-runtime-context'
+import { getGitHubRuntimeRepoId } from '@/lib/work-items/github/github-source-runtime-context'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { translate } from '@/i18n/i18n'
 import type { ChecksTabActionContext } from './checks-tab-actions'

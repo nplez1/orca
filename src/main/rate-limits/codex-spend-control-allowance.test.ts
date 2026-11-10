@@ -8,7 +8,7 @@ import type { ProviderRateLimits } from '../../shared/rate-limit-types'
 import {
   fetchCodexRateLimitsViaBackend,
   supplementCodexSessionWindow
-} from './codex-backend-usage-client'
+} from './providers/codex/codex-backend-usage-client'
 
 // Why: invented stand-in for the account's reset instant; the backend reports Unix
 // seconds and Orca stores Unix ms, so every assertion below pins that conversion.

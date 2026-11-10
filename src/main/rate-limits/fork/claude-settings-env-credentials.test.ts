@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   parseClaudeSettingsEnvToken,
   readClaudeOAuthCredentials
-} from '../claude-oauth-credentials'
+} from '../providers/claude/claude-oauth-credentials'
 
 const keychain = vi.hoisted(() => vi.fn())
 vi.mock('../../claude-accounts/keychain', () => ({

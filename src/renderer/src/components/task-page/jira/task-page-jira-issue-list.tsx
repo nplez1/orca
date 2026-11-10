@@ -14,7 +14,7 @@ import type { TaskSourceContext } from '../../../../../shared/work-items/task-so
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
-} from '@/lib/jira-issue-workspace-attachment'
+} from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { JiraIssueRow } from '../../task-page-jira-issue-row'
 import type { JiraListColumn } from '../../jira-list-columns'
 

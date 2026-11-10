@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchInactiveClaudeAccountUsage } from '../claude-managed-account-usage'
-import { fetchClaudeOAuthUsage } from '../claude-oauth-usage-request'
-import { readClaudeOAuthCredentials } from '../claude-oauth-credentials'
+import { fetchInactiveClaudeAccountUsage } from '../providers/claude/claude-managed-account-usage'
+import { fetchClaudeOAuthUsage } from '../providers/claude/claude-oauth-usage-request'
+import { readClaudeOAuthCredentials } from '../providers/claude/claude-oauth-credentials'
 import { readClaudeUsageFromCli } from './claude-cli-usage-probe'
 
-vi.mock('../claude-oauth-usage-request', () => ({ fetchClaudeOAuthUsage: vi.fn() }))
-vi.mock('../claude-oauth-credentials', () => ({
+vi.mock('../providers/claude/claude-oauth-usage-request', () => ({
+  fetchClaudeOAuthUsage: vi.fn()
+}))
+vi.mock('../providers/claude/claude-oauth-credentials', () => ({
   readClaudeOAuthCredentials: vi.fn(),
   resolveClaudeOAuthCredentialReadOptions: () => undefined
 }))

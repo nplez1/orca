@@ -5,7 +5,7 @@ import { buildClaudeChildProcessEnv } from '../../claude/claude-child-process-en
 import { createClaudeCodeProcessSpawn } from '../../claude/claude-agent-sdk-process-spawn'
 import { loadClaudeAgentSdk } from '../../claude/claude-stream-json-connection'
 import { resolveClaudeCommand } from '../../codex-cli/command'
-import { resolveHiddenProbeCwd } from '../hidden-probe-cwd'
+import { resolveHiddenProbeCwd } from '../../lib/hidden-probe-cwd'
 import { mapClaudeCliRateLimitInfo, mapClaudeCliUsageResponse } from './claude-cli-usage-response'
 
 /**

@@ -19,7 +19,10 @@ import {
   readCachedCheckDetails,
   rememberCheckDetails
 } from '@/components/github/check-details-cache'
-import { getGitHubRuntimeRepoId, type GitHubRuntimeHost } from '@/lib/github-source-runtime-context'
+import {
+  getGitHubRuntimeRepoId,
+  type GitHubRuntimeHost
+} from '@/lib/work-items/github/github-source-runtime-context'
 import { translate } from '@/i18n/i18n'
 import type { GitHubOwnerRepo } from '../../../../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'

@@ -5,7 +5,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createManagedCommandMatcher } from './installer-utils'
+import { createManagedCommandMatcher } from './installation/commands/managed-hook-command-matching'
 
 // A resolved `.orca` path in this user's home belongs to an official install once one has run.
 const ownHomeLegacyCommand = (): string => join(homedir(), '.orca', 'agent-hooks', 'claude-hook.sh')

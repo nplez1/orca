@@ -14,8 +14,7 @@ import { WorkspaceEmptyState } from '../workspace-empty-state/WorkspaceEmptyStat
 import { resolveGroupTabFromVisibleId } from './tab-group-visible-id'
 import { getTabPaneBodyDroppableId, type HoveredTabInsertion } from './useTabDragSplit'
 import { tabGroupBodyAnchorName } from './tab-group-body-anchor'
-import { registerTabGroupBody } from './tab-group-body-geometry'
-import { observeTabGroupBodyGridSize } from '@/runtime/sync-runtime-graph/graph-sync-scheduler'
+import { useTabGroupBodyRef } from './useTabGroupBodyRef'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TabGroup } from '../../../../shared/tab-types'
 import { isStructuredTab } from '../../../../shared/agent-session/view/structured-agent-session-tab'
@@ -114,22 +113,7 @@ export default function TabGroupPanel({
     },
     disabled: !isTabDragActive
   })
-  const setBodyRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      setBodyDropRef(node)
-      if (!node) {
-        return undefined
-      }
-      const unregisterBody = registerTabGroupBody(groupId, node)
-      const stopGridSizeReport = observeTabGroupBodyGridSize(node)
-      return () => {
-        unregisterBody()
-        stopGridSizeReport()
-        setBodyDropRef(null)
-      }
-    },
-    [groupId, setBodyDropRef]
-  )
+  const setBodyRef = useTabGroupBodyRef(groupId, setBodyDropRef)
   const attachEditorFileDropOwner = useEditorGroupFileDropOwner({ worktreeId, groupId })
   const launchDefaultAgent = useCallback(
     (agent: TuiAgent): void => {
@@ -403,7 +387,12 @@ export default function TabGroupPanel({
           )}
 
         {showsSplitLanding ? (
-          <SplitPaneLanding worktreeId={worktreeId} groupId={groupId} autoFocus={isFocused} />
+          <SplitPaneLanding
+            worktreeId={worktreeId}
+            groupId={groupId}
+            autoFocus={isFocused}
+            onClosePane={hasSplitGroups ? commands.closeGroup : undefined}
+          />
         ) : null}
 
         {/* Why: terminal/browser/simulator/structured-chat panes render at the worktree level; tab activation only changes overlay visibility and never remounts a live surface. */}

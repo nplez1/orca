@@ -17,6 +17,8 @@ import { createJiraSlice } from './jira/jira'
 import { createEditorSlice } from './editor/create-editor-slice'
 import { createStatsSlice } from './process-stats/stats'
 import { createMemorySlice } from './process-stats/memory'
+import { createStructuredChatCompanionWritesSlice } from './agent-status/structured-chat-companion-writes'
+import { createEphemeralVmLifecycleSlice } from './ephemeral-vm/ephemeral-vm-lifecycle'
 import { createWorkspaceSpaceSlice } from './workspace-cleanup/workspace-space'
 import {
   createClaudeUsageSlice,
@@ -89,6 +91,8 @@ export function createTestStore() {
         ...createJiraSlice(...a),
         ...createEditorSlice(...a),
         ...createStatsSlice(...a),
+        ...createStructuredChatCompanionWritesSlice(...a),
+        ...createEphemeralVmLifecycleSlice(...a),
         ...createMemorySlice(...a),
         ...createWorkspaceSpaceSlice(...a),
         ...createClaudeUsageSlice(...a),

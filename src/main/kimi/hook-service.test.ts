@@ -12,7 +12,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { KimiHookService, getManagedCommand } from './hook-service'
-import { wrapWindowsHookCommand, wrapPosixHookCommand } from '../agent-hooks/installer-utils'
+import { wrapWindowsHookCommand } from '../agent-hooks/installation/commands/windows-hook-command'
+import { wrapPosixHookCommand } from '../agent-hooks/installation/commands/posix-hook-command'
 import { buildManagedKimiHooksBlock, KIMI_HOOK_EVENTS } from './kimi-hook-config-toml'
 
 // Isolate homedir (HOME/USERPROFILE) and KIMI_CODE_HOME so installs cannot touch real configs.

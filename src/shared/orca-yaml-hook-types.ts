@@ -48,6 +48,8 @@ export type OrcaVmRecipe = {
    *  a workspace whose host was created by this recipe, and clicking it runs `command` with the
    *  workspace's host name, workspace name, and workspace path. */
   contextMenuItems?: OrcaVmRecipeContextMenuItem[]
+  // Per-mode wall-clock limits; orca.yaml accepts one number for every mode or a per-mode map.
+  timeoutSeconds?: OrcaVmRecipeTimeoutSeconds
 }
 
 export type OrcaVmRecipeContextMenuItem = {
@@ -55,6 +57,10 @@ export type OrcaVmRecipeContextMenuItem = {
   label: string
   command: string
 }
+
+export type OrcaVmRecipeLifecycleMode = 'create' | 'suspend' | 'resume' | 'destroy'
+
+export type OrcaVmRecipeTimeoutSeconds = Partial<Record<OrcaVmRecipeLifecycleMode, number>>
 
 export type OrcaVmRecipeDiagnostic = {
   index: number

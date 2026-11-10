@@ -188,6 +188,7 @@ export class RepoLifecycleOperations {
         | 'executionHostId'
         | 'symlinkPaths'
         | 'sharedDirectoriesMode'
+        | 'dictationTerms'
         | 'issueSourcePreference'
         | 'forkSyncMode'
         | 'agentWorkspaceTrust'

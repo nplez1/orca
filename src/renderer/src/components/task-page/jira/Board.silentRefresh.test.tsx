@@ -14,7 +14,7 @@ import type {
 } from '../../../../../shared/jira/jira-types'
 import type { TaskPageJiraBoardModel } from './Board'
 import { TaskPageJiraBoard } from './Board'
-import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { clearTaskPageJiraBoardCache } from '../../task-page-jira-board-cache'
 

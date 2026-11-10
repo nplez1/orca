@@ -3,15 +3,15 @@ import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import type { AgentHookInstallStatus } from '../../shared/agent-hook-listener/configuration/agent-hook-types'
 import {
   createManagedCommandMatcher,
-  removeManagedCommands,
-  wrapPosixHookCommand,
-  type HookDefinition
-} from '../agent-hooks/installer-utils'
+  removeManagedCommands
+} from '../agent-hooks/installation/commands/managed-hook-command-matching'
+import { wrapPosixHookCommand } from '../agent-hooks/installation/commands/posix-hook-command'
+import type { HookDefinition } from '../agent-hooks/installation/configuration/hook-config-schema'
 import {
   readHooksJsonRemote,
-  writeHooksJsonRemote,
-  writeManagedScriptRemote
-} from '../agent-hooks/installer-utils-remote'
+  writeHooksJsonRemote
+} from '../agent-hooks/installation/configuration/hooks-json-remote'
+import { writeManagedScriptRemote } from '../agent-hooks/installation/scripts/managed-script-write-remote'
 import { COPILOT_EVENTS } from './copilot-managed-hook-definitions'
 import { getManagedScript } from './copilot-managed-script'
 

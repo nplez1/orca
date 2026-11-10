@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { formatClipboardFilePath } from '@/lib/clipboard-file-path'
+import { formatClipboardFilePath } from '@/lib/clipboard/clipboard-file-path'
 import { openAiVaultSessionLogInOrca } from './ai-vault/session-actions/ai-vault-session-log-open'
 import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
 

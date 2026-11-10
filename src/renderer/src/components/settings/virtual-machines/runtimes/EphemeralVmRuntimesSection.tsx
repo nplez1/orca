@@ -4,111 +4,25 @@ import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
-import { parseEphemeralVmLifetimeDuration } from '../../../../../../shared/ephemeral-vm-lifetime'
-import { EPHEMERAL_VM_CLEANUP_STOPPED_ERROR } from '../../../../../../shared/ephemeral-vm-recipe-destroy-result'
-import {
-  isEphemeralVmHostActionable,
-  refreshEphemeralVmRuntimes,
-  resolveEphemeralVmRuntimeLease
-} from '@/hooks/useEphemeralVmRuntimes'
+import { refreshEphemeralVmRuntimes } from '@/hooks/useEphemeralVmRuntimes'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
+import { useTranslate } from '@/i18n/use-translate'
 import { ephemeralVmCleanupErrorText } from '@/lib/ephemeral-vm-error-copy'
 import { Button } from '../../../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../ui/tooltip'
 import { EphemeralVmCleanupStopDialog } from './EphemeralVmCleanupStopDialog'
 import { EphemeralVmRuntimeRow, formatEphemeralVmLeaseDeadline } from './EphemeralVmRuntimeRow'
 import { CloudVmSetupGuide } from './CloudVmSetupGuide'
-
-function hasCleanupFailed(runtime: EphemeralVmRuntimeRecord): boolean {
-  return (
-    runtime.cleanupStatus === 'failed' ||
-    runtime.status === 'cleanup_failed' ||
-    (runtime.status === 'cleaned' && runtime.sshTargetId !== undefined)
-  )
-}
-
-function isCleanupRunning(runtime: EphemeralVmRuntimeRecord): boolean {
-  return runtime.cleanupStatus === 'running' || runtime.status === 'cleanup_pending'
-}
-
-function hasCleanupStopped(runtime: EphemeralVmRuntimeRecord): boolean {
-  return (
-    runtime.cleanupStatus === 'failed' &&
-    runtime.cleanupLastError === EPHEMERAL_VM_CLEANUP_STOPPED_ERROR
-  )
-}
-
-export function getVisibleEphemeralVmRuntimes(
-  runtimes: readonly EphemeralVmRuntimeRecord[]
-): EphemeralVmRuntimeRecord[] {
-  return runtimes
-    .filter((runtime) => runtime.status !== 'cleaned' || runtime.sshTargetId !== undefined)
-    .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
-}
-
-/**
- * The lifetimes this runtime's provider sells, or none when it cannot be extended.
- *
- * Why the runtime's own snapshot: a later edit to the recipe pack must not offer a lifetime this
- * runtime was never created with. Why nothing once the host is released or reclaimed: main refuses
- * that extension, so offering it would only produce an action that always fails.
- */
-export function getEphemeralVmExtendDurations(runtime: EphemeralVmRuntimeRecord): string[] {
-  // Why the shared predicate: "this host cannot take an action" is the same question the lease chip,
-  // the context menu and main's refusal all ask, and it covers reclaimed, cleaned, released, and a
-  // teardown that already started.
-  if (!runtime.extend || !isEphemeralVmHostActionable(runtime)) {
-    return []
-  }
-  return (runtime.extendDurations ?? []).filter(
-    (duration) => parseEphemeralVmLifetimeDuration(duration) !== null
-  )
-}
-
-/**
- * The deadline a successful extension reported, or null when the provider reported none.
- *
- * Why module scope: the clock has to be read outside render, where an impure call is the caller's.
- */
-function getExtendedEphemeralVmLeaseDeadline(runtime: EphemeralVmRuntimeRecord): number | null {
-  return resolveEphemeralVmRuntimeLease(runtime, Date.now())?.lifetime?.releaseAtMs ?? null
-}
-
-export function getEphemeralVmRuntimeStatusLabel(
-  runtime: EphemeralVmRuntimeRecord,
-  t: Translate = translate
-): string {
-  if (hasCleanupStopped(runtime)) {
-    return t(
-      'auto.components.settings.EphemeralVmRuntimesSection.cleanupStopped',
-      'Cleanup stopped'
-    )
-  }
-  if (hasCleanupFailed(runtime)) {
-    return t('auto.components.settings.EphemeralVmRuntimesSection.cleanupFailed', 'Cleanup failed')
-  }
-  if (runtime.cleanupStatus === 'running' || runtime.status === 'cleanup_pending') {
-    return t(
-      'auto.components.settings.EphemeralVmRuntimesSection.cleanupRunning',
-      'Cleanup running'
-    )
-  }
-  if (runtime.cleanupStatus === 'disabled') {
-    return t(
-      'auto.components.settings.EphemeralVmRuntimesSection.cleanupDisabled',
-      'Cleanup disabled'
-    )
-  }
-  if (runtime.status === 'running') {
-    return t('auto.components.settings.EphemeralVmRuntimesSection.running', 'Running')
-  }
-  if (runtime.status === 'failed') {
-    return t('auto.components.settings.EphemeralVmRuntimesSection.failed', 'Failed')
-  }
-  return runtime.status
-}
+import {
+  getEphemeralVmExtendDurations,
+  getEphemeralVmRuntimeStatusLabel,
+  getExtendedEphemeralVmLeaseDeadline,
+  getVisibleEphemeralVmRuntimes,
+  hasCleanupFailed,
+  hasCleanupStopped,
+  isCleanupRunning
+} from './ephemeral-vm-runtimes-section-state'
 
 export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
   const t = useTranslate()
@@ -158,9 +72,11 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
     void refresh()
   }, [refresh])
 
-  const hasRunningCleanup = runtimes.some(isCleanupRunning) || cleaningId !== null
+  const hasRunningLifecycle =
+    runtimes.some((runtime) => isCleanupRunning(runtime) || runtime.status === 'provisioning') ||
+    cleaningId !== null
   useEffect(() => {
-    if (!hasRunningCleanup) {
+    if (!hasRunningLifecycle) {
       return
     }
     let cancelled = false
@@ -178,7 +94,7 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
         clearTimeout(timer)
       }
     }
-  }, [hasRunningCleanup, refresh])
+  }, [hasRunningLifecycle, refresh])
 
   const cleanupRuntime = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
     setCleaningId(runtime.id)
@@ -315,6 +231,24 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
     }
   }
 
+  const forgetRuntime = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
+    try {
+      await window.api.ephemeralVm.forgetRuntime({ runtimeId: runtime.id })
+    } catch (error) {
+      if (mountedRef.current) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : t(
+                'auto.components.settings.EphemeralVmRuntimesSection.removeFromListFailed',
+                'Couldn’t remove Cloud VM runtime from the list.'
+              )
+        )
+      }
+    }
+    await refresh(false)
+  }
+
   const stopCleanup = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
     setStoppingId(runtime.id)
     await runAsyncTaskWithFailure(
@@ -377,8 +311,8 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={4}>
                 {t(
-                  'auto.components.settings.EphemeralVmRuntimesSection.cloudVmRefreshLabel',
-                  'Refresh Cloud VMs'
+                  'auto.components.settings.EphemeralVmRuntimesSection.cca21fb369',
+                  'Refresh cloud VMs'
                 )}
               </TooltipContent>
             </Tooltip>
@@ -409,6 +343,7 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
                 extending !== null && extending.runtimeId === runtime.id ? extending.lifetime : null
               }
               onExtendLifetime={(lifetime) => void extendLifetime(runtime, lifetime)}
+              onForget={() => void forgetRuntime(runtime)}
             />
           ))}
         </div>

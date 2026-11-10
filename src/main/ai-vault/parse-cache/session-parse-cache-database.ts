@@ -1,3 +1,4 @@
+import { startSpan } from '../../observability/tracer'
 // Scanner-owned per-transcript rows persist changes without rewriting or capping the full working set.
 import { isSqliteCorruption } from '../../sqlite/sqlite-read-failure'
 import { hardenSqliteDatabaseFiles } from '../../sqlite/harden-database-files'
@@ -214,9 +215,11 @@ export class SessionParseCacheDatabase {
     if (db === null) {
       return fallback
     }
+    const span = startSpan('aiVault.parseCache.sqlite')
     try {
       return operation(db)
     } catch (error) {
+      span.fail(error instanceof Error ? error : String(error))
       console.debug('[ai-vault] session parse cache database failed', error)
       if (isSqliteCorruption(error)) {
         this.close()
@@ -233,6 +236,8 @@ export class SessionParseCacheDatabase {
         }
       }
       return fallback
+    } finally {
+      span.end()
     }
   }
 }

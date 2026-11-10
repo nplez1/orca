@@ -1,3 +1,4 @@
+import type { NestedWorktreeRemovalApproval } from '../../../../shared/worktree/nested-removal'
 import type {
   RuntimeWorktreeTerminalCloseResult,
   RuntimeWorktreeTerminalSleepResult
@@ -166,7 +167,10 @@ export function queueWorkspaceDelete<T>(
   selector: string,
   hostId: string | undefined,
   requested: Partial<Record<RemovalFlag, boolean>> &
-    Pick<RemoveManagedWorktreeOptions, 'deleteBranch'> & { deleteRemoteBranch?: boolean },
+    Pick<RemoveManagedWorktreeOptions, 'deleteBranch'> & {
+      deleteRemoteBranch?: boolean
+      approvedNestedWorktrees?: readonly NestedWorktreeRemovalApproval[]
+    },
   /** Called with the normalized flags, plus the caller's host when it named one. */
   run: (
     removal: Record<RemovalFlag, boolean> &
@@ -185,7 +189,8 @@ export function queueWorkspaceDelete<T>(
   const deleteRemoteBranch = requested.deleteRemoteBranch === true
   const options: LifecycleDeleteOptions = {
     // Why keyed: deleting and keeping the branch differ; a retry must not join the other's reply.
-    key: getRuntimeWorktreeRemovalOptionsKey({ ...removal, deleteRemoteBranch }),
+    // A reviewed nested delete must not share a plain delete's reply, which refuses the nesting.
+    key: `${getRuntimeWorktreeRemovalOptionsKey({ ...removal, deleteRemoteBranch })}${requested.approvedNestedWorktrees ? `:nested:${JSON.stringify(requested.approvedNestedWorktrees)}` : ''}`,
     force: removal.allowUnverifiedPtyStop,
     label: getExplicitWorktreeIdSelector(selector) ?? selector
   }

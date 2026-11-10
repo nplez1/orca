@@ -27,7 +27,7 @@ vi.mock('@/runtime/source-control/references/runtime-repo-client.ts', () => ({
     return () => {}
   }
 }))
-vi.mock('@/lib/connection-context', () => ({ getConnectionId: () => null }))
+vi.mock('@/lib/workspace/ownership/connection-context', () => ({ getConnectionId: () => null }))
 vi.mock('../source-control/sync/worktree-git-owner-target.ts', () => ({
   // SAFETY: the hook only forwards this value into the mocked RPC context.
   getWorktreeGitOwnerTarget: () => ({ kind: 'local' }) as const

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork s picked-review checks path rides inside upstream s actions, and splitting costs a permanent sync hunk. */
-import { capturePRCheckContract } from '@/lib/pr-check-observation-contract'
+import { capturePRCheckContract } from '@/lib/source-control/checks/pr-check-observation-contract'
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
 import type { GitHubSlice } from '../github-slice-contract'

@@ -14,7 +14,7 @@ import {
 } from '../../src/renderer/src/components/task-page/linear/task-page-linear-refresh-test-fixtures'
 import { useState } from 'react'
 import { writeLinearIssue } from '@/lib/work-items/linear/linear-issue-write'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
 import { pendingLinearIssueWrites } from '@/store/slices/linear/linear-issue-write-publication'
 import { useTaskPageLinearListProjectionPrelude } from '../../src/renderer/src/components/task-page/linear/use-task-page-linear-list-projection'

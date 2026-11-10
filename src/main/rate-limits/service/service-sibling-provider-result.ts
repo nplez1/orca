@@ -1,5 +1,5 @@
 import { providerResultSnapshot } from './service-provider-result-snapshot'
-import type { ProviderRateLimits } from './service-types'
+import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 
 export type SettledProviderResult =
   | { status: 'fulfilled'; value: ProviderRateLimits }

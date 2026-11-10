@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 10-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import type { PRCheckContract } from '@/lib/pr-check-observation-contract'
+import type { PRCheckContract } from '@/lib/source-control/checks/pr-check-observation-contract'
 import {
   acceptPRCheckObservation,
   completePRCheckOwnerScope

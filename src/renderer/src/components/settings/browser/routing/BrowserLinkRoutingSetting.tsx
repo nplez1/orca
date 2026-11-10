@@ -21,7 +21,7 @@ export function BrowserLinkRoutingSetting({
   updateSettings
 }: BrowserLinkRoutingSettingProps): React.JSX.Element {
   const t = useTranslate()
-  const title = t('auto.components.settings.BrowserPane.d3eb69c0aa', 'Link Routing')
+  const title = t('auto.components.settings.BrowserPane.7a366a05e1', 'Link routing')
   return (
     <SearchableSetting
       title={title}

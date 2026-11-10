@@ -20,8 +20,8 @@ import { getHostedReviewStateChangeCopy } from './hosted-review-state-change-cop
 import { buildGitHubPRStackMergeConfirmation } from './github-pr-stack-confirmation'
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import { useReadyHostedReviewAction } from './use-ready-hosted-review-action'
-import { codeHostErrorText } from '@/lib/code-host-error-copy'
 import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
+import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-copy'
 
 export type HostedReviewActionInfo = Pick<
   HostedReviewInfo,

@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type * as FileUtils from '../codex-accounts/fs-utils'
+import type * as FileUtils from '../filesystem/atomic-file-publication'
 import type * as GenericPassword from '../macos-keychain/generic-password'
 import { setMainHttpClient } from '../network/http-client'
 
@@ -26,7 +26,7 @@ vi.mock('../macos-keychain/generic-password', async (importOriginal) => ({
   readKeychainPassword: keychain.read,
   writeKeychainPassword: keychain.write
 }))
-vi.mock('../codex-accounts/fs-utils', async (importOriginal) => {
+vi.mock('../filesystem/atomic-file-publication', async (importOriginal) => {
   const actual = await importOriginal<typeof FileUtils>()
   const guard = () => {
     if (filesystem.refuseWrites) {

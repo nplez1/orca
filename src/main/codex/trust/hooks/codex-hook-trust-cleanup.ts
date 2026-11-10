@@ -3,7 +3,7 @@ import { HOME_DIRECTORY_NAME } from '../../../../shared/app-directory-names'
 import {
   MANAGED_HOOK_TIMEOUT_SECONDS,
   type HookDefinition
-} from '../../../agent-hooks/installer-utils'
+} from '../../../agent-hooks/installation/configuration/hook-config-schema'
 import {
   readHookTrustEntries,
   removeHookTrustEntries,

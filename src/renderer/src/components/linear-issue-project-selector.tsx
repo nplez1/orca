@@ -1,6 +1,9 @@
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
 import { confirmLinearIssueWrite } from '@/store/slices/linear/linear-issue-publication'
-import { taskProviderErrorMessage, taskProviderErrorText } from '@/lib/task-provider-error-copy'
+import {
+  taskProviderErrorMessage,
+  taskProviderErrorText
+} from '@/lib/work-items/task-provider-error-copy'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, FolderKanban, LoaderCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,7 +18,7 @@ import { linearListProjects } from '@/runtime/linear/runtime-linear-project-clie
 import { useAppStore } from '@/store'
 import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type { LinearProjectSummary } from '../../../shared/linear/project-types'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 
 export function LinearIssueProjectSelector({

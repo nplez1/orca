@@ -14,9 +14,9 @@ import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
 import { buildJiraCreateSubmission } from '@/components/task-page/jira/task-page-jira-create-fields'
 import { useTranslate } from '@/i18n/use-translate'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import { getCommentBodySubmitState } from '@/lib/comment-body-submit-state'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { isJiraUserField, resolveJiraFieldControlKind } from '../../../shared/jira-field-rendering'
+import { getCommentBodySubmitState } from '@/lib/source-control/review/comments/comment-body-submit-state'
 import {
   buildResolutionFieldValue,
   classifyTransitionRequirements,

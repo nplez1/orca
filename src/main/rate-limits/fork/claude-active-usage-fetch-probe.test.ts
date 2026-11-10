@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchActiveClaudeRateLimits } from '../claude-active-usage-fetch'
-import { fetchClaudeOAuthUsage } from '../claude-oauth-usage-request'
-import { readClaudeOAuthCredentials } from '../claude-oauth-credentials'
+import { fetchActiveClaudeRateLimits } from '../providers/claude/claude-active-usage-fetch'
+import { fetchClaudeOAuthUsage } from '../providers/claude/claude-oauth-usage-request'
+import { readClaudeOAuthCredentials } from '../providers/claude/claude-oauth-credentials'
 import { refreshClaudeOAuthCredentials } from '../../claude-accounts/claude-oauth-token-refresh'
-import { OAuthUsageError } from '../claude-oauth-usage-error'
+import { OAuthUsageError } from '../providers/claude/claude-oauth-usage-error'
 import { readClaudeUsageFromCli } from './claude-cli-usage-probe'
 
 const RETRY_AFTER_MS = 3_593_000
@@ -24,8 +24,10 @@ const cliReading = {
   usageMetadata: { source: 'cli' as const, attemptedSources: ['cli' as const] }
 }
 
-vi.mock('../claude-oauth-usage-request', () => ({ fetchClaudeOAuthUsage: vi.fn() }))
-vi.mock('../claude-oauth-credentials', () => ({
+vi.mock('../providers/claude/claude-oauth-usage-request', () => ({
+  fetchClaudeOAuthUsage: vi.fn()
+}))
+vi.mock('../providers/claude/claude-oauth-credentials', () => ({
   readClaudeOAuthCredentials: vi.fn(),
   resolveClaudeOAuthCredentialReadOptions: () => undefined
 }))

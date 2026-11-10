@@ -1,3 +1,4 @@
+import type { SparsePresetFailure } from '../../shared/worktree/sparse-preset-failure'
 import type {
   ForgetRemovedWorktreesForExecutionHostArgs,
   ForgetRemovedWorktreesForExecutionHostResult,
@@ -210,7 +211,7 @@ export type SparsePresetsApi = {
     id?: string
     name: string
     directories: string[]
-  }) => Promise<SparsePreset>
+  }) => Promise<SparsePreset | SparsePresetFailure>
   remove: (args: { repoId: string; presetId: string }) => Promise<void>
   onChanged: (callback: (data: { repoId: string }) => void) => () => void
 }

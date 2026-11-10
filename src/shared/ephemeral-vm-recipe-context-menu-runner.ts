@@ -62,6 +62,19 @@ export async function runEphemeralVmRecipeContextMenuItem(
     }
   }
 
+  // Why a refusal: the item's hook is handed the create's result to address the same machine.
+  if (!args.recipeResult) {
+    return {
+      ok: false,
+      context: args.context,
+      error: `Recipe "${args.recipe.id}" has no recorded result to run an item against.`,
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      signal: null
+    }
+  }
+
   const payload = buildEphemeralVmRecipeContextMenuPayload({
     recipe: args.recipe,
     context: args.context,

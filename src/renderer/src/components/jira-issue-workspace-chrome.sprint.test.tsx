@@ -7,7 +7,7 @@ import type { ComponentProps } from 'react'
 import type { JiraIssue, JiraSprintAssignment } from '../../../shared/jira/jira-types'
 import { JiraIssueMetadataBar } from './jira-issue-workspace-chrome'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback

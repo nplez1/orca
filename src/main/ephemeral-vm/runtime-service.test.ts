@@ -1,9 +1,6 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, truncateSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { encodePairingOffer } from '../../shared/remote-runtime/pairing/pairing'
-import { PAIRING_OFFER_VERSION } from '../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
 import {
   getEphemeralVmRuntimeStorePath,
   listEphemeralVmRuntimes,
@@ -14,37 +11,21 @@ import {
   getEphemeralVmRuntimeFeatureStorePath,
   MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
 } from '../../shared/ephemeral-vm-runtime-feature-store'
-import { cleanupEphemeralVmRuntime, resumeEphemeralVmRuntime } from './runtime-service'
-import { provisionEphemeralVmRuntime } from './runtime-provisioning'
+import {
+  cleanupEphemeralVmRuntime,
+  provisionEphemeralVmRuntime,
+  resumeEphemeralVmRuntime
+} from './runtime-service'
 import { stopEphemeralVmRuntimeCleanup } from './runtime-cleanup-control'
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
+import {
+  cleanupTempDirs,
+  makeDir,
+  makePairingCode,
+  nodeCommand
+} from './runtime-service.test-harness'
 
-const tempDirs: string[] = []
-
-afterEach(() => {
-  for (const root of tempDirs.splice(0)) {
-    rmSync(root, { recursive: true, force: true })
-  }
-})
-
-function makeDir(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), prefix))
-  tempDirs.push(dir)
-  return dir
-}
-
-function makePairingCode(): string {
-  return encodePairingOffer({
-    v: PAIRING_OFFER_VERSION,
-    endpoint: 'wss://sandbox.example.com',
-    deviceToken: 'token',
-    publicKeyB64: 'public-key'
-  })
-}
-
-function nodeCommand(scriptPath: string): string {
-  return `"${process.execPath}" "${scriptPath}"`
-}
+afterEach(cleanupTempDirs)
 
 describe('ephemeral VM runtime service', () => {
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
@@ -215,7 +196,42 @@ describe('ephemeral VM runtime service', () => {
     expect(readFileSync(countPath, 'utf8')).toBe('xx')
   })
 
-  it('does not persist a runtime when recipe output cannot be parsed', async () => {
+  it('keeps no record when create is cancelled before its script starts', async () => {
+    const userDataPath = makeDir('orca-ephemeral-vm-service-user-data-')
+    const repoPath = makeDir('orca-ephemeral-vm-service-repo-')
+    const startedPath = join(repoPath, 'started.txt')
+    const startPath = join(repoPath, 'start.js')
+    writeFileSync(startPath, `require('fs').writeFileSync(${JSON.stringify(startedPath)}, 'x')\n`)
+    const controller = new AbortController()
+    controller.abort()
+
+    const provisioned = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe: { id: 'cloud-sandbox', name: 'Cloud Sandbox', create: nodeCommand(startPath) },
+      signal: controller.signal
+    })
+
+    expect(provisioned).toMatchObject({ ok: false, start: { exitCode: null } })
+    expect(existsSync(startedPath)).toBe(false)
+    expect(listEphemeralVmRuntimes(userDataPath)).toEqual([])
+  })
+
+  it('keeps no record when create fails validation before its script starts', async () => {
+    const userDataPath = makeDir('orca-ephemeral-vm-service-user-data-')
+    const missingRepoPath = join(makeDir('orca-ephemeral-vm-service-repo-'), 'missing')
+
+    await expect(
+      provisionEphemeralVmRuntime({
+        userDataPath,
+        repoPath: missingRepoPath,
+        recipe: { id: 'cloud-sandbox', name: 'Cloud Sandbox', create: 'unused' }
+      })
+    ).rejects.toThrow()
+    expect(listEphemeralVmRuntimes(userDataPath)).toEqual([])
+  })
+
+  it('keeps a result-less failed record when recipe output cannot be parsed', async () => {
     const userDataPath = makeDir('orca-ephemeral-vm-service-user-data-')
     const repoPath = makeDir('orca-ephemeral-vm-service-repo-')
     const startPath = join(repoPath, 'start.js')
@@ -228,7 +244,8 @@ describe('ephemeral VM runtime service', () => {
         id: 'cloud-sandbox',
         name: 'Cloud Sandbox',
         create: nodeCommand(startPath)
-      }
+      },
+      now: 1_000
     })
 
     expect(provisioned).toMatchObject({
@@ -237,7 +254,138 @@ describe('ephemeral VM runtime service', () => {
         error: 'Recipe stdout must be one JSON object.'
       }
     })
-    expect(listEphemeralVmRuntimes(userDataPath)).toEqual([])
+    const runtimes = listEphemeralVmRuntimes(userDataPath)
+    expect(runtimes).toEqual([
+      expect.objectContaining({
+        id: provisioned.start.context.instanceId,
+        status: 'failed',
+        cleanupLastError: 'Recipe stdout must be one JSON object.',
+        createdAt: 1_000
+      })
+    ])
+    expect(runtimes[0]).not.toHaveProperty('recipeResult')
+  })
+
+  it('keeps a timed-out create destroyable by its instance id', async () => {
+    const userDataPath = makeDir('orca-ephemeral-vm-service-user-data-')
+    const repoPath = makeDir('orca-ephemeral-vm-service-repo-')
+    const startPath = join(repoPath, 'start.js')
+    writeFileSync(startPath, 'setInterval(() => {}, 1000)')
+    const recipe: OrcaVmRecipe = {
+      id: 'slow-sandbox',
+      name: 'Slow Sandbox',
+      create: nodeCommand(startPath),
+      destroy: nodeCommand(startPath),
+      timeoutSeconds: { create: 1 }
+    }
+
+    const provisioned = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe,
+      now: 1_000
+    })
+
+    expect(provisioned).toMatchObject({ ok: false, start: { errorCode: 'recipeTimedOut' } })
+    expect(listEphemeralVmRuntimes(userDataPath)).toEqual([
+      expect.objectContaining({
+        id: provisioned.start.context.instanceId,
+        status: 'failed',
+        cleanupStatus: 'not_started',
+        cleanupLastErrorCode: 'recipeTimedOut',
+        recipe: expect.not.objectContaining({ timeoutSeconds: expect.anything() })
+      })
+    ])
+  })
+
+  it('reconciles a create interrupted by a crash into a destroyable failed record', async () => {
+    const userDataPath = makeDir('orca-ephemeral-vm-service-user-data-')
+    const repoPath = makeDir('orca-ephemeral-vm-service-repo-')
+    const startPath = join(repoPath, 'start.js')
+    const destroyPath = join(repoPath, 'destroy.js')
+    const spawnedPath = join(repoPath, 'create-spawned.txt')
+    const payloadPath = join(repoPath, 'destroy-payload.json')
+    writeFileSync(
+      startPath,
+      [
+        `require('fs').writeFileSync(${JSON.stringify(spawnedPath)}, process.env.ORCA_VM_INSTANCE_ID)`,
+        'setInterval(() => {}, 1000)'
+      ].join('\n')
+    )
+    writeFileSync(
+      destroyPath,
+      [
+        "let input = ''",
+        "process.stdin.on('data', (chunk) => { input += chunk })",
+        `process.stdin.on('end', () => require('fs').writeFileSync(${JSON.stringify(payloadPath)}, input))`
+      ].join('\n')
+    )
+    const recipe: OrcaVmRecipe = {
+      id: 'slow-sandbox',
+      name: 'Slow Sandbox',
+      create: nodeCommand(startPath),
+      destroy: nodeCommand(destroyPath)
+    }
+    const controller = new AbortController()
+    const provisioning = provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe,
+      repoId: 'repo-1',
+      workspaceName: 'Slow VM',
+      now: 1_000,
+      signal: controller.signal
+    })
+    await vi.waitFor(() => expect(existsSync(spawnedPath)).toBe(true), { timeout: 10_000 })
+    const instanceId = readFileSync(spawnedPath, 'utf8')
+
+    // Persisted before create returned, and invisible to older builds' store schema.
+    expect(listEphemeralVmRuntimes(userDataPath)).toEqual([
+      expect.objectContaining({ id: instanceId, status: 'provisioning', repoId: 'repo-1' })
+    ])
+    expect(
+      JSON.parse(readFileSync(getEphemeralVmRuntimeStorePath(userDataPath), 'utf8')).runtimes
+    ).toEqual([])
+    const { reconcileInterruptedEphemeralVmProvisions: reconcileInSameProcess } =
+      await import('./runtime-provisioning-persistence')
+    expect(reconcileInSameProcess(userDataPath)).toEqual([])
+
+    // A relaunch has no record of the in-flight create.
+    vi.resetModules()
+    const { reconcileInterruptedEphemeralVmProvisions } =
+      await import('./runtime-provisioning-persistence')
+    const reconciled = reconcileInterruptedEphemeralVmProvisions(userDataPath, 5_000)
+    controller.abort()
+    await provisioning
+
+    expect(reconciled).toEqual([
+      {
+        id: instanceId,
+        recipeId: 'slow-sandbox',
+        recipe,
+        repoId: 'repo-1',
+        repoPath,
+        workspaceName: 'Slow VM',
+        status: 'failed',
+        cleanupStatus: 'not_started',
+        cleanupLastError:
+          'Orca stopped while this VM was being created. Destroy it to release any provider resources.',
+        cleanupLastErrorCode: 'provisionInterrupted',
+        createdAt: 1_000,
+        updatedAt: 5_000
+      }
+    ])
+
+    const cleanup = await cleanupEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe,
+      runtimeId: instanceId
+    })
+    expect(cleanup).toMatchObject({ ok: true, runtime: { status: 'cleaned' } })
+    const payload = JSON.parse(readFileSync(payloadPath, 'utf8'))
+    expect(payload).toMatchObject({ mode: 'destroy', instanceId, recipeId: 'slow-sandbox' })
+    expect(payload).not.toHaveProperty('recipeResult')
   })
 
   it('rejects an unwritable feature store before a checkout-mode recipe creates resources', async () => {
@@ -640,123 +788,6 @@ describe('ephemeral VM runtime service', () => {
         status: 'resume_failed',
         connectionMode: 'ssh',
         recipeResult: { connection: { type: 'ssh' } }
-      }
-    })
-  })
-
-  const LEASE_SSH_CONNECTION = {
-    type: 'ssh' as const,
-    projectRoot: '/workspace/repo',
-    target: { label: 'VM', host: 'host', port: 22, username: 'orca' }
-  }
-  const SEEDED_RELEASE_AT = '2026-10-13T03:00:00Z'
-
-  /** A suspended host holding a lease deadline, plus the resume hook that answers for it. */
-  function seedSuspendedLease(printed: string): {
-    userDataPath: string
-    repoPath: string
-    recipe: OrcaVmRecipe
-  } {
-    const userDataPath = makeDir('orca-ephemeral-vm-service-user-data-')
-    const repoPath = makeDir('orca-ephemeral-vm-service-repo-')
-    const resumePath = join(repoPath, 'resume.js')
-    writeFileSync(resumePath, `console.log(${JSON.stringify(printed)})`)
-    const recipe: OrcaVmRecipe = {
-      id: 'cloud-sandbox',
-      name: 'Cloud Sandbox',
-      create: 'unused',
-      resume: nodeCommand(resumePath)
-    }
-    upsertEphemeralVmRuntime(userDataPath, {
-      id: 'runtime-1',
-      recipeId: recipe.id,
-      recipe,
-      status: 'suspended',
-      connectionMode: 'ssh',
-      cleanupStatus: 'not_started',
-      createdAt: 1,
-      updatedAt: 1,
-      recipeResult: {
-        schemaVersion: 1,
-        connection: LEASE_SSH_CONNECTION,
-        userData: { releaseAt: SEEDED_RELEASE_AT }
-      }
-    })
-    return { userDataPath, repoPath, recipe }
-  }
-
-  it('rejects a resume whose deadline cannot be read, keeping the stored one', async () => {
-    const { userDataPath, repoPath, recipe } = seedSuspendedLease(
-      JSON.stringify({
-        schemaVersion: 1,
-        connection: LEASE_SSH_CONNECTION,
-        // Offsetless, so the deadline cannot be read as an instant.
-        userData: { releaseAt: '2026-10-13T03:26:41' }
-      })
-    )
-
-    const resumed = await resumeEphemeralVmRuntime({
-      userDataPath,
-      repoPath,
-      recipe,
-      runtimeId: 'runtime-1'
-    })
-
-    expect(resumed).toMatchObject({
-      ok: false,
-      error: expect.stringContaining('userData.releaseAt must be an RFC 3339 timestamp'),
-      runtime: { status: 'resume_failed' }
-    })
-    // The earlier deadline is the only reconciliation Orca has left, so it must survive.
-    expect(listEphemeralVmRuntimes(userDataPath)[0].recipeResult).toMatchObject({
-      userData: { releaseAt: SEEDED_RELEASE_AT }
-    })
-  })
-
-  it('rejects a resume that drops the deadline metadata', async () => {
-    const { userDataPath, repoPath, recipe } = seedSuspendedLease(
-      JSON.stringify({ schemaVersion: 1, connection: LEASE_SSH_CONNECTION })
-    )
-
-    const resumed = await resumeEphemeralVmRuntime({
-      userDataPath,
-      repoPath,
-      recipe,
-      runtimeId: 'runtime-1'
-    })
-
-    expect(resumed).toMatchObject({
-      ok: false,
-      error:
-        'Resume returned no lifetime metadata, which would have discarded the release deadline.',
-      runtime: { status: 'resume_failed' }
-    })
-    expect(listEphemeralVmRuntimes(userDataPath)[0].recipeResult).toMatchObject({
-      userData: { releaseAt: SEEDED_RELEASE_AT }
-    })
-  })
-
-  it('keeps a resume that still reports a deadline', async () => {
-    const { userDataPath, repoPath, recipe } = seedSuspendedLease(
-      JSON.stringify({
-        schemaVersion: 1,
-        connection: LEASE_SSH_CONNECTION,
-        userData: { releaseAt: '2026-10-13T07:00:00Z' }
-      })
-    )
-
-    const resumed = await resumeEphemeralVmRuntime({
-      userDataPath,
-      repoPath,
-      recipe,
-      runtimeId: 'runtime-1'
-    })
-
-    expect(resumed).toMatchObject({
-      ok: true,
-      runtime: {
-        status: 'running',
-        recipeResult: { userData: { releaseAt: '2026-10-13T07:00:00Z' } }
       }
     })
   })

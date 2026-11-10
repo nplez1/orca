@@ -9,9 +9,9 @@ import {
 import {
   getProviderRuntimeContextKey,
   getEnvironmentRuntimeContextKey
-} from '@/lib/provider-runtime-context'
+} from '@/runtime/hosts/observations/provider-runtime-context'
 import { getLinearCacheGeneration, getLinearMutationGeneration } from './linear-slice-request-state'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import { ownedSourceTarget, type OwnedSource } from '@/lib/provider-source-target'
 
 export function normalizeListAttributeFilter(

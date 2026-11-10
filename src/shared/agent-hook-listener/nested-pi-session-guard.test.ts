@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  createHookListenerState,
-  seedLegacyAgentStatusForTests,
-  type HookListenerState
-} from './listener-state'
+import { createHookListenerState, type HookListenerState } from './listener-state'
+import { seedLegacyAgentStatusForTests } from './legacy-agent-status-test-seed'
 import { isNestedPiSessionEvent } from './nested-pi-session-guard'
 import { normalizeAndAccept, PANE_KEY } from './normalization/agent-hook-listener-test-harness'
 import { AGENT_DESCENDANT_QUIET_REAP_MS } from '../agent-descendant-roster'

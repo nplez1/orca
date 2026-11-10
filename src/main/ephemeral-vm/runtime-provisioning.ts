@@ -1,10 +1,7 @@
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
-import {
-  newEphemeralVmInstanceId,
-  runEphemeralVmRecipeStart,
-  type EphemeralVmRecipeStartFailure,
-  type EphemeralVmRecipeStartResult,
-  type EphemeralVmRecipeStartSuccess
+import type {
+  EphemeralVmRecipeStartFailure,
+  EphemeralVmRecipeStartSuccess
 } from '../../shared/ephemeral-vm-recipe-runner'
 import {
   removeEphemeralVmProvisioningAttempt,
@@ -12,18 +9,13 @@ import {
 } from '../../shared/ephemeral-vm-provisioning-attempts'
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
-import { cleanupFailedEphemeralVmStart } from './failed-start-cleanup'
-import {
-  persistProvisionedEphemeralVmRuntime,
-  prepareEphemeralVmCompatibilityPersistence,
-  type EphemeralVmCompatibilityPersistence
-} from './runtime-provisioning-persistence'
 
 /**
  * Starting one ephemeral runtime: the create hook, and the record that has to survive it.
  *
- * Split from `runtime-service` because it is the only lifecycle action that runs a hook before any
- * record of the machine exists, so the ordering inside it is what the leak fixes are about.
+ * The create itself lives in `runtime-service`, on upstream's write-ahead records. What stays here is
+ * the fork's own bookkeeping around it — the bounded attempts store its startup reconcile reads, and
+ * the in-process in-flight registry that keeps that reconcile from flagging a live create.
  */
 
 export type ProvisionEphemeralVmRuntimeArgs = {
@@ -82,127 +74,23 @@ export function holdEphemeralVmProvisioningInFlightForTest(instanceId: string): 
   }
 }
 
-export async function provisionEphemeralVmRuntime(
-  args: ProvisionEphemeralVmRuntimeArgs
-): Promise<ProvisionEphemeralVmRuntimeResult> {
-  const compatibility = prepareEphemeralVmCompatibilityPersistence(args)
-  // Why the id is chosen here rather than inside the runner: it has to exist before the hook starts,
-  // because the hook is what allocates the machine.
-  const instanceId = compatibility?.instanceId ?? newEphemeralVmInstanceId()
-  // Why recorded before the spawn: the recipe runs detached, so an app that is quit or killed during
-  // the create leaves the script writing into a pipe nobody holds — and a machine the provider bills
-  // for with nothing on disk naming it. The next startup looks for exactly these rows.
-  recordProvisioningAttempt(args, instanceId, compatibility?.createdAt)
-
+export function beginEphemeralVmProvisioningInFlight(instanceId: string): void {
   inFlightCreates.add(instanceId)
-  try {
-    return await startProvisionedRuntime(args, instanceId, compatibility)
-  } finally {
-    // Why the whole body and not just the spawn: the row stays on disk through the destroy hooks that
-    // follow, and a registration that re-ran while one of those ran would flag a live create.
-    inFlightCreates.delete(instanceId)
-  }
 }
 
-async function startProvisionedRuntime(
-  args: ProvisionEphemeralVmRuntimeArgs,
-  instanceId: string,
-  compatibility: EphemeralVmCompatibilityPersistence | null
-): Promise<ProvisionEphemeralVmRuntimeResult> {
-  let start: EphemeralVmRecipeStartResult
-  try {
-    start = await runEphemeralVmRecipeStart({
-      repoPath: args.repoPath,
-      recipe: args.recipe,
-      context: {
-        instanceId,
-        projectId: args.projectId,
-        workspaceId: args.workspaceId,
-        workspaceName: args.workspaceName,
-        repoUrl: args.repoUrl,
-        branch: args.branch,
-        ref: args.ref,
-        expectedRefHead: args.expectedRefHead,
-        orcaVersion: args.orcaVersion
-      },
-      signal: args.signal,
-      onStdout: args.onStdout,
-      onStderr: args.onStderr
-    })
-  } catch (error) {
-    // Why cleared on a rejection: the hook never reported, and a failure to spawn it means it never
-    // ran either, so there is no machine for a later startup to look for.
-    forgetProvisioningAttempt(args.userDataPath, instanceId)
-    throw error
-  }
-
-  if (!start.ok) {
-    return finishFailedProvisioning(args, { instanceId, start })
-  }
-
-  // Why the attempt outlives the persist: the persisted record is what replaces it, so clearing first
-  // would leave a window where a crash loses both. Why nothing is caught here: persistence clears the
-  // row itself when it managed to destroy the machine, and otherwise the machine exists with nothing
-  // else naming it.
-  const runtime = await persistProvisionedEphemeralVmRuntime(args, start, compatibility)
-  forgetProvisioningAttempt(args.userDataPath, instanceId)
-
-  return { ok: true, start, runtime }
+/** Cleared for the whole create, not just the spawn: the row outlives the destroy hooks that follow. */
+export function endEphemeralVmProvisioningInFlight(instanceId: string): void {
+  inFlightCreates.delete(instanceId)
 }
 
 /**
- * The machine's fate after a create that reported a failure.
+ * Recorded before the spawn.
  *
- * Why the attempt sometimes stays: a hook that was killed never showed anyone its transcript, and the
- * release it may have run lives inside the recipe — so a machine can exist with nothing recording it.
- * A hook that exited on its own put its reason in front of the user, which is a record they can act on.
+ * Why: the recipe runs detached, so an app that is quit or killed during the create leaves the script
+ * writing into a pipe nobody holds — and a machine the provider bills for with nothing on disk naming
+ * it. The next startup looks for exactly these rows.
  */
-async function finishFailedProvisioning(
-  args: ProvisionEphemeralVmRuntimeArgs,
-  failed: { instanceId: string; start: EphemeralVmRecipeStartFailure }
-): Promise<ProvisionEphemeralVmRuntimeResult> {
-  if (!failed.start.recipeResult) {
-    if (!failed.start.aborted) {
-      forgetProvisioningAttempt(args.userDataPath, failed.instanceId)
-    }
-    return { ok: false, start: failed.start }
-  }
-  try {
-    // Why cleanup before the row is cleared: a kill during this destroy hook would leave a machine whose
-    // id Orca knows with no record of it, which is exactly the leak this row exists to prevent.
-    await cleanupFailedEphemeralVmStart(args, {
-      context: failed.start.context,
-      recipeResult: failed.start.recipeResult
-    })
-  } catch {
-    // Why keep the row: cleanupFailedEphemeralVmStart throws when it could not even record the failure,
-    // so the machine's state is unknown and this row is the only thing that says it may exist.
-    return { ok: false, start: failed.start }
-  }
-  forgetProvisioningAttempt(args.userDataPath, failed.instanceId)
-  return { ok: false, start: failed.start }
-}
-
-/**
- * Best effort, deliberately.
- *
- * Why: a create that has succeeded must not be reported as an error because its bookkeeping row could
- * not be removed, and a spawn failure must not be replaced by a removal failure. A row that outlives
- * its create only costs a startup warning.
- */
-function forgetProvisioningAttempt(userDataPath: string, instanceId: string): void {
-  try {
-    removeEphemeralVmProvisioningAttempt(userDataPath, instanceId)
-  } catch (error) {
-    recordSwallowedFailure(
-      'ephemeral-vm',
-      error,
-      `could not clear the provisioning record for ${instanceId}`
-    )
-  }
-}
-
-function recordProvisioningAttempt(
+export function recordEphemeralVmProvisioningAttempt(
   args: ProvisionEphemeralVmRuntimeArgs,
   instanceId: string,
   createdAt: number | undefined
@@ -217,4 +105,27 @@ function recordProvisioningAttempt(
     ...(args.workspaceId ? { workspaceId: args.workspaceId } : {}),
     ...(args.workspaceName ? { workspaceName: args.workspaceName } : {})
   })
+}
+
+/**
+ * Best effort, deliberately.
+ *
+ * Why: a create that has succeeded must not be reported as an error because its bookkeeping row could
+ * not be removed, and a spawn failure must not be replaced by a removal failure. A row that outlives
+ * its create only costs a startup warning — and upstream's `provisioning` record remains the durable
+ * one, so nothing is lost when this clears.
+ */
+export function forgetEphemeralVmProvisioningAttempt(
+  userDataPath: string,
+  instanceId: string
+): void {
+  try {
+    removeEphemeralVmProvisioningAttempt(userDataPath, instanceId)
+  } catch (error) {
+    recordSwallowedFailure(
+      'ephemeral-vm',
+      error,
+      `could not clear the provisioning record for ${instanceId}`
+    )
+  }
 }

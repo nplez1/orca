@@ -1,4 +1,4 @@
-import { antigravityUsageDisabledSnapshot } from '../antigravity-usage-snapshot'
+import { antigravityUsageDisabledSnapshot } from '../providers/antigravity/antigravity-usage-snapshot'
 import type { ForkUsageStateKey } from '../../../shared/usage-providers/usage-provider-manifest'
 import { RateLimitServiceAntigravityAccounts } from './service-antigravity-accounts'
 import type { InternalRateLimitState, ProviderRateLimits } from './service-types'

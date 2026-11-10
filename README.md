@@ -111,20 +111,6 @@ The feature wall below is upstream Orca's; its "Docs" links go to upstream's doc
 <tr>
 <td width="50%" valign="middle">
 
-### Orchestrate Agents
-
-Hand a big task to one agent. It splits the work, starts worker agents in their own workspaces, and brings their results back to you.
-
-[Docs →](https://www.onorca.dev/docs/cli/orchestration)
-
-</td>
-<td width="50%">
-  <a href="https://www.onorca.dev/docs/cli/orchestration"><picture><source srcset="docs/assets/readme-features/orchestration.webp" type="image/webp"><img src="docs/assets/readme-features/orchestration.poster.jpg" alt="A coordinator agent splitting a task between two worker agents and reporting their results" width="100%" /></picture></a>
-</td>
-</tr>
-<tr>
-<td width="50%" valign="middle">
-
 ### Chat or Terminal
 
 Run any agent in Chat UI or as the raw CLI, and move a conversation between the two without losing context.
@@ -134,6 +120,20 @@ Run any agent in Chat UI or as the raw CLI, and move a conversation between the 
 </td>
 <td width="50%">
   <a href="https://www.onorca.dev/docs/agents/native-chat"><picture><source srcset="docs/assets/readme-features/chat-or-terminal.webp" type="image/webp"><img src="docs/assets/readme-features/chat-or-terminal.poster.jpg" alt="The same agent conversation in Chat UI and in the terminal, side by side" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### Orchestrate Agents
+
+Hand a big task to one agent. It splits the work, starts worker agents in their own workspaces, and brings their results back to you.
+
+[Docs →](https://www.onorca.dev/docs/cli/orchestration)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/cli/orchestration"><picture><source srcset="docs/assets/readme-features/orchestration.webp" type="image/webp"><img src="docs/assets/readme-features/orchestration.poster.jpg" alt="A coordinator agent splitting a task between two worker agents and reporting their results" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -361,11 +361,9 @@ Pair the Orca mobile app with Orca NP to monitor and steer your agents from your
 
 - **Orca NP issues &amp; ideas:** [Open an issue](https://github.com/nplez1/orca/issues) for anything specific to this fork.
 - **Upstream community:** upstream Orca's channels cover everything this fork inherits — [Discord](https://discord.gg/fzjDKHxv8Q), [@orca_build on X](https://x.com/orca_build), and [upstream issues](https://github.com/stablyai/orca/issues) for bugs that also reproduce in official Orca.
-- **Upstream WeChat group:** Scan to join an Orca community WeChat group. If one group is full, join another.
+- **Upstream WeChat group:** Scan to join an Orca community WeChat group.
 
-  <img src="docs/assets/wechat-qr-group14.jpg" alt="WeChat QR code for the Orca community" width="160" />
-  <img src="docs/assets/wechat-qr-group15.jpg" alt="WeChat QR code for the Orca community" width="160" />
-  <img src="docs/assets/wechat-qr-group16.jpg" alt="WeChat QR code for the Orca community" width="160" />
+  <img src="docs/assets/wechat-qr.jpg" alt="WeChat QR code for the Orca community" width="160" />
 
 - **Docs:** [onorca.dev/docs](https://www.onorca.dev/docs) documents upstream Orca.
 - **Show support:** [Star](https://github.com/nplez1/orca) this repo to follow the fork, or [upstream](https://github.com/stablyai/orca).

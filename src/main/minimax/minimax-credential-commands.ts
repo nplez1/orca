@@ -18,11 +18,11 @@ import {
   refuseCredentialSealedElsewhere,
   savedCredentialUnreadable
 } from '../credentials/saved-credential-readability'
-import { clearMiniMaxSessionCookieJar } from '../rate-limits/minimax/minimax-request-context'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
+import { clearMiniMaxSessionCookieJar } from '../rate-limits/providers/minimax/minimax-request-context'
 import { refreshAfterCredentialChange } from '../ipc/credential-change-rate-limit-refresh'
 import { getMainHttpClient } from '../network/http-client'
-import type { RateLimitService } from '../rate-limits/service'
+import type { RateLimitService } from '../rate-limits/service/rate-limit-service'
 import type { MiniMaxCredentialsStatus } from '../../shared/minimax-credentials-status'
 
 type UsageRefresher = Pick<RateLimitService, 'refresh' | 'invalidateMiniMaxCredentialState'>

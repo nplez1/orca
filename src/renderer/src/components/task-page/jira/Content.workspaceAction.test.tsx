@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
-import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'

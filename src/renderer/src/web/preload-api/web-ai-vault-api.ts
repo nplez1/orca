@@ -119,6 +119,7 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
             ? { afterFingerprint: args.afterFingerprint }
             : {}),
           ...(held ? { syncFromFingerprint: held.fingerprint } : {}),
+          ...(args?.scopeOnly === true ? { scopeOnly: true } : {}),
           scopePaths: aiVaultAppliedScopePaths(args)
         },
         fetchPage: (pageArgs) =>

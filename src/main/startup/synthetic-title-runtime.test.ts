@@ -15,7 +15,7 @@ vi.mock('../ipc/pty/pane/key-state', () => ({
   registerPaneKeyTeardownListener: vi.fn(),
   getPtyIdForPaneKey: (paneKey: string) => (paneKey === 'pane-1' ? 'pty-1' : null)
 }))
-vi.mock('../agent-hooks/server', () => ({
+vi.mock('../agent-hooks/server/agent-hook-server', () => ({
   agentHookServer: {
     subscribePaneStatusClear: vi.fn(),
     subscribeStatusDrop: vi.fn(),

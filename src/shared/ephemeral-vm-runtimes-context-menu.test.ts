@@ -6,6 +6,7 @@ import {
   isReleasedEphemeralVmRuntime,
   toEphemeralVmRuntimeContextMenuFields,
   toEphemeralVmRuntimeRecipeSnapshot,
+  type EphemeralVmProvisionedRuntimeRecord,
   type EphemeralVmRuntimeRecord
 } from './ephemeral-vm-runtimes'
 import { projectRuntimeForRollback } from './ephemeral-vm-runtime-rollback-projection'
@@ -19,7 +20,9 @@ function recipe(overrides: Partial<OrcaVmRecipe> = {}): OrcaVmRecipe {
   return { id: 'team-machine', name: 'Team machine', create: './create.sh', ...overrides }
 }
 
-function record(overrides: Partial<EphemeralVmRuntimeRecord> = {}): EphemeralVmRuntimeRecord {
+function record(
+  overrides: Partial<EphemeralVmRuntimeRecord> = {}
+): EphemeralVmProvisionedRuntimeRecord {
   return {
     id: 'runtime-1',
     recipeId: 'team-machine',

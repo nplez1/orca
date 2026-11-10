@@ -128,7 +128,8 @@ async function listAiVaultSessions(
       scopePaths:
         paths.length <= AI_VAULT_SCOPE_PATHS_MAX_COUNT ? [...new Set(paths)].sort() : paths,
       executionHostScope,
-      includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions === true
+      includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions === true,
+      ...(args?.scopeOnly === true ? { scopeOnly: true } : {})
     })
   const key = scopeKey(aiVaultAppliedScopePaths(args) ?? [])
   const depth = requestedAiVaultSessionDepth(args)
@@ -288,9 +289,7 @@ export function registerAiVaultHandlers(options: AiVaultHandlerOptions = {}): vo
     const controller = listCancellations.begin(event, requestToken)
     try {
       await handlerOptions.ensureStructuredSessionOwnership?.()
-      const result = await listAiVaultSessions(args, {
-        signal: controller?.signal
-      })
+      const result = await listAiVaultSessions(args, { signal: controller?.signal })
       return projectStructuredAiVaultSessions(result, OPENS_EVERY_STRUCTURED_CHAT)
     } catch (error) {
       // Expected cancellation is a result so Electron does not log rejected IPC as an error.

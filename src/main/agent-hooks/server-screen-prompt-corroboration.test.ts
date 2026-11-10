@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentHookSource } from '../../shared/agent-hook-listener/transport/agent-hook-relay'
-import { AgentHookServer, _internals } from './server'
+import { AgentHookServer, _internals } from './server/agent-hook-server'
 import {
   SCREEN_PROMPT_FAST_RECHECK_COUNT,
   SCREEN_PROMPT_SLOW_RECHECK_MS,
@@ -11,7 +11,7 @@ import {
   screenPromptReleaseRow,
   screenPromptRow
 } from './server/server-screen-prompt-corroboration'
-import { buildBody, PANE, postHookEvent } from './server.test-fixtures'
+import { buildBody, PANE, postHookEvent } from './server/testing/server.test-fixtures'
 import type { EnrichedAgentHookEventPayload } from './server/server-types'
 
 const { getCohortAtEmitMock, trackMock } = vi.hoisted(() => ({

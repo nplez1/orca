@@ -120,7 +120,7 @@ export function ShareUsageButton(props: ShareUsageButtonProps): React.JSX.Elemen
 
   return (
     <Dialog>
-      <TooltipProvider delayDuration={250}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <DialogTrigger asChild>

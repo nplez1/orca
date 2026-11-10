@@ -9,8 +9,8 @@ import {
   listCapableSharedControlSockets,
   startDesktopPresenceReporter
 } from '../notifications/desktop-presence-reporter'
-import { agentHookServer } from '../agent-hooks/server'
-import { installHookStatusSessionTabsRepublish } from '../agent-hooks/hook-status-session-tabs-republish'
+import { agentHookServer } from '../agent-hooks/server/agent-hook-server'
+import { installHookStatusSessionTabsRepublish } from '../agent-hooks/runtime/hook-status-session-tabs-republish'
 import { initTelemetry, track } from '../telemetry/client'
 import { installMainThreadStallProbe } from '../diagnostics/main-thread-stall-probe'
 import { installUiHangLifecycleObserver } from '../diagnostics/ui-hang-lifecycle-observer'

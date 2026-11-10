@@ -5,7 +5,7 @@ import {
   type DisableableUsageProviderId
 } from '../../shared/usage-provider-enablement'
 import { usageProviderConfiguredFlags } from '../../shared/usage-providers/usage-provider-readouts'
-import { RateLimitService } from './service'
+import { RateLimitService } from './service/rate-limit-service'
 import {
   MIN_REFETCH_MS,
   USAGE_PROVIDER_STATE_KEYS,
@@ -17,16 +17,16 @@ import {
   mockFreshBackgroundProviderFetches,
   okProvider,
   resetRateLimitProviderMocks
-} from './rate-limit-service-test-harness'
-import { fetchClaudeRateLimits } from './claude-fetcher'
-import { fetchCodexRateLimits } from './codex-fetcher'
-import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
-import { fetchKimiRateLimits } from './kimi-fetcher'
-import { fetchOpenCodeGoUsage } from './opencode-go-usage-source-selection'
-import { fetchZcodeRateLimits } from './zcode-usage-fetcher'
-import { fetchMuseRateLimits } from './muse-usage-fetcher'
-import { fetchAntigravityRateLimits } from './antigravity-usage-fetcher'
-import { fetchMiniMaxRateLimits } from './minimax/minimax-fetcher'
+} from './service/rate-limit-service-test-harness'
+import { fetchActiveClaudeRateLimits } from './providers/claude/claude-active-usage-fetch'
+import { fetchCodexRateLimits } from './providers/codex/codex-fetcher'
+import { fetchGeminiRateLimits } from './providers/gemini/gemini-usage-fetcher'
+import { fetchKimiRateLimits } from './providers/kimi/kimi-fetcher'
+import { fetchOpenCodeGoUsage } from './providers/opencode-go/opencode-go-usage-source-selection'
+import { fetchZcodeRateLimits } from './providers/zcode/zcode-usage-fetcher'
+import { fetchMuseRateLimits } from './providers/muse/muse-usage-fetcher'
+import { fetchAntigravityRateLimits } from './providers/antigravity/antigravity-usage-fetcher'
+import { fetchMiniMaxRateLimits } from './providers/minimax/minimax-fetcher'
 import { fetchDeepSeekRateLimits } from './deepseek/deepseek-fetcher'
 import { fetchFireworksRateLimits } from './fireworks/fireworks-fetcher'
 import { fetchDeepInfraRateLimits } from './deepinfra/deepinfra-fetcher'
@@ -35,10 +35,10 @@ import {
   getCachedCopilotGhCredentials,
   readCopilotGhCredentialsForCycle
 } from './copilot/copilot-gh-credentials'
-import { fetchGrokRateLimits } from './grok-fetcher'
-import { readGrokAuthSession } from './grok-auth'
-import { fetchCursorRateLimits } from './cursor-fetcher'
-import { readCursorAuthSession } from './cursor-auth'
+import { fetchGrokRateLimits } from './providers/grok/grok-fetcher'
+import { readGrokAuthSession } from './providers/grok/grok-auth'
+import { fetchCursorRateLimits } from './providers/cursor/cursor-fetcher'
+import { readCursorAuthSession } from './providers/cursor/cursor-auth'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { hasMiniMaxApiKey } from '../minimax/minimax-api-key-store'
 import { hasZcodePlanApiKey } from '../zcode/zcode-plan-api-key-store'
@@ -47,41 +47,44 @@ import { hasFireworksCredentials } from '../fireworks/fireworks-credentials-stor
 import { hasDeepInfraApiKey } from '../deepinfra/deepinfra-api-key-store'
 import { hasCopilotCredentials } from '../copilot-credentials/copilot-credentials-store'
 
-vi.mock('./claude-fetcher', () => ({
-  fetchClaudeRateLimits: vi.fn(),
-  fetchManagedAccountUsage: vi.fn()
+vi.mock('./providers/claude/claude-active-usage-fetch', () => ({
+  fetchActiveClaudeRateLimits: vi.fn()
 }))
 
-vi.mock('./codex-fetcher', () => ({
+vi.mock('./providers/claude/claude-managed-account-usage', () => ({
+  fetchInactiveClaudeAccountUsage: vi.fn()
+}))
+
+vi.mock('./providers/codex/codex-fetcher', () => ({
   consumeCodexRateLimitResetCredit: vi.fn(),
   fetchCodexRateLimits: vi.fn()
 }))
 
-vi.mock('./gemini-usage-fetcher', () => ({
+vi.mock('./providers/gemini/gemini-usage-fetcher', () => ({
   fetchGeminiRateLimits: vi.fn()
 }))
 
-vi.mock('./kimi-fetcher', () => ({
+vi.mock('./providers/kimi/kimi-fetcher', () => ({
   fetchKimiRateLimits: vi.fn()
 }))
 
-vi.mock('./opencode-go-usage-source-selection', () => ({
+vi.mock('./providers/opencode-go/opencode-go-usage-source-selection', () => ({
   fetchOpenCodeGoUsage: vi.fn()
 }))
 
-vi.mock('./zcode-usage-fetcher', () => ({
+vi.mock('./providers/zcode/zcode-usage-fetcher', () => ({
   fetchZcodeRateLimits: vi.fn()
 }))
 
-vi.mock('./muse-usage-fetcher', () => ({
+vi.mock('./providers/muse/muse-usage-fetcher', () => ({
   fetchMuseRateLimits: vi.fn()
 }))
 
-vi.mock('./antigravity-usage-fetcher', () => ({
+vi.mock('./providers/antigravity/antigravity-usage-fetcher', () => ({
   fetchAntigravityRateLimits: vi.fn()
 }))
 
-vi.mock('./minimax/minimax-fetcher', () => ({
+vi.mock('./providers/minimax/minimax-fetcher', () => ({
   fetchMiniMaxRateLimits: vi.fn()
 }))
 
@@ -123,19 +126,19 @@ vi.mock('../fireworks/fireworks-credentials-store', () => ({
   hasFireworksCredentials: vi.fn(() => false)
 }))
 
-vi.mock('./grok-fetcher', () => ({
+vi.mock('./providers/grok/grok-fetcher', () => ({
   fetchGrokRateLimits: vi.fn()
 }))
 
-vi.mock('./cursor-fetcher', () => ({
+vi.mock('./providers/cursor/cursor-fetcher', () => ({
   fetchCursorRateLimits: vi.fn()
 }))
 
-vi.mock('./cursor-auth', () => ({
+vi.mock('./providers/cursor/cursor-auth', () => ({
   readCursorAuthSession: vi.fn()
 }))
 
-vi.mock('./grok-auth', () => ({
+vi.mock('./providers/grok/grok-auth', () => ({
   readGrokAuthSession: vi.fn(() => ({ status: 'missing' }))
 }))
 
@@ -230,7 +233,7 @@ function providerWiring(
   const skipped = (mock: () => Mock): ProviderQuery => ({ kind: 'skipped', mock })
   return {
     claude: {
-      query: skipped(() => vi.mocked(fetchClaudeRateLimits)),
+      query: skipped(() => vi.mocked(fetchActiveClaudeRateLimits)),
       credentialReads: [() => spies.claudeAuthPreparation]
     },
     codex: {
@@ -381,7 +384,7 @@ describe('usage provider enablement conformance', () => {
     vi.useFakeTimers()
     resetRateLimitProviderMocks()
     mockFreshBackgroundProviderFetches()
-    vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => okProvider('claude', 12))
+    vi.mocked(fetchActiveClaudeRateLimits).mockImplementation(async () => okProvider('claude', 12))
     vi.mocked(hasMiniMaxSessionCookie).mockReturnValue(true)
     vi.mocked(hasMiniMaxApiKey).mockReturnValue(true)
     vi.mocked(hasZcodePlanApiKey).mockReturnValue(true)

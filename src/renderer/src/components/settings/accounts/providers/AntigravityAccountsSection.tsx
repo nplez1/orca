@@ -16,11 +16,9 @@ import { Button } from '../../../ui/button'
 import { Badge } from '../../../ui/badge'
 import { ManagedRuntimeInstallRow } from '../../../managed-runtime/ManagedRuntimeInstallRow'
 import { antigravityChatSignInRunning } from '@/runtime/provider-accounts/sign-in/antigravity-chat-sign-in-status'
-import {
-  AntigravityChatSignInRow,
-  antigravityChatSignInBlocked,
-  useAntigravityChatSignIn
-} from '../../../provider-accounts/AntigravityChatSignInRow'
+import { AntigravityChatSignInRow } from '../../../provider-accounts/AntigravityChatSignInRow'
+import { antigravityChatSignInBlocked } from '../../../provider-accounts/antigravity-chat-runtime-sign-in-policy'
+import { useAntigravityChatSignIn } from '../../../provider-accounts/use-antigravity-chat-sign-in'
 import { openAppHttpLinkFromAnchor } from '@/lib/browser/navigation/app-http-link-open'
 import { formatTimeAgo } from '../../../status-bar/tooltip'
 import { ChatUnavailableOnWindowsNote } from '../../../agent/launch-settings/AgentChatChoiceControls'
@@ -181,8 +179,7 @@ export function AntigravityAccountsSection({
 
   return (
     <div id="accounts-antigravity" className="scroll-mt-6">
-      <SettingsGroup
-      >
+      <SettingsGroup>
         <div className="space-y-4 py-4">
           <p className="text-xs text-muted-foreground">
             {t(

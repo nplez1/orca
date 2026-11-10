@@ -1,17 +1,17 @@
-import { fetchClaudeRateLimits } from '../claude-fetcher'
-import { fetchCodexRateLimits } from '../codex-fetcher'
-import { fetchGeminiRateLimits } from '../gemini-usage-fetcher'
-import { fetchGrokRateLimits } from '../grok-fetcher'
-import { readGrokAuthSession } from '../grok-auth'
-import { fetchCursorRateLimits } from '../cursor-fetcher'
-import { readCursorAuthSession } from '../cursor-auth'
-import { fetchZcodeRateLimits } from '../zcode-usage-fetcher'
-import { fetchAntigravityRateLimits } from '../antigravity-usage-fetcher'
-import { antigravityUsageDisabledSnapshot } from '../antigravity-usage-snapshot'
+import { fetchActiveClaudeRateLimits } from '../providers/claude/claude-active-usage-fetch'
+import { fetchCodexRateLimits } from '../providers/codex/codex-fetcher'
+import { fetchGeminiRateLimits } from '../providers/gemini/gemini-usage-fetcher'
+import { fetchGrokRateLimits } from '../providers/grok/grok-fetcher'
+import { readGrokAuthSession } from '../providers/grok/grok-auth'
+import { fetchCursorRateLimits } from '../providers/cursor/cursor-fetcher'
+import { readCursorAuthSession } from '../providers/cursor/cursor-auth'
+import { fetchZcodeRateLimits } from '../providers/zcode/zcode-usage-fetcher'
+import { fetchAntigravityRateLimits } from '../providers/antigravity/antigravity-usage-fetcher'
+import { antigravityUsageDisabledSnapshot } from '../providers/antigravity/antigravity-usage-snapshot'
 import { ZCODE_PLAN_SITE_BASE_URLS } from '../../../shared/zcode-plan-sites'
-import { fetchMiniMaxRateLimits } from '../minimax/minimax-fetcher'
+import { fetchMiniMaxRateLimits } from '../providers/minimax/minimax-fetcher'
 import { createHash } from 'node:crypto'
-import { fetchOpenCodeGoUsage } from '../opencode-go-usage-source-selection'
+import { fetchOpenCodeGoUsage } from '../providers/opencode-go/opencode-go-usage-source-selection'
 import { prepareForkProviderCycle } from '../fork/fork-provider-cycle'
 import { RateLimitServiceCycleFetchState } from './service-cycle-fetch-state'
 import { trackSettledProviderResult } from './service-sibling-provider-result'
@@ -203,7 +203,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       await Promise.allSettled([
         claudeFetchGated
           ? Promise.resolve(previousState.claude as ProviderRateLimits)
-          : fetchClaudeRateLimits({
+          : fetchActiveClaudeRateLimits({
               authPreparation: claudeAuthPreparation,
               allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
               allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),

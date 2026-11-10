@@ -71,10 +71,7 @@ export type NewWorkspaceComposerCardProps = {
   onProjectChange: (value: string) => void
   projectHostSetupOptions?: ProjectHostSetupOption[]
   selectedProjectHostSetupId?: string | null
-  onProjectHostSetupChange?: (
-    setupId: string,
-    provisioning?: ProjectHostSetupProvisioning
-  ) => void
+  onProjectHostSetupChange?: (setupId: string, provisioning?: ProjectHostSetupProvisioning) => void
   ephemeralVmRecipes?: EphemeralVmRecipeOption[]
   selectedEphemeralVmRecipeId?: string | null
   onEphemeralVmRecipeChange?: (recipeId: string | null) => void
@@ -128,6 +125,8 @@ export type NewWorkspaceComposerCardProps = {
   detectedAgentIds: Set<TuiAgent> | null
   onOpenAgentSettings: (invoker: HTMLButtonElement) => void
   advancedOpen: boolean
+  setupChoiceRevealRequest: number
+  onSetupChoiceRevealed: () => void
   onToggleAdvanced: () => void
   createDisabled: boolean
   projectError: string | null

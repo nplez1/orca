@@ -135,6 +135,10 @@ export function resolveEphemeralVmRuntimeLease(
   if (!runtime) {
     return null
   }
+  // Why a skip: a write-ahead record has no create result yet, so there is no deadline to show.
+  if (!runtime.recipeResult) {
+    return null
+  }
   const read = readEphemeralVmLifetime(runtime.recipeResult.userData)
   // Why an unreadable deadline still resolves to "no lease": the four lifetime keys are validated
   // when the recipe result is read, and a bad one is reported as a warning there. Arriving here at

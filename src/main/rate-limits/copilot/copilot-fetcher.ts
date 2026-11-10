@@ -3,7 +3,7 @@ import { extractExecError, parseRetryAfterMs } from '../../git/exec-error'
 import { isGhPrimaryRateLimitStderr } from '../../git/gh-rate-limit-breaker'
 import { ghExecFileAsync } from '../../git/command-runner/gh-exec-file'
 import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-fallback'
-import { capUsageRetryAfterMs } from '../usage-retry-after'
+import { capUsageRetryAfterMs } from '../providers/usage-retry-after'
 import {
   buildCopilotEntitlementSnapshot,
   buildCopilotSnapshot,

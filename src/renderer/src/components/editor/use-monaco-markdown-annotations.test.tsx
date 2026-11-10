@@ -36,7 +36,7 @@ vi.mock('@/store', () => ({
 }))
 
 import { useMonacoMarkdownAnnotations } from './markdown-source-tools/monaco/use-monaco-markdown-annotations'
-import { NO_RESOURCE_EVIDENCE } from '@/lib/workspace-copy-owner'
+import { NO_RESOURCE_EVIDENCE } from '@/lib/workspace/ownership/workspace-copy-owner'
 import {
   createFakeDiffCommentEditor,
   type FakeDiffCommentEditor

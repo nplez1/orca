@@ -32,14 +32,14 @@ inline src/main/runtime/repositories/runtime-project-host-setup-controller.ts
 inline src/main/runtime/rpc/methods/files/files.ts
 inline src/main/runtime/terminal/lifecycle/pty-exit-lifecycle.ts
 inline src/main/runtime/workspaces/creation/runtime-local-worktree-create-candidate.ts
-inline src/main/ssh/connection/ssh-connection-store.ts
+inline src/main/ssh/targets/ssh-connection-store.ts
 inline src/main/ssh/connection/ssh-connection.ts
-inline src/main/ssh/ssh-channel-multiplexer.ts
+inline src/main/ssh/protocol/ssh-channel-multiplexer.ts
 inline src/main/startup/main-process-ready-foundation.ts
 inline src/packages/process-host/src/run-process.ts
 inline src/renderer/src/components/NewWorkspaceComposerModal.tsx
 inline src/renderer/src/components/activity/activity-thread-hover-card.tsx
-inline src/renderer/src/components/automations/automation-host-catalog.ts
+inline src/renderer/src/components/automations/hosts/automation-host-catalog.ts
 inline src/renderer/src/components/diff-comments/useDiffCommentDecorator.tsx
 inline src/renderer/src/components/editor/check-details/panel/CheckRunDetailsPanel.tsx
 inline src/renderer/src/components/editor/diff/monaco-view/DiffViewer.tsx

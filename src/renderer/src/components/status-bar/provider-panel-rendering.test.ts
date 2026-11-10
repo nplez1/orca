@@ -4,7 +4,7 @@ import { createElement } from 'react'
 import type * as ReactModule from 'react'
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 
-vi.mock('@/lib/agent-catalog', async () => {
+vi.mock('@/lib/agent-catalog/agent-catalog', async () => {
   const ReactActual = await vi.importActual<typeof ReactModule>('react')
   return {
     AgentIcon: ({ agent }: { agent: string }) =>

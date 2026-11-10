@@ -11,7 +11,7 @@ import {
 import { useAppStore } from '../../store'
 import { forgetRefusedPaneResume, namesRefusedResume } from '@/lib/forget-refused-pane-resume'
 import { resolveAgentPaneAuthorityKey } from '@/store/slices/agent-status/agent-pane-authority'
-import { resolvePaneKey } from './agent-status-routing'
+import { resolvePaneKey } from '../../lib/agent-status/ownership/agent-status-pane-ownership'
 import type { PendingAgentStatusEvent } from './agent-status-bridge-types'
 import { isAgentStatusRoutingReady } from './agent-status-routing-readiness'
 

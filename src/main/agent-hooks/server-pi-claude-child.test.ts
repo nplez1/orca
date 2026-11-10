@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AgentHookServer } from './server'
-import { buildBody, PANE, postHookEvent } from './server.test-fixtures'
+import { AgentHookServer } from './server/agent-hook-server'
+import { buildBody, PANE, postHookEvent } from './server/testing/server.test-fixtures'
 import { piClaudeParentMarkerPath } from '../../shared/pi-claude-parent-marker'
 
 vi.mock('../telemetry/client', () => ({ track: vi.fn() }))

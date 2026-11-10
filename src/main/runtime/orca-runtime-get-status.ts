@@ -1,4 +1,3 @@
-import { BROWSER_GOOGLE_COOKIE_CLEAR_CAPABILITY } from '../../shared/browser-runtime-capabilities'
 import { OrcaRuntimeWithPtyController } from './terminal/lifecycle/orca-runtime-pty-controller'
 import type { RuntimeDegradation, RuntimeStatus } from '../../shared/runtime-types'
 import {
@@ -7,17 +6,12 @@ import {
   runtimeBrowserCommandsFactorySupportsClientHosting,
   runtimeBrowserUnavailableCause
 } from './browser/installation/runtime-browser-commands-factory'
-import { isBrowserIdentityModeStoreInitialized } from '../browser/identity/browser-identity-mode-store'
+import { isBrowserIdentityModeStoreInitialized } from '../browser/identity/mode/browser-identity-mode-store'
 import { servesLocalWslMigrationSource } from '../orcad/orcad-migration-wsl-destination'
 import { ORCAD_MIGRATION_LOCAL_WSL_SOURCE_RUNTIME_CAPABILITY } from '../../shared/orcad-runtime-capabilities'
 import { advertisedOrcadMigrationDestinationCapabilities } from '../orcad/orcad-migration-destination-capabilities'
 import { USAGE_CREDENTIALS_RUNTIME_CAPABILITY } from '../../shared/account-runtime-capabilities'
 import {
-  BROWSER_CERTIFICATE_TRUST_RUNTIME_CAPABILITY,
-  BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
-  BROWSER_HEADLESS_RUNTIME_CAPABILITY,
-  BROWSER_IDENTITY_RUNTIME_CAPABILITY,
-  BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY,
   MANAGED_SERVER_RUNTIME_CAPABILITY,
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
   REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,
@@ -25,6 +19,14 @@ import {
   RUNTIME_PROTOCOL_VERSION,
   SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY
 } from '../../shared/protocol-version'
+import {
+  BROWSER_CERTIFICATE_TRUST_RUNTIME_CAPABILITY,
+  BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
+  BROWSER_GOOGLE_COOKIE_CLEAR_CAPABILITY,
+  BROWSER_HEADLESS_RUNTIME_CAPABILITY,
+  BROWSER_IDENTITY_RUNTIME_CAPABILITY,
+  BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY
+} from '../../shared/browser/runtime/browser-runtime-capabilities'
 import {
   TERMINAL_PROMPT_DELIVERY_RUNTIME_CAPABILITY,
   TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY

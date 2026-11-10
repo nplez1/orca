@@ -18,7 +18,7 @@ export type EphemeralVmRecipeLifecyclePayload = {
   projectId?: string
   workspaceId?: string
   workspaceName?: string
-  recipeResult: EphemeralVmRecipeResult
+  recipeResult?: EphemeralVmRecipeResult
   /** The lifetime the provider is being asked for, in the canonical `<count><unit>`
    *  form. Present only for `extend`, where it is the whole point of the call. */
   lifetime?: string
@@ -38,7 +38,7 @@ export type EphemeralVmRecipeLifecyclePayload = {
 export function buildEphemeralVmRecipeCleanupPayload(args: {
   recipe: Pick<OrcaVmRecipe, 'id'>
   context: EphemeralVmRecipeContext
-  recipeResult: EphemeralVmRecipeResult
+  recipeResult?: EphemeralVmRecipeResult
 }): EphemeralVmRecipeLifecyclePayload {
   return buildEphemeralVmRecipeLifecyclePayload({ ...args, mode: 'destroy' })
 }
@@ -47,7 +47,7 @@ export function buildEphemeralVmRecipeLifecyclePayload(args: {
   mode: EphemeralVmRecipeLifecycleMode
   recipe: Pick<OrcaVmRecipe, 'id'>
   context: EphemeralVmRecipeContext
-  recipeResult: EphemeralVmRecipeResult
+  recipeResult?: EphemeralVmRecipeResult
 }): EphemeralVmRecipeLifecyclePayload {
   return {
     schemaVersion: 1,
@@ -57,7 +57,7 @@ export function buildEphemeralVmRecipeLifecyclePayload(args: {
     projectId: args.context.projectId,
     workspaceId: args.context.workspaceId,
     workspaceName: args.context.workspaceName,
-    recipeResult: args.recipeResult
+    ...(args.recipeResult ? { recipeResult: args.recipeResult } : {})
   }
 }
 

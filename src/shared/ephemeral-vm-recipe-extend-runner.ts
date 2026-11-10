@@ -65,7 +65,25 @@ export async function runEphemeralVmRecipeExtend(
     }
   }
 
-  const payload = buildEphemeralVmRecipeExtendPayload({ ...args, lifetime: args.lifetime })
+  // Why a refusal rather than an empty payload: the extend hook is handed the create's result to
+  // address the same machine, so a runtime with no recorded result cannot be extended at all.
+  if (!args.recipeResult) {
+    return {
+      ok: false,
+      context: args.context,
+      error: `Recipe "${args.recipe.id}" has no recorded result to extend from.`,
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      signal: null
+    }
+  }
+
+  const payload = buildEphemeralVmRecipeExtendPayload({
+    ...args,
+    recipeResult: args.recipeResult,
+    lifetime: args.lifetime
+  })
   const processResult = await runRecipeCommand({
     command: args.recipe.extend,
     repoPath: args.repoPath,

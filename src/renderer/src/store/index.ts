@@ -55,6 +55,8 @@ import { createRemoteServerUpdatesSlice } from './slices/runtime-host-updates/re
 import { createTerminalQuickCommandHostsSlice } from './terminals/terminal-quick-command-hosts'
 import { createStructuredSessionLaunchDirectorySlice } from './slices/agent-status/structured-session-launch-directories'
 import { createStructuredChatSleptAtSlice } from './slices/agent-status/structured-chat-slept-at'
+import { createStructuredChatCompanionWritesSlice } from './slices/agent-status/structured-chat-companion-writes'
+import { createEphemeralVmLifecycleSlice } from './slices/ephemeral-vm/ephemeral-vm-lifecycle'
 import { createWorkspaceAttentionSlice } from './slices/workspace-attention/workspace-attention-slice'
 import { e2eConfig } from '@/lib/e2e-config'
 import type { createWebRuntimeSessionTerminal } from '@/runtime/hosted-terminals/creation/web-runtime-terminal-creation'
@@ -78,6 +80,7 @@ import {
 } from '@/lib/renderer-memory-profile'
 import { estimateStateCollectionKB } from '@/lib/state-collection-byte-estimate'
 import { registerWindowsPathAccessEnvironments } from '@/lib/windows-path-access'
+import { STORE_OBSERVER_INSTALLERS } from './store-observer-installers'
 
 // Dev-only churn probe cannot be armed in shipped builds; avoid its per-write wrapper. Cascade probe stays enabled for field crash telemetry.
 const withDevelopmentStoreProbes = (createState: StateCreator<AppState, [], []>) =>
@@ -153,13 +156,19 @@ export const useAppStore = create<AppState>()(
           ...createWorktreeSetupRunnerSlice(...a),
           ...createForkUiSlice(...a),
           ...createStructuredChatSleptAtSlice(...a),
-          ...createWorkspaceAttentionSlice(...a)
+          ...createStructuredChatCompanionWritesSlice(...a),
+          ...createWorkspaceAttentionSlice(...a),
+          ...createEphemeralVmLifecycleSlice(...a)
         }
       })
     ),
     import.meta.env.DEV || e2eConfig.exposeStore
   )
 )
+
+for (const install of STORE_OBSERVER_INSTALLERS) {
+  install(useAppStore)
+}
 
 registerStructuredSelectionCatalogStore({
   read: useAppStore.getState,

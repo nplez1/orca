@@ -4,7 +4,7 @@ import { ZCODE_PLAN_SITE_CONSOLE_URLS } from '../../../../shared/zcode-plan-site
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { translate } from '@/i18n/i18n'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
-import { AgentIcon } from '@/lib/agent-catalog'
+import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import {
   ClaudeIcon,
   GeminiIcon,
@@ -43,10 +43,8 @@ import type { UsageCredentialHost } from './accounts/usage/usage-credential-host
 import type { UsageHostSettingsModel } from './accounts/usage/use-usage-host-settings'
 import { renderClaudeAccountsSection } from './accounts/claude/accounts-pane-claude-section'
 import { renderCodexAccountsSection } from './accounts/codex/accounts-pane-codex-section'
-import {
-  renderGeminiAccountsSection,
-  renderOpenCodeAccountsSection
-} from './accounts/providers/accounts-pane-provider-setting-sections'
+import { renderGeminiAccountsSection } from './accounts/providers/accounts-pane-gemini-section'
+import { renderOpenCodeAccountsSection } from './accounts/providers/accounts-pane-opencode-section'
 import { AntigravityAccountsSection } from './accounts/providers/AntigravityAccountsSection'
 import {
   MiniMaxAccountsSection,

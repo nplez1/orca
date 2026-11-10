@@ -1,6 +1,9 @@
 import { observeLinearIssueRead } from '@/store/slices/linear/linear-issue-publication'
-import { taskProviderErrorMessage, taskProviderErrorText } from '@/lib/task-provider-error-copy'
-import { ImeInput } from '@/lib/ime-text-field'
+import {
+  taskProviderErrorMessage,
+  taskProviderErrorText
+} from '@/lib/work-items/task-provider-error-copy'
+import { ImeInput } from '@/lib/text-input/ime/ime-text-field'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, LoaderCircle, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,7 +16,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import { linearCreateSubIssue } from '@/runtime/linear/runtime-linear-issue-client'
 import { useAppStore } from '@/store'
 import type { LinearIssue, LinearIssueChildSummary } from '../../../shared/linear/issue-types'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 
 function mergeLinearSubIssues(

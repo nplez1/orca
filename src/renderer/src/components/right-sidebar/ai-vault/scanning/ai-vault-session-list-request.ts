@@ -11,12 +11,16 @@ import { aiVaultSessionKeyScopePaths } from '../session-list/ai-vault-session-li
 import {
   aiVaultSessionResultCacheKey,
   cacheAiVaultSessionResult,
-  readCachedAiVaultSessionResult
+  readCachedAiVaultSessionResult,
+  readLastAiVaultSessionResult
 } from './ai-vault-session-result-cache'
+import type { SavedAiVaultSessionList } from './ai-vault-saved-session-lists'
 
 /** Match panel requests so readers share host/renderer caches instead of evicting one another. */
 export type AiVaultSessionListRequest = {
   scopePaths: readonly string[]
+  /** Workspace and Project list only their own sessions; All and the tab move lookup leave it off. */
+  scopeOnly?: boolean
   executionHostScope: ExecutionHostScope
   sessionLimit: AiVaultSessionLimit
   query?: string
@@ -31,6 +35,7 @@ export function aiVaultSessionListArgs(
     limit: request.sessionLimit === 'unlimited' ? undefined : request.sessionLimit,
     unlimited: request.sessionLimit === 'unlimited',
     scopePaths: aiVaultSessionKeyScopePaths(request.scopePaths, request.sessionLimit),
+    ...(request.scopeOnly === true ? { scopeOnly: true } : {}),
     executionHostScope: request.executionHostScope,
     force: options.force,
     requestToken: options.requestToken,
@@ -46,7 +51,24 @@ export function readCachedAiVaultSessionList(
       request.executionHostScope,
       request.scopePaths,
       request.sessionLimit,
-      request.query
+      request.query,
+      request.scopeOnly
+    ),
+    limit: request.sessionLimit,
+    scopePaths: request.scopePaths
+  })
+}
+
+export function readLastAiVaultSessionList(
+  request: AiVaultSessionListRequest
+): Promise<SavedAiVaultSessionList | null> {
+  return readLastAiVaultSessionResult({
+    key: aiVaultSessionResultCacheKey(
+      request.executionHostScope,
+      request.scopePaths,
+      request.sessionLimit,
+      request.query,
+      request.scopeOnly
     ),
     limit: request.sessionLimit,
     scopePaths: request.scopePaths
@@ -65,7 +87,8 @@ export function cacheAiVaultSessionList(
       request.executionHostScope,
       request.scopePaths,
       request.sessionLimit,
-      request.query
+      request.query,
+      request.scopeOnly
     ),
     executionHostScope: request.executionHostScope,
     limit: request.sessionLimit,

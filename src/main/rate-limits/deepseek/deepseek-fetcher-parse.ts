@@ -1,6 +1,6 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
-import { parseUsageRetryAfterMs } from '../usage-retry-after'
-import { classifyThrownUsageRequestError } from '../usage-request-failure-kind'
+import { parseUsageRetryAfterMs } from '../providers/usage-retry-after'
+import { classifyThrownUsageRequestError } from '../providers/usage-request-failure-kind'
 import {
   buildDeepSeekCredits,
   makeDeepSeekError,

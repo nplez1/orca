@@ -1,4 +1,4 @@
-import { readPRCheckRefreshOwner } from '@/lib/pr-check-refresh-owner'
+import { readPRCheckRefreshOwner } from '@/lib/source-control/checks/pr-check-refresh-owner'
 import type React from 'react'
 import { toast } from 'sonner'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
@@ -8,9 +8,12 @@ import {
   type GitHubChecksContextOwner,
   type GitHubChecksTabState
 } from '@/components/github-checks-tab-state'
-import { getGitHubRuntimeRepoId, type GitHubRuntimeHost } from '@/lib/github-source-runtime-context'
-import { startFixChecksAgent } from '@/lib/fix-checks-agent-launch'
 import { rerunChecksAcrossProviders } from '@/components/pr-checks-rerun'
+import {
+  getGitHubRuntimeRepoId,
+  type GitHubRuntimeHost
+} from '@/lib/work-items/github/github-source-runtime-context'
+import { startFixChecksAgent } from '@/lib/source-control/checks/fix-checks-agent-launch'
 import { buildFixBrokenChecksPrompt } from '../../../../../shared/source-control/checks/pr-checks-fix-prompt'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import type { GitHubOwnerRepo } from '../../../../../shared/github/pull-request-types'

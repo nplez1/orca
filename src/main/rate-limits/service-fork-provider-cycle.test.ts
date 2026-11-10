@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
-import { RateLimitService } from './service'
-import { fetchClaudeRateLimits } from './claude-fetcher'
-import { fetchCodexRateLimits } from './codex-fetcher'
+import { RateLimitService } from './service/rate-limit-service'
+import { fetchActiveClaudeRateLimits } from './providers/claude/claude-active-usage-fetch'
+import { fetchCodexRateLimits } from './providers/codex/codex-fetcher'
 import { fetchDeepSeekRateLimits } from './deepseek/deepseek-fetcher'
 import { fetchFireworksRateLimits } from './fireworks/fireworks-fetcher'
 import { fetchCopilotRateLimits } from './copilot/copilot-fetcher'
@@ -16,31 +16,34 @@ import {
   mockFreshBackgroundProviderFetches,
   okProvider,
   resetRateLimitProviderMocks
-} from './rate-limit-service-test-harness'
+} from './service/rate-limit-service-test-harness'
 
-vi.mock('./claude-fetcher', () => ({
-  fetchClaudeRateLimits: vi.fn(),
-  fetchManagedAccountUsage: vi.fn()
+vi.mock('./providers/claude/claude-active-usage-fetch', () => ({
+  fetchActiveClaudeRateLimits: vi.fn()
 }))
 
-vi.mock('./codex-fetcher', () => ({
+vi.mock('./providers/claude/claude-managed-account-usage', () => ({
+  fetchInactiveClaudeAccountUsage: vi.fn()
+}))
+
+vi.mock('./providers/codex/codex-fetcher', () => ({
   consumeCodexRateLimitResetCredit: vi.fn(),
   fetchCodexRateLimits: vi.fn()
 }))
 
-vi.mock('./gemini-usage-fetcher', () => ({
+vi.mock('./providers/gemini/gemini-usage-fetcher', () => ({
   fetchGeminiRateLimits: vi.fn()
 }))
 
-vi.mock('./kimi-fetcher', () => ({
+vi.mock('./providers/kimi/kimi-fetcher', () => ({
   fetchKimiRateLimits: vi.fn()
 }))
 
-vi.mock('./opencode-go-usage-source-selection', () => ({
+vi.mock('./providers/opencode-go/opencode-go-usage-source-selection', () => ({
   fetchOpenCodeGoUsage: vi.fn()
 }))
 
-vi.mock('./minimax/minimax-fetcher', () => ({
+vi.mock('./providers/minimax/minimax-fetcher', () => ({
   fetchMiniMaxRateLimits: vi.fn()
 }))
 
@@ -78,25 +81,27 @@ vi.mock('../fireworks/fireworks-credentials-store', () => ({
   hasFireworksCredentials: vi.fn(() => false)
 }))
 
-vi.mock('./grok-fetcher', () => ({
+vi.mock('./providers/grok/grok-fetcher', () => ({
   fetchGrokRateLimits: vi.fn()
 }))
 
-vi.mock('./grok-auth', () => ({
+vi.mock('./providers/grok/grok-auth', () => ({
   readGrokAuthSession: vi.fn(() => ({ status: 'missing' }))
 }))
 
-vi.mock('./cursor-fetcher', () => ({
+vi.mock('./providers/cursor/cursor-fetcher', () => ({
   fetchCursorRateLimits: vi.fn()
 }))
 
-vi.mock('./cursor-auth', () => ({
+vi.mock('./providers/cursor/cursor-auth', () => ({
   readCursorAuthSession: vi.fn()
 }))
 
-vi.mock('./zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
-vi.mock('./antigravity-usage-fetcher', () => ({ fetchAntigravityRateLimits: vi.fn() }))
-vi.mock('./muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
+vi.mock('./providers/zcode/zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
+vi.mock('./providers/antigravity/antigravity-usage-fetcher', () => ({
+  fetchAntigravityRateLimits: vi.fn()
+}))
+vi.mock('./providers/muse/muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
 
 vi.mock('../minimax/minimax-cookie-store', () => ({
   hasMiniMaxSessionCookie: vi.fn(() => false)
@@ -109,7 +114,7 @@ vi.mock('../minimax/minimax-api-key-store', () => ({
 describe('RateLimitService fork provider sibling cycle', () => {
   beforeEach(() => {
     resetRateLimitProviderMocks()
-    vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 7))
+    vi.mocked(fetchActiveClaudeRateLimits).mockResolvedValue(okProvider('claude', 7))
     vi.mocked(fetchCodexRateLimits).mockResolvedValue(okProvider('codex', 20))
   })
 
@@ -181,7 +186,9 @@ describe('RateLimitService fork provider sibling cycle', () => {
       vi.useFakeTimers()
       try {
         mockFreshBackgroundProviderFetches()
-        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => okProvider('claude', 3))
+        vi.mocked(fetchActiveClaudeRateLimits).mockImplementation(async () =>
+          okProvider('claude', 3)
+        )
         vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
         const service = new RateLimitService()
         service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
@@ -203,7 +210,9 @@ describe('RateLimitService fork provider sibling cycle', () => {
       vi.useFakeTimers()
       try {
         mockFreshBackgroundProviderFetches()
-        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () => okProvider('claude', 3))
+        vi.mocked(fetchActiveClaudeRateLimits).mockImplementation(async () =>
+          okProvider('claude', 3)
+        )
         vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())
         const service = new RateLimitService()
         service.setDeepSeekConfigResolver(() => ({ apiKey: 'sk-rate-limited' }))
@@ -225,7 +234,7 @@ describe('RateLimitService fork provider sibling cycle', () => {
         mockFreshBackgroundProviderFetches()
         const heldClaude = deferred<ProviderRateLimits>()
         let holdClaude = false
-        vi.mocked(fetchClaudeRateLimits).mockImplementation(async () =>
+        vi.mocked(fetchActiveClaudeRateLimits).mockImplementation(async () =>
           holdClaude ? heldClaude.promise : okProvider('claude', 3)
         )
         vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => rateLimitedDeepSeek())

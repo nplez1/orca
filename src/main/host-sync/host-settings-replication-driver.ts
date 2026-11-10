@@ -3,7 +3,7 @@ import {
   HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY,
   type HostSettingsReplicationApplyResult
 } from '../../shared/host-settings-replication'
-import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime/remote-runtime-client'
+import { sendRemoteRuntimeRequestOnSocket } from '../../shared/remote-runtime/requests/remote-runtime-request-socket'
 import { pairedRuntimeConnectionFromOffer } from '../../shared/remote-runtime/pairing/paired-runtime-connection'
 import { resolveEnvironmentPairingOffer } from '../../shared/remote-runtime/host-store/runtime-environment-store'
 import { HOST_SETTINGS_CREDENTIAL_PORTS } from './host-settings-credential-ports'
@@ -38,7 +38,7 @@ export function getHostSettingsReplicationSync(): HostSettingsReplicationSync {
       ports: HOST_SETTINGS_CREDENTIAL_PORTS,
       resolvePairing,
       sendRequest: (pairing, method, params, timeoutMs) =>
-        sendRemoteRuntimeRequest<HostSettingsReplicationApplyResult>(
+        sendRemoteRuntimeRequestOnSocket<HostSettingsReplicationApplyResult>(
           pairedRuntimeConnectionFromOffer(pairing),
           method,
           params,
@@ -50,7 +50,7 @@ export function getHostSettingsReplicationSync(): HostSettingsReplicationSync {
       // the reason for it. Pushes are debounced, so this is one status read per host per burst.
       supportsReplication: async (environmentId) => {
         try {
-          const response = await sendRemoteRuntimeRequest(
+          const response = await sendRemoteRuntimeRequestOnSocket(
             pairedRuntimeConnectionFromOffer(resolvePairing(environmentId)),
             'status.get',
             undefined,

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
-import { RateLimitService } from './service'
-import { fetchClaudeRateLimits } from './claude-fetcher'
-import { fetchCodexRateLimits } from './codex-fetcher'
+import { RateLimitService } from './service/rate-limit-service'
+import { fetchActiveClaudeRateLimits } from './providers/claude/claude-active-usage-fetch'
+import { fetchCodexRateLimits } from './providers/codex/codex-fetcher'
 import { fetchDeepInfraRateLimits } from './deepinfra/deepinfra-fetcher'
 import { hasDeepInfraApiKey } from '../deepinfra/deepinfra-api-key-store'
 import {
@@ -11,31 +11,34 @@ import {
   flushMicrotasks,
   okProvider,
   resetRateLimitProviderMocks
-} from './rate-limit-service-test-harness'
+} from './service/rate-limit-service-test-harness'
 
-vi.mock('./claude-fetcher', () => ({
-  fetchClaudeRateLimits: vi.fn(),
-  fetchManagedAccountUsage: vi.fn()
+vi.mock('./providers/claude/claude-active-usage-fetch', () => ({
+  fetchActiveClaudeRateLimits: vi.fn()
 }))
 
-vi.mock('./codex-fetcher', () => ({
+vi.mock('./providers/claude/claude-managed-account-usage', () => ({
+  fetchInactiveClaudeAccountUsage: vi.fn()
+}))
+
+vi.mock('./providers/codex/codex-fetcher', () => ({
   consumeCodexRateLimitResetCredit: vi.fn(),
   fetchCodexRateLimits: vi.fn()
 }))
 
-vi.mock('./gemini-usage-fetcher', () => ({
+vi.mock('./providers/gemini/gemini-usage-fetcher', () => ({
   fetchGeminiRateLimits: vi.fn()
 }))
 
-vi.mock('./kimi-fetcher', () => ({
+vi.mock('./providers/kimi/kimi-fetcher', () => ({
   fetchKimiRateLimits: vi.fn()
 }))
 
-vi.mock('./opencode-go-usage-source-selection', () => ({
+vi.mock('./providers/opencode-go/opencode-go-usage-source-selection', () => ({
   fetchOpenCodeGoUsage: vi.fn()
 }))
 
-vi.mock('./minimax/minimax-fetcher', () => ({
+vi.mock('./providers/minimax/minimax-fetcher', () => ({
   fetchMiniMaxRateLimits: vi.fn()
 }))
 
@@ -74,23 +77,25 @@ vi.mock('../deepinfra/deepinfra-api-key-store', () => ({
   hasDeepInfraApiKey: vi.fn(() => false)
 }))
 
-vi.mock('./grok-fetcher', () => ({
+vi.mock('./providers/grok/grok-fetcher', () => ({
   fetchGrokRateLimits: vi.fn()
 }))
 
-vi.mock('./grok-auth', () => ({
+vi.mock('./providers/grok/grok-auth', () => ({
   readGrokAuthSession: vi.fn(() => ({ status: 'missing' }))
 }))
 
-vi.mock('./cursor-fetcher', () => ({
+vi.mock('./providers/cursor/cursor-fetcher', () => ({
   fetchCursorRateLimits: vi.fn()
 }))
 
-vi.mock('./zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
-vi.mock('./antigravity-usage-fetcher', () => ({ fetchAntigravityRateLimits: vi.fn() }))
-vi.mock('./muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
+vi.mock('./providers/zcode/zcode-usage-fetcher', () => ({ fetchZcodeRateLimits: vi.fn() }))
+vi.mock('./providers/antigravity/antigravity-usage-fetcher', () => ({
+  fetchAntigravityRateLimits: vi.fn()
+}))
+vi.mock('./providers/muse/muse-usage-fetcher', () => ({ fetchMuseRateLimits: vi.fn() }))
 
-vi.mock('./cursor-auth', () => ({
+vi.mock('./providers/cursor/cursor-auth', () => ({
   readCursorAuthSession: vi.fn()
 }))
 
@@ -119,7 +124,7 @@ describe('RateLimitService DeepInfra usage', () => {
     resetRateLimitProviderMocks()
     // Why: these cases only stub DeepInfra, so the surrounding fetch cycle still
     // needs healthy Claude/Codex results.
-    vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 7))
+    vi.mocked(fetchActiveClaudeRateLimits).mockResolvedValue(okProvider('claude', 7))
     vi.mocked(fetchCodexRateLimits).mockResolvedValue(okProvider('codex', 20))
   })
 
@@ -183,7 +188,7 @@ describe('RateLimitService DeepInfra usage', () => {
     service.setDeepInfraConfigResolver(() => {
       throw new Error('DeepInfra API key could not be decrypted')
     })
-    vi.mocked(fetchClaudeRateLimits).mockResolvedValueOnce(okProvider('claude', 10))
+    vi.mocked(fetchActiveClaudeRateLimits).mockResolvedValueOnce(okProvider('claude', 10))
 
     await service.refresh()
 

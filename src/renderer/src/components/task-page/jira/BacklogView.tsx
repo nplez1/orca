@@ -2,7 +2,7 @@ import type { JiraIssue, JiraProjectStatusOrder } from '../../../../../shared/ji
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import type { useTaskPageJiraBoard } from '../../use-task-page-jira-board'
-import type { JiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import type { JiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import type { TaskPageJiraSprintOptions } from '@/components/task-page-jira-sprint-cell'
 import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
 import { Button } from '@/components/ui/button'

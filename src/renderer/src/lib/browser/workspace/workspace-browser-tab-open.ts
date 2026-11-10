@@ -34,7 +34,7 @@ import {
 import {
   getFloatingWorkspaceOperationRoute,
   resolveWorktreeOperationRoute
-} from '../../worktree-operation-route'
+} from '../../workspace/ownership/worktree-operation-route'
 import {
   intentPresentation,
   openFailure,

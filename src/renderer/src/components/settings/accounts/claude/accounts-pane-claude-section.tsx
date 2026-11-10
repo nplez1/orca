@@ -84,10 +84,9 @@ export function renderClaudeAccountsSection(
     )
   return (
     <div key="claude-accounts" id="accounts-claude" className="scroll-mt-6">
-      <SettingsGroup
-      >
+      <SettingsGroup>
         <SearchableSetting
-          title={t('auto.components.settings.AccountsPane.8bbfd74556', 'Claude Accounts')}
+          title={t('auto.components.settings.AccountsPane.89b9a151c3', 'Claude accounts')}
           description={t(
             'accounts.claude.profileSwitching',
             'Switching applies to the next Claude you start in any tab.'
@@ -126,7 +125,7 @@ export function renderClaudeAccountsSection(
                   ) : (
                     <Plus className="size-3" />
                   )}
-                  {t('auto.components.settings.AccountsPane.b0e948a4f9', 'Add Account')}
+                  {t('auto.components.settings.AccountsPane.7e9977b560', 'Add account')}
                 </Button>
                 {!isRemoteAccountScope && canOfferClaudeSignInLink(accountRuntime.runtime) ? (
                   <ClaudeSignInLinkMenu

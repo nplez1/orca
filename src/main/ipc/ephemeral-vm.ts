@@ -6,22 +6,21 @@ import {
 } from '../../shared/ephemeral-vm-recipes'
 import {
   getEphemeralVmRecipeResultWarnings,
-  redactEphemeralVmRecipeDiagnosticText,
-  type EphemeralVmRecipeResultWarning
+  redactEphemeralVmRecipeDiagnosticText
 } from '../../shared/ephemeral-vm-recipe-diagnostics'
 import { getProvisionedRootRecipeRepoUrl } from '../../shared/ephemeral-vm-recipe-repo-url'
 // Import the Node-only doctor directly so browser consumers of the barrel do not bundle fs/path.
 import { doctorEphemeralVmRecipe } from '../../shared/ephemeral-vm-recipe-doctor'
 import { updateEphemeralVmRuntimeStatus } from '../../shared/ephemeral-vm-runtime-store'
-import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
+import { requireEphemeralVmRecipeResult } from '../../shared/ephemeral-vm-runtimes'
 import { addEnvironmentFromPairingCode } from '../../shared/remote-runtime/host-store/runtime-environment-store'
+import { redactRuntimeEnvironment } from '../../shared/remote-runtime/host-catalog/runtime-environments'
 import {
-  redactRuntimeEnvironment,
-  type PublicKnownRuntimeEnvironment
-} from '../../shared/remote-runtime/host-catalog/runtime-environments'
-import { cleanupEphemeralVmRuntime } from '../ephemeral-vm/runtime-service'
-import { provisionEphemeralVmRuntime } from '../ephemeral-vm/runtime-provisioning'
+  cleanupEphemeralVmRuntime,
+  provisionEphemeralVmRuntime
+} from '../ephemeral-vm/runtime-service'
 import { connectRuntimeOwnedSshTarget } from '../ephemeral-vm/runtime-ssh'
+import { reconcileInterruptedEphemeralVmProvisionsOnStartup } from '../ephemeral-vm/runtime-provisioning-persistence'
 import {
   getRecipeRepo,
   listRecipeCatalog,
@@ -38,38 +37,16 @@ import { flagInterruptedEphemeralVmProvisioning } from '../ephemeral-vm-runtime-
 import { getCurrentMainWindow } from './ssh/ssh-ipc-context'
 import { getRuntimeEnvironmentRegistryRoot } from './runtime-environments/runtime-environment-registry-root'
 import {
+  buildEphemeralEnvironmentName,
+  provisionFailure,
+  type EphemeralVmProvisionIpcResult
+} from './ephemeral-vm/ephemeral-vm-ipc-presentation'
+import {
   ephemeralVmFailure,
-  pickEphemeralVmFailureCode,
-  type EphemeralVmFailure
+  pickEphemeralVmFailureCode
 } from '../../shared/ephemeral-vm-failure-copy'
 
 const activeProvisionControllers = new Map<string, AbortController>()
-
-export type EphemeralVmProvisionIpcResult =
-  | {
-      ok: true
-      connectionType: 'orca-server'
-      runtime: EphemeralVmRuntimeRecord
-      environment: PublicKnownRuntimeEnvironment
-      stderr: string
-      warnings: EphemeralVmRecipeResultWarning[]
-    }
-  | {
-      ok: true
-      connectionType: 'ssh'
-      runtime: EphemeralVmRuntimeRecord
-      sshTargetId: string
-      /** The managed Orca server the host runs; its workspace lives there. */
-      environmentId?: string
-      expectedRefHead?: string
-      stderr: string
-      warnings: EphemeralVmRecipeResultWarning[]
-    }
-  | ({
-      ok: false
-      stderr: string
-      stdout: string
-    } & EphemeralVmFailure)
 
 export function registerEphemeralVmHandlers(store: Store, pluginService?: PluginService): void {
   ipcMain.removeHandler('ephemeralVm:listRecipes')
@@ -86,6 +63,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
   // reported can be told apart from one whose app was killed mid-flight. It warns and records the
   // flag; nothing can destroy the machine, because no recipe result ever arrived to build destroy from.
   flagInterruptedEphemeralVmProvisioning({ userDataPath: app.getPath('userData') })
+  reconcileInterruptedEphemeralVmProvisionsOnStartup(app.getPath('userData'))
 
   ipcMain.handle('ephemeralVm:listRecipes', async (_event, args: { repoId: string }) => {
     return listRecipes(store, args.repoId, await getApprovedPluginVmRecipes(pluginService))
@@ -218,13 +196,11 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
               runtimeId: result.runtime.id,
               connection
             })
-            const runtime = updateEphemeralVmRuntimeStatus(
-              app.getPath('userData'),
-              result.runtime.id,
-              {
+            const runtime = requireEphemeralVmRecipeResult(
+              updateEphemeralVmRuntimeStatus(app.getPath('userData'), result.runtime.id, {
                 sshTargetId: ssh.targetId,
                 runtimeEnvironmentId: ssh.environmentId
-              }
+              })
             )
             return {
               ok: true,
@@ -273,9 +249,11 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
             stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
           }
         }
-        const runtime = updateEphemeralVmRuntimeStatus(app.getPath('userData'), result.runtime.id, {
-          runtimeEnvironmentId: environment.id
-        })
+        const runtime = requireEphemeralVmRecipeResult(
+          updateEphemeralVmRuntimeStatus(app.getPath('userData'), result.runtime.id, {
+            runtimeEnvironmentId: environment.id
+          })
+        )
         return {
           ok: true,
           connectionType: 'orca-server',
@@ -304,12 +282,4 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
       return { cancelled: true }
     }
   )
-}
-
-function buildEphemeralEnvironmentName(repoName: string, runtimeId: string): string {
-  return `${repoName} VM ${runtimeId.slice(-8)}`
-}
-
-function provisionFailure(failure: EphemeralVmFailure): EphemeralVmProvisionIpcResult {
-  return { ok: false, ...failure, stdout: '', stderr: '' }
 }

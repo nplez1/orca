@@ -3,7 +3,7 @@ import type { Repo } from '../../../../shared/repo-types'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
 import { isHostLocalProjectId } from '../../../../shared/project-host-setup-projection'
 import type { GitPushTarget, Worktree } from '../../../../shared/worktree/types'
-import { branchName } from '@/lib/git-utils'
+import { branchName } from '@/lib/source-control/branches/branch-name'
 import { resolveWorktreeBranchLabel } from '@/lib/worktree-default-display-name'
 import type { ComposerModalData } from '@/components/NewWorkspaceComposerModal'
 

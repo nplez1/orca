@@ -4,6 +4,7 @@ import {
 } from './ephemeral-vm-lifetime'
 import { asRecord, asTrimmedString } from './orca-yaml-fields'
 import { MAX_ORCA_YAML_COLLECTION_ENTRIES } from './orca-yaml-file-limit'
+import { parseEphemeralVmRecipeTimeoutSeconds } from './ephemeral-vm-recipe-timeouts'
 import type {
   OrcaVmRecipe,
   OrcaVmRecipeContextMenuItem,
@@ -175,6 +176,15 @@ export function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
       const resume = asTrimmedString(record.resume)
       const destroyValue = asTrimmedString(record.destroy) ?? asTrimmedString(record.cleanup)
       const destroyDisabled = destroyValue === 'none'
+      const timeouts = parseEphemeralVmRecipeTimeoutSeconds(record.timeoutSeconds)
+      if (!timeouts.ok) {
+        // A bad limit should not hide the recipe; its steps stay unlimited.
+        diagnostics.push({
+          index,
+          field: 'timeoutSeconds',
+          message: `Recipe "${id}" ${timeouts.message} Steps keep no time limit.`
+        })
+      }
       const extend = asTrimmedString(record.extend)
       const extendDurations =
         record.extendDurations === undefined
@@ -217,6 +227,9 @@ export function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
         ...(resume ? { resume } : {}),
         ...(destroyValue && !destroyDisabled ? { destroy: destroyValue } : {}),
         ...(destroyDisabled ? { destroyDisabled: true } : {}),
+        ...(timeouts.ok && timeouts.timeoutSeconds
+          ? { timeoutSeconds: timeouts.timeoutSeconds }
+          : {}),
         ...(extend ? { extend } : {}),
         ...(extendDurations.length > 0 ? { extendDurations } : {}),
         ...(contextMenuItems.items.length > 0 ? { contextMenuItems: contextMenuItems.items } : {})

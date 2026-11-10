@@ -7,7 +7,6 @@ import type { PiScheduledWorkInventory } from './pi-scheduled-work'
 import type { ClaudeLeadTurnState, CodexLeadTurnState } from './main-agent-turn-state'
 
 import {
-  AGENT_STATUS_2A_CURRENT_PRODUCER_MODE,
   createAgentStatusLegacyAdapter,
   type AgentStatusLegacyAdapter,
   type AgentStatusLegacyAdapterOptions,
@@ -21,6 +20,7 @@ import type { AgentSubagentSnapshot } from '../agent-status/contracts/agent-stat
 import type { ClaudeToolRequest } from './claude-tool-request-identity'
 import type { CodexSubagentRoster } from '../codex-subagent-roster'
 import type { CodexSubagentTranscriptState } from '../codex-subagent-transcript'
+import type { CodexAsyncQuestions } from './providers/codex-async-questions'
 import type { MuseSessionLogState } from '../muse-session-log'
 import type { AgentHookEventPayload, ToolSnapshot } from './listener-event'
 import {
@@ -81,6 +81,8 @@ export type HookListenerState = {
   codexSubagentTranscriptByPaneKey: Map<string, CodexSubagentTranscriptState>
   /** Root Codex state/model, kept separate from child hook traffic. */
   codexLeadStateByPaneKey: Map<string, CodexLeadTurnState>
+  /** Mid-turn async questions Codex's TUI holds open; its own status keeps saying working. */
+  codexAsyncQuestionsByPaneKey: Map<string, CodexAsyncQuestions>
   /** Ephemeral forked Codex threads (/side) per pane; they never own the pane's status. */
   codexEphemeralForkSessionsByPaneKey: Map<string, string[]>
   /** A rollout-less Codex start held until its prompt shows a new conversation or the hidden title thread. */
@@ -191,6 +193,7 @@ export function createHookListenerState(
     codexSubagentRosterByPaneKey: new Map(),
     codexSubagentTranscriptByPaneKey: new Map(),
     codexLeadStateByPaneKey: new Map(),
+    codexAsyncQuestionsByPaneKey: new Map(),
     codexEphemeralForkSessionsByPaneKey: new Map(),
     codexHeldEphemeralStartByPaneKey: new Map(),
     grokActiveTurnByPaneKey: new Map(),
@@ -253,23 +256,6 @@ export function getLegacyStatusListingOrder(
   return legacyStatusAdapter(state).listingOrder(paneKey)
 }
 
-/** Test harnesses seed the same compatibility region without exposing a mutable Map. */
-export function seedLegacyAgentStatusForTests(
-  state: HookListenerState,
-  entry: AgentHookEventPayload
-): void {
-  if (
-    !admitLegacyAgentStatus(
-      state,
-      'main-status-update',
-      entry,
-      AGENT_STATUS_2A_CURRENT_PRODUCER_MODE
-    )
-  ) {
-    throw new Error('Test legacy agent-status seed was refused')
-  }
-}
-
 export function clearPaneCacheState(state: HookListenerState, paneKey: string): void {
   deletePaneScopedCacheEntry(state.lastPromptByPaneKey, paneKey)
   deletePaneScopedCacheEntry(state.lastToolByPaneKey, paneKey)
@@ -295,6 +281,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.codexSubagentRosterByPaneKey.delete(paneKey)
   state.codexSubagentTranscriptByPaneKey.delete(paneKey)
   state.codexLeadStateByPaneKey.delete(paneKey)
+  state.codexAsyncQuestionsByPaneKey.delete(paneKey)
   state.codexEphemeralForkSessionsByPaneKey.delete(paneKey)
   state.codexHeldEphemeralStartByPaneKey.delete(paneKey)
   state.grokActiveTurnByPaneKey.delete(paneKey)
@@ -341,6 +328,7 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.codexSubagentRosterByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexSubagentTranscriptByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexLeadStateByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.codexAsyncQuestionsByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexEphemeralForkSessionsByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexHeldEphemeralStartByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.grokActiveTurnByPaneKey, fromPaneKey, toPaneKey)
@@ -392,6 +380,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.codexSubagentRosterByPaneKey.clear()
   state.codexSubagentTranscriptByPaneKey.clear()
   state.codexLeadStateByPaneKey.clear()
+  state.codexAsyncQuestionsByPaneKey.clear()
   state.codexEphemeralForkSessionsByPaneKey.clear()
   state.codexHeldEphemeralStartByPaneKey.clear()
   state.grokActiveTurnByPaneKey.clear()

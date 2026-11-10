@@ -5,7 +5,7 @@ import {
   saveDeepInfraApiKey
 } from '../deepinfra/deepinfra-api-key-store'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
-import type { RateLimitService } from '../rate-limits/service'
+import type { RateLimitService } from '../rate-limits/service/rate-limit-service'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 export type DeepInfraCredentialsStatus = {

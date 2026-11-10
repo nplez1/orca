@@ -5,14 +5,16 @@ import {
   type VisibleOrchestrationState
 } from '@/runtime/agent-orchestration/visible-agent-orchestration'
 import type { AppState } from '@/store/types'
-import { isExplicitAgentStatusFresh } from '@/lib/pane-agent-evidence'
+import {
+  isAgentStatusFresh,
+  AGENT_STATUS_STALE_AFTER_MS
+} from '../../../../../../shared/agent-status/contracts/agent-status-freshness'
 import { migrationUnsupportedToAgentStatusEntry } from '../../../../../../shared/migration-unsupported-agent-entry'
 import {
   mergeAgentStatusOrchestration,
   parseAgentStatusPaneIdentity,
   resolveAgentStatusWorktreeId
 } from '../../../../../../shared/agent-status/identity/agent-status-worktree-attribution'
-import { AGENT_STATUS_STALE_AFTER_MS } from '../../../../../../shared/agent-status/contracts/agent-status-freshness'
 import type {
   AgentStatusEntry,
   AgentStatusOrchestrationContext,
@@ -160,7 +162,7 @@ function getWorktreeAgentActivitySummaries(
       addAgentStatusPaneId(summary, paneIdentity.tabId, paneIdentity.paneId)
       continue
     }
-    if (!isExplicitAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)) {
+    if (!isAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)) {
       // Retain stale pane identity to suppress generated permission titles after the row loses authority.
       addStalePaneId(summary, paneIdentity.tabId, paneIdentity.paneId)
       if (entry.state === 'done') {

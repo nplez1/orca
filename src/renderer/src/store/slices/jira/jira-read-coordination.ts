@@ -12,10 +12,10 @@ import {
   getTaskSourceRuntimeSettings,
   type TaskSourceContext
 } from '../../../../../shared/work-items/task-source-context'
-import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import { runtimeTargetEnvironmentId } from '../../../runtime/rpc/targets/runtime-client-target'
 import type { OwnedSource } from '@/lib/provider-source-target'
+import { getProviderRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 import { parseJiraStatusError } from '../../../../../shared/jira/jira-status-error'
 
 const CACHE_TTL = 60_000

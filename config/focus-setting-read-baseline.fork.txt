@@ -22,6 +22,7 @@
 1 src/renderer/src/components/right-sidebar/use-workspace-review-selection.ts # transitive reader: getWorkspaceReferenceRuntimeVersion folds getProviderRuntimeContextKey(null) into the hosted-review cache key, and null is this app rather than the focused host. Reusing the sidebar card's key is the point, so this is not routing
 1 src/renderer/src/components/settings/JiraBoardSettings.tsx # settings scope: the default Jira board is a global setting, so the pane's board list belongs to the focused host's Jira account, and the memo keys on that host id alone (2026-10-16 owner-routing migration)
 0 src/renderer/src/components/sidebar/workspace-board/projection/workspace-board-task-status-sync.ts # fork has 0 where upstream allows 4; lowered by a fork prune
+0 src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts
 10 src/renderer/src/components/task-page/TaskPage.tsx # 10 where upstream allows 9: the merge added one transitive reader under the page. The page routes by the row s owner; the extra is a composition-root reader. Follow-up: re-route it and lower this row
 1 src/renderer/src/components/task-page/jira/IssueAssigneeField.tsx # fork has 1 where upstream allows 2; lowered by a fork prune
 0 src/renderer/src/components/task-page/jira/task-page-jira-status-order.ts

@@ -1,6 +1,6 @@
 import { focusAgentTabSurface, isAgentTabFocusClaimed } from '@/lib/agent-tab-focus-policy'
 import { useAppStore } from '@/store/index'
-import type { ActivateAndRevealResult } from '@/lib/worktree-activation-outcome'
+import type { ActivateAndRevealResult } from '@/lib/workspace/activation/worktree-activation-outcome'
 
 let cancelPendingFocus: (() => void) | null = null
 

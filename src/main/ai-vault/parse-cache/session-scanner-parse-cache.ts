@@ -1,3 +1,4 @@
+import { throwIfAiVaultScanCancelled, waitForAiVaultScan } from '../ai-vault-scan-cancellation'
 import { createQoderSessionResumeState } from '../scanners/qoder/session-scanner-qoder-parser'
 import type { AiVaultSession } from '../../../shared/ai-vault/contracts/ai-vault-types'
 import { inSessionParseFileLane } from './session-parse-file-lane'
@@ -111,11 +112,14 @@ export async function parseAgentSessionFileCached(
   platform: NodeJS.Platform,
   stats?: SessionParseStats,
   requireRead?: SessionParseReadRequirement,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  indexing = false
 ): Promise<AiVaultSession | null> {
   // Serialize lookup/read/store because overlapping parses share a resume point and message channel.
-  return inSessionParseFileLane(candidate.file.path, () =>
-    parseCachedInLane(candidate, platform, stats, requireRead, signal)
+  return inSessionParseFileLane(
+    candidate.file.path,
+    () => parseCachedInLane(candidate, platform, stats, requireRead, signal, indexing),
+    signal
   )
 }
 
@@ -153,7 +157,8 @@ async function parseCachedInLane(
   platform: NodeJS.Platform,
   stats?: SessionParseStats,
   requireRead?: SessionParseReadRequirement,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  indexing = false
 ): Promise<AiVaultSession | null> {
   const { file } = candidate
   const key = sessionParseCacheKey(candidate.agent, file.path)
@@ -168,7 +173,7 @@ async function parseCachedInLane(
 
   if (entry !== undefined && sessionParseCacheCoversTranscript(candidate, key, platform)) {
     if (sidecarUnchanged(entry.sidecar, file.sidecar)) {
-      return reuseCachedSession(candidate, key, entry, stats)
+      return reuseCachedSession(candidate, key, entry, stats, signal)
     }
     // Metadata-only sidecar changes can merge onto the saved fold without rereading the transcript.
     if (sidecarEnrichesWithoutReparse(candidate) && entry.foldSession !== undefined) {
@@ -178,6 +183,7 @@ async function parseCachedInLane(
         platform,
         signal
       )
+      throwIfAiVaultScanCancelled(signal)
       const session = reuseUnchangedSidecarSession(entry.session, enriched.session)
       storeSessionParseCacheEntry(key, {
         ...entry,
@@ -207,7 +213,8 @@ async function parseCachedInLane(
       stateFactory,
       stats,
       signal,
-      sessionForConsumers
+      sessionForConsumers,
+      indexing
     })
     storeSessionParseCacheEntry(key, {
       agent: candidate.agent,
@@ -230,6 +237,7 @@ async function parseCachedInLane(
     stats,
     signal,
     sessionForConsumers,
+    indexing,
     onSkippedRecords: (records) => {
       skippedRecords = mergeSkippedTranscriptRecords([], records)
     }
@@ -252,7 +260,8 @@ async function reuseCachedSession(
   candidate: SessionFileCandidate,
   key: string,
   entry: SessionParseCacheEntry,
-  stats?: SessionParseStats
+  stats?: SessionParseStats,
+  signal?: AbortSignal
 ): Promise<AiVaultSession | null> {
   if (stats) {
     stats.reused++
@@ -262,9 +271,9 @@ async function reuseCachedSession(
   if (session && session.messageCount === 0) {
     const subagentTranscriptCount =
       session.agent === 'claude'
-        ? await countSubagentTranscripts(candidate.file.path)
+        ? await countSubagentTranscripts(candidate.file.path, signal)
         : session.agent === 'omp'
-          ? await countOmpSubagentTranscripts(candidate.file.path)
+          ? await countOmpSubagentTranscripts(candidate.file.path, signal)
           : null
     if (
       subagentTranscriptCount !== null &&
@@ -275,8 +284,9 @@ async function reuseCachedSession(
   }
   // Index titles can change independently of the transcript signature.
   if (session && candidate.agent === 'codex') {
-    session = await refreshCachedCodexTitle(candidate, session)
+    session = await waitForAiVaultScan(refreshCachedCodexTitle(candidate, session), signal)
   }
+  throwIfAiVaultScanCancelled(signal)
   storeSessionParseCacheEntry(key, { ...entry, session })
   return session
 }

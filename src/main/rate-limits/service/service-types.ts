@@ -1,6 +1,6 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import type { ZcodePlanSite } from '../../../shared/zcode-plan-sites'
-import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
+import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth/runtime-auth-types'
 import type {
   ClaudeAccountSelectionTarget,
   NormalizedClaudeAccountSelectionTarget
@@ -9,8 +9,8 @@ import type { KimiHomeResolution } from '../../kimi/kimi-runtime-home'
 import type {
   CodexAccountSelectionTarget,
   NormalizedCodexAccountSelectionTarget
-} from '../../codex-accounts/runtime-selection'
-import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service'
+} from '../../../shared/codex-selection-lane'
+import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service-types'
 import type { SettledProviderResult } from './service-sibling-provider-result'
 import type { ForkProviderCyclePrepared } from '../fork/fork-provider-cycle'
 
@@ -21,10 +21,9 @@ export type {
   InactiveAccountUsage,
   RateLimitRuntimeTarget
 } from '../../../shared/rate-limit-types'
-export type { InactiveClaudeAccountInfo } from '../claude-fetcher'
 export type { ClaudeStatusLineRateLimits } from '../../../shared/claude-statusline-rate-limits'
 export type { NetworkProxySettings } from '../../../shared/network-proxy'
-export type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
+export type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth/runtime-auth-types'
 export type {
   ClaudeAccountSelectionTarget,
   NormalizedClaudeAccountSelectionTarget
@@ -33,9 +32,9 @@ export { normalizeClaudeAccountSelectionTarget } from '../../claude-accounts/run
 export type {
   CodexAccountSelectionTarget,
   NormalizedCodexAccountSelectionTarget
-} from '../../codex-accounts/runtime-selection'
-export { normalizeCodexAccountSelectionTarget } from '../../codex-accounts/runtime-selection'
-export type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service'
+} from '../../../shared/codex-selection-lane'
+export { normalizeCodexAccountSelectionTarget } from '../../../shared/codex-selection-lane'
+export type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service-types'
 
 export type InactiveCodexHome = { kind: 'ready'; managedHomePath: string } | { kind: 'skip' }
 

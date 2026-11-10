@@ -13,7 +13,7 @@ import {
 
 import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import { loadGitLabJobLogDetails } from '@/runtime/repository-gitlab/gitlab-job-trace-client'
-import { startFixChecksAgent } from '@/lib/fix-checks-agent-launch'
+import { startFixChecksAgent } from '@/lib/source-control/checks/fix-checks-agent-launch'
 import { openChecksPanelHostedReviewUrl } from './checks-panel-hosted-review-click-routing'
 import { isMacPlatform } from '../../../terminal-pane/links/terminal-link-open-hints'
 import { translate } from '@/i18n/i18n'

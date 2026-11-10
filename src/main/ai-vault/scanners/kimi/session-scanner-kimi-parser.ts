@@ -1,3 +1,4 @@
+import { throwIfAiVaultScanCancelled, waitForAiVaultScan } from '../../ai-vault-scan-cancellation'
 import {
   openTranscriptReadStream,
   wslGatedReadFile
@@ -34,15 +35,21 @@ export async function parseKimiSessionFile(
 ): Promise<AiVaultSession | null> {
   let stateRecord: Record<string, unknown> | null
   try {
-    const raw: unknown = JSON.parse(await wslGatedReadFile(file.path, 'utf-8', 'scan', signal))
-    stateRecord = asRecord(raw)
+    const parsed: unknown = JSON.parse(
+      await waitForAiVaultScan(wslGatedReadFile(file.path, 'utf-8', 'scan', signal), signal)
+    )
+    stateRecord = asRecord(parsed)
   } catch (error) {
+    throwIfAiVaultScanCancelled(signal)
     // An oversized state file is a fact about the session, not an absent one.
     if (error instanceof NodeFileReadTooLargeError) {
       throw error
     }
     // Propagate WSL refusal so an unreachable state file is not cached as no session.
-    if (error instanceof WslTranscriptFsError) {
+    if (
+      error instanceof WslTranscriptFsError ||
+      (error instanceof Error && error.name === 'AbortError')
+    ) {
       throw error
     }
     return null
@@ -56,7 +63,8 @@ export async function parseKimiSessionFile(
 
   // Kimi resume requires the indexed work directory; session IDs alone are not sufficient.
   const workDirBySessionId = await readKimiWorkDirBySessionId(
-    kimiSessionIndexPathFromStatePath(file.path)
+    kimiSessionIndexPathFromStatePath(file.path),
+    signal
   )
   accumulator.cwd = workDirBySessionId.get(sessionId) ?? null
 
@@ -65,14 +73,19 @@ export async function parseKimiSessionFile(
   updateTimeline(accumulator, extractString(stateRecord.createdAt))
   updateTimeline(accumulator, extractString(stateRecord.updatedAt))
 
-  await consumeKimiWireTranscript(accumulator, kimiPrimaryAgentWirePath(file.path, stateRecord))
+  await consumeKimiWireTranscript(
+    accumulator,
+    kimiPrimaryAgentWirePath(file.path, stateRecord),
+    signal
+  )
 
   return finalizeSession(accumulator, platform)
 }
 
 async function consumeKimiWireTranscript(
   accumulator: SessionAccumulator,
-  wirePath: string
+  wirePath: string,
+  signal?: AbortSignal
 ): Promise<void> {
   let pendingAssistantText: string[] = []
   const flushAssistant = (): void => {
@@ -84,10 +97,11 @@ async function consumeKimiWireTranscript(
     }
   }
 
-  const input = openTranscriptReadStream(wirePath, { encoding: 'utf-8' }, 'scan')
+  const input = openTranscriptReadStream(wirePath, { encoding: 'utf-8' }, 'scan', signal)
   const lines = createInterface({ input, crlfDelay: Infinity })
   try {
     for await (const line of lines) {
+      await waitForAiVaultScan(accumulator.messages.drain?.() ?? Promise.resolve(), signal)
       const record = parseJsonObject(line)
       if (!record) {
         continue
@@ -111,8 +125,12 @@ async function consumeKimiWireTranscript(
       }
     }
   } catch (error) {
+    throwIfAiVaultScanCancelled(signal)
     // Metadata-only sessions may list, but WSL refusal must propagate so missing wire content remains retryable.
-    if (error instanceof WslTranscriptFsError) {
+    if (
+      error instanceof WslTranscriptFsError ||
+      (error instanceof Error && error.name === 'AbortError')
+    ) {
       throw error
     }
   } finally {
@@ -121,6 +139,7 @@ async function consumeKimiWireTranscript(
     input.destroy()
   }
   flushAssistant()
+  await waitForAiVaultScan(accumulator.messages.drain?.() ?? Promise.resolve(), signal)
 }
 
 function consumeKimiUserMessage(accumulator: SessionAccumulator, value: unknown): void {

@@ -1,6 +1,6 @@
 import { writeLinearIssue } from '@/lib/work-items/linear/linear-issue-write'
-import { taskProviderErrorMessage } from '@/lib/task-provider-error-copy'
-import { ImeTextarea } from '@/lib/ime-text-field'
+import { taskProviderErrorMessage } from '@/lib/work-items/task-provider-error-copy'
+import { ImeTextarea } from '@/lib/text-input/ime/ime-text-field'
 import React, { useCallback, useRef, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,7 +22,7 @@ import {
   resolveLinearIssueTextDraftState
 } from './linear-issue-text-draft-state'
 import { translate } from '@/i18n/i18n'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import { useTranslate } from '@/i18n/use-translate'
 
 type LinearIssueTextEditorProps = {

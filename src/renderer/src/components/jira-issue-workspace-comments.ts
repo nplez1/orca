@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import {
   getCommentBodySubmitState,
   hasBoundedCommentBodyText
-} from '@/lib/comment-body-submit-state'
+} from '@/lib/source-control/review/comments/comment-body-submit-state'
 import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
 import { jiraAddIssueComment, jiraIssueComments } from '../runtime/jira/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'

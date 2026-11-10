@@ -26,6 +26,8 @@ vi.mock('./filesystem/access/filesystem-auth.ts', () => ({
 import {
   ensureFloatingWorkspaceDirectory,
   grantFloatingWorkspaceDirectory,
+  getFloatingWorkspaceFileRoots,
+  trustFloatingWorkspaceDirectory,
   resolveFloatingTerminalCwd,
   sanitizeFloatingWorkspaceDirectorySetting
 } from './floating-workspace-directory'
@@ -150,7 +152,8 @@ describe('floating workspace directory authorization', () => {
     expect(authorizeExternalPathMock).toHaveBeenCalledWith(canonicalSelectedDir)
   })
 
-  it('stores symlink grants as canonical targets and rejects the link after retargeting', async () => {    const store = createStore()
+  it('stores symlink grants as canonical targets and rejects the link after retargeting', async () => {
+    const store = createStore()
     const originalTarget = path.join(tempRoot, 'original-target')
     const retargetedTarget = path.join(tempRoot, 'retargeted-target')
     const selectedLink = path.join(tempRoot, 'selected-link')
@@ -235,5 +238,25 @@ describe('floating workspace directory authorization', () => {
       arbitraryDir
     )
     expect(authorizeExternalPathMock).not.toHaveBeenCalledWith(arbitraryDir)
+  })
+
+  it('never re-points an existing trusted folder swapped for a link when trusting another', async () => {
+    await mkdir(path.join(tempRoot, 'a'))
+    const approved = await realpath(path.join(tempRoot, 'a'))
+    const elsewhere = path.join(tempRoot, 'b')
+    const other = path.join(tempRoot, 'c')
+    await mkdir(elsewhere)
+    await mkdir(other)
+    const store = createStore({ floatingTerminalCwd: approved })
+    await trustFloatingWorkspaceDirectory(store, approved)
+    await rm(approved, { recursive: true })
+    await symlinkDirectory(elsewhere, approved)
+
+    await trustFloatingWorkspaceDirectory(store, other)
+
+    const canonicalElsewhere = await realpath(elsewhere)
+    expect(store.settings.floatingTerminalTrustedCwds).not.toContain(canonicalElsewhere)
+    store.settings = { ...store.settings, floatingTerminalCwd: canonicalElsewhere }
+    expect(getFloatingWorkspaceFileRoots(store).exactRoots).toEqual([])
   })
 })

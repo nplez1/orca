@@ -1,9 +1,9 @@
-import { taskProviderErrorMessage } from '@/lib/task-provider-error-copy'
 import type {
   JiraFieldErrors,
   JiraIssue,
   JiraMutationResult
 } from '../../../shared/jira/jira-types'
+import { taskProviderErrorMessage } from '@/lib/work-items/task-provider-error-copy'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { JiraWriteTimeoutError } from '@/runtime/jira-write-deadline'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'

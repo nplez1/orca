@@ -2,7 +2,7 @@ import { translate } from '@/i18n/i18n'
 import type { GitHubRerunPRChecksResult, PRCheckDetail } from '../../../shared/github/check-types'
 import { selectRerunTargets } from '../../../shared/jenkins-rebuild'
 import { rerunJenkinsCheck } from '@/runtime/jenkins-rebuild-client'
-import { codeHostErrorText } from '@/lib/code-host-error-copy'
+import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-copy'
 
 /**
  * One "Rerun" action over a failure list that can contain both GitHub Actions checks and Jenkins

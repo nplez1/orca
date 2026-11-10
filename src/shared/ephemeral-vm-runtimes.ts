@@ -5,6 +5,8 @@ import {
   EphemeralVmRecipeResultSchema
 } from './ephemeral-vm-recipes'
 import type { OrcaVmRecipe, OrcaVmRecipeContextMenuItem } from './orca-yaml-hook-types'
+import type { EphemeralVmFailure } from './ephemeral-vm-failure-copy'
+import { toEphemeralVmRuntimeRecipeSnapshot as stripEphemeralVmRecipeTimeouts } from './ephemeral-vm-recipe-timeouts'
 
 export const EphemeralVmRuntimeStatusSchema = z.enum([
   'provisioning',
@@ -85,6 +87,8 @@ export const EphemeralVmRuntimeRecordSchema = z.object({
    *  cannot redirect a click at a different script. A host with none offers no extra items. */
   contextMenuItems: EphemeralVmContextMenuItemListSchema.optional(),
   repoId: z.string().min(1).optional(),
+  /** Repo checkout the lifecycle commands ran from, so destroy still works if `repoId` stops resolving. */
+  repoPath: z.string().min(1).optional(),
   projectId: z.string().min(1).optional(),
   workspaceId: z.string().min(1).optional(),
   workspaceName: z.string().min(1).optional(),
@@ -117,9 +121,14 @@ export const EphemeralVmRuntimeRecordSchema = z.object({
    * needs that match to forget the row when the reclaim event reached nobody.
    */
   reclaimedHostIds: z.array(z.string().min(1)).optional(),
+  /** Last suspend/resume failure (English + optional code/params); cleared when one succeeds. */
+  lifecycleLastError: z.string().min(1).optional(),
+  lifecycleLastErrorCode: z.string().min(1).optional(),
+  lifecycleLastErrorParams: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
   createdAt: z.number().finite(),
   updatedAt: z.number().finite(),
-  recipeResult: EphemeralVmRecipeResultSchema
+  /** Absent only on write-ahead records persisted before `create` returned a result. */
+  recipeResult: EphemeralVmRecipeResultSchema.optional()
 })
 
 export type EphemeralVmRuntimeRecord = z.infer<typeof EphemeralVmRuntimeRecordSchema>
@@ -159,7 +168,8 @@ export function isEphemeralVmHostActionable(runtime: EphemeralVmRuntimeRecord): 
  * deliberately does not know them — they live on the record itself, so the snapshot stays
  * parseable by an older build. Leaving them in makes the snapshot unparseable here, which fails
  * the write *after* the provider has already billed for a machine, so no caller may bypass this
- * conversion.
+ * conversion. Upstream's `timeoutSeconds` is stripped first, for the same strictness, so one call
+ * yields a snapshot both lines' older builds accept.
  */
 export function toEphemeralVmRuntimeRecipeSnapshot(
   recipe: OrcaVmRecipe
@@ -169,7 +179,7 @@ export function toEphemeralVmRuntimeRecipeSnapshot(
     extendDurations: _extendDurations,
     contextMenuItems: _contextMenuItems,
     ...snapshot
-  } = recipe
+  } = stripEphemeralVmRecipeTimeouts(recipe)
   return snapshot
 }
 
@@ -199,6 +209,53 @@ function toEphemeralVmContextMenuItem(
 ): EphemeralVmContextMenuItem {
   return { id: item.id, label: item.label, command: item.command }
 }
+
+export type EphemeralVmProvisionedRuntimeRecord = EphemeralVmRuntimeRecord & {
+  recipeResult: NonNullable<EphemeralVmRuntimeRecord['recipeResult']>
+}
+
+export function hasEphemeralVmRecipeResult(
+  runtime: EphemeralVmRuntimeRecord
+): runtime is EphemeralVmProvisionedRuntimeRecord {
+  return runtime.recipeResult !== undefined
+}
+
+export function requireEphemeralVmRecipeResult(
+  runtime: EphemeralVmRuntimeRecord
+): EphemeralVmProvisionedRuntimeRecord {
+  if (!hasEphemeralVmRecipeResult(runtime)) {
+    throw new Error(`Ephemeral VM runtime never finished provisioning: ${runtime.id}`)
+  }
+  return runtime
+}
+
+/** Fields `updateEphemeralVmRuntimeStatus` may change; undefined leaves a field as is. */
+export type EphemeralVmRuntimeStatusPatch = {
+  status?: EphemeralVmRuntimeStatus
+  cleanupStatus?: EphemeralVmCleanupStatus
+  cleanupLastAttemptAt?: number
+  /** A string clears any stored code; null clears both. */
+  cleanupLastError?: string | EphemeralVmFailure | null
+  /** Suspend/resume failure; null clears it. */
+  lifecycleLastError?: EphemeralVmFailure | null
+  /** When the host's registrations were released because its lease had lapsed. */
+  reclaimedAt?: number
+  /** Execution-host identities the runtime was reachable as when it was reclaimed. */
+  reclaimedHostIds?: string[]
+  workspaceId?: string
+  workspaceName?: string
+  connectionMode?: EphemeralVmRuntimeRecord['connectionMode'] | null
+  /** null clears it, for a host whose server registration has been released. */
+  runtimeEnvironmentId?: string | null
+  sshTargetId?: string | null
+  recipeResult?: EphemeralVmRuntimeRecord['recipeResult']
+  updatedAt?: number
+}
+
+/** Suspend/resume over IPC: failures come back as values so the code reaches the renderer catalog. */
+export type EphemeralVmWorkspaceLifecycleResult =
+  | { ok: true; runtime: EphemeralVmRuntimeRecord | null }
+  | ({ ok: false } & EphemeralVmFailure)
 
 export const EphemeralVmRuntimeStoreSchema = z.object({
   version: z.literal(1),

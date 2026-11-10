@@ -103,6 +103,7 @@ export class RepoUpdatePersistenceOperations {
         | 'executionHostId'
         | 'symlinkPaths'
         | 'sharedDirectoriesMode'
+        | 'dictationTerms'
         | 'issueSourcePreference'
         | 'defaultJiraProject'
         | 'forkSyncMode'

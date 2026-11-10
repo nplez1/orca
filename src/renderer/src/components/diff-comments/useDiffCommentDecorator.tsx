@@ -7,7 +7,7 @@ import {
 } from '@/store/slices/diff-comments/diff-comment-owner'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { createRoot, type Root } from 'react-dom/client'
-import { getCommentBodyLayoutLineCount } from '@/lib/comment-body-line-count'
+import { getCommentBodyLayoutLineCount } from '@/lib/source-control/review/comments/comment-body-line-count'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import {

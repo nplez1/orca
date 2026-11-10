@@ -1,6 +1,11 @@
 import { ipcRenderer } from 'electron'
 import type { PreloadApi } from '../api-types'
 import type { EphemeralVmRuntimeReclaimed } from '../../shared/ephemeral-vm-runtime-reclaim'
+import { EPHEMERAL_VM_RUNTIMES_CHANGED_CHANNEL } from '../../shared/ephemeral-vm-runtime-store-events'
+import {
+  PENDING_VM_CHECKOUTS_CHANGED_CHANNEL,
+  type PendingVmCheckout
+} from '../../shared/pending-vm-checkouts'
 
 export const ephemeralVmApi = {
   listRecipes: (args) => ipcRenderer.invoke('ephemeralVm:listRecipes', args),
@@ -19,6 +24,12 @@ export const ephemeralVmApi = {
   listRuntimes: () => ipcRenderer.invoke('ephemeralVm:listRuntimes'),
   attachWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:attachWorkspace', args),
   resumeWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:resumeWorkspace', args),
+  suspendWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:suspendWorkspace', args),
+  onRuntimesChanged: (callback) => {
+    const listener = (): void => callback()
+    ipcRenderer.on(EPHEMERAL_VM_RUNTIMES_CHANGED_CHANNEL, listener)
+    return () => ipcRenderer.removeListener(EPHEMERAL_VM_RUNTIMES_CHANGED_CHANNEL, listener)
+  },
   cleanup: (args) => ipcRenderer.invoke('ephemeralVm:cleanup', args),
   stopCleanup: (args) => ipcRenderer.invoke('ephemeralVm:stopCleanup', args),
   extendLifetime: (args) => ipcRenderer.invoke('ephemeralVm:extendLifetime', args),
@@ -31,5 +42,16 @@ export const ephemeralVmApi = {
     ipcRenderer.on('ephemeralVm:runtimeReclaimed', listener)
     return () => ipcRenderer.removeListener('ephemeralVm:runtimeReclaimed', listener)
   },
-  getCleanupCommand: (args) => ipcRenderer.invoke('ephemeralVm:getCleanupCommand', args)
+  getCleanupCommand: (args) => ipcRenderer.invoke('ephemeralVm:getCleanupCommand', args),
+  forgetRuntime: (args) => ipcRenderer.invoke('ephemeralVm:forgetRuntime', args),
+  publishPendingCheckouts: (checkouts) => {
+    void ipcRenderer.invoke('ephemeralVm:publishPendingCheckouts', checkouts).catch(() => {})
+  },
+  listPendingCheckouts: () => ipcRenderer.invoke('ephemeralVm:listPendingCheckouts'),
+  onPendingCheckoutsChanged: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, checkouts: PendingVmCheckout[]): void =>
+      callback(checkouts)
+    ipcRenderer.on(PENDING_VM_CHECKOUTS_CHANGED_CHANNEL, listener)
+    return () => ipcRenderer.removeListener(PENDING_VM_CHECKOUTS_CHANGED_CHANNEL, listener)
+  }
 } satisfies PreloadApi['ephemeralVm']

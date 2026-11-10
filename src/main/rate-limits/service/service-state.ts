@@ -9,7 +9,7 @@ import type {
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import { USAGE_PROVIDER_IDS } from '../../../shared/usage-provider-enablement'
 import { usageProviderPendingReadout } from '../../../shared/usage-providers/usage-provider-readouts'
-import type { AntigravityAccountUsageRecorder } from '../antigravity-account-usage'
+import type { AntigravityAccountUsageRecorder } from '../providers/antigravity/antigravity-account-usage'
 import {
   type ActiveRateLimitProvider,
   type InactiveCodexAccountInfo,
@@ -28,13 +28,13 @@ import {
   type CopilotRateLimitConfig,
   type GeminiCliOAuthEnabledResolver,
   USAGE_PROVIDER_STATE_KEYS,
-  type NormalizedCodexAccountSelectionTarget,
-  type NormalizedClaudeAccountSelectionTarget,
-  type InactiveClaudeAccountInfo,
-  type NetworkProxySettings,
   DEFAULT_POLL_MS
 } from './service-types'
-import { readGrokAuthSession } from '../grok-auth'
+import type { NormalizedCodexAccountSelectionTarget } from '../../../shared/codex-selection-lane'
+import type { NormalizedClaudeAccountSelectionTarget } from '../../claude-accounts/runtime-selection'
+import type { InactiveClaudeAccount } from '../providers/claude/claude-managed-account-usage'
+import type { NetworkProxySettings } from '../../../shared/network-proxy'
+import { readGrokAuthSession } from '../providers/grok/grok-auth'
 
 /** Hidden placeholder a disabled provider resolves to, so a cycle can settle its slot without a network call. */
 export function disabledUsageProviderSnapshot(
@@ -172,7 +172,7 @@ export abstract class RateLimitServiceState {
   protected antigravityAccountUsageRecorder: AntigravityAccountUsageRecorder | null = null
   protected antigravityAccounts: AntigravityAccountUsage[] = []
   protected museUsageEnabledResolver: MuseUsageEnabledResolver | null = null
-  protected inactiveClaudeAccountsResolver: (() => InactiveClaudeAccountInfo[]) | null = null
+  protected inactiveClaudeAccountsResolver: (() => InactiveClaudeAccount[]) | null = null
   protected inactiveCodexAccountsResolver: (() => InactiveCodexAccountInfo[]) | null = null
   protected networkProxySettingsResolver: (() => NetworkProxySettings) | null = null
   protected inactiveClaudeCache = new Map<string, ProviderRateLimits>()

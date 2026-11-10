@@ -22,7 +22,7 @@ import {
   aiGenerationAgentLabel,
   type AiGenerationSettingsConfig
 } from '@/lib/ai-generation-settings'
-import { AgentIcon } from '@/lib/agent-catalog'
+import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'

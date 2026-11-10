@@ -1,6 +1,6 @@
 import { useLinearIssueResult } from '@/hooks/linear-issue-committed-state'
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import { useAppStore } from '@/store'
 import type { TaskPageLinearViewStatePreludeModel } from './use-task-page-linear-view-state'
 import { useState, useRef } from 'react'

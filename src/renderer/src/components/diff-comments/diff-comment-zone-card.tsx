@@ -144,7 +144,7 @@ export function renderDiffCommentZoneCard(
   root.render(
     // View zones are separate React roots outside the app root, so App.tsx context providers don't reach them.
     <TranslationScopeProvider>
-      <TooltipProvider delayDuration={400}>
+      <TooltipProvider>
         <DiffCommentCard
           lineNumber={comment.lineNumber}
           startLine={comment.startLine}
@@ -225,7 +225,7 @@ export function renderDiffCommentDraftCard(
 ): void {
   root.render(
     <TranslationScopeProvider>
-      <TooltipProvider delayDuration={400}>
+      <TooltipProvider>
         <DiffCommentDraftCard
           imageUploadAddress={imageUploadAddress}
           lineNumber={draft.lineNumber}

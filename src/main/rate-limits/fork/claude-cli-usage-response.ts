@@ -1,7 +1,16 @@
 import type { ProviderRateLimits, RateLimitWindow } from '../../../shared/rate-limit-types'
-import type { ClaudeOAuthExtraUsage, ClaudeOAuthSpend } from '../claude-usage-credits'
-import { mapClaudeExtraUsage, mapClaudeSpendLimitWindow } from '../claude-usage-credits'
-import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from '../claude-usage-window'
+import type {
+  ClaudeOAuthExtraUsage,
+  ClaudeOAuthSpend
+} from '../providers/claude/claude-usage-credits'
+import {
+  mapClaudeExtraUsage,
+  mapClaudeSpendLimitWindow
+} from '../providers/claude/claude-usage-credits'
+import {
+  mapClaudeUsageWindow,
+  type ClaudeUsageWindowInput
+} from '../providers/claude/claude-usage-window'
 
 const SESSION_WINDOW_MINUTES = 300
 const WEEKLY_WINDOW_MINUTES = 10_080

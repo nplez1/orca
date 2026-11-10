@@ -1,5 +1,8 @@
 import { readFile } from 'node:fs/promises'
-import { writeFileAtomically, writeFileAtomicallyIfUnchanged } from '../codex-accounts/fs-utils'
+import {
+  writeFileAtomically,
+  writeFileAtomicallyIfUnchanged
+} from '../filesystem/atomic-file-publication'
 import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
 import {
   isKeychainNotFoundError,

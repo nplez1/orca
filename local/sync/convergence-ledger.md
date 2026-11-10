@@ -22,6 +22,31 @@ Rules for using it:
 
 ---
 
+## `import/no-cycle` keeps the fork's depth bound (2026-11-10 sync)
+
+**Paths:** `config/oxlint-code-quality-native-plugins.json`
+
+**Resolution:** manual — union, not take-theirs
+
+**Decision:** the rule reads `["warn", { "maxDepth": 3, "ignoreTypes": true }]`. Upstream's 2026-11-10
+sync replaced `{ maxDepth: 3 }` with `{ ignoreTypes: true }`, dropping the depth bound; the fork keeps
+both options, so upstream's type-ignoring applies and the depth bound the fork has always run under
+stays in force.
+
+**Why:** removing the bound surfaced 18 pre-existing cycles in 13 fork-owned files (the
+`ipc/filesystem/watchers/filesystem-watcher-*` cluster and the
+`ai-generation-fields → AgentLaunchPicker → AgentSettingsDialog → AgentsPane → SessionSummaryAiSetting`
+renderer cluster) and turned `audit:code-quality:native` red, which is a release gate. Breaking those
+cycles is a multi-file refactor of code this sync did not change. Recording it as a known red was not
+available either: that step prints only the `[ELIFECYCLE]` fallback line, and gate-lint can cover such
+a line only with `wholeStep: true`, which would mask every future failure of the step.
+
+**Do not:** resolve this conflict by taking upstream's value wholesale without the depth bound, and do
+not silence it with `wholeStep`. If the 13 files' cycles are broken, drop `maxDepth` in the same commit
+that does it.
+
+---
+
 ## Upstream owner-scoped reorganisation (2026-11-08 sync)
 
 **Paths:** `src/main/**`, `src/renderer/src/**`, `src/shared/**`, `config/scripts/**`
@@ -1697,6 +1722,35 @@ imports each shared module by name.
 **Do not:** recreate the barrel to keep an import path stable, or move the fork's four flat modules
 into the directory "for consistency" — `rg 'ephemeral-vm-runtime-(extend|lock|reclaim|context-menu)'`
 is the shape the next sync expects.
+
+#### Provisioning recovery: one create function, both records (2026-11-09 sync)
+
+**Paths:** `src/main/ephemeral-vm/runtime-service.ts`,
+`src/main/ephemeral-vm/runtime-provisioning.ts`, `src/main/ephemeral-vm/runtime-provisioning-persistence.ts`
+
+**Decision.** Both sides independently built "record the create before the spawn, so an app killed
+mid-create does not leave a provider-billed machine with nothing on disk naming it". Upstream's is a
+write-ahead record in the runtime store (`beginEphemeralVmProvisioning` → status `provisioning`,
+cleared by `persistProvisioned…` / `persistFailedEphemeralVmStart` / `endEphemeralVmProvisioning`).
+The fork's is a separate bounded attempts store (`ephemeral-vm-provisioning-attempts`, capped at 20)
+read by `ephemeral-vm-runtime-provisioning-recovery.ts` at startup, which flags interrupted creates.
+The merge left `provisionEphemeralVmRuntime` **defined twice**.
+
+**Resolution (owner's call, this sync):** one function — **upstream's** — which also writes the
+fork's attempt row, so both records exist and the fork's startup recovery keeps working unchanged.
+The fork's attempt row is cleared on the two terminal paths (success, `!start.ok`) and deliberately
+**kept** on an unexpected throw, because an unknown machine fate should surface as a reconcile
+warning rather than disappear. The fork's duplicate function, its `startProvisionedRuntime` /
+`finishFailedProvisioning` / `forgetProvisioningAttempt` internals, and
+`prepareEphemeralVmCompatibilityPersistence`'s call site are deleted;
+`runtime-provisioning.ts` keeps only the two arg/result types, the in-flight registry
+(`isEphemeralVmProvisioningInFlight`, `holdEphemeralVmProvisioningInFlightForTest`, and the
+begin/end pair) and the record/forget helpers `runtime-service.ts` calls.
+
+**Do not:** reintroduce a second `provisionEphemeralVmRuntime`, and do not "simplify" by dropping the
+fork's attempt row — upstream's record is durable but does not feed the fork's interrupted-create
+flagging UI. Equally, do not move the fork's recovery onto upstream's records without re-measuring
+what the startup reconcile reads.
 
 ### Jira: upstream's `ipc/jira/` split and `jira/attachments/` renames win
 

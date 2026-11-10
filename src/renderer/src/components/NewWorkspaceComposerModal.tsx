@@ -42,7 +42,7 @@ import {
   useWorkspaceCopyTarget,
   type ProjectHostSetupProvisioning
 } from '@/components/new-workspace/use-workspace-copy-target'
-import { branchName } from '@/lib/git-utils'
+import { branchName } from '@/lib/source-control/branches/branch-name'
 import { activateAndRevealWorktree } from '@/lib/workspace/activation/worktree-activation'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
@@ -50,7 +50,7 @@ import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer
 import '@/components/sidebar/workspace-creation/folder/folder-workspace-source-repos'
 import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/workspace-creation/folder/folder-workspace-source-selection'
 import { useAgentMenuObservation } from '@/components/tab-bar/use-new-tab-agent-menu-rows'
-import { addAppKeyListener, removeAppKeyListener } from '@/lib/app-keyboard-router'
+import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
 export type { ComposerModalData }
 
 // Keep Add Project’s clone/SSH machinery outside the composer entry render, matching App loading.

@@ -12,7 +12,7 @@ import type {
   JiraTransition,
   JiraUser
 } from '../../../shared/jira/jira-types'
-import { defaultScopeHost } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
 
 const mocks = vi.hoisted(() => ({

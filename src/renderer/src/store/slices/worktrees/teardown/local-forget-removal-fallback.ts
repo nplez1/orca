@@ -8,11 +8,11 @@
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
-import type { WorktreeOperationGenerationGuard } from '@/lib/worktree-operation-generation'
+import type { WorktreeOperationGenerationGuard } from '@/lib/workspace/ownership/worktree-operation-generation'
 import {
   resolveWorktreeOperationRouteResult,
   resolveWorktreeOperationRouteResultForHost
-} from '@/lib/worktree-operation-route'
+} from '@/lib/workspace/ownership/worktree-operation-route'
 import type { WorktreeSliceGet } from '../listing/worktree-slice-types'
 import {
   isRuntimeRepoNotFoundError,

@@ -31,6 +31,8 @@ export const HOST_SYNC_DISPOSITION_ROWS_B = {
   // Why voice is host-local: it carries a models directory, a microphone device id, and a flag for
   // whether an OpenAI key is configured — the last of which would claim a key this host does not have.
   voice: 'hostLocal',
+  // Why hostLocal: a one-time migration marker for this install, like the account-runtime one.
+  voiceDictationModeDefaultedToAuto: 'hostLocal',
   // Why these two are host-local despite holding secrets: they are secrets in a plaintext settings file
   // with no ledger and no revocation, so replicating them would put a credential on a host that
   // `revokeReplicatedCredential` cannot reach. They belong in a credential port first.
@@ -169,6 +171,7 @@ export const HOST_SYNC_DISPOSITION_ROWS_B = {
   // Why hostLocal: a "already told this host" ledger; copying it suppresses the notice there.
   desktopBrowserBridgeNoticedTargetIds: 'hostLocal',
   nativeChatScrollToLatestOnSend: 'replicated',
+  nativeChatMarkNewMessages: 'replicated',
   nativeChatTurnDiffSummary: 'replicated',
   nativeChatCiResultLines: 'replicated',
   nativeChatIdleStopMinutes: 'replicated',

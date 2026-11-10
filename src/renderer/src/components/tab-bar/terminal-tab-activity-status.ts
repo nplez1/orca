@@ -2,9 +2,12 @@ import {
   readAgentAttentionUnreadReason,
   type ReadableAgentAttentionUnread
 } from '@/attention/agent-attention-contract'
-import { isExplicitAgentStatusFresh } from '@/lib/pane-agent-evidence'
+import {
+  isAgentStatusFresh,
+  AGENT_STATUS_STALE_AFTER_MS
+} from '../../../../shared/agent-status/contracts/agent-status-freshness'
 import { resolveWorktreeStatus, type WorktreeStatus } from '@/lib/worktree-status'
-import { AGENT_STATUS_STALE_AFTER_MS } from '../../../../shared/agent-status/contracts/agent-status-freshness'
+
 import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
 import { agentVerdictDisplayMark } from '../../../../shared/agent-status/lifecycle/agent-main-agent-verdict'
 import { resolveProgramStatusPresentation } from '../../../../shared/program-status/presentation'
@@ -73,7 +76,7 @@ export function getTerminalTabActivityFlags(
       continue
     }
     // Apply sidebar freshness rules so abandoned/slept panes cannot keep tab spinners alive.
-    if (!isExplicitAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)) {
+    if (!isAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)) {
       // Stale identity suppresses Orca's one-shot permission label without suppressing native titles.
       const staleFlags = getOrCreateTerminalTabActivityFlags(flagsByTabId, identity.tabId)
       staleFlags.stalePaneIds.add(identity.paneId)

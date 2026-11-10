@@ -12,7 +12,7 @@ import {
 } from '../../../shared/source-control/ai/generation/commit-message-agent-spec'
 import type { CommitMessageAiSettings } from '../../../shared/source-control/ai/generation/commit-message-ai-types'
 import type { TuiAgent } from '../../../shared/agent-launch/catalog/tui-agent'
-import { getAgentCatalog } from '@/lib/agent-catalog'
+import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
 
 /** The fields a selection reads. Both stored blocks are a superset of this. */
 export type AiGenerationSettingsConfig = Pick<

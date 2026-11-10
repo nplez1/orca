@@ -9,7 +9,7 @@ import {
 } from '../right-sidebar/checks-panel/comments/right-panel-comment-composer'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { formatPrCommentRelativeTime } from '../../../../shared/source-control/review-comments/pr-comment-time'
-import { getDiffCommentLineLabel } from '@/lib/diff-comment-compat'
+import { getDiffCommentLineLabel } from '@/lib/source-control/review/comments/diff-comment-compat'
 import { useCommentCardResize } from '../diff-comments/useCommentCardResize'
 import type { DecoratedDiffComment } from '../diff-comments/decorated-diff-comment'
 import { translate } from '@/i18n/i18n'

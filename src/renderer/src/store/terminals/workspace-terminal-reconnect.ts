@@ -4,6 +4,7 @@ import { buildWorktreeByIdIndex } from './workspace-terminal-worktree-index'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
 import { selectWorktreesByRepo } from '../workspaces/catalog/workspace-record-fields'
+import { markFullResync, recordDraft, tabBucketDraft } from '../keyed-record-transitions'
 
 export type PersistedTerminalHints = {
   tabsByWorktree: Record<string, TerminalTab[]> | null
@@ -110,24 +111,58 @@ export function createWorkspaceTerminalReconnectActions(
           workspaceSessionReady: true,
           pendingReconnectWorktreeIds: [],
           pendingReconnectTabByWorktree: {},
-          pendingReconnectPtyIdByTabId: {}
+          // Cold path: the whole reconnect inventory is consumed.
+          pendingReconnectPtyIdByTabId: markFullResync({}, 'reconnect-inventory')
         })
         return
       }
       // Why: defer daemon attachment for real dimensions; eager 80×24 flushes garble output.
-      const { tabsByWorktree: reconnectedTabsByWorktree, ptyIdsByTabId: reconnectedPtyIdsByTabId } =
-        buildPersistedTerminalHints({
-          ids,
-          pendingReconnectTabByWorktree,
-          pendingReconnectPtyIdByTabId,
-          terminalLayoutsByTabId,
-          tabsByWorktree,
-          ptyIdsByTabId
-        })
-      // Why indexed: the loop neither sets state nor awaits, so one index over the
-      // whole store snapshot serves every iteration.
+      const reconnectedTabsByWorktree = tabBucketDraft(tabsByWorktree)
+      const reconnectedPtyIdsByTabId = recordDraft(ptyIdsByTabId)
+      // No writes/awaits in the loop, so one store-snapshot index serves every iteration.
       const worktreeById = buildWorktreeByIdIndex(selectWorktreesByRepo(get()))
       const repoById = buildByIdIndex(get().repos)
+      for (const worktreeId of ids) {
+        const tabs = tabsByWorktree[worktreeId] ?? []
+        const targetTabIds = pendingReconnectTabByWorktree[worktreeId] ?? []
+        const tabById = targetTabIds.length > 1 ? buildByIdIndex(tabs) : null
+        const tabsToReconnect: TerminalTab[] =
+          targetTabIds.length > 0
+            ? targetTabIds
+                .map((id) => (tabById ? tabById.get(id) : tabs.find((t) => t.id === id)))
+                .filter((t): t is TerminalTab => t != null)
+            : tabs.slice(0, 1)
+        if (tabsToReconnect.length === 0) {
+          continue
+        }
+        for (const tab of tabsToReconnect) {
+          const tabId = tab.id
+          const layout = terminalLayoutsByTabId[tabId]
+          const leafPtyMap = layout?.ptyIdsByLeafId ?? {}
+          const tabLevelPtyId = pendingReconnectPtyIdByTabId[tabId]
+          const hasLeafMappings = Object.keys(leafPtyMap).length > 0
+          // Advertise leaf PTYs before mount so daemon sessions do not look orphaned; subsumed rows may lack tab.ptyId but retain leaf bindings.
+          const allPtyIds = hasLeafMappings
+            ? (Object.values(leafPtyMap).filter(Boolean) as string[])
+            : tabLevelPtyId
+              ? [tabLevelPtyId]
+              : []
+          if (allPtyIds.length > 0) {
+            // Why: hide-sleeping reads ptyIdsByTabId for liveness; restored daemon sessions run before their pane remounts, so advertise them.
+            reconnectedPtyIdsByTabId.set(tabId, allPtyIds)
+          }
+          if (tabLevelPtyId) {
+            const nextTabs = reconnectedTabsByWorktree.get(worktreeId)
+            if (!nextTabs) {
+              continue
+            }
+            reconnectedTabsByWorktree.set(
+              worktreeId,
+              nextTabs.map((t) => (t.id === tabId ? { ...t, ptyId: tabLevelPtyId } : t))
+            )
+          }
+        }
+      }
       // Why: keep deferred SSH session IDs for post-cleanup reconnect.
       const deferredSshSessionIdsByTabId: Record<string, string> = {}
       for (const worktreeId of ids) {
@@ -158,14 +193,17 @@ export function createWorkspaceTerminalReconnectActions(
       if (signal?.aborted) {
         return
       }
+      const nextTabsByWorktree = reconnectedTabsByWorktree.finish()
+      const nextPtyIdsByTabId = reconnectedPtyIdsByTabId.finish()
       set({
         // Only each row's ptyId changes, a field the frame merge leaves to the window.
-        ...(reconnectedTabsByWorktree ? { tabsByWorktree: reconnectedTabsByWorktree } : {}),
-        ...(reconnectedPtyIdsByTabId ? { ptyIdsByTabId: reconnectedPtyIdsByTabId } : {}),
+        ...(nextTabsByWorktree !== tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
+        ...(nextPtyIdsByTabId !== ptyIdsByTabId ? { ptyIdsByTabId: nextPtyIdsByTabId } : {}),
         workspaceSessionReady: true,
         pendingReconnectWorktreeIds: [],
         pendingReconnectTabByWorktree: {},
-        pendingReconnectPtyIdByTabId: {},
+        // Cold path: the whole reconnect inventory is consumed.
+        pendingReconnectPtyIdByTabId: markFullResync({}, 'reconnect-inventory'),
         deferredSshSessionIdsByTabId
       })
     }

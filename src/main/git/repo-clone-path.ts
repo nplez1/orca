@@ -15,27 +15,45 @@ export type ClaimedCloneTarget = {
 
 type CloneDirectoryIdentity = Pick<Stats, 'dev' | 'ino' | 'birthtimeMs'>
 
+/** Path part of a clone source: scp-style host prefixes removed, URL schemes kept. */
+function cloneSourcePath(url: string): { path: string; windows: boolean } {
+  const source = url.replace(/\.git\/?$/, '')
+  if (/^[A-Za-z]:[\\/]/.test(source) || source.startsWith('\\\\')) {
+    return { path: source, windows: true }
+  }
+  const scpPath = !source.includes('://')
+    ? source.match(/^(?:[^@/:]+@)?(?:\[[^\]]+\]|[^:/\s]+):(.+)$/)?.[1]
+    : undefined
+  return { path: scpPath ?? source, windows: false }
+}
+
+function assertCloneFolderName(name: string, message: string): string {
+  if (!name || name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
+    throw new Error(message)
+  }
+  return name
+}
+
 export function deriveCloneRepoNameFromUrl(url: string): string {
   // Reject dot destinations before cleanup could remove a parent or unrelated folder.
-  const source = url.replace(/\.git\/?$/, '')
-  const isWindowsLocalSource = /^[A-Za-z]:[\\/]/.test(source) || source.startsWith('\\\\')
-  const scpPath =
-    !isWindowsLocalSource && !source.includes('://')
-      ? source.match(/^(?:[^@/:]+@)?(?:\[[^\]]+\]|[^:/\s]+):(.+)$/)?.[1]
-      : undefined
-  const repoName = isWindowsLocalSource ? win32.basename(source) : posix.basename(scpPath ?? source)
-  if (!repoName || repoName === '.' || repoName === '..') {
-    throw new Error('Invalid repository name derived from URL')
-  }
-  if (repoName.includes('/') || repoName.includes('\\')) {
-    throw new Error('Invalid repository name derived from URL')
-  }
-  return repoName
+  const { path, windows } = cloneSourcePath(url)
+  const repoName = windows ? win32.basename(path) : posix.basename(path)
+  return assertCloneFolderName(repoName, 'Invalid repository name derived from URL')
+}
+
+/** The segment above the repository (GitHub owner, GitLab group), or null when there is none. */
+export function deriveCloneOwnerFromUrl(url: string): string | null {
+  const { path, windows } = cloneSourcePath(url)
+  const pathOps = windows ? win32 : posix
+  const repoPath = windows ? path : path.replace(/^[a-z][\w+.-]*:\/\/[^/]*/i, '')
+  const owner = pathOps.basename(pathOps.dirname(repoPath))
+  return owner && owner !== '.' && owner !== '..' && !owner.includes(':') ? owner : null
 }
 
 export function deriveValidatedClonePath(args: {
   url: string
   destination: string
+  folderName?: string
   /** Where the checkout goes, relative to `destination`. Absent uses the URL-derived repo name.
    *  The project-folder layout passes `<projectFolder>/<branch>`, so the checkout lands inside
    *  its project folder instead of directly in the destination. */
@@ -49,7 +67,10 @@ export function deriveValidatedClonePath(args: {
     throw new Error('Clone destination must be an absolute path')
   }
 
-  const repoName = deriveCloneRepoNameFromUrl(args.url)
+  const requestedFolderName = args.folderName?.trim()
+  const repoName = requestedFolderName
+    ? assertCloneFolderName(requestedFolderName, 'Invalid clone folder name')
+    : deriveCloneRepoNameFromUrl(args.url)
 
   const clonePath = join(args.destination, args.relativeClonePath ?? repoName)
   const resolvedDestination = resolve(args.destination)

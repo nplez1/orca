@@ -45,11 +45,15 @@ function formatCheckTimestamp(
 }
 
 type CheckStatusLike = {
+  gitlabAllowedFailure?: boolean
   status: PRCheckDetail['status'] | (string & {}) | null | undefined
   conclusion: PRCheckDetail['conclusion'] | (string & {}) | null | undefined
 }
 
 function getCheckStatusLabel(check: CheckStatusLike, t: Translate = translate): string {
+  if (check.gitlabAllowedFailure === true && check.conclusion === 'neutral') {
+    return t('checks.gitlabAllowedFailure', 'Allowed to fail')
+  }
   const conclusion = check.conclusion ?? 'pending'
   switch (conclusion) {
     case 'success':
@@ -363,6 +367,7 @@ export function CheckRunDetailsPanel({
                 return hasJobs ? (
                   <CheckRunJobs
                     key="jobs"
+                    check={check}
                     jobs={jobs}
                     hasFailedJobs={failedJobs.length > 0}
                     positionOwner={positionOwner}

@@ -149,10 +149,12 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
     cloneUrl,
     cloneDestination,
     cloneError,
+    cloneFolder,
     cloneProgress,
     isCloning,
-    setCloneUrl,
-    setCloneDestination,
+    changeCloneUrl,
+    changeCloneDestination,
+    changeCloneFolderName,
     setCloneError,
     resetCloneFlow,
     handlePickDestination,
@@ -320,6 +322,7 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
         cloneUrl={cloneUrl}
         cloneDestination={cloneDestination}
         cloneError={cloneError}
+        cloneFolder={cloneFolder}
         cloneProgress={cloneProgress}
         isCloning={isCloning}
         sshTargets={sshTargets}
@@ -382,14 +385,9 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
         }}
         onAddRemoteRepo={handleAddRemoteRepo}
         onConnectTarget={handleConnectTarget}
-        onCloneUrlChange={(value) => {
-          setCloneUrl(value)
-          setCloneError(null)
-        }}
-        onCloneDestinationChange={(value) => {
-          setCloneDestination(value)
-          setCloneError(null)
-        }}
+        onCloneUrlChange={changeCloneUrl}
+        onCloneDestinationChange={changeCloneDestination}
+        onCloneFolderNameChange={changeCloneFolderName}
         onPickCloneDestination={handlePickDestination}
         onClone={handleClone}
         onNestedGroupNameChange={setNestedGroupName}

@@ -17,6 +17,7 @@ import {
 } from '../../../shared/worktree/visibility-sources'
 import { prepareLocalWorktreeRootForRepo } from '../../workspaces/creation/worktree-root-preparation'
 import { commitProvenRepoKindChange } from '../../workspaces/catalog/folder-repo-git-conversion'
+import { normalizeDictationTerms } from '../../../shared/dictation-dictionary'
 import { invalidateAuthorizedRootsCache } from '../worktrees/removal/registered-worktree-roots-cache'
 import { notifyReposChanged } from './repos-changed-notification'
 import {
@@ -46,6 +47,7 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
             | 'kind'
             | 'symlinkPaths'
             | 'sharedDirectoriesMode'
+            | 'dictationTerms'
             | 'issueSourcePreference'
             | 'forkSyncMode'
             | 'agentWorkspaceTrust'
@@ -117,6 +119,14 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
         !isWorktreeSharedDirectoriesMode(updates.sharedDirectoriesMode)
       ) {
         delete updates.sharedDirectoriesMode
+      }
+      if ('dictationTerms' in updates) {
+        const terms = normalizeDictationTerms(updates.dictationTerms)
+        if (terms) {
+          updates.dictationTerms = terms
+        } else {
+          delete updates.dictationTerms
+        }
       }
       if ('worktreeBasePath' in updates && updates.worktreeBasePath !== undefined) {
         const v = updates.worktreeBasePath as unknown
