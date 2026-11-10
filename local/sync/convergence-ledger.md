@@ -2542,3 +2542,9 @@ next reader does not re-derive it.
   `revealInFileManager` when the panel took upstream's row handlers, orphaning
   `use-ai-vault-session-copy-actions.ts`. Which behaviour is intended is not recorded anywhere, so it
   is left as it merged rather than guessed at.
+- **`components/settings/MarkdownReviewNotesSetting.tsx` is a fork-owned orphan and stays.** Nothing
+  imports it since `GeneralEditorSettingsSection` inlines upstream's row. Deleting it is correct on
+  the merits and was tried, but `post-sync.mjs`'s `deleted-fork-modules` check reads `tip..HEAD` and
+  cannot tell a reviewed deletion from a merge accident, so a deletion reds the sync gate. Weakening
+  that gate to clean up one file is the wrong trade: the check is what catches a module the merge
+  silently dropped, and an orphan costs nothing.
