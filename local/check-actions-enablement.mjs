@@ -31,9 +31,11 @@
  *   run that is already going.
  *
  * Exit codes: 0 clean, 1 drift or an unverifiable entry, 2 cannot reach the API — "cannot tell" is
- * never a pass — and 3 a finding only a person may resolve (a required or fork-owned lane is active with
- * no entry, so the sweep will not touch it and widening the list would hide it). `local/ci-health-report.mjs`
- * reads those codes: 1 delegates to the autonomous pipeline, 2 and 3 do not.
+ * never a pass — and 3 a finding only a person may resolve: a **fork-owned** lane is enabled and is not
+ * on the live list, which a sync cannot have caused, and the only two remedies are disabling a lane
+ * someone enabled on purpose or widening the list to hide it. A `REQUIRED` lane that changed shape stays
+ * at 1 and is delegable, because correcting its pin is a decision an agent can make and record.
+ * `local/ci-health-report.mjs` reads those codes: 1 delegates to the autonomous pipeline, 2 and 3 do not.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -369,6 +371,9 @@ export function judgeEnablement(
   //   REQUIRED already means "disabled is drift", so turning one off would manufacture the drift it
   //   exists to prevent;
   // - a fork-owned file. A sync cannot add one, so an enabled one with no entry is a person's decision.
+  //
+  // `kind` names the guard that held it back, so the report says the true reason: a required lane is
+  // never swept whatever else it is, and six of the required lanes are fork-owned too.
   const needsDecision = []
   const sweepable = (path, why) => {
     if (!required.includes(path) && !isForkOwnedPath(path)) {
@@ -377,7 +382,7 @@ export function judgeEnablement(
     needsDecision.push({
       path,
       why,
-      kind: isForkOwnedPath(path) ? 'fork-owned' : 'required'
+      kind: required.includes(path) ? 'required' : 'fork-owned'
     })
     return false
   }
@@ -591,7 +596,7 @@ function report(verdict, fix) {
     console.log(
       `  DECIDE   ${
         d.kind === 'fork-owned'
-          ? 'a sync cannot have enabled this, so a person decides'
+          ? 'enabled with no entry, and a sync cannot have added it, so a person decides'
           : 'required, so the sweep will not disarm it'
       }: ${d.path} (${d.why})`
     )
@@ -685,8 +690,7 @@ function report(verdict, fix) {
     if (verdict.needsDecision.some((entry) => entry.kind === 'fork-owned')) {
       console.log(
         '  escalate a fork-owned lane is enabled with no entry, and a sync cannot have turned it on — ' +
-          'a person decides whether it belongs here. Do not disable it to make this check green, and do ' +
-          'not widen REQUIRED to hide it.'
+          'a person decides whether it belongs here. Do not disable it to make this check green.'
       )
     }
     for (const path of failed) {
@@ -727,10 +731,13 @@ function main() {
   verdict.actionsDisabled = actionsEnabled
   const residual = report(verdict, fix)
   if (residual > 0) {
-    // 3 rather than 1 when something needs a person: 1 means "a scoped defect the pipeline may take on",
-    // and neither available action is that — disabling a fork-owned lane undoes a person's decision, and
-    // widening the list hides the finding. `local/ci-health-report.mjs` withholds `agent:auto` on 3.
-    process.exit(verdict.needsDecision.length > 0 ? 3 : 1)
+    // 3 rather than 1 for a fork-owned lane only: 1 means "a scoped defect the pipeline may take on", and
+    // neither action available for one of those is that — disabling it undoes a person's decision, and
+    // widening the list hides the finding. A required lane that changed shape stays 1, because pinning its
+    // new trigger is a decision an agent may make and record. `local/ci-health-report.mjs` withholds
+    // `agent:auto` on 3.
+    const decided = verdict.needsDecision.some((entry) => entry.kind === 'fork-owned')
+    process.exit(decided ? 3 : 1)
   }
   console.log('  OK')
 }

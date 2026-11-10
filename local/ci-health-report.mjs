@@ -81,17 +81,18 @@ export const AGENT_AUTO_LABEL = 'agent:auto'
  * auto-merge pointed at it would be guessing at what to fix.
  */
 export function judgeDelegation(checks) {
-  // Exit 3 first, and it wins over a delegable red: the finding is a lane someone enabled on purpose, or
-  // a required lane with no pin. Neither available action is one an agent may take — disabling a
-  // fork-owned lane undoes a person's decision, and widening `REQUIRED` hides the finding the issue
-  // forbids hiding — so this is a decision, not a scoped defect.
+  // Exit 3 first, and it wins over a delegable red: the finding is a fork-owned lane someone enabled on
+  // purpose. Neither available action is one an agent may take — disabling it undoes a person's decision,
+  // and widening `REQUIRED` hides the finding the issue forbids hiding — so this is a decision, not a
+  // scoped defect. It withholds the label from the whole issue rather than from that check: an agent
+  // handed a red it may not resolve will resolve it anyway.
   const undecided = checks.filter((check) => check.code === 3)
   if (undecided.length > 0) {
     return {
       delegate: false,
       reason:
         `${undecided.map((check) => check.name).join(', ')} needs a decision only a person can make` +
-        ' — the sweep will not touch a required or fork-owned lane'
+        ' — a fork-owned lane is enabled that nobody listed, and a sync cannot have done that'
     }
   }
   const red = checks.filter((check) => check.code === 1)

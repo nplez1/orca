@@ -257,6 +257,24 @@ describe('what the sweep may turn off', () => {
       { path, why: 'its triggers changed shape', kind: 'fork-owned' }
     ])
   })
+
+  // Six required lanes are fork-owned too, and `kind` names the guard that held the lane back: saying
+  // "enabled with no entry" about `fork-main-tests.yml` would point the reader at a cause it does not
+  // have, and a required lane stays delegable while a fork-owned one does not.
+  it('names the required guard, not the fork-owned one, when a lane is both', () => {
+    const path = '.github/workflows/fork-main-tests.yml'
+    const verdict = judge([active(path)], factsFor(path, ['schedule', 'push']), {
+      required: [path],
+      allowedInert: [],
+      expected: { [path]: ['schedule', 'workflow_dispatch'] }
+    })
+
+    expect(verdict.disableTargets).toEqual([])
+    expect(verdict.needsDecision).toEqual([
+      { path, why: 'its triggers changed shape', kind: 'required' }
+    ])
+    expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
+  })
 })
 
 describe('the fork-owned reading', () => {
