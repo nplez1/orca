@@ -5,7 +5,19 @@
 name; where an older entry reads oddly for the topology it was written in (a `main` that mirrored
 upstream), the date on it is the explanation. `upstream/main` has always meant upstream's.
 
-Last updated **2026-11-08** — `main` merged upstream main @ `51c77320bc` (1537 commits) from
+Last updated **2026-11-10** — `main` merged upstream main @ `86ee16da9ea` (426 commits) from
+`24dceda182f` (merge `266cd398f34`, merge base `51c77320bc`). **281 conflicted paths** —
+`both-rewrote 155, union 64, modify/delete 27, rename-replay 23, duplicate-tail 9, no-markers 2,
+duplicate-members 1`. 73 paths were proved mechanically, 21 deletions were settled by the ledger (16
+upstream test retirements and the 5 dashboard-popout hosts), 5 re-homes re-applied the fork's delta at
+upstream's new path, and the remaining content conflicts were resolved in 13 area batches. The cost
+this time was not the markers but the module moves underneath them: **~230 import specifiers across 60
+files** pointed at files the merge had moved or deleted, with no conflict marker and no conflict entry,
+and `tc:web` still held 84 errors once every marker was gone. Decisions are in
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md), and the narrative in
+[LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log.
+
+Previous — **2026-11-08** — `main` merged upstream main @ `51c77320bc` (1537 commits) from
 `3f8bbfb269` (merge `5a02a4c8406`, merge base `0fa5dae2f9`, rollback tag
 `archive/pre-sync-3f8bbfb269`). **1110 conflicted paths, 1239 hunks** —
 `modify/delete 645, both-rewrote 263, union 154, rename-replay 27, duplicate-tail 17,

@@ -2921,6 +2921,75 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-11-10 — merge of upstream `86ee16da9ea` (426 commits) into the release line, from
+  `24dceda182f`** (merge base `51c77320bc`, merge commit `266cd398f34`). **281 conflicted paths** —
+  `both-rewrote 155, union 64, modify/delete 27, rename-replay 23, duplicate-tail 9, no-markers 2,
+  duplicate-members 1`. Upstream advanced from `69e10786752` to `86ee16da9ea` while the sync was
+  fetching, so the newer tip was merged (runbook trap 11). Decisions are in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer will
+  want first:
+
+  - **The clone was shallow and the graft hid the ancestry.** `pre-sync.mjs` refused with "no merge
+    base" and reported 12 upstream commits; `git fetch upstream --deepen=3000` restored merge base
+    `51c77320bc` and the true size — **426 commits, not 12**. A sync that starts from a shallow clone
+    measures the wrong thing before it resolves anything.
+  - **Resolved in four tiers.** `conflicts.mjs --apply-proven` proved **73 of 281 paths** outright
+    (import-only three-way unions, fork-unchanged, upstream-unchanged). **21 deletions** were settled
+    against the ledger: 16 upstream-retired test suites — including five the rename record called
+    "re-homed" that upstream had renamed _then deleted again_, verified against `upstream/main`
+    rather than the rename record — and the 5 dashboard-popout hosts per the owner's 2026-10-26
+    decision that delivery is a content-area view. `expected-deletions.json` pruned 6 entries both
+    sides deleted and re-bound 12 to their current upstream blobs. **5 re-homes** re-applied the
+    fork's delta at upstream's new path. The rest were resolved in 13 disjoint area batches.
+  - **~230 import specifiers across 60 files pointed at modules this merge moved or deleted, with no
+    conflict marker and no conflict entry.** The merge is clean at the syntax level and broken at the
+    module level: the `rate-limits` `providers/`/`service/` reorganisation alone moved 35 mappings
+    across 24 files, and the renderer `lib/` regrouping, the agent-hooks `installation/` move and a
+    clipboard sender-trust extraction did the same. `pnpm tc` is the backstop for this class, and the
+    first `tc:web` run after the markers were gone still held **84** errors.
+  - **Upstream's new `orca.yaml` recipe timeout was silently ignored.** `parseEphemeralVmRecipeTimeoutSeconds`
+    landed inside a function the fork had moved to `orca-yaml-vm-recipes.ts`, so the key parsed
+    nowhere and no test failed. Re-homed onto the fork's split module.
+  - **Two settings upstream added were unclassified in the host-sync disposition map**
+    (`nativeChatMarkNewMessages` → `replicated`, `voiceDictationModeDefaultedToAuto` → `hostLocal`).
+  - **`WorktreeStatus` exists twice and the merge repointed a consumer at the wrong one.** The fork's
+    `lib/worktree-status.ts` union carries `'setup'`; upstream's `shared/worktree-status-rollup.ts`
+    does not. `CrewAgentIcons` was moved onto the narrow type and lost its `'setup'` case.
+  - **Two store slices upstream added were missing from the test store**, so every suite that builds
+    the test store failed to typecheck (`applyStructuredChatCompanionWrites`,
+    `createEphemeralVmLifecycleSlice`).
+  - **A fork identity string regressed to upstream's.** `OpenAiCompatibleProviderDialog` shipped
+    `~/.orca` where the catalog and the sibling dialog say `~/.orca-np`; the localization gate caught
+    it as an English/catalog mismatch, which is the only reason it was noticed.
+  - **Ephemeral VM provisioning convergence (owner's call).** Both sides had independently built
+    "record the VM create before the spawn": upstream a write-ahead record, the fork a bounded
+    attempts store. One create function now does both — upstream's — and it also writes the fork's
+    attempt row so the fork's startup reconcile keeps working. Recorded in
+    [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "Ephemeral VM".
+  - **Five files were split rather than suppressed.** The `max-lines` ratchet fails on any newly added
+    `eslint-disable`, so `runtime-service.test.ts`, `session-search-engine.ts`, `ephemeral-vm.ts`,
+    `use-section-rows.ts` and `EphemeralVmRuntimesSection.tsx` each gave up a cohesive piece to a
+    sibling module. `TabGroupPanel.tsx` and `native-chat/wsl-transcript-fs-access.ts` followed.
+  - **`import/no-cycle` keeps the fork's depth bound.** Upstream replaced `{ maxDepth: 3 }` with
+    `{ ignoreTypes: true }`; removing the bound surfaced 18 pre-existing cycles in 13 fork-owned files
+    and reddened `audit:code-quality:native`. The fork keeps both options, and the deviation is
+    recorded in the ledger with the 13 files named. Silencing it was not available: that step prints
+    only the `[ELIFECYCLE]` fallback line, which gate-lint can cover only with `wholeStep: true` —
+    masking every future failure of the step.
+  - **Three ratchets this sync introduced had never seen the fork's own files.**
+    `check:main-sync-fs-ratchet` (new from upstream) and `check:recurring-timer-ratchet` reported 22
+    fork-owned or fork-modified files at "baseline allows 0"; each was adopted at its current count
+    with a reason, then pruned to 2230 and 99. `check:workspace-path-sync-fs-ratchet`'s single row
+    was re-bound from `rate-limits/hidden-probe-cwd.ts` to `lib/hidden-probe-cwd.ts` after the move.
+    `check:focus-read-ratchet` was pruned 642 → 641.
+  - **Fork-comment ratchet re-baselined to 7267** (`--init --accept`, reason recorded): the fork's
+    pre-existing comments on upstream-owned files plus the comment lines this sync's own repairs
+    added.
+  - **Localization**: the orphan-key pass and the catalog regeneration are one operation, not two.
+    Deleting the reported orphan keys by hand removed keys the source still generates (the hashes had
+    moved, not the keys), so the extraction gate flipped to "extracted keys missing from en.json".
+    `pnpm sync:localization-catalog` is what reconciles both directions.
+
 - **2026-11-08 — merge of upstream `51c77320bc` (1537 commits) into the release line, from
   `3f8bbfb269`** (merge base `0fa5dae2f9`, rollback tag `archive/pre-sync-3f8bbfb269`, merge commit
   `5a02a4c8406`). **1110 conflicted paths, 1239 hunks** —
@@ -3001,66 +3070,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     `checks-detail-polling-policy.ts` to `src/shared/github/` and three `task-page-jira-*` files
     into `task-page/jira/`) and +4 genuine lines across three files, all recorded in the baseline's
     `accepted` field.
-
-- **2026-10-30 — merge of upstream `a903985082` (906 commits) into the release line, from
-  `16f49e00cf`** (merge base `f173998203`, rollback tag `archive/pre-sync-16f49e00cf`, merge commit
-  `985687d2004`, then `a7a778bc197`, `69d7a35c4a`). **184 conflicted paths, 340 hunks** —
-  `both-rewrote 98, union 57, rename-replay 10, duplicate-tail 8, modify/delete 8,
-  duplicate-members 2, add/add 1`. Decisions are in
-  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-30 sync"; the
-  ones a reviewer will want first:
-
-  - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **38 of 184 paths** outright
-    (55 import-only three-way unions, 6 upstream- or fork-unchanged whole hunks, 1 identity-only).
-    **8 modify/delete** entries were settled: four renderer dashboard-popout paths per the owner's
-    2026-10-26 product decision, and four upstream test retirements — including
-    `worktrees-create-first-work-rename.test.ts`, whose behaviour upstream's `f5a4a7218ab`
-    implemented itself. The remaining **138 paths** were resolved in 5 disjoint area batches bound to
-    the ledger, then the 11 sidebar `.txt` goldens were **regenerated** from the resolved row model
-    rather than merged.
-  - **Upstream extracted the PR conversation parser and dropped the fork's review verdicts with it.**
-    `get-pr-comments.ts` kept the fork's `includeReviewVerdicts` option but the new
-    `pr-conversation-response.ts` mapped no `state`, so a bodyless approval reached the Checks panel
-    as nothing. The field, `mapGraphQLReview` and the shared `isReportableReviewSubmission` keep-rule
-    are re-homed there for the GraphQL **and** REST paths.
-  - **The update feed's redirect regex was an escaped literal a fixed-string grep cannot see.**
-    `updater-prerelease-feed.ts` matched `/nplez1\/orca/releases/tag/` by hand while the rest of the
-    file reads `RELEASES_REPO`; it now derives the prefix, and `FEED_FILES` in
-    `local/sync/lib/post-sync-checks.mjs` names `src/main/updater-release-targets.ts`, the one
-    declaration every feed URL reads. A feed file may now satisfy the check **through** a checked
-    constant instead of carrying a second copy of the slug.
-  - **Three union resolutions dropped code with no conflict marker.** `worktree-status.ts` kept two
-    of ten `STATUS_LABELS` getters (every activity label but `inactive`/`setup` read `undefined`);
-    `terminal-transient-facts.ts` ended up with **two** `getTrackedPtyTitle` declarations, one from
-    each side; `agent-state-rules-catalog.ts` lost the fork's `copilot` rule file, which upstream
-    never had, to upstream's lazy-parse refactor.
-  - **`local-agent-inventory-refresh.ts`** (upstream's extraction) derived isolation only from the
-    floating terminal, dropping the fork's `options.isolated`; a per-workspace enable re-read would
-    have blanked the shared detected list.
-  - **Max-lines: 22 upstream-owned files sit at the oxlint budget and the fork's delta pushed each
-    over it** (1–93 code lines). Per the ownership rule in § "`local(lint)`" every one carries an
-    inline `eslint-disable max-lines` naming its overage plus a baseline row, which is the same
-    exemption the 2026-10-28 entry records: splitting an upstream file costs a permanent hunk on
-    every later sync. **Named follow-up, not silently exempted:** the five heaviest —
-    `worktree-title-derived-agent-rows.test.ts` (+91), `pty-spawn-env-terminal-basics.test.ts` (+93),
-    `fs-bridge.ts` (+39), `worktree-agent-activity-summary.ts` (+35) and
-    `session-search-store.ts` (+35) — are the ones to split when a sync leaves room, because their
-    overage is a fork block rather than a few lines.
-  - **13 settings upstream added were unclassified in the host-sync disposition map.** All 13 are
-    `replicated` (preferences and per-host selections), matching
-    `autoRenameBranchFromWorkDefaultedOn` and `browserProfileScope`; `pluginSystemDefaultedOn` is
-    replicated like upstream's other one-shot default markers.
-  - **`fork-symbols.mjs` reported a loss that was not one.** It followed a function's returned object
-    literal only when the function had exactly one `return`, so `describeUpdateFailure`'s guard plus
-    fallback hid `ok`/`error` and the scan called them lost. It now follows every top-level return.
-  - **Fork-comment ratchet re-baselined to 5962** (`--init --accept`, reason recorded): four
-    upstream-owned files that this merge made fork-modified carry fork rationale with no fork-owned
-    home yet, plus 3 comment lines from this sync's own repairs.
-  - **Localization**: 24 orphan keys removed from each of the ten locales (the deleted dashboard
-    popout and four reworded strings), 26 stale tombstones removed from each fork overlay, the two
-    #169 ack toasts the fork rewords retired from every locale so they fall back to the fork's English
-    overlay, `subagentSession` collapsed to one base key with `defaultValue_one`, and the dead
-    `taskPageJiraBoard.changeStatusFailed` string dropped.
 
 ### `local(ci)`: release workflow
 
