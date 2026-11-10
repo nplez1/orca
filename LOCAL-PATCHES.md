@@ -1530,6 +1530,17 @@ The rule is therefore scoped by ownership, not by size:
   `cancelListSessions` calls and its own `if` left exactly where upstream wrote them. The suppression
   comment and the baseline row both name it, and the row is the record — not a quiet allowance.
 
+**The compiler fix moves comments, and the comment counter reads a move as an addition.**
+`check-upstream-file-comments` diffs against the sync base, so wrapping a try/catch/finally into a
+module helper relocates every fork comment inside the block and each one counts as newly written —
+`use-checks-panel-manual-refresh.tsx` (9) and `ai-vault-session-refresh.ts` (10, of which two are the
+max-lines suppression above) cross their maxima with no new prose at all. The commit's own prose was
+deleted rather than recorded: the six `Why` lines it had added to `DiffViewer.tsx`,
+`useFileExplorerVisibleRowProjection.ts` and `ai-vault-session-refresh.ts` are gone, and the reason for
+the whole class lives in this paragraph instead, which is the #267 precedent. The two moved-comment
+rows and the total they sum are recorded in `local/lint-known-red.json` with the evidence and pruned
+at the next re-baseline.
+
 Anchors: `config/max-lines-baseline.txt` (header + the `ai-vault-session-refresh.ts` row),
 `src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-session-refresh.ts` (the
 suppression and its reason), `src/renderer/src/lib/guarded-side-read.ts` (the fork-owned split).

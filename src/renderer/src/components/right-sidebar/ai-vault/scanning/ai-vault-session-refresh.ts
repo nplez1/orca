@@ -88,7 +88,6 @@ export function useAiVaultSessionRefresh(
   const executionHostScopeRef = useRef<ExecutionHostScope>(executionHostScope)
   const sessionLimitRef = useRef(sessionLimit)
   // Keep render pure for React Doctor; layout effect still lands before refresh effects.
-  // Why every latest-value ref lands here: React Compiler rejects ref writes during render.
   useLayoutEffect(() => {
     sessionLimitRef.current = sessionLimit
     associationsRef.current = associations
@@ -106,7 +105,6 @@ export function useAiVaultSessionRefresh(
       )}\n${sessionLimitRef.current}`,
     []
   )
-  // Why a ref for the queued re-run: React Compiler cannot compile a callback that calls itself.
   const refreshRef = useRef<((args?: AiVaultRefreshArgs) => Promise<void>) | null>(null)
   const refresh = useCallback(
     async (args: AiVaultRefreshArgs = {}): Promise<void> => {
@@ -243,7 +241,6 @@ export function useAiVaultSessionRefresh(
   )
   // Defer throttled new-session rescans until budget frees so sessions cannot remain invisible indefinitely.
   const forcedRescanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Why a ref for the retry: React Compiler cannot compile a callback that calls itself.
   const requestForcedRescanRef = useRef<(() => void) | null>(null)
   const requestForcedRescan = useCallback(() => {
     if (claimAiVaultForcedRescan()) {

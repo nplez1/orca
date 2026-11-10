@@ -261,7 +261,6 @@ export default function DiffViewer({
   const onSaveRef = useRef(onSave)
   const onContentChangeRef = useRef(onContentChange)
   const propsRef = useRef({ relativePath, language, onSave })
-  // Why a layout effect: React Compiler rejects ref writes during render.
   useLayoutEffect(() => {
     onSaveRef.current = onSave
     onContentChangeRef.current = onContentChange

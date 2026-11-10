@@ -32,7 +32,8 @@
     "2026-11-09: one whole-step entry for `check:code-quality:changed`, which a sync merge cannot pass before",
     "it is pushed — see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
     "the first run after `git push origin main`; prune it then.",
-    "The `check-upstream-file-comments` entries are the same sync's: fork-comment growth that five fork PRs had already put on the base branch before the merge. They are recorded, not accepted; see their evidence."
+    "The `check-upstream-file-comments` entries are the same sync's: fork-comment growth that five fork PRs had already put on the base branch before the merge. They are recorded, not accepted; see their evidence.",
+    "2026-11-09: three entries for the compiler-fix commit. Two files cross their maxima only because the fix MOVED existing fork comments (the counter diffs against the sync base, so a move reads as an addition), and one total row pins the sum. The commit's own prose was removed instead of recorded; see LOCAL-PATCHES.md local(ratchets)."
   ],
   "recordedAt": "2026-11-09",
   "entries": [
@@ -70,10 +71,26 @@
     },
     {
       "step": "check-upstream-file-comments",
-      "match": "^5414 fork comment lines in total, baseline 5269$",
+      "match": "^src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-session-refresh\\.ts: 10 fork comment line\\(s\\), baseline 7$",
+      "class": "fork-comment-moved-by-fix",
+      "owner": "local(gates) b0eb07205ad — React Compiler bailouts",
+      "evidence": "The 2026-11-09 compiler fix wrapped this file's try/catch/finally into module helpers, which MOVES the fork's existing comments into new positions; the counter diffs against the sync base, so a moved line counts as an added one. Nothing new is written: every line here is prose that was already in the file before the fix (git show 33d8977e3fd:<file> reproduces it), and the only genuinely new comment this commit adds is ai-vault-session-refresh's max-lines suppression, which the ownership rule in LOCAL-PATCHES.md requires. Fix by re-baselining in the next sync (--init --accept) once the moved lines settle, or by moving the prose into LOCAL-PATCHES.md.",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-panel-manual-refresh\\.tsx: 9 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-moved-by-fix",
+      "owner": "local(gates) b0eb07205ad — React Compiler bailouts",
+      "evidence": "The 2026-11-09 compiler fix wrapped this file's try/catch/finally into module helpers, which MOVES the fork's existing comments into new positions; the counter diffs against the sync base, so a moved line counts as an added one. Nothing new is written: every line here is prose that was already in the file before the fix (git show 33d8977e3fd:<file> reproduces it), and the only genuinely new comment this commit adds is ai-vault-session-refresh's max-lines suppression, which the ownership rule in LOCAL-PATCHES.md requires. Fix by re-baselining in the next sync (--init --accept) once the moved lines settle, or by moving the prose into LOCAL-PATCHES.md.",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^5459 fork comment lines in total, baseline 5269$",
       "class": "fork-comment-total-growth",
-      "owner": "fork sync 07239b228d6 (Merge upstream/main 51c77320bc, 1537 commits)",
-      "evidence": "The total moved 5413 -> 5414 after the 51c77320bc sync, and no per-file row explains it: measured identically at origin/nplez1/main (f4337166d22) in a detached worktree with no changes from any branch, and on the branch itself (5414 both, --verbose, zero per-file findings in rate-limits). So the base is the red, not the branch under it. Of the 145 lines over baseline, 144 belong to the per-file rows above and were added by the five fork PRs they name; this row covers the remaining line the sync itself added without re-baselining the total. Fix by re-baselining with --init --accept in the sync that caused it, or by moving that prose into LOCAL-PATCHES.md. The match pins the exact total, so any further growth is a new red.",
+      "owner": "local(gates) b0eb07205ad — React Compiler bailouts, over the recorded-not-accepted rows",
+      "evidence": "The total is the sum of the per-file rows above plus the five sync-debt rows recorded before this commit: 5459 against 5269. Removing this commit's own prose (six lines in DiffViewer, useFileExplorerVisibleRowProjection and ai-vault-session-refresh) took it 5465 -> 5459, and what remains is the moved-comment artifact the two fork-comment-moved-by-fix rows describe plus the pre-sync growth those rows already own. Fix by re-baselining with --init --accept in the sync that settles the moved lines. The match pins the exact total, so any further growth is a new red.",
       "flaky": false
     }
   ]
