@@ -2157,6 +2157,19 @@ Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
   removal. The hazard the audit named is the real reason this mattered: the entries' `match`,
   `Unable to read profile state database`, is exactly what a genuine profile-state open regression
   throws, so the allowlist could not have seen one.
+- **27 `agent-hooks` files, the same `sqlite-binding` class, reopened by the 2026-11-10 sync.** Upstream
+  `06a528f774e` (_perf(agent-hooks): save agent status as per-pane SQLite rows_) made `LastStatusStore`
+  hydrate through `KeyedJsonRowCache`, which does `new SyncDatabase(path, { readonly: true })` — the
+  same read-only WAL reopen that Bun 1.4.4 on macOS refuses with `unable to open database file`, and
+  that `-shm` retention under 1.4.3 hid. `findSqliteRuntimeTests`
+  (`config/scripts/test-runtime/sqlite-admission/vitest-sqlite-runtime-scan.mjs`) only follows direct
+  imports of `sync-database` or a listed harness, and these suites import only `AgentHookServer`, so
+  all 27 ran under the Bun project and every presence read degraded to `unverifiable` — 54 failures
+  with no test at fault. The same 27 under the Node runtime: **191/191 passed**. They are listed in
+  `NODE_RUNTIME_INCLUDE` with the reason, and nothing else changed. The lesson is the scan's, not the
+  tests': an indirection added upstream silently moves a suite between runtimes, so a new
+  `unable to open database file` cluster should be read as "which project did this run in" before it
+  is read as a behaviour regression.
 - **`verify-cli-bin`, `macos-path-semantics`** — new upstream case; the child's `process.cwd()` reports
   `/private/var/…` against the unresolved `os.tmpdir()` the case compares.
 - **`reclaim-worktree-generated-files`, `host-toolchain`** — new upstream file. The script recovers from
