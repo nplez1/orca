@@ -145,4 +145,17 @@ describe('first agent launch in a repo', () => {
     unsubscribeDialog()
     expect(launch()).toBeNull()
   })
+
+  it('asks for a pi launch, whose own trust prompt Orca now answers', async () => {
+    const pending = awaitAgentWorkspaceTrustDecision({
+      launchAgent: 'pi',
+      workspaceId: WORKTREE,
+      connectionId: null
+    })
+
+    expect(pending).not.toBeNull()
+    expect(getAgentWorkspaceTrustDecisionRequest()?.repoId).toBe('repo-1')
+    await answerAgentWorkspaceTrustDecision('pre-trust')
+    await expect(pending).resolves.toBe('pre-trust')
+  })
 })

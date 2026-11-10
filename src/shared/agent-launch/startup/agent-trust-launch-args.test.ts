@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { withAgentTrustLaunchArgs } from './agent-trust-launch-args'
+import {
+  agentLaunchDependsOnWorkspaceTrust,
+  withAgentTrustLaunchArgs
+} from './agent-trust-launch-args'
 
 const PI_DRAFT_CLEANUP_POSIX =
   '; command test -n "$fish_pid" && set --erase -g ORCA_PI_PREFILL; command test -z "$fish_pid" && unset ORCA_PI_PREFILL; true'
@@ -62,5 +65,14 @@ describe('withAgentTrustLaunchArgs', () => {
   it('refuses a compound command that is not a lone pi invocation', () => {
     expect(withAgentTrustLaunchArgs('cd /tmp && pi', 'pi', 'posix')).toBe('cd /tmp && pi')
     expect(withAgentTrustLaunchArgs('pi; rm -rf /', 'pi', 'posix')).toBe('pi; rm -rf /')
+  })
+})
+
+describe('agentLaunchDependsOnWorkspaceTrust', () => {
+  it('covers an agent whose launch reads the answer as well as one whose trust Orca writes', () => {
+    expect(agentLaunchDependsOnWorkspaceTrust('pi')).toBe(true)
+    expect(agentLaunchDependsOnWorkspaceTrust('claude')).toBe(true)
+    expect(agentLaunchDependsOnWorkspaceTrust('aider')).toBe(false)
+    expect(agentLaunchDependsOnWorkspaceTrust(undefined)).toBe(false)
   })
 })

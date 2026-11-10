@@ -109,7 +109,11 @@ describe('agent trust launch args', () => {
 
   it('stays out of a folder the user opened rather than Orca creating it', () => {
     expect(
-      trustLaunchArgs({ worktreeId: 'folder:folder-1', folderPath: '/Users/me/notes' })
+      trustLaunchArgs({
+        worktreeId: 'folder:folder-1',
+        folderPath: '/Users/me/notes',
+        cwd: '/Users/me/notes'
+      })
     ).toEqual([])
     expect(
       trustLaunchArgs({ worktreeId: FLOATING_TERMINAL_WORKTREE_ID, cwd: '/Users/me/notes' })
@@ -125,28 +129,5 @@ describe('agent trust launch args', () => {
   it('has nothing to add for an agent with no trust args', () => {
     expect(trustLaunchArgs({ launchAgent: 'claude' })).toEqual([])
     expect(trustLaunchArgs({ launchAgent: 'codex' })).toEqual([])
-  })
-})
-
-describe('pi never pre-writes a trust artifact', () => {
-  it('reports no trust write for a fresh pi launch', async () => {
-    const spawnOptions: AgentTrustSpawnFields = {}
-    await applyAgentWorkspaceTrustToSpawn({
-      launchAgent: 'pi',
-      worktreeId: 'repo-1::/srv/app',
-      cwd: '/srv/app',
-      store: {
-        getFolderWorkspace: () => undefined,
-        getRepo: () => ({ agentWorkspaceTrust: 'pre-trust' })
-      },
-      isFreshLaunch: true,
-      settings: { agentWorkspaceTrustEnabled: true },
-      env: {},
-      claudeAuth: null,
-      wslDistro: null,
-      connectionId: null,
-      spawnOptions
-    })
-    expect(spawnOptions).toEqual({})
   })
 })

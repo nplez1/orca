@@ -65,41 +65,25 @@ function spawnInput(input: {
 }
 
 describe('pi launch command carries its project-trust answer', () => {
-  it('adds --approve to the spawned command only', async () => {
+  it('adds --approve to the spawned command only, and writes no trust artifact', async () => {
     const launch = await assemblePtySpawnLaunchOptions(spawnInput({}))
     expect(launch.spawnOptions.command).toBe("pi --approve 'fix the bug'")
     // Why: the caller keeps this one as the session's command, so it must stay resumable as authored.
     expect(launch.launchCommand).toBe("pi 'fix the bug'")
+    // Why: the flag is this run's answer, so pi's own store must stay untouched.
+    expect(launch.spawnOptions.agentWorkspaceTrust).toBeUndefined()
   })
 
-  it('leaves the command alone when the agent is the one asking', async () => {
+  it('honours every input that says the agent answers for itself', async () => {
     const asked = await assemblePtySpawnLaunchOptions(spawnInput({ repoDecision: 'agent-asks' }))
     expect(asked.spawnOptions.command).toBe("pi 'fix the bug'")
     const skipped = await assemblePtySpawnLaunchOptions(
       spawnInput({ skipAgentWorkspaceTrust: true })
     )
     expect(skipped.spawnOptions.command).toBe("pi 'fix the bug'")
-  })
-
-  it('does not answer for a folder the user opened', async () => {
-    const folder = await assemblePtySpawnLaunchOptions(spawnInput({ cwd: '/Users/me/notes' }))
-    expect(folder.spawnOptions.command).toBe("pi 'fix the bug'")
-  })
-
-  it('keeps the flag out of a re-adopted pane', async () => {
+    const outside = await assemblePtySpawnLaunchOptions(spawnInput({ cwd: '/Users/me/notes' }))
+    expect(outside.spawnOptions.command).toBe("pi 'fix the bug'")
     const adopted = await assemblePtySpawnLaunchOptions(spawnInput({ preAdoptedStablePane: true }))
     expect(adopted.spawnOptions.command).toBe("pi 'fix the bug'")
-  })
-
-  it('never asks Orca to pre-write a pi trust artifact', async () => {
-    const launch = await assemblePtySpawnLaunchOptions(spawnInput({}))
-    expect(launch.spawnOptions.agentWorkspaceTrust).toBeUndefined()
-  })
-
-  it('says nothing extra for an agent without trust args', async () => {
-    const claude = await assemblePtySpawnLaunchOptions(
-      spawnInput({ launchAgent: 'claude', launchCommand: "claude 'fix the bug'" })
-    )
-    expect(claude.spawnOptions.command).toBe("claude 'fix the bug'")
   })
 })

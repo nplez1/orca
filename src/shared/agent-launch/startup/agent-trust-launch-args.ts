@@ -1,5 +1,5 @@
 import { getCommandTokenPathBasename, getFirstCommandToken } from '../../command-token-scanner'
-import { TUI_AGENT_CONFIG } from '../catalog/tui-agent-config'
+import { TUI_AGENT_CONFIG, isTuiAgent } from '../catalog/tui-agent-config'
 import type { TuiAgent } from '../catalog/tui-agent'
 import {
   clearEnvCommand,
@@ -34,6 +34,18 @@ export function agentTrustLaunchArgs(agent: unknown): readonly string[] {
   return typeof agent === 'string' && Object.hasOwn(TRUST_ARGS_BY_AGENT, agent)
     ? TRUST_ARGS_BY_AGENT[agent]
     : []
+}
+
+/**
+ * Whether Orca's workspace pre-trust answer governs this agent's launch — it writes a trust artifact
+ * for it, or answers its own prompt from it. Both need the user's once-per-repo answer, so neither
+ * may settle trust before that answer exists.
+ */
+export function agentLaunchDependsOnWorkspaceTrust(agent: unknown): boolean {
+  return (
+    agentTrustLaunchArgs(agent).length > 0 ||
+    (isTuiAgent(agent) && Boolean(TUI_AGENT_CONFIG[agent].preflightTrust))
+  )
 }
 
 /** Splice the agent's trust args in after its executable, or return the command untouched. */
