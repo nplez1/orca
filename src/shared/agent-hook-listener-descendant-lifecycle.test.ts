@@ -289,6 +289,25 @@ describe('descendant lifecycle never settles the pane', () => {
           ?.payload.state
       ).toBeUndefined()
     })
+
+    it('keeps the verdict grok stated on the row its waiting child holds open', () => {
+      startTurn()
+      publish('grok', {
+        hookEventName: 'pre_tool_use',
+        subagentType: 'x',
+        subagentId: 'sub-1',
+        toolName: 'ask_user_question',
+        toolInput: { question: 'which one?' }
+      })
+
+      const failed = publish('grok', { hookEventName: 'stop_failure', reason: 'end_turn' })
+      expect(failed?.payload.state).toBe('waiting')
+      // Why: grok states the turn's own verdict, and holding its row open must not replace it.
+      // Losing `outcome` would make a failed turn read as a clean one for as long as the child waits.
+      expect(failed?.payload.mainAgent).toEqual(
+        expect.objectContaining({ state: 'done', outcome: 'failure' })
+      )
+    })
   })
 
   // Why: #283. The row's state and the child list it publishes are two surfaces of one session —
