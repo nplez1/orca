@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { Worktree } from '../../../shared/worktree/types'
@@ -36,6 +36,7 @@ export function JiraIssueWorkspaceSplitAction({
   onOpenWorkspace?: (workspace: Worktree) => 'opened' | 'failed' | void
   onStartWorkspace?: (issue: JiraIssue) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   const [menuOpen, setMenuOpen] = useState(false)
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heldRef = useRef(false)
@@ -82,12 +83,12 @@ export function JiraIssueWorkspaceSplitAction({
   }
 
   const bodyLabel = linked
-    ? translate(
+    ? t(
         'auto.components.TaskPage.jiraOpenAttachedWorkspace',
         'Open workspace attached to {{value0}}',
         { value0: issue.key }
       )
-    : translate('auto.components.TaskPage.ff90d0abc7', 'Start workspace from {{value0}}', {
+    : t('auto.components.TaskPage.ff90d0abc7', 'Start workspace from {{value0}}', {
         value0: issue.key
       })
 
@@ -118,8 +119,8 @@ export function JiraIssueWorkspaceSplitAction({
 
   const caretLabel =
     workspaces.length === 1
-      ? translate('jira.workspace.single', '1 workspace linked to {{key}}', { key: issue.key })
-      : translate('jira.workspace.count', '{{count}} workspaces linked to {{key}}', {
+      ? t('jira.workspace.single', '1 workspace linked to {{key}}', { key: issue.key })
+      : t('jira.workspace.count', '{{count}} workspaces linked to {{key}}', {
           count: workspaces.length,
           key: issue.key
         })
@@ -190,7 +191,7 @@ export function JiraIssueWorkspaceSplitAction({
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => onStartWorkspace?.(issue)}>
           <ArrowRight className="size-3.5" />
-          {translate('jira.workspace.startAnother', 'Start new workspace')}
+          {t('jira.workspace.startAnother', 'Start new workspace')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

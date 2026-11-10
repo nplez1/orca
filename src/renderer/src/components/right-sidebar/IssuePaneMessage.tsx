@@ -1,6 +1,6 @@
 import { CircleDot, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /** Loading / unavailable / no-link states for the Issue pane. */
 export function IssuePaneMessage({
@@ -12,6 +12,7 @@ export function IssuePaneMessage({
   providerLabel?: string
   onRetry?: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
   if (kind === 'loading') {
     return (
       <div className="flex flex-1 items-center justify-center p-4">
@@ -24,7 +25,7 @@ export function IssuePaneMessage({
     return (
       <div className="flex flex-1 flex-col items-start gap-3 p-4">
         <p className="text-xs text-muted-foreground">
-          {translate(
+          {t(
             'auto.components.right.sidebar.IssuePane.unavailable',
             "Couldn't load this {{value0}} issue.",
             { value0: providerLabel ?? '' }
@@ -33,7 +34,7 @@ export function IssuePaneMessage({
         {onRetry ? (
           <Button variant="outline" size="xs" className="w-fit" onClick={onRetry}>
             <RefreshCw className="size-3" />
-            {translate('auto.components.right.sidebar.IssuePane.retry', 'Retry')}
+            {t('auto.components.right.sidebar.IssuePane.retry', 'Retry')}
           </Button>
         ) : null}
       </div>
@@ -44,7 +45,7 @@ export function IssuePaneMessage({
     return (
       <div className="flex flex-1 flex-col items-start gap-3 p-4">
         <p className="text-xs text-muted-foreground">
-          {translate(
+          {t(
             'auto.components.right.sidebar.IssuePane.repoOffDevice',
             "The repo this {{value0}} issue lives in isn't set up on this device.",
             { value0: providerLabel ?? '' }
@@ -58,7 +59,7 @@ export function IssuePaneMessage({
     <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
       <CircleDot className="size-6 text-muted-foreground/60" />
       <p className="text-xs text-muted-foreground">
-        {translate(
+        {t(
           'auto.components.right.sidebar.IssuePane.noIssue',
           'No issue is linked to this workspace.'
         )}

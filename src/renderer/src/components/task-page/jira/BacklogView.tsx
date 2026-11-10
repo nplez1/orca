@@ -6,7 +6,7 @@ import type { JiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspa
 import type { TaskPageJiraSprintOptions } from '@/components/task-page-jira-sprint-cell'
 import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
 import { Button } from '@/components/ui/button'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { LoaderCircle } from 'lucide-react'
 import { formatRelativeTime } from '../task-page-source-context'
 import { getJiraStatusTone } from './task-page-jira-status-tone'
@@ -42,10 +42,11 @@ export function TaskPageJiraBacklogView({
   sourceContext,
   sprintOptions
 }: TaskPageJiraBacklogViewProps): React.JSX.Element {
+  const t = useTranslate()
   const backlogTitle =
     board.backlogTotal === null
-      ? translate('auto.components.TaskPage.16d73d88ad', 'Backlog')
-      : translate('auto.components.TaskPage.jiraBacklogCount', 'Backlog · {{value0}} issues', {
+      ? t('auto.components.TaskPage.16d73d88ad', 'Backlog')
+      : t('auto.components.TaskPage.jiraBacklogCount', 'Backlog · {{value0}} issues', {
           value0: board.backlogTotal
         })
 
@@ -54,11 +55,11 @@ export function TaskPageJiraBacklogView({
       {board.overview && board.overview.activeSprints.length === 0 ? (
         <div className="border-b border-border/50 px-3 py-2 text-xs text-muted-foreground">
           {board.overview.board.type === 'scrum'
-            ? translate(
+            ? t(
                 'auto.components.TaskPage.jiraNoActiveSprint',
                 'This board has no active sprint; showing its backlog.'
               )
-            : translate(
+            : t(
                 'auto.components.TaskPage.jiraBoardHasNoSprints',
                 'This board does not use sprints; showing its board-filter backlog.'
               )}
@@ -67,7 +68,7 @@ export function TaskPageJiraBacklogView({
       <div className="flex items-center justify-between gap-3 border-b border-border/50 px-3 py-2">
         <h2 className="text-sm font-medium text-foreground">{backlogTitle}</h2>
         <span className="text-xs text-muted-foreground">
-          {translate('auto.components.TaskPage.jiraBacklogLoadedCount', '{{value0}} loaded', {
+          {t('auto.components.TaskPage.jiraBacklogLoadedCount', '{{value0}} loaded', {
             value0: board.backlogLoadedCount
           })}
         </span>
@@ -84,18 +85,15 @@ export function TaskPageJiraBacklogView({
         <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           <LoaderCircle className="mx-auto size-4 animate-spin" />
           <span className="mt-2 block">
-            {translate('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
+            {t('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
           </span>
         </div>
       ) : null}
       {board.backlogIssues.length === 0 && !board.backlogError && !board.backlogBlanked ? (
         <div className="px-4 py-10 text-center text-sm text-muted-foreground">
           {board.backlogIsLast
-            ? translate(
-                'auto.components.TaskPage.jiraBacklogEmpty',
-                'No backlog issues match this filter.'
-              )
-            : translate(
+            ? t('auto.components.TaskPage.jiraBacklogEmpty', 'No backlog issues match this filter.')
+            : t(
                 'auto.components.TaskPage.jiraBacklogPageEmpty',
                 'No matching issues in this page. Load more to continue searching the backlog.'
               )}
@@ -130,11 +128,8 @@ export function TaskPageJiraBacklogView({
             onClick={() => void board.loadMoreBacklog()}
           >
             {board.backlogLoadingMore
-              ? translate('auto.components.TaskPage.jiraBoardLoadingMore', 'Loading…')
-              : translate(
-                  'auto.components.TaskPage.jiraLoadMoreBacklog',
-                  'Load more backlog issues'
-                )}
+              ? t('auto.components.TaskPage.jiraBoardLoadingMore', 'Loading…')
+              : t('auto.components.TaskPage.jiraLoadMoreBacklog', 'Load more backlog issues')}
           </Button>
         </div>
       ) : null}

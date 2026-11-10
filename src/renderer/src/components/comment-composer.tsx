@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Markdown } from '@tiptap/markdown'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
@@ -15,7 +15,7 @@ import {
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import './comment-composer.css'
 
 export type CommentComposerProps = {
@@ -103,6 +103,16 @@ export function commentMarkdownForSubmit(markdown: string): string {
  *  The provider receives the same Markdown the plain-textarea composer used to
  *  send: the editor's vocabulary is deliberately limited to the constructs Jira's
  *  comment converter can express, so nothing can render here but post as source. */
+/** Why module-level: a try/finally in the component body bails React Compiler out of it. */
+function applyExternalValue(flag: { current: boolean }, apply: () => void): void {
+  flag.current = true
+  try {
+    apply()
+  } finally {
+    flag.current = false
+  }
+}
+
 export function CommentComposer({
   value,
   onValueChange,
@@ -115,6 +125,7 @@ export function CommentComposer({
   disabledReason,
   className
 }: CommentComposerProps): React.JSX.Element {
+  const t = useTranslate()
   const spellcheckEnabled = useAppStore((s) => s.settings?.richMarkdownSpellcheckEnabled ?? true)
   const applyingExternalValueRef = useRef(false)
   const lastSyncedMarkdownRef = useRef(value)
@@ -127,10 +138,13 @@ export function CommentComposer({
   const isMac = navigator.userAgent.includes('Mac')
   const locked = disabled || submitting
 
-  onValueChangeRef.current = onValueChange
-  onSubmitRef.current = onSubmit
-  canSubmitRef.current = canSubmit
-  lockedRef.current = locked
+  // Why a layout effect: React Compiler rejects ref writes during render.
+  useLayoutEffect(() => {
+    onValueChangeRef.current = onValueChange
+    onSubmitRef.current = onSubmit
+    canSubmitRef.current = canSubmit
+    lockedRef.current = locked
+  }, [canSubmit, locked, onSubmit, onValueChange])
 
   const extensions = useMemo(
     () => [
@@ -205,13 +219,10 @@ export function CommentComposer({
     // reset explicitly or the posted draft would survive in the bubble.
     if (!value.trim()) {
       if (editor.getMarkdown().trim()) {
-        applyingExternalValueRef.current = true
-        try {
+        applyExternalValue(applyingExternalValueRef, () => {
           editor.commands.clearContent(true)
           lastSyncedMarkdownRef.current = ''
-        } finally {
-          applyingExternalValueRef.current = false
-        }
+        })
       } else {
         lastSyncedMarkdownRef.current = ''
       }
@@ -220,13 +231,10 @@ export function CommentComposer({
     if (value === lastSyncedMarkdownRef.current) {
       return
     }
-    applyingExternalValueRef.current = true
-    try {
+    applyExternalValue(applyingExternalValueRef, () => {
       editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false })
       lastSyncedMarkdownRef.current = value
-    } finally {
-      applyingExternalValueRef.current = false
-    }
+    })
   }, [editor, value])
 
   const activeFormats = useEditorState({
@@ -270,27 +278,27 @@ export function CommentComposer({
   const toolbar: { action: CommentFormatAction; label: string; icon: typeof Bold }[] = [
     {
       action: 'bold',
-      label: translate('auto.components.comment.composer.f3e93f1b3a', 'Bold'),
+      label: t('auto.components.comment.composer.f3e93f1b3a', 'Bold'),
       icon: Bold
     },
     {
       action: 'italic',
-      label: translate('auto.components.comment.composer.705066a871', 'Italic'),
+      label: t('auto.components.comment.composer.705066a871', 'Italic'),
       icon: Italic
     },
     {
       action: 'code',
-      label: translate('auto.components.comment.composer.20fc7f3d3d', 'Code'),
+      label: t('auto.components.comment.composer.20fc7f3d3d', 'Code'),
       icon: Code2
     },
     {
       action: 'quote',
-      label: translate('auto.components.comment.composer.96d2a26262', 'Quote'),
+      label: t('auto.components.comment.composer.96d2a26262', 'Quote'),
       icon: Quote
     },
     {
       action: 'list',
-      label: translate('auto.components.comment.composer.564c4d0787', 'List'),
+      label: t('auto.components.comment.composer.564c4d0787', 'List'),
       icon: List
     }
   ]

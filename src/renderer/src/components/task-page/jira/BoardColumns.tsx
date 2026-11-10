@@ -13,6 +13,7 @@ import { TaskPageJiraPriorityBadge } from '../../task-page-jira-priority-badge'
 import { getJiraPrioritySurfaceTone } from '../../task-page-jira-priority-tone'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { JiraIssueRowContextMenu } from '../../JiraIssueRowContextMenu'
 import { buildJiraIssueRowWorkspaceAction } from '../../jira-issue-row-actions'
 
@@ -84,6 +85,7 @@ function JiraBoardCard({
   onDragStart: (issue: JiraIssue, event: DragEvent<HTMLDivElement>) => void
   onDragEnd: () => void
 }): JSX.Element {
+  const t = useTranslate()
   const prioritySurface = getJiraPrioritySurfaceTone(issue.priority)
   const storyPoints = cardStoryPoints(issue)
   const workspaceMenuItem = buildJiraIssueRowWorkspaceAction({
@@ -149,15 +151,12 @@ function JiraBoardCard({
               <span
                 // Why the label as well as the shorthand: a screen reader reads "3sp"
                 // as "3 s p", and the card's own name is built from its text.
-                aria-label={translate(
+                aria-label={t(
                   'auto.components.TaskPage.jiraCardStoryPointsLabel',
                   '{{value0}} story points',
                   { value0: issue.storyPoints }
                 )}
-                title={translate(
-                  'auto.components.TaskPage.jiraCardStoryPointsTitle',
-                  'Story points'
-                )}
+                title={t('auto.components.TaskPage.jiraCardStoryPointsTitle', 'Story points')}
                 className="shrink-0 text-3xs tabular-nums text-muted-foreground"
               >
                 {storyPoints}
@@ -167,8 +166,7 @@ function JiraBoardCard({
         </div>
         <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-2xs text-muted-foreground">
           <span className="truncate">
-            {issue.assignee?.displayName ??
-              translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
+            {issue.assignee?.displayName ?? t('auto.components.TaskPage.42a9160321', 'Unassigned')}
           </span>
           <div className="flex min-w-0 items-center gap-2">
             {attachedWorkspaceLabel ? (
@@ -204,6 +202,7 @@ export function TaskPageJiraBoardColumns({
   onStartWorkspace,
   emptyStateUnknown = false
 }: TaskPageJiraBoardColumnsProps): JSX.Element {
+  const t = useTranslate()
   const renderColumn = (
     key: string,
     label: string,
@@ -231,7 +230,7 @@ export function TaskPageJiraBoardColumns({
       <div className="space-y-2 p-2">
         {issues.length === 0 && !emptyStateUnknown ? (
           <p className="px-1 py-2 text-xs text-muted-foreground">
-            {translate('auto.components.TaskPage.jiraBoardEmptyColumn', 'No issues')}
+            {t('auto.components.TaskPage.jiraBoardEmptyColumn', 'No issues')}
           </p>
         ) : null}
         {issues.map((issue) => {

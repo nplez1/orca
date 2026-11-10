@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 type JiraTransitionPickerProps = {
   issue: JiraIssue | null
@@ -29,22 +29,23 @@ export function TaskPageJiraTransitionPicker({
   onClose,
   disabled
 }: JiraTransitionPickerProps): JSX.Element {
+  const t = useTranslate()
   return (
     <Dialog open={issue !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {translate('auto.components.TaskPage.jiraChooseTransition', 'Choose a status change')}
+            {t('auto.components.TaskPage.jiraChooseTransition', 'Choose a status change')}
           </DialogTitle>
           <DialogDescription>
             {issue
               ? mode === 'otherStatuses'
-                ? translate(
+                ? t(
                     'auto.components.TaskPage.jiraChooseOtherStatusTransition',
                     '{{value0}} does not sit in a board column. Choose the status change to apply.',
                     { value0: issue.key }
                   )
-                : translate(
+                : t(
                     'auto.components.TaskPage.jiraChooseTransitionDescription',
                     'More than one Jira transition can move {{value0}} to that column. Choose one to continue.',
                     { value0: issue.key }

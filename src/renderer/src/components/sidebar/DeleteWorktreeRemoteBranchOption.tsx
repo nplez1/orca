@@ -1,6 +1,6 @@
 import { useId, type JSX } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /**
  * Opt-in companion to the local branch delete. Unchecked unless the user (or the
@@ -14,6 +14,7 @@ export function DeleteWorktreeRemoteBranchOption({
   checked: boolean
   onCheckedChange: (checked: boolean) => void
 }): JSX.Element {
+  const t = useTranslate()
   const controlId = useId()
   const hintId = useId()
   return (
@@ -27,13 +28,13 @@ export function DeleteWorktreeRemoteBranchOption({
       />
       <div className="space-y-0.5">
         <label htmlFor={controlId} className="block cursor-pointer text-xs text-foreground/80">
-          {translate(
+          {t(
             'auto.components.sidebar.DeleteWorktreeRemoteBranchOption.alsoDeleteRemoteBranch',
             'Also delete the remote branch'
           )}
         </label>
         <p id={hintId} className="text-[11px] text-muted-foreground">
-          {translate(
+          {t(
             'auto.components.sidebar.DeleteWorktreeRemoteBranchOption.alsoDeleteRemoteBranchHint',
             "Permanently deletes this workspace's branch on its remote. Cannot be undone, and is skipped when the local branch is kept."
           )}

@@ -84,7 +84,12 @@ it('fails on a failed test even while the teardown race is present', () => {
     reportText: report({
       failedTests: 1,
       failedSuites: 1,
-      failing: [['src/main/ipc/worktrees-detected-scan-cache.test.ts', 'stops re-scanning']]
+      failing: [
+        [
+          'src/main/ipc/worktrees/listing/persisted-worktree-scan-cache.test.ts',
+          'stops re-scanning'
+        ]
+      ]
     }),
     logText: log({ errors: [TOLERATED_UNHANDLED_ERROR] }),
     outcome: 'failure'
@@ -92,7 +97,7 @@ it('fails on a failed test even while the teardown race is present', () => {
 
   expect(verdict.ok).toBe(false)
   expect(verdict.problems).toEqual([
-    'failing: src/main/ipc/worktrees-detected-scan-cache.test.ts › stops re-scanning'
+    'failing: src/main/ipc/worktrees/listing/persisted-worktree-scan-cache.test.ts › stops re-scanning'
   ])
 })
 

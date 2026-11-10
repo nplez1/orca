@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { isDotfileRelativePath } from './file-explorer/tree/file-explorer-entries'
 import type { DirCache, TreeNode } from './file-explorer/tree/file-explorer-types'
 import {
@@ -133,17 +133,16 @@ function relativePathListsEqual(a: readonly string[], b: readonly string[]): boo
  */
 export function useContentStableRelativePaths(relativePaths: string[], enabled: boolean): string[] {
   // Why: filters need fresh identities per keystroke and must not evict the tree signature.
-  const prevRef = useRef<string[] | null>(null)
-  const prev = prevRef.current
-  // Why publish `stable`, not `relativePaths`: the ref must hold what this hook actually
-  // returned. Publishing the input instead leaves the ref one commit behind, so a wave of
+  // Why state adjusted during render, not a ref: React Compiler rejects render-phase ref reads,
+  // and a render-phase update still commits the stable list without a second render.
+  const [held, setHeld] = useState<string[] | null>(null)
+  // Why publish `stable`, not `relativePaths`: `held` must hold what this hook actually
+  // returned. Publishing the input instead leaves it one commit behind, so a wave of
   // content-equal arrays flips identity on every render — the churn this hook exists to stop.
   const stable =
-    enabled && prev && relativePathListsEqual(prev, relativePaths) ? prev : relativePaths
-  // Why write-in-effect: render must stay pure (react-doctor); the first commit of a new
-  // list loses stability, never staleness.
-  useEffect(() => {
-    prevRef.current = stable
-  }, [stable])
+    enabled && held && relativePathListsEqual(held, relativePaths) ? held : relativePaths
+  if (stable !== held) {
+    setHeld(stable)
+  }
   return stable
 }

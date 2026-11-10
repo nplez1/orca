@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store/index'
 import type { DirCache } from './file-explorer-types'
 import {
@@ -138,15 +138,6 @@ export function useFileExplorerVisibleRowProjection(
     projectionPending,
     projectionError: currentProjectionError
   } = useFileExplorerChunkedProjection({ nameFilter, projectionArgs, projectionContextKey })
-  const lastFilteredProjectionRef = useRef<{
-    contextKey: string
-    projection: FileExplorerRowProjection
-  } | null>(null)
-  useLayoutEffect(() => {
-    if (!nameFilter) {
-      lastFilteredProjectionRef.current = null
-    }
-  }, [nameFilter])
   const ordinaryProjection = useMemo(
     () =>
       nameFilter
@@ -170,20 +161,30 @@ export function useFileExplorerVisibleRowProjection(
       displayRootPath
     ]
   )
+  // Why state adjusted during render, not a ref: React Compiler rejects render-phase ref reads,
+  // and holding the last non-null projection is exactly a render-phase update.
+  const [lastFilteredProjection, setLastFilteredProjection] = useState<{
+    contextKey: string
+    projection: FileExplorerRowProjection
+  } | null>(null)
+  if (!nameFilter && lastFilteredProjection !== null) {
+    setLastFilteredProjection(null)
+  } else if (
+    nameFilter &&
+    filteredProjection &&
+    (lastFilteredProjection?.contextKey !== projectionContextKey ||
+      lastFilteredProjection.projection !== filteredProjection)
+  ) {
+    setLastFilteredProjection({ contextKey: projectionContextKey, projection: filteredProjection })
+  }
   const previousFilteredProjection =
-    lastFilteredProjectionRef.current?.contextKey === projectionContextKey
-      ? lastFilteredProjectionRef.current.projection
+    lastFilteredProjection?.contextKey === projectionContextKey
+      ? lastFilteredProjection.projection
       : null
   const rowProjection = nameFilter
     ? (filteredProjection ?? previousFilteredProjection ?? EMPTY_FILTERED_PROJECTION)
     : ordinaryProjection
   useLayoutEffect(() => {
-    if (filteredProjection) {
-      lastFilteredProjectionRef.current = {
-        contextKey: projectionContextKey,
-        projection: filteredProjection
-      }
-    }
     if (
       nameFilter?.correlationId &&
       !nameFilter.previousResults &&

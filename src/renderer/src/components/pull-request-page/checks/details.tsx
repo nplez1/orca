@@ -17,7 +17,6 @@ import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { assignUniqueListKeys } from './details-list-keys'
 import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import { translate } from '@/i18n/i18n'
 
 export function CheckDetailsPanel({
   check,
@@ -93,7 +92,7 @@ export function CheckDetailsPanel({
             {refreshing && (
               <span role="status" aria-live="polite" className="flex items-center gap-1">
                 <LoaderCircle className="size-3 animate-spin" />
-                {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
+                {t('githubChecks.refreshingDetails', 'Refreshing check details…')}
               </span>
             )}
             <JenkinsRebuildButton

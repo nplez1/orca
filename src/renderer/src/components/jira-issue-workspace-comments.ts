@@ -10,6 +10,7 @@ import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import type { JiraComment } from '../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { runAsyncTaskWithFailure } from '../lib/async-task-with-cleanup'
 
 export type JiraIssueCommentsState = {
   comments: JiraComment[]
@@ -46,34 +47,38 @@ export function useJiraIssueComments({
     async (key: string, siteId: string | undefined, requestId: number): Promise<void> => {
       setCommentsLoading(true)
       setCommentsError(null)
-      try {
-        let fetched = await jiraIssueComments(providerSettings, key, siteId)
-        if (requestId !== requestIdRef.current) {
-          return
-        }
-        const optimistic = optimisticCommentsRef.current
-        if (optimistic.length > 0) {
-          const fetchedIds = new Set(fetched.map((comment) => comment.id))
-          fetched = [...fetched, ...optimistic.filter((comment) => !fetchedIds.has(comment.id))]
-        }
-        setComments(fetched)
-      } catch (error) {
-        if (requestId === requestIdRef.current) {
-          setCommentsError(
-            extractIpcErrorMessage(
-              error,
-              translate(
-                'auto.components.JiraIssueWorkspace.failedToLoadComments',
-                'Failed to load comments.'
+      await runAsyncTaskWithFailure(
+        async () => {
+          let fetched = await jiraIssueComments(providerSettings, key, siteId)
+          if (requestId !== requestIdRef.current) {
+            return
+          }
+          const optimistic = optimisticCommentsRef.current
+          if (optimistic.length > 0) {
+            const fetchedIds = new Set(fetched.map((comment) => comment.id))
+            fetched = [...fetched, ...optimistic.filter((comment) => !fetchedIds.has(comment.id))]
+          }
+          setComments(fetched)
+        },
+        (error) => {
+          if (requestId === requestIdRef.current) {
+            setCommentsError(
+              extractIpcErrorMessage(
+                error,
+                translate(
+                  'auto.components.JiraIssueWorkspace.failedToLoadComments',
+                  'Failed to load comments.'
+                )
               )
             )
-          )
+          }
+        },
+        () => {
+          if (requestId === requestIdRef.current) {
+            setCommentsLoading(false)
+          }
         }
-      } finally {
-        if (requestId === requestIdRef.current) {
-          setCommentsLoading(false)
-        }
-      }
+      )
     },
     [providerSettings]
   )
@@ -108,38 +113,40 @@ export function useJiraIssueComments({
       return
     }
     setCommentSubmitting(true)
-    try {
-      const result = await jiraAddIssueComment(
-        providerSettings,
-        issueKey,
-        bodyState.body,
-        issueSiteId,
-        // Why: this composer is Markdown — its toolbar inserts it and the thread
-        // renders it — so the host has to convert it for the site.
-        'markdown'
-      )
-      if (!result.ok) {
-        throw new Error(result.error)
-      }
-      const comment: JiraComment = {
-        id: result.id || createBrowserUuid(),
-        body: bodyState.body,
-        createdAt: new Date().toISOString(),
-        user: { accountId: 'local', displayName: 'You' }
-      }
-      optimisticCommentsRef.current.push(comment)
-      setComments((prev) => [...prev, comment])
-      setCommentDraft('')
-    } catch (error) {
-      toast.error(
-        extractIpcErrorMessage(
-          error,
-          translate('auto.components.JiraIssueWorkspace.fa132c8aed', 'Failed to add comment.')
+    await runAsyncTaskWithFailure(
+      async () => {
+        const result = await jiraAddIssueComment(
+          providerSettings,
+          issueKey,
+          bodyState.body,
+          issueSiteId,
+          // Why: this composer is Markdown — its toolbar inserts it and the thread
+          // renders it — so the host has to convert it for the site.
+          'markdown'
         )
-      )
-    } finally {
-      setCommentSubmitting(false)
-    }
+        if (!result.ok) {
+          throw new Error(result.error)
+        }
+        const comment: JiraComment = {
+          id: result.id || createBrowserUuid(),
+          body: bodyState.body,
+          createdAt: new Date().toISOString(),
+          user: { accountId: 'local', displayName: 'You' }
+        }
+        optimisticCommentsRef.current.push(comment)
+        setComments((prev) => [...prev, comment])
+        setCommentDraft('')
+      },
+      (error) => {
+        toast.error(
+          extractIpcErrorMessage(
+            error,
+            translate('auto.components.JiraIssueWorkspace.fa132c8aed', 'Failed to add comment.')
+          )
+        )
+      },
+      () => setCommentSubmitting(false)
+    )
   }, [commentDraft, commentSubmitting, issueKey, issueSiteId, providerSettings])
 
   const retryComments = useCallback((): void => {

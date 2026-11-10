@@ -20,7 +20,6 @@ import type { HostHeaderRow } from '../../../../../../shared/sidebar-list/host-s
 import { HostSectionHeaderMenu } from './HostSectionHeaderMenu'
 import { stopRepoHeaderMenuEvent } from './header-event-guards'
 import { getHostHeaderDetail } from './host-header-detail'
-import { translate } from '@/i18n/i18n'
 
 /** How long one ephemeral host has left, as its header shows it. */
 export type EphemeralHostLease = {
@@ -83,6 +82,7 @@ function EphemeralHostLeaseMarker({
 }: {
   hostId: ExecutionHostId
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const lease = useHostEphemeralLease(hostId)
   if (!lease) {
     return null
@@ -97,12 +97,10 @@ function EphemeralHostLeaseMarker({
       )}
     >
       {lease.expired
-        ? translate('auto.components.sidebar.WorktreeList.ephemeralLeaseExpired', 'Expired')
-        : translate(
-            'auto.components.sidebar.WorktreeList.ephemeralLeaseRemaining',
-            'Exp {{value0}}',
-            { value0: lease.remaining }
-          )}
+        ? t('auto.components.sidebar.WorktreeList.ephemeralLeaseExpired', 'Expired')
+        : t('auto.components.sidebar.WorktreeList.ephemeralLeaseRemaining', 'Exp {{value0}}', {
+            value0: lease.remaining
+          })}
     </span>
   )
 }

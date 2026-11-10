@@ -8,7 +8,7 @@ import { getWorkspaceAttachments } from '../../../../shared/workspace-attachment
 import type { WorkspaceAttachmentMutation } from '../../../../shared/workspace-attachments/workspace-attachment-mutation'
 import { getWorkspaceAttachmentKey } from '../../../../shared/workspace-attachments/workspace-attachment-normalization'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { buildWorkspaceAttachmentEdits } from '../sidebar/workspace-card/metadata/worktree-attachment-editing'
 import { buildIssueUnlinkUpdates } from '@/components/sidebar/workspace-issue-unlink-updates'
 import {
@@ -33,6 +33,7 @@ export type LinkedIssuePaneTarget = Pick<SupportedWorkspaceLinkedIssue, 'provide
 /** Link actions for the issue pane, owned by the active workspace's own link
  *  slots rather than by the pane body. */
 export function useLinkedIssuePaneActions(target?: LinkedIssuePaneTarget): LinkedIssuePaneActions {
+  const t = useTranslate()
   const worktree = useActiveWorktree()
   const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
   const openModal = useAppStore((s) => s.openModal)
@@ -43,7 +44,7 @@ export function useLinkedIssuePaneActions(target?: LinkedIssuePaneTarget): Linke
   // action can take effect there.
   const isFolderWorkspace = worktreeId ? parseWorkspaceKey(worktreeId)?.type === 'folder' : false
   const linkActionsDisabledReason = isFolderWorkspace
-    ? translate(
+    ? t(
         'auto.components.right.sidebar.IssuePane.folderWorkspaceLink',
         'A folder workspace keeps the issue it was created from.'
       )

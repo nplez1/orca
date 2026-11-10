@@ -1,3 +1,4 @@
+import { runAsyncTask, runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 /* eslint-disable max-lines -- Why: upstream's manual refresh plus the fork's carry-over of the
    refreshed PR's repo and head SHA into the acknowledgement path. */
 import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
@@ -20,7 +21,6 @@ import {
 } from '../../workspace-review-selection'
 import { recordChecksPanelPRRefreshBreadcrumb } from './checks-panel-pr-refresh-breadcrumb'
 import { getHostedReviewManualRefreshError } from '../../hosted-review/provider-actions/github-refresh-error-copy'
-import type { PRInfo } from '../../../../../../shared/github/pull-request-types'
 import {
   checksPanelManualRefreshProvider,
   refreshChecksPanelHostedReview,
@@ -113,64 +113,68 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         useAppStore.getState().workspaceReviewSelectionByWorktree[activeWorktreeId] ===
           pickedReviewKey
       const isCurrentPickRequest = (): boolean => isCurrentRequest() && isPickStillShown()
-      try {
-        const refreshedReview = await reviewSelection.refreshSelectedReview()
-        if (!isCurrentPickRequest()) {
-          return
+      await runAsyncTaskWithFailure(
+        async () => {
+          const refreshedReview = await reviewSelection.refreshSelectedReview()
+          if (!isCurrentPickRequest()) {
+            return
+          }
+          const headSha = refreshedReview?.headSha ?? pickedReview.headSha
+          if (refreshedReview?.provider === 'gitlab' || activeGitLabReview) {
+            await fetchGitLabDetails({
+              mrNumberOverride: refreshedReview?.number ?? activeGitLabReview?.number ?? null,
+              headShaOverride: headSha ?? null,
+              commitAsCurrent: true,
+              isRequestCurrent: isCurrentPickRequest
+            })
+            return
+          }
+          const pickedPRNumber = refreshedReview?.number ?? pickedReview.number
+          const pickedRequestKey = checksPanelAsyncResultKey(
+            prCacheKey,
+            branch,
+            pickedPRNumber,
+            pr?.prRepo,
+            headSha
+          )
+          asyncResultKeyRef.current = pickedRequestKey
+          setChecksLoading(true)
+          setCommentsLoading(true)
+          const [refreshedChecks, refreshedComments] = await Promise.all([
+            fetchPRChecks(repo.path, pickedPRNumber, undefined, headSha, pr?.prRepo, {
+              force: true,
+              ...repoOptions,
+              wakeWslDistro: true,
+              userRefresh: true
+            }),
+            fetchPRComments(repo.path, pickedPRNumber, {
+              force: true,
+              ...repoOptions,
+              prRepo: pr?.prRepo,
+              headSha,
+              userRefresh: true
+            })
+          ])
+          if (!isCurrentPickRequest() || !isCurrentAsyncResult(pickedRequestKey)) {
+            return
+          }
+          setChecks(refreshedChecks)
+          setComments(refreshedComments)
+        },
+        (error) => {
+          console.warn('Failed to refresh the selected review:', error)
+        },
+        () => {
+          if (isCurrentPickRequest()) {
+            setChecksLoading(false)
+            setCommentsLoading(false)
+          }
+          if (isCurrentRequest()) {
+            refreshInFlightRef.current = false
+            setIsRefreshing(false)
+          }
         }
-        const headSha = refreshedReview?.headSha ?? pickedReview.headSha
-        if (refreshedReview?.provider === 'gitlab' || activeGitLabReview) {
-          await fetchGitLabDetails({
-            mrNumberOverride: refreshedReview?.number ?? activeGitLabReview?.number ?? null,
-            headShaOverride: headSha ?? null,
-            commitAsCurrent: true,
-            isRequestCurrent: isCurrentPickRequest
-          })
-          return
-        }
-        const pickedPRNumber = refreshedReview?.number ?? pickedReview.number
-        const pickedRequestKey = checksPanelAsyncResultKey(
-          prCacheKey,
-          branch,
-          pickedPRNumber,
-          pr?.prRepo,
-          headSha
-        )
-        asyncResultKeyRef.current = pickedRequestKey
-        setChecksLoading(true)
-        setCommentsLoading(true)
-        const [refreshedChecks, refreshedComments] = await Promise.all([
-          fetchPRChecks(repo.path, pickedPRNumber, undefined, headSha, pr?.prRepo, {
-            force: true,
-            ...repoOptions,
-            wakeWslDistro: true,
-            userRefresh: true
-          }),
-          fetchPRComments(repo.path, pickedPRNumber, {
-            force: true,
-            ...repoOptions,
-            prRepo: pr?.prRepo,
-            headSha,
-            userRefresh: true
-          })
-        ])
-        if (!isCurrentPickRequest() || !isCurrentAsyncResult(pickedRequestKey)) {
-          return
-        }
-        setChecks(refreshedChecks)
-        setComments(refreshedComments)
-      } catch (error) {
-        console.warn('Failed to refresh the selected review:', error)
-      } finally {
-        if (isCurrentPickRequest()) {
-          setChecksLoading(false)
-          setCommentsLoading(false)
-        }
-        if (isCurrentRequest()) {
-          refreshInFlightRef.current = false
-          setIsRefreshing(false)
-        }
-      }
+      )
       return
     }
     const refreshStartedAt = Date.now()
@@ -188,250 +192,255 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
       prChecksStatus: pr?.checksStatus,
       refreshState: prCacheKey ? useAppStore.getState().prRefreshStates[prCacheKey] : null
     })
-    try {
-      if (activeWorktreeId && activeWorktreePath && !isFolder && ownerTarget) {
-        // Why one resolution: a same-path twin must not get this copy's transport, SSH target or answer.
-        const copy = resolveWorktreeGitCopyNow(activeWorktreeId, ownerCopyHostId)
-        const ownerHostId = copy?.hostId ?? null
-        const snapshotIdentity = readChecksPanelRefreshGitIdentitySnapshot({
-          snapshot: gitStatusSnapshot,
-          contextKey: panelContextKey,
-          currentBranch: branch
-        })
-        if (snapshotIdentity.kind === 'changed') {
-          updateWorktreeGitIdentity(
-            activeWorktreeId,
-            { head: snapshotIdentity.head, branch: snapshotIdentity.branch },
-            ownerHostId
-          )
-          // A discovered terminal branch switch must restart branch-keyed effects rather than refresh old PR data.
-          refreshOutcome = 'branch-changed'
-          return
-        }
-        try {
-          const statusContext = {
-            target: copy?.transport ?? ownerTarget,
-            worktreeId: activeWorktreeId,
-            worktreePath: activeWorktreePath,
-            connectionId: copy ? copy.connectionId : (activeConnectionId ?? undefined)
-          }
-          const status = await getRuntimeGitStatus(statusContext, MANUAL_STATUS_READ)
-          const observedBranch = status.branch ?? (status.head ? null : undefined)
-          updateWorktreeGitIdentity(
-            activeWorktreeId,
-            { head: status.head, branch: observedBranch },
-            ownerHostId
-          )
-          if (
-            observedBranch !== undefined &&
-            hasChecksPanelGitStatusBranchChanged({
-              observedBranch,
-              currentBranch: branch
-            })
-          ) {
+    await runAsyncTaskWithFailure(
+      async () => {
+        if (activeWorktreeId && activeWorktreePath && !isFolder && ownerTarget) {
+          // Why one resolution: a same-path twin must not get this copy's transport, SSH target or answer.
+          const copy = resolveWorktreeGitCopyNow(activeWorktreeId, ownerCopyHostId)
+          const ownerHostId = copy?.hostId ?? null
+          const snapshotIdentity = readChecksPanelRefreshGitIdentitySnapshot({
+            snapshot: gitStatusSnapshot,
+            contextKey: panelContextKey,
+            currentBranch: branch
+          })
+          if (snapshotIdentity.kind === 'changed') {
+            updateWorktreeGitIdentity(
+              activeWorktreeId,
+              { head: snapshotIdentity.head, branch: snapshotIdentity.branch },
+              ownerHostId
+            )
             // A discovered terminal branch switch must restart branch-keyed effects rather than refresh old PR data.
             refreshOutcome = 'branch-changed'
             return
           }
-          let freshRemoteStatus = status.upstreamStatus
-          if (activeWorktreePushTarget) {
-            freshRemoteStatus = await getRuntimeGitUpstreamStatus(
-              statusContext,
-              activeWorktreePushTarget
+          try {
+            const statusContext = {
+              target: copy?.transport ?? ownerTarget,
+              worktreeId: activeWorktreeId,
+              worktreePath: activeWorktreePath,
+              connectionId: copy ? copy.connectionId : (activeConnectionId ?? undefined)
+            }
+            const status = await getRuntimeGitStatus(statusContext, MANUAL_STATUS_READ)
+            const observedBranch = status.branch ?? (status.head ? null : undefined)
+            updateWorktreeGitIdentity(
+              activeWorktreeId,
+              { head: status.head, branch: observedBranch },
+              ownerHostId
             )
-          } else if (
-            !freshRemoteStatus ||
-            (freshRemoteStatus.ahead > 0 &&
-              freshRemoteStatus.behind > 0 &&
-              freshRemoteStatus.behindCommitsArePatchEquivalent === undefined)
-          ) {
-            freshRemoteStatus = await getRuntimeGitUpstreamStatus(statusContext)
+            if (
+              observedBranch !== undefined &&
+              hasChecksPanelGitStatusBranchChanged({
+                observedBranch,
+                currentBranch: branch
+              })
+            ) {
+              // A discovered terminal branch switch must restart branch-keyed effects rather than refresh old PR data.
+              refreshOutcome = 'branch-changed'
+              return
+            }
+            let freshRemoteStatus = status.upstreamStatus
+            if (activeWorktreePushTarget) {
+              freshRemoteStatus = await getRuntimeGitUpstreamStatus(
+                statusContext,
+                activeWorktreePushTarget
+              )
+            } else if (
+              !freshRemoteStatus ||
+              (freshRemoteStatus.ahead > 0 &&
+                freshRemoteStatus.behind > 0 &&
+                freshRemoteStatus.behindCommitsArePatchEquivalent === undefined)
+            ) {
+              freshRemoteStatus = await getRuntimeGitUpstreamStatus(statusContext)
+            }
+            if (
+              isCurrentRequest() &&
+              shouldCommitChecksPanelGitStatusSnapshot(panelContextKeyRef.current, panelContextKey)
+            ) {
+              // Reuse this click's status read to refresh Publish/Create eligibility.
+              setGitStatusSnapshot({
+                contextKey: panelContextKey,
+                hasUncommittedChanges: status.entries.length > 0,
+                remoteStatus: freshRemoteStatus,
+                gitIdentity: {
+                  head: status.head,
+                  branch: observedBranch
+                }
+              })
+            }
+          } catch (error) {
+            console.warn('[ChecksPanel] pre-refresh git identity refresh failed', error)
           }
-          if (
-            isCurrentRequest() &&
-            shouldCommitChecksPanelGitStatusSnapshot(panelContextKeyRef.current, panelContextKey)
-          ) {
-            // Reuse this click's status read to refresh Publish/Create eligibility.
-            setGitStatusSnapshot({
-              contextKey: panelContextKey,
-              hasUncommittedChanges: status.entries.length > 0,
-              remoteStatus: freshRemoteStatus,
-              gitIdentity: {
-                head: status.head,
-                branch: observedBranch
-              }
-            })
-          }
-        } catch (error) {
-          console.warn('[ChecksPanel] pre-refresh git identity refresh failed', error)
         }
-      }
-      if (refreshProvider !== 'github') {
-        refreshOutcome = await refreshChecksPanelHostedReview(
-          model,
-          refreshProvider,
-          isCurrentRequest
-        )
-        return
-      }
-      const refreshStoreState = useAppStore.getState()
-      const startedPRRefreshToken = buildGitHubPRRefreshStateClearToken(
-        refreshStoreState.prRefreshStates[prCacheKey],
-        refreshStoreState.prRefreshSequences,
-        prCacheKey
-      )
-      let refreshedPR: PRInfo | null = null
-      try {
-        refreshedPR = await fetchPRForBranch(repo.path, branch, {
-          force: true,
-          ...repoOptions,
-          worktreeId: activeWorktreeId ?? undefined,
-          linkedPRNumber: linkedPR,
-          fallbackPRNumber: fallbackGitHubPRNumber,
-          reason: 'manual',
-          userRefresh: true
-        })
-      } finally {
-        if (startedPRRefreshToken) {
-          expireGitHubPRRefreshState(prCacheKey, startedPRRefreshToken)
-        }
-      }
-      // Read this click's settlement now; the key-wide slot can belong to another read after the card read.
-      const prLookupFailed =
-        !refreshedPR && useAppStore.getState().prRefreshStates[prCacheKey]?.status === 'error'
-      if (!isCurrentRequest()) {
-        return
-      }
-      // The PR read above owns GitHub's refresh status, checks and comments; the review card read only refreshes the card.
-      await refreshHostedReviewForClick(
-        model,
-        repo,
-        branch,
-        refreshedPR?.number ?? fallbackGitHubPRNumber
-      ).catch(() => null)
-      if (!isCurrentRequest()) {
-        return
-      }
-      if (prLookupFailed) {
-        refreshOutcome = 'error'
-        return
-      }
-      if (refreshedPR) {
-        refreshOutcome = 'pr'
-        const prRequestKey = checksPanelAsyncResultKey(
-          prCacheKey,
-          branch,
-          refreshedPR.number,
-          refreshedPR.prRepo,
-          refreshedPR.headSha
-        )
-        if (!isCurrentAsyncResult(initialRequestKey) && !isCurrentRequest()) {
+        if (refreshProvider !== 'github') {
+          refreshOutcome = await refreshChecksPanelHostedReview(
+            model,
+            refreshProvider,
+            isCurrentRequest
+          )
           return
         }
-        // Forced refresh may discover the number before React repaints; mark these checks current now.
-        asyncResultKeyRef.current = prRequestKey
-        // Pass fresh headSha directly; the closure predates force-pushes and PR-number changes.
-        const refreshedChecks = fetchPRChecks(
-          repo.path,
-          refreshedPR.number,
-          branch,
-          refreshedPR.headSha,
-          refreshedPR.prRepo,
-          { force: true, ...repoOptions, wakeWslDistro: true, userRefresh: true }
-        ).then(
-          (result) => {
-            if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
-              return
+        const refreshStoreState = useAppStore.getState()
+        const startedPRRefreshToken = buildGitHubPRRefreshStateClearToken(
+          refreshStoreState.prRefreshStates[prCacheKey],
+          refreshStoreState.prRefreshSequences,
+          prCacheKey
+        )
+        const refreshedPR = await runAsyncTask(
+          () =>
+            fetchPRForBranch(repo.path, branch, {
+              force: true,
+              ...repoOptions,
+              worktreeId: activeWorktreeId ?? undefined,
+              linkedPRNumber: linkedPR,
+              fallbackPRNumber: fallbackGitHubPRNumber,
+              reason: 'manual',
+              userRefresh: true
+            }),
+          () => {
+            if (startedPRRefreshToken) {
+              expireGitHubPRRefreshState(prCacheKey, startedPRRefreshToken)
             }
-            setChecks(result)
-            const signature = JSON.stringify(
-              result.map((c) => `${c.name}:${c.status}:${c.conclusion}`)
-            )
-            pollIntervalRef.current =
-              signature === prevChecksRef.current
-                ? Math.min(pollIntervalRef.current * 2, 120_000)
-                : 30_000
-            prevChecksRef.current = signature
-          },
-          (err) => {
-            if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
-              return
-            }
-            console.warn('Failed to fetch PR checks:', err)
-            setChecks([])
           }
         )
-        setChecksLoading(true)
-        setCommentsLoading(true)
-        const refreshedComments = fetchPRComments(repo.path, refreshedPR.number, {
-          force: true,
-          ...repoOptions,
-          prRepo: refreshedPR.prRepo,
-          headSha: refreshedPR.headSha,
-          userRefresh: true
-        }).then(
-          (result) => {
-            if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {
-              setComments(result)
-            }
-          },
-          (err) => {
-            if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
-              return
-            }
-            console.warn('Failed to fetch PR comments:', err)
-            setComments([])
-          }
-        )
-        await Promise.all([
-          refreshedChecks.finally(() => {
-            if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {
-              setChecksLoading(false)
-            }
-          }),
-          refreshedComments.finally(() => {
-            if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {
-              setCommentsLoading(false)
-            }
-          })
-        ])
-      } else if (isCurrentRequest()) {
-        setChecks([])
-        setComments([])
-        refreshOutcome = 'no-pr'
-      }
-    } catch {
-      refreshOutcome = 'error'
-      // GitHub failures surface through the PR store's own classified state, which clears itself.
-      if (isCurrentRequest() && refreshProvider !== 'github') {
-        setManualFailure(getHostedReviewManualRefreshError(refreshProvider))
-      }
-    } finally {
-      recordChecksPanelPRRefreshBreadcrumb({
-        event: 'done',
-        provider: refreshProvider,
-        repoId: repo.id,
-        worktreeId: activeWorktreeId,
-        branch,
-        prCacheKey,
-        prNumber: activeGitLabReview?.number ?? prNumber,
-        prState: activeGitLabReview?.state ?? pr?.state,
-        prChecksStatus: pr?.checksStatus,
-        refreshState: prCacheKey ? useAppStore.getState().prRefreshStates[prCacheKey] : null,
-        outcome: refreshOutcome,
-        durationMs: Date.now() - refreshStartedAt,
-        currentRequest: isCurrentRequest()
-      })
-      if (isCurrentRequest()) {
-        if (['review', 'no-review', 'pr', 'no-pr'].includes(refreshOutcome)) {
-          setManualFailure(null)
+        // Read this click's settlement now; the key-wide slot can belong to another read after the card read.
+        const prLookupFailed =
+          !refreshedPR && useAppStore.getState().prRefreshStates[prCacheKey]?.status === 'error'
+        if (!isCurrentRequest()) {
+          return
         }
-        refreshInFlightRef.current = false
-        setIsRefreshing(false)
-        // Rerun eligibility to clear resolved authentication errors even when Git state is unchanged.
-        setEligibilityRefreshNonce((value) => value + 1)
+        // The PR read above owns GitHub's refresh status, checks and comments; the review card read only refreshes the card.
+        await refreshHostedReviewForClick(
+          model,
+          repo,
+          branch,
+          refreshedPR?.number ?? fallbackGitHubPRNumber
+        ).catch(() => null)
+        if (!isCurrentRequest()) {
+          return
+        }
+        if (prLookupFailed) {
+          refreshOutcome = 'error'
+          return
+        }
+        if (refreshedPR) {
+          refreshOutcome = 'pr'
+          const prRequestKey = checksPanelAsyncResultKey(
+            prCacheKey,
+            branch,
+            refreshedPR.number,
+            refreshedPR.prRepo,
+            refreshedPR.headSha
+          )
+          if (!isCurrentAsyncResult(initialRequestKey) && !isCurrentRequest()) {
+            return
+          }
+          // Forced refresh may discover the number before React repaints; mark these checks current now.
+          asyncResultKeyRef.current = prRequestKey
+          // Pass fresh headSha directly; the closure predates force-pushes and PR-number changes.
+          const refreshedChecks = fetchPRChecks(
+            repo.path,
+            refreshedPR.number,
+            branch,
+            refreshedPR.headSha,
+            refreshedPR.prRepo,
+            { force: true, ...repoOptions, wakeWslDistro: true, userRefresh: true }
+          ).then(
+            (result) => {
+              if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
+                return
+              }
+              setChecks(result)
+              const signature = JSON.stringify(
+                result.map((c) => `${c.name}:${c.status}:${c.conclusion}`)
+              )
+              pollIntervalRef.current =
+                signature === prevChecksRef.current
+                  ? Math.min(pollIntervalRef.current * 2, 120_000)
+                  : 30_000
+              prevChecksRef.current = signature
+            },
+            (err) => {
+              if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
+                return
+              }
+              console.warn('Failed to fetch PR checks:', err)
+              setChecks([])
+            }
+          )
+          setChecksLoading(true)
+          setCommentsLoading(true)
+          const refreshedComments = fetchPRComments(repo.path, refreshedPR.number, {
+            force: true,
+            ...repoOptions,
+            prRepo: refreshedPR.prRepo,
+            headSha: refreshedPR.headSha,
+            userRefresh: true
+          }).then(
+            (result) => {
+              if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {
+                setComments(result)
+              }
+            },
+            (err) => {
+              if (!isCurrentRequest() || !isCurrentAsyncResult(prRequestKey)) {
+                return
+              }
+              console.warn('Failed to fetch PR comments:', err)
+              setComments([])
+            }
+          )
+          await Promise.all([
+            refreshedChecks.finally(() => {
+              if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {
+                setChecksLoading(false)
+              }
+            }),
+            refreshedComments.finally(() => {
+              if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {
+                setCommentsLoading(false)
+              }
+            })
+          ])
+        } else if (isCurrentRequest()) {
+          setChecks([])
+          setComments([])
+          refreshOutcome = 'no-pr'
+        }
+      },
+      () => {
+        refreshOutcome = 'error'
+        // GitHub failures surface through the PR store's own classified state, which clears itself.
+        if (isCurrentRequest() && refreshProvider !== 'github') {
+          setManualFailure(getHostedReviewManualRefreshError(refreshProvider))
+        }
+      },
+      () => {
+        recordChecksPanelPRRefreshBreadcrumb({
+          event: 'done',
+          provider: refreshProvider,
+          repoId: repo.id,
+          worktreeId: activeWorktreeId,
+          branch,
+          prCacheKey,
+          prNumber: activeGitLabReview?.number ?? prNumber,
+          prState: activeGitLabReview?.state ?? pr?.state,
+          prChecksStatus: pr?.checksStatus,
+          refreshState: prCacheKey ? useAppStore.getState().prRefreshStates[prCacheKey] : null,
+          outcome: refreshOutcome,
+          durationMs: Date.now() - refreshStartedAt,
+          currentRequest: isCurrentRequest()
+        })
+        if (isCurrentRequest()) {
+          if (['review', 'no-review', 'pr', 'no-pr'].includes(refreshOutcome)) {
+            setManualFailure(null)
+          }
+          refreshInFlightRef.current = false
+          setIsRefreshing(false)
+          // Rerun eligibility to clear resolved authentication errors even when Git state is unchanged.
+          setEligibilityRefreshNonce((value) => value + 1)
+        }
       }
-    }
+    )
   }, [
     model,
     repo,

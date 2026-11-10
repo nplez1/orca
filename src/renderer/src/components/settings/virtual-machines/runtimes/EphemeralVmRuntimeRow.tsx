@@ -5,7 +5,6 @@ import { getEphemeralVmRecipeResultProjectRoot } from '../../../../../../shared/
 import { formatEphemeralVmCountdown } from '../../../../../../shared/ephemeral-vm-lifetime'
 import { useSecondTickNow } from '@/components/sidebar/workspace-card/activity/prompt-cache-countdown-clock'
 import { resolveEphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
-import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
 import { ephemeralVmCleanupErrorText } from '@/lib/ephemeral-vm-error-copy'
@@ -39,6 +38,7 @@ function EphemeralVmLeaseStatus({
 }: {
   runtime: EphemeralVmRuntimeRecord
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const hasDeadline = useMemo(
     () => Boolean(resolveEphemeralVmRuntimeLease(runtime, 0)?.lifetime),
     [runtime]
@@ -53,7 +53,7 @@ function EphemeralVmLeaseStatus({
       <p className="mt-0.5 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground">
         <Unplug className="mt-px size-3 shrink-0" />
         <span>
-          {translate(
+          {t(
             'auto.components.settings.EphemeralVmRuntimesSection.reclaimedHost',
             'Released from Orca on {{value0}}: this host stopped answering after its provider deadline, so its workspace rows were removed. The provider still owns the resource — Cleanup releases it now.',
             { value0: formatEphemeralVmLeaseDeadline(runtime.reclaimedAt) }
@@ -71,7 +71,7 @@ function EphemeralVmLeaseStatus({
       <p className="mt-0.5 flex items-start gap-1 text-[11px] leading-snug text-destructive">
         <AlertTriangle className="mt-px size-3 shrink-0" />
         <span>
-          {translate(
+          {t(
             'auto.components.settings.EphemeralVmRuntimesSection.leaseExpired',
             'Lease expired {{value0}}. The provider can remove this host at any time, including while Orca is offline.',
             { value0: deadline }
@@ -84,7 +84,7 @@ function EphemeralVmLeaseStatus({
     <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-snug text-muted-foreground">
       <span className="inline-flex items-center gap-1">
         <CalendarClock className="size-3 shrink-0" />
-        {translate(
+        {t(
           'auto.components.settings.EphemeralVmRuntimesSection.providerDeadline',
           'Provider deadline {{value0}}',
           { value0: deadline }
@@ -92,7 +92,7 @@ function EphemeralVmLeaseStatus({
       </span>
       {lifetime.provider ? (
         <span>
-          {translate(
+          {t(
             'auto.components.settings.EphemeralVmRuntimesSection.leaseProvider',
             'Provider: {{value0}}',
             { value0: lifetime.provider }
@@ -100,7 +100,7 @@ function EphemeralVmLeaseStatus({
         </span>
       ) : null}
       <span className="tabular-nums font-medium text-foreground">
-        {translate(
+        {t(
           'auto.components.settings.EphemeralVmRuntimesSection.leaseRemaining',
           '{{value0}} left',
           { value0: formatEphemeralVmCountdown(lease.remainingMs) }
@@ -191,11 +191,8 @@ export function EphemeralVmRuntimeRow({
                   <CalendarClock className="size-3" />
                 )}
                 {isExtending
-                  ? translate(
-                      'auto.components.settings.EphemeralVmRuntimesSection.extending',
-                      'Extending…'
-                    )
-                  : translate(
+                  ? t('auto.components.settings.EphemeralVmRuntimesSection.extending', 'Extending…')
+                  : t(
                       'auto.components.settings.EphemeralVmRuntimesSection.extendLifetime',
                       'Extend lifetime'
                     )}
@@ -208,7 +205,7 @@ export function EphemeralVmRuntimeRow({
                   disabled={disabled || isExtending}
                   onSelect={() => onExtendLifetime(duration)}
                 >
-                  {translate(
+                  {t(
                     'auto.components.settings.EphemeralVmRuntimesSection.extendTo',
                     'Extend to {{value0}}',
                     { value0: duration }

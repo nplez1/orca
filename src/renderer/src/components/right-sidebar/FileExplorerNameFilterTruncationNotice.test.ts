@@ -1,3 +1,5 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { getIntlLocale } from '@/i18n/i18n'
 import type { WorkspacePathSearchFenceIdentity } from '../../../../shared/workspace-path-search-contract'
@@ -25,35 +27,26 @@ const liveScanIdentity: WorkspacePathSearchFenceIdentity = {
   pageBudget: { maxPaths: 5_000, maxSerializedBytes: 100_000 }
 }
 
+// Why a real render: the notice reads useTranslate()/useIntlLocale(), which a plain call cannot.
+function notice(props: Parameters<typeof FileExplorerNameFilterTruncationNotice>[0]): string {
+  return renderToStaticMarkup(createElement(FileExplorerNameFilterTruncationNotice, props))
+}
+
 describe('FileExplorerNameFilterTruncationNotice', () => {
   it('says how many matches were found and how many are shown', () => {
-    const element = FileExplorerNameFilterTruncationNotice({
-      shownCount: 5_000,
-      totalCount: 182_311
-    })
-
-    expect(element?.props.children).toBe(
+    expect(notice({ shownCount: 5_000, totalCount: 182_311 })).toContain(
       `Showing the first ${(5_000).toLocaleString(getIntlLocale())} of ${(182_311).toLocaleString(getIntlLocale())} matches — add more of the name to narrow it down`
     )
   })
 
   it('labels a retained prior page as updating instead of repeating its old count', () => {
-    const element = FileExplorerNameFilterTruncationNotice({
-      shownCount: 5,
-      totalCount: null,
-      isUpdating: true
-    })
-
-    expect(element?.props.children).toBe('Updating file list')
+    expect(notice({ shownCount: 5, totalCount: null, isUpdating: true })).toContain(
+      'Updating file list'
+    )
   })
 
   it('never claims a count the host could not provide', () => {
-    const element = FileExplorerNameFilterTruncationNotice({
-      shownCount: 5_000,
-      totalCount: null
-    })
-
-    expect(element?.props.children).toBe(
+    expect(notice({ shownCount: 5_000, totalCount: null })).toContain(
       'Only part of this workspace was searched — add more of the name to narrow it down'
     )
   })
@@ -61,7 +54,7 @@ describe('FileExplorerNameFilterTruncationNotice', () => {
   it('does not label an exact live-scan fallback as still indexing', () => {
     // Regression: the index was still building, but the live scan already finished, so calling
     // these results "Indexing files…" (and hiding that they are complete) was wrong.
-    const element = FileExplorerNameFilterTruncationNotice({
+    const markup = notice({
       shownCount: 1,
       totalCount: 1,
       isIndexing: true,
@@ -76,13 +69,11 @@ describe('FileExplorerNameFilterTruncationNotice', () => {
       }
     })
 
-    expect(element?.props.children).toBe(
-      'Complete results from a full scan — the file index is still building'
-    )
+    expect(markup).toContain('Complete results from a full scan — the file index is still building')
   })
 
   it('still labels a non-exact building index as indexing', () => {
-    const element = FileExplorerNameFilterTruncationNotice({
+    const markup = notice({
       shownCount: 0,
       totalCount: null,
       isIndexing: true,
@@ -94,6 +85,6 @@ describe('FileExplorerNameFilterTruncationNotice', () => {
       })
     })
 
-    expect(element?.props.children).toBe('Indexing files…')
+    expect(markup).toContain('Indexing files…')
   })
 })

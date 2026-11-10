@@ -37,7 +37,6 @@ import { useTranslate } from '@/i18n/use-translate'
 import type { AiVaultHostScopeOption } from '../scope/ai-vault-host-scope'
 import { AiVaultSessionLimitMenu } from '../session-list/AiVaultSessionLimitMenu'
 import type { AiVaultSessionLimit } from '../session-list/ai-vault-session-limit'
-import { translate } from '@/i18n/i18n'
 
 const VAULT_HEADER_CONTROL_CLASS = 'size-6 shrink-0'
 
@@ -322,7 +321,7 @@ export function VaultViewMenu({
         </div>
         {availableAgents.length === 0 ? (
           <div className="px-2 pb-2 text-[11px] text-muted-foreground">
-            {translate(
+            {t(
               'auto.components.right.sidebar.AiVaultPanelControls.noEnabledAgents',
               'No agents enabled in Settings'
             )}
@@ -379,7 +378,7 @@ export function VaultViewMenu({
               onCheckedChange={(checked) => onShowSubagentSessionsChange(checked === true)}
               onSelect={(event) => event.preventDefault()}
             >
-              {translate(
+              {t(
                 'auto.components.right.sidebar.AiVaultPanelControls.showSubagentSessions',
                 'Show subagent sessions'
               )}
@@ -388,7 +387,7 @@ export function VaultViewMenu({
                 hidden entirely, so say so rather than let rows vanish. */}
             {!showSubagentSessions && hiddenSubagentCount > 0 ? (
               <div className="px-2 pb-1 text-[11px] text-muted-foreground">
-                {translate(
+                {t(
                   'auto.components.right.sidebar.AiVaultPanelControls.hiddenSubagentSessions',
                   '{{value0}} subagent sessions hidden (parent not loaded)',
                   { value0: hiddenSubagentCount }

@@ -24,7 +24,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { LoaderCircle } from 'lucide-react'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 
 export type JiraIssueFieldOutcome =
@@ -77,6 +77,7 @@ function EditFieldsForm({
   }) => Promise<JiraIssueFieldOutcome>
   onClose: () => void
 }): JSX.Element {
+  const t = useTranslate()
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((entry) => [entry.field.key, entry.value]))
   )
@@ -140,10 +141,10 @@ function EditFieldsForm({
     <>
       <DialogHeader>
         <DialogTitle>
-          {translate('auto.components.JiraIssueWorkspace.editFieldsTitle', 'Edit Jira fields')}
+          {t('auto.components.JiraIssueWorkspace.editFieldsTitle', 'Edit Jira fields')}
         </DialogTitle>
         <DialogDescription>
-          {translate(
+          {t(
             'auto.components.JiraIssueWorkspace.editFieldsDescription',
             'Custom fields Jira allows you to change on {{value0}}.',
             { value0: issue.key }
@@ -153,7 +154,7 @@ function EditFieldsForm({
       <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto scrollbar-sleek">
         {fields.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            {translate(
+            {t(
               'auto.components.JiraIssueWorkspace.editFieldsEmpty',
               'Jira reports no editable custom fields on this issue.'
             )}
@@ -203,16 +204,16 @@ function EditFieldsForm({
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose} disabled={submitting}>
-          {translate('auto.components.TaskPage.ff69a30681', 'Cancel')}
+          {t('auto.components.TaskPage.ff69a30681', 'Cancel')}
         </Button>
         <Button onClick={() => void handleSubmit()} disabled={submitting || !hasChanges}>
           {submitting ? (
             <>
               <LoaderCircle className="size-4 animate-spin" />
-              {translate('auto.components.JiraIssueWorkspace.editFieldsSaving', 'Saving…')}
+              {t('auto.components.JiraIssueWorkspace.editFieldsSaving', 'Saving…')}
             </>
           ) : (
-            translate('auto.components.right.sidebar.IssuePane.save', 'Save')
+            t('auto.components.right.sidebar.IssuePane.save', 'Save')
           )}
         </Button>
       </DialogFooter>

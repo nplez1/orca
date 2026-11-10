@@ -348,7 +348,7 @@ export function CheckRunDetailsPanel({
                   }
                 >
                   <Settings className="size-3.5" />
-                  {translate('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
+                  {t('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
                 </Button>
               </div>
             )}

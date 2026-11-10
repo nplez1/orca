@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { jiraSearchUsers, type RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /** The people a draft already names, in draft order. A held accountId the site gives no
  *  name for is shown as itself: the picker has to offer a row for it, or it could never
@@ -48,6 +48,7 @@ export function JiraUserMultiPicker({
   label: string
   placeholder: string
 }): React.JSX.Element {
+  const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const held = useMemo(() => jiraHeldUsers(users, value), [users, value])
@@ -115,7 +116,7 @@ export function JiraUserMultiPicker({
             autoFocus
             value={query}
             onValueChange={setQuery}
-            placeholder={translate('components.jiraUserPicker.search', 'Search users')}
+            placeholder={t('components.jiraUserPicker.search', 'Search users')}
           />
           <CommandList animateHeight>
             {/* Why held rows sit above the results and ignore the query: the current
@@ -153,11 +154,8 @@ export function JiraUserMultiPicker({
             {results.length === 0 && !loading ? (
               <p className="px-3 py-2 text-xs text-muted-foreground">
                 {held.length > 0
-                  ? translate(
-                      'components.jiraUserMultiPicker.noOtherMatch',
-                      'No other users match.'
-                    )
-                  : translate('components.jiraUserPicker.empty', 'No users found')}
+                  ? t('components.jiraUserMultiPicker.noOtherMatch', 'No other users match.')
+                  : t('components.jiraUserPicker.empty', 'No users found')}
               </p>
             ) : null}
           </CommandList>

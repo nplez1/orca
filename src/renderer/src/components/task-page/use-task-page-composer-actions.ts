@@ -272,33 +272,20 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     hasLinearProjectContext: Boolean(selectedLinearProject),
     hasLinearViewContext: Boolean(selectedLinearCustomView)
   })
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the TaskPage hook chain hands each stage a wider model than it declares, and this intersection names exactly the members this stage adds.
-  const nextModel = model as typeof model & {
-    openComposerForLinearItem: typeof openComposerForLinearItem
-    handleUseLinearItem: typeof handleUseLinearItem
-    handleOpenOrUseLinearItem: typeof handleOpenOrUseLinearItem
-    handleLinearWorkspaceChange: typeof handleLinearWorkspaceChange
-    handleLinearTeamSelectionChange: typeof handleLinearTeamSelectionChange
-    handleLinearScopeOpen: typeof handleLinearScopeOpen
-    handleLinearAccessConnected: typeof handleLinearAccessConnected
-    openComposerForJiraItem: typeof openComposerForJiraItem
-    handleUseJiraItem: typeof handleUseJiraItem
-    handleOpenOrUseJiraItem: typeof handleOpenOrUseJiraItem
-    jiraIssueAttachmentIndex: typeof jiraIssueAttachmentIndex
-    taskPageListChromeHidden: typeof taskPageListChromeHidden
+  return {
+    ...model,
+    openComposerForLinearItem,
+    handleUseLinearItem,
+    handleOpenOrUseLinearItem,
+    handleLinearWorkspaceChange,
+    handleLinearTeamSelectionChange,
+    handleLinearScopeOpen,
+    handleLinearAccessConnected,
+    openComposerForJiraItem,
+    handleUseJiraItem,
+    handleOpenOrUseJiraItem,
+    jiraIssueAttachmentIndex,
+    taskPageListChromeHidden
   }
-  nextModel.openComposerForLinearItem = openComposerForLinearItem
-  nextModel.handleUseLinearItem = handleUseLinearItem
-  nextModel.handleOpenOrUseLinearItem = handleOpenOrUseLinearItem
-  nextModel.handleLinearWorkspaceChange = handleLinearWorkspaceChange
-  nextModel.handleLinearTeamSelectionChange = handleLinearTeamSelectionChange
-  nextModel.handleLinearScopeOpen = handleLinearScopeOpen
-  nextModel.handleLinearAccessConnected = handleLinearAccessConnected
-  nextModel.openComposerForJiraItem = openComposerForJiraItem
-  nextModel.handleUseJiraItem = handleUseJiraItem
-  nextModel.handleOpenOrUseJiraItem = handleOpenOrUseJiraItem
-  nextModel.jiraIssueAttachmentIndex = jiraIssueAttachmentIndex
-  nextModel.taskPageListChromeHidden = taskPageListChromeHidden
-  return nextModel
 }
 export type TaskPageComposerActionsModel = ReturnType<typeof useTaskPageComposerActions>

@@ -2,6 +2,11 @@ import type { PreloadApi } from '../../../../preload/api-types'
 import { holdBrowserAttachmentFiles } from '@/lib/browser-attachment-files'
 import { resolveRuntimeFilePath } from './web-runtime-worktree-catalog'
 
+/** The web build has no in-app browser, so every destination is the browser tab. */
+function openBrowserTab(url: string): void {
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 async function pathExistsOnRuntime(path: string): Promise<boolean> {
   try {
     await resolveRuntimeFilePath(path)
@@ -26,21 +31,16 @@ function pickBrowserFiles(): Promise<File[]> {
 export function createShellApi(): NonNullable<Partial<PreloadApi>['shell']> {
   const openResult = { ok: true } as const
   return {
-    openPath: (path) =>
-      Promise.resolve(window.open(path, '_blank', 'noopener,noreferrer') as never),
+    openPath: (path) => Promise.resolve(openBrowserTab(path)),
     openInFileManager: () => Promise.resolve(openResult),
     openInExternalEditor: () => Promise.resolve(openResult),
-    openUrl: (url) => Promise.resolve(window.open(url, '_blank', 'noopener,noreferrer') as never),
-    // The web build has no in-app browser, so both destinations are the browser tab.
-    openUrlInSystemBrowser: (url) => {
-      window.open(url, '_blank', 'noopener,noreferrer')
-      return Promise.resolve()
-    },
+    openUrl: (url) => Promise.resolve(openBrowserTab(url)),
+    openUrlInSystemBrowser: (url) => Promise.resolve(openBrowserTab(url)),
     onContextualLinkRequested: () => () => {},
     markContextualLinkRouterReady: () => {},
     openFilePath: () => Promise.resolve(false),
     openFileUri: (uri) => {
-      window.open(uri, '_blank', 'noopener,noreferrer')
+      openBrowserTab(uri)
       return Promise.resolve('opened')
     },
     pathExists: async (path) => pathExistsOnRuntime(path),

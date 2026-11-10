@@ -9,7 +9,6 @@ import {
   isPreflightIssueDismissed
 } from './landing-preflight-dismissal'
 import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
-import { translate } from '@/i18n/i18n'
 import { hasGitHubBackedProject, type PreflightIssue } from './landing-preflight-issues'
 import { useLandingPreflightRuntime } from './landing-preflight-runtime'
 import { GitHubStarButton } from './GitHubStarButton'
@@ -22,7 +21,6 @@ import {
   type LandingShortcutItem
 } from './landing-layout'
 import { useTranslate } from '@/i18n/use-translate'
-
 
 function dismissedPreflightIssueIds(issues: PreflightIssue[], repos: readonly Repo[]): Set<string> {
   return new Set(
@@ -142,8 +140,8 @@ export default function Landing(): React.JSX.Element {
       <div className="w-full max-w-lg px-6">
         <div className="flex flex-col items-center gap-4 py-8">
           <OrcaBrandMark
-            logoAlt={translate('auto.components.Landing.520304a067', 'Orca logo')}
-            title={translate('auto.components.Landing.6ca6ff404e', 'ORCA')}
+            logoAlt={t('auto.components.Landing.520304a067', 'Orca logo')}
+            title={t('auto.components.Landing.6ca6ff404e', 'ORCA')}
           />
 
           {preflightIssues.length > 0 && <PreflightBanner issues={preflightIssues} repos={repos} />}

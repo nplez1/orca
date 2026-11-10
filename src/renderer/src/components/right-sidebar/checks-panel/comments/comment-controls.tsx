@@ -30,7 +30,6 @@ import type { PRCommentGroupActionState } from '@/lib/source-control/review/comm
 import type { PRCommentPresentationClasses } from './pr-comment-presentation'
 import { useTranslate } from '@/i18n/use-translate'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import { translate } from '@/i18n/i18n'
 
 export function CopyButton({
   text,
@@ -265,7 +264,7 @@ export function CommentMoreMenu({
         {hasOpenInCode ? (
           <DropdownMenuItem onSelect={() => onOpenInCode?.()}>
             <FileCode />
-            {translate(
+            {t(
               'auto.components.right.sidebar.checks.panel.comment.controls.3dd06603e1',
               'Show in code'
             )}

@@ -249,7 +249,7 @@ export function SshTargetCard({
           <span className="truncate text-sm font-medium">{target.label}</span>
           {hidden ? (
             <Badge variant="hostContext" className="self-center">
-              {translate('auto.components.settings.SshTargetCard.hiddenBadge', 'Hidden')}
+              {t('auto.components.settings.SshTargetCard.hiddenBadge', 'Hidden')}
             </Badge>
           ) : null}
           {servedByOrcaServer ? (

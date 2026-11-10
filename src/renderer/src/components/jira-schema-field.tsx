@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 
 /**
@@ -55,6 +55,7 @@ export function JiraSchemaFieldControl({
    *  and the transition form falls back only where the issue holds no value. */
   fallbackToText?: boolean
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const kind = resolveJiraFieldControlKind(field)
   if (kind === null && !fallbackToText) {
     return null
@@ -64,7 +65,7 @@ export function JiraSchemaFieldControl({
       ? [
           {
             key: 'none',
-            label: translate('components.jiraSchemaField.noUser', 'None'),
+            label: t('components.jiraSchemaField.noUser', 'None'),
             onSelect: () => {
               userField.onSelectUser(null)
               onValueChange('')
@@ -106,13 +107,13 @@ export function JiraSchemaFieldControl({
           }}
           disabled={disabled}
           label={field.name}
-          placeholder={translate('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
+          placeholder={t('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
             value0: field.name
           })}
         />
         {unnamed && displayValue && displayValue !== value ? (
           <p className="text-2xs text-muted-foreground">
-            {translate('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
+            {t('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
               value0: displayValue
             })}
           </p>
@@ -127,7 +128,7 @@ export function JiraSchemaFieldControl({
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        placeholder={translate('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
+        placeholder={t('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
           value0: field.name
         })}
       />
@@ -140,7 +141,7 @@ export function JiraSchemaFieldControl({
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger>
           <SelectValue
-            placeholder={translate('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
+            placeholder={t('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
               value0: field.name
             })}
           />
@@ -163,7 +164,7 @@ export function JiraSchemaFieldControl({
       <textarea
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
-        placeholder={translate('auto.components.TaskPage.919a20dd5b', 'Enter {{value0}}', {
+        placeholder={t('auto.components.TaskPage.919a20dd5b', 'Enter {{value0}}', {
           value0: field.name
         })}
         rows={4}
@@ -180,8 +181,8 @@ export function JiraSchemaFieldControl({
         type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'}
         placeholder={
           kind === 'textList' || kind === 'userList'
-            ? translate('auto.components.TaskPage.56cdb413a2', 'Comma-separated values')
-            : translate('auto.components.TaskPage.919a20dd5b', 'Enter {{value0}}', {
+            ? t('auto.components.TaskPage.56cdb413a2', 'Comma-separated values')
+            : t('auto.components.TaskPage.919a20dd5b', 'Enter {{value0}}', {
                 value0: field.name
               })
         }
@@ -189,7 +190,7 @@ export function JiraSchemaFieldControl({
       />
       {displayValue && displayValue !== value ? (
         <p className="text-2xs text-muted-foreground">
-          {translate('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
+          {t('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
             value0: displayValue
           })}
         </p>

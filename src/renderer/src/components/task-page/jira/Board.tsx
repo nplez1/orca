@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import type { JSX } from 'react'
 import type {
   JiraBoardSelection,
@@ -25,6 +26,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { jiraUpdateIssue } from '../../../runtime/jira/runtime-jira-client'
 import { toast } from 'sonner'
 import { LoaderCircle } from 'lucide-react'
@@ -56,6 +58,7 @@ export function TaskPageJiraBoard({
    *  item in or out of these lists just as a row move does. */
   refreshSignal?: number
 }): JSX.Element {
+  const t = useTranslate()
   const board = useTaskPageJiraBoard(model, selection, refreshSignal)
   const [activeView, setActiveViewState] = useState<'sprint' | 'backlog'>(
     () => loadJiraBoardViewPreferences().activeView
@@ -98,24 +101,29 @@ export function TaskPageJiraBoard({
       return
     }
     setAssigningSprintIssueKey(issue.key)
-    try {
-      const result = await jiraUpdateIssue(providerSettings, issue.key, { sprintId }, issue.siteId)
-      if (!result.ok) {
-        throw new Error(result.error)
-      }
-      toast.success(
-        translate('auto.components.TaskPage.jiraSprintAssigned', '{{value0}} moved to {{value1}}', {
-          value0: issue.key,
-          value1: sprintName(sprintId)
-        })
-      )
-      onIssueMoved(issue)
-      board.refreshSilently()
-    } catch (error) {
-      toast.error(jiraBoardErrorText(error))
-    } finally {
-      setAssigningSprintIssueKey(null)
-    }
+    await runAsyncTaskWithFailure(
+      async () => {
+        const result = await jiraUpdateIssue(
+          providerSettings,
+          issue.key,
+          { sprintId },
+          issue.siteId
+        )
+        if (!result.ok) {
+          throw new Error(result.error)
+        }
+        toast.success(
+          t('auto.components.TaskPage.jiraSprintAssigned', '{{value0}} moved to {{value1}}', {
+            value0: issue.key,
+            value1: sprintName(sprintId)
+          })
+        )
+        onIssueMoved(issue)
+        board.refreshSilently()
+      },
+      (error) => toast.error(jiraBoardErrorText(error)),
+      () => setAssigningSprintIssueKey(null)
+    )
   }
 
   useEffect(() => {
@@ -149,7 +157,7 @@ export function TaskPageJiraBoard({
         <div className="flex items-center justify-between gap-3 border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <span className="min-w-0">{board.overviewError}</span>
           <Button type="button" variant="outline" size="sm" onClick={board.refresh}>
-            {translate('auto.components.TaskPage.0bfbf62f75', 'Retry')}
+            {t('auto.components.TaskPage.0bfbf62f75', 'Retry')}
           </Button>
         </div>
       ) : null}
@@ -157,7 +165,7 @@ export function TaskPageJiraBoard({
       {board.overviewLoading ? (
         <div className="flex min-h-40 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" />
-          {translate('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
+          {t('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto scrollbar-sleek">
@@ -184,13 +192,11 @@ export function TaskPageJiraBoard({
               }
             />
           ) : (
-            <section
-              aria-label={translate('auto.components.TaskPage.jiraCurrentSprint', 'Current sprint')}
-            >
+            <section aria-label={t('auto.components.TaskPage.jiraCurrentSprint', 'Current sprint')}>
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-3 py-2">
                 <div className="min-w-0 text-sm font-medium text-foreground">
                   {board.activeSprint?.name ??
-                    translate('auto.components.TaskPage.jiraCurrentSprint', 'Current sprint')}
+                    t('auto.components.TaskPage.jiraCurrentSprint', 'Current sprint')}
                 </div>
                 {board.overview && board.overview.activeSprints.length > 1 ? (
                   <Select value={board.activeSprintId} onValueChange={board.setActiveSprintId}>
@@ -218,7 +224,7 @@ export function TaskPageJiraBoard({
               {board.sprintBlanked ? (
                 <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
                   <LoaderCircle className="size-4 animate-spin" />
-                  {translate('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
+                  {t('auto.components.TaskPage.jiraBoardLoading', 'Loading…')}
                 </div>
               ) : null}
               {board.overview?.activeSprints.length && !board.sprintBlanked ? (
@@ -249,7 +255,7 @@ export function TaskPageJiraBoard({
               !board.sprintError &&
               board.overview?.activeSprints.length ? (
                 <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  {translate(
+                  {t(
                     'auto.components.TaskPage.jiraSprintEmpty',
                     'No issues match this filter in the active sprint.'
                   )}
@@ -266,10 +272,7 @@ export function TaskPageJiraBoard({
                   >
                     {loadMoreLabel(
                       board.sprintLoadingMore,
-                      translate(
-                        'auto.components.TaskPage.jiraLoadMoreSprint',
-                        'Load more sprint issues'
-                      )
+                      t('auto.components.TaskPage.jiraLoadMoreSprint', 'Load more sprint issues')
                     )}
                   </Button>
                 </div>

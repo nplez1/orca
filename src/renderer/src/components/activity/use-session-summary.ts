@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
   SessionSummarySessionRef,
   SessionSummarySnapshot
@@ -51,9 +51,12 @@ export function useSessionSummary(
   const sessionTranscriptPath = session?.providerSession?.transcriptPath ?? ''
   // Reads the latest snapshot without tearing down and recreating the auto-refresh timer.
   const snapshotRef = useRef<SessionSummarySnapshot | null>(null)
-  snapshotRef.current = snapshot
   const agentUpdatedAtRef = useRef<number | undefined>(agentUpdatedAt)
-  agentUpdatedAtRef.current = agentUpdatedAt
+  // Why a layout effect: React Compiler rejects ref writes during render.
+  useLayoutEffect(() => {
+    snapshotRef.current = snapshot
+    agentUpdatedAtRef.current = agentUpdatedAt
+  }, [agentUpdatedAt, snapshot])
 
   const accept = useCallback(
     (next: SessionSummarySnapshot): void => {

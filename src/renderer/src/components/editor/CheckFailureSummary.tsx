@@ -1,6 +1,6 @@
 import React from 'react'
 import { XCircle } from 'lucide-react'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { isFailedStepState } from '../../../../shared/check-step-visibility'
 import type { PRCheckRunDetails, PRCheckStep } from '../../../../shared/github/check-types'
 
@@ -52,6 +52,7 @@ export function CheckFailureSummary({
 }: {
   details: PRCheckRunDetails
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const failures = collectFailures(details)
   if (failures.length === 0) {
     return null
@@ -60,7 +61,7 @@ export function CheckFailureSummary({
     <section className="rounded-md border border-destructive/30 bg-destructive/5">
       <div className="flex items-center gap-2 border-b border-destructive/20 px-3 py-2 text-sm font-medium text-destructive">
         <XCircle className="size-4 shrink-0" />
-        {translate('checkDetails.failures', 'Failures')}
+        {t('checkDetails.failures', 'Failures')}
         <span className="text-xs font-normal text-muted-foreground">{failures.length}</span>
       </div>
       <ul className="divide-y divide-destructive/10">

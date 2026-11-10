@@ -104,6 +104,7 @@ export function ReviewMergeReadinessBadge({
 }: {
   review: WorktreeCardPrDisplay
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const mergeReadiness = getHostedReviewMergeReadiness(review)
   // Why: null means the checks badge beside this one already carries the story, or the
   // provider has not reported a merge state to report at all.
@@ -112,7 +113,7 @@ export function ReviewMergeReadinessBadge({
     return null
   }
   const { readiness } = mergeReadiness
-  const title = translate(
+  const title = t(
     'auto.components.sidebar.WorktreeCardMetadataStatusBadges.mergeVerdictTitle',
     'Merge: {{value0}}',
     { value0: label }

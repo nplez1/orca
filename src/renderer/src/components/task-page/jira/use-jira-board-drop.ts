@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { runAsyncTask } from '@/lib/async-task-with-cleanup'
 import type { DragEvent } from 'react'
 import type {
   JiraBoardColumn,
@@ -13,7 +14,7 @@ import {
 } from '../../../../../shared/jira/jira-transition-fields'
 import { jiraListTransitions } from '../../../runtime/jira/runtime-jira-client'
 import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { toast } from 'sonner'
 import { useJiraBoardTransitionMove } from './use-jira-board-transition-move'
 import { jiraBoardErrorText } from './jira-board-error-text'
@@ -42,6 +43,7 @@ export function useJiraBoardDrop({
   revalidateBoard: () => void
   onIssueMoved: (issue: JiraIssue) => void
 }) {
+  const t = useTranslate()
   const move = useJiraBoardTransitionMove({
     providerSettings,
     applyIssuePatch,
@@ -117,7 +119,7 @@ export function useJiraBoardDrop({
     }
     if (move.movingIssueKeys.includes(issue.key) || dropsInFlightRef.current.has(issue.key)) {
       toast.message(
-        translate('auto.components.TaskPage.jiraBoardIssueMoving', '{{value0}} is still moving.', {
+        t('auto.components.TaskPage.jiraBoardIssueMoving', '{{value0}} is still moving.', {
           value0: issue.key
         })
       )
@@ -130,7 +132,7 @@ export function useJiraBoardDrop({
   const runColumnDrop = async (column: JiraBoardColumn, issue: JiraIssue): Promise<void> => {
     if (column.statusIds.includes(issue.status.id)) {
       toast.message(
-        translate(
+        t(
           'auto.components.TaskPage.jiraBoardAlreadyInColumn',
           '{{value0}} is already in {{value1}}.',
           { value0: issue.key, value1: column.name }
@@ -146,7 +148,7 @@ export function useJiraBoardDrop({
     if (matchingTransitions.length === 0) {
       if (transitions.length === 0) {
         toast.error(
-          translate(
+          t(
             'auto.components.TaskPage.jiraNoAvailableTransitions',
             'Jira lists no available transitions for {{value0}}; the issue may be closed or you may lack permission.',
             { value0: issue.key }
@@ -154,7 +156,7 @@ export function useJiraBoardDrop({
         )
       } else {
         toast.error(
-          translate(
+          t(
             'auto.components.TaskPage.jiraNoStatusTransitionAvailable',
             'Jira cannot move {{value0}} to {{value1}}. Available moves: {{value2}}.',
             {
@@ -184,11 +186,10 @@ export function useJiraBoardDrop({
     if (!issue) {
       return
     }
-    try {
-      await runColumnDrop(column, issue)
-    } finally {
-      dropsInFlightRef.current.delete(issue.key)
-    }
+    await runAsyncTask(
+      () => runColumnDrop(column, issue),
+      () => dropsInFlightRef.current.delete(issue.key)
+    )
   }
 
   /**
@@ -206,7 +207,7 @@ export function useJiraBoardDrop({
     )
     if (otherTransitions.length === 0) {
       toast.error(
-        translate(
+        t(
           'auto.components.TaskPage.jiraNoOtherStatusTransition',
           'Jira has no move from {{value0}} to a status outside the board columns.',
           { value0: issue.key }
@@ -228,11 +229,10 @@ export function useJiraBoardDrop({
     if (!issue) {
       return
     }
-    try {
-      await runOtherDrop(issue)
-    } finally {
-      dropsInFlightRef.current.delete(issue.key)
-    }
+    await runAsyncTask(
+      () => runOtherDrop(issue),
+      () => dropsInFlightRef.current.delete(issue.key)
+    )
   }
 
   return {

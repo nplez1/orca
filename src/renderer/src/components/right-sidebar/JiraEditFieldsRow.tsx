@@ -9,7 +9,7 @@ import {
   JiraIssueEditFieldsDialog,
   type JiraIssueFieldOutcome
 } from '@/components/jira-issue-edit-fields-dialog'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 
@@ -34,23 +34,22 @@ export function JiraEditFieldsRow({
   providerSettings: RuntimeJiraSettings
   onSubmit: (updates: JiraIssueUpdate) => Promise<JiraIssueFieldOutcome>
 }): JSX.Element {
+  const t = useTranslate()
   const [open, setOpen] = useState(false)
   return (
     <>
       <IssuePanePropertyRow
-        label={translate('auto.components.right.sidebar.IssuePane.fields', 'Fields')}
+        label={t('auto.components.right.sidebar.IssuePane.fields', 'Fields')}
         pending={pending}
         value={
           error && fields.length === 0 ? (
             <span className="text-destructive">{error}</span>
           ) : fields.length > 0 ? (
-            translate(
-              'auto.components.right.sidebar.IssuePane.editableFields',
-              '{{value0}} editable',
-              { value0: fields.length }
-            )
+            t('auto.components.right.sidebar.IssuePane.editableFields', '{{value0}} editable', {
+              value0: fields.length
+            })
           ) : (
-            translate('auto.components.right.sidebar.IssuePane.noEditableFields', 'None editable')
+            t('auto.components.right.sidebar.IssuePane.noEditableFields', 'None editable')
           )
         }
         withChevron={false}
@@ -63,7 +62,7 @@ export function JiraEditFieldsRow({
           onClick={onRetry}
           className="w-full px-2 py-1 text-left text-2xs text-muted-foreground hover:text-foreground"
         >
-          {translate('auto.components.JiraIssueWorkspace.retryEditFields', 'Retry')}
+          {t('auto.components.JiraIssueWorkspace.retryEditFields', 'Retry')}
         </button>
       ) : null}
       <JiraIssueEditFieldsDialog

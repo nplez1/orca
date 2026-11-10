@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { runAsyncTaskWithFailure } from '../lib/async-task-with-cleanup'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-client'
 import {
@@ -130,8 +131,8 @@ export function useTaskPageJiraBoardPages(args: {
     setSprintLoading(true)
     setSprintBlanked(!silent)
     setSprintError(null)
-    void (async () => {
-      try {
+    void runAsyncTaskWithFailure(
+      async () => {
         const next = await readJiraBoardScopePages({
           providerSettings,
           boardId,
@@ -143,20 +144,22 @@ export function useTaskPageJiraBoardPages(args: {
           sprintLoadedRef.current = true
           commitSprintPage(next)
         }
-      } catch (error) {
+      },
+      (error) => {
         if (generation === sprintGeneration.current) {
           setSprintError(describeJiraBoardPageError(error))
           if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
             onRuntimeBoardUnavailable()
           }
         }
-      } finally {
+      },
+      () => {
         if (generation === sprintGeneration.current) {
           setSprintLoading(false)
           setSprintBlanked(false)
         }
       }
-    })()
+    )
     return () => {
       sprintGeneration.current += 1
     }
@@ -186,8 +189,8 @@ export function useTaskPageJiraBoardPages(args: {
     setBacklogLoading(true)
     setBacklogBlanked(!silent)
     setBacklogError(null)
-    void (async () => {
-      try {
+    void runAsyncTaskWithFailure(
+      async () => {
         const next = await readJiraBoardScopePages({
           providerSettings,
           boardId,
@@ -199,20 +202,22 @@ export function useTaskPageJiraBoardPages(args: {
           backlogLoadedRef.current = true
           commitBacklogPage(next)
         }
-      } catch (error) {
+      },
+      (error) => {
         if (generation === backlogGeneration.current) {
           setBacklogError(describeJiraBoardPageError(error))
           if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
             onRuntimeBoardUnavailable()
           }
         }
-      } finally {
+      },
+      () => {
         if (generation === backlogGeneration.current) {
           setBacklogLoading(false)
           setBacklogBlanked(false)
         }
       }
-    })()
+    )
     return () => {
       backlogGeneration.current += 1
     }

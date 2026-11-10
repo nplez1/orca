@@ -15,7 +15,6 @@ import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import { JiraIssueTransitionControl } from './jira-issue-transition-control'
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import type {
@@ -69,8 +68,8 @@ export function JiraIssueWorkspaceHeader({
           size="sm"
         >
           {attachedWorkspaceLabel
-            ? translate('auto.components.JiraIssueWorkspace.showWorkspace', 'Show workspace')
-            : translate('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
+            ? t('auto.components.JiraIssueWorkspace.showWorkspace', 'Show workspace')
+            : t('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
           {attachedWorkspaceLabel ? (
             <FolderOpen className="size-4" />
           ) : (
@@ -154,6 +153,7 @@ export function JiraIssueMetadataBar({
   ) => Promise<JiraMutationResult>
   submitIssueFields: (updates: JiraIssueUpdate) => Promise<JiraIssueFieldOutcome>
 }): React.JSX.Element {
+  const t = useTranslate()
   const [editFieldsOpen, setEditFieldsOpen] = useState(false)
   return (
     <>
@@ -180,7 +180,7 @@ export function JiraIssueMetadataBar({
               className="rounded-md px-1.5 py-0.5 text-2xs text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
             >
               {displayed.priority?.name ??
-                translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
+                t('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
               {pendingField === 'priority' ? (
                 <LoaderCircle className="ml-1 inline size-3 animate-spin" />
               ) : null}
@@ -192,7 +192,7 @@ export function JiraIssueMetadataBar({
                 void mutateIssue('priority', { priorityId: null }, { priority: undefined })
               }
             >
-              {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
+              {t('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
             </DropdownMenuItem>
             {prioritiesError ? (
               <p className="px-2 py-1.5 text-2xs text-destructive">{prioritiesError}</p>
@@ -255,7 +255,7 @@ export function JiraIssueMetadataBar({
           <div className="ml-auto flex min-w-0 items-center gap-1 text-2xs text-destructive">
             <span className="max-w-[220px] truncate">{editFieldsError}</span>
             <Button type="button" variant="ghost" size="xs" onClick={reloadEditFields}>
-              {translate('auto.components.JiraIssueWorkspace.retryEditFields', 'Retry')}
+              {t('auto.components.JiraIssueWorkspace.retryEditFields', 'Retry')}
             </Button>
           </div>
         ) : (
@@ -268,7 +268,7 @@ export function JiraIssueMetadataBar({
             onClick={() => setEditFieldsOpen(true)}
           >
             {editFieldsLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
-            {translate('auto.components.JiraIssueWorkspace.editFields', 'Edit fields')}
+            {t('auto.components.JiraIssueWorkspace.editFields', 'Edit fields')}
           </Button>
         )}
       </div>

@@ -7,7 +7,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import { getJiraIssueRowActions, type JiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
 import { Popover, PopoverAnchor } from '@/components/ui/popover'
@@ -24,6 +24,7 @@ export function JiraIssueRowContextMenu({
   workspaceAction: JiraIssueRowWorkspaceAction | null
   children: ReactNode
 }): React.JSX.Element {
+  const t = useTranslate()
   const [templateOpen, setTemplateOpen] = useState(false)
   const anchorRef = useRef<HTMLElement | null>(null)
   const setAnchor = (element: HTMLDivElement | null) => {
@@ -94,7 +95,7 @@ export function JiraIssueRowContextMenu({
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => setTemplateOpen(true)}>
             <FileText className="size-3.5" />
-            {translate('jira.prompt.dialogTitle', 'Copy prompt from template')}
+            {t('jira.prompt.dialogTitle', 'Copy prompt from template')}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

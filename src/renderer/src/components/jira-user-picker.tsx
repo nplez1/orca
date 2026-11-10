@@ -237,7 +237,7 @@ export function JiraUserPicker({
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={translate('components.jiraUserPicker.search', 'Search users')}
+          placeholder={t('components.jiraUserPicker.search', 'Search users')}
           className="mb-1 h-7"
           autoFocus
         />
@@ -258,7 +258,7 @@ export function JiraUserPicker({
           <p className="px-2 py-1.5 text-xs text-destructive">{error}</p>
         ) : users.length === 0 && !loading ? (
           <p className="px-2 py-1.5 text-xs text-muted-foreground">
-            {translate('components.jiraUserPicker.empty', 'No users found')}
+            {t('components.jiraUserPicker.empty', 'No users found')}
           </p>
         ) : (
           <JiraUserOptionList users={users} onSelect={selectUser} />

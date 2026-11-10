@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ExternalLink, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { ORCA_REPOSITORY_URL } from '../../../shared/orca-repository'
 import type { OrcaStarState } from './orca-star-state'
 
@@ -18,6 +18,7 @@ export function GitHubStarButton({
   state,
   setState
 }: GitHubStarButtonProps): React.JSX.Element | null {
+  const t = useTranslate()
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const mountedRef = useMountedRef()
@@ -99,10 +100,10 @@ export function GitHubStarButton({
           />
         )}
         {state === 'starred'
-          ? translate('auto.components.Landing.ec43b38ba7', 'Starred on GitHub')
+          ? t('auto.components.Landing.ec43b38ba7', 'Starred on GitHub')
           : state === 'web-fallback'
-            ? translate('auto.components.Landing.157bb5ecbb', 'Open GitHub')
-            : translate('auto.components.Landing.0d0ace8861', 'Star on GitHub')}
+            ? t('auto.components.Landing.157bb5ecbb', 'Open GitHub')
+            : t('auto.components.Landing.0d0ace8861', 'Star on GitHub')}
       </button>
       {state === 'starred' && menuOpen && (
         <div className="absolute right-0 bottom-[calc(100%+4px)] z-10 min-w-[100px] rounded-md border border-border bg-popover py-1 shadow-floating">
@@ -113,7 +114,7 @@ export function GitHubStarButton({
               setState('hidden')
             }}
           >
-            {translate('auto.components.Landing.c1cf168479', 'Hide')}
+            {t('auto.components.Landing.c1cf168479', 'Hide')}
           </button>
         </div>
       )}

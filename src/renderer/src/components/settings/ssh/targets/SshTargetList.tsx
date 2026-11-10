@@ -232,17 +232,15 @@ export function SshTargetList({
               <ChevronRight
                 className={cn('size-3.5 transition-transform', hiddenExpanded && 'rotate-90')}
               />
-              {translate(
-                'auto.components.settings.SshTargetList.hiddenSection',
-                'Hidden ({{value0}})',
-                { value0: hiddenTargets.length }
-              )}
+              {t('auto.components.settings.SshTargetList.hiddenSection', 'Hidden ({{value0}})', {
+                value0: hiddenTargets.length
+              })}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="space-y-2 pt-2">
               <p className="text-xs text-muted-foreground">
-                {translate(
+                {t(
                   'auto.components.settings.SshTargetList.hiddenSectionHint',
                   'These hosts come from your SSH config. They stay out of the lists where you pick a host, but anything already running on them keeps working.'
                 )}

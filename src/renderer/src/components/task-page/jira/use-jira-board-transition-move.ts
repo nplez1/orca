@@ -1,3 +1,4 @@
+import { runAsyncTaskOrRecover } from '@/lib/async-task-with-cleanup'
 import { jiraBoardErrorText } from './jira-board-error-text'
 import { useState } from 'react'
 import type {
@@ -9,7 +10,7 @@ import type {
 import type { JiraTransitionSubmitOutcome } from '../../jira-transition-fields-form'
 import { jiraUpdateIssue } from '../../../runtime/jira/runtime-jira-client'
 import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { toast } from 'sonner'
 
 /** The fields a transition's own screen requires, held while the form collects them. */
@@ -42,6 +43,7 @@ export function useJiraBoardTransitionMove({
   revalidateBoard: () => void
   onIssueMoved: (issue: JiraIssue) => void
 }) {
+  const t = useTranslate()
   const [movingIssueKeys, setMovingIssueKeys] = useState<string[]>([])
   // Why a count, not a flag: two moves can overlap, and the first to finish must
   // not re-enable the other move's dialog mid-request.
@@ -68,40 +70,42 @@ export function useJiraBoardTransitionMove({
     markMoving(issue.key, true)
     setInFlightCount((current) => current + 1)
     let succeeded = false
-    try {
-      const result = await jiraUpdateIssue(
-        providerSettings,
-        issue.key,
-        { ...updates, transitionId: transition.id },
-        issue.siteId
-      )
-      if (!result.ok) {
-        return {
-          ok: false,
-          error: result.error,
-          ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
-          ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
+    return await runAsyncTaskOrRecover(
+      async () => {
+        const result = await jiraUpdateIssue(
+          providerSettings,
+          issue.key,
+          { ...updates, transitionId: transition.id },
+          issue.siteId
+        )
+        if (!result.ok) {
+          return {
+            ok: false,
+            error: result.error,
+            ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
+            ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
+          }
         }
+        succeeded = true
+        toast.success(
+          t('auto.components.TaskPage.jiraIssueMoved', '{{value0}} moved to {{value1}}', {
+            value0: issue.key,
+            value1: transition.to.name
+          })
+        )
+        onIssueMoved(issue)
+        revalidateBoard()
+        return { ok: true }
+      },
+      (error) => ({ ok: false, error: jiraBoardErrorText(error) }),
+      () => {
+        if (!succeeded) {
+          applyIssuePatch(issue.key, { status: previousStatus }, issue.siteId)
+        }
+        markMoving(issue.key, false)
+        setInFlightCount((current) => Math.max(0, current - 1))
       }
-      succeeded = true
-      toast.success(
-        translate('auto.components.TaskPage.jiraIssueMoved', '{{value0}} moved to {{value1}}', {
-          value0: issue.key,
-          value1: transition.to.name
-        })
-      )
-      onIssueMoved(issue)
-      revalidateBoard()
-      return { ok: true }
-    } catch (error) {
-      return { ok: false, error: jiraBoardErrorText(error) }
-    } finally {
-      if (!succeeded) {
-        applyIssuePatch(issue.key, { status: previousStatus }, issue.siteId)
-      }
-      markMoving(issue.key, false)
-      setInFlightCount((current) => Math.max(0, current - 1))
-    }
+    )
   }
 
   return {
@@ -129,10 +133,7 @@ export function useJiraBoardTransitionMove({
       if (!pending) {
         return {
           ok: false,
-          error: translate(
-            'auto.components.TaskPage.jiraNoPendingTransition',
-            'No transition is pending.'
-          )
+          error: t('auto.components.TaskPage.jiraNoPendingTransition', 'No transition is pending.')
         }
       }
       const outcome = await applyTransition(pending.issue, pending.transition, updates)

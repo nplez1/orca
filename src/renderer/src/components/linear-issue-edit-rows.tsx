@@ -17,7 +17,7 @@ import {
   LINEAR_ESTIMATE_PRESETS,
   formatLinearEstimateLabel
 } from '@/components/linear-item-drawer-edit-controls'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { getLinearPriorityLabel } from '@/components/task-page/task-page-localized-options'
 import {
   IssueAssigneeCombobox,
@@ -58,12 +58,13 @@ function LinearStatusRow({
 }: {
   controller: LinearIssueEditController
 }): React.JSX.Element {
+  const t = useTranslate()
   const { states, localState, currentStateId, handleStateChange, statePending } = controller
   return (
     <Popover>
       <PopoverTrigger asChild>
         <IssuePanePropertyRow
-          label={translate('auto.components.right.sidebar.IssuePane.status', 'Status')}
+          label={t('auto.components.right.sidebar.IssuePane.status', 'Status')}
           pending={statePending}
           disabled={statePending}
           value={
@@ -84,7 +85,7 @@ function LinearStatusRow({
         ) : states.loading ? (
           <div className="flex items-center gap-2 px-2 py-3 text-[12px] text-muted-foreground">
             <LoaderCircle className="size-3 animate-spin" />
-            {translate('auto.components.LinearItemDrawer.59b6cd3706', 'Loading states')}
+            {t('auto.components.LinearItemDrawer.59b6cd3706', 'Loading states')}
           </div>
         ) : (
           states.data.map((state) => (
@@ -115,6 +116,7 @@ function LinearAssigneeRow({
 }: {
   controller: LinearIssueEditController
 }): React.JSX.Element {
+  const t = useTranslate()
   const { members, localAssignee, handleAssigneeChange, assigneePending } = controller
   const viewerEmail = useAppStore((state) => state.linearStatus.viewer?.email ?? null)
   const roster: IssueAssigneeOption[] = members.data.map((member) => ({
@@ -125,7 +127,7 @@ function LinearAssigneeRow({
   }))
   return (
     <IssueAssigneeCombobox
-      label={translate('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
+      label={t('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
       roster={roster}
       selected={
         localAssignee
@@ -153,12 +155,13 @@ function LinearPriorityRow({
 }: {
   controller: LinearIssueEditController
 }): React.JSX.Element {
+  const t = useTranslate()
   const { localPriority, handlePriorityChange, priorityPending } = controller
   return (
     <Popover>
       <PopoverTrigger asChild>
         <IssuePanePropertyRow
-          label={translate('auto.components.right.sidebar.IssuePane.priority', 'Priority')}
+          label={t('auto.components.right.sidebar.IssuePane.priority', 'Priority')}
           pending={priorityPending}
           disabled={priorityPending}
           value={
@@ -194,6 +197,7 @@ function LinearEstimateRow({
 }: {
   controller: LinearIssueEditController
 }): React.JSX.Element {
+  const t = useTranslate()
   const {
     localEstimate,
     handleEstimateChange,
@@ -208,7 +212,7 @@ function LinearEstimateRow({
     <Popover open={estimatePopoverOpen} onOpenChange={handleEstimatePopoverOpenChange}>
       <PopoverTrigger asChild>
         <IssuePanePropertyRow
-          label={translate('auto.components.LinearItemDrawer.e6cd6f6d3e', 'Estimate')}
+          label={t('auto.components.LinearItemDrawer.e6cd6f6d3e', 'Estimate')}
           pending={estimatePending}
           disabled={estimatePending}
           value={formatLinearEstimateLabel(localEstimate)}
@@ -241,10 +245,7 @@ function LinearEstimateRow({
               }
             }}
             inputMode="numeric"
-            placeholder={translate(
-              'auto.components.LinearItemDrawer.fbb90300e2',
-              'Custom estimate'
-            )}
+            placeholder={t('auto.components.LinearItemDrawer.fbb90300e2', 'Custom estimate')}
             className="h-8"
           />
           <div className="flex items-center justify-between gap-2">
@@ -254,7 +255,7 @@ function LinearEstimateRow({
               size="sm"
               onClick={() => handleEstimateChange(null)}
             >
-              {translate('auto.components.LinearItemDrawer.ceeb8c6153', 'Clear')}
+              {t('auto.components.LinearItemDrawer.ceeb8c6153', 'Clear')}
             </Button>
             <Button
               type="button"
@@ -263,7 +264,7 @@ function LinearEstimateRow({
               disabled={estimatePending}
             >
               {estimatePending ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
-              {translate('auto.components.LinearItemDrawer.b5675b0694', 'Save')}
+              {t('auto.components.LinearItemDrawer.b5675b0694', 'Save')}
             </Button>
           </div>
         </div>
@@ -277,6 +278,7 @@ function LinearLabelsRow({
 }: {
   controller: LinearIssueEditController
 }): React.JSX.Element {
+  const t = useTranslate()
   const {
     labels,
     localLabels,
@@ -291,7 +293,7 @@ function LinearLabelsRow({
     <Popover open={labelPopoverOpen} onOpenChange={setLabelPopoverOpen}>
       <PopoverTrigger asChild>
         <IssuePanePropertyRow
-          label={translate('auto.components.right.sidebar.IssuePane.labels', 'Labels')}
+          label={t('auto.components.right.sidebar.IssuePane.labels', 'Labels')}
           pending={labelsPending}
           disabled={labelsPending}
           value={
@@ -299,7 +301,7 @@ function LinearLabelsRow({
               labelSummary
             ) : (
               <span className="text-muted-foreground">
-                {translate('auto.components.LinearItemDrawer.23886c7eec', 'Add label')}
+                {t('auto.components.LinearItemDrawer.23886c7eec', 'Add label')}
               </span>
             )
           }
@@ -312,7 +314,7 @@ function LinearLabelsRow({
           ) : labels.loading ? (
             <div className="flex items-center gap-2 px-2 py-3 text-[12px] text-muted-foreground">
               <LoaderCircle className="size-3 animate-spin" />
-              {translate('auto.components.LinearItemDrawer.cddd9b04a7', 'Loading labels')}
+              {t('auto.components.LinearItemDrawer.cddd9b04a7', 'Loading labels')}
             </div>
           ) : (
             labels.data.map((label) => (

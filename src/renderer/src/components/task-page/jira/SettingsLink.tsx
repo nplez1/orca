@@ -1,13 +1,14 @@
 import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
 
 export function TaskPageJiraSettingsLink(): React.JSX.Element {
+  const t = useTranslate()
   const openSettingsPage = useAppStore((state) => state.openSettingsPage)
   const openSettingsTarget = useAppStore((state) => state.openSettingsTarget)
-  const label = translate('auto.components.TaskPage.jiraTaskSettings', 'Jira task settings')
+  const label = t('auto.components.TaskPage.jiraTaskSettings', 'Jira task settings')
   return (
     <Tooltip>
       <TooltipTrigger asChild>

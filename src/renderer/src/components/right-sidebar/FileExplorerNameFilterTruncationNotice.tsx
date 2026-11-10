@@ -1,6 +1,6 @@
 import React from 'react'
 import type { WorkspacePathSearchResponse } from '../../../../shared/workspace-path-search-contract'
-import { getIntlLocale, translate } from '@/i18n/i18n'
+import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 
 /** Why: bounded or provisional pages must not read as complete workspace answers. */
 export function FileExplorerNameFilterTruncationNotice({
@@ -24,6 +24,8 @@ export function FileExplorerNameFilterTruncationNotice({
   hasError?: boolean
   hasProjectionError?: boolean
 }): React.JSX.Element | null {
+  const t = useTranslate()
+  const intlLocale = useIntlLocale()
   const state = workspacePathSearch?.state
   const isExactComplete =
     state?.coverage === 'complete' &&
@@ -44,11 +46,11 @@ export function FileExplorerNameFilterTruncationNotice({
     return (
       <p className="text-xs text-muted-foreground" role="status">
         {hasProjectionError
-          ? translate(
+          ? t(
               'auto.components.right.sidebar.FileExplorerNameFilter.projectionBudget',
               'The filtered file list is too large to display — add more of the name to narrow it down'
             )
-          : translate(
+          : t(
               'auto.components.right.sidebar.FileExplorerNameFilter.updateFailed',
               'File search is unavailable — showing previous results when available'
             )}
@@ -58,37 +60,28 @@ export function FileExplorerNameFilterTruncationNotice({
   if (isUpdating || state?.freshness === 'dirty' || state?.freshness === 'reconciling') {
     return (
       <p className="text-xs text-muted-foreground" role="status">
-        {translate(
-          'auto.components.right.sidebar.FileExplorerNameFilter.updating',
-          'Updating file list'
-        )}
+        {t('auto.components.right.sidebar.FileExplorerNameFilter.updating', 'Updating file list')}
       </p>
     )
   }
   if ((isIndexing || isStructuredIndexing) && !isExactComplete) {
     return (
       <p className="text-xs text-muted-foreground" role="status">
-        {translate(
-          'auto.components.right.sidebar.FileExplorerNameFilter.indexing',
-          'Indexing files…'
-        )}
+        {t('auto.components.right.sidebar.FileExplorerNameFilter.indexing', 'Indexing files…')}
       </p>
     )
   }
   if (isSearching) {
     return (
       <p className="text-xs text-muted-foreground" role="status">
-        {translate(
-          'auto.components.right.sidebar.FileExplorerNameFilter.searching',
-          'Searching files…'
-        )}
+        {t('auto.components.right.sidebar.FileExplorerNameFilter.searching', 'Searching files…')}
       </p>
     )
   }
   if (totalCount === null && (truncated || !workspacePathSearch)) {
     return (
       <p className="text-xs text-muted-foreground" role="status">
-        {translate(
+        {t(
           'auto.components.right.sidebar.FileExplorer.filterScannedPartialWorkspace',
           'Only part of this workspace was searched — add more of the name to narrow it down'
         )}
@@ -98,7 +91,7 @@ export function FileExplorerNameFilterTruncationNotice({
   if (hasPartialCoverage || (workspacePathSearch && !isExactComplete)) {
     return (
       <p className="text-xs text-muted-foreground" role="status">
-        {translate(
+        {t(
           'auto.components.right.sidebar.FileExplorer.filterScannedPartialWorkspace',
           'Only part of this workspace was searched — add more of the name to narrow it down'
         )}
@@ -111,7 +104,7 @@ export function FileExplorerNameFilterTruncationNotice({
     if (isExactComplete && (isIndexing || isStructuredIndexing)) {
       return (
         <p className="text-xs text-muted-foreground" role="status">
-          {translate(
+          {t(
             'auto.components.right.sidebar.FileExplorerNameFilter.liveScanComplete',
             'Complete results from a full scan — the file index is still building'
           )}
@@ -123,12 +116,12 @@ export function FileExplorerNameFilterTruncationNotice({
 
   return (
     <p className="text-xs text-muted-foreground" role="status">
-      {translate(
+      {t(
         'auto.components.right.sidebar.FileExplorer.filterShowingFirstMatches',
         'Showing the first {{value0}} of {{value1}} matches — add more of the name to narrow it down',
         {
-          value0: shownCount.toLocaleString(getIntlLocale()),
-          value1: totalCount.toLocaleString(getIntlLocale())
+          value0: shownCount.toLocaleString(intlLocale),
+          value1: totalCount.toLocaleString(intlLocale)
         }
       )}
     </p>

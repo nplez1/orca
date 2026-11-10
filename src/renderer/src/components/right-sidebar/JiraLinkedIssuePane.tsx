@@ -19,6 +19,7 @@ import { useAppStore } from '@/store'
 import type { JiraComment, JiraIssue, JiraUser } from '../../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { IssueAssigneeCombobox, type IssueAssigneeOption } from './IssueAssigneeCombobox'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
@@ -69,6 +70,7 @@ export function JiraLinkedIssuePane({
   sourceContext: TaskSourceContext
   issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
+  const t = useTranslate()
   const viewerAccountId = useAppStore((s) => s.jiraStatus.viewer?.accountId ?? null)
   const linkActions = useLinkedIssuePaneActions(linkedIssue)
   const providerSettings: RuntimeJiraSettings = sourceContext
@@ -149,7 +151,7 @@ export function JiraLinkedIssuePane({
                 }}
               />
               <IssueAssigneeCombobox
-                label={translate('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
+                label={t('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
                 roster={detail.users.map(jiraUserOption)}
                 rosterError={detail.usersError}
                 selected={displayed.assignee ? [jiraUserOption(displayed.assignee)] : []}
@@ -215,10 +217,7 @@ export function JiraLinkedIssuePane({
                 />
               ) : (
                 <p className="text-xs italic text-muted-foreground">
-                  {translate(
-                    'auto.components.JiraIssueWorkspace.c4889a47e4',
-                    'No description provided.'
-                  )}
+                  {t('auto.components.JiraIssueWorkspace.c4889a47e4', 'No description provided.')}
                 </p>
               )}
             </section>
@@ -254,12 +253,13 @@ function JiraPriorityRow({
   displayed: JiraIssue
   detail: JiraDetail
 }): React.JSX.Element {
+  const t = useTranslate()
   const pending = detail.pendingField === 'priority'
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <IssuePanePropertyRow
-          label={translate('auto.components.right.sidebar.IssuePane.priority', 'Priority')}
+          label={t('auto.components.right.sidebar.IssuePane.priority', 'Priority')}
           pending={pending}
           disabled={pending}
           value={
@@ -267,7 +267,7 @@ function JiraPriorityRow({
               <TaskPageJiraPriorityBadge priority={displayed.priority} />
             ) : (
               <span className="text-muted-foreground">
-                {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
+                {t('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
               </span>
             )
           }
@@ -279,7 +279,7 @@ function JiraPriorityRow({
             void detail.mutateIssue('priority', { priorityId: null }, { priority: undefined })
           }
         >
-          {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
+          {t('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
         </DropdownMenuItem>
         {detail.prioritiesError ? (
           <p className="px-2 py-1.5 text-2xs text-destructive">{detail.prioritiesError}</p>
@@ -307,6 +307,7 @@ function JiraLabelsRow({
   displayed: JiraIssue
   detail: JiraDetail
 }): React.JSX.Element {
+  const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(displayed.labels.join(', '))
   useEffect(() => {
@@ -328,14 +329,14 @@ function JiraLabelsRow({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <IssuePanePropertyRow
-          label={translate('auto.components.right.sidebar.IssuePane.labels', 'Labels')}
+          label={t('auto.components.right.sidebar.IssuePane.labels', 'Labels')}
           pending={detail.pendingField === 'labels'}
           value={
             displayed.labels.length > 0 ? (
               displayed.labels.join(', ')
             ) : (
               <span className="text-muted-foreground">
-                {translate('auto.components.right.sidebar.IssuePane.noLabels', 'None')}
+                {t('auto.components.right.sidebar.IssuePane.noLabels', 'None')}
               </span>
             )
           }
@@ -353,10 +354,7 @@ function JiraLabelsRow({
                   save()
                 }
               }}
-              placeholder={translate(
-                'auto.components.JiraIssueWorkspace.0f3c07a901',
-                'backend, bug'
-              )}
+              placeholder={t('auto.components.JiraIssueWorkspace.0f3c07a901', 'backend, bug')}
               className="h-8 text-xs"
               autoFocus
             />
@@ -366,7 +364,7 @@ function JiraLabelsRow({
               onClick={save}
               disabled={detail.pendingField === 'labels'}
             >
-              {translate('auto.components.right.sidebar.IssuePane.save', 'Save')}
+              {t('auto.components.right.sidebar.IssuePane.save', 'Save')}
             </Button>
           </div>
         </div>

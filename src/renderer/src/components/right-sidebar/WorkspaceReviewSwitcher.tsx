@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { WorkspaceReviewSelectionEntry } from './workspace-review-selection'
 
 /** What a review is called in the switcher: `PR #12` on GitHub and `MR !12` on GitLab. */
@@ -42,7 +42,8 @@ export function WorkspaceReviewSwitcher({
   onSelectReview,
   className
 }: WorkspaceReviewSwitcherProps): React.JSX.Element | null {
-  const switchLabel = translate(
+  const t = useTranslate()
+  const switchLabel = t(
     'auto.components.right.sidebar.WorkspaceReviewSwitcher.switchReview',
     'Switch pull request'
   )
@@ -81,7 +82,7 @@ export function WorkspaceReviewSwitcher({
                 </span>
                 <span className="truncate text-2xs text-muted-foreground">
                   {entry.title ||
-                    translate(
+                    t(
                       'auto.components.right.sidebar.WorkspaceReviewSwitcher.untitledReview',
                       'Untitled review'
                     )}

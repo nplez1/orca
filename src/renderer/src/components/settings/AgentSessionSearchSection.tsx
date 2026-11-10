@@ -12,7 +12,7 @@ import {
   SettingsSubsectionHeader,
   SettingsSwitchRow
 } from './form-controls/SettingsFormControls'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 type AgentSessionSearchSectionProps = {
   settings: GlobalSettings
@@ -45,23 +45,24 @@ export function AgentSessionSearchSection({
   settings,
   updateSettings
 }: AgentSessionSearchSectionProps): React.JSX.Element {
+  const t = useTranslate()
   const current = resolveAiVaultSearchSettings(settings)
   const update = (patch: Partial<AiVaultSearchSettings>): void => {
     updateSettings({ aiVaultSearch: { ...current, ...patch } })
   }
-  const contentTitle = translate(
+  const contentTitle = t(
     'auto.components.settings.AgentSessionSearchSection.contentTitle',
     'Index conversation content'
   )
-  const contentDescription = translate(
+  const contentDescription = t(
     'auto.components.settings.AgentSessionSearchSection.contentDescription',
     'Indexes session titles, working directories, branches, and message text from transcripts on this machine. When off, search covers titles and paths but not conversation contents.'
   )
-  const retentionTitle = translate(
+  const retentionTitle = t(
     'auto.components.settings.AgentSessionSearchSection.retentionTitle',
     'History range'
   )
-  const retentionDescription = translate(
+  const retentionDescription = t(
     'auto.components.settings.AgentSessionSearchSection.retentionDescription',
     'How far back to index transcripts. All history indexes every transcript the scan can find.'
   )
@@ -74,11 +75,11 @@ export function AgentSessionSearchSection({
   return (
     <section className="space-y-3">
       <SettingsSubsectionHeader
-        title={translate(
+        title={t(
           'auto.components.settings.AgentSessionSearchSection.title',
           'Session History Search'
         )}
-        description={translate(
+        description={t(
           'auto.components.settings.AgentSessionSearchSection.description',
           'Search your local agent sessions by title, project, and conversation content.'
         )}
@@ -111,14 +112,14 @@ export function AgentSessionSearchSection({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_HISTORY_VALUE}>
-                  {translate(
+                  {t(
                     'auto.components.settings.AgentSessionSearchSection.allHistory',
                     'All history'
                   )}
                 </SelectItem>
                 {retentionDayOptions(current.historyDays).map((days) => (
                   <SelectItem key={days} value={String(days)}>
-                    {translate(
+                    {t(
                       'auto.components.settings.AgentSessionSearchSection.lastDays',
                       'Last {{value0}} days',
                       { value0: days }

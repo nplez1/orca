@@ -4,6 +4,7 @@ import { jiraGetIssue } from '../runtime/jira/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
+import { runAsyncTask } from '../lib/async-task-with-cleanup'
 import {
   mergeJiraIssueHydration,
   type EditableJiraIssueField
@@ -78,16 +79,17 @@ export function useJiraIssueWorkspaceRefresh({
     }
     const scope = issueScope
     setRefreshing(true)
-    try {
-      await refreshIssue()
-      // Why the second guard: the transitions read this closure holds is the previous
-      // issue's, so reloading it after a selection move lands A's choices in B's picker.
-      if (scopeRef.current === scope) {
-        await reloadTransitions()
-      }
-    } finally {
-      setRefreshing(false)
-    }
+    await runAsyncTask(
+      async () => {
+        await refreshIssue()
+        // Why the second guard: the transitions read this closure holds is the previous
+        // issue's, so reloading it after a selection move lands A's choices in B's picker.
+        if (scopeRef.current === scope) {
+          await reloadTransitions()
+        }
+      },
+      () => setRefreshing(false)
+    )
   }, [displayed, issueScope, refreshIssue, reloadTransitions])
 
   useEffect(() => {

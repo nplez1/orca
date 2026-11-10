@@ -3,7 +3,7 @@ import { LoaderCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 
 /** One selectable person, normalized across Jira / Linear / GitHub. */
@@ -104,6 +104,7 @@ export function IssueAssigneeCombobox({
   rosterError?: string | null
   maxDefault?: number
 }): React.JSX.Element {
+  const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<IssueAssigneeOption[] | null>(null)
@@ -171,10 +172,10 @@ export function IssueAssigneeCombobox({
 
   const triggerValue = useMemo(() => {
     if (selected.length === 0) {
-      return translate('auto.components.right.sidebar.IssueAssignee.unassigned', 'Unassigned')
+      return t('auto.components.right.sidebar.IssueAssignee.unassigned', 'Unassigned')
     }
     return selected.map((option) => option.label).join(', ')
-  }, [selected])
+  }, [selected, t])
   const handleSelect = useCallback(
     (option: IssueAssigneeOption) => {
       onSelect(option)
@@ -216,10 +217,7 @@ export function IssueAssigneeCombobox({
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={translate(
-              'auto.components.right.sidebar.IssueAssignee.search',
-              'Search people'
-            )}
+            placeholder={t('auto.components.right.sidebar.IssueAssignee.search', 'Search people')}
             className="mb-1 h-7"
             autoFocus
           />
@@ -235,22 +233,19 @@ export function IssueAssigneeCombobox({
                 }}
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] text-muted-foreground hover:bg-accent"
               >
-                {translate('auto.components.right.sidebar.IssueAssignee.unassigned', 'Unassigned')}
+                {t('auto.components.right.sidebar.IssueAssignee.unassigned', 'Unassigned')}
               </button>
             ) : null}
             {searching ? (
               <div className="flex items-center gap-2 px-2 py-3 text-[12px] text-muted-foreground">
                 <LoaderCircle className="size-3 animate-spin" />
-                {translate('auto.components.right.sidebar.IssueAssignee.searching', 'Searching…')}
+                {t('auto.components.right.sidebar.IssueAssignee.searching', 'Searching…')}
               </div>
             ) : emptyRosterError ? (
               <p className="px-2 py-1.5 text-xs text-destructive">{emptyRosterError}</p>
             ) : showEmpty ? (
               <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
-                {translate(
-                  'auto.components.right.sidebar.IssueAssignee.noResults',
-                  'No people found'
-                )}
+                {t('auto.components.right.sidebar.IssueAssignee.noResults', 'No people found')}
               </p>
             ) : (
               visible.map((option) => {
@@ -270,7 +265,7 @@ export function IssueAssigneeCombobox({
                     <span className="min-w-0 flex-1 truncate">{option.label}</span>
                     {isSelf?.(option) ? (
                       <span className="shrink-0 text-[10px] text-muted-foreground">
-                        {translate('auto.components.right.sidebar.IssueAssignee.you', 'You')}
+                        {t('auto.components.right.sidebar.IssueAssignee.you', 'You')}
                       </span>
                     ) : null}
                     {isSelected ? (

@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react'
 import { Check, ChevronsDownUp, CornerDownLeft, ExternalLink, Reply, Undo2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import {
   RightPanelCommentComposer,
@@ -12,6 +13,7 @@ import { getDiffCommentLineLabel } from '@/lib/diff-comment-compat'
 import { useCommentCardResize } from '../diff-comments/useCommentCardResize'
 import type { DecoratedDiffComment } from '../diff-comments/decorated-diff-comment'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import './pr-comment-thread.css'
 
 type Props = {
@@ -63,6 +65,7 @@ export function PRCommentThreadCard({
   onContentResize,
   observeRenderedSize
 }: Props): React.JSX.Element {
+  const t = useTranslate()
   const thread = comment.thread
   // Why: the card is remounted into a view zone at an unpredictable moment, and relative labels
   // are presentation only — freezing "now" at mount keeps them from re-rendering mid-gesture.
@@ -127,10 +130,7 @@ export function PRCommentThreadCard({
             <span className="orca-pr-comment-author">{comment.author}</span>
             {comment.isBot ? (
               <span className="orca-pr-comment-bot-badge">
-                {translate(
-                  'auto.components.pr.comment.inline.PRCommentThreadCard.dfcd8f7f21',
-                  'bot'
-                )}
+                {t('auto.components.pr.comment.inline.PRCommentThreadCard.dfcd8f7f21', 'bot')}
               </span>
             ) : null}
             <span className="orca-pr-comment-meta-text">{lineLabel}</span>
@@ -140,10 +140,7 @@ export function PRCommentThreadCard({
             {isResolved ? (
               <span className="orca-pr-comment-resolved-badge">
                 <Check className="size-3" />
-                {translate(
-                  'auto.components.pr.comment.inline.PRCommentThreadCard.27eb8f6ea9',
-                  'Resolved'
-                )}
+                {t('auto.components.pr.comment.inline.PRCommentThreadCard.27eb8f6ea9', 'Resolved')}
               </span>
             ) : null}
           </div>
@@ -156,11 +153,11 @@ export function PRCommentThreadCard({
               <button
                 type="button"
                 className="orca-diff-comment-pill-btn"
-                aria-label={translate(
+                aria-label={t(
                   'auto.components.pr.comment.inline.PRCommentThreadCard.be8d2e8f48',
                   'Reply'
                 )}
-                title={translate(
+                title={t(
                   'auto.components.pr.comment.inline.PRCommentThreadCard.be8d2e8f48',
                   'Reply'
                 )}
@@ -179,22 +176,22 @@ export function PRCommentThreadCard({
                 className={cn('orca-diff-comment-pill-btn', resolving && 'pointer-events-none')}
                 aria-label={
                   isResolved
-                    ? translate(
+                    ? t(
                         'auto.components.pr.comment.inline.PRCommentThreadCard.b50141162f',
                         'Unresolve thread'
                       )
-                    : translate(
+                    : t(
                         'auto.components.pr.comment.inline.PRCommentThreadCard.3b01798961',
                         'Resolve thread'
                       )
                 }
                 title={
                   isResolved
-                    ? translate(
+                    ? t(
                         'auto.components.pr.comment.inline.PRCommentThreadCard.b50141162f',
                         'Unresolve thread'
                       )
-                    : translate(
+                    : t(
                         'auto.components.pr.comment.inline.PRCommentThreadCard.3b01798961',
                         'Resolve thread'
                       )
@@ -212,11 +209,11 @@ export function PRCommentThreadCard({
               <button
                 type="button"
                 className="orca-diff-comment-pill-btn"
-                aria-label={translate(
+                aria-label={t(
                   'auto.components.pr.comment.inline.PRCommentThreadCard.e2be68390f',
                   'Open on GitHub'
                 )}
-                title={translate(
+                title={t(
                   'auto.components.pr.comment.inline.PRCommentThreadCard.e2be68390f',
                   'Open on GitHub'
                 )}
@@ -224,7 +221,7 @@ export function PRCommentThreadCard({
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
-                  void window.api.shell.openUrl(comment.url ?? '')
+                  openAppHttpLink(comment.url ?? '', { event })
                 }}
               >
                 <ExternalLink className="size-3" />
@@ -234,11 +231,11 @@ export function PRCommentThreadCard({
               <button
                 type="button"
                 className="orca-diff-comment-pill-btn"
-                aria-label={translate(
+                aria-label={t(
                   'auto.components.pr.comment.inline.PRCommentThreadCard.2002706ed8',
                   'Hide thread'
                 )}
-                title={translate(
+                title={t(
                   'auto.components.pr.comment.inline.PRCommentThreadCard.2002706ed8',
                   'Hide thread'
                 )}
@@ -271,12 +268,12 @@ export function PRCommentThreadCard({
               }}
             >
               {repliesExpanded
-                ? translate(
+                ? t(
                     'auto.components.pr.comment.inline.PRCommentThreadCard.b1daf89414',
                     'Hide {{value0}} {{value1}}',
                     { value0: replies.length, value1: replies.length === 1 ? 'reply' : 'replies' }
                   )
-                : translate(
+                : t(
                     'auto.components.pr.comment.inline.PRCommentThreadCard.21e296c94d',
                     'Show {{value0}} {{value1}}',
                     { value0: replies.length, value1: replies.length === 1 ? 'reply' : 'replies' }
@@ -291,7 +288,7 @@ export function PRCommentThreadCard({
         {replying && onReply ? (
           <div className="orca-pr-comment-composer">
             <RightPanelCommentComposer
-              placeholder={translate(
+              placeholder={t(
                 'auto.components.pr.comment.inline.PRCommentThreadCard.90e6e6fd21',
                 'Reply to this thread'
               )}
@@ -318,7 +315,7 @@ export function PRCommentThreadCard({
             }}
           >
             <CornerDownLeft className="size-3" />
-            {translate('auto.components.pr.comment.inline.PRCommentThreadCard.be8d2e8f48', 'Reply')}
+            {t('auto.components.pr.comment.inline.PRCommentThreadCard.be8d2e8f48', 'Reply')}
           </button>
         ) : null}
       </div>

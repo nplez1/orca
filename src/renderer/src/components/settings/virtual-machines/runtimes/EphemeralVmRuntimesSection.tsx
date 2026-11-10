@@ -1,3 +1,4 @@
+import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import { Loader2, RefreshCw } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
@@ -124,27 +125,31 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
       if (mountedRef.current && showLoading) {
         setIsLoading(true)
       }
-      try {
-        const nextRuntimes = await window.api.ephemeralVm.listRuntimes()
-        if (mountedRef.current) {
-          setRuntimes(getVisibleEphemeralVmRuntimes(nextRuntimes))
+      await runAsyncTaskWithFailure(
+        async () => {
+          const nextRuntimes = await window.api.ephemeralVm.listRuntimes()
+          if (mountedRef.current) {
+            setRuntimes(getVisibleEphemeralVmRuntimes(nextRuntimes))
+          }
+        },
+        async (error) => {
+          if (mountedRef.current && reportError) {
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : translate(
+                    'auto.components.settings.EphemeralVmRuntimesSection.cloudVmLoadFailed',
+                    'Couldn’t load Cloud VM runtimes.'
+                  )
+            )
+          }
+        },
+        () => {
+          if (mountedRef.current && showLoading) {
+            setIsLoading(false)
+          }
         }
-      } catch (error) {
-        if (mountedRef.current && reportError) {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : translate(
-                  'auto.components.settings.EphemeralVmRuntimesSection.cloudVmLoadFailed',
-                  'Couldn’t load Cloud VM runtimes.'
-                )
-          )
-        }
-      } finally {
-        if (mountedRef.current && showLoading) {
-          setIsLoading(false)
-        }
-      }
+      )
     },
     [mountedRef]
   )
@@ -177,54 +182,58 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
 
   const cleanupRuntime = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
     setCleaningId(runtime.id)
-    try {
-      const cleaned = await window.api.ephemeralVm.cleanup({ runtimeId: runtime.id })
-      if (hasCleanupStopped(cleaned)) {
-        await refresh(false)
-        return
-      }
-      if (hasCleanupFailed(cleaned)) {
-        throw new Error(
-          ephemeralVmCleanupErrorText(cleaned) ??
-            t(
-              'auto.components.settings.EphemeralVmRuntimesSection.cloudVmCleanupFailedToast',
-              'Couldn’t clean up Cloud VM runtime.'
-            )
-        )
-      }
-      if (mountedRef.current) {
-        toast.success(
-          cleaned.cleanupStatus === 'disabled'
-            ? t(
-                'auto.components.settings.EphemeralVmRuntimesSection.cloudVmMarkedCleaned',
-                'Marked Cloud VM runtime as cleaned.'
-              )
-            : t(
-                'auto.components.settings.EphemeralVmRuntimesSection.cloudVmCleaned',
-                'Cleaned up Cloud VM runtime.'
-              )
-        )
-      }
-      await refresh()
-    } catch (error) {
-      if (mountedRef.current) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : t(
+    await runAsyncTaskWithFailure(
+      async () => {
+        const cleaned = await window.api.ephemeralVm.cleanup({ runtimeId: runtime.id })
+        if (hasCleanupStopped(cleaned)) {
+          await refresh(false)
+          return
+        }
+        if (hasCleanupFailed(cleaned)) {
+          throw new Error(
+            ephemeralVmCleanupErrorText(cleaned) ??
+              t(
                 'auto.components.settings.EphemeralVmRuntimesSection.cloudVmCleanupFailedToast',
                 'Couldn’t clean up Cloud VM runtime.'
               )
-        )
+          )
+        }
+        if (mountedRef.current) {
+          toast.success(
+            cleaned.cleanupStatus === 'disabled'
+              ? t(
+                  'auto.components.settings.EphemeralVmRuntimesSection.cloudVmMarkedCleaned',
+                  'Marked Cloud VM runtime as cleaned.'
+                )
+              : t(
+                  'auto.components.settings.EphemeralVmRuntimesSection.cloudVmCleaned',
+                  'Cleaned up Cloud VM runtime.'
+                )
+          )
+        }
         await refresh()
+      },
+      async (error) => {
+        if (mountedRef.current) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : t(
+                  'auto.components.settings.EphemeralVmRuntimesSection.cloudVmCleanupFailedToast',
+                  'Couldn’t clean up Cloud VM runtime.'
+                )
+          )
+          await refresh()
+        }
+      },
+      () => {
+        if (mountedRef.current) {
+          setCleaningId(null)
+        }
+        // Why: a released host must stop advertising a deadline on every surface that reads the cache.
+        void refreshEphemeralVmRuntimes()
       }
-    } finally {
-      if (mountedRef.current) {
-        setCleaningId(null)
-      }
-      // Why: a released host must stop advertising a deadline on every surface that reads the cache.
-      void refreshEphemeralVmRuntimes()
-    }
+    )
   }
 
   const extendLifetime = async (
@@ -232,40 +241,44 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
     lifetime: string
   ): Promise<void> => {
     setExtending({ runtimeId: runtime.id, lifetime })
-    try {
-      const extended = await window.api.ephemeralVm.extendLifetime({
-        runtimeId: runtime.id,
-        lifetime
-      })
-      if (mountedRef.current) {
-        const extendedDeadlineMs = getExtendedEphemeralVmLeaseDeadline(extended)
-        toast.success(
-          extendedDeadlineMs !== null
-            ? translate(
-                'auto.components.settings.EphemeralVmRuntimesSection.leaseExtendedUntil',
-                'Lease extended to {{value0}}.',
-                { value0: formatEphemeralVmLeaseDeadline(extendedDeadlineMs) }
-              )
-            : translate(
-                'auto.components.settings.EphemeralVmRuntimesSection.leaseExtended',
-                'Lease extended.'
-              )
-        )
+    await runAsyncTaskWithFailure(
+      async () => {
+        const extended = await window.api.ephemeralVm.extendLifetime({
+          runtimeId: runtime.id,
+          lifetime
+        })
+        if (mountedRef.current) {
+          const extendedDeadlineMs = getExtendedEphemeralVmLeaseDeadline(extended)
+          toast.success(
+            extendedDeadlineMs !== null
+              ? t(
+                  'auto.components.settings.EphemeralVmRuntimesSection.leaseExtendedUntil',
+                  'Lease extended to {{value0}}.',
+                  { value0: formatEphemeralVmLeaseDeadline(extendedDeadlineMs) }
+                )
+              : t(
+                  'auto.components.settings.EphemeralVmRuntimesSection.leaseExtended',
+                  'Lease extended.'
+                )
+          )
+        }
+        await refresh(false)
+        // Why also the shared cache: the workspace card and the host list read the deadline there.
+        await refreshEphemeralVmRuntimes()
+      },
+      async (error) => {
+        // Why no refresh on failure: main leaves the record untouched, so the deadline did not move.
+        // Why the provider's own words: only its message says whether a retry could succeed.
+        if (mountedRef.current) {
+          toast.error(error instanceof Error ? error.message : String(error))
+        }
+      },
+      () => {
+        if (mountedRef.current) {
+          setExtending(null)
+        }
       }
-      await refresh(false)
-      // Why also the shared cache: the workspace card and the host list read the deadline there.
-      await refreshEphemeralVmRuntimes()
-    } catch (error) {
-      // Why no refresh on failure: main leaves the record untouched, so the deadline did not move.
-      // Why the provider's own words: only its message says whether a retry could succeed.
-      if (mountedRef.current) {
-        toast.error(error instanceof Error ? error.message : String(error))
-      }
-    } finally {
-      if (mountedRef.current) {
-        setExtending(null)
-      }
-    }
+    )
   }
 
   const copyCleanupCommand = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
@@ -304,30 +317,34 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
 
   const stopCleanup = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
     setStoppingId(runtime.id)
-    try {
-      await window.api.ephemeralVm.stopCleanup({ runtimeId: runtime.id })
-      if (mountedRef.current) {
-        setPendingStop(null)
-        await refresh(false)
+    await runAsyncTaskWithFailure(
+      async () => {
+        await window.api.ephemeralVm.stopCleanup({ runtimeId: runtime.id })
+        if (mountedRef.current) {
+          setPendingStop(null)
+          await refresh(false)
+        }
+      },
+      async (error) => {
+        if (mountedRef.current) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : t(
+                  'auto.components.settings.EphemeralVmRuntimesSection.stopCleanupFailed',
+                  'Couldn’t stop Cloud VM cleanup.'
+                )
+          )
+          await refresh(false)
+        }
+      },
+      () => {
+        if (mountedRef.current) {
+          setStoppingId(null)
+        }
+        void refreshEphemeralVmRuntimes()
       }
-    } catch (error) {
-      if (mountedRef.current) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : t(
-                'auto.components.settings.EphemeralVmRuntimesSection.stopCleanupFailed',
-                'Couldn’t stop Cloud VM cleanup.'
-              )
-        )
-        await refresh(false)
-      }
-    } finally {
-      if (mountedRef.current) {
-        setStoppingId(null)
-      }
-      void refreshEphemeralVmRuntimes()
-    }
+    )
   }
 
   const hasRuntimes = runtimes.length > 0

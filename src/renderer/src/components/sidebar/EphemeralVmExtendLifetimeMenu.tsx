@@ -15,7 +15,9 @@ import {
   useEphemeralVmRuntimes
 } from '@/hooks/useEphemeralVmRuntimes'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { readEphemeralVmLifetime } from '../../../../shared/ephemeral-vm-lifetime'
 import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
 import { formatEphemeralVmDeadline } from './ephemeral-vm-lease-presentation'
@@ -48,6 +50,7 @@ export function EphemeralVmExtendLifetimeMenu({
   workspaceId: string
   disabled: boolean
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const records = useEphemeralVmRuntimes()
   const runtime = findEphemeralVmRuntimeForWorkspace(records, workspaceId)
   const [pendingLifetime, setPendingLifetime] = useState<string | null>(null)
@@ -59,31 +62,35 @@ export function EphemeralVmExtendLifetimeMenu({
         return
       }
       setPendingLifetime(lifetime)
-      try {
-        const extended = await window.api.ephemeralVm.extendLifetime({
-          runtimeId: runtime.id,
-          lifetime
-        })
-        toast.success(describeExtendSuccess(extended))
-        // Why: a successful extension can have re-addressed the host, so the cached records are stale.
-        await refreshEphemeralVmRuntimes()
-      } catch (cause) {
-        // Why unwrapped: Electron prefixes every rejection with the channel it came from, so a
-        // provider's reason would arrive buried.
-        toast.error(
-          extractIpcErrorMessage(
-            cause,
-            translate(
-              'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extendFailed',
-              'Couldn’t extend the lease. Try again.'
+      await runAsyncTaskWithFailure(
+        async () => {
+          const extended = await window.api.ephemeralVm.extendLifetime({
+            runtimeId: runtime.id,
+            lifetime
+          })
+          toast.success(describeExtendSuccess(extended))
+          // Why: a successful extension can have re-addressed the host, so the cached records are stale.
+          await refreshEphemeralVmRuntimes()
+        },
+        (cause) => {
+          // Why unwrapped: Electron prefixes every rejection with the channel it came from, so a
+          // provider's reason would arrive buried.
+          toast.error(
+            extractIpcErrorMessage(
+              cause,
+              translate(
+                'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extendFailed',
+                'Couldn’t extend the lease. Try again.'
+              )
             )
           )
-        )
-      } finally {
-        if (mountedRef.current) {
-          setPendingLifetime(null)
+        },
+        () => {
+          if (mountedRef.current) {
+            setPendingLifetime(null)
+          }
         }
-      }
+      )
     },
     [mountedRef, runtime]
   )
@@ -101,11 +108,8 @@ export function EphemeralVmExtendLifetimeMenu({
       <DropdownMenuSubTrigger disabled={disabled || pending}>
         <CalendarClock className="size-3.5" />
         {pending
-          ? translate(
-              'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extending',
-              'Extending…'
-            )
-          : translate(
+          ? t('auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extending', 'Extending…')
+          : t(
               'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extendLifetime',
               'Extend lifetime'
             )}
@@ -118,11 +122,8 @@ export function EphemeralVmExtendLifetimeMenu({
             onSelect={() => void handleExtend(duration)}
           >
             {pendingLifetime === duration
-              ? translate(
-                  'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extending',
-                  'Extending…'
-                )
-              : translate(
+              ? t('auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extending', 'Extending…')
+              : t(
                   'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extendTo',
                   'Extend to {{value0}}',
                   { value0: duration }

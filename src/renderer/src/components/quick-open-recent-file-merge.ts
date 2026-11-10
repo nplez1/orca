@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import type { RuntimeFileOperationArgs } from '../runtime/files/runtime-file-client-types'
 import type { listRuntimeFiles } from '@/runtime/runtime-file-client'
 import { runtimeTargetForOwnerEnvironment } from '../runtime/rpc/targets/runtime-client-target'
@@ -87,7 +87,11 @@ export function useQuickOpenRecentListing(args: {
   // Why: the returned publisher is handed to the listing effects, so its identity is held stable
   // and the current request is read through a ref — that keeps the publisher out of their deps.
   const requestRef = useRef({ ...args, context, options, recentKey, cache })
-  requestRef.current = { ...args, context, options, recentKey, cache }
+  // Why a layout effect: React Compiler rejects ref writes during render, and a layout effect
+  // still lands before the passive listing effects that read this through the publisher.
+  useLayoutEffect(() => {
+    requestRef.current = { ...args, context, options, recentKey, cache }
+  }, [args, cache, context, options, recentKey])
   const publishedRef = useRef<RuntimeFileListing | null>(null)
   return useCallback((value: RuntimeFileListing) => {
     const request = requestRef.current

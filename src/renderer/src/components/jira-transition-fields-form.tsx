@@ -12,8 +12,8 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
 import { buildJiraCreateSubmission } from '@/components/task-page/jira/task-page-jira-create-fields'
-import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
+import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import { getCommentBodySubmitState } from '@/lib/comment-body-submit-state'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { isJiraUserField, resolveJiraFieldControlKind } from '../../../shared/jira-field-rendering'
@@ -318,10 +318,10 @@ export function JiraTransitionFieldsForm({
               className="-my-1 shrink-0"
               disabled={pending}
               data-link-url={issueUrl}
-              onClick={() => void window.api.shell.openUrl(issueUrl)}
+              onClick={(event) => openAppHttpLink(issueUrl, { event })}
             >
               <ExternalLink className="size-3" />
-              {translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}
+              {t('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}
             </Button>
           ) : null}
         </div>

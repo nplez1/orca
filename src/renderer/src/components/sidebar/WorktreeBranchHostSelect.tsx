@@ -8,7 +8,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { normalizeExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
 import type { BranchGroupMember } from '../../../../shared/sidebar-list/row-types'
 
@@ -28,6 +28,7 @@ export const WorktreeBranchHostSelect = React.memo(function WorktreeBranchHostSe
   onSelectHost,
   onPointerDown
 }: WorktreeBranchHostSelectProps) {
+  const t = useTranslate()
   const selectedLabel =
     members.find((member) => member.hostId === selectedHostId)?.hostLabel ??
     members[0]?.hostLabel ??
@@ -38,10 +39,7 @@ export const WorktreeBranchHostSelect = React.memo(function WorktreeBranchHostSe
         <button
           type="button"
           data-branch-host-select=""
-          aria-label={translate(
-            'auto.components.sidebar.WorktreeBranchHostSelect.label',
-            'Select host'
-          )}
+          aria-label={t('auto.components.sidebar.WorktreeBranchHostSelect.label', 'Select host')}
           onPointerDown={(event) => {
             // Why: the card body activates the workspace on click; the switcher must not.
             event.stopPropagation()

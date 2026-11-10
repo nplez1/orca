@@ -1,7 +1,7 @@
 import { RefreshCw } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { AiGenerationFields } from './ai-generation-fields'
 import { SearchableSetting } from './section-layout/SearchableSetting'
 import { useSessionSummaryAiSettings } from './use-session-summary-ai-settings'
@@ -11,6 +11,7 @@ import { useSessionSummaryAiSettings } from './use-session-summary-ai-settings'
  *  Its own setting rather than a Source Control AI recipe, so summary cost can be
  *  tuned without changing commit messages. */
 export function SessionSummaryAiSetting(): React.JSX.Element {
+  const t = useTranslate()
   const {
     config,
     selectPortalRoot,
@@ -29,8 +30,8 @@ export function SessionSummaryAiSetting(): React.JSX.Element {
     onRefreshModels
   } = useSessionSummaryAiSettings()
 
-  const title = translate('settings.sessionSummaryAi.title', 'Session summaries')
-  const description = translate(
+  const title = t('settings.sessionSummaryAi.title', 'Session summaries')
+  const description = t(
     'settings.sessionSummaryAi.description',
     'The agent and model that summarize a session in the Summary tab. A fold runs only while that tab is open, reads only what was added since the last fold, and its result is cached.'
   )
@@ -65,9 +66,9 @@ export function SessionSummaryAiSetting(): React.JSX.Element {
             <div className="flex items-center justify-between gap-3">
               <p className="text-[11px] leading-snug text-muted-foreground">
                 {discoveryStatus === 'discovering'
-                  ? translate('settings.sessionSummaryAi.discovering', 'Discovering models…')
+                  ? t('settings.sessionSummaryAi.discovering', 'Discovering models…')
                   : discoveryStatus === 'unavailable'
-                    ? translate(
+                    ? t(
                         'settings.sessionSummaryAi.modelsUnavailable',
                         "Couldn't list this agent's models — using its built-in list."
                       )
@@ -82,7 +83,7 @@ export function SessionSummaryAiSetting(): React.JSX.Element {
                   onClick={onRefreshModels}
                 >
                   <RefreshCw className="size-3" />
-                  {translate('settings.sessionSummaryAi.refreshModels', 'Refresh models')}
+                  {t('settings.sessionSummaryAi.refreshModels', 'Refresh models')}
                 </Button>
               ) : null}
             </div>

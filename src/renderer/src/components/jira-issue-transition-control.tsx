@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { ChevronDown, CircleAlert, ExternalLink, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import {
@@ -93,10 +92,7 @@ export function JiraIssueTransitionControl({
         error:
           error instanceof Error
             ? taskProviderErrorText(error.message)
-            : translate(
-                'auto.components.JiraIssueWorkspace.ea21952aa3',
-                'Failed to update Jira issue.'
-              )
+            : t('auto.components.JiraIssueWorkspace.ea21952aa3', 'Failed to update Jira issue.')
       }
     }
   }

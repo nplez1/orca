@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /** Why a configured board is not on screen: the runtime serving Jira predates the board view. */
 export function TaskPageJiraBoardUnavailableNotice({
@@ -8,6 +8,7 @@ export function TaskPageJiraBoardUnavailableNotice({
 }: {
   onRetry: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <div
       role="status"
@@ -15,13 +16,13 @@ export function TaskPageJiraBoardUnavailableNotice({
     >
       <Info className="size-3.5 flex-none" />
       <span className="min-w-0 flex-1">
-        {translate(
+        {t(
           'auto.components.TaskPage.jiraBoardRequiresNewRuntime',
           'This Jira runtime does not support board views. Showing the issue list instead.'
         )}
       </span>
       <Button type="button" variant="ghost" size="xs" onClick={onRetry}>
-        {translate('auto.components.TaskPage.0bfbf62f75', 'Retry')}
+        {t('auto.components.TaskPage.0bfbf62f75', 'Retry')}
       </Button>
     </div>
   )

@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { getStateLabel } from '@/components/github/work-item-state-presentation'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import {
   IssueAssigneeCombobox,
   type IssueAssigneeOption
@@ -31,6 +31,7 @@ const MENU_ITEM_CLASS =
  *  same mutation handlers and rosters as the Task view's `GHEditSection`, so
  *  cache invalidation stays identical. */
 export function GHEditSectionRows(props: GHEditSectionPillsProps): React.JSX.Element {
+  const t = useTranslate()
   const {
     item,
     localState,
@@ -95,7 +96,7 @@ export function GHEditSectionRows(props: GHEditSectionPillsProps): React.JSX.Ele
       <Popover open={statusPopoverOpen} onOpenChange={onStatusOpenChange}>
         <PopoverTrigger asChild>
           <IssuePanePropertyRow
-            label={translate('auto.components.right.sidebar.IssuePane.status', 'Status')}
+            label={t('auto.components.right.sidebar.IssuePane.status', 'Status')}
             pending={isStatePending}
             disabled={isStatePending}
             value={
@@ -140,7 +141,7 @@ export function GHEditSectionRows(props: GHEditSectionPillsProps): React.JSX.Ele
       </Popover>
 
       <IssueAssigneeCombobox
-        label={translate('auto.components.right.sidebar.IssueAssignee.assignees', 'Assignees')}
+        label={t('auto.components.right.sidebar.IssueAssignee.assignees', 'Assignees')}
         multiple
         roster={assigneeRoster}
         selected={selectedAssignees}
@@ -153,7 +154,7 @@ export function GHEditSectionRows(props: GHEditSectionPillsProps): React.JSX.Ele
       <Popover open={labelPopoverOpen} onOpenChange={handleLabelOpenChange}>
         <PopoverTrigger asChild>
           <IssuePanePropertyRow
-            label={translate('auto.components.right.sidebar.IssuePane.labels', 'Labels')}
+            label={t('auto.components.right.sidebar.IssuePane.labels', 'Labels')}
             pending={isLabelsPending}
             disabled={isLabelsPending}
             value={
@@ -161,7 +162,7 @@ export function GHEditSectionRows(props: GHEditSectionPillsProps): React.JSX.Ele
                 localLabels.join(', ')
               ) : (
                 <span className="text-muted-foreground">
-                  {translate('auto.components.right.sidebar.IssuePane.noLabels', 'None')}
+                  {t('auto.components.right.sidebar.IssuePane.noLabels', 'None')}
                 </span>
               )
             }
@@ -172,7 +173,7 @@ export function GHEditSectionRows(props: GHEditSectionPillsProps): React.JSX.Ele
             <Input
               value={labelQuery}
               onChange={(event) => setLabelQuery(event.target.value)}
-              placeholder={translate(
+              placeholder={t(
                 'auto.components.right.sidebar.IssuePane.filterLabels',
                 'Filter labels'
               )}
@@ -186,10 +187,7 @@ export function GHEditSectionRows(props: GHEditSectionPillsProps): React.JSX.Ele
                 </div>
               ) : filteredLabels.length === 0 ? (
                 <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
-                  {translate(
-                    'auto.components.right.sidebar.IssuePane.noLabelsFound',
-                    'No labels found'
-                  )}
+                  {t('auto.components.right.sidebar.IssuePane.noLabelsFound', 'No labels found')}
                 </p>
               ) : (
                 filteredLabels.map((label) => (

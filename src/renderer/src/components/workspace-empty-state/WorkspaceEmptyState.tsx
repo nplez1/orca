@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { TerminalSquare } from 'lucide-react'
 import { useAppStore } from '@/store'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { AgentIcon, getAgentCatalog } from '@/lib/agent-catalog'
 import { useShortcutKeyDetails, type ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
 import { useTabBarDefaultAgent } from '@/components/tab-bar/use-tab-bar-default-agent'
@@ -30,6 +30,7 @@ export function WorkspaceEmptyState({
   onNewTerminal,
   onNewAgent
 }: WorkspaceEmptyStateProps): React.JSX.Element {
+  const t = useTranslate()
   const repos = useAppStore((s) => s.repos)
   const { agent: defaultAgent, isAgentLaunchPending } = useTabBarDefaultAgent(worktreeId)
   const [starState, setStarState] = useOrcaStarState()
@@ -42,21 +43,18 @@ export function WorkspaceEmptyState({
       items.push({
         id: 'agent',
         shortcut: newAgentShortcut,
-        action: translate('auto.components.workspaceEmptyState.agentShortcut', 'New agent tab')
+        action: t('auto.components.workspaceEmptyState.agentShortcut', 'New agent tab')
       })
     }
     if (newTerminalShortcut.keys.length > 0) {
       items.push({
         id: 'terminal',
         shortcut: newTerminalShortcut,
-        action: translate(
-          'auto.components.workspaceEmptyState.terminalShortcut',
-          'New terminal tab'
-        )
+        action: t('auto.components.workspaceEmptyState.terminalShortcut', 'New terminal tab')
       })
     }
     return items
-  }, [defaultAgent, newAgentShortcut, newTerminalShortcut])
+  }, [defaultAgent, newAgentShortcut, newTerminalShortcut, t])
 
   const defaultAgentLabel = defaultAgent
     ? (getAgentCatalog().find((entry) => entry.id === defaultAgent)?.label ?? defaultAgent)
@@ -71,12 +69,12 @@ export function WorkspaceEmptyState({
       <div className="w-full max-w-lg px-6">
         <div className="flex flex-col items-center gap-4 py-8">
           <OrcaBrandMark
-            logoAlt={translate('auto.components.workspaceEmptyState.logo', 'Orca logo')}
-            title={translate('auto.components.workspaceEmptyState.title', 'ORCA')}
+            logoAlt={t('auto.components.workspaceEmptyState.logo', 'Orca logo')}
+            title={t('auto.components.workspaceEmptyState.title', 'ORCA')}
           />
 
           <p className="text-sm text-muted-foreground text-center">
-            {translate(
+            {t(
               'auto.components.workspaceEmptyState.description',
               'This workspace has no open tabs.'
             )}
@@ -90,7 +88,7 @@ export function WorkspaceEmptyState({
                 disabled={isAgentLaunchPending}
               >
                 <AgentIcon agent={defaultAgent} size={14} />
-                {translate('auto.components.workspaceEmptyState.newAgent', 'New {{agent}} agent', {
+                {t('auto.components.workspaceEmptyState.newAgent', 'New {{agent}} agent', {
                   agent: defaultAgentLabel
                 })}
               </button>
@@ -101,7 +99,7 @@ export function WorkspaceEmptyState({
               onClick={onNewTerminal}
             >
               <TerminalSquare className="size-3.5" />
-              {translate('auto.components.workspaceEmptyState.newTerminal', 'New terminal')}
+              {t('auto.components.workspaceEmptyState.newTerminal', 'New terminal')}
             </button>
           </div>
 

@@ -14,7 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { readIpcErrorMessage } from '@/lib/ipc-error'
-import { translate } from '@/i18n/i18n'
+import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
+import { useTranslate } from '@/i18n/use-translate'
 
 /**
  * Add or edit one Jenkins server.
@@ -34,6 +35,7 @@ export function JenkinsServerDialog({
   server: JenkinsServerSummary | null
   onSaved: (server: JenkinsServerSummary) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   const mountedRef = useMountedRef()
   const labelId = useId()
   const baseUrlId = useId()
@@ -57,36 +59,38 @@ export function JenkinsServerDialog({
     }
     setSaving(true)
     setError(null)
-    try {
-      const result = await window.api.jenkins.saveServer({
-        ...(server ? { id: server.id } : {}),
-        label,
-        baseUrl,
-        username,
-        apiToken
-      })
-      if (!result) {
+    await runAsyncTaskWithFailure(
+      async () => {
+        const result = await window.api.jenkins.saveServer({
+          ...(server ? { id: server.id } : {}),
+          label,
+          baseUrl,
+          username,
+          apiToken
+        })
+        if (!result) {
+          setError(t('jenkins.settings.unavailable', 'Jenkins servers cannot be managed here.'))
+          return
+        }
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
+        onSaved(result.server)
+        onOpenChange(false)
+      },
+      (submitError) => {
         setError(
-          translate('jenkins.settings.unavailable', 'Jenkins servers cannot be managed here.')
+          readIpcErrorMessage(submitError) ??
+            t('jenkins.settings.saveFailed', 'Could not save this Jenkins server.')
         )
-        return
+      },
+      () => {
+        if (mountedRef.current) {
+          setSaving(false)
+        }
       }
-      if (!result.ok) {
-        setError(result.error)
-        return
-      }
-      onSaved(result.server)
-      onOpenChange(false)
-    } catch (submitError) {
-      setError(
-        readIpcErrorMessage(submitError) ??
-          translate('jenkins.settings.saveFailed', 'Could not save this Jenkins server.')
-      )
-    } finally {
-      if (mountedRef.current) {
-        setSaving(false)
-      }
-    }
+    )
   }
 
   return (
@@ -96,11 +100,11 @@ export function JenkinsServerDialog({
           <DialogHeader>
             <DialogTitle>
               {editing
-                ? translate('jenkins.settings.editTitle', 'Edit Jenkins server')
-                : translate('jenkins.settings.addTitle', 'Add Jenkins server')}
+                ? t('jenkins.settings.editTitle', 'Edit Jenkins server')
+                : t('jenkins.settings.addTitle', 'Add Jenkins server')}
             </DialogTitle>
             <DialogDescription>
-              {translate(
+              {t(
                 'jenkins.settings.description',
                 'Orca reads build stages and timing from this server for checks that link to it. The token is stored encrypted when your OS keychain is available.'
               )}
@@ -108,29 +112,29 @@ export function JenkinsServerDialog({
           </DialogHeader>
 
           <div className="space-y-1.5">
-            <Label htmlFor={labelId}>{translate('jenkins.settings.label', 'Name')}</Label>
+            <Label htmlFor={labelId}>{t('jenkins.settings.label', 'Name')}</Label>
             <Input
               id={labelId}
               value={label}
-              placeholder={translate('jenkins.settings.labelPlaceholder', 'Build server')}
+              placeholder={t('jenkins.settings.labelPlaceholder', 'Build server')}
               onChange={(event) => setLabel(event.target.value)}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor={baseUrlId}>{translate('jenkins.settings.baseUrl', 'Server URL')}</Label>
+            <Label htmlFor={baseUrlId}>{t('jenkins.settings.baseUrl', 'Server URL')}</Label>
             <Input
               id={baseUrlId}
               value={baseUrl}
               required
-              placeholder={translate(
+              placeholder={t(
                 'jenkins.settings.baseUrlPlaceholder',
                 'https://ci.example.com/jenkins'
               )}
               onChange={(event) => setBaseUrl(event.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              {translate(
+              {t(
                 'jenkins.settings.baseUrlHint',
                 'Include the path Jenkins is served under, if it is not at the root.'
               )}
@@ -138,7 +142,7 @@ export function JenkinsServerDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor={usernameId}>{translate('jenkins.settings.username', 'Username')}</Label>
+            <Label htmlFor={usernameId}>{t('jenkins.settings.username', 'Username')}</Label>
             <Input
               id={usernameId}
               value={username}
@@ -148,9 +152,7 @@ export function JenkinsServerDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor={apiTokenId}>
-              {translate('jenkins.settings.apiToken', 'API token')}
-            </Label>
+            <Label htmlFor={apiTokenId}>{t('jenkins.settings.apiToken', 'API token')}</Label>
             <Input
               id={apiTokenId}
               type="password"
@@ -158,13 +160,13 @@ export function JenkinsServerDialog({
               autoComplete="off"
               placeholder={
                 server?.hasToken
-                  ? translate('jenkins.settings.tokenKeep', 'Leave blank to keep the saved token')
+                  ? t('jenkins.settings.tokenKeep', 'Leave blank to keep the saved token')
                   : ''
               }
               onChange={(event) => setApiToken(event.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              {translate(
+              {t(
                 'jenkins.settings.apiTokenHint',
                 'Create one in Jenkins under your user profile → Configure → API Token.'
               )}
@@ -179,11 +181,11 @@ export function JenkinsServerDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {translate('jenkins.settings.cancel', 'Cancel')}
+              {t('jenkins.settings.cancel', 'Cancel')}
             </Button>
             <Button type="submit" disabled={!canSubmit || saving} aria-busy={saving}>
               {saving && <LoaderCircle className="size-3.5 animate-spin" />}
-              {translate('jenkins.settings.save', 'Save')}
+              {t('jenkins.settings.save', 'Save')}
             </Button>
           </DialogFooter>
         </form>

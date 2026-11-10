@@ -2,7 +2,7 @@ import type { TaskPageJiraBoardFilter } from '../../task-page-jira-board-model'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { LoaderCircle, RefreshCw, Search, X } from 'lucide-react'
 
 type TaskPageJiraBoardHeaderProps = {
@@ -34,25 +34,26 @@ export function TaskPageJiraBoardHeader({
   onRefresh,
   onUseIssueList
 }: TaskPageJiraBoardHeaderProps): React.JSX.Element {
+  const t = useTranslate()
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3 py-2">
         <div className="min-w-0">
           <div className="truncate text-2xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            {boardName ?? translate('auto.components.TaskPage.jiraBoardView', 'Jira board')}
+            {boardName ?? t('auto.components.TaskPage.jiraBoardView', 'Jira board')}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {sprintAvailable === true
-              ? translate(
+              ? t(
                   'auto.components.TaskPage.jiraBoardStatusColumns',
                   'Status columns · active sprint only'
                 )
               : sprintAvailable === false
-                ? translate(
+                ? t(
                     'auto.components.TaskPage.jiraBoardNoSprintDescription',
                     'No active sprint · board-filter backlog'
                   )
-                : translate(
+                : t(
                     'auto.components.TaskPage.jiraBoardSprintLoading',
                     'Loading sprint details from the board'
                   )}
@@ -60,7 +61,7 @@ export function TaskPageJiraBoardHeader({
         </div>
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="xs" onClick={onUseIssueList}>
-            {translate('auto.components.TaskPage.jiraIssueListView', 'Issue list')}
+            {t('auto.components.TaskPage.jiraIssueListView', 'Issue list')}
           </Button>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -70,7 +71,7 @@ export function TaskPageJiraBoardHeader({
                 size="icon-sm"
                 onClick={onRefresh}
                 disabled={loading}
-                aria-label={translate('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
+                aria-label={t('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
               >
                 {loading ? (
                   <LoaderCircle className="size-4 animate-spin" />
@@ -80,7 +81,7 @@ export function TaskPageJiraBoardHeader({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {translate('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
+              {t('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -90,7 +91,7 @@ export function TaskPageJiraBoardHeader({
         <div
           className="flex items-center gap-1"
           role="group"
-          aria-label={translate('auto.components.TaskPage.jiraBoardViews', 'Jira board views')}
+          aria-label={t('auto.components.TaskPage.jiraBoardViews', 'Jira board views')}
         >
           <Button
             type="button"
@@ -100,7 +101,7 @@ export function TaskPageJiraBoardHeader({
             disabled={sprintAvailable !== true}
             onClick={() => onViewChange('sprint')}
           >
-            {translate('auto.components.TaskPage.jiraSprintView', 'Sprint')}
+            {t('auto.components.TaskPage.jiraSprintView', 'Sprint')}
           </Button>
           <Button
             type="button"
@@ -109,20 +110,17 @@ export function TaskPageJiraBoardHeader({
             size="sm"
             onClick={() => onViewChange('backlog')}
           >
-            {translate('auto.components.TaskPage.16d73d88ad', 'Backlog')}
+            {t('auto.components.TaskPage.16d73d88ad', 'Backlog')}
           </Button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {translate('auto.components.TaskPage.jiraFilterLabel', 'Filter')}
+            {t('auto.components.TaskPage.jiraFilterLabel', 'Filter')}
           </span>
           <div
             className="flex items-center gap-1"
             role="group"
-            aria-label={translate(
-              'auto.components.TaskPage.jiraFilterGroupLabel',
-              'Filter Jira issues'
-            )}
+            aria-label={t('auto.components.TaskPage.jiraFilterGroupLabel', 'Filter Jira issues')}
           >
             <Button
               type="button"
@@ -132,7 +130,7 @@ export function TaskPageJiraBoardHeader({
               onClick={() => onFilterChange('me')}
               disabled={!viewerAvailable}
             >
-              {translate('auto.components.TaskPage.jiraMeFilter', 'Me')}
+              {t('auto.components.TaskPage.jiraMeFilter', 'Me')}
             </Button>
             <Button
               type="button"
@@ -141,7 +139,7 @@ export function TaskPageJiraBoardHeader({
               aria-pressed={filter === 'all'}
               onClick={() => onFilterChange('all')}
             >
-              {translate('auto.components.TaskPage.jiraAllFilter', 'All')}
+              {t('auto.components.TaskPage.jiraAllFilter', 'All')}
             </Button>
             <Button
               type="button"
@@ -150,7 +148,7 @@ export function TaskPageJiraBoardHeader({
               aria-pressed={filter === 'unassigned'}
               onClick={() => onFilterChange('unassigned')}
             >
-              {translate('auto.components.TaskPage.jiraUnassignedFilter', 'Unassigned')}
+              {t('auto.components.TaskPage.jiraUnassignedFilter', 'Unassigned')}
             </Button>
           </div>
         </div>
@@ -163,11 +161,11 @@ export function TaskPageJiraBoardHeader({
             <Input
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder={translate(
+              placeholder={t(
                 'auto.components.TaskPage.jiraBoardIssueFilterPlaceholder',
                 'Filter issues by key, summary, or assignee'
               )}
-              aria-label={translate(
+              aria-label={t(
                 'auto.components.TaskPage.jiraBoardIssueFilterLabel',
                 'Filter board issues'
               )}
@@ -178,7 +176,7 @@ export function TaskPageJiraBoardHeader({
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label={translate('auto.components.TaskPage.b797bdd7c3', 'Clear search')}
+              aria-label={t('auto.components.TaskPage.b797bdd7c3', 'Clear search')}
               onClick={() => onQueryChange('')}
             >
               <X className="size-4" />

@@ -1,4 +1,4 @@
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
 import type { PRCheckBuild } from '../../../shared/github/check-types'
 
@@ -54,6 +54,7 @@ export function CheckBuildMetadata({
   /** Separation from whatever sits above, since callers box or divide this block differently. */
   className?: string
 }): React.JSX.Element | null {
+  const t = useTranslate()
   if (!build) {
     return null
   }
@@ -70,25 +71,25 @@ export function CheckBuildMetadata({
 
   return (
     <div className={cn('min-w-0', className)}>
-      <SectionLabel>{translate('checkBuild.title', 'Build')}</SectionLabel>
+      <SectionLabel>{t('checkBuild.title', 'Build')}</SectionLabel>
       <div className="grid gap-0.5 text-[11px]">
         {build.number !== null && (
-          <MetadataRow label={translate('checkBuild.number', 'Number')}>
+          <MetadataRow label={t('checkBuild.number', 'Number')}>
             <span className="font-mono">#{build.number}</span>
           </MetadataRow>
         )}
         {build.triggeredBy !== null && (
-          <MetadataRow label={translate('checkBuild.triggeredBy', 'Triggered by')}>
+          <MetadataRow label={t('checkBuild.triggeredBy', 'Triggered by')}>
             {build.triggeredBy}
           </MetadataRow>
         )}
         {build.queuedMs !== null && (
-          <MetadataRow label={translate('checkBuild.queued', 'Queued')}>
+          <MetadataRow label={t('checkBuild.queued', 'Queued')}>
             {formatBuildDuration(build.queuedMs)}
           </MetadataRow>
         )}
         {build.estimatedDurationMs !== null && (
-          <MetadataRow label={translate('checkBuild.estimated', 'Estimated')}>
+          <MetadataRow label={t('checkBuild.estimated', 'Estimated')}>
             {formatBuildDuration(build.estimatedDurationMs)}
           </MetadataRow>
         )}
@@ -96,7 +97,7 @@ export function CheckBuildMetadata({
 
       {build.parameters.length > 0 && (
         <div className="mt-2 min-w-0">
-          <SectionLabel>{translate('checkBuild.parameters', 'Parameters')}</SectionLabel>
+          <SectionLabel>{t('checkBuild.parameters', 'Parameters')}</SectionLabel>
           <div className="grid gap-0.5 text-[11px]">
             {build.parameters.map((parameter) => (
               <MetadataRow key={parameter.name} label={parameter.name}>
@@ -111,7 +112,7 @@ export function CheckBuildMetadata({
 
       {build.commits.length > 0 && (
         <div className="mt-2 min-w-0">
-          <SectionLabel>{translate('checkBuild.commits', 'Commits')}</SectionLabel>
+          <SectionLabel>{t('checkBuild.commits', 'Commits')}</SectionLabel>
           <div className="grid gap-0.5 text-[11px]">
             {build.commits.map((commit) => (
               <div key={commit.id} className="flex min-w-0 items-baseline gap-2">

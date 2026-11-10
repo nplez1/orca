@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { useAppStore } from '../../store'
 
@@ -94,25 +94,21 @@ export function useNewTabMenuFocusHandoff(): {
       pendingFocus.focus()
     })
   }
-  const clearPendingNewTabMenuFocusOnUnmountRef = useRef<
-    ((node: HTMLDivElement | null) => void) | null
-  >(null)
-  if (clearPendingNewTabMenuFocusOnUnmountRef.current === null) {
-    clearPendingNewTabMenuFocusOnUnmountRef.current = (node: HTMLDivElement | null): void => {
-      if (node !== null) {
-        return
-      }
-      // Why: cancel the delayed focus handoff via this root ref cleanup, avoiding an otherwise cleanup-only React Effect.
-      pendingNewTabMenuFocusRef.current = null
-      clearPendingNewTabMenuFocusAnimation()
-      clearPendingNewTabMenuFocusRetry()
+  // Why useCallback rather than a lazily-filled ref: a stable identity without a render-phase ref read.
+  const clearPendingNewTabMenuFocusOnUnmount = useCallback((node: HTMLDivElement | null): void => {
+    if (node !== null) {
+      return
     }
-  }
+    // Why: cancel the delayed focus handoff via this root ref cleanup, avoiding an otherwise cleanup-only React Effect.
+    pendingNewTabMenuFocusRef.current = null
+    clearPendingNewTabMenuFocusAnimation()
+    clearPendingNewTabMenuFocusRetry()
+  }, [])
   return {
     queueNewActiveTerminalFocusAfterNewTabMenuClose,
     queueTerminalTabFocusAfterNewTabMenuClose,
     queueFocusAfterNewTabMenuClose,
     runPendingNewTabMenuFocusAfterClose,
-    clearPendingNewTabMenuFocusOnUnmount: clearPendingNewTabMenuFocusOnUnmountRef.current
+    clearPendingNewTabMenuFocusOnUnmount
   }
 }

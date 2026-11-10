@@ -29,7 +29,6 @@ import {
   formatLineRange
 } from './comment-controls'
 import { isMutablePRConversationComment } from '../../../../../../shared/github/pr-comment-mutability'
-import { translate } from '@/i18n/i18n'
 
 export function CommentRow({
   imageUploadAddress,
@@ -230,7 +229,7 @@ export function CommentRow({
             type="button"
             className={cn(presentation.pathBadge, 'cursor-pointer transition-colors')}
             title={comment.path}
-            aria-label={translate(
+            aria-label={t(
               'auto.components.right.sidebar.checks.panel.comment.row.5cca1251df',
               'Show in code'
             )}

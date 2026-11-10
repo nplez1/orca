@@ -25,7 +25,6 @@ import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { AgentSessionHistoryIcon } from './agent-session-history-icon'
 import { hasSessionSummaryBridge } from './session-summary-subject'
 import type { ActivityBarItem } from './activity-bar-buttons'
-import { translate } from '@/i18n/i18n'
 
 export type RightSidebarActivityItems = {
   visibleItems: ActivityBarItem[]
@@ -108,7 +107,7 @@ export function useRightSidebarActivityItems({
               // beside Agents rather than with the source-control group.
               id: 'summary' as const,
               icon: StickyNote,
-              title: translate('activity.sessionSummary.label', 'Session summary'),
+              title: t('activity.sessionSummary.label', 'Session summary'),
               shortcut: ''
             }
           ]
@@ -144,7 +143,7 @@ export function useRightSidebarActivityItems({
       {
         id: 'issue',
         icon: linkedIssueProvider ? providerIconComponent(linkedIssueProvider) : CircleDot,
-        title: translate('auto.components.right.sidebar.index.issue', 'Issue'),
+        title: t('auto.components.right.sidebar.index.issue', 'Issue'),
         shortcut: '',
         linkedIssueOnly: true
       },

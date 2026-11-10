@@ -13,7 +13,6 @@ import { paneCheckSteps } from '../../../../../../shared/check-step-visibility'
 import type { GitHubRepositoryIdentity } from '../../../../../../shared/github/pull-request-types'
 import { CheckJobLogTail } from '../logs/check-job-log-tail'
 import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
-import { translate } from '@/i18n/i18n'
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { checkJobIdentities } from '@/components/editor/check-details/reading/check-details-reading-cache'
@@ -54,6 +53,7 @@ function ViewFullCheckDetailsButton({
  * the stages still moving and the ones that failed, capped, because a pipeline can list hundreds.
  */
 function CheckJobSteps({ job }: { job: PRCheckJob }): React.JSX.Element | null {
+  const t = useTranslate()
   const { steps, hiddenCount } = paneCheckSteps(job)
   if (steps.length === 0 && hiddenCount === 0) {
     return null
@@ -74,7 +74,7 @@ function CheckJobSteps({ job }: { job: PRCheckJob }): React.JSX.Element | null {
       ))}
       {hiddenCount > 0 && (
         <div className="text-[11px] text-muted-foreground">
-          {translate('checkDetails.hiddenStages', '+{{value0}} more stages', {
+          {t('checkDetails.hiddenStages', '+{{value0}} more stages', {
             value0: hiddenCount
           })}
         </div>
@@ -195,7 +195,7 @@ export function CheckRunDetails({
             )}
             {durationMs !== null && (
               <span>
-                {translate('checkDetails.duration', 'Duration')} {formatBuildDuration(durationMs)}
+                {t('checkDetails.duration', 'Duration')} {formatBuildDuration(durationMs)}
               </span>
             )}
             {check.checkRunId && (
@@ -213,7 +213,7 @@ export function CheckRunDetails({
             {refreshing && (
               <span role="status" aria-live="polite" className="flex items-center gap-1">
                 <LoaderCircle className="size-3 animate-spin" />
-                {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
+                {t('githubChecks.refreshingDetails', 'Refreshing check details…')}
               </span>
             )}
             {/* Why no onStarted: this panel polls, so the row picks the new build up on its own. */}
@@ -241,7 +241,7 @@ export function CheckRunDetails({
                     }
                   >
                     <Settings className="size-3" />
-                    {translate('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
+                    {t('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
                   </Button>
                 )}
                 <Button

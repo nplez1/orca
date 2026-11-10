@@ -18,7 +18,6 @@ import {
   getCheckStatusLabel
 } from '@/components/github/pr-check-presentation'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import { translate } from '@/i18n/i18n'
 
 export function ChecksTabCheckDetails({
   check,
@@ -81,7 +80,7 @@ export function ChecksTabCheckDetails({
             {refreshing && (
               <span role="status" aria-live="polite" className="flex items-center gap-1">
                 <LoaderCircle className="size-3 animate-spin" />
-                {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
+                {t('githubChecks.refreshingDetails', 'Refreshing check details…')}
               </span>
             )}
             <JenkinsRebuildButton

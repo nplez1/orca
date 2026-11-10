@@ -33,7 +33,6 @@ import type { AgentDotState } from '@/components/AgentStateDot'
 import type { AiVaultSearchHit } from '../../../../../../shared/ai-vault/search/ai-vault-search-types'
 import { AiVaultSearchEvidence } from '../search/AiVaultSearchEvidence'
 import { useAiVaultSessionDisplayTitle } from './use-ai-vault-session-display-title'
-import { translate } from '@/i18n/i18n'
 
 // One step per nesting level. Pi emits a single level today; the cap keeps a
 // pathological chain from walking rows off the pane instead of clipping.
@@ -275,7 +274,7 @@ export function VaultSessionRow({
               subagentChildrenExpanded && 'rotate-90'
             )}
           />
-          {translate(
+          {t(
             'auto.components.right.sidebar.AiVaultSessionRow.subagentSession',
             '{{count}} subagent sessions',
             {

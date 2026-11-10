@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { isJiraStoryPointsField } from '../../../shared/jira-field-rendering'
 import type {
   JiraEditableField,
@@ -201,17 +202,18 @@ export function JiraStoryPointsEditorForm({
 }: {
   editor: JiraStoryPointsEditor
 }): React.JSX.Element {
+  const t = useTranslate()
   const messageId = useId()
   // Jira's own refusal outranks the hint, and a draft that is not a number outranks
   // both: the draft the user is looking at is what needs answering. Nothing to say
   // means no described-by, so the input is never pointed at an empty message.
   const problem = editor.invalid
-    ? translate('auto.components.JiraIssueStoryPointsControl.invalid', 'Enter a number.')
+    ? t('auto.components.JiraIssueStoryPointsControl.invalid', 'Enter a number.')
     : editor.error
   const hint =
     editor.points === undefined
       ? null
-      : translate(
+      : t(
           'auto.components.JiraIssueStoryPointsControl.clearHint',
           'An empty value clears the field.'
         )
@@ -254,14 +256,14 @@ export function JiraStoryPointsEditorForm({
           disabled={editor.pending}
           onClick={() => editor.setOpen(false)}
         >
-          {translate('auto.components.JiraIssueStoryPointsControl.cancel', 'Cancel')}
+          {t('auto.components.JiraIssueStoryPointsControl.cancel', 'Cancel')}
         </Button>
         <Button
           type="submit"
           size="xs"
           disabled={editor.blocked || editor.invalid || !editor.changed}
         >
-          {translate('auto.components.JiraIssueStoryPointsControl.save', 'Save')}
+          {t('auto.components.JiraIssueStoryPointsControl.save', 'Save')}
         </Button>
       </div>
     </form>

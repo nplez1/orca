@@ -4,6 +4,7 @@ import type { JenkinsServerSummary } from '../../../../shared/jenkins-servers'
 import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { readIpcErrorMessage } from '@/lib/ipc-error'
+import { runAsyncTask, runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import {
   IntegrationCardDetails,
   IntegrationCardShell
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { useIntegrationSubordinateRowClass } from '../integrations/presentation/integration-card-presentation'
 import { JenkinsServerDialog } from './jenkins-server-dialog'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 type TestResult = { ok: boolean; message: string }
 
@@ -28,6 +30,7 @@ const TEST_RESULT_CLASSES: Record<'ok' | 'problem', string> = {
  * decided by matching its URL against these prefixes — so this list is the whole configuration.
  */
 export function JenkinsIntegrationCard(): React.JSX.Element {
+  const t = useTranslate()
   const mountedRef = useMountedRef()
   const subordinateRowClass = useIntegrationSubordinateRowClass(
     'flex flex-wrap items-center gap-x-3 gap-y-1'
@@ -74,89 +77,96 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
         delete next[serverId]
         return next
       })
-      try {
-        const result = await window.api.jenkins.testServer({ id: serverId })
-        if (!mountedRef.current) {
-          return
-        }
-        setTestByServerId((current) => ({
-          ...current,
-          [serverId]: !result
-            ? {
-                ok: false,
-                message: translate(
-                  'jenkins.settings.unavailable',
-                  'Jenkins servers cannot be managed here.'
-                )
-              }
-            : result.ok
-              ? {
-                  ok: true,
-                  message: result.version
-                    ? translate(
-                        'jenkins.settings.connectedVersion',
-                        'Connected to Jenkins {{value0}}',
-                        {
-                          value0: result.version
-                        }
-                      )
-                    : translate('jenkins.settings.connected', 'Connected')
-                }
-              : { ok: false, message: result.error }
-        }))
-      } catch (error) {
-        if (mountedRef.current) {
+      await runAsyncTaskWithFailure(
+        async () => {
+          const result = await window.api.jenkins.testServer({ id: serverId })
+          if (!mountedRef.current) {
+            return
+          }
           setTestByServerId((current) => ({
             ...current,
-            [serverId]: {
-              ok: false,
-              message:
-                readIpcErrorMessage(error) ??
-                translate('jenkins.settings.testFailed', 'Could not reach this Jenkins server.')
-            }
+            [serverId]: !result
+              ? {
+                  ok: false,
+                  message: translate(
+                    'jenkins.settings.unavailable',
+                    'Jenkins servers cannot be managed here.'
+                  )
+                }
+              : result.ok
+                ? {
+                    ok: true,
+                    message: result.version
+                      ? translate(
+                          'jenkins.settings.connectedVersion',
+                          'Connected to Jenkins {{value0}}',
+                          {
+                            value0: result.version
+                          }
+                        )
+                      : translate('jenkins.settings.connected', 'Connected')
+                  }
+                : { ok: false, message: result.error }
           }))
+        },
+        (error) => {
+          if (mountedRef.current) {
+            setTestByServerId((current) => ({
+              ...current,
+              [serverId]: {
+                ok: false,
+                message:
+                  readIpcErrorMessage(error) ??
+                  translate('jenkins.settings.testFailed', 'Could not reach this Jenkins server.')
+              }
+            }))
+          }
+        },
+        () => {
+          if (mountedRef.current) {
+            setTestingId(null)
+          }
         }
-      } finally {
-        if (mountedRef.current) {
-          setTestingId(null)
-        }
-      }
+      )
     },
     [mountedRef]
   )
 
   const handleRemove = async (server: JenkinsServerSummary): Promise<void> => {
     setRemovingId(server.id)
-    try {
-      await window.api.jenkins.removeServer({ id: server.id })
-      if (mountedRef.current) {
-        setTestByServerId((current) => {
-          const next = { ...current }
-          delete next[server.id]
-          return next
-        })
+    await runAsyncTask(
+      async () => {
+        await window.api.jenkins.removeServer({ id: server.id })
+        if (mountedRef.current) {
+          setTestByServerId((current) => {
+            const next = { ...current }
+            delete next[server.id]
+            return next
+          })
+        }
+      },
+      async () => {
+        if (mountedRef.current) {
+          setRemovingId(null)
+        }
+        await loadServers()
       }
-    } finally {
-      if (mountedRef.current) {
-        setRemovingId(null)
-      }
-      await loadServers()
-    }
+    )
   }
 
   const count = servers?.length ?? 0
   const statusLabel = loadFailed
-    ? translate('jenkins.settings.statusUnknown', 'Unknown')
+    ? t('jenkins.settings.statusUnknown', 'Unknown')
     : count === 0
-      ? translate('jenkins.settings.statusNone', 'Not configured')
-      : translate('jenkins.settings.statusCount', '{{value0}} configured', { value0: count })
+      ? t('jenkins.settings.statusNone', 'Not configured')
+      : t('jenkins.settings.statusCount', '{{value0}} configured', { value0: count })
 
   return (
     <IntegrationCardShell
       settingsSectionId={JENKINS_INTEGRATION_SETTINGS_TARGET_ID}
       icon={<Server className="size-5" />}
       name="Jenkins"
-      description={translate(
+      description={t(
         'jenkins.settings.card.description',
         'Read build stages, status and timing for checks that link to Jenkins.'
       )}
@@ -174,7 +184,7 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
           }}
         >
           <Plus className="size-3.5" />
-          {translate('jenkins.settings.add', 'Add server')}
+          {t('jenkins.settings.add', 'Add server')}
         </Button>
       }
     >
@@ -190,9 +200,7 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
                   <div className="truncate text-[11px] text-muted-foreground">
                     {server.baseUrl}
                     {server.username ? ` · ${server.username}` : ''}
-                    {server.hasToken
-                      ? ''
-                      : ` · ${translate('jenkins.settings.noToken', 'no token saved')}`}
+                    {server.hasToken ? '' : ` · ${t('jenkins.settings.noToken', 'no token saved')}`}
                   </div>
                 </div>
                 {result && (
@@ -216,13 +224,13 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
                     onClick={() => void runTest(server.id)}
                   >
                     {testingId === server.id && <LoaderCircle className="size-3 animate-spin" />}
-                    {translate('jenkins.settings.test', 'Test')}
+                    {t('jenkins.settings.test', 'Test')}
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="xs"
-                    aria-label={translate('jenkins.settings.edit', 'Edit {{value0}}', {
+                    aria-label={t('jenkins.settings.edit', 'Edit {{value0}}', {
                       value0: server.label
                     })}
                     onClick={() => {
@@ -237,7 +245,7 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
                     variant="ghost"
                     size="xs"
                     disabled={removingId === server.id}
-                    aria-label={translate('jenkins.settings.remove', 'Remove {{value0}}', {
+                    aria-label={t('jenkins.settings.remove', 'Remove {{value0}}', {
                       value0: server.label
                     })}
                     onClick={() => void handleRemove(server)}

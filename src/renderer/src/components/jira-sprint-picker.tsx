@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { matchesCommandTerms } from '@/lib/command-choice-filter'
 import type { JiraSprint } from '../../../shared/jira/jira-types'
 import { sortJiraSprintsNearToday } from './jira-sprint-sorter'
@@ -85,6 +86,7 @@ export function JiraSprintPicker({
   includeBacklog?: boolean
   align?: 'start' | 'end'
 }): React.JSX.Element {
+  const t = useTranslate()
   // Why the open timestamp rather than reading the clock during render: the ranking is
   // relative to "now", and a render has to stay pure. Sampling it on open also means a
   // long-lived drawer re-ranks against the day it is reopened.
@@ -113,18 +115,18 @@ export function JiraSprintPicker({
       <PopoverContent className="w-64" align={align}>
         <Command
           density="menu"
-          label={translate('auto.components.JiraSprintPicker.sprint', 'Sprint')}
+          label={t('auto.components.JiraSprintPicker.sprint', 'Sprint')}
           filter={sprintChoiceFilter}
           // Why: the picker sits inside a clickable issue row, and React bubbles a
           // portalled popover's clicks up the component tree to that row's handler.
           onClick={(event) => event.stopPropagation()}
         >
           <CommandInput
-            placeholder={translate('auto.components.JiraSprintPicker.findSprint', 'Find a sprint…')}
+            placeholder={t('auto.components.JiraSprintPicker.findSprint', 'Find a sprint…')}
           />
           <CommandList animateHeight>
             <CommandEmpty>
-              {translate('auto.components.JiraSprintPicker.noSprintMatch', 'No sprint matches.')}
+              {t('auto.components.JiraSprintPicker.noSprintMatch', 'No sprint matches.')}
             </CommandEmpty>
             {includeBacklog ? (
               <CommandItem

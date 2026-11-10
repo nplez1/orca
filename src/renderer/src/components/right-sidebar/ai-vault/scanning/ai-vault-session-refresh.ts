@@ -1,3 +1,6 @@
+/* eslint-disable max-lines -- Why: upstream-owned, and this fork touches it only to clear React
+   Compiler bailouts; splitting it would put a fork hunk in the way of the next sync. */
+import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { aiVaultScanErrorText } from './ai-vault-scan-issue-copy'
@@ -68,8 +71,7 @@ export function useAiVaultSessionRefresh(
   const [loading, setLoading] = useState(false)
   const [failure, setFailure] = useState<{ scopeKey: string; cause: string } | null>(null)
   const [terminalScopeKey, setTerminalScopeKey] = useState<string | null>(null)
-  const requestTokenRef = useRef<string>(undefined!)
-  requestTokenRef.current ??= createBrowserUuid()
+  const [requestToken] = useState(() => createBrowserUuid())
   const refreshIdRef = useRef(0)
   const refreshInFlightRef = useRef(false)
   const pendingRefreshRef = useRef(false)
@@ -77,23 +79,23 @@ export function useAiVaultSessionRefresh(
   const pendingBackgroundRef = useRef(true)
   const conditionalSnapshotRef = useRef<ConditionalSnapshot | null>(null)
   const mountedRef = useRef(true)
-  const publicationGateRef = useRef<AiVaultSessionPublicationGate>(undefined!)
-  publicationGateRef.current ??= new AiVaultSessionPublicationGate()
+  const [publicationGate] = useState(() => new AiVaultSessionPublicationGate())
   const scanScopeKey = `${aiVaultSessionResultCacheKey(executionHostScope, scopePaths, sessionLimit, hostQuery)}\n${sessionLimit}`
   // Kept through rescans so a repeat failure doesn't blink; shown only for the scope that failed.
   const error = failure?.scopeKey === scanScopeKey ? aiVaultScanErrorText(failure.cause) : null
   const scopePathsRef = useRef<readonly string[]>(scopePaths)
-  scopePathsRef.current = scopePaths
   const hostQueryRef = useRef(hostQuery)
-  hostQueryRef.current = hostQuery
   const executionHostScopeRef = useRef<ExecutionHostScope>(executionHostScope)
-  executionHostScopeRef.current = executionHostScope
   const sessionLimitRef = useRef(sessionLimit)
   // Keep render pure for React Doctor; layout effect still lands before refresh effects.
+  // Why every latest-value ref lands here: React Compiler rejects ref writes during render.
   useLayoutEffect(() => {
     sessionLimitRef.current = sessionLimit
     associationsRef.current = associations
-  }, [associations, sessionLimit])
+    scopePathsRef.current = scopePaths
+    hostQueryRef.current = hostQuery
+    executionHostScopeRef.current = executionHostScope
+  }, [associations, executionHostScope, hostQuery, scopePaths, sessionLimit])
   const currentScanScopeKey = useCallback(
     () =>
       `${aiVaultSessionResultCacheKey(
@@ -104,6 +106,8 @@ export function useAiVaultSessionRefresh(
       )}\n${sessionLimitRef.current}`,
     []
   )
+  // Why a ref for the queued re-run: React Compiler cannot compile a callback that calls itself.
+  const refreshRef = useRef<((args?: AiVaultRefreshArgs) => Promise<void>) | null>(null)
   const refresh = useCallback(
     async (args: AiVaultRefreshArgs = {}): Promise<void> => {
       const observation = associationsRef.current
@@ -125,7 +129,7 @@ export function useAiVaultSessionRefresh(
         const scanKey = currentScanScopeKey()
         setFailure(null)
         setTerminalScopeKey(null)
-        publicationGateRef.current.publish(cachedResult, (published) => {
+        publicationGate.publish(cachedResult, (published) => {
           if (!mountedRef.current || scanKey !== currentScanScopeKey() || !associationCurrent()) {
             return
           }
@@ -140,11 +144,14 @@ export function useAiVaultSessionRefresh(
       // Queue scope changes during an in-flight scan so the new view still refreshes.
       if (refreshInFlightRef.current) {
         pendingRefreshRef.current = true
-        pendingForceRef.current ||= args.force === true
-        pendingBackgroundRef.current &&= args.background === true || cachedResult !== null
+        if (args.force === true) {
+          pendingForceRef.current = true
+        }
+        pendingBackgroundRef.current =
+          pendingBackgroundRef.current && (args.background === true || cachedResult !== null)
         if (args.force === true && args.background !== true) {
           void window.api.aiVault
-            .cancelListSessions({ requestToken: requestTokenRef.current })
+            .cancelListSessions({ requestToken: requestToken })
             .catch((error: unknown) => console.warn('Could not cancel Session History scan', error))
         }
         return
@@ -174,65 +181,70 @@ export function useAiVaultSessionRefresh(
         sessionLimit: selectedLimit,
         ...(hostQueryRef.current ? { query: hostQueryRef.current } : {})
       }
-      try {
-        const previous = conditionalSnapshotRef.current
-        const result = await refreshAiVaultSessionList(
-          request,
-          { force: args.force, requestToken: requestTokenRef.current },
-          previous?.scopeKey === scanKey ? previous : undefined
-        )
-        // Reject superseded or old-scope replies before they can repaint History.
-        if (!requestCurrent()) {
-          return
-        }
-        if (result.cancelled) {
-          setTerminalScopeKey(scanKey)
-          return
-        }
-        setFailure(null)
-        cacheAiVaultSessionList(request, result, { replaceHostEntries: args.force === true })
-        publicationGateRef.current.publish(result, (published) => {
+      await runAsyncTaskWithFailure(
+        async () => {
+          const previous = conditionalSnapshotRef.current
+          const result = await refreshAiVaultSessionList(
+            request,
+            { force: args.force, requestToken: requestToken },
+            previous?.scopeKey === scanKey ? previous : undefined
+          )
+          // Reject superseded or old-scope replies before they can repaint History.
+          if (!requestCurrent()) {
+            return
+          }
+          if (result.cancelled) {
+            setTerminalScopeKey(scanKey)
+            return
+          }
+          setFailure(null)
+          cacheAiVaultSessionList(request, result, { replaceHostEntries: args.force === true })
+          publicationGate.publish(result, (published) => {
+            if (requestCurrent()) {
+              applyScan(published, selectedLimit, scanKey, (applied) => {
+                conditionalSnapshotRef.current = published.fingerprint
+                  ? { scopeKey: scanKey, fingerprint: published.fingerprint, result: applied }
+                  : null
+              })
+            }
+          })
+        },
+        (err) => {
+          // Cancellation means another shared scan superseded this one; do not replace its incoming list with an error.
           if (requestCurrent()) {
-            applyScan(published, selectedLimit, scanKey, (applied) => {
-              conditionalSnapshotRef.current = published.fingerprint
-                ? { scopeKey: scanKey, fingerprint: published.fingerprint, result: applied }
-                : null
-            })
+            setTerminalScopeKey(scanKey)
+            if (!isAiVaultScanCancelledError(err)) {
+              setFailure({
+                scopeKey: scanKey,
+                cause: err instanceof Error ? err.message : String(err)
+              })
+            }
           }
-        })
-      } catch (err) {
-        // Cancellation means another shared scan superseded this one; do not replace its incoming list with an error.
-        if (requestCurrent()) {
-          setTerminalScopeKey(scanKey)
-          if (!isAiVaultScanCancelledError(err)) {
-            setFailure({
-              scopeKey: scanKey,
-              cause: err instanceof Error ? err.message : String(err)
-            })
+        },
+        () => {
+          refreshInFlightRef.current = false
+          if (mountedRef.current && refreshIdRef.current === refreshId) {
+            setLoading(false)
+          }
+          if (pendingRefreshRef.current && mountedRef.current) {
+            pendingRefreshRef.current = false
+            const force = pendingForceRef.current
+            // The queued refresh is background-only if every queued caller was.
+            const background = pendingBackgroundRef.current
+            pendingForceRef.current = false
+            pendingBackgroundRef.current = true
+            void refreshRef.current?.({ force, background })
           }
         }
-      } finally {
-        refreshInFlightRef.current = false
-        if (mountedRef.current && refreshIdRef.current === refreshId) {
-          setLoading(false)
-        }
-        if (pendingRefreshRef.current && mountedRef.current) {
-          pendingRefreshRef.current = false
-          const force = pendingForceRef.current
-          // The queued refresh is background-only if every queued caller was.
-          const background = pendingBackgroundRef.current
-          pendingForceRef.current = false
-          pendingBackgroundRef.current = true
-          void refresh({ force, background })
-        }
-      }
+      )
       // Read changing scope through refs; recursion requires a stable refresh identity.
     },
-    [applyScan, currentScanScopeKey]
+    [applyScan, currentScanScopeKey, publicationGate, requestToken]
   )
-
   // Defer throttled new-session rescans until budget frees so sessions cannot remain invisible indefinitely.
   const forcedRescanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Why a ref for the retry: React Compiler cannot compile a callback that calls itself.
+  const requestForcedRescanRef = useRef<(() => void) | null>(null)
   const requestForcedRescan = useCallback(() => {
     if (claimAiVaultForcedRescan()) {
       void refresh({ background: true, force: true })
@@ -244,14 +256,16 @@ export function useAiVaultSessionRefresh(
     }
     forcedRescanTimerRef.current = setTimeout(() => {
       forcedRescanTimerRef.current = null
-      requestForcedRescan()
+      requestForcedRescanRef.current?.()
     }, waitMs)
   }, [refresh])
+  useLayoutEffect(() => {
+    refreshRef.current = refresh
+    requestForcedRescanRef.current = requestForcedRescan
+  }, [refresh, requestForcedRescan])
 
   useEffect(() => {
     mountedRef.current = true
-    const requestToken = requestTokenRef.current
-    const publicationGate = publicationGateRef.current
     return () => {
       mountedRef.current = false
       publicationGate.cancel()
@@ -268,30 +282,30 @@ export function useAiVaultSessionRefresh(
         forcedRescanTimerRef.current = null
       }
     }
-  }, [])
+  }, [publicationGate, requestToken])
 
   // Panel entry reuses the renderer result first, then the host scan cache.
   useEffect(() => {
-    publicationGateRef.current.cancel()
+    publicationGate.cancel()
     pendingRefreshRef.current = false
     pendingForceRef.current = false
     pendingBackgroundRef.current = true
     if (refreshInFlightRef.current) {
       void window.api.aiVault.cancelListSessions({
-        requestToken: requestTokenRef.current
+        requestToken: requestToken
       })
     }
     void refresh({ force: false, reuseLoadedDepth: true })
-  }, [associations, executionHostScope, refresh, scanScopeKey])
+  }, [associations, executionHostScope, publicationGate, refresh, requestToken, scanScopeKey])
 
   useEffect(
     () =>
       associations.subscribe(() => {
-        publicationGateRef.current.cancel()
+        publicationGate.cancel()
         conditionalSnapshotRef.current = null
         void refresh({ background: true, force: false })
       }),
-    [associations, refresh]
+    [associations, publicationGate, refresh]
   )
 
   // Retry prior relay-readiness errors on host events; otherwise startup/reconnect failures can persist indefinitely.

@@ -8,7 +8,7 @@ import {
   useJiraStoryPointsEditor,
   type JiraStoryPointsMutation
 } from '@/components/jira-issue-story-points-control'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 
 /**
@@ -27,6 +27,7 @@ export function JiraStoryPointsRow({
   pendingField: string | null
   mutateIssue: JiraStoryPointsMutation
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const editor = useJiraStoryPointsEditor({ displayed, editFields, pendingField, mutateIssue })
   if (!editor.pointsField) {
     return editor.points === undefined ? null : (
@@ -52,7 +53,7 @@ export function JiraStoryPointsRow({
           value={
             editor.points === undefined ? (
               <span className="text-muted-foreground">
-                {translate('auto.components.JiraIssueStoryPointsControl.none', 'No points')}
+                {t('auto.components.JiraIssueStoryPointsControl.none', 'No points')}
               </span>
             ) : (
               jiraStoryPointsLabel(editor.points)

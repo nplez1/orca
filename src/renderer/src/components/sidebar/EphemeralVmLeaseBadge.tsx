@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import {
   formatEphemeralVmDeadline,
   type EphemeralVmLeaseIndicator
@@ -19,6 +19,7 @@ export function EphemeralVmLeaseBadge({
 }: {
   indicator: EphemeralVmLeaseIndicator
 }): React.JSX.Element {
+  const t = useTranslate()
   const deadline = formatEphemeralVmDeadline(indicator.releaseAtMs)
   return (
     <Tooltip>
@@ -27,24 +28,22 @@ export function EphemeralVmLeaseBadge({
             destructive status pill is the repo's one treatment for "act on this now". */}
         <Badge variant={indicator.tone === 'destructive' ? 'statusDanger' : 'hostContext'}>
           {indicator.expired
-            ? translate('auto.components.sidebar.WorktreeCard.ephemeralLeaseExpired', 'Expired')
-            : translate(
-                'auto.components.sidebar.WorktreeCard.ephemeralLeaseRemaining',
-                'Exp {{value0}}',
-                { value0: indicator.remaining }
-              )}
+            ? t('auto.components.sidebar.WorktreeCard.ephemeralLeaseExpired', 'Expired')
+            : t('auto.components.sidebar.WorktreeCard.ephemeralLeaseRemaining', 'Exp {{value0}}', {
+                value0: indicator.remaining
+              })}
         </Badge>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={8}>
         <div className="space-y-1">
           <div>
             {indicator.expired
-              ? translate(
+              ? t(
                   'auto.components.sidebar.WorktreeCard.ephemeralLeaseEndedAt',
                   'Lease ended {{value0}}',
                   { value0: deadline }
                 )
-              : translate(
+              : t(
                   'auto.components.sidebar.WorktreeCard.ephemeralLeaseEndsAt',
                   'Lease ends {{value0}}',
                   { value0: deadline }
@@ -52,7 +51,7 @@ export function EphemeralVmLeaseBadge({
           </div>
           {indicator.provider ? (
             <div className="opacity-80">
-              {translate(
+              {t(
                 'auto.components.sidebar.WorktreeCard.ephemeralLeaseProvider',
                 'Provider: {{value0}}',
                 { value0: indicator.provider }

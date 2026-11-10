@@ -3,6 +3,18 @@ import type { IDisposable } from '@xterm/xterm'
 import type { UseTerminalPaneLifecycleDeps } from '../../mounting/terminal-pane-lifecycle-types'
 import { recordUiHangOperation } from '@/lib/ui-hang-diagnostics/record-ui-hang-operation'
 
+type SampleableBinding = IDisposable & { sampleForegroundAgentOnFocus?: () => void }
+
+/** Why module-level: a try/finally in the hook body bails React Compiler out of the whole hook. */
+function sampleForegroundAgent(binding: SampleableBinding | undefined): void {
+  const startedAtMs = performance.now()
+  try {
+    binding?.sampleForegroundAgentOnFocus?.()
+  } finally {
+    recordUiHangOperation('foreground-agent-focus-sample', startedAtMs)
+  }
+}
+
 export function useTerminalForegroundAgentSampling(
   deps: Pick<
     UseTerminalPaneLifecycleDeps,
@@ -18,16 +30,11 @@ export function useTerminalForegroundAgentSampling(
       if (!activePane) {
         return
       }
-      // SAFETY: Sampling is optional on the disposable binding and guarded before invocation.
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Sampling is optional on the disposable binding and guarded before invocation.
       const binding = deps.panePtyBindingsRef.current.get(activePane.id) as
-        | (IDisposable & { sampleForegroundAgentOnFocus?: () => void })
+        | SampleableBinding
         | undefined
-      const startedAtMs = performance.now()
-      try {
-        binding?.sampleForegroundAgentOnFocus?.()
-      } finally {
-        recordUiHangOperation('foreground-agent-focus-sample', startedAtMs)
-      }
+      sampleForegroundAgent(binding)
     }
     window.addEventListener('focus', onWindowFocus)
     return () => window.removeEventListener('focus', onWindowFocus)

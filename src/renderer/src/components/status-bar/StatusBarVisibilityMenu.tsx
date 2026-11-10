@@ -12,7 +12,6 @@ import { CopilotIcon, DeepInfraIcon, DeepSeekIcon, FireworksIcon } from './fork-
 import { useTranslate } from '@/i18n/use-translate'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import type { StatusBarController } from './use-status-bar-controller'
-import { translate } from '@/i18n/i18n'
 
 export function StatusBarVisibilityMenu({
   controller
@@ -129,7 +128,7 @@ export function StatusBarVisibilityMenu({
           }}
         >
           <DeepSeekIcon size={14} />
-          {translate('settings.appearance.statusBar.deepseekLabel', 'DeepSeek Balance')}
+          {t('settings.appearance.statusBar.deepseekLabel', 'DeepSeek Balance')}
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={statusBarItems.includes('fireworks')}
@@ -139,7 +138,7 @@ export function StatusBarVisibilityMenu({
           }}
         >
           <FireworksIcon size={14} />
-          {translate('settings.appearance.statusBar.fireworksLabel', 'Fireworks.ai Spend')}
+          {t('settings.appearance.statusBar.fireworksLabel', 'Fireworks.ai Spend')}
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={statusBarItems.includes('deepinfra')}
@@ -149,7 +148,7 @@ export function StatusBarVisibilityMenu({
           }}
         >
           <DeepInfraIcon size={14} />
-          {translate('settings.appearance.statusBar.deepinfraLabel', 'DeepInfra Balance')}
+          {t('settings.appearance.statusBar.deepinfraLabel', 'DeepInfra Balance')}
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={statusBarItems.includes('copilot')}
@@ -159,7 +158,7 @@ export function StatusBarVisibilityMenu({
           }}
         >
           <CopilotIcon size={14} />
-          {translate('settings.appearance.statusBar.copilotLabel', 'GitHub Copilot Usage')}
+          {t('settings.appearance.statusBar.copilotLabel', 'GitHub Copilot Usage')}
         </DropdownMenuCheckboxItem>
         {isStatusBarItemAvailable('grok', detectedAgentIds) && (
           <DropdownMenuCheckboxItem

@@ -1,7 +1,7 @@
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 type SshTargetVisibilityToggleProps = {
   hidden: boolean
@@ -23,9 +23,10 @@ export function SshTargetVisibilityToggle({
   busy,
   onSetHidden
 }: SshTargetVisibilityToggleProps): React.JSX.Element {
+  const t = useTranslate()
   const label = hidden
-    ? translate('auto.components.settings.SshTargetVisibilityToggle.unhide', 'Unhide host')
-    : translate('auto.components.settings.SshTargetVisibilityToggle.hide', 'Hide host')
+    ? t('auto.components.settings.SshTargetVisibilityToggle.unhide', 'Unhide host')
+    : t('auto.components.settings.SshTargetVisibilityToggle.hide', 'Hide host')
   return (
     <Tooltip>
       <TooltipTrigger asChild>

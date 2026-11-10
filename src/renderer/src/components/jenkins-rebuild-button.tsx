@@ -4,7 +4,9 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
+import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import { rerunJenkinsCheck, hasJenkinsApi } from '@/runtime/jenkins-rebuild-client'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
@@ -38,6 +40,7 @@ export function JenkinsRebuildButton({
   /** Icon with a tooltip, for a check row — the label would push the row's name out of the way. */
   iconOnly?: boolean
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const [rebuilding, setRebuilding] = useState(false)
   const [justQueued, setJustQueued] = useState(false)
   // Why this window lives here rather than in the rerun client: the check keeps reading `completed`
@@ -54,24 +57,26 @@ export function JenkinsRebuildButton({
   const busy = rebuilding || justQueued
   const run = useCallback(async (): Promise<void> => {
     setRebuilding(true)
-    try {
-      const outcome = await rerunJenkinsCheck(check)
-      if (!outcome.ok) {
-        toast.error(outcome.error)
-        return
-      }
-      toast.success(outcome.message)
-      setJustQueued(true)
-      onStarted?.()
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : translate('jenkins.rerun.failed', 'Jenkins could not rerun this build.')
-      )
-    } finally {
-      setRebuilding(false)
-    }
+    await runAsyncTaskWithFailure(
+      async () => {
+        const outcome = await rerunJenkinsCheck(check)
+        if (!outcome.ok) {
+          toast.error(outcome.error)
+          return
+        }
+        toast.success(outcome.message)
+        setJustQueued(true)
+        onStarted?.()
+      },
+      (err) => {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : translate('jenkins.rerun.failed', 'Jenkins could not rerun this build.')
+        )
+      },
+      () => setRebuilding(false)
+    )
   }, [check, onStarted])
 
   // Why also the status: a queued or running build is not something to rerun — Jenkins would run
@@ -88,8 +93,8 @@ export function JenkinsRebuildButton({
     return null
   }
   const label = rebuilding
-    ? translate('jenkins.rerun.rerunning', 'Rerunning…')
-    : translate('jenkins.rerun.action', 'Rerun build')
+    ? t('jenkins.rerun.rerunning', 'Rerunning…')
+    : t('jenkins.rerun.action', 'Rerun build')
   if (iconOnly) {
     return (
       <Tooltip>
@@ -101,7 +106,7 @@ export function JenkinsRebuildButton({
             className={cn('size-6', className)}
             disabled={busy}
             aria-busy={busy}
-            aria-label={translate('jenkins.rerun.action', 'Rerun build')}
+            aria-label={t('jenkins.rerun.action', 'Rerun build')}
             onClick={(event) => {
               // Why: the row underneath toggles the details, and rerunning is not a request to open them.
               event.stopPropagation()

@@ -81,6 +81,7 @@ export type RepoHeaderProjectActions = {
 }
 
 function RepoHeaderAddToHostSubmenu({ repo }: { repo: Repo }): React.JSX.Element | null {
+  const t = useTranslate()
   // Why: mounted only while this dropdown is open, so no host list is built for closed menus.
   const { addToHost, getAddToHostOptions } = useProjectAddToHost()
   const options = getAddToHostOptions(repo)
@@ -91,7 +92,7 @@ function RepoHeaderAddToHostSubmenu({ repo }: { repo: Repo }): React.JSX.Element
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
         <Server className="size-3.5" />
-        {translate('auto.components.sidebar.WorktreeList.addToHost', 'Add to…')}
+        {t('auto.components.sidebar.WorktreeList.addToHost', 'Add to…')}
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent>
         {options.map((option) => (

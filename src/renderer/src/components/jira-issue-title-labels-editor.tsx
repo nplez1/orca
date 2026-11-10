@@ -1,7 +1,7 @@
 import { LoaderCircle, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /** Title + labels editor for an open Jira issue, shared by the Task view's
  *  `JiraIssueWorkspaceContent` and the right-sidebar Issue pane. */
@@ -22,10 +22,11 @@ export function JiraIssueTitleLabelsEditor({
   handleSaveLabels: () => void
   pendingField: string | null
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <div className="grid gap-2">
       <label className="text-2xs font-medium text-muted-foreground">
-        {translate('auto.components.JiraIssueWorkspace.444865b4a8', 'Title')}
+        {t('auto.components.JiraIssueWorkspace.444865b4a8', 'Title')}
       </label>
       <div className="flex gap-2">
         <Input
@@ -53,13 +54,13 @@ export function JiraIssueTitleLabelsEditor({
         </Button>
       </div>
       <label className="mt-2 text-2xs font-medium text-muted-foreground">
-        {translate('auto.components.JiraIssueWorkspace.aee97b6913', 'Labels')}
+        {t('auto.components.JiraIssueWorkspace.aee97b6913', 'Labels')}
       </label>
       <div className="flex gap-2">
         <Input
           value={labelsDraft}
           onChange={(event) => setLabelsDraft(event.target.value)}
-          placeholder={translate('auto.components.JiraIssueWorkspace.0f3c07a901', 'backend, bug')}
+          placeholder={t('auto.components.JiraIssueWorkspace.0f3c07a901', 'backend, bug')}
           className="h-8 text-xs"
         />
         <Button

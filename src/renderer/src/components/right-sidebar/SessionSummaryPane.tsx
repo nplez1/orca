@@ -1,7 +1,7 @@
 import React from 'react'
 import { Info, RefreshCw, StickyNote } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
 import { resolveSessionSummaryHeaderState } from '@/components/activity/session-summary-presentation'
 import { useSessionSummary } from '@/components/activity/use-session-summary'
@@ -23,6 +23,7 @@ function SessionSummarySubjectBody({
   executionHostId: string | null
   isOpen: boolean
 }): React.JSX.Element {
+  const t = useTranslate()
   // Why the pane's own records: this window is the process holding the pane, so what it knows
   // about the session outranks the folding side's row — which may be absent (a paired host
   // that only runs the PTY) or relayed without the agent's transcript path.
@@ -42,7 +43,7 @@ function SessionSummarySubjectBody({
       <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-1.5">
         <StickyNote className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {translate('activity.sessionSummary.label', 'Session summary')}
+          {t('activity.sessionSummary.label', 'Session summary')}
         </span>
         <span
           className={cn(
@@ -61,8 +62,8 @@ function SessionSummarySubjectBody({
           type="button"
           onClick={refresh}
           disabled={refreshing}
-          aria-label={translate('activity.sessionSummary.refresh', 'Refresh summary')}
-          title={translate('activity.sessionSummary.refresh', 'Refresh summary')}
+          aria-label={t('activity.sessionSummary.refresh', 'Refresh summary')}
+          title={t('activity.sessionSummary.refresh', 'Refresh summary')}
           className={cn(
             'shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground',
             refreshing && 'animate-spin opacity-60'
@@ -89,6 +90,7 @@ export default function SessionSummaryPane({
 }: {
   isVisible: boolean
 }): React.JSX.Element {
+  const t = useTranslate()
   const paneKey = useSessionSummaryPaneKey()
   const executionHostId = useSessionSummaryExecutionHostId()
   const hostSupported = useSessionSummaryHostSupported()
@@ -104,7 +106,7 @@ export default function SessionSummaryPane({
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <Info className="size-6 text-muted-foreground/60" aria-hidden="true" />
           <p className="text-xs text-muted-foreground">
-            {translate(
+            {t(
               'activity.sessionSummary.unavailableInWindow',
               'Session summaries are not available in this window.'
             )}
@@ -126,7 +128,7 @@ export default function SessionSummaryPane({
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <Info className="size-6 text-muted-foreground/60" aria-hidden="true" />
           <p className="text-xs text-muted-foreground">
-            {translate(
+            {t(
               'activity.sessionSummary.unsupportedHost',
               'Session summaries are not available for a workspace on this host.'
             )}
@@ -136,10 +138,7 @@ export default function SessionSummaryPane({
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <Info className="size-6 text-muted-foreground/60" aria-hidden="true" />
           <p className="text-xs text-muted-foreground">
-            {translate(
-              'activity.sessionSummary.notFocused',
-              'Focus an agent session to see its summary.'
-            )}
+            {t('activity.sessionSummary.notFocused', 'Focus an agent session to see its summary.')}
           </p>
         </div>
       )}

@@ -3,6 +3,7 @@ import { Pencil, Server } from 'lucide-react'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { AddWorktreeToAnotherHostRefusal } from './worktree-to-host-composer-data'
 import type { WorktreeContextMenuModel } from './workspace-actions/context-menu/use-worktree-context-menu-model'
 
@@ -36,6 +37,7 @@ export function WorkspaceIdentityMenuItems({
 }: {
   model: WorktreeContextMenuModel
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const { addToAnotherHost, handleAddToAnotherHost, handleRename, isDeleting, isMultiContext } =
     model
   if (isMultiContext) {
@@ -45,12 +47,12 @@ export function WorkspaceIdentityMenuItems({
     <>
       <DropdownMenuItem onSelect={handleRename} disabled={isDeleting}>
         <Pencil className="size-3.5" />
-        {translate('auto.components.sidebar.WorktreeContextMenu.439fa94d53', 'Update')}
+        {t('auto.components.sidebar.WorktreeContextMenu.439fa94d53', 'Update')}
       </DropdownMenuItem>
       {addToAnotherHost.kind === 'hidden' ? null : addToAnotherHost.kind === 'available' ? (
         <DropdownMenuItem onSelect={handleAddToAnotherHost} disabled={isDeleting}>
           <Server className="size-3.5" />
-          {translate(
+          {t(
             'auto.components.sidebar.WorktreeContextMenu.addToAnotherHost',
             'Add to another host…'
           )}
@@ -63,7 +65,7 @@ export function WorkspaceIdentityMenuItems({
             <div>
               <DropdownMenuItem disabled>
                 <Server className="size-3.5" />
-                {translate(
+                {t(
                   'auto.components.sidebar.WorktreeContextMenu.addToAnotherHost',
                   'Add to another host…'
                 )}

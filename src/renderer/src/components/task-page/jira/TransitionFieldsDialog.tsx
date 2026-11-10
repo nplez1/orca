@@ -10,7 +10,7 @@ import {
   type JiraTransitionSubmitOutcome
 } from '@/components/jira-transition-fields-form'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { RuntimeJiraSettings } from '../../../runtime/jira/runtime-jira-client'
 
 export type JiraTransitionFieldsRequest = {
@@ -44,18 +44,19 @@ export function TaskPageJiraTransitionFieldsDialog({
   onSubmit: (updates: JiraIssueUpdate) => Promise<JiraTransitionSubmitOutcome>
   onClose: () => void
 }): JSX.Element {
+  const t = useTranslate()
   return (
     <Dialog open={request !== null} onOpenChange={(open) => !open && !submitting && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogTitle>
-          {translate(
+          {t(
             'auto.components.TaskPage.jiraTransitionFieldsTitle',
             'Update fields to move {{value0}}',
             { value0: request?.issue.key ?? '' }
           )}
         </DialogTitle>
         <DialogDescription>
-          {translate(
+          {t(
             'auto.components.TaskPage.jiraTransitionFieldsDescription',
             'Jira requires these fields before it will apply the {{value0}} transition.',
             { value0: request?.transition.name ?? '' }

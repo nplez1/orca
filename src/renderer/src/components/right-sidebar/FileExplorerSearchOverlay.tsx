@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome-types'
 import { SearchResultsPane } from './file-explorer/content-search/SearchResultsPane'
 import type { useFileSearchPanel } from './file-explorer/content-search/useFileSearchPanel'
@@ -17,6 +17,7 @@ export function FileExplorerSearchOverlay({
   explorerView: RightSidebarExplorerView
   searchPanel: ReturnType<typeof useFileSearchPanel>
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <div
       className={cn(
@@ -28,10 +29,7 @@ export function FileExplorerSearchOverlay({
         <SearchResultsPane {...searchPanel.resultsProps} />
       ) : (
         <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-          {translate(
-            'auto.components.right.sidebar.Search.98c8435e36',
-            'Select a workspace to search'
-          )}
+          {t('auto.components.right.sidebar.Search.98c8435e36', 'Select a workspace to search')}
         </div>
       )}
     </div>

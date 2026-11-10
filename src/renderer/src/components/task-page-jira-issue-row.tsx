@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { getIntlLocale, translate } from '@/i18n/i18n'
+import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
 import { JiraIssueRowContextMenu } from './JiraIssueRowContextMenu'
 import { buildJiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
@@ -60,6 +60,8 @@ export function JiraIssueRow({
   selected,
   showSiteContext
 }: TaskPageJiraIssueRowProps): React.JSX.Element {
+  const intlLocale = useIntlLocale()
+  const t = useTranslate()
   const linkedWorkspaces = getIssueWorkspaces?.(issue) ?? []
   // The chip and the button must read one rule: fall back to the index-derived
   // attachment so an index-only caller still flips the action.
@@ -233,7 +235,7 @@ export function JiraIssueRow({
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
-                {new Date(issue.updatedAt).toLocaleString(getIntlLocale())}
+                {new Date(issue.updatedAt).toLocaleString(intlLocale)}
               </TooltipContent>
             </Tooltip>
 
@@ -272,17 +274,15 @@ export function JiraIssueRow({
                   event.stopPropagation()
                   openAppHttpLink(issue.url, { event })
                 }}
-                aria-label={translate(
-                  'auto.components.TaskPage.4ac8ff2275',
-                  'Open {{value0}} in Jira',
-                  { value0: issue.key }
-                )}
+                aria-label={t('auto.components.TaskPage.4ac8ff2275', 'Open {{value0}} in Jira', {
+                  value0: issue.key
+                })}
               >
                 <ExternalLink className="size-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {translate('auto.components.TaskPage.eee68073b2', 'Open in Jira')}
+              {t('auto.components.TaskPage.eee68073b2', 'Open in Jira')}
             </TooltipContent>
           </Tooltip>
         </div>

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { IssueProviderIcon, issueProviderLabel } from './issue-provider-presentation'
 import {
   IssuePaneIssueIdentifier,
@@ -29,6 +29,7 @@ function IssuePaneEditableTitle({
   saving: boolean
   onCommit: (title: string) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   const [draft, setDraft] = useState(title)
   const [draftTitle, setDraftTitle] = useState(title)
   // Adjusting during render rather than in an effect: the draft follows the prop without a second pass.
@@ -60,7 +61,7 @@ function IssuePaneEditableTitle({
           }
         }}
         disabled={saving}
-        aria-label={translate('auto.components.right.sidebar.IssuePane.title', 'Issue title')}
+        aria-label={t('auto.components.right.sidebar.IssuePane.title', 'Issue title')}
         className={cn(
           '-mx-1 w-full rounded bg-transparent px-1 py-0.5 text-sm font-semibold leading-snug',
           'text-foreground outline-none transition hover:bg-muted/40 focus:bg-muted/60 focus:ring-1 focus:ring-ring'
@@ -89,7 +90,8 @@ function IssuePaneLinkMenu({
   onUnlinkIssue: () => void
   onLinkAnotherIssue: () => void
 }): React.JSX.Element {
-  const moreActionsLabel = translate(
+  const t = useTranslate()
+  const moreActionsLabel = t(
     'auto.components.right.sidebar.IssuePane.moreActions',
     'More issue actions'
   )
@@ -111,14 +113,14 @@ function IssuePaneLinkMenu({
           <TooltipTrigger asChild>
             <DropdownMenuItem disabled={disabledReason !== null} onSelect={onUnlinkIssue}>
               <Unlink className="size-3.5" />
-              {translate(
+              {t(
                 'auto.components.right.sidebar.IssuePane.unlinkIssue',
                 'Unlink issue from workspace'
               )}
             </DropdownMenuItem>
           </TooltipTrigger>
           <TooltipContent side="left" sideOffset={8} className="max-w-72">
-            {translate(
+            {t(
               'auto.components.right.sidebar.IssuePane.unlinkIssueDescription',
               'Orca will hide {{value0}} from this workspace. The issue on {{value1}} won’t be changed.',
               { value0: identifier, value1: providerLabel }
@@ -127,10 +129,7 @@ function IssuePaneLinkMenu({
         </Tooltip>
         <DropdownMenuItem disabled={disabledReason !== null} onSelect={onLinkAnotherIssue}>
           <Link className="size-3.5" />
-          {translate(
-            'auto.components.right.sidebar.IssuePane.linkAnotherIssue',
-            'Link another issue'
-          )}
+          {t('auto.components.right.sidebar.IssuePane.linkAnotherIssue', 'Link another issue')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -176,6 +175,7 @@ export function IssuePaneHeader({
    *  split control that keeps opening the issue and adds issue selection. */
   issueSwitcher?: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
+  const t = useTranslate()
   const providerLabel = issueProviderLabel(provider)
 
   return (
@@ -209,10 +209,7 @@ export function IssuePaneHeader({
               size="icon-xs"
               onClick={onRefresh}
               disabled={refreshing}
-              aria-label={translate(
-                'auto.components.right.sidebar.IssuePane.refresh',
-                'Refresh issue'
-              )}
+              aria-label={t('auto.components.right.sidebar.IssuePane.refresh', 'Refresh issue')}
             >
               {refreshing ? (
                 <LoaderCircle className="size-3.5 animate-spin" />
@@ -222,7 +219,7 @@ export function IssuePaneHeader({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
-            {translate('auto.components.right.sidebar.IssuePane.refresh', 'Refresh issue')}
+            {t('auto.components.right.sidebar.IssuePane.refresh', 'Refresh issue')}
           </TooltipContent>
         </Tooltip>
         {onUnlinkIssue && onLinkAnotherIssue ? (

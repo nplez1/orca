@@ -11,6 +11,7 @@ import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { toast } from 'sonner'
 import { jiraListBoards, type RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
@@ -43,6 +44,7 @@ export function JiraBoardSettings({
   settings,
   updateSettingsOrThrow
 }: JiraBoardSettingsProps): React.JSX.Element {
+  const t = useTranslate()
   const jiraStatus = useAppStore((state) => state.jiraStatus)
   const checkJiraConnection = useAppStore((state) => state.checkJiraConnection)
   const selectedSiteId: JiraSiteSelection | undefined =
@@ -68,7 +70,7 @@ export function JiraBoardSettings({
   // picker on the old board — and without this the user never learns the selection did not stick.
   const saveBoard = (selection: JiraBoardSelection | null): void => {
     void updateSettingsOrThrow({ defaultJiraBoard: selection }).catch(() => {
-      toast.error(translate('sessionHistory.settings.saveError', 'Could not save. Try again.'))
+      toast.error(t('sessionHistory.settings.saveError', 'Could not save. Try again.'))
     })
   }
 
@@ -111,7 +113,7 @@ export function JiraBoardSettings({
     () => [
       {
         value: SETTINGS_COMBOBOX_NONE,
-        label: translate(
+        label: t(
           'auto.components.settings.JiraBoardSettings.useListView',
           'No default board (use issue list)'
         )
@@ -119,12 +121,12 @@ export function JiraBoardSettings({
       ...buildJiraBoardOptions(
         boards,
         selectedBoard,
-        translate('auto.components.settings.JiraBoardSettings.unnamedBoard', 'Board {{value0}}', {
+        t('auto.components.settings.JiraBoardSettings.unnamedBoard', 'Board {{value0}}', {
           value0: selectedBoard?.boardId ?? ''
         })
       )
     ],
-    [boards, selectedBoard]
+    [boards, selectedBoard, t]
   )
   const selectedBoardValue = selectedBoard
     ? boardSelectionOptionValue(selectedBoard)
@@ -133,8 +135,8 @@ export function JiraBoardSettings({
   return (
     <section className="space-y-3" data-settings-section="tasks-jira-board">
       <SearchableSetting
-        title={translate('auto.components.settings.JiraBoardSettings.title', 'Jira board view')}
-        description={translate(
+        title={t('auto.components.settings.JiraBoardSettings.title', 'Jira board view')}
+        description={t(
           'auto.components.settings.JiraBoardSettings.description',
           'Choose the default Jira board shown in Tasks.'
         )}
@@ -142,7 +144,7 @@ export function JiraBoardSettings({
       >
         <div className="max-w-md space-y-2">
           <Label htmlFor="tasks-jira-default-board">
-            {translate('auto.components.settings.JiraBoardSettings.defaultBoard', 'Default board')}
+            {t('auto.components.settings.JiraBoardSettings.defaultBoard', 'Default board')}
           </Label>
           <SettingsCombobox
             id="tasks-jira-default-board"
@@ -163,21 +165,18 @@ export function JiraBoardSettings({
               })
             }}
             options={boardOptions}
-            placeholder={translate(
+            placeholder={t(
               'auto.components.settings.JiraBoardSettings.chooseBoard',
               'Choose a board'
             )}
-            searchPlaceholder={translate(
+            searchPlaceholder={t(
               'auto.components.settings.JiraBoardSettings.searchBoards',
               'Search boards by name...'
             )}
             emptyMessage={
               boardsLoading
-                ? translate(
-                    'auto.components.settings.JiraBoardSettings.loadingBoards',
-                    'Loading boards...'
-                  )
-                : translate(
+                ? t('auto.components.settings.JiraBoardSettings.loadingBoards', 'Loading boards...')
+                : t(
                     'auto.components.settings.JiraBoardSettings.noBoardsMatch',
                     'No boards match this search.'
                   )
@@ -186,7 +185,7 @@ export function JiraBoardSettings({
             onSearchChange={setBoardQuery}
           />
           <p className="text-xs text-muted-foreground">
-            {translate(
+            {t(
               'auto.components.settings.JiraBoardSettings.defaultBoardHelp',
               'The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter. Search to find a board on a Jira site with many.'
             )}
@@ -194,11 +193,11 @@ export function JiraBoardSettings({
           {!boardsLoading && !loadError && boards.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               {appliedBoardQuery
-                ? translate(
+                ? t(
                     'auto.components.settings.JiraBoardSettings.noBoardsForSearch',
                     'Jira returned no boards matching this search.'
                   )
-                : translate(
+                : t(
                     'auto.components.settings.JiraBoardSettings.noBoardsReturned',
                     'Jira returned no boards for this site. Check that the account can see a board.'
                   )}
@@ -218,7 +217,7 @@ export function JiraBoardSettings({
               size="xs"
               onClick={() => setRetryNonce((nonce) => nonce + 1)}
             >
-              {translate('auto.components.settings.JiraBoardSettings.retry', 'Retry')}
+              {t('auto.components.settings.JiraBoardSettings.retry', 'Retry')}
             </Button>
           </div>
         ) : null}

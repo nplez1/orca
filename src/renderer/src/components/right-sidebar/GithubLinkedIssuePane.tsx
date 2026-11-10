@@ -12,7 +12,7 @@ import { useAppStore } from '@/store'
 import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { IssuePaneHeader } from './IssuePaneHeader'
 import type { IssuePaneIssueSwitcherProps } from './IssuePaneIssueSwitcher'
 import { IssuePaneMessage } from './IssuePaneMessage'
@@ -193,6 +193,7 @@ function GithubLinkedIssueDetail({
   repoId: string
   sourceContext: TaskSourceContext | null
 }): React.JSX.Element {
+  const t = useTranslate()
   const {
     details,
     displayWorkItem,
@@ -253,7 +254,7 @@ function GithubLinkedIssueDetail({
             />
           ) : (
             <p className="text-xs italic text-muted-foreground">
-              {translate(
+              {t(
                 'auto.components.right.sidebar.IssuePane.noDescription',
                 'No description provided.'
               )}

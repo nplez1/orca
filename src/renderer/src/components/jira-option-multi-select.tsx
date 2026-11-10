@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { matchesCommandTerms } from '@/lib/command-choice-filter'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /**
  * The token an option control holds for one allowed value: the id Jira's own payload
@@ -82,6 +82,7 @@ export function JiraOptionMultiSelect({
   disabled?: boolean
   placeholder: string
 }): React.JSX.Element {
+  const t = useTranslate()
   const [open, setOpen] = useState(false)
   const entries = useMemo(
     () =>
@@ -143,14 +144,11 @@ export function JiraOptionMultiSelect({
         <Command density="menu" label={placeholder} filter={jiraOptionChoiceFilter}>
           <CommandInput
             autoFocus
-            placeholder={translate('components.jiraOptionMultiSelect.search', 'Search options...')}
+            placeholder={t('components.jiraOptionMultiSelect.search', 'Search options...')}
           />
           <CommandList animateHeight>
             <CommandEmpty>
-              {translate(
-                'components.jiraOptionMultiSelect.noMatch',
-                'No options match your search.'
-              )}
+              {t('components.jiraOptionMultiSelect.noMatch', 'No options match your search.')}
             </CommandEmpty>
             {[...entries, ...orphanTokens.map((token) => ({ token, label: token }))].map(
               (entry) => {

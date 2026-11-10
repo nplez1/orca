@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { IssueProviderIcon, issueProviderLabel } from './issue-provider-presentation'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
@@ -41,6 +41,7 @@ export function IssuePaneIssueIdentifier({
   onOpenIssue?: (url: string, event: React.MouseEvent<HTMLButtonElement>) => void
   className?: string
 }): React.JSX.Element {
+  const t = useTranslate()
   const shared = cn('min-w-0 truncate px-0.5 font-mono text-2xs text-muted-foreground', className)
   if (!openUrl || !onOpenIssue) {
     return <span className={shared}>{identifier}</span>
@@ -62,7 +63,7 @@ export function IssuePaneIssueIdentifier({
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={6}>
-        {translate('auto.components.right.sidebar.IssuePane.openIn', 'Open on {{value0}}', {
+        {t('auto.components.right.sidebar.IssuePane.openIn', 'Open on {{value0}}', {
           value0: issueProviderLabel(provider)
         })}
       </TooltipContent>
@@ -90,10 +91,8 @@ export function IssuePaneIssueSwitcher({
   onOpenIssue?: (url: string, event: React.MouseEvent<HTMLButtonElement>) => void
   switcher: IssuePaneIssueSwitcherProps
 }): React.JSX.Element {
-  const switchLabel = translate(
-    'auto.components.right.sidebar.IssuePane.switchIssue',
-    'Switch issue'
-  )
+  const t = useTranslate()
+  const switchLabel = t('auto.components.right.sidebar.IssuePane.switchIssue', 'Switch issue')
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">

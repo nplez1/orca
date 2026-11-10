@@ -1,5 +1,6 @@
 import React from 'react'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import {
   SESSION_SUMMARY_HOST_OUTDATED_MESSAGE,
   type SessionSummaryFact,
@@ -129,6 +130,7 @@ function Disclosure({
  * them in either window.
  */
 function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.Element {
+  const t = useTranslate()
   const [showFullSession, setShowFullSession] = React.useState(false)
   const [ledgerOpen, setLedgerOpen] = React.useState(false)
   const [timelineOpen, setTimelineOpen] = React.useState(false)
@@ -158,7 +160,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
   if (ledgerEmpty) {
     return (
       <p className="text-xs text-muted-foreground">
-        {translate('activity.sessionSummary.nothingYet', 'Nothing notable in this session yet.')}
+        {t('activity.sessionSummary.nothingYet', 'Nothing notable in this session yet.')}
       </p>
     )
   }
@@ -187,7 +189,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
       <ReportBody ledger={ledger} report={report} />
       {nothingSince ? (
         <p className="text-xs text-muted-foreground">
-          {translate(
+          {t(
             'activity.sessionSummary.nothingSince',
             'Nothing has happened since your last message.'
           )}
@@ -195,7 +197,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
       ) : null}
       {ledger.gaps.length > 0 ? (
         <p className="text-2xs text-muted-foreground" title={ledger.gaps.join('\n')}>
-          {translate(
+          {t(
             'activity.sessionSummary.gaps',
             '{{count}} unreadable transcript record(s) were skipped; the rest of the session was summarized.',
             { count: ledger.gaps.length }
@@ -204,7 +206,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
       ) : null}
       {factsAvailable ? (
         <Disclosure
-          label={translate('activity.sessionSummary.ledger', 'Ledger')}
+          label={t('activity.sessionSummary.ledger', 'Ledger')}
           detail={factDetail(facts, showFullSession)}
           open={ledgerOpen}
           onToggle={() => setLedgerOpen((open) => !open)}
@@ -214,7 +216,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
       ) : null}
       {timeline.length > 0 ? (
         <Disclosure
-          label={translate('activity.sessionSummary.timeline', 'Timeline')}
+          label={t('activity.sessionSummary.timeline', 'Timeline')}
           detail={timelineDetail(timeline, showFullSession)}
           open={timelineOpen}
           onToggle={() => setTimelineOpen((open) => !open)}
@@ -225,7 +227,7 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
               onClick={() => setTimelinePage((page) => page + TIMELINE_PAGE_SIZE)}
               className="mb-1 text-2xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
             >
-              {translate('activity.sessionSummary.moreTimeline', 'Show {{count}} earlier', {
+              {t('activity.sessionSummary.moreTimeline', 'Show {{count}} earlier', {
                 count: Math.min(hiddenTimeline, TIMELINE_PAGE_SIZE)
               })}
             </button>
@@ -242,8 +244,8 @@ function LedgerContent({ ledger }: { ledger: SessionSummaryLedger }): React.JSX.
           className="text-2xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
         >
           {showFullSession
-            ? translate('activity.sessionSummary.showSince', 'Show since your last message')
-            : translate('activity.sessionSummary.showFullSession', 'Show the full session')}
+            ? t('activity.sessionSummary.showSince', 'Show since your last message')
+            : t('activity.sessionSummary.showFullSession', 'Show the full session')}
         </button>
       ) : null}
     </div>
@@ -299,6 +301,7 @@ export function SessionSummaryLedgerView({
 }: {
   snapshot: SessionSummarySnapshot | null
 }): React.JSX.Element {
+  const t = useTranslate()
   if (snapshot?.ledger) {
     return (
       <>
@@ -307,14 +310,11 @@ export function SessionSummaryLedgerView({
         {snapshot.status === 'failed' ? (
           <p className="mb-2 text-xs text-muted-foreground">
             {snapshot.error === SESSION_SUMMARY_HOST_OUTDATED_MESSAGE
-              ? translate(
+              ? t(
                   'activity.sessionSummary.hostOutdated',
                   'This host runs an older Orca. Update Orca there to summarize its sessions.'
                 )
-              : translate(
-                  'activity.sessionSummary.stale',
-                  "Couldn't refresh — showing the last summary."
-                )}
+              : t('activity.sessionSummary.stale', "Couldn't refresh — showing the last summary.")}
           </p>
         ) : null}
         <LedgerContent ledger={snapshot.ledger} />
@@ -326,7 +326,7 @@ export function SessionSummaryLedgerView({
     if (snapshot.error === SESSION_SUMMARY_HOST_OUTDATED_MESSAGE) {
       return (
         <p className="text-xs text-muted-foreground">
-          {translate(
+          {t(
             'activity.sessionSummary.hostOutdated',
             'This host runs an older Orca. Update Orca there to summarize its sessions.'
           )}
@@ -336,7 +336,7 @@ export function SessionSummaryLedgerView({
     return (
       <>
         <p className="text-xs text-muted-foreground">
-          {translate('activity.sessionSummary.failed', 'Could not summarize this session.')}
+          {t('activity.sessionSummary.failed', 'Could not summarize this session.')}
         </p>
         {snapshot.error ? (
           <p className="mt-1 break-words text-xs text-muted-foreground">{snapshot.error}</p>
@@ -347,7 +347,7 @@ export function SessionSummaryLedgerView({
   if (snapshot?.status === 'unsupported-host') {
     return (
       <p className="text-xs text-muted-foreground">
-        {translate(
+        {t(
           'activity.sessionSummary.unsupportedHost',
           'Session summaries are not available for a workspace on this host.'
         )}
@@ -358,10 +358,7 @@ export function SessionSummaryLedgerView({
     return (
       <>
         <p className="text-xs text-muted-foreground">
-          {translate(
-            'activity.sessionSummary.unavailable',
-            'No readable transcript for this session yet.'
-          )}
+          {t('activity.sessionSummary.unavailable', 'No readable transcript for this session yet.')}
         </p>
         {/* Why: names which of the two it is — nothing written yet, or a transcript this
             fold could not reach — instead of one message for both. */}

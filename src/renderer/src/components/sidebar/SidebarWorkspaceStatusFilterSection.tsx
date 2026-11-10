@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { getWorkspaceStatusVisualMeta } from './workspace-status/presentation/workspace-status'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 type SidebarWorkspaceStatusFilterSectionProps = {
   preserveWorkspaceBoardOpen?: boolean
@@ -18,6 +18,7 @@ const SidebarWorkspaceStatusFilterSection = React.memo(
   function SidebarWorkspaceStatusFilterSection({
     preserveWorkspaceBoardOpen = false
   }: SidebarWorkspaceStatusFilterSectionProps) {
+    const t = useTranslate()
     const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
     const hiddenWorkspaceStatusIds = useAppStore((s) => s.hiddenWorkspaceStatusIds)
     const setHiddenWorkspaceStatusIds = useAppStore((s) => s.setHiddenWorkspaceStatusIds)
@@ -37,11 +38,11 @@ const SidebarWorkspaceStatusFilterSection = React.memo(
 
     const visibilityLabel =
       hiddenCount === 0
-        ? translate(
+        ? t(
             'auto.components.sidebar.SidebarWorkspaceStatusFilterSection.bda5f9404e',
             'All statuses'
           )
-        : translate(
+        : t(
             'auto.components.sidebar.SidebarWorkspaceStatusFilterSection.63cf2888f5',
             '{{value0}} hidden',
             { value0: hiddenCount }
@@ -78,7 +79,7 @@ const SidebarWorkspaceStatusFilterSection = React.memo(
         <DropdownMenuSubTrigger>
           <span className="flex flex-1 items-center justify-between gap-3">
             <span>
-              {translate(
+              {t(
                 'auto.components.sidebar.SidebarWorkspaceStatusFilterSection.040f28a2a6',
                 'Status'
               )}
@@ -94,7 +95,7 @@ const SidebarWorkspaceStatusFilterSection = React.memo(
         >
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-[11px] font-semibold text-muted-foreground">
-              {translate(
+              {t(
                 'auto.components.sidebar.SidebarWorkspaceStatusFilterSection.040f28a2a6',
                 'Status'
               )}
@@ -105,7 +106,7 @@ const SidebarWorkspaceStatusFilterSection = React.memo(
               className="rounded-full px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40 disabled:hover:bg-transparent"
               disabled={hiddenCount === 0}
             >
-              {translate(
+              {t(
                 'auto.components.sidebar.SidebarWorkspaceStatusFilterSection.66ae0c2967',
                 'Show all'
               )}

@@ -6,6 +6,7 @@ import {
   jiraListPriorities,
   jiraListTransitions
 } from '../runtime/jira/runtime-jira-client'
+import { runGuardedSideRead } from '../lib/guarded-side-read'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import {
   describeJiraSideReadFailure,
@@ -218,20 +219,14 @@ export function useJiraIssueSideData({
     const readId = ++transitionsReadIdRef.current
     setTransitionsLoading(true)
     setTransitionsError(null)
-    try {
-      const next = await jiraListTransitions(providerSettings, issueKey, issueSiteId)
-      if (readId === transitionsReadIdRef.current) {
-        setTransitions(next)
-      }
-    } catch (error) {
-      if (readId === transitionsReadIdRef.current) {
-        setTransitionsError(describeJiraSideReadFailure(error, ...TRANSITIONS_READ_FAILED))
-      }
-    } finally {
-      if (readId === transitionsReadIdRef.current) {
-        setTransitionsLoading(false)
-      }
-    }
+    await runGuardedSideRead({
+      isCurrent: () => readId === transitionsReadIdRef.current,
+      read: () => jiraListTransitions(providerSettings, issueKey, issueSiteId),
+      apply: setTransitions,
+      onError: (error) =>
+        setTransitionsError(describeJiraSideReadFailure(error, ...TRANSITIONS_READ_FAILED)),
+      done: () => setTransitionsLoading(false)
+    })
   }, [issueKey, issueSiteId, providerSettings])
 
   const reloadEditFields = useCallback(async (): Promise<void> => {
@@ -241,20 +236,14 @@ export function useJiraIssueSideData({
     const requestedKey = issueKey
     setEditFieldsLoading(true)
     setEditFieldsError(null)
-    try {
-      const next = await jiraListEditFields(providerSettings, requestedKey, issueSiteId, true)
-      if (issueKeyRef.current === requestedKey) {
-        setEditFields(next)
-      }
-    } catch (error) {
-      if (issueKeyRef.current === requestedKey) {
-        setEditFieldsError(describeJiraSideReadFailure(error, ...EDIT_FIELDS_READ_FAILED))
-      }
-    } finally {
-      if (issueKeyRef.current === requestedKey) {
-        setEditFieldsLoading(false)
-      }
-    }
+    await runGuardedSideRead({
+      isCurrent: () => issueKeyRef.current === requestedKey,
+      read: () => jiraListEditFields(providerSettings, requestedKey, issueSiteId, true),
+      apply: setEditFields,
+      onError: (error) =>
+        setEditFieldsError(describeJiraSideReadFailure(error, ...EDIT_FIELDS_READ_FAILED)),
+      done: () => setEditFieldsLoading(false)
+    })
   }, [issueKey, issueSiteId, providerSettings])
 
   const reloadSprintAssignment = useCallback(async (): Promise<void> => {

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { openAppHttpLinkFromAnchor } from '../../lib/browser/navigation/app-http-link-open'
 import type { DisableableUsageProviderId } from '../../../../shared/usage-provider-enablement'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { Badge } from '../ui/badge'
 import { Switch } from '../ui/switch'
 
@@ -59,15 +59,16 @@ export function ProviderAccountsSection({
   onEnabledChange: (enabled: boolean) => void
   children: ReactNode
 }): React.JSX.Element {
+  const t = useTranslate()
   const switchId = `usage-provider-enabled-${providerId}`
-  const switchLabel = translate(
+  const switchLabel = t(
     'auto.components.settings.ProviderUsageEnableSwitch.8e832829e7',
     'Let Orca query {{value0}}',
     { value0: title }
   )
   // Why: the consequence of switching a provider off no longer fits under a
   // per-provider paragraph, so it stays one hover away on the control that causes it.
-  const switchHint = translate(
+  const switchHint = t(
     'auto.components.settings.ProviderUsageEnableSwitch.e3340ac4e1',
     'When off, Orca never asks {{value0}} for usage and never reads its sign-in from software installed on this computer.',
     { value0: title }
@@ -90,7 +91,7 @@ export function ProviderAccountsSection({
               {title}
               {enabled ? null : (
                 <Badge variant="hostContext">
-                  {translate('auto.components.settings.ProviderAccountsSection.off', 'Off')}
+                  {t('auto.components.settings.ProviderAccountsSection.off', 'Off')}
                 </Badge>
               )}
             </h3>
@@ -103,7 +104,7 @@ export function ProviderAccountsSection({
         children
       ) : (
         <p className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          {translate(
+          {t(
             'auto.components.settings.ProviderUsageEnableSwitch.e9b8e0fc2e',
             '{{value0}} is off. Orca will not query it or read its sign-in from software installed on this computer.',
             { value0: title }

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store/index'
 import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
-import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import {
   classifyTransitionRequirements,
@@ -86,7 +85,7 @@ export function TaskPageJiraBoardView({
     if (!target) {
       return {
         ok: false,
-        error: translate('jira.board.noTarget', 'No Jira host is available for this move.')
+        error: t('jira.board.noTarget', 'No Jira host is available for this move.')
       }
     }
     const request = requestRef.current
@@ -105,7 +104,7 @@ export function TaskPageJiraBoardView({
       if (!mutationScope) {
         return {
           ok: false,
-          error: translate('jira.board.noTarget', 'No Jira host is available for this move.')
+          error: t('jira.board.noTarget', 'No Jira host is available for this move.')
         }
       }
       let latest: JiraIssue | null = null
@@ -283,7 +282,7 @@ export function TaskPageJiraBoardView({
           if (!prompt?.selected) {
             return Promise.resolve({
               ok: false as const,
-              error: translate('jira.board.noTransitionSelected', 'No status change is selected.')
+              error: t('jira.board.noTransitionSelected', 'No status change is selected.')
             })
           }
           return apply(prompt.issue, prompt.selected, updates)

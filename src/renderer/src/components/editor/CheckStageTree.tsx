@@ -2,7 +2,7 @@ import React from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
 import { formatBuildDuration } from '@/components/check-build-metadata'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
 import type { PRCheckJob, PRCheckStep } from '../../../../shared/github/check-types'
 import { resolveStepOutcome } from '../../../../shared/source-control/checks/pr-check-step-status'
@@ -33,6 +33,7 @@ function stepKey(step: PRCheckStep): string {
  * answer to "what broke" is visible without a click.
  */
 function StageNode({ step }: { step: PRCheckStep }): React.JSX.Element {
+  const t = useTranslate()
   const outcome = resolveStepOutcome(step)
   const children = step.children ?? []
   const hasChildren = children.length > 0
@@ -47,7 +48,7 @@ function StageNode({ step }: { step: PRCheckStep }): React.JSX.Element {
             type="button"
             onClick={() => setExpanded((value) => !value)}
             aria-expanded={expanded}
-            aria-label={translate('checkDetails.toggleStage', 'Toggle stage steps')}
+            aria-label={t('checkDetails.toggleStage', 'Toggle stage steps')}
             className="shrink-0 rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {expanded ? (

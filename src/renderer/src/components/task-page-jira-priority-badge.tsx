@@ -1,6 +1,6 @@
 import type { JiraPriority } from '../../../shared/jira/jira-types'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { getJiraPrioritySeverity } from './task-page-jira-priority-tone'
 import { getJiraPriorityTone } from './task-page/jira/task-page-jira-status-tone'
 
@@ -19,6 +19,7 @@ export function TaskPageJiraPriorityBadge({
   priority?: JiraPriority | null
   className?: string
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <span
       data-severity={getJiraPrioritySeverity(priority)}
@@ -34,7 +35,7 @@ export function TaskPageJiraPriorityBadge({
     >
       <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />
       <span className="min-w-0 truncate">
-        {priority?.name ?? translate('auto.components.TaskPage.713179dfdc', 'No priority')}
+        {priority?.name ?? t('auto.components.TaskPage.713179dfdc', 'No priority')}
       </span>
     </span>
   )

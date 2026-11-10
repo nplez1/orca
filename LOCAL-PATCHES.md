@@ -1513,6 +1513,27 @@ a row it cannot reproduce until it is. Three baseline lines in
 `config/workspace-record-read-baseline.txt` therefore belong to this fork — the evidence for them is
 this paragraph, as with the red sets.
 
+### `local(ratchets)`: an upstream file the fork only fixes keeps its shape
+
+`check:max-lines-ratchet` says to split an oversized file rather than suppress the rule, and for this
+fork's own files that is right. It is wrong for an upstream-owned file the fork touches only to clear
+a red: the split moves code upstream still owns into a new module, so every later sync carries a fork
+hunk in the middle of a file upstream keeps editing — a merge cost paid forever to save three lines.
+The rule is therefore scoped by ownership, not by size:
+
+- **Fork-owned file over budget** — split it. `src/renderer/src/components/jira-issue-workspace-side-data.ts`
+  is the 2026-11-09 example: its two side reads now share `runGuardedSideRead` in
+  `src/renderer/src/lib/guarded-side-read.ts`, which also removed the duplicated guard shape.
+- **Upstream-owned file over budget after a fix-only change** — keep upstream's shape and record the
+  row in `config/max-lines-baseline.txt` (whose header now says so). `ai-vault-session-refresh.ts` is
+  the case: 303 code lines after the React Compiler fixes, with upstream's three inline
+  `cancelListSessions` calls and its own `if` left exactly where upstream wrote them. The suppression
+  comment and the baseline row both name it, and the row is the record — not a quiet allowance.
+
+Anchors: `config/max-lines-baseline.txt` (header + the `ai-vault-session-refresh.ts` row),
+`src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-session-refresh.ts` (the
+suppression and its reason), `src/renderer/src/lib/guarded-side-read.ts` (the fork-owned split).
+
 ### `local(lint)`: the lint verdict is a file too
 
 Reds on the base branch have had to be hand-verified as pre-existing in an unrelated PR (#160, then

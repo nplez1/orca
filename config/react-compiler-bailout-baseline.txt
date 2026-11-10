@@ -1,9 +1,8 @@
 # React Compiler diagnostics (functions it skips) per renderer file. Generated; never hand-edit.
 # Lower after a fix: pnpm check:react-compiler-compat-ratchet --prune. Regenerate (compiler bump, reviewed exception): --update
 5 src/renderer/src/app-shell/TitlebarLeftControls.tsx
-3 src/renderer/src/app-shell/use-app-startup-hydration.ts
+1 src/renderer/src/app-shell/use-app-startup-hydration.ts
 2 src/renderer/src/components/FirstLaunchBanner.tsx
-1 src/renderer/src/components/JiraIssueWorkspace.tsx
 3 src/renderer/src/components/LinearIssueTextEditor.tsx
 1 src/renderer/src/components/LinearItemDrawer.tsx
 1 src/renderer/src/components/NewWorkspaceComposerModal.tsx
@@ -79,10 +78,9 @@
 3 src/renderer/src/components/crash-report/use-crash-report-copy.ts
 1 src/renderer/src/components/dashboard/useAgentBucketCounts.ts
 1 src/renderer/src/components/dashboard/useLiveDashboardSnapshot.ts
-2 src/renderer/src/components/diff-comments/DiffCommentCard.tsx
+1 src/renderer/src/components/diff-comments/DiffCommentCard.tsx
 5 src/renderer/src/components/diff-comments/DiffCommentPopover.tsx
 2 src/renderer/src/components/diff-comments/diff-comment-draft-zone.ts
-1 src/renderer/src/components/diff-comments/useDiffCommentDecorator.tsx
 1 src/renderer/src/components/editor/EditorPanelShell.tsx
 5 src/renderer/src/components/editor/MonacoEditor.tsx
 1 src/renderer/src/components/editor/PdfViewer.tsx
@@ -105,7 +103,6 @@
 1 src/renderer/src/components/editor/csv/useCsvPagedPreview.ts
 3 src/renderer/src/components/editor/csv/useCsvTableEditor.ts
 1 src/renderer/src/components/editor/diff/large-files/useDiffViewerLargeDiffLifecycle.ts
-3 src/renderer/src/components/editor/diff/monaco-view/DiffViewer.tsx
 1 src/renderer/src/components/editor/diff/review/DiffNotesSendMenu.tsx
 1 src/renderer/src/components/editor/editor-header-file-rename.ts
 1 src/renderer/src/components/editor/external-changes/ExternalFileChangeCompareDialog.tsx
@@ -163,7 +160,6 @@
 1 src/renderer/src/components/feature-wall/agents-orchestration/OrchestrationPage.tsx
 2 src/renderer/src/components/feature-wall/agents-orchestration/UsageAccountsCard.tsx
 2 src/renderer/src/components/feature-wall/use-feature-wall-tour-telemetry.ts
-3 src/renderer/src/components/feature-wall/useAiCommitPrSettings.ts
 1 src/renderer/src/components/floating-terminal/FloatingTerminalIconContextMenu.tsx
 3 src/renderer/src/components/floating-terminal/FloatingTerminalToggleButton.tsx
 1 src/renderer/src/components/floating-terminal/use-floating-terminal-panel-geometry.ts
@@ -309,7 +305,6 @@
 1 src/renderer/src/components/right-sidebar/ai-vault/panel/AiVaultPanel.tsx
 2 src/renderer/src/components/right-sidebar/ai-vault/scanning/AiVaultScanProgressStrip.tsx
 1 src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-association-observation.ts
-9 src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-session-refresh.ts
 1 src/renderer/src/components/right-sidebar/ai-vault/search/AiVaultPanelSearch.tsx
 1 src/renderer/src/components/right-sidebar/ai-vault/search/use-ai-vault-search.ts
 2 src/renderer/src/components/right-sidebar/ai-vault/session-actions/ai-vault-session-delete-action.ts
@@ -322,7 +317,6 @@
 1 src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-detail-timer.ts
 1 src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-list-state.tsx
 2 src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-panel-entry-refresh-and-title-actions.tsx
-2 src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-panel-manual-refresh.tsx
 3 src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-panel-polling.tsx
 2 src/renderer/src/components/right-sidebar/checks-panel/review-actions/use-checks-panel-branch-actions.tsx
 2 src/renderer/src/components/right-sidebar/checks-panel/review-actions/use-checks-panel-check-and-review-actions.tsx
@@ -343,7 +337,6 @@
 14 src/renderer/src/components/right-sidebar/file-explorer/selection/useFileExplorerKeys.ts
 2 src/renderer/src/components/right-sidebar/file-explorer/selection/useFileExplorerSelection.ts
 2 src/renderer/src/components/right-sidebar/file-explorer/tree/useFileExplorerTree.ts
-2 src/renderer/src/components/right-sidebar/file-explorer/tree/useFileExplorerVisibleRowProjection.ts
 7 src/renderer/src/components/right-sidebar/file-explorer/watching/useFileExplorerWatch.ts
 1 src/renderer/src/components/right-sidebar/host-scoped-ports-panel.tsx
 2 src/renderer/src/components/right-sidebar/hosted-review/creation/use-create-pull-request-field-generation.ts
@@ -386,7 +379,7 @@
 1 src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts
 3 src/renderer/src/components/right-sidebar/use-right-sidebar-tab-routing.ts
 1 src/renderer/src/components/runtime-access/RuntimeRepairDialog.tsx
-8 src/renderer/src/components/settings/accounts/AccountsPane.tsx
+5 src/renderer/src/components/settings/accounts/AccountsPane.tsx
 3 src/renderer/src/components/settings/accounts/providers/AntigravityAccountsSection.tsx
 1 src/renderer/src/components/settings/accounts/providers/CursorAccountsSection.tsx
 2 src/renderer/src/components/settings/accounts/providers/GrokAccountsSection.tsx
@@ -466,7 +459,6 @@
 1 src/renderer/src/components/settings/updates/ReleaseBuildPicker.tsx
 1 src/renderer/src/components/settings/updates/ReleaseChannelSection.tsx
 1 src/renderer/src/components/settings/virtual-machines/recipes/EphemeralVmsPane.tsx
-4 src/renderer/src/components/settings/virtual-machines/runtimes/EphemeralVmRuntimesSection.tsx
 1 src/renderer/src/components/settings/voice/VoiceMicrophoneSetting.tsx
 2 src/renderer/src/components/settings/voice/VoicePane.tsx
 1 src/renderer/src/components/settings/wsl/hosts/WslHostsSection.tsx
@@ -577,7 +569,6 @@
 1 src/renderer/src/components/tab-bar/use-new-tab-agent-menu-rows.ts
 1 src/renderer/src/components/tab-bar/use-omnibox-browser-history.ts
 2 src/renderer/src/components/tab-bar/use-open-tab-search.ts
-1 src/renderer/src/components/tab-bar/use-tab-bar-create-menu-controller.ts
 2 src/renderer/src/components/tab-bar/use-tab-bar-item-actions.ts
 1 src/renderer/src/components/tab-group/useTabDragSplit.ts
 1 src/renderer/src/components/task-page/github/AssigneesCell.tsx
@@ -616,7 +607,6 @@
 20 src/renderer/src/components/task-page/linear/use-task-page-linear-list-selection.ts
 2 src/renderer/src/components/task-page/linear/use-task-page-linear-project-creation.ts
 1 src/renderer/src/components/task-page/linear/use-task-page-linear-view-state.ts
-10 src/renderer/src/components/task-page/use-task-page-composer-actions.ts
 3 src/renderer/src/components/task-page/use-task-page-detail-routing.ts
 1 src/renderer/src/components/task-page/use-task-page-global-effects.ts
 8 src/renderer/src/components/task-page/use-task-page-provider-metadata.ts
@@ -630,7 +620,6 @@
 5 src/renderer/src/components/task-page/use-task-page-workspace-actions.ts
 2 src/renderer/src/components/terminal-pane/chat/use-covered-terminal-focus-handoff.ts
 2 src/renderer/src/components/terminal-pane/chat/use-terminal-pane-chat-projection.ts
-1 src/renderer/src/components/terminal-pane/context-menu/use-terminal-context-menu-trigger.ts
 12 src/renderer/src/components/terminal-pane/context-menu/use-terminal-pane-context-menu.ts
 1 src/renderer/src/components/terminal-pane/controller/TerminalPaneCodexRestartPortals.tsx
 1 src/renderer/src/components/terminal-pane/controller/use-terminal-pane-context-actions.ts

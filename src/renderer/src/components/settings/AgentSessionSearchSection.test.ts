@@ -3,9 +3,18 @@ import { describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { AiVaultSearchSettings } from '../../../../shared/ai-vault/search/ai-vault-search-settings'
+import type * as UseTranslateModule from '@/i18n/use-translate'
 import { AgentSessionSearchSection } from './AgentSessionSearchSection'
 import { getAgentsPaneSearchEntries } from './agents/agents-search'
 import { matchesSettingsSearch } from './search/settings-search'
+
+// Why: this harness calls the section as a plain function, so its render hooks must resolve
+// without a render; the module functions are what useTranslate() falls back to outside a provider.
+vi.mock('@/i18n/use-translate', async (importOriginal) => {
+  const actual = await importOriginal<typeof UseTranslateModule>()
+  const { getIntlLocale, translate } = await import('@/i18n/i18n')
+  return { ...actual, useTranslate: () => translate, useIntlLocale: () => getIntlLocale() }
+})
 
 type ReactElementLike = {
   type: unknown

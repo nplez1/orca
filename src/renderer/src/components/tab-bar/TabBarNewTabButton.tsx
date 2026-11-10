@@ -3,7 +3,7 @@ import { ChevronDown, Loader2, Plus } from 'lucide-react'
 import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { useTabBarDefaultAgent } from './use-tab-bar-default-agent'
 import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 
@@ -62,7 +62,8 @@ function useHoldToOpenMenu(onOpenMenu: () => void): {
 }
 
 function PlainNewTabTrigger(): React.JSX.Element {
-  const label = translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')
+  const t = useTranslate()
+  const label = t('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -101,17 +102,18 @@ function SplitNewTabTrigger({
   onLaunchAgent: (agent: TuiAgent) => void
   onOpenMenu: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
   const agentLabel = getAgentCatalog().find((entry) => entry.id === agent)?.label ?? agent
-  const launchLabel = translate(
+  const launchLabel = t(
     'auto.components.tab.bar.TabBarDefaultAgentButton.2a0cbdc8a1',
     'Open {{value0}} in a new tab',
     { value0: agentLabel }
   )
-  const moreOptionsLabel = translate(
+  const moreOptionsLabel = t(
     'auto.components.tab.bar.TabBarNewTabButton.729bccd8bd',
     'More options'
   )
-  const holdHint = translate(
+  const holdHint = t(
     'auto.components.tab.bar.TabBarNewTabButton.6417e68a08',
     'Hold for all new tab options'
   )

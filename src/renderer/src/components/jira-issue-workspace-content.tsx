@@ -7,7 +7,6 @@ import { CommentComposer } from '@/components/comment-composer'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import type { JiraComment, JiraIssue } from '../../../shared/jira/jira-types'
 import { JiraIssueTitleLabelsEditor } from './jira-issue-title-labels-editor'
@@ -178,8 +177,8 @@ export function JiraIssueWorkspaceContent({
           className="mb-3 w-full justify-center gap-2 sm:hidden"
         >
           {attachedWorkspaceLabel
-            ? translate('auto.components.JiraIssueWorkspace.showWorkspace', 'Show workspace')
-            : translate('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
+            ? t('auto.components.JiraIssueWorkspace.showWorkspace', 'Show workspace')
+            : t('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
           {attachedWorkspaceLabel ? (
             <FolderOpen className="size-4" />
           ) : (
@@ -230,17 +229,15 @@ export function JiraIssueCommentComposer({
   canSubmitComment: boolean
   handleSubmitComment: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <div className="flex-none border-t border-border/50 bg-background px-3 py-3">
       <CommentComposer
         value={commentDraft}
         onValueChange={setCommentDraft}
         onSubmit={handleSubmitComment}
-        placeholder={translate(
-          'auto.components.JiraIssueWorkspace.a585fd204e',
-          'Add a Jira comment...'
-        )}
-        submitLabel={translate('auto.components.JiraIssueWorkspace.b0b92666c9', 'Comment')}
+        placeholder={t('auto.components.JiraIssueWorkspace.a585fd204e', 'Add a Jira comment...')}
+        submitLabel={t('auto.components.JiraIssueWorkspace.b0b92666c9', 'Comment')}
         canSubmit={canSubmitComment}
         submitting={commentSubmitting}
       />

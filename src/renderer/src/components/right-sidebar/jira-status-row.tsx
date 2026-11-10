@@ -14,8 +14,9 @@ import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
 } from '@/components/jira-transition-fields-form'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
+import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import type { RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
 import {
   classifyTransitionRequirements,
@@ -64,6 +65,7 @@ export function JiraStatusRow({
     transition: JiraTransition
   ) => Promise<JiraTransitionSubmitOutcome>
 }): JSX.Element {
+  const t = useTranslate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [selected, setSelected] = useState<JiraTransition | null>(null)
   const [rejectedFieldErrors, setRejectedFieldErrors] = useState<JiraFieldErrors>({})
@@ -111,7 +113,7 @@ export function JiraStatusRow({
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
         <PopoverTrigger asChild>
           <IssuePanePropertyRow
-            label={translate('auto.components.right.sidebar.IssuePane.status', 'Status')}
+            label={t('auto.components.right.sidebar.IssuePane.status', 'Status')}
             pending={pending}
             disabled={pending || transitions.length === 0}
             value={
@@ -151,21 +153,21 @@ export function JiraStatusRow({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {translate('components.jiraStatusRow.title', 'Change {{value0}} to {{value1}}', {
+              {t('components.jiraStatusRow.title', 'Change {{value0}} to {{value1}}', {
                 value0: issue.key,
                 value1: selected?.name ?? ''
               })}
             </DialogTitle>
             {requirement?.kind === 'form' ? (
               <DialogDescription>
-                {translate(
+                {t(
                   'components.jiraStatusRow.description',
                   'Jira requires these fields before it will apply this status change.'
                 )}
               </DialogDescription>
             ) : (
               <DialogDescription>
-                {translate(
+                {t(
                   'components.jiraStatusRow.refused',
                   'Jira refused this change. Review the reason below, or finish it in Jira.'
                 )}
@@ -208,15 +210,15 @@ export function JiraStatusRow({
                 size="sm"
                 className="-my-1 shrink-0"
                 data-link-url={issue.url}
-                onClick={() => void window.api.shell.openUrl(issue.url)}
+                onClick={(event) => openAppHttpLink(issue.url, { event })}
               >
-                {translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}
+                {t('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}
               </Button>
             </div>
           ) : null}
           <DialogFooter>
             <Button variant="ghost" onClick={reset} disabled={pending}>
-              {translate('auto.components.TaskPage.ff69a30681', 'Cancel')}
+              {t('auto.components.TaskPage.ff69a30681', 'Cancel')}
             </Button>
           </DialogFooter>
         </DialogContent>

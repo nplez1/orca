@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { SessionSummaryLedgerView } from './session-summary-ledger-view'
 import { resolveSessionSummaryHeaderState } from './session-summary-presentation'
 import { useSessionSummary } from './use-session-summary'
@@ -13,6 +13,7 @@ import { useSessionSummary } from './use-session-summary'
  *  `openActivityPage`), so the right-sidebar summary pane is the live surface;
  *  this strip is kept so the pane still renders correctly if the view returns. */
 export function SessionSummaryPanel({ paneKey }: { paneKey: string }): React.JSX.Element {
+  const t = useTranslate()
   const [expanded, setExpanded] = useState(false)
   const { snapshot } = useSessionSummary(paneKey, expanded)
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
@@ -30,7 +31,7 @@ export function SessionSummaryPanel({ paneKey }: { paneKey: string }): React.JSX
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
         )}
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {translate('activity.sessionSummary.label', 'Session summary')}
+          {t('activity.sessionSummary.label', 'Session summary')}
         </span>
         <span
           className={cn(

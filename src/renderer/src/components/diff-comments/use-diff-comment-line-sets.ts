@@ -19,11 +19,12 @@ export function useDiffCommentLineSets(
     () => commentableLineNumbers?.join(','),
     [commentableLineNumbers]
   )
-  const commentableLineSet = useMemo(
-    () => (commentableLineNumbers ? new Set(commentableLineNumbers) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [commentableLineKey]
-  )
+  const commentableLineSet = useMemo(() => {
+    if (commentableLineKey === undefined) {
+      return null
+    }
+    return new Set(commentableLineKey === '' ? [] : commentableLineKey.split(',').map(Number))
+  }, [commentableLineKey])
   // Value-keyed for the same reason: a thread toggled anywhere hands every mounted surface a fresh
   // display map, and a new-but-equal array must not cost the overlay a push it does not need.
   const gutterOccupiedLineKey = useMemo(
@@ -31,8 +32,7 @@ export function useDiffCommentLineSets(
     [gutterOccupiedLineNumbers]
   )
   const gutterOccupiedLineSet = useMemo(
-    () => new Set(gutterOccupiedLineNumbers ?? []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => new Set(gutterOccupiedLineKey ? gutterOccupiedLineKey.split(',').map(Number) : []),
     [gutterOccupiedLineKey]
   )
   return { commentableLineSet, gutterOccupiedLineSet }

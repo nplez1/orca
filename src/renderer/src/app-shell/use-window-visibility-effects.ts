@@ -8,6 +8,19 @@ import {
   recordUiHangOperation
 } from '@/lib/ui-hang-diagnostics/record-ui-hang-operation'
 
+type VisibilityActions = ReturnType<typeof selectWindowVisibilityActions>
+
+/** Why module-level: a try/finally in the component body bails React Compiler out of the whole hook. */
+function refreshVisibleGitHub(actions: VisibilityActions): void {
+  const startedAtMs = performance.now()
+  try {
+    actions.refreshAllGitHub()
+    actions.bumpGitHubPRVisibleRefreshGeneration()
+  } finally {
+    recordUiHangOperation('window-visible-github-refresh', startedAtMs)
+  }
+}
+
 /** Window-visibility reactions that must run app-wide, not per-surface. */
 export function useWindowVisibilityEffects(): void {
   const actions = useAppStore(selectWindowVisibilityActions)
@@ -16,13 +29,7 @@ export function useWindowVisibilityEffects(): void {
     const handler = (): void => {
       if (document.visibilityState === 'visible') {
         recordUiHangLifecycleEvent('document-visible')
-        const startedAtMs = performance.now()
-        try {
-          actions.refreshAllGitHub()
-          actions.bumpGitHubPRVisibleRefreshGeneration()
-        } finally {
-          recordUiHangOperation('window-visible-github-refresh', startedAtMs)
-        }
+        refreshVisibleGitHub(actions)
       } else {
         recordUiHangLifecycleEvent('document-hidden')
         actions.reportVisibleGitHubPRRefreshCandidates([], Date.now())

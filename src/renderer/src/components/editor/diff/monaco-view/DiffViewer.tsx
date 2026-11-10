@@ -128,17 +128,18 @@ export default function DiffViewer({
 
   // Why: a review thread reveal owns the scroll the same way a local note does — otherwise the
   // first-change auto-scroll below undoes it in a diff tab that has no stored view state yet.
+  const prCommentThreads = prCommentSurface?.threads
   const pendingScrollForSurface = useMemo(() => {
     if (pendingScrollForThisViewer) {
       return pendingScrollForThisViewer
     }
-    if (!scrollToDiffCommentId || !prCommentSurface?.threads) {
+    if (!scrollToDiffCommentId || !prCommentThreads) {
       return null
     }
-    return prCommentSurface.threads.some((thread) => thread.id === scrollToDiffCommentId)
+    return prCommentThreads.some((thread) => thread.id === scrollToDiffCommentId)
       ? scrollToDiffCommentId
       : null
-  }, [pendingScrollForThisViewer, prCommentSurface?.threads, scrollToDiffCommentId])
+  }, [pendingScrollForThisViewer, prCommentThreads, scrollToDiffCommentId])
 
   // A draft keeps its captured owner across a same-tab rename but saves under the file's current path.
   const relativePathRef = useRef(relativePath)
@@ -258,14 +259,16 @@ export default function DiffViewer({
   }, [unregisterDiffEditor])
 
   const onSaveRef = useRef(onSave)
-  onSaveRef.current = onSave
   const onContentChangeRef = useRef(onContentChange)
-  onContentChangeRef.current = onContentChange
+  const propsRef = useRef({ relativePath, language, onSave })
+  // Why a layout effect: React Compiler rejects ref writes during render.
+  useLayoutEffect(() => {
+    onSaveRef.current = onSave
+    onContentChangeRef.current = onContentChange
+    propsRef.current = { relativePath, language, onSave }
+  }, [language, onSave, onContentChange, relativePath])
 
   const { setupCopy, toastNode } = useContextualCopySetup()
-
-  const propsRef = useRef({ relativePath, language, onSave })
-  propsRef.current = { relativePath, language, onSave }
   const currentDiffModelPaths = useDiffViewerLargeDiffLifecycle({
     limited: renderLimit.limited,
     modelKey,

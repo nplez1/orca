@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { Check, Copy, ExternalLink, Globe } from 'lucide-react'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useClipboardTextCopyFeedback } from '@/hooks/use-clipboard-text-copy-feedback'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { openContextualHttpLink } from '@/lib/contextual-http-link'
 import { isEditableTarget } from '@/lib/editable-target'
 import { cn } from '@/lib/utils'
@@ -64,6 +64,7 @@ function contextMenuLinkUrl(event: MouseEvent): { url: string; origin: HTMLEleme
  * system browser, or copy the address. Mounted once at the app root so no surface has to opt in.
  */
 export function AppLinkContextMenu(): React.JSX.Element {
+  const t = useTranslate()
   const [request, setRequest] = useState<LinkContextMenuRequest | null>(null)
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
   const { copyText, status: copyStatus } = useClipboardTextCopyFeedback(request?.url ?? '')
@@ -127,8 +128,8 @@ export function AppLinkContextMenu(): React.JSX.Element {
 
   const copyLabel =
     copyStatus === 'copied'
-      ? translate('auto.components.link.actions.copied', 'Copied')
-      : translate('auto.components.link.actions.copyLink', 'Copy Link')
+      ? t('auto.components.link.actions.copied', 'Copied')
+      : t('auto.components.link.actions.copyLink', 'Copy Link')
 
   return (
     <Popover
@@ -165,10 +166,7 @@ export function AppLinkContextMenu(): React.JSX.Element {
             {activeWorktreeId ? (
               <LinkMenuRow
                 icon={<Globe className="size-3.5 text-muted-foreground" />}
-                label={translate(
-                  'auto.components.link.actions.openInOrcaBrowser',
-                  'Open in Orca Browser'
-                )}
+                label={t('auto.components.link.actions.openInOrcaBrowser', 'Open in Orca Browser')}
                 onRun={() =>
                   run(() =>
                     openContextualHttpLink(request.url, {
@@ -181,7 +179,7 @@ export function AppLinkContextMenu(): React.JSX.Element {
             ) : null}
             <LinkMenuRow
               icon={<ExternalLink className="size-3.5 text-muted-foreground" />}
-              label={translate(
+              label={t(
                 'auto.components.link.actions.openInSystemBrowser',
                 'Open in System Browser'
               )}

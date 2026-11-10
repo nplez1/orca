@@ -12,6 +12,7 @@ import { GitHubUserAvatar } from '@/components/github/github-user-avatar'
 import type { GitHubReviewState } from '../../../../../shared/github/comment-types'
 import type { PRReviewVerdict } from '../../../../../shared/pr-review-verdicts'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 // Why: wording is settled by the merge-readiness badge, and the icon is what separates a change
 // request from an approval for a reader who has not read the label yet. Colour never carries the
@@ -74,6 +75,7 @@ function ReviewVerdictRow({
   verdict: PRReviewVerdict
   onJumpToComment?: (commentId: number) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   const Icon = VERDICT_ICON[verdict.state]
   const label = getVerdictLabel(verdict.state)
   // Why: a verdict with no body has no comment to land on, so it must not offer a click at all —
@@ -93,7 +95,7 @@ function ReviewVerdictRow({
       </span>
       {verdict.isBot ? (
         <span className="shrink-0 rounded border border-border bg-muted px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {translate('auto.components.right.sidebar.checks.panel.content.2ba0a32bdd', 'bot')}
+          {t('auto.components.right.sidebar.checks.panel.content.2ba0a32bdd', 'bot')}
         </span>
       ) : null}
       {/* The verdict is primary text, not a chip: it reads at the section header's weight. */}
@@ -129,13 +131,14 @@ export function ReviewVerdictsBlock({
   verdicts: PRReviewVerdict[]
   onJumpToComment?: (commentId: number) => void
 }): React.JSX.Element | null {
+  const t = useTranslate()
   if (verdicts.length === 0) {
     return null
   }
   return (
     <div className="border-b border-border px-3 py-2.5">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {translate(
+        {t(
           'auto.components.right.sidebar.checks.panel.review.verdicts.47c8e272bfb7',
           'Review verdicts'
         )}

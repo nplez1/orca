@@ -2,7 +2,7 @@ import { LoaderCircle, RefreshCw } from 'lucide-react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { Button } from '@/components/ui/button'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /** One comment, normalized across Jira / Linear / GitHub. */
 export type IssueCommentView = {
@@ -46,12 +46,13 @@ export function IssueCommentThread({
   error: string | null
   onRetry: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-medium text-foreground">
-            {translate('auto.components.right.sidebar.IssueComments.title', 'Comments')}
+            {t('auto.components.right.sidebar.IssueComments.title', 'Comments')}
           </span>
           {comments.length > 0 ? (
             <span className="text-[12px] text-muted-foreground">{comments.length}</span>
@@ -64,7 +65,7 @@ export function IssueCommentThread({
             ) : (
               <RefreshCw className="size-3" />
             )}
-            {translate('auto.components.right.sidebar.IssueComments.retry', 'Retry')}
+            {t('auto.components.right.sidebar.IssueComments.retry', 'Retry')}
           </Button>
         ) : null}
       </div>
@@ -79,7 +80,7 @@ export function IssueCommentThread({
         </div>
       ) : comments.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {translate('auto.components.right.sidebar.IssueComments.empty', 'No comments yet.')}
+          {t('auto.components.right.sidebar.IssueComments.empty', 'No comments yet.')}
         </p>
       ) : (
         <div className="flex flex-col gap-3">

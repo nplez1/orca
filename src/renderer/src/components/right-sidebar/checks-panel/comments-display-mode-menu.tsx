@@ -9,7 +9,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import {
   getPRCommentsListDisplayModeLabel,
   PR_COMMENT_LIST_DISPLAY_MODES,
@@ -24,6 +24,7 @@ export function CommentsDisplayModeMenu({
   displayMode: PRCommentsListDisplayMode
   onDisplayModeChange: (mode: PRCommentsListDisplayMode) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -32,7 +33,7 @@ export function CommentsDisplayModeMenu({
           variant="ghost"
           size="icon-xs"
           className="text-muted-foreground hover:text-foreground"
-          aria-label={translate(
+          aria-label={t(
             'auto.components.right.sidebar.checks.panel.content.f5cf324efa',
             'Comment display options'
           )}
@@ -42,7 +43,7 @@ export function CommentsDisplayModeMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="bottom" sideOffset={6}>
         <DropdownMenuLabel>
-          {translate('auto.components.right.sidebar.checks.panel.content.5e6e5a13fa', 'View')}
+          {t('auto.components.right.sidebar.checks.panel.content.5e6e5a13fa', 'View')}
         </DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={displayMode}

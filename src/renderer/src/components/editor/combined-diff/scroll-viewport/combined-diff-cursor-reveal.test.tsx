@@ -5,6 +5,7 @@ import { afterAll, afterEach, expect, it, vi } from 'vitest'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
 import type { DiffOnMount } from '@monaco-editor/react'
 import { installCombinedDiffCursorReveal } from './combined-diff-cursor-reveal'
+import { installMonacoDelayerCancellationGuard } from '@/lib/monaco-delayer-cancellation-guard'
 
 import {
   prFilesDiffScrollTopCache,
@@ -30,6 +31,8 @@ Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
   })
 })
 afterAll(() => Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', canvasContext))
+// Why: monaco's WordHighlighter Delayer cancelled on editor dispose surfaces as an unhandled rejection.
+installMonacoDelayerCancellationGuard()
 const disposers: (() => void)[] = []
 let diff: monaco.editor.IStandaloneDiffEditor
 let viewport: HTMLDivElement

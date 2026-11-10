@@ -87,7 +87,7 @@ export function FloatingWorkspacePane({
     )
     if (!result.ok) {
       toast.error(
-        translate(
+        t(
           'auto.components.settings.FloatingWorkspacePane.revealFailed',
           'Could not open the floating workspace folder.'
         )

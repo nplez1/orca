@@ -2,7 +2,7 @@ import React from 'react'
 import { Input } from '@/components/ui/input'
 import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import { replaceCompletedWorkspaceEmojiShortcode } from '@/lib/workspace-emoji-shortcodes'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { SelectionIcon } from './smart-workspace-source-row-content'
 import type { SmartWorkspaceNameSelection } from './smart-workspace-name-field-model'
 
@@ -34,13 +34,14 @@ export function TaskImpliedSourceNameField({
   disabledPlaceholder?: string
   onPlainEnter?: () => void
 }): React.JSX.Element {
-  const nameLabel = translate(
+  const t = useTranslate()
+  const nameLabel = t(
     'auto.components.new.workspace.SmartWorkspaceNameField.workspaceName',
     'Workspace name'
   )
   const placeholder = disabled
     ? (disabledPlaceholder ??
-      translate('auto.components.new.workspace.SmartWorkspaceNameField.unavailable', 'Unavailable'))
+      t('auto.components.new.workspace.SmartWorkspaceNameField.unavailable', 'Unavailable'))
     : nameLabel
 
   return (

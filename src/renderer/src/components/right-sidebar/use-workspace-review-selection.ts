@@ -108,12 +108,13 @@ export function useWorkspaceReviewSelection({
     () => (worktree ? getWorkspaceReferenceRuntimeVersion(worktree, repo) : ''),
     [worktree, repo]
   )
+  const selectedAttachment = selected?.attachment
   const request = useMemo<WorkspaceReferenceRequest | null>(
     () =>
-      selected?.attachment && worktree
-        ? getWorkspaceReferenceRequest(selected.attachment, worktree, repo, runtimeVersion)
+      selectedAttachment && worktree
+        ? getWorkspaceReferenceRequest(selectedAttachment, worktree, repo, runtimeVersion)
         : null,
-    [selected?.attachment, worktree, repo, runtimeVersion]
+    [selectedAttachment, worktree, repo, runtimeVersion]
   )
   const cacheEntry = useAppStore((s) => (request ? s.hostedReviewCache[request.key] : undefined))
   const canRead =

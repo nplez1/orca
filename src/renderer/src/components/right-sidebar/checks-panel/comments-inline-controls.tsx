@@ -1,7 +1,7 @@
 import { MessageSquareOff, MessagesSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 /**
  * Hides or restores the review threads the code surfaces draw, and explains their absence.
@@ -16,12 +16,13 @@ export function CommentsInlineToggle({
   enabled: boolean
   onToggle: () => void
 }): React.JSX.Element {
+  const t = useTranslate()
   const label = enabled
-    ? translate(
+    ? t(
         'auto.components.right.sidebar.checks.panel.comments.list.38a6c0254e',
         'Hide comments in code'
       )
-    : translate(
+    : t(
         'auto.components.right.sidebar.checks.panel.comments.list.a2a5fb7686',
         'Show comments in code'
       )
@@ -65,10 +66,11 @@ export function CommentsInlineHeadMismatchNotice({
   worktreeHeadOid: string
   commentsHeadSha: string
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <div className="border-b border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
       <div>
-        {translate(
+        {t(
           'auto.components.right.sidebar.checks.panel.comments.list.6b9c7f83c4',
           'Comments are not shown in code because they do not belong to the commit that is checked out.'
         )}
@@ -76,14 +78,14 @@ export function CommentsInlineHeadMismatchNotice({
       <div className="mt-1 font-mono text-[10px] text-muted-foreground/80">
         <div>
           {worktreeHeadOid.slice(0, 7)}{' '}
-          {translate(
+          {t(
             'auto.components.right.sidebar.checks.panel.comments.list.c0227ee68e',
             '(checked out)'
           )}
         </div>
         <div>
           {commentsHeadSha.slice(0, 7)}{' '}
-          {translate(
+          {t(
             'auto.components.right.sidebar.checks.panel.comments.list.a8502d9752',
             '(comments fetched at)'
           )}

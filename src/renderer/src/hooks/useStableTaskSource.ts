@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState } from 'react'
 import {
   areTaskSourceContextsEqual,
   type TaskSourceContext
@@ -16,9 +16,12 @@ export function useStableTaskSource(source: TaskSourceContext): TaskSourceContex
 /** For a link that may carry no source at all: null stays null instead of becoming a source. */
 export function useStableTaskSource(source: TaskSourceContext | null): TaskSourceContext | null
 export function useStableTaskSource(source: TaskSourceContext | null): TaskSourceContext | null {
-  const held = useRef(source)
-  if (!areTaskSourceContextsEqual(held.current, source)) {
-    held.current = source
+  // Why state adjusted during render, not a ref: React re-renders before committing, so the
+  // identity stays stable without a render-phase ref read React Compiler cannot compile.
+  const [held, setHeld] = useState(source)
+  if (!areTaskSourceContextsEqual(held, source)) {
+    setHeld(source)
+    return source
   }
-  return held.current
+  return held
 }

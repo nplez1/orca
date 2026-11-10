@@ -1,3 +1,4 @@
+import { runAsyncTaskOrRecover } from '../lib/async-task-with-cleanup'
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
@@ -85,81 +86,85 @@ export function useJiraIssueWorkspaceMutation({
       for (const editable of optimistic ? editedJiraIssueFields(optimistic) : []) {
         editedFieldsRef.current.add(editable)
       }
-      try {
-        await enqueueJiraIssueMutation({
-          scope: requestKey,
-          previous,
-          optimistic: optimistic ?? {},
-          commentsChanged: Boolean(updates.transitionComment?.trim()),
-          update: async () => {
-            if (sprintChanged) {
-              selectSprint(updates.sprintId ?? null)
-            }
-            return jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
-          },
-          refresh: () => jiraGetIssue(providerSettings, displayed.key, displayed.siteId),
-          patchIssue: (patch) =>
-            patchJiraIssue(displayed.key, patch, {
-              sourceContext,
-              siteId: displayed.siteId,
-              contextKey: mutationContextKey
-            })
-        })
-        if (sprintChanged) {
-          // Why before the re-read: the move is committed by the time this thunk resolves,
-          // and the board's reload must not wait on a round trip that only feeds the picker.
-          onSprintChange?.()
-          await reloadSprintAssignment()
-        }
-        if (updates.customFields) {
-          // Why: the "Edit fields" form seeds itself from the same editmeta read, so
-          // a value written here has to be re-read or the two disagree about the field.
-          await reloadEditFields()
-        }
-        return { ok: true }
-      } catch (error) {
-        if (sprintChanged) {
-          // Why the local restore before the re-read: the fault that failed the move
-          // usually fails that read too, and the picker must not keep showing a sprint
-          // the issue never reached.
-          restoreSprintAssignment(previousSprintAssignment)
-          await reloadSprintAssignment()
-        }
-        // Why the timeout first: its message is the shared English constant, and the
-        // user needs the "check the value" wording rather than a raw transport string.
-        const message =
-          error instanceof JiraWriteTimeoutError
-            ? translate('jira.issue.writeTimedOut', error.message)
-            : extractIpcErrorMessage(
-                error,
-                translate(
-                  'auto.components.JiraIssueWorkspace.ea21952aa3',
-                  'Failed to update Jira issue.'
+      return await runAsyncTaskOrRecover(
+        async () => {
+          await enqueueJiraIssueMutation({
+            scope: requestKey,
+            previous,
+            optimistic: optimistic ?? {},
+            commentsChanged: Boolean(updates.transitionComment?.trim()),
+            update: async () => {
+              if (sprintChanged) {
+                selectSprint(updates.sprintId ?? null)
+              }
+              return jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
+            },
+            refresh: () => jiraGetIssue(providerSettings, displayed.key, displayed.siteId),
+            patchIssue: (patch) =>
+              patchJiraIssue(displayed.key, patch, {
+                sourceContext,
+                siteId: displayed.siteId,
+                contextKey: mutationContextKey
+              })
+          })
+          if (sprintChanged) {
+            // Why before the re-read: the move is committed by the time this thunk resolves,
+            // and the board's reload must not wait on a round trip that only feeds the picker.
+            onSprintChange?.()
+            await reloadSprintAssignment()
+          }
+          if (updates.customFields) {
+            // Why: the "Edit fields" form seeds itself from the same editmeta read, so
+            // a value written here has to be re-read or the two disagree about the field.
+            await reloadEditFields()
+          }
+          return { ok: true }
+        },
+        async (error) => {
+          if (sprintChanged) {
+            // Why the local restore before the re-read: the fault that failed the move
+            // usually fails that read too, and the picker must not keep showing a sprint
+            // the issue never reached.
+            restoreSprintAssignment(previousSprintAssignment)
+            await reloadSprintAssignment()
+          }
+          // Why the timeout first: its message is the shared English constant, and the
+          // user needs the "check the value" wording rather than a raw transport string.
+          const message =
+            error instanceof JiraWriteTimeoutError
+              ? translate('jira.issue.writeTimedOut', error.message)
+              : extractIpcErrorMessage(
+                  error,
+                  translate(
+                    'auto.components.JiraIssueWorkspace.ea21952aa3',
+                    'Failed to update Jira issue.'
+                  )
                 )
-              )
-        // Why a flag rather than the field name: more than one surface mutates a
-        // transition — the sheet's control reports the error inline, but the pane's
-        // status row does not — so only the caller with an inline display opts out.
-        if (!options?.reportsInline) {
-          toast.error(message)
+          // Why a flag rather than the field name: more than one surface mutates a
+          // transition — the sheet's control reports the error inline, but the pane's
+          // status row does not — so only the caller with an inline display opts out.
+          if (!options?.reportsInline) {
+            toast.error(message)
+          }
+          // Why carried through: a transition's refusal names the fields it refused,
+          // and a surface that shows them inline has nothing to show without this.
+          return {
+            ok: false,
+            error: message,
+            ...(error instanceof JiraMutationFailure && error.fieldErrors
+              ? { fieldErrors: error.fieldErrors }
+              : {}),
+            ...(error instanceof JiraMutationFailure && error.errorMessages
+              ? { errorMessages: error.errorMessages }
+              : {})
+          }
+        },
+        () => {
+          if (scopeGeneration === scopeGenerationRef.current) {
+            setPendingField(null)
+          }
         }
-        // Why carried through: a transition's refusal names the fields it refused,
-        // and a surface that shows them inline has nothing to show without this.
-        return {
-          ok: false,
-          error: message,
-          ...(error instanceof JiraMutationFailure && error.fieldErrors
-            ? { fieldErrors: error.fieldErrors }
-            : {}),
-          ...(error instanceof JiraMutationFailure && error.errorMessages
-            ? { errorMessages: error.errorMessages }
-            : {})
-        }
-      } finally {
-        if (scopeGeneration === scopeGenerationRef.current) {
-          setPendingField(null)
-        }
-      }
+      )
     },
     [
       displayed,

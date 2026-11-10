@@ -1,0 +1,27 @@
+# Fork overlay on config/direct-link-open-baseline.txt, which stays byte-identical to upstream.
+# A row here replaces that file's row for the same path; 0 withdraws upstream's allowance.
+# Only paths whose count differs from upstream belong here; every row says why.
+# The 0 rows are upstream's own rows, stale in this tree because upstream's 51c77320bc merge
+# moved those opens behind openAppHttpLink; they are a plain prune, not a fork decision.
+# Prune writes this file, never the upstream one: pnpm check:direct-link-open-ratchet --prune
+1 src/renderer/src/components/GitHubStarButton.tsx # star-Orca page, the header's exception; the fork's shared nudge opens ORCA_REPOSITORY_URL directly, as upstream's StarNagCard and StarNagToastHost still do
+0 src/renderer/src/components/Landing.tsx
+0 src/renderer/src/components/LinuxPackageInstallRecoveryCard.tsx
+0 src/renderer/src/components/UpdateErrorCardContent.tsx
+0 src/renderer/src/components/browser-pane/assemble-chrome/browser-page-context-menu-items.tsx
+0 src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx
+0 src/renderer/src/components/browser-pane/assemble-chrome/browser-page-viewport-overlays.tsx
+0 src/renderer/src/components/browser-pane/client-hosted-browser-load-failure.tsx
+0 src/renderer/src/components/browser-pane/stream-remote/remote-browser-page-context-menu.tsx
+0 src/renderer/src/components/browser-pane/stream-remote/remote-browser-page-viewport.tsx
+0 src/renderer/src/components/dashboard-popout/preview-terminal-links.ts
+0 src/renderer/src/components/right-sidebar/ssh-forwarded-ports-section.tsx
+0 src/renderer/src/components/right-sidebar/ssh-ports-panel.tsx
+0 src/renderer/src/components/settings/accounts/codex/CodexLoginLinkNotice.tsx
+0 src/renderer/src/components/settings/accounts/sign-in/HostAccountSignInPrompt.tsx
+0 src/renderer/src/components/settings/updates/ReleaseChannelSection.tsx
+0 src/renderer/src/components/tab-bar/BrowserTab.tsx
+0 src/renderer/src/lib/browser/navigation/http-link-routing.ts
+0 src/renderer/src/lib/workspace-ports/workspace-port-actions.ts
+0 src/renderer/src/runtime/provider-accounts/sign-in/antigravity-chat-sign-in-status.ts
+1 src/renderer/src/web/preload-api/web-shell-api.ts # fork has 1 where upstream allows 3: openPath, openUrl, openUrlInSystemBrowser and openFileUri share one openBrowserTab helper, because a browser tab is the only destination the web build has

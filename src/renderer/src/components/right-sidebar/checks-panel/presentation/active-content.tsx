@@ -34,6 +34,7 @@ import type { ChecksPanelActiveContentModel } from './active-content-props'
 import { useWorktreePRCommentInline } from '../../../pr-comment-inline/worktree-pr-comment-inline'
 import { usePRCommentCodeNavigation } from '../../../pr-comment-inline/pr-comment-code-navigation'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
+import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import type { PRComment } from '../../../../../../shared/github/comment-types'
 import { ChecksPanelReviewHeader } from './review-header'
 
@@ -147,7 +148,7 @@ export function ChecksPanelActiveContent({
       // Why: only an unopenable comment falls back to the provider — an outdated thread still opens
       // its file, just without the scroll.
       if (!openCommentInCode(comment) && comment.url) {
-        void window.api.shell.openUrl(comment.url)
+        openAppHttpLink(comment.url)
       }
     },
     [openCommentInCode]

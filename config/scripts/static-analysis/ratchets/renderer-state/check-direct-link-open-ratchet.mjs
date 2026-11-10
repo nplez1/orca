@@ -5,6 +5,7 @@ import { readTrackedSources, runCountRatchet } from '../../ratchet-baseline/ratc
 // Web links from Orca's UI go through openAppHttpLink so they honour the link setting (#28692).
 
 const BASELINE_PATH = 'config/direct-link-open-baseline.txt'
+const OVERLAY_PATH = 'config/direct-link-open-baseline.fork.txt'
 const SCAN_ROOTS = ['src/renderer/src']
 const HEADER = [
   '# Direct system-browser opens (shell.openUrl / window.open) per renderer file.',
@@ -47,6 +48,7 @@ export function main(root = process.cwd(), arg = undefined) {
     {
       name: 'direct-link-open',
       baselinePath: BASELINE_PATH,
+      overlayPath: OVERLAY_PATH,
       header: HEADER,
       collect: collectDirectLinkOpenCounts,
       unit: 'direct system-browser open(s)',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { UiHangDiagnosticsStatus } from '../../../../shared/ui-hang-diagnostics-types'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { SearchableSetting } from './section-layout/SearchableSetting'
 import { SettingsSwitchRow } from './form-controls/SettingsFormControls'
 import { getAdvancedSearchEntry } from './advanced/advanced-search'
@@ -14,6 +14,7 @@ export function UiHangDiagnosticsSetting({
   enabled,
   onToggle
 }: UiHangDiagnosticsSettingProps): React.JSX.Element {
+  const t = useTranslate()
   const [status, setStatus] = useState<UiHangDiagnosticsStatus | null>(null)
   const searchEntry = getAdvancedSearchEntry().uiHangDiagnostics
 
@@ -47,11 +48,8 @@ export function UiHangDiagnosticsSetting({
       id="advanced-ui-hang-logging"
     >
       <SettingsSwitchRow
-        label={translate(
-          'auto.components.settings.UiHangDiagnosticsSetting.7879895603',
-          'Log UI hangs'
-        )}
-        description={translate(
+        label={t('auto.components.settings.UiHangDiagnosticsSetting.7879895603', 'Log UI hangs')}
+        description={t(
           'auto.components.settings.UiHangDiagnosticsSetting.38d00b7a2e',
           'Off by default. Records UI-thread stalls and window freezes so you can share them when reporting a hang.'
         )}
@@ -61,20 +59,20 @@ export function UiHangDiagnosticsSetting({
       {enabled && status?.logFilePath ? (
         <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
           <p className="text-xs font-medium">
-            {translate('auto.components.settings.UiHangDiagnosticsSetting.e19f83d807', 'Log file')}
+            {t('auto.components.settings.UiHangDiagnosticsSetting.e19f83d807', 'Log file')}
           </p>
           <p className="select-text break-all font-mono text-xs text-muted-foreground">
             {status.logFilePath}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {translate(
+            {t(
               'auto.components.settings.UiHangDiagnosticsSetting.9fa69c4cae',
               'Written while logging is on.'
             )}
           </p>
           {status.disabledReason ? (
             <p className="mt-1 text-xs text-destructive">
-              {translate(
+              {t(
                 'auto.components.settings.UiHangDiagnosticsSetting.2b5bd8a767',
                 'Local log writes are disabled by policy (CI or ORCA_DIAGNOSTICS_DISABLED).'
               )}

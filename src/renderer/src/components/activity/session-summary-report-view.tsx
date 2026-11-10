@@ -5,7 +5,7 @@
 // structured whole-session report) must not be conflated: one is a sentence about the window since
 // the reader's last message, the other is a headline plus ordered phases.
 import React from 'react'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import type {
   SessionSummaryFullReport,
   SessionSummaryLedger
@@ -53,6 +53,7 @@ export function ReportBody({
   ledger: SessionSummaryLedger
   report: SessionSummaryReportView
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <>
       {report.sections.length > 0 ? (
@@ -73,7 +74,7 @@ export function ReportBody({
         <div>
           {report.through !== null && report.through < ledger.foldedThrough ? (
             <span className="mr-1 text-2xs text-muted-foreground">
-              {translate('activity.sessionSummary.asOf', '(as of #{{index}})', {
+              {t('activity.sessionSummary.asOf', '(as of #{{index}})', {
                 index: report.through
               })}
             </span>

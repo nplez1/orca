@@ -97,7 +97,7 @@ export function log({ errors = [], declaredCount = errors.length } = {}) {
       (headline) =>
         `\u2500\u2500\u2500\u2500\u2500\u2500 Unhandled Rejection \u2500\u2500\u2500\u2500\u2500\u2500\n` +
         `\u001b[31m\u001b[1m${headline}\u001b[22m\u001b[39m\n` +
-        `This error originated in "src/main/ipc/worktrees-detected-scan-cache.test.ts" test file.`
+        `This error originated in "src/main/ipc/worktrees/listing/persisted-worktree-scan-cache.test.ts" test file.`
     )
     .join('\n')
   return (
