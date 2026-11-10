@@ -423,7 +423,7 @@ byte-for-byte and keep only the fork hook. Measured headroom (`skipComments`, `s
 | File                                                                                     | Effective lines | Headroom vs cap                     |
 | ---------------------------------------------------------------------------------------- | --------------- | ----------------------------------- |
 | `runtime-rpc-client.ts`                                                                  | 292 / 300       | 8 → one import + a 2-line call fits |
-| `use-status-bar-controller.ts`                                                           | 280 / 300       | 20                                  |
+| `use-status-bar-controller.ts`                                                           | 297 / 300       | 3 — restore landed (#324)           |
 | `runtime-file-search-client.ts`                                                          | 274 / 300       | 26                                  |
 | `tooltip.tsx`                                                                            | 345 / 400       | 55                                  |
 | `Landing.tsx`                                                                            | 283 / 400       | 117                                 |

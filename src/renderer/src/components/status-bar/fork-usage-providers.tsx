@@ -135,11 +135,13 @@ export type ForkUsageProviderSettings = {
   copilotTokenConfigured: boolean
 }
 
+// Why optional: upstream's own controller body builds this object from the providers it knows, so
+// requiring the fork's slots there would mean editing upstream's body on every sync.
 export type ForkUsageProviderSnapshots = {
-  deepseek: ProviderRateLimits | null | undefined
-  fireworks: ProviderRateLimits | null | undefined
-  deepinfra: ProviderRateLimits | null | undefined
-  copilot: ProviderRateLimits | null | undefined
+  deepseek?: ProviderRateLimits | null | undefined
+  fireworks?: ProviderRateLimits | null | undefined
+  deepinfra?: ProviderRateLimits | null | undefined
+  copilot?: ProviderRateLimits | null | undefined
 }
 
 // Why the presence flag and the pending skeleton are not here: both are readout

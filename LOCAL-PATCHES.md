@@ -2770,6 +2770,41 @@ all derived from it.
   needs its own adapter and its own review, and `docs/reference/host-settings-replication.md` now says
   so instead of claiming every provider credential travels.
 
+### `local(usage)`: the status bar adds the fork's providers by merging, not by copying upstream (#324)
+
+Anchors: `src/renderer/src/components/status-bar/use-status-bar-controller.ts`,
+`src/renderer/src/components/status-bar/fork-status-bar-usage.ts`.
+
+**The symptom.** The fork had replaced upstream's per-provider body in the status bar controller with
+its own projection of every provider — 139 lines changed, 123 of them deletions, in a file upstream
+touched 21 times in the 90 days before this base. Every provider upstream adds conflicted there, and
+the copy went stale silently twice: upstream's `!remoteOwned` Antigravity gate and its ZCode saved-plan
+key both had to be ported into the fork's copy by hand after a merge dropped them.
+
+**What the fork does now.** Upstream's body is restored byte for byte. `git diff upstream/main` on that
+file is three lines: the import, `return {` becoming `const controller = {`, and a final
+`withForkStatusBarUsage(controller, …)` return. The fork's four providers — DeepSeek, Fireworks,
+DeepInfra, Copilot — are folded in by that one call, which only widens `anyFetching` /
+`hasVisibleUsageMeters` / `anyVisible` and only narrows `isEmptyUsageState`, so a value the fork does
+not understand survives a sync untouched. The controller passes upstream's own `usageSettings`, so the
+fork inherits upstream's remote-owner handling instead of re-deriving it. `T extends
+ForkStatusBarUsage` on the merge is what makes an upstream rename of one of those six keys a `pnpm tc`
+failure rather than a silently unmerged field.
+
+**That file has three code lines of headroom left.** Upstream sits at 295 of its 300-line `max-lines`
+budget (`skipComments`, `skipBlankLines`) and this seam spends two, so 297. Any further fork addition
+there belongs in a fork-owned module, not a fourth line: the ratchet in
+`config/max-lines-baseline.txt` may only shrink, so a `max-lines` disable is not an option. It is also
+a sync hazard — upstream growing that file by more than three lines breaks the budget on the merge.
+
+- **`ForkUsageProviderSnapshots`' four slots are optional now** (`fork-usage-providers.tsx`). Upstream's
+  body cannot name the fork's slots, so requiring them made its `isUsageEmptyState` call a typecheck
+  error — which is why the copy existed. The fork's own call passes every slot, so nothing is left
+  unchecked.
+- **The old `status-bar-usage-projection.ts` is gone.** `fork-status-bar-usage.test.ts` replaces its
+  test: the merge is identity when no fork provider is configured, and a fork reading or saved key
+  still reaches the roster, the meter count and the empty state.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream
