@@ -13,7 +13,6 @@ import {
 } from '../../local/gate-verdict-cache.mjs'
 import {
   FORK_OWNED_PATHS,
-  REVIEW_CLAIM_EXAMPLE,
   TARGETS,
   allowlistAtHead,
   changedPathsIn,
@@ -29,12 +28,27 @@ import {
   parseGateWaivers,
   unitGateVerdict
 } from '../../local/open-pr.mjs'
-import { reviewClaim, waiverDisclosure } from '../../local/pr-body-claims.mjs'
+import {
+  REVIEWER,
+  REVIEW_CLAIM_EXAMPLE,
+  reviewClaim,
+  waiverDisclosure
+} from '../../local/pr-body-claims.mjs'
 
 const SCRIPT = new URL('../../local/open-pr.mjs', import.meta.url).pathname
 const REVISION = 'a'.repeat(40)
 const ALLOWLIST = '{"entries":[]}\n'
 const dirs = []
+
+const REVIEWER_NAME = REVIEWER.name.split(/\s+/)[0]
+/** A valid pi thinking level the reviewer did NOT run at, derived so a swap keeps it wrong. */
+const OTHER_LEVEL = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'].find(
+  (level) => level !== REVIEWER.thinking
+)
+
+/** A claim line in the accepted shape, so swapping the reviewer rewrites no case below. */
+const reviewed = (rounds, reviewer = `${REVIEWER.name}, ${REVIEWER.thinking}`) =>
+  `Reviewed by ${reviewer}: ${rounds}`
 
 afterEach(() => {
   for (const dir of dirs.splice(0)) {
@@ -109,35 +123,34 @@ it('collects a waiver per gate, and refuses one without a reason', () => {
 
 it('accepts the review claim AGENTS.md asks for', () => {
   expect(reviewClaim(`${REVIEW_CLAIM_EXAMPLE}\n`)).toMatchObject({ ok: true })
-  expect(reviewClaim('### Reviewed by Opus 5.5, high: round 2 delta clean')).toMatchObject({
-    ok: true
-  })
+  expect(reviewClaim(`### ${reviewed('round 2 delta clean')}`)).toMatchObject({ ok: true })
   expect(
-    reviewClaim('- **Reviewed by** claude/opus, high: R1 (1 blocker fixed), clean on R2')
+    reviewClaim(
+      `- **Reviewed by** ${REVIEWER.provider}/${REVIEWER.alias}, ${REVIEWER.thinking}: R1 (1 blocker fixed), clean on R2`
+    )
   ).toMatchObject({ ok: true })
-  expect(reviewClaim('Reviewed by Opus 5.5, high: R1, 2 blockers addressed')).toMatchObject({
-    ok: true
-  })
+  expect(reviewClaim(reviewed('R1, 2 blockers addressed'))).toMatchObject({ ok: true })
 })
 
 it('refuses a review claim with no round, no closed verdict, or only a fenced example', () => {
-  expect(reviewClaim('Reviewed by Opus 5.5, high: looks fine')).toMatchObject({
+  expect(reviewClaim(reviewed('looks fine'))).toMatchObject({
     ok: false,
     reason: expect.stringContaining('names no review round')
   })
-  expect(reviewClaim('Reviewed by Opus 5.5, high: R1')).toMatchObject({
+  expect(reviewClaim(reviewed('R1'))).toMatchObject({
     ok: false,
     reason: expect.stringContaining('states no closed verdict')
   })
   // An open finding is not a verdict, which is what makes the gate worth having.
-  expect(reviewClaim('Reviewed by Opus 5.5, high: R1 (3 blocking, unresolved)')).toMatchObject({
+  expect(reviewClaim(reviewed('R1 (3 blocking, unresolved)'))).toMatchObject({
     ok: false,
     reason: expect.stringContaining('open finding')
   })
-  expect(
-    reviewClaim('Reviewed by Opus 5.5, high: R1 (3 blocking unresolved, 2 nits)')
-  ).toMatchObject({ ok: false, reason: expect.stringContaining('open finding') })
-  expect(reviewClaim('Reviewed by Opus 5.5, high: R1 not clean')).toMatchObject({
+  expect(reviewClaim(reviewed('R1 (3 blocking unresolved, 2 nits)'))).toMatchObject({
+    ok: false,
+    reason: expect.stringContaining('open finding')
+  })
+  expect(reviewClaim(reviewed('R1 not clean'))).toMatchObject({
     ok: false,
     reason: expect.stringContaining('open finding')
   })
@@ -467,35 +480,37 @@ it('reads the body file it was given, not a fixed path', () => {
 it('refuses a review claim whose verdicts are still open', () => {
   // Every one of these was ACCEPTED by the previous regex, which is why gate 2 enforced nothing.
   for (const claim of [
-    'Reviewed by Opus 5.5: R1 (3 blocking, not yet fixed)',
+    `Reviewed by ${REVIEWER.name}: R1 (3 blocking, not yet fixed)`,
     'Reviewed by nobody: R1, will be fixed later',
-    'Reviewed by Opus: R1 found 2 BLOCKERs; nits fixed',
-    'Reviewed by Opus 5.5, high: R1 (3 blocking), R2 clean',
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed); R2 TBD',
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), R2 unresolved'
+    `Reviewed by ${REVIEWER_NAME}: R1 found 2 BLOCKERs; nits fixed`,
+    reviewed('R1 (3 blocking), R2 clean'),
+    reviewed('R1 (2 blocking fixed); R2 TBD'),
+    reviewed('R1 (2 blocking fixed), R2 unresolved')
   ]) {
     expect(reviewClaim(claim), claim).toMatchObject({ ok: false })
   }
 })
 
 it('names what a refused review claim is missing', () => {
-  expect(reviewClaim('Reviewed by Opus 5.5: R1 (2 blocking fixed)')).toMatchObject({
+  expect(reviewClaim(`Reviewed by ${REVIEWER.name}: R1 (2 blocking fixed)`)).toMatchObject({
     ok: false,
-    reason: expect.stringContaining('Opus reviewer at high reasoning')
+    reason: expect.stringContaining(`${REVIEWER.name} at ${REVIEWER.thinking} reasoning`)
   })
-  expect(reviewClaim('Reviewed by someone, high: R1 (2 blocking fixed)')).toMatchObject({
+  expect(
+    reviewClaim(reviewed('R1 (2 blocking fixed)', `someone, ${REVIEWER.thinking}`))
+  ).toMatchObject({
     ok: false,
-    reason: expect.stringContaining('Opus reviewer')
+    reason: expect.stringContaining(REVIEWER.name)
   })
-  expect(reviewClaim('Reviewed by Opus 5.5, high: R1 found 2 blockers')).toMatchObject({
+  expect(reviewClaim(reviewed('R1 found 2 blockers'))).toMatchObject({
     ok: false,
     reason: expect.stringContaining('closing verb beside it')
   })
-  expect(reviewClaim('Reviewed by Opus 5.5, high: R1 (2 blocking fixed), R2')).toMatchObject({
+  expect(reviewClaim(reviewed('R1 (2 blocking fixed), R2'))).toMatchObject({
     ok: false,
     reason: expect.stringContaining('every round needs its own')
   })
-  expect(reviewClaim('Reviewed by Opus 5.5, high: R1 (3 blocking, not yet fixed)')).toMatchObject({
+  expect(reviewClaim(reviewed('R1 (3 blocking, not yet fixed)'))).toMatchObject({
     ok: false,
     reason: expect.stringContaining('open finding')
   })
@@ -504,16 +519,16 @@ it('names what a refused review claim is missing', () => {
 it('refuses a claim whose blocker count is not closed where it is counted', () => {
   for (const claim of [
     // `clean` elsewhere in the line used to satisfy the round without closing these findings.
-    'Reviewed by Opus 5.5, high: R1 found 2 blockers, everything else clean',
+    reviewed('R1 found 2 blockers, everything else clean'),
     // The closing verb is in the next clause, not beside the count.
-    'Reviewed by Opus 5.5, high: R1 (2 blocking, 1 fixed)',
-    'Reviewed by Opus 5.5, high: R1 (3 blocking: 1 fixed)',
-    'Reviewed by Opus 5.5, high: R1 2 blockers found and 1 fixed',
-    'Reviewed by Opus 5.5, high: R1 (2 blockers - one fixed)',
+    reviewed('R1 (2 blocking, 1 fixed)'),
+    reviewed('R1 (3 blocking: 1 fixed)'),
+    reviewed('R1 2 blockers found and 1 fixed'),
+    reviewed('R1 (2 blockers - one fixed)'),
     // A count that says what is left open in another word.
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed, 1 deferred)',
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), follow-up filed for the rest',
-    'Reviewed by Opus 5.5, high: R1 1 SHOULD-FIX open, R1 clean'
+    reviewed('R1 (2 blocking fixed, 1 deferred)'),
+    reviewed('R1 (2 blocking fixed), follow-up filed for the rest'),
+    reviewed('R1 1 SHOULD-FIX open, R1 clean')
   ]) {
     expect(reviewClaim(claim), claim).toMatchObject({ ok: false })
   }
@@ -522,16 +537,16 @@ it('refuses a claim whose blocker count is not closed where it is counted', () =
 it('accepts the claim shapes a real review produces, including a delta round', () => {
   for (const claim of [
     REVIEW_CLAIM_EXAMPLE,
-    'Reviewed by Opus 5.5, high: R1 (0 blocking fixed), delta clean on R2',
+    reviewed('R1 (0 blocking fixed), delta clean on R2'),
     // 'no blockers' is a clean verdict, not a count that needs closing.
-    'Reviewed by Opus 5.5, high: R1 clean, no blockers',
-    'Reviewed by Opus 5.5, high: R1 (no blocking findings)',
-    'Reviewed by claude/opus, high: R1 (1 blocker fixed), clean on R2',
-    'Reviewed by Opus 5.5, high: round 2 delta clean',
-    'Reviewed by Opus 5.5, high: R1, 2 blockers addressed',
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed); R2 (1 blocking fixed), R3 clean',
+    reviewed('R1 clean, no blockers'),
+    reviewed('R1 (no blocking findings)'),
+    `Reviewed by ${REVIEWER.provider}/${REVIEWER.alias}, ${REVIEWER.thinking}: R1 (1 blocker fixed), clean on R2`,
+    reviewed('round 2 delta clean'),
+    reviewed('R1, 2 blockers addressed'),
+    reviewed('R1 (2 blocking fixed); R2 (1 blocking fixed), R3 clean'),
     // AGENTS.md's own wording for a delta range: one round named twice is one round.
-    'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta R1..R2 clean'
+    reviewed('R1 (2 blocking fixed), delta R1..R2 clean')
   ]) {
     expect(reviewClaim(claim), claim).toMatchObject({ ok: true })
   }
@@ -539,10 +554,14 @@ it('accepts the claim shapes a real review produces, including a delta round', (
 
 it('requires the reviewer AGENTS.md names, version and reasoning included', () => {
   for (const claim of [
-    'Reviewed by Opus 4, high: R1 clean',
-    'Reviewed by Opus 5.5: R1 clean',
-    'Reviewed by a strong model, high: R1 clean',
-    'Reviewed by gpt-5, high: R1 clean'
+    // The reviewer this gate used before `REVIEWER` named another: a swap has to fail loudly.
+    'Reviewed by Opus 5.5, high: R1 clean',
+    // The right family without a dotted version.
+    `Reviewed by ${REVIEWER_NAME} 4, ${REVIEWER.thinking}: R1 clean`,
+    // The right reviewer at a level it did not run at.
+    reviewed('R1 clean', `${REVIEWER.name}, ${OTHER_LEVEL}`),
+    reviewed('R1 clean', `a strong model, ${REVIEWER.thinking}`),
+    reviewed('R1 clean', `gpt-5, ${REVIEWER.thinking}`)
   ]) {
     expect(reviewClaim(claim), claim).toMatchObject({ ok: false })
   }

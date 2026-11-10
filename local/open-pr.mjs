@@ -13,7 +13,7 @@
 // is resolved against the remote the PR targets — `upstream` for an upstream PR, `origin`
 // otherwise — because the two remotes track different branches with the same name.
 //
-// Why both PR gates are read here: AGENTS.md makes the PR's own verification and one Opus review
+// Why both PR gates are read here: AGENTS.md makes the PR's own verification and one gate-2 review
 // conditions of opening a PR, and a rule that nothing reads is advisory. This refuses a body with no
 // review claim, and a head with no cached unit-gate PASS *when the change is global enough that a
 // targeted run proves nothing* — the full suite itself moved to the release gate, so requiring it per
@@ -35,7 +35,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
-import { reviewClaim, waiverDisclosure } from './pr-body-claims.mjs'
+import { REVIEW_CLAIM_EXAMPLE, reviewClaim, waiverDisclosure } from './pr-body-claims.mjs'
 import { unitRuntimeInputs } from '../config/scripts/ci/unit-selection/ci-unit-runtime-inputs.mjs'
 import {
   GATE_INPUT_PATHS,
@@ -69,9 +69,6 @@ export const TARGETS = {
   fork: { repository: FORK, base: FORK_BASE, remote: 'origin' },
   upstream: { repository: UPSTREAM, base: UPSTREAM_BASE, remote: 'upstream' }
 }
-
-export const REVIEW_CLAIM_EXAMPLE =
-  'Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2'
 
 function run(command, args) {
   // Why the buffer: the default is 1 MiB, and `ls-tree` over this repository's 41k upstream files
@@ -151,7 +148,8 @@ with the reason. Gate 2 needs a
 line in the body shaped like:
   ${REVIEW_CLAIM_EXAMPLE}
 Where that line names a round, the round needs a closed verdict of its own — \`clean\`, or a count of
-blocking findings that were fixed — and the reviewer has to be the Opus reviewer AGENTS.md names.
+blocking findings that were fixed — and the reviewer has to be the one \`REVIEWER\` in
+\`pr-body-claims.mjs\` names, at the level that object names.
 `
 }
 

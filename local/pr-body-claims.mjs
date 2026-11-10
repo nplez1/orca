@@ -3,12 +3,40 @@
 // that file is at its line budget and this is the part a test can drive without a git repository.
 
 /**
- * Gate 2's reviewer, as AGENTS.md names it: an Opus model at high reasoning. Why the token check:
- * without it the gate accepts a review by anyone, which is not the claim the gate exists to verify.
- * Why a dotted version: `Opus 4` is not the reviewer AGENTS.md names, and the bare backend name
- * (`claude/opus`) is accepted because that is how the model is invoked.
+ * Gate 2's reviewer — the ONE place a reviewer swap happens. Everything that has to agree with it is
+ * derived from here: the claim regex below, `REVIEW_CLAIM_EXAMPLE`, the refusal message, and the tests
+ * that pin accepted shapes. Why a constant rather than a settings file: `open-pr.mjs` refuses a body on
+ * the regex built from it, so a value in a file nothing loads would be unenforced.
+ *
+ * Why the token check at all: without it the gate accepts a review by anyone, which is not the claim
+ * the gate exists to verify.
  */
-export const REVIEWER_CLAIM = /^(?:claude[-/]opus|opus\s+\d+\.\d+)\b[\s\S]*\bhigh\b/i
+export const REVIEWER = {
+  /** The `claude/*` Claude Code CLI backend; `alias` reaches the CLI as `--model <alias>`. */
+  provider: 'claude',
+  alias: 'fable',
+  /** How the reviewer reads in a PR body. The version is dotted: `Fable 4` is not this reviewer. */
+  name: 'Fable 5.2',
+  /** pi thinking level, which the CLI receives as `--effort`. The claim line has to name it. */
+  thinking: 'medium'
+}
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * The claim shape, built from `REVIEWER`: the backend spelling (`claude/fable`) or the body spelling
+ * with a dotted version (`Fable 5.2`), followed by the reasoning level it ran at. Both spellings are
+ * accepted because both are how the reviewer is invoked and how a body reports it.
+ */
+export const REVIEWER_CLAIM = new RegExp(
+  `^(?:${REVIEWER.provider}[-/]${escapeRegExp(REVIEWER.alias)}|` +
+    `${escapeRegExp(REVIEWER.name.split(/\s+/)[0])}\\s+\\d+\\.\\d+)\\b[\\s\\S]*\\b` +
+    `${escapeRegExp(REVIEWER.thinking)}\\b`,
+  'i'
+)
+
+/** The line a PR body is expected to carry, and the one `open-pr.mjs` prints when it refuses one. */
+export const REVIEW_CLAIM_EXAMPLE = `Reviewed by ${REVIEWER.name}, ${REVIEWER.thinking}: R1 (2 blocking fixed), delta clean on R2`
 
 /** Wording that names a finding without claiming it was closed. */
 export const OPEN_VERDICT_WORDS =
@@ -62,7 +90,7 @@ export function reviewClaim(body) {
     if (!REVIEWER_CLAIM.test(reviewer)) {
       return {
         ok: false,
-        reason: `the review line names "${reviewer}" as the reviewer, and AGENTS.md § PR gate 2 requires an Opus reviewer at high reasoning (\`Opus 5.5, high\` or \`claude/opus, high\`)`
+        reason: `the review line names "${reviewer}" as the reviewer, and AGENTS.md § PR gate 2 requires ${REVIEWER.name} at ${REVIEWER.thinking} reasoning (\`${REVIEWER.name}, ${REVIEWER.thinking}\` or \`${REVIEWER.provider}/${REVIEWER.alias}, ${REVIEWER.thinking}\`)`
       }
     }
     // Why the whole claim: "not yet fixed" does not contain "not fixed", and that one gap accepted

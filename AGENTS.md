@@ -103,10 +103,12 @@ and an upstream head carrying any `local(` commit — or any fork-owned path (`l
 `LOCAL-PATCHES.md`, `BRANCHES.md`, `UPSTREAM-SYNC-RUNBOOK.md`, `.husky/commit-msg`) — is refused
 outright.
 
-**Both PR gates are read by that script.** It refuses any PR whose body has no review claim line:
+**Both PR gates are read by that script.** It refuses any PR whose body has no review claim line. The
+reviewer and the reasoning level that line must name come from `REVIEWER` in
+`local/pr-body-claims.mjs`, which also exports the example:
 
 ```
-Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2
+Reviewed by Fable 5.2, medium: R1 (2 blocking fixed), delta clean on R2
 ```
 
 Gate 1 is **diff-scope dependent**, because the full unit suite moved off the PR boundary and onto the
