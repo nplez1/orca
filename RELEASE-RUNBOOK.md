@@ -15,7 +15,7 @@ has since landed.
   from this fork instead of being offered an official release.
 - `publisherName` dropped, so unsigned Windows installers update themselves.
 - `.github/workflows/fork-release.yml` registered and active.
-- Actions enabled on the fork; `nplez1/main` is the default branch, which is what makes a
+- Actions enabled on the fork; `main` is the default branch, which is what makes a
   `workflow_dispatch` workflow runnable at all. That is repository state, not tree state — a merge can
   flip it back, so re-check it after every merge (Step 0.5).
 - Pushing works over `ssh://git@ssh.github.com:443/...` (port 22 is blocked on this network).
@@ -30,7 +30,7 @@ This step is **complete** — the pipeline ran unsigned on 2026-09-16 and has pu
 from np.6 to np.11 since, so the only reason to repeat it is a change to `fork-release.yml` itself.
 
 ```bash
-gh workflow run fork-release.yml --repo nplez1/orca --ref nplez1/main
+gh workflow run fork-release.yml --repo nplez1/orca --ref main
 gh run watch --repo nplez1/orca
 ```
 
@@ -118,7 +118,7 @@ above — fix it, or classify it in `local/nightly-linux-known-red.json` with ev
 ## Step 2 — publish the first signed release
 
 ```bash
-gh workflow run fork-release.yml --repo nplez1/orca --ref nplez1/main
+gh workflow run fork-release.yml --repo nplez1/orca --ref main
 ```
 
 The version is stamped `<package.json version>-np.<run number>` by the workflow. That suffix matters
@@ -138,7 +138,7 @@ Two things about it are enforced by the `release-ref` job before any artifact is
   already published.
 
 A refusal names the newest tag; re-dispatch with `version_suffix` set above it
-(`gh workflow run fork-release.yml --ref nplez1/main -f version_suffix=np.42`).
+(`gh workflow run fork-release.yml --ref main -f version_suffix=np.42`).
 
 Once `MAC_CERTS` exists the workflow switches itself to the signed, hardened, notarized path. There
 is nothing else to change.
@@ -261,7 +261,7 @@ release tag, so the first release has no predecessor. Publish a second, trivial 
 each machine moves to it on its own.
 
 ```bash
-gh workflow run fork-release.yml --repo nplez1/orca --ref nplez1/main
+gh workflow run fork-release.yml --repo nplez1/orca --ref main
 gh release list --repo nplez1/orca --limit 5
 ```
 

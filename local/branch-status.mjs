@@ -20,13 +20,18 @@ import { pathToFileURL } from 'node:url'
 
 const FORK = 'nplez1/orca'
 const UPSTREAM = 'stablyai/orca'
-// Why not `origin/main`: origin's fetch refspec maps only `refs/heads/nplez1/*`, so no
-// `origin/main` ref exists locally and every own delta measured against it printed `0 file(s)`.
-export const FORK_BASE = 'nplez1/main'
+export const FORK_BASE = 'main'
 // Where a branch that is not part of this fork's line is measured from.
 export const UPSTREAM_BASE = 'upstream/main'
 const FORK_NAMESPACE = 'nplez1/'
-const REF_NAMESPACES = ['refs/heads/nplez1', 'refs/remotes/origin/nplez1']
+// Why the fork line's own refs are here: it is reported in its own inventory, and it is not in the
+// `nplez1/` namespace — the namespace covers the feature branches cut from it.
+const REF_NAMESPACES = [
+  'refs/heads/nplez1',
+  'refs/remotes/origin/nplez1',
+  'refs/heads/main',
+  'refs/remotes/origin/main'
+]
 
 // Why explicit parents: most fork branches are cut straight from FORK_BASE, but a few exist only
 // on top of another branch, and measuring those against the base would report the parent's files
@@ -38,7 +43,7 @@ export const PARENTS = {
 }
 
 // Why still a list: these are upstream-bound, so they are the one part of the inventory that
-// `refs/heads/nplez1` cannot describe. They are cut from `origin/main` and opened against
+// `refs/heads/nplez1` cannot describe. They are cut from `upstream/main` and opened against
 // `stablyai/orca` (see BRANCHES.md § Dependency graph); a name here that is in no ref is reported.
 export const UPSTREAM_BOUND = [
   'fix/cli-symlink-world-readable',
@@ -118,8 +123,14 @@ export function branchNames({ local, remote }, upstreamBound = UPSTREAM_BOUND, f
   for (const branch of upstreamBound) {
     names.add(branch)
   }
+  // Why the fork line is in its own inventory: it is the base every other row is measured from, and
+  // its own delta is the one number this report exists to give — how far `main` is ahead of upstream.
+  // It is not in the `nplez1/` namespace, so the prefix filter alone would have dropped it.
   return [...names]
-    .filter((name) => name.startsWith(FORK_NAMESPACE) || upstreamBound.includes(name))
+    .filter(
+      (name) =>
+        name === FORK_BASE || name.startsWith(FORK_NAMESPACE) || upstreamBound.includes(name)
+    )
     .sort((left, right) => {
       if (left === FORK_BASE) {
         return -1

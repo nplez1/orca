@@ -1,6 +1,6 @@
 # Upstream sync runbook
 
-How to bring `nplez1/main` up to upstream `main` and publish a release from it. The short
+How to bring `main` up to upstream `main` and publish a release from it. The short
 instruction is **"sync upstream"**; everything below is what that means.
 
 Companions: [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) for the patch series that must survive,
@@ -54,7 +54,7 @@ What a merge gives up, and what replaces it:
 
 Still true either way, so do not "fix" these:
 
-- `.husky/commit-msg` refuses `local(` commits on any branch that does not carry `nplez1/main` in its
+- `.husky/commit-msg` refuses `local(` commits on any branch that does not carry `main` in its
   history — i.e. anywhere upstream-bound. Do not bypass it.
 - `.github/workflows/fork-release.yml` stamps `<package.json version>-np.${GITHUB_RUN_NUMBER}` —
   history shape is irrelevant to versioning.
@@ -91,7 +91,7 @@ node local/sync/pre-sync.mjs --prepare
 `--prepare` is idempotent and refuses to clobber an existing backup. It checks the things that made
 the 2026-10-05 sync expensive to diagnose: a clean tree (nothing here is safe to sync dirty), no
 stray conflict markers, **the tip typechecks before you start**, the derived localization catalog
-regenerating to no diff, `local(` commits confined to `nplez1/main`, `rerere.enabled` +
+regenerating to no diff, `local(` commits confined to `main`, `rerere.enabled` +
 `merge.conflictStyle zdiff3`, and it records old base / old tip / new base plus the dry-run conflict
 set. Nothing on the remote changes until Step 4.
 
@@ -100,12 +100,12 @@ set. Nothing on the remote changes until Step 4.
 **Release line (default):**
 
 ```bash
-git checkout nplez1/main
+git checkout main
 git merge upstream/main          # one conflict set, resolved once per file
 ```
 
-**Feature branches (rebase):** a fork PR branch is cut from `nplez1/main`, which is
-the base `local/open-pr.mjs` requires; only an **upstream-bound** branch is cut from `origin/main`.
+**Feature branches (rebase):** a fork PR branch is cut from `main`, which is
+the base `local/open-pr.mjs` requires; only an **upstream-bound** branch is cut from `upstream/main`.
 Either way, rebase `--onto` the new base. Replay order is by commit date, so a commit that arrived
 through a merge can land after the commits that refined it. That is expected; see the traps in
 Step 2.
@@ -329,20 +329,18 @@ Then the gates that no script can judge:
 
 ## Step 4 — push
 
-The upstream mirror goes first, and its sweep is part of the same command: a workflow file new to that
-push arrives active, so the sweep has to follow immediately (see `local/sync/push-upstream-mirror.mjs`
-for why this is one step and not two). The release line's own push is the third place new workflow
-files can land — this repository's default branch is `nplez1/main`, so a `schedule` there fires without
-any push at all.
+The release line's push and its sweep are one command: a workflow file new to that push arrives
+active, and this repository's default branch is `main`, so a `schedule` there fires without any push
+at all. The enablement check cannot get ahead of a file GitHub has not seen yet, which is why the two
+halves are not two steps (see `local/sync/publish-sync.mjs`).
 
 ```bash
-node local/sync/push-upstream-mirror.mjs   # push origin upstream/main:main, then sweep the fleet
-git push origin nplez1/main                # the sync result; a merge line fast-forwards, no force needed
-node local/check-actions-enablement.mjs    # the release line can deliver new workflow files too
+node local/sync/publish-sync.mjs   # push origin main, then sweep the fleet
 ```
 
 A rebased patch series or feature branch still needs `--force-with-lease`. Keep
-`backup/nplez1-main-pre-sync` until a release has shipped from the new line.
+`backup/nplez1-main-pre-sync` (its name predates the 2026-11-09 rename) until a release has shipped
+from the new line.
 
 ## Step 5 — record it
 
@@ -356,6 +354,6 @@ A rebased patch series or feature branch still needs `--force-with-lease`. Keep
 
 ## Step 6 — release
 
-`gh workflow run fork-release.yml --repo nplez1/orca --ref nplez1/main`, then follow
+`gh workflow run fork-release.yml --repo nplez1/orca --ref main`, then follow
 [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md). The version stamps itself as
 `<package.json version>-np.<run number>`, so no number is chosen by hand.

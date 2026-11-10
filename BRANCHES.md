@@ -1,6 +1,10 @@
 # Branch tracker
 
-Last updated **2026-11-08** — `nplez1/main` merged upstream main @ `51c77320bc` (1537 commits) from
+**Naming, 2026-11-09:** the fork's release line was renamed `nplez1/main` → `main`, and the old `main`
+— an unmaintained mirror of upstream — was retired. Entries dated before that say `nplez1/main` or
+`origin/main` for what is today `main` / `origin/main`; `upstream/main` has always meant upstream's.
+
+Last updated **2026-11-08** — `main` merged upstream main @ `51c77320bc` (1537 commits) from
 `3f8bbfb269` (merge `5a02a4c8406`, merge base `0fa5dae2f9`, rollback tag
 `archive/pre-sync-3f8bbfb269`). **1110 conflicted paths, 1239 hunks** —
 `modify/delete 645, both-rewrote 263, union 154, rename-replay 27, duplicate-tail 17,
@@ -12,7 +16,7 @@ dominated the cost. Decisions are in [local/sync/convergence-ledger.md](./local/
 § "Upstream owner-scoped reorganisation", and the narrative in
 [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log.
 
-Previous — **2026-11-01** — `nplez1/main` merged upstream main @ `0fa5dae2f9` (459 commits) from
+Previous — **2026-11-01** — `main` merged upstream main @ `0fa5dae2f9` (459 commits) from
 `01eac17153` (merge `7fea08330aa`, merge base `a903985082`, rollback tag
 `archive/pre-sync-01eac17153`), plus follow-ups `62107128f7a` and `87421079c3b`. **202 conflicted
 paths** — `both-rewrote 101, modify/delete 56, union 37, duplicate-tail 6, duplicate-members 2`.
@@ -21,7 +25,7 @@ files the fork accepts as deletions), and the remaining 130 resolved in eight ar
 are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-11-01 sync", and
 the narrative in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log.
 
-Before that, on **2026-10-30** — `nplez1/main` merged upstream main @ `a903985082` (906 commits) from
+Before that, on **2026-10-30** — `main` merged upstream main @ `a903985082` (906 commits) from
 `16f49e00cf` (merge `985687d2004`, merge base `f173998203`, rollback tag
 `archive/pre-sync-16f49e00cf`). **184 conflicted paths / 340 hunks** — `both-rewrote 98, union 57,
 rename-replay 10, duplicate-tail 8, modify/delete 8, duplicate-members 2, add/add 1`. 38 paths were
@@ -30,7 +34,7 @@ sidebar goldens were regenerated rather than merged. Decisions are in
 [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-30 sync", and the
 narrative in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log.
 
-Before that, on **2026-10-25** — `nplez1/main` merged upstream main @ `0571e45107` (556 commits) from
+Before that, on **2026-10-25** — `main` merged upstream main @ `0571e45107` (556 commits) from
 `095cf32705` (merge `281cccf5a4`, merge base `57b5082404`, rollback tag
 `archive/pre-sync-095cf32705`). 249 conflicted paths / 367 hunks, four to five times the previous
 two syncs: `both-rewrote 167, union 47, modify/delete 23, duplicate-tail 8, rename-replay 2,
@@ -40,7 +44,7 @@ hunk read as both-rewrote. **Every local branch now sits on a pre-sync base** �
 Decisions are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) §
 "2026-10-25 sync", and the sync log in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) names each resolution.
 
-Before that, on **2026-10-22** — `nplez1/main` merged upstream main @ `57b5082404` (268 commits) from
+Before that, on **2026-10-22** — `main` merged upstream main @ `57b5082404` (268 commits) from
 `c67d40f97b` (merge `05b4768249`, merge base `bbc8303b47`, rollback tag
 `archive/pre-sync-c67d40f97b`). 52 conflicted paths, and no add/add this time: `union 22,
 both-rewrote 20, modify/delete 5, duplicate-members 2, rename-replay 2, duplicate-tail 1`. Upstream's
@@ -53,7 +57,7 @@ marker pointing at them. Decisions are in
 [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-22 sync", and the
 sync log in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) names each resolution.
 
-Before that, on **2026-10-21** — `nplez1/main` merged upstream main @ `bbc8303b47` (418 commits) from
+Before that, on **2026-10-21** — `main` merged upstream main @ `bbc8303b47` (418 commits) from
 `43fa95b4cf` (merge `276fe47cee`, merge base `83c768d1b4`, rollback tag
 `archive/pre-sync-43fa95b4cf`). 63 conflicted paths, mostly upstream product work rather than a
 reorganisation: the SSH settings screen became a grouped/windowed multi-select list, the MiniMax and
@@ -64,7 +68,7 @@ Dashboard became a first-class view, and four lint ratchets were added. Two file
 before touching either. See [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) §
 "2026-10-21 sync" for the decisions.
 
-Before that, on **2026-10-19** — `nplez1/main` merged upstream main @ `83c768d1b4` (170 commits) from
+Before that, on **2026-10-19** — `main` merged upstream main @ `83c768d1b4` (170 commits) from
 `cc42fb3b93` (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). 52 conflicted
 paths, mostly upstream's own module reorganisation: the SSH tree split into
 `ssh/connection/`, `ssh/targets/` and `ssh/config/`, the filesystem-watcher and runtime-environment
@@ -72,7 +76,7 @@ modules split, and the locale/markdown helpers moved to `shared/`. Fork-owned fi
 conflicted on had to follow those renames — see [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for
 the full list of what the merge broke without a conflict marker.
 
-Before that, on **2026-10-18** — `nplez1/main` merged upstream main @ `fc24ac3715` (628 commits) into
+Before that, on **2026-10-18** — `main` merged upstream main @ `fc24ac3715` (628 commits) into
 the release line from `12545ad17e` (merge `db746c211b`, rollback tag
 `archive/pre-sync-12545ad17e`). 89 conflicted paths, and the convergence was three seams rather than
 one product line: the **AI Vault parse cache moved onto upstream's SQLite database** (the fork's
@@ -115,22 +119,22 @@ depends on, and what is blocking it.** If the two disagree, the script is right.
 ## Rules that keep this from rotting
 
 - **Where a PR goes is a decision, not a default.** Unless upstream is asked for in so many words,
-  a PR opens against this fork (`nplez1/orca`) with base `nplez1/main` — the fork's default branch.
+  a PR opens against this fork (`nplez1/orca`) with base `main` — the fork's default branch.
   `stablyai/orca` is the target only for the upstream-bound branches listed below, and only when
   that is what was asked for. `node local/open-pr.mjs` applies the default and requires an explicit
   `--upstream` to leave the fork.
-- **A PR's head must descend from its base.** The two branches called `main` here are different
-  lines: `nplez1/main` is this fork's own line, `main` mirrors upstream. A head cut from `main`
-  and opened against `nplez1/main` reads as a small diff locally, but the PR then carries every
-  fork-only patch as a reversion. Fork PRs are cut from `nplez1/main`; the upstream-bound branches
-  below are cut from `origin/main`, which is the base they are opened against. `open-pr.mjs`
+- **A PR's head must descend from its base.** `main` names a different line on each remote: the
+  fork's own line is `origin/main`, upstream's is `upstream/main`. A head cut from `upstream/main`
+  and opened against `origin/main` reads as a small diff locally, but the PR then carries every
+  fork-only patch as a reversion. Fork PRs are cut from `main`; the upstream-bound branches
+  below are cut from `upstream/main`, which is the base they are opened against. `open-pr.mjs`
   refuses the mismatch instead of letting review find it.
-- Upstream-bound PR branches are cut from `origin/main`, **never** from `nplez1/main`. That is
+- Upstream-bound PR branches are cut from `upstream/main`, **never** from `main`. That is
   what makes it impossible for a fork-only patch to leak into an upstream-bound PR.
-- A `local(...)` commit is refused on any branch that is **not on `nplez1/main`'s own line**
+- A `local(...)` commit is refused on any branch that is **not on `main`'s own line**
   (`.husky/commit-msg`). The test is lineage, not the branch name and not the fork's current tip:
   a fork PR branch descends from a commit on that line and is allowed however far behind it is, and
-  `nplez1/main` itself is allowed. On an upstream-bound branch the same hook refuses a `local(`
+  `main` itself is allowed. On an upstream-bound branch the same hook refuses a `local(`
   subject, and also refuses a commit staging a fork-owned path (`local/**`, `.agents/skills/**`,
   `LOCAL-PATCHES.md`, …) under any subject, because the subject prefix is a convention a squash does
   not carry. The hook only runs on a tree that carries it: a clean upstream checkout has no
@@ -159,7 +163,7 @@ origin/main
     └── fix/terminal-session-reconnect
         └── feat/startup-worktree-hydration
 
-nplez1/main  ── this fork's own line: everything above, plus fork-only patches
+main  ── this fork's own line: everything above, plus fork-only patches
                 └── nplez1/Hide-hosts
                 └── nplez1/Bundled-Skills-Target
                 └── nplez1/issue-151
@@ -170,7 +174,7 @@ skill stubs resolve `orca-np`/`orca-np-dev` instead of a bare `orca`, managed PT
 `ORCA_CLI_COMMAND`, and the install/update rail plus the freshness lock source name `nplez1/orca`
 while still recognizing `stablyai/orca`. It is fork-only by design — upstream publishes the
 upstream names — so it lives in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § `local(skills)` and must land
-on `nplez1/main` before its content reaches any build, because the pin is the build's own commit.
+on `main` before its content reaches any build, because the pin is the build's own commit.
 
 The three-deep chain is real, not cosmetic: `startup-worktree-hydration` needs the
 `WorktreeApi.listCached` method that `worktree-scan-cache-persistence` adds **and** a store action
@@ -183,7 +187,7 @@ dependency, so the three want to land in that order.
 could be offered to `stablyai/orca` on demand. That cost every sync: a branch 2,800 commits behind is
 not "ready", it is a snapshot, and the ready state decays faster than anyone maintains it. The fork's
 rule is now the opposite — **no branch is kept upstream-ready.** If upstream work is wanted, it is cut
-**fresh from `nplez1/main`**, because the code that lands there is the only version worth offering; an
+**fresh from `main`**, because the code that lands there is the only version worth offering; an
 old branch is a source of ideas, never a base.
 
 So a branch with a merged PR is deleted once the PR merges, and a branch with no open PR and no plan to
@@ -200,7 +204,7 @@ Where the tag sits: the branch tip, except `nplez1/AI-Prompts`, where the local 
 PR never got (`5cd608f2f0`), so the tag points at that superset.
 
 **Zero-loss deletions** — the PR merged and the branch tip equals the PR head (`headRefOid`), so the
-content is in `nplez1/main`:
+content is in `main`:
 
 | Branch                                                    | Why it was safe                                             |
 | --------------------------------------------------------- | ----------------------------------------------------------- |
@@ -214,7 +218,7 @@ content is in `nplez1/main`:
 | `docs/actions-enablement-check`                           | PR #174 merged 2026-10-24                                   |
 
 **Archived with unlanded content** — recoverable, and the tag is the record. None of these is a base for
-anything; re-cut from `nplez1/main` if the idea is wanted again.
+anything; re-cut from `main` if the idea is wanted again.
 
 | Branch                              | Own work                                   | Note                                                                                                                                                                                   |
 | ----------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -240,7 +244,7 @@ none was ever opened. Two things to know if one is ever resurrected: the three `
 residual files, +1,220/−5,833) predates § 6.4's adoption of upstream's Claude spend cap, so it is a
 history of the code that item deletes, not a source for it.
 
-**Deliberately kept:** `nplez1/main`, `nplez1/Fork-Opt` (PR #187), and the three `backup/*` refs
+**Deliberately kept:** `main`, `nplez1/Fork-Opt` (PR #187), and the three `backup/*` refs
 (`backup/nplez1-main-pre-sync`, `backup/BUG-Remote-Host-History-r19`,
 `backup/jira-sprint-assignment-pre-rebase`). The backups are pre-sync and pre-rebase snapshots — deleting
 a safety ref to tidy a branch list is the worst trade available, so they stay.
@@ -250,13 +254,13 @@ Every `### <branch>` section below is now historical unless the table above says
 ## Base drift — recorded, not fixed
 
 **2026-10-25:** after the `0571e45107` merge, **no local branch contains it** — every one needs a
-catch-up merge of `nplez1/main` before `local/open-pr.mjs` will accept it. Measured with
-`node local/branch-status.mjs --local-only` plus `git merge-base <branch> nplez1/main` (PR state was
+catch-up merge of `main` before `local/open-pr.mjs` will accept it. Measured with
+`node local/branch-status.mjs --local-only` plus `git merge-base <branch> main` (PR state was
 not read; run without `--local-only` for it):
 
 - `nplez1/AI-Prompts` on `ad57148cf6`, `nplez1/Session-Summary` on `204984546d` — one and six
   commits behind the pre-sync tip, so this sync is essentially the whole catch-up (563 and 568
-  behind `nplez1/main`);
+  behind `main`);
 - `nplez1/docs/fork-differences` on `3dbea1c247` (2026-10-19, 1466 behind);
 - `nplez1/pi-osc52-clipboard-over-paired-client` on `f9363b970c` (2026-10-17, 2116 behind);
 - `nplez1/fix-tag-mirror-token` and `nplez1/hunt-vitest-nonexit` on `bb043b9724` (2026-10-15, 2523
@@ -268,13 +272,13 @@ not read; run without `--local-only` for it):
 Every other tracked branch is `not local` in this clone, so its base was not measured.
 
 **2026-10-16:** the same two fork PRs (`#109`, `#110`) are still open and now sit two syncs behind:
-they were cut before the 2026-10-15 sync, and `nplez1/main` has since moved to `ae9db02137` plus
+they were cut before the 2026-10-15 sync, and `main` has since moved to `ae9db02137` plus
 this sync's repairs. Neither was rebased. `#20813` and every unopened branch below are where the
 2026-10-13 measurements left them — re-measure rather than trusting a figure in this file.
 
-**2026-10-15:** two fork PRs are open against `nplez1/main` and were cut before this sync, so they now
+**2026-10-15:** two fork PRs are open against `main` and were cut before this sync, so they now
 sit on `bb043b9724` and need a catch-up merge before they can be updated — `#109`
-(`nplez1/automations-project-scope`) and `#110` (`nplez1/automations-create-by-desc`). `nplez1/main`
+(`nplez1/automations-project-scope`) and `#110` (`nplez1/automations-create-by-desc`). `main`
 itself moved to `79d7351d64`; a PR head that does not descend from it is refused by
 `local/open-pr.mjs` rather than reviewed.
 
@@ -353,7 +357,7 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Not done, deliberately:** the “queued row says waiting for another delete” state and a UI cancel
   button from fix direction 3. Both are new IPC/renderer surface; the queue is bounded by a timeout
   that reports a retryable error instead, which is what removes the unbounded wait.
-- **Verified:** `pnpm tc:node` / `tc:web` / `tc:cli`, `check:code-quality:changed nplez1/main`
+- **Verified:** `pnpm tc:node` / `tc:web` / `tc:cli`, `check:code-quality:changed main`
   (0 findings), `oxlint` on every changed file, and 171 tests across the 14 removal-path files
   (`host-checkout-removal`, `worktree-delete-limit`, `runtime-file-watcher-removal`,
   `windows-worktree-removal-leftover`, `worktrees-background-removal`, `worktrees-removal-recovery`,
@@ -377,7 +381,7 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   wait is not), mobile's delete reply ignores `warning`, and nothing here was reproduced on Windows.
 - **Not verified on Windows:** no Windows host was available, so the platform-specific claims are
   read from the code and covered by mocked-fs tests, not reproduced. See the issue's § Verification.
-- **Base:** merged `nplez1/main` @ `0f81cd7f350` (PR #276, project-folder relocation) after the PR
+- **Base:** merged `main` @ `0f81cd7f350` (PR #276, project-folder relocation) after the PR
   opened. Auto-merge, no conflict and no resolution hunk (`--remerge-diff` empty), and no file
   overlap with this branch's changes.
 
@@ -471,7 +475,7 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   `isHostCatalogFenceCurrent` removed both the fork's per-host generation map and its connection
   fence, and upstream's `failed` flag keeps repo-scoped UI from being validated for a host that
   never answered. The 2026-10-11 sync took upstream's side in full, so the branch has nothing left
-  to contribute upstream. Its fix is already on `nplez1/main` either way.
+  to contribute upstream. Its fix is already on `main` either way.
 - **Why:** an all-hosts repo catalog fetch could outlive the connection it started on, letting a
   catalog fetched over the old connection overwrite the new one's. Also fixes repo-scoped UI being
   validated for a host that never answered.
@@ -554,12 +558,12 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Verified:** `pnpm tc` clean; `check:code-quality:changed` clean; the focused suites for every file
   it touches; the full gate PASS with no stale or unseen entry. Reviewed by Opus 5.5, high, over three
   rounds (R1: 4 SHOULD-FIX; delta R2: 1 SHOULD-FIX; narrow R3: 2 MINOR) plus a resolution round on the
-  `nplez1/main` merge — clean of BLOCKER/SHOULD-FIX. The verdict line for the shipped revision is in
+  `main` merge — clean of BLOCKER/SHOULD-FIX. The verdict line for the shipped revision is in
   the PR body, since `local/open-pr.mjs` requires a cached PASS for the exact head.
 
 ### nplez1/Hide-hosts — PR #9, **merged** (2026-09-19)
 
-- **Landed as** `cad3e4df59` on `nplez1/main` (`72034293d5`, the tip this sync was rebased from).
+- **Landed as** `cad3e4df59` on `main` (`72034293d5`, the tip this sync was rebased from).
   The branch itself is gone from both the fork and this checkout, so `node local/branch-status.mjs`
   reports it MISSING — that is expected, not drift.
 - **Why:** a host Orca imports from `~/.ssh/config` could only be removed, and the next sync brought
@@ -595,7 +599,7 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   `src/shared/jira` (585 tests) plus the renderer Jira suites (553), and the Jira IPC/RPC/CLI suites
   (129). `pnpm lint` stops at four repo-wide ratchets (`id-only-store-write`, `repo-host-read`,
   `workspace-record-read`, `host-list-render`) whose flagged files are all untouched by this branch and
-  whose offending lines exist at the base commit: red on `nplez1/main` already, not caused here.
+  whose offending lines exist at the base commit: red on `main` already, not caused here.
   `JiraIssueWorkspace.transition-source.test.tsx` used to pin the bare-string payload and now pins the
   name reference. Two Opus review rounds (high): round 1 found one BLOCKER (the control gate keyed off
   `items: string`, which some sites do not report) and one SHOULD-FIX (project guessed from the issue
@@ -664,7 +668,7 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   also have appeared for users who never connected Jira; three children in the `justify-between` row
   moved the Linear selector into the middle), both fixed in R2, delta clean.
 
-### nplez1/main
+### main
 
 This fork's own line: upstream `main` plus all of the above plus fork-only patches, and the only
 branch that carries the release tooling. See [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) for the patch

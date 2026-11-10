@@ -17,8 +17,8 @@ if [ -z "$ref" ] || [ -z "$tag" ] || [ -z "$sha" ] || [ -z "$repo" ]; then
   exit 2
 fi
 
-if [ "$ref" != "refs/heads/nplez1/main" ]; then
-  echo "::error::a release must be dispatched from refs/heads/nplez1/main, not $ref — this tag is the update feed every installed build reads." >&2
+if [ "$ref" != "refs/heads/main" ]; then
+  echo "::error::a release must be dispatched from refs/heads/main, not $ref — this tag is the update feed every installed build reads." >&2
   exit 1
 fi
 

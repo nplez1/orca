@@ -25,7 +25,7 @@ dropped item.
 | `max-lines` (§ 5.2) — **reversed 10-27**  | rule restored; 8 upstream files exempt with a directive + baseline row; `conflicts.mjs` split                                                                           | Turning the rule off cost 4 changed lines in upstream's config, **two of upstream's own tests red**, and an inert ratchet. Only 9 files were over: 1, 3, 3, 9, 20, 23, 31, 34 lines and our own 682-line CLI. Upstream's baseline exists for exactly this                      |
 | Nightly backstop (§ 4.1)                  | `run_relay_integration: false` in `fork-main-tests.yml`                                                                                                                 | It was **wedged**, not disabled: a job on `blacksmith-4vcpu-ubuntu-2404` queued 17 h and `cancel-in-progress: false` blocked every later night                                                                                                                                 |
 | Nightly liveness (§ 4.1)                  | `local/check-nightly-liveness.mjs`                                                                                                                                      | Exit 1 on stale **or** wedged; exit 2 (cannot tell) is deliberately not a pass. A **cancelled run is not a verdict** — the first version read the author's own cancel as a red night _and_ hid the last green, so it now keeps a schedule clock and a verdict clock separately |
-| Flake waiver (§ 4.2)                      | empty branch diff falls back to `HEAD^1..HEAD`, else `unknown`, and `unknown` never waives                                                                              | A sync merges _onto_ `nplez1/main`, so the old rule waived every flake across a 556-commit merge                                                                                                                                                                               |
+| Flake waiver (§ 4.2)                      | empty branch diff falls back to `HEAD^1..HEAD`, else `unknown`, and `unknown` never waives                                                                              | A sync merges _onto_ `main`, so the old rule waived every flake across a 556-commit merge                                                                                                                                                                                      |
 | Known-red detail (§ 4.5)                  | per-entry `match` regex; 9 of 17 pinned (the count moves as entries are pruned)                                                                                         | An entry matched on file and title alone, so a test failing for a new reason stayed "known"                                                                                                                                                                                    |
 | `check:changed` base (§ 4.4)              | `origin/HEAD` first                                                                                                                                                     | `origin/main` on this fork is **upstream's mirror**, so the gate diffed 2,846 files                                                                                                                                                                                            |
 | Comment policy (§ 4.6)                    | policy in `LOCAL-PATCHES.md` + 6 pure annotations removed                                                                                                               | Of 18 files whose whole diff was comments, 12 were the fork **rewording upstream's** comments to match fork reality. Reverting them makes the comments false                                                                                                                   |
@@ -46,7 +46,7 @@ dropped item.
 | Usage providers as data (§ 5.3, renderer) | one mapping file answers five upstream `if`-arms; `icons.tsx` byte-identical to the merge base; duplicate `hasUsageData` gone                                           | Hunk **counts** barely moved (10→10, 6→7, 7→7, 5→6, 2→2). What shrank is hunk **size**, 3–9 lines → 1–2: a guard at a call site still diffs at that call site. Cheaper conflicts, not fewer                                                                                    |
 | Smoke selector (§ 6.1)                    | `local/sync/smoke-selector.mjs` + 10 fixture tests; `--touched-only` is the cheap mode                                                                                  | The plan's "526 files / 8.8 test-minutes" is not reconstructable: touched-only is 886 files / 14.8 min, and the one-import-level walk 4,459 / 74.6 min — within 15% of the 43-minute full gate it was meant to replace                                                         |
 | Nightly red set measured (§ 6.2)          | dispatch `40460070298`: 3 of 5 shards green, 3 red files, 1 unhandled error                                                                                             | All three were the **branch gap**, not Linux environment classes: each maps to a commit that exists here and not on `main`. The third was a test attaching `.rejects` after awaiting a different promise                                                                       |
-| PR #186 merged                            | squash `7c53c12a17` — merge commits are disabled on this repo                                                                                                           | Every PR into `nplez1/main` squashes, so the PR body has to carry the story: main's history will not                                                                                                                                                                           |
+| PR #186 merged                            | squash `7c53c12a17` — merge commits are disabled on this repo                                                                                                           | Every PR into `main` squashes, so the PR body has to carry the story: main's history will not                                                                                                                                                                                  |
 | pi fence + roster (§ 5.7)                 | fork's 204-line #68 module deleted, upstream's 54-line rule live at `f37c1f6b95`'s bytes; `codex-subagent-roster.ts` back at its own path, 5 more files at 0 fork hunks | The gate is what made it a decision: the fork's #68 suite ran **unmodified** and 22/22 passed, so the 150 extra lines bought nothing. Two ledger entries needed dated addenda because they had declared the rename correct                                                     |
 | Linux parity checker (§ 6.2)              | `local/check-nightly-linux-parity.mjs`; `absent` is never a pass, no reports exits 2                                                                                    | First real run: **all 17 Mac-allowlisted entries pass on Linux**. The allowlist was assumed environment-bound and is now validated, which is what makes the nightly readable as a verdict                                                                                      |
 | Gate worker cap (§ 6.8)                   | isolation re-runs batched into one cold start; the gate prints `VITEST_MAX_WORKERS`; shell + shim now 4                                                                 | The 2,575 s vs 1,400 s doubling was **the cap, not more work**: 9 concurrent files became 2 while module count _fell_ 44k→32k. The machine `AGENTS.md` had claimed the gate was uncapped                                                                                       |
@@ -189,7 +189,7 @@ divergence that could be zero.
 
 **R8 — Test and tooling debt hides the cost.** 40 allowlisted failures of which ~33 look provable by
 environment (`bash` 3.2 vs 5, `/private/var` vs `/var`, bun 1.4.4 + Apple SQLite); the flake waiver
-diffs against `merge-base(nplez1/main, HEAD)` which is **empty on the release line**, so every
+diffs against `merge-base(main, HEAD)` which is **empty on the release line**, so every
 isolated re-run pass is waived after a merge; the nightly that replaced the per-PR suite has not
 run; `check:changed` still defaults its base to `origin/main`, i.e. upstream, so the pre-handoff
 gate diffs the fork's entire 2,846-file delta.
@@ -206,7 +206,7 @@ _syncs-affected × work-removed_, using the baseline above.
 | #    | Item                                                                     | Why                                                                     | Effort | Impact                                                                 |
 | ---- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------- |
 | P0.1 | Prove the nightly backstop runs (§4.1)                                   | The PR gate traded the full suite away for it; it has one run ever      | S      | restores the safety net the whole verification tier assumes            |
-| P0.2 | Empty branch diff is `unknown`, never waived (§4.2)                      | Waives _every_ flake after every merge                                  | S      | stops hidden merge flakes reaching `nplez1/main`                       |
+| P0.2 | Empty branch diff is `unknown`, never waived (§4.2)                      | Waives _every_ flake after every merge                                  | S      | stops hidden merge flakes reaching `main`                              |
 | P0.3 | Gate preflight: daily liveness only (§4.3)                               | Two of the three proposed checks turned out to be false                 | S      | see § 4.3 — dropped on evidence; the liveness check shipped separately |
 | P0.4 | `check:changed` base `origin/main` → `origin/HEAD` (§4.4)                | Diffs 2,846 files on every handoff, unqueued                            | S      | minutes per handoff; less memory pressure                              |
 | P0.5 | Per-entry `match` on known-red failure detail (§4.5)                     | An allowlisted test can start failing for a new reason and stay "known" | S      | stops 40 tests masking regressions                                     |
@@ -274,8 +274,8 @@ leaving it to be noticed.
 
 ### 4.2 The flake waiver is blanket on the release line — **done 2026-10-27**
 
-`gate-unit.mjs:169-178` diffs `merge-base(nplez1/main, HEAD) .. HEAD`. A sync is merged **onto**
-`nplez1/main`, so on the release line the merge-base _is_ HEAD, the diff is empty, and
+`gate-unit.mjs:169-178` diffs `merge-base(main, HEAD) .. HEAD`. A sync is merged **onto**
+`main`, so on the release line the merge-base _is_ HEAD, the diff is empty, and
 `flakeWaiver` (`gate-flake-coupling.mjs:162-171`) then finds no coupled path for any test, so every
 failure that passes in isolation is waived. The `7811f60dd6` PASS — "1 flaky re-run passed" — was
 judged against an empty diff immediately after a 556-commit merge.
@@ -842,13 +842,13 @@ The measurement stands — after 10-25 no branch contained the release tip, the 
 behind — but the policy question underneath it is answered by the product owner: **branches are no
 longer kept upstream-ready.** That idea cost every sync (a branch 2,800 commits behind is a snapshot,
 not a ready state) and its premise is gone. If upstream work is wanted, it is cut **fresh from
-`nplez1/main`**; the code that lands there is the only version worth offering.
+`main`**; the code that lands there is the only version worth offering.
 
 Executed: **28 branches retired**, each with a pushed `archive/2026-10-27/<branch>` tag first, so nothing
 is unrecoverable — 8 zero-loss (merged PR whose tip equals the PR head, or a patch already in `main`),
 and 20 archived-with-unlanded-content (the old `nplez1/*` ideas and all twelve upstream-bound
 `fix/*`/`feat/*` branches). The one with real unlanded code is `nplez1/AI-Prompts` (PR #184 closed
-unmerged; it creates `src/shared/ai-prompts/**`, absent from `main`). `nplez1/main`, `nplez1/Fork-Opt`
+unmerged; it creates `src/shared/ai-prompts/**`, absent from `main`). `main`, `nplez1/Fork-Opt`
 and the three `backup/*` snapshots are kept deliberately. The table, the restore commands and the
 per-branch reasoning live in `BRANCHES.md` § "Retired".
 
@@ -936,11 +936,11 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
   the identity modules (~50 commits), and 35 files are shared, so a separable series cannot be cut.
   The runbook, `LOCAL-PATCHES.md` and `local/sync/README.md` now say the release line merges, feature
   branches rebase, and there is no patch series.
-- **`.husky/commit-msg` — scoped to lineage.** It refused `local(` everywhere but `nplez1/main`,
+- **`.husky/commit-msg` — scoped to lineage.** It refused `local(` everywhere but `main`,
   including fork PR branches, and the observed result was policy work committed there _without_ the
   label at least five times (#146, #130, #142, #177, #52) — an unlabelled fork-only change riding a
   fork PR is worse than the mistake the hook guarded. It now allows `local(` on any branch carrying
-  `nplez1/main` in its history and still refuses anything cut from `origin/main`.
+  `main` in its history and still refuses anything cut from `origin/main`.
 
 ---
 

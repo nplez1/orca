@@ -18,7 +18,7 @@ name: Fork release
 # there is no flag: fix the red, or classify it in `local/nightly-linux-known-red.json` with evidence.
 #
 # What is also gated is the dispatch itself: the `release-ref` job refuses any ref but
-# `refs/heads/nplez1/main`, and any tag that already points at another commit.
+# `refs/heads/main`, and any tag that already points at another commit.
 #
 # Why every `uses:` is pinned to a commit SHA with its tag in a trailing comment: these jobs hold
 # `contents: write` and, on macOS, the Apple certificate and notarisation secrets. The repository

@@ -3,6 +3,8 @@
 Entries moved verbatim out of [LOCAL-PATCHES.md](../../LOCAL-PATCHES.md) § Sync log, which keeps the
 three most recent inline so that section stays readable. Same text and same order; newest first.
 
+Entries dated before the 2026-11-09 rename say `nplez1/main` for what is today `main`.
+
 - **2026-10-28 — merge of upstream `f173998203` (838 commits) into the release line, from
   `7b86cb0846`** (merge base `0571e45107`, rollback tag `archive/pre-sync-7b86cb0846`, merge commit
   `2fadfe371b`, then `6491bd5e25`, `029137ad95`). **431 conflicted paths, 621 hunks** —
@@ -1884,7 +1886,7 @@ Entries from 2026-10-19 back to 2026-09-16 — 24 of them — are in
 
 - **2026-09-25 — released as `v1.4.197-np.12`** from `c80bbf6aba` (workflow run 36121027339,
   signed and notarized), then **`v1.4.197-np.13`** from `227953323b` (run 36173876959) carrying the
-  two `local(agents)` follow-ups below. One commit landed on the remote's `nplez1/main` while the sync
+  two `local(agents)` follow-ups below. One commit landed on the remote's `main` while the sync
   was running —
   `dd06e8a8f4` (#32, hide disabled agents from the session-history filter). It was cherry-picked onto
   the rebased line as `c80bbf6aba`, applied with no conflict and the same 130/57 delta; `pnpm tc`
@@ -2035,7 +2037,7 @@ Entries from 2026-10-19 back to 2026-09-16 — 24 of them — are in
     `upstream/main`, and now, and which carries no `SAFETY:` comment in any of the three. So this sync
     introduced none of the 36, and the harness finding is attributable only because the fork's own
     commit adds lines in that file and the gate's added-line window covers the assertion.
-    As before, the gate's own base resolves to the _pre-sync_ tip (`origin/HEAD` names `nplez1/main`,
+    As before, the gate's own base resolves to the _pre-sync_ tip (`origin/HEAD` names `main`,
     which the rebase has not been pushed to yet), so its merge-base falls back and the whole
     fork+upstream delta reads as added lines — the run is only meaningful once `origin/main` is
     fast-forwarded, or with the explicit base above.
@@ -2053,7 +2055,7 @@ Entries from 2026-10-19 back to 2026-09-16 — 24 of them — are in
     roster holds a waiting child. See the `local(agents)` section below for the anchors.
 
 - **2026-09-22** — onto upstream `6ae5ef2d00` (67 commits), from the released tip `08b1285fda`
-  (np.10 released) plus the commit that landed on `nplez1/main` while the sync was running
+  (np.10 released) plus the commit that landed on `main` while the sync was running
   (`3a346cc657`, #25 — cherry-picked onto the rebased line, where it replays byte-identical). 95
   commits replayed: **87 byte-identical by `range-diff`, 8 adapted, none dropped.** Four of the 95
   conflicted, across eight files:

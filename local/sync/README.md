@@ -38,19 +38,20 @@ node local/sync/conflicts.mjs            # per file: stages, balance, class, led
 node local/sync/post-sync.mjs
 
 # 4. publish
-git push origin upstream/main:main && git push origin nplez1/main
+node local/sync/publish-sync.mjs         # push origin main, then sweep the Actions fleet
 ```
 
 ## What each one is for
 
 **`pre-sync.mjs`** — the gate whose absence made the 2026-10-05 sync expensive. It refuses to start
 on a dirty tree or a tip that does not typecheck, regenerates the derived localization catalog, checks
-that `local(` commits are only on `nplez1/main`, verifies the local branch's relationship to
-`origin/nplez1/main` (equal / ahead / behind / diverged, failing on behind or diverged), sets
+that `local(` commits are only on `main`, verifies the local branch's relationship to
+`origin/main` (equal / ahead / behind / diverged, failing on behind or diverged), sets
 `rerere` and `zdiff3`, records the old base / local tip / new base, and prints the conflict set a merge
 would present plus the next step (merge by default, rebase with `--rebase`). `--prepare` is
 idempotent: a rerun never overwrites `backup/nplez1-main-pre-sync`, and a backup that has drifted off
-the pre-sync tip is reported as a failure rather than passing silently.
+the pre-sync tip is reported as a failure rather than passing silently. The backup ref keeps its
+pre-rename name because existing refs are named that.
 
 **`conflicts.mjs`** — the tool that replaced a throwaway script run ~20 times by hand. For every
 conflicted path it prints the three merge stages, each side's delimiter balance, the added/removed

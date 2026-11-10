@@ -81,7 +81,7 @@ function passingVerdict(overrides = {}) {
 it('targets the fork by default and upstream only on request', () => {
   expect(TARGETS.fork).toMatchObject({
     repository: 'nplez1/orca',
-    base: 'nplez1/main',
+    base: 'main',
     remote: 'origin'
   })
   expect(TARGETS.upstream).toMatchObject({
@@ -570,7 +570,7 @@ it('writes a waiver into the body, because that is the only place a reader looks
 
 it('derives the fork-owned set from top-level trees upstream does not carry', () => {
   // Why top-level trees: a file-level derivation would refuse every new src/ file in an upstream PR
-  // cut from work that has already landed on nplez1/main (BRANCHES.md), which is the normal shape
+  // cut from work that has already landed on main (BRANCHES.md), which is the normal shape
   // there. A whole tree upstream lacks is fork territory; a file inside src/ is not.
   const forkAdded = [
     '.agents/skills/electron/SKILL.md',
@@ -581,7 +581,7 @@ it('derives the fork-owned set from top-level trees upstream does not carry', ()
   const upstreamTop = ['src', '.github', 'docs', 'README.md']
   const fakeGit = (args) => {
     if (args[0] === 'rev-parse') {
-      return args[3] === 'refs/remotes/origin/nplez1/main' ? null : 'refs/heads/nplez1/main'
+      return args[3] === 'refs/remotes/origin/main' ? null : 'refs/heads/main'
     }
     if (args[0] === 'diff') {
       return forkAdded.join('\n')
@@ -603,7 +603,7 @@ it('refuses a branch that carries a fork directory nobody listed', () => {
   const changed = ['src/main/x.ts', 'tools/fork-only/thing.mjs']
   const fakeGit = (args) => {
     if (args[0] === 'rev-parse') {
-      return args[3] === 'refs/remotes/origin/nplez1/main' ? 'refs/heads/nplez1/main' : null
+      return args[3] === 'refs/remotes/origin/main' ? 'refs/heads/main' : null
     }
     if (args[0] === 'diff' && args.includes('--diff-filter=A')) {
       return ['tools/fork-only/thing.mjs', 'src/main/upstream-adds-this.ts'].join('\n')

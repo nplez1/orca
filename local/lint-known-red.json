@@ -31,7 +31,7 @@
     "",
     "2026-11-09: one whole-step entry for `check:code-quality:changed`, which a sync merge cannot pass before",
     "it is pushed — see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
-    "the first run after `git push origin nplez1/main`; prune it then.",
+    "the first run after `git push origin main`; prune it then.",
     "The `check-upstream-file-comments` entries are the same sync's: fork-comment growth that five fork PRs had already put on the base branch before the merge. They are recorded, not accepted; see their evidence."
   ],
   "recordedAt": "2026-11-09",

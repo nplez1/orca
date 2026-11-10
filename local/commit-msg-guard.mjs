@@ -5,7 +5,7 @@
 // act on. It is `commit-msg` rather than `pre-commit` because the subject is what identifies the
 // commit as fork-only, and `pre-commit` cannot see it.
 //
-// Why lineage and not the tip: the first version required the *current* `nplez1/main` tip to be an
+// Why lineage and not the tip: the first version required the *current* `main` tip to be an
 // ancestor of HEAD, so once the fork advanced — any other PR squash-merging — every older fork branch
 // was refused. That pushed people to drop the `local(` label, the unlabelled fork-only commit that
 // the hook's own header calls the worse outcome (#319). A branch that descends from the fork's own
@@ -45,10 +45,10 @@ function firstResolvable(runGit, refs) {
 /**
  * Which line HEAD is on, by ancestry rather than by any tip.
  *
- * Why the union of upstream refs and not one base: with a single base, a fork that has synced `O_new`
- * while this guard's upstream ref is still `O_old` makes a branch cut from the newer `origin/main` list
- * upstream commits as fork-only. Excluding every resolvable upstream ref closes that whenever any one
- * of them is fresh.
+ * Why a list and not one base: excluding every resolvable upstream ref is what makes a stale base
+ * harmless, and the union costs nothing. Since the 2026-11-09 rename there is one upstream ref —
+ * `main` on both remotes is the fork's own line, so it can no longer be a second upstream base — but
+ * the loop stays so that adding one back does not mean rewriting the check.
  */
 export function classifyLineage(runGit = quietGitRun) {
   if (attempt(runGit, ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']) === null) {
@@ -123,7 +123,7 @@ export function decide({ subject, lineage, why = '', forkOwnedStaged = [], branc
       ok: false,
       lines: [
         `refusing a fork-only commit on '${branch}', which is upstream-bound.`,
-        `  '${subject}' belongs on a branch that descends from nplez1/main.`,
+        `  '${subject}' belongs on a branch that descends from main.`,
         `  ${why}, so a fork-only change committed here is reviewed as part of that PR's diff.`
       ]
     }

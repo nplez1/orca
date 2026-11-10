@@ -18,18 +18,19 @@ export const FORK_OWNED_PATHS = [
 ]
 
 /** Where the fork's own line lives, most authoritative first. */
-export const FORK_LINE_REFS = ['refs/remotes/origin/nplez1/main', 'refs/heads/nplez1/main']
+export const FORK_LINE_REFS = ['refs/remotes/origin/main', 'refs/heads/main']
 
 /**
- * Every ref that can prove a commit is upstream's, so lineage never depends on one of them being
- * fresh. They disagree in practice: `origin/main` and `upstream/main` were 2,000 commits apart here.
- * Fully qualified, because a short name loses to a tag of the same name.
+ * Every ref that can prove a commit is upstream's. Fully qualified, because a short name loses to a
+ * tag of the same name.
+ *
+ * Why only `upstream`: `main` on both remotes is the fork's own line since the 2026-11-09 rename, so
+ * `origin/main` is the *opposite* of upstream — listing it here made every fork path read as
+ * upstream-owned, which emptied the derived fork-owned set and let a fork-only file ride an
+ * upstream-bound branch. The refs this list used to carry (`origin/main`, `heads/main`) are now the
+ * fork line; `fork-main-gates.yml` and the release guard are what keep that line honest.
  */
-export const UPSTREAM_BASE_REFS = [
-  'refs/remotes/upstream/main',
-  'refs/remotes/origin/main',
-  'refs/heads/main'
-]
+export const UPSTREAM_BASE_REFS = ['refs/remotes/upstream/main']
 
 // Why the buffer: the default is 1 MiB, and `ls-tree` over this repository's 41k upstream files
 // aborts with ENOBUFS — which the derivation reads as "no fork line", silently dropping the check.
@@ -56,7 +57,7 @@ export function quietGitRun(args) {
  * Why top-level trees: the hand list could not keep up — `.agents/skills/**`,
  * `.github/workflows/fork-*.yml`, `.github/scripts/fork-release-notes.mjs` and `local/orca-vm/` were
  * all fork-added and all absent from it. Why not files, and not nested directories either:
- * BRANCHES.md records that upstream work is cut from code that has already landed on `nplez1/main`,
+ * BRANCHES.md records that upstream work is cut from code that has already landed on `main`,
  * so every new `src/` file — including one in a directory the fork created, a provider for instance —
  * is "added since upstream/main" and would be refused. That is the one path fork work has to reach
  * upstream, so a tree upstream already owns stays reviewable; a whole tree it lacks does not.
@@ -65,7 +66,7 @@ export function quietGitRun(args) {
  *
  * Why `upstreamBase` may be a list: the top-level tree set is unioned over every upstream ref, so a
  * stale `upstream/main` cannot make a file upstream already carries look fork-added. Measured case:
- * upstream adds a file, the fork merges it, and the branch cut from a fresher `origin/main` then
+ * upstream adds a file, the fork merges it, and the branch cut from a fresher upstream ref then
  * modifies it — against a stale base that file reads as added-on-the-fork-line.
  */
 export function derivedForkOwnedPaths(upstreamBase, runGit = gitRun, refs = FORK_LINE_REFS) {

@@ -1,4 +1,8 @@
-# Local patches on `nplez1/main`
+# Local patches on `main`
+
+**Naming, 2026-11-09:** the release line was renamed `nplez1/main` → `main`; the old `main` (an
+upstream mirror) is retired, so `main` on both remotes is this fork's own line. Entries below dated
+before that name `nplez1/main`, or treat `origin/main` as upstream — both are historical.
 
 This branch is upstream `main` plus a small, deliberate set of changes that exist **only here**.
 They are never proposed upstream, and they must never reach an upstream-bound PR branch.
@@ -7,7 +11,7 @@ They are never proposed upstream, and they must never reach an upstream-bound PR
 
 - Local commits use a `local(<area>):` prefix so they stand out in `git log`.
 - A local patch may only touch files that **no PR branch owns**. Fork PR branches are cut from
-  `nplez1/main` and upstream-bound ones from `origin/main`, so a patch can only leak upstream through
+  `main` and upstream-bound ones from `upstream/main`, so a patch can only leak upstream through
   an upstream-bound branch's diff — but if a local patch touched a file a PR also changes, the fork
   and the PR would silently disagree about that file.
 - Every patch is listed below with its reason and its exact anchors, because upstream edits to those
@@ -920,7 +924,7 @@ Why `git add -f` and not an un-ignore rule: `.agents/skills/` stays ignored, so 
 still drop machine-local symlinks beside these files without them showing up as untracked. Only the
 three directories above are force-tracked.
 
-Scope: a fresh checkout of `nplez1/main` carries the skills; a worktree branched before this commit
+Scope: a fresh checkout of `main` carries the skills; a worktree branched before this commit
 gets them on its next sync. The `electron` skill's runtime dependency is `@playwright/cli`
 (`npm i -g @playwright/cli`, which provides the `playwright-cli` binary).
 
@@ -1053,7 +1057,7 @@ the original "600000 ms" was only right for one of them, and pi accepts an ms-sc
 producing a command with no deadline), and the `## Opening a PR` example derives its body path with
 `mktemp` instead of the fixed `/tmp/body.md` that two concurrent agents collided on.
 
-Scope: same as `local(skills)` — a fresh worktree cut from `nplez1/main` carries it; a worktree
+Scope: same as `local(skills)` — a fresh worktree cut from `main` carries it; a worktree
 branched before this commit does not.
 
 ### `local(test)`: the 2026-10-29 box — repaired in the tree, and the eight that are recorded
@@ -1441,7 +1445,7 @@ silently again; `tests/tools/open-pr.test.mjs` gains the case its
 fixtures needed for the gate-inputs contract. #178 had already added `tests/tools/unit-gate.test.mjs` for
 the judgement module, so those cases are not duplicated here.
 
-### `local(ratchets)`: `pnpm lint` was red on `nplez1/main` (#161)
+### `local(ratchets)`: `pnpm lint` was red on `main` (#161)
 
 `pnpm lint` failed on this fork's own default branch. The ratchets that failed are upstream's
 (`config/scripts/check-*.mjs` and their baselines are present on `upstream/main`, and no script is
@@ -1579,7 +1583,7 @@ keyed by path, so a moved file shows up twice. Each step was handled as follows.
 - **`verify:localization-coverage`** — the allowlist's `object-property:error` "Error" row followed
   `TIMELINE_KIND_LABELS`, which #281 moved from `session-summary-ledger-view.tsx` to
   `session-summary-evidence-view.tsx`.
-- **`check:code-quality:changed`** — whole-step known red, stale after the push. Until `nplez1/main`
+- **`check:code-quality:changed`** — whole-step known red, stale after the push. Until `main`
   is pushed, `origin/HEAD` is the pre-sync tip. The "changed" set is then upstream's 1537 commits
   (25,053 code files), and `spawnSync` fails with `E2BIG` before reporting anything. The runbook's
   sync-sized form against `upstream/main` reported 96 findings on 72 distinct lines, and every one of
@@ -1758,7 +1762,7 @@ is the assertion.
 when the configured prefix consumes it`: `a8ca9685a3` (#170) gave the branch-prefix login the repo's
 pinned gh account, so `resolveLocalGitUsername` takes a second argument, and that upstream case still
 asserted the one-argument call. Nothing in this branch touches the file — `git diff --stat
-b094309766..nplez1/main` does not list it — so it was repaired in the same shape as the two above
+b094309766..main` does not list it — so it was repaired in the same shape as the two above
 rather than recorded.
 
 The first full run after the tightening (`098d3ea4a3`, before PR #177 landed) passed:
@@ -1858,7 +1862,7 @@ re-implementing it. No behaviour changes in either file.
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,
 from `46f640a501`'s refactor rather than a sync), and `pnpm lint` could not pass on any branch cut from
-`nplez1/main`. **Fixed in the 2026-10-19 sync** the same way every other overflow on this branch was:
+`main`. **Fixed in the 2026-10-19 sync** the same way every other overflow on this branch was:
 a split, never a cap or a baseline entry. The forced-rescan throttle — `claimAiVaultForcedRescan`,
 its retry delay and its test reset — moved to `ai-vault-forced-rescan-throttle.ts`, with
 `markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as the new edges the hook and the tab-bar
@@ -2229,7 +2233,7 @@ drift away from the file the way a list in this document would.
 Three fixes with one cause: a signal that was **absent** was read as a signal that was satisfied.
 
 - `local/gate-unit.mjs` `branchDiff()` treated an empty diff as a resolved one. A sync merges upstream
-  _onto_ `nplez1/main`, so `merge-base(nplez1/main, HEAD)` is HEAD itself, the diff is empty, and
+  _onto_ `main`, so `merge-base(main, HEAD)` is HEAD itself, the diff is empty, and
   `flakeWaiver` reads "nothing coupled was touched" — waiving every flaky pass on a line a 556-commit
   merge had just built. That is the release line, which is where the gate runs. An empty diff now falls
   back to the merge's first parent (`HEAD^1..HEAD`, what that merge contributed) and to `unknown` when
@@ -2302,14 +2306,14 @@ is that a known red no longer sends mail; a new one still does, once, with its n
 
 **What the first real runs measured.** The 2026-10-26 scheduled run (id `40308443374`) is unusable as a
 red set: its cancel rewrote the run-level conclusion, so a reader saw four red shards and no verdict.
-The cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `nplez1/main` plus this
+The cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `main` plus this
 repair): five shards, **three green**, and three red files in total —
 `rate-limits/service-inactive-claude-cooldown.test.ts`, `daemon/daemon-appimage-copy-host.electron.test.ts`
 and `daemon/daemon-electron-to-node-adoption.electron.test.ts` — plus one unhandled error,
 `selector_not_found`.
 
 **All three were the branch gap, not the platform.** Each maps onto a commit that exists here and not on
-`nplez1/main`: the cooldown expectation (`ba8e632509`), the fixture's esbuild specifiers
+`main`: the cooldown expectation (`ba8e632509`), the fixture's esbuild specifiers
 (`be847f718f`), and the unhandled rejection (`fbb41b497d`). The third is a **test defect** — the test
 attached `.rejects` after awaiting a different promise, so the refusal settled unobserved while the
 assertion still passed. So this measurement shows Linux carrying **no environment-bound red set of its
@@ -2347,7 +2351,7 @@ from them: a cancel can hide four red shards, but only from a checker that does 
 **The cost of that, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate on a
 fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as mergeable, so
 the pre-PR gates in `AGENTS.md` (targeted tests for the changed area, `pnpm tc`, `gate-lint`, plus the
-review) are the only thing standing between a change and `nplez1/main` — nothing in CI backstops a
+review) are the only thing standing between a change and `main` — nothing in CI backstops a
 skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at all; it runs nightly on
 `fork-main-tests.yml` and again at the release gate, and the failure window that choice accepts is a
 cross-cutting break sitting on the release line until one of those two runs.
@@ -2472,8 +2476,8 @@ stayed true because nothing changed.
   `manual: true` and becomes one row per workflow, so removing the step from either one is drift.
 - **The max-lines exemption rule moved out of the Vitest inventory**, from the retired
   tests/tools/max-lines-policy.test.mjs to `local/max-lines-exemption.test.mjs`.
-  The old test tried `origin/main`, then fell back to `origin/HEAD` — which on this fork resolves to
-  `origin/nplez1/main`, where every path "exists upstream", so the rule checked nothing. It also
+  The old test tried `origin/main`, then fell back to `origin/HEAD` — which at the time resolved to the
+  upstream mirror, where every path "exists upstream", so the rule checked nothing. It also
   `skipIf`-ed silently in a CI checkout, which has neither ref. The comparison is now the **recorded
   sync base**, `local/upstream-file-comments-baseline.json` `.base` — the same record
   `check-upstream-file-comments.mjs` already falls back to, rewritten by the runbook's `--init` step.
@@ -2502,10 +2506,10 @@ with no diff a reader could see. These four came in with upstream's `d9a7aa89c8`
 `581e23319d`, `8b64ec281a` and `965286939d` (2026-10-27).
 
 - **`ci-branch-cache-sweep.yml` — the one that made this more than tidying drift.** Its keep-set is
-  `new Set(['refs/heads/main'])`, and this fork's default branch is **`nplez1/main`**
+  `new Set(['refs/heads/main'])`, and this fork's default branch was then **`nplez1/main`**
   (`gh api repos/nplez1/orca --jq .default_branch`), so the release line was what it swept. Its only run,
   `40762364436` (2026-10-28T20:20Z), logged `Removed 28 idle branch caches (9.39 GB)` and all 28 were
-  `refs/heads/nplez1/main`, including `node-cache-*`, `electron-builder-*`,
+  `refs/heads/main`, including `node-cache-*`, `electron-builder-*`,
   `electron-package-Linux-ARM64-43.8.1`, `native-modules-*`, `pnpm-lockfile-verified-*` and a `bun-`
   key. It ran every three hours. The damage is checkable
   from the other side: the confirmation run below reports `Cache not found for input keys:` for
@@ -2536,7 +2540,7 @@ After `--fix`: `76 workflows on nplez1/orca, 10 active (3 required + 7 allowed-i
 `module_cache`, whose default in `unit-tests.yml` is `'off'`, so there is no restore step for a producer
 key to match; and a cache saved by a run on `main` is restorable only by runs on `main` and PRs based on
 it — what is shared across branches is the other direction, caches written on the default branch
-(`nplez1/main`). Making it real costs three hunks in upstream-owned files — the caller's
+(`nplez1/main`, and `main` since the rename). Making it real costs three hunks in upstream-owned files — the caller's
 runner, `unit_plan`'s `if:` guard, and `module_cache: warm` on the nightly — for a cache nothing here
 consumes, since `pr.yml` is off and there is no PR shard to warm. Disabled, and no fork hunk taken.
 
@@ -2687,7 +2691,7 @@ wildcard). It found the one dead entry this section used to describe and no othe
 
 ### `local(lint)`: the two #198 flaky-test-pattern reds, fixed in the tree and pruned
 
-`orca-queue node local/gate-lint.mjs` on a branch cut from `nplez1/main` at `941acb70e0` failed
+`orca-queue node local/gate-lint.mjs` on a branch cut from `main` at `941acb70e0` failed
 `lint:ast-grep-gates` on two files that commit merged, and on nothing else. That step is where these
 live now: the 2026-10-28 sync folded upstream's `check:flaky-test-pattern-ratchet` into
 `lint:ast-grep-gates`, and `local/lint-known-red.json` followed the rename. The red itself did not
@@ -2812,7 +2816,7 @@ main" means that document, start to finish. What matters specifically for the pa
 
 ```bash
 git fetch upstream
-git checkout nplez1/main
+git checkout main
 git merge upstream/main
 ```
 
@@ -2864,7 +2868,7 @@ After a **rebase** — a feature branch, never the release line — confirm the
 series came through unchanged: `range-diff` prints `=` per patch that is byte-identical:
 
 ```bash
-git range-diff --no-patch <old-base>..<old-tip> <new-base>..nplez1/main
+git range-diff --no-patch <old-base>..<old-tip> <new-base>..main
 ```
 
 After resolving any conflict in `src/renderer/src/i18n/en-runtime-required.json`, regenerate it rather
@@ -3209,7 +3213,7 @@ the built-in one — so a missing or lapsed credential is a config error, never 
 permissions rejection. Set a fresh PAT as the repository secret and nothing else changes.
 
 **What that PAT is allowed to do is wider than the job needs (audit #221 C3).** The secret belongs to
-`nplez1`, which is the `exempt` bypass actor on the only ruleset protecting `refs/heads/nplez1/main`,
+`nplez1`, which is the `exempt` bypass actor on the only ruleset protecting `refs/heads/main`,
 so the same credential the mirror holds for tags could push, force-push or delete the release line.
 It is also handed to `actions/checkout`, which persists it in `.git/config` for the whole job, and no
 tag ruleset exists — so "an existing tag is never moved" depended only on the absence of `--force`.
@@ -3312,7 +3316,7 @@ computes a reverse-import closure that one changed file turns into ~3,000 of 13,
 is a shard planner, not a PR lane. The unit suite stays on `fork-main-tests.yml` nightly and now also
 gates a release (`fork-release.yml`).
 
-**Why not repo-wide `pnpm lint`, measured on `nplez1/main` at 2026-10-29:** it reports "2 of 36 lint
+**Why not repo-wide `pnpm lint`, measured on `main` at 2026-10-29:** it reports "2 of 36 lint
 step(s) failed" — `oxlint` is red for `src/cli/handlers/vm.ts` (336 counted lines against a limit of
 300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. That is exactly the debt
 `fork-main-gates.yml` was written to surface — and it too is `disabled_manually`, so nothing reports it
@@ -3353,7 +3357,7 @@ that only disabled would not have stopped it either. Two things changed:
 - `local/check-actions-enablement.mjs --fix` cancels the queued and in-progress runs of everything it
   disables. It also disables an allowed-inert entry that has gained a `schedule`, `push` or
   `pull_request` trigger, because "disabled is also fine" is what allowed-inert means.
-- `local/sync/push-upstream-mirror.mjs` is the mirror push and that sweep in one command, so the two
+- `local/sync/publish-sync.mjs` is the release-line push and that sweep in one command, so the two
   cannot be separated. It refuses to push when a remote is missing, when `upstream/main` was not
   fetched, or when it is run from a checkout other than the one it lives in — the push would otherwise
   target one repository while the sweep targeted another.
@@ -3372,20 +3376,20 @@ equivalent minutes a month, still $0.
 
 | lane                        | triggers                                    | why it is on                                                             |
 | --------------------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
-| `fork-main-gates.yml`       | schedule, push `nplez1/main`, dispatch      | repo-wide oxlint, max-lines, localization, `pnpm tc` on the release line |
+| `fork-main-gates.yml`       | schedule, push `main`, dispatch             | repo-wide oxlint, max-lines, localization, `pnpm tc` on the release line |
 | `dependency-security.yml`   | `pull_request` (path-gated), call, dispatch | supply-chain audit; lockfile/Cargo/patches changes only                  |
 | `mobile.yml`                | `pull_request`, push `main`                 | mobile parity is first-class and no PR lane covered it                   |
 | `node-server-tests.yml`     | `pull_request`, call, schedule, dispatch    | headless/remote server path                                              |
 | `macos-updater-tests.yml`   | `pull_request`, dispatch                    | auto-update correctness, ~7 min of macOS in six runs                     |
 | `performance-contracts.yml` | schedule, `pull_request`, dispatch          | perf regression contract, 21 of 24 runs green                            |
 
-**The ordering is the load-bearing part.** `local/sync/push-upstream-mirror.mjs` is the mirror push and
+**The ordering is the load-bearing part.** `local/sync/publish-sync.mjs` is the release-line push and
 `check-actions-enablement --fix` in one command, so a lane that is active but not on the list is disabled
 by the next sync. That is what "GitHub auto-disabled a bunch of stuff" turned out to be: the census is
 `67 disabled_manually`, and it has never contained a `disabled_inactivity` (GitHub's inactivity rule
 needs 60 days without repository activity, and this repo pushes daily) or a `disabled_fork`. The sweep
 is the only mechanism, so the six went into `REQUIRED` in the same change that enabled them — otherwise
-the next mirror push would have undone it.
+the next sync push would have undone it.
 
 **`fork-main-gates.yml` had been off since 2026-10-08**, when it went red three runs running, which left
 23 days in which nothing ran repo-wide oxlint, max-lines, the localization catalogs or `pnpm tc` on the
@@ -3402,8 +3406,9 @@ Two hazards are accepted knowingly, recorded here so the next reader does not re
 `node-server-tests.yml`'s `fast_runners` defaults to **true** for `workflow_dispatch` and `workflow_call`,
 so a manual dispatch puts its jobs on `blacksmith-*` labels this fork does not provision; `pull_request`
 and `schedule` events pass no input and stay on GitHub-hosted runners. And `mobile.yml`'s `push` leg
-targets `branches: [main]`, the upstream mirror branch rather than `nplez1/main`, so that leg re-tests
-upstream's own code; the PR leg is the useful half.
+targets `branches: [main]`, which was the upstream mirror branch before the 2026-11-09 rename and is the
+fork's own line now — so that leg used to re-test upstream's own code and now re-tests the release line.
+The PR leg is still the useful half.
 
 **Still off, and why.** `pr.yml` and `unit-tests.yml`: upstream's whole fleet in one 1,400-line file,
 20 jobs, six without a timeout, `ubuntu-slim` and `blacksmith-*` labels, and it calls the red
@@ -3576,7 +3581,7 @@ Pinning the status quo is not approving it, and the table could not tell the dif
 An upstream test pinned `workflow.on.schedule` for `node-server-tests.yml` at one entry, and the fork
 re-pointed it at its own truth (`not.toHaveProperty('schedule')`) with the reason inline. Deleting the
 cron made the original assertion fail with `Target cannot be null or undefined`.
-It reached `nplez1/main` because every path #288 touched — `local/`, `tests/`, `.github/`, `*.md` — is
+It reached `main` because every path #288 touched — `local/`, `tests/`, `.github/`, `*.md` — is
 in `open-pr.mjs`'s `TARGETED_PATHS`, so gate 1 read "not required" and no suite ran; the first run to
 see it was the 2026-11-08 dispatch, shard 12/12.
 **That guard is gone now.** Upstream retired the test in the 2026-11-08 sync — its module is
@@ -3590,7 +3595,7 @@ the `config/scripts` consumers are where to look after any workflow edit.
 
 **Why this is not just "we deleted two lines".** The next upstream sync can put either cron back, and
 it will: those are upstream's files. `FORK_SCHEDULES` is what makes the reintroduction a report rather
-than a silent return, and `local/sync/push-upstream-mirror.mjs` already runs
+than a silent return, and `local/sync/publish-sync.mjs` already runs
 `check-actions-enablement --fix` after a sync. The four fork-owned crons are in `REQUIRED`, so the same
 sweep cannot disable them either.
 
@@ -3673,8 +3678,8 @@ close.test.tsx › leaves focus that lands after the overlay is gone` raced `act
 ### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch is on
-`nplez1/main`'s own line, and refuses any commit staging a fork-owned path on a branch that is not.
-Upstream-bound branches are cut from `origin/main`, so a fork-only file committed to one is reviewed
+`main`'s own line, and refuses any commit staging a fork-owned path on a branch that is not.
+Upstream-bound branches are cut from `upstream/main`, so a fork-only file committed to one is reviewed
 upstream. It is `commit-msg` rather than `pre-commit` because the message is what identifies the
 commit as fork-only, and `pre-commit` cannot see it. The decision lives in
 `local/commit-msg-guard.mjs`, which imports the same fork-owned path set from
@@ -3682,38 +3687,39 @@ commit as fork-only, and `pre-commit` cannot see it. The decision lives in
 two stops.
 
 **Scoped to lineage on 2026-10-27, not to a branch name.** The original rule allowed `local(` on
-`nplez1/main` and nowhere else, which included fork PR branches — and the result was worse than the
+`main` and nowhere else, which included fork PR branches — and the result was worse than the
 mistake it guarded: policy work committed there _without_ the `local(` label at least five times
 (#146, #130, #142, #177, #52), producing unlabelled fork-only changes riding fork PRs. A fork PR
-branch descends from `nplez1/main`; that lineage is what the rule follows, so `local(` is allowed
-on the fork's own line and still refused on anything cut from `origin/main`.
+branch descends from `main`; that lineage is what the rule follows, so `local(` is allowed
+on the fork's own line and still refused on anything cut from `upstream/main`.
 
 **Tested as lineage, not as the tip, on 2026-11-09 (#319).** The first lineage test asked whether the
-_current_ `nplez1/main` tip was an ancestor of `HEAD`, so the moment the fork advanced — any other PR
+_current_ `main` tip was an ancestor of `HEAD`, so the moment the fork advanced — any other PR
 squash-merging — every older fork branch was refused, which pushed exactly the same unlabelled-commit
-workaround. It also refused every `local(` commit when no local `nplez1/main` ref existed, which is
+workaround. It also refused every `local(` commit when no local `main` ref existed, which is
 the state of a fresh clone. Now: `merge-base --all HEAD <forkRef>` must be non-empty, and `git
 rev-list -1 <bases> --not <every resolvable upstream ref>` must be non-empty — the fork's own commits
-have to be behind `HEAD`, however far behind the tip the branch is. The union of upstream refs
-(`upstream/main`, `origin/main`, `main`) is deliberate: with one base, a fork that has synced further
-than that base would read a branch cut from a fresher `origin/main` as fork work. Unresolvable refs,
+have to be behind `HEAD`, however far behind the tip the branch is. `UPSTREAM_BASE_REFS` is a list for
+that reason and holds one entry, `upstream/main`: `main` on both remotes is the fork's own line since
+the 2026-11-09 rename, so `origin/main` is the opposite of an upstream base — listing it emptied the
+derived fork-owned set and let a fork-only file ride an upstream-bound branch. Unresolvable refs,
 an unborn `HEAD`, and a fork ref with no reachable common ancestor (a `--depth` clone) allow the
 commit with a warning, because a hook that blocks a fresh clone gets `--no-verify`'d and then guards
 nothing.
 
-**Known limit, not a bug to rediscover:** a branch whose commits reach `nplez1/main` through a merge
+**Known limit, not a bug to rediscover:** a branch whose commits reach `main` through a merge
 commit rather than a squash is indistinguishable from fork work, because its own commits become
 fork-only bases. Lineage cannot tell that case apart from a real fork branch. The `local(` subject and
 the fork-owned paths are what remain, plus `open-pr --upstream`.
 
-**The hook can only see a tree that carries it.** Neither `origin/main` nor `upstream/main` has
-`.husky/commit-msg` or `local/`, and husky's runner exits 0 when a hook file is absent, so a clean
+**The hook can only see a tree that carries it.** `upstream/main` has neither `.husky/commit-msg` nor
+`local/`, and husky's runner exits 0 when a hook file is absent, so a clean
 upstream checkout has no hook at all. It fires on a tree that already carries the fork's hook: a merge
-of `nplez1/main` into an upstream branch, a manual checkout of the hook, or a tree that has already
+of `main` into an upstream branch, a manual checkout of the hook, or a tree that has already
 leaked. `local/open-pr.mjs --upstream` remains the stop for the rest, and a plain `gh pr create`
 still bypasses both.
 
-If a commit is wrongly refused, the fix is to branch from `nplez1/main`, not to bypass the hook.
+If a commit is wrongly refused, the fix is to branch from `main`, not to bypass the hook.
 
 ### `local(vm)`: an ephemeral machine per worktree
 

@@ -162,7 +162,7 @@ function resolveBase(root, requestedBase) {
     requestedBase,
     process.env.ORCA_CODE_QUALITY_BASE,
     // Why: the branch a change is reviewed against is the remote's *default*
-    // branch, which is not always named main — a fork can rename it (nplez1/main),
+    // branch, which is not always named main — a fork can rename it,
     // and the hardcoded origin/main then diffs the whole fork's trunk instead.
     'origin/HEAD',
     'origin/main',

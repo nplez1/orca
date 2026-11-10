@@ -60,7 +60,7 @@ function resolveMergeBase(root, requested) {
   for (const candidate of [
     requested,
     process.env.ORCA_CODE_QUALITY_BASE,
-    // The fork's origin is nplez1/orca, whose default branch is nplez1/main.
+    // The fork's origin is nplez1/orca, whose default branch is main.
     'origin/HEAD',
     'origin/main',
     'main'

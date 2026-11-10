@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # LOCAL(nplez1): a fork-only change must never reach an upstream-bound branch.
 #
-# Upstream-bound branches are cut from origin/main, so a fork-only file committed to one is reviewed
+# Upstream-bound branches are cut from upstream/main, so a fork-only file committed to one is reviewed
 # as part of that PR's diff — and the point of LOCAL-PATCHES.md is that these patches are reviewed
 # nowhere. `local/open-pr.mjs --upstream` already refuses a `local(` subject and every fork-owned
 # path, so this is the earlier, cheaper stop.
@@ -9,7 +9,7 @@
 # It deliberately does NOT refuse `local(` on a fork PR branch. It used to, and the result was worse
 # than the mistake it guarded: policy work committed there without the `local(` label at least five
 # times (#146, #130, #142, #177, #52), which is an *unlabelled* fork-only change riding a fork PR.
-# A fork PR branch descends from nplez1/main, and that lineage is the line the rule follows — however
+# A fork PR branch descends from main, and that lineage is the line the rule follows — however
 # far behind the fork's current tip it is (#319).
 #
 # The decision is in `local/commit-msg-guard.mjs` because it needs the fork-owned path set that

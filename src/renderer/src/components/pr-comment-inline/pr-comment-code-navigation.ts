@@ -91,7 +91,7 @@ export function resolvePRCommentCodeSurface({
   // Why also the exact ref: a local base named `release/2.0` reads as `2.0` to the branch helper, and
   // that mismatch would cost the jump the surface it came for.
   // Why the namespace prefix too: a provider names a base branch without an owner, while the local
-  // remote ref carries one — this fork's reviews target `main` on GitHub and `origin/nplez1/main` here,
+  // remote ref carries one — this fork's reviews target `main` on GitHub and `origin/main` here,
   // and requiring the two names to be equal is what sent every such jump to the wrong view.
   const compareIsReviewBase = (baseRef: string): boolean => {
     if (reviewBase === null) {

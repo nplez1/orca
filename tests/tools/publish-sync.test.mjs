@@ -3,14 +3,9 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  MIRROR_PUSH,
-  SWEEP,
-  judgeRun,
-  refusalsFor
-} from '../../local/sync/push-upstream-mirror.mjs'
+import { SYNC_PUSH, SWEEP, judgeRun, refusalsFor } from '../../local/sync/publish-sync.mjs'
 
-const SCRIPT = new URL('../../local/sync/push-upstream-mirror.mjs', import.meta.url).pathname
+const SCRIPT = new URL('../../local/sync/publish-sync.mjs', import.meta.url).pathname
 const dirs = []
 
 afterEach(() => {
@@ -21,7 +16,7 @@ afterEach(() => {
 
 const run = (cwd, ...args) => spawnSync('node', [SCRIPT, ...args], { cwd, encoding: 'utf8' })
 
-describe('the mirror push refuses to run half of itself', () => {
+describe('the publish push refuses to run half of itself', () => {
   it('refuses without both remotes, naming which one is missing', () => {
     const problems = refusalsFor({ remotes: ['origin'], hasUpstreamMain: true })
 
@@ -83,24 +78,24 @@ describe('what a run means', () => {
 })
 
 describe('the script itself', () => {
-  it('pushes the one ref pair, atomically, and sweeps with --fix right after', () => {
+  it('pushes the fork line, atomically, and sweeps with --fix right after', () => {
     const source = readFileSync(
-      new URL('../../local/sync/push-upstream-mirror.mjs', import.meta.url),
+      new URL('../../local/sync/publish-sync.mjs', import.meta.url),
       'utf8'
     )
 
-    expect(MIRROR_PUSH).toEqual(['push', '--atomic', 'origin', 'upstream/main:main'])
+    expect(SYNC_PUSH).toEqual(['push', '--atomic', 'origin', 'main'])
     expect(SWEEP.join(' ')).toContain('local/check-actions-enablement.mjs --fix')
     // The constants are what the run uses, not a description of it.
     expect(source).toContain('spawnSync(SWEEP[0], SWEEP.slice(1)')
-    expect(source).toContain("spawnSync('git', MIRROR_PUSH")
-    expect(source.indexOf("spawnSync('git', MIRROR_PUSH")).toBeLessThan(
+    expect(source).toContain("spawnSync('git', SYNC_PUSH")
+    expect(source.indexOf("spawnSync('git', SYNC_PUSH")).toBeLessThan(
       source.indexOf('spawnSync(SWEEP[0]')
     )
   })
 
   it('exits 2 before pushing when run from another checkout', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mirror-push-'))
+    const dir = mkdtempSync(join(tmpdir(), 'publish-sync-'))
     dirs.push(dir)
     spawnSync('git', ['init', '-q', dir], { encoding: 'utf8' })
 

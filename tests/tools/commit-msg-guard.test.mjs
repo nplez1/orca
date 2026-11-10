@@ -56,33 +56,35 @@ function commit(dir, subject) {
 }
 
 /**
- * The shape the hook has to tell apart: `main` is upstream's line, `nplez1/main` is the fork's own
- * (one commit that adds fork-only paths), `fork-old` was cut from the fork line before the fork
- * advanced, and `up` was cut from upstream's line.
+ * The shape the hook has to tell apart: `main` is the fork's own line (one commit that adds fork-only
+ * paths), `upstream-line` is upstream's tip and what `refs/remotes/upstream/main` points at, `fork-old`
+ * was cut from the fork line before the fork advanced, and `up` was cut from upstream's line.
  */
 function fixture() {
   const dir = tempDir()
-  git(dir, ['init', '-q', '-b', 'main'])
+  git(dir, ['init', '-q', '-b', 'upstream-line'])
   write(dir, 'src/a.ts', 'a')
   commit(dir, 'chore: upstream 0')
-  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
   git(dir, ['update-ref', 'refs/remotes/upstream/main', 'HEAD'])
 
-  git(dir, ['checkout', '-q', '-b', 'nplez1/main'])
+  git(dir, ['checkout', '-q', '-b', 'main'])
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
   write(dir, 'local/tool.mjs', 'tool')
   write(dir, 'RELEASE-RUNBOOK.md', 'notes')
   write(dir, '.husky/commit-msg', 'hook')
   commit(dir, 'local(hooks): fork 1')
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
 
   git(dir, ['checkout', '-q', '-b', 'fork-old'])
   write(dir, 'src/branch.ts', 'b')
   commit(dir, 'feat: branch work')
 
-  git(dir, ['checkout', '-q', 'nplez1/main'])
+  git(dir, ['checkout', '-q', 'main'])
   write(dir, 'local/tool2.mjs', 'tool2')
   commit(dir, 'local(hooks): fork 2')
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
 
-  git(dir, ['checkout', '-q', '-b', 'up', 'main'])
+  git(dir, ['checkout', '-q', '-b', 'up', 'upstream-line'])
   write(dir, 'src/upstream.ts', 'u')
   commit(dir, 'feat: upstream work')
   return dir
@@ -105,25 +107,25 @@ function stage(dir, path, text) {
   git(dir, ['add', path])
 }
 
-it('accepts a local( commit on a fork branch that is behind an advanced nplez1/main', () => {
+it('accepts a local( commit on a fork branch that is behind an advanced main', () => {
   const dir = fixture()
   git(dir, ['checkout', '-q', 'fork-old'])
 
   expect(guard(dir, 'local(hooks): a fork-only change')).toMatchObject({ status: 0 })
 })
 
-it('accepts a local( commit on nplez1/main itself', () => {
+it('accepts a local( commit on main itself', () => {
   const dir = fixture()
-  git(dir, ['checkout', '-q', 'nplez1/main'])
+  git(dir, ['checkout', '-q', 'main'])
 
   expect(guard(dir, 'local(hooks): a fork-only change')).toMatchObject({ status: 0 })
 })
 
 it('accepts a local( commit when only the remote fork ref exists', () => {
   const dir = fixture()
-  git(dir, ['update-ref', 'refs/remotes/origin/nplez1/main', 'nplez1/main'])
+  git(dir, ['update-ref', 'refs/remotes/origin/main', 'main'])
   git(dir, ['checkout', '-q', 'fork-old'])
-  git(dir, ['branch', '-q', '-D', 'nplez1/main'])
+  git(dir, ['branch', '-q', '-D', 'main'])
 
   expect(guard(dir, 'local(hooks): a fork-only change')).toMatchObject({ status: 0 })
 })
@@ -172,38 +174,24 @@ it('accepts an ordinary source change on an upstream-bound branch', () => {
 it('allows the commit with a warning when no fork line ref resolves', () => {
   const dir = fixture()
   git(dir, ['checkout', '-q', 'fork-old'])
-  git(dir, ['branch', '-q', '-D', 'nplez1/main'])
+  git(dir, ['branch', '-q', '-D', 'main'])
+  git(dir, ['update-ref', '-d', 'refs/remotes/origin/main'])
 
   const result = guard(dir, 'local(hooks): a fork-only change')
   expect(result.status).toBe(0)
   expect(result.stderr).toContain('not classifying')
 })
 
-it('reads a branch cut from a fresher origin/main as upstream when upstream/main is behind', () => {
-  const dir = fixture()
-  git(dir, ['checkout', '-q', 'main'])
-  write(dir, 'src/newer.ts', 'n')
-  commit(dir, 'feat: newer upstream work')
-  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
-  // Why the fork has to sync before the branch is cut: only then is the branch's merge base a commit
-  // that `upstream/main` lacks, which is the case a single-base exclusion gets wrong.
-  git(dir, ['checkout', '-q', 'nplez1/main'])
-  git(dir, ['merge', '-q', '--no-edit', 'main'])
-  git(dir, ['checkout', '-q', '-b', 'up-fresh', 'main'])
-  stage(dir, 'src/more.ts', 'm')
-
-  expect(guard(dir, 'local(hooks): a fork-only change')).toMatchObject({ status: 1 })
-})
-
 it('does not read a file upstream already carries as fork-added', () => {
   const dir = fixture()
-  git(dir, ['checkout', '-q', 'main'])
+  git(dir, ['checkout', '-q', 'upstream-line'])
   write(dir, 'NEW.md', 'upstream notes')
   commit(dir, 'docs: upstream notes')
-  git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
-  git(dir, ['checkout', '-q', 'nplez1/main'])
-  git(dir, ['merge', '-q', '--no-edit', 'main'])
-  git(dir, ['checkout', '-q', '-b', 'up-fresh', 'main'])
+  git(dir, ['update-ref', 'refs/remotes/upstream/main', 'HEAD'])
+  // The fork syncs it, so the file is on both lines; only a base that predates it makes it fork-added.
+  git(dir, ['checkout', '-q', 'main'])
+  git(dir, ['merge', '-q', '--no-edit', 'upstream-line'])
+  git(dir, ['checkout', '-q', '-b', 'up-fresh', 'upstream-line'])
   stage(dir, 'NEW.md', 'upstream notes, edited')
 
   expect(guard(dir, 'docs: edit the upstream notes')).toMatchObject({ status: 0 })
@@ -218,11 +206,11 @@ it('accepts removing a leaked fork file, which is the fix for the leak', () => {
   expect(guard(dir, 'chore: drop the leaked file')).toMatchObject({ status: 0 })
 })
 
-it('refuses a merge of nplez1/main into an upstream-bound branch', () => {
+it('refuses a merge of main into an upstream-bound branch', () => {
   const dir = fixture()
-  git(dir, ['merge', '-q', '--no-commit', '--no-ff', 'nplez1/main'])
+  git(dir, ['merge', '-q', '--no-commit', '--no-ff', 'main'])
 
-  const result = guard(dir, 'Merge branch nplez1/main into up')
+  const result = guard(dir, 'Merge branch main into up')
   expect(result.status).toBe(1)
   expect(result.stderr).toContain('local/tool.mjs')
   git(dir, ['merge', '--abort'])

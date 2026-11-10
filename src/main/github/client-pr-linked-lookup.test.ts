@@ -130,7 +130,7 @@ describe('getPRForBranch', () => {
           updatedAt: '2026-03-28T00:00:00Z',
           isDraft: false,
           mergeable: 'MERGEABLE',
-          baseRefName: 'nplez1/main',
+          baseRefName: 'main',
           headRefName: 'nplez1/beachball',
           baseRefOid: 'base-oid',
           headRefOid: 'head-oid'
@@ -180,5 +180,4 @@ describe('getPRForBranch', () => {
     expect(pr?.number).toBe(3)
     expect(pr?.prRepo).toEqual({ owner: 'stablyai', repo: 'orca' })
   })
-
 })

@@ -1,22 +1,27 @@
 #!/usr/bin/env node
 /**
- * Push the upstream `main` mirror to this fork, then sweep the Actions fleet — as one step.
+ * Publish the synced release line to this fork, then sweep the Actions fleet — as one step.
  *
- * `UPSTREAM-SYNC-RUNBOOK.md` step 4 pushes `upstream/main` to the fork's `main` branch. A workflow file
- * new to that push arrives **active**: a file with `push: [main]` fires on that very push, and one with
+ * `UPSTREAM-SYNC-RUNBOOK.md` step 4 pushes the merge to the fork's `main` branch. A workflow file new
+ * to that push arrives **active**: a file with `push: [main]` fires on that very push, and one with
  * `schedule` or `pull_request` starts firing as soon as it exists on this repository, whose default
- * branch is `nplez1/main`. The enablement check cannot get ahead of that, because GitHub has no
- * workflow to disable until the file is there — so the only lever is sweeping immediately, which is
- * what this wrapper exists to make unskippable. On 2026-10-28T13:17Z that push started "Unit transform
+ * branch is `main`. The enablement check cannot get ahead of that, because GitHub has no workflow to
+ * disable until the file is there — so the only lever is sweeping immediately, which is what this
+ * wrapper exists to make unskippable. On 2026-10-28T13:17Z the equivalent push started "Unit transform
  * cache producer", which then wedged for 12 hours; a sweep alone would not have stopped a run already
  * going, which is why `check-actions-enablement --fix` also cancels the queued and in-progress runs of
  * whatever it disables.
  *
+ * Why it replaced `push-upstream-mirror.mjs`: that script pushed `upstream/main` to a fork branch
+ * literally named `main`, which was the upstream mirror. `main` is now the fork's own line, so the
+ * same command would have overwritten it with upstream's tree. The push is the fork line and nothing
+ * else; there is no mirror branch left to keep in step.
+ *
  * The two halves are one command on purpose: a runbook line that says "push, then remember to sweep"
  * is the same failure with more words.
  *
- *   node local/sync/push-upstream-mirror.mjs            push, then `check-actions-enablement --fix`
- *   node local/sync/push-upstream-mirror.mjs --dry-run   print the plan and what is on now; changes nothing
+ *   node local/sync/publish-sync.mjs            push, then `check-actions-enablement --fix`
+ *   node local/sync/publish-sync.mjs --dry-run   print the plan and what is on now; changes nothing
  *
  * Exit: 0 pushed and clean, 1 the push or the sweep failed, 2 refused before pushing or the sweep could
  * not tell.
@@ -28,8 +33,8 @@ import { pathToFileURL } from 'node:url'
 
 const ROOT = resolve(import.meta.dirname, '../..')
 
-/** The mirror is one fixed ref pair; taking them as arguments would invite a different one. */
-export const MIRROR_PUSH = ['push', '--atomic', 'origin', 'upstream/main:main']
+/** One fixed refspec: the fork's release line, and nothing else. */
+export const SYNC_PUSH = ['push', '--atomic', 'origin', 'main']
 export const SWEEP = ['node', 'local/check-actions-enablement.mjs', '--fix']
 
 /** Why the push cannot be judged without both remotes, and what to do about it. */
@@ -47,7 +52,8 @@ export function refusalsFor({ remotes, hasUpstreamMain, toplevel, root }) {
   }
   if (!hasUpstreamMain) {
     problems.push(
-      "upstream/main does not resolve — 'git fetch upstream' first, so the push sends what you reviewed"
+      "upstream/main does not resolve — 'git fetch upstream' first, so the line being published is " +
+        'the sync you reviewed and not a stale one'
     )
   }
   return problems
@@ -111,13 +117,13 @@ function main() {
   const refusals = refusalsFor(facts(cwd))
   if (refusals.length > 0) {
     for (const problem of refusals) {
-      console.error(`push-upstream-mirror: refusing — ${problem}`)
+      console.error(`publish-sync: refusing — ${problem}`)
     }
     process.exit(2)
   }
 
-  console.log(`push-upstream-mirror: ${dryRun ? 'plan' : 'pushing'}`)
-  console.log(`  1. git ${MIRROR_PUSH.join(' ')}`)
+  console.log(`publish-sync: ${dryRun ? 'plan' : 'pushing'}`)
+  console.log(`  1. git ${SYNC_PUSH.join(' ')}`)
   console.log(`  2. ${SWEEP.join(' ')}`)
 
   if (dryRun) {
@@ -131,11 +137,11 @@ function main() {
     process.exit(check.status ?? 2)
   }
 
-  const push = spawnSync('git', MIRROR_PUSH, { cwd, encoding: 'utf8' })
+  const push = spawnSync('git', SYNC_PUSH, { cwd, encoding: 'utf8' })
   process.stdout.write(`${push.stdout ?? ''}${push.stderr ?? ''}`)
   if (push.status !== 0) {
     const verdict = judgeRun({ pushStatus: push.status ?? 1, sweepStatus: null })
-    console.error(`push-upstream-mirror: ${verdict.message}`)
+    console.error(`publish-sync: ${verdict.message}`)
     process.exit(verdict.code)
   }
 
@@ -148,9 +154,9 @@ function main() {
   process.stdout.write(`${sweep.stdout ?? ''}${sweep.stderr ?? ''}`)
   const verdict = judgeRun({ pushStatus: 0, sweepStatus: sweep.status ?? 2 })
   if (verdict.code === 0) {
-    console.log(`push-upstream-mirror: ${verdict.message}`)
+    console.log(`publish-sync: ${verdict.message}`)
   } else {
-    console.error(`push-upstream-mirror: ${verdict.message}`)
+    console.error(`publish-sync: ${verdict.message}`)
   }
   process.exit(verdict.code)
 }

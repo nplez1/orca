@@ -14,7 +14,7 @@ name: Fork PR gates
 # `ci-unit-selection.mjs` turns one changed file into ~3,000 of 13,064 test files, which is a shard
 # planner, not a PR lane. It runs nightly and now also gates a release.
 #
-# Why not `pnpm lint` here yet: measured on `nplez1/main` at 2026-10-29, `pnpm lint` reports "2 of 36
+# Why not `pnpm lint` here yet: measured on `main` at 2026-10-29, `pnpm lint` reports "2 of 36
 # lint step(s) failed" — `oxlint` on its own is red for `src/cli/handlers/vm.ts` (336 counted lines,
 # limit 300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. A repo-wide lane that is
 # red on its own base teaches everyone to ignore it, so this lane judges the PR's changed lines

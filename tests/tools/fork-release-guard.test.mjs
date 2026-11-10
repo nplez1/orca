@@ -92,19 +92,19 @@ describe('the release dispatch guard', () => {
     const { run, sha, tag } = scenario({ ref: 'refs/heads/audit-210', target: 'missing' })
     const result = run(['refs/heads/audit-210', tag, sha, 'nplez1/orca'])
     expect(result.status).toBe(1)
-    expect(result.stderr).toContain('dispatched from refs/heads/nplez1/main')
+    expect(result.stderr).toContain('dispatched from refs/heads/main')
   })
 
   it('creates the tag when the release does not exist yet', () => {
     const { run, sha, tag } = scenario({ target: 'missing' })
-    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('does not exist yet')
   })
 
   it('accepts a re-dispatch onto the commit the tag names', () => {
     const { run, sha, tag } = scenario({ target: 'sha' })
-    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('already exists')
   })
@@ -113,7 +113,7 @@ describe('the release dispatch guard', () => {
     // The measured hole: the old check printed "uploading into it" and replaced the assets of a
     // release whose tag and notes pointed at the previous revision.
     const { run, sha, tag, other } = scenario({ target: 'branch', tagCommit: 'other' })
-    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
     expect(sha).not.toBe(other)
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('would replace its assets')
@@ -122,39 +122,39 @@ describe('the release dispatch guard', () => {
   it('resolves a branch-named target to the tag, never to this run’s checkout', () => {
     // electron-builder records the branch it published from. Resolving that name against the
     // checkout always equals GITHUB_SHA, which accepted a re-dispatch from any commit on the branch.
-    const here = scenario({ target: 'nplez1/main', tagCommit: 'here' })
-    expect(here.run(['refs/heads/nplez1/main', here.tag, here.sha, 'nplez1/orca']).status).toBe(0)
+    const here = scenario({ target: 'main', tagCommit: 'here' })
+    expect(here.run(['refs/heads/main', here.tag, here.sha, 'nplez1/orca']).status).toBe(0)
 
-    const elsewhere = scenario({ target: 'nplez1/main', tagCommit: 'other' })
+    const elsewhere = scenario({ target: 'main', tagCommit: 'other' })
     expect(
-      elsewhere.run(['refs/heads/nplez1/main', elsewhere.tag, elsewhere.sha, 'nplez1/orca']).status
+      elsewhere.run(['refs/heads/main', elsewhere.tag, elsewhere.sha, 'nplez1/orca']).status
     ).toBe(1)
   })
 
   it('refuses when the tag is not in this checkout, rather than assuming it matches', () => {
-    const { run, sha, tag } = scenario({ target: 'nplez1/main', tagCommit: null })
-    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+    const { run, sha, tag } = scenario({ target: 'main', tagCommit: null })
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
     expect(result.status).toBe(1)
     expect(result.stderr).toContain(`not ${sha}`)
   })
 
   it('tells a gh failure apart from a missing release', () => {
     const { run, sha, tag } = scenario({ target: 'error' })
-    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('cannot read release')
   })
 
   it('is a usage error to run it without a tag or repository', () => {
     const { run } = scenario({ target: 'missing' })
-    expect(run(['refs/heads/nplez1/main']).status).toBe(2)
+    expect(run(['refs/heads/main']).status).toBe(2)
   })
 
   // Semver compares a pre-release label alphabetically, so `rc.1` on the same base outranks every
   // `np.<n>` of that base: installs move to it and nothing published afterwards is ever offered.
   it('refuses a suffix that is not np.<n>', () => {
     const { run, sha } = scenario({ target: 'missing' })
-    const result = run(['refs/heads/nplez1/main', 'v1.2.3-rc.1', sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', 'v1.2.3-rc.1', sha, 'nplez1/orca'])
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('is not a publishable release version')
@@ -165,7 +165,7 @@ describe('the release dispatch guard', () => {
   // release sorts below the newest published one and no installed build sees it.
   it('refuses a version that is not above the newest published release', () => {
     const { run, sha, tag } = scenario({ target: 'missing', existingTags: ['v1.2.3-np.9'] })
-    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('not above the newest published release v1.2.3-np.9')
@@ -177,7 +177,7 @@ describe('the release dispatch guard', () => {
       tag: 'v1.2.3-np.10',
       existingTags: ['v1.2.3-np.9', 'v1.2.3-np.8']
     })
-    const result = run(['refs/heads/nplez1/main', 'v1.2.3-np.10', sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', 'v1.2.3-np.10', sha, 'nplez1/orca'])
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('does not exist yet')
@@ -191,7 +191,7 @@ describe('the release dispatch guard', () => {
       tag: 'v1.2.3-np.10',
       existingTags: ['v1.2.3-np.9', 'v1.2.3-np.41-hotfix']
     })
-    const result = run(['refs/heads/nplez1/main', 'v1.2.3-np.10', sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', 'v1.2.3-np.10', sha, 'nplez1/orca'])
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('above the newest published release v1.2.3-np.9')
@@ -201,7 +201,7 @@ describe('the release dispatch guard', () => {
     // A re-dispatch publishes into the same tag, so it has to fail for the same reason a new tag
     // would — the shape check never depends on the tag being new.
     const { run, sha } = scenario({ target: 'sha', tagCommit: 'here', tag: 'v1.2.3-rc.1' })
-    const result = run(['refs/heads/nplez1/main', 'v1.2.3-rc.1', sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', 'v1.2.3-rc.1', sha, 'nplez1/orca'])
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('is not a publishable release version')
@@ -215,7 +215,7 @@ describe('the release dispatch guard', () => {
       tagCommit: 'here',
       existingTags: ['v9.9.9-np.99']
     })
-    const result = run(['refs/heads/nplez1/main', tag, sha, 'nplez1/orca'])
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('already exists')

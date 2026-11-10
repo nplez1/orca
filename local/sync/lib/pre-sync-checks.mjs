@@ -20,13 +20,12 @@ import {
   writeSyncState
 } from './run.mjs'
 
-export const FORK_BRANCH = 'nplez1/main'
+export const FORK_BRANCH = 'main'
 export const LOCAL_FORK_REF = `refs/heads/${FORK_BRANCH}`
 export const ORIGIN_FORK_REF = `refs/remotes/origin/${FORK_BRANCH}`
 export const UPSTREAM_REF = 'refs/remotes/upstream/main'
 export const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
-export const BACKUP_REF = 'backup/nplez1-main-pre-sync'
-// The release line merges; a feature branch or a `local(...)` series rebases (see the runbook's "Two
+export const BACKUP_REF = 'backup/nplez1-main-pre-sync' // The release line merges; a feature branch or a `local(...)` series rebases (see the runbook's "Two
 // shapes, one decision"). `pre-sync.mjs --rebase` selects the second procedure.
 export const MERGE_COMMAND = `git checkout ${FORK_BRANCH} && git merge upstream/main`
 export const REBASE_COMMAND = `git checkout ${FORK_BRANCH} && GIT_EDITOR=true git rebase upstream/main`
@@ -61,7 +60,8 @@ function forkBranch() {
       details: []
     }
   }
-  // PR branches are cut from origin/main, so that range is the one that isolates them.
+  // PR branches are cut from origin/main, which is this fork's own line, so that range is the one
+  // that isolates them.
   const base = refExists(ORIGIN_MAIN_REF) ? 'origin/main' : 'upstream/main'
   const lines = (gitText(['log', '--format=%h %s', '--grep', '^local(', `${base}..HEAD`]) ?? '')
     .split('\n')

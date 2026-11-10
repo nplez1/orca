@@ -138,10 +138,10 @@ describe('resolvePRCommentCodeSurface', () => {
   })
 
   it('accepts a base whose local remote ref carries a namespace the provider does not name', () => {
-    // The fork's reviews target `main` on the provider, while the worktree pins `origin/nplez1/main`.
+    // The fork's reviews target `main` on the provider, while the worktree pins `origin/main`.
     for (const baseRef of [
-      'origin/nplez1/main',
-      'refs/remotes/origin/nplez1/main',
+      'origin/main',
+      'refs/remotes/origin/main',
       'refs/remotes/upstream/main'
     ]) {
       expect(

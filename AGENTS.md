@@ -96,7 +96,7 @@ node local/open-pr.mjs --title "..." --body-file "$body" --upstream        # onl
 The body path is `mktemp`-derived on purpose: several agents run at once on one machine and share
 `/tmp`, and a fixed `/tmp/body.md` has already collided between two of them.
 
-It defaults to fork `nplez1/orca` / base `nplez1/main`, requires `--upstream` to leave the fork, and
+It defaults to fork `nplez1/orca` / base `main`, requires `--upstream` to leave the fork, and
 refuses a head that does not descend from its base. The base is resolved against the remote the PR
 targets (`upstream` for an upstream PR, `origin` otherwise), because the two track different branches,
 and an upstream head carrying any `local(` commit — or any fork-owned path (`local/`,
@@ -128,24 +128,24 @@ way, so an upstream PR carries no verdict for it and always needs an explicit
 `--waive-gate 1:"upstream PR, gated by upstream CI"`. `--dry-run` reports a refusal instead of
 aborting, so the decision can be inspected before the ~20-minute run.
 
-Why the ancestry check matters: the two branches called `main` are different lines. A head cut from
-`main` and opened against `nplez1/main` looks like a small diff locally but carries every fork-only
-patch as a reversion — that is where the ~300k-line PRs came from.
+Why the ancestry check matters: `main` names a different line on each remote. A head cut from
+`upstream/main` and opened against the fork's `main` looks like a small diff locally but carries every
+fork-only patch as a reversion — that is where the ~300k-line PRs came from.
 
 ## Branch state
 
 - `node local/branch-status.mjs` — live SHAs and PR state. **Source of truth.** The inventory is derived
-  from `refs/heads/nplez1`, `origin/nplez1/*` and the fork's own heads, and PR state is read from both
-  `nplez1/orca` and `stablyai/orca`; `--local-only` skips the network. A dependency key that matches no
-  branch is reported rather than ignored.
+  from `refs/heads/nplez1`, `origin/nplez1/*`, `main` and the fork's own heads, and PR state is read
+  from both `nplez1/orca` and `stablyai/orca`; `--local-only` skips the network. A dependency key that
+  matches no branch is reported rather than ignored.
 - [`BRANCHES.md`](./BRANCHES.md) — why each branch exists, what blocks it, dependency order. Read before
   any PR or branch work. It records what the script cannot know; if the two disagree, the script is right.
 - [`LOCAL-PATCHES.md`](./LOCAL-PATCHES.md) — the fork-only patch series.
-- A `local(...)` commit is refused on any branch that does **not** descend from `nplez1/main`
+- A `local(...)` commit is refused on any branch that does **not** descend from `main`
   (`.husky/commit-msg`). The test is ancestry, not the branch name: every fork PR branch carries
-  `nplez1/main` in its history and is allowed, `nplez1/main` itself is allowed, and an upstream-bound
-  branch cut from `origin/main` is refused. If it fires, switch branches — do not bypass it.
-- Fork PR branches are cut from `nplez1/main`; upstream-bound branches from `origin/main`.
+  `main` in its history and is allowed, `main` itself is allowed, and an upstream-bound branch cut from
+  `upstream/main` is refused. If it fires, switch branches — do not bypass it.
+- Fork PR branches are cut from `main`; upstream-bound branches from `upstream/main`.
 - Chained branches rebase **parent-first**. Force-push with `--force-with-lease origin <branch>`.
 
 ## Verify

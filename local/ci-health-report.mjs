@@ -6,7 +6,7 @@
  * enabled that should not be, nothing REQUIRED disabled) and `local/check-nightly-liveness.mjs` (the
  * nightly backstop is actually running and actually green). A check a human has to remember to run is
  * a comment, and the cost showed: a cache sweep stayed active from about 2026-10-25 and was found on
- * 10-28, after it had deleted 9.39 GB of `nplez1/main` caches, and one nightly issue sat open while
+ * 10-28, after it had deleted 9.39 GB of `main` caches, and one nightly issue sat open while
  * the last three runs were failure, success, success.
  *
  * `local/check-queued-runs.mjs` is the third, and it covers what `timeout-minutes` cannot: a job whose

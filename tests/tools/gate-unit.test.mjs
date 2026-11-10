@@ -539,18 +539,18 @@ describe('the diff that judges a flaky pass', () => {
 
   it('uses the merge-base against the release line when that diff has content', () => {
     const run = fakeGit({
-      'merge-base nplez1/main HEAD': 'base',
+      'merge-base main HEAD': 'base',
       'diff --name-only --no-renames base HEAD': 'src/a.ts'
     })
-    expect(branchDiff(run)).toEqual({ base: 'nplez1/main', files: new Set(['src/a.ts']) })
+    expect(branchDiff(run)).toEqual({ base: 'main', files: new Set(['src/a.ts']) })
   })
 
   it('does not read an empty release-line diff as resolved, and judges the merge instead', () => {
-    // The sync shape: the merge lands *on* nplez1/main, so merge-base is HEAD, the diff is empty,
+    // The sync shape: the merge lands *on* main, so merge-base is HEAD, the diff is empty,
     // and the merge's own contribution is the only diff that can judge it.
     const run = fakeGit({
-      'merge-base nplez1/main HEAD': 'head',
-      'merge-base origin/nplez1/main HEAD': 'head',
+      'merge-base main HEAD': 'head',
+      'merge-base origin/main HEAD': 'head',
       'diff --name-only --no-renames head HEAD': '',
       'rev-list --parents -n 1 HEAD': 'head first second',
       'diff --name-only --no-renames first HEAD': 'src/b.ts'
@@ -560,8 +560,8 @@ describe('the diff that judges a flaky pass', () => {
 
   it('answers unknown when there is nothing but HEAD itself to compare against', () => {
     const run = fakeGit({
-      'merge-base nplez1/main HEAD': 'head',
-      'merge-base origin/nplez1/main HEAD': 'head',
+      'merge-base main HEAD': 'head',
+      'merge-base origin/main HEAD': 'head',
       'diff --name-only --no-renames head HEAD': '',
       'rev-list --parents -n 1 HEAD': 'head'
     })
@@ -569,12 +569,12 @@ describe('the diff that judges a flaky pass', () => {
   })
 
   it('judges a squashed land on the release line by its own single parent', () => {
-    // Every PR into nplez1/main squashes, so a landed change is a one-parent commit that IS the line:
-    // its diff against nplez1/main is empty. Reading that as `unknown` means "in the diff", which
+    // Every PR into main squashes, so a landed change is a one-parent commit that IS the line:
+    // its diff against main is empty. Reading that as `unknown` means "in the diff", which
     // refuses every flake on code the commit never touched.
     const run = fakeGit({
-      'merge-base nplez1/main HEAD': 'head',
-      'merge-base origin/nplez1/main HEAD': 'head',
+      'merge-base main HEAD': 'head',
+      'merge-base origin/main HEAD': 'head',
       'diff --name-only --no-renames head HEAD': '',
       'rev-list --parents -n 1 HEAD': 'head first',
       'diff --name-only --no-renames first HEAD': 'src/c.ts'
@@ -584,8 +584,8 @@ describe('the diff that judges a flaky pass', () => {
 
   it('still answers unknown when a single-parent HEAD changed nothing itself', () => {
     const run = fakeGit({
-      'merge-base nplez1/main HEAD': 'head',
-      'merge-base origin/nplez1/main HEAD': 'head',
+      'merge-base main HEAD': 'head',
+      'merge-base origin/main HEAD': 'head',
       'diff --name-only --no-renames head HEAD': '',
       'rev-list --parents -n 1 HEAD': 'head first',
       'diff --name-only --no-renames first HEAD': ''

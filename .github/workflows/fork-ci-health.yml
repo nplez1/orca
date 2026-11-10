@@ -5,7 +5,7 @@ name: Fork CI health
 # (the nightly backstop is running, and green) and `local/check-queued-runs.mjs` (nothing is waiting for
 # a runner that will never pick it up) — existed and were run by nobody. `rg` found them only in docs and
 # a test. The cost was concrete: a cache sweep stayed active from about 2026-10-25 undetected until
-# 10-28, after it had deleted 9.39 GB of `nplez1/main` caches, and a nightly issue sat open while the
+# 10-28, after it had deleted 9.39 GB of `main` caches, and a nightly issue sat open while the
 # last three runs were failure, success, success. The queued-run check is the one that bounds what
 # `timeout-minutes` cannot: a label nothing provisions waits for the 24 h queue limit, not its timeout.
 #

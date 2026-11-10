@@ -29,7 +29,7 @@ const WORKFLOW = 'fork-main-tests.yml'
 const REPO = 'nplez1/orca'
 // The schedule only ever runs on the default branch, and a dispatch on a feature branch must not be
 // able to answer for the nightly.
-const BRANCH = 'nplez1/main'
+const BRANCH = 'main'
 const CRON_UTC_HOUR = 4
 const CRON_UTC_MINUTE = 53
 

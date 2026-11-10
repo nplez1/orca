@@ -302,12 +302,12 @@ describe('main', () => {
       ].join('\n')
     )
     expect(main(['--init'], root)).toBe(1)
-    expect(main(['--init', '--accept', 'nplez1/main grew it'], root)).toBe(0)
+    expect(main(['--init', '--accept', 'main grew it'], root)).toBe(0)
     const accepted = JSON.parse(
       readFileSync(join(root, 'local', 'upstream-file-comments-baseline.json'), 'utf8')
     )
     expect(accepted.total).toBe(2)
-    expect(accepted.accepted).toBe('nplez1/main grew it')
+    expect(accepted.accepted).toBe('main grew it')
 
     // A shrink is a red until it is locked in, so the slack cannot be spent again elsewhere.
     writeFileSync(file, '// one reason\nexport const value = 2\n')

@@ -49,7 +49,7 @@ export const REQUIRED = [
   '.github/workflows/fork-release.yml',
   '.github/workflows/fork-upstream-tags.yml',
   // Why the unit lane is required and not merely allowed: `AGENTS.md` moved the full unit suite off
-  // the PR boundary and onto this nightly lane, so with it disabled nothing verifies `nplez1/main`
+  // the PR boundary and onto this nightly lane, so with it disabled nothing verifies `main`
   // between merges — a cross-cutting break sits on the release line until someone runs the release
   // gate by hand. Treating "disabled" as drift is the whole point: this is the backstop, and a
   // backstop nobody notices is off is not one. See LOCAL-PATCHES.md § local(ci) before changing it.
@@ -145,7 +145,7 @@ export const EXPECTED_TRIGGERS = {
  */
 export const FORK_SCHEDULES = {
   '.github/workflows/fork-main-tests.yml':
-    'the nightly unit backstop — nothing else tests nplez1/main between merges',
+    'the nightly unit backstop — nothing else tests main between merges',
   '.github/workflows/fork-main-gates.yml':
     'repo-wide oxlint, max-lines, localization catalogs and `pnpm tc` on the release line',
   '.github/workflows/fork-ci-health.yml':

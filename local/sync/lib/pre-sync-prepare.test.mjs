@@ -13,7 +13,7 @@ after(remove)
 const first = commit('first', { 'src/a.ts': 'export const a = 1\n' })
 const second = commit('second', { 'src/a.ts': 'export const a = 2\n' })
 git('update-ref', 'refs/remotes/upstream/main', second)
-git('update-ref', 'refs/heads/nplez1/main', second)
+git('update-ref', 'refs/heads/main', second)
 // A backup left pointing at the previous sync's tip: the case the runbook calls stale.
 git('update-ref', 'refs/heads/backup/nplez1-main-pre-sync', first)
 
@@ -21,7 +21,7 @@ process.chdir(repo)
 const { BACKUP_REF, prepare } = await import('./pre-sync-checks.mjs')
 
 const outcome = prepare(
-  { shas: { forkRef: 'refs/heads/nplez1/main', oldBase: first, oldTip: second, newBase: second } },
+  { shas: { forkRef: 'refs/heads/main', oldBase: first, oldTip: second, newBase: second } },
   0
 )
 
@@ -36,7 +36,7 @@ test('the state file records this sync and a rerun does not move the ref again',
   assert.equal(outcome.state.oldTip, second)
   const rerun = prepare(
     {
-      shas: { forkRef: 'refs/heads/nplez1/main', oldBase: first, oldTip: second, newBase: second }
+      shas: { forkRef: 'refs/heads/main', oldBase: first, oldTip: second, newBase: second }
     },
     0
   )
@@ -50,7 +50,7 @@ test('a stale archive TAG is reported as a failure instead of being moved', () =
   git('tag', `archive/pre-sync-${second.slice(0, 10)}`, first)
   const tagged = prepare(
     {
-      shas: { forkRef: 'refs/heads/nplez1/main', oldBase: first, oldTip: second, newBase: second }
+      shas: { forkRef: 'refs/heads/main', oldBase: first, oldTip: second, newBase: second }
     },
     0
   )

@@ -73,9 +73,13 @@ it('derives every shared /tmp path instead of naming a fixed one', () => {
 
 it('states the fork PR base the hook and the script both enforce', () => {
   const hook = read('.husky/commit-msg')
+  const script = read('local/open-pr.mjs')
 
-  expect(hook).toContain('nplez1/main')
-  expect(hook).not.toContain('PR branches are cut from origin/main')
+  // One base, named the same way in both: the fork's own line, which is `main` on both remotes.
+  expect(hook).toContain('descends from main')
+  expect(script).toContain("const FORK_BASE = 'main'")
+  // Upstream-bound branches are cut from upstream's line, which `origin/main` no longer is.
+  expect(hook).toContain('cut from upstream/main')
 })
 
 it('records what the runners actually bill, instead of the billed-minutes premise', () => {
@@ -107,15 +111,16 @@ it('names the cheap PR lane it decided on, and why the unit suite is not it', ()
   )
 })
 
-it('pushes the upstream mirror through the enablement sweep, not as a bare git push', () => {
+it('pushes the release line through the enablement sweep, not as a bare git push', () => {
   // A workflow file new to that push arrives active; sweeping afterwards in the same step is the only
   // lever, because there is no workflow to disable until the file exists (issue #221 C5).
   const step = section(read('UPSTREAM-SYNC-RUNBOOK.md'), '## Step 4 — push').join('\n')
   const blocks = codeBlocks(step).join('\n')
 
-  expect(blocks).toContain('node local/sync/push-upstream-mirror.mjs')
-  expect(blocks).not.toMatch(/^git push origin upstream\/main:main/m)
-  expect(blocks).toContain('node local/check-actions-enablement.mjs')
+  expect(blocks).toContain('node local/sync/publish-sync.mjs')
+  // The wrapper is the only push in the step, so a bare `git push` cannot slip in beside it.
+  expect(blocks).not.toMatch(/^git push origin/m)
+  expect(blocks).not.toContain('upstream/main:main')
 })
 
 it('says why the PR lane does not run repo-wide lint yet, with the measured failures', () => {

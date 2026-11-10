@@ -5,7 +5,7 @@
 # existing tag cannot be moved — but that was a property of the command line, not of the job, and
 # nothing said so if someone added `--force`, `--mirror` or a refspec. Worse, the PAT the mirror
 # authenticates with belongs to the account that is the `exempt` bypass actor on the only ruleset
-# protecting `refs/heads/nplez1/main`, and no tag ruleset exists at all — so there is no server-side
+# protecting `refs/heads/main`, and no tag ruleset exists at all — so there is no server-side
 # backstop either.
 #
 # This makes the guarantee explicit and testable: compare the tags this checkout is about to push

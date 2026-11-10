@@ -153,13 +153,13 @@ function readJsonFile(path, what) {
  * a resolvable base the answer is `unknown`, and a flaky pass is never waived on `unknown`.
  *
  * Why an empty diff is not a resolved one: a sync merges upstream *onto* the release line, so
- * `merge-base(nplez1/main, HEAD)` is HEAD itself and the diff comes back empty — which waived every
+ * `merge-base(main, HEAD)` is HEAD itself and the diff comes back empty — which waived every
  * flaky pass on a line a 556-commit merge had just built. What that merge contributed is
  * `HEAD^1..HEAD`, so that is the diff that has to judge it.
  */
 export function branchDiff(runGit = git) {
   let baseResolved = false
-  for (const base of ['nplez1/main', 'origin/nplez1/main']) {
+  for (const base of ['main', 'origin/main']) {
     const mergeBase = runGit(['merge-base', base, 'HEAD'])
     if (!mergeBase) {
       continue
@@ -177,8 +177,8 @@ export function branchDiff(runGit = git) {
   }
   // Why the first parent and not HEAD^2: everything a merge adds to the release line is
   // `HEAD^1..HEAD`, so nothing that merge could have broken falls outside the diff.
-  // Why a single-parent HEAD is included: every PR into `nplez1/main` squashes, so a landed change is
-  // a one-parent commit whose diff against `nplez1/main` is empty — it IS that line. Excluding it left
+  // Why a single-parent HEAD is included: every PR into `main` squashes, so a landed change is
+  // a one-parent commit whose diff against `main` is empty — it IS that line. Excluding it left
   // the answer `null`, and `null` means "in the diff", so a load flake on the release line could never
   // be excused and the gate would fail on code that commit did not touch.
   const parents = (runGit(['rev-list', '--parents', '-n', '1', 'HEAD']) ?? '').split(' ')

@@ -1,7 +1,7 @@
 // The upstream commit this fork's sync is keyed to, and what that commit contains.
 //
 // Why a recorded SHA and not a ref: `origin` is this fork's own repository, so `origin/HEAD` resolves to
-// `nplez1/main` — the fork line, where every path exists and a rule about upstream ownership checks
+// `main` — the fork line, where every path exists and a rule about upstream ownership checks
 // nothing. A ref tip is also the wrong answer, because it moves between syncs: upstream moved
 // `ssh/connection/ssh-connection-store.ts` to `ssh/targets/` after the last sync, so a tip-based ruler
 // reads two upstream-owned baseline rows as fork-owned. The record is the sync's own assertion, rewritten

@@ -28,7 +28,7 @@ name: Mirror upstream release tags
 #
 # Why this job cannot move a tag, stated as a check and not as a property of its command line: the PAT
 # belongs to `nplez1`, which is the `exempt` bypass actor on the only ruleset protecting
-# `refs/heads/nplez1/main`, and no tag ruleset exists — so nothing server-side would stop a moved
+# `refs/heads/main`, and no tag ruleset exists — so nothing server-side would stop a moved
 # `v*` tag, and before 2026-10-29 "an existing tag is never moved" rested entirely on the absence of
 # `--force` in this file. `.github/scripts/fork-tag-mirror-guard.sh` reads both remotes and fails the
 # job when a tag it would send already exists at another commit.

@@ -6,12 +6,12 @@
 // said which of the two a PR belongs to. A PR aimed at upstream is a decision, not a default
 // (see BRANCHES.md), so upstream requires the explicit `--upstream` flag here.
 //
-// Why the ancestry check: this fork's own line is `nplez1/main`, while `main` mirrors upstream.
-// A branch cut from `main` and opened against `nplez1/main` still looks like a small diff
-// locally, but the PR then carries every fork-only patch as a reversion. Descendant-of-base is
-// the property that rules that out, and it fails loudly instead of showing up in review. The base
+// Why the ancestry check: this fork's own line is `main` on `origin`, while upstream's is `main` on
+// `upstream`. A branch cut from `upstream/main` and opened against the fork's `main` still looks like a
+// small diff locally, but the PR then carries every fork-only patch as a reversion. Descendant-of-base
+// is the property that rules that out, and it fails loudly instead of showing up in review. The base
 // is resolved against the remote the PR targets — `upstream` for an upstream PR, `origin`
-// otherwise — because the two remotes track different branches.
+// otherwise — because the two remotes track different branches with the same name.
 //
 // Why both PR gates are read here: AGENTS.md makes the PR's own verification and one Opus review
 // conditions of opening a PR, and a rule that nothing reads is advisory. This refuses a body with no
@@ -27,7 +27,7 @@
 //   node local/open-pr.mjs --title "..." --body-file "$body" --upstream
 //   node local/open-pr.mjs --title "..." --body-file "$body" --waive-gate 1:"<why>"
 //
-// Upstream PRs are cut from `main`, this fork's PRs from `nplez1/main`; `--base <branch>`
+// Upstream PRs are cut from `upstream/main`, this fork's PRs from `origin/main`; `--base <branch>`
 // overrides either.
 
 import { execFileSync } from 'node:child_process'
@@ -60,7 +60,7 @@ export {
 
 const FORK = 'nplez1/orca'
 const UPSTREAM = 'stablyai/orca'
-const FORK_BASE = 'nplez1/main'
+const FORK_BASE = 'main'
 const UPSTREAM_BASE = 'main'
 
 // Why a remote per target: `origin` tracks only `refs/heads/nplez1/*`, so validating an upstream

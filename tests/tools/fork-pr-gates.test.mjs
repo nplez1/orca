@@ -22,7 +22,7 @@ describe('the cheap PR lane', () => {
   })
 
   it('does not run the repo-wide lint lane while the release line is red for it', () => {
-    // `pnpm lint` reports 2 of 36 steps failed on nplez1/main (oxlint over max-lines in the CLI, and a
+    // `pnpm lint` reports 2 of 36 steps failed on main (oxlint over max-lines in the CLI, and a
     // stale flaky-test baseline). A permanently red required check is worse than no check.
     const scripts = runScripts(GATES).join('\n')
 

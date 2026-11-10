@@ -14,7 +14,7 @@ on:
     - cron: '23 4 * * *'
   workflow_dispatch:
   push:
-    branches: [nplez1/main]
+    branches: [main]
 
 permissions:
   contents: read
