@@ -336,6 +336,7 @@ describe('the sweep', () => {
       'check-actions: 81 workflows on nplez1/orca, 18 active',
       "  DRIFT    active but not on the fork's live list: .github/workflows/x.yml — X",
       "  disabled .github/workflows/x.yml (active but not on the fork's live list)",
+      '  disabled .github/workflows/y.yml (its triggers changed shape)',
       '  DISABLED Actions is disabled for nplez1/orca, so no lane here can run at all',
       '  OK'
     ].join('\n')
@@ -344,13 +345,18 @@ describe('the sweep', () => {
       check('check-nightly-liveness', 0)
     ]
 
+    // Both routes, because only one of them is "not on the list" and the remedies differ.
     expect(disabledBySweep(checks)).toEqual([
-      { path: '.github/workflows/x.yml', why: "active but not on the fork's live list" }
+      { path: '.github/workflows/x.yml', why: "active but not on the fork's live list" },
+      { path: '.github/workflows/y.yml', why: 'its triggers changed shape' }
     ])
     // The reason travels with the path: two of the three disable routes are a lane that *is* on the
     // list, and telling a reader to add those to REQUIRED would leave them MISSING instead.
     expect(closeComment(checks)).toContain(
       "- `.github/workflows/x.yml` — active but not on the fork's live list"
+    )
+    expect(closeComment(checks)).toContain(
+      '- `.github/workflows/y.yml` — its triggers changed shape'
     )
   })
 

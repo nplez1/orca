@@ -688,7 +688,7 @@ function report(verdict, fix) {
           'decision in LOCAL-PATCHES.md § local(ci)'
       )
     }
-    if (verdict.needsDecision.some((entry) => entry.kind === 'fork-owned')) {
+    if (verdict.needsDecision.some((entry) => entry.kind === 'fork-owned' && !entry.listed)) {
       console.log(
         '  escalate a fork-owned lane is enabled with no entry, and a sync cannot have turned it on — ' +
           'a person decides whether it belongs here. Do not disable it to make this check green.'
