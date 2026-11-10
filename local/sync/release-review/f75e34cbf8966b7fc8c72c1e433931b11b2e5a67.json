@@ -1,0 +1,93 @@
+{
+  "revision": "f75e34cbf8966b7fc8c72c1e433931b11b2e5a67",
+  "base": "24dceda182f",
+  "upstream": "86ee16da9ea",
+  "mergeCommit": "266cd398f34",
+  "reviewer": {
+    "provider": "claude",
+    "alias": "fable",
+    "name": "Fable 5.2",
+    "thinking": "medium"
+  },
+  "artifact": {
+    "kind": "remerge-diff",
+    "path": "/var/folders/3h/nwvql3c50l36252gj6cx1cs80000gn/T/orca-fable-review.HLf9bl/remerge-diff.patch",
+    "bytes": 1404935
+  },
+  "note": "Six slices. A, C and E reported in the first pass; B, D and F were dispatched and never reported, which is why np.49 shipped on a third of its review. All six have now been read. Every BLOCKER and SHOULD-FIX is fixed in the tree; MINOR and NIT findings are recorded in local/sync/convergence-ledger.md under 'Review follow-ups from the 2026-11-10 sync'.",
+  "slices": [
+    {
+      "id": "A",
+      "lines": "133-5190",
+      "scope": "config/, docs, package.json, resources/skills, src/cli, src/main/agent-hooks, agent-launch",
+      "verdict": "reported",
+      "blockers": 1,
+      "shouldFix": 1,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "resolved": "serve-service.test.ts had reverted to upstream bytes and lost the fork's orca-np identity assertions; WORKER_THREAD_ENTRY_NAMES had lost the fork's worker entry."
+    },
+    {
+      "id": "B",
+      "lines": "5191-9103",
+      "scope": "ai-vault*, claude-accounts, claude, codex, command-code, ephemeral-vm*, git, github, host-sync, first ipc",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 2,
+      "minors": 1,
+      "nits": 1,
+      "unresolved": 0,
+      "resolved": "The startup recovery dropped every attempt because the merged create writes upstream's provisioning record under the same id first, so the fork flag never fired; the abort-row condition was wider than pre-sync; the attempt write sat outside the try. All three fixed."
+    },
+    {
+      "id": "C",
+      "lines": "9104-15517",
+      "scope": "src/main/ipc, native-chat, orca-profiles, persistence, pi, rate-limits, runtime, sqlite, ssh, startup, window, src/preload",
+      "verdict": "reported",
+      "blockers": 1,
+      "shouldFix": 1,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "resolved": "orca-runtime-owned-controllers wired cloneRepo with the old positional signature inside a @ts-nocheck file; clipboard-ipc-sender-trust regained the dashboard-popout admission the fork deleted."
+    },
+    {
+      "id": "D",
+      "lines": "15518-21410",
+      "scope": "renderer App.tsx and components/ through settings/ssh",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 3,
+      "minors": 4,
+      "nits": 2,
+      "unresolved": 0,
+      "resolved": "The fork's Delete Remote Branch By Default toggle was dropped while the setting stayed declared, defaulted, replicated and read; the forced-rescan budget was split across two modules so the fork's rule was a no-op; an 18-case fork automation suite was lost. All three fixed."
+    },
+    {
+      "id": "E",
+      "lines": "21411-24300",
+      "scope": "settings/virtual-machines, settings/voice, sidebar, status-bar, tab-bar, tab-group, i18n, lib/*",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "resolved": "All 11 locale catalogs diverged from upstream; restored byte-for-byte with tombstones in the fork overlays."
+    },
+    {
+      "id": "F",
+      "lines": "24300-26668",
+      "scope": "renderer lib/*, runtime/*, store/**, web/preload-api, src/shared/** incl. orca-yaml*, rpc-contract, tests/e2e",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 0,
+      "minors": 1,
+      "nits": 3,
+      "unresolved": 0,
+      "resolved": "No blocking finding. Confirmed sidebar-worktree-activation's fork delta was re-applied at the new path, and that the popout deletion matches the ledger's dashboard-delivery decision."
+    }
+  ],
+  "waiver": null
+}
