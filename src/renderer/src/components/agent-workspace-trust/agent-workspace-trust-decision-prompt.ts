@@ -1,9 +1,6 @@
 import { useAppStore } from '@/store'
 import { getRepoRowIdentity, repoMatchesHostIdentity } from '@/store/repos/repo-host-identity'
-import {
-  TUI_AGENT_CONFIG,
-  isTuiAgent
-} from '../../../../shared/agent-launch/catalog/tui-agent-config'
+import { agentLaunchDependsOnWorkspaceTrust } from '../../../../shared/agent-launch/startup/agent-trust-launch-args'
 import {
   needsAgentWorkspaceTrustDecision,
   type AgentWorkspaceTrustDecision
@@ -103,7 +100,9 @@ export function awaitAgentWorkspaceTrustDecision(args: {
   if (listeners.size === 0) {
     return null
   }
-  if (!isTuiAgent(args.launchAgent) || !TUI_AGENT_CONFIG[args.launchAgent].preflightTrust) {
+  // Why the shared predicate: an agent that answers its own trust prompt from Orca's answer needs it
+  // asked just as much as one whose trust Orca pre-writes.
+  if (!agentLaunchDependsOnWorkspaceTrust(args.launchAgent)) {
     return null
   }
   const repo = repoForWorkspace(args.workspaceId, args.connectionId)
