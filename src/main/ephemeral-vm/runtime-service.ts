@@ -99,7 +99,12 @@ export async function provisionEphemeralVmRuntime(
     if (!start.ok) {
       await persistFailedEphemeralVmStart(args, writeAhead, start)
       endEphemeralVmProvisioning(args, writeAhead)
-      forgetEphemeralVmProvisioningAttempt(args.userDataPath, instanceId)
+      // Why an aborted create keeps its row: the kill lands after the release, so the destroy it
+      // started may never have finished and the user never saw the failure. The row is what a later
+      // startup has to go on, and only a failure the user actually saw may drop it.
+      if (!start.aborted) {
+        forgetEphemeralVmProvisioningAttempt(args.userDataPath, instanceId)
+      }
       return { ok: false, start }
     }
     const runtime = await persistProvisionedEphemeralVmRuntime(args, start, writeAhead)

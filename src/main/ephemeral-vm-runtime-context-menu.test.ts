@@ -132,7 +132,7 @@ function makeFixture(recipe: Partial<OrcaVmRecipe> = {}): Fixture {
       }
       return {
         runtime,
-        repo: { ok: true, repo: { path: fixture.repoPath, id: 'repo-1' } },
+        repoPath: fixture.repoPath,
         recipe: fixture.recipe
       }
     }
