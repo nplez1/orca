@@ -21,6 +21,7 @@ import {
   labelEnv,
   maySweep
 } from '../../local/ci-health-report.mjs'
+import { exitCodeFor } from '../../local/check-actions-enablement.mjs'
 import { REPO_ROOT, readWorkflow, runScripts, triggerKeys } from './workflow-file.mjs'
 
 const check = (name, code, output = `${name} output`) => ({ name, code, output })
@@ -343,8 +344,33 @@ describe('the sweep', () => {
       check('check-nightly-liveness', 0)
     ]
 
-    expect(disabledBySweep(checks)).toEqual(['.github/workflows/x.yml'])
-    expect(closeComment(checks)).toContain('- `.github/workflows/x.yml`')
+    expect(disabledBySweep(checks)).toEqual([
+      { path: '.github/workflows/x.yml', why: "active but not on the fork's live list" }
+    ])
+    // The reason travels with the path: two of the three disable routes are a lane that *is* on the
+    // list, and telling a reader to add those to REQUIRED would leave them MISSING instead.
+    expect(closeComment(checks)).toContain(
+      "- `.github/workflows/x.yml` — active but not on the fork's live list"
+    )
+  })
+
+  // The one mapping that decides whether a red reaches an agent. Exit 3 is the only finding whose two
+  // remedies — disable the lane, or widen the list — are both forbidden to one.
+  it('maps a verdict to the exit code the pipeline reads', () => {
+    const forkOwned = {
+      needsDecision: [{ path: '.github/workflows/fork-x.yml', kind: 'fork-owned', listed: false }]
+    }
+    const required = {
+      needsDecision: [{ path: '.github/workflows/mobile.yml', kind: 'required', listed: true }]
+    }
+    const listedForkOwned = {
+      needsDecision: [{ path: '.github/workflows/fork-x.yml', kind: 'fork-owned', listed: true }]
+    }
+
+    expect(exitCodeFor({ needsDecision: [] }, 0)).toBe(0)
+    expect(exitCodeFor(forkOwned, 1)).toBe(3)
+    expect(exitCodeFor(required, 1)).toBe(1)
+    expect(exitCodeFor(listedForkOwned, 1)).toBe(1)
   })
 
   it('closes with the plain line when nothing was disabled', () => {

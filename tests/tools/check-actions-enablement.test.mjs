@@ -199,7 +199,7 @@ describe('a lane that grew a trigger', () => {
     })
 
     expect(verdict.needsDecision).toEqual([
-      { path, why: 'active with no pinned triggers', kind: 'required' }
+      { path, why: 'active with no pinned triggers', kind: 'required', listed: true }
     ])
     expect(verdict.disableTargets).toEqual([])
     expect(verdict.ok).toBe(false)
@@ -234,7 +234,7 @@ describe('what the sweep may turn off', () => {
 
     expect(verdict.drift.map((entry) => entry.path)).toEqual([path])
     expect(verdict.needsDecision).toEqual([
-      { path, why: "active but not on the fork's live list", kind: 'fork-owned' }
+      { path, why: "active but not on the fork's live list", kind: 'fork-owned', listed: false }
     ])
     expect(verdict.disableTargets).toEqual([])
     expect(verdict.ok).toBe(false)
@@ -254,7 +254,7 @@ describe('what the sweep may turn off', () => {
 
     expect(verdict.disableTargets).toEqual([])
     expect(verdict.needsDecision).toEqual([
-      { path, why: 'its triggers changed shape', kind: 'fork-owned' }
+      { path, why: 'its triggers changed shape', kind: 'fork-owned', listed: true }
     ])
   })
 
@@ -271,7 +271,7 @@ describe('what the sweep may turn off', () => {
 
     expect(verdict.disableTargets).toEqual([])
     expect(verdict.needsDecision).toEqual([
-      { path, why: 'its triggers changed shape', kind: 'required' }
+      { path, why: 'its triggers changed shape', kind: 'required', listed: true }
     ])
     expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
   })

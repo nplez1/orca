@@ -3384,9 +3384,10 @@ that existed before it ran unattended:
   the pipeline may take on", and the only two things an agent could do here are the two this section
   forbids: disable a lane someone enabled on purpose, or widen the list to hide the finding. It withholds
   the label from the whole issue rather than from that one check, because an agent handed a red it may
-  not resolve will resolve it anyway. A `REQUIRED` lane whose triggers changed shape stays at 1 and stays
-  delegable: pinning the new trigger is a decision an agent can make and record, and six of the required
-  lanes are fork-owned, so exit 3 has to be keyed on the guard that actually held the lane back.
+  not resolve will resolve it anyway. Exit 3 is keyed on the guard that held the lane back **and** on the
+  route: a `REQUIRED` lane whose triggers changed shape stays at 1 and stays delegable, because pinning
+  the new trigger is a decision an agent can make and record, and six of the required lanes are
+  fork-owned — so "fork-owned" alone would withhold delegation from the routine post-sync case.
 
 A night that heals itself reports clean, so the close comment names what the sweep disabled. When no
 issue was open — the ordinary case, because the sweep usually runs before the red ever reaches one —

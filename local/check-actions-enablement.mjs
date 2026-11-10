@@ -372,38 +372,40 @@ export function judgeEnablement(
   //   exists to prevent;
   // - a fork-owned file. A sync cannot add one, so an enabled one with no entry is a person's decision.
   //
-  // `kind` names the guard that held it back, so the report says the true reason: a required lane is
-  // never swept whatever else it is, and six of the required lanes are fork-owned too.
+  // `kind` names the guard that held it back and `listed` whether it was on the live list at all, so the
+  // report says the true reason: a required lane is never swept whatever else it is, six of the required
+  // lanes are fork-owned too, and a fork-owned lane can be on the list with only its trigger shape wrong.
   const needsDecision = []
-  const sweepable = (path, why) => {
+  const sweepable = (path, why, listed) => {
     if (!required.includes(path) && !isForkOwnedPath(path)) {
       return true
     }
     needsDecision.push({
       path,
       why,
-      kind: required.includes(path) ? 'required' : 'fork-owned'
+      kind: required.includes(path) ? 'required' : 'fork-owned',
+      listed
     })
     return false
   }
 
   const disableTargets = [
     ...drift
-      .filter((entry) => sweepable(entry.path, "active but not on the fork's live list"))
+      .filter((entry) => sweepable(entry.path, "active but not on the fork's live list", false))
       .map((entry) => ({
         path: entry.path,
         id: entry.id,
         why: "active but not on the fork's live list"
       })),
     ...triggerDrift
-      .filter((entry) => sweepable(entry.path, 'its triggers changed shape'))
+      .filter((entry) => sweepable(entry.path, 'its triggers changed shape', true))
       .map((entry) => ({
         path: entry.path,
         id: byPath.get(entry.path)?.id ?? null,
         why: 'its triggers changed shape'
       })),
     ...unpinned
-      .filter((entry) => sweepable(entry.path, 'active with no pinned triggers'))
+      .filter((entry) => sweepable(entry.path, 'active with no pinned triggers', true))
       .map((entry) => ({
         path: entry.path,
         id: byPath.get(entry.path)?.id ?? null,
@@ -593,13 +595,12 @@ function report(verdict, fix) {
     console.log(`  DRIFT    active but not on the fork's live list: ${w.path} — ${w.name}`)
   }
   for (const d of verdict.needsDecision) {
-    console.log(
-      `  DECIDE   ${
-        d.kind === 'fork-owned'
-          ? 'enabled with no entry, and a sync cannot have added it, so a person decides'
-          : 'required, so the sweep will not disarm it'
-      }: ${d.path} (${d.why})`
-    )
+    const reason = d.listed
+      ? d.kind === 'required'
+        ? 'required, so the sweep will not disarm it'
+        : 'fork-owned, so the sweep will not touch it'
+      : 'enabled with no entry, and a sync cannot have added it, so a person decides'
+    console.log(`  DECIDE   ${reason}: ${d.path} (${d.why})`)
   }
   for (const m of verdict.missing) {
     console.log(`  MISSING  required but ${m.state}: ${m.path}`)
@@ -705,6 +706,21 @@ function report(verdict, fix) {
   return residual
 }
 
+/**
+ * The exit code for a finished run, from the verdict alone so it can be pinned by a test: 3 only when a
+ * fork-owned lane is enabled and nobody listed it, which is the one finding whose two remedies — disable
+ * it, or widen the list — are both forbidden to an agent. Everything else that is red stays 1.
+ */
+export function exitCodeFor(verdict, residual) {
+  if (residual === 0) {
+    return 0
+  }
+  const decided = verdict.needsDecision.some(
+    (entry) => entry.kind === 'fork-owned' && !entry.listed
+  )
+  return decided ? 3 : 1
+}
+
 function main() {
   const fix = process.argv.includes('--fix')
   let workflows
@@ -730,14 +746,9 @@ function main() {
   })
   verdict.actionsDisabled = actionsEnabled
   const residual = report(verdict, fix)
-  if (residual > 0) {
-    // 3 rather than 1 for a fork-owned lane only: 1 means "a scoped defect the pipeline may take on", and
-    // neither action available for one of those is that — disabling it undoes a person's decision, and
-    // widening the list hides the finding. A required lane that changed shape stays 1, because pinning its
-    // new trigger is a decision an agent may make and record. `local/ci-health-report.mjs` withholds
-    // `agent:auto` on 3.
-    const decided = verdict.needsDecision.some((entry) => entry.kind === 'fork-owned')
-    process.exit(decided ? 3 : 1)
+  const code = exitCodeFor(verdict, residual)
+  if (code !== 0) {
+    process.exit(code)
   }
   console.log('  OK')
 }

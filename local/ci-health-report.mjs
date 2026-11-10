@@ -284,8 +284,9 @@ export function disabledBySweep(checks) {
   const enablement = checks.find((check) => check.name === 'check-actions-enablement')
   return String(enablement?.output ?? '')
     .split('\n')
-    .map((line) => /^\s*disabled\s+(\S+)\s+\(/.exec(line)?.[1])
+    .map((line) => /^\s*disabled\s+(\.github\/workflows\/\S+)\s+\((.*)\)\s*$/.exec(line))
     .filter(Boolean)
+    .map((match) => ({ path: match[1], why: match[2] }))
 }
 
 /**
@@ -295,6 +296,11 @@ export function disabledBySweep(checks) {
  * none was — the ordinary case, because the sweep usually runs before the red ever reaches an issue —
  * the record is the run log plus the workflows' own `disabled_manually` state, which
  * `gh api repos/<repo>/actions/workflows` answers at any time.
+ *
+ * Why the reason travels with the path: only one of the three disable routes is "not on the live list".
+ * The other two are an `ALLOWED_INERT` lane whose triggers changed shape and one with no pinned
+ * triggers, and for those the remedy is the pin plus a re-enable — telling the reader to add the file to
+ * `REQUIRED` would leave it `MISSING` instead.
  */
 export function closeComment(checks) {
   const closed = 'All fork health checks are clean again.'
@@ -305,11 +311,12 @@ export function closeComment(checks) {
   return [
     closed,
     '',
-    'The enablement sweep disabled these on the way — a sync enables every workflow file it adds, and',
-    "nothing that is not on the fork's live list may stay on. Add one back to `REQUIRED` in",
-    '`local/actions-enablement-contract.mjs` if it belongs there:',
+    'The enablement sweep disabled these on the way. A sync enables every workflow file it adds, and',
+    "nothing that is not on the fork's live list may stay on — so if one belongs on, re-enable it and",
+    'correct `local/actions-enablement-contract.mjs` in the same change (its `REQUIRED` / `ALLOWED_INERT`',
+    'entry, or the triggers pinned for it):',
     '',
-    ...disabled.map((path) => `- \`${path}\``)
+    ...disabled.map((entry) => `- \`${entry.path}\` — ${entry.why}`)
   ].join('\n')
 }
 
@@ -442,9 +449,7 @@ function main() {
   if (fixRequested && !fix) {
     // Said out loud: a dispatch from a branch otherwise reads as an ordinary report-only run, and the
     // reader would think the sweep ran and found nothing.
-    const why = dryRun
-      ? '--dry-run'
-      : `ref ${process.env.GITHUB_REF ?? '(none)'} is not refs/heads/main`
+    const why = dryRun ? '--dry-run' : `ref ${process.env.GITHUB_REF} is not refs/heads/main`
     console.error(`ci-health: not sweeping — ${why}`)
   }
   const runUrl =
