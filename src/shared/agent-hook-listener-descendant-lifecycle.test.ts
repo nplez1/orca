@@ -307,6 +307,20 @@ describe('descendant lifecycle never settles the pane', () => {
       expect(failed?.payload.mainAgent).toEqual(
         expect.objectContaining({ state: 'done', outcome: 'failure' })
       )
+
+      // A second question arrives as the child's own event, which builds a fresh payload: the verdict
+      // has to survive that path too, or the row loses its failure while the child is still waiting.
+      const askedAgain = publish('grok', {
+        hookEventName: 'pre_tool_use',
+        subagentType: 'x',
+        subagentId: 'sub-1',
+        toolName: 'ask_user_question',
+        toolInput: { question: 'and this one?' }
+      })
+      expect(askedAgain?.payload.state).toBe('waiting')
+      expect(askedAgain?.payload.mainAgent).toEqual(
+        expect.objectContaining({ state: 'done', outcome: 'failure' })
+      )
     })
   })
 

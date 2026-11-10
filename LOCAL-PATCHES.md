@@ -709,15 +709,22 @@ its own, so nothing a roster-owning lane said is replaced. It applies to every p
 and the held row keeps the lead's vocabulary, so a held `waiting` still reads `waiting`. Nothing
 changes for a lead that is still working: a hold over one asserts nothing a `mainAgent` reader needs.
 
-Three things this deliberately does not change, all stated so the next reader does not re-derive
-them. A `waiting` or `blocked` program-status proposal can still take a held row after the silence
-window — a needs-you signal should win, and the cost is that its row carries no children, which for
-pi needs a child dialog under a finished lead. A cancelled turn's held row publishes `mainAgent`
-without `outcome: 'cancellation'`, so a turn-news listener can announce a cancelled turn as finished;
-carrying the outcome is more than one hunk and is left as a follow-up. And the hold has no escape
-hatch of its own — a pi that stays alive but stops reporting a dead child pins the row until its next
-hook post or the 30-minute display decay, the same exposure the scheduled-work hold and Claude's
-child roster already carry.
+Four things this deliberately does not change, all stated so the next reader does not re-derive them.
+A `waiting` or `blocked` program-status proposal can still take a held row after the silence window —
+a needs-you signal should win, and the cost is that its row carries no children, which for pi needs a
+child dialog under a finished lead. A held row's `mainAgent` carries no `outcome`, so a turn that was
+cancelled, errored or cut off before it produced a reply announces its end through
+`terminal-agent-turn-news.ts` as finished where it previously announced nothing; stamping
+`outcome: 'cancellation'` on a working pi row would arm `isCancelVerdictLatched`, and pi has no
+`opensNewTurn` event to release it, so carrying the outcome is a follow-up rather than one hunk. The
+hold has no escape hatch of its own — a pi that stays alive but stops reporting a dead child pins the
+row until its next hook post or the 30-minute display decay, the same exposure the scheduled-work hold
+and Claude's child roster already carry. And the held row's `mainAgent` is what every `mainAgent`
+reader now sees, so three of them change for a held pi row and each is the intended semantics rather
+than a side effect: a `tui-idle` wait reports the lead's turn ready while children run (which is what
+the lane already does for Claude), `agent_not_working` refuses a Stop instead of sending Escape, and a
+plugin subscribed to agent status events sees the lead verdict at lead end and a `done` row without it
+at drain.
 
 Anchors:
 

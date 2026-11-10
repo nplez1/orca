@@ -66,14 +66,14 @@ it('keeps a pane working, with its child, past the hook-silence fallback while t
   expect(row()?.subagents?.map((child) => child.id)).toEqual(['run-1'])
 })
 
-it('still hands a hook-silent pane with no child to its terminal status', async () => {
+it('still hands a hook-silent working lead to its terminal status, child or not', async () => {
   await piHook('before_agent_start', { prompt: 'run the build' })
-  await piHook('agent_end', { subagent_runs: [] })
+  await piHook('tool_execution_end', { subagent_runs: [CHILD] })
 
   vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
-  // A turn held open by its own long tool call has no `mainAgent` verdict to state, so the ordinary
-  // fallback must keep working — otherwise a hook-silent pane pins itself working for good.
-  await piHook('before_agent_start', { prompt: 'run the build' })
+  // A lead that has not finished states no verdict, so the hold this branch publishes cannot apply:
+  // the ordinary fallback must still end a hook-silent pane. Without that guard every child-bearing
+  // pane whose tool call goes quiet would pin itself working for good.
   programDone()
 
   vi.advanceTimersByTime(HOOK_SILENCE_BEFORE_PROGRAM_STATUS_FALLBACK_MS + 1)

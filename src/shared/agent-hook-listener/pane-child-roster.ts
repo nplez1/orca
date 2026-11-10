@@ -93,6 +93,15 @@ export function carriedReportedChildren(
   return reported.children
 }
 
+/** The outcome a previous `done` verdict already stated, when it stated one. */
+function previousDoneOutcome(previous: AgentMainAgentStatus | undefined): {
+  outcome?: AgentMainAgentStatus['outcome']
+} {
+  return previous?.state === 'done' && previous.outcome !== undefined
+    ? { outcome: previous.outcome }
+    : {}
+}
+
 /** Publish one row from one child roster: the state and the child list a reader renders come out of
  *  the same list, through the same fold every other lane uses.
  *
@@ -141,6 +150,11 @@ export function resolvePaneHold(
                   held.previousMainAgent,
                   {
                     state: 'done',
+                    // Why the previous verdict's outcome rides too: this call site builds a fresh
+                    // payload with no `mainAgent`, so a re-hold of a verdict a roster-owning lane
+                    // already stated (grok's failed turn, asked about again) would otherwise drop
+                    // the outcome the first hold carried.
+                    ...previousDoneOutcome(held.previousMainAgent),
                     // Why the turn's own completion time and nothing else: a re-hold of the same
                     // finished turn keeps its clock through the previous `done` row, and a row
                     // whose lead was not done cannot date this one.
