@@ -2511,3 +2511,34 @@ optional chaining (25), upstream's forge-owner guard meeting fixtures that name 
 not (18), `workingMode: 'monitoring'` gated behind a fork policy that deliberately omits it (22),
 and upstream's `#36822` opting pi out of title synthesis while the fork's permission bell still has to
 ring (3).
+
+## Review follow-ups from the 2026-11-10 sync
+
+The 2026-11-10 merge shipped as `v1.4.214-np.49` after a review that read three of its six slices.
+Reading the other three afterwards found four real regressions, all fixed (the abort-row condition,
+the recovery's reported test, the split forced-rescan budget, and the dropped Delete Remote Branch
+toggle). What follows is what that reading found and this sync deliberately did **not** change, so the
+next reader does not re-derive it.
+
+- **`src/renderer/src/lib/project-host-health-detail.ts` is an upstream orphan.** Nothing imports it;
+  the fork keeps its own `getHostHealthUnavailableDetail` in `lib/project-host-setup-availability.ts`,
+  which is the richer copy (it answers `provisioning`, `waking` and `suspended`). Deleting upstream's
+  copy would only restore it at the next sync, so it stays and the duplicate is recorded here.
+- **`ephemeral-vm-recipe-timeouts.ts` does not cover `extend` or `contextMenuItems`.** `timeoutSeconds`
+  knows `create | suspend | resume | destroy`, but the fork's recipes also run those two hooks, and
+  neither runner passes a `timeoutMs` — so they run unlimited, and a map naming `extend` is rejected
+  as "not a lifecycle step", which drops every limit on that recipe. A gap where two features meet,
+  not a regression of this merge.
+- **`browserListKey` omits `scopeOnly`** (`web/preload-api/web-ai-vault-api.ts`), so a scope-only and
+  a full listing over the same paths would share one held list. Latent: no web or renderer caller sets
+  it; only mobile does.
+- **`workspace-terminal-reconnect.ts` carries two copies of the persisted-hint builder** — the
+  resolution took upstream's inlined loop while `publishPersistedTerminalHints` still calls the fork's
+  `buildPersistedTerminalHints`. They agree today and can drift.
+- **AI Vault at `Unlimited` still tags requests and cache keys `scopeOnly`.** The paths are emptied at
+  that limit, so the host ignores the marker and returns the All list; the client then caches it under
+  a second key, so toggling Workspace/Project ↔ All re-requests an identical list.
+- **`AiVaultPanel`'s "Reveal log" and "Open cwd"** went from `shell.openPath(path, executionHostId)` to
+  `revealInFileManager` when the panel took upstream's row handlers, orphaning
+  `use-ai-vault-session-copy-actions.ts`. Which behaviour is intended is not recorded anywhere, so it
+  is left as it merged rather than guessed at.
