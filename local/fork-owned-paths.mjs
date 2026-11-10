@@ -17,6 +17,30 @@ export const FORK_OWNED_PATHS = [
   '.husky/commit-msg'
 ]
 
+/**
+ * Whether one path is in the literal list above. A directory entry is a prefix, `*` stays inside one
+ * path segment, and anything else is the whole path — the same reading git gives the pathspecs below.
+ *
+ * Why this is not the derived set: that one needs git refs, and `local/check-actions-enablement.mjs`
+ * runs in a depth-1 Actions checkout with no `upstream` remote. A sync cannot add a fork-owned file
+ * either way, so the literal list is the whole answer for "could a sync have enabled this".
+ */
+export function isForkOwnedPath(path) {
+  return FORK_OWNED_PATHS.some((entry) => {
+    if (entry.endsWith('/')) {
+      return path.startsWith(entry)
+    }
+    if (!entry.includes('*')) {
+      return path === entry
+    }
+    const pattern = entry
+      .split('*')
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[^/]*')
+    return new RegExp(`^${pattern}$`).test(path)
+  })
+}
+
 /** Where the fork's own line lives, most authoritative first. */
 export const FORK_LINE_REFS = ['refs/remotes/origin/main', 'refs/heads/main']
 

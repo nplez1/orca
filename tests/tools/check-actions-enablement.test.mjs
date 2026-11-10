@@ -177,14 +177,64 @@ describe('a lane that grew a trigger', () => {
   it('treats an enabled file with no pin as a problem, not as permission', () => {
     const path = '.github/workflows/unpinned.yml'
     const verdict = judge([active(path)], factsFor(path, ['pull_request']), {
-      required: [path],
-      allowedInert: []
+      required: [],
+      allowedInert: [path]
     })
 
     expect(verdict.unpinned).toEqual([{ path, all: ['pull_request'] }])
     expect(verdict.disableTargets.map((target) => target.why)).toEqual([
       'active with no pinned triggers'
     ])
+  })
+
+  // The sweep now runs unattended, so one deleted `EXPECTED_TRIGGERS` row must not be enough to let the
+  // watchdog turn itself off — which is what the old unfiltered `unpinned` mapping would have done.
+  it('reports a required lane with no pin and never disables it', () => {
+    const path = '.github/workflows/fork-ci-health.yml'
+    const verdict = judge([active(path)], factsFor(path, ['schedule']), {
+      required: [path],
+      allowedInert: [],
+      expected: {}
+    })
+
+    expect(verdict.requiredUnpinned).toEqual([{ path, all: ['schedule'] }])
+    expect(verdict.disableTargets).toEqual([])
+    expect(verdict.ok).toBe(false)
+    expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
+  })
+})
+
+describe('what the sweep may turn off', () => {
+  // A sync enables every workflow file it adds, and that is the class this exists to clear.
+  it('disables an inherited file that is on neither list', () => {
+    const path = '.github/workflows/orca-server-artifact.yml'
+    const verdict = judge([active(path)], factsFor(path, ['pull_request']), {
+      required: [],
+      allowedInert: [],
+      expected: {}
+    })
+
+    expect(verdict.forkOwnedDrift).toEqual([])
+    expect(verdict.disableTargets.map((target) => target.path)).toEqual([path])
+    expect(residualProblems({ verdict, fix: true, disabled: [path], failed: [] })).toBe(0)
+  })
+
+  // `.github/workflows/fork-*.yml` cannot have arrived from a sync, so an active one with no entry is a
+  // person's decision: report it, let an agent escalate it, never revert it.
+  it('reports a fork-owned lane with no entry instead of disabling it', () => {
+    const path = '.github/workflows/fork-new-lane.yml'
+    const verdict = judge([active(path)], factsFor(path, ['schedule', 'workflow_dispatch']), {
+      required: [],
+      allowedInert: [],
+      expected: {}
+    })
+
+    expect(verdict.drift.map((entry) => entry.path)).toEqual([path])
+    expect(verdict.forkOwnedDrift.map((entry) => entry.path)).toEqual([path])
+    expect(verdict.disableTargets).toEqual([])
+    expect(verdict.ok).toBe(false)
+    // And it stays outstanding under --fix, so a sweep cannot report itself clean having left it.
+    expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
   })
 })
 

@@ -32,6 +32,16 @@
  *
  *   node local/ci-health-report.mjs               run the checks, open/update/close the issue
  *   node local/ci-health-report.mjs --dry-run     print the verdict and the action it would take
+ *   node local/ci-health-report.mjs --fix         let the enablement check clear inherited drift
+ *
+ * Why the sweep runs here at all: an upstream sync that adds a workflow file enables it, and GitHub has
+ * no tree-level way to say "off" (`LOCAL-PATCHES.md` § local(ci)). `local/sync/publish-sync.mjs` sweeps
+ * after its own push, so this covers every route that skips it — a gatekeeper merge, a hand push, a
+ * sync that did not use that script. Without it, one inherited file costs a delegation: an agent, a
+ * PR, and a diff that cannot exist because the fix is repository state, not a file.
+ *
+ * `--fix` is refused off `refs/heads/main`: a `workflow_dispatch` runs the tree of the ref it was
+ * dispatched on, and a branch cut before a lane joined `REQUIRED` reads that lane as drift.
  *
  * Exit codes: 0 all clean, 1 attention needed (the run is red so the failure notifies), 2 could not
  * tell — which is not a pass either.
@@ -46,7 +56,12 @@ const REPO = 'nplez1/orca'
 
 /** The checks, in the order the issue body lists them. */
 export const CHECKS = [
-  { name: 'check-actions-enablement', script: 'local/check-actions-enablement.mjs' },
+  {
+    name: 'check-actions-enablement',
+    script: 'local/check-actions-enablement.mjs',
+    // Only this one has a fix: the other two read state rather than own it.
+    fixArgs: ['--fix']
+  },
   { name: 'check-nightly-liveness', script: 'local/check-nightly-liveness.mjs' },
   { name: 'check-queued-runs', script: 'local/check-queued-runs.mjs' }
 ]
@@ -229,6 +244,56 @@ export function decideAction({ ok, issueNumber }) {
   return issueNumber ? 'update' : 'create'
 }
 
+/**
+ * Whether this invocation may sweep, i.e. let a check turn things off.
+ *
+ * Why the ref and not just the flag: a `workflow_dispatch` runs the tree of the ref it was dispatched
+ * on, and a branch cut before a lane joined `REQUIRED` sees that lane as active-but-unlisted — the
+ * sweep would then disable a lane the release line needs. Only the release line may sweep. A run with
+ * no `GITHUB_REF` at all is a person at a terminal, which is the one case that keeps its own judgment.
+ */
+export function maySweep({ fix, dryRun, ref }) {
+  if (!fix || dryRun) {
+    return false
+  }
+  return ref === undefined || ref === null || ref === '' ? true : ref === 'refs/heads/main'
+}
+
+/** The arguments one check is spawned with: its own, plus the fix only the enablement check declares. */
+export function argsFor(check, fix) {
+  return fix ? [...(check.fixArgs ?? [])] : []
+}
+
+/** The workflow files a sweep disabled, read back out of the enablement check's own report. */
+export function disabledBySweep(checks) {
+  const enablement = checks.find((check) => check.name === 'check-actions-enablement')
+  return String(enablement?.output ?? '')
+    .split('\n')
+    .map((line) => /^\s*disabled\s+(\S+)\s+\(/.exec(line)?.[1])
+    .filter(Boolean)
+}
+
+/**
+ * What to say when closing the issue. A self-healed night reports clean, so this is the only place the
+ * record of what the sweep turned off survives — the job log keeps it for 90 days, the issue forever.
+ */
+export function closeComment(checks) {
+  const closed = 'All fork health checks are clean again.'
+  const disabled = disabledBySweep(checks)
+  if (disabled.length === 0) {
+    return closed
+  }
+  return [
+    closed,
+    '',
+    'The enablement sweep disabled these on the way — a sync enables every workflow file it adds, and',
+    "nothing that is not on the fork's live list may stay on. Add one back to `REQUIRED` in",
+    '`local/check-actions-enablement.mjs` if it belongs there:',
+    '',
+    ...disabled.map((path) => `- \`${path}\``)
+  ].join('\n')
+}
+
 function gh(args, options = {}) {
   return execFileSync('gh', args, {
     encoding: 'utf8',
@@ -300,13 +365,13 @@ function applyDelegationLabel({ number, add }) {
   return 0
 }
 
-function runChecks() {
+function runChecks({ fix = false } = {}) {
   return CHECKS.map((check) => {
     // The delegate token belongs to the label step alone. These checks quote their output into a public
     // issue, so a secret in their environment is one `console.error(process.env)` away from a leak.
     const env = { ...process.env }
     delete env.GH_DELEGATE_TOKEN
-    const result = spawnSync('node', [resolve(ROOT, check.script)], {
+    const result = spawnSync('node', [resolve(ROOT, check.script), ...argsFor(check, fix)], {
       cwd: ROOT,
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
@@ -353,12 +418,17 @@ function writeBody(args, body) {
 
 function main() {
   const dryRun = process.argv.includes('--dry-run')
+  const fix = maySweep({
+    fix: process.argv.includes('--fix'),
+    dryRun,
+    ref: process.env.GITHUB_REF
+  })
   const runUrl =
     process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${REPO}/actions/runs/${process.env.GITHUB_RUN_ID}`
       : null
 
-  const checks = runChecks()
+  const checks = runChecks({ fix })
   const verdict = judgeHealth(checks, { runUrl })
 
   let issue = null
@@ -416,7 +486,7 @@ function main() {
         '--repo',
         REPO,
         '--comment',
-        'All fork health checks are clean again.'
+        closeComment(checks)
       ])
       console.log(`ci-health: closed #${issue.number}`)
     }

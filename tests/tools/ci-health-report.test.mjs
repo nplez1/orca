@@ -6,8 +6,11 @@ import {
   CHECKS,
   ISSUE_TITLE,
   MARKER,
+  argsFor,
+  closeComment,
   decideAction,
   decideLabel,
+  disabledBySweep,
   findOpenIssue,
   issueLabels,
   issueLookupArgs,
@@ -15,7 +18,8 @@ import {
   judgeDelegation,
   judgeHealth,
   labelAction,
-  labelEnv
+  labelEnv,
+  maySweep
 } from '../../local/ci-health-report.mjs'
 import { REPO_ROOT, readWorkflow, runScripts, triggerKeys } from './workflow-file.mjs'
 
@@ -246,10 +250,21 @@ describe('the lane that runs it', () => {
     expect(triggerKeys(workflow.on)).toEqual(
       expect.arrayContaining(['schedule', 'workflow_dispatch'])
     )
-    expect(workflow.permissions).toMatchObject({ actions: 'read', issues: 'write' })
+    // `actions: write` is the sweep's: disabling a file and cancelling its run both need it.
+    expect(workflow.permissions).toMatchObject({ actions: 'write', issues: 'write' })
     expect(runScripts(workflow)).toContainEqual(
-      expect.stringContaining('node local/ci-health-report.mjs')
+      expect.stringContaining('node local/ci-health-report.mjs --fix')
     )
+  })
+
+  // Only the enablement check owns state; the other two read it, and a fix flag they ignore is a
+  // permission nobody asked for.
+  it('gives the fix to the enablement check alone', () => {
+    for (const entry of CHECKS) {
+      const expected = entry.name === 'check-actions-enablement' ? ['--fix'] : []
+      expect(argsFor(entry, true), entry.name).toEqual(expected)
+      expect(argsFor(entry, false), entry.name).toEqual([])
+    }
   })
 
   it('has a script on disk for every check it claims to run', () => {
@@ -279,5 +294,38 @@ describe('the issue lookup', () => {
     const args = issueLookupArgs()
 
     expect(args[args.indexOf('--state') + 1]).toBe('open')
+  })
+})
+
+describe('the sweep', () => {
+  it('sweeps on the release line only', () => {
+    expect(maySweep({ fix: true, dryRun: false, ref: 'refs/heads/main' })).toBe(true)
+    // A dispatch runs the tree of the ref it was dispatched on, and that tree may predate a lane
+    // joining REQUIRED — the sweep would then disable a lane the release line needs.
+    expect(maySweep({ fix: true, dryRun: false, ref: 'refs/heads/nplez1/issue-349' })).toBe(false)
+    expect(maySweep({ fix: false, dryRun: false, ref: 'refs/heads/main' })).toBe(false)
+    expect(maySweep({ fix: true, dryRun: true, ref: 'refs/heads/main' })).toBe(false)
+    // No ref at all is a person at a terminal, not a lane.
+    expect(maySweep({ fix: true, dryRun: false, ref: undefined })).toBe(true)
+  })
+
+  it('names what it turned off in the close comment, so a healed night still says so', () => {
+    const output = [
+      'check-actions: 81 workflows on nplez1/orca, 18 active',
+      "  DRIFT    active but not on the fork's live list: .github/workflows/x.yml — X",
+      "  disabled .github/workflows/x.yml (active but not on the fork's live list)",
+      '  OK'
+    ].join('\n')
+    const checks = [
+      check('check-actions-enablement', 0, output),
+      check('check-nightly-liveness', 0)
+    ]
+
+    expect(disabledBySweep(checks)).toEqual(['.github/workflows/x.yml'])
+    expect(closeComment(checks)).toContain('- `.github/workflows/x.yml`')
+  })
+
+  it('closes with the plain line when nothing was disabled', () => {
+    expect(closeComment(clean())).toBe('All fork health checks are clean again.')
   })
 })

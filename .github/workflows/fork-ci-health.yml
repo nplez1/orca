@@ -15,7 +15,9 @@ name: Fork CI health
 # place, closed when the checks are all clean again.
 #
 # Why it can afford `issues: write`: it owns exactly one issue, and the token is scoped to this
-# repository. `actions: read` is what the liveness check needs to read run history.
+# repository. `actions` is `write` rather than `read` because the same token disables the workflow files
+# a sync re-enabled (see the note on `permissions` below); it is what reads run history for the liveness
+# check too, since write implies read.
 #
 # Why a second token: a red issue is delegated to the autonomous pipeline by applying `agent:auto`,
 # and `driver.py::_labeler_permission` refuses a label whose `labeled` actor is a bot — "an agent
@@ -32,7 +34,14 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  # Why write: an upstream sync enables every workflow file it adds, and GitHub has no tree-level way to
+  # say "off" (`LOCAL-PATCHES.md` § local(ci)). The lane therefore runs the enablement check with
+  # `--fix`, which needs `actions: write` to disable a file and to cancel a run it had already started.
+  # Not reachable from untrusted input: this workflow has no `pull_request` trigger and takes no
+  # payload, so the token is only ever used by code on the ref it checked out. `--fix` is refused off
+  # `refs/heads/main` inside `local/ci-health-report.mjs` (`maySweep`), so a dispatch from an older
+  # branch cannot switch off a lane that branch predates.
+  actions: write
   issues: write
 
 concurrency:
@@ -55,8 +64,13 @@ jobs:
         with:
           native-runtime: none
 
+      # `--fix` lets the enablement check clear inherited drift itself. What it may disable is decided
+      # in `local/check-actions-enablement.mjs`: never a `REQUIRED` lane, and never a fork-owned one
+      # (`.github/workflows/fork-*.yml`), because a sync cannot have added those — a person did, so a
+      # person decides. What it disabled is quoted into the close comment on the issue, so a night that
+      # healed itself still leaves a record.
       - name: Run the health checks and report
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_DELEGATE_TOKEN: ${{ secrets.AGENT_DELEGATE_TOKEN }}
-        run: node local/ci-health-report.mjs
+        run: node local/ci-health-report.mjs --fix
