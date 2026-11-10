@@ -10,7 +10,10 @@ import { AiVaultSessionPublicationGate } from './ai-vault-session-publication-ga
 import { EMPTY_AI_VAULT_SESSIONS } from '../session-list/ai-vault-session-identity'
 import { useAppliedAiVaultScan } from './ai-vault-applied-scan'
 import { useAiVaultSessionHostRefreshEvents } from '../scope/ai-vault-host-scope'
-import { aiVaultSessionResultCacheKey } from './ai-vault-session-result-cache'
+import {
+  aiVaultSessionResultCacheKey,
+  resetAiVaultSessionResultCacheForTest
+} from './ai-vault-session-result-cache'
 import {
   refreshAiVaultSessionList,
   type AiVaultConditionalSnapshot,
@@ -26,7 +29,6 @@ import {
   markForcedRescanSpent,
   resetAiVaultForcedRescanBudgetForTest
 } from './ai-vault-forced-rescan-budget'
-import { resetAiVaultSessionResultCacheForTest } from './ai-vault-session-result-cache'
 import { resetAgentSessionIdsRefreshKeys } from './ai-vault-agent-session-refresh-key'
 import type {
   AiVaultListResult,
