@@ -69,11 +69,8 @@ function harness(
     prompt: 'Build the thing',
     updatedAt: 1
   }
-  let brainReply: (prompt: string, signal: AbortSignal) => string | Promise<string> = (prompt) =>
-    JSON.stringify({
-      inProgress: 'folding',
-      timeline: [{ kind: 'milestone', text: prompt.slice(0, 10), sourceIndex: 0 }]
-    })
+  let brainReply: (prompt: string, signal: AbortSignal) => string | Promise<string> = () =>
+    JSON.stringify({ inProgress: 'folding' })
   const brainPrompts: string[] = []
   const brain: SessionFoldBrain = {
     complete: async ({ prompt, signal }) => {
@@ -264,12 +261,7 @@ describe('SessionSummaryService', () => {
     expect(store.get('tab:leaf')?.seenThrough).toBe(1)
 
     setEvents(events(9))
-    setBrainReply(() =>
-      JSON.stringify({
-        done: ['more'],
-        timeline: [{ kind: 'milestone', text: 'next', sourceIndex: 8 }]
-      })
-    )
+    setBrainReply(() => JSON.stringify({ done: ['more'] }))
     updates.length = 0
     const reopened = service.open({ paneKey: 'tab:leaf' })
     expect(reopened.seenThrough).toBe(1)
@@ -280,7 +272,8 @@ describe('SessionSummaryService', () => {
     expect(chunkPrompt).not.toContain('[#4 user]')
     const ready = updates.find((u) => u.status === 'ready')
     expect(ready?.ledger?.foldedThrough).toBe(9)
-    expect(ready?.ledger?.timeline.map((entry) => entry.text)).toContain('next')
+    // The timeline is projected from the facts, so the milestone is the done fact itself.
+    expect(ready?.ledger?.timeline.map((entry) => entry.text)).toContain('more')
   })
 
   it('resets the ledger when the pane hosts a different session', async () => {
@@ -444,6 +437,7 @@ describe('SessionSummaryService host routing', () => {
               blockers: [],
               decisions: [],
               timeline: [],
+              markers: [],
               reportSince: null,
               reportFull: {
                 headline: 'Summarized on the host.',
@@ -455,7 +449,6 @@ describe('SessionSummaryService host routing', () => {
               userMessageCount: 1,
               foldedThrough: 3,
               foldedAt: 1,
-              timelineBase: 0,
               foldGap: null,
               gaps: []
             }

@@ -106,9 +106,18 @@ export type SessionSummaryLedger = {
   blockers: SessionSummaryFact[]
   decisions: SessionSummaryFact[]
   // Why not trimmed: entries are indexed (the "since" window and the reader's place are
-  // both computed from this array), so dropping one silently rewrites history. Extract
-  // prompts bound growth per chunk; the view collapses what it renders.
+  // both computed from this array), so dropping one silently rewrites history. It is also a
+  // projection of the facts and markers below, so it cannot outgrow them.
   timeline: SessionSummaryTimelineEntry[]
+  /**
+   * The deterministic half of `timeline`: the reader's own messages, tool bursts and the failures
+   * inside them, planned from the transcript.
+   *
+   * Why stored rather than recomputed: a fold only reads the messages after its cursor, so the
+   * markers for the messages before it would otherwise have to be read again — and the timeline is
+   * re-projected on every apply, which needs all of them.
+   */
+  markers: SessionSummaryTimelineDeltaEntry[]
   /**
    * Progress report covering only what happened after the reader's last message. Null when the
    * reader has spoken to the agent only once — the window is then the whole session, and a
@@ -127,13 +136,6 @@ export type SessionSummaryLedger = {
   /** Transcript message index through which this ledger is folded (exclusive). */
   foldedThrough: number
   foldedAt: number | null
-  /**
-   * Timeline entries dropped from the head of `timeline` to bound the store.
-   *
-   * Why it exists: entry ids are derived from the entry's position, so a head trim would hand a
-   * new entry an id an older one already holds — duplicate React keys and a wrong seen cursor.
-   */
-  timelineBase: number
   /** Chunks this ledger's last fold could not summarize; null when the fold covered everything. */
   foldGap: SessionSummaryFoldGap | null
   /**
@@ -145,7 +147,13 @@ export type SessionSummaryLedger = {
   gaps: string[]
 }
 
-/** What one chunk extract (or one merged fold) contributes to a ledger. */
+/**
+ * What one chunk extract contributes to a ledger: model output, and nothing else.
+ *
+ * Why the timeline and its markers are not here: they are derived from the transcript, not written
+ * by a model, and the chunk cache keys extracts — so a derived value in a delta would be a cached
+ * fact about a transcript the cache does not hold.
+ */
 export type SessionSummaryLedgerDelta = {
   goal?: SessionSummaryFact | null
   plan?: SessionSummaryFact[]
@@ -153,7 +161,6 @@ export type SessionSummaryLedgerDelta = {
   done?: SessionSummaryFact[]
   blockers?: SessionSummaryFact[]
   decisions?: SessionSummaryFact[]
-  timeline?: SessionSummaryTimelineDeltaEntry[]
 }
 
 /** Deterministic facts shown before any fold runs. Cheap: no LLM, no transcript read. */
@@ -268,8 +275,6 @@ export const SESSION_SUMMARY_TEXT_MAX_LENGTH = 600
  * for, were the ones dropped.
  */
 export const SESSION_SUMMARY_LIST_MAX_ITEMS = 12
-/** Most timeline entries one pane keeps on disk; the newest are kept. */
-export const SESSION_SUMMARY_TIMELINE_MAX_ENTRIES = 2_000
 /** Hard ceiling on the whole-session report, so it cannot become a book. */
 export const SESSION_SUMMARY_REPORT_MAX_SECTIONS = 8
 export const SESSION_SUMMARY_REPORT_MAX_CHARS = 4_000

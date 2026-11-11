@@ -8,7 +8,6 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { durableWriteTempPath, writeFileDurableSync } from '../filesystem/durable-file-write'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
-import { boundSessionSummaryLedgerForStorage } from './session-summary-ledger'
 import type {
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
@@ -67,8 +66,13 @@ function registerExitFlush(): void {
  * `timelineBase`/`foldGap`/`gaps`, and the chunk extracts are keyed to the digest that produced
  * them — a v2 extract was written from a prompt that truncated every event to 1,500 characters, so
  * reusing it would fold the old, lossy reading of the same messages.
+ *
+ * v4: the chunk prompt no longer carries one line per tool call, and the timeline is a projection
+ * of the facts and markers rather than model output. Both change what a cached extract means: a v3
+ * extract was written from a prompt where a burst was twenty separate lines, and a v3 ledger holds
+ * a timeline no projection reproduces.
  */
-const STORE_VERSION = 3
+const STORE_VERSION = 4
 
 type SessionSummaryStoreFile = {
   version?: number
@@ -101,20 +105,10 @@ export class SessionSummaryStore {
   }
 
   set(paneKey: string, entry: SessionSummaryStoreEntry): void {
-    // Why here and not in the fold: 200 panes each keep an unbounded timeline plus its chunk cache,
-    // and what the store holds is history the pane pages through — the newest is what a reader
-    // scrolls to. The ledger's `timelineBase` keeps entry ids unique across the trim.
-    const ledger = boundSessionSummaryLedgerForStorage(entry.ledger)
-    this.entries[paneKey] = {
-      ...entry,
-      chunkFailures: entry.chunkFailures ?? {},
-      ledger,
-      // Only after a trim: the cursor counts entries, and dropping the head moved every position.
-      seenThrough:
-        ledger.timelineBase > 0
-          ? Math.min(entry.seenThrough, ledger.timelineBase + ledger.timeline.length)
-          : entry.seenThrough
-    }
+    // Why nothing is trimmed here any more: the timeline is a projection of the facts and markers,
+    // so it cannot outgrow them, and a head trim would make the projection depend on how often the
+    // ledger had been written.
+    this.entries[paneKey] = { ...entry, chunkFailures: entry.chunkFailures ?? {} }
     const keys = Object.keys(this.entries)
     if (keys.length > MAX_ENTRIES) {
       const evictable = keys

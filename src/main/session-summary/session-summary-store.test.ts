@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionSummaryStore, type SessionSummaryStoreEntry } from './session-summary-store'
-import { SESSION_SUMMARY_TIMELINE_MAX_ENTRIES } from '../../shared/session-summary-types'
 
 const LEDGER = {
   goal: null,
@@ -13,13 +12,13 @@ const LEDGER = {
   blockers: [],
   decisions: [],
   timeline: [],
+  markers: [],
   reportSince: null,
   reportFull: null,
   lastUserMessageIndex: 1,
   userMessageCount: 2,
   foldedThrough: 2,
   foldedAt: null,
-  timelineBase: 0,
   foldGap: null,
   gaps: []
 }
@@ -92,29 +91,43 @@ describe('SessionSummaryStore', () => {
     ])
   })
 
-  // The store is a cache with 200 panes in it, and the ledger's timeline is now unbounded in memory.
-  // What lands on disk keeps the newest entries, which is what a reader scrolls to.
-  it('bounds the timeline it retains and remembers how many it dropped', () => {
-    const store = new SessionSummaryStore(filePath())
-    const timeline = Array.from(
-      { length: SESSION_SUMMARY_TIMELINE_MAX_ENTRIES + 50 },
-      (_, index) => ({
-        id: `e${index}`,
-        kind: 'milestone' as const,
-        text: `t${index}`,
-        sourceIndex: index
+  // A ledger written by a build whose chunk prompt carried one line per tool call, and whose
+  // timeline was model output. Reusing it would fold the old, noisier reading of the same messages
+  // and show a timeline no projection reproduces, so the version bump discards the whole cache.
+  it('discards a store file written by an older ledger shape', () => {
+    writeFileSync(
+      filePath(),
+      JSON.stringify({
+        version: 3,
+        entries: {
+          pane: {
+            ...ENTRY,
+            ledger: { ...LEDGER, timelineBase: 0, foldedThrough: 900 }
+          }
+        }
       })
     )
+
+    const store = new SessionSummaryStore(filePath())
+
+    expect(store.get('pane')).toBeNull()
+  })
+
+  it('keeps every timeline entry, because the timeline is a projection and cannot outgrow them', () => {
+    const store = new SessionSummaryStore(filePath())
+    const timeline = Array.from({ length: 50 }, (_, index) => ({
+      id: `e${index}`,
+      kind: 'milestone' as const,
+      text: `t${index}`,
+      sourceIndex: index
+    }))
     store.set('pane', {
       ...ENTRY,
       ledger: { ...LEDGER, timeline, foldedThrough: timeline.length }
     })
     store.flush()
 
-    const stored = store.get('pane')?.ledger
-    expect(stored?.timeline).toHaveLength(SESSION_SUMMARY_TIMELINE_MAX_ENTRIES)
-    expect(stored?.timelineBase).toBe(50)
-    expect(stored?.timeline.at(-1)?.text).toBe(`t${timeline.length - 1}`)
+    expect(store.get('pane')?.ledger.timeline).toEqual(timeline)
   })
 
   // An entry with a chunk cache but no ledger yet is a first fold in progress, not an empty summary:

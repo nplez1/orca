@@ -56,6 +56,7 @@ function readySnapshot(overrides: Partial<SessionSummarySnapshot> = {}): Session
       blockers: [],
       decisions: [],
       timeline: [],
+      markers: [],
       reportSince: null,
       reportFull: {
         headline: 'Shipping the summary pane.',
@@ -67,7 +68,6 @@ function readySnapshot(overrides: Partial<SessionSummarySnapshot> = {}): Session
       userMessageCount: 1,
       foldedThrough: 4,
       foldedAt: 1_000,
-      timelineBase: 0,
       foldGap: null,
       gaps: []
     },
@@ -193,13 +193,13 @@ describe('SessionSummaryPane', () => {
         blockers: [],
         decisions: [],
         timeline: [],
+        markers: [],
         reportSince: null,
         reportFull: null,
         lastUserMessageIndex: null,
         userMessageCount: 1,
         foldedThrough: 4,
         foldedAt: 1,
-        timelineBase: 0,
         foldGap: null,
         gaps: []
       }

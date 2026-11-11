@@ -30,9 +30,9 @@ export function recordSessionSummarySeenCursor(args: {
     stored.seenThrough,
     Math.min(
       Math.max(0, Math.floor(args.seenTimelineCount)),
-      // Why the base: entries trimmed from the head of the timeline keep their absolute position, so
-      // the count a viewer reports is still comparable with it.
-      stored.ledger.timelineBase + stored.ledger.timeline.length
+      // The timeline is a projection, so its length only grows: an entry appended by a later fold
+      // sorts after every entry already there.
+      stored.ledger.timeline.length
     )
   )
   if (seenThrough === stored.seenThrough) {

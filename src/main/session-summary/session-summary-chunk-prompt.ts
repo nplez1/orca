@@ -2,25 +2,28 @@
 //
 // This is deliberately the *only* thing chunk sizing decides. It never decides what the model may
 // see — that is the digest's job (`session-summary-event-digest.ts`), which represents every event
-// at the detail its role deserves. Keeping the two apart is what makes a session of any length fold
-// end to end: coverage is complete, and the budget only decides how many calls it takes.
-import type { SessionSummarySourceEvent } from './session-summary-event-digest'
+// at the detail its role deserves, and the render plan's (`session-summary-render-plan.ts`), which
+// decides which of those events read as one line. Keeping them apart is what makes a session of any
+// length fold end to end: coverage is complete, and the budget only decides how many calls it takes.
+import type { SessionSummaryRenderItem } from './session-summary-render-plan'
 
 /**
- * How much text one chunk prompt may carry.
+ * How many rendered lines one chunk prompt may carry.
  *
  * Why characters and not events: the binding constraint is the prompt, and an agent CLI delivered
- * the prompt as an argv argument has a hard per-argument limit. Event count is the secondary bound,
- * because digest lines are short and would otherwise let one call cover a whole session.
+ * the prompt as an argv argument has a hard per-argument limit. Why lines as well: prose renders
+ * one line per message, so without a second bound a chatty session would put a whole session in one
+ * call. Lines, not events — a run of tool calls is one line now, and counting the events it stands
+ * for would keep a tool-heavy session at five calls for no gain in what the model reads.
  */
 const CHUNK_MAX_CHARS = 24_000
-const CHUNK_MAX_EVENTS = 120
+const CHUNK_MAX_LINES = 120
 
 /**
  * One model call's slice: whole events `[from, to)`, or the `[partFrom, partTo)` character span of
  * a single event too large to send in one prompt.
  *
- * Why parts: user and assistant text is no longer cut, so one message can reach the reader's 256 KB
+ * Why parts: user and assistant text is not cut, so one message can reach the reader's 256 KB
  * per-message guard — larger than a prompt may be. Splitting it keeps the event index intact (it is
  * still one event) while keeping each call's prompt bounded.
  */
@@ -42,51 +45,64 @@ export type SessionSummaryChunkRange = {
 /** A part of the transcript the reader could not decode, placed by the messages read before it. */
 export type SessionSummaryGap = { afterEventIndex: number; text: string }
 
-/** Split [0, events.length) into bounded chunks. Deterministic: same inputs → same ranges, so cache keys are stable across resumes. */
+/**
+ * Split [0, items.length) into bounded chunks. Deterministic: same inputs → same ranges, so cache
+ * keys are stable across resumes.
+ *
+ * Why it pages items and not events: a chunk boundary has to fall between two rendered lines, or a
+ * burst would be cut in half and the two halves would each name a count that never happened. The
+ * ranges it returns are still *event* ranges, which is what every index downstream counts.
+ */
 export function buildSessionSummaryChunks(
-  events: readonly SessionSummarySourceEvent[],
+  items: readonly SessionSummaryRenderItem[],
   chunkMaxChars = CHUNK_MAX_CHARS,
-  chunkMaxEvents = CHUNK_MAX_EVENTS
+  chunkMaxLines = CHUNK_MAX_LINES
 ): SessionSummaryChunkRange[] {
   const ranges: SessionSummaryChunkRange[] = []
   let from = 0
   let chars = 0
+  let lines = 0
   const flush = (to: number): void => {
     ranges.push({ from, to })
     from = to
     chars = 0
+    lines = 0
   }
-  for (let index = 0; index < events.length; index += 1) {
-    const length = events[index].text.length
-    if (length > chunkMaxChars) {
-      // Why flush first: the events before this one are a chunk of their own, and mixing a part of
-      // this event into it would make the part's index range ambiguous.
-      if (index > from) {
-        flush(index)
+  for (const item of items) {
+    const length = item.text.length
+    // Why only a single-event item can be split: the parts are a paging device over one message's
+    // text, and a burst item is already bounded (`BURST_MAX_CHARS`) so it never needs one.
+    if (length > chunkMaxChars && item.to - item.from === 1) {
+      // Why flush first: the items before this one are a chunk of their own, and mixing a part of
+      // this item into it would make the part's index range ambiguous.
+      if (item.from > from) {
+        flush(item.from)
       }
       const partCount = Math.ceil(length / chunkMaxChars)
       for (let offset = 0; offset < length; offset += chunkMaxChars) {
-        const partIndex = Math.floor(offset / chunkMaxChars)
         ranges.push({
-          from: index,
-          to: index + 1,
+          from: item.from,
+          to: item.to,
           partFrom: offset,
           partTo: Math.min(length, offset + chunkMaxChars),
-          partIndex,
+          partIndex: Math.floor(offset / chunkMaxChars),
           partCount
         })
       }
-      from = index + 1
+      from = item.to
       chars = 0
+      lines = 0
       continue
     }
     chars += length
-    if (chars >= chunkMaxChars || index - from + 1 >= chunkMaxEvents) {
-      flush(index + 1)
+    lines += 1
+    if (chars >= chunkMaxChars || lines >= chunkMaxLines) {
+      flush(item.to)
     }
   }
-  if (from < events.length) {
-    ranges.push({ from, to: events.length })
+  const last = items.at(-1)
+  if (last && from < last.to) {
+    ranges.push({ from, to: last.to })
   }
   return ranges
 }
@@ -100,12 +116,11 @@ Produce a JSON object with exactly these keys:
 - "done": fact[] — completed milestones (at most 5)
 - "blockers": fact[] — errors, failed approaches, things awaiting input (at most 5)
 - "decisions": fact[] — notable choices made (at most 5)
-- "timeline": array of { "kind": one of "milestone"|"decision"|"error"|"needs-input"|"tool-burst"|"user-input", "text": one short sentence, "sourceIndex": number } — the notable events of this slice, chronological, at most 10.
 Rules: respond with ONLY the JSON object. Use plain lowercase text. Keep each "text" to one short sentence. If the slice is ambiguous or low-signal, say so in few entries rather than inventing detail.
-A "tool" line is a digest of what a tool did, not its output: read it as one action, and take failures from the exit code or the error line it names. A line marked "part N of M" is one piece of a single long message; do not treat the parts as separate messages.`
+A "tool" line is a digest of what a tool did, not its output: read it as one action, and take failures from the exit code or the error line it names. A "tool" line anchored to a range of messages is one burst of consecutive tool calls: read it as one phase of work, take the count and the tool mix from that line, and take its failures from the "#index call · failure" lines beneath it. A line marked "part N of M" is one piece of a single long message; do not treat the parts as separate messages.`
 
 function renderChunkTranscript(
-  events: readonly SessionSummarySourceEvent[],
+  items: readonly SessionSummaryRenderItem[],
   range: SessionSummaryChunkRange,
   absoluteFrom: number,
   gaps: readonly SessionSummaryGap[]
@@ -122,29 +137,36 @@ function renderChunkTranscript(
       lines.push(`[gap after #${absoluteFrom + gap.afterEventIndex - 1}] ${gap.text}`)
     }
   }
-  for (let index = range.from; index < range.to; index += 1) {
-    const event = events[index]
+  for (const item of items) {
+    // A chunk boundary always falls between items, so this never renders half of one.
+    if (item.to <= range.from || item.from >= range.to) {
+      continue
+    }
+    const anchor =
+      item.to - item.from > 1
+        ? `#${absoluteFrom + item.from}-#${absoluteFrom + item.to - 1}`
+        : `#${absoluteFrom + item.from}`
     if (range.partFrom === undefined || range.partTo === undefined) {
-      lines.push(`[#${absoluteFrom + index} ${event.role}] ${event.text}`)
+      lines.push(`[${anchor} ${item.role}] ${item.text}`)
       continue
     }
     lines.push(
-      `[#${absoluteFrom + index} ${event.role} · part ${(range.partIndex ?? 0) + 1} of ${
+      `[${anchor} ${item.role} · part ${(range.partIndex ?? 0) + 1} of ${
         range.partCount ?? 1
-      }] ${event.text.slice(range.partFrom, range.partTo)}`
+      }] ${item.text.slice(range.partFrom, range.partTo)}`
     )
   }
   return lines.join('\n')
 }
 
 export function buildSessionSummaryChunkPrompt(
-  events: readonly SessionSummarySourceEvent[],
+  items: readonly SessionSummaryRenderItem[],
   range: SessionSummaryChunkRange,
   absoluteFrom: number,
   gaps: readonly SessionSummaryGap[] = []
 ): string {
   return `${CHUNK_EXTRACT_INSTRUCTIONS}\n\nTranscript slice:\n${renderChunkTranscript(
-    events,
+    items,
     range,
     absoluteFrom,
     gaps

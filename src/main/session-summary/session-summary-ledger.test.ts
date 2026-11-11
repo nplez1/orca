@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   applySessionSummaryDelta,
-  boundSessionSummaryLedgerForStorage,
   emptySessionSummaryLedger,
   hasProducedLedger,
   mergeSessionSummaryDeltas,
@@ -55,27 +54,27 @@ describe('normalizeSessionSummaryDelta', () => {
     expect(delta?.done).toEqual([fact('slice relative', 49), fact('past the end', 49)])
   })
 
-  it('normalizes text, lists, and timeline entries with caps', () => {
+  it('normalizes text and lists with caps', () => {
     const longText = 'x'.repeat(SESSION_SUMMARY_TEXT_MAX_LENGTH * 2)
     const delta = normalizeSessionSummaryDelta({
       goal: { text: `  ${longText}  `, sourceIndex: 2 },
-      plan: ['keep', 'keep', '', 42, ...Array.from({ length: 30 }, (_, i) => `step ${i}`)],
-      timeline: [
-        { kind: 'milestone', text: 'shipped', sourceIndex: 3 },
-        { kind: 'bogus-kind', text: 'dropped', sourceIndex: 1 },
-        { kind: 'error', text: '', sourceIndex: 1 },
-        { kind: 'error', text: 'boom', sourceIndex: -5 }
-      ]
+      plan: ['keep', 'keep', '', 42, ...Array.from({ length: 30 }, (_, i) => `step ${i}`)]
     })
     expect(delta?.goal?.text).toHaveLength(SESSION_SUMMARY_TEXT_MAX_LENGTH)
     expect(delta?.goal?.text.endsWith('…')).toBe(true)
     expect(delta?.goal?.sourceIndex).toBe(2)
     expect(delta?.plan).toHaveLength(SESSION_SUMMARY_LIST_MAX_ITEMS)
     expect(delta?.plan?.[0]).toEqual(fact('keep', null))
-    expect(delta?.timeline).toEqual([
-      { kind: 'milestone', text: 'shipped', sourceIndex: 3 },
-      { kind: 'error', text: 'boom', sourceIndex: 0 }
-    ])
+  })
+
+  // The extract is asked for facts only. A reply that still carries a timeline must not smuggle
+  // model-written entries into a projection the ledger derives itself.
+  it('drops a timeline an older prompt would have produced', () => {
+    const delta = normalizeSessionSummaryDelta({
+      done: ['shipped'],
+      timeline: [{ kind: 'milestone', text: 'shipped', sourceIndex: 3 }]
+    })
+    expect(delta).toEqual({ done: [fact('shipped', null)] })
   })
 })
 
@@ -85,13 +84,11 @@ describe('mergeSessionSummaryDeltas', () => {
       {
         goal: fact('first goal', 1),
         inProgress: fact('a', 1),
-        done: [fact('x', 1), fact('y', 2)],
-        timeline: [{ kind: 'milestone', text: 't1', sourceIndex: 1 }]
+        done: [fact('x', 1), fact('y', 2)]
       },
       {
         inProgress: fact('b', 2),
-        done: [fact('y', 9), fact('z', 3)],
-        timeline: [{ kind: 'decision', text: 't2', sourceIndex: 2 }]
+        done: [fact('y', 9), fact('z', 3)]
       },
       // A later chunk with nothing to say about the goal must not erase what an earlier one found.
       { goal: null, done: [fact('z', 4)] }
@@ -100,9 +97,6 @@ describe('mergeSessionSummaryDeltas', () => {
     expect(merged.inProgress).toEqual(fact('b', 2))
     // y keeps its *first* index: a fact restated later did not become news when it was repeated.
     expect(merged.done).toEqual([fact('x', 1), fact('y', 2), fact('z', 3)])
-    expect(merged.timeline).toHaveLength(2)
-    expect(merged.timeline?.[0].text).toBe('t1')
-    expect(merged.timeline?.[1].text).toBe('t2')
   })
 })
 
@@ -140,22 +134,92 @@ describe('applySessionSummaryDelta', () => {
     expect(replaced.inProgress).toEqual(fact('working', 2))
   })
 
-  it('appends to the timeline without rewriting history and advances foldedThrough', () => {
-    const base = {
-      ...emptySessionSummaryLedger(),
-      timeline: [{ id: 'entry-0', kind: 'milestone' as const, text: 't1', sourceIndex: 1 }],
-      foldedThrough: 2
-    }
+  it('projects the timeline from the facts and the markers and advances foldedThrough', () => {
+    const base = { ...emptySessionSummaryLedger(), foldedThrough: 2 }
     const next = applySessionSummaryDelta(
       base,
-      { timeline: [{ kind: 'error' as const, text: 't2', sourceIndex: 3 }] },
+      {
+        done: [{ text: 'shipped the flag', sourceIndex: 4 }],
+        blockers: [{ text: 'tests red', sourceIndex: 5 }]
+      },
       7,
-      100
+      100,
+      null,
+      0,
+      {
+        markers: [
+          { kind: 'user-input', text: 'make it work', sourceIndex: 2 },
+          { kind: 'tool-burst', text: '6 tool calls · Read 6', sourceIndex: 3 },
+          // Superseded by the blocker at the same index: one failure, one row.
+          { kind: 'error', text: 'Bash npm test · FAIL x', sourceIndex: 5 }
+        ]
+      }
     )
-    expect(next.timeline.map((entry) => entry.text)).toEqual(['t1', 't2'])
-    expect(base.timeline).toHaveLength(1)
+    expect(next.timeline).toEqual([
+      { id: 'user-input-2', kind: 'user-input', text: 'make it work', sourceIndex: 2 },
+      { id: 'tool-burst-3', kind: 'tool-burst', text: '6 tool calls · Read 6', sourceIndex: 3 },
+      { id: 'milestone-4', kind: 'milestone', text: 'shipped the flag', sourceIndex: 4 },
+      { id: 'error-5', kind: 'error', text: 'tests red', sourceIndex: 5 }
+    ])
+    // The marker is still kept: it is what a later projection re-derives from.
+    expect(next.markers).toHaveLength(3)
+    expect(base.timeline).toEqual([])
     expect(next.foldedThrough).toBe(7)
     expect(next.foldedAt).toBe(100)
+  })
+
+  // Re-folding a range after a cache miss used to append its entries a second time. A projection
+  // has one answer per (kind, sourceIndex), so applying the same range twice changes nothing.
+  it('re-projects to the same timeline when the same range is applied twice', () => {
+    const delta = { done: [{ text: 'a', sourceIndex: 3 }] }
+    const markers = [{ kind: 'tool-burst' as const, text: '5 tool calls · Read 5', sourceIndex: 2 }]
+    const once = applySessionSummaryDelta(emptySessionSummaryLedger(), delta, 7, 100, null, 0, {
+      markers
+    })
+    const twice = applySessionSummaryDelta(once, delta, 7, 200, null, 0, { markers })
+    expect(twice.timeline).toEqual(once.timeline)
+    expect(twice.markers).toHaveLength(1)
+  })
+
+  it('appends a later fold after the entries already there', () => {
+    const first = applySessionSummaryDelta(
+      emptySessionSummaryLedger(),
+      { done: [{ text: 'a', sourceIndex: 1 }] },
+      3,
+      1
+    )
+    const second = applySessionSummaryDelta(first, { done: [{ text: 'b', sourceIndex: 4 }] }, 6, 2)
+    expect(second.timeline.map((entry) => entry.id)).toEqual(['milestone-1', 'milestone-4'])
+    expect(second.timeline[0]).toEqual(first.timeline[0])
+  })
+
+  // A chunk whose extract omits sourceIndex anchors all of its facts at the slice's last message,
+  // so two milestones can share an index. Duplicate ids are duplicate React keys.
+  it('keeps ids unique when two facts of one kind share a message', () => {
+    const next = applySessionSummaryDelta(
+      emptySessionSummaryLedger(),
+      {
+        done: [
+          { text: 'a', sourceIndex: 9 },
+          { text: 'b', sourceIndex: 9 }
+        ]
+      },
+      10,
+      1
+    )
+    expect(next.timeline.map((entry) => entry.id)).toEqual(['milestone-9', 'milestone-9-2'])
+  })
+
+  // The timeline is the position its provenance gives it, and the pane's window cannot place an
+  // entry with no index at all.
+  it('leaves an unanchored fact out of the timeline', () => {
+    const next = applySessionSummaryDelta(
+      emptySessionSummaryLedger(),
+      { done: [{ text: 'no index', sourceIndex: null }] },
+      3,
+      1
+    )
+    expect(next.timeline).toEqual([])
   })
 
   it('records the reader’s place and the reports a fold already wrote', () => {
@@ -174,51 +238,6 @@ describe('applySessionSummaryDelta', () => {
     expect(next.userMessageCount).toBe(2)
     expect(next.reportSince).toEqual({ text: 'since', through: 4 })
     expect(next.reportFull?.text).toBe('full')
-  })
-})
-
-describe('boundSessionSummaryLedgerForStorage', () => {
-  it('keeps the newest entries and records how many it dropped', () => {
-    const timeline = Array.from({ length: 10 }, (_, index) => ({
-      id: `e${index}`,
-      kind: 'milestone' as const,
-      text: `t${index}`,
-      sourceIndex: index
-    }))
-    const bounded = boundSessionSummaryLedgerForStorage(
-      { ...emptySessionSummaryLedger(), timeline },
-      4
-    )
-    expect(bounded.timeline.map((entry) => entry.text)).toEqual(['t6', 't7', 't8', 't9'])
-    expect(bounded.timelineBase).toBe(6)
-  })
-
-  it('leaves a ledger under the bound untouched', () => {
-    const ledger = emptySessionSummaryLedger()
-    expect(boundSessionSummaryLedgerForStorage(ledger, 4)).toBe(ledger)
-  })
-
-  // Entry ids are derived from an entry's position, so a head trim would hand a new entry an id an
-  // older one already holds — duplicate React keys and a wrong seen cursor.
-  it('keeps new entry ids unique after a trim', () => {
-    const timeline = Array.from({ length: 6 }, (_, index) => ({
-      id: `old-${index}`,
-      kind: 'milestone' as const,
-      text: `t${index}`,
-      sourceIndex: index
-    }))
-    const trimmed = boundSessionSummaryLedgerForStorage(
-      { ...emptySessionSummaryLedger(), timeline, foldedThrough: 6 },
-      3
-    )
-    const next = applySessionSummaryDelta(
-      trimmed,
-      { timeline: [{ kind: 'error', text: 'new', sourceIndex: 7 }] },
-      8,
-      100
-    )
-    const ids = next.timeline.map((entry) => entry.id)
-    expect(new Set(ids).size).toBe(ids.length)
   })
 })
 

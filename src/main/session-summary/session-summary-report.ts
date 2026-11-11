@@ -15,9 +15,7 @@ import type {
   SessionSummaryFullReport,
   SessionSummaryLedger,
   SessionSummaryLedgerDelta,
-  SessionSummaryReport,
-  SessionSummaryTimelineDeltaEntry,
-  SessionSummaryTimelineEntry
+  SessionSummaryReport
 } from '../../shared/session-summary-types'
 import {
   applySessionSummaryReportSection,
@@ -66,13 +64,13 @@ function sectionPerGroup(groupCount: number): boolean {
   return groupCount > 1
 }
 
-/** The facts and timeline entries whose provenance falls inside one report group. */
+/** The facts whose provenance falls inside one report group. */
 function batchForRange(
   ledger: SessionSummaryLedger,
   from: number,
   to: number,
   includeTo: boolean
-): SessionSummaryLedgerDelta & { timeline: SessionSummaryTimelineDeltaEntry[] } {
+): SessionSummaryLedgerDelta {
   const inRange = (index: number | null): boolean => {
     // A fact with no provenance can only belong to the session's first report: it was written by a
     // cache that predates indexes, and every later group would otherwise repeat it.
@@ -83,13 +81,6 @@ function batchForRange(
   }
   const keep = (facts: readonly SessionSummaryFact[]): SessionSummaryFact[] =>
     facts.filter((fact) => inRange(fact.sourceIndex))
-  const timeline: SessionSummaryTimelineDeltaEntry[] = ledger.timeline
-    .filter((entry) => inRange(entry.sourceIndex))
-    .map((entry: SessionSummaryTimelineEntry) => ({
-      kind: entry.kind,
-      text: entry.text,
-      sourceIndex: entry.sourceIndex
-    }))
   return {
     ...(ledger.goal && inRange(ledger.goal.sourceIndex) ? { goal: ledger.goal } : {}),
     ...(ledger.inProgress && inRange(ledger.inProgress.sourceIndex)
@@ -98,8 +89,7 @@ function batchForRange(
     plan: keep(ledger.plan),
     done: keep(ledger.done),
     blockers: keep(ledger.blockers),
-    decisions: keep(ledger.decisions),
-    timeline
+    decisions: keep(ledger.decisions)
   }
 }
 
@@ -166,7 +156,6 @@ export async function rewriteSessionSummaryReports(args: {
         prompt: buildSessionSummaryReportPrompt({
           previous: report,
           delta: batch,
-          timeline: batch.timeline,
           windowRestarted: args.windowRestarted,
           userMessageCount: args.userMessageCount,
           lastUserMessageIndex: args.lastUserMessageIndex,

@@ -26,6 +26,7 @@ function ledger(overrides: Partial<SessionSummaryLedger> = {}): SessionSummaryLe
       { id: 'a', kind: 'milestone', text: 'early milestone', sourceIndex: 10 },
       { id: 'b', kind: 'error', text: 'recent failure', sourceIndex: 45 }
     ],
+    markers: [],
     reportSince: { text: 'The flag works now; the release wiring is next.', through: 46 },
     reportFull: {
       headline: 'Building a --since flag',
@@ -44,7 +45,6 @@ function ledger(overrides: Partial<SessionSummaryLedger> = {}): SessionSummaryLe
     userMessageCount: 3,
     foldedThrough: 46,
     foldedAt: 1_000,
-    timelineBase: 0,
     foldGap: null,
     gaps: [],
     ...overrides
@@ -118,6 +118,7 @@ describe('SessionSummaryLedgerView', () => {
             inProgress: null,
             done: [{ text: 'old work', sourceIndex: 5 }],
             timeline: [{ id: 'a', kind: 'milestone', text: 'old milestone', sourceIndex: 5 }],
+            markers: [],
             lastUserMessageIndex: 40
           })
         )}
@@ -253,6 +254,7 @@ describe('SessionSummaryLedgerView', () => {
             inProgress: null,
             done: [{ text: 'old work', sourceIndex: 5 }],
             timeline: [{ id: 'a', kind: 'milestone', text: 'old milestone', sourceIndex: 5 }],
+            markers: [],
             lastUserMessageIndex: 40
           })
         )}

@@ -2,7 +2,7 @@
 // merge → a report chain over the unfolded range.
 //
 // Three things are deliberately kept apart. *Paging* decides how many model calls a fold takes
-// (`CHUNK_MAX_CHARS` / `CHUNK_MAX_EVENTS`) and never what the model may see. *Truncation* — dropping
+// (`CHUNK_MAX_CHARS` / `CHUNK_MAX_LINES`) and never what the model may see. *Truncation* — dropping
 // content by position once a character budget is hit — is gone. What the model sees is the digest
 // (`session-summary-event-digest.ts`), which represents every event at the detail its role deserves.
 //
@@ -30,6 +30,8 @@ export { extractSessionSummaryJson }
 import { rewriteSessionSummaryReports } from './session-summary-report'
 import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
 import type { SessionSummarySourceEvent } from './session-summary-event-digest'
+import { planSessionSummaryRenderItems } from './session-summary-render-plan'
+import { planSessionSummaryTimelineMarkers } from './session-summary-timeline'
 
 import {
   buildSessionSummaryChunks,
@@ -147,7 +149,10 @@ export async function foldSessionSummaryEvents(args: {
 }): Promise<SessionSummaryFoldResult> {
   const { brain, ledger, events, signal, cache, failures } = args
   const baseIndex = ledger.foldedThrough
-  const ranges = buildSessionSummaryChunks(events)
+  // Why planned once and not per chunk: paging and rendering have to agree on where a chunk ends,
+  // and a burst is only collapsible if both see the same items.
+  const items = planSessionSummaryRenderItems(events)
+  const ranges = buildSessionSummaryChunks(items)
   const gaps = args.gaps ?? []
   let completedChunks = 0
   const reportProgress = (): void => {
@@ -193,7 +198,7 @@ export async function foldSessionSummaryEvents(args: {
         for (let attempt = 0; attempt < CHUNK_ATTEMPTS; attempt += 1) {
           try {
             const raw = await brain.complete({
-              prompt: buildSessionSummaryChunkPrompt(events, range, baseIndex, gaps),
+              prompt: buildSessionSummaryChunkPrompt(items, range, baseIndex, gaps),
               signal: foldSignal
             })
             foldSignal.throwIfAborted()
@@ -302,12 +307,9 @@ export async function foldSessionSummaryEvents(args: {
 
     const merged = mergeSessionSummaryDeltas(deltas)
     // Why sliced: a degraded fold stops at the first failed chunk, so counting the reader's messages
-    // across the whole read would count the ones the next fold is about to count again.
-    const readerMessages = readerMessagesAfter(
-      ledger,
-      events.slice(0, foldedThrough - baseIndex),
-      baseIndex
-    )
+    // — or planning markers — across the whole read would count what the next fold is about to.
+    const applied = events.slice(0, foldedThrough - baseIndex)
+    const readerMessages = readerMessagesAfter(ledger, applied, baseIndex)
     const folded = applySessionSummaryDelta(
       ledger,
       merged,
@@ -315,7 +317,11 @@ export async function foldSessionSummaryEvents(args: {
       args.readAt ?? Date.now(),
       readerMessages.lastUserMessageIndex,
       readerMessages.userMessageCount,
-      { foldGap: gap, gaps: [...gaps.map((entry) => entry.text), ...abandoned] }
+      {
+        foldGap: gap,
+        gaps: [...gaps.map((entry) => entry.text), ...abandoned],
+        markers: planSessionSummaryTimelineMarkers(applied, baseIndex)
+      }
     )
     const reports = await rewriteSessionSummaryReports({
       brain,
