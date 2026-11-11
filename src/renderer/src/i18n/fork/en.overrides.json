@@ -17,6 +17,7 @@
   "auto.components.settings.OpenAiTranscriptionKeyDialog.d246b2bdb3": "Local runtime keys are stored in ~/.orca using Electron encrypted storage when available.",
   "auto.components.settings.ShortcutsPane.d8c988dab4": "~/.orca/keybindings.json",
   "auto.components.settings.experimental.search.agentDashboard.description": "Kanban board for monitoring agents across worktrees, in-window or as a pop-out.",
+  "auto.components.sidebar.WorkspaceKanbanSettingsMenu.4c2eaa78cc": "Moving a linked workspace updates its Linear issue status when a matching workflow state exists.",
   "auto.hooks.useSettingsNavigationMetadata.b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, and Grok.",
   "auto.store.slices.worktrees.2e17f825d4": "Worktree deleted, branch kept",
   "auto.store.slices.worktrees.3b57982bf6": "Git could not safely delete branch \"{{value0}}\" after deleting workspace \"{{value1}}\", so Orca kept it to avoid losing local commits.",

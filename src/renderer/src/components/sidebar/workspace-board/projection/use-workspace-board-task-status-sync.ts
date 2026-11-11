@@ -19,11 +19,11 @@ import type {
   Worktree
 } from '../../../../../../shared/worktree/types'
 import {
-  getWorkspaceBoardTaskStatusSyncRequest,
   syncWorkspaceBoardTaskStatuses,
   type WorkspaceBoardTaskStatusSyncMessage,
   type WorkspaceBoardTaskStatusSyncResult
 } from './workspace-board-task-status-sync'
+import { getWorkspaceBoardTaskStatusSyncRequest } from './workspace-board-task-status-sync-request'
 
 function formatTaskStatusSyncMessage(message: WorkspaceBoardTaskStatusSyncMessage): string {
   switch (message.kind) {
@@ -67,6 +67,48 @@ function formatTaskStatusSyncMessage(message: WorkspaceBoardTaskStatusSyncMessag
       return translate(
         'auto.components.sidebar.WorkspaceKanbanDrawer.b6c7d8e9f0',
         'Task status sync could not finish.'
+      )
+    case 'jira-issue-read-failed':
+      return translate(
+        'auto.components.sidebar.WorkspaceKanbanDrawer.jiraIssueReadFailed',
+        'Jira issue {{value0}} could not be read.',
+        { value0: message.issueKey }
+      )
+    case 'jira-missing-transition':
+      return translate(
+        'auto.components.sidebar.WorkspaceKanbanDrawer.jiraMissingTransition',
+        'No Jira transition reaches {{value0}}.',
+        { value0: message.statusLabel }
+      )
+    case 'jira-ambiguous-transition':
+      return translate(
+        'auto.components.sidebar.WorkspaceKanbanDrawer.jiraAmbiguousTransition',
+        'More than one Jira status could mean {{value0}}.',
+        { value0: message.statusLabel }
+      )
+    case 'jira-transition-needs-fields':
+      return translate(
+        'auto.components.sidebar.WorkspaceKanbanDrawer.jiraTransitionNeedsFields',
+        'Jira issue {{value0}} needs fields before it can move to {{value1}}; move it from the Tasks board.',
+        { value0: message.issueKey, value1: message.statusLabel }
+      )
+    case 'jira-update-failed':
+      return translate(
+        'auto.components.sidebar.WorkspaceKanbanDrawer.jiraUpdateFailed',
+        'Could not update Jira issue {{value0}}.',
+        { value0: message.issueKey }
+      )
+    case 'jira-provider-error':
+      return translate(
+        'auto.components.sidebar.WorkspaceKanbanDrawer.jiraProviderError',
+        'Could not sync Jira issue {{value0}}.',
+        { value0: message.issueKey }
+      )
+    case 'jira-owner-ambiguous':
+      return translate(
+        'auto.components.sidebar.WorkspaceKanbanDrawer.jiraOwnerAmbiguous',
+        'Skipped Jira issue {{value0}}: this workspace is on more than one host.',
+        { value0: message.issueKey }
       )
   }
 }
@@ -191,6 +233,16 @@ export function useWorkspaceBoardTaskStatusSync(args: {
                 hostWorktreeTarget({ id: worktree.id, hostId: worktree.hostId })
               )?.workspaceStatus
             : state.getKnownWorktreeById(worktree.id)?.workspaceStatus
+        },
+        onJiraIssueTransitioned: ({ issue, to, source }) => {
+          useAppStore.getState().patchJiraIssue(
+            issue.key,
+            { status: to },
+            {
+              siteId: issue.siteId ?? null,
+              sourceContext: source.kind === 'task-source' ? source : null
+            }
+          )
         }
       })
         .then((result) => {

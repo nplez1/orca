@@ -13,7 +13,13 @@ import type {
   WorkspaceStatusDefinition,
   Worktree
 } from '../../../../../../shared/worktree/types'
-import { getWorkspaceStatus } from '../../../../../../shared/workspace-statuses'
+import {
+  defaultJiraStatusSyncDeps,
+  syncJiraWorktreeStatus,
+  type JiraIssueTransitioned,
+  type JiraStatusSyncDeps,
+  type JiraStatusSyncMessage
+} from './workspace-board-jira-status-sync'
 
 export type WorkspaceBoardTaskStatusSyncResult = {
   updated: number
@@ -30,6 +36,7 @@ export type WorkspaceBoardTaskStatusSyncMessage =
   | { kind: 'provider-error'; issueIdentifier: string; detail?: string }
   | { kind: 'owner-ambiguous'; issueIdentifier: string }
   | { kind: 'unexpected-error'; detail?: string }
+  | JiraStatusSyncMessage
 
 type WorkspaceBoardTaskStatusSyncDependencies = {
   getIssue: typeof linearGetIssue
@@ -41,44 +48,15 @@ type WorkspaceBoardTaskStatusSyncDependencies = {
 export type SyncWorkspaceBoardTaskStatusesArgs = {
   worktreeKeys: readonly string[]
   targetStatus: WorkspaceStatusDefinition
-  worktreesByKey: ReadonlyMap<
-    string,
-    Pick<Worktree, 'linkedLinearIssue' | 'linkedLinearIssueWorkspaceId'>
-  >
+  worktreesByKey: ReadonlyMap<string, Worktree>
   settings?: RuntimeLinearSettings
   /** `null` refuses the worktree: its owner is ambiguous, so no host's Linear settings apply. */
   getSettingsForWorktree?: (worktreeKey: string) => RuntimeLinearSettings | null
   getLatestWorkspaceStatus: (worktreeKey: string) => WorkspaceStatus | null | undefined
   deps?: Partial<WorkspaceBoardTaskStatusSyncDependencies>
-}
-
-export type WorkspaceBoardTaskStatusSyncRequest = {
-  worktreeKeys: string[]
-  targetStatus: WorkspaceStatusDefinition
-}
-
-export function getWorkspaceBoardTaskStatusSyncRequest(args: {
-  enabled: boolean
-  worktreeKeys: readonly string[]
-  status: WorkspaceStatus
-  worktreesByKey: ReadonlyMap<string, Pick<Worktree, 'workspaceStatus'>>
-  workspaceStatuses: readonly WorkspaceStatusDefinition[]
-}): WorkspaceBoardTaskStatusSyncRequest | null {
-  if (!args.enabled || args.worktreeKeys.length === 0) {
-    return null
-  }
-  const targetStatus = args.workspaceStatuses.find((item) => item.id === args.status)
-  if (!targetStatus) {
-    return null
-  }
-  const changedWorktreeKeys = [...new Set(args.worktreeKeys)].filter((key) => {
-    const worktree = args.worktreesByKey.get(key)
-    return worktree ? getWorkspaceStatus(worktree, args.workspaceStatuses) !== args.status : false
-  })
-  if (changedWorktreeKeys.length === 0) {
-    return null
-  }
-  return { worktreeKeys: changedWorktreeKeys, targetStatus }
+  jiraDeps?: Partial<JiraStatusSyncDeps>
+  /** Patches the provider cache after a Jira transition, so a pane does not show the old status. */
+  onJiraIssueTransitioned?: (transition: JiraIssueTransitioned) => void
 }
 
 const defaultDeps: WorkspaceBoardTaskStatusSyncDependencies = {
@@ -88,6 +66,10 @@ const defaultDeps: WorkspaceBoardTaskStatusSyncDependencies = {
 }
 
 const worktreeSyncQueues = new Map<string, Promise<unknown>>()
+
+function emptyResult(): WorkspaceBoardTaskStatusSyncResult {
+  return { updated: 0, skipped: 0, failed: 0, messages: [] }
+}
 
 function normalizeStateName(name: string): string {
   return name.trim().toLowerCase()
@@ -174,12 +156,7 @@ async function syncLinearWorktreeStatus(
   worktreeKey: string,
   deps: WorkspaceBoardTaskStatusSyncDependencies
 ): Promise<WorkspaceBoardTaskStatusSyncResult> {
-  const result: WorkspaceBoardTaskStatusSyncResult = {
-    updated: 0,
-    skipped: 0,
-    failed: 0,
-    messages: []
-  }
+  const result = emptyResult()
   const worktree = args.worktreesByKey.get(worktreeKey)
   if (!worktree?.linkedLinearIssue) {
     return skipped(result)
@@ -255,22 +232,56 @@ async function syncLinearWorktreeStatus(
   }
 }
 
+/** One tracker write per card: Linear's slot wins, then a Jira link, then nothing to sync. */
+async function syncWorktreeTaskStatus(
+  args: SyncWorkspaceBoardTaskStatusesArgs,
+  worktreeKey: string,
+  deps: WorkspaceBoardTaskStatusSyncDependencies,
+  jiraDeps: JiraStatusSyncDeps
+): Promise<WorkspaceBoardTaskStatusSyncResult> {
+  const worktree = args.worktreesByKey.get(worktreeKey)
+  // Why the Linear slot first: a workspace linked to both synced Linear before Jira existed.
+  if (worktree?.linkedLinearIssue) {
+    return syncLinearWorktreeStatus(args, worktreeKey, deps)
+  }
+  const result = emptyResult()
+  if (!worktree) {
+    return result
+  }
+  const outcome = await syncJiraWorktreeStatus(
+    {
+      worktree,
+      targetStatus: args.targetStatus,
+      // Why not `??`: a present callback answering null is an ambiguous owner, not a fallback.
+      settings: args.getSettingsForWorktree
+        ? args.getSettingsForWorktree(worktreeKey)
+        : (args.settings ?? { kind: 'local' }),
+      getLatestWorkspaceStatus: () => args.getLatestWorkspaceStatus(worktreeKey)
+    },
+    jiraDeps
+  )
+  if (outcome.status === 'updated') {
+    args.onJiraIssueTransitioned?.(outcome)
+    result.updated += 1
+    return result
+  }
+  return outcome.status === 'failed'
+    ? failed(result, outcome.message)
+    : skipped(result, outcome.message)
+}
+
 export async function syncWorkspaceBoardTaskStatuses(
   args: SyncWorkspaceBoardTaskStatusesArgs
 ): Promise<WorkspaceBoardTaskStatusSyncResult> {
   const deps = { ...defaultDeps, ...args.deps }
-  const aggregate: WorkspaceBoardTaskStatusSyncResult = {
-    updated: 0,
-    skipped: 0,
-    failed: 0,
-    messages: []
-  }
+  const jiraDeps = { ...defaultJiraStatusSyncDeps, ...args.jiraDeps }
+  const aggregate = emptyResult()
 
   const uniqueKeys = new Set(args.worktreeKeys)
   await Promise.all(
     [...uniqueKeys].map(async (worktreeKey) => {
       const item = await enqueueWorktreeSync(worktreeKey, () =>
-        syncLinearWorktreeStatus(args, worktreeKey, deps)
+        syncWorktreeTaskStatus(args, worktreeKey, deps, jiraDeps)
       )
       mergeResult(aggregate, item)
     })
