@@ -1,17 +1,17 @@
 // Resolve parent and Git defaults on the chosen host while rejecting stale async results.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { GitAvailability } from './create-project-defaults'
+import {
+  RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS,
+  resolveRuntimeCreateParent,
+  withTimeout
+} from './runtime-create-parent'
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
-import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import type { AddRepoDialogStep } from '../dialog/add-repo-dialog-types'
-import { getDefaultCreateProjectParent, type GitAvailability } from './create-project-defaults'
-import { layoutNestsPrimaryCheckout } from '../../../../../../shared/orca-workspace-layout'
-import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
-import { toRuntimeExecutionHostId } from '../../../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 
 const LOCAL_GIT_AVAILABILITY_TIMEOUT_MS = 1500
-const RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS = 3000
 
 export type CreateRuntimeParentStatus = 'idle' | 'checking' | 'failed'
 
@@ -23,27 +23,6 @@ type AutoFilledCreateParent = {
 type CreateParentProvenance = {
   parent: string
   targetKey: string
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  return new Promise<T>((resolve, reject) => {
-    timeout = setTimeout(() => reject(new Error('Timed out')), timeoutMs)
-    promise.then(
-      (value) => {
-        if (timeout) {
-          clearTimeout(timeout)
-        }
-        resolve(value)
-      },
-      (error) => {
-        if (timeout) {
-          clearTimeout(timeout)
-        }
-        reject(error)
-      }
-    )
-  })
 }
 
 export function useCreateProjectDefaults({
@@ -221,25 +200,11 @@ export function useCreateProjectDefaults({
 
     const gen = ++createParentDefaultGenRef.current
     setCreateRuntimeParentStatus('checking')
-    const runtimeHostIds = [toRuntimeExecutionHostId(runtimeEnvironmentId)]
-    const layoutMode = worktreeLayoutMode ?? 'repo-nested'
-    // Nested layouts container the project inside the worktree root; flat ones inside the checkout root.
-    const storedParent =
-      getHostSettingOverrideForIds(
-        { hostSettingOverrides },
-        runtimeHostIds,
-        layoutNestsPrimaryCheckout(layoutMode) ? 'defaultWorktreeLocation' : 'defaultRepoRoot'
-      ) ?? ''
-    const resolveParent = storedParent
-      ? Promise.resolve({ resolvedPath: '', parent: storedParent })
-      : withTimeout(
-          browseRuntimeServerDirectory(runtimeEnvironmentId, '~'),
-          RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS
-        ).then((result) => ({
-          resolvedPath: result.resolvedPath,
-          parent: getDefaultCreateProjectParent(result.resolvedPath, worktreeLayoutMode)
-        }))
-    void resolveParent
+    void resolveRuntimeCreateParent({
+      runtimeEnvironmentId,
+      worktreeLayoutMode,
+      hostSettingOverrides
+    })
       .then((result) => {
         if (
           gen !== createParentDefaultGenRef.current ||

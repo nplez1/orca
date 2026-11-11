@@ -3,7 +3,6 @@ import { legacyBaseRefSearchResult } from '../../../../shared/base-ref-search-re
 import type { CloneTargetCheck } from '../../../../shared/git/clone/clone-target-check'
 import type { Repo } from '../../../../shared/repo-types'
 import { getDefaultCreateProjectParent } from '@/components/sidebar/project-admission/create/create-project-defaults'
-import { getDefaultRepoRootConvention } from '../../../../shared/host-repo-root'
 import {
   callRuntimeResult,
   callRuntimeResultWithOwner,
@@ -77,13 +76,6 @@ export function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
         path: '~'
       })
       return getDefaultCreateProjectParent(result.resolvedPath)
-    },
-    getDefaultRepoRoot: async () => {
-      // A web client is served by one host, so that host's home names the convention.
-      const result = await callRuntimeResult<{ resolvedPath: string }>('files.browseServerDir', {
-        path: '~'
-      })
-      return getDefaultRepoRootConvention(result.resolvedPath)
     },
     onCloneProgress: () => noopUnsubscribe,
     getBaseRefDefault: async ({ repoId }) =>

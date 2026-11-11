@@ -150,6 +150,8 @@ export function HostFolderSettingRow({
       // The native dialog returns paths on this computer, which is the scope it was opened for.
       void pickLocalProjectLocationFolder((path) => {
         setDraft(path)
+        editedRef.current = false
+        lastCommittedRef.current = path
         writeValue(path)
       })
       return
@@ -190,8 +192,9 @@ export function HostFolderSettingRow({
             }
             if (e.key === 'Escape') {
               skipNextBlurCommitRef.current = true
-              editedRef.current = false
               setDraft(value)
+              // Back to the saved value, so a later Reset or scope change may re-seed it.
+              editedRef.current = false
               e.currentTarget.blur()
             }
           }}

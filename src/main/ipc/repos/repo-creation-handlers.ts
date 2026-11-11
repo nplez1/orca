@@ -14,7 +14,6 @@ import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../share
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { getEffectiveHostSetting } from '../../../shared/host-setting-overrides'
-import { getDefaultRepoRootConvention } from '../../../shared/host-repo-root'
 import { probeGitAvailability } from '../../git/git-availability'
 import { gitExecFileAsync } from '../../git/runner'
 import { getInitDefaultBranchName } from '../../git/init-default-branch'
@@ -43,6 +42,16 @@ export async function probeLocalGitAvailability(): Promise<boolean> {
 function getDefaultCreateProjectParent(store: Store): string {
   const home = homedir()
   const settings = store.getSettings()
+  // An explicit checkout root wins: under a nested layout it is the project's container.
+  const storedRoot = getEffectiveHostSetting(
+    settings,
+    LOCAL_EXECUTION_HOST_ID,
+    'defaultRepoRoot',
+    ''
+  ).trim()
+  if (storedRoot) {
+    return storedRoot
+  }
   const configured = getEffectiveHostSetting(
     settings,
     LOCAL_EXECUTION_HOST_ID,
@@ -61,11 +70,6 @@ function getDefaultCreateProjectParent(store: Store): string {
     return configured
   }
   return join(home, 'orca', 'projects')
-}
-
-/** The convention only: the row already holds any stored override, so echoing it back would survive a Reset. */
-function getDefaultRepoRoot(store: Store): string {
-  return getDefaultRepoRootConvention(homedir(), resolveWorktreeLayoutMode(store.getSettings()))
 }
 
 /**
@@ -112,7 +116,6 @@ async function resolveCreateTargetPath(
 export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: Store): void {
   ipcMain.handle('repos:isGitAvailable', () => probeLocalGitAvailability())
   ipcMain.handle('repos:getDefaultCreateProjectParent', () => getDefaultCreateProjectParent(store))
-  ipcMain.handle('repos:getDefaultRepoRoot', () => getDefaultRepoRoot(store))
 
   ipcMain.handle(
     'repos:add',

@@ -805,7 +805,7 @@
         "RepoRootSetting": {
           "title": "Repository root folder",
           "description": "Where checkouts are cloned on this host.",
-          "localCaption": "New projects and clones are created here. Clearing this reverts to the Orca default for your workspace layout.",
+          "localCaption": "New clones start here. Clearing this reverts to the Orca default for your workspace layout.",
           "remoteCaption": "Where {{value0}} keeps its checkouts, as that machine spells it."
         }
       },

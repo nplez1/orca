@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
 import { getDefaultRepoRootConvention } from '../../../../../shared/host-repo-root'
+import { getEffectiveHostSetting } from '../../../../../shared/host-setting-overrides'
 import {
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
 } from '../../../../../shared/orca-workspace-layout'
+import { getDefaultCloneParent } from '../../sidebar/project-admission/create/clone-defaults'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
 import { HostFolderSettingRow } from './HostFolderSettingRow'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
@@ -36,7 +38,18 @@ export function RepoRootSetting({
     }
     let cancelled = false
     const load = isLocal
-      ? window.api.repos.getDefaultRepoRoot()
+      ? // The same rule the clone flow applies here, so the field cannot promise another folder.
+        Promise.resolve(
+          getDefaultCloneParent(
+            getEffectiveHostSetting(
+              settings,
+              LOCAL_EXECUTION_HOST_ID,
+              'defaultWorktreeLocation',
+              settings.workspaceDir
+            ),
+            layoutMode
+          )
+        )
       : environmentId
         ? browseRuntimeServerDirectory(environmentId, '~').then((listing) =>
             getDefaultRepoRootConvention(listing.resolvedPath, layoutMode)
@@ -57,7 +70,7 @@ export function RepoRootSetting({
     return () => {
       cancelled = true
     }
-  }, [environmentId, isLocal, layoutMode, scope.available])
+  }, [environmentId, isLocal, layoutMode, scope.available, settings])
   return (
     <HostFolderSettingRow
       scope={scope}
@@ -74,7 +87,7 @@ export function RepoRootSetting({
       keywords={['repository', 'repo', 'root', 'checkout', 'clone', 'destination', 'host']}
       localCaption={t(
         'auto.components.settings.RepoRootSetting.localCaption',
-        'New projects and clones are created here. Clearing this reverts to the Orca default for your workspace layout.'
+        'New clones start here. Clearing this reverts to the Orca default for your workspace layout.'
       )}
       remoteCaption={t(
         'auto.components.settings.RepoRootSetting.remoteCaption',

@@ -49,10 +49,6 @@ function renderRow(settings: GlobalSettings, scope: SettingsHostScope, updateSet
 beforeEach(() => {
   browseRuntimeServerDirectory.mockReset()
   browseRuntimeServerDirectory.mockResolvedValue({ resolvedPath: '/home/me', entries: [] })
-  Object.defineProperty(window, 'api', {
-    configurable: true,
-    value: { repos: { getDefaultRepoRoot: async () => '/Users/me/orca/projects' } }
-  })
 })
 
 afterEach(cleanup)
@@ -60,8 +56,9 @@ afterEach(cleanup)
 describe('RepoRootSetting', () => {
   it('shows this computer’s convention when nothing is stored', async () => {
     renderRow(settingsWith({}), localScope)
+    // The default workspace dir is <home>/orca/workspaces, so the clone parent is that tree itself.
     await waitFor(() =>
-      expect(screen.getByRole<HTMLInputElement>('textbox').value).toBe('/Users/me/orca/projects')
+      expect(screen.getByRole<HTMLInputElement>('textbox').value).toBe('/Users/me/orca/workspaces')
     )
   })
 
@@ -88,7 +85,7 @@ describe('RepoRootSetting', () => {
   it('stores a value for this computer as a host override', async () => {
     const user = userEvent.setup()
     const { input, updateSettings } = renderRow(settingsWith({}), localScope)
-    await waitFor(() => expect(input.value).toBe('/Users/me/orca/projects'))
+    await waitFor(() => expect(input.value).toBe('/Users/me/orca/workspaces'))
     await user.clear(input)
     await user.type(input, '/data/checkouts{Enter}')
     expect(updateSettings).toHaveBeenCalledWith({
