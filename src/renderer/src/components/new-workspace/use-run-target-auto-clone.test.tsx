@@ -243,6 +243,39 @@ describe('useRunTargetAutoClone', () => {
     )
   })
 
+  it('starts nothing for a host the user abandoned while its folder was still being resolved', async () => {
+    let releaseProbe: (value: string) => void = () => {}
+    mocks.resolveCloneParentForHost.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseProbe = resolve
+        })
+    )
+    const { result } = renderClone()
+
+    act(() => result.current.start(option))
+    await act(async () => result.current.start(OTHER_HOST))
+    await act(async () => {
+      releaseProbe('/home/abandoned')
+    })
+
+    // Why: the abandoned host would otherwise end up with a checkout nobody asked to keep.
+    expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
+    expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: 'runtime:env-c' })
+  })
+
+  it('keeps a destination typed while no clone was pending for the host picked next', async () => {
+    const { result } = renderClone()
+
+    act(() => result.current.setOverrides({ destination: '/srv/typed-before' }))
+    await act(async () => result.current.start(option))
+
+    expect(mocks.setupProjectClone).toHaveBeenCalledWith(
+      expect.objectContaining({ destination: '/srv/typed-before' }),
+      { onFailure: 'throw' }
+    )
+  })
+
   it('runs nothing when the default folder is already taken', async () => {
     mocks.checkCloneTargetOn.mockResolvedValue({
       status: 'taken',

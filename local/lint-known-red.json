@@ -32,8 +32,8 @@
     "2026-11-09: one whole-step entry for `check:code-quality:changed`, which a sync merge cannot pass before",
     "it is pushed — see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
     "the first run after `git push origin main`; prune it then.",
-    "The `check-upstream-file-comments` entries are the same sync's: fork-comment growth that five fork PRs had already put on the base branch before the merge. They are recorded, not accepted; see their evidence.",
-    "2026-11-09: three entries for the compiler-fix commit. Two files cross their maxima only because the fix MOVED existing fork comments (the counter diffs against the sync base, so a move reads as an addition), and one total row pins the sum. The commit's own prose was removed instead of recorded; see LOCAL-PATCHES.md local(ratchets)."
+    "The `check-upstream-file-comments` entries that sync left were pruned on 2026-11-11, when a branch re-took that baseline; see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-11 fork-comment re-take.",
+    "2026-11-11: three `check:focus-read-ratchet` entries, red at the merge base from #361's per-host settings scope; see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-11 fork-comment re-take."
   ],
   "recordedAt": "2026-11-11",
   "entries": [

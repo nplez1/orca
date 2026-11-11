@@ -1789,8 +1789,8 @@ rows record it; restructuring reviewed code to dodge a regex would be the worse 
 existed: 5511 against a 5419 baseline, from 8 files. Measured in `/Volumes/Storage/Code/orca/main` at
 that revision. #361, #363, #364 and #365 added fork comments above upstream's code without re-taking
 the ratchet, and each one kept the previous baseline. The baseline is re-taken here with
-`--init --accept` at **5507** — four below `main`'s 5511, because this branch marks its own upstream
-comments with `fork-comment-ok` instead of leaving them uncounted — and every file over its old
+`--init --accept` at **5507** — four below `main`'s 5511, because this branch's own comments above
+upstream code carry `fork-comment-ok` and the ratchet counts none of them — and every file over its old
 maximum now carries a frozen per-file maximum, so the drift can only shrink from here. The seven
 `check-upstream-file-comments` known-red entries in `local/lint-known-red.json` were stale the moment
 the baseline moved, and are pruned; the gate now reports `5507/5507, 0 stale`.

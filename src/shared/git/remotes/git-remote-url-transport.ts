@@ -66,9 +66,18 @@ function parseRemote(url: string): ParsedRemote | null {
   return null
 }
 
-/** A path under `scm/` is a server layout whose other transport is not derivable from this one. */
+/**
+ * A `scm/<project>/<repo>` path is Bitbucket Server's layout, whose ssh form is
+ * `ssh://host:7999/<project>/<repo>` — a different path on a different port, so nothing derivable.
+ * Matching the segment wherever it sits catches a server behind a context path (`/bitbucket/scm/…`)
+ * while a project that merely happens to be called `scm` keeps its switch.
+ */
 function pathFirstSegmentIsRewritable(path: string): boolean {
-  return path.split('/')[0]?.toLowerCase() !== DIFFERENT_PATH_SEGMENT
+  const segments = path.split('/')
+  return !segments.some(
+    (segment, index) =>
+      segment.toLowerCase() === DIFFERENT_PATH_SEGMENT && segments.length - index - 1 === 2
+  )
 }
 
 /** A host we can rewrite for: a dotless name is an unresolved `~/.ssh/config` alias, not a forge. */

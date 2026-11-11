@@ -62,6 +62,8 @@ type CloneRequest = {
   url: string
   destinationOverride: string
   folderName?: string
+  /** True once the user is still here but has moved to another host, so nothing should be cloned. */
+  isSuperseded: () => boolean
 }
 
 /**
@@ -98,9 +100,10 @@ export function useRunTargetAutoClone({
   // Only the host the user is currently waiting on may drive the status; a clone they moved away
   // from still finishes on the host, but must not retarget the composer or overwrite its state.
   const pendingKeyRef = useRef<string | null>(null)
-  // The host a destination override was last written for, kept across clears: a path names one
-  // machine, so it must not follow the user to the next host picked.
-  const lastHostKeyRef = useRef<string | null>(null)
+  // The clone a destination override was written for, kept across clears: a path names one machine,
+  // so it must not follow the user to another host — but a value typed while nothing is pending
+  // belongs to whatever host is picked next.
+  const destinationKeyRef = useRef<string | null>(null)
   // A closed composer must not be retargeted by a clone it started before it went away.
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -111,6 +114,9 @@ export function useRunTargetAutoClone({
   }, [])
 
   const setOverrides = useCallback((next: Partial<RunTargetCloneOverrides>): void => {
+    if (next.destination !== undefined) {
+      destinationKeyRef.current = pendingKeyRef.current
+    }
     setOverridesState((current) => ({ ...current, ...next }))
   }, [])
 
@@ -119,7 +125,8 @@ export function useRunTargetAutoClone({
       option,
       url,
       destinationOverride,
-      folderName
+      folderName,
+      isSuperseded
     }: CloneRequest): Promise<ProjectCloneOutcome> => {
       if (!url) {
         return {
@@ -131,7 +138,7 @@ export function useRunTargetAutoClone({
         }
       }
       if (!projectId) {
-        return { kind: 'failed', message: '' }
+        return { kind: 'abandoned' }
       }
       const destination =
         destinationOverride ||
@@ -140,6 +147,11 @@ export function useRunTargetAutoClone({
           hostIds: [option.hostId],
           ...(layoutMode ? { layoutMode } : {})
         }))
+      // Why here as well as at the outcome: the host lookup is the long wait, and a user who has
+      // moved on must not end up with a checkout on a host they abandoned.
+      if (isSuperseded()) {
+        return { kind: 'abandoned' }
+      }
       if (!destination.trim()) {
         return {
           kind: 'failed',
@@ -155,6 +167,9 @@ export function useRunTargetAutoClone({
         ...(folderName ? { folderName } : {})
       }
       const check = await checkCloneTargetOn(getProjectCloneCheckTarget(option.hostId), cloneArgs)
+      if (isSuperseded()) {
+        return { kind: 'abandoned' }
+      }
       if (check?.status === 'taken') {
         return {
           kind: 'folder-taken',
@@ -203,8 +218,8 @@ export function useRunTargetAutoClone({
       // Why keyed rather than counted: a second pick of the same host joins the running clone, and
       // that clone's own continuation has to stay live or the composer waits on it forever.
       pendingKeyRef.current = key
-      const hostChanged = lastHostKeyRef.current !== null && lastHostKeyRef.current !== key
-      lastHostKeyRef.current = key
+      const hostChanged = destinationKeyRef.current !== null && destinationKeyRef.current !== key
+      destinationKeyRef.current = key
       const destinationOverride = hostChanged ? '' : overrides.destination.trim()
       if (hostChanged && overrides.destination) {
         setOverridesState((current) => ({ ...current, destination: '' }))
@@ -217,15 +232,14 @@ export function useRunTargetAutoClone({
           option,
           url: overrides.url.trim() || defaultCloneUrl.trim(),
           destinationOverride,
+          // Why unmount does not count: a reopened composer may be waiting on this same clone.
+          isSuperseded: () => mountedRef.current && pendingKeyRef.current !== key,
           ...(requestedFolderName ? { folderName: requestedFolderName } : {})
         })
       )
-      void promise.then((outcome) => {
+      const applyOutcome = (outcome: ProjectCloneOutcome): void => {
         // Why both: an unmounted composer and one that moved to another host must not be retargeted.
-        if (!mountedRef.current || pendingKeyRef.current !== key) {
-          return
-        }
-        if (outcome.kind === 'failed' && !outcome.message) {
+        if (!mountedRef.current || pendingKeyRef.current !== key || outcome.kind === 'abandoned') {
           return
         }
         if (outcome.kind === 'provisioned') {
@@ -249,6 +263,9 @@ export function useRunTargetAutoClone({
                 canUseExistingFolder: outcome.canUseExistingFolder
               }
         )
+      }
+      void promise.then(applyOutcome, () => {
+        // cloneOnce reports its own failures; this only stops a derived rejection going unhandled.
       })
     },
     [cloneOnce, defaultCloneUrl, onProvisioned, overrides.destination, overrides.url, projectId]

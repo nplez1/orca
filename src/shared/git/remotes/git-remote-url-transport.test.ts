@@ -76,6 +76,7 @@ describe('rewriteGitRemoteTransport', () => {
   const perTransportPaths: [url: string, to: GitRemoteTransport][] = [
     ['https://dev.azure.com/org/project/_git/app', 'ssh'],
     ['https://bitbucket.example.com/scm/PROJ/app.git', 'ssh'],
+    ['https://bitbucket.example.com/bitbucket/scm/PROJ/app.git', 'ssh'],
     ['git@bitbucket.example.com:scm/PROJ/app.git', 'https'],
     // Why the port rule: a self-hosted server's ssh path is not derivable from an arbitrary port.
     ['ssh://git@bitbucket.example.com:7999/PROJ/app.git', 'https']

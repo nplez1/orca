@@ -3,6 +3,8 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 /** What a clone onto a host came to, in terms every surface that asked can report. */
 export type ProjectCloneOutcome =
   | { kind: 'provisioned'; setupId: string }
+  /** The user moved to another host while this one was still resolving; nothing was cloned. */
+  | { kind: 'abandoned' }
   | {
       kind: 'folder-taken'
       folderName: string
