@@ -35,62 +35,30 @@
     "The `check-upstream-file-comments` entries are the same sync's: fork-comment growth that five fork PRs had already put on the base branch before the merge. They are recorded, not accepted; see their evidence.",
     "2026-11-09: three entries for the compiler-fix commit. Two files cross their maxima only because the fix MOVED existing fork comments (the counter diffs against the sync base, so a move reads as an addition), and one total row pins the sum. The commit's own prose was removed instead of recorded; see LOCAL-PATCHES.md local(ratchets)."
   ],
-  "recordedAt": "2026-11-09",
+  "recordedAt": "2026-11-11",
   "entries": [
     {
-      "step": "check-upstream-file-comments",
-      "match": "^(?:src/main/ai-vault/session-scanner-jsonl-reader\\.ts: 9 fork comment line\\(s\\), baseline 0|src/main/ai-vault/transcripts/session-transcript-consumers\\.ts: 15 fork comment line\\(s\\), baseline 0|src/main/ai-vault/transcripts/session-transcript-reader\\.ts: 14 fork comment line\\(s\\), baseline 6)$",
-      "class": "fork-comment-growth-pre-sync",
-      "owner": "#281 (2c28acde9dc, feat(session-summary))",
-      "evidence": "Pre-existing on the base branch, not this sync's: the pre-sync tip 3f8bbfb269e already measured 6161 fork comment lines against its 6011 baseline (23 files over their maxima, 125 lines), added after the last re-baseline (0f44ef5f4e0, #273) without --accept. The sync re-baseline keeps these files at their pre-growth maxima so the growth stays visible. Fix by moving the prose into LOCAL-PATCHES.md or a fork-owned module (the #267 precedent), or accept it with --init --accept; either change makes this entry stale. The match pins each file's exact count, so any further growth is a new red. Files: src/main/ai-vault/session-scanner-jsonl-reader.ts 0->9, src/main/ai-vault/transcripts/session-transcript-consumers.ts 0->15, src/main/ai-vault/transcripts/session-transcript-reader.ts 6->14.",
+      "step": "check:focus-read-ratchet",
+      "match": "^src/renderer/src/components/settings/host-scope/use-settings-host-scope\\.ts: 2 focus read\\(s\\), baseline allows 0\\. Route by the resource's owner\\. Only a creation flow with no source row may use defaultCreationHost\\.$",
+      "class": "focus-read-foreign-361",
+      "owner": "local(gates) — #361 f079fb32908, the per-host settings scope",
+      "evidence": "Foreign red: `pnpm check:focus-read-ratchet` fails identically at the merge base. Measured in /Volumes/Storage/Code/orca/main at dbb25491d3e: the same three lines (use-settings-host-scope.ts 2 vs 0, Settings.tsx 1 vs 2, WorkspaceDirectorySetting.tsx 0 vs 1). They arrived with #361 (f079fb32908), the per-host settings scope, which this branch does not touch. The two 'baseline still allows' rows are prunable slack, and the use-settings-host-scope read is a real new focus read in that PR's own file; fixing either is that PR's change, not this issue's.",
       "flaky": false
     },
     {
-      "step": "check-upstream-file-comments",
-      "match": "^(?:src/main/git/worktrees/removal/windows-worktree-removal\\.ts: 7 fork comment line\\(s\\), baseline 0|src/main/git/worktrees/removal/worktree-delete-limit\\.ts: 6 fork comment line\\(s\\), baseline 0|src/main/git/worktrees/removal/worktree-removal\\.ts: 10 fork comment line\\(s\\), baseline 8|src/main/filesystem/host-tree-removal\\.ts: 7 fork comment line\\(s\\), baseline 0|src/renderer/src/store/slices/worktrees/teardown/remove-worktree\\.ts: 9 fork comment line\\(s\\), baseline 8|src/shared/worktree/create-types\\.ts: 6 fork comment line\\(s\\), baseline 5|src/shared/worktree/removal\\.ts: 5 fork comment line\\(s\\), baseline 0)$",
-      "class": "fork-comment-growth-pre-sync",
-      "owner": "#277 (a0310d156e3, fix(worktrees): locked Windows delete)",
-      "evidence": "Pre-existing on the base branch, not this sync's: the pre-sync tip 3f8bbfb269e already measured 6161 fork comment lines against its 6011 baseline (23 files over their maxima, 125 lines), added after the last re-baseline (0f44ef5f4e0, #273) without --accept. The sync re-baseline keeps these files at their pre-growth maxima so the growth stays visible. Fix by moving the prose into LOCAL-PATCHES.md or a fork-owned module (the #267 precedent), or accept it with --init --accept; either change makes this entry stale. The match pins each file's exact count, so any further growth is a new red. Files: src/main/git/worktrees/removal/windows-worktree-removal.ts 0->7, src/main/git/worktrees/removal/worktree-delete-limit.ts 0->6, src/main/git/worktrees/removal/worktree-removal.ts 8->10, src/main/filesystem/host-tree-removal.ts 0->7, src/renderer/src/store/slices/worktrees/teardown/remove-worktree.ts 8->9, src/shared/worktree/create-types.ts 5->6, src/shared/worktree/removal.ts 0->5.",
+      "step": "check:focus-read-ratchet",
+      "match": "^src/renderer/src/components/settings/Settings\\.tsx: 1 focus read\\(s\\), baseline still allows 2\\. Run: pnpm check:focus-read-ratchet --prune$",
+      "class": "focus-read-prunable-361",
+      "owner": "local(gates) — #361 f079fb32908, the per-host settings scope",
+      "evidence": "Foreign red: `pnpm check:focus-read-ratchet` fails identically at the merge base. Measured in /Volumes/Storage/Code/orca/main at dbb25491d3e: the same three lines (use-settings-host-scope.ts 2 vs 0, Settings.tsx 1 vs 2, WorkspaceDirectorySetting.tsx 0 vs 1). They arrived with #361 (f079fb32908), the per-host settings scope, which this branch does not touch. The two 'baseline still allows' rows are prunable slack, and the use-settings-host-scope read is a real new focus read in that PR's own file; fixing either is that PR's change, not this issue's.",
       "flaky": false
     },
     {
-      "step": "check-upstream-file-comments",
-      "match": "^(?:src/main/ipc/worktree-remote\\.ts: 37 fork comment line\\(s\\), baseline 32|src/main/runtime/orca-runtime-tests/local-worktree-creation-part-02\\.spec\\.ts: 6 fork comment line\\(s\\), baseline 0|src/renderer/src/components/new-workspace/new-workspace-composer-card-props\\.ts: 6 fork comment line\\(s\\), baseline 5|src/renderer/src/store/slices/worktrees/create/create-worktree\\.ts: 5 fork comment line\\(s\\), baseline 0|src/shared/worktree-runtime-capabilities\\.ts: 5 fork comment line\\(s\\), baseline 0)$",
-      "class": "fork-comment-growth-pre-sync",
-      "owner": "#295 (3f8bbfb269e, fix(sidebar): copy a workspace to another host)",
-      "evidence": "Pre-existing on the base branch, not this sync's: the pre-sync tip 3f8bbfb269e already measured 6161 fork comment lines against its 6011 baseline (23 files over their maxima, 125 lines), added after the last re-baseline (0f44ef5f4e0, #273) without --accept. The sync re-baseline keeps these files at their pre-growth maxima so the growth stays visible. Fix by moving the prose into LOCAL-PATCHES.md or a fork-owned module (the #267 precedent), or accept it with --init --accept; either change makes this entry stale. The match pins each file's exact count, so any further growth is a new red. Files: src/main/ipc/worktree-remote.ts 32->37, src/main/runtime/orca-runtime-tests/local-worktree-creation-part-02.spec.ts 0->6, src/renderer/src/components/new-workspace/new-workspace-composer-card-props.ts 5->6, src/renderer/src/store/slices/worktrees/create/create-worktree.ts 0->5, src/shared/worktree-runtime-capabilities.ts 0->5.",
-      "flaky": false
-    },
-    {
-      "step": "check-upstream-file-comments",
-      "match": "^(?:src/main/pi/agent-status-extension-source\\.ts: 8 fork comment line\\(s\\), baseline 0|src/main/pi/agent-status-extension-test-harness\\.ts: 13 fork comment line\\(s\\), baseline 10|src/main/pi/agent-status-handler-source\\.ts: 7 fork comment line\\(s\\), baseline 0|src/main/pi/agent-status-session-boundary-source\\.ts: 27 fork comment line\\(s\\), baseline 26|src/shared/agent-hook-listener/normalization/normalize-hook-payload\\.ts: 26 fork comment line\\(s\\), baseline 23|src/shared/agent-hook-listener/listener-state\\.ts: 13 fork comment line\\(s\\), baseline 9|src/shared/agent-hook-listener/providers/pi-family-events\\.ts: 10 fork comment line\\(s\\), baseline 0)$",
-      "class": "fork-comment-growth-pre-sync",
-      "owner": "#287 (904945bada4, fix(agents): monitoring pi pane), with #283/#286 (2b723f88196) on listener-state and pi-family-events",
-      "evidence": "Pre-existing on the base branch, not this sync's: the pre-sync tip 3f8bbfb269e already measured 6161 fork comment lines against its 6011 baseline (23 files over their maxima, 125 lines), added after the last re-baseline (0f44ef5f4e0, #273) without --accept. The sync re-baseline keeps these files at their pre-growth maxima so the growth stays visible. Fix by moving the prose into LOCAL-PATCHES.md or a fork-owned module (the #267 precedent), or accept it with --init --accept; either change makes this entry stale. The match pins each file's exact count, so any further growth is a new red. Files: src/main/pi/agent-status-extension-source.ts 0->8, src/main/pi/agent-status-extension-test-harness.ts 10->13, src/main/pi/agent-status-handler-source.ts 0->7, src/main/pi/agent-status-session-boundary-source.ts 26->27, src/shared/agent-hook-listener/normalization/normalize-hook-payload.ts 23->26, src/shared/agent-hook-listener/listener-state.ts 9->13, src/shared/agent-hook-listener/providers/pi-family-events.ts 0->10.",
-      "flaky": false
-    },
-    {
-      "step": "check-upstream-file-comments",
-      "match": "^src/renderer/src/components/right-sidebar/ai-vault/scanning/ai-vault-session-refresh\\.ts: 10 fork comment line\\(s\\), baseline 7$",
-      "class": "fork-comment-moved-by-fix",
-      "owner": "local(gates) b0eb07205ad — React Compiler bailouts",
-      "evidence": "The 2026-11-09 compiler fix wrapped this file's try/catch/finally into module helpers, which MOVES the fork's existing comments into new positions; the counter diffs against the sync base, so a moved line counts as an added one. Nothing new is written: every line here is prose that was already in the file before the fix (git show 33d8977e3fd:<file> reproduces it), and the only genuinely new comment this commit adds is ai-vault-session-refresh's max-lines suppression, which the ownership rule in LOCAL-PATCHES.md requires. Fix by re-baselining in the next sync (--init --accept) once the moved lines settle, or by moving the prose into LOCAL-PATCHES.md.",
-      "flaky": false
-    },
-    {
-      "step": "check-upstream-file-comments",
-      "match": "^src/renderer/src/components/right-sidebar/checks-panel/refresh/use-checks-panel-manual-refresh\\.tsx: 9 fork comment line\\(s\\), baseline 0$",
-      "class": "fork-comment-moved-by-fix",
-      "owner": "local(gates) b0eb07205ad — React Compiler bailouts",
-      "evidence": "The 2026-11-09 compiler fix wrapped this file's try/catch/finally into module helpers, which MOVES the fork's existing comments into new positions; the counter diffs against the sync base, so a moved line counts as an added one. Nothing new is written: every line here is prose that was already in the file before the fix (git show 33d8977e3fd:<file> reproduces it), and the only genuinely new comment this commit adds is ai-vault-session-refresh's max-lines suppression, which the ownership rule in LOCAL-PATCHES.md requires. Fix by re-baselining in the next sync (--init --accept) once the moved lines settle, or by moving the prose into LOCAL-PATCHES.md.",
-      "flaky": false
-    },
-    {
-      "step": "check-upstream-file-comments",
-      "match": "^5459 fork comment lines in total, baseline 5269$",
-      "class": "fork-comment-total-growth",
-      "owner": "local(gates) b0eb07205ad — React Compiler bailouts, over the recorded-not-accepted rows",
-      "evidence": "The total is the sum of the per-file rows above plus the five sync-debt rows recorded before this commit: 5459 against 5269. Removing this commit's own prose (six lines in DiffViewer, useFileExplorerVisibleRowProjection and ai-vault-session-refresh) took it 5465 -> 5459, and what remains is the moved-comment artifact the two fork-comment-moved-by-fix rows describe plus the pre-sync growth those rows already own. Fix by re-baselining with --init --accept in the sync that settles the moved lines. The match pins the exact total, so any further growth is a new red.",
+      "step": "check:focus-read-ratchet",
+      "match": "^src/renderer/src/components/settings/general/WorkspaceDirectorySetting\\.tsx: 0 focus read\\(s\\), baseline still allows 1\\. Run: pnpm check:focus-read-ratchet --prune$",
+      "class": "focus-read-prunable-361",
+      "owner": "local(gates) — #361 f079fb32908, the per-host settings scope",
+      "evidence": "Foreign red: `pnpm check:focus-read-ratchet` fails identically at the merge base. Measured in /Volumes/Storage/Code/orca/main at dbb25491d3e: the same three lines (use-settings-host-scope.ts 2 vs 0, Settings.tsx 1 vs 2, WorkspaceDirectorySetting.tsx 0 vs 1). They arrived with #361 (f079fb32908), the per-host settings scope, which this branch does not touch. The two 'baseline still allows' rows are prunable slack, and the use-settings-host-scope read is a real new focus read in that PR's own file; fixing either is that PR's change, not this issue's.",
       "flaky": false
     }
   ]

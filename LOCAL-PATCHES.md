@@ -1783,6 +1783,26 @@ reuses the sidebar card's request key on purpose so a switch does not overwrite 
 The ratchet counts the transitive call in that file and in the two panes that call the hook, so the
 rows record it; restructuring reviewed code to dodge a regex would be the worse trade.
 
+### `local(lint)`: the 2026-11-11 fork-comment re-take, and three focus reads recorded from #361
+
+`node local/check-upstream-file-comments.mjs` was red on `main` at `dbb25491d3e` before this branch
+existed: 5511 against a 5419 baseline, from 8 files. Measured in `/Volumes/Storage/Code/orca/main` at
+that revision. #361, #363, #364 and #365 added fork comments above upstream's code without re-taking
+the ratchet, and each one kept the previous baseline. The baseline is re-taken here with
+`--init --accept` at **5507** — four below `main`'s 5511, because this branch marks its own upstream
+comments with `fork-comment-ok` instead of leaving them uncounted — and every file over its old
+maximum now carries a frozen per-file maximum, so the drift can only shrink from here. The seven
+`check-upstream-file-comments` known-red entries in `local/lint-known-red.json` were stale the moment
+the baseline moved, and are pruned; the gate now reports `5507/5507, 0 stale`.
+
+`check:focus-read-ratchet` is red on the same revision, and stays red here: measured in the same
+worktree, it reports `use-settings-host-scope.ts` at 2 against a baseline of 0, `Settings.tsx` at 1
+against 2, and `WorkspaceDirectorySetting.tsx` at 0 against 1. All three are #361's, which this branch
+does not touch — two are prunable slack and one is a real new focus read in that PR's own hook. They
+are recorded in `local/lint-known-red.json` with that evidence and the exact lines as matches, so any
+new focus read in those files is still a new red. Clearing them belongs to a change that touches #361's
+settings scope, not to an issue about the composer's run-target picker.
+
 ### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
 
 `local/unit-known-red.json` had drifted into the two shapes its own note warns against: every entry was

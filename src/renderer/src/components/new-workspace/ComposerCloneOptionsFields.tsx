@@ -74,7 +74,9 @@ export function ComposerCloneOptionsFields({
               // Capture pointer intent before Radix roving focus can consume the click.
               onPointerDownCapture={() => switchTransport(candidate)}
             >
-              {candidate === 'ssh' ? 'SSH' : 'HTTPS'}
+              {candidate === 'ssh'
+                ? t('auto.components.NewWorkspaceComposerCard.cloneProtocolSsh', 'SSH')
+                : t('auto.components.NewWorkspaceComposerCard.cloneProtocolHttps', 'HTTPS')}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
