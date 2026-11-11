@@ -90,7 +90,7 @@ export default function WorkspaceKanbanSettingsMenu({
               <span className="block text-[11px] leading-4 text-muted-foreground">
                 {t(
                   'auto.components.sidebar.WorkspaceKanbanSettingsMenu.4c2eaa78cc',
-                  'Moving a linked workspace updates its Linear issue status when a matching workflow state exists.'
+                  'Moving a linked workspace updates its Linear issue status, or moves its Jira issue to the status or board column with the same name.'
                 )}
               </span>
             </span>
