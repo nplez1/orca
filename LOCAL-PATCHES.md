@@ -1791,7 +1791,10 @@ that revision. #361, #363, #364 and #365 added fork comments above upstream's co
 the ratchet, and each one kept the previous baseline. The baseline is re-taken here with
 `--init --accept` at **5507** — four below `main`'s 5511, because this branch's own comments above
 upstream code carry `fork-comment-ok` and the ratchet counts none of them — and every file over its old
-maximum now carries a frozen per-file maximum, so the drift can only shrink from here. The seven
+maximum now carries a frozen per-file maximum, so the drift can only shrink from here. Rebased onto
+`f3086f3283c` (#366, the Skills/Mobile chrome) it was re-taken once more at **5515**: that PR added
+eight lines in `mobile-page.css`, `SkillsPage.tsx`, `skills-page-column.ts` and
+`use-skills-page-keyboard-navigation.ts`, again without re-taking the ratchet. The seven
 `check-upstream-file-comments` known-red entries in `local/lint-known-red.json` were stale the moment
 the baseline moved, and are pruned; the gate now reports `5507/5507, 0 stale`.
 
