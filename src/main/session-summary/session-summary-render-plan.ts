@@ -32,9 +32,15 @@ export type SessionSummaryRenderItem = {
 
 /** One tool call, with the result that completes it merged in. */
 export type SessionSummaryToolCall = {
-  /** Event index of the call. */
+  /** Event index of the call, which is also where the entry is anchored. */
   from: number
-  /** Exclusive end: the call's own event, or the pair's two. */
+  /**
+   * Exclusive end of the slice of the run this call covers.
+   *
+   * Not necessarily its own result: an interleaved parallel call's result sits after a later
+   * call's index, and the slices have to partition the run so a chunk boundary can fall between
+   * two of them. The whole run collapses to one line, so only the anchor matters.
+   */
   to: number
   /** The tool's name, when the call line named one. */
   name: string | null
