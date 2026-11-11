@@ -117,7 +117,7 @@ Produce a JSON object with exactly these keys:
 - "blockers": fact[] — errors, failed approaches, things awaiting input (at most 5)
 - "decisions": fact[] — notable choices made (at most 5)
 Rules: respond with ONLY the JSON object. Use plain lowercase text. Keep each "text" to one short sentence. If the slice is ambiguous or low-signal, say so in few entries rather than inventing detail.
-A "tool" line is a digest of what a tool did, not its output: read it as one action, and take failures from the exit code or the error line it names. A "tool" line anchored to a range of messages is one burst of consecutive tool calls: read it as one phase of work, take the count and the tool mix from that line, and take its failures from the "#index call · failure" lines beneath it. A line marked "part N of M" is one piece of a single long message; do not treat the parts as separate messages.`
+A "tool" line is a digest of what a tool did, not its output: read it as one action, and take failures from the exit code or the error line it names. A "tool" line that begins with a count of tool calls is one burst of consecutive calls: read it as one phase of work, take its count and tool mix from that line, and take its failures from the "#index call · outcome" lines beneath it. A line marked "part N of M" is one piece of a single long message; do not treat the parts as separate messages.`
 
 function renderChunkTranscript(
   items: readonly SessionSummaryRenderItem[],
@@ -142,10 +142,11 @@ function renderChunkTranscript(
     if (item.to <= range.from || item.from >= range.to) {
       continue
     }
-    const anchor =
-      item.to - item.from > 1
-        ? `#${absoluteFrom + item.from}-#${absoluteFrom + item.to - 1}`
-        : `#${absoluteFrom + item.from}`
+    // Why only a burst names a range: a single call is anchored at the call's own message, which
+    // is where a fact about it — and the timeline's error marker — belongs.
+    const anchor = item.burst
+      ? `#${absoluteFrom + item.from}-#${absoluteFrom + item.to - 1}`
+      : `#${absoluteFrom + item.from}`
     if (range.partFrom === undefined || range.partTo === undefined) {
       lines.push(`[${anchor} ${item.role}] ${item.text}`)
       continue

@@ -28,6 +28,8 @@ export type SessionSummaryToolFacts = {
   label: string
   /** A result only: the text evidences a failure. */
   failed: boolean
+  /** A result only: how the digest states the outcome — `ok`, `exit 2`, `exit 1 · FAIL …`. */
+  outcome: string | null
   /** A result only: the failure line it quotes, which a bare exit code does not have. */
   failureLine: string | null
 }
@@ -176,6 +178,7 @@ function digestToolCall(text: string, paired: PendingToolCall | null): DigestEve
       name: call.name,
       label,
       failed: false,
+      outcome: null,
       failureLine: null
     }
   }
@@ -223,6 +226,7 @@ function digestToolResult(message: TranscriptMessage, paired: PendingToolCall | 
       name: paired?.name ?? null,
       label,
       failed: outcome.failed,
+      outcome: outcome.text,
       failureLine: outcome.failureLine
     }
   }

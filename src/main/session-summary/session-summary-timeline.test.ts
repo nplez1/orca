@@ -49,7 +49,7 @@ describe('planSessionSummaryTimelineMarkers', () => {
       { kind: 'tool-burst', text: '5 tool calls · Read 5 · 1 failed', sourceIndex: 101 },
       {
         kind: 'error',
-        text: 'Read /repo/src/f2.ts · FAIL src/x.test.ts > adds a flag',
+        text: 'Read /repo/src/f2.ts · exit 1 · FAIL src/x.test.ts > adds a flag',
         sourceIndex: 105
       }
     ])
@@ -68,6 +68,19 @@ describe('planSessionSummaryTimelineMarkers', () => {
     const events = digest([call('Grep', 'TODO'), result('no matches\nExit code: 1'), ...readRun(5)])
     const markers = planSessionSummaryTimelineMarkers(events, 0)
     expect(markers.filter((marker) => marker.kind === 'error')).toEqual([])
+  })
+
+  // A paste that opens with a newline would otherwise give an empty prompt row.
+  it('quotes the first non-empty line of the reader’s message', () => {
+    const markers = planSessionSummaryTimelineMarkers(
+      digest([prose('user', '\n\n  fix the parser  \nand then the lexer')]),
+      0
+    )
+    expect(markers).toEqual([{ kind: 'user-input', text: 'fix the parser', sourceIndex: 0 }])
+  })
+
+  it('leaves a blank message out of the timeline', () => {
+    expect(planSessionSummaryTimelineMarkers(digest([prose('user', '   \n\t')]), 0)).toEqual([])
   })
 
   it('bounds the reader’s message it quotes', () => {

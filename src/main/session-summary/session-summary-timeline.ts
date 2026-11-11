@@ -43,6 +43,11 @@ export type SessionSummaryTimelineFacts = Pick<
  *
  * `baseIndex` is the transcript index of `events[0]` — the ledger's `foldedThrough` before this
  * fold — because a marker's anchor has to be a transcript index like every fact's.
+ *
+ * Why a run's marker depends on where the fold stopped: a session folded mid-burst sees two short
+ * runs where one long fold would see one, and a run under `TOOL_BURST_MIN_CALLS` produces no
+ * marker. Re-folding the same range is still idempotent — the same slice replans the same markers
+ * — but a session folded in one pass and the same session folded live do not have to agree.
  */
 export function planSessionSummaryTimelineMarkers(
   events: readonly SessionSummarySourceEvent[],
@@ -54,11 +59,12 @@ export function planSessionSummaryTimelineMarkers(
     if (event.role !== 'user') {
       continue
     }
-    markers.push({
-      kind: 'user-input',
-      text: excerpt(event.text),
-      sourceIndex: baseIndex + index
-    })
+    const text = excerpt(event.text)
+    if (!text) {
+      // A blank message is not a prompt, and an empty row in the pane says nothing.
+      continue
+    }
+    markers.push({ kind: 'user-input', text, sourceIndex: baseIndex + index })
   }
   for (const run of planSessionSummaryToolRuns(events)) {
     if (run.calls.length >= TOOL_BURST_MIN_CALLS) {
@@ -76,7 +82,7 @@ export function planSessionSummaryTimelineMarkers(
       }
       markers.push({
         kind: 'error',
-        text: `${call.label} · ${call.failureLine}`,
+        text: `${call.label} · ${call.outcome ?? call.failureLine}`,
         sourceIndex: baseIndex + call.from
       })
     }
@@ -85,10 +91,14 @@ export function planSessionSummaryTimelineMarkers(
 }
 
 function excerpt(text: string): string {
-  const firstLine = text.split('\n', 1)[0].trim()
-  return firstLine.length > USER_INPUT_MAX_CHARS
-    ? `${firstLine.slice(0, USER_INPUT_MAX_CHARS - 1)}…`
-    : firstLine
+  // Why the first *non-empty* line: a paste that opens with a newline would otherwise give an
+  // empty prompt row.
+  const line =
+    text
+      .split('\n')
+      .find((candidate) => candidate.trim() !== '')
+      ?.trim() ?? ''
+  return line.length > USER_INPUT_MAX_CHARS ? `${line.slice(0, USER_INPUT_MAX_CHARS - 1)}…` : line
 }
 
 function markerKey(marker: SessionSummaryTimelineDeltaEntry): string {

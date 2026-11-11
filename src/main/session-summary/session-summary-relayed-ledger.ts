@@ -4,7 +4,10 @@
 // relays a ledger whose facts are bare strings and which has no window boundary, and reading
 // that as-is hides every fact (nothing compares greater than `undefined`) and renders an object
 // as a React child. Coercing on arrival costs one pass and keeps both directions readable.
-import { SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS } from '../../shared/session-summary-types'
+import {
+  SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS,
+  SESSION_SUMMARY_TIMELINE_KINDS
+} from '../../shared/session-summary-types'
 import type {
   SessionSummaryFact,
   SessionSummaryFoldGap,
@@ -64,9 +67,9 @@ function coerceMarkers(value: unknown): SessionSummaryTimelineDeltaEntry[] {
           return false
         }
         return (
-          typeof entry.kind === 'string' &&
           typeof entry.text === 'string' &&
-          typeof entry.sourceIndex === 'number'
+          typeof entry.sourceIndex === 'number' &&
+          SESSION_SUMMARY_TIMELINE_KINDS.some((kind) => kind === entry.kind)
         )
       })
     : []

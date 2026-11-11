@@ -475,6 +475,41 @@ describe('foldSessionSummaryEvents', () => {
     expect([...cacheStore.keys()].sort()).toEqual(['0-120', '120-240', '360-480'])
   })
 
+  // A degraded fold stops at the first failed chunk, so planning markers across the whole read
+  // would anchor entries to messages the next fold is about to fold again.
+  it('plans markers only for the events a degraded fold applied', async () => {
+    const brain = jsonBrain((prompt) => {
+      if (prompt.includes('[#240 ')) {
+        throw new Error('flaky cli')
+      }
+      return { done: ['ok'] }
+    })
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(480),
+      signal: new AbortController().signal
+    })
+    expect(result.ledger.foldedThrough).toBe(240)
+    expect(result.ledger.markers.length).toBeGreaterThan(0)
+    expect(result.ledger.markers.every((marker) => marker.sourceIndex < 240)).toBe(true)
+    expect(result.ledger.timeline.every((entry) => entry.sourceIndex < 240)).toBe(true)
+  })
+
+  // The timeline is a projection, so the same range folded twice has one answer.
+  it('produces the same timeline when the same range is folded twice', async () => {
+    const fold = async (): Promise<unknown> => {
+      const result = await foldSessionSummaryEvents({
+        brain: jsonBrain(() => ({ done: ['shipped'] })),
+        ledger: emptySessionSummaryLedger(),
+        events: events(130),
+        signal: new AbortController().signal
+      })
+      return result.ledger.timeline
+    }
+    expect(await fold()).toEqual(await fold())
+  })
+
   it('resumes after a failure without re-asking for the chunks already summarized', async () => {
     const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
     let failChunk = true

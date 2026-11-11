@@ -21,6 +21,13 @@ export type SessionSummaryRenderItem = {
   role: SessionSummarySourceEvent['role']
   /** The rendered text, without the `[#from-#to role]` anchor. */
   text: string
+  /**
+   * Several calls collapsed into one line, so the anchor names the whole span.
+   *
+   * Why a flag and not `to - from > 1`: a single call is still two events, and anchoring it to a
+   * range made the prompt call one call a burst.
+   */
+  burst?: true
 }
 
 /** One tool call, with the result that completes it merged in. */
@@ -36,6 +43,8 @@ export type SessionSummaryToolCall = {
   /** The full digest line, used when the call renders on its own. */
   text: string
   failed: boolean
+  /** How the digest states the outcome: `ok`, `exit 2`, `exit 1 · FAIL …`. */
+  outcome: string | null
   /** The failure line the result quoted, which a bare exit code does not have. */
   failureLine: string | null
 }
@@ -69,69 +78,90 @@ const BURST_MAX_NAMED_TOOLS = 4
  * Maximal runs of consecutive tool events, each call+result pair merged into one call.
  *
  * Exported because the timeline's markers are read from the same runs: a burst is one thing that
- * happened, and the prompt and the timeline must agree on where it starts and ends.
+ * happened, and the prompt and the timeline must agree on where a run starts and ends.
  */
 export function planSessionSummaryToolRuns(
   events: readonly SessionSummarySourceEvent[]
 ): SessionSummaryToolRun[] {
   const runs: SessionSummaryToolRun[] = []
-  let current: SessionSummaryToolRun | null = null
-  for (let index = 0; index < events.length; index += 1) {
-    const event = events[index]
-    if (event.role !== 'tool') {
-      current = null
+  let index = 0
+  while (index < events.length) {
+    if (events[index].role !== 'tool') {
+      index += 1
       continue
     }
-    const call = readToolCall(events, index)
-    if (!current) {
-      current = { from: index, to: call.to, calls: [call] }
-      runs.push(current)
-    } else {
-      current.to = call.to
-      current.calls.push(call)
+    const from = index
+    while (index < events.length && events[index].role === 'tool') {
+      index += 1
     }
-    // A merged pair consumed the result, so the loop must not read it again.
-    index = call.to - 1
+    runs.push({ from, to: index, calls: readRunCalls(events, from, index) })
   }
   return runs
 }
 
-function readToolCall(
+/**
+ * One entry per call in `[from, to)`, its result folded in wherever it sits.
+ *
+ * Why pair by id and not by adjacency: agents issue parallel calls, so the transcript records
+ * call A, call B, result A, result B. Pairing those by adjacency found no pair at all and counted
+ * two reads as four calls. The id comes from the digester's own FIFO pairing, so it is the answer
+ * to "which call does this result complete".
+ *
+ * Why the spans are then assigned by partition: an interleaved pair's result sits after a later
+ * call's index, so the natural spans overlap — and overlapping spans would let a chunk boundary
+ * fall inside one. The anchor is the call, and the whole run collapses to one line anyway.
+ */
+function readRunCalls(
   events: readonly SessionSummarySourceEvent[],
-  index: number
-): SessionSummaryToolCall {
-  const event = events[index]
-  const facts = event.tool
-  // Why the adjacency check and not just the pair id: agents issue parallel calls, so results
-  // arrive in call order after both calls. Merging a call with a result that is not next to it
-  // would label one call's line with another's numbers.
-  const next = events[index + 1]
-  const completes =
-    facts?.kind === 'call' &&
-    next?.role === 'tool' &&
-    next.tool?.kind === 'result' &&
-    next.tool.pair === facts.pair
-  if (!completes) {
-    return {
+  from: number,
+  to: number
+): SessionSummaryToolCall[] {
+  const calls: SessionSummaryToolCall[] = []
+  const byPair = new Map<number, SessionSummaryToolCall>()
+  for (let index = from; index < to; index += 1) {
+    const event = events[index]
+    const facts = event.tool
+    if (facts?.kind === 'call') {
+      const call: SessionSummaryToolCall = {
+        from: index,
+        to: index + 1,
+        name: facts.name,
+        label: facts.label,
+        text: event.text,
+        failed: false,
+        outcome: null,
+        failureLine: null
+      }
+      calls.push(call)
+      byPair.set(facts.pair, call)
+      continue
+    }
+    const paired = facts ? byPair.get(facts.pair) : undefined
+    if (paired && facts) {
+      // The result's line: it already names the call and adds the outcome.
+      paired.text = event.text
+      paired.label = facts.label
+      paired.failed = facts.failed
+      paired.outcome = facts.outcome
+      paired.failureLine = facts.failureLine
+      byPair.delete(facts.pair)
+      continue
+    }
+    calls.push({
       from: index,
       to: index + 1,
       name: facts?.name ?? null,
       label: facts?.label ?? event.text,
       text: event.text,
       failed: facts?.failed ?? false,
+      outcome: facts?.outcome ?? null,
       failureLine: facts?.failureLine ?? null
-    }
+    })
   }
-  return {
-    from: index,
-    to: index + 2,
-    name: facts.name,
-    label: next.tool?.label ?? facts.label,
-    // The result's line: it already names the call and adds the outcome.
-    text: next.text,
-    failed: next.tool?.failed ?? false,
-    failureLine: next.tool?.failureLine ?? null
+  for (let position = 0; position < calls.length; position += 1) {
+    calls[position].to = calls[position + 1]?.from ?? to
   }
+  return calls
 }
 
 /** The whole event array as rendered lines: prose one each, tool activity collapsed. */
@@ -166,11 +196,13 @@ function pushRunItems(items: SessionSummaryRenderItem[], run: SessionSummaryTool
     if (!first || !last) {
       return
     }
+    const burst = group.length >= BURST_MIN_CALLS
     items.push({
       from: first.from,
       to: last.to,
       role: 'tool',
-      text: group.length >= BURST_MIN_CALLS ? renderBurst(group) : last.text
+      text: burst ? renderBurst(group) : last.text,
+      ...(burst ? { burst: true as const } : {})
     })
     group = []
     chars = 0
@@ -187,9 +219,12 @@ function pushRunItems(items: SessionSummaryRenderItem[], run: SessionSummaryTool
 
 function renderBurst(calls: readonly SessionSummaryToolCall[]): string {
   const headline = describeSessionSummaryToolBurst(calls)
+  // Why every failure and not only a quoted one: a command that exited 2 without a line the
+  // digest recognises is still the command a blocker is about, and dropping it left the extract
+  // less than it was shown before bursts existed.
   const failures = calls
-    .filter((call) => call.failed && call.failureLine)
-    .map((call) => `  #${call.from} ${call.label} · ${call.failureLine}`)
+    .filter((call) => call.failed && call.outcome)
+    .map((call) => `  #${call.from} ${call.label} · ${call.outcome}`)
   return [headline, ...failures].join('\n')
 }
 
@@ -197,7 +232,8 @@ function renderBurst(calls: readonly SessionSummaryToolCall[]): string {
  * `46 tool calls · Read 18, Edit 12, Bash 9, Grep 7 · 3 failed`
  *
  * Exported because the timeline's burst marker says the same thing: the prompt and the timeline
- * must not disagree about what a run of calls was.
+ * must not disagree about what a run of calls was. They can disagree about how many lines it
+ * takes — the prompt splits a run too long for one item, the timeline does not.
  */
 export function describeSessionSummaryToolBurst(calls: readonly SessionSummaryToolCall[]): string {
   const counts = new Map<string, number>()

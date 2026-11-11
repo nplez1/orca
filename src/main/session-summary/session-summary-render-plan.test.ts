@@ -8,7 +8,10 @@ import {
   planSessionSummaryRenderItems,
   planSessionSummaryToolRuns
 } from './session-summary-render-plan'
-import { buildSessionSummaryChunks } from './session-summary-chunk-prompt'
+import {
+  buildSessionSummaryChunks,
+  buildSessionSummaryChunkPrompt
+} from './session-summary-chunk-prompt'
 
 function call(name: string, target: string): TranscriptMessage {
   return { role: 'tool', text: `${name}: ${target}`, timestamp: null, toolKind: 'call' }
@@ -56,18 +59,23 @@ describe('planSessionSummaryToolRuns', () => {
     expect(runs[0].calls[0].failed).toBe(false)
   })
 
-  // Agents issue parallel calls, so results arrive in call order after both calls. Merging by
-  // adjacency alone would label the second call's line with the first result's numbers.
-  it('does not merge a call with a result that belongs to another call', () => {
+  // Agents issue parallel calls, so the transcript records call A, call B, result A, result B.
+  // Pairing those by adjacency found no pair at all and counted two reads as four calls; pairing
+  // by the digester's own id gives each call its own result, wherever it sits.
+  it('merges parallel calls with their own results', () => {
     const events = digest([
       call('Read', '/repo/src/a.ts'),
       call('Read', '/repo/src/b.ts'),
-      result(OK_BODY),
-      result(OK_BODY)
+      result('a\nb'),
+      result('c')
     ])
     const [run] = planSessionSummaryToolRuns(events)
-    // Four events, four calls: nothing merges, so no result is quoted under another call's label.
-    expect(run.calls.map((entry) => entry.to - entry.from)).toEqual([1, 1, 1, 1])
+    expect(run.calls).toHaveLength(2)
+    expect(run.calls.map((entry) => entry.from)).toEqual([0, 1])
+    // The spans partition the run, so no chunk boundary can fall inside a call.
+    expect(run.calls.map((entry) => entry.to)).toEqual([1, 4])
+    expect(run.calls[0].text).toContain('2 lines')
+    expect(run.calls[1].text).toContain('1 line /')
   })
 
   it('counts an orphan result as one call', () => {
@@ -98,9 +106,10 @@ describe('planSessionSummaryRenderItems', () => {
       from: 1,
       to: 7,
       role: 'tool',
+      burst: true,
       text: [
         '3 tool calls · Read 1, Bash 1, Grep 1 · 1 failed',
-        '  #3 Bash npm test · FAIL src/x.test.ts > adds a flag'
+        '  #3 Bash npm test · exit 1 · FAIL src/x.test.ts > adds a flag'
       ].join('\n')
     })
   })
@@ -123,6 +132,25 @@ describe('planSessionSummaryRenderItems', () => {
       text: expect.stringContaining('Read /repo/src/a.ts · 20 lines / ')
     })
     expect(items[1].text).toContain('ok')
+  })
+
+  // A failure the digest cannot quote a line for is still the command a blocker is about, so it
+  // has to stay attributable: a bare `exit 2` used to reach the extract as its own line, and a
+  // burst that only counted it told the extract nothing about which command failed.
+  it('expands a failure that has only an exit code', () => {
+    const events = digest([
+      prose('user', 'typecheck it'),
+      call('Read', '/repo/src/a.ts'),
+      result(OK_BODY),
+      call('Bash', 'pnpm tc'),
+      result('src/x.ts(3,1): error TS2322: Type is not assignable\nExit code: 2'),
+      call('Grep', 'TS2322'),
+      result('1 match')
+    ])
+    const items = planSessionSummaryRenderItems(events)
+    expect(items[1].text).toBe(
+      ['3 tool calls · Read 1, Bash 1, Grep 1 · 1 failed', '  #3 Bash pnpm tc · exit 2'].join('\n')
+    )
   })
 
   it('names the first four tools and counts the rest', () => {
@@ -149,6 +177,27 @@ describe('planSessionSummaryRenderItems', () => {
     }
     expect(items.find((item) => item.role === 'tool')?.from).toBe(1)
     expect(items.at(-1)?.to).toBe(messages.length)
+  })
+})
+
+describe('the chunk prompt anchor', () => {
+  // A single call is anchored at its own message — the one a fact about it belongs to — and only
+  // a burst names a span. Anchoring a lone call to a range made the prompt call it a burst.
+  it('anchors a single call at its own message and a burst at its span', () => {
+    const single = digest([prose('user', 'read it'), call('Read', '/a.ts'), result(OK_BODY)])
+    expect(
+      buildSessionSummaryChunkPrompt(planSessionSummaryRenderItems(single), { from: 0, to: 3 }, 0)
+    ).toContain('[#1 tool] Read /a.ts · 20 lines / ')
+    const burst = digest([
+      prose('user', 'go'),
+      ...Array.from({ length: 3 }, () => [call('Read', '/a.ts'), result(OK_BODY)]).flat()
+    ])
+    const prompt = buildSessionSummaryChunkPrompt(
+      planSessionSummaryRenderItems(burst),
+      { from: 0, to: 7 },
+      0
+    )
+    expect(prompt).toContain('[#1-#6 tool] 3 tool calls · Read 3')
   })
 })
 
