@@ -505,7 +505,8 @@
           "ba3480642f": "Nest Workspaces",
           "a8ce626e4b": null,
           "deleteRemoteBranchOnWorkspaceDelete": "Delete Remote Branch By Default",
-          "deleteRemoteBranchOnWorkspaceDeleteRowDescription": "Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone."
+          "deleteRemoteBranchOnWorkspaceDeleteRowDescription": "Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone.",
+          "defaultsEditAnotherHost": "These defaults belong to {{value0}}, the default host, not the host selected above."
         },
         "JiraBoardSettings": {
           "chooseBoard": "Choose a board",
@@ -791,6 +792,21 @@
         },
         "CliSection": {
           "9fd4023db0": "Show in File Manager"
+        },
+        "SettingsHostScopePicker": {
+          "thisComputer": "This computer",
+          "servers": "Orca servers",
+          "machines": "Machines without a server",
+          "machineOnlyNotice": "{{value0}} has no Orca server, so its server settings cannot be shown here. Choose this computer or one of its servers at the top of Settings."
+        },
+        "WorkspaceDirectorySetting": {
+          "remoteCaption": "The workspace folder on {{value0}}, as that machine spells it. It is never this computer’s path."
+        },
+        "RepoRootSetting": {
+          "title": "Repository root folder",
+          "description": "Where checkouts are cloned on this host.",
+          "localCaption": "Defaults to ~/orca/projects. Projects and clones are created here.",
+          "remoteCaption": "Where {{value0}} keeps its checkouts, as that machine spells it."
         }
       },
       "sidebar": {

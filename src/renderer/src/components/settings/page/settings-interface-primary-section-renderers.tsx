@@ -4,6 +4,7 @@ import { MobileEmulatorSettingsPane } from '../mobile/emulator/MobileEmulatorSet
 import { QuickCommandsPane } from '../quick-commands/QuickCommandsPane'
 import { TerminalPane } from '../terminal/TerminalPane'
 import { SettingsSection } from '../section-layout/SettingsSection'
+import { isServerScope } from '../host-scope/settings-host-scope'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 import type { SettingsRenderContext } from './settings-render-context'
@@ -26,7 +27,10 @@ export function renderTerminalSettingsSection(
     >
       {view.isSectionMounted('terminal') ? (
         <TerminalPane
-          hostScope={model.settingsHostScope}
+          hostScope={isServerScope(model.settingsHostScope) ? model.settingsHostScope : undefined}
+          machineOnlyHostLabel={
+            isServerScope(model.settingsHostScope) ? undefined : model.settingsHostScope.label
+          }
           settings={model.settings}
           updateSettings={model.updateSettings}
           scrollbackMode={model.scrollbackMode}

@@ -12,14 +12,14 @@ import type { CodexConfigSyncStatus } from '../../../../../shared/codex-config-s
 import type { FeatureInteractionId } from '../../../../../shared/feature-interaction-catalog'
 import type { ProviderAccountRuntimeView } from '../../provider-accounts/provider-account-visibility'
 import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../host-scope/settings-host-scope'
 import type { LocalAccountRuntime } from '../../../lib/provider-accounts/account-runtime-label'
 
 export type AccountsPaneProps = {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
   updateSettingsOrThrow: (updates: Partial<GlobalSettings>) => Promise<void> | void
-  hostScope: SettingsHostScope
+  hostScope: SettingsServerScope
   nativeAccounts?: boolean
   onAccountLocationChange?: () => void
   wslSupportedPlatform?: boolean

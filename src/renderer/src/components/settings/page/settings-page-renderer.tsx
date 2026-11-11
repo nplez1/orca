@@ -121,13 +121,10 @@ export function renderSettingsPage(
           onClose={interactions.closeSettingsPageWithPromptGuard}
           hostPicker={
             !model.isWebClient &&
-            shouldShowSettingsHostScopePicker(
-              model.settingsHostScope,
-              model.runtimeEnvironments
-            ) ? (
+            shouldShowSettingsHostScopePicker(model.settingsHostScope, model.settingsHosts) ? (
               <SettingsHostScopePicker
                 scope={model.settingsHostScope}
-                environments={model.runtimeEnvironments}
+                hosts={model.settingsHosts}
                 onChoose={model.setSettingsHostChoice}
               />
             ) : null

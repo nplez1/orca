@@ -10,6 +10,9 @@ import type {
   ProjectHostSetupResult
 } from '../../../../../../shared/project-types'
 import { useTranslate } from '@/i18n/use-translate'
+import { useAppStore } from '@/store/index'
+import { resolveWorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import { useCloneParentDefault } from '../../../sidebar/project-admission/create/use-clone-parent-default'
 import { Button } from '../../../ui/button'
 import { Label } from '../../../ui/label'
 import { HostCombobox } from '../../../host-picker/HostCombobox'
@@ -74,11 +77,10 @@ export function RepositoryHostSetupActions({
   const [setupKind, setSetupKind] = useState<'git' | 'folder'>('git')
   const [cloneUrl, setCloneUrl] = useState('')
   const [cloneDestination, setCloneDestination] = useState('')
-  const { cloneFolder, cloneArgs, setCloneFolderName, resetCloneFolder, checkCloneFolderTaken } =
-    useCloneFolderOverride(cloneUrl, cloneDestination)
   const [isSettingUp, setIsSettingUp] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
   const [isCreatingPendingSetup, setIsCreatingPendingSetup] = useState(false)
+  const settings = useAppStore((state) => state.settings)
   const [handledAddHostRequest, setHandledAddHostRequest] = useState<ProjectHostAddRequest | null>(
     null
   )
@@ -113,6 +115,18 @@ export function RepositoryHostSetupActions({
   const canUseSetupTargetHost = setupTargetHostOption?.isAvailable ?? false
   const canUsePathActions =
     canUseSetupTargetHost && (setupTargetHostOption?.canUsePathActions ?? false)
+  // Same rule as the sidebar clone step, so adding a project to a host needs no typed path.
+  const hostRepoRoot = useCloneParentDefault({
+    settings,
+    hostIds: setupTargetHostId ? [setupTargetHostId] : [],
+    layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
+    enabled: isOpen && canUsePathActions
+  })
+  // Derived, so a default that arrives late never overwrites what the user typed.
+  const setupPathValue = setupPath || hostRepoRoot.parent
+  const cloneDestinationValue = cloneDestination || hostRepoRoot.parent
+  const { cloneFolder, cloneArgs, setCloneFolderName, resetCloneFolder, checkCloneFolderTaken } =
+    useCloneFolderOverride(cloneUrl, cloneDestinationValue)
 
   if (setupHostOptions.length === 0) {
     return null
@@ -129,7 +143,7 @@ export function RepositoryHostSetupActions({
   }
 
   const handleExistingFolder = async (): Promise<void> => {
-    if (!setupTargetHostId || !canUsePathActions || !setupPath.trim()) {
+    if (!setupTargetHostId || !canUsePathActions || !setupPathValue.trim()) {
       return
     }
     setIsSettingUp(true)
@@ -137,7 +151,7 @@ export function RepositoryHostSetupActions({
       const result = await setupProjectExistingFolder({
         projectId: selectedProjectHostSetup.projectId,
         hostId: setupTargetHostId,
-        path: setupPath.trim(),
+        path: setupPathValue.trim(),
         kind: setupKind,
         displayName: repoDisplayName
       })
@@ -151,7 +165,12 @@ export function RepositoryHostSetupActions({
   }
 
   const handleClone = async (): Promise<void> => {
-    if (!setupTargetHostId || !canUsePathActions || !cloneUrl.trim() || !cloneDestination.trim()) {
+    if (
+      !setupTargetHostId ||
+      !canUsePathActions ||
+      !cloneUrl.trim() ||
+      !cloneDestinationValue.trim()
+    ) {
       return
     }
     setIsCloning(true)
@@ -278,7 +297,7 @@ export function RepositoryHostSetupActions({
       ) : null}
       {step === 'existing' ? (
         <HostSetupExistingFolderStep
-          setupPath={setupPath}
+          setupPath={setupPathValue}
           setupKind={setupKind}
           disabled={!canUsePathActions}
           isSettingUp={isSettingUp}
@@ -291,7 +310,7 @@ export function RepositoryHostSetupActions({
       {step === 'clone' ? (
         <HostSetupCloneStep
           cloneUrl={cloneUrl}
-          cloneDestination={cloneDestination}
+          cloneDestination={cloneDestinationValue}
           disabled={!canUsePathActions}
           isCloning={isCloning}
           onBack={() => setStep('choose')}

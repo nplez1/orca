@@ -142,6 +142,7 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
     createParent,
     setCreateParent,
+    hostSettingOverrides: settings?.hostSettingOverrides,
     worktreeLayoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined
   })
 
@@ -164,6 +165,7 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
     hostId: hostSelection.selectedHostId,
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
     workspaceDir: settings?.workspaceDir,
+    hostSettingOverrides: settings?.hostSettingOverrides,
     worktreeLayoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
     fetchWorktrees,
     onGitRepoReady: completeGitRepoAdd

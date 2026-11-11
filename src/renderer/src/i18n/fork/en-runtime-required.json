@@ -10,6 +10,12 @@
         }
       },
       "settings": {
+        "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": "Client default",
+          "2b3c4d5e6f": "Apply to",
+          "3c4d5e6f7a": "Overrides client default",
+          "4d5e6f7a8b": "Inherits the client default"
+        },
         "browser": {
           "search": {
             "linkRoutingModifier": {

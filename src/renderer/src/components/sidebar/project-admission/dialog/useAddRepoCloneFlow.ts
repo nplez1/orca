@@ -5,6 +5,12 @@ import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import type { AddRepoExistingWorkspaceSource } from '../../../../../../shared/telemetry-events'
 import type { Repo } from '../../../../../../shared/repo-types'
 import { getCloneDestinationAutoFill } from '../create/clone-defaults'
+import { useCloneParentDefault } from '../create/use-clone-parent-default'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  toRuntimeExecutionHostId
+} from '../../../../../../shared/execution-host'
+import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
@@ -24,6 +30,7 @@ export function useAddRepoCloneFlow({
   hostId,
   activeRuntimeEnvironmentId,
   workspaceDir,
+  hostSettingOverrides,
   worktreeLayoutMode,
   fetchWorktrees,
   onGitRepoReady
@@ -33,6 +40,8 @@ export function useAddRepoCloneFlow({
   hostId?: string | null
   activeRuntimeEnvironmentId: string | null | undefined
   workspaceDir: string | null | undefined
+  /** Per-host folder overrides, so a remote destination starts at that machine's own folder. */
+  hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
   /** Placement mode, so the default destination lands the checkout inside its project folder. */
   worktreeLayoutMode?: WorktreeLayoutMode
   fetchWorktrees: (
@@ -87,23 +96,38 @@ export function useAddRepoCloneFlow({
     return window.api.repos.onCloneProgress(setCloneProgress)
   }, [isCloning])
 
+  const sshHostId = hostId?.startsWith('ssh:') ? (hostId as ExecutionHostId) : null
+  const hostIds: ExecutionHostId[] = activeRuntimeEnvironmentId?.trim()
+    ? [
+        toRuntimeExecutionHostId(activeRuntimeEnvironmentId.trim()),
+        ...(sshHostId ? [sshHostId] : [])
+      ]
+    : sshHostId
+      ? [sshHostId]
+      : [LOCAL_EXECUTION_HOST_ID]
+  const cloneParent = useCloneParentDefault({
+    settings: { workspaceDir, hostSettingOverrides },
+    hostIds,
+    layoutMode: worktreeLayoutMode,
+    enabled: step === 'clone'
+  })
   const cloneDestinationAutoFill = getCloneDestinationAutoFill({
     step,
     cloneDestination,
-    activeRuntimeEnvironmentId,
-    workspaceDir,
-    layoutMode: worktreeLayoutMode,
-    cloneStepAutoFilled
+    cloneStepAutoFilled,
+    parent: cloneParent.parent
   })
-  if (step !== 'clone') {
-    if (cloneStepAutoFilled) {
+  useEffect(() => {
+    if (step !== 'clone') {
       setCloneStepAutoFilled(false)
+      return
     }
-  } else if (cloneDestinationAutoFill) {
-    // Late defaults may seed local destinations; remote clone paths remain user-entered.
+    if (!cloneDestinationAutoFill) {
+      return
+    }
     setCloneStepAutoFilled(true)
     setCloneDestination(cloneDestinationAutoFill.destination)
-  }
+  }, [cloneDestinationAutoFill, step])
 
   const resetCloneFlow = useCallback((): void => {
     cloneGenRef.current++

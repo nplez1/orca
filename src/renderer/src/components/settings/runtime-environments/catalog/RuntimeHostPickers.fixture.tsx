@@ -1,7 +1,12 @@
 import type { PublicKnownRuntimeEnvironment } from '../../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import { defineFixture } from '../../../../component-fixtures/component-fixture'
 import { SettingsHostScopePicker } from '../../host-scope/SettingsHostScopePicker'
-import type { SettingsHostScope } from '../../host-scope/settings-host-scope'
+import type { SettingsHostScope, SettingsHostScopeHost } from '../../host-scope/settings-host-scope'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
+} from '../../../../../../shared/execution-host'
 import { RuntimeDefaultHostRow } from './runtime-default-host-row'
 
 function environment(index: number): PublicKnownRuntimeEnvironment {
@@ -27,7 +32,15 @@ function environment(index: number): PublicKnownRuntimeEnvironment {
 
 const environments = Array.from({ length: 12 }, (_, index) => environment(index + 1))
 const selectedHostId = 'server-8'
+const hosts: SettingsHostScopeHost[] = [
+  { id: LOCAL_EXECUTION_HOST_ID, label: 'Local Mac' },
+  ...environments.map((entry) => ({ id: toRuntimeExecutionHostId(entry.id), label: entry.name })),
+  { id: toSshExecutionHostId('builder'), label: 'builder.example.com' }
+]
 const scope: SettingsHostScope = {
+  hostId: toRuntimeExecutionHostId(selectedHostId),
+  label: 'Montreal build server 8',
+  equivalentHostIds: [toRuntimeExecutionHostId(selectedHostId)],
   target: { kind: 'environment', environmentId: selectedHostId },
   available: true
 }
@@ -55,7 +68,5 @@ export const runtimeDefaultHostMenu = defineFixture({
 
 export const settingsHostScopeMenu = defineFixture({
   ...fixture,
-  render: () => (
-    <SettingsHostScopePicker scope={scope} environments={environments} onChoose={() => {}} />
-  )
+  render: () => <SettingsHostScopePicker scope={scope} hosts={hosts} onChoose={() => {}} />
 })

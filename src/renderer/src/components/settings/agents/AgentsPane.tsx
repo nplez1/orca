@@ -27,7 +27,7 @@ import {
   AgentPermissionsSetting,
   type AgentPermissionsSettingProps
 } from './permissions/AgentPermissionsSetting'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../host-scope/settings-host-scope'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { useTranslate } from '@/i18n/use-translate'
 import { AgentWorkspaceTrustSetting } from './behavior/AgentWorkspaceTrustSetting'
@@ -39,7 +39,7 @@ type AgentSettingProps = {
 
 type AgentsPaneProps = AgentSettingProps & {
   /** Host whose agent launch settings and detected agents the pane shows. */
-  hostScope: SettingsHostScope
+  hostScope: SettingsServerScope
   wslSupportedPlatform?: boolean
   wslAvailable?: boolean
   wslDistros?: string[]

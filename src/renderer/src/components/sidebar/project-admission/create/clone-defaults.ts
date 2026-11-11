@@ -2,6 +2,14 @@ import {
   layoutNestsPrimaryCheckout,
   type WorktreeLayoutMode
 } from '../../../../../../shared/orca-workspace-layout'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
+import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
+import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+import { getDefaultCreateProjectParent } from './create-project-defaults'
 
 export function getDefaultCloneParent(
   workspaceDir: string,
@@ -39,26 +47,61 @@ export function getDefaultCloneParent(
   return parent
 }
 
+export type CloneParentSettings = {
+  workspaceDir?: string | null
+  hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
+}
+
+/** Where a clone lands for a host: its checkout root, else its worktree root under the layout rule. */
+export function getCloneParentForHost({
+  settings,
+  hostIds,
+  layoutMode = 'repo-nested',
+  hostHome
+}: {
+  settings: CloneParentSettings | null | undefined
+  hostIds: readonly ExecutionHostId[]
+  layoutMode?: WorktreeLayoutMode
+  /** The machine's home directory, when the caller could probe it. */
+  hostHome?: string | null
+}): string {
+  // Cloning onto an SSH host is refused, so it never gets a destination.
+  if (hostIds.some((hostId) => parseExecutionHostId(hostId)?.kind === 'ssh')) {
+    return ''
+  }
+  const isLocal = hostIds.includes(LOCAL_EXECUTION_HOST_ID)
+  // An explicit checkout root already names the folder checkouts go in.
+  const repoRoot = getHostSettingOverrideForIds(settings, hostIds, 'defaultRepoRoot')
+  if (repoRoot) {
+    return repoRoot
+  }
+  const worktreeRoot = getHostSettingOverrideForIds(settings, hostIds, 'defaultWorktreeLocation')
+  if (worktreeRoot) {
+    return getDefaultCloneParent(worktreeRoot, layoutMode)
+  }
+  if (isLocal) {
+    return getDefaultCloneParent(settings?.workspaceDir ?? '', layoutMode)
+  }
+  // Never this computer's workspaceDir: it names a folder on another machine's disk.
+  return hostHome
+    ? getDefaultCloneParent(getDefaultCreateProjectParent(hostHome, layoutMode), layoutMode)
+    : ''
+}
+
 export function getCloneDestinationAutoFill({
   step,
   cloneDestination,
-  activeRuntimeEnvironmentId,
-  workspaceDir,
-  layoutMode,
-  cloneStepAutoFilled
+  cloneStepAutoFilled,
+  parent
 }: {
   step: string
   cloneDestination: string
-  activeRuntimeEnvironmentId: string | null | undefined
-  workspaceDir: string | null | undefined
-  layoutMode?: WorktreeLayoutMode
   cloneStepAutoFilled: boolean
+  /** The host's resolved clone parent, from `getCloneParentForHost`. */
+  parent: string
 }): { destination: string } | null {
-  if (step !== 'clone' || cloneStepAutoFilled || cloneDestination) {
+  if (step !== 'clone' || cloneStepAutoFilled || cloneDestination || !parent) {
     return null
   }
-  if (activeRuntimeEnvironmentId?.trim() || !workspaceDir) {
-    return null
-  }
-  return { destination: getDefaultCloneParent(workspaceDir, layoutMode) }
+  return { destination: parent }
 }

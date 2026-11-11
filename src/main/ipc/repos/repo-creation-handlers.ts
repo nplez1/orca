@@ -14,6 +14,7 @@ import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../share
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { getEffectiveHostSetting } from '../../../shared/host-setting-overrides'
+import { getEffectiveHostRepoRoot } from '../../../shared/host-repo-root'
 import { probeGitAvailability } from '../../git/git-availability'
 import { gitExecFileAsync } from '../../git/runner'
 import { getInitDefaultBranchName } from '../../git/init-default-branch'
@@ -62,6 +63,15 @@ function getDefaultCreateProjectParent(store: Store): string {
   return join(home, 'orca', 'projects')
 }
 
+/** Where this computer keeps checkouts: its stored root, else the `<home>/orca/projects` convention. */
+function getDefaultRepoRoot(store: Store): string {
+  return getEffectiveHostRepoRoot({
+    settings: store.getSettings(),
+    hostIds: [LOCAL_EXECUTION_HOST_ID],
+    hostHome: homedir()
+  })
+}
+
 /**
  * Folder the new project's primary checkout goes in: named for the branch `git init` will
  * create, so the checkout sits beside the worktrees that land in the same container.
@@ -106,6 +116,7 @@ async function resolveCreateTargetPath(
 export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: Store): void {
   ipcMain.handle('repos:isGitAvailable', () => probeLocalGitAvailability())
   ipcMain.handle('repos:getDefaultCreateProjectParent', () => getDefaultCreateProjectParent(store))
+  ipcMain.handle('repos:getDefaultRepoRoot', () => getDefaultRepoRoot(store))
 
   ipcMain.handle(
     'repos:add',

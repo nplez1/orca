@@ -2,12 +2,11 @@ import {
   layoutNestsPrimaryCheckout,
   type WorktreeLayoutMode
 } from '../../../../../../shared/orca-workspace-layout'
+import { joinHostPath, trimHostPathSeparators } from '../../../../../../shared/host-path-join'
 
 export type GitAvailability = 'checking' | 'available' | 'unavailable' | 'unknown'
 
-function pathSeparatorFor(pathValue: string): '/' | '\\' {
-  return pathValue.includes('\\') ? '\\' : '/'
-}
+export { joinHostPath as joinCreateProjectPath } from '../../../../../../shared/host-path-join'
 
 /** Home-relative shorthand for an Orca-derived default project root, or null for anything else.
  *  Both shapes are worth showing as `~/…` instead of an absolute path. */
@@ -27,42 +26,18 @@ function isHomeOrcaRoot(pathValue: string, leaf: string): boolean {
   ).test(pathValue)
 }
 
-function trimTrailingSeparators(pathValue: string): string {
-  const trimmed = pathValue.replace(/[\\/]+$/, '')
-  if (trimmed === '' && pathValue.startsWith('/')) {
-    return '/'
-  }
-  if (/^[A-Za-z]:$/.test(trimmed)) {
-    return `${trimmed}${pathSeparatorFor(pathValue)}`
-  }
-  return trimmed
-}
-
-export function joinCreateProjectPath(parentPath: string, childName: string): string {
-  const parent = trimTrailingSeparators(parentPath.trim())
-  const child = childName.trim().replace(/^[\\/]+/, '')
-  if (!parent || !child) {
-    return parent || child
-  }
-  const separator = pathSeparatorFor(parent)
-  if (parent === '/' || /^[A-Za-z]:[\\/]$/.test(parent)) {
-    return `${parent}${child}`
-  }
-  return `${parent}${separator}${child}`
-}
-
 export function getDefaultCreateProjectParent(
   homeDir: string,
   layoutMode: WorktreeLayoutMode = 'repo-nested'
 ): string {
-  const trimmedHomeDir = trimTrailingSeparators(homeDir.trim())
+  const trimmedHomeDir = trimHostPathSeparators(homeDir.trim())
   if (!trimmedHomeDir) {
     return ''
   }
   // fork-comment-ok: under a nested layout a project's container lives inside the workspace dir, so the
   // default project root is <home>/orca/workspaces rather than the sibling orca/projects.
   const rootName = layoutNestsPrimaryCheckout(layoutMode) ? 'workspaces' : 'projects'
-  return joinCreateProjectPath(joinCreateProjectPath(trimmedHomeDir, 'orca'), rootName)
+  return joinHostPath(joinHostPath(trimmedHomeDir, 'orca'), rootName)
 }
 
 export function getCreateProjectDefaultParentAutoFill({

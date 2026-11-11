@@ -3,6 +3,8 @@ import { GitPane } from '../source-control/GitPane'
 import { GitProviderApiBudgetPane } from '../source-control/GitProviderApiBudgetPane'
 import { TasksPane } from '../tasks/TasksPane'
 import { SettingsSection } from '../section-layout/SettingsSection'
+import { SettingsHostScopeMachineOnlyNotice } from '../host-scope/SettingsHostScopePicker'
+import { isServerScope } from '../host-scope/settings-host-scope'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 import type { SettingsRenderContext } from './settings-render-context'
@@ -44,10 +46,14 @@ export function renderGitSettingsSection(
             customPromptDiscardSignal={model.sourceControlAiPromptDiscardSignal}
             settingsSearchQuery={model.settingsSearchQuery}
           />
-          <GitProviderApiBudgetPane
-            settingsSearchQuery={model.settingsSearchQuery}
-            target={model.settingsHostScope.target}
-          />
+          {isServerScope(model.settingsHostScope) ? (
+            <GitProviderApiBudgetPane
+              settingsSearchQuery={model.settingsSearchQuery}
+              target={model.settingsHostScope.target}
+            />
+          ) : (
+            <SettingsHostScopeMachineOnlyNotice hostLabel={model.settingsHostScope.label} />
+          )}
         </>
       ) : null}
     </SettingsSection>

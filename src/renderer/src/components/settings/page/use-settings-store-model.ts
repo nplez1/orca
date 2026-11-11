@@ -37,9 +37,8 @@ import {
   buildSettingsProjectList,
   removeSettingsProjectFromAllHosts
 } from '../navigation/settings-project-list'
-import { resolveSettingsHostScope } from '../host-scope/settings-host-scope'
+import { useSettingsHostScope } from '../host-scope/use-settings-host-scope'
 import { useSettingsHostNavigation } from '../host-scope/use-settings-host-navigation'
-import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import {
   blockRemovalForUnsavedFiles,
   projectRemovalTargets
@@ -72,7 +71,6 @@ export function useSettingsStoreModel() {
   const modelStates = useAppStore((s) => s.modelStates)
   const refreshModelStates = useAppStore((s) => s.refreshModelStates)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
-  const runtimeEnvironmentCatalogHydrated = useAppStore((s) => s.runtimeEnvironmentCatalogHydrated)
 
   const projectHostSetupProjection = useProjectHostSetupProjection()
   // Use navigation’s grouping inputs so pane and navigation lists agree.
@@ -181,28 +179,11 @@ export function useSettingsStoreModel() {
     releaseNativeAccounts,
     consumeSettingsNavigation
   } = useSettingsHostNavigation(settingsNavigationTarget)
-  const defaultScope = defaultScopeHost(settings)
-  const defaultRuntimeEnvironmentId =
-    defaultScope.kind === 'environment' ? defaultScope.environmentId : null
-  // Key by IDs so status-only catalog changes cannot restart host-scoped loads.
-  const savedEnvironmentIdsKey = runtimeEnvironments.map((environment) => environment.id).join('\n')
   // Web clients use their serving host and cannot offer host selection.
-  const settingsHostScope = useMemo(
-    () =>
-      resolveSettingsHostScope({
-        choice: isWebClient ? null : settingsHostChoice,
-        defaultEnvironmentId: defaultRuntimeEnvironmentId,
-        savedEnvironmentIds: savedEnvironmentIdsKey ? savedEnvironmentIdsKey.split('\n') : [],
-        catalogHydrated: runtimeEnvironmentCatalogHydrated
-      }),
-    [
-      defaultRuntimeEnvironmentId,
-      isWebClient,
-      runtimeEnvironmentCatalogHydrated,
-      savedEnvironmentIdsKey,
-      settingsHostChoice
-    ]
-  )
+  const { scope: settingsHostScope, hosts: settingsHosts } = useSettingsHostScope({
+    choice: settingsHostChoice,
+    isWebClient
+  })
 
   return {
     generalSubPage,
@@ -284,6 +265,7 @@ export function useSettingsStoreModel() {
     setHiddenExperimentalUnlocked,
     runtimeEnvironments,
     settingsHostScope,
+    settingsHosts,
     nativeAccounts,
     releaseNativeAccounts,
     consumeSettingsNavigation,

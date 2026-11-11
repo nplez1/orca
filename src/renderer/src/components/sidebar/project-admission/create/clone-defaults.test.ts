@@ -1,0 +1,139 @@
+import { describe, expect, it } from 'vitest'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
+} from '../../../../../../shared/execution-host'
+import { getCloneDestinationAutoFill, getCloneParentForHost } from './clone-defaults'
+
+const LOCAL = LOCAL_EXECUTION_HOST_ID
+const SERVER = toRuntimeExecutionHostId('server-a')
+const SSH = toSshExecutionHostId('builder')
+
+describe('getCloneParentForHost', () => {
+  it('uses this computer’s workspace dir under a nested layout', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { workspaceDir: '/Users/me/orca/workspaces' },
+        hostIds: [LOCAL],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('/Users/me/orca/workspaces')
+  })
+
+  it('places a flat-layout clone beside the workspaces tree', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { workspaceDir: '/Users/me/orca/workspaces' },
+        hostIds: [LOCAL],
+        layoutMode: 'flat'
+      })
+    ).toBe('/Users/me/orca')
+  })
+
+  it('prefers the host’s stored checkout root', () => {
+    expect(
+      getCloneParentForHost({
+        settings: {
+          workspaceDir: '/Users/me/orca/workspaces',
+          hostSettingOverrides: { [SERVER]: { defaultRepoRoot: '/srv/src' } }
+        },
+        hostIds: [SERVER],
+        layoutMode: 'project-folder'
+      })
+    ).toBe('/srv/src')
+  })
+
+  it('derives a remote default from that host’s own worktree root', () => {
+    expect(
+      getCloneParentForHost({
+        settings: {
+          hostSettingOverrides: {
+            [SERVER]: { defaultWorktreeLocation: '/home/me/orca/workspaces' }
+          }
+        },
+        hostIds: [SERVER],
+        layoutMode: 'project-folder'
+      })
+    ).toBe('/home/me/orca/workspaces')
+  })
+
+  it('never hands a remote host this computer’s workspaceDir', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { workspaceDir: '/Users/me/orca/workspaces' },
+        hostIds: [SERVER],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('')
+  })
+
+  it('falls back to the probed home convention for a remote host', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { workspaceDir: '/Users/me/orca/workspaces' },
+        hostIds: [SERVER],
+        layoutMode: 'repo-nested',
+        hostHome: '/home/me'
+      })
+    ).toBe('/home/me/orca/workspaces')
+  })
+
+  it('never offers a destination on an SSH host, which cannot clone', () => {
+    expect(
+      getCloneParentForHost({
+        settings: {
+          hostSettingOverrides: { [SSH]: { defaultWorktreeLocation: '/srv/orca' } }
+        },
+        hostIds: [SSH],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('')
+  })
+})
+
+describe('getCloneDestinationAutoFill', () => {
+  it('fills an empty destination once', () => {
+    expect(
+      getCloneDestinationAutoFill({
+        step: 'clone',
+        cloneDestination: '',
+        cloneStepAutoFilled: false,
+        parent: '/srv/src'
+      })
+    ).toEqual({ destination: '/srv/src' })
+  })
+
+  it('never overwrites what the user typed', () => {
+    expect(
+      getCloneDestinationAutoFill({
+        step: 'clone',
+        cloneDestination: '/typed',
+        cloneStepAutoFilled: false,
+        parent: '/srv/src'
+      })
+    ).toBeNull()
+  })
+
+  it('fills once per visit to the clone step', () => {
+    expect(
+      getCloneDestinationAutoFill({
+        step: 'clone',
+        cloneDestination: '',
+        cloneStepAutoFilled: true,
+        parent: '/srv/src'
+      })
+    ).toBeNull()
+  })
+
+  it('waits while the host’s default is still unknown', () => {
+    expect(
+      getCloneDestinationAutoFill({
+        step: 'clone',
+        cloneDestination: '',
+        cloneStepAutoFilled: false,
+        parent: ''
+      })
+    ).toBeNull()
+  })
+})

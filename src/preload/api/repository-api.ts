@@ -92,6 +92,7 @@ export type RepositoryApi = {
   }) => Promise<{ repo: Repo } | RepoCreateFailure>
   isGitAvailable: () => Promise<boolean>
   getDefaultCreateProjectParent: () => Promise<string>
+  getDefaultRepoRoot: () => Promise<string>
   onCloneProgress: (callback: (data: { phase: string; percent: number }) => void) => () => void
   getBaseRefDefault: (args: {
     repoId: string

@@ -5,6 +5,10 @@ import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-serv
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import type { AddRepoDialogStep } from '../dialog/add-repo-dialog-types'
 import { getDefaultCreateProjectParent, type GitAvailability } from './create-project-defaults'
+import { layoutNestsPrimaryCheckout } from '../../../../../../shared/orca-workspace-layout'
+import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
+import { toRuntimeExecutionHostId } from '../../../../../../shared/execution-host'
+import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 
 const LOCAL_GIT_AVAILABILITY_TIMEOUT_MS = 1500
 const RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS = 3000
@@ -47,7 +51,8 @@ export function useCreateProjectDefaults({
   activeRuntimeEnvironmentId,
   createParent,
   setCreateParent,
-  worktreeLayoutMode
+  worktreeLayoutMode,
+  hostSettingOverrides
 }: {
   step: AddRepoDialogStep
   activeRuntimeEnvironmentId: string | null | undefined
@@ -55,6 +60,8 @@ export function useCreateProjectDefaults({
   setCreateParent: (value: string) => void
   /** Placement mode, so a runtime host's default parent matches the layout in use. */
   worktreeLayoutMode?: WorktreeLayoutMode
+  /** Per-host folder overrides: a stored root wins over recomputing from the host's home. */
+  hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
 }): {
   createDefaultParent: string
   createGitAvailability: GitAvailability
@@ -214,10 +221,25 @@ export function useCreateProjectDefaults({
 
     const gen = ++createParentDefaultGenRef.current
     setCreateRuntimeParentStatus('checking')
-    void withTimeout(
-      browseRuntimeServerDirectory(runtimeEnvironmentId, '~'),
-      RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS
-    )
+    const runtimeHostIds = [toRuntimeExecutionHostId(runtimeEnvironmentId)]
+    const layoutMode = worktreeLayoutMode ?? 'repo-nested'
+    // Nested layouts container the project inside the worktree root; flat ones inside the checkout root.
+    const storedParent =
+      getHostSettingOverrideForIds(
+        { hostSettingOverrides },
+        runtimeHostIds,
+        layoutNestsPrimaryCheckout(layoutMode) ? 'defaultWorktreeLocation' : 'defaultRepoRoot'
+      ) ?? ''
+    const resolveParent = storedParent
+      ? Promise.resolve({ resolvedPath: '', parent: storedParent })
+      : withTimeout(
+          browseRuntimeServerDirectory(runtimeEnvironmentId, '~'),
+          RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS
+        ).then((result) => ({
+          resolvedPath: result.resolvedPath,
+          parent: getDefaultCreateProjectParent(result.resolvedPath, worktreeLayoutMode)
+        }))
+    void resolveParent
       .then((result) => {
         if (
           gen !== createParentDefaultGenRef.current ||
@@ -225,7 +247,7 @@ export function useCreateProjectDefaults({
         ) {
           return
         }
-        const parent = getDefaultCreateProjectParent(result.resolvedPath, worktreeLayoutMode)
+        const parent = result.parent
         createStepAutoFilledRef.current = true
         autoFilledCreateParentRef.current = {
           parent,
@@ -250,6 +272,7 @@ export function useCreateProjectDefaults({
     activeCreateParentRuntimeEnvironmentId,
     canReplaceCreateParentDefault,
     createParent,
+    hostSettingOverrides,
     setCreateParent,
     step,
     worktreeLayoutMode

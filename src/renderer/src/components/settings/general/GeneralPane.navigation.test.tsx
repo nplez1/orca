@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../../shared/constants'
 import { useAppStore } from '@/store'
 import { GeneralPane } from './GeneralPane'
+import { LOCAL_SETTINGS_HOST_SCOPE } from '../host-scope/settings-host-scope'
 import type { GeneralSubPage } from './general-sub-pages'
 import { useSettingsRepoScrollEffects } from '../navigation/use-settings-repo-scroll-effects'
 import type { SettingsStoreModel } from '../page/use-settings-store-model'
@@ -13,7 +14,14 @@ import type { SettingsNavigationModel } from '../navigation/use-settings-navigat
 import type { SettingsTerminalModel } from '../page/use-settings-terminal-model'
 import { TooltipProvider } from '../../ui/tooltip'
 
-beforeEach(() => useAppStore.setState(useAppStore.getInitialState(), true))
+beforeEach(() => {
+  useAppStore.setState(useAppStore.getInitialState(), true)
+  // The General pane reads this computer's repository root convention on mount.
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: { repos: { getDefaultRepoRoot: async () => '/tmp/orca/projects' } }
+  })
+})
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
@@ -89,6 +97,7 @@ function NavigationHarness({
       <button onClick={() => requestTarget('general-open-in-apps')}>Open app settings link</button>
       <GeneralPane
         settings={settings}
+        hostScope={LOCAL_SETTINGS_HOST_SCOPE}
         subPage={generalSubPage}
         fontSuggestions={[]}
         updateSettings={(updates) => {

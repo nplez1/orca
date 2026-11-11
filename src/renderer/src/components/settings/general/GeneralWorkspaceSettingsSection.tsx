@@ -11,6 +11,8 @@ import { OpenInMenuEditor, type useOpenInMenuDraft } from './OpenInMenuSetting'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { SettingsSegmentedControl } from '../form-controls/SettingsFormControls'
 import { WorkspaceDirectorySetting } from './WorkspaceDirectorySetting'
+import { RepoRootSetting } from './RepoRootSetting'
+import type { SettingsHostScope } from '../host-scope/settings-host-scope'
 import { useTranslate } from '@/i18n/use-translate'
 import { GlobalWorktreeVisibilitySourcesSetting } from './GlobalWorktreeVisibilitySourcesSetting'
 import { GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
@@ -20,10 +22,15 @@ type GeneralWorkspaceSettingsSectionProps = {
   openInDraft: ReturnType<typeof useOpenInMenuDraft>
   page: GeneralSubPage
   settings: GlobalSettings
+  /** The machine chosen at the top of Settings. */
+  hostScope: SettingsHostScope
   updateSettings: (updates: Partial<GlobalSettings>) => void
   updateSettingsOrThrow?: (updates: Partial<GlobalSettings>) => void | Promise<void>
   defaultsSupported?: boolean
   sourceDefaultsSupported?: boolean
+  /** Worktree-visibility defaults belong to the default host, which may not be the picked one. */
+  defaultsEditAnotherHost?: boolean
+  defaultsHostLabel?: string
 }
 
 export function GeneralWorkspaceSettingsSection({
@@ -33,14 +40,22 @@ export function GeneralWorkspaceSettingsSection({
   updateSettings,
   updateSettingsOrThrow = updateSettings,
   defaultsSupported = true,
-  sourceDefaultsSupported = true
+  sourceDefaultsSupported = true,
+  defaultsEditAnotherHost = false,
+  defaultsHostLabel = '',
+  hostScope
 }: GeneralWorkspaceSettingsSectionProps): React.JSX.Element {
   const t = useTranslate()
   return (
     <SettingsGroup title={getGeneralSubPageTitle(page, t)}>
       {page === 'folder' ? (
         <div>
-          <WorkspaceDirectorySetting settings={settings} updateSettings={updateSettings} />
+          <WorkspaceDirectorySetting
+            settings={settings}
+            updateSettings={updateSettings}
+            scope={hostScope}
+          />
+          <RepoRootSetting settings={settings} updateSettings={updateSettings} scope={hostScope} />
           <SearchableSetting
             id={GENERAL_SETTING_ANCHORS.nesting}
             title={t(
@@ -132,6 +147,15 @@ export function GeneralWorkspaceSettingsSection({
               'GSD'
             ]}
           >
+            {defaultsEditAnotherHost ? (
+              <p className="pb-2 text-xs text-muted-foreground">
+                {t(
+                  'auto.components.settings.GeneralWorkspaceSettingsSection.defaultsEditAnotherHost',
+                  'These defaults belong to {{value0}}, the default host, not the host selected above.',
+                  { value0: defaultsHostLabel }
+                )}
+              </p>
+            ) : null}
             <GlobalWorktreeVisibilitySourcesSetting
               settings={settings}
               defaultsSupported={defaultsSupported}

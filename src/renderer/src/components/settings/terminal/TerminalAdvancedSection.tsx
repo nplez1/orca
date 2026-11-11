@@ -1,5 +1,5 @@
 import { TerminalLimitSetting } from './session-management/TerminalLimitSetting'
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../host-scope/settings-host-scope'
 import { useState } from 'react'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import { TERMINAL_DEFAULT_WORD_SEPARATOR } from '../../../../../shared/terminal/input/terminal-word-separator'
@@ -21,9 +21,12 @@ import { TerminalMacKeyboardSection } from './platform/TerminalMacKeyboardSectio
 import { useTranslate } from '@/i18n/use-translate'
 import { openAppHttpLinkFromAnchor } from '@/lib/browser/navigation/app-http-link-open'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
+import { SettingsHostScopeMachineOnlyNotice } from '../host-scope/SettingsHostScopePicker'
 
 type TerminalAdvancedSectionProps = {
-  hostScope?: SettingsHostScope
+  hostScope?: SettingsServerScope
+  /** Set when the picked machine runs no server, so the limit row explains itself instead of vanishing. */
+  machineOnlyHostLabel?: string
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
   scrollbackMode: 'preset' | 'custom'
@@ -44,6 +47,7 @@ function toWordSeparatorSetting(draft: string): string | undefined {
 
 export function TerminalAdvancedSection({
   hostScope,
+  machineOnlyHostLabel,
   settings,
   updateSettings,
   scrollbackMode,
@@ -193,7 +197,11 @@ export function TerminalAdvancedSection({
         />
       </SearchableSetting>
 
-      {hostScope ? <TerminalLimitSetting scope={hostScope} /> : null}
+      {hostScope ? (
+        <TerminalLimitSetting scope={hostScope} />
+      ) : machineOnlyHostLabel ? (
+        <SettingsHostScopeMachineOnlyNotice hostLabel={machineOnlyHostLabel} />
+      ) : null}
 
       <SearchableSetting
         title={t('auto.components.settings.TerminalPane.8abcfcf8d3', 'Word separators')}

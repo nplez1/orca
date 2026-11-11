@@ -1,93 +1,124 @@
 import { useTranslate } from '@/i18n/use-translate'
-import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host'
-import type { PublicKnownRuntimeEnvironment } from '../../../../../shared/remote-runtime/host-catalog/runtime-environments'
-import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  getLocalExecutionHostLabel,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../shared/execution-host'
 import {
   SettingsSearchableSelect,
+  type SettingsSearchableSelectGroup,
   type SettingsSearchableSelectOption
 } from '../form-controls/SettingsSearchableSelect'
-import type { SettingsHostScope } from './settings-host-scope'
-
-const LOCAL_VALUE = 'local'
-const ENVIRONMENT_VALUE_PREFIX = 'environment:'
+import type { SettingsHostScope, SettingsHostScopeHost } from './settings-host-scope'
 
 type SettingsHostScopePickerProps = {
   scope: SettingsHostScope
-  environments: readonly PublicKnownRuntimeEnvironment[]
-  onChoose: (choice: RuntimeClientTarget) => void
+  hosts: readonly SettingsHostScopeHost[]
+  onChoose: (hostId: ExecutionHostId) => void
 }
 
+/** A merged SSH row stands for the server it deploys, so it belongs with the servers. */
+function hasServer(host: SettingsHostScopeHost): boolean {
+  const parsed = parseExecutionHostId(host.id)
+  if (parsed?.kind === 'runtime') {
+    return true
+  }
+  return (host.aliasHostIds ?? []).some((alias) => parseExecutionHostId(alias)?.kind === 'runtime')
+}
+
+function pickerGroupFor(host: SettingsHostScopeHost): 'computer' | 'servers' | 'machines' {
+  const parsed = parseExecutionHostId(host.id)
+  if (parsed?.kind === 'local') {
+    return 'computer'
+  }
+  return hasServer(host) ? 'servers' : 'machines'
+}
+
+/** Local-only users need no picker; any second machine, server or SSH, makes it useful. */
 export function shouldShowSettingsHostScopePicker(
   scope: SettingsHostScope,
-  environments: readonly PublicKnownRuntimeEnvironment[]
+  hosts: readonly SettingsHostScopeHost[]
 ): boolean {
-  return environments.length > 0 || scope.target.kind === 'environment'
+  return (
+    scope.hostId !== LOCAL_EXECUTION_HOST_ID ||
+    hosts.some((host) => host.id !== LOCAL_EXECUTION_HOST_ID)
+  )
 }
 
 export function SettingsHostScopePicker({
   scope,
-  environments,
+  hosts,
   onChoose
 }: SettingsHostScopePickerProps): React.JSX.Element {
   const t = useTranslate()
-  const scopeEnvironmentId = runtimeTargetEnvironmentId(scope.target)
-  const value = scopeEnvironmentId
-    ? `${ENVIRONMENT_VALUE_PREFIX}${scopeEnvironmentId}`
-    : LOCAL_VALUE
-  const label = t('auto.components.settings.SettingsHostScopePicker.label', 'Host')
-  const selectedEnvironmentAvailable = environments.some(
-    (environment) => environment.id === scopeEnvironmentId
-  )
-  const options: SettingsSearchableSelectOption[] = [
+  const rows: SettingsHostScopeHost[] = hosts.some((host) => host.id === LOCAL_EXECUTION_HOST_ID)
+    ? [...hosts]
+    : [{ id: LOCAL_EXECUTION_HOST_ID, label: getLocalExecutionHostLabel() }, ...hosts]
+  const optionFor = (host: SettingsHostScopeHost): SettingsSearchableSelectOption => ({
+    value: host.id,
+    label: host.label,
+    keywords: [host.id]
+  })
+  const grouped: SettingsSearchableSelectGroup[] = [
     {
-      value: LOCAL_VALUE,
-      label: getLocalExecutionHostLabel()
+      key: 'computer',
+      heading: t('auto.components.settings.SettingsHostScopePicker.thisComputer', 'This computer'),
+      options: rows.filter((host) => pickerGroupFor(host) === 'computer').map(optionFor)
     },
-    ...environments
-      .filter((environment) => scope.available || environment.id !== scopeEnvironmentId)
-      .map((environment) => ({
-        value: `${ENVIRONMENT_VALUE_PREFIX}${environment.id}`,
-        label: environment.name,
-        keywords: [environment.id]
-      }))
-  ]
-  if (scopeEnvironmentId && (!scope.available || !selectedEnvironmentAvailable)) {
-    options.push({
-      value,
-      label: scope.available
-        ? t('auto.components.settings.SettingsHostScopePicker.loading', 'Loading hosts…')
-        : t(
-            'auto.components.settings.SettingsHostScopePicker.unavailable',
-            '{{value0}} (unavailable)',
-            { value0: scopeEnvironmentId }
-          ),
-      keywords: [scopeEnvironmentId],
-      disabled: true
+    {
+      key: 'servers',
+      heading: t('auto.components.settings.SettingsHostScopePicker.servers', 'Orca servers'),
+      options: rows.filter((host) => pickerGroupFor(host) === 'servers').map(optionFor)
+    },
+    {
+      key: 'machines',
+      heading: t(
+        'auto.components.settings.SettingsHostScopePicker.machines',
+        'Machines without a server'
+      ),
+      options: rows.filter((host) => pickerGroupFor(host) === 'machines').map(optionFor)
+    }
+  ].filter((group) => group.options.length > 0)
+  // A removed server or an id the registry dropped must stay visible, never silently rebound.
+  if (!scope.available || !rows.some((host) => host.id === scope.hostId)) {
+    grouped.push({
+      key: 'unavailable',
+      options: [
+        {
+          value: scope.hostId,
+          label: scope.available
+            ? t('auto.components.settings.SettingsHostScopePicker.loading', 'Loading hosts…')
+            : t(
+                'auto.components.settings.SettingsHostScopePicker.unavailable',
+                '{{value0}} (unavailable)',
+                { value0: scope.label }
+              ),
+          keywords: [scope.hostId],
+          disabled: true
+        }
+      ]
     })
   }
+  const label = t('auto.components.settings.SettingsHostScopePicker.label', 'Host')
   return (
     <div className="flex min-w-0 items-center text-settings-detail">
       <span className="sr-only">{label}</span>
       <SettingsSearchableSelect
         compact
         ariaLabel={label}
-        value={value}
-        groups={[{ key: 'settings-hosts', options }]}
+        value={scope.hostId}
+        groups={grouped}
         searchPlaceholder={t(
           'auto.components.settings.SettingsSearchableSelect.searchHosts',
           'Search hosts…'
         )}
-        onValueChange={(next) =>
-          onChoose(
-            next.startsWith(ENVIRONMENT_VALUE_PREFIX)
-              ? {
-                  kind: 'environment',
-                  environmentId: next.slice(ENVIRONMENT_VALUE_PREFIX.length)
-                }
-              : { kind: 'local' }
-          )
-        }
+        onValueChange={(next) => {
+          const hostId = parseExecutionHostId(next)?.id
+          if (hostId) {
+            onChoose(hostId)
+          }
+        }}
       />
     </div>
   )
@@ -101,6 +132,24 @@ export function SettingsHostScopeUnavailableNotice(): React.JSX.Element {
       {t(
         'auto.components.settings.SettingsHostScopePicker.unavailableNotice',
         'This server is no longer saved, so nothing can be shown for it. Choose another host at the top of Settings.'
+      )}
+    </p>
+  )
+}
+
+/** Shown in place of a server-backed pane when the chosen machine runs no Orca server. */
+export function SettingsHostScopeMachineOnlyNotice({
+  hostLabel
+}: {
+  hostLabel: string
+}): React.JSX.Element {
+  const t = useTranslate()
+  return (
+    <p className="text-sm text-muted-foreground">
+      {t(
+        'auto.components.settings.SettingsHostScopePicker.machineOnlyNotice',
+        '{{value0}} has no Orca server, so its server settings cannot be shown here. Choose this computer or one of its servers at the top of Settings.',
+        { value0: hostLabel }
       )}
     </p>
   )

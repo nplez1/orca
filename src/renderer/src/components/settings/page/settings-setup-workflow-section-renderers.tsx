@@ -87,6 +87,7 @@ export function renderGeneralSettingsSection(
             interactions.contentScrollRef.current?.scrollTo({ top: 0 })
           }}
           settings={model.settings}
+          hostScope={model.settingsHostScope}
           updateSettings={model.updateSettings}
           updateSettingsOrThrow={model.updateSettingsOrThrow}
           fontSuggestions={model.terminalFontSuggestions}
