@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { isForkOwnedPath } from '../../local/fork-owned-paths.mjs'
 import {
   ACCEPTED_RUNNER_LABELS,
   ALLOWED_INERT,
@@ -177,14 +178,120 @@ describe('a lane that grew a trigger', () => {
   it('treats an enabled file with no pin as a problem, not as permission', () => {
     const path = '.github/workflows/unpinned.yml'
     const verdict = judge([active(path)], factsFor(path, ['pull_request']), {
-      required: [path],
-      allowedInert: []
+      required: [],
+      allowedInert: [path]
     })
 
     expect(verdict.unpinned).toEqual([{ path, all: ['pull_request'] }])
     expect(verdict.disableTargets.map((target) => target.why)).toEqual([
       'active with no pinned triggers'
     ])
+  })
+
+  // The sweep now runs unattended, so a required lane must not be reachable by any disable route —
+  // which is what the old unfiltered `unpinned` mapping allowed.
+  it('reports a required lane with no pin and never disables it', () => {
+    const path = '.github/workflows/node-server-tests.yml'
+    const verdict = judge([active(path)], factsFor(path, ['pull_request']), {
+      required: [path],
+      allowedInert: [],
+      expected: {}
+    })
+
+    expect(verdict.needsDecision).toEqual([
+      { path, why: 'active with no pinned triggers', kind: 'required', listed: true }
+    ])
+    expect(verdict.disableTargets).toEqual([])
+    expect(verdict.ok).toBe(false)
+    expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
+  })
+})
+
+describe('what the sweep may turn off', () => {
+  // A sync enables every workflow file it adds, and that is the class this exists to clear.
+  it('disables an inherited file that is on neither list', () => {
+    const path = '.github/workflows/orca-server-artifact.yml'
+    const verdict = judge([active(path)], factsFor(path, ['pull_request']), {
+      required: [],
+      allowedInert: [],
+      expected: {}
+    })
+
+    expect(verdict.needsDecision).toEqual([])
+    expect(verdict.disableTargets.map((target) => target.path)).toEqual([path])
+    expect(residualProblems({ verdict, fix: true, disabled: [path], failed: [] })).toBe(0)
+  })
+
+  // `.github/workflows/fork-*.yml` cannot have arrived from a sync, so an active one with no entry is a
+  // person's decision: report it, let it open an issue nobody delegates, never revert it.
+  it('reports a fork-owned lane with no entry instead of disabling it', () => {
+    const path = '.github/workflows/fork-new-lane.yml'
+    const verdict = judge([active(path)], factsFor(path, ['schedule', 'workflow_dispatch']), {
+      required: [],
+      allowedInert: [],
+      expected: {}
+    })
+
+    expect(verdict.drift.map((entry) => entry.path)).toEqual([path])
+    expect(verdict.needsDecision).toEqual([
+      { path, why: "active but not on the fork's live list", kind: 'fork-owned', listed: false }
+    ])
+    expect(verdict.disableTargets).toEqual([])
+    expect(verdict.ok).toBe(false)
+    // And it stays outstanding under --fix, so a sweep cannot report itself clean having left it.
+    expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
+  })
+
+  // The other two routes into `disableTargets` are guarded the same way; only the drift route fires
+  // today, and a fork-owned lane someone parks in ALLOWED_INERT must not lose to a trigger edit.
+  it('leaves a fork-owned lane alone when its triggers change shape', () => {
+    const path = '.github/workflows/fork-new-lane.yml'
+    const verdict = judge([active(path)], factsFor(path, ['workflow_dispatch', 'push']), {
+      required: [],
+      allowedInert: [path],
+      expected: { [path]: ['workflow_dispatch'] }
+    })
+
+    expect(verdict.disableTargets).toEqual([])
+    expect(verdict.needsDecision).toEqual([
+      { path, why: 'its triggers changed shape', kind: 'fork-owned', listed: true }
+    ])
+  })
+
+  // Six required lanes are fork-owned too, and `kind` names the guard that held the lane back: saying
+  // "enabled with no entry" about `fork-main-tests.yml` would point the reader at a cause it does not
+  // have, and a required lane stays delegable while a fork-owned one does not.
+  it('names the required guard, not the fork-owned one, when a lane is both', () => {
+    const path = '.github/workflows/fork-main-tests.yml'
+    const verdict = judge([active(path)], factsFor(path, ['schedule', 'push']), {
+      required: [path],
+      allowedInert: [],
+      expected: { [path]: ['schedule', 'workflow_dispatch'] }
+    })
+
+    expect(verdict.disableTargets).toEqual([])
+    expect(verdict.needsDecision).toEqual([
+      { path, why: 'its triggers changed shape', kind: 'required', listed: true }
+    ])
+    expect(residualProblems({ verdict, fix: true, disabled: [], failed: [] })).toBe(1)
+  })
+})
+
+describe('the fork-owned reading', () => {
+  // It has to agree with `forkOwnedPathspec` in the same module, or the sweep and the commit guard
+  // disagree about which files a sync could have added.
+  it('matches the list the same way git reads its pathspecs', () => {
+    expect(isForkOwnedPath('.github/workflows/fork-ci-health.yml')).toBe(true)
+    expect(isForkOwnedPath('.github/workflows/fork-new.yml')).toBe(true)
+    // A `*` stays inside one segment, and the extension is part of the entry.
+    expect(isForkOwnedPath('.github/workflows/nested/fork-new.yml')).toBe(false)
+    expect(isForkOwnedPath('.github/workflows/fork-new.yaml')).toBe(false)
+    // A directory entry is a prefix; the bare name is not the directory.
+    expect(isForkOwnedPath('local/actions-enablement-contract.mjs')).toBe(true)
+    expect(isForkOwnedPath('local')).toBe(false)
+    expect(isForkOwnedPath('LOCAL-PATCHES.md')).toBe(true)
+    // An inherited lane is the whole point: it is not fork-owned.
+    expect(isForkOwnedPath('.github/workflows/orca-server-artifact.yml')).toBe(false)
   })
 })
 

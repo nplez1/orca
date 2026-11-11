@@ -3398,6 +3398,57 @@ Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`,
 `e2e.yml`, `mobile.yml` and `fork-main-gates.yml`. `fork-main-tests.yml` is the exception above: it is
 live, and the section below is why its being live was not the same as its running.
 
+#### The daily lane clears inherited drift itself (2026-11-10, #349)
+
+The 2026-11-09 sync added two workflow files and, because upstream's fleet is disabled per workflow
+and a **new** file arrives enabled, both came up live: `orca-server-artifact.yml` and
+`release-mirror-r2.yml`. Neither had ever run (`gh run list --workflow <file>` returned `[]` for both)
+and neither had a live caller — the only callers, `release-cut.yml` and `mobile-android-release.yml`,
+are `disabled_manually` — but the daily health check reported both as `DRIFT` and the only way to clear
+it was repository state. Both are now `disabled_manually`:
+
+- `orca-server-artifact.yml` carries an inherited `schedule` (`45 11 * * *`) plus a path-gated
+  `pull_request` trigger, so leaving it live spends minutes on matching PRs and daily; a disabled
+  callee still runs when called, so `release-cut.yml` loses nothing if it is ever re-enabled.
+- `release-mirror-r2.yml` needs `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` and writes to upstream's
+  `downloads.onorca.dev` bucket. No release on this fork publishes there, so there is nothing to
+  mirror and nothing to backfill by hand.
+
+**The class is now self-clearing.** `fork-ci-health.yml` holds `actions: write` and runs
+`local/ci-health-report.mjs --fix`, which passes `--fix` to the enablement check alone. Before this,
+the drift cost a delegation: an agent, a PR, and a diff that cannot exist, because the fix is
+repository state rather than a file. Three bounds make the unattended sweep safe, and each is a bug
+that existed before it ran unattended:
+
+- **`refs/heads/main` only** (`maySweep`). A `workflow_dispatch` runs the tree of the ref it was
+  dispatched on, and a branch cut before a lane joined `REQUIRED` reads that lane as drift — so a
+  dispatch from any other ref would have switched off lanes the release line needs. A refused `--fix`
+  now says so, because otherwise a branch dispatch reads as an ordinary report-only run.
+- **Never a `REQUIRED` lane, by any of the three routes into `disableTargets`** — drift, a changed
+  trigger shape, and unpinned. Only the last two needed a filter. Unpinned is a guard rather than a
+  live path: a deleted `EXPECTED_TRIGGERS` row makes the file `UNKNOWN`, because the facts are seeded
+  from that table, so the reachable version of this was a required _callee_ (`node-server-tests.yml`,
+  through `qualified-orcad-template.yml`) whose row someone removed. The exclusion is one filter, not
+  a new mechanism.
+- **Never a fork-owned file** (`.github/workflows/fork-*.yml`, `local/**`). A sync cannot add one, so
+  an active fork-owned lane with no entry is a person's decision: it is reported as `DECIDE`, and the
+  check exits **3** instead of 1. That code is what withholds `agent:auto` — 1 means "a scoped defect
+  the pipeline may take on", and the only two things an agent could do here are the two this section
+  forbids: disable a lane someone enabled on purpose, or widen the list to hide the finding. It withholds
+  the label from the whole issue rather than from that one check, because an agent handed a red it may
+  not resolve will resolve it anyway. Exit 3 is keyed on the guard that held the lane back **and** on the
+  route: a `REQUIRED` lane whose triggers changed shape stays at 1 and stays delegable, because pinning
+  the new trigger is a decision an agent can make and record, and six of the required lanes are
+  fork-owned — so "fork-owned" alone would withhold delegation from the routine post-sync case.
+
+A night that heals itself reports clean, so the close comment names what the sweep disabled. When no
+issue was open — the ordinary case, because the sweep usually runs before the red ever reaches one —
+the record is the run log plus the workflows' own `disabled_manually` state, which `gh api
+repos/nplez1/orca/actions/workflows` answers at any time. Root cause was not fixed here:
+`local/sync/publish-sync.mjs` already sweeps after its own push, so either the 11-10 sync did not use it
+or its sweep failed and nobody acted. The daily sweep is the backstop for every route that skips it — a
+gatekeeper merge, a hand push, a sync that did not use that script.
+
 #### The cost premise was wrong, and the PR lane that follows from it (audit #221 C2)
 
 This section said the fleet being fully on "burned nearly the full month in a few days", and put the

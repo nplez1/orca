@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
+import { REQUIRED } from '../../local/actions-enablement-contract.mjs'
 
 const ROOT = new URL('../../', import.meta.url)
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8')
@@ -106,9 +107,9 @@ it('names the cheap PR lane it decided on, and why the unit suite is not it', ()
   expect(live).toContain('fork-pr-gates.yml')
   expect(live).toContain('cheapest useful lane')
   expect(workflow).toContain('pull_request')
-  expect(read('local/check-actions-enablement.mjs')).toContain(
-    "'.github/workflows/fork-pr-gates.yml'"
-  )
+  // The table itself, not its source text: the pinned tables live in their own module, and a doc test
+  // that greps a file stops checking anything the moment the value moves.
+  expect(REQUIRED).toContain('.github/workflows/fork-pr-gates.yml')
 })
 
 it('pushes the release line through the enablement sweep, not as a bare git push', () => {

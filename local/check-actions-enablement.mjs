@@ -31,171 +31,32 @@
  *   run that is already going.
  *
  * Exit codes: 0 clean, 1 drift or an unverifiable entry, 2 cannot reach the API — "cannot tell" is
- * never a pass.
+ * never a pass — and 3 a finding only a person may resolve: a **fork-owned** lane is enabled and is not
+ * on the live list, which a sync cannot have caused, and the only two remedies are disabling a lane
+ * someone enabled on purpose or widening the list to hide it. A `REQUIRED` lane that changed shape stays
+ * at 1 and is delegable, because correcting its pin is a decision an agent can make and record.
+ * `local/ci-health-report.mjs` reads those codes: 1 delegates to the autonomous pipeline, 2 and 3 do not.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
+import {
+  ACCEPTED_RUNNER_LABELS,
+  ALLOWED_INERT,
+  EXPECTED_TRIGGERS,
+  FORK_SCHEDULES,
+  REQUIRED
+} from './actions-enablement-contract.mjs'
+import { isForkOwnedPath } from './fork-owned-paths.mjs'
 
 const REPO = 'nplez1/orca'
 const ROOT = resolve(import.meta.dirname, '..')
 
-// Must stay enabled: the release build, the daily v* tag mirror, the nightly full unit suite, the
-// cheap PR lane, the daily health check that watches the rest, and the lanes enabled on
-// 2026-10-31 after the cost premise was measured to be zero (LOCAL-PATCHES.md § local(ci)).
-export const REQUIRED = [
-  '.github/workflows/fork-release.yml',
-  '.github/workflows/fork-upstream-tags.yml',
-  // Why the unit lane is required and not merely allowed: `AGENTS.md` moved the full unit suite off
-  // the PR boundary and onto this nightly lane, so with it disabled nothing verifies `main`
-  // between merges — a cross-cutting break sits on the release line until someone runs the release
-  // gate by hand. Treating "disabled" as drift is the whole point: this is the backstop, and a
-  // backstop nobody notices is off is not one. See LOCAL-PATCHES.md § local(ci) before changing it.
-  '.github/workflows/fork-main-tests.yml',
-  // Why: the cheap PR lane `LOCAL-PATCHES.md` § local(ci) decided on. A lane a ruleset can require is
-  // worthless disabled, and nothing else would say so.
-  '.github/workflows/fork-pr-gates.yml',
-  // Why: this is the check that watches the health checks. An unwatched watchdog is exactly the
-  // failure `LOCAL-PATCHES.md` § local(ci) records, so a disabled one is drift, not a preference.
-  '.github/workflows/fork-ci-health.yml',
-  // Why: the only lane that runs repo-wide oxlint, max-lines, localization catalogs and `pnpm tc` on
-  // the release line. It was off from 2026-10-08 to 2026-10-31 and nothing reported that, which is the
-  // gap this entry closes.
-  '.github/workflows/fork-main-gates.yml',
-  // Why: supply-chain audit, path-gated to lockfile/Cargo/patches changes, so it costs nothing on an
-  // ordinary PR and covers the one class of change a unit lane cannot see.
-  '.github/workflows/dependency-security.yml',
-  // Why: mobile parity is first-class in `AGENTS.md` and no PR lane here covered it. Its `push: [main]`
-  // leg is path-gated, and `main` is this fork's own line since the 2026-11-09 rename — so that leg now
-  // re-tests the release line where it used to re-test the upstream mirror.
-  '.github/workflows/mobile.yml',
-  // Why: the headless/remote server path is first-class too. Its `fast_runners` input defaults to true
-  // for dispatch and call, so a manual dispatch lands on `blacksmith-*` labels this fork lacks; PR and
-  // schedule events pass no input and stay on hosted runners.
-  '.github/workflows/node-server-tests.yml',
-  // Why: auto-update correctness, ~7 min of macOS across six observed PR runs.
-  '.github/workflows/macos-updater-tests.yml',
-  // Why: perf regression contract on PRs and nightly, 21 of 24 observed runs green.
-  '.github/workflows/performance-contracts.yml'
-]
-
-// Inert without a manual dispatch or a caller — active is fine, and so is disabled. Their pinned
-// triggers below are the same claim, spelled out.
-export const ALLOWED_INERT = [
-  '.github/workflows/zcode-account-contract.yml',
-  '.github/workflows/unit-module-cache-benchmark.yml',
-  '.github/workflows/windows-native-preparation-benchmark.yml',
-  '.github/workflows/ci-cache-warmup-platform-jobs.yml',
-  '.github/workflows/qualified-orcad-template.yml',
-  '.github/workflows/layout-owner-e2e.yml',
-  '.github/workflows/dev-channel-win-publish.yml'
-]
-
-/**
- * The exact `on:` keys every enabled file is allowed to have, as data rather than as a rule, because a
- * rule cannot tell "this lane grew a schedule" from "this lane always had one". A sync that edits a
- * trigger fails here instead of quietly adding work; a deliberate change updates this table in the
- * same commit, which is what makes the change visible in review.
- *
- * An enabled file with no entry is reported too: pinning is the guard, not an optional extra.
- */
-export const EXPECTED_TRIGGERS = {
-  '.github/workflows/fork-release.yml': ['workflow_dispatch'],
-  '.github/workflows/fork-upstream-tags.yml': ['schedule', 'workflow_dispatch'],
-  '.github/workflows/fork-main-tests.yml': ['schedule', 'workflow_dispatch'],
-  '.github/workflows/fork-pr-gates.yml': ['pull_request', 'workflow_dispatch'],
-  '.github/workflows/fork-ci-health.yml': ['schedule', 'workflow_dispatch'],
-  '.github/workflows/fork-main-gates.yml': ['schedule', 'workflow_dispatch', 'push'],
-  '.github/workflows/dependency-security.yml': [
-    'pull_request',
-    'workflow_call',
-    'workflow_dispatch'
-  ],
-  '.github/workflows/mobile.yml': ['pull_request', 'push'],
-  '.github/workflows/node-server-tests.yml': ['pull_request', 'workflow_dispatch', 'workflow_call'],
-  '.github/workflows/macos-updater-tests.yml': ['pull_request', 'workflow_dispatch'],
-  '.github/workflows/performance-contracts.yml': ['workflow_dispatch', 'pull_request'],
-  '.github/workflows/zcode-account-contract.yml': ['workflow_dispatch'],
-  '.github/workflows/unit-module-cache-benchmark.yml': ['workflow_dispatch'],
-  '.github/workflows/windows-native-preparation-benchmark.yml': ['workflow_dispatch'],
-  '.github/workflows/ci-cache-warmup-platform-jobs.yml': ['workflow_call'],
-  '.github/workflows/qualified-orcad-template.yml': ['workflow_call'],
-  '.github/workflows/layout-owner-e2e.yml': ['workflow_dispatch'],
-  '.github/workflows/dev-channel-win-publish.yml': ['workflow_call']
-}
-
-/**
- * The only files allowed to carry a `schedule:` trigger, each with the reason it needs a clock.
- *
- * Why this is separate from `EXPECTED_TRIGGERS`: that table pins which triggers an enabled lane has, so
- * it can only catch a trigger being added to a file someone already thought about. It recorded
- * `schedule` as expected for `node-server-tests.yml` and `performance-contracts.yml` — both upstream
- * files nobody on this fork wrote, both firing upstream's cron daily — and pinning the status quo is not
- * the same as approving it.
- *
- * On 2026-11-06 GitHub disabled Actions on this repository for exactly that: "Workflows inherited from
- * the upstream repository often run on schedules or events that aren't needed on a fork." Nothing in
- * this file objected, because the objectionable crons were pinned as expected. A list that has to name
- * the reason, rather than one that records what is already there, is the difference.
- *
- * An entry here is a claim that this fork needs the lane to run on a clock. An enabled file with a
- * `schedule:` and no entry is reported and is never auto-disabled: the fix is to delete the cron from
- * the file, not to switch the whole lane off.
- */
-export const FORK_SCHEDULES = {
-  '.github/workflows/fork-main-tests.yml':
-    'the nightly unit backstop — nothing else tests main between merges',
-  '.github/workflows/fork-main-gates.yml':
-    'repo-wide oxlint, max-lines, localization catalogs and `pnpm tc` on the release line',
-  '.github/workflows/fork-ci-health.yml':
-    'watches the other lanes; a watchdog with no clock is not one',
-  '.github/workflows/fork-upstream-tags.yml':
-    "mirrors upstream's release tags, which the fork's release line is cut from"
-}
-
-/**
- * Files that do name a runner this fork does not provision, each with the exact labels it may name and
- * the reason. Per label rather than per file: a new `blacksmith-*` in one of these files still fails,
- * which is what stops the exception from covering a job added later.
- *
- * Two of these are reached only through `workflow_call`, and a called workflow runs whether or not it
- * is enabled — so `unit-tests.yml`, which two active lanes call, belongs here even though its own state
- * is disabled.
- */
-export const ACCEPTED_RUNNER_LABELS = {
-  '.github/workflows/node-server-tests.yml': {
-    labels: [
-      'blacksmith-2vcpu-ubuntu-2404',
-      'blacksmith-4vcpu-ubuntu-2404',
-      'blacksmith-6vcpu-macos-15',
-      'blacksmith-8vcpu-ubuntu-2204',
-      'blacksmith-8vcpu-ubuntu-2404',
-      'blacksmith-8vcpu-ubuntu-2404-arm'
-    ],
-    reason:
-      'behind `fast_runners`, true only for dispatch and call; PR and schedule events pass no input'
-  },
-  '.github/workflows/ci-cache-warmup-platform-jobs.yml': {
-    labels: [
-      'blacksmith-4vcpu-ubuntu-2404',
-      'blacksmith-4vcpu-ubuntu-2404-arm',
-      'blacksmith-8vcpu-ubuntu-2404'
-    ],
-    reason: 'reachable only through workflow_call, and both of its callers are disabled'
-  },
-  '.github/workflows/unit-tests.yml': {
-    labels: ['blacksmith-4vcpu-ubuntu-2404'],
-    reason:
-      'the `runner` input default; fork-main-tests and fork-release both pass ubuntu-24.04-arm'
-  },
-  '.github/workflows/e2e.yml': {
-    labels: ['blacksmith-4vcpu-ubuntu-2404', 'blacksmith-8vcpu-ubuntu-2404'],
-    reason:
-      'each `runs-on` is gated on `inputs.fast_runners`, which defaults false; reached only from dispatch-only lanes'
-  }
-}
+// Re-exported: `LOCAL-PATCHES.md` § local(ci) and both test files name this module's `REQUIRED`, and a
+// name that moved is a doc that stopped being true.
+export { ACCEPTED_RUNNER_LABELS, ALLOWED_INERT, EXPECTED_TRIGGERS, FORK_SCHEDULES, REQUIRED }
 
 /**
  * Runner families this fork does not provision, as patterns rather than one vendor's prefix. A job
@@ -503,32 +364,60 @@ export function judgeEnablement(
     }
   }
 
-  // Everything `--fix` is allowed to turn off. A required lane is never in here: disabling the
-  // watchdog that reports the problem is worse than the problem, and REQUIRED already means "disabled
-  // is drift", so turning one off would manufacture the drift it exists to prevent.
+  // A candidate the sweep must not act on, and why. Two kinds, one accounting rule so neither can be
+  // dropped from `problems` by being excluded from `disableTargets`:
+  //
+  // - a required lane. Disabling the watchdog that reports the problem is worse than the problem, and
+  //   REQUIRED already means "disabled is drift", so turning one off would manufacture the drift it
+  //   exists to prevent;
+  // - a fork-owned file. A sync cannot add one, so an enabled one with no entry is a person's decision.
+  //
+  // `kind` names the guard that held it back and `listed` whether it was on the live list at all, so the
+  // report says the true reason: a required lane is never swept whatever else it is, six of the required
+  // lanes are fork-owned too, and a fork-owned lane can be on the list with only its trigger shape wrong.
+  const needsDecision = []
+  const sweepable = (path, why, listed) => {
+    if (!required.includes(path) && !isForkOwnedPath(path)) {
+      return true
+    }
+    needsDecision.push({
+      path,
+      why,
+      kind: required.includes(path) ? 'required' : 'fork-owned',
+      listed
+    })
+    return false
+  }
+
   const disableTargets = [
-    ...drift.map((entry) => ({
-      path: entry.path,
-      id: entry.id,
-      why: "active but not on the fork's live list"
-    })),
+    ...drift
+      .filter((entry) => sweepable(entry.path, "active but not on the fork's live list", false))
+      .map((entry) => ({
+        path: entry.path,
+        id: entry.id,
+        why: "active but not on the fork's live list"
+      })),
     ...triggerDrift
-      .filter((entry) => !required.includes(entry.path))
+      .filter((entry) => sweepable(entry.path, 'its triggers changed shape', true))
       .map((entry) => ({
         path: entry.path,
         id: byPath.get(entry.path)?.id ?? null,
         why: 'its triggers changed shape'
       })),
-    ...unpinned.map((entry) => ({
-      path: entry.path,
-      id: byPath.get(entry.path)?.id ?? null,
-      why: 'active with no pinned triggers'
-    }))
+    ...unpinned
+      .filter((entry) => sweepable(entry.path, 'active with no pinned triggers', true))
+      .map((entry) => ({
+        path: entry.path,
+        id: byPath.get(entry.path)?.id ?? null,
+        why: 'active with no pinned triggers'
+      }))
   ]
 
+  // Why `requiredTriggerDrift` is not added here: a required lane that changed shape is already in
+  // `needsDecision`, and one finding counted twice would report a single file as two problems.
   const problems =
     disableTargets.length +
-    requiredTriggerDrift.length +
+    needsDecision.length +
     missing.length +
     stale.length +
     unreadable.length +
@@ -549,6 +438,7 @@ export function judgeEnablement(
     forbiddenTriggers,
     unreadable,
     disableTargets,
+    needsDecision,
     ok: problems === 0
   }
 }
@@ -566,18 +456,35 @@ export function residualProblems({ verdict, fix = false, disabled = [], failed =
   const outstanding = verdict.disableTargets.filter((target) => !handled.has(target.path)).length
   return (
     outstanding +
+    verdict.needsDecision.length +
     verdict.missing.length +
     verdict.stale.length +
     verdict.unreadable.length +
     verdict.unapprovedRunners.length +
     verdict.forbiddenTriggers.length +
-    verdict.requiredTriggerDrift.length +
     verdict.inheritedSchedules.length
   )
 }
 
 function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+}
+
+/**
+ * The same runner with gh's stderr discarded, for a probe whose failure is an expected answer.
+ *
+ * Why: `execFileSync` inherits stderr by default, so the repo-wide Actions-permission read — which
+ * needs admin and therefore always fails from a workflow token — used to drop gh's own "Resource not
+ * accessible by integration (HTTP 403)" into the job log, and `local/ci-health-report.mjs` quotes
+ * that log into the public health issue, where it read as a finding. Only this probe is quiet: for the
+ * real ones, gh's stderr is what `firstLine(error)` turns into the message.
+ */
+function ghQuiet(args) {
+  return execFileSync('gh', args, {
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
 }
 
 /**
@@ -687,6 +594,14 @@ function report(verdict, fix) {
   for (const w of verdict.drift) {
     console.log(`  DRIFT    active but not on the fork's live list: ${w.path} — ${w.name}`)
   }
+  for (const d of verdict.needsDecision) {
+    const reason = d.listed
+      ? d.kind === 'required'
+        ? 'required, so the sweep will not disarm it'
+        : 'fork-owned, so the sweep will not touch it'
+      : 'enabled with no entry, and a sync cannot have added it, so a person decides'
+    console.log(`  DECIDE   ${reason}: ${d.path} (${d.why})`)
+  }
   for (const m of verdict.missing) {
     console.log(`  MISSING  required but ${m.state}: ${m.path}`)
   }
@@ -709,8 +624,11 @@ function report(verdict, fix) {
   if (verdict.actionsDisabled) {
     console.log(`  DISABLED ${verdict.actionsDisabled.reason}`)
   }
+  const decided = new Set(verdict.needsDecision.map((entry) => entry.path))
   for (const u of verdict.unpinned) {
-    console.log(`  UNPINNED active but no triggers pinned, so its shape is unproven: ${u.path}`)
+    if (!decided.has(u.path)) {
+      console.log(`  UNPINNED active but no triggers pinned, so its shape is unproven: ${u.path}`)
+    }
   }
   for (const u of verdict.unapprovedRunners) {
     const via = u.reachedFrom === u.path ? '' : ` via ${u.reachedFrom}`
@@ -770,6 +688,12 @@ function report(verdict, fix) {
           'decision in LOCAL-PATCHES.md § local(ci)'
       )
     }
+    if (verdict.needsDecision.some((entry) => entry.kind === 'fork-owned' && !entry.listed)) {
+      console.log(
+        '  escalate a fork-owned lane is enabled with no entry, and a sync cannot have turned it on — ' +
+          'a person decides whether it belongs here. Do not disable it to make this check green.'
+      )
+    }
     for (const path of failed) {
       // A workflow can be off and still be a problem: disabling does not stop a run already going.
       console.log(
@@ -780,6 +704,21 @@ function report(verdict, fix) {
     }
   }
   return residual
+}
+
+/**
+ * The exit code for a finished run, from the verdict alone so it can be pinned by a test: 3 only when a
+ * fork-owned lane is enabled and nobody listed it, which is the one finding whose two remedies — disable
+ * it, or widen the list — are both forbidden to an agent. Everything else that is red stays 1.
+ */
+export function exitCodeFor(verdict, residual) {
+  if (residual === 0) {
+    return 0
+  }
+  const decided = verdict.needsDecision.some(
+    (entry) => entry.kind === 'fork-owned' && !entry.listed
+  )
+  return decided ? 3 : 1
 }
 
 function main() {
@@ -796,7 +735,7 @@ function main() {
   // this endpoint rather than about the machine, and it must not turn a real verdict into an error.
   let actionsEnabled = null
   try {
-    actionsEnabled = judgeActionsEnabled(JSON.parse(gh(actionsPermissionsArgs())))
+    actionsEnabled = judgeActionsEnabled(JSON.parse(ghQuiet(actionsPermissionsArgs())))
   } catch {
     actionsEnabled = null
   }
@@ -806,8 +745,10 @@ function main() {
     facts: readFacts(Object.keys(EXPECTED_TRIGGERS), ROOT)
   })
   verdict.actionsDisabled = actionsEnabled
-  if (report(verdict, fix) > 0) {
-    process.exit(1)
+  const residual = report(verdict, fix)
+  const code = exitCodeFor(verdict, residual)
+  if (code !== 0) {
+    process.exit(code)
   }
   console.log('  OK')
 }
