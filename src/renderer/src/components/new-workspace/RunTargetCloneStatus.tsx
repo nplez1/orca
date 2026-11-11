@@ -25,7 +25,7 @@ export function RunTargetCloneStatus({
     return null
   }
   const host = status.target.label
-  if (status.kind === 'resolving' || status.kind === 'cloning') {
+  if (status.kind === 'cloning') {
     return (
       <p
         role="status"

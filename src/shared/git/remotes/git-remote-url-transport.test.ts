@@ -39,8 +39,10 @@ describe('rewriteGitRemoteTransport', () => {
     ['git@bitbucket.org:acme/app', 'https', 'https://bitbucket.org/acme/app'],
     ['ssh://git@ssh.github.com:443/acme/app.git', 'https', 'https://github.com/acme/app.git'],
     ['https://altssh.gitlab.com/group/app.git', 'ssh', 'git@gitlab.com:group/app.git'],
+    // Why kept: a path segment that merely happens to be `scm` is not Bitbucket Server's layout.
+    ['https://gitlab.com/org/scm/app.git', 'ssh', 'git@gitlab.com:org/scm/app.git'],
     ['https://token@github.com/acme/app.git', 'ssh', 'git@github.com:acme/app.git'],
-    ['ssh://git@github.com:2222/acme/app.git', 'https', 'https://github.com/acme/app.git']
+    ['ssh://git@github.com:22/acme/app.git', 'https', 'https://github.com/acme/app.git']
   ]
 
   it.each(cases)('rewrites %s to %s', (url, to, expected) => {
@@ -58,6 +60,12 @@ describe('rewriteGitRemoteTransport', () => {
     )
   })
 
+  it('keeps a self-hosted ssh port out of the rewrite, since its path is unknown', () => {
+    expect(
+      rewriteGitRemoteTransport('ssh://git@gitlab.example.com:2222/g/a.git', 'https')
+    ).toBeNull()
+  })
+
   it('never invents a user on the way to https', () => {
     expect(rewriteGitRemoteTransport('https://user:pw@github.com/acme/app.git', 'ssh')).toBe(
       'git@github.com:acme/app.git'
@@ -68,7 +76,9 @@ describe('rewriteGitRemoteTransport', () => {
   const perTransportPaths: [url: string, to: GitRemoteTransport][] = [
     ['https://dev.azure.com/org/project/_git/app', 'ssh'],
     ['https://bitbucket.example.com/scm/PROJ/app.git', 'ssh'],
-    ['git@bitbucket.example.com:scm/PROJ/app.git', 'https']
+    ['git@bitbucket.example.com:scm/PROJ/app.git', 'https'],
+    // Why the port rule: a self-hosted server's ssh path is not derivable from an arbitrary port.
+    ['ssh://git@bitbucket.example.com:7999/PROJ/app.git', 'https']
   ]
 
   it.each(perTransportPaths)('leaves %s alone, whose path differs per transport', (url, to) => {

@@ -12,9 +12,9 @@ import { checkCloneTargetOn } from '@/components/sidebar/project-admission/clone
 import { resolveCloneParentForHost } from '@/components/sidebar/project-admission/create/resolve-clone-parent-for-host'
 import type { ProjectHostSetupProvisioning } from './use-workspace-copy-target'
 import {
-  isProjectCloneInFlight,
   getProjectCloneKey,
-  trackProjectClone
+  trackProjectClone,
+  type ProjectCloneOutcome
 } from './project-clone-in-flight'
 
 /** The host a clone is for, kept with its row so the picker and the status line name the same host. */
@@ -26,7 +26,6 @@ export type RunTargetCloneTarget = {
 
 export type RunTargetCloneStatus =
   | { kind: 'idle' }
-  | { kind: 'resolving'; target: RunTargetCloneTarget }
   | { kind: 'cloning'; target: RunTargetCloneTarget }
   | {
       kind: 'folder-taken'
@@ -35,7 +34,6 @@ export type RunTargetCloneStatus =
       /** The taken folder as a host path, for adopting it instead. */
       path: string
       suggestion: string
-      /** A non-empty folder may already be this project, so offer to adopt it instead. */
       canUseExistingFolder: boolean
     }
   | { kind: 'failed'; target: RunTargetCloneTarget; message: string }
@@ -59,12 +57,21 @@ export type RunTargetAutoClone = {
   clear: () => void
 }
 
+type CloneRequest = {
+  option: NeedsSetupProjectHostOption
+  url: string
+  destinationOverride: string
+  folderName?: string
+}
+
 /**
  * Clones a project onto the host the user just picked, with no dialog.
  *
  * Starts from the composer's own defaults and reports every outcome where the picker was: a host
  * that cannot clone never reaches here (its row says why), and a failure keeps the error, Retry and
- * "Use existing folder" on the row instead of a toast.
+ * "Use existing folder" on the row instead of a toast. The clone itself is shared through a
+ * registry, so a second pick — or a composer reopened mid-clone — joins it and still learns how it
+ * turned out.
  */
 export function useRunTargetAutoClone({
   projectId,
@@ -91,6 +98,9 @@ export function useRunTargetAutoClone({
   // Only the host the user is currently waiting on may drive the status; a clone they moved away
   // from still finishes on the host, but must not retarget the composer or overwrite its state.
   const pendingKeyRef = useRef<string | null>(null)
+  // The host a destination override was last written for, kept across clears: a path names one
+  // machine, so it must not follow the user to the next host picked.
+  const lastHostKeyRef = useRef<string | null>(null)
   // A closed composer must not be retargeted by a clone it started before it went away.
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -104,6 +114,86 @@ export function useRunTargetAutoClone({
     setOverridesState((current) => ({ ...current, ...next }))
   }, [])
 
+  const cloneOnce = useCallback(
+    async ({
+      option,
+      url,
+      destinationOverride,
+      folderName
+    }: CloneRequest): Promise<ProjectCloneOutcome> => {
+      if (!url) {
+        return {
+          kind: 'failed',
+          message: translate(
+            'auto.components.NewWorkspaceComposerCard.cloneNeedsRemote',
+            'This project has no remote to clone from. Use a folder that already exists on this host.'
+          )
+        }
+      }
+      if (!projectId) {
+        return { kind: 'failed', message: '' }
+      }
+      const destination =
+        destinationOverride ||
+        (await resolveCloneParentForHost({
+          settings,
+          hostIds: [option.hostId],
+          ...(layoutMode ? { layoutMode } : {})
+        }))
+      if (!destination.trim()) {
+        return {
+          kind: 'failed',
+          message: translate(
+            'auto.components.NewWorkspaceComposerCard.cloneNeedsDestination',
+            'Orca could not find a folder to clone into on this host. Use a folder that already exists there.'
+          )
+        }
+      }
+      const cloneArgs = {
+        url,
+        destination,
+        ...(folderName ? { folderName } : {})
+      }
+      const check = await checkCloneTargetOn(getProjectCloneCheckTarget(option.hostId), cloneArgs)
+      if (check?.status === 'taken') {
+        return {
+          kind: 'folder-taken',
+          folderName: check.folderName,
+          path: joinHostPath(destination, check.folderName),
+          suggestion: check.suggestedFolderName ?? check.folderName,
+          canUseExistingFolder: check.reason === 'not-empty'
+        }
+      }
+      try {
+        const result = await setupProjectClone(
+          { projectId, hostId: option.hostId, ...cloneArgs, displayName: projectName },
+          { onFailure: 'throw' }
+        )
+        if (!result) {
+          return {
+            kind: 'failed',
+            message: translate(
+              'auto.components.NewWorkspaceComposerCard.cloneSetupFailed',
+              'Cloned, but Orca could not add the project on this host.'
+            )
+          }
+        }
+        return { kind: 'provisioned', setupId: result.setup.id }
+      } catch (error) {
+        return {
+          kind: 'failed',
+          message:
+            readIpcErrorMessage(error) ??
+            translate(
+              'auto.components.NewWorkspaceComposerCard.cloneFailed',
+              'Cloning failed on this host.'
+            )
+        }
+      }
+    },
+    [layoutMode, projectId, projectName, settings, setupProjectClone]
+  )
+
   const run = useCallback(
     (option: NeedsSetupProjectHostOption, requestedFolderName?: string): void => {
       if (!projectId) {
@@ -112,128 +202,56 @@ export function useRunTargetAutoClone({
       const key = getProjectCloneKey(projectId, option.hostId)
       // Why keyed rather than counted: a second pick of the same host joins the running clone, and
       // that clone's own continuation has to stay live or the composer waits on it forever.
-      const previousKey = pendingKeyRef.current
       pendingKeyRef.current = key
-      const isCurrent = (): boolean => mountedRef.current && pendingKeyRef.current === key
-      const target: RunTargetCloneTarget = { hostId: option.hostId, label: option.label, option }
-      const url = overrides.url.trim() || defaultCloneUrl.trim()
-      // Why dropped on a host change: a destination is a path on one machine, so carrying it to
-      // another would clone into a folder the user never meant for that host. A URL is
-      // host-independent, and a value typed before any host was chosen is kept for the first one.
-      const hostChanged = previousKey !== null && previousKey !== key
+      const hostChanged = lastHostKeyRef.current !== null && lastHostKeyRef.current !== key
+      lastHostKeyRef.current = key
       const destinationOverride = hostChanged ? '' : overrides.destination.trim()
       if (hostChanged && overrides.destination) {
         setOverridesState((current) => ({ ...current, destination: '' }))
       }
-      const fail = (message: string): void => {
-        if (isCurrent()) {
-          setStatus({ kind: 'failed', target, message })
-        }
-      }
+      const target: RunTargetCloneTarget = { hostId: option.hostId, label: option.label, option }
+      setStatus({ kind: 'cloning', target })
 
-      setStatus({ kind: 'resolving', target })
-      const runClone = async (): Promise<void> => {
-        if (!url) {
-          fail(
-            translate(
-              'auto.components.NewWorkspaceComposerCard.cloneNeedsRemote',
-              'This project has no remote to clone from. Use a folder that already exists on this host.'
-            )
-          )
-          return
-        }
-        const destination =
-          destinationOverride ||
-          (await resolveCloneParentForHost({
-            settings,
-            hostIds: [option.hostId],
-            ...(layoutMode ? { layoutMode } : {})
-          }))
-        if (!isCurrent()) {
-          return
-        }
-        if (!destination.trim()) {
-          fail(
-            translate(
-              'auto.components.NewWorkspaceComposerCard.cloneNeedsDestination',
-              'Orca could not find a folder to clone into on this host. Use a folder that already exists there.'
-            )
-          )
-          return
-        }
-        setStatus({ kind: 'cloning', target })
-        const cloneArgs = {
-          url,
-          destination,
+      const promise = trackProjectClone(key, () =>
+        cloneOnce({
+          option,
+          url: overrides.url.trim() || defaultCloneUrl.trim(),
+          destinationOverride,
           ...(requestedFolderName ? { folderName: requestedFolderName } : {})
-        }
-        const check = await checkCloneTargetOn(getProjectCloneCheckTarget(option.hostId), cloneArgs)
-        if (!isCurrent()) {
+        })
+      )
+      void promise.then((outcome) => {
+        // Why both: an unmounted composer and one that moved to another host must not be retargeted.
+        if (!mountedRef.current || pendingKeyRef.current !== key) {
           return
         }
-        if (check?.status === 'taken') {
-          setStatus({
-            kind: 'folder-taken',
-            target,
-            folderName: check.folderName,
-            path: joinHostPath(destination, check.folderName),
-            suggestion: check.suggestedFolderName ?? check.folderName,
-            canUseExistingFolder: check.reason === 'not-empty'
-          })
+        if (outcome.kind === 'failed' && !outcome.message) {
           return
         }
-        try {
-          const result = await setupProjectClone(
-            { projectId, hostId: option.hostId, ...cloneArgs, displayName: projectName },
-            { onFailure: 'throw' }
-          )
-          if (!isCurrent()) {
-            return
-          }
-          if (!result) {
-            fail(
-              translate(
-                'auto.components.NewWorkspaceComposerCard.cloneSetupFailed',
-                'Cloned, but Orca could not add the project on this host.'
-              )
-            )
-            return
-          }
+        if (outcome.kind === 'provisioned') {
           pendingKeyRef.current = null
           setStatus({ kind: 'idle' })
           onProvisioned(
-            getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }),
+            getProjectHostSetupSelectionKey({ id: outcome.setupId, hostId: option.hostId }),
             'cloned'
           )
-        } catch (error) {
-          fail(
-            readIpcErrorMessage(error) ??
-              translate(
-                'auto.components.NewWorkspaceComposerCard.cloneFailed',
-                'Cloning failed on this host.'
-              )
-          )
+          return
         }
-      }
-
-      if (isProjectCloneInFlight(key)) {
-        // Why join: this pair is already cloning, so a second request could only collide.
-        setStatus({ kind: 'cloning', target })
-        return
-      }
-      trackProjectClone(key, runClone)
+        setStatus(
+          outcome.kind === 'failed'
+            ? { kind: 'failed', target, message: outcome.message }
+            : {
+                kind: 'folder-taken',
+                target,
+                folderName: outcome.folderName,
+                path: outcome.path,
+                suggestion: outcome.suggestion,
+                canUseExistingFolder: outcome.canUseExistingFolder
+              }
+        )
+      })
     },
-    [
-      defaultCloneUrl,
-      layoutMode,
-      onProvisioned,
-      overrides.destination,
-      overrides.url,
-      projectId,
-      projectName,
-      settings,
-      setupProjectClone
-    ]
+    [cloneOnce, defaultCloneUrl, onProvisioned, overrides.destination, overrides.url, projectId]
   )
 
   const start = useCallback(

@@ -131,8 +131,8 @@ export default function NewWorkspaceComposerCard(
   const needsSetupProjectHostSetupOptions = projectHostSetupOptions.filter(
     (option) => option.kind === 'needs-setup'
   )
-  // fork-comment-ok: warm the fallback chunk from a row that can only take a folder, or from a
-  // clone that already failed, so the dialog opens without a stall in either case.
+  // fork-comment-ok: warm the fallback chunk for a folder-only row or a failed clone, so it opens
+  // without a stall.
   const hasFallbackLocationOption =
     runTargetClone?.status.kind === 'failed' ||
     runTargetClone?.status.kind === 'folder-taken' ||
@@ -222,15 +222,16 @@ export default function NewWorkspaceComposerCard(
     setSetLocationInitialPath(undefined)
     onNestedDialogOpenChange?.(false)
   }, [onNestedDialogOpenChange])
+  const clearPendingClone = runTargetClone?.clear
   const handleSetLocationReady = React.useCallback(
     (setupId: string, provisioning: ProjectHostSetupProvisioning): void => {
       handleSetLocationClose()
-      // Why: the fallback answered the clone this composer was waiting on, so it must stop
+      // fork-comment-ok: the fallback answered the clone this composer waited on, so it must stop
       // blocking Create and stop reporting the failure it was opened for.
-      runTargetClone?.clear()
+      clearPendingClone?.()
       onProjectHostSetupChange?.(setupId, provisioning)
     },
-    [handleSetLocationClose, onProjectHostSetupChange, runTargetClone]
+    [clearPendingClone, handleSetLocationClose, onProjectHostSetupChange]
   )
   const handleConnectRunTargetHost = React.useCallback(
     async (option: NeedsProjectHostOption): Promise<void> => {

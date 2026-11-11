@@ -48,6 +48,13 @@ const option: NeedsSetupProjectHostOption = {
   canSetLocation: true
 }
 
+const OTHER_HOST: NeedsSetupProjectHostOption = {
+  ...option,
+  id: 'needs-setup:runtime:env-c',
+  hostId: 'runtime:env-c',
+  label: 'Second box'
+}
+
 function renderClone(onProvisioned = vi.fn()) {
   return renderHook(() =>
     useRunTargetAutoClone({
@@ -179,6 +186,60 @@ describe('useRunTargetAutoClone', () => {
     expect(onProvisioned).toHaveBeenCalledWith(
       JSON.stringify(['setup-c', 'runtime:env-c']),
       'cloned'
+    )
+  })
+
+  it('joins a clone a closed composer started, and still reports how it turned out', async () => {
+    let finish: (value: unknown) => void = () => {}
+    mocks.setupProjectClone.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      })
+    )
+    const first = renderClone()
+    await act(async () => {
+      first.result.current.start(option)
+    })
+    // A reopened composer is a new instance: it has no pending key of its own.
+    first.unmount()
+    const onProvisioned = vi.fn()
+    const second = renderClone(onProvisioned)
+    await act(async () => {
+      second.result.current.start(option)
+    })
+
+    expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
+    expect(second.result.current.status.kind).toBe('cloning')
+
+    await act(async () => {
+      finish({ setup: { id: 'setup-new' } })
+    })
+
+    // Why: the reopened composer must not be left waiting on a clone it joined but never hears about.
+    expect(onProvisioned).toHaveBeenCalledWith(JSON.stringify(['setup-new', HOST]), 'cloned')
+    expect(second.result.current.status.kind).toBe('idle')
+  })
+
+  it('drops a destination typed for another host instead of cloning into it there', async () => {
+    mocks.checkCloneTargetOn
+      .mockResolvedValueOnce({
+        status: 'taken',
+        folderName: 'app',
+        suggestedFolderName: 'app-2',
+        reason: 'not-empty'
+      })
+      .mockResolvedValue(null)
+    const { result } = renderClone()
+
+    await act(async () => result.current.start(option))
+    act(() => result.current.setOverrides({ destination: '/srv/only-on-b' }))
+    act(() => result.current.clear())
+    await act(async () => result.current.start(OTHER_HOST))
+
+    // Why the default: a path names one machine, so it must not follow the user to the next host.
+    expect(mocks.setupProjectClone).toHaveBeenCalledWith(
+      expect.objectContaining({ hostId: 'runtime:env-c', destination: DESTINATION }),
+      { onFailure: 'throw' }
     )
   })
 

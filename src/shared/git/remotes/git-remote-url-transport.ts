@@ -14,8 +14,10 @@ const SSH_URL = /^ssh:\/\/(?:([^@/]+)@)?([^/]+)\/(.+)$/
 const HTTPS_URL = /^https?:\/\/(?:([^@/]+)@)?([^/]+)\/(.+)$/
 /** Remotes whose path is not the same string on both transports, or that no transport switch helps. */
 const UNSUPPORTED_HOST = /(^|\.)(?:visualstudio|azure)\.com$/i
-/** Bitbucket Server and friends serve `https://host/scm/<project>/<repo>` against `ssh://host:7999/<project>/<repo>`. */
-const PATH_DIFFERS_PER_TRANSPORT = /(^|[:/])scm\//i
+/** Bitbucket Server serves `https://host/scm/<project>/<repo>` against `ssh://host:7999/<project>/<repo>`. */
+const DIFFERENT_PATH_SEGMENT = 'scm'
+/** Ports whose ssh form is known to name the same path as its https form. */
+const KNOWN_SSH_PORTS = new Set(['22', '443'])
 const UNSUPPORTED_PREFIX = /^(?:git|file|ext|ftp|ftps|rsync|svn):/i
 
 /** A query or fragment means this is a browsable link, not the remote's own path. */
@@ -35,9 +37,7 @@ function parseRemote(url: string): ParsedRemote | null {
   if (!trimmed || UNSUPPORTED_PREFIX.test(trimmed)) {
     return null
   }
-  if (PATH_DIFFERS_PER_TRANSPORT.test(trimmed)) {
-    return null
-  }
+
   // A local checkout path is not a remote, whatever it looks like on either platform.
   if (/^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith('.') || trimmed.startsWith('/')) {
     return null
@@ -45,19 +45,30 @@ function parseRemote(url: string): ParsedRemote | null {
   const scp = SCP_FORM.exec(trimmed)
   if (scp) {
     const path = cleanPath(scp[3])
-    return path ? { transport: 'ssh', host: scp[2], path } : null
+    return path && pathFirstSegmentIsRewritable(path)
+      ? { transport: 'ssh', host: scp[2], path }
+      : null
   }
   const sshUrl = SSH_URL.exec(trimmed)
   if (sshUrl) {
     const path = cleanPath(sshUrl[3])
-    return path ? { transport: 'ssh', host: sshUrl[2], path } : null
+    return path && pathFirstSegmentIsRewritable(path)
+      ? { transport: 'ssh', host: sshUrl[2], path }
+      : null
   }
   const httpsUrl = HTTPS_URL.exec(trimmed)
   if (httpsUrl) {
     const path = cleanPath(httpsUrl[3])
-    return path ? { transport: 'https', host: httpsUrl[2], path } : null
+    return path && pathFirstSegmentIsRewritable(path)
+      ? { transport: 'https', host: httpsUrl[2], path }
+      : null
   }
   return null
+}
+
+/** A path under `scm/` is a server layout whose other transport is not derivable from this one. */
+function pathFirstSegmentIsRewritable(path: string): boolean {
+  return path.split('/')[0]?.toLowerCase() !== DIFFERENT_PATH_SEGMENT
 }
 
 /** A host we can rewrite for: a dotless name is an unresolved `~/.ssh/config` alias, not a forge. */
@@ -84,8 +95,9 @@ export function detectGitRemoteTransport(url: string): GitRemoteTransport | null
 /**
  * The same repository in the other transport's spelling, or null when it has no counterpart.
  *
- * Credentials and ports are dropped in both directions: the ssh form is scp-shaped (which cannot
- * carry a port), and a persisted clone URL must never hold a token the user did not type here.
+ * A rewrite drops credentials and ports: the ssh form is scp-shaped (which cannot carry a port), and
+ * a persisted clone URL must never hold a token the user did not type here. Asking for the transport
+ * the URL already has returns it untouched, so nothing is dropped without cause.
  */
 export function rewriteGitRemoteTransport(url: string, to: GitRemoteTransport): string | null {
   const parsed = parseRemote(url)
@@ -96,6 +108,13 @@ export function rewriteGitRemoteTransport(url: string, to: GitRemoteTransport): 
   // (ssh-over-443, a self-hosted server on 2222), so asking for the transport already in use is a no-op.
   if (parsed.transport === to) {
     return url.trim()
+  }
+  // Why: a self-hosted server's ssh path is not derivable from an arbitrary port — Bitbucket Server
+  // serves `:7999/<project>/<repo>` where https has `/scm/<project>/<repo>`. Only the ports whose
+  // meaning is known (default, and ssh-over-443) are converted; anything else stays for the user.
+  const sshPort = parsed.transport === 'ssh' ? parsed.host.split(':')[1] : undefined
+  if (sshPort !== undefined && !KNOWN_SSH_PORTS.has(sshPort)) {
+    return null
   }
   // Why folded both ways: GitHub serves SSH-over-443 from ssh.github.com and GitLab from
   // altssh.gitlab.com, so the alias names the same forge under either transport.

@@ -25,7 +25,7 @@ export function ComposerCloneOptionsFields({
   clone: RunTargetAutoClone
 }): React.JSX.Element {
   const t = useTranslate()
-  const running = clone.status.kind === 'resolving' || clone.status.kind === 'cloning'
+  const running = clone.status.kind === 'cloning'
   const url = clone.overrides.url || clone.defaultUrl
   const transport = detectGitRemoteTransport(url)
   const switchTransport = (to: GitRemoteTransport): void => {

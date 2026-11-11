@@ -80,7 +80,11 @@ describe('resolveRunTargetRowAction', () => {
   it('does nothing while a clone runs, or while a taken folder needs a decision', () => {
     // Why: re-asking would collide on the destination, and a taken folder has its own two answers.
     expect(resolveRunTargetRowAction(cloneable, 'cloning')).toBe('none')
-    expect(resolveRunTargetRowAction(cloneable, 'resolving')).toBe('none')
     expect(resolveRunTargetRowAction(cloneable, 'folder-taken')).toBe('none')
+  })
+
+  it('does nothing on a host that refused the project, even after a clone for it failed', () => {
+    // Why: a host that went unhealthy mid-clone must keep its own reason, not offer the dialog.
+    expect(resolveRunTargetRowAction(refused, 'failed')).toBe('none')
   })
 })

@@ -104,7 +104,7 @@ export default function RunTargetRowList({
             cloneStatus.kind !== 'idle' && cloneStatus.target.hostId === row.option.hostId
               ? cloneStatus
               : null
-          const cloning = status?.kind === 'resolving' || status?.kind === 'cloning'
+          const cloning = status?.kind === 'cloning'
           const commitRow = (): void => {
             const action = resolveRunTargetRowAction(availability, status?.kind ?? 'idle')
             if (action === 'start-clone') {

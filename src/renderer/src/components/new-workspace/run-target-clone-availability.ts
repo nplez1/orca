@@ -55,11 +55,16 @@ export type RunTargetRowAction =
 
 export function resolveRunTargetRowAction(
   availability: RunTargetCloneAvailability,
-  statusKind: 'idle' | 'resolving' | 'cloning' | 'folder-taken' | 'failed'
+  statusKind: 'idle' | 'cloning' | 'folder-taken' | 'failed'
 ): RunTargetRowAction {
+  // Why first: a host that cannot take the project at all keeps its own reason, whatever a clone
+  // for it did earlier — otherwise a host that went unhealthy mid-clone would offer the dialog.
+  if (availability.kind === 'refused') {
+    return 'none'
+  }
   // Why: a running clone must not be re-asked for, and a taken folder needs the suggestion or the
   // existing folder, both of which the row and the status line offer as their own actions.
-  if (statusKind === 'resolving' || statusKind === 'cloning' || statusKind === 'folder-taken') {
+  if (statusKind === 'cloning' || statusKind === 'folder-taken') {
     return 'none'
   }
   if (statusKind === 'failed') {

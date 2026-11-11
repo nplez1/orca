@@ -193,7 +193,7 @@ export default function RunTargetCombobox({
           clone && clone.status.kind !== 'idle' && clone.status.target.hostId === row.option.hostId
             ? clone.status
             : null
-        // Same routing as the row's own click, so Enter and a click can never disagree.
+        // fork-comment-ok: same routing as the row's own click, so Enter and a click cannot disagree.
         const action = resolveRunTargetRowAction(availability, rowStatus?.kind ?? 'idle')
         if (action === 'start-clone') {
           startClone(row.option)
@@ -354,8 +354,14 @@ export default function RunTargetCombobox({
               onConnectHost={(option) => void connectHost(option)}
               onStartClone={startClone}
               onUseExistingFolder={openExistingFolder}
-              onRetryClone={() => clone?.retry()}
-              onCloneAs={(folderName) => clone?.cloneAs(folderName)}
+              onRetryClone={() => {
+                close()
+                clone?.retry()
+              }}
+              onCloneAs={(folderName) => {
+                close()
+                clone?.cloneAs(folderName)
+              }}
             />
           </div>
           <HostListOverflowNote hiddenCount={hiddenHostCount} />

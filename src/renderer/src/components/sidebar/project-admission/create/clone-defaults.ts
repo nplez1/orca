@@ -48,13 +48,7 @@ export type CloneParentSettings = {
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
 }
 
-/** Where a clone lands for a host: its checkout root, else its worktree root under the layout rule. */
-/**
- * Whether resolving this host's clone parent needs its home folder read.
- *
- * One rule for the hook and the awaited resolver: a host with a stored root already answers, and
- * only a runtime host can be probed at all.
- */
+// fork-comment-ok: one rule for the hook and the awaited resolver, so the two cannot drift.
 export function needsHostHomeProbe(
   settings: CloneParentSettings | null | undefined,
   hostIds: readonly ExecutionHostId[]
@@ -70,6 +64,7 @@ export function needsHostHomeProbe(
   return { environmentId, probe: environmentId !== null && !hasStoredRoot }
 }
 
+/** Where a clone lands for a host: its checkout root, else its worktree root under the layout rule. */
 export function getCloneParentForHost({
   settings,
   hostIds,
