@@ -41,7 +41,7 @@ test('restores the active top-level view (Tasks) after an app restart', async (/
     await expect
       .poll(async () => getStoreState<string>(first.page, 'activeView'), { timeout: 10_000 })
       .toBe('tasks')
-    // Use locale-independent Tasks chrome; the Close tasks label is translated.
+    // Use locale-independent Tasks chrome; the source bar is the page's stable marker.
     await expect(
       first.page.locator('[data-contextual-tour-target="tasks-source-filters"]')
     ).toBeVisible({ timeout: 10_000 })

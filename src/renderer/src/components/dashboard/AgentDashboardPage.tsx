@@ -4,6 +4,7 @@ import { AgentKanbanBoard } from '../dashboard-popout/AgentKanbanBoard'
 import type { AgentRevealArgs } from '../dashboard-popout/AgentTerminalDialog'
 import { AgentDashboardSettingsMenu } from './AgentDashboardSettingsMenu'
 import { revealDashboardAgent } from './reveal-dashboard-agent'
+import { useAgentDashboardPageEscape } from './use-agent-dashboard-page-escape'
 import { useLiveDashboardSnapshot } from './useLiveDashboardSnapshot'
 
 /**
@@ -14,6 +15,7 @@ import { useLiveDashboardSnapshot } from './useLiveDashboardSnapshot'
 export default function AgentDashboardPage(): React.JSX.Element {
   const snapshot = useLiveDashboardSnapshot()
   const closePage = useAppStore((s) => s.closeAgentDashboardPage)
+  useAgentDashboardPageEscape(closePage)
 
   const handleAckAgent = useCallback((paneKey: string) => {
     useAppStore.getState().acknowledgeAgents([paneKey])
@@ -25,13 +27,13 @@ export default function AgentDashboardPage(): React.JSX.Element {
   }, [])
 
   return (
-    <div data-agent-dashboard-page="" className="h-full w-full">
+    // This page owns the top band, so it reserves it the way Artifacts does.
+    <div data-agent-dashboard-page="" className="h-full w-full pt-5 md:pt-6">
       <AgentKanbanBoard
         snapshot={snapshot}
         containerClassName="h-full w-full"
         onAckAgent={handleAckAgent}
         onRevealAgent={handleRevealAgent}
-        onClose={closePage}
         headerActions={<AgentDashboardSettingsMenu />}
       />
     </div>

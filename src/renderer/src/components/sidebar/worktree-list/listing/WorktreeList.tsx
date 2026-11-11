@@ -105,7 +105,6 @@ const WorktreeList = React.memo(function WorktreeList({
   const openModal = useAppStore((s) => s.openModal)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
-  const activeView = useAppStore((s) => s.activeView)
   const activeModal = useAppStore((s) => s.activeModal)
   const pendingRevealWorktree = useAppStore((s) => s.pendingRevealWorktree)
   const pendingRevealSidebarRow = useAppStore((s) => s.pendingRevealSidebarRow)
@@ -324,10 +323,8 @@ const WorktreeList = React.memo(function WorktreeList({
         hostOptions={rowModel.hostOptions}
         occurrencePlan={rowModel.occurrencePlan}
         visibleProjectRepoIdsBySection={visibleProjectRepoIdsBySection}
-        // Full-page Tasks/Activity views have no selected worktree card.
-        activeWorktreeId={
-          activeView === 'tasks' || activeView === 'activity' ? null : currentSidebarWorktreeId
-        }
+        // Every view keeps its workspace card selected, full-page views included.
+        activeWorktreeId={currentSidebarWorktreeId}
         activeWorkspaceExecutionHostId={activeWorkspaceExecutionHostId}
         currentWorktreeId={currentSidebarWorktreeId}
         groupBy={groupBy}

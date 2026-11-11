@@ -239,7 +239,7 @@ export function AgentKanbanBoard({
       <div
         className={cn('relative flex flex-col bg-background text-foreground', containerClassName)}
       >
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5 pr-[max(1rem,var(--window-controls-width,0px))]">
           <h1 className="text-[13px] font-semibold">{t('dashboardPopout.title', 'Agents')}</h1>
           <span className="text-[11px] text-muted-foreground">
             {t('dashboardPopout.total', '{{count}} total', {
