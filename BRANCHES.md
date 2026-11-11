@@ -345,8 +345,10 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   folder. The once-per-repository consent prompt gained `agentLaunchDependsOnWorkspaceTrust`, so it
   asks for an agent whose launch _reads_ the answer, not only for one whose trust Orca pre-writes;
   without that, pi would have gone from “pi asks every time” to “nobody asks”.
-- **Base:** `nplez1/main`, as every fork PR here is. `local/open-pr.mjs` still defaults to `main`, so
-  pass `--base nplez1/main` or retarget afterwards — #353 was opened against `main` and bounced on it.
+- **Base:** `main`, the fork's release line and default branch. `local/open-pr.mjs` defaults to it —
+  no `--base` needed. (Corrected 2026-11-10: this entry was written while the driver still pinned the
+  retired `nplez1/main`, and #353 was opened against `main` before the two branches were reconciled.
+  The driver now refuses to run if the repository default no longer matches its pinned base.)
 - **Verified:** `pnpm tc` clean; focused suites green (19 spawn/argv + 6 renderer-prompt);
   `check:code-quality:changed` clean; unit gate PASS on the head. Reviewed by `claude/opus`, high: R1
   (1 SHOULD-FIX fixed), delta clean on R2; `claude/fable`, medium: R1 clean, its 4 MINORs recorded in
