@@ -1,4 +1,4 @@
-import { BookOpen, Download, History, Link2, MoreHorizontal, Share2, Trash2, X } from 'lucide-react'
+import { BookOpen, Download, History, Link2, MoreHorizontal, Share2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { useTranslate } from '@/i18n/use-translate'
 import { skillCountLabel } from '../presentation/skill-display-labels'
-import { SKILLS_PAGE_COLUMN } from './skills-page-column'
+import { SKILLS_PAGE_COLUMN, SKILLS_PAGE_TOP_ROW_INSET } from './skills-page-column'
 import { SkillsSourcesPopover } from './SkillsSourcesPopover'
 import type { SkillSourceInventoryEntry } from './skill-source-inventory'
 
@@ -19,7 +19,6 @@ export function SkillsPageHeader({
   sourceEntries,
   scannedSourceCount,
   hostLabel,
-  onClose,
   onStartShare,
   deleteSupported,
   deleteUnsupportedReason,
@@ -32,7 +31,6 @@ export function SkillsPageHeader({
   sourceEntries: readonly SkillSourceInventoryEntry[]
   scannedSourceCount: number
   hostLabel: string | null
-  onClose: () => void
   onStartShare: () => void
   /** Disable deletion with a reason until the target and host capability are known. */
   deleteSupported: boolean
@@ -45,24 +43,13 @@ export function SkillsPageHeader({
   const t = useTranslate()
   return (
     <header className="shrink-0 border-b border-border">
-      <div className={cn(SKILLS_PAGE_COLUMN, 'flex items-center gap-2 py-3')}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0 rounded-full"
-              onClick={onClose}
-              aria-label={t('auto.components.skills.SkillsPage.closeSkills', 'Close skills')}
-            >
-              <X className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            {t('auto.components.skills.SkillsPage.closeTooltip', 'Close · Esc')}
-          </TooltipContent>
-        </Tooltip>
-        <div className="mx-1 h-5 w-px bg-border/50" aria-hidden />
+      <div
+        className={cn(
+          SKILLS_PAGE_COLUMN,
+          SKILLS_PAGE_TOP_ROW_INSET,
+          'flex items-center gap-2 py-3'
+        )}
+      >
         <BookOpen className="size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold">

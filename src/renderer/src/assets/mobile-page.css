@@ -4,7 +4,8 @@
   position: absolute;
   top: 12px;
   left: 12px;
-  right: 12px;
+  /* This page owns the top band, so the toolbar itself clears the fixed Windows/Linux controls. */
+  right: max(12px, var(--window-controls-width, 0px));
   z-index: 3;
   display: flex;
   align-items: flex-start;
@@ -22,10 +23,6 @@
   font-weight: 600;
   text-align: left;
   white-space: normal;
-}
-
-.mobile-page-root .mp-page-toolbar-close {
-  margin-top: 1px;
 }
 
 .mobile-page-root {

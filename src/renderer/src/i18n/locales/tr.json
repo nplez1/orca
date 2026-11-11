@@ -5382,8 +5382,6 @@
           "filterSource": "Kaynağa göre filtrele",
           "allSources": "Tümü",
           "clearFilters": "Filtreleri temizle",
-          "closeSkills": "Becerileri kapat",
-          "closeTooltip": "Kapat · Esc",
           "moreActions": "Diğer işlemler",
           "sharedLinks": "Paylaşılan bağlantılar",
           "emptyCopy": "Taranan beceri klasörleri boş. Paylaşılan bir paket yükleyin veya bir beceri ekledikten sonra yenileyin.",
@@ -15315,8 +15313,6 @@
           "diagnosticsCopyFailed": "Tanılama bilgileri kopyalanamadı"
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "Kapat · Esc",
-          "9883b58693": "Orca Mobile'ı kapat",
           "fb5f28330e": "Kenar çubuğunda göster",
           "c669abcf8f": "Kenar çubuğundan gizle",
           "e1c7b4a92d": "Ayarlar > Mobil bölümünden yapılandırın.",

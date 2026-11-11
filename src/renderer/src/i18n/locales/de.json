@@ -5398,8 +5398,6 @@
           "filterSource": "Nach Quelle filtern",
           "allSources": "Alle",
           "clearFilters": "Filter zurücksetzen",
-          "closeSkills": "Skills schließen",
-          "closeTooltip": "Schließen · Esc",
           "moreActions": "Weitere Aktionen",
           "sharedLinks": "Geteilte Links",
           "emptyCopy": "Die durchsuchten Skill-Ordner sind leer. Ein geteiltes Paket installieren oder nach dem Hinzufügen eines Skills aktualisieren.",
@@ -15331,8 +15329,6 @@
           "diagnosticsCopyFailed": "Diagnosedaten konnten nicht kopiert werden"
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "Schließen · Esc",
-          "9883b58693": "Orca Mobile schließen",
           "fb5f28330e": "In der Seitenleiste anzeigen",
           "c669abcf8f": "Aus der Seitenleiste ausblenden",
           "e1c7b4a92d": "Unter Einstellungen > Mobil konfigurieren.",

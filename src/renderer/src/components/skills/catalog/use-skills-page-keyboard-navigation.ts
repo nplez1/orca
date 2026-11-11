@@ -28,10 +28,17 @@ export function useSkillsPageKeyboardNavigation({
         return
       }
       const target = event.target
+      // A terminal — including the floating workspace over this page — keeps Escape as its interrupt.
+      if (target instanceof Element && target.closest('.xterm, [data-floating-terminal-panel]')) {
+        return
+      }
       if (
         target instanceof HTMLElement &&
         target.matches('input, textarea, select, [contenteditable="true"], [contenteditable=""]')
       ) {
+        // Esc first exits field focus, then leaves selection/shared links, then the page.
+        event.preventDefault()
+        target.blur()
         return
       }
       event.preventDefault()

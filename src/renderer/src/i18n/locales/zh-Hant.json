@@ -5279,8 +5279,6 @@
           "filterSource": "按來源篩選",
           "allSources": "全部",
           "clearFilters": "清除篩選",
-          "closeSkills": "關閉技能",
-          "closeTooltip": "關閉 · Esc",
           "moreActions": "更多操作",
           "sharedLinks": "共用連結",
           "emptyCopy": "掃描的技能資料夾為空。安裝共用套件，或新增技能後重新整理。",
@@ -15117,8 +15115,6 @@
           "diagnosticsCopyFailed": "無法複製診斷資訊"
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "關閉 · Esc",
-          "9883b58693": "關閉 Orca Mobile",
           "fb5f28330e": "在側邊欄中顯示",
           "c669abcf8f": "從側邊欄隱藏",
           "e1c7b4a92d": "在設定 > 行動版中設定。",
