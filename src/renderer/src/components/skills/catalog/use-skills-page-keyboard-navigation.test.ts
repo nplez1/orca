@@ -62,6 +62,32 @@ describe('useSkillsPageKeyboardNavigation', () => {
     expect(closeSkillsPage).not.toHaveBeenCalled()
   })
 
+  it('never takes Escape from the floating workspace over the page', () => {
+    const { closeSkillsPage } = renderSkillsEscape()
+    const panel = document.createElement('div')
+    panel.setAttribute('data-floating-terminal-panel', '')
+    const textarea = document.createElement('textarea')
+    panel.append(textarea)
+    document.body.append(panel)
+    textarea.focus()
+    fireEvent.keyDown(textarea, { key: 'Escape' })
+    expect(document.activeElement).toBe(textarea)
+    expect(closeSkillsPage).not.toHaveBeenCalled()
+  })
+
+  it('never takes Escape from a terminal pane', () => {
+    const { closeSkillsPage } = renderSkillsEscape()
+    const terminal = document.createElement('div')
+    terminal.className = 'xterm'
+    const textarea = document.createElement('textarea')
+    terminal.append(textarea)
+    document.body.append(terminal)
+    textarea.focus()
+    fireEvent.keyDown(textarea, { key: 'Escape' })
+    expect(document.activeElement).toBe(textarea)
+    expect(closeSkillsPage).not.toHaveBeenCalled()
+  })
+
   it('exits selection mode instead of the page', () => {
     const { closeSkillsPage, exitSelection } = renderSkillsEscape({ selectionMode: 'delete' })
     fireEvent.keyDown(document.body, { key: 'Escape' })
