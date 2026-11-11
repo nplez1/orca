@@ -4,7 +4,10 @@
 // relays a ledger whose facts are bare strings and which has no window boundary, and reading
 // that as-is hides every fact (nothing compares greater than `undefined`) and renders an object
 // as a React child. Coercing on arrival costs one pass and keeps both directions readable.
-import { SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS } from '../../shared/session-summary-types'
+import {
+  SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS,
+  SESSION_SUMMARY_TIMELINE_KINDS
+} from '../../shared/session-summary-types'
 import type {
   SessionSummaryFact,
   SessionSummaryFoldGap,
@@ -12,6 +15,7 @@ import type {
   SessionSummaryLedger,
   SessionSummaryReport,
   SessionSummaryReportSection,
+  SessionSummaryTimelineDeltaEntry,
   SessionSummaryTimelineEntry
 } from '../../shared/session-summary-types'
 
@@ -51,6 +55,21 @@ function coerceTimeline(value: unknown): SessionSummaryTimelineEntry[] {
           typeof entry.kind === 'string' &&
           typeof entry.text === 'string' &&
           typeof entry.sourceIndex === 'number'
+        )
+      })
+    : []
+}
+
+function coerceMarkers(value: unknown): SessionSummaryTimelineDeltaEntry[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is SessionSummaryTimelineDeltaEntry => {
+        if (!isRecord(entry)) {
+          return false
+        }
+        return (
+          typeof entry.text === 'string' &&
+          typeof entry.sourceIndex === 'number' &&
+          SESSION_SUMMARY_TIMELINE_KINDS.some((kind) => kind === entry.kind)
         )
       })
     : []
@@ -171,6 +190,9 @@ export function coerceRelayedLedger(value: unknown): SessionSummaryLedger | null
     blockers: coerceFactList(value.blockers),
     decisions: coerceFactList(value.decisions),
     timeline: coerceTimeline(value.timeline),
+    // An older host has no markers: its timeline is the model-written one it sent, and it is shown
+    // as it stands because the projection only ever runs on the host that folds.
+    markers: coerceMarkers(value.markers),
     reportSince: coerceReport(value.reportSince),
     reportFull: coerceFullReport(value.reportFull),
     // An older host has no boundary: everything it folded is "the session", so a null boundary
@@ -179,8 +201,6 @@ export function coerceRelayedLedger(value: unknown): SessionSummaryLedger | null
     userMessageCount: coerceCount(value.userMessageCount),
     foldedThrough: coerceCount(value.foldedThrough),
     foldedAt: typeof value.foldedAt === 'number' ? value.foldedAt : null,
-    // An older host trims nothing, so every entry it holds starts at position zero.
-    timelineBase: coerceCount(value.timelineBase),
     foldGap: coerceFoldGap(value.foldGap),
     gaps: coerceGaps(value.gaps)
   }

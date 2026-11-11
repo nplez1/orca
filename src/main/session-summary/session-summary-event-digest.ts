@@ -11,6 +11,29 @@
 // or the preprocessing would replace the expense it removes.
 import type { TranscriptMessage } from '../ai-vault/transcripts/session-transcript-consumers'
 
+/**
+ * What a tool event *is*, apart from how it reads.
+ *
+ * Why structure on the event and not a second parse of `text`: a tool call and its result are two
+ * events that say the same thing, so rendering has to know which of them completes which. The
+ * digester is the only place that pairing exists.
+ */
+export type SessionSummaryToolFacts = {
+  kind: 'call' | 'result'
+  /** Shared by a call and the result that completes it, so rendering can merge the pair. */
+  pair: number
+  /** The tool's name, when the call line named one. */
+  name: string | null
+  /** `<name> <target>`: how a reader (and the extract) identifies the call. */
+  label: string
+  /** A result only: the text evidences a failure. */
+  failed: boolean
+  /** A result only: how the digest states the outcome — `ok`, `exit 2`, `exit 1 · FAIL …`. */
+  outcome: string | null
+  /** A result only: the failure line it quotes, which a bare exit code does not have. */
+  failureLine: string | null
+}
+
 export type SessionSummarySourceEvent = {
   role: 'user' | 'assistant' | 'tool'
   /** The event's text as the model sees it: full for prose, a one-line digest for a tool event. */
@@ -20,6 +43,8 @@ export type SessionSummarySourceEvent = {
   textTruncated?: true
   /** Decoded length before that bound, so the digest can name what it stands in for. */
   textOriginalLength?: number
+  /** Present on tool events; absent on prose and on an event built without the digester. */
+  tool?: SessionSummaryToolFacts
 }
 
 /** A tool call's target, as the digest names it: enough to identify it, never a body. */
@@ -74,31 +99,38 @@ export type SessionSummaryEventDigester = {
 }
 
 /** A tool call whose result has not arrived yet. */
-type PendingToolCall = { name: string | null; target: string | null }
+type PendingToolCall = { pair: number; name: string | null; target: string | null }
 
 export function createSessionSummaryEventDigester(): SessionSummaryEventDigester {
   // Why a queue and not "the last tool name": agents issue parallel calls, so results arrive
   // A, B after calls A, B. The pairing is FIFO, and prose closes the batch.
   const pending: PendingToolCall[] = []
+  // Why a counter and not the event index: `skip()` also advances the queue, and a skipped call
+  // still owns the result that follows it.
+  let pairs = 0
   const note = (message: TranscriptMessage): PendingToolCall | null => {
     if (message.role !== 'tool') {
       pending.length = 0
       return null
     }
     if (message.toolKind === 'result') {
-      return pending.shift() ?? null
+      // An orphan result is still one tool call: it gets a pair of its own so nothing downstream
+      // has to special-case a missing one.
+      return pending.shift() ?? { pair: (pairs += 1), name: null, target: null }
     }
-    const call = parseToolCall(message.text)
+    const call = { ...parseToolCall(message.text), pair: (pairs += 1) }
     pending.push(call)
     return call
   }
   return {
     digest(message) {
       const paired = note(message)
+      const digest = digestEvent(message, paired)
       return {
         role: message.role,
-        text: digestEventText(message, paired),
+        text: digest.text,
         timestamp: message.timestamp,
+        ...(digest.tool ? { tool: digest.tool } : {}),
         ...(message.textTruncated ? { textTruncated: true as const } : {}),
         ...(message.textOriginalLength === undefined
           ? {}
@@ -111,11 +143,16 @@ export function createSessionSummaryEventDigester(): SessionSummaryEventDigester
   }
 }
 
-function digestEventText(message: TranscriptMessage, paired: PendingToolCall | null): string {
+/** An event's text, and what a tool event is, which its text alone cannot say. */
+type DigestEvent = { text: string; tool?: SessionSummaryToolFacts }
+
+function digestEvent(message: TranscriptMessage, paired: PendingToolCall | null): DigestEvent {
   if (message.role !== 'tool') {
-    return message.textTruncated
-      ? `${message.text}\n[truncated at ${formatBytes(message.textOriginalLength ?? 0)} read]`
-      : message.text
+    return {
+      text: message.textTruncated
+        ? `${message.text}\n[truncated at ${formatBytes(message.textOriginalLength ?? 0)} read]`
+        : message.text
+    }
   }
   if (message.toolKind === 'result') {
     return digestToolResult(message, paired)
@@ -124,15 +161,30 @@ function digestEventText(message: TranscriptMessage, paired: PendingToolCall | n
 }
 
 /** `Read: src/foo.ts` → `Read src/foo.ts`, the call half of the pair the result completes. */
-function digestToolCall(text: string, paired: PendingToolCall | null): string {
-  const call = paired ?? parseToolCall(text)
-  if (!call.name) {
-    return boundLine(text)
+function digestToolCall(text: string, paired: PendingToolCall | null): DigestEvent {
+  // `note()` always returns the call for a call event; the fallback keeps this total for a caller
+  // that hands it a message the queue never saw.
+  const call = paired ?? { ...parseToolCall(text), pair: 0 }
+  const label = call.name
+    ? call.target
+      ? `${call.name} ${call.target}`
+      : call.name
+    : boundLine(text)
+  return {
+    text: label,
+    tool: {
+      kind: 'call',
+      pair: call.pair,
+      name: call.name,
+      label,
+      failed: false,
+      outcome: null,
+      failureLine: null
+    }
   }
-  return call.target ? `${call.name} ${call.target}` : call.name
 }
 
-function parseToolCall(text: string): PendingToolCall {
+function parseToolCall(text: string): Omit<PendingToolCall, 'pair'> {
   const firstLine = firstLineOf(text)
   const separator = firstLine.indexOf(': ')
   if (separator === -1) {
@@ -151,7 +203,7 @@ function parseToolCall(text: string): PendingToolCall {
  * The result carries the call's name and target because that is the one line a reader (and the
  * extract) needs: what was done, and whether it worked.
  */
-function digestToolResult(message: TranscriptMessage, paired: PendingToolCall | null): string {
+function digestToolResult(message: TranscriptMessage, paired: PendingToolCall | null): DigestEvent {
   const text = message.text
   const label = paired?.name
     ? paired.target
@@ -160,31 +212,52 @@ function digestToolResult(message: TranscriptMessage, paired: PendingToolCall | 
     : 'tool result'
   const parts = [label, `${countLines(text)} / ${formatBytes(text.length)}`]
   const outcome = describeOutcome(text)
-  if (outcome) {
-    parts.push(outcome)
-  }
+  parts.push(outcome.text)
   if (message.textTruncated) {
     // Why no size: a tool result's cap stops counting once it is full, so the length it reports is
     // the cap rather than the truth. Naming the limit is accurate; a figure would not be.
     parts.push('truncated by the reader')
   }
-  return parts.join(' · ')
+  return {
+    text: parts.join(' · '),
+    tool: {
+      kind: 'result',
+      pair: paired?.pair ?? 0,
+      name: paired?.name ?? null,
+      label,
+      failed: outcome.failed,
+      outcome: outcome.text,
+      failureLine: outcome.failureLine
+    }
+  }
+}
+
+type ToolOutcome = {
+  /** How the digest states it: `ok`, `exit 0`, `exit 1 · FAIL …`. */
+  text: string
+  failed: boolean
+  /** The line it quoted, which a bare exit code does not have. */
+  failureLine: string | null
 }
 
 /** Success, an exit code, or the failure — whichever the text actually evidences. */
-function describeOutcome(text: string): string | null {
+function describeOutcome(text: string): ToolOutcome {
   const window = scanWindow(text)
   const exit = EXIT_CODE_PATTERN.exec(window)
   if (exit) {
     const code = Number.parseInt(exit[1], 10)
     if (code === 0) {
-      return 'exit 0'
+      return { text: 'exit 0', failed: false, failureLine: null }
     }
     const errorLine = firstFailureLine(window)
-    return errorLine ? `exit ${code} · ${errorLine}` : `exit ${code}`
+    return errorLine
+      ? { text: `exit ${code} · ${errorLine}`, failed: true, failureLine: errorLine }
+      : { text: `exit ${code}`, failed: true, failureLine: null }
   }
   const errorLine = firstFailureLine(window)
-  return errorLine ? `failed · ${errorLine}` : 'ok'
+  return errorLine
+    ? { text: `failed · ${errorLine}`, failed: true, failureLine: errorLine }
+    : { text: 'ok', failed: false, failureLine: null }
 }
 
 function firstFailureLine(window: string): string | null {

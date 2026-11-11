@@ -5,8 +5,7 @@
 // without a model or a ledger.
 import type {
   SessionSummaryFullReport,
-  SessionSummaryLedgerDelta,
-  SessionSummaryTimelineDeltaEntry
+  SessionSummaryLedgerDelta
 } from '../../shared/session-summary-types'
 import {
   SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS,
@@ -26,17 +25,11 @@ Rules: respond with ONLY the JSON object. Never invent work, files, results or i
 /** The `since` report is inherently short — it covers only the work after one message. */
 const SINCE_MAX_CHARS = 600
 
-/** Timeline entries a single report call is shown; the rest of its group is facts. */
-const REPORT_TIMELINE_MAX_ENTRIES = 60
-const REPORT_TIMELINE_TEXT_MAX_CHARS = 200
-
 export type SessionSummaryReportInput = {
   /** The report as it stands, or null on the first fold. */
   previous: SessionSummaryFullReport | null
   /** Ledger facts folded in this batch, already normalized. */
   delta: SessionSummaryLedgerDelta
-  /** Timeline entries folded in this batch. */
-  timeline: readonly SessionSummaryTimelineDeltaEntry[]
   /** Whether the reader spoke to the agent inside this batch (the window just restarted). */
   windowRestarted: boolean
   /** User messages so far; 1 means the window covers the whole session. */
@@ -93,14 +86,6 @@ export function buildSessionSummaryReportPrompt(input: SessionSummaryReportInput
     }
   }
   lines.push('', 'Facts folded in this batch:', ...(facts.length > 0 ? facts : ['(none)']))
-  const timeline = input.timeline.slice(-REPORT_TIMELINE_MAX_ENTRIES).map((entry) => {
-    const text =
-      entry.text.length > REPORT_TIMELINE_TEXT_MAX_CHARS
-        ? `${entry.text.slice(0, REPORT_TIMELINE_TEXT_MAX_CHARS)}…`
-        : entry.text
-    return `[#${entry.sourceIndex} ${entry.kind}] ${text}`
-  })
-  lines.push('', 'Timeline of this batch:', ...(timeline.length > 0 ? timeline : ['(none)']))
   return `${REPORT_INSTRUCTIONS}\n\n${lines.join('\n')}`
 }
 

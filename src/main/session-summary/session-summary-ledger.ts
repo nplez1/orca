@@ -1,20 +1,21 @@
-// Pure ledger operations: model output normalization and delta application.
-// Facts update in place; the timeline is append-only (entries are counted by
-// index for "since you last looked", so rewrites would move the cursor).
+// Pure ledger operations: model output normalization, delta application, and the timeline
+// projection. Facts update in place; the timeline is *derived* from the facts and the markers the
+// fold planned, so re-folding a range yields the same entries instead of appending them again.
 import type {
   SessionSummaryFact,
   SessionSummaryFoldGap,
   SessionSummaryLedger,
   SessionSummaryLedgerDelta,
-  SessionSummaryTimelineDeltaEntry,
-  SessionSummaryTimelineKind
+  SessionSummaryTimelineDeltaEntry
 } from '../../shared/session-summary-types'
 import {
   SESSION_SUMMARY_LIST_MAX_ITEMS,
-  SESSION_SUMMARY_TEXT_MAX_LENGTH,
-  SESSION_SUMMARY_TIMELINE_KINDS,
-  SESSION_SUMMARY_TIMELINE_MAX_ENTRIES
+  SESSION_SUMMARY_TEXT_MAX_LENGTH
 } from '../../shared/session-summary-types'
+import {
+  mergeSessionSummaryMarkers,
+  projectSessionSummaryTimeline
+} from './session-summary-timeline'
 
 export function emptySessionSummaryLedger(): SessionSummaryLedger {
   return {
@@ -25,13 +26,13 @@ export function emptySessionSummaryLedger(): SessionSummaryLedger {
     blockers: [],
     decisions: [],
     timeline: [],
+    markers: [],
     reportSince: null,
     reportFull: null,
     lastUserMessageIndex: null,
     userMessageCount: 0,
     foldedThrough: 0,
     foldedAt: null,
-    timelineBase: 0,
     foldGap: null,
     gaps: []
   }
@@ -131,34 +132,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function isTimelineKind(value: unknown): value is SessionSummaryTimelineKind {
-  return typeof value === 'string' && SESSION_SUMMARY_TIMELINE_KINDS.some((kind) => kind === value)
-}
-
-function normalizeTimeline(value: unknown): SessionSummaryTimelineDeltaEntry[] {
-  if (!Array.isArray(value)) {
-    return []
-  }
-  const out: SessionSummaryTimelineDeltaEntry[] = []
-  for (const item of value) {
-    if (!isRecord(item)) {
-      continue
-    }
-    const obj = item
-    const text = normalizeText(obj.text)
-    const sourceIndex = obj.sourceIndex
-    if (text === null || !isTimelineKind(obj.kind) || typeof sourceIndex !== 'number') {
-      continue
-    }
-    out.push({
-      kind: obj.kind,
-      text,
-      sourceIndex: Number.isFinite(sourceIndex) && sourceIndex >= 0 ? Math.floor(sourceIndex) : 0
-    })
-  }
-  return out
-}
-
 /**
  * Normalize an untrusted (model-produced) delta. Null when nothing usable is present.
  *
@@ -191,9 +164,6 @@ export function normalizeSessionSummaryDelta(
   }
   if ('decisions' in obj) {
     delta.decisions = normalizeFactList(obj.decisions, indexes)
-  }
-  if ('timeline' in obj) {
-    delta.timeline = normalizeTimeline(obj.timeline)
   }
   return Object.keys(delta).length > 0 ? delta : null
 }
@@ -235,13 +205,12 @@ function mergeFactLists(...lists: SessionSummaryFact[][]): SessionSummaryFact[] 
 
 /**
  * Fold chunk deltas into one delta, in chunk order. Scalars: the last chunk
- * that expressed an opinion wins (it saw the most recent context). Lists:
- * ordered union. Timeline: concatenation in chunk order.
+ * that expressed an opinion wins (it saw the most recent context). Lists: ordered union.
  */
 export function mergeSessionSummaryDeltas(
   deltas: readonly SessionSummaryLedgerDelta[]
 ): SessionSummaryLedgerDelta {
-  const merged: SessionSummaryLedgerDelta = { timeline: [] }
+  const merged: SessionSummaryLedgerDelta = {}
   for (const delta of deltas) {
     // Why only a real opinion: chunks are merged in order, and a later chunk that says nothing
     // about the goal used to erase the one an earlier chunk had just found.
@@ -263,9 +232,6 @@ export function mergeSessionSummaryDeltas(
     if (delta.decisions) {
       merged.decisions = mergeFactLists(merged.decisions ?? [], delta.decisions)
     }
-    if (delta.timeline) {
-      merged.timeline = [...(merged.timeline ?? []), ...delta.timeline]
-    }
   }
   return merged
 }
@@ -286,10 +252,11 @@ export function applySessionSummaryDelta(
   extras: {
     foldGap?: SessionSummaryFoldGap | null
     gaps?: readonly string[]
+    /** The markers planned for the events this apply covers; they never come from a model. */
+    markers?: readonly SessionSummaryTimelineDeltaEntry[]
   } = {}
 ): SessionSummaryLedger {
-  const timelineBase = ledger.timelineBase ?? 0
-  return {
+  const facts = {
     // Why the last non-null wins: a later chunk that says nothing about the goal must not erase
     // the title. A goal is replaced, never unset, so an explicit null is "no opinion", not "none".
     goal: delta.goal ?? ledger.goal,
@@ -299,16 +266,15 @@ export function applySessionSummaryDelta(
     blockers: delta.blockers ? mergeFactLists(ledger.blockers, delta.blockers) : ledger.blockers,
     decisions: delta.decisions
       ? mergeFactLists(ledger.decisions, delta.decisions)
-      : ledger.decisions,
-    timeline: [
-      ...ledger.timeline,
-      ...(delta.timeline ?? []).map((entry, index) => ({
-        ...entry,
-        // Why the base: entries are trimmed from the head when the store is bounded, and an id
-        // derived from the trimmed length would collide with one already kept.
-        id: `${entry.sourceIndex}-${entry.kind}-${timelineBase + ledger.timeline.length + index}`
-      }))
-    ],
+      : ledger.decisions
+  }
+  const markers = mergeSessionSummaryMarkers(ledger.markers, extras.markers ?? [])
+  return {
+    ...facts,
+    // Why re-projected and not appended: the timeline has one answer per (kind, sourceIndex), so
+    // applying the same range twice cannot duplicate or reword an entry.
+    timeline: projectSessionSummaryTimeline(facts, markers),
+    markers,
     // Carried, not derived: reports are written by the fold's report step, and a delta apply
     // (which also runs for facts alone) must not silently drop them.
     reportSince: ledger.reportSince,
@@ -317,7 +283,6 @@ export function applySessionSummaryDelta(
     userMessageCount,
     foldedThrough: Math.max(ledger.foldedThrough, foldedThrough),
     foldedAt,
-    timelineBase,
     // Why reset by default: a fold that reached the end of what it was given has no gap, and a
     // caller that leaves one behind would have the pane report a gap that no longer exists.
     foldGap: extras.foldGap ?? null,
@@ -336,26 +301,4 @@ function mergeGaps(previous: readonly string[], next: readonly string[] | undefi
     }
   }
   return out
-}
-
-/**
- * The ledger as the store keeps it: the newest timeline entries, and a base so ids stay unique.
- *
- * Why bounded at all: `session-summaries.json` holds up to 200 panes, each now with an unbounded
- * timeline and its chunk cache. The timeline is history the pane pages through, so dropping the
- * oldest is the loss the reader can least feel.
- */
-export function boundSessionSummaryLedgerForStorage(
-  ledger: SessionSummaryLedger,
-  maxTimelineEntries = SESSION_SUMMARY_TIMELINE_MAX_ENTRIES
-): SessionSummaryLedger {
-  const overflow = ledger.timeline.length - maxTimelineEntries
-  if (overflow <= 0) {
-    return ledger
-  }
-  return {
-    ...ledger,
-    timeline: ledger.timeline.slice(overflow),
-    timelineBase: (ledger.timelineBase ?? 0) + overflow
-  }
 }

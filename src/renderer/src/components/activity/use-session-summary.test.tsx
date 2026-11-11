@@ -132,13 +132,13 @@ describe('useSessionSummary', () => {
       blockers: [],
       decisions: [],
       timeline: [],
+      markers: [],
       reportSince: null,
       reportFull: null,
       lastUserMessageIndex: null,
       userMessageCount: 0,
       foldedThrough: 0,
       foldedAt: null,
-      timelineBase: 0,
       foldGap: null,
       gaps: []
     }

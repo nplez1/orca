@@ -73,12 +73,10 @@ export function useSessionSummary(
             ledger: next.ledger ?? snapshotRef.current?.ledger ?? null
           }
         : next
-      const timeline = merged.ledger
-      if (timeline) {
-        seenCountRef.current = Math.max(
-          seenCountRef.current,
-          timeline.timelineBase + timeline.timeline.length
-        )
+      const ledger = merged.ledger
+      if (ledger) {
+        // The timeline is a projection, so its length only grows; nothing trims its head.
+        seenCountRef.current = Math.max(seenCountRef.current, ledger.timeline.length)
       }
       setSnapshot(merged)
     },

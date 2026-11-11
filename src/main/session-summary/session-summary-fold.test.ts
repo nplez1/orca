@@ -10,6 +10,7 @@ import {
   type SessionSummarySourceEvent
 } from './session-summary-fold'
 import { SESSION_SUMMARY_FOLD_CHUNK_CONCURRENCY } from './session-summary-fold-slots'
+import { planSessionSummaryRenderItems } from './session-summary-render-plan'
 import { SESSION_SUMMARY_REPORT_MAX_SECTIONS } from '../../shared/session-summary-types'
 
 const REPORT_PROMPT_PREFIX = 'You write the progress report'
@@ -20,6 +21,11 @@ function events(count: number): SessionSummarySourceEvent[] {
     text: `message ${index}`,
     timestamp: null
   }))
+}
+
+/** Chunking and rendering both read the render plan; prose renders one item per event. */
+function itemsOf(source: SessionSummarySourceEvent[]) {
+  return planSessionSummaryRenderItems(source)
 }
 
 function reply(overrides: Record<string, unknown> = {}): string {
@@ -49,8 +55,8 @@ function jsonBrain(handler: (prompt: string, call: number) => unknown): SessionF
 }
 
 describe('buildSessionSummaryChunks', () => {
-  it('covers every event exactly once and respects the event cap', () => {
-    const ranges = buildSessionSummaryChunks(events(250))
+  it('covers every event exactly once and respects the line cap', () => {
+    const ranges = buildSessionSummaryChunks(itemsOf(events(250)))
     expect(ranges[0]).toEqual({ from: 0, to: 120 })
     expect(ranges.at(-1)?.to).toBe(250)
     for (let index = 0; index < ranges.length - 1; index += 1) {
@@ -64,7 +70,7 @@ describe('buildSessionSummaryChunks', () => {
       text: 'y'.repeat(2000),
       timestamp: null
     }))
-    const ranges = buildSessionSummaryChunks(long, 3000, 120)
+    const ranges = buildSessionSummaryChunks(itemsOf(long), 3000, 120)
     expect(ranges.length).toBeGreaterThan(1)
     expect(ranges.at(-1)?.to).toBe(4)
   })
@@ -76,7 +82,7 @@ describe('buildSessionSummaryChunks', () => {
       { role: 'user', text: 'short', timestamp: null },
       { role: 'assistant', text: 'z'.repeat(7_000), timestamp: null }
     ]
-    const ranges = buildSessionSummaryChunks(oversized, 3_000, 120)
+    const ranges = buildSessionSummaryChunks(itemsOf(oversized), 3_000, 120)
     expect(ranges[0]).toEqual({ from: 0, to: 1 })
     const parts = ranges.slice(1)
     expect(parts.length).toBe(3)
@@ -107,7 +113,7 @@ describe('extractSessionSummaryJson', () => {
 
 describe('buildSessionSummaryChunkPrompt', () => {
   it('renders indexed events with roles', () => {
-    const prompt = buildSessionSummaryChunkPrompt(events(3), { from: 1, to: 3 }, 10)
+    const prompt = buildSessionSummaryChunkPrompt(itemsOf(events(3)), { from: 1, to: 3 }, 10)
     expect(prompt).toContain('[#11 assistant] message 1')
     expect(prompt).toContain('[#12 user] message 2')
     expect(prompt).not.toContain('message 0')
@@ -115,7 +121,7 @@ describe('buildSessionSummaryChunkPrompt', () => {
 
   // A record the reader could not decode is a hole in "the entire log" unless the prompt names it.
   it('names a skipped record in the slice that covers it', () => {
-    const prompt = buildSessionSummaryChunkPrompt(events(3), { from: 1, to: 3 }, 0, [
+    const prompt = buildSessionSummaryChunkPrompt(itemsOf(events(3)), { from: 1, to: 3 }, 0, [
       { afterEventIndex: 2, text: 'Skipped 1 oversized transcript record.' }
     ])
     expect(prompt).toContain('[gap after #1] Skipped 1 oversized transcript record.')
@@ -123,7 +129,7 @@ describe('buildSessionSummaryChunkPrompt', () => {
 
   it('renders a part with its own label and no other part of the message', () => {
     const prompt = buildSessionSummaryChunkPrompt(
-      [{ role: 'assistant', text: 'aaaaabbbbb', timestamp: null }],
+      itemsOf([{ role: 'assistant', text: 'aaaaabbbbb', timestamp: null }]),
       { from: 0, to: 1, partFrom: 5, partTo: 10, partIndex: 1, partCount: 2 },
       0
     )
@@ -137,12 +143,7 @@ describe('foldSessionSummaryEvents', () => {
     const seenPrompts: string[] = []
     const brain = jsonBrain((prompt) => {
       seenPrompts.push(prompt)
-      return {
-        done: [`chunk ${seenPrompts.length}`],
-        timeline: [
-          { kind: 'milestone', text: `m${seenPrompts.length}`, sourceIndex: seenPrompts.length }
-        ]
-      }
+      return { done: [`chunk ${seenPrompts.length}`] }
     })
     const result = await foldSessionSummaryEvents({
       brain,
@@ -159,7 +160,14 @@ describe('foldSessionSummaryEvents', () => {
       { text: 'chunk 1', sourceIndex: 119 },
       { text: 'chunk 2', sourceIndex: 129 }
     ])
-    expect(result.ledger.timeline.map((entry) => entry.text)).toEqual(['m1', 'm2'])
+    // The timeline is a projection: one milestone per done fact, anchored where the extract placed
+    // it, with an id derived from (kind, sourceIndex).
+    expect(result.ledger.timeline.filter((entry) => entry.kind === 'milestone')).toEqual([
+      { id: 'milestone-119', kind: 'milestone', text: 'chunk 1', sourceIndex: 119 },
+      { id: 'milestone-129', kind: 'milestone', text: 'chunk 2', sourceIndex: 129 }
+    ])
+    // And the reader's own messages are markers, not model output: one per user event.
+    expect(result.ledger.timeline.filter((entry) => entry.kind === 'user-input')).toHaveLength(65)
     expect(result.ledger.reportFull?.headline).toBe('a headline')
     // events(130) alternates user/assistant from a user message: 65 reader messages.
     expect(result.ledger.userMessageCount).toBe(65)
@@ -170,7 +178,7 @@ describe('foldSessionSummaryEvents', () => {
 
   it('reuses cached chunk extracts instead of calling the brain again', async () => {
     const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
-    cacheStore.set('0-120', { done: [{ text: 'cached', sourceIndex: 0 }], timeline: [] })
+    cacheStore.set('0-120', { done: [{ text: 'cached', sourceIndex: 0 }] })
     let calls = 0
     const brain = jsonBrain(() => {
       calls += 1
@@ -276,7 +284,7 @@ describe('foldSessionSummaryEvents', () => {
         if (prompt.includes('[#240 ')) {
           throw new Error('content filter')
         }
-        return JSON.stringify({ done: ['ok'], timeline: [] })
+        return JSON.stringify({ done: ['ok'] })
       }
     }
     let ledger = emptySessionSummaryLedger()
@@ -326,7 +334,7 @@ describe('foldSessionSummaryEvents', () => {
         if (prompt.includes('[#1 ')) {
           throw new Error('content filter')
         }
-        return JSON.stringify({ done: ['ok'], timeline: [] })
+        return JSON.stringify({ done: ['ok'] })
       }
     }
     const result = await foldSessionSummaryEvents({
@@ -467,6 +475,41 @@ describe('foldSessionSummaryEvents', () => {
     expect([...cacheStore.keys()].sort()).toEqual(['0-120', '120-240', '360-480'])
   })
 
+  // A degraded fold stops at the first failed chunk, so planning markers across the whole read
+  // would anchor entries to messages the next fold is about to fold again.
+  it('plans markers only for the events a degraded fold applied', async () => {
+    const brain = jsonBrain((prompt) => {
+      if (prompt.includes('[#240 ')) {
+        throw new Error('flaky cli')
+      }
+      return { done: ['ok'] }
+    })
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: emptySessionSummaryLedger(),
+      events: events(480),
+      signal: new AbortController().signal
+    })
+    expect(result.ledger.foldedThrough).toBe(240)
+    expect(result.ledger.markers.length).toBeGreaterThan(0)
+    expect(result.ledger.markers.every((marker) => marker.sourceIndex < 240)).toBe(true)
+    expect(result.ledger.timeline.every((entry) => entry.sourceIndex < 240)).toBe(true)
+  })
+
+  // The timeline is a projection, so the same range folded twice has one answer.
+  it('produces the same timeline when the same range is folded twice', async () => {
+    const fold = async (): Promise<unknown> => {
+      const result = await foldSessionSummaryEvents({
+        brain: jsonBrain(() => ({ done: ['shipped'] })),
+        ledger: emptySessionSummaryLedger(),
+        events: events(130),
+        signal: new AbortController().signal
+      })
+      return result.ledger.timeline
+    }
+    expect(await fold()).toEqual(await fold())
+  })
+
   it('resumes after a failure without re-asking for the chunks already summarized', async () => {
     const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
     let failChunk = true
@@ -580,7 +623,7 @@ describe('foldSessionSummaryEvents', () => {
         if (prompt.includes('[#240 ')) {
           throw new Error('flaky cli')
         }
-        return JSON.stringify({ done: ['ok'], timeline: [] })
+        return JSON.stringify({ done: ['ok'] })
       }
     }
     const first = await foldSessionSummaryEvents({
@@ -596,9 +639,7 @@ describe('foldSessionSummaryEvents', () => {
     const resumed = await foldSessionSummaryEvents({
       brain: {
         complete: async ({ prompt }) =>
-          prompt.startsWith(REPORT_PROMPT_PREFIX)
-            ? reply()
-            : JSON.stringify({ done: ['ok'], timeline: [] })
+          prompt.startsWith(REPORT_PROMPT_PREFIX) ? reply() : JSON.stringify({ done: ['ok'] })
       },
       ledger: first.ledger,
       events: events(480).slice(first.ledger.foldedThrough),
@@ -635,7 +676,7 @@ describe('foldSessionSummaryEvents', () => {
           throw new Error('flaky cli')
         }
         const part = /part (\d) of (\d)/.exec(prompt)?.[1] ?? '1'
-        return JSON.stringify({ done: [`part ${part}`], timeline: [] })
+        return JSON.stringify({ done: [`part ${part}`] })
       }
     }
     await expect(
@@ -760,8 +801,7 @@ describe('a session of any length folds end to end', () => {
             prompt.includes(marker)
           )
           return JSON.stringify({
-            done: markers.length > 0 ? markers : [`chunk ${chunkCalls}`],
-            timeline: []
+            done: markers.length > 0 ? markers : [`chunk ${chunkCalls}`]
           })
         }
       }

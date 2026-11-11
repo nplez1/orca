@@ -24,10 +24,6 @@ const input = {
     done: [{ text: 'flag parsed', sourceIndex: 44 }],
     blockers: [{ text: 'tests red', sourceIndex: 12 }]
   },
-  timeline: [
-    { kind: 'milestone' as const, text: 'early work', sourceIndex: 11 },
-    { kind: 'error' as const, text: 'recent failure', sourceIndex: 45 }
-  ],
   windowRestarted: true,
   userMessageCount: 3,
   lastUserMessageIndex: 40,
@@ -80,24 +76,24 @@ describe('buildSessionSummaryReportPrompt', () => {
     expect(prompt).toContain('Do not write "since"')
   })
 
-  it('carries the previous report forward and bounds the timeline', () => {
+  it('carries the previous report forward', () => {
     const previous: SessionSummaryFullReport = {
       headline: 'old headline',
       sections: [{ id: 's1', title: 'old phase', text: 'old text', through: 12 }],
       through: 12,
       text: 'old headline\n\nold text'
     }
-    const timeline = Array.from({ length: 200 }, (_, index) => ({
-      kind: 'milestone' as const,
-      text: `entry ${index} ${'x'.repeat(400)}`,
-      sourceIndex: index
-    }))
-    const prompt = buildSessionSummaryReportPrompt({ ...input, previous, timeline })
+    const prompt = buildSessionSummaryReportPrompt({ ...input, previous })
     expect(prompt).toContain('old headline')
     expect(prompt).toContain('old phase')
-    expect(prompt).toContain('entry 199')
-    expect(prompt).not.toContain('entry 100 ')
-    expect(prompt.length).toBeLessThan(30_000)
+  })
+
+  // The timeline is a projection of the facts this prompt is already given, so carrying it as a
+  // second copy was up to 12 KB per report call for something the model cannot use twice.
+  it('carries no timeline block', () => {
+    const prompt = buildSessionSummaryReportPrompt(input)
+    expect(prompt).not.toContain('Timeline of this batch')
+    expect(prompt).not.toContain('[#11 milestone]')
   })
 })
 
