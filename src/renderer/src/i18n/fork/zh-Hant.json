@@ -101,6 +101,9 @@
       "sidebar": {
         "WorktreeContextMenu": {
           "editDetails": null
+        },
+        "WorkspaceKanbanSettingsMenu": {
+          "4c2eaa78cc": null
         }
       }
     },

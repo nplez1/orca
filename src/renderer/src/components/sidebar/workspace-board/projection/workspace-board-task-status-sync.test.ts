@@ -290,7 +290,8 @@ describe('syncWorkspaceBoardTaskStatuses with a Jira link', () => {
       { transitionId: 't-2' },
       'site-b'
     )
-    expect(setup.loadStatusOrder).not.toHaveBeenCalled()
+    // Why asserted: the column check runs before the name match, so the order is read even then.
+    expect(setup.loadStatusOrder).toHaveBeenCalledTimes(1)
   })
 
   it('falls back to the board column of the same name', async () => {
@@ -314,6 +315,28 @@ describe('syncWorkspaceBoardTaskStatuses with a Jira link', () => {
       { transitionId: 't-5' },
       'site-b'
     )
+  })
+
+  it('skips a move whose issue already sits in the card column under another status', async () => {
+    const setup = setupJira(jiraWorktree(), 'Done')
+    setup.getIssue.mockResolvedValue(
+      jiraIssue({
+        status: { id: '4', name: "Won't Do", categoryKey: 'done', categoryName: 'Done' }
+      })
+    )
+    setup.listTransitions.mockResolvedValue([jiraTransition('t-3', '3', 'Done')])
+    setup.loadStatusOrder.mockResolvedValue({
+      statusIdsByColumn: [['3', '4']],
+      columns: [{ name: 'Done', statusIds: ['3', '4'] }]
+    })
+
+    await expect(setup.run()).resolves.toMatchObject({
+      updated: 0,
+      skipped: 1,
+      failed: 0,
+      messages: []
+    })
+    expect(setup.updateIssue).not.toHaveBeenCalled()
   })
 
   it('reports a transition that needs screen fields instead of submitting it', async () => {

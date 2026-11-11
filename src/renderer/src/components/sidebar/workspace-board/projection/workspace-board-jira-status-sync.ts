@@ -28,6 +28,7 @@ import type {
   Worktree
 } from '../../../../../../shared/worktree/types'
 import type { TaskSourceContext } from '../../../../../../shared/work-items/task-source-context'
+import type { Repo } from '../../../../../../shared/repo-types'
 
 /** The Jira failures a board move can report; the board owns the copy for each. */
 export type JiraStatusSyncMessage =
@@ -67,6 +68,8 @@ export const defaultJiraStatusSyncDeps: JiraStatusSyncDeps = {
 
 export type SyncJiraWorktreeStatusArgs = {
   worktree: Worktree
+  /** The workspace's repository, so the fallback source routes through the account its row names. */
+  repo?: Repo
   targetStatus: WorkspaceStatusDefinition
   /** The workspace owner's host, or `null` when its captured copy is gone or ambiguous. */
   settings: RuntimeJiraSettings | null
@@ -155,21 +158,24 @@ async function resolveTransition(
   siteId: string | null,
   deps: JiraStatusSyncDeps
 ): Promise<TransitionMatch> {
+  const columns = await columnsNamed(args, source, issue, siteId, deps)
+  const [column] = columns
+  // Why the column before the name: a column groups several statuses, so an issue sitting in a
+  // sibling status of the card's own column is already where the user dropped it — and a name match
+  // would otherwise move it between two statuses the user sees as one lane.
+  if (columns.length === 1 && column.statusIds.includes(issue.status.id)) {
+    return { kind: 'already-there' }
+  }
   const target = normalizeName(args.targetStatus.label)
   const byName = transitions.filter((transition) => normalizeName(transition.to.name) === target)
   if (byName.length > 0) {
     return matchDestination(byName)
   }
-  const columns = await columnsNamed(args, source, issue, siteId, deps)
   if (columns.length > 1) {
     return { kind: 'ambiguous' }
   }
   if (columns.length === 0) {
     return { kind: 'missing' }
-  }
-  const [column] = columns
-  if (column.statusIds.includes(issue.status.id)) {
-    return { kind: 'already-there' }
   }
   return matchDestination(getTaskPageJiraBoardTransitionTargets(transitions, column.statusIds))
 }
@@ -194,9 +200,10 @@ export async function syncJiraWorktreeStatus(
   // Why the attachment's own account first: the link records the site it was attached from, so a
   // workspace linked to another site must not read back through whichever site is selected now.
   const source =
-    active.sourceContext ??
-    getWorkspaceAttachmentSourceContext('jira', undefined, args.worktree) ??
-    args.settings
+    active.sourceContext ?? getWorkspaceAttachmentSourceContext('jira', args.repo, args.worktree)
+  if (!source) {
+    return { status: 'skipped' }
+  }
   const linkedSite = linkedSiteId(source)
   try {
     const issue = await deps.getIssue(source, issueKey, linkedSite)

@@ -10,6 +10,7 @@ import { getRuntimeTargetForWorktreeOwner } from '@/lib/file-owner-runtime-targe
 import { runtimeTargetForWorkspaceOwner } from '@/lib/workspace/ownership/resolve-owner'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { warnAmbiguousOwnerOnce } from '@/lib/ambiguous-owner-warning'
+import { getIndexedRepoMap } from '@/store/repos/repository-catalog-index'
 import type { WorktreeOperationRouteState } from '@/lib/workspace/ownership/worktree-operation-route'
 import type { RuntimeLinearSettings } from '@/runtime/linear/runtime-linear-client'
 import { translate } from '@/i18n/i18n'
@@ -89,7 +90,7 @@ function formatTaskStatusSyncMessage(message: WorkspaceBoardTaskStatusSyncMessag
     case 'jira-transition-needs-fields':
       return translate(
         'auto.components.sidebar.WorkspaceKanbanDrawer.jiraTransitionNeedsFields',
-        'Jira issue {{value0}} needs fields before it can move to {{value1}}; move it from the Tasks board.',
+        'Jira issue {{value0}} needs fields before it can move to {{value1}}; open the issue to move it.',
         { value0: message.issueKey, value1: message.statusLabel }
       )
     case 'jira-update-failed':
@@ -243,6 +244,11 @@ export function useWorkspaceBoardTaskStatusSync(args: {
               sourceContext: source.kind === 'task-source' ? source : null
             }
           )
+        },
+        getRepoForWorktree: (key) => {
+          const worktree = args.worktreesByKey.get(key)
+          const state = useAppStore.getState()
+          return worktree ? getIndexedRepoMap(state.repos).get(worktree.repoId) : undefined
         }
       })
         .then((result) => {

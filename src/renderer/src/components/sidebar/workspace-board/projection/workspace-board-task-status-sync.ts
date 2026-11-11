@@ -13,6 +13,7 @@ import type {
   WorkspaceStatusDefinition,
   Worktree
 } from '../../../../../../shared/worktree/types'
+import type { Repo } from '../../../../../../shared/repo-types'
 import {
   defaultJiraStatusSyncDeps,
   syncJiraWorktreeStatus,
@@ -53,6 +54,8 @@ export type SyncWorkspaceBoardTaskStatusesArgs = {
   /** `null` refuses the worktree: its owner is ambiguous, so no host's Linear settings apply. */
   getSettingsForWorktree?: (worktreeKey: string) => RuntimeLinearSettings | null
   getLatestWorkspaceStatus: (worktreeKey: string) => WorkspaceStatus | null | undefined
+  /** The card's repository row, so a Jira source built from the workspace names its account host. */
+  getRepoForWorktree?: (worktreeKey: string) => Repo | undefined
   deps?: Partial<WorkspaceBoardTaskStatusSyncDependencies>
   jiraDeps?: Partial<JiraStatusSyncDeps>
   /** Patches the provider cache after a Jira transition, so a pane does not show the old status. */
@@ -251,6 +254,7 @@ async function syncWorktreeTaskStatus(
   const outcome = await syncJiraWorktreeStatus(
     {
       worktree,
+      repo: args.getRepoForWorktree?.(worktreeKey),
       targetStatus: args.targetStatus,
       // Why not `??`: a present callback answering null is an ambiguous owner, not a fallback.
       settings: args.getSettingsForWorktree

@@ -843,7 +843,7 @@
           "jiraMissingTransition": "No Jira transition reaches {{value0}}.",
           "jiraOwnerAmbiguous": "Skipped Jira issue {{value0}}: this workspace is on more than one host.",
           "jiraProviderError": "Could not sync Jira issue {{value0}}.",
-          "jiraTransitionNeedsFields": "Jira issue {{value0}} needs fields before it can move to {{value1}}; move it from the Tasks board.",
+          "jiraTransitionNeedsFields": "Jira issue {{value0}} needs fields before it can move to {{value1}}; open the issue to move it.",
           "jiraUpdateFailed": "Could not update Jira issue {{value0}}."
         },
         "WorkspaceKanbanSettingsMenu": {
