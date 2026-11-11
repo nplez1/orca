@@ -11154,10 +11154,6 @@
           }
         },
         "WorkspaceDirectorySetting": {
-          "1a2b3c4d5e": "Valeur par défaut du client",
-          "2b3c4d5e6f": "Appliquer à",
-          "3c4d5e6f7a": "Remplace la valeur par défaut du client",
-          "4d5e6f7a8b": "Hérite de la valeur par défaut du client",
           "5e6f7a8b9c": "Réinitialiser",
           "6f7a8b9cad": "Utilisez un chemin relatif (ex. .orca/worktrees) pour un emplacement par projet, ou un chemin absolu pour un dossier partagé unique."
         },

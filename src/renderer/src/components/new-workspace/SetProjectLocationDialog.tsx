@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useCloneFolderOverride } from '../sidebar/project-admission/clone-folder/use-clone-folder-override'
 import { getProjectCloneCheckTarget } from '../../store/projects/project-host-routing'
+import { useCloneParentDefault } from '../sidebar/project-admission/create/use-clone-parent-default'
+import { resolveWorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import { Download, FolderOpen } from 'lucide-react'
 import {
   Dialog,
@@ -16,7 +18,11 @@ import {
   getProjectHostSetupSelectionKey,
   type NeedsSetupProjectHostOption
 } from '@/lib/project-host-setup-options'
-import { parseExecutionHostId } from '../../../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../shared/execution-host'
 import type { RepoKind } from '../../../../shared/repo-types'
 import { pickLocalProjectLocationFolder } from './pick-local-project-folder'
 import { CloneForm, ExistingFolderForm, LocationActionButton } from './SetProjectLocationForms'
@@ -112,8 +118,6 @@ function SetProjectLocationDialogBody({
   const [setupKind, setSetupKind] = useState<RepoKind>(projectKind)
   const [cloneUrl, setCloneUrl] = useState(defaultCloneUrl)
   const [cloneDestination, setCloneDestination] = useState('')
-  const { cloneFolder, cloneArgs, setCloneFolderName, checkCloneFolderTaken } =
-    useCloneFolderOverride(cloneUrl, cloneDestination)
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Clones may finish long after dismissal; do not retarget a composer the user has since moved to another host.
   const abandoned = useRef(false)
@@ -128,9 +132,22 @@ function SetProjectLocationDialogBody({
   const remoteHost =
     parsedHost?.kind === 'ssh' || parsedHost?.kind === 'runtime' ? parsedHost : null
   const canClone = projectKind === 'git'
+  const settings = useAppStore((state) => state.settings)
+  const cloneHostIds: ExecutionHostId[] = remoteHost ? [option.hostId] : [LOCAL_EXECUTION_HOST_ID]
+  // Same rule as the sidebar clone step, so the two clone UIs cannot disagree.
+  const cloneParent = useCloneParentDefault({
+    settings,
+    hostIds: cloneHostIds,
+    layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
+    enabled: canClone && view === 'clone'
+  })
+  // Derived, so a default that arrives late never overwrites what the user typed.
+  const cloneDestinationValue = cloneDestination || cloneParent.parent
+  const { cloneFolder, cloneArgs, setCloneFolderName, checkCloneFolderTaken } =
+    useCloneFolderOverride(cloneUrl, cloneDestinationValue)
   const pathFields: Record<BrowseField, { value: string; set: (path: string) => void }> = {
     existing: { value: setupPath, set: setSetupPath },
-    clone: { value: cloneDestination, set: setCloneDestination }
+    clone: { value: cloneDestinationValue, set: setCloneDestination }
   }
 
   const browsing = view === 'browse' && remoteHost !== null
@@ -180,7 +197,7 @@ function SetProjectLocationDialogBody({
   }
 
   const handleCloneSubmit = async (): Promise<void> => {
-    if (!cloneUrl.trim() || !cloneDestination.trim()) {
+    if (!cloneUrl.trim() || !cloneDestinationValue.trim()) {
       return
     }
     setIsSubmitting(true)
@@ -286,7 +303,7 @@ function SetProjectLocationDialogBody({
       {view === 'clone' ? (
         <CloneForm
           cloneUrl={cloneUrl}
-          cloneDestination={cloneDestination}
+          cloneDestination={cloneDestinationValue}
           isSubmitting={isSubmitting}
           onBack={() => setView('choose')}
           onCloneUrlChange={setCloneUrl}

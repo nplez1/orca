@@ -2,7 +2,7 @@ import { useAppStateValue } from '@/store/retained-views/app-state-view'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import { getLocalExecutionHostLabel } from '../../../../../../shared/execution-host'
-import type { SettingsHostScope } from '../../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../../host-scope/settings-host-scope'
 import { SettingsSwitchRow } from '../../form-controls/SettingsFormControls'
 import {
   getCodexHistorySharingDescription,
@@ -20,7 +20,7 @@ export function CodexHistorySharingSetting({
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
   /** The host whose Codex launches write the history links. */
-  hostScope: SettingsHostScope
+  hostScope: SettingsServerScope
 }): React.JSX.Element {
   const t = useTranslate()
   const environmentId = runtimeTargetEnvironmentId(hostScope.target)

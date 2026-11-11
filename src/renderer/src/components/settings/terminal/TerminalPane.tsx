@@ -1,4 +1,4 @@
-import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../host-scope/settings-host-scope'
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
@@ -36,7 +36,9 @@ import { useTranslate } from '@/i18n/use-translate'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 
 type TerminalPaneProps = {
-  hostScope?: SettingsHostScope
+  hostScope?: SettingsServerScope
+  /** Set when the picked machine runs no server, so its server-only rows explain themselves. */
+  machineOnlyHostLabel?: string
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
   scrollbackMode: 'preset' | 'custom'
@@ -57,6 +59,7 @@ type TerminalPaneProps = {
 
 export function TerminalPane({
   hostScope,
+  machineOnlyHostLabel,
   settings,
   updateSettings,
   scrollbackMode,
@@ -324,6 +327,7 @@ export function TerminalPane({
       <TerminalAdvancedSection
         key="advanced"
         hostScope={hostScope}
+        machineOnlyHostLabel={machineOnlyHostLabel}
         settings={settings}
         updateSettings={updateSettings}
         scrollbackMode={scrollbackMode}

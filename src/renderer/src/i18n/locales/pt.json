@@ -8430,10 +8430,6 @@
           "916f480036": "Remover Destino SSH"
         },
         "WorkspaceDirectorySetting": {
-          "1a2b3c4d5e": "Padrão do cliente",
-          "2b3c4d5e6f": "Aplicar a",
-          "3c4d5e6f7a": "Substitui o padrão do cliente",
-          "4d5e6f7a8b": "Herda o padrão do cliente",
           "5e6f7a8b9c": "Redefinir",
           "6f7a8b9cad": "Use um caminho relativo (ex.: .orca/worktrees) para um local por projeto, ou um caminho absoluto para uma pasta compartilhada única."
         },

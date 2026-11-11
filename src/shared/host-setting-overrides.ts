@@ -1,11 +1,14 @@
 import type { ExecutionHostId } from './execution-host'
 import type { GlobalSettings } from './global-settings-types'
 
-/** Limit per-host preferences to host-specific values: client-side display labels and filesystem worktree roots.
+/** Limit per-host preferences to host-specific values: client-side display labels and filesystem roots.
  * Remote hosts cannot reuse a local workspaceDir unchanged. */
 export type HostSettingOverrides = {
   displayLabel?: string
+  /** Where this host's worktrees live. */
   defaultWorktreeLocation?: string
+  /** Where this host's checkouts live; equal to the worktree root only under a nested layout. */
+  defaultRepoRoot?: string
 }
 
 // Share host override ?? client default across UI/registry/tests.
@@ -26,6 +29,50 @@ export function getHostSettingOverride(
   key: HostSettingOverrideKey
 ): string | undefined {
   return normalize(settings?.hostSettingOverrides?.[hostId]?.[key])
+}
+
+/** The first non-empty override among a machine's ids, so a merged row reads the same value under either id. */
+export function getHostSettingOverrideForIds(
+  settings: HostSettingsSlice | null | undefined,
+  hostIds: readonly ExecutionHostId[],
+  key: HostSettingOverrideKey
+): string | undefined {
+  for (const hostId of hostIds) {
+    const value = getHostSettingOverride(settings, hostId, key)
+    if (value !== undefined) {
+      return value
+    }
+  }
+  return undefined
+}
+
+/** Writes the first id and clears the rest, so a stale alias override cannot shadow the new value. */
+export function setHostSettingOverrideForIds(
+  settings: HostSettingsSlice | null | undefined,
+  hostIds: readonly ExecutionHostId[],
+  key: HostSettingOverrideKey,
+  value: string
+): Partial<Record<ExecutionHostId, HostSettingOverrides>> {
+  const [primary, ...aliases] = hostIds
+  if (!primary) {
+    return settings?.hostSettingOverrides ?? {}
+  }
+  return aliases.reduce(
+    (next, hostId) => clearHostSettingOverride({ hostSettingOverrides: next }, hostId, key),
+    setHostSettingOverride(settings, primary, key, value)
+  )
+}
+
+/** Clears every id a merged machine answers to, so Reset cannot leave the value under an alias. */
+export function clearHostSettingOverrideForIds(
+  settings: HostSettingsSlice | null | undefined,
+  hostIds: readonly ExecutionHostId[],
+  key: HostSettingOverrideKey
+): Partial<Record<ExecutionHostId, HostSettingOverrides>> {
+  return hostIds.reduce(
+    (next, hostId) => clearHostSettingOverride({ hostSettingOverrides: next }, hostId, key),
+    settings?.hostSettingOverrides ?? {}
+  )
 }
 
 /** `host override ?? client default`. Unknown hosts and cleared overrides fall back. */

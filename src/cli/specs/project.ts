@@ -48,7 +48,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
     path: ['project', 'setup-clone'],
     summary: 'Make a project available on a host by cloning a repository',
     usage:
-      'orca project setup-clone --project <id> --host <host> --url <clone-url> --destination <path> [--folder-name <name>] [--display-name <name>] [--json]',
+      'orca project setup-clone --project <id> --host <host> --url <clone-url> [--destination <path>] [--folder-name <name>] [--display-name <name>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'project',
@@ -59,6 +59,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'display-name'
     ],
     notes: [
+      'Omit --destination to use the host’s repository root convention: <home>/orca/workspaces for the default nested layout, <home>/orca/projects for flat. The CLI cannot see the desktop’s per-host folder overrides or the host’s layout mode, so a folder set in Settings → General does not change this default; pass --destination for anything else.',
       'For remote runtimes, --destination must be an absolute parent directory on the remote server.',
       '--folder-name sets the folder created inside --destination; it defaults to the repository name from the URL.',
       '--host takes local, ssh:<target-id>, runtime:<environment-id>, or the bare host name `orca host list` prints for any of them.',

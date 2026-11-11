@@ -11,6 +11,7 @@ import type {
   ProjectHostSetupUpdateResult
 } from '../../shared/project-types'
 import { getSshTargetIdForExecutionHost, type ExecutionHostId } from '../../shared/execution-host'
+import { getDefaultRepoRootConvention } from '../../shared/host-repo-root'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import { PROJECT_HOST_SETUP_HOST_TARGET_RUNTIME_CAPABILITY } from '../../shared/worktree-runtime-capabilities'
 import type { CommandHandler, HandlerContext } from '../dispatch'
@@ -108,6 +109,14 @@ async function getOptionalSetupHostId(
   return await getRequiredHostId(flags, client)
 }
 
+// The CLI cannot read the desktop's per-host folder overrides, so it defaults from the convention
+// the desktop also falls back to, on whichever machine answers. It cannot read the host's layout
+// mode either, so it assumes the default nested one.
+async function resolveDefaultCloneDestination(client: HandlerContext['client']): Promise<string> {
+  const result = await client.call<{ resolvedPath: string }>('files.browseServerDir', { path: '~' })
+  return getDefaultRepoRootConvention(result.result.resolvedPath)
+}
+
 export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
   'project list': async ({ client, json }) => {
     const result = await client.call<{ projects: Project[] }>('project.list')
@@ -150,10 +159,14 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, formatProjectHostSetupResult)
   },
   'project setup-clone': async ({ flags, client, cwd, json }) => {
-    const rawDestination = getRequiredStringFlag(flags, 'destination')
+    const explicitDestination = getOptionalStringFlag(flags, 'destination')
+    const url = getRequiredStringFlag(flags, 'url')
+    // Resolve the host before the default: a bad flag must fail before the extra round trip.
+    const hostId = await getRequiredHostId(flags, client)
+    const rawDestination = explicitDestination ?? (await resolveDefaultCloneDestination(client))
     const args: ProjectHostSetupCloneArgs = {
-      hostId: await getRequiredHostId(flags, client),
-      url: getRequiredStringFlag(flags, 'url'),
+      hostId,
+      url,
       destination: resolveRepoPathArgument(
         rawDestination,
         cwd,

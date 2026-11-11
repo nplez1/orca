@@ -7,7 +7,7 @@ import { Input } from '../../../ui/input'
 import { Button } from '../../../ui/button'
 import { SettingsRow } from '../../form-controls/SettingsFormControls'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
-import type { SettingsHostScope } from '../../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../../host-scope/settings-host-scope'
 import { readTerminalLimit, saveTerminalLimit } from './terminal-limit-transport'
 import { useAppStore } from '@/store/index'
 import { getRuntimeEnvironmentConnectionGeneration } from '@/store/slices/runtime-status/runtime-status-connection-generation'
@@ -21,7 +21,7 @@ import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { runtimeHostContactForEntry } from '../../../../../../shared/remote-runtime/host-status/runtime-host-contact'
 import { getTerminalLimitSearchKeywords } from '../platform/terminal-advanced-platform-search'
 
-export function TerminalLimitSetting({ scope }: { scope: SettingsHostScope }): React.JSX.Element {
+export function TerminalLimitSetting({ scope }: { scope: SettingsServerScope }): React.JSX.Element {
   const environmentId = scope.target.kind === 'environment' ? scope.target.environmentId : null
   const revision = useAppStore((state) => {
     const host = state.runtimeEnvironments.find((item) => item.id === environmentId)
@@ -46,7 +46,7 @@ export function TerminalLimitSetting({ scope }: { scope: SettingsHostScope }): R
   )
 }
 
-function TerminalLimitField({ scope }: { scope: SettingsHostScope }): React.JSX.Element {
+function TerminalLimitField({ scope }: { scope: SettingsServerScope }): React.JSX.Element {
   const t = useTranslate()
   const intlLocale = useIntlLocale()
   const route = useMemo<HostRoute>(() => ({ target: scope.target, at: 'local' }), [scope.target])

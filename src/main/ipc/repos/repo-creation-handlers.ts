@@ -42,6 +42,16 @@ export async function probeLocalGitAvailability(): Promise<boolean> {
 function getDefaultCreateProjectParent(store: Store): string {
   const home = homedir()
   const settings = store.getSettings()
+  // An explicit checkout root wins: under a nested layout it is the project's container.
+  const storedRoot = getEffectiveHostSetting(
+    settings,
+    LOCAL_EXECUTION_HOST_ID,
+    'defaultRepoRoot',
+    ''
+  ).trim()
+  if (storedRoot) {
+    return storedRoot
+  }
   const configured = getEffectiveHostSetting(
     settings,
     LOCAL_EXECUTION_HOST_ID,

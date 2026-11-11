@@ -19,7 +19,7 @@ import {
 import { AgentLaunchSettingsLoading } from './AgentLaunchSettingsLoading'
 import { HostAgentLaunchSettings } from './HostAgentLaunchSettings'
 import { SettingsHostScopeUnavailableNotice } from '../../host-scope/SettingsHostScopePicker'
-import type { SettingsHostScope } from '../../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../../host-scope/settings-host-scope'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import { useTranslate } from '@/i18n/use-translate'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
@@ -37,7 +37,7 @@ export function AgentLaunchSettingsSection({
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
   /** Host chosen in the Settings host menu; launch settings are edited in that host's store. */
-  hostScope: SettingsHostScope
+  hostScope: SettingsServerScope
   renderPermissions: AgentPermissionsRenderer
 }): React.JSX.Element {
   const environmentId = runtimeTargetEnvironmentId(hostScope.target)

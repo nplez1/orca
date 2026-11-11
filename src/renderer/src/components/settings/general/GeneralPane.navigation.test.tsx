@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../../shared/constants'
 import { useAppStore } from '@/store'
 import { GeneralPane } from './GeneralPane'
+import { LOCAL_SETTINGS_HOST_SCOPE } from '../host-scope/settings-host-scope'
 import type { GeneralSubPage } from './general-sub-pages'
 import { useSettingsRepoScrollEffects } from '../navigation/use-settings-repo-scroll-effects'
 import type { SettingsStoreModel } from '../page/use-settings-store-model'
@@ -89,6 +90,7 @@ function NavigationHarness({
       <button onClick={() => requestTarget('general-open-in-apps')}>Open app settings link</button>
       <GeneralPane
         settings={settings}
+        hostScope={LOCAL_SETTINGS_HOST_SCOPE}
         subPage={generalSubPage}
         fontSuggestions={[]}
         updateSettings={(updates) => {

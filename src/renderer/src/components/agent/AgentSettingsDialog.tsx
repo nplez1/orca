@@ -17,7 +17,11 @@ import {
 } from '@/lib/windows-terminal-capabilities'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { useWindowsTerminalCapabilityOwnerKey } from '@/hooks/useWindowsTerminalCapabilityOwnerKey'
-import { resolveSettingsHostScope } from '@/components/settings/host-scope/settings-host-scope'
+import {
+  isServerScope,
+  resolveSettingsHostScope
+} from '@/components/settings/host-scope/settings-host-scope'
+import { getSettingsFocusedExecutionHostId } from '../../../../shared/execution-host'
 
 type AgentSettingsDialogProps = {
   open: boolean
@@ -67,10 +71,15 @@ export default function AgentSettingsDialog({
   // Why: no picker here; the pane names the default host it detects on.
   const hostScope = resolveSettingsHostScope({
     choice: null,
-    defaultEnvironmentId: settings.activeRuntimeEnvironmentId,
+    defaultHostId: getSettingsFocusedExecutionHostId(settings),
+    hosts: [],
     savedEnvironmentIds: runtimeEnvironments.map((environment) => environment.id),
     catalogHydrated: runtimeEnvironmentCatalogHydrated
   })
+  if (!isServerScope(hostScope)) {
+    // The focused host is always this computer or a paired server; nothing to show otherwise.
+    return null
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

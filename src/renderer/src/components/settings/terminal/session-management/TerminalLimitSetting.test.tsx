@@ -5,7 +5,11 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TerminalLimitSetting } from './TerminalLimitSetting'
 import { readTerminalLimit, saveTerminalLimit } from './terminal-limit-transport'
-import type { SettingsHostScope } from '../../host-scope/settings-host-scope'
+import type { SettingsServerScope } from '../../host-scope/settings-host-scope'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  toRuntimeExecutionHostId
+} from '../../../../../../shared/execution-host'
 import type { TerminalLimitStatus } from '../../../../../../shared/terminal/runtime-policy/terminal-limit-policy'
 import { useAppStore } from '@/store/index'
 import { i18n } from '@/i18n/i18n'
@@ -36,7 +40,13 @@ vi.mock('@/runtime/rpc/environment-revisions/host-identity-fence', () => ({
   captureHostIdentityFence: () => ({}),
   isHostIdentityFenceCurrent: () => true
 }))
-const local: SettingsHostScope = { target: { kind: 'local' }, available: true }
+const local: SettingsServerScope = {
+  hostId: LOCAL_EXECUTION_HOST_ID,
+  label: 'Local Mac',
+  equivalentHostIds: [LOCAL_EXECUTION_HOST_ID],
+  target: { kind: 'local' },
+  available: true
+}
 const base: TerminalLimitStatus = {
   maxTerminals: 256,
   systemPtyLimit: 511,
@@ -67,6 +77,16 @@ afterEach(() => {
   act(() => root.unmount())
   document.body.replaceChildren()
 })
+function environmentScope(environmentId: string): SettingsServerScope {
+  const hostId = toRuntimeExecutionHostId(environmentId)
+  return {
+    hostId,
+    label: environmentId,
+    equivalentHostIds: [hostId],
+    target: { kind: 'environment', environmentId },
+    available: true
+  }
+}
 async function render(scope = local): Promise<void> {
   await act(async () => root.render(<TerminalLimitSetting scope={scope} />))
 }
@@ -107,13 +127,13 @@ it('discards a late answer and draft when switching execution hosts', async () =
     daemonNonce: 'daemon-b'
   })
   publish('server', true, 1)
-  await render({ target: { kind: 'environment', environmentId: 'server' }, available: true })
+  await render(environmentScope('server'))
   await act(async () => complete?.(base))
   expect(input().value).toBe('128')
   expect(input().max).toBe('256')
   advanceRuntimeEnvironmentConnectionGeneration('server')
   vi.mocked(readTerminalLimit).mockResolvedValue({ ...base, maxTerminals: 64 })
-  await render({ target: { kind: 'environment', environmentId: 'server' }, available: true })
+  await render(environmentScope('server'))
   expect(input().value).toBe('64')
 })
 
@@ -165,10 +185,7 @@ function publish(id: string, live: boolean, checkedAt: number): void {
 
 it('disables on contact loss and reads again on a real same-runtime recovery publication', async () => {
   publish('server', true, 1)
-  const scope: SettingsHostScope = {
-    target: { kind: 'environment', environmentId: 'server' },
-    available: true
-  }
+  const scope: SettingsServerScope = environmentScope('server')
   await render(scope)
   await type('384')
   const generation = useAppStore

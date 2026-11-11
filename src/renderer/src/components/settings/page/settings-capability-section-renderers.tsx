@@ -7,8 +7,11 @@ import { LinearAgentSkillPane } from '../skills/linear/LinearAgentSkillPane'
 import { OrchestrationPane } from '../orchestration/OrchestrationPane'
 import { VoicePane } from '../voice/VoicePane'
 import { SettingsSection } from '../section-layout/SettingsSection'
-import { SettingsHostScopeUnavailableNotice } from '../host-scope/SettingsHostScopePicker'
-import { LOCAL_SETTINGS_HOST_SCOPE } from '../host-scope/settings-host-scope'
+import {
+  SettingsHostScopeMachineOnlyNotice,
+  SettingsHostScopeUnavailableNotice
+} from '../host-scope/SettingsHostScopePicker'
+import { LOCAL_SETTINGS_HOST_SCOPE, isServerScope } from '../host-scope/settings-host-scope'
 import { wslHostDistroForTarget } from '@/runtime/provider-accounts/ownership/wsl-host-account-owner'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
@@ -32,7 +35,7 @@ export function renderAgentsSettingsSection(
     >
       {view.isSectionMounted('agents') ? (
         <div className="space-y-8">
-          {model.settingsHostScope.target.kind === 'local' ? (
+          {model.settingsHostScope.target?.kind === 'local' ? (
             <AgentDefaultSurfaceSection settings={model.settings} />
           ) : null}
           <AgentsPane
@@ -55,10 +58,11 @@ export function renderAccountsSettingsSection(
   t: Translate = translate
 ): React.JSX.Element {
   const { model, navigation, terminal, view } = context
-  const wslHostDistro = wslHostDistroForTarget(
-    model.settingsHostScope.target,
-    model.runtimeEnvironments
-  )
+  const scope = model.settingsHostScope
+  // A machine-only host has no server to ask about WSL; nothing may stand in for it.
+  const wslHostDistro = isServerScope(scope)
+    ? wslHostDistroForTarget(scope.target, model.runtimeEnvironments)
+    : null
   return (
     <SettingsSection
       id="accounts"
@@ -70,12 +74,14 @@ export function renderAccountsSettingsSection(
       )}
       searchEntries={navigation.getSectionSearchEntries('accounts')}
     >
-      {!view.isSectionMounted('accounts') ? null : !model.settingsHostScope.available ? (
+      {!view.isSectionMounted('accounts') ? null : !isServerScope(scope) ? (
+        <SettingsHostScopeMachineOnlyNotice hostLabel={scope.label} />
+      ) : !scope.available ? (
         <SettingsHostScopeUnavailableNotice />
       ) : wslHostDistro ? (
         // A WSL host's orcad has no account services; this desktop owns its distro's accounts.
         <AccountsPane
-          key={wslHostDistro ?? getProviderAccountsOwnerKey(model.settingsHostScope.target)}
+          key={wslHostDistro ?? getProviderAccountsOwnerKey(scope.target)}
           nativeAccounts={model.nativeAccounts}
           onAccountLocationChange={model.releaseNativeAccounts}
           settings={model.settings}
@@ -90,13 +96,13 @@ export function renderAccountsSettingsSection(
         />
       ) : (
         <AccountsPane
-          key={wslHostDistro ?? getProviderAccountsOwnerKey(model.settingsHostScope.target)}
+          key={wslHostDistro ?? getProviderAccountsOwnerKey(scope.target)}
           nativeAccounts={model.nativeAccounts}
           onAccountLocationChange={model.releaseNativeAccounts}
           settings={model.settings}
           updateSettings={model.updateSettings}
           updateSettingsOrThrow={model.updateSettingsOrThrow}
-          hostScope={model.settingsHostScope}
+          hostScope={scope}
           wslSupportedPlatform={terminal.runtimeWslSupportedPlatform}
           wslAvailable={terminal.windowsTerminalCapabilities.wslAvailable}
           wslDistros={terminal.windowsTerminalCapabilities.wslDistros}

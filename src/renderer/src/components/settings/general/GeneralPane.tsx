@@ -29,6 +29,20 @@ import { GeneralConfirmationsSection } from './GeneralConfirmationsSection'
 import { GeneralSearchResults } from './GeneralSearchResults'
 import { getGeneralSubPageTitle, type GeneralSubPage } from './general-sub-pages'
 import { useOpenInMenuDraft } from './OpenInMenuSetting'
+import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host'
+
+/** Whether two Settings targets name the same machine. */
+function sameRuntimeTarget(left: RuntimeClientTarget | null, right: RuntimeClientTarget): boolean {
+  if (!left || left.kind !== right.kind) {
+    return false
+  }
+  return (
+    left.kind === 'local' ||
+    (right.kind === 'environment' && left.environmentId === right.environmentId)
+  )
+}
 
 export function getDesktopPlatformFromUserAgent(userAgent: string): 'darwin' | 'win32' | 'other' {
   if (userAgent.includes('Mac')) {
@@ -59,6 +73,8 @@ const EMPTY_WSL_DISTROS: string[] = []
 
 type GeneralPaneProps = {
   settings: GlobalSettings
+  /** The machine chosen at the top of Settings. */
+  hostScope: SettingsHostScope
   updateSettings: (updates: Partial<GlobalSettings>) => void
   updateSettingsOrThrow?: (updates: Partial<GlobalSettings>) => void | Promise<void>
   fontSuggestions: string[]
@@ -105,9 +121,21 @@ function GeneralPaneView({
     (state) => state.worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId
   )
   const target = defaultScopeHost(props.settings)
+  // Why the default host, not the picker: visibility defaults are read from, and written to, that
+  // host's store, so following the picker would label one machine with another's values.
   const defaultsSupported = target.kind === 'local' || target.environmentId === defaultsRuntimeId
   const sourceDefaultsSupported =
     defaultsSupported && (target.kind === 'local' || target.environmentId === sourceRuntimeId)
+  const defaultsEditAnotherHost = !sameRuntimeTarget(props.hostScope.target, target)
+  const defaultsEnvironmentName = useAppStore((state) =>
+    target.kind === 'environment'
+      ? state.runtimeEnvironments.find((entry) => entry.id === target.environmentId)?.name
+      : null
+  )
+  const defaultsHostLabel =
+    target.kind === 'environment'
+      ? (defaultsEnvironmentName ?? target.environmentId)
+      : getLocalExecutionHostLabel()
   if (query.trim() === '' && subPage) {
     return subPage === 'editor' ? (
       <GeneralEditorSettingsSection {...props} />
@@ -118,6 +146,8 @@ function GeneralPaneView({
         openInDraft={openInDraft}
         defaultsSupported={defaultsSupported}
         sourceDefaultsSupported={sourceDefaultsSupported}
+        defaultsEditAnotherHost={defaultsEditAnotherHost}
+        defaultsHostLabel={defaultsHostLabel}
       />
     )
   }

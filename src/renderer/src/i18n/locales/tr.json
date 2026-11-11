@@ -11270,10 +11270,6 @@
           }
         },
         "WorkspaceDirectorySetting": {
-          "1a2b3c4d5e": "İstemci varsayılanı",
-          "2b3c4d5e6f": "Şuna uygula",
-          "3c4d5e6f7a": "İstemci varsayılanını geçersiz kılar",
-          "4d5e6f7a8b": "İstemci varsayılanını devralır",
           "5e6f7a8b9c": "Sıfırla",
           "6f7a8b9cad": "Proje başına bir konum için göreli bir yol (ör. .orca/worktrees) veya paylaşılan tek bir klasör için mutlak bir yol kullanın."
         },
