@@ -139,8 +139,8 @@ async function columnsNamed(
   if (!scope) {
     return []
   }
-  // Why cached and best-effort: a project with no single proven board answers no columns, and the
-  // board column is only ever the fallback for a name that matched no status.
+  // Why cached and best-effort: a project with no single proven board answers no columns, and a
+  // failure leaves the name match as the only signal rather than failing the move.
   const order = await deps.loadStatusOrder(
     source,
     getTaskPageJiraStatusOrderRuntimeScopeKey(SYNC_SCOPE_KEY, getJiraRuntimeTarget(source)),
@@ -181,9 +181,9 @@ async function resolveTransition(
 }
 
 /**
- * Moves a Jira-linked workspace's issue to the card's status. Name match first because it is the
- * cheapest and the workspace label is a name; the Jira board column of that name is the fallback,
- * since a column groups several statuses and is what the Tasks board drops into.
+ * Moves a Jira-linked workspace's issue to the card's status. The card's Jira board column decides
+ * whether the issue is already where the user dropped it; within that, the transition's destination
+ * status name is the first signal and the column's statuses are the fallback.
  */
 export async function syncJiraWorktreeStatus(
   args: SyncJiraWorktreeStatusArgs,
