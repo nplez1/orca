@@ -20,14 +20,32 @@ const mocks = vi.hoisted(() => ({
   submit: vi.fn(),
   activate: vi.fn(),
   success: vi.fn(),
-  availability: vi.fn<() => HostStructuredAgentAvailability>()
+  availability: vi.fn<() => HostStructuredAgentAvailability>(),
+  cloneBlocksCreate: false
+}))
+
+vi.mock('@/components/new-workspace/use-run-target-auto-clone', () => ({
+  useRunTargetAutoClone: () => ({
+    status: { kind: 'idle' },
+    overrides: { url: '', destination: '' },
+    setOverrides: () => {},
+    defaultUrl: '',
+    pendingHostId: null,
+    blocksCreate: mocks.cloneBlocksCreate,
+    start: () => {},
+    retry: () => {},
+    cloneAs: () => {},
+    clear: () => {}
+  })
 }))
 
 vi.mock('@/runtime/native-chat/agent-catalogs/use-host-structured-agent-availability.ts', () => ({
   useHostStructuredAgentAvailability: mocks.availability
 }))
 vi.mock('@/components/agent/AgentSettingsDialog', () => ({ default: () => null }))
-vi.mock('@/lib/workspace/activation/worktree-activation.ts', () => ({ activateAndRevealWorktree: mocks.activate }))
+vi.mock('@/lib/workspace/activation/worktree-activation.ts', () => ({
+  activateAndRevealWorktree: mocks.activate
+}))
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: vi.fn(), info: vi.fn() } }))
 vi.mock('@/hooks/useDetectedAgents', () => ({
   useDetectedAgents: () => ({
@@ -111,10 +129,15 @@ beforeEach(() => {
   mocks.activate.mockReset()
   mocks.success.mockReset()
   mocks.availability.mockReturnValue({ state: 'pending' })
+  mocks.cloneBlocksCreate = false
   setLocalRuntimeCapabilitiesForTests(RUNTIME_CAPABILITIES)
   useAppStore.setState({
     activeModal: 'new-workspace-composer',
-    modalData: { lockedWorkspaceBranch: 'main', lockedWorkspaceSourceHostId: 'local' },
+    modalData: {
+      lockedWorkspaceBranch: 'main',
+      lockedWorkspaceSourceHostId: 'local',
+      lockedWorkspaceIsPrimary: true
+    },
     settings: { ...getDefaultSettings('/test'), defaultTuiAgent: 'claude' },
     worktreesByRepo: { 'repo-b': [primaryCheckoutOnMain()] }
   })
@@ -159,4 +182,45 @@ it('still creates when the checkout we cloned is not on the copied branch', asyn
 
   expect(mocks.success).not.toHaveBeenCalled()
   expect(mocks.submit).toHaveBeenCalledTimes(1)
+})
+
+it('says a branch the clone took belongs to the main checkout, not to the copied workspace', async () => {
+  // Why: a non-primary workspace on the default branch is the case the shortcut could misreport.
+  useAppStore.setState({
+    modalData: { lockedWorkspaceBranch: 'main', lockedWorkspaceSourceHostId: 'local' }
+  })
+  render(<NewWorkspaceComposerModal />, { wrapper: TooltipProvider })
+
+  fireEvent.click(screen.getByText('Clone'))
+  await create()
+
+  expect(mocks.submit).not.toHaveBeenCalled()
+  expect(mocks.success.mock.calls[0][0]).toContain('one checkout per branch')
+  expect(mocks.success.mock.calls[0][0]).not.toContain('This project is now on')
+  expect(mocks.activate).toHaveBeenCalledWith(`repo-b::${CLONE_PATH}`, {
+    navigationIntent: 'user-open'
+  })
+})
+
+it('creates the copied workspace when the clone landed on another branch', async () => {
+  useAppStore.setState({
+    modalData: { lockedWorkspaceBranch: 'feature-x', lockedWorkspaceSourceHostId: 'local' }
+  })
+  render(<NewWorkspaceComposerModal />, { wrapper: TooltipProvider })
+
+  fireEvent.click(screen.getByText('Clone'))
+  await create()
+
+  // Why: the primary checkout stays on the default branch and the copy needs its own worktree.
+  expect(mocks.success).not.toHaveBeenCalled()
+  expect(mocks.submit).toHaveBeenCalledTimes(1)
+  expect(mocks.submit.mock.calls[0][1]).toMatchObject({ exactBranchName: true })
+})
+
+it('cannot create while a clone for the chosen host is unfinished', async () => {
+  mocks.cloneBlocksCreate = true
+  render(<NewWorkspaceComposerModal />, { wrapper: TooltipProvider })
+
+  // Why: the selected setup is still the previous host, so creating would land in the wrong place.
+  expect(screen.getByRole('button', { name: 'Create' })).toHaveProperty('disabled', true)
 })

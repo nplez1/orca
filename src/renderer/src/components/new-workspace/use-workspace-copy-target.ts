@@ -13,6 +13,18 @@ import { isLockedSourceHostTarget } from './locked-target-host'
 /** How a project reached a host inside this composer; only our own clone makes the clone the copy. */
 export type ProjectHostSetupProvisioning = 'existing-folder' | 'cloned'
 
+/**
+ * Why a clone we made already holds the copied branch.
+ *
+ * `primary-copy` is the copy itself: the workspace being copied *was* the repo's primary checkout, so
+ * its clone is that workspace on the new host. `branch-held-by-primary` is a different workspace
+ * whose branch the clone checked out anyway — git keeps one checkout per branch, so the branch is
+ * there but that workspace is not, and saying otherwise would be a lie the user cannot act on.
+ */
+export type CloneLandedKind = 'primary-copy' | 'branch-held-by-primary'
+
+export type CloneLandedCopy = { worktree: Worktree; kind: CloneLandedKind }
+
 export type WorkspaceCopyTargetInput = {
   /** Set only when the composer is copying an existing workspace, so every other mode is inert. */
   lockedWorkspaceBranch?: string
@@ -24,6 +36,8 @@ export type WorkspaceCopyTargetInput = {
   selectedEphemeralVmRecipeId?: string | null
   /** The copy also recreates a fork remote, so its branch is not the checkout's own branch. */
   hasLockedPushTarget?: boolean
+  /** The copied workspace is the repo's primary checkout, so a clone of it *is* that workspace. */
+  lockedWorkspaceIsPrimary?: boolean
 }
 
 export type WorkspaceCopyTarget = {
@@ -33,7 +47,7 @@ export type WorkspaceCopyTarget = {
   onlySourceHostAvailable: boolean
   recordProvisionedSetup: (setupId: string, provisioning: ProjectHostSetupProvisioning) => void
   /** The workspace the copy would duplicate, when our own clone already checked its branch out. */
-  resolveCloneLandedCopy: () => Promise<Worktree | null>
+  resolveCloneLandedCopy: () => Promise<CloneLandedCopy | null>
   /** Name of the host the copy would land on, for reporting the outcome. */
   selectedTargetHostLabel: string
 }
@@ -55,7 +69,8 @@ export function useWorkspaceCopyTarget(input: WorkspaceCopyTargetInput): Workspa
     selectedProjectHostSetupId,
     selectedRepoExecutionHostId,
     selectedEphemeralVmRecipeId,
-    hasLockedPushTarget = false
+    hasLockedPushTarget = false,
+    lockedWorkspaceIsPrimary = false
   } = input
   const copyMode = Boolean(lockedWorkspaceBranch)
   const [clonedSetupKeys, setClonedSetupKeys] = useState<ReadonlySet<string>>(() => new Set())
@@ -109,7 +124,7 @@ export function useWorkspaceCopyTarget(input: WorkspaceCopyTargetInput): Workspa
     return option?.kind === 'ready' ? option : null
   }, [projectHostSetupOptions, selectedProjectHostSetupId])
 
-  const resolveCloneLandedCopy = useCallback(async (): Promise<Worktree | null> => {
+  const resolveCloneLandedCopy = useCallback(async (): Promise<CloneLandedCopy | null> => {
     if (!copyMode || !lockedWorkspaceBranch || !selectedReadyOption) {
       return null
     }
@@ -135,8 +150,22 @@ export function useWorkspaceCopyTarget(input: WorkspaceCopyTargetInput): Workspa
         // A twin repo id can hold another host's row, and an unstamped row is a local one.
         (worktree.hostId ?? LOCAL_EXECUTION_HOST_ID) === hostId
     )
-    return landed ?? null
-  }, [copyMode, clonedSetupKeys, hasLockedPushTarget, lockedWorkspaceBranch, selectedReadyOption])
+    return landed
+      ? {
+          worktree: landed,
+          // Why: the clone's primary checkout holding the branch is only the same workspace when the
+          // copy was that checkout; otherwise the branch is here and the workspace is not.
+          kind: lockedWorkspaceIsPrimary ? 'primary-copy' : 'branch-held-by-primary'
+        }
+      : null
+  }, [
+    copyMode,
+    clonedSetupKeys,
+    hasLockedPushTarget,
+    lockedWorkspaceBranch,
+    lockedWorkspaceIsPrimary,
+    selectedReadyOption
+  ])
 
   return {
     lockedTargetIsSourceHost,

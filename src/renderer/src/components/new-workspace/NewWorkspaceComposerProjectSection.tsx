@@ -6,6 +6,7 @@ import ProjectCombobox from '@/components/new-workspace/ProjectCombobox'
 import RunTargetCombobox from '@/components/new-workspace/RunTargetCombobox'
 import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
+import type { RepoKind } from '../../../../shared/repo-types'
 import { getSelectedNewWorkspaceProjectOptionId } from '@/lib/new-workspace-project-options'
 import type {
   EphemeralVmRecipeOption,
@@ -14,6 +15,8 @@ import type {
 } from './new-workspace-composer-card-props'
 import { EMPTY_PROJECT_OPTIONS } from './new-workspace-composer-card-props'
 import { LockedComposerValue } from './LockedComposerValue'
+import { RunTargetCloneStatus } from './RunTargetCloneStatus'
+import type { RunTargetAutoClone } from './use-run-target-auto-clone'
 
 type NewWorkspaceComposerProjectSectionProps = Pick<
   NewWorkspaceComposerCardProps,
@@ -47,7 +50,11 @@ type NewWorkspaceComposerProjectSectionProps = Pick<
   handleAddSshHost: () => void
   handleAddRemoteServer: () => void
   handleConnectRunTargetHost: (option: NeedsProjectHostOption) => Promise<void>
-  handleSetLocation: (option: NeedsProjectHostOption) => void
+  handleStartClone: (option: NeedsProjectHostOption) => void
+  handleUseExistingFolder: (option: NeedsProjectHostOption, initialPath?: string) => void
+  cloneProjectKind: RepoKind
+  cloneUrl: string
+  runTargetClone: RunTargetAutoClone | null
   sshStatusLabel: string
   connectButtonLabel: string
   selectedProjectName: string
@@ -78,7 +85,11 @@ export function NewWorkspaceComposerProjectSection({
   handleAddSshHost,
   handleAddRemoteServer,
   handleConnectRunTargetHost,
-  handleSetLocation,
+  handleStartClone,
+  handleUseExistingFolder,
+  cloneProjectKind,
+  cloneUrl,
+  runTargetClone,
   ephemeralVmRecipeError,
   selectedRepoRequiresConnection,
   selectedRepoConnectionId,
@@ -176,8 +187,18 @@ export function NewWorkspaceComposerProjectSection({
               onAddSshHost={handleAddSshHost}
               onAddRemoteServer={handleAddRemoteServer}
               onConnectHost={handleConnectRunTargetHost}
-              onSetLocation={handleSetLocation}
+              projectKind={cloneProjectKind}
+              cloneUrl={cloneUrl}
+              clone={runTargetClone}
+              onStartClone={handleStartClone}
+              onUseExistingFolder={handleUseExistingFolder}
             />
+            {runTargetClone ? (
+              <RunTargetCloneStatus
+                clone={runTargetClone}
+                onUseExistingFolder={handleUseExistingFolder}
+              />
+            ) : null}
             {ephemeralVmRecipeError ? (
               <p className="whitespace-pre-line text-[11px] text-destructive">
                 {ephemeralVmRecipeError}

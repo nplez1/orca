@@ -48,6 +48,22 @@ export type CloneParentSettings = {
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
 }
 
+// fork-comment-ok: one rule for the hook and the awaited resolver, so the two cannot drift.
+export function needsHostHomeProbe(
+  settings: CloneParentSettings | null | undefined,
+  hostIds: readonly ExecutionHostId[]
+): { environmentId: string | null; probe: boolean } {
+  const environmentId =
+    hostIds
+      .map((hostId) => parseExecutionHostId(hostId))
+      .find((parsed) => parsed?.kind === 'runtime')?.environmentId ?? null
+  const hasStoredRoot = Boolean(
+    getHostSettingOverrideForIds(settings, hostIds, 'defaultRepoRoot') ??
+    getHostSettingOverrideForIds(settings, hostIds, 'defaultWorktreeLocation')
+  )
+  return { environmentId, probe: environmentId !== null && !hasStoredRoot }
+}
+
 /** Where a clone lands for a host: its checkout root, else its worktree root under the layout rule. */
 export function getCloneParentForHost({
   settings,

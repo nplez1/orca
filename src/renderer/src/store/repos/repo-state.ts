@@ -215,7 +215,11 @@ export type RepoSlice = {
   deleteProjectHostSetup: (
     args: ProjectHostSetupDeleteArgs
   ) => Promise<ProjectHostSetupDeleteResult | null>
-  setupProjectClone: (args: ProjectHostSetupCloneArgs) => Promise<ProjectHostSetupResult | null>
+  setupProjectClone: (
+    args: ProjectHostSetupCloneArgs,
+    // fork-comment-ok: 'throw' is for a caller that shows the failure inline instead of as a toast.
+    options?: { onFailure?: 'toast' | 'throw' }
+  ) => Promise<ProjectHostSetupResult | null>
   addNonGitFolder: (path: string, options?: AddRepoPathOptions) => Promise<Repo | null>
   scanNestedRepos: (
     path: string,

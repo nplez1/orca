@@ -1,7 +1,6 @@
 import React from 'react'
 import { AlertTriangle, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { useTranslate } from '@/i18n/use-translate'
 import { HostRowIcon } from '../host-row-icon'
@@ -63,48 +62,48 @@ export function ConnectHostButton({
   )
 }
 
-export function SetLocationButton({
-  hostLabel,
-  onSetLocation
+// fork-comment-ok: same click contract as Connect — the row must not commit when its action does.
+/** A row's inline next step. */
+export function RowTextAction({
+  label,
+  ariaLabel,
+  disabled = false,
+  onClick
 }: {
-  hostLabel: string
-  onSetLocation: () => void
+  label: string
+  ariaLabel?: string
+  disabled?: boolean
+  onClick: () => void
 }): React.JSX.Element {
-  const t = useTranslate()
-  const label = t('auto.components.NewWorkspaceComposerCard.setLocation', 'Set project location')
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          className="ml-auto shrink-0 self-center"
-          aria-label={t(
-            'auto.components.NewWorkspaceComposerCard.setLocationOnHost',
-            'Set project location on {{host}}',
-            { host: hostLabel }
-          )}
-          onMouseDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onSetLocation()
-          }}
-        >
-          {label}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={6}>
-        {t(
-          'auto.components.NewWorkspaceComposerCard.setLocationTooltip',
-          'Choose a folder or clone this project onto {{host}}.',
-          { host: hostLabel }
-        )}
-      </TooltipContent>
-    </Tooltip>
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      disabled={disabled}
+      aria-label={ariaLabel ?? label}
+      className="ml-1 shrink-0 self-center"
+      onMouseDown={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      }}
+      onClick={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onClick()
+      }}
+    >
+      {label}
+    </Button>
+  )
+}
+
+export function CloneProgressLabel(): React.JSX.Element {
+  const t = useTranslate()
+  return (
+    <span className="ml-1 flex shrink-0 items-center gap-1 self-center text-xs text-muted-foreground">
+      <LoaderCircle className="size-3 animate-spin" />
+      {t('auto.components.NewWorkspaceComposerCard.cloning', 'Cloning…')}
+    </span>
   )
 }

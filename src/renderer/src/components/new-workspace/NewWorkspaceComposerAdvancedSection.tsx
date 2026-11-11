@@ -17,6 +17,7 @@ import {
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import { ComposerParentWorktreePicker } from './ComposerParentWorktreePicker'
+import { ComposerCloneOptionsFields } from './ComposerCloneOptionsFields'
 import { resolveImpliedTaskSource } from './implied-task-source'
 import type { NewWorkspaceComposerCardProps } from './new-workspace-composer-card-props'
 
@@ -57,6 +58,7 @@ type NewWorkspaceComposerAdvancedSectionProps = Pick<
   | 'onSparseSelectPreset'
   | 'canUseSparseCheckout'
   | 'identityLocked'
+  | 'runTargetClone'
 > & {
   sparseEditing?: boolean
   onSparseEditingChange: (editing: boolean) => void
@@ -103,7 +105,8 @@ export function NewWorkspaceComposerAdvancedSection({
   sparseSelectedPresetId,
   onSparseSelectPreset,
   canUseSparseCheckout,
-  identityLocked = false
+  identityLocked = false,
+  runTargetClone
 }: NewWorkspaceComposerAdvancedSectionProps): React.JSX.Element {
   const t = useTranslate()
   const handleNotePaste = React.useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -218,6 +221,10 @@ export function NewWorkspaceComposerAdvancedSection({
               activeFolderWorkspaceId={activeFolderWorkspaceId}
               disabled={!advancedOpen}
             />
+          ) : null}
+
+          {selectedRepoIsGit && runTargetClone ? (
+            <ComposerCloneOptionsFields clone={runTargetClone} />
           ) : null}
 
           <div className="space-y-1">

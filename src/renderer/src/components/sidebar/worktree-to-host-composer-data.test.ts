@@ -50,11 +50,23 @@ describe('add workspace to another host', () => {
       initialWorkspaceTarget: { projectId: 'github:acme/app' },
       initialRepoId: 'local-repo',
       lockedWorkspaceBranch: 'feature/fix-login',
+      // Why the flag: a clone of this workspace is that workspace only when it is the checkout itself.
+      lockedWorkspaceIsPrimary: false,
       // Why the remote copy: the target host usually has this branch only as a remote-tracking ref.
       initialBaseBranch: 'origin/feature/fix-login',
       lockedWorkspaceSourceHostId: 'local',
       telemetrySource: 'sidebar'
     })
+  })
+
+  it('marks a copy of the primary checkout as the checkout itself', () => {
+    const data = buildWorktreeToHostComposerData({
+      worktree: makeWorktree({ isMainWorktree: true }),
+      repo: localRepo,
+      projectId: 'github:acme/app'
+    })
+
+    expect(data.lockedWorkspaceIsPrimary).toBe(true)
   })
 
   it('starts from the remote the workspace publishes to', () => {

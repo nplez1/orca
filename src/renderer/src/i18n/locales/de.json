@@ -2560,9 +2560,6 @@
         "connectTimedOut": "Zeitüberschreitung beim Verbindungsaufbau. Die Verbindung wird möglicherweise noch im Hintergrund hergestellt.",
         "connectingHost": "Verbindung wird hergestellt…",
         "connectHost": "Verbinden",
-        "setLocation": "Projektpfad festlegen",
-        "setLocationOnHost": "Projektpfad auf {{host}} festlegen",
-        "setLocationTooltip": "Einen Ordner auswählen oder dieses Projekt auf {{host}} klonen.",
         "addHost": "Host hinzufügen",
         "addSshHost": "SSH-Host hinzufügen",
         "addSshHostHint": "Einen vorhandenen Rechner über SSH verwenden",
@@ -15179,12 +15176,7 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
-            "title": "Projektpfad festlegen",
             "description": "Den Speicherort von {{project}} auf {{host}} auswählen.",
-            "browseFolder": "Ordner auswählen",
-            "browseFolderHelp": "Einen vorhandenen Checkout oder Ordner auf diesem Host verwenden.",
-            "cloneFromUrl": "Von URL klonen",
-            "cloneFromUrlHelp": "Dieses Repository auf {{host}} klonen.",
             "saveLocation": "Speicherort festlegen"
           },
           "SmartWorkspaceNameField": {

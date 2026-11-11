@@ -2352,9 +2352,6 @@
         "connectTimedOut": "La connexion a expiré. Elle se poursuit peut-être en arrière-plan.",
         "connectingHost": "Connexion…",
         "connectHost": "Se connecter",
-        "setLocation": "Définir l'emplacement du projet",
-        "setLocationOnHost": "Définir l'emplacement du projet sur {{host}}",
-        "setLocationTooltip": "Choisissez un dossier ou clonez ce projet sur {{host}}.",
         "addHost": "Ajouter un hôte",
         "addSshHost": "Ajouter un hôte SSH",
         "addSshHostHint": "Utiliser une machine existante via SSH",
@@ -15115,12 +15112,7 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
-            "title": "Définir l'emplacement du projet",
             "description": "Choisissez l'emplacement de {{project}} sur {{host}}.",
-            "browseFolder": "Parcourir le dossier",
-            "browseFolderHelp": "Utilisez un checkout ou un dossier existant sur cet hôte.",
-            "cloneFromUrl": "Cloner depuis une URL",
-            "cloneFromUrlHelp": "Clonez ce dépôt sur {{host}}.",
             "saveLocation": "Définir l'emplacement"
           },
           "SmartWorkspaceNameField": {

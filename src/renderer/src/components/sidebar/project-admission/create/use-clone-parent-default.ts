@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
-import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
-import { getCloneParentForHost, type CloneParentSettings } from './clone-defaults'
+import {
+  getCloneParentForHost,
+  needsHostHomeProbe,
+  type CloneParentSettings
+} from './clone-defaults'
 
 /** One clone destination rule for both clone UIs: the host's stored root, else its own home. */
 export function useCloneParentDefault({
@@ -17,16 +20,9 @@ export function useCloneParentDefault({
   layoutMode?: WorktreeLayoutMode
   enabled: boolean
 }): { parent: string; pending: boolean } {
-  const environmentId =
-    hostIds
-      .map((hostId) => parseExecutionHostId(hostId))
-      .find((parsed) => parsed?.kind === 'runtime')?.environmentId ?? null
-  const hasStoredRoot = Boolean(
-    getHostSettingOverrideForIds(settings, hostIds, 'defaultRepoRoot') ??
-    getHostSettingOverrideForIds(settings, hostIds, 'defaultWorktreeLocation')
-  )
+  const { environmentId, probe } = needsHostHomeProbe(settings, hostIds)
   // Only a host with nothing stored needs its home read, and only once per host.
-  const shouldProbe = enabled && environmentId !== null && !hasStoredRoot
+  const shouldProbe = enabled && probe
   const [hostHome, setHostHome] = useState<string | null>(null)
   const [probeFailed, setProbeFailed] = useState(false)
   useEffect(() => {

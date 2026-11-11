@@ -113,7 +113,11 @@ function ProjectAndHostPreview({
         handleAddSshHost={() => {}}
         handleAddRemoteServer={() => {}}
         handleConnectRunTargetHost={async () => {}}
-        handleSetLocation={() => {}}
+        handleStartClone={() => {}}
+        handleUseExistingFolder={() => {}}
+        cloneProjectKind="git"
+        cloneUrl="git@github.com:acme/orca.git"
+        runTargetClone={null}
         onConnectSelectedRepo={async () => {}}
         sshStatusLabel="Connected"
         connectButtonLabel="Connect"

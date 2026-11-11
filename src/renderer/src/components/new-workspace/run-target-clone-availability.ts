@@ -1,0 +1,77 @@
+import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
+import type { RepoKind } from '../../../../shared/repo-types'
+import { translate } from '@/i18n/i18n'
+import type { Translate } from '@/i18n/use-translate'
+
+/**
+ * What a host row without the project can actually do when chosen.
+ *
+ * `refused` keeps the host's own reason (unhealthy, no server, host-local project, setup in
+ * progress): the row shows that sentence and commits to nothing, so a row never looks automatic and
+ * then fails. The other two are decided from facts the composer holds — the project's kind and the
+ * remote it was cloned from — because those decide whether a clone can be attempted at all.
+ */
+export type RunTargetCloneAvailability =
+  | { kind: 'clone' }
+  | { kind: 'existing-folder-only'; reason: string }
+  | { kind: 'refused' }
+
+export function getRunTargetCloneAvailability(
+  option: Pick<NeedsSetupProjectHostOption, 'canSetLocation'>,
+  { projectKind, cloneUrl }: { projectKind: RepoKind; cloneUrl: string },
+  t: Translate = translate
+): RunTargetCloneAvailability {
+  if (!option.canSetLocation) {
+    return { kind: 'refused' }
+  }
+  if (projectKind !== 'git') {
+    return {
+      kind: 'existing-folder-only',
+      reason: t(
+        'auto.components.NewWorkspaceComposerCard.cloneNeedsGitProject',
+        'Only a Git project can be cloned. Use a folder that already exists on this host.'
+      )
+    }
+  }
+  if (!cloneUrl.trim()) {
+    return {
+      kind: 'existing-folder-only',
+      reason: t(
+        'auto.components.NewWorkspaceComposerCard.cloneNeedsRemote',
+        'This project has no remote to clone from. Use a folder that already exists on this host.'
+      )
+    }
+  }
+  return { kind: 'clone' }
+}
+
+/** What choosing a host row does, decided once so a click and Enter cannot disagree. */
+export type RunTargetRowAction =
+  | 'start-clone'
+  | 'retry-clone'
+  | 'use-existing-folder'
+  /** Nothing: the row is refused, already cloning, or waiting on a decision only it can offer. */
+  | 'none'
+
+export function resolveRunTargetRowAction(
+  availability: RunTargetCloneAvailability,
+  statusKind: 'idle' | 'cloning' | 'folder-taken' | 'failed'
+): RunTargetRowAction {
+  // Why first: a host that cannot take the project at all keeps its own reason, whatever a clone
+  // for it did earlier — otherwise a host that went unhealthy mid-clone would offer the dialog.
+  if (availability.kind === 'refused') {
+    return 'none'
+  }
+  // Why: a running clone must not be re-asked for, and a taken folder needs the suggestion or the
+  // existing folder, both of which the row and the status line offer as their own actions.
+  if (statusKind === 'cloning' || statusKind === 'folder-taken') {
+    return 'none'
+  }
+  if (statusKind === 'failed') {
+    return availability.kind === 'clone' ? 'retry-clone' : 'use-existing-folder'
+  }
+  if (availability.kind === 'clone') {
+    return 'start-clone'
+  }
+  return availability.kind === 'existing-folder-only' ? 'use-existing-folder' : 'none'
+}

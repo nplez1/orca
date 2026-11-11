@@ -88,7 +88,26 @@
         "test": {
           "fixture": {}
         },
-        "addAnotherHostToCopy": "Add another host to copy this workspace to — none other is configured yet."
+        "addAnotherHostToCopy": "Add another host to copy this workspace to — none other is configured yet.",
+        "cloneRepoUrl": "Repository URL",
+        "cloneProtocol": "Clone protocol",
+        "cloneDestination": "Destination folder",
+        "cloneDestinationDefault": "This host's checkout folder",
+        "cloningOntoHost": "Cloning onto {{host}}…",
+        "cloneFolderTaken": "{{folder}} already exists on {{host}}.",
+        "cloneAsSuggestion": "Clone as {{name}}",
+        "useExistingFolder": "Use existing folder",
+        "retryClone": "Retry",
+        "cloning": "Cloning…",
+        "useExistingFolderOnHost": "Use an existing folder on {{host}}",
+        "retryCloneOnHost": "Retry cloning onto {{host}}",
+        "cloneNeedsGitProject": "Only a Git project can be cloned. Use a folder that already exists on this host.",
+        "cloneNeedsRemote": "This project has no remote to clone from. Use a folder that already exists on this host.",
+        "cloneNeedsDestination": "Orca could not find a folder to clone into on this host. Use a folder that already exists there.",
+        "cloneSetupFailed": "Cloned, but Orca could not add the project on this host.",
+        "cloneFailed": "Cloning failed on this host.",
+        "cloneProtocolSsh": "SSH",
+        "cloneProtocolHttps": "HTTPS"
       },
       "PullRequestPage": {
         "18f2af42ac": null,
@@ -1007,13 +1026,21 @@
         "changeStatusFailed": null
       },
       "NewWorkspaceComposerModal": {
-        "copyAlreadyLanded": "This project is now on {{host}} on {{branch}}."
+        "copyAlreadyLanded": "This project is now on {{host}} on {{branch}}.",
+        "copyBranchHeldByPrimary": "{{branch}} is checked out by the main checkout of this project on {{host}}. Git keeps one checkout per branch, so that is the workspace there."
       },
       "feature": {
         "wall": {
           "AiCommitPrSettingsCard": {
             "be8917699e": "Model",
             "4b2fc4b80c": "Thinking effort"
+          }
+        }
+      },
+      "new": {
+        "workspace": {
+          "SetProjectLocationDialog": {
+            "useExistingFolderTitle": "Use an existing folder"
           }
         }
       }

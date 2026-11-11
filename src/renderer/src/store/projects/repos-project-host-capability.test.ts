@@ -85,6 +85,23 @@ describe('repos-project-host-capability', () => {
       expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
     })
 
+    it('hands a clone failure back to a caller that shows it inline', async () => {
+      runtimeCapabilities = [PROJECT_HOST_SETUP_RUNTIME_CAPABILITY]
+      const store = createTestStore()
+
+      await expect(
+        store.getState().setupProjectClone(
+          {
+            projectId: 'project-1',
+            hostId: 'runtime:env-1',
+            url: 'https://github.com/stablyai/orca.git',
+            destination: '/srv'
+          },
+          { onFailure: 'throw' }
+        )
+      ).rejects.toThrow(/cannot add projects on its SSH hosts|capability|not support/i)
+    })
+
     it('blocks runtime project setup mutations when workspace run-context support is missing', async () => {
       runtimeCapabilities = [PROJECT_HOST_SETUP_RUNTIME_CAPABILITY]
       const store = createTestStore()

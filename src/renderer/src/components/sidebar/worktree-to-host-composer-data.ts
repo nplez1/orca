@@ -60,6 +60,9 @@ export function buildWorktreeToHostComposerData({
     // resolves the project from that instead of an invented identity key.
     initialRepoId: worktree.repoId,
     lockedWorkspaceBranch: branch,
+    // Why: the clone of a primary checkout *is* that workspace on the target host, and the clone of
+    // any other workspace is not, even when it lands on the same branch.
+    lockedWorkspaceIsPrimary: worktree.isMainWorktree === true,
     ...(branch ? { initialBaseBranch: `${baseRemote}/${baseBranch}` } : {}),
     ...(pushTargetUrl
       ? {
