@@ -32,6 +32,9 @@ export function useSkillsPageKeyboardNavigation({
         target instanceof HTMLElement &&
         target.matches('input, textarea, select, [contenteditable="true"], [contenteditable=""]')
       ) {
+        // Esc first exits field focus, then leaves selection/shared links, then the page.
+        event.preventDefault()
+        target.blur()
         return
       }
       event.preventDefault()
