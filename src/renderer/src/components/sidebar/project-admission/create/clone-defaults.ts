@@ -49,6 +49,27 @@ export type CloneParentSettings = {
 }
 
 /** Where a clone lands for a host: its checkout root, else its worktree root under the layout rule. */
+/**
+ * Whether resolving this host's clone parent needs its home folder read.
+ *
+ * One rule for the hook and the awaited resolver: a host with a stored root already answers, and
+ * only a runtime host can be probed at all.
+ */
+export function needsHostHomeProbe(
+  settings: CloneParentSettings | null | undefined,
+  hostIds: readonly ExecutionHostId[]
+): { environmentId: string | null; probe: boolean } {
+  const environmentId =
+    hostIds
+      .map((hostId) => parseExecutionHostId(hostId))
+      .find((parsed) => parsed?.kind === 'runtime')?.environmentId ?? null
+  const hasStoredRoot = Boolean(
+    getHostSettingOverrideForIds(settings, hostIds, 'defaultRepoRoot') ??
+    getHostSettingOverrideForIds(settings, hostIds, 'defaultWorktreeLocation')
+  )
+  return { environmentId, probe: environmentId !== null && !hasStoredRoot }
+}
+
 export function getCloneParentForHost({
   settings,
   hostIds,

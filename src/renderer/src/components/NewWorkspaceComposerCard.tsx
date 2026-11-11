@@ -131,14 +131,18 @@ export default function NewWorkspaceComposerCard(
   const needsSetupProjectHostSetupOptions = projectHostSetupOptions.filter(
     (option) => option.kind === 'needs-setup'
   )
-  // fork-comment-ok: warm only the fallback row, so the picker's own read overlaps the chunk load.
-  const hasFallbackLocationOption = needsSetupProjectHostSetupOptions.some(
-    (option) =>
-      getRunTargetCloneAvailability(option, {
-        projectKind: selectedRepoIsGit ? 'git' : 'folder',
-        cloneUrl: defaultCloneUrl
-      }).kind === 'existing-folder-only'
-  )
+  // fork-comment-ok: warm the fallback chunk from a row that can only take a folder, or from a
+  // clone that already failed, so the dialog opens without a stall in either case.
+  const hasFallbackLocationOption =
+    runTargetClone?.status.kind === 'failed' ||
+    runTargetClone?.status.kind === 'folder-taken' ||
+    needsSetupProjectHostSetupOptions.some(
+      (option) =>
+        getRunTargetCloneAvailability(option, {
+          projectKind: selectedRepoIsGit ? 'git' : 'folder',
+          cloneUrl: defaultCloneUrl
+        }).kind === 'existing-folder-only'
+    )
   React.useEffect(() => {
     if (hasFallbackLocationOption) {
       void loadSetProjectLocationDialog().catch(() => {})
@@ -221,9 +225,12 @@ export default function NewWorkspaceComposerCard(
   const handleSetLocationReady = React.useCallback(
     (setupId: string, provisioning: ProjectHostSetupProvisioning): void => {
       handleSetLocationClose()
+      // Why: the fallback answered the clone this composer was waiting on, so it must stop
+      // blocking Create and stop reporting the failure it was opened for.
+      runTargetClone?.clear()
       onProjectHostSetupChange?.(setupId, provisioning)
     },
-    [handleSetLocationClose, onProjectHostSetupChange]
+    [handleSetLocationClose, onProjectHostSetupChange, runTargetClone]
   )
   const handleConnectRunTargetHost = React.useCallback(
     async (option: NeedsProjectHostOption): Promise<void> => {

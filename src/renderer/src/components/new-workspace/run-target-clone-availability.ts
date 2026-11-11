@@ -44,3 +44,29 @@ export function getRunTargetCloneAvailability(
   }
   return { kind: 'clone' }
 }
+
+/** What choosing a host row does, decided once so a click and Enter cannot disagree. */
+export type RunTargetRowAction =
+  | 'start-clone'
+  | 'retry-clone'
+  | 'use-existing-folder'
+  /** Nothing: the row is refused, already cloning, or waiting on a decision only it can offer. */
+  | 'none'
+
+export function resolveRunTargetRowAction(
+  availability: RunTargetCloneAvailability,
+  statusKind: 'idle' | 'resolving' | 'cloning' | 'folder-taken' | 'failed'
+): RunTargetRowAction {
+  // Why: a running clone must not be re-asked for, and a taken folder needs the suggestion or the
+  // existing folder, both of which the row and the status line offer as their own actions.
+  if (statusKind === 'resolving' || statusKind === 'cloning' || statusKind === 'folder-taken') {
+    return 'none'
+  }
+  if (statusKind === 'failed') {
+    return availability.kind === 'clone' ? 'retry-clone' : 'use-existing-folder'
+  }
+  if (availability.kind === 'clone') {
+    return 'start-clone'
+  }
+  return availability.kind === 'existing-folder-only' ? 'use-existing-folder' : 'none'
+}

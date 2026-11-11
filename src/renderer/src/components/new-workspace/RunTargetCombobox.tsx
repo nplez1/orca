@@ -22,7 +22,10 @@ import {
 import { AddHostSubmenuRow } from './RunTargetSubmenus'
 import RunTargetRowList from './RunTargetRowList'
 import RunTargetField from './RunTargetField'
-import { getRunTargetCloneAvailability } from './run-target-clone-availability'
+import {
+  getRunTargetCloneAvailability,
+  resolveRunTargetRowAction
+} from './run-target-clone-availability'
 import type { RunTargetAutoClone } from './use-run-target-auto-clone'
 import { HostListOverflowNote } from '@/components/host-picker/HostListOverflowNote'
 
@@ -185,22 +188,26 @@ export default function RunTargetCombobox({
       }
       if (row.kind === 'needs-setup') {
         // fork-comment-ok: a refused host must keep the reason its row shows, not gain a clone.
-        if (!row.option.canSetLocation) {
-          return
-        }
-        if (
-          getRunTargetCloneAvailability(row.option, { projectKind, cloneUrl }, t).kind ===
-          'existing-folder-only'
-        ) {
+        const availability = getRunTargetCloneAvailability(row.option, { projectKind, cloneUrl }, t)
+        const rowStatus =
+          clone && clone.status.kind !== 'idle' && clone.status.target.hostId === row.option.hostId
+            ? clone.status
+            : null
+        // Same routing as the row's own click, so Enter and a click can never disagree.
+        const action = resolveRunTargetRowAction(availability, rowStatus?.kind ?? 'idle')
+        if (action === 'start-clone') {
+          startClone(row.option)
+        } else if (action === 'retry-clone') {
+          close()
+          clone?.retry()
+        } else if (action === 'use-existing-folder') {
           openExistingFolder(row.option)
-          return
         }
-        startClone(row.option)
         return
       }
       setSubmenu(row.kind === 'recipes' ? 'recipes' : 'add-host')
     },
-    [cloneUrl, projectKind, rows, selectHost, startClone, t, openExistingFolder]
+    [clone, cloneUrl, close, openExistingFolder, projectKind, rows, selectHost, startClone, t]
   )
 
   const handleKeyDown = useCallback(
@@ -243,25 +250,24 @@ export default function RunTargetCombobox({
 
   const fieldLabel = selectedRecipe
     ? `${getEphemeralVmLabel(t)} / ${selectedRecipe.name}`
-    : (selectedHost?.label ?? pendingClone?.label ?? '')
+    : (pendingClone?.label ?? selectedHost?.label ?? '')
   const fieldDetail = selectedRecipe
     ? getRecipeDetail(selectedRecipe, t)
-    : (selectedHost?.path ??
-      (pendingClone
-        ? clone?.status.kind === 'failed'
-          ? clone.status.message
-          : clone?.status.kind === 'folder-taken'
-            ? t(
-                'auto.components.NewWorkspaceComposerCard.cloneFolderTaken',
-                '{{folder}} already exists on {{host}}.',
-                { folder: clone.status.folderName, host: pendingClone.label }
-              )
-            : t(
-                'auto.components.NewWorkspaceComposerCard.cloningOntoHost',
-                'Cloning onto {{host}}…',
-                { host: pendingClone.label }
-              )
-        : ''))
+    : pendingClone
+      ? clone?.status.kind === 'failed'
+        ? clone.status.message
+        : clone?.status.kind === 'folder-taken'
+          ? t(
+              'auto.components.NewWorkspaceComposerCard.cloneFolderTaken',
+              '{{folder}} already exists on {{host}}.',
+              { folder: clone.status.folderName, host: pendingClone.label }
+            )
+          : t(
+              'auto.components.NewWorkspaceComposerCard.cloningOntoHost',
+              'Cloning onto {{host}}…',
+              { host: pendingClone.label }
+            )
+      : (selectedHost?.path ?? '')
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -277,7 +283,7 @@ export default function RunTargetCombobox({
         onToggle={() => setOpen(!open)}
         committed={committed}
         isRecipe={selectedRecipe !== null}
-        hostId={selectedHost?.hostId ?? pendingClone?.hostId ?? null}
+        hostId={pendingClone?.hostId ?? selectedHost?.hostId ?? null}
         label={fieldLabel}
         detail={fieldDetail}
         listId={listId}

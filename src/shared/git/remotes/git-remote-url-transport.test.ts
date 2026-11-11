@@ -47,22 +47,31 @@ describe('rewriteGitRemoteTransport', () => {
     expect(rewriteGitRemoteTransport(url, to)).toBe(expected)
   })
 
-  it('returns the url unchanged when it already has the requested transport', () => {
+  it('returns the url untouched when it already has the requested transport', () => {
+    // Why untouched rather than canonical: a port the user picked on purpose (ssh-over-443, a
+    // self-hosted server on 2222) must survive a click on the transport that is already selected.
+    expect(rewriteGitRemoteTransport('ssh://git@ssh.github.com:443/acme/app.git', 'ssh')).toBe(
+      'ssh://git@ssh.github.com:443/acme/app.git'
+    )
     expect(rewriteGitRemoteTransport('https://github.com/acme/app.git', 'https')).toBe(
       'https://github.com/acme/app.git'
     )
   })
 
-  it('never emits credentials in either direction', () => {
-    expect(rewriteGitRemoteTransport('https://user:pw@github.com/acme/app.git', 'https')).toBe(
-      'https://github.com/acme/app.git'
+  it('never invents a user on the way to https', () => {
+    expect(rewriteGitRemoteTransport('https://user:pw@github.com/acme/app.git', 'ssh')).toBe(
+      'git@github.com:acme/app.git'
     )
     expect(rewriteGitRemoteTransport('git@github.com:acme/app.git', 'https')).not.toContain('@')
   })
 
-  it('leaves an Azure DevOps remote alone, whose path differs per transport', () => {
-    expect(
-      rewriteGitRemoteTransport('https://dev.azure.com/org/project/_git/app', 'ssh')
-    ).toBeNull()
+  const perTransportPaths: [url: string, to: GitRemoteTransport][] = [
+    ['https://dev.azure.com/org/project/_git/app', 'ssh'],
+    ['https://bitbucket.example.com/scm/PROJ/app.git', 'ssh'],
+    ['git@bitbucket.example.com:scm/PROJ/app.git', 'https']
+  ]
+
+  it.each(perTransportPaths)('leaves %s alone, whose path differs per transport', (url, to) => {
+    expect(rewriteGitRemoteTransport(url, to)).toBeNull()
   })
 })

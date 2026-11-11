@@ -29,6 +29,9 @@ export function ComposerCloneOptionsFields({
   const url = clone.overrides.url || clone.defaultUrl
   const transport = detectGitRemoteTransport(url)
   const switchTransport = (to: GitRemoteTransport): void => {
+    if (to === transport) {
+      return
+    }
     const rewritten = rewriteGitRemoteTransport(url, to)
     if (rewritten) {
       clone.setOverrides({ url: rewritten })

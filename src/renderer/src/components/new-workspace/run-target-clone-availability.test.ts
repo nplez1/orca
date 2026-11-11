@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
-import { getRunTargetCloneAvailability } from './run-target-clone-availability'
+import {
+  getRunTargetCloneAvailability,
+  resolveRunTargetRowAction
+} from './run-target-clone-availability'
 
 const option: NeedsSetupProjectHostOption = {
   kind: 'needs-setup',
@@ -50,5 +53,34 @@ describe('getRunTargetCloneAvailability', () => {
         { projectKind: 'git', cloneUrl: remote }
       )
     ).toEqual({ kind: 'refused' })
+  })
+})
+
+describe('resolveRunTargetRowAction', () => {
+  const cloneable = { kind: 'clone' } as const
+  const folderOnly = { kind: 'existing-folder-only', reason: 'no remote' } as const
+  const refused = { kind: 'refused' } as const
+
+  it('starts a clone from an idle cloneable row', () => {
+    expect(resolveRunTargetRowAction(cloneable, 'idle')).toBe('start-clone')
+  })
+
+  it('adopts a folder when the row cannot clone', () => {
+    expect(resolveRunTargetRowAction(folderOnly, 'idle')).toBe('use-existing-folder')
+  })
+
+  it('does nothing on a refused row', () => {
+    expect(resolveRunTargetRowAction(refused, 'idle')).toBe('none')
+  })
+
+  it('retries a failed clone instead of starting a second one', () => {
+    expect(resolveRunTargetRowAction(cloneable, 'failed')).toBe('retry-clone')
+  })
+
+  it('does nothing while a clone runs, or while a taken folder needs a decision', () => {
+    // Why: re-asking would collide on the destination, and a taken folder has its own two answers.
+    expect(resolveRunTargetRowAction(cloneable, 'cloning')).toBe('none')
+    expect(resolveRunTargetRowAction(cloneable, 'resolving')).toBe('none')
+    expect(resolveRunTargetRowAction(cloneable, 'folder-taken')).toBe('none')
   })
 })

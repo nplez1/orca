@@ -123,7 +123,8 @@ describe('useRunTargetAutoClone', () => {
         finish = resolve
       })
     )
-    const { result } = renderClone()
+    const onProvisioned = vi.fn()
+    const { result } = renderClone(onProvisioned)
 
     // Flush the destination resolution so the first clone is genuinely in flight.
     await act(async () => {
@@ -136,6 +137,49 @@ describe('useRunTargetAutoClone', () => {
 
     // Why: a second clone would collide on the destination or land a duplicate checkout.
     expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
+    // Why: the joined pick must not strand the clone it joined — the composer would wait forever.
+    expect(onProvisioned).toHaveBeenCalledWith(JSON.stringify(['setup-new', HOST]), 'cloned')
+    expect(result.current.status.kind).toBe('idle')
+  })
+
+  it('ignores the host it was moved away from and applies the one it was moved to', async () => {
+    const finishes = new Map<string, (value: unknown) => void>()
+    mocks.setupProjectClone.mockImplementation(
+      (args: { hostId: string }) =>
+        new Promise((resolve) => {
+          finishes.set(args.hostId, resolve)
+        })
+    )
+    const otherHost: NeedsSetupProjectHostOption = {
+      ...option,
+      id: 'needs-setup:runtime:env-c',
+      hostId: 'runtime:env-c',
+      label: 'Second box'
+    }
+    const onProvisioned = vi.fn()
+    const { result } = renderClone(onProvisioned)
+
+    await act(async () => {
+      result.current.start(option)
+    })
+    await act(async () => {
+      result.current.start(otherHost)
+    })
+    await act(async () => {
+      finishes.get(HOST)?.({ setup: { id: 'setup-b' } })
+    })
+
+    expect(onProvisioned).not.toHaveBeenCalled()
+    expect(result.current.status).toMatchObject({ kind: 'cloning' })
+
+    await act(async () => {
+      finishes.get('runtime:env-c')?.({ setup: { id: 'setup-c' } })
+    })
+
+    expect(onProvisioned).toHaveBeenCalledWith(
+      JSON.stringify(['setup-c', 'runtime:env-c']),
+      'cloned'
+    )
   })
 
   it('runs nothing when the default folder is already taken', async () => {

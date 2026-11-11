@@ -229,6 +229,15 @@ function QuickTabBody({
     layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
     onProvisioned: handleProjectHostSetupProvisioned
   })
+  // fork-comment-ok: a clone belongs to the project that started it — a URL, a destination and the
+  // setup it lands on all name that project, so switching project must drop the whole request.
+  const selectedProjectId = cardProps.selectedProjectId ?? null
+  const clearRunTargetClone = runTargetClone.clear
+  const setRunTargetCloneOverrides = runTargetClone.setOverrides
+  useEffect(() => {
+    clearRunTargetClone()
+    setRunTargetCloneOverrides({ url: '', destination: '' })
+  }, [clearRunTargetClone, selectedProjectId, setRunTargetCloneOverrides])
   // Why: the composer's built-in `onOpenAgentSettings` handler navigates to
   // the settings page and closes the modal. For the quick-create flow we want
   // a less disruptive affordance — a nested dialog layered over the composer

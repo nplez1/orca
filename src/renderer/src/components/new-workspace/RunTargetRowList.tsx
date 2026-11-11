@@ -13,7 +13,10 @@ import {
   RowTextAction
 } from './RunTargetRowActions'
 import { RecipesSubmenuRow } from './RunTargetSubmenus'
-import { getRunTargetCloneAvailability } from './run-target-clone-availability'
+import {
+  getRunTargetCloneAvailability,
+  resolveRunTargetRowAction
+} from './run-target-clone-availability'
 import type { EphemeralVmRecipeOption, RunTargetRowModel } from './run-target-options'
 import type { RunTargetCloneStatus } from './use-run-target-auto-clone'
 
@@ -102,21 +105,17 @@ export default function RunTargetRowList({
               ? cloneStatus
               : null
           const cloning = status?.kind === 'resolving' || status?.kind === 'cloning'
-          const startClone = (): void => {
-            // Why: the row's own state decides what a second click means, so it never re-asks for a
-            // clone that is already running or one whose folder is known to be taken.
-            if (cloning || status?.kind === 'folder-taken') {
-              return
-            }
-            if (status?.kind === 'failed') {
-              onRetryClone()
-              return
-            }
-            if (availability.kind === 'clone') {
+          const commitRow = (): void => {
+            const action = resolveRunTargetRowAction(availability, status?.kind ?? 'idle')
+            if (action === 'start-clone') {
               onStartClone(row.option)
               return
             }
-            if (availability.kind === 'existing-folder-only') {
+            if (action === 'retry-clone') {
+              onRetryClone()
+              return
+            }
+            if (action === 'use-existing-folder') {
               onUseExistingFolder(row.option)
             }
           }
@@ -155,15 +154,29 @@ export default function RunTargetRowList({
               onClick={() => onUseExistingFolder(row.option)}
             />
           ) : status?.kind === 'failed' ? (
-            <RowTextAction
-              label={t('auto.components.NewWorkspaceComposerCard.retryClone', 'Retry')}
-              ariaLabel={t(
-                'auto.components.NewWorkspaceComposerCard.retryCloneOnHost',
-                'Retry cloning onto {{host}}',
-                { host: row.option.label }
-              )}
-              onClick={onRetryClone}
-            />
+            <span className="ml-1 flex shrink-0 items-center self-center">
+              <RowTextAction
+                label={t('auto.components.NewWorkspaceComposerCard.retryClone', 'Retry')}
+                ariaLabel={t(
+                  'auto.components.NewWorkspaceComposerCard.retryCloneOnHost',
+                  'Retry cloning onto {{host}}',
+                  { host: row.option.label }
+                )}
+                onClick={onRetryClone}
+              />
+              <RowTextAction
+                label={t(
+                  'auto.components.NewWorkspaceComposerCard.useExistingFolder',
+                  'Use existing folder'
+                )}
+                ariaLabel={t(
+                  'auto.components.NewWorkspaceComposerCard.useExistingFolderOnHost',
+                  'Use an existing folder on {{host}}',
+                  { host: row.option.label }
+                )}
+                onClick={() => onUseExistingFolder(row.option)}
+              />
+            </span>
           ) : status?.kind === 'folder-taken' ? (
             <RowTextAction
               label={t(
@@ -192,7 +205,7 @@ export default function RunTargetRowList({
               dimmed
               optionId={optionId}
               onArm={() => onArm(row.key, null)}
-              onCommit={startClone}
+              onCommit={commitRow}
               trailing={trailing}
             />
           )

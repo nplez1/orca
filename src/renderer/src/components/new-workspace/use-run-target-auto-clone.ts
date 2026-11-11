@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import { joinHostPath } from '../../../../shared/host-path-join'
@@ -88,8 +88,17 @@ export function useRunTargetAutoClone({
     url: '',
     destination: ''
   })
-  // Only the newest selection may drive the status; an abandoned clone still finishes on the host.
-  const requestIdRef = useRef(0)
+  // Only the host the user is currently waiting on may drive the status; a clone they moved away
+  // from still finishes on the host, but must not retarget the composer or overwrite its state.
+  const pendingKeyRef = useRef<string | null>(null)
+  // A closed composer must not be retargeted by a clone it started before it went away.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   const setOverrides = useCallback((next: Partial<RunTargetCloneOverrides>): void => {
     setOverridesState((current) => ({ ...current, ...next }))
@@ -100,12 +109,22 @@ export function useRunTargetAutoClone({
       if (!projectId) {
         return
       }
-      requestIdRef.current += 1
-      const requestId = requestIdRef.current
-      const isCurrent = (): boolean => requestIdRef.current === requestId
+      const key = getProjectCloneKey(projectId, option.hostId)
+      // Why keyed rather than counted: a second pick of the same host joins the running clone, and
+      // that clone's own continuation has to stay live or the composer waits on it forever.
+      const previousKey = pendingKeyRef.current
+      pendingKeyRef.current = key
+      const isCurrent = (): boolean => mountedRef.current && pendingKeyRef.current === key
       const target: RunTargetCloneTarget = { hostId: option.hostId, label: option.label, option }
       const url = overrides.url.trim() || defaultCloneUrl.trim()
-      const destinationOverride = overrides.destination.trim()
+      // Why dropped on a host change: a destination is a path on one machine, so carrying it to
+      // another would clone into a folder the user never meant for that host. A URL is
+      // host-independent, and a value typed before any host was chosen is kept for the first one.
+      const hostChanged = previousKey !== null && previousKey !== key
+      const destinationOverride = hostChanged ? '' : overrides.destination.trim()
+      if (hostChanged && overrides.destination) {
+        setOverridesState((current) => ({ ...current, destination: '' }))
+      }
       const fail = (message: string): void => {
         if (isCurrent()) {
           setStatus({ kind: 'failed', target, message })
@@ -180,6 +199,7 @@ export function useRunTargetAutoClone({
             )
             return
           }
+          pendingKeyRef.current = null
           setStatus({ kind: 'idle' })
           onProvisioned(
             getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }),
@@ -196,7 +216,6 @@ export function useRunTargetAutoClone({
         }
       }
 
-      const key = getProjectCloneKey(projectId, option.hostId)
       if (isProjectCloneInFlight(key)) {
         // Why join: this pair is already cloning, so a second request could only collide.
         setStatus({ kind: 'cloning', target })
@@ -240,7 +259,7 @@ export function useRunTargetAutoClone({
   )
 
   const clear = useCallback((): void => {
-    requestIdRef.current += 1
+    pendingKeyRef.current = null
     setStatus((current) => (current.kind === 'idle' ? current : { kind: 'idle' }))
   }, [])
 

@@ -14,6 +14,8 @@ const SSH_URL = /^ssh:\/\/(?:([^@/]+)@)?([^/]+)\/(.+)$/
 const HTTPS_URL = /^https?:\/\/(?:([^@/]+)@)?([^/]+)\/(.+)$/
 /** Remotes whose path is not the same string on both transports, or that no transport switch helps. */
 const UNSUPPORTED_HOST = /(^|\.)(?:visualstudio|azure)\.com$/i
+/** Bitbucket Server and friends serve `https://host/scm/<project>/<repo>` against `ssh://host:7999/<project>/<repo>`. */
+const PATH_DIFFERS_PER_TRANSPORT = /(^|[:/])scm\//i
 const UNSUPPORTED_PREFIX = /^(?:git|file|ext|ftp|ftps|rsync|svn):/i
 
 /** A query or fragment means this is a browsable link, not the remote's own path. */
@@ -31,6 +33,9 @@ function cleanPath(path: string): string | null {
 function parseRemote(url: string): ParsedRemote | null {
   const trimmed = url.trim()
   if (!trimmed || UNSUPPORTED_PREFIX.test(trimmed)) {
+    return null
+  }
+  if (PATH_DIFFERS_PER_TRANSPORT.test(trimmed)) {
     return null
   }
   // A local checkout path is not a remote, whatever it looks like on either platform.
@@ -86,6 +91,11 @@ export function rewriteGitRemoteTransport(url: string, to: GitRemoteTransport): 
   const parsed = parseRemote(url)
   if (!parsed || !rewritableHost(parsed.host)) {
     return null
+  }
+  // Why unchanged: a rewrite through the scp form would drop a port the user picked on purpose
+  // (ssh-over-443, a self-hosted server on 2222), so asking for the transport already in use is a no-op.
+  if (parsed.transport === to) {
+    return url.trim()
   }
   // Why folded both ways: GitHub serves SSH-over-443 from ssh.github.com and GitLab from
   // altssh.gitlab.com, so the alias names the same forge under either transport.
