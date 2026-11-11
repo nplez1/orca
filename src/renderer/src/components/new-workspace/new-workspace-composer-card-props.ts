@@ -11,6 +11,7 @@ import type {
   ProjectHostSetupOption
 } from '@/lib/project-host-setup-options'
 import type { ProjectHostSetupProvisioning } from './use-workspace-copy-target'
+import type { RunTargetAutoClone } from './use-run-target-auto-clone'
 import type { SetupConfig } from '../../../../shared/orca-hook-setup-config'
 import type { WorkspaceCreateErrorDisplay } from '@/lib/workspace-create-error-format'
 import type { SmartNameMode } from '../../../../shared/new-workspace/smart-workspace-source-results'
@@ -72,6 +73,8 @@ export type NewWorkspaceComposerCardProps = {
   projectHostSetupOptions?: ProjectHostSetupOption[]
   selectedProjectHostSetupId?: string | null
   onProjectHostSetupChange?: (setupId: string, provisioning?: ProjectHostSetupProvisioning) => void
+  // fork-comment-ok: the picker's clone state, threaded so the card and its Advanced section agree.
+  runTargetClone?: RunTargetAutoClone | null
   ephemeralVmRecipes?: EphemeralVmRecipeOption[]
   selectedEphemeralVmRecipeId?: string | null
   onEphemeralVmRecipeChange?: (recipeId: string | null) => void

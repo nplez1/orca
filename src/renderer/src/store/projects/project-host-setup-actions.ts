@@ -253,7 +253,7 @@ export function createProjectHostSetupActions(
       }
     },
 
-    setupProjectClone: async (args) => {
+    setupProjectClone: async (args, options) => {
       try {
         assertNotSshProjectHost(get(), args.hostId)
         const target = getProjectSetupRuntimeTarget(args.hostId)
@@ -287,6 +287,9 @@ export function createProjectHostSetupActions(
         })
       } catch (err) {
         console.error('Failed to clone project on host:', err)
+        if (options?.onFailure === 'throw') {
+          throw err
+        }
         toastProjectAddFailure(err)
         return null
       }

@@ -36,6 +36,8 @@ export type ComposerModalData = {
   /** Set when an existing workspace is being copied to another host: the name and branch are
    *  implied by that workspace, so the composer shows them as fixed facts. */
   lockedWorkspaceBranch?: string
+  // fork-comment-ok: the clone of a primary checkout is the copy; of any other, it is not.
+  lockedWorkspaceIsPrimary?: boolean
   /** The remote the copied branch publishes to, which the target host has to recreate. */
   lockedWorkspacePushTarget?: GitPushTarget
   /** Host the copied workspace already lives on; recreating it there would only rename the branch. */

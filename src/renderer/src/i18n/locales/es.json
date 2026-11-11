@@ -2116,9 +2116,6 @@
         "addRemoteOrcaServerHint": "Emparejar otro tiempo de ejecución Orca",
         "hostConnectionFailed": "Connection failed",
         "defaultBranchUpdateFailed": "No se pudo actualizar la rama predeterminada del proyecto. Inténtalo de nuevo.",
-        "setLocation": "Establecer ubicación del proyecto",
-        "setLocationOnHost": "Establecer ubicación del proyecto en {{host}}",
-        "setLocationTooltip": "Elige una carpeta o clona este proyecto en {{host}}.",
         "connect": "Conectar",
         "reconnect": "Reconectar",
         "setupConfigDefaultTabs": "Comandos de pestañas predeterminadas",
@@ -14942,12 +14939,7 @@
             "browse": "Browse run targets"
           },
           "SetProjectLocationDialog": {
-            "title": "Establecer ubicación del proyecto",
             "description": "Elige dónde se ubica {{project}} en {{host}}.",
-            "browseFolder": "Examinar carpeta",
-            "browseFolderHelp": "Usa un checkout o una carpeta existente en este host.",
-            "cloneFromUrl": "Clonar desde URL",
-            "cloneFromUrlHelp": "Clona este repositorio en {{host}}.",
             "saveLocation": "Establecer ubicación"
           },
           "projectCombobox": {

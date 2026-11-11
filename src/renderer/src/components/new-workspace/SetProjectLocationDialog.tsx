@@ -1,9 +1,4 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { useCloneFolderOverride } from '../sidebar/project-admission/clone-folder/use-clone-folder-override'
-import { getProjectCloneCheckTarget } from '../../store/projects/project-host-routing'
-import { useCloneParentDefault } from '../sidebar/project-admission/create/use-clone-parent-default'
-import { resolveWorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
-import { Download, FolderOpen } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -18,34 +13,29 @@ import {
   getProjectHostSetupSelectionKey,
   type NeedsSetupProjectHostOption
 } from '@/lib/project-host-setup-options'
-import {
-  LOCAL_EXECUTION_HOST_ID,
-  parseExecutionHostId,
-  type ExecutionHostId
-} from '../../../../shared/execution-host'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
 import type { RepoKind } from '../../../../shared/repo-types'
 import { pickLocalProjectLocationFolder } from './pick-local-project-folder'
-import { CloneForm, ExistingFolderForm, LocationActionButton } from './SetProjectLocationForms'
+import { ExistingFolderForm } from './SetProjectLocationForms'
 import type { ProjectHostSetupProvisioning } from './use-workspace-copy-target'
-
-type DialogView = 'choose' | 'existing' | 'clone' | 'browse'
-type BrowseField = 'existing' | 'clone'
 
 type SetProjectLocationDialogProps = {
   option: NeedsSetupProjectHostOption | null
   projectName: string
   projectKind: RepoKind
-  defaultCloneUrl: string
+  initialPath?: string | undefined
   onClose: () => void
-  /** `provisioning` tells the composer whether this flow cloned the checkout, which makes the clone the copy. */
   onReady: (setupId: string, provisioning: ProjectHostSetupProvisioning) => void
 }
 
+// fork-comment-ok: this surface exists only because the clone moved out of it — the fallback a
+// failed or impossible clone lands on. Without that note the next reader restores the clone form.
+/** Adopting a checkout that already exists on a host. */
 export function SetProjectLocationDialog({
   option,
   projectName,
   projectKind,
-  defaultCloneUrl,
+  initialPath,
   onClose,
   onReady
 }: SetProjectLocationDialogProps): React.JSX.Element {
@@ -56,7 +46,7 @@ export function SetProjectLocationDialog({
     setRenderOption(option)
   }
   const activeOption = option ?? renderOption
-  // Radix captures document Escape first; delegate browser back-out here so the form survives leaving the browser.
+  // fork-comment-ok: Radix captures Escape first, so backing out of the browser is delegated here.
   const exitHostBrowser = useRef<(() => boolean) | null>(null)
 
   return (
@@ -80,11 +70,11 @@ export function SetProjectLocationDialog({
       >
         {activeOption ? (
           <SetProjectLocationDialogBody
-            key={activeOption.id}
+            key={`${activeOption.id}:${initialPath ?? ''}`}
             option={activeOption}
             projectName={projectName}
             projectKind={projectKind}
-            defaultCloneUrl={defaultCloneUrl}
+            initialPath={initialPath}
             exitHostBrowser={exitHostBrowser}
             onReady={onReady}
           />
@@ -98,28 +88,23 @@ function SetProjectLocationDialogBody({
   option,
   projectName,
   projectKind,
-  defaultCloneUrl,
+  initialPath,
   exitHostBrowser,
   onReady
 }: {
   option: NeedsSetupProjectHostOption
   projectName: string
   projectKind: RepoKind
-  defaultCloneUrl: string
+  initialPath?: string | undefined
   exitHostBrowser: RefObject<(() => boolean) | null>
   onReady: (setupId: string, provisioning: ProjectHostSetupProvisioning) => void
 }): React.JSX.Element {
   const t = useTranslate()
   const setupProjectExistingFolder = useAppStore((state) => state.setupProjectExistingFolder)
-  const setupProjectClone = useAppStore((state) => state.setupProjectClone)
-  const [view, setView] = useState<DialogView>('choose')
-  const [browseField, setBrowseField] = useState<BrowseField>('existing')
-  const [setupPath, setSetupPath] = useState('')
+  const [browsing, setBrowsing] = useState(false)
+  const [setupPath, setSetupPath] = useState(initialPath ?? '')
   const [setupKind, setSetupKind] = useState<RepoKind>(projectKind)
-  const [cloneUrl, setCloneUrl] = useState(defaultCloneUrl)
-  const [cloneDestination, setCloneDestination] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  // Clones may finish long after dismissal; do not retarget a composer the user has since moved to another host.
   const abandoned = useRef(false)
   useEffect(() => {
     // Reset on mount because StrictMode’s setup/cleanup/setup would otherwise permanently abandon this dialog.
@@ -131,45 +116,25 @@ function SetProjectLocationDialogBody({
   const parsedHost = parseExecutionHostId(option.hostId)
   const remoteHost =
     parsedHost?.kind === 'ssh' || parsedHost?.kind === 'runtime' ? parsedHost : null
-  const canClone = projectKind === 'git'
-  const settings = useAppStore((state) => state.settings)
-  const cloneHostIds: ExecutionHostId[] = remoteHost ? [option.hostId] : [LOCAL_EXECUTION_HOST_ID]
-  // Same rule as the sidebar clone step, so the two clone UIs cannot disagree.
-  const cloneParent = useCloneParentDefault({
-    settings,
-    hostIds: cloneHostIds,
-    layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
-    enabled: canClone && view === 'clone'
-  })
-  // Derived, so a default that arrives late never overwrites what the user typed.
-  const cloneDestinationValue = cloneDestination || cloneParent.parent
-  const { cloneFolder, cloneArgs, setCloneFolderName, checkCloneFolderTaken } =
-    useCloneFolderOverride(cloneUrl, cloneDestinationValue)
-  const pathFields: Record<BrowseField, { value: string; set: (path: string) => void }> = {
-    existing: { value: setupPath, set: setSetupPath },
-    clone: { value: cloneDestinationValue, set: setCloneDestination }
-  }
 
-  const browsing = view === 'browse' && remoteHost !== null
   useEffect(() => {
     exitHostBrowser.current = browsing
       ? () => {
-          setView(browseField)
+          setBrowsing(false)
           return true
         }
       : null
     return () => {
       exitHostBrowser.current = null
     }
-  }, [browseField, browsing, exitHostBrowser])
+  }, [browsing, exitHostBrowser])
 
-  const openHostBrowser = (field: BrowseField): void => {
+  const openHostBrowser = (): void => {
     if (!remoteHost) {
-      void pickLocalProjectLocationFolder(pathFields[field].set)
+      void pickLocalProjectLocationFolder(setSetupPath)
       return
     }
-    setBrowseField(field)
-    setView('browse')
+    setBrowsing(true)
   }
 
   const handleExistingSubmit = async (): Promise<void> => {
@@ -196,40 +161,14 @@ function SetProjectLocationDialogBody({
     }
   }
 
-  const handleCloneSubmit = async (): Promise<void> => {
-    if (!cloneUrl.trim() || !cloneDestinationValue.trim()) {
-      return
-    }
-    setIsSubmitting(true)
-    try {
-      if (await checkCloneFolderTaken(getProjectCloneCheckTarget(option.hostId))) {
-        return
-      }
-      const result = await setupProjectClone({
-        projectId: option.projectId,
-        hostId: option.hostId,
-        ...cloneArgs,
-        displayName: projectName
-      })
-      if (result && !abandoned.current) {
-        onReady(
-          getProjectHostSetupSelectionKey({ id: result.setup.id, hostId: option.hostId }),
-          'cloned'
-        )
-      }
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   if (browsing && remoteHost) {
     return (
       <CreateProjectParentBrowser
         sshTargetId={remoteHost.kind === 'ssh' ? remoteHost.targetId : null}
         runtimeEnvironmentId={remoteHost.kind === 'runtime' ? remoteHost.environmentId : null}
-        createParent={pathFields[browseField].value}
-        onParentChange={pathFields[browseField].set}
-        onClose={() => setView(browseField)}
+        createParent={setupPath}
+        onParentChange={setSetupPath}
+        onClose={() => setBrowsing(false)}
       />
     )
   }
@@ -239,8 +178,8 @@ function SetProjectLocationDialogBody({
       <DialogHeader>
         <DialogTitle>
           {t(
-            'auto.components.new.workspace.SetProjectLocationDialog.title',
-            'Set project location'
+            'auto.components.new.workspace.SetProjectLocationDialog.useExistingFolderTitle',
+            'Use an existing folder'
           )}
         </DialogTitle>
         <DialogDescription>
@@ -251,69 +190,15 @@ function SetProjectLocationDialogBody({
           )}
         </DialogDescription>
       </DialogHeader>
-      {view === 'choose' ? (
-        <div className="space-y-2">
-          <LocationActionButton
-            icon={FolderOpen}
-            title={t(
-              'auto.components.new.workspace.SetProjectLocationDialog.browseFolder',
-              'Browse folder'
-            )}
-            description={t(
-              'auto.components.new.workspace.SetProjectLocationDialog.browseFolderHelp',
-              'Use an existing checkout or folder on this host.'
-            )}
-            onClick={() => {
-              setView('existing')
-              // Local hosts get the native picker straight away — one click instead of two.
-              if (!remoteHost && !setupPath) {
-                void pickLocalProjectLocationFolder(setSetupPath)
-              }
-            }}
-          />
-          {canClone ? (
-            <LocationActionButton
-              icon={Download}
-              title={t(
-                'auto.components.new.workspace.SetProjectLocationDialog.cloneFromUrl',
-                'Clone from URL'
-              )}
-              description={t(
-                'auto.components.new.workspace.SetProjectLocationDialog.cloneFromUrlHelp',
-                'Clone this repository onto {{host}}.',
-                { host: option.label }
-              )}
-              onClick={() => setView('clone')}
-            />
-          ) : null}
-        </div>
-      ) : null}
-      {view === 'existing' ? (
-        <ExistingFolderForm
-          setupPath={setupPath}
-          setupKind={setupKind}
-          isSubmitting={isSubmitting}
-          onBack={() => setView('choose')}
-          onPathChange={setSetupPath}
-          onKindChange={setSetupKind}
-          onBrowse={() => openHostBrowser('existing')}
-          onSubmit={() => void handleExistingSubmit()}
-        />
-      ) : null}
-      {view === 'clone' ? (
-        <CloneForm
-          cloneUrl={cloneUrl}
-          cloneDestination={cloneDestinationValue}
-          isSubmitting={isSubmitting}
-          onBack={() => setView('choose')}
-          onCloneUrlChange={setCloneUrl}
-          onCloneDestinationChange={setCloneDestination}
-          cloneFolder={cloneFolder}
-          onCloneFolderNameChange={setCloneFolderName}
-          onBrowse={() => openHostBrowser('clone')}
-          onSubmit={() => void handleCloneSubmit()}
-        />
-      ) : null}
+      <ExistingFolderForm
+        setupPath={setupPath}
+        setupKind={setupKind}
+        isSubmitting={isSubmitting}
+        onPathChange={setSetupPath}
+        onKindChange={setSetupKind}
+        onBrowse={openHostBrowser}
+        onSubmit={() => void handleExistingSubmit()}
+      />
     </>
   )
 }

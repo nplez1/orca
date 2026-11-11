@@ -43,7 +43,11 @@ function Preview({ vmSelected }: { vmSelected: boolean }): React.JSX.Element {
         onAddSshHost={() => {}}
         onAddRemoteServer={() => {}}
         onConnectHost={async () => {}}
-        onSetLocation={() => {}}
+        projectKind="git"
+        cloneUrl="git@github.com:acme/orca.git"
+        clone={null}
+        onStartClone={() => {}}
+        onUseExistingFolder={() => {}}
       />
     </div>
   )

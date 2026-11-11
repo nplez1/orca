@@ -40,6 +40,8 @@ import { getSshStatusLabel } from './new-workspace/new-workspace-composer-ssh-st
 import { useNewWorkspaceComposerFileDrop } from './new-workspace/use-new-workspace-composer-file-drop'
 import { useComposerFileDragOver } from './new-workspace/use-composer-file-drag-over'
 import type { ProjectHostSetupProvisioning } from './new-workspace/use-workspace-copy-target'
+import { getRunTargetCloneAvailability } from './new-workspace/run-target-clone-availability'
+import { resolveComposerProjectName } from './new-workspace/composer-project-name'
 import { buildDefaultAgentSettingsUpdate } from '../../../shared/agent-launch/choices/default-agent-settings'
 
 // Lazy-load the project-location browser outside boot; warming shares this module entry with the click.
@@ -80,7 +82,8 @@ export default function NewWorkspaceComposerCard(
     selectedRepoProjectId,
     activeFolderWorkspaceId,
     onAddProjectOverride,
-    onNestedDialogOpenChange
+    onNestedDialogOpenChange,
+    runTargetClone = null
   } = props
   const projectOptions = props.projectOptions ?? EMPTY_PROJECT_OPTIONS
   const projectHostSetupOptions = props.projectHostSetupOptions ?? EMPTY_PROJECT_HOST_SETUP_OPTIONS
@@ -109,14 +112,18 @@ export default function NewWorkspaceComposerCard(
   const [setLocationOption, setSetLocationOption] = React.useState<NeedsProjectHostOption | null>(
     null
   )
+  const [setLocationInitialPath, setSetLocationInitialPath] = React.useState<string | undefined>(
+    undefined
+  )
   // Retain the dialog while its cleared option drives the close animation.
   const [setLocationDialogMounted, setSetLocationDialogMounted] = React.useState(false)
 
-  const selectedRepo = eligibleRepos.find((candidate) => candidate.id === repoId)
-  const selectedRepoName = selectedRepo?.displayName ?? selectedRepo?.path ?? 'This project'
-  const selectedProjectName =
-    projectOptions.find((candidate) => candidate.id === selectedProjectId)?.displayName ??
-    selectedRepoName
+  const selectedProjectName = resolveComposerProjectName({
+    projectOptions,
+    selectedProjectId,
+    eligibleRepos,
+    repoId
+  })
   const defaultCloneUrl = resolveProjectCloneUrlPrefill(projects, repos, selectedProjectId)
   const readyProjectHostSetupOptions = projectHostSetupOptions.filter(
     (option) => option.kind === 'ready'
@@ -124,15 +131,19 @@ export default function NewWorkspaceComposerCard(
   const needsSetupProjectHostSetupOptions = projectHostSetupOptions.filter(
     (option) => option.kind === 'needs-setup'
   )
-  // Warm when a usable Set location row appears so reading the picker overlaps the chunk load.
-  const hasSetLocationOption = needsSetupProjectHostSetupOptions.some(
-    (option) => option.canSetLocation
+  // fork-comment-ok: warm only the fallback row, so the picker's own read overlaps the chunk load.
+  const hasFallbackLocationOption = needsSetupProjectHostSetupOptions.some(
+    (option) =>
+      getRunTargetCloneAvailability(option, {
+        projectKind: selectedRepoIsGit ? 'git' : 'folder',
+        cloneUrl: defaultCloneUrl
+      }).kind === 'existing-folder-only'
   )
   React.useEffect(() => {
-    if (hasSetLocationOption) {
+    if (hasFallbackLocationOption) {
       void loadSetProjectLocationDialog().catch(() => {})
     }
-  }, [hasSetLocationOption])
+  }, [hasFallbackLocationOption])
   const shouldShowRunTargetPicker =
     readyProjectHostSetupOptions.length > 0 ||
     ephemeralVmRecipes.length > 0 ||
@@ -193,8 +204,9 @@ export default function NewWorkspaceComposerCard(
     }
     openModal('add-repo')
   }, [onAddProjectOverride, openModal])
-  const handleSetLocation = React.useCallback(
-    (option: NeedsProjectHostOption): void => {
+  const handleUseExistingFolder = React.useCallback(
+    (option: NeedsProjectHostOption, initialPath?: string): void => {
+      setSetLocationInitialPath(initialPath)
       setSetLocationDialogMounted(true)
       setSetLocationOption(option)
       onNestedDialogOpenChange?.(true)
@@ -203,6 +215,7 @@ export default function NewWorkspaceComposerCard(
   )
   const handleSetLocationClose = React.useCallback((): void => {
     setSetLocationOption(null)
+    setSetLocationInitialPath(undefined)
     onNestedDialogOpenChange?.(false)
   }, [onNestedDialogOpenChange])
   const handleSetLocationReady = React.useCallback(
@@ -304,7 +317,11 @@ export default function NewWorkspaceComposerCard(
           handleAddSshHost={() => setAddRemoteHostMode('ssh')}
           handleAddRemoteServer={() => setAddRemoteHostMode('server')}
           handleConnectRunTargetHost={handleConnectRunTargetHost}
-          handleSetLocation={handleSetLocation}
+          handleStartClone={(option) => runTargetClone?.start(option)}
+          handleUseExistingFolder={handleUseExistingFolder}
+          cloneProjectKind={selectedRepoIsGit ? 'git' : 'folder'}
+          cloneUrl={defaultCloneUrl}
+          runTargetClone={runTargetClone}
           sshStatusLabel={sshStatusLabel}
           connectButtonLabel={connectButtonLabel}
           selectedProjectName={selectedProjectName}
@@ -346,7 +363,7 @@ export default function NewWorkspaceComposerCard(
             option={setLocationOption}
             projectName={selectedProjectName}
             projectKind={selectedRepoIsGit ? 'git' : 'folder'}
-            defaultCloneUrl={defaultCloneUrl}
+            initialPath={setLocationInitialPath}
             onClose={handleSetLocationClose}
             onReady={handleSetLocationReady}
           />

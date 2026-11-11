@@ -83,16 +83,32 @@ afterEach(() => {
 
 describe('useWorkspaceCopyTarget', () => {
   it('treats our own clone that already holds the branch as the copy', async () => {
-    const { result } = renderCopyTarget({}, [
+    const { result } = renderCopyTarget({ lockedWorkspaceIsPrimary: true }, [
       worktreeAt(CLONE_PATH, 'refs/heads/main', { hostId: 'runtime:env-b' })
     ])
 
     act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
     await expect(result.current.resolveCloneLandedCopy()).resolves.toMatchObject({
-      id: `repo-b::${CLONE_PATH}`
+      worktree: { id: `repo-b::${CLONE_PATH}` },
+      kind: 'primary-copy'
     })
     expect(storeMocks.fetchWorktrees).toHaveBeenCalledWith('repo-b', {
       executionHostId: 'runtime:env-b'
+    })
+  })
+
+  it('reports a branch the clone took from a non-primary copy as held by the primary', async () => {
+    // Why: git keeps one checkout per branch, so this branch is on the host but this workspace is
+    // not; the create path would only collide, and the outcome must say which object it found.
+    const { result } = renderCopyTarget({}, [
+      worktreeAt(CLONE_PATH, 'refs/heads/main', { hostId: 'runtime:env-b' })
+    ])
+
+    act(() => result.current.recordProvisionedSetup('["setup-b","runtime:env-b"]', 'cloned'))
+
+    await expect(result.current.resolveCloneLandedCopy()).resolves.toMatchObject({
+      worktree: { id: `repo-b::${CLONE_PATH}` },
+      kind: 'branch-held-by-primary'
     })
   })
 
@@ -132,7 +148,7 @@ describe('useWorkspaceCopyTarget', () => {
     act(() => local.result.current.recordProvisionedSetup('["setup-local","local"]', 'cloned'))
 
     await expect(local.result.current.resolveCloneLandedCopy()).resolves.toMatchObject({
-      path: CLONE_PATH
+      worktree: { path: CLONE_PATH }
     })
   })
 

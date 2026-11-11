@@ -2504,9 +2504,6 @@
         "connectTimedOut": "連線逾時，可能仍在背景連線中。",
         "connectingHost": "連線中…",
         "connectHost": "連線",
-        "setLocation": "設定專案位置",
-        "setLocationOnHost": "在 {{host}} 上設定專案位置",
-        "setLocationTooltip": "選擇一個資料夾或將此專案複製到 {{host}} 上。",
         "addHost": "新增主機",
         "addSshHost": "新增 SSH 主機",
         "addSshHostHint": "透過 SSH 使用現有機器",
@@ -14965,12 +14962,7 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
-            "title": "設定專案位置",
             "description": "選擇 {{project}} 位於 {{host}} 上的位置。",
-            "browseFolder": "瀏覽資料夾",
-            "browseFolderHelp": "使用此主機上已有的檢出或資料夾。",
-            "cloneFromUrl": "從 URL 複製",
-            "cloneFromUrlHelp": "將此存放庫複製到 {{host}} 上。",
             "saveLocation": "設定位置"
           },
           "SmartWorkspaceNameField": {

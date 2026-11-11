@@ -12,10 +12,13 @@ export type CloneFolderOverride = {
   taken: { folderName: string; reason: 'other-repository' | 'not-empty' }
 }
 
-async function checkCloneTargetOn(
-  target: RuntimeClientTarget,
+export async function checkCloneTargetOn(
+  target: RuntimeClientTarget | null,
   args: CloneTargetArgs
 ): Promise<CloneTargetCheck | null> {
+  if (!target) {
+    return null
+  }
   try {
     return target.kind === 'environment'
       ? (await callRuntimeRpc<{ target: CloneTargetCheck }>(target, 'repo.checkCloneTarget', args))
@@ -69,7 +72,7 @@ export function useCloneFolderOverride(
       target: RuntimeClientTarget | null,
       isCurrent: () => boolean = () => true
     ): Promise<boolean> => {
-      const check = target ? await checkCloneTargetOn(target, cloneArgs) : null
+      const check = await checkCloneTargetOn(target, cloneArgs)
       if (!isCurrent()) {
         return true
       }

@@ -2082,9 +2082,6 @@
         "addRemoteOrcaServerHint": "配对另一个 Orca 运行时",
         "hostConnectionFailed": "Connection failed",
         "defaultBranchUpdateFailed": "无法更新项目默认分支。再试一次。",
-        "setLocation": "设置项目位置",
-        "setLocationOnHost": "将项目位置设置为 {{host}}",
-        "setLocationTooltip": "选择一个文件夹或将此项目克隆到 {{host}} 上。",
         "connect": "连接",
         "reconnect": "重新连接",
         "setupConfigDefaultTabs": "默认标签页命令",
@@ -14568,12 +14565,7 @@
             "browse": "浏览运行目标"
           },
           "SetProjectLocationDialog": {
-            "title": "设置项目位置",
             "description": "选择 {{project}} 位于 {{host}} 上的位置。",
-            "browseFolder": "浏览文件夹",
-            "browseFolderHelp": "使用该主机上现有的签出或文件夹。",
-            "cloneFromUrl": "从 URL 克隆",
-            "cloneFromUrlHelp": "将此仓库克隆到 {{host}} 上。",
             "saveLocation": "设置位置"
           },
           "projectCombobox": {

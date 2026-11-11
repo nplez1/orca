@@ -9,6 +9,7 @@ import {
   type ReadyProjectHostSetupOption
 } from '@/lib/project-host-setup-options'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { RepoKind } from '../../../../shared/repo-types'
 import { isWithinComboboxRoot, useTypeAheadCombobox } from './use-type-ahead-combobox'
 import { COMBOBOX_POPOVER_SURFACE } from './type-ahead-combobox-styles'
 import {
@@ -21,6 +22,8 @@ import {
 import { AddHostSubmenuRow } from './RunTargetSubmenus'
 import RunTargetRowList from './RunTargetRowList'
 import RunTargetField from './RunTargetField'
+import { getRunTargetCloneAvailability } from './run-target-clone-availability'
+import type { RunTargetAutoClone } from './use-run-target-auto-clone'
 import { HostListOverflowNote } from '@/components/host-picker/HostListOverflowNote'
 
 type RunTargetComboboxProps = {
@@ -34,7 +37,11 @@ type RunTargetComboboxProps = {
   onAddRemoteServer?: () => void
   onAddSshHost?: () => void
   onConnectHost?: (option: NeedsSetupProjectHostOption) => Promise<void> | void
-  onSetLocation?: (option: NeedsSetupProjectHostOption) => void
+  projectKind: RepoKind
+  cloneUrl: string
+  clone: RunTargetAutoClone | null
+  onStartClone?: (option: NeedsSetupProjectHostOption) => void
+  onUseExistingFolder?: (option: NeedsSetupProjectHostOption) => void
 }
 
 const ROOT_ATTRIBUTE = 'data-run-target-combobox-root'
@@ -51,7 +58,11 @@ export default function RunTargetCombobox({
   onAddRemoteServer,
   onAddSshHost,
   onConnectHost,
-  onSetLocation
+  projectKind,
+  cloneUrl,
+  clone = null,
+  onStartClone,
+  onUseExistingFolder
 }: RunTargetComboboxProps): React.JSX.Element {
   const t = useTranslate()
   const [submenu, setSubmenu] = useState<'recipes' | 'add-host' | null>(null)
@@ -85,8 +96,12 @@ export default function RunTargetCombobox({
     // An unlisted target (e.g. a per-workspace VM) shows "Choose target", never another host's name (#38669).
     null
   const selectedRecipe = recipes.find((recipe) => recipe.id === recipeValue) ?? null
+  // fork-comment-ok: the pending clone is the only source for the field's value until a setup exists.
+  const pendingClone = clone && clone.status.kind !== 'idle' ? clone.status.target : null
   const armedRow = rows.find((row) => row.key === armedKey) ?? rows[0] ?? null
-  const committed = query.length === 0 && (selectedRecipe !== null || selectedHost !== null)
+  const committed =
+    query.length === 0 &&
+    (selectedRecipe !== null || selectedHost !== null || pendingClone !== null)
 
   // Closing also drops any open submenu, which the shared hook doesn't know about.
   const close = useCallback((): void => {
@@ -94,21 +109,24 @@ export default function RunTargetCombobox({
     setSubmenu(null)
   }, [combobox])
 
+  const clearPendingClone = clone?.clear
   const selectHost = useCallback(
     (option: ReadyProjectHostSetupOption): void => {
       onHostChange?.(getProjectHostSetupSelectionKey(option))
       onRecipeChange?.(null)
+      clearPendingClone?.()
       close()
     },
-    [close, onHostChange, onRecipeChange]
+    [clearPendingClone, close, onHostChange, onRecipeChange]
   )
 
   const selectRecipe = useCallback(
     (recipeId: string): void => {
       onRecipeChange?.(recipeId)
+      clearPendingClone?.()
       close()
     },
-    [close, onRecipeChange]
+    [clearPendingClone, close, onRecipeChange]
   )
 
   const connectHost = useCallback(
@@ -133,16 +151,26 @@ export default function RunTargetCombobox({
     [connectingHostIds, onConnectHost]
   )
 
-  // Row clicks, inline actions and Enter must all close the picker before opening the setup dialog.
-  const setLocation = useCallback(
+  const startClone = useCallback(
     (option: NeedsSetupProjectHostOption): void => {
-      if (!option.canSetLocation || !onSetLocation) {
+      if (!onStartClone) {
         return
       }
       close()
-      onSetLocation(option)
+      onStartClone(option)
     },
-    [close, onSetLocation]
+    [close, onStartClone]
+  )
+
+  const openExistingFolder = useCallback(
+    (option: NeedsSetupProjectHostOption): void => {
+      if (!onUseExistingFolder) {
+        return
+      }
+      close()
+      onUseExistingFolder(option)
+    },
+    [close, onUseExistingFolder]
   )
 
   const activate = useCallback(
@@ -156,12 +184,23 @@ export default function RunTargetCombobox({
         return
       }
       if (row.kind === 'needs-setup') {
-        setLocation(row.option)
+        // fork-comment-ok: a refused host must keep the reason its row shows, not gain a clone.
+        if (!row.option.canSetLocation) {
+          return
+        }
+        if (
+          getRunTargetCloneAvailability(row.option, { projectKind, cloneUrl }, t).kind ===
+          'existing-folder-only'
+        ) {
+          openExistingFolder(row.option)
+          return
+        }
+        startClone(row.option)
         return
       }
       setSubmenu(row.kind === 'recipes' ? 'recipes' : 'add-host')
     },
-    [rows, selectHost, setLocation]
+    [cloneUrl, projectKind, rows, selectHost, startClone, t, openExistingFolder]
   )
 
   const handleKeyDown = useCallback(
@@ -204,10 +243,25 @@ export default function RunTargetCombobox({
 
   const fieldLabel = selectedRecipe
     ? `${getEphemeralVmLabel(t)} / ${selectedRecipe.name}`
-    : (selectedHost?.label ?? '')
+    : (selectedHost?.label ?? pendingClone?.label ?? '')
   const fieldDetail = selectedRecipe
     ? getRecipeDetail(selectedRecipe, t)
-    : (selectedHost?.path ?? '')
+    : (selectedHost?.path ??
+      (pendingClone
+        ? clone?.status.kind === 'failed'
+          ? clone.status.message
+          : clone?.status.kind === 'folder-taken'
+            ? t(
+                'auto.components.NewWorkspaceComposerCard.cloneFolderTaken',
+                '{{folder}} already exists on {{host}}.',
+                { folder: clone.status.folderName, host: pendingClone.label }
+              )
+            : t(
+                'auto.components.NewWorkspaceComposerCard.cloningOntoHost',
+                'Cloning onto {{host}}…',
+                { host: pendingClone.label }
+              )
+        : ''))
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -223,7 +277,7 @@ export default function RunTargetCombobox({
         onToggle={() => setOpen(!open)}
         committed={committed}
         isRecipe={selectedRecipe !== null}
-        hostId={selectedHost?.hostId ?? null}
+        hostId={selectedHost?.hostId ?? pendingClone?.hostId ?? null}
         label={fieldLabel}
         detail={fieldDetail}
         listId={listId}
@@ -281,7 +335,9 @@ export default function RunTargetCombobox({
               recipesOpen={submenu === 'recipes'}
               connectingHostIds={connectingHostIds}
               canConnect={Boolean(onConnectHost)}
-              canSetLocation={Boolean(onSetLocation)}
+              projectKind={projectKind}
+              cloneUrl={cloneUrl}
+              cloneStatus={clone?.status ?? { kind: 'idle' }}
               onArm={(key, nextSubmenu) => {
                 arm(key)
                 setSubmenu(nextSubmenu)
@@ -290,7 +346,10 @@ export default function RunTargetCombobox({
               onSelectHost={selectHost}
               onSelectRecipe={selectRecipe}
               onConnectHost={(option) => void connectHost(option)}
-              onSetLocation={setLocation}
+              onStartClone={startClone}
+              onUseExistingFolder={openExistingFolder}
+              onRetryClone={() => clone?.retry()}
+              onCloneAs={(folderName) => clone?.cloneAs(folderName)}
             />
           </div>
           <HostListOverflowNote hiddenCount={hiddenHostCount} />

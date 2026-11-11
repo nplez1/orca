@@ -42,6 +42,10 @@ import {
   useWorkspaceCopyTarget,
   type ProjectHostSetupProvisioning
 } from '@/components/new-workspace/use-workspace-copy-target'
+import { useRunTargetAutoClone } from '@/components/new-workspace/use-run-target-auto-clone'
+import { resolveComposerProjectName } from '@/components/new-workspace/composer-project-name'
+import { resolveProjectCloneUrlPrefill } from '@/lib/project-clone-url-prefill'
+import { resolveWorktreeLayoutMode } from '../../../shared/orca-workspace-layout'
 import { branchName } from '@/lib/source-control/branches/branch-name'
 import { activateAndRevealWorktree } from '@/lib/workspace/activation/worktree-activation'
 import { translate } from '@/i18n/i18n'
@@ -135,6 +139,8 @@ function QuickTabBody({
 }): React.JSX.Element {
   const t = useTranslate()
   const settings = useAppStore((s) => s.settings)
+  const projects = useAppStore((s) => s.projects)
+  const repos = useAppStore((s) => s.repos)
   // Why: copying an existing workspace fixes the branch; the base ref follows it so the checkout
   // starts from that branch instead of whatever the target host defaults to.
   const lockedWorkspaceBranch = modalData.lockedWorkspaceBranch
@@ -194,7 +200,8 @@ function QuickTabBody({
     selectedProjectHostSetupId: cardProps.selectedProjectHostSetupId ?? null,
     selectedRepoExecutionHostId: cardProps.selectedRepoExecutionHostId,
     selectedEphemeralVmRecipeId: cardProps.selectedEphemeralVmRecipeId,
-    hasLockedPushTarget: Boolean(lockedWorkspacePushTarget)
+    hasLockedPushTarget: Boolean(lockedWorkspacePushTarget),
+    lockedWorkspaceIsPrimary: modalData.lockedWorkspaceIsPrimary === true
   })
   const handleProjectHostSetupProvisioned = useCallback(
     (setupId: string, provisioning?: ProjectHostSetupProvisioning): void => {
@@ -205,6 +212,23 @@ function QuickTabBody({
     },
     [cardProps, recordProvisionedSetup]
   )
+  const runTargetClone = useRunTargetAutoClone({
+    projectId: cardProps.selectedProjectId ?? null,
+    projectName: resolveComposerProjectName({
+      projectOptions: cardProps.projectOptions ?? [],
+      selectedProjectId: cardProps.selectedProjectId ?? null,
+      eligibleRepos: cardProps.eligibleRepos ?? [],
+      repoId: cardProps.repoId
+    }),
+    defaultCloneUrl: resolveProjectCloneUrlPrefill(
+      projects,
+      repos,
+      cardProps.selectedProjectId ?? null
+    ),
+    settings,
+    layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
+    onProvisioned: handleProjectHostSetupProvisioned
+  })
   // Why: the composer's built-in `onOpenAgentSettings` handler navigates to
   // the settings page and closes the modal. For the quick-create flow we want
   // a less disruptive affordance — a nested dialog layered over the composer
@@ -267,7 +291,8 @@ function QuickTabBody({
   const createDisabled = formDisabled || !launchSelection.ready
   // Why one value: the button, the Cmd/Ctrl+Enter guard and the effect deps must agree, or a
   // keyboard submit slips past a disabled button.
-  const effectiveCreateDisabled = createDisabled || lockedTargetIsSourceHost
+  const effectiveCreateDisabled =
+    createDisabled || lockedTargetIsSourceHost || runTargetClone.blocksCreate
 
   const handleQuickAgentChange = useCallback(
     (
@@ -291,16 +316,25 @@ function QuickTabBody({
     const landedCopy = await resolveCloneLandedCopy()
     if (landedCopy) {
       toast.success(
-        translate(
-          'auto.components.NewWorkspaceComposerModal.copyAlreadyLanded',
-          'This project is now on {{host}} on {{branch}}.',
-          {
-            host: selectedTargetHostLabel,
-            branch: branchName(lockedWorkspaceBranch ?? '')
-          }
-        )
+        landedCopy.kind === 'primary-copy'
+          ? translate(
+              'auto.components.NewWorkspaceComposerModal.copyAlreadyLanded',
+              'This project is now on {{host}} on {{branch}}.',
+              {
+                host: selectedTargetHostLabel,
+                branch: branchName(lockedWorkspaceBranch ?? '')
+              }
+            )
+          : translate(
+              'auto.components.NewWorkspaceComposerModal.copyBranchHeldByPrimary',
+              '{{branch}} is checked out by the main checkout of this project on {{host}}. Git keeps one checkout per branch, so that is the workspace there.',
+              {
+                host: selectedTargetHostLabel,
+                branch: branchName(lockedWorkspaceBranch ?? '')
+              }
+            )
       )
-      activateAndRevealWorktree(landedCopy.id, { navigationIntent: 'user-open' })
+      activateAndRevealWorktree(landedCopy.worktree.id, { navigationIntent: 'user-open' })
       onClose()
       return
     }
@@ -484,6 +518,7 @@ function QuickTabBody({
         lockedTargetIsSourceHost={lockedTargetIsSourceHost}
         onlySourceHostAvailable={onlySourceHostAvailable}
         onProjectHostSetupChange={handleProjectHostSetupProvisioned}
+        runTargetClone={runTargetClone}
         createDisabled={effectiveCreateDisabled}
         impliedTaskSourceUrl={impliedTaskSourceUrl}
         // Chips list offered agents, keeping a pick whose chat is still being learned.

@@ -2536,9 +2536,6 @@
         "connectTimedOut": "Bağlantı zaman aşımına uğradı. Arka planda hâlâ bağlanıyor olabilir.",
         "connectingHost": "Bağlanıyor…",
         "connectHost": "Bağlan",
-        "setLocation": "Proje konumunu ayarla",
-        "setLocationOnHost": "{{host}} üzerinde proje konumunu ayarla",
-        "setLocationTooltip": "Bir klasör seçin veya bu projeyi {{host}} üzerine clone'layın.",
         "addHost": "Sunucu ekle",
         "addSshHost": "SSH sunucusu ekle",
         "addSshHostHint": "SSH üzerinden mevcut bir makineyi kullanın",
@@ -15163,12 +15160,7 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
-            "title": "Proje konumunu ayarla",
             "description": "{{project}} projesinin {{host}} üzerinde nerede duracağını seçin.",
-            "browseFolder": "Klasöre göz at",
-            "browseFolderHelp": "Bu host'ta mevcut bir checkout veya klasör kullanın.",
-            "cloneFromUrl": "URL'den klonla",
-            "cloneFromUrlHelp": "Bu repoyu {{host}} üzerine klonlayın.",
             "saveLocation": "Konumu ayarla"
           },
           "SmartWorkspaceNameField": {

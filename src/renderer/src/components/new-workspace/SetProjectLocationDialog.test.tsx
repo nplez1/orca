@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode, type ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,10 +40,10 @@ import { SetProjectLocationDialog } from './SetProjectLocationDialog'
 
 const option: NeedsSetupProjectHostOption = {
   kind: 'needs-setup',
-  id: 'needs-setup:ssh:openclaw',
+  id: 'needs-setup:runtime:env-b',
   projectId: 'project-orca',
-  hostId: 'ssh:openclaw',
-  label: 'openclaw',
+  hostId: 'runtime:env-b',
+  label: 'build box',
   detail: 'Project location not set',
   isAvailable: true,
   attention: false,
@@ -59,7 +59,6 @@ function renderDialog(
       option={option}
       projectName="orca"
       projectKind="git"
-      defaultCloneUrl="git@github.com:stablyai/orca.git"
       onClose={vi.fn()}
       onReady={vi.fn()}
       {...overrides}
@@ -72,10 +71,7 @@ beforeEach(() => {
   storeMocks.setupProjectExistingFolder.mockReset()
   storeMocks.setupProjectClone.mockReset()
   storeMocks.setupProjectExistingFolder.mockResolvedValue({
-    setup: { id: 'setup-openclaw' }
-  })
-  storeMocks.setupProjectClone.mockResolvedValue({
-    setup: { id: 'setup-openclaw-clone' }
+    setup: { id: 'setup-env-b' }
   })
 })
 
@@ -84,32 +80,46 @@ afterEach(() => {
 })
 
 describe('SetProjectLocationDialog', () => {
-  it('keeps the parent caller in charge of close and saves an existing folder', async () => {
+  it('is the existing-folder fallback only, never a clone step', () => {
+    renderDialog()
+
+    expect(screen.getByTestId('set-project-location-dialog')).toBeTruthy()
+    expect(screen.getByText('Use an existing folder')).toBeTruthy()
+    // Why: cloning starts from the host picker now, so offering it here would be a second way in.
+    expect(screen.queryByRole('button', { name: /Clone from URL/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Set project location/ })).toBeNull()
+  })
+
+  it('opens on the folder a failed clone already found', () => {
+    renderDialog({ initialPath: '/srv/checkouts/orca' })
+
+    expect(screen.getByPlaceholderText('/path/to/project/on/host')).toHaveProperty(
+      'value',
+      '/srv/checkouts/orca'
+    )
+  })
+
+  it('saves the existing folder and reports it as an adoption, not a clone', async () => {
     const onClose = vi.fn()
     const onReady = vi.fn()
     const user = renderDialog({ onClose, onReady })
 
-    expect(screen.getByTestId('set-project-location-dialog')).toBeTruthy()
-    expect(screen.getByText('Set project location')).toBeTruthy()
-    expect(screen.getByText('Choose where orca lives on openclaw.')).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: /Browse folder/ }))
-    await user.click(screen.getByRole('button', { name: 'Browse host filesystem' }))
-    await user.click(screen.getByRole('button', { name: 'Select remote folder' }))
+    await user.type(screen.getByPlaceholderText('/path/to/project/on/host'), '/remote/orca')
     await user.click(screen.getByRole('button', { name: 'Set location' }))
 
     expect(storeMocks.setupProjectExistingFolder).toHaveBeenCalledWith({
       projectId: 'project-orca',
-      hostId: 'ssh:openclaw',
+      hostId: 'runtime:env-b',
       path: '/remote/orca',
       kind: 'git',
       displayName: 'orca'
     })
     // Why the method: only our own clone can make the clone itself the copy.
     expect(onReady).toHaveBeenCalledWith(
-      JSON.stringify(['setup-openclaw', 'ssh:openclaw']),
+      JSON.stringify(['setup-env-b', 'runtime:env-b']),
       'existing-folder'
     )
+    expect(storeMocks.setupProjectClone).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
 
@@ -117,7 +127,6 @@ describe('SetProjectLocationDialog', () => {
     const onClose = vi.fn()
     const user = renderDialog({ onClose })
 
-    await user.click(screen.getByRole('button', { name: /Browse folder/ }))
     await user.click(screen.getByRole('button', { name: 'Browse host filesystem' }))
     expect(screen.getByTestId('remote-file-browser')).toBeTruthy()
 
@@ -131,38 +140,11 @@ describe('SetProjectLocationDialog', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('reports a clone as the flow that provisioned the checkout', async () => {
-    storeMocks.setupProjectClone.mockResolvedValue({ setup: { id: 'setup-openclaw-clone' } })
-    const onReady = vi.fn()
-    const user = userEvent.setup()
-    render(
-      <SetProjectLocationDialog
-        option={option}
-        projectName="orca"
-        projectKind="git"
-        defaultCloneUrl="https://github.com/stablyai/orca.git"
-        onClose={vi.fn()}
-        onReady={onReady}
-      />
-    )
-
-    await user.click(screen.getByRole('button', { name: /Clone from URL/ }))
-    await user.type(screen.getByPlaceholderText('/destination/on/host'), '/remote/orca')
-    await user.click(screen.getByRole('button', { name: 'Clone' }))
-
-    // Why: only our own clone makes the clone itself the copy of a default-branch workspace.
-    expect(onReady).toHaveBeenCalledWith(
-      JSON.stringify(['setup-openclaw-clone', 'ssh:openclaw']),
-      'cloned'
-    )
-  })
-
-  it('does not retarget the composer when a slow clone lands after dismissal', async () => {
-    // An SSH clone is unbounded and the dialog stays dismissable while it runs.
-    let finishClone: (result: { setup: { id: string } }) => void = () => {}
-    storeMocks.setupProjectClone.mockReturnValue(
+  it('does not retarget the composer when a slow setup lands after dismissal', async () => {
+    let finishSetup: (result: { setup: { id: string } }) => void = () => {}
+    storeMocks.setupProjectExistingFolder.mockReturnValue(
       new Promise((resolve) => {
-        finishClone = resolve
+        finishSetup = resolve
       })
     )
     const onReady = vi.fn()
@@ -172,30 +154,25 @@ describe('SetProjectLocationDialog', () => {
         option={option}
         projectName="orca"
         projectKind="git"
-        defaultCloneUrl="https://github.com/stablyai/orca.git"
         onClose={onClose}
         onReady={onReady}
       />
     )
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('button', { name: /Clone from URL/ }))
-    await user.type(screen.getByPlaceholderText('/destination/on/host'), '/remote/orca')
-    await user.click(screen.getByRole('button', { name: 'Clone' }))
+    await user.type(screen.getByPlaceholderText('/path/to/project/on/host'), '/remote/orca')
+    await user.click(screen.getByRole('button', { name: 'Set location' }))
 
     rerender(
       <SetProjectLocationDialog
         option={null}
         projectName="orca"
         projectKind="git"
-        defaultCloneUrl="https://github.com/stablyai/orca.git"
         onClose={onClose}
         onReady={onReady}
       />
     )
-    await act(async () => {
-      finishClone({ setup: { id: 'setup-openclaw-clone' } })
-    })
+    finishSetup({ setup: { id: 'setup-env-b' } })
 
     expect(onReady).not.toHaveBeenCalled()
   })
@@ -208,7 +185,6 @@ describe('SetProjectLocationDialog', () => {
           option={option}
           projectName="orca"
           projectKind="git"
-          defaultCloneUrl="git@github.com:stablyai/orca.git"
           onClose={vi.fn()}
           onReady={onReady}
         />
@@ -216,13 +192,11 @@ describe('SetProjectLocationDialog', () => {
     )
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('button', { name: /Browse folder/ }))
     await user.type(screen.getByPlaceholderText('/path/to/project/on/host'), '/remote/orca')
     await user.click(screen.getByRole('button', { name: 'Set location' }))
 
-    // Why the method: only our own clone can make the clone itself the copy.
     expect(onReady).toHaveBeenCalledWith(
-      JSON.stringify(['setup-openclaw', 'ssh:openclaw']),
+      JSON.stringify(['setup-env-b', 'runtime:env-b']),
       'existing-folder'
     )
   })

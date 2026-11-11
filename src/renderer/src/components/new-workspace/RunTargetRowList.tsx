@@ -3,10 +3,19 @@ import type {
   NeedsSetupProjectHostOption,
   ReadyProjectHostSetupOption
 } from '@/lib/project-host-setup-options'
+import type { RepoKind } from '../../../../shared/repo-types'
+import { useTranslate } from '@/i18n/use-translate'
 import { HostRowIcon, RunTargetRow } from './RunTargetComboboxRow'
-import { ConnectHostButton, NeedsSetupHostIcon, SetLocationButton } from './RunTargetRowActions'
+import {
+  CloneProgressLabel,
+  ConnectHostButton,
+  NeedsSetupHostIcon,
+  RowTextAction
+} from './RunTargetRowActions'
 import { RecipesSubmenuRow } from './RunTargetSubmenus'
+import { getRunTargetCloneAvailability } from './run-target-clone-availability'
 import type { EphemeralVmRecipeOption, RunTargetRowModel } from './run-target-options'
+import type { RunTargetCloneStatus } from './use-run-target-auto-clone'
 
 /** The scrolling rows of the run-target picker; "Add host" is pinned outside this list. */
 export default function RunTargetRowList({
@@ -19,13 +28,18 @@ export default function RunTargetRowList({
   recipesOpen,
   connectingHostIds,
   canConnect,
-  canSetLocation,
+  projectKind,
+  cloneUrl,
+  cloneStatus,
   onArm,
   onRecipesOpenChange,
   onSelectHost,
   onSelectRecipe,
   onConnectHost,
-  onSetLocation
+  onStartClone,
+  onUseExistingFolder,
+  onRetryClone,
+  onCloneAs
 }: {
   rows: readonly RunTargetRowModel[]
   armedKey: string | null
@@ -37,15 +51,21 @@ export default function RunTargetRowList({
   recipesOpen: boolean
   connectingHostIds: ReadonlySet<string>
   canConnect: boolean
-  canSetLocation: boolean
+  projectKind: RepoKind
+  cloneUrl: string
+  cloneStatus: RunTargetCloneStatus
   /** Arms a row and opens the submenu that row owns, if any. */
   onArm: (key: string, submenu: 'recipes' | null) => void
   onRecipesOpenChange: (open: boolean) => void
   onSelectHost: (option: ReadyProjectHostSetupOption) => void
   onSelectRecipe: (recipeId: string) => void
   onConnectHost: (option: NeedsSetupProjectHostOption) => void
-  onSetLocation: (option: NeedsSetupProjectHostOption) => void
+  onStartClone: (option: NeedsSetupProjectHostOption) => void
+  onUseExistingFolder: (option: NeedsSetupProjectHostOption, initialPath?: string) => void
+  onRetryClone: () => void
+  onCloneAs: (folderName: string) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <>
       {rows.map((row) => {
@@ -72,39 +92,108 @@ export default function RunTargetRowList({
         if (row.kind === 'needs-setup') {
           const connecting = connectingHostIds.has(row.option.hostId)
           const hasConnect = Boolean(row.option.connectAction && canConnect)
-          const hasSetLocation = Boolean(row.option.canSetLocation && canSetLocation)
+          const availability = getRunTargetCloneAvailability(
+            row.option,
+            { projectKind, cloneUrl },
+            t
+          )
+          const status =
+            cloneStatus.kind !== 'idle' && cloneStatus.target.hostId === row.option.hostId
+              ? cloneStatus
+              : null
+          const cloning = status?.kind === 'resolving' || status?.kind === 'cloning'
+          const startClone = (): void => {
+            // Why: the row's own state decides what a second click means, so it never re-asks for a
+            // clone that is already running or one whose folder is known to be taken.
+            if (cloning || status?.kind === 'folder-taken') {
+              return
+            }
+            if (status?.kind === 'failed') {
+              onRetryClone()
+              return
+            }
+            if (availability.kind === 'clone') {
+              onStartClone(row.option)
+              return
+            }
+            if (availability.kind === 'existing-folder-only') {
+              onUseExistingFolder(row.option)
+            }
+          }
+          const detail =
+            status?.kind === 'failed'
+              ? status.message
+              : status?.kind === 'folder-taken'
+                ? t(
+                    'auto.components.NewWorkspaceComposerCard.cloneFolderTaken',
+                    '{{folder}} already exists on {{host}}.',
+                    { folder: status.folderName, host: row.option.label }
+                  )
+                : availability.kind === 'existing-folder-only'
+                  ? availability.reason
+                  : hasConnect || cloning
+                    ? ''
+                    : row.option.detail
+          const trailing = hasConnect ? (
+            <ConnectHostButton
+              connecting={connecting}
+              onConnect={() => onConnectHost(row.option)}
+            />
+          ) : cloning ? (
+            <CloneProgressLabel />
+          ) : availability.kind === 'existing-folder-only' ? (
+            <RowTextAction
+              label={t(
+                'auto.components.NewWorkspaceComposerCard.useExistingFolder',
+                'Use existing folder'
+              )}
+              ariaLabel={t(
+                'auto.components.NewWorkspaceComposerCard.useExistingFolderOnHost',
+                'Use an existing folder on {{host}}',
+                { host: row.option.label }
+              )}
+              onClick={() => onUseExistingFolder(row.option)}
+            />
+          ) : status?.kind === 'failed' ? (
+            <RowTextAction
+              label={t('auto.components.NewWorkspaceComposerCard.retryClone', 'Retry')}
+              ariaLabel={t(
+                'auto.components.NewWorkspaceComposerCard.retryCloneOnHost',
+                'Retry cloning onto {{host}}',
+                { host: row.option.label }
+              )}
+              onClick={onRetryClone}
+            />
+          ) : status?.kind === 'folder-taken' ? (
+            <RowTextAction
+              label={t(
+                'auto.components.NewWorkspaceComposerCard.cloneAsSuggestion',
+                'Clone as {{name}}',
+                { name: status.suggestion }
+              )}
+              onClick={() => onCloneAs(status.suggestion)}
+            />
+          ) : undefined
           return (
             <RunTargetRow
               key={row.key}
               icon={
                 <NeedsSetupHostIcon
                   hostId={row.option.hostId}
-                  connecting={connecting}
+                  connecting={connecting || Boolean(cloning)}
                   attention={row.option.attention}
                 />
               }
               label={row.option.label}
-              // Inline Connect/Set location already provides the next step; omit duplicate detail text.
-              detail={hasConnect || hasSetLocation ? '' : row.option.detail}
+              // fork-comment-ok: inline Connect/clone state already provides the next step.
+              detail={detail}
               armed={isArmed}
               current={false}
               dimmed
               optionId={optionId}
               onArm={() => onArm(row.key, null)}
-              onCommit={() => onSetLocation(row.option)}
-              trailing={
-                hasConnect ? (
-                  <ConnectHostButton
-                    connecting={connecting}
-                    onConnect={() => onConnectHost(row.option)}
-                  />
-                ) : hasSetLocation ? (
-                  <SetLocationButton
-                    hostLabel={row.option.label}
-                    onSetLocation={() => onSetLocation(row.option)}
-                  />
-                ) : undefined
-              }
+              onCommit={startClone}
+              trailing={trailing}
             />
           )
         }

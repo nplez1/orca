@@ -2618,9 +2618,6 @@
         "connectTimedOut": "Время ожидания подключения истекло. Возможно, оно продолжается в фоновом режиме.",
         "connectingHost": "Подключение…",
         "connectHost": "Подключиться",
-        "setLocation": "Задать расположение проекта",
-        "setLocationOnHost": "Задать расположение проекта на {{host}}",
-        "setLocationTooltip": "Выберите папку или клонируйте этот проект на {{host}}.",
         "addHost": "Добавить сервер",
         "addSshHost": "Добавить SSH-сервер",
         "addSshHostHint": "Использовать существующий компьютер по SSH",
@@ -15645,12 +15642,7 @@
       "new": {
         "workspace": {
           "SetProjectLocationDialog": {
-            "title": "Задать расположение проекта",
             "description": "Выберите, где находится {{project}} на {{host}}.",
-            "browseFolder": "Выбрать папку",
-            "browseFolderHelp": "Используйте существующую рабочую копию или папку на этом компьютере.",
-            "cloneFromUrl": "Клонировать по URL",
-            "cloneFromUrlHelp": "Клонируйте этот репозиторий на {{host}}.",
             "saveLocation": "Задать расположение"
           },
           "SmartWorkspaceNameField": {
