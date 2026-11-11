@@ -14,26 +14,26 @@
 export const REVIEWER = {
   /** The `claude/*` Claude Code CLI backend; `alias` reaches the CLI as `--model <alias>`. */
   provider: 'claude',
-  alias: 'fable',
-  /** How the reviewer reads in a PR body. The version is dotted: `Fable 4` is not this reviewer. */
-  name: 'Fable 5.2',
+  alias: 'opus',
+  /** How the reviewer reads in a PR body. The version is dotted: `Opus 5.4` is not this reviewer. */
+  name: 'Opus 5.5',
   /** pi thinking level, which the CLI receives as `--effort`. The claim line has to name it. */
-  thinking: 'medium'
+  thinking: 'high'
 }
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** A spelling with its spaces loosened, so `Fable 5.2` also matches `Fable  5.2`. */
+/** A spelling with its spaces loosened, so `Opus 5.5` also matches `Opus  5.5`. */
 const spaced = (text) => escapeRegExp(text).replace(/\s+/g, '\\s+')
 
 /**
- * The claim shape, built from `REVIEWER`: the backend spelling (`claude/fable`) or the body spelling
- * (`Fable 5.2`), followed by the reasoning level it ran at. Both spellings are accepted because both
+ * The claim shape, built from `REVIEWER`: the backend spelling (`claude/opus`) or the body spelling
+ * (`Opus 5.5`), followed by the reasoning level it ran at. Both spellings are accepted because both
  * are how the reviewer is invoked and how a body reports it.
  *
  * Why the whole name rather than a family word plus a loose version: a reviewer whose name is not
  * shaped `<Word> <N.N>` (`GPT-5.5`, `Claude Opus 5.5`) would generate a regex that refuses its own
- * claim line, and matching the name whole also pins the version — `Fable 4` is not this reviewer.
+ * claim line, and matching the name whole also pins the version — `Opus 5.4` is not this reviewer.
  */
 export const REVIEWER_CLAIM = new RegExp(
   `^(?:${spaced(REVIEWER.provider)}[-/]${spaced(REVIEWER.alias)}|${spaced(REVIEWER.name)})\\b` +

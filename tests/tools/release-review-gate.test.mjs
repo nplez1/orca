@@ -58,7 +58,7 @@ describe('release review gate', () => {
 
   it('refuses a review by anyone but the configured reviewer', () => {
     const problems = validateManifest(
-      manifest([reported('A')], { reviewer: { ...REVIEWER, thinking: 'high' } }),
+      manifest([reported('A')], { reviewer: { ...REVIEWER, thinking: 'medium' } }),
       { revision: REVISION }
     )
     expect(problems).toHaveLength(1)
@@ -116,7 +116,7 @@ describe('release review gate', () => {
     const wrongReviewer = validateManifest(
       manifest([{ id: 'A', verdict: 'no-report' }], {
         waiver: { reason: 'ran out of budget' },
-        reviewer: { ...REVIEWER, alias: 'opus' }
+        reviewer: { ...REVIEWER, alias: 'sonnet' }
       }),
       { revision: REVISION }
     )
