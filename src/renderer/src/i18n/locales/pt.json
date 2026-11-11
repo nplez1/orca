@@ -13744,8 +13744,6 @@
           "filterSource": "Filtrar por origem",
           "allSources": "Todas",
           "clearFilters": "Limpar filtros",
-          "closeSkills": "Fechar skills",
-          "closeTooltip": "Fechar · Esc",
           "moreActions": "Mais ações",
           "sharedLinks": "Links compartilhados",
           "emptyCopy": "As pastas de skills escaneadas estão vazias. Instale um pacote compartilhado, ou atualize após adicionar uma skill.",
@@ -16821,8 +16819,6 @@
           "rateLimitedBody": "O Orca Relay está ocupado. Aguarde um minuto e tente novamente ou use a LAN para parear pelo Tailscale ou pela mesma rede Wi‑Fi."
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "Fechar · Esc",
-          "9883b58693": "Fechar o Orca Mobile",
           "fb5f28330e": "Mostrar na barra lateral",
           "c669abcf8f": "Ocultar da barra lateral",
           "e1c7b4a92d": "Configure em Configurações > Mobile.",

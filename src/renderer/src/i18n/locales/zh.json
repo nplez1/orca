@@ -4806,8 +4806,6 @@
           "filterSource": "按来源筛选",
           "allSources": "全部",
           "clearFilters": "清除筛选",
-          "closeSkills": "关闭技能",
-          "closeTooltip": "关闭 · Esc",
           "moreActions": "更多操作",
           "sharedLinks": "共享链接",
           "emptyCopy": "扫描的技能文件夹为空。请安装共享包，或添加技能后刷新。",
@@ -14650,8 +14648,6 @@
           "diagnosticsCopyFailed": "无法复制诊断信息"
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "关闭 · Esc",
-          "9883b58693": "关闭 Orca 手机",
           "fb5f28330e": "在侧边栏中显示",
           "c669abcf8f": "从侧边栏隐藏",
           "e1c7b4a92d": "在设置 > 移动端中配置。",

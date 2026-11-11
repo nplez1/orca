@@ -12,7 +12,6 @@ import type { MobilePairingConnectionMode } from '../../../../shared/remote-runt
 import type { MobileRelayMintFailure } from '../../../../shared/remote-runtime/relay/mobile-relay-mint-failure'
 
 type MobilePageContentProps = {
-  closeMobilePage: () => void
   copyInstallUrl: () => void
   copyPairingCode: () => void
   devices: readonly PairedMobileDevice[]
@@ -58,7 +57,6 @@ type MobilePageContentProps = {
 }
 
 export function MobilePageContent({
-  closeMobilePage,
   copyInstallUrl,
   copyPairingCode,
   devices,
@@ -107,7 +105,6 @@ export function MobilePageContent({
     <div className="mobile-page-root scrollbar-sleek">
       <MobilePageToolbar
         showMobileButton={showMobileButton}
-        onClose={closeMobilePage}
         onToggleMobileSidebarButton={toggleMobileSidebarButton}
       />
       <section className="mp-hero">

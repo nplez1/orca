@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { useTranslate } from '@/i18n/use-translate'
 import { selectedCountLabel } from '../presentation/skill-display-labels'
-import { SKILLS_PAGE_COLUMN } from './skills-page-column'
+import { SKILLS_PAGE_COLUMN, SKILLS_PAGE_TOP_ROW_INSET } from './skills-page-column'
 import { SKILLS_SUBTITLE_ACTION_CLASS } from './skills-subtitle-action'
 
 /** Keep submit in the header’s action slot; close and Escape leave selection mode before leaving the page. */
@@ -40,7 +40,13 @@ export function SkillsSelectionHeader({
   const t = useTranslate()
   return (
     <header className="shrink-0 border-b border-border">
-      <div className={cn(SKILLS_PAGE_COLUMN, 'flex items-center gap-2 py-3')}>
+      <div
+        className={cn(
+          SKILLS_PAGE_COLUMN,
+          SKILLS_PAGE_TOP_ROW_INSET,
+          'flex items-center gap-2 py-3'
+        )}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

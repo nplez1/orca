@@ -5784,8 +5784,6 @@
           "filterSource": "Filter by source",
           "allSources": "All",
           "clearFilters": "Clear filters",
-          "closeSkills": "Close skills",
-          "closeTooltip": "Close · Esc",
           "moreActions": "More actions",
           "sharedLinks": "Shared links",
           "emptyCopy": "The scanned skill folders are empty. Install a shared bundle, or refresh after adding a skill.",
@@ -15870,8 +15868,6 @@
           "diagnosticsCopyFailed": "Failed to copy diagnostics"
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "Close · Esc",
-          "9883b58693": "Close Orca Mobile",
           "fb5f28330e": "Show in sidebar",
           "c669abcf8f": "Hide from sidebar",
           "e1c7b4a92d": "Configure in Settings > Mobile.",

@@ -325,7 +325,6 @@ export default function MobilePage(): React.JSX.Element {
 
   return (
     <MobilePageContent
-      closeMobilePage={closeMobilePage}
       copyInstallUrl={() => void copyInstallUrl()}
       copyPairingCode={() => void copyPairingCode()}
       devices={devices}

@@ -230,7 +230,8 @@ export default function SkillsPage(): React.JSX.Element {
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col bg-background">
+    // This page owns the top band, so it reserves it the way Artifacts does.
+    <main className="flex min-h-0 flex-1 flex-col bg-background pt-5 md:pt-6">
       {selectionMode ? (
         <SkillsSelectionHeader
           title={
@@ -276,7 +277,6 @@ export default function SkillsPage(): React.JSX.Element {
           sourceEntries={sourceEntries}
           scannedSourceCount={scannedSkillSourceCount(sourceEntries)}
           hostLabel={hostLabel}
-          onClose={closeSkillsPage}
           onStartShare={() => {
             setSelectionMode('share')
             setSelectedSkillIds(new Set())

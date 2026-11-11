@@ -4806,8 +4806,6 @@
           "filterSource": "소스별 필터",
           "allSources": "전체",
           "clearFilters": "필터 지우기",
-          "closeSkills": "스킬 닫기",
-          "closeTooltip": "닫기 · Esc",
           "moreActions": "추가 작업",
           "sharedLinks": "공유 링크",
           "emptyCopy": "검색한 스킬 폴더가 비어 있습니다. 공유 번들을 설치하거나 스킬을 추가한 후 새로 고치세요.",
@@ -14650,8 +14648,6 @@
           "diagnosticsCopyFailed": "진단을 복사하지 못했습니다."
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "닫기 · Esc",
-          "9883b58693": "Orca 모바일 닫기",
           "fb5f28330e": "사이드바에 표시",
           "c669abcf8f": "사이드바에서 숨기기",
           "e1c7b4a92d": "설정 > 모바일에서 구성하세요.",

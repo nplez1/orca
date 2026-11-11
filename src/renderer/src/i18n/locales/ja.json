@@ -4806,8 +4806,6 @@
           "filterSource": "ソースで絞り込み",
           "allSources": "すべて",
           "clearFilters": "フィルターをクリア",
-          "closeSkills": "スキルを閉じる",
-          "closeTooltip": "閉じる · Esc",
           "moreActions": "その他の操作",
           "sharedLinks": "共有リンク",
           "emptyCopy": "スキャンしたスキルフォルダーは空です。共有バンドルをインストールするか、スキルを追加後に更新してください。",
@@ -14650,8 +14648,6 @@
           "diagnosticsCopyFailed": "診断情報のコピーに失敗しました"
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "閉じる・Esc",
-          "9883b58693": "Orca モバイルを閉じる",
           "fb5f28330e": "サイドバーに表示",
           "c669abcf8f": "サイドバーから非表示",
           "e1c7b4a92d": "[設定] > [モバイル] で設定します。",

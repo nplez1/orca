@@ -40,12 +40,14 @@ const AgentDashboardPage = lazy(() => import('../components/dashboard/AgentDashb
 const Terminal = lazy(() => import('../components/Terminal'))
 
 // Views whose page renders its own top row, so the shell must not stack an empty titlebar above it.
-// Skills, mobile and the landing page still take the stripe; converting them is a separate change.
+// The landing page still takes the stripe; converting it is a separate change.
 const VIEWS_OWNING_CONTENT_HEADER: ReadonlySet<TopLevelView> = new Set([
   'automations',
   'artifacts',
   'tasks',
-  'dashboard'
+  'dashboard',
+  'skills',
+  'mobile'
 ])
 
 type WorktreeSidebarScrollRefs = {

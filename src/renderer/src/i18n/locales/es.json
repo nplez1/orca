@@ -4950,8 +4950,6 @@
           "filterSource": "Filtrar por origen",
           "allSources": "Todo",
           "clearFilters": "Borrar filtros",
-          "closeSkills": "Cerrar skills",
-          "closeTooltip": "Cerrar · Esc",
           "moreActions": "Más acciones",
           "sharedLinks": "Enlaces compartidos",
           "emptyCopy": "Las carpetas de skills analizadas están vacías. Instala un paquete compartido o actualiza después de añadir una skill.",
@@ -15024,8 +15022,6 @@
           "diagnosticsCopyFailed": "No se pudieron copiar los diagnósticos"
         },
         "MobilePageToolbar": {
-          "ad2284a9e2": "Cerrar · Esc",
-          "9883b58693": "Cerrar Orca Mobile",
           "fb5f28330e": "Mostrar en la barra lateral",
           "c669abcf8f": "Ocultar de la barra lateral",
           "e1c7b4a92d": "Configúralo en Ajustes > Móvil.",
