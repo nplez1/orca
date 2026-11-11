@@ -14,14 +14,7 @@ import type { SettingsNavigationModel } from '../navigation/use-settings-navigat
 import type { SettingsTerminalModel } from '../page/use-settings-terminal-model'
 import { TooltipProvider } from '../../ui/tooltip'
 
-beforeEach(() => {
-  useAppStore.setState(useAppStore.getInitialState(), true)
-  // The General pane reads this computer's repository root convention on mount.
-  Object.defineProperty(window, 'api', {
-    configurable: true,
-    value: { repos: { getDefaultRepoRoot: async () => '/tmp/orca/projects' } }
-  })
-})
+beforeEach(() => useAppStore.setState(useAppStore.getInitialState(), true))
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()

@@ -1,14 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
-import { getDefaultRepoRootConvention } from '../../../../../shared/host-repo-root'
-import { getEffectiveHostSetting } from '../../../../../shared/host-setting-overrides'
 import {
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
 } from '../../../../../shared/orca-workspace-layout'
-import { getDefaultCloneParent } from '../../sidebar/project-admission/create/clone-defaults'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
+import { getCloneParentForHost } from '../../sidebar/project-admission/create/clone-defaults'
 import { HostFolderSettingRow } from './HostFolderSettingRow'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
 import { useTranslate } from '@/i18n/use-translate'
@@ -30,47 +28,40 @@ export function RepoRootSetting({
   const isLocal = scope.hostId === LOCAL_EXECUTION_HOST_ID
   const environmentId = scope.target?.kind === 'environment' ? scope.target.environmentId : null
   const layoutMode: WorktreeLayoutMode = resolveWorktreeLayoutMode(settings)
-  const [convention, setConvention] = useState('')
+  const [hostHome, setHostHome] = useState<string | null>(null)
   useEffect(() => {
-    setConvention('')
-    if (!scope.available) {
+    setHostHome(null)
+    if (isLocal || !scope.available || environmentId === null) {
       return
     }
     let cancelled = false
-    const load = isLocal
-      ? // The same rule the clone flow applies here, so the field cannot promise another folder.
-        Promise.resolve(
-          getDefaultCloneParent(
-            getEffectiveHostSetting(
-              settings,
-              LOCAL_EXECUTION_HOST_ID,
-              'defaultWorktreeLocation',
-              settings.workspaceDir
-            ),
-            layoutMode
-          )
-        )
-      : environmentId
-        ? browseRuntimeServerDirectory(environmentId, '~').then((listing) =>
-            getDefaultRepoRootConvention(listing.resolvedPath, layoutMode)
-          )
-        : Promise.resolve('')
-    void load
-      .then((value) => {
+    void browseRuntimeServerDirectory(environmentId, '~')
+      .then((listing) => {
         if (!cancelled) {
-          setConvention(value)
+          setHostHome(listing.resolvedPath)
         }
       })
       .catch(() => {
         // An unreachable host keeps whatever root was last stored and no convention.
         if (!cancelled) {
-          setConvention('')
+          setHostHome(null)
         }
       })
     return () => {
       cancelled = true
     }
-  }, [environmentId, isLocal, layoutMode, scope.available, settings])
+  }, [environmentId, isLocal, scope.available])
+  // The same rule the clone flow applies to this machine, so the field cannot promise another folder.
+  const fallbackValue = useMemo(
+    () =>
+      getCloneParentForHost({
+        settings,
+        hostIds: isLocal ? [LOCAL_EXECUTION_HOST_ID] : scope.equivalentHostIds,
+        layoutMode,
+        hostHome
+      }),
+    [hostHome, isLocal, layoutMode, scope.equivalentHostIds, settings]
+  )
   return (
     <HostFolderSettingRow
       scope={scope}
@@ -78,7 +69,7 @@ export function RepoRootSetting({
       updateSettings={updateSettings}
       settingKey="defaultRepoRoot"
       // A suggestion source, never a forced location: clearing the field falls back to the convention.
-      fallbackValue={convention}
+      fallbackValue={fallbackValue}
       title={t('auto.components.settings.RepoRootSetting.title', 'Repository root folder')}
       description={t(
         'auto.components.settings.RepoRootSetting.description',
