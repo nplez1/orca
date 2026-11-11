@@ -52,8 +52,14 @@ test('the sidebar entry is a first-class dashboard view with a back-stack entry'
     )
   ).toBe(true)
 
-  // The board's close control returns to the previous view and unselects the entry.
-  await orcaPage.getByRole('button', { name: 'Close dashboard' }).click()
+  // Esc is the page's exit; it returns to the previous view and unselects the entry.
+  await orcaPage.evaluate(() => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement) {
+      active.blur()
+    }
+  })
+  await orcaPage.keyboard.press('Escape')
   await expect(orcaPage.locator(DASHBOARD_PAGE)).toBeHidden()
   await expect(entry).not.toHaveAttribute('aria-current', 'page')
   await expect(entry).not.toHaveAttribute('data-current', 'true')

@@ -12,6 +12,17 @@ async function openTasksPage(page: Parameters<typeof getStoreState>[0]): Promise
   })
 }
 
+async function closeTasksPage(page: Parameters<typeof getStoreState>[0]): Promise<void> {
+  // The page has no close button; Esc is its exit, and a focused field would only blur.
+  await page.evaluate(() => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement) {
+      active.blur()
+    }
+  })
+  await page.keyboard.press('Escape')
+}
+
 async function openMockedPaginatedGitHubTasks(
   page: Parameters<typeof getStoreState>[0],
   app: ElectronApplication
@@ -89,7 +100,7 @@ test.describe('Tasks page', () => {
     })
     await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(300)
 
-    await orcaPage.getByRole('button', { name: 'Close tasks' }).click()
+    await closeTasksPage(orcaPage)
     await expect(list).toHaveCount(0)
     const clampedRowsStyle = await orcaPage.addStyleTag({
       content:
@@ -125,7 +136,7 @@ test.describe('Tasks page', () => {
       .poll(() => restoredList.evaluate((element) => element.scrollTop))
       .toBeGreaterThan(300)
 
-    await orcaPage.getByRole('button', { name: 'Close tasks' }).click()
+    await closeTasksPage(orcaPage)
     const pendingRestoreStyle = await orcaPage.addStyleTag({
       content:
         '[data-task-list-scroll="github"] > .divide-y { max-height: 0 !important; overflow: hidden !important; }'
@@ -160,7 +171,7 @@ test.describe('Tasks page', () => {
     await expect
       .poll(() => restoredList.evaluate((element) => element.scrollTop))
       .toBeGreaterThan(300)
-    await orcaPage.getByRole('button', { name: 'Close tasks' }).click()
+    await closeTasksPage(orcaPage)
 
     const permanentlyClampedRowsStyle = await orcaPage.addStyleTag({
       content:
@@ -173,7 +184,7 @@ test.describe('Tasks page', () => {
     )
     // Outlast the old 5s restore give-up so an unpainted list cannot overwrite remembered scroll with zero.
     await orcaPage.waitForTimeout(5_500)
-    await orcaPage.getByRole('button', { name: 'Close tasks' }).click()
+    await closeTasksPage(orcaPage)
     await expect
       .poll(async () => {
         const position = await getStoreState<{ scrollTop: number }>(orcaPage, 'taskListPosition')

@@ -2,7 +2,7 @@ import type { TaskPageComposerActionsModel } from './use-task-page-composer-acti
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
-import { X, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { shouldShowJiraSiteSelector } from '../task-page-jira-board-model'
@@ -26,7 +26,6 @@ export function TaskPageSourceBar({
     settings,
     jiraBoardViewMode,
     openTaskPage,
-    closeTaskPage,
     updateSettings,
     selectJiraSite,
     linearConnected,
@@ -64,23 +63,6 @@ export function TaskPageSourceBar({
         className="flex min-w-0 flex-wrap items-center gap-2"
         data-contextual-tour-target="tasks-source-filters"
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 rounded-full"
-              onClick={closeTaskPage}
-              aria-label={t('auto.components.TaskPage.1a06219d5c', 'Close tasks')}
-            >
-              <X className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            {t('auto.components.TaskPage.4826fd1ad8', 'Close · Esc')}
-          </TooltipContent>
-        </Tooltip>
-        <div className="mx-1 h-5 w-px bg-border/50" aria-hidden />
         {visibleSourceOptions.map((source) => {
           const active = taskSource === source.id
           const sourceAvailabilityNotice = taskSourceAvailabilityNoticeByProvider[source.id] ?? null
@@ -172,13 +154,9 @@ export function TaskPageSourceBar({
                   disabled={!selectedLinearTeamForExternalLink}
                   aria-label={
                     selectedLinearTeamForExternalLink
-                      ? t(
-                          'auto.components.TaskPage.246bd64aed',
-                          'Open {{value0}} in Linear',
-                          {
-                            value0: selectedLinearTeamForExternalLink.name
-                          }
-                        )
+                      ? t('auto.components.TaskPage.246bd64aed', 'Open {{value0}} in Linear', {
+                          value0: selectedLinearTeamForExternalLink.name
+                        })
                       : t(
                           'auto.components.TaskPage.8029e2bd4d',
                           'Select one Linear team to open in Linear'
@@ -194,10 +172,7 @@ export function TaskPageSourceBar({
                   ? t('auto.components.TaskPage.246bd64aed', 'Open {{value0}} in Linear', {
                       value0: selectedLinearTeamForExternalLink.name
                     })
-                  : t(
-                      'auto.components.TaskPage.2af3ab5c58',
-                      'Select one team to open in Linear'
-                    )}
+                  : t('auto.components.TaskPage.2af3ab5c58', 'Select one team to open in Linear')}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -221,10 +196,7 @@ export function TaskPageSourceBar({
                   setJiraLoading(true)
                   void selectJiraSite(value).catch(() => {
                     toast.error(
-                      t(
-                        'auto.components.TaskPage.d09b7631b7',
-                        'Failed to switch Jira site.'
-                      )
+                      t('auto.components.TaskPage.d09b7631b7', 'Failed to switch Jira site.')
                     )
                   })
                 }}

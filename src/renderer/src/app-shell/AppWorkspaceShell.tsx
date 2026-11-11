@@ -11,6 +11,8 @@ import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/R
 import { FloatingTerminalToggleButton } from '../components/floating-terminal/FloatingTerminalToggleButton'
 import { TerminalWorkbenchContainer } from '../components/TerminalWorkbenchContainer'
 import type { VirtualizedScrollAnchor } from '../hooks/useVirtualizedScrollAnchor'
+import type { TopLevelView } from '../../../shared/ui-chrome-types'
+import { cn } from '@/lib/utils'
 import { TitlebarLeftControls } from './TitlebarLeftControls'
 import { RightSidebarToggle, TitlebarMainStrip } from './TitlebarMainStrip'
 import type { AppChromeLayout } from './use-app-chrome-layout'
@@ -36,6 +38,15 @@ const WorkspaceSpacePage = lazy(() => import('../components/workspace-space/Work
 const MobilePage = lazy(() => import('../components/mobile/MobilePage'))
 const AgentDashboardPage = lazy(() => import('../components/dashboard/AgentDashboardPage'))
 const Terminal = lazy(() => import('../components/Terminal'))
+
+// Views whose page renders its own top row, so the shell must not stack an empty titlebar above it.
+// Skills, mobile and the landing page still take the stripe; converting them is a separate change.
+const VIEWS_OWNING_CONTENT_HEADER: ReadonlySet<TopLevelView> = new Set([
+  'automations',
+  'artifacts',
+  'tasks',
+  'dashboard'
+])
 
 type WorktreeSidebarScrollRefs = {
   scrollOffsetRef: React.MutableRefObject<number>
@@ -127,6 +138,10 @@ export function AppWorkspaceShell(props: {
   const scrollAnchorRef = useRef<VirtualizedScrollAnchor>(null)
   const sidebarScrollRefs = { scrollOffsetRef, scrollAnchorRef }
   const { setOpenWithFocus } = floatingWorkspace
+  const stripeMounted =
+    layout.stackedSidebarOpen && !VIEWS_OWNING_CONTENT_HEADER.has(layout.activeView)
+  // A page that owns its header reserves the window-controls band itself, unless a titlebar above did.
+  const contentTitlebarMounted = !layout.leftTitlebarChromeLayout.shouldMount || stripeMounted
   // `orca plugin shot` captures the right sidebar, which the parked launcher floats over.
   const capturingPluginShot = usePluginViewCaptureStore((s) => s.capturing)
   const toggleFloatingWorkspace = useCallback(
@@ -188,13 +203,15 @@ export function AppWorkspaceShell(props: {
                 <WorktreeSidebar layout={layout} scrollRefs={sidebarScrollRefs} />
               )
             ) : null}
-            <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
-              {/* Automations/artifacts own their headers; another titlebar would leave an empty stripe. */}
-              {layout.stackedSidebarOpen &&
-              layout.activeView !== 'automations' &&
-              layout.activeView !== 'artifacts' ? (
-                <div className="titlebar">{titlebarMainStrip}</div>
-              ) : null}
+            <div
+              className={cn(
+                'flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden',
+                !contentTitlebarMounted &&
+                  '[--content-top-controls-inset:var(--window-controls-height,0px)]'
+              )}
+            >
+              {/* An owned header means another titlebar here would leave an empty stripe. */}
+              {stripeMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}
               <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden">
                 {/* Match the open sidebar header’s alignment to prevent toggle jitter. */}
                 {showsFloatingRightSidebarToggle(layout) && (
