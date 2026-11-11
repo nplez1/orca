@@ -14,7 +14,7 @@ import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../share
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { getEffectiveHostSetting } from '../../../shared/host-setting-overrides'
-import { getEffectiveHostRepoRoot } from '../../../shared/host-repo-root'
+import { getDefaultRepoRootConvention } from '../../../shared/host-repo-root'
 import { probeGitAvailability } from '../../git/git-availability'
 import { gitExecFileAsync } from '../../git/runner'
 import { getInitDefaultBranchName } from '../../git/init-default-branch'
@@ -63,13 +63,9 @@ function getDefaultCreateProjectParent(store: Store): string {
   return join(home, 'orca', 'projects')
 }
 
-/** Where this computer keeps checkouts: its stored root, else the `<home>/orca/projects` convention. */
+/** The convention only: the row already holds any stored override, so echoing it back would survive a Reset. */
 function getDefaultRepoRoot(store: Store): string {
-  return getEffectiveHostRepoRoot({
-    settings: store.getSettings(),
-    hostIds: [LOCAL_EXECUTION_HOST_ID],
-    hostHome: homedir()
-  })
+  return getDefaultRepoRootConvention(homedir(), resolveWorktreeLayoutMode(store.getSettings()))
 }
 
 /**

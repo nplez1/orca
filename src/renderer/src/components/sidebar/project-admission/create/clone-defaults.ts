@@ -2,11 +2,7 @@ import {
   layoutNestsPrimaryCheckout,
   type WorktreeLayoutMode
 } from '../../../../../../shared/orca-workspace-layout'
-import {
-  LOCAL_EXECUTION_HOST_ID,
-  parseExecutionHostId,
-  type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import { getDefaultCreateProjectParent } from './create-project-defaults'
@@ -65,11 +61,15 @@ export function getCloneParentForHost({
   /** The machine's home directory, when the caller could probe it. */
   hostHome?: string | null
 }): string {
-  // Cloning onto an SSH host is refused, so it never gets a destination.
-  if (hostIds.some((hostId) => parseExecutionHostId(hostId)?.kind === 'ssh')) {
+  const parsedIds = hostIds
+    .map((hostId) => parseExecutionHostId(hostId))
+    .filter((parsed) => parsed !== null)
+  const isLocal = parsedIds.some((parsed) => parsed.kind === 'local')
+  // Cloning onto an SSH-only machine is refused, so it never gets a destination. A merged pair keeps
+  // its server id, which is where the folder is stored.
+  if (!isLocal && !parsedIds.some((parsed) => parsed.kind === 'runtime')) {
     return ''
   }
-  const isLocal = hostIds.includes(LOCAL_EXECUTION_HOST_ID)
   // An explicit checkout root already names the folder checkouts go in.
   const repoRoot = getHostSettingOverrideForIds(settings, hostIds, 'defaultRepoRoot')
   if (repoRoot) {

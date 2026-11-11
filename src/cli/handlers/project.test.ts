@@ -53,7 +53,7 @@ describe('orca project setup-clone', () => {
     })
     output.mockRestore()
     const clone = calls.find((call) => call.method === 'projectHostSetup.clone')
-    expect(clone?.params).toMatchObject({ destination: '/home/me/orca/projects' })
+    expect(clone?.params).toMatchObject({ destination: '/home/me/orca/workspaces' })
   })
 
   it('keeps an explicit destination exactly as given', async () => {
@@ -91,6 +91,6 @@ describe('orca project setup-clone', () => {
     })
     output.mockRestore()
     const clone = calls.find((call) => call.method === 'projectHostSetup.clone')
-    expect(clone?.params).toMatchObject({ destination: '/srv/users/me/orca/projects' })
+    expect(clone?.params).toMatchObject({ destination: '/srv/users/me/orca/workspaces' })
   })
 })

@@ -122,8 +122,8 @@ export function RepositoryHostSetupActions({
     layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
     enabled: isOpen && canUsePathActions
   })
-  // Derived, so a default that arrives late never overwrites what the user typed.
-  const setupPathValue = setupPath || hostRepoRoot.parent
+  // Derived, so a default that arrives late never overwrites what the user typed. Only the clone
+  // destination gets a default: this step imports a folder that must already exist.
   const cloneDestinationValue = cloneDestination || hostRepoRoot.parent
   const { cloneFolder, cloneArgs, setCloneFolderName, resetCloneFolder, checkCloneFolderTaken } =
     useCloneFolderOverride(cloneUrl, cloneDestinationValue)
@@ -143,7 +143,7 @@ export function RepositoryHostSetupActions({
   }
 
   const handleExistingFolder = async (): Promise<void> => {
-    if (!setupTargetHostId || !canUsePathActions || !setupPathValue.trim()) {
+    if (!setupTargetHostId || !canUsePathActions || !setupPath.trim()) {
       return
     }
     setIsSettingUp(true)
@@ -151,7 +151,7 @@ export function RepositoryHostSetupActions({
       const result = await setupProjectExistingFolder({
         projectId: selectedProjectHostSetup.projectId,
         hostId: setupTargetHostId,
-        path: setupPathValue.trim(),
+        path: setupPath.trim(),
         kind: setupKind,
         displayName: repoDisplayName
       })
@@ -297,7 +297,7 @@ export function RepositoryHostSetupActions({
       ) : null}
       {step === 'existing' ? (
         <HostSetupExistingFolderStep
-          setupPath={setupPathValue}
+          setupPath={setupPath}
           setupKind={setupKind}
           disabled={!canUsePathActions}
           isSettingUp={isSettingUp}

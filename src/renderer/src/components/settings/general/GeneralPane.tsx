@@ -127,8 +127,15 @@ function GeneralPaneView({
   const sourceDefaultsSupported =
     defaultsSupported && (target.kind === 'local' || target.environmentId === sourceRuntimeId)
   const defaultsEditAnotherHost = !sameRuntimeTarget(props.hostScope.target, target)
+  const defaultsEnvironmentName = useAppStore((state) =>
+    target.kind === 'environment'
+      ? state.runtimeEnvironments.find((entry) => entry.id === target.environmentId)?.name
+      : null
+  )
   const defaultsHostLabel =
-    target.kind === 'environment' ? target.environmentId : getLocalExecutionHostLabel()
+    target.kind === 'environment'
+      ? (defaultsEnvironmentName ?? target.environmentId)
+      : getLocalExecutionHostLabel()
   if (query.trim() === '' && subPage) {
     return subPage === 'editor' ? (
       <GeneralEditorSettingsSection {...props} />

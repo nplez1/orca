@@ -1,9 +1,3 @@
-import {
-  layoutNestsPrimaryCheckout,
-  type WorktreeLayoutMode
-} from '../../../../../../shared/orca-workspace-layout'
-import { joinHostPath, trimHostPathSeparators } from '../../../../../../shared/host-path-join'
-
 export type GitAvailability = 'checking' | 'available' | 'unavailable' | 'unknown'
 
 export { joinHostPath as joinCreateProjectPath } from '../../../../../../shared/host-path-join'
@@ -26,19 +20,10 @@ function isHomeOrcaRoot(pathValue: string, leaf: string): boolean {
   ).test(pathValue)
 }
 
-export function getDefaultCreateProjectParent(
-  homeDir: string,
-  layoutMode: WorktreeLayoutMode = 'repo-nested'
-): string {
-  const trimmedHomeDir = trimHostPathSeparators(homeDir.trim())
-  if (!trimmedHomeDir) {
-    return ''
-  }
-  // fork-comment-ok: under a nested layout a project's container lives inside the workspace dir, so the
-  // default project root is <home>/orca/workspaces rather than the sibling orca/projects.
-  const rootName = layoutNestsPrimaryCheckout(layoutMode) ? 'workspaces' : 'projects'
-  return joinHostPath(joinHostPath(trimmedHomeDir, 'orca'), rootName)
-}
+// fork-comment-ok: under a nested layout a project's container lives inside the workspace dir, so the
+// default project root is <home>/orca/workspaces rather than the sibling orca/projects. The repo-root
+// setting derives from the same rule, so both live in one place.
+export { getDefaultRepoRootConvention as getDefaultCreateProjectParent } from '../../../../../../shared/host-repo-root'
 
 export function getCreateProjectDefaultParentAutoFill({
   step,

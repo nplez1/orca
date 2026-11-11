@@ -69,14 +69,17 @@ export function HostFolderSettingRow({
   // A probed fallback can arrive while the user types; only an untouched draft is re-seeded.
   const editedRef = useRef(false)
   const seededHostIdRef = useRef(scope.hostId)
+  const lastCommittedRef = useRef(value)
 
   useEffect(() => {
     // settings:set creates directories; a new scope must never commit the previous host's draft.
-    if (seededHostIdRef.current === scope.hostId && editedRef.current) {
+    const untouched = !editedRef.current || draftValueRef.current === lastCommittedRef.current
+    if (seededHostIdRef.current === scope.hostId && !untouched) {
       return
     }
     seededHostIdRef.current = scope.hostId
     editedRef.current = false
+    lastCommittedRef.current = value
     setDraftValue(value)
     draftValueRef.current = value
   }, [scope.hostId, value])
@@ -109,6 +112,9 @@ export function HostFolderSettingRow({
     if (next === value) {
       return
     }
+    // The draft now matches what was saved, so a later value change may re-seed it.
+    editedRef.current = false
+    lastCommittedRef.current = next
     writeValue(next)
   }
 
@@ -138,6 +144,8 @@ export function HostFolderSettingRow({
     scope.available && (isLocal || sshTargetId !== null || runtimeEnvironmentId !== null)
 
   const handleBrowse = (): void => {
+    // The pointer-down skip has already suppressed the blur this click caused.
+    skipNextBlurCommitRef.current = false
     if (isLocal) {
       // The native dialog returns paths on this computer, which is the scope it was opened for.
       void pickLocalProjectLocationFolder((path) => {
@@ -182,6 +190,7 @@ export function HostFolderSettingRow({
             }
             if (e.key === 'Escape') {
               skipNextBlurCommitRef.current = true
+              editedRef.current = false
               setDraft(value)
               e.currentTarget.blur()
             }
@@ -221,6 +230,8 @@ export function HostFolderSettingRow({
               createParent={draftValue}
               onParentChange={(path) => {
                 setDraft(path)
+                editedRef.current = false
+                lastCommittedRef.current = path
                 writeValue(path)
               }}
               onClose={() => setBrowsing(false)}

@@ -110,7 +110,8 @@ async function getOptionalSetupHostId(
 }
 
 // The CLI cannot read the desktop's per-host folder overrides, so it defaults from the convention
-// the desktop also falls back to: <home>/orca/projects on whichever machine answers.
+// the desktop also falls back to, on whichever machine answers. It cannot read the host's layout
+// mode either, so it assumes the default nested one.
 async function resolveDefaultCloneDestination(client: HandlerContext['client']): Promise<string> {
   const result = await client.call<{ resolvedPath: string }>('files.browseServerDir', { path: '~' })
   return getDefaultRepoRootConvention(result.result.resolvedPath)
@@ -158,11 +159,14 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, formatProjectHostSetupResult)
   },
   'project setup-clone': async ({ flags, client, cwd, json }) => {
-    const rawDestination =
-      getOptionalStringFlag(flags, 'destination') ?? (await resolveDefaultCloneDestination(client))
+    const explicitDestination = getOptionalStringFlag(flags, 'destination')
+    const url = getRequiredStringFlag(flags, 'url')
+    // Resolve the host before the default: a bad flag must fail before the extra round trip.
+    const hostId = await getRequiredHostId(flags, client)
+    const rawDestination = explicitDestination ?? (await resolveDefaultCloneDestination(client))
     const args: ProjectHostSetupCloneArgs = {
-      hostId: await getRequiredHostId(flags, client),
-      url: getRequiredStringFlag(flags, 'url'),
+      hostId,
+      url,
       destination: resolveRepoPathArgument(
         rawDestination,
         cwd,

@@ -109,7 +109,7 @@ describe('RepoRootSetting', () => {
   it('derives a remote convention from that host’s own home', async () => {
     renderRow(settingsWith({}), serverScope)
     await waitFor(() =>
-      expect(screen.getByRole<HTMLInputElement>('textbox').value).toBe('/home/me/orca/projects')
+      expect(screen.getByRole<HTMLInputElement>('textbox').value).toBe('/home/me/orca/workspaces')
     )
     expect(browseRuntimeServerDirectory).toHaveBeenCalledWith(SERVER_ID, '~')
   })

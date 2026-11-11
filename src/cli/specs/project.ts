@@ -59,7 +59,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'display-name'
     ],
     notes: [
-      'Omit --destination to use the host’s repository root convention (<home>/orca/projects). The desktop’s per-host folder overrides live on the desktop and are not visible to the CLI, so a folder you set in Settings → General does not change this default; pass --destination for anything else.',
+      'Omit --destination to use the host’s repository root convention: <home>/orca/workspaces for the default nested layout, <home>/orca/projects for flat. The CLI cannot see the desktop’s per-host folder overrides or the host’s layout mode, so a folder set in Settings → General does not change this default; pass --destination for anything else.',
       'For remote runtimes, --destination must be an absolute parent directory on the remote server.',
       '--folder-name sets the folder created inside --destination; it defaults to the repository name from the URL.',
       '--host takes local, ssh:<target-id>, runtime:<environment-id>, or the bare host name `orca host list` prints for any of them.',

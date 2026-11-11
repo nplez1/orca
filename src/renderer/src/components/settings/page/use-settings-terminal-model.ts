@@ -80,7 +80,8 @@ export function useSettingsTerminalModel(
     target: { kind: 'local' },
     hostPlatform: localWindowsRuntimeCapabilities.hostPlatform
   })
-  const isWindowsTerminalHost = runtimeWslSupportedPlatform
+  // A machine-only scope has no host to describe, so this computer's shell options must not appear.
+  const isWindowsTerminalHost = runtimeTarget !== null && runtimeWslSupportedPlatform
 
   if ([...navigation.neededSectionIds].some((id) => !model.mountedSectionIds.has(id))) {
     // Record needed sections during render to avoid a blank pass before an effect.

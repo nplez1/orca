@@ -34,24 +34,20 @@ export function renderAgentsSettingsSection(
       searchEntries={navigation.getSectionSearchEntries('agents')}
     >
       {view.isSectionMounted('agents') ? (
-        isServerScope(model.settingsHostScope) ? (
-          <div className="space-y-8">
-            {model.settingsHostScope.target.kind === 'local' ? (
-              <AgentDefaultSurfaceSection settings={model.settings} />
-            ) : null}
-            <AgentsPane
-              settings={model.settings}
-              updateSettings={model.updateSettings}
-              hostScope={model.settingsHostScope}
-              wslSupportedPlatform={terminal.localWslSupportedPlatform}
-              wslAvailable={terminal.localWindowsRuntimeCapabilities.wslAvailable}
-              wslDistros={terminal.localWindowsRuntimeCapabilities.wslDistros}
-              wslCapabilitiesLoading={terminal.localWindowsRuntimeCapabilities.isLoading}
-            />
-          </div>
-        ) : (
-          <SettingsHostScopeMachineOnlyNotice hostLabel={model.settingsHostScope.label} />
-        )
+        <div className="space-y-8">
+          {model.settingsHostScope.target?.kind === 'local' ? (
+            <AgentDefaultSurfaceSection settings={model.settings} />
+          ) : null}
+          <AgentsPane
+            settings={model.settings}
+            updateSettings={model.updateSettings}
+            hostScope={model.settingsHostScope}
+            wslSupportedPlatform={terminal.localWslSupportedPlatform}
+            wslAvailable={terminal.localWindowsRuntimeCapabilities.wslAvailable}
+            wslDistros={terminal.localWindowsRuntimeCapabilities.wslDistros}
+            wslCapabilitiesLoading={terminal.localWindowsRuntimeCapabilities.isLoading}
+          />
+        </div>
       ) : null}
     </SettingsSection>
   )

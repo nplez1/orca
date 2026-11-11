@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
-import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from '../../../../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
 import { getDefaultRepoRootConvention } from '../../../../../shared/host-repo-root'
+import {
+  resolveWorktreeLayoutMode,
+  type WorktreeLayoutMode
+} from '../../../../../shared/orca-workspace-layout'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
 import { HostFolderSettingRow } from './HostFolderSettingRow'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
@@ -23,8 +27,7 @@ export function RepoRootSetting({
   const t = useTranslate()
   const isLocal = scope.hostId === LOCAL_EXECUTION_HOST_ID
   const environmentId = scope.target?.kind === 'environment' ? scope.target.environmentId : null
-  const sshTargetId =
-    parseExecutionHostId(scope.hostId)?.kind === 'ssh' && !environmentId ? scope.hostId : null
+  const layoutMode: WorktreeLayoutMode = resolveWorktreeLayoutMode(settings)
   const [convention, setConvention] = useState('')
   useEffect(() => {
     setConvention('')
@@ -36,7 +39,7 @@ export function RepoRootSetting({
       ? window.api.repos.getDefaultRepoRoot()
       : environmentId
         ? browseRuntimeServerDirectory(environmentId, '~').then((listing) =>
-            getDefaultRepoRootConvention(listing.resolvedPath)
+            getDefaultRepoRootConvention(listing.resolvedPath, layoutMode)
           )
         : Promise.resolve('')
     void load
@@ -54,7 +57,7 @@ export function RepoRootSetting({
     return () => {
       cancelled = true
     }
-  }, [environmentId, isLocal, scope.available, sshTargetId])
+  }, [environmentId, isLocal, layoutMode, scope.available])
   return (
     <HostFolderSettingRow
       scope={scope}
@@ -71,7 +74,7 @@ export function RepoRootSetting({
       keywords={['repository', 'repo', 'root', 'checkout', 'clone', 'destination', 'host']}
       localCaption={t(
         'auto.components.settings.RepoRootSetting.localCaption',
-        'Defaults to ~/orca/projects. Projects and clones are created here.'
+        'New projects and clones are created here. Clearing this reverts to the Orca default for your workspace layout.'
       )}
       remoteCaption={t(
         'auto.components.settings.RepoRootSetting.remoteCaption',

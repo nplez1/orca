@@ -12,18 +12,14 @@ import {
   type SettingsHostScopeHost
 } from './settings-host-scope'
 
-/** The machines the Settings host picker offers, one row per machine. */
-export function useSettingsHosts(): SettingsHostScopeHost[] {
-  const { hostOptions } = useSidebarHostScopeOptions()
-  return useMemo(() => pickerExecutionHosts(hostOptions), [hostOptions])
-}
-
 /** The host Settings is showing. A web client is served by one host and cannot choose another. */
 export function useSettingsHostScope(args: {
   choice: ExecutionHostId | null
   isWebClient: boolean
 }): { scope: SettingsHostScope; hosts: SettingsHostScopeHost[] } {
-  const hosts = useSettingsHosts()
+  const { hostOptions } = useSidebarHostScopeOptions()
+  // The resolver needs merged-away ids too, or a seeded server id cannot find the row that stands for it.
+  const hosts = useMemo(() => pickerExecutionHosts(hostOptions), [hostOptions])
   const settings = useAppStore((state) => state.settings)
   const catalogHydrated = useAppStore((state) => state.runtimeEnvironmentCatalogHydrated)
   // Key by IDs so status-only catalog changes cannot restart host-scoped loads.
@@ -35,11 +31,11 @@ export function useSettingsHostScope(args: {
       resolveSettingsHostScope({
         choice: args.isWebClient ? null : args.choice,
         defaultHostId: getSettingsFocusedExecutionHostId(settings),
-        hosts,
+        hosts: hostOptions,
         savedEnvironmentIds: savedEnvironmentIdsKey ? savedEnvironmentIdsKey.split('\n') : [],
         catalogHydrated
       }),
-    [args.choice, args.isWebClient, catalogHydrated, hosts, savedEnvironmentIdsKey, settings]
+    [args.choice, args.isWebClient, catalogHydrated, hostOptions, savedEnvironmentIdsKey, settings]
   )
   return { scope, hosts }
 }

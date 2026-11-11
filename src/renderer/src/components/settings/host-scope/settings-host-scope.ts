@@ -30,6 +30,23 @@ export function isServerScope(scope: SettingsHostScope): scope is SettingsServer
   return scope.target !== null
 }
 
+const targetByKey = new Map<string, RuntimeClientTarget | null>()
+
+/** One object per distinct target, so a status-only host refresh cannot restart host-scoped loads. */
+function stableTarget(target: RuntimeClientTarget | null): RuntimeClientTarget | null {
+  const key =
+    target === null
+      ? 'none'
+      : target.kind === 'local'
+        ? 'local'
+        : `environment:${target.environmentId}`
+  if (targetByKey.has(key)) {
+    return targetByKey.get(key) ?? null
+  }
+  targetByKey.set(key, target)
+  return target
+}
+
 export const LOCAL_SETTINGS_HOST_SCOPE: SettingsServerScope = {
   hostId: LOCAL_EXECUTION_HOST_ID,
   label: getLocalExecutionHostLabel(),
@@ -38,10 +55,22 @@ export const LOCAL_SETTINGS_HOST_SCOPE: SettingsServerScope = {
   available: true
 }
 
+/** The server id first, so a merged pair stores its folder under the id every consumer can derive. */
+function canonicalHostIds(
+  hostId: ExecutionHostId,
+  aliasHostIds: readonly ExecutionHostId[]
+): ExecutionHostId[] {
+  const ids = [hostId, ...aliasHostIds]
+  const serverId = ids.find((id) => parseExecutionHostId(id)?.kind === 'runtime')
+  return serverId ? [serverId, ...ids.filter((id) => id !== serverId)] : ids
+}
+
 function scopeForHostId(args: {
   hostId: ExecutionHostId
   label: string
   equivalentHostIds: readonly ExecutionHostId[]
+  /** False when the registry does not list this id, so an SSH target that is gone cannot be browsed. */
+  known: boolean
   savedEnvironmentIds: readonly string[]
   catalogHydrated: boolean
 }): SettingsHostScope {
@@ -55,7 +84,7 @@ function scopeForHostId(args: {
       hostId,
       label,
       equivalentHostIds,
-      target: { kind: 'environment', environmentId: parsed.environmentId },
+      target: stableTarget({ kind: 'environment', environmentId: parsed.environmentId }),
       // An unhydrated catalog does not prove the server was removed.
       available: !args.catalogHydrated || args.savedEnvironmentIds.includes(parsed.environmentId)
     }
@@ -70,11 +99,17 @@ function scopeForHostId(args: {
       hostId,
       label,
       equivalentHostIds,
-      target: environmentId ? { kind: 'environment', environmentId } : null,
-      available: true
+      target: stableTarget(environmentId ? { kind: 'environment', environmentId } : null),
+      available: args.known
     }
   }
-  return { hostId, label, equivalentHostIds, target: { kind: 'local' }, available: true }
+  return {
+    hostId,
+    label,
+    equivalentHostIds,
+    target: stableTarget({ kind: 'local' }),
+    available: true
+  }
 }
 
 export function resolveSettingsHostScope(args: {
@@ -88,10 +123,12 @@ export function resolveSettingsHostScope(args: {
   const requestedHostId = args.choice ?? (args.defaultHostId || LOCAL_EXECUTION_HOST_ID)
   // A merged-away id resolves to the row that stands for it, so the picker always shows a row.
   const shown = indexExecutionHostsById(args.hosts).get(requestedHostId)
+  const hostId = shown?.id ?? requestedHostId
   return scopeForHostId({
-    hostId: shown?.id ?? requestedHostId,
+    hostId,
     label: shown?.label ?? fallbackHostLabel(requestedHostId),
-    equivalentHostIds: shown ? [shown.id, ...(shown.aliasHostIds ?? [])] : [requestedHostId],
+    equivalentHostIds: canonicalHostIds(hostId, shown?.aliasHostIds ?? []),
+    known: shown !== undefined,
     savedEnvironmentIds: args.savedEnvironmentIds,
     catalogHydrated: args.catalogHydrated
   })

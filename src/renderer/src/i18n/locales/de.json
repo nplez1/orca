@@ -11286,10 +11286,6 @@
           }
         },
         "WorkspaceDirectorySetting": {
-          "1a2b3c4d5e": "Client-Standard",
-          "2b3c4d5e6f": "Anwenden auf",
-          "3c4d5e6f7a": "Überschreibt den Client-Standard",
-          "4d5e6f7a8b": "Übernimmt den Client-Standard",
           "5e6f7a8b9c": "Zurücksetzen",
           "6f7a8b9cad": "Einen relativen Pfad (z. B. .orca/worktrees) für einen projektspezifischen Speicherort oder einen absoluten Pfad für einen gemeinsamen Ordner verwenden."
         },

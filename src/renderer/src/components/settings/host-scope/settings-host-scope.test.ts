@@ -60,7 +60,8 @@ describe('resolveSettingsHostScope', () => {
   it('resolves a merged SSH row to the server it deploys', () => {
     expect(resolve(MERGED_SSH_HOST.id)).toMatchObject({
       target: { kind: 'environment', environmentId: 'server-b' },
-      equivalentHostIds: [MERGED_SSH_HOST.id, toRuntimeExecutionHostId('server-b')]
+      // The server id comes first so every consumer can derive the key the folder is stored under.
+      equivalentHostIds: [toRuntimeExecutionHostId('server-b'), MERGED_SSH_HOST.id]
     })
   })
 

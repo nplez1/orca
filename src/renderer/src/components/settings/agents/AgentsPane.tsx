@@ -27,7 +27,8 @@ import {
   AgentPermissionsSetting,
   type AgentPermissionsSettingProps
 } from './permissions/AgentPermissionsSetting'
-import type { SettingsServerScope } from '../host-scope/settings-host-scope'
+import { isServerScope, type SettingsHostScope } from '../host-scope/settings-host-scope'
+import { SettingsHostScopeMachineOnlyNotice } from '../host-scope/SettingsHostScopePicker'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { useTranslate } from '@/i18n/use-translate'
 import { AgentWorkspaceTrustSetting } from './behavior/AgentWorkspaceTrustSetting'
@@ -38,8 +39,8 @@ type AgentSettingProps = {
 }
 
 type AgentsPaneProps = AgentSettingProps & {
-  /** Host whose agent launch settings and detected agents the pane shows. */
-  hostScope: SettingsServerScope
+  /** Host whose agent launch settings the pane shows; this computer's groups always show. */
+  hostScope: SettingsHostScope
   wslSupportedPlatform?: boolean
   wslAvailable?: boolean
   wslDistros?: string[]
@@ -58,19 +59,25 @@ export function AgentsPane({
   const t = useTranslate()
   return (
     <div className="space-y-8">
-      <AgentLaunchSettingsSection
-        settings={settings}
-        updateSettings={updateSettings}
-        hostScope={hostScope}
-        renderPermissions={renderAgentPermissions}
-      />
-      <SettingsGroup>
-        <CodexHistorySharingSetting
-          settings={settings}
-          updateSettings={updateSettings}
-          hostScope={hostScope}
-        />
-      </SettingsGroup>
+      {isServerScope(hostScope) ? (
+        <>
+          <AgentLaunchSettingsSection
+            settings={settings}
+            updateSettings={updateSettings}
+            hostScope={hostScope}
+            renderPermissions={renderAgentPermissions}
+          />
+          <SettingsGroup>
+            <CodexHistorySharingSetting
+              settings={settings}
+              updateSettings={updateSettings}
+              hostScope={hostScope}
+            />
+          </SettingsGroup>
+        </>
+      ) : (
+        <SettingsHostScopeMachineOnlyNotice hostLabel={hostScope.label} />
+      )}
       <SettingsGroup title={getLocalExecutionHostLabel()}>
         <AgentRuntimeSetting
           settings={settings}
