@@ -331,6 +331,28 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
+### nplez1/issue-358 — the fold reads prose, not the tool log (fork issue #358, PR #363)
+
+- **Why:** the session-summary fold was handed one line per tool event, and every tool call is _two_
+  events — the call and the result that names it. On three real transcripts from this machine tool
+  text was 72–84% of the retained fold input while the prose the summary is built from was 12–19%,
+  and the timeline was model output that cost up to ten entries of output tokens per chunk and could
+  be reworded by a re-fold.
+- **Shape:** the digest now carries what a tool event _is_ (`kind`, the `pair` id shared by a call and
+  its result, `label`, `failed`, `outcome`, `failureLine`), and a new render plan collapses a run of
+  calls into one burst line while keeping every failure expanded. Paging still returns event ranges —
+  `foldedThrough`, `sourceIndex` and `chunkCacheKey` are untouched — but its line budget counts
+  rendered lines, which is what takes a 512-event session from five calls to one. The timeline is now
+  a projection of the facts plus programmatic `markers`, with ids from `(kind, sourceIndex)`, so a
+  re-fold is idempotent; the extract and the report prompt both lose their timeline. `STORE_VERSION`
+  3 → 4, and `timelineBase`/`SESSION_SUMMARY_TIMELINE_MAX_ENTRIES` are gone with the bound they served.
+- **Base:** `main`. Rebased onto `f379fb32908` (#361) before the PR.
+- **Verified:** measured 94.4 → 18.9 KB, 66.6 → 23.4 KB, 65.4 → 14.0 KB and 5/3/3 chunks → 1/1/1;
+  `pnpm tc` clean; 875 focused tests; `check:code-quality:changed` clean; unit gate PASS on the head
+  (the diff touches `src/shared`). Reviewed by `claude/opus`, high: R1 (2 SHOULD-FIX fixed — parallel
+  calls double-counted, bare-exit failures not expanded), delta clean on R2; the four remaining MINORs
+  are recorded in the PR body.
+
 ### nplez1/issue-352 — pi's folder-trust prompt blocked a new worktree (fork issue #352, PR #353)
 
 - **Why:** the first pi launched into a brand-new worktree blocked on pi's interactive “Trust project
