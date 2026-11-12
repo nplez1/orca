@@ -11,9 +11,16 @@ export const CLAUDE_PREVIOUS_PROMPT_ID = '33333333-3333-4333-8333-333333333333'
 export function normalizeAndAccept(
   state: HookListenerState,
   source: Parameters<typeof normalizeHookPayload>[1],
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  options: Parameters<typeof normalizeHookPayload>[4] = {}
 ): ReturnType<typeof normalizeHookPayload> {
-  const event = normalizeHookPayload(state, source, { paneKey: PANE_KEY, payload }, 'production')
+  const event = normalizeHookPayload(
+    state,
+    source,
+    { paneKey: PANE_KEY, payload },
+    'production',
+    options
+  )
   if (event) {
     seedLegacyAgentStatusForTests(state, event)
   }

@@ -11,7 +11,11 @@ import {
   type ParsedAgentStatusPayload
 } from '../agent-status/contracts/agent-status-types'
 import type { DescendantEntry, DescendantEventFacts } from './descendant-events'
-import { deleteLegacyAgentStatus, type HookListenerState } from './listener-state'
+import {
+  deleteLegacyAgentStatus,
+  recordHoldRetraction,
+  type HookListenerState
+} from './listener-state'
 import {
   carriedReportedChildren,
   paneChildSnapshots,
@@ -40,7 +44,8 @@ export function applyDescendantEventToPane(
   state: HookListenerState,
   source: AgentHookSource,
   paneKey: string,
-  facts: DescendantEventFacts
+  facts: DescendantEventFacts,
+  options: { ownsHoldRetraction?: boolean } = {}
 ): ParsedAgentStatusPayload | null {
   const now = Date.now()
   if (facts.kind === 'live-set') {
@@ -98,7 +103,7 @@ export function applyDescendantEventToPane(
     children.length === 0
   if (facts.kind === 'child' && facts.ended === true && leadState === undefined) {
     if (nothingClaimsThePane) {
-      retractDescendantHoldRow(state, paneKey)
+      retractDescendantHoldRow(state, paneKey, options)
     }
     return null
   }
@@ -107,7 +112,7 @@ export function applyDescendantEventToPane(
   // and the row is held open by a state nobody reported. Nothing is claimed instead, so the pane
   // keeps its own verdict rather than inheriting one from the absence of it.
   if (facts.kind === 'live-set' && nothingClaimsThePane) {
-    retractDescendantHoldRow(state, paneKey)
+    retractDescendantHoldRow(state, paneKey, options)
     return null
   }
 
@@ -144,11 +149,27 @@ export function applyDescendantEventToPane(
 /** Drop the row this lane published from a live child set, once nothing is left to justify it:
  *  the cached row is the last survivor of a hold whose child is gone. Only a row carrying
  *  descendants is this lane's own — a pane nobody has described has no row, and a row from before
- *  a scope reset carries no child to retract. */
-function retractDescendantHoldRow(state: HookListenerState, paneKey: string): void {
-  if ((state.lastStatusByPaneKey.get(paneKey)?.payload.subagents?.length ?? 0) > 0) {
-    deleteLegacyAgentStatus(state, paneKey)
+ *  a scope reset carries no child to retract.
+ *
+ *  An ingest that can publish the deletion (`ownsHoldRetraction`) records it instead of deleting:
+ *  the row must still be there for that ingest to retire it through its own drop path, which is what
+ *  tells every listener and the renderer. */
+function retractDescendantHoldRow(
+  state: HookListenerState,
+  paneKey: string,
+  options: { ownsHoldRetraction?: boolean }
+): void {
+  // Why identity-only: a retained resume record is not a claim on the pane, and re-recording it on a
+  // repeated drain would retire the same row twice.
+  const held = state.lastStatusByPaneKey.get(paneKey)
+  if ((held?.payload.subagents?.length ?? 0) === 0 || held?.providerSessionOnly === true) {
+    return
   }
+  if (options.ownsHoldRetraction === true) {
+    recordHoldRetraction(state, paneKey)
+    return
+  }
+  deleteLegacyAgentStatus(state, paneKey)
 }
 
 /** How long a retired child's conversation is still recognised. Long enough for a spooled hook

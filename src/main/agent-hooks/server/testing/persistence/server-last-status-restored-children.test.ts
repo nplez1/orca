@@ -4,11 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AgentHookServer, _internals } from '../../agent-hook-server'
 import { buildBody, postHookEvent } from '../server.test-fixtures'
+import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
 
 const { getCohortAtEmitMock, trackMock } = vi.hoisted(() => ({
   getCohortAtEmitMock: vi.fn(),
   trackMock: vi.fn()
 }))
+
+const PI_PANE = makePaneKey('tab-pi', '55555555-5555-4555-8555-555555555555')
 
 vi.mock('../../../../telemetry/client', () => ({
   track: trackMock
@@ -121,6 +124,57 @@ describe('Last-status persistence', () => {
       expect(server.getStatusSnapshot()[0]?.restoredUnconfirmed).toBeUndefined()
     } finally {
       server.stop()
+    }
+  })
+
+  it('retires a restored pi hold once its last child drains, and does not restore it again', async () => {
+    const firstServer = new AgentHookServer()
+    await firstServer.start({ env: 'production', userDataPath })
+    await postHookEvent(
+      firstServer,
+      buildBody(
+        { hook_event_name: 'subagent_async_state', subagent_runs: [{ id: 'run-1' }] },
+        { paneKey: PI_PANE, tabId: 'tab-pi' }
+      ),
+      '/hook/pi'
+    )
+    expect(firstServer.getStatusSnapshotForPane(PI_PANE)[0]).toMatchObject({ state: 'working' })
+    firstServer.flushStatusPersistSync()
+    firstServer.stop()
+
+    const server = new AgentHookServer()
+    await server.start({ env: 'production', userDataPath })
+    try {
+      // Why: the hydrated row is a hold nothing in this runtime recorded a lead verdict for, so the
+      // drain below is the only event left that can retire it.
+      expect(server.getStatusSnapshotForPane(PI_PANE)[0]).toMatchObject({ state: 'working' })
+      const cleared: unknown[] = []
+      server.setPaneStatusClearListener((clear) => cleared.push(clear))
+
+      await postHookEvent(
+        server,
+        buildBody(
+          { hook_event_name: 'subagent_async_state', subagent_runs: [] },
+          { paneKey: PI_PANE, tabId: 'tab-pi' }
+        ),
+        '/hook/pi'
+      )
+
+      expect(cleared).toEqual([{ paneKey: PI_PANE }])
+      expect(server.getStatusSnapshotForPane(PI_PANE)).toEqual([])
+      server.flushStatusPersistSync()
+    } finally {
+      server.stop()
+    }
+
+    // Why a third server: the deletion has to be what was persisted, or the next restart restores
+    // the same stale hold and the pane is Working again with nothing left to clear it.
+    const thirdServer = new AgentHookServer()
+    await thirdServer.start({ env: 'production', userDataPath })
+    try {
+      expect(thirdServer.getStatusSnapshotForPane(PI_PANE)).toEqual([])
+    } finally {
+      thirdServer.stop()
     }
   })
 })

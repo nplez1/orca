@@ -152,6 +152,10 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
           return
         }
         const normalized = this.normalizeLocalHookPayload(source, aliasedBody)
+        // A retraction carries no event: the row it retires is the whole message.
+        if (normalized.retractedHold !== undefined) {
+          this.retractHeldStatusEntry(normalized.retractedHold)
+        }
         if (source === 'muse' && !normalized.event) {
           this.rearmIgnoredMuseHook(aliasedBody)
         }

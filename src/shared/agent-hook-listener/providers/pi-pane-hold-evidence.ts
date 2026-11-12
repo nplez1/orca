@@ -60,6 +60,21 @@ export function recordPiScheduledWork(
   state.piScheduledWorkByPaneKey.set(paneKey, { jobs, receivedAt: now })
 }
 
+/** Whether this pane's session still has armed work, which claims the pane on its own: a loop that
+ *  re-enters the session or a cold job the scheduler will fire.
+ *
+ *  Why the descendant lane asks: it retracts a held row when nothing claims the pane, and an armed
+ *  loop or wakeup is a claim — the row must stand until the fire republishes it, or the pane reads
+ *  cleared while its own extension is about to post again. */
+export function paneHasArmedPiScheduledWork(
+  state: HookListenerState,
+  paneKey: string,
+  now = Date.now()
+): boolean {
+  const inventory = state.piScheduledWorkByPaneKey.get(paneKey)
+  return inventory !== undefined && piScheduledWorkIsLive(inventory, now)
+}
+
 /** Hold a finished Pi turn open while its session still has scheduled work armed.
  *
  *  Runs on the payload the descendant gate produced, never before it: the gate records the lead's own

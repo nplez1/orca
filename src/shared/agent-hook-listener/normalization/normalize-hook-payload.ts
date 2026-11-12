@@ -31,6 +31,7 @@ import {
 import { claudeRowHasUnlistedLiveWork } from '../providers/claude-pane-hold-evidence'
 import {
   applyPiScheduledWorkHold,
+  paneHasArmedPiScheduledWork,
   recordPiScheduledWork
 } from '../providers/pi-pane-hold-evidence'
 import { readString } from '../tool-input-preview'
@@ -48,6 +49,7 @@ export function normalizeHookPayload(
     deferCompactOwnershipToClient?: boolean
     previousOpenCodeMainAgent?: AgentMainAgentStatus
     bindingStatusByPaneKey?: ReadonlyMap<string, AgentHookEventPayload>
+    ownsHoldRetraction?: boolean
     admitOpenCodeTui?: (
       identity: Pick<
         AgentHookEventPayload,
@@ -56,6 +58,7 @@ export function normalizeHookPayload(
     ) => boolean | 'preserve-poster'
   } = {}
 ): AgentHookEventPayload | null {
+  state.pendingHoldRetraction = undefined
   const envelope = parseHookEnvelope(state, source, body, expectedEnv)
   if (!envelope) {
     return null
@@ -261,7 +264,8 @@ export function normalizeHookPayload(
     hookPayload: providerHookPayload,
     envelope: record,
     extractedPrompt,
-    previousOpenCodeMainAgent: options.previousOpenCodeMainAgent
+    previousOpenCodeMainAgent: options.previousOpenCodeMainAgent,
+    ownsHoldRetraction: options.ownsHoldRetraction === true
   })
   const providerSessionOnly =
     (source === 'pi' || source === 'prime-agent' || source === 'jcode') &&
@@ -300,6 +304,9 @@ export function normalizeHookPayload(
   if (source === 'pi') {
     recordPiScheduledWork(state, paneKey, hookPayloadRecord)
   }
+  if (state.pendingHoldRetraction === paneKey && paneHasArmedPiScheduledWork(state, paneKey)) {
+    state.pendingHoldRetraction = undefined
+  }
   const piHeldPayload =
     source === 'pi' ? applyPiScheduledWorkHold(state, paneKey, transportPayload) : transportPayload
   // Why: an identity-only record is what discards a status row, so it is only right while there is
@@ -312,6 +319,7 @@ export function normalizeHookPayload(
   if (!piHeldPayload) {
     return null
   }
+  state.pendingHoldRetraction = undefined
   const grokActiveTurn = source === 'grok' ? state.grokActiveTurnByPaneKey.get(paneKey) : undefined
   const claudeBatchSettledRequests =
     source === 'claude' && eventName === 'PostToolBatch'

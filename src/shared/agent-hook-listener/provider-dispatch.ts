@@ -73,6 +73,7 @@ export function normalizeProviderEvent(input: {
   envelope: Record<string, unknown>
   extractedPrompt: ExtractedPromptText
   previousOpenCodeMainAgent?: AgentMainAgentStatus
+  ownsHoldRetraction?: boolean
 }): ProviderDispatchResult {
   const { state, source, promptText, paneKey, hookPayload, envelope, extractedPrompt } = input
   // Ephemeral side chats share the pane but must not replace its recorded main turn.
@@ -105,7 +106,9 @@ export function normalizeProviderEvent(input: {
   const descendant = readDescendantEventFacts(source, eventName, hookPayload)
   if (descendant) {
     return {
-      payload: applyDescendantEventToPane(state, source, paneKey, descendant),
+      payload: applyDescendantEventToPane(state, source, paneKey, descendant, {
+        ownsHoldRetraction: input.ownsHoldRetraction === true
+      }),
       // Why: a child's prompt is not the pane's turn label, and its tool events are not a user submit.
       resolvedPromptText: '',
       hasTranscriptPromptEvidence: false,
