@@ -1806,6 +1806,18 @@ are recorded in `local/lint-known-red.json` with that evidence and the exact lin
 new focus read in those files is still a new red. Clearing them belongs to a change that touches #361's
 settings scope, not to an issue about the composer's run-target picker.
 
+### `local(lint)`: the 2026-11-12 fork-comment total re-pin, from merges after #411
+
+`node local/check-upstream-file-comments.mjs` on the release line at `80dcc0425` reports 5655 fork
+comment lines against the frozen 5515. None of that growth is this branch's: it removed its own four
+comment lines above upstream's code in `clone-defaults.ts` and `useCreateProjectDefaults.ts`, which
+took the two per-file rows it had produced with them, and the total fell from 5660 to 5655. The
+remaining 140 lines arrived through merges of other work (#411, #414, #415, #416, #418, #422, #424,
+#425), 73 of them in the per-file rows already recorded and the rest in files under
+`PER_FILE_THRESHOLD`, where the total is the only place growth shows. The `fork-comment-foreign-total`
+known-red entry is re-pinned from `5648` to `5655` with that evidence, so any further growth is still a
+new red. Moving that prose into this file or a fork-owned module is those PRs' change.
+
 ### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
 
 `local/unit-known-red.json` had drifted into the two shapes its own note warns against: every entry was
