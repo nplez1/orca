@@ -61,6 +61,13 @@ export {
   jiraSearchUsers
 } from './runtime-jira-user-fields-client'
 export { jiraStatusForTarget } from './runtime-jira-project-client'
+export {
+  jiraListIssuesPage,
+  jiraListIssuesPageForTarget,
+  jiraSearchIssuesPage,
+  jiraSearchIssuesPageForTarget,
+  type JiraIssuePageCursor
+} from './runtime-jira-page-client'
 export { jiraListFavouriteFiltersForTarget } from './runtime-jira-favourite-filters-client'
 export type { RuntimeJiraSettings } from './runtime-jira-target'
 export {

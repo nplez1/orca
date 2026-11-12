@@ -4,8 +4,35 @@ export type JiraRecord = Record<string, unknown>
 
 export type JiraSearchResponse = {
   issues?: JiraRecord[]
+  startAt?: number
+  total?: number
   nextPageToken?: string
   isLast?: boolean
+}
+
+/** Whether a page is the last one, from whichever signals the API generation gave.
+ *  Cloud's `/search/jql` reports `isLast` and a token but no total; Server/DC's
+ *  classic `/search` reports `startAt` and `total` and never a token. */
+export function resolveJiraPageIsLast(args: {
+  issueCount: number
+  maxResults: number
+  startAt: number
+  total: number | null
+  isLast?: boolean
+  nextPageToken?: string | null
+}): boolean {
+  const { issueCount, maxResults, startAt, total, isLast } = args
+  const nextPageToken = args.nextPageToken ?? null
+  if (issueCount === 0 && nextPageToken === null) {
+    return true
+  }
+  if (typeof isLast === 'boolean') {
+    return isLast
+  }
+  if (nextPageToken !== null) {
+    return false
+  }
+  return total === null ? issueCount < maxResults : startAt + issueCount >= total
 }
 
 export type JiraPagedResponse<T> = {

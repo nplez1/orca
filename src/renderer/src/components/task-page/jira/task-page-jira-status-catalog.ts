@@ -12,6 +12,36 @@ export function getJiraStatusCatalogScopeKey(
   return project ? `${scopeKey}::${getJiraProjectSelectionKey(project)}` : scopeKey
 }
 
+/** The status options come from the loaded page, so they may only be rebuilt for the one
+ *  view that reads them: the unfiltered preset list. */
+export function shouldBuildJiraStatusCatalog(args: {
+  hasWorkspace: boolean
+  remoteSearch: string
+  selectedStatuses: readonly unknown[]
+}): boolean {
+  return !args.hasWorkspace && !args.remoteSearch.trim() && args.selectedStatuses.length === 0
+}
+
+/** The scope the list's status options belong to, or null when this view has none. */
+export function jiraListStatusCatalogScopeKey(args: {
+  hasWorkspace: boolean
+  remoteSearch: string
+  selectedStatuses: readonly unknown[]
+  sourceScopeKey: string
+  selectedSiteId: string | null | undefined
+  preset: string
+  project?: JiraProjectReference | null
+}): string | null {
+  return shouldBuildJiraStatusCatalog(args)
+    ? getJiraStatusCatalogScopeKey(
+        args.sourceScopeKey,
+        args.selectedSiteId,
+        args.preset,
+        args.project
+      )
+    : null
+}
+
 export type JiraStatusCatalogItem = { name: string; categoryKey: string }
 const STATUS_NAME_COLLATOR = new Intl.Collator('en', { sensitivity: 'base' })
 const STATUS_NAME_TIE_BREAKER = new Intl.Collator('en')

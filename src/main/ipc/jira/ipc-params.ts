@@ -1,4 +1,8 @@
-import type { JiraIssueUpdate, JiraSiteSelection } from '../../../shared/jira/jira-types'
+import type {
+  JiraIssueFilter,
+  JiraIssueUpdate,
+  JiraSiteSelection
+} from '../../../shared/jira/jira-types'
 import { isRecord } from '../../../shared/agent-status/child-work/agent-status-child-work-value-guards'
 
 export function normalizeJiraSiteId(value: unknown): string | undefined {
@@ -9,6 +13,13 @@ export function normalizeJiraSiteSelection(value: unknown): JiraSiteSelection | 
   const siteId = normalizeJiraSiteId(value)
   return siteId
 }
+
+export const VALID_JIRA_ISSUE_FILTERS = new Set<JiraIssueFilter>([
+  'assigned',
+  'reported',
+  'all',
+  'done'
+])
 
 export function clampJiraIssueLimit(value: unknown, fallback = 30): number {
   const limit = typeof value === 'number' && Number.isFinite(value) ? value : fallback

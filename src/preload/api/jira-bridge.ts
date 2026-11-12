@@ -42,12 +42,30 @@ export const jiraApi = {
   cancelSearchIssues: (args: { requestId: string }): Promise<void> =>
     ipcRenderer.invoke('jira:cancelSearchIssues', args),
 
+  searchIssuesPage: (args: {
+    jql: string
+    limit?: number
+    siteId?: string
+    pageToken?: string
+    startAt?: number
+    requestId?: string
+  }) => ipcRenderer.invoke('jira:searchIssuesPage', args),
+
   listIssues: (args?: {
     filter?: 'assigned' | 'reported' | 'all' | 'done'
     filters?: JiraIssueListFilters
     limit?: number
     siteId?: string
   }) => ipcRenderer.invoke('jira:listIssues', args),
+
+  listIssuesPage: (args?: {
+    filter?: 'assigned' | 'reported' | 'all' | 'done'
+    filters?: JiraIssueListFilters
+    limit?: number
+    siteId?: string
+    pageToken?: string
+    startAt?: number
+  }) => ipcRenderer.invoke('jira:listIssuesPage', args),
 
   getIssue: (args: { key: string; siteId?: string; mediaFormat?: JiraMediaFormat }) =>
     ipcRenderer.invoke('jira:getIssue', args),

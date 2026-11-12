@@ -19,6 +19,7 @@ import type {
   JiraIssue,
   JiraIssueFilter,
   JiraIssueListFilters,
+  JiraIssueSearchPage,
   JiraIssueType,
   JiraIssueUpdate,
   JiraMutationResult,
@@ -53,12 +54,28 @@ export type JiraApi = {
     requestId?: string
   }) => Promise<JiraIssue[]>
   cancelSearchIssues: (args: { requestId: string }) => Promise<void>
+  searchIssuesPage: (args: {
+    jql: string
+    limit?: number
+    siteId?: JiraSiteSelection
+    pageToken?: string
+    startAt?: number
+    requestId?: string
+  }) => Promise<JiraIssueSearchPage>
   listIssues: (args?: {
     filter?: JiraIssueFilter
     limit?: number
     siteId?: JiraSiteSelection
     filters?: JiraIssueListFilters
   }) => Promise<JiraIssue[]>
+  listIssuesPage: (args?: {
+    filter?: JiraIssueFilter
+    limit?: number
+    siteId?: JiraSiteSelection
+    filters?: JiraIssueListFilters
+    pageToken?: string
+    startAt?: number
+  }) => Promise<JiraIssueSearchPage>
   getIssue: (args: {
     key: string
     siteId?: string
