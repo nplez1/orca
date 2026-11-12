@@ -13,7 +13,11 @@ import {
 import { selectExecutionHostDisplayLabel } from '@/runtime/hosts/display/execution-host-display-label'
 import { getWorkspaceStatus } from '../../../../../../shared/workspace-statuses'
 import { translate } from '@/i18n/i18n'
-import type { WorkspaceStatus, Worktree } from '../../../../../../shared/worktree/types'
+import type {
+  WorkspaceStatus,
+  WorkspaceStatusDefinition,
+  Worktree
+} from '../../../../../../shared/worktree/types'
 
 /** A dragged card: the rule's owner plus the host and status its label and no-op check read. */
 export type WorkspaceKanbanRefusalCard = StatusColumnOwner &
@@ -29,7 +33,7 @@ export type WorkspaceKanbanColumnRefusal = {
   /** The refused cards' host, when every refused card lives on one; null for a mixed set. */
   cardHostLabel: string | null
   refusedCount: number
-  /** Dragged cards this drop could resolve; unresolvable cards are neither refused nor counted. */
+  /** Dragged cards this drop would move; a card already in the column is neither refused nor counted. */
   totalCount: number
 }
 
@@ -78,11 +82,11 @@ export function resolveWorkspaceKanbanColumnRefusal(
 
 /** A card already in the column is a no-op, never a refusal, so it says nothing about hosts. */
 function isCardMovingTo(
-  state: AppState,
+  knownStatuses: readonly WorkspaceStatusDefinition[],
   card: WorkspaceKanbanRefusalCard,
   status: WorkspaceStatus
 ): boolean {
-  return getWorkspaceStatus(card, selectAllKnownWorkspaceStatuses(state)) !== status
+  return getWorkspaceStatus(card, knownStatuses) !== status
 }
 
 /**
@@ -97,27 +101,31 @@ export function partitionWorkspaceKanbanDropCards<C extends WorkspaceKanbanRefus
   const accepted: C[] = []
   const refused: C[] = []
   let movableCount = 0
+  // Why once: a host-only column id is absent from the local list, so this merge is what names it.
+  const knownStatuses = selectAllKnownWorkspaceStatuses(state)
   for (const card of cards) {
-    if (isCardMovingTo(state, card, status)) {
+    const moving = isCardMovingTo(knownStatuses, card, status)
+    if (moving) {
       movableCount += 1
     }
     if (isWorkspaceStatusAllowedOnHost(state, card, status)) {
       accepted.push(card)
-    } else if (isCardMovingTo(state, card, status)) {
+    } else if (moving) {
       refused.push(card)
     }
   }
   return { accepted, refused, movableCount }
 }
 
-/** Whether every card this drop would move is barred, so the lane must refuse rather than partly take it. */
+/** Whether the column takes none of the dragged cards, so the lane must refuse rather than partly take them. */
 export function isWorkspaceKanbanColumnRefused(
   state: AppState,
   cards: readonly WorkspaceKanbanRefusalCard[],
   status: WorkspaceStatus
 ): boolean {
-  const { refused, movableCount } = partitionWorkspaceKanbanDropCards(state, cards, status)
-  return refused.length > 0 && refused.length === movableCount
+  const { accepted, refused } = partitionWorkspaceKanbanDropCards(state, cards, status)
+  // A card already in the lane still drops something, so the lane must keep looking droppable.
+  return accepted.length === 0 && refused.length > 0
 }
 
 /** False when a local column or no paired host defines this id, so no refusal is possible and no scan is needed. */
