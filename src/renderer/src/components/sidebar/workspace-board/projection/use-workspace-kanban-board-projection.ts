@@ -1,7 +1,10 @@
 import { useLayoutEffect, useMemo } from 'react'
 import type { useAppStore } from '@/store'
 import { useVisibleWorkspaceKanbanWorktreeIds } from '../surface/use-visible-workspace-kanban-worktree-ids'
-import { groupWorkspaceKanbanWorktrees } from './workspace-kanban-worktree-groups'
+import {
+  groupHiddenWorkspaceKanbanWorktrees,
+  groupWorkspaceKanbanWorktrees
+} from './workspace-kanban-worktree-groups'
 import { buildWorkspaceKanbanLaneViews } from '../search/workspace-kanban-search'
 import { useWorkspaceKanbanSearch } from '../search/use-workspace-kanban-search'
 import { registerWorkspaceKanbanSidebarDropGroups } from '../drag/workspace-kanban-sidebar-drop'
@@ -37,6 +40,17 @@ export function useWorkspaceKanbanBoardProjection(args: {
         sortBy: args.sortBy
       }),
     [args.allWorktrees, args.sortBy, args.workspaceStatuses, visibleWorktreeIds]
+  )
+  // Counted before search: a card the filters hide is never a search result, so a lane reports the
+  // hidden ones alongside whatever the query left visible.
+  const hiddenWorktreesByStatus = useMemo(
+    () =>
+      groupHiddenWorkspaceKanbanWorktrees({
+        worktrees: args.allWorktrees,
+        visibleWorktreeIds,
+        workspaceStatuses: args.workspaceStatuses
+      }),
+    [args.allWorktrees, args.workspaceStatuses, visibleWorktreeIds]
   )
   const worktreeById = useMemo(
     () => buildUnambiguousWorktreeIdIndex(args.allWorktrees),
@@ -103,6 +117,7 @@ export function useWorkspaceKanbanBoardProjection(args: {
     activeWorktreeIdentity,
     boardDragGroups,
     boardWorktrees,
+    hiddenWorktreesByStatus,
     laneFullWorktreeIds,
     laneViews,
     renderedBoardWorktrees,

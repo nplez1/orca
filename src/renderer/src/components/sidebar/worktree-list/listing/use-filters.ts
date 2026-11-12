@@ -136,22 +136,29 @@ function getRevealTargetHostId(state: AppState, worktree: Worktree, repo: Repo |
   return getWorktreeExecutionHostId(worktree, repo, defaultHostId)
 }
 
+/** Turn off the shared filters hiding one workspace; the fork's status filter is left alone. */
+export function revealWorkspaceRowFilters(worktree: Worktree): void {
+  // Read per workspace: filterRepoIds appends, so a stale snapshot would drop earlier reveals.
+  const state = useAppStore.getState()
+  const repo = state.repos.find((candidate) => candidate.id === worktree.repoId)
+  const context = {
+    state,
+    worktree,
+    repo,
+    targetHostId: getRevealTargetHostId(state, worktree, repo)
+  }
+  for (const key of activeWorkspaceRowFilterKeys(sidebarWorkspaceRowFilters(state))) {
+    REVEAL_WORKSPACE[key](context)
+  }
+}
+
 export function useSidebarWorktreeFilters() {
   const filterState = useAppStore(useShallow(selectSidebarFilterState))
 
   const revealWorkspaceFilters = useCallback((worktree: Worktree) => {
-    const state = useAppStore.getState()
-    const repo = state.repos.find((candidate) => candidate.id === worktree.repoId)
-    const context = {
-      state,
-      worktree,
-      repo,
-      targetHostId: getRevealTargetHostId(state, worktree, repo)
-    }
-    for (const key of activeWorkspaceRowFilterKeys(sidebarWorkspaceRowFilters(state))) {
-      REVEAL_WORKSPACE[key](context)
-    }
+    revealWorkspaceRowFilters(worktree)
     // The status filter is fork-only and not a shared filter key, so it reveals separately.
+    const state = useAppStore.getState()
     if (
       worktree.workspaceStatus &&
       state.hiddenWorkspaceStatusIds.includes(worktree.workspaceStatus)

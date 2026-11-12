@@ -3,6 +3,7 @@ import { useAppStore } from '@/store'
 import { useAllWorktrees } from '@/store/slices/worktrees/listing/use-worktree-catalog'
 import { useRepoMap } from '@/store/repos/use-repository-catalog'
 import { useWorkspaceStatusDocumentDrop } from '../../worktree-list/drag/use-workspace-status-drop'
+import { revealWorkspaceRowFilters } from '../../worktree-list/listing/use-filters'
 import { useWorkspaceKanbanAreaSelection } from '../selection/use-workspace-kanban-area-selection'
 import { useWorkspaceKanbanCardPointerDrag } from '../drag/use-workspace-kanban-card-pointer-drag'
 import { useWorkspaceKanbanColumnResize } from '../viewport/use-workspace-kanban-column-resize'
@@ -90,6 +91,7 @@ function WorkspaceKanbanDrawerContent({
     activeWorktreeIdentity,
     boardDragGroups,
     boardWorktrees,
+    hiddenWorktreesByStatus,
     laneFullWorktreeIds,
     laneViews,
     renderedBoardWorktrees,
@@ -198,6 +200,16 @@ function WorkspaceKanbanDrawerContent({
   const handleWorktreeActivate = useCallback(() => {
     onOpenChange(false)
   }, [onOpenChange])
+  // Why reveal rather than clear every filter: only the filters hiding these cards are the user's
+  // reason for not seeing them, and the sidebar status filter is one the board never applied.
+  const handleShowHiddenInStatus = useCallback(
+    (statusId: string) => {
+      for (const worktree of hiddenWorktreesByStatus.get(statusId) ?? []) {
+        revealWorkspaceRowFilters(worktree)
+      }
+    },
+    [hiddenWorktreesByStatus]
+  )
   const handleHeaderClose = useCallback(() => {
     // Only the board’s own close paths bypass its explicit drag/outside-dismiss rules.
     onOpenChange(false)
@@ -282,6 +294,7 @@ function WorkspaceKanbanDrawerContent({
         laneScrollerRef,
         statuses: boardStatuses,
         laneViews,
+        hiddenWorktreesByStatus,
         laneFullWorktreeIds,
         hasQuery,
         repoMap,
@@ -300,6 +313,7 @@ function WorkspaceKanbanDrawerContent({
         onContextMenuSelect: selectRenderedForContextMenu,
         onAssignWorkspaceStatus: moveWorktreesToStatus,
         onCreateWorktree: createWorktreeForStatus,
+        onShowHidden: handleShowHiddenInStatus,
         onColumnResizeStart,
         onColumnResizeKeyDown
       }}

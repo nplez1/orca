@@ -4,6 +4,7 @@ import React, { createRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
+import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 
 const virtualWindow = vi.hoisted(() => ({ startIndex: 0, visibleCount: 4 }))
 const animationFrames = new Map<number, FrameRequestCallback>()
@@ -67,17 +68,20 @@ vi.mock('./WorkspaceKanbanStatusLane', () => ({
   default: ({
     status,
     items,
+    hiddenCount,
     renderCards,
     activeWorktreeIdentity
   }: {
     status: WorkspaceStatusDefinition
     items: readonly Worktree[]
+    hiddenCount: number
     renderCards: boolean
     activeWorktreeIdentity: string | null
   }) => (
     <section
       data-workspace-status={status.id}
       data-item-count={items.length}
+      data-hidden-count={hiddenCount}
       data-render-cards={renderCards ? 'true' : 'false'}
       data-active-worktree-identity={activeWorktreeIdentity ?? ''}
     >
@@ -101,6 +105,9 @@ function makeGrid(activeWorktreeIdentity: string | null = null): React.JSX.Eleme
       laneScrollerRef={createRef()}
       statuses={STATUSES}
       laneViews={new Map()}
+      hiddenWorktreesByStatus={
+        new Map([['state-01', [makeWorktree({ id: 'hidden', repoId: 'repo' })]]])
+      }
       laneFullWorktreeIds={new Map()}
       hasQuery={false}
       repoMap={REPO_MAP}
@@ -118,6 +125,7 @@ function makeGrid(activeWorktreeIdentity: string | null = null): React.JSX.Eleme
       onSelectionGesture={() => false}
       onContextMenuSelect={() => []}
       onCreateWorktree={() => {}}
+      onShowHidden={() => {}}
       onColumnResizeStart={() => {}}
       onColumnResizeKeyDown={() => {}}
     />
@@ -170,5 +178,20 @@ describe('WorkspaceKanbanLaneGrid', () => {
       'state-20',
       'state-21'
     ])
+  })
+
+  it('passes each lane the count of members its sidebar filters hide', () => {
+    const rendered = renderGrid()
+
+    expect(
+      rendered.container
+        .querySelector('[data-workspace-status="state-01"]')
+        ?.getAttribute('data-hidden-count')
+    ).toBe('1')
+    expect(
+      rendered.container
+        .querySelector('[data-workspace-status="state-02"]')
+        ?.getAttribute('data-hidden-count')
+    ).toBe('0')
   })
 })

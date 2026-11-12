@@ -889,6 +889,12 @@
         "WorkspaceKanbanSettingsMenu": {
           "4c2eaa78cc": "Moving a linked workspace updates its Linear issue status, or moves its Jira issue to the status or board column with the same name."
         },
+        "WorkspaceKanbanStatusLane": {
+          "hiddenByFilters": "{{value0}} hidden by filters",
+          "showHidden": "Show",
+          "showHiddenHint": "Turn off the filters hiding these workspaces",
+          "showHiddenLabel": "Show workspaces hidden by filters"
+        },
         "WorktreeBranchHostSelect": {
           "label": "Select host"
         },
