@@ -1,3 +1,4 @@
+import { isCaseInsensitiveRuntimeRoot } from './cross-platform-path'
 import { joinHostPath, trimHostPathSeparators } from './host-path-join'
 import { LOCAL_EXECUTION_HOST_ID } from './execution-host'
 import type { GlobalSettings } from './global-settings-types'
@@ -26,14 +27,18 @@ export function getDefaultRepoRootConvention(
 /** Under `flat` a checkout lands in the worktree root the user named — except for Orca's own
  *  `<x>/orca/workspaces` tree, whose checkouts belong in its sibling `orca/projects`. */
 function flatCheckoutParent(worktreeRoot: string): string {
+  // Windows roots fold case, so a hand-typed `…\Orca\Workspaces` is still Orca's own tree.
+  const foldCase = isCaseInsensitiveRuntimeRoot(worktreeRoot)
+  const isSegment = (segment: string, expected: string): boolean =>
+    foldCase ? segment.toLowerCase() === expected : segment === expected
   const trimmed = trimHostPathSeparators(worktreeRoot)
   const separatorIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
-  if (separatorIndex <= 0 || trimmed.slice(separatorIndex + 1) !== 'workspaces') {
+  if (separatorIndex <= 0 || !isSegment(trimmed.slice(separatorIndex + 1), 'workspaces')) {
     return worktreeRoot
   }
   const parent = trimmed.slice(0, separatorIndex)
   const parentSeparatorIndex = Math.max(parent.lastIndexOf('/'), parent.lastIndexOf('\\'))
-  if (parent.slice(parentSeparatorIndex + 1) !== 'orca') {
+  if (!isSegment(parent.slice(parentSeparatorIndex + 1), 'orca')) {
     return worktreeRoot
   }
   return joinHostPath(parent, 'projects')

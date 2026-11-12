@@ -75,6 +75,18 @@ describe('resolveCheckoutParent', () => {
     ).toBe('/data/workspaces')
   })
 
+  it('folds case only on Windows roots, where a hand-typed tree is still Orca’s own', () => {
+    expect(
+      resolveCheckoutParent({
+        storedWorktreeRoot: 'C:\\Users\\me\\Orca\\Workspaces',
+        layoutMode: 'flat'
+      })
+    ).toBe('C:\\Users\\me\\Orca\\projects')
+    expect(
+      resolveCheckoutParent({ storedWorktreeRoot: '/data/Orca/Workspaces', layoutMode: 'flat' })
+    ).toBe('/data/Orca/Workspaces')
+  })
+
   it('falls back to the convention for the host home', () => {
     expect(resolveCheckoutParent({ layoutMode: 'flat', hostHome: '/home/a' })).toBe(
       '/home/a/orca/projects'

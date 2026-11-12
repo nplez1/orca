@@ -45,6 +45,16 @@ describe('getCloneParentForHost', () => {
     ).toBe('/srv/wt')
   })
 
+  it('keeps a folder that only ends in workspaces, so a checkout never lands beside it', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { workspaceDir: '/data/workspaces' },
+        hostIds: [LOCAL],
+        layoutMode: 'flat'
+      })
+    ).toBe('/data/workspaces')
+  })
+
   it('prefers the host’s stored checkout root', () => {
     expect(
       getCloneParentForHost({

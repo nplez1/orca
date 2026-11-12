@@ -99,6 +99,21 @@ describe('the checkout folder is one rule for clone, the Settings row and create
     }
   })
 
+  it('agrees on this computer with a stored repo root, in every layout', () => {
+    for (const layoutMode of ['flat', 'repo-nested', 'project-folder'] as const) {
+      const settings = settingsWith(layoutMode, {
+        [LOCAL_EXECUTION_HOST_ID]: { defaultRepoRoot: '/data/checkouts' }
+      })
+      const row = getCloneParentForHost({
+        settings,
+        hostIds: [LOCAL_EXECUTION_HOST_ID],
+        layoutMode
+      })
+      expect(row).toBe('/data/checkouts')
+      expect(getLocalCheckoutParent(settings, LOCAL_HOME)).toBe(row)
+    }
+  })
+
   it.each(STORED_CASES)(
     'agrees with create-project on a runtime host with $name',
     async ({ overrides }) => {
