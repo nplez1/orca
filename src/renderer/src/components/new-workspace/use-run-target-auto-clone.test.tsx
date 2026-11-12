@@ -277,6 +277,9 @@ describe('useRunTargetAutoClone', () => {
     // Why: the abandoned host would otherwise end up with a checkout nobody asked to keep.
     expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
     expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: 'runtime:env-c' })
+    // Why: nothing was cloned, so there is nothing to report either.
+    expect(mocks.toastError).not.toHaveBeenCalled()
+    expect(mocks.toastWarning).not.toHaveBeenCalled()
   })
 
   it('starts nothing for a host abandoned before the composer closed', async () => {
@@ -493,12 +496,37 @@ describe('useRunTargetAutoClone', () => {
     })
 
     // Why a toast: the row that would have carried this failure no longer exists.
-    expect(mocks.toastError).toHaveBeenCalledWith("Couldn't clone app onto Build box", {
-      description: 'Repository not found',
-      duration: expect.any(Number)
-    })
+    const [title, options] = mocks.toastError.mock.calls[0]
     expect(mocks.toastError).toHaveBeenCalledTimes(1)
+    // Why these two: the user has to be able to tell which project, on which host, failed.
+    expect(title).toContain('app')
+    expect(title).toContain('Build box')
+    expect(options.description).toBe('Repository not found')
     expect(onProvisioned).not.toHaveBeenCalled()
+  })
+
+  it('toasts a failure from the host the user moved away from, naming that host', async () => {
+    const pending = new Map<string, { reject: (error: unknown) => void }>()
+    mocks.setupProjectClone.mockImplementation(
+      (args: { hostId: string }) =>
+        new Promise((_resolve, reject) => {
+          pending.set(args.hostId, { reject })
+        })
+    )
+    const { result } = renderClone()
+
+    await act(async () => result.current.start(option))
+    await act(async () => result.current.start(OTHER_HOST))
+    await act(async () => {
+      pending.get(HOST)?.reject(new Error('Host key verification failed'))
+    })
+
+    // Why: the failure belongs to the host that ran it, and the composer now waits on another one.
+    const [title, options] = mocks.toastError.mock.calls[0]
+    expect(mocks.toastError).toHaveBeenCalledTimes(1)
+    expect(title).toContain('Build box')
+    expect(options.description).toBe('Host key verification failed')
+    expect(result.current.status).toMatchObject({ kind: 'cloning' })
   })
 
   it('toasts a failure that lands after the user cleared the selection', async () => {
@@ -512,10 +540,10 @@ describe('useRunTargetAutoClone', () => {
     })
 
     // Why: the composer can no longer show it, and a silent failure is the bug this fixes.
-    expect(mocks.toastError).toHaveBeenCalledWith("Couldn't clone app onto Build box", {
-      description: 'Host key verification failed',
-      duration: expect.any(Number)
-    })
+    const [title, options] = mocks.toastError.mock.calls[0]
+    expect(mocks.toastError).toHaveBeenCalledTimes(1)
+    expect(title).toContain('Build box')
+    expect(options.description).toBe('Host key verification failed')
   })
 
   it('toasts once when every composer that joined the clone has closed', async () => {
@@ -592,11 +620,11 @@ describe('useRunTargetAutoClone', () => {
 
     // Why "didn't clone": the folder check runs before anything is cloned, so nothing failed.
     expect(mocks.setupProjectClone).not.toHaveBeenCalled()
-    expect(mocks.toastWarning).toHaveBeenCalledWith("Didn't clone app onto Build box", {
-      description:
-        '/home/alice/orca/projects/app already exists. Pick Build box again to clone under another name, or use that folder.',
-      duration: expect.any(Number)
-    })
+    const [title, options] = mocks.toastWarning.mock.calls[0]
+    expect(mocks.toastWarning).toHaveBeenCalledTimes(1)
+    expect(title).toContain('Build box')
+    // Why the path: on a remote host it is the only thing that says where the folder is.
+    expect(options.description).toContain('/home/alice/orca/projects/app')
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 

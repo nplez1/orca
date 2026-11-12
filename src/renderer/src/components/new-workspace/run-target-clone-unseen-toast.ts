@@ -43,11 +43,18 @@ export function toastUnseenRunTargetClone({
         { project: projectName, host: hostLabel }
       ),
       {
-        description: translate(
-          'auto.components.NewWorkspaceComposerCard.cloneSkippedFolderTaken',
-          '{{path}} already exists. Pick {{host}} again to clone under another name, or use that folder.',
-          { path: outcome.path, host: hostLabel }
-        ),
+        // Why the folder's own reason: adopting a folder that holds another repository is refused.
+        description: outcome.canUseExistingFolder
+          ? translate(
+              'auto.components.NewWorkspaceComposerCard.cloneSkippedFolderTaken',
+              '{{path}} already exists. Pick {{host}} again to clone under another name, or use that folder.',
+              { path: outcome.path, host: hostLabel }
+            )
+          : translate(
+              'auto.components.NewWorkspaceComposerCard.cloneSkippedFolderTakenByOtherRepo',
+              '{{path}} already exists and holds a different repository. Pick {{host}} again to clone under another name.',
+              { path: outcome.path, host: hostLabel }
+            ),
         duration: ERROR_TOAST_DURATION
       }
     )

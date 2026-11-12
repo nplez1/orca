@@ -109,6 +109,7 @@
         "cloneFailedOnHostToast": "Couldn't clone {{project}} onto {{host}}",
         "cloneSkippedOnHostToast": "Didn't clone {{project}} onto {{host}}",
         "cloneSkippedFolderTaken": "{{path}} already exists. Pick {{host}} again to clone under another name, or use that folder.",
+        "cloneSkippedFolderTakenByOtherRepo": "{{path}} already exists and holds a different repository. Pick {{host}} again to clone under another name.",
         "cloneProtocolSsh": "SSH",
         "cloneProtocolHttps": "HTTPS"
       },
