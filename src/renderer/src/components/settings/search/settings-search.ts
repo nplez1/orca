@@ -6,6 +6,8 @@ export type SettingsSearchEntry = {
   keywords?: string[]
   cmdJKeywords?: string[]
   targetSectionId?: string
+  /** Section header: matched as a whole query only, since it owns no rows. */
+  isSectionHeader?: boolean
 }
 
 export const SETTINGS_SEARCH_QUERY_MAX_BYTES = 2 * 1024
@@ -71,13 +73,12 @@ export function normalizeSettingsSearchQuery(query: string): string {
 
 function scoreSettingsSearchText(
   normalizedTerm: string,
-  value: string | undefined,
+  normalizedValue: string,
   tier: SettingsSearchScoreTier
 ): number {
-  if (!value) {
+  if (!normalizedValue) {
     return SETTINGS_SEARCH_NO_MATCH_SCORE
   }
-  const normalizedValue = foldSettingsSearchText(value)
   if (normalizedValue === normalizedTerm) {
     return tier.exact
   }
@@ -92,23 +93,39 @@ function scoreSettingsSearchText(
 
 function scoreSettingsSearchValues(
   normalizedTerm: string,
-  values: readonly string[] | undefined,
+  normalizedValues: readonly string[],
   tier: SettingsSearchScoreTier
 ): number {
-  return (values ?? []).reduce(
+  return normalizedValues.reduce(
     (score, value) => Math.max(score, scoreSettingsSearchText(normalizedTerm, value, tier)),
     SETTINGS_SEARCH_NO_MATCH_SCORE
   )
 }
 
 function tokenizeSettingsSearchQuery(normalizedQuery: string): string[] {
-  return normalizedQuery.split(/\s+/).filter(Boolean)
+  // Why dedupe: a repeated word cannot change the result, only the work per entry.
+  return [...new Set(normalizedQuery.split(/\s+/).filter(Boolean))]
+}
+
+type FoldedSettingsSearchEntry = {
+  title: string
+  description: string
+  keywords: readonly string[]
+}
+
+// Fold once per entry; a query re-scores every entry of every visible section on each keystroke.
+function foldSettingsSearchEntry(entry: SettingsSearchEntry): FoldedSettingsSearchEntry {
+  return {
+    title: foldSettingsSearchText(entry.title),
+    description: entry.description ? foldSettingsSearchText(entry.description) : '',
+    keywords: (entry.keywords ?? []).map(foldSettingsSearchText)
+  }
 }
 
 /** Best tier one term reaches across an entry's fields, or no match. */
-function scoreSettingsSearchEntryTerm(
+function scoreFoldedSettingsSearchTerm(
   normalizedTerm: string,
-  entry: SettingsSearchEntry,
+  entry: FoldedSettingsSearchEntry,
   titleTier: SettingsSearchScoreTier
 ): number {
   return Math.max(
@@ -118,21 +135,29 @@ function scoreSettingsSearchEntryTerm(
   )
 }
 
-// An entry is only as good as the word it matches worst, so every word has to land in this entry.
-function scoreSettingsSearchEntryTokens(
+// Every word has to land in this entry, so a word that misses ends the entry.
+function scoreFoldedSettingsSearchTerms(
   tokens: readonly string[],
-  entry: SettingsSearchEntry,
+  entry: FoldedSettingsSearchEntry,
   titleTier: SettingsSearchScoreTier
 ): number {
-  if (tokens.length === 0) {
-    return SETTINGS_SEARCH_NO_MATCH_SCORE
+  let weakest = Number.POSITIVE_INFINITY
+  for (const token of tokens) {
+    const score = scoreFoldedSettingsSearchTerm(token, entry, titleTier)
+    if (score === SETTINGS_SEARCH_NO_MATCH_SCORE) {
+      return SETTINGS_SEARCH_NO_MATCH_SCORE
+    }
+    weakest = Math.min(weakest, score)
   }
-  return Math.min(...tokens.map((token) => scoreSettingsSearchEntryTerm(token, entry, titleTier)))
+  return weakest
 }
 
-export function scoreSettingsSearch(
+type SettingsSearchMatchMode = 'words' | 'phrase'
+
+function scoreSettingsSearchEntries(
   query: string,
-  entries: SettingsSearchEntry | SettingsSearchEntry[]
+  entries: SettingsSearchEntry | SettingsSearchEntry[],
+  matchMode: SettingsSearchMatchMode
 ): number {
   if (isSettingsSearchQueryTooLarge(query)) {
     return SETTINGS_SEARCH_NO_MATCH_SCORE
@@ -142,18 +167,41 @@ export function scoreSettingsSearch(
     return SETTINGS_SEARCH_EMPTY_QUERY_SCORE
   }
 
-  const tokens = tokenizeSettingsSearchQuery(normalizedQuery)
+  const tokens = matchMode === 'words' ? tokenizeSettingsSearchQuery(normalizedQuery) : []
+  const splitsWords = tokens.length > 1
   const values = Array.isArray(entries) ? entries : [entries]
   return values.reduce((score, entry, index) => {
     // The first entry is the pane title; rank it above setting titles.
     const titleTier = index === 0 ? PANE_TITLE_SCORE : ENTRY_TITLE_SCORE
-    return Math.max(
-      score,
-      // Why keep the whole-query score: a phrase that already matched keeps today's rank.
-      scoreSettingsSearchEntryTerm(normalizedQuery, entry, titleTier),
-      scoreSettingsSearchEntryTokens(tokens, entry, titleTier)
-    )
+    const folded = foldSettingsSearchEntry(entry)
+    // Why keep the whole-query score: a phrase that already matched keeps today's score.
+    const phraseScore = scoreFoldedSettingsSearchTerm(normalizedQuery, folded, titleTier)
+    // Why a section header is never split: it owns no rows, so a cross-word header match
+    // would list a section whose body is empty.
+    const wordScore =
+      splitsWords && !entry.isSectionHeader
+        ? scoreFoldedSettingsSearchTerms(tokens, folded, titleTier)
+        : phraseScore
+    return Math.max(score, phraseScore, wordScore)
   }, SETTINGS_SEARCH_NO_MATCH_SCORE)
+}
+
+export function scoreSettingsSearch(
+  query: string,
+  entries: SettingsSearchEntry | SettingsSearchEntry[]
+): number {
+  return scoreSettingsSearchEntries(query, entries, 'words')
+}
+
+/**
+ * Whole query only. For callers that read a label — a theme name, a repo name — rather than
+ * ranking rows, where splitting into words matches a different label than the one asked for.
+ */
+export function scoreSettingsSearchPhrase(
+  query: string,
+  entries: SettingsSearchEntry | SettingsSearchEntry[]
+): number {
+  return scoreSettingsSearchEntries(query, entries, 'phrase')
 }
 
 export function getSettingsSectionSearchEntries(section: {
@@ -162,7 +210,10 @@ export function getSettingsSectionSearchEntries(section: {
   searchEntries: readonly SettingsSearchEntry[]
 }): SettingsSearchEntry[] {
   // Ranking and filtering need the same pane entry so title-only hits render content.
-  return [{ title: section.title, description: section.description }, ...section.searchEntries]
+  return [
+    { title: section.title, description: section.description, isSectionHeader: true },
+    ...section.searchEntries
+  ]
 }
 
 export function rankSettingsSearchItems<T>(

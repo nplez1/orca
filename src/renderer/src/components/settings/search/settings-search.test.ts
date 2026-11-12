@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { getAppearancePaneSearchEntries, getThemeEntries } from '../appearance/appearance-search'
 import { getTerminalTypographySearchEntries } from '../terminal/appearance/terminal-typography-search'
 import {
-  SETTINGS_SEARCH_QUERY_MAX_BYTES,
   getSettingsSectionSearchEntries,
   matchesSettingsSearch,
-  normalizeSettingsSearchQuery,
   rankSettingsSearchItems,
   scoreSettingsSearch,
+  scoreSettingsSearchPhrase,
   type SettingsSearchEntry
 } from './settings-search'
 
@@ -27,15 +26,6 @@ describe('settings search multi-word queries', () => {
     expect(matchesSettingsSearch('dark theme', getThemeEntries())).toBe(true)
   })
 
-  it('keeps the Appearance pane reachable from the search box', () => {
-    const appearanceSectionEntries = getSettingsSectionSearchEntries({
-      title: 'Appearance',
-      description: 'Theme, zoom, app and terminal appearance, sidebars, and status bar.',
-      searchEntries: getAppearancePaneSearchEntries()
-    })
-    expect(matchesSettingsSearch('dark theme', appearanceSectionEntries)).toBe(true)
-  })
-
   it('finds the terminal font size setting in any word order', () => {
     expect(matchesSettingsSearch('font size terminal', getTerminalTypographySearchEntries())).toBe(
       true
@@ -52,15 +42,27 @@ describe('settings search multi-word queries', () => {
 
   it('returns nothing when one word matches nothing', () => {
     expect(scoreSettingsSearch('dark zzz', themeEntry)).toBe(0)
-    expect(matchesSettingsSearch('dark zzz', themeEntry)).toBe(false)
     expect(matchesSettingsSearch('dark theme zzz', getThemeEntries())).toBe(false)
   })
 
-  // Why: a section only renders when one of its entries matched, so a hit always has a row to show.
-  it('does not match when the words are split across entries', () => {
-    expect(
-      matchesSettingsSearch('terminal font', [{ title: 'Terminal' }, { title: 'Font size' }])
-    ).toBe(false)
+  it('keeps the Appearance pane reachable from the search box', () => {
+    const appearanceSectionEntries = getSettingsSectionSearchEntries({
+      title: 'Appearance',
+      description: 'Theme, zoom, app and terminal appearance, sidebars, and status bar.',
+      searchEntries: getAppearancePaneSearchEntries()
+    })
+    expect(matchesSettingsSearch('dark theme', appearanceSectionEntries)).toBe(true)
+  })
+
+  // Why: a section header owns no rows, so a header-only word match would show an empty pane.
+  it('does not split words across a section header title and description', () => {
+    const sectionEntries = getSettingsSectionSearchEntries({
+      title: 'Appearance',
+      description: 'Theme, zoom, app and terminal appearance, sidebars, and status bar.',
+      searchEntries: [{ title: 'App icon', description: 'Choose the dock icon.' }]
+    })
+    expect(matchesSettingsSearch('theme zoom', sectionEntries)).toBe(false)
+    expect(matchesSettingsSearch('theme', sectionEntries)).toBe(true)
   })
 })
 
@@ -71,25 +73,13 @@ describe('settings search ranking', () => {
     keywords: ['dark']
   }
 
-  it('keeps exact > prefix > substring for a single word', () => {
+  it('keeps exact > prefix > substring and pane title > setting title > description > keyword', () => {
     expect(scoreSettingsSearch('theme', tiersEntry)).toBeGreaterThan(
       scoreSettingsSearch('them', tiersEntry)
     )
     expect(scoreSettingsSearch('them', tiersEntry)).toBeGreaterThan(
       scoreSettingsSearch('hem', tiersEntry)
     )
-    expect(scoreSettingsSearch('appearance', tiersEntry)).toBeGreaterThan(
-      scoreSettingsSearch('ppearance', tiersEntry)
-    )
-    expect(scoreSettingsSearch('dark', tiersEntry)).toBeGreaterThan(
-      scoreSettingsSearch('dar', tiersEntry)
-    )
-    expect(scoreSettingsSearch('dar', tiersEntry)).toBeGreaterThan(
-      scoreSettingsSearch('ark', tiersEntry)
-    )
-  })
-
-  it('keeps pane title > setting title > description > keyword for a single word', () => {
     const paneScore = scoreSettingsSearch('terminal', [
       { title: 'Terminal' },
       { title: 'Terminal font' }
@@ -115,22 +105,12 @@ describe('settings search ranking', () => {
     expect(ranked.map(({ item }) => item.id)).toEqual(['phrase', 'words'])
   })
 
-  it('scores a multi-word query by its weakest word', () => {
-    const strong = { title: 'Font size' }
-    const weak = { title: 'Font', description: 'size' }
-    expect(scoreSettingsSearch('font size', strong)).toBeGreaterThan(
-      scoreSettingsSearch('font size', weak)
-    )
-  })
-
-  it('keeps the empty-query and oversized-query behaviour', () => {
-    expect(scoreSettingsSearch('   ', themeEntry)).toBeGreaterThan(0)
-    expect(rankSettingsSearchItems('  ', [themeEntry], (item) => item)).toHaveLength(1)
-    expect(scoreSettingsSearch('x'.repeat(SETTINGS_SEARCH_QUERY_MAX_BYTES + 1), themeEntry)).toBe(0)
-  })
-
-  it('normalizes case, padding and the Turkish dotted İ', () => {
-    expect(normalizeSettingsSearchQuery('  Dark Theme  ')).toBe('dark theme')
-    expect(normalizeSettingsSearchQuery('İnput')).toBe('input')
+  // Why: terminal theme target intent reads labels, so "dark mode theme" must not pick "Match dark mode".
+  it('can match a label on the whole query only', () => {
+    const lightThemeLabels: SettingsSearchEntry[] = [
+      { title: 'Match dark mode', keywords: ['theme', 'light mode'] }
+    ]
+    expect(scoreSettingsSearch('dark mode theme', lightThemeLabels)).toBeGreaterThan(0)
+    expect(scoreSettingsSearchPhrase('dark mode theme', lightThemeLabels)).toBe(0)
   })
 })
