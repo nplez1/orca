@@ -9,6 +9,7 @@ import {
 } from '../../../../../shared/host-setting-overrides'
 import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from '../../../../../shared/execution-host'
 import { normalizeWorkspaceDirInput } from '../../../../../shared/worktree/workspace-dir-input'
+import { isAbsoluteOrHomeFolderPath } from '@/lib/host-folder-path'
 import { isWindowsUserAgent } from '@/lib/user-agent-platform'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
@@ -35,10 +36,23 @@ export type HostFolderSettingRowProps = {
   remoteCaption: React.ReactNode
   /** Explains what this computer's value means. */
   localCaption: React.ReactNode
+  /** This computer's workspace folder is documented to take a relative per-project path. */
+  allowRelativePath?: boolean
   anchorId?: string
   title: string
   description: string
   keywords: string[]
+}
+
+/** A destination the clone or create path refuses is a value the row must not save: it names a
+ *  folder on another machine, so only that machine's own home can expand a `~`. */
+function isUnusableFolderPath(
+  value: string,
+  requiresAbsolute: boolean,
+  isWindowsHost: boolean
+): boolean {
+  const trimmed = value.trim()
+  return requiresAbsolute && trimmed !== '' && !isAbsoluteOrHomeFolderPath(trimmed, isWindowsHost)
 }
 
 /** One folder on the machine chosen at the top of Settings; this computer is the client default. */
@@ -51,6 +65,7 @@ export function HostFolderSettingRow({
   writeLocal,
   remoteCaption,
   localCaption,
+  allowRelativePath,
   anchorId,
   title,
   description,
@@ -66,10 +81,14 @@ export function HostFolderSettingRow({
   const draftValueRef = useRef(value)
   const skipNextBlurCommitRef = useRef(false)
   const [browsing, setBrowsing] = useState(false)
+  const [pathRefused, setPathRefused] = useState(false)
   // A probed fallback can arrive while the user types; only an untouched draft is re-seeded.
   const editedRef = useRef(false)
   const seededHostIdRef = useRef(scope.hostId)
   const lastCommittedRef = useRef(value)
+  // A relative path only ever means a per-project location, which only this computer documents.
+  const requiresAbsolutePath = !(allowRelativePath && isLocal)
+  const isWindowsHost = isLocal && isWindowsUserAgent()
 
   useEffect(() => {
     // settings:set creates directories; a new scope must never commit the previous host's draft.
@@ -82,12 +101,15 @@ export function HostFolderSettingRow({
     lastCommittedRef.current = value
     setDraftValue(value)
     draftValueRef.current = value
-  }, [scope.hostId, value])
+    // A value saved before this check existed stays visible as the problem it is.
+    setPathRefused(isUnusableFolderPath(value, requiresAbsolutePath, isWindowsHost))
+  }, [scope.hostId, value, requiresAbsolutePath, isWindowsHost])
 
   const setDraft = (next: string): void => {
     editedRef.current = true
     draftValueRef.current = next
     setDraftValue(next)
+    setPathRefused(false)
   }
 
   const writeValue = (next: string): void => {
@@ -109,6 +131,10 @@ export function HostFolderSettingRow({
     // Show the value main will save, so a padded re-save of the saved path writes nothing.
     const next = normalizeWorkspaceDirInput(draftValueRef.current, isWindowsUserAgent())
     setDraft(next)
+    if (isUnusableFolderPath(next, requiresAbsolutePath, isWindowsHost)) {
+      setPathRefused(true)
+      return
+    }
     if (next === value) {
       return
     }
@@ -199,6 +225,7 @@ export function HostFolderSettingRow({
             }
           }}
           className="flex-1 text-xs"
+          aria-invalid={pathRefused ? true : undefined}
         />
         <Button
           variant="outline"
@@ -215,7 +242,16 @@ export function HostFolderSettingRow({
         </Button>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{isLocal ? localCaption : remoteCaption}</p>
+        {pathRefused ? (
+          <p className="text-xs text-destructive">
+            {t(
+              'auto.components.settings.general.HostFolderSettingRow.607a8e146c',
+              'Use a full path, or one that starts with ~/.'
+            )}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">{isLocal ? localCaption : remoteCaption}</p>
+        )}
         {hasOverride && (
           <Button type="button" variant="ghost" size="xs" onClick={resetOverride}>
             <RotateCcw className="size-3.5" />

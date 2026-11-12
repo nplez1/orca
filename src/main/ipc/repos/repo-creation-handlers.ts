@@ -10,11 +10,11 @@ import {
   layoutNestsPrimaryCheckout,
   resolveWorktreeLayoutMode
 } from '../../../shared/orca-workspace-layout'
-import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../shared/constants'
-import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
+import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/constants'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
-import { getEffectiveHostSetting } from '../../../shared/host-setting-overrides'
 import { probeGitAvailability } from '../../git/git-availability'
+import { expandLeadingHomePath } from '../../filesystem/home-path-expansion'
+import { resolveDefaultCreateProjectParent } from './default-create-project-parent'
 import { gitExecFileAsync } from '../../git/runner'
 import { getInitDefaultBranchName } from '../../git/init-default-branch'
 import { sanitizeWorktreeName } from '../worktree-logic'
@@ -40,36 +40,7 @@ export async function probeLocalGitAvailability(): Promise<boolean> {
 
 /** Ignore seeded workspaceDir: treating it as user intent nests projects inside the worktree root. */
 function getDefaultCreateProjectParent(store: Store): string {
-  const home = homedir()
-  const settings = store.getSettings()
-  // An explicit checkout root wins: under a nested layout it is the project's container.
-  const storedRoot = getEffectiveHostSetting(
-    settings,
-    LOCAL_EXECUTION_HOST_ID,
-    'defaultRepoRoot',
-    ''
-  ).trim()
-  if (storedRoot) {
-    return storedRoot
-  }
-  const configured = getEffectiveHostSetting(
-    settings,
-    LOCAL_EXECUTION_HOST_ID,
-    'defaultWorktreeLocation',
-    settings.workspaceDir ?? ''
-  ).trim()
-  // fork-comment-ok: under a nested layout the container's parent *is* the workspace dir, so the
-  // "beside the worktree tree" fallback below would place the project outside its own container.
-  if (layoutNestsPrimaryCheckout(resolveWorktreeLayoutMode(settings))) {
-    return configured || getDefaultWorkspaceDir(home)
-  }
-  const isUntouchedDefault =
-    normalizeRuntimePathForComparison(configured) ===
-    normalizeRuntimePathForComparison(getDefaultWorkspaceDir(home))
-  if (configured && !isUntouchedDefault) {
-    return configured
-  }
-  return join(home, 'orca', 'projects')
+  return resolveDefaultCreateProjectParent(store.getSettings(), homedir())
 }
 
 /**
@@ -145,7 +116,8 @@ export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: S
       args: { parentPath: string; name: string; kind: 'git' | 'folder' }
     ): Promise<{ repo: Repo } | RepoCreateFailure> => {
       const name = args.name?.trim() ?? ''
-      const parentPath = args.parentPath?.trim() ?? ''
+      // fork-comment-ok: `~` is this machine's home, and the create path refuses anything relative.
+      const parentPath = expandLeadingHomePath(args.parentPath?.trim() ?? '', homedir())
       // Untrusted IPC kinds must not skip Git initialization yet persist as Git projects.
       const repoKind: 'git' | 'folder' = args.kind === 'folder' ? 'folder' : 'git'
 

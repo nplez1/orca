@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { refuseWslHostWindowsDrivePath } from '../terminal/launch/wsl-host-windows-drive-guard'
 import { mkdir } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { dirname } from 'node:path'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/repo-badge-color'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/execution-host'
@@ -12,7 +13,8 @@ import {
   claimCloneTarget,
   deriveValidatedClonePath,
   getClonePathComparisonKey,
-  getSavedProjectPathKeys
+  getSavedProjectPathKeys,
+  resolveCloneDestination
 } from '../../git/repo-clone-path'
 import { gitSpawnAfterWindowsEnvironmentReady } from '../../git/command-runner/git-spawn'
 import { promptGuardGitEnv } from '../../git/command-runner/git-process-env'
@@ -73,7 +75,12 @@ export class RuntimeRepositoryCloneController {
       throw new Error('runtime_unavailable')
     }
     return checkCloneTarget(
-      { ...args, url: args.url.trim(), destination: args.destination.trim() },
+      {
+        ...args,
+        url: args.url.trim(),
+        // fork-comment-ok: this server owns the destination's `~`, and the caller cannot expand it.
+        destination: resolveCloneDestination(args.destination, homedir())
+      },
       (pathKeys) => findRegistrationCandidateAt(store, pathKeys, executionHostId),
       LOCAL_EXECUTION_HOST_ID
     )
@@ -94,17 +101,19 @@ export class RuntimeRepositoryCloneController {
     if (!trimmedDestination) {
       throw new Error('Clone destination is required')
     }
+    // fork-comment-ok: `~` is this server's home; the branch probe below creates and enters the path.
+    const resolvedDestination = resolveCloneDestination(trimmedDestination, homedir())
     // fork-comment-ok: the branch probe below creates and enters this path, so refuse it first.
-    await refuseWslHostWindowsDrivePath(trimmedDestination)
+    await refuseWslHostWindowsDrivePath(resolvedDestination)
     // fork-comment-ok: a nested layout has to nest a server-hosted clone the way the local one does.
     const placement = await resolveCloneTargetPlacement({
       url: trimmedUrl,
-      destination: trimmedDestination,
+      destination: resolvedDestination,
       settings: store.getSettings()
     })
     const clonePath = deriveValidatedClonePath({
       url: trimmedUrl,
-      destination: trimmedDestination,
+      destination: resolvedDestination,
       folderName,
       relativeClonePath: placement.relativeClonePath
     })
@@ -124,7 +133,7 @@ export class RuntimeRepositoryCloneController {
       return await runWithGitReadCacheInvalidation(() =>
         this.cloneAfterPathLock(
           trimmedUrl,
-          trimmedDestination,
+          resolvedDestination,
           clonePath,
           executionHostId,
           placement
@@ -140,7 +149,7 @@ export class RuntimeRepositoryCloneController {
 
   private async cloneAfterPathLock(
     trimmedUrl: string,
-    trimmedDestination: string,
+    destination: string,
     clonePath: string,
     executionHostId: ExecutionHostId | null | undefined,
     placement: CloneTargetPlacement
@@ -157,7 +166,7 @@ export class RuntimeRepositoryCloneController {
       return reused
     }
 
-    await mkdir(trimmedDestination, { recursive: true })
+    await mkdir(destination, { recursive: true })
     // fork-comment-ok: the claim below is non-recursive, so a nested project folder must exist first.
     await mkdir(dirname(clonePath), { recursive: true })
     const claimedTarget = await claimCloneTarget(clonePath)
@@ -166,7 +175,7 @@ export class RuntimeRepositoryCloneController {
       proc = await gitSpawnAfterWindowsEnvironmentReady(
         ['clone', '--progress', '--', trimmedUrl, clonePath],
         {
-          cwd: trimmedDestination,
+          cwd: destination,
           // Host Git on purpose: the clone makes a new repo no project owns, even inside one.
           hostGit: true,
           admissionTier: 'interactive',
