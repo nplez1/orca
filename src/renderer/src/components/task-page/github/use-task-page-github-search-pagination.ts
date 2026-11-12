@@ -84,7 +84,7 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
             countedTotalPages: null
           })
           if (reason === 'window-unreachable') {
-            // Why: a proven window limit answers the click, so the page stops being offered instead of failing again.
+            // fork-comment-ok: a proven window limit answers the click, so the page stops being offered instead of failing again.
             setPaginationError(null)
             toast.error(
               translate(
@@ -100,7 +100,7 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
             )
             setProvenPageLimit((previous) => applyWindowPageLimit(previous, target))
           } else if (reason === 'load-failed') {
-            // Why: the store folds a per-repo network or IPC failure into failedCount, so this — not the catch below — is what a real outage reaches. It owns the reason and the retry.
+            // fork-comment-ok: the store folds a per-repo network or IPC failure into failedCount, so this — not the catch below — is what a real outage reaches.
             setPaginationError({
               page: target,
               message: translate(
@@ -152,7 +152,7 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
         setCurrentPage(target)
         setPaginationError(null)
       } catch (err) {
-        // Why: this is the only load path with no row to carry the failure, so it reports itself instead of only logging.
+        // fork-comment-ok: this is the only load path with no row to carry the failure, so it reports itself instead of only logging.
         if (paginationGenerationRef.current === requestGeneration) {
           setPaginationError({
             page: target,

@@ -308,7 +308,7 @@ export function TaskPageGitHubList({
       totalPages > 1 ? (
         <div className="flex-none border-t border-border/50 bg-background">
           {paginationError ? (
-            // Why: a rejected next-page read changes nothing on screen, so without this the click reads as "no more results".
+            // fork-comment-ok: a rejected next-page read changes nothing on screen, so without this the click reads as "no more results".
             <div
               role="alert"
               aria-atomic="true"

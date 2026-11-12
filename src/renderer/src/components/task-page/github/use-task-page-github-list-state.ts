@@ -94,8 +94,7 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
   const githubListRestoreWriteRef = useRef<GitHubListRestoreWrite | null>(null)
   const [paginationLoading, setPaginationLoading] = useState(false)
   const [loadingTargetPage, setLoadingTargetPage] = useState<number | null>(null)
-  // Why: a rejected next-page read owns no row, so the page it failed on and its reason live here for the list to show and retry.
-  // The landing run retires it with the rest of the list's failures, so a query, mode or refresh cannot resurrect it.
+  // fork-comment-ok: no row can carry a rejected next-page read, so the page and its reason need a slot here.
   const [paginationError, setPaginationError] = useState<GitHubPageLoadError | null>(null)
   // Keep proven 422 limits separate so late counts replace speculation without resurrecting unreachable pages.
   const [provenPageLimit, setProvenPageLimit] = useState<number | null>(null)
@@ -170,7 +169,7 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
     paginationGenerationRef.current += 1
     setPaginationLoading(false)
     setLoadingTargetPage(null)
-    // Why: a failure names a page of the list this generation replaces, so keeping it would resurface a stale banner when the user returns to that query or mode.
+    // fork-comment-ok: the ordering is the fix — a stale page's failure must not outlive the generation that owns it.
     // oxlint-disable-next-line react-doctor/no-adjust-state-on-prop-change
     setPaginationError(null)
   }, [
@@ -251,5 +250,4 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
 }
 export type TaskPageGitHubListStateModel = ReturnType<typeof useTaskPageGitHubListState>
 
-/** The page a failed next-page read was asked for, and the reason to show beside its Retry. */
 export type GitHubPageLoadError = { message: string; page: number }
