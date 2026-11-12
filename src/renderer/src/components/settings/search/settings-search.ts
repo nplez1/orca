@@ -70,7 +70,7 @@ export function normalizeSettingsSearchQuery(query: string): string {
 }
 
 function scoreSettingsSearchText(
-  normalizedQuery: string,
+  normalizedTerm: string,
   value: string | undefined,
   tier: SettingsSearchScoreTier
 ): number {
@@ -78,27 +78,56 @@ function scoreSettingsSearchText(
     return SETTINGS_SEARCH_NO_MATCH_SCORE
   }
   const normalizedValue = foldSettingsSearchText(value)
-  if (normalizedValue === normalizedQuery) {
+  if (normalizedValue === normalizedTerm) {
     return tier.exact
   }
-  if (normalizedValue.startsWith(normalizedQuery)) {
+  if (normalizedValue.startsWith(normalizedTerm)) {
     return tier.prefix
   }
-  if (normalizedValue.includes(normalizedQuery)) {
+  if (normalizedValue.includes(normalizedTerm)) {
     return tier.substring
   }
   return SETTINGS_SEARCH_NO_MATCH_SCORE
 }
 
 function scoreSettingsSearchValues(
-  normalizedQuery: string,
+  normalizedTerm: string,
   values: readonly string[] | undefined,
   tier: SettingsSearchScoreTier
 ): number {
   return (values ?? []).reduce(
-    (score, value) => Math.max(score, scoreSettingsSearchText(normalizedQuery, value, tier)),
+    (score, value) => Math.max(score, scoreSettingsSearchText(normalizedTerm, value, tier)),
     SETTINGS_SEARCH_NO_MATCH_SCORE
   )
+}
+
+function tokenizeSettingsSearchQuery(normalizedQuery: string): string[] {
+  return normalizedQuery.split(/\s+/).filter(Boolean)
+}
+
+/** Best tier one term reaches across an entry's fields, or no match. */
+function scoreSettingsSearchEntryTerm(
+  normalizedTerm: string,
+  entry: SettingsSearchEntry,
+  titleTier: SettingsSearchScoreTier
+): number {
+  return Math.max(
+    scoreSettingsSearchText(normalizedTerm, entry.title, titleTier),
+    scoreSettingsSearchText(normalizedTerm, entry.description, DESCRIPTION_SCORE),
+    scoreSettingsSearchValues(normalizedTerm, entry.keywords, KEYWORD_SCORE)
+  )
+}
+
+// An entry is only as good as the word it matches worst, so every word has to land in this entry.
+function scoreSettingsSearchEntryTokens(
+  tokens: readonly string[],
+  entry: SettingsSearchEntry,
+  titleTier: SettingsSearchScoreTier
+): number {
+  if (tokens.length === 0) {
+    return SETTINGS_SEARCH_NO_MATCH_SCORE
+  }
+  return Math.min(...tokens.map((token) => scoreSettingsSearchEntryTerm(token, entry, titleTier)))
 }
 
 export function scoreSettingsSearch(
@@ -113,15 +142,16 @@ export function scoreSettingsSearch(
     return SETTINGS_SEARCH_EMPTY_QUERY_SCORE
   }
 
+  const tokens = tokenizeSettingsSearchQuery(normalizedQuery)
   const values = Array.isArray(entries) ? entries : [entries]
   return values.reduce((score, entry, index) => {
     // The first entry is the pane title; rank it above setting titles.
-    const titleScore = index === 0 ? PANE_TITLE_SCORE : ENTRY_TITLE_SCORE
+    const titleTier = index === 0 ? PANE_TITLE_SCORE : ENTRY_TITLE_SCORE
     return Math.max(
       score,
-      scoreSettingsSearchText(normalizedQuery, entry.title, titleScore),
-      scoreSettingsSearchText(normalizedQuery, entry.description, DESCRIPTION_SCORE),
-      scoreSettingsSearchValues(normalizedQuery, entry.keywords, KEYWORD_SCORE)
+      // Why keep the whole-query score: a phrase that already matched keeps today's rank.
+      scoreSettingsSearchEntryTerm(normalizedQuery, entry, titleTier),
+      scoreSettingsSearchEntryTokens(tokens, entry, titleTier)
     )
   }, SETTINGS_SEARCH_NO_MATCH_SCORE)
 }
