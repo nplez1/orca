@@ -225,8 +225,10 @@ describe('foldSessionSummaryEvents', () => {
     let chunkPrompt = ''
     const brain = jsonBrain((prompt) => {
       chunkPrompt = prompt
-      // The index the prompt's failure line names, cited back the way the extract is told to.
-      return { blockers: [{ text: 'npm test fails', sourceIndex: 43 }] }
+      // Cite whatever index the failure line names, the way the extract is told to — so this test
+      // fails on a fold-relative index too, not only on the line that quotes it.
+      const cited = Number(/^ {2}#(\d+) Bash/m.exec(prompt)?.[1])
+      return { blockers: [{ text: 'npm test fails', sourceIndex: cited }] }
     })
     const result = await foldSessionSummaryEvents({
       brain,
@@ -234,13 +236,13 @@ describe('foldSessionSummaryEvents', () => {
       events,
       signal: new AbortController().signal
     })
-    expect(chunkPrompt).toContain('[#41-#46 tool]')
-    expect(chunkPrompt).toContain('  #43 Bash npm test · exit 1 · FAIL src/x.test.ts > adds a flag')
     expect(result.ledger.blockers).toEqual([{ text: 'npm test fails', sourceIndex: 43 }])
     // One row for one failure: the blocker replaces the marker rather than sitting beside it.
     expect(result.ledger.timeline.filter((entry) => entry.kind === 'error')).toEqual([
       { id: 'error-43', kind: 'error', text: 'npm test fails', sourceIndex: 43 }
     ])
+    expect(chunkPrompt).toContain('[#41-#46 tool]')
+    expect(chunkPrompt).toContain('  #43 Bash npm test · exit 1 · FAIL src/x.test.ts > adds a flag')
   })
 
   // Acceptance 5: no positional truncation survives. The old fold cut every event at 1,500
