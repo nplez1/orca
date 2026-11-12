@@ -24,7 +24,8 @@ export type SessionSummaryToolFacts = {
   pair: number
   /** The tool's name, when the call line named one. */
   name: string | null
-  /** `<name> <target>`: how a reader (and the extract) identifies the call. */
+  /** `<name> <target>`: how a reader (and the extract) identifies the call — or the call's own
+   * bounded line when it named no tool. */
   label: string
   /** A result only: the text evidences a failure. */
   failed: boolean

@@ -150,13 +150,13 @@ describe('createSessionSummaryEventDigester', () => {
 
   // The name gate exists to reject a sentence that happens to contain a colon, and the fallback has
   // to be the call's own line: labelling it `tool result` is what lost the identity in the first
-  // place. A harness that omits the name emits the call's input as its text.
+  // place. A call the decoder found no name for carries its argument as its text.
   it('repeats the call’s own line when its name does not parse', () => {
     const digester = createSessionSummaryEventDigester()
-    digester.digest(call('{"path": "/repo/x.ts"}'))
+    digester.digest(call('ls -la'))
     const event = digester.digest(result('one line'))
     expect(event.tool?.name).toBeNull()
-    expect(event.text).toBe('{"path": "/repo/x.ts"} · 1 line / 8 B · ok')
+    expect(event.text).toBe('ls -la · 1 line / 8 B · ok')
   })
 
   // A fold resumes at a cursor, so the call sits before it and only its result is digested. The

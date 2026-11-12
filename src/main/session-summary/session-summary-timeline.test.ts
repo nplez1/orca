@@ -60,19 +60,20 @@ describe('planSessionSummaryTimelineMarkers', () => {
     ])
   })
 
-  // #386 acceptance: digest -> render plan -> timeline. A failing MCP call is the interesting one,
-  // and `tool result · failed · …` named neither the tool nor what it was called on.
+  // #386 acceptance: digest -> render plan -> timeline, in the shape the decoder really emits. An
+  // MCP call's input carries no key `decodeToolCall` reads, so the call's text is the bare name —
+  // the `separator === -1` branch — and `tool result · failed · …` named nothing.
   it('names a long MCP tool on its error marker', () => {
     const events = digest([
       prose('user', 'open the pull request'),
-      call(MCP_TOOL, 'owner/repo'),
+      { role: 'tool', text: MCP_TOOL, timestamp: null, toolKind: 'call' },
       result(FAILED_MCP)
     ])
     expect(planSessionSummaryTimelineMarkers(events, 0)).toEqual([
       { kind: 'user-input', text: 'open the pull request', sourceIndex: 0 },
       {
         kind: 'error',
-        text: `${MCP_TOOL} owner/repo · failed · Error: Validation Failed`,
+        text: `${MCP_TOOL} · failed · Error: Validation Failed`,
         sourceIndex: 1
       }
     ])
