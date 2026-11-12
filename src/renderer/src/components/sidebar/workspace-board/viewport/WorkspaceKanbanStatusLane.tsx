@@ -89,9 +89,13 @@ function WorkspaceKanbanStatusLane({
   // Only filtered-away cards justify No matches; intrinsically empty lanes remain Empty.
   const laneTotalCount = totalCount ?? items.length
   const isFiltered = hasQuery && laneTotalCount > 0
-  // Hidden members are the lane's own, so the badge counts them even though they cannot render.
-  const laneMembershipCount = laneTotalCount + hiddenCount
-  const isNarrowed = isFiltered || hiddenCount > 0
+  // A query narrows within what it can match; without one the sidebar filters are what narrow the
+  // lane, so its members are the visible cards plus the hidden ones.
+  const badgeText = isFiltered
+    ? `${items.length} / ${laneTotalCount}`
+    : hiddenCount > 0
+      ? `${items.length} / ${laneTotalCount + hiddenCount}`
+      : String(items.length)
   const hiddenLabel =
     hiddenCount > 0
       ? t(
@@ -100,6 +104,11 @@ function WorkspaceKanbanStatusLane({
           { value0: hiddenCount }
         )
       : ''
+  const showHiddenLabel = t(
+    'auto.components.sidebar.WorkspaceKanbanStatusLane.showHiddenLabel',
+    'Show {{value0}} workspaces hidden by filters',
+    { value0: hiddenCount }
+  )
   const showHiddenHint = t(
     'auto.components.sidebar.WorkspaceKanbanStatusLane.showHiddenHint',
     'Turn off the filters hiding these workspaces'
@@ -120,11 +129,9 @@ function WorkspaceKanbanStatusLane({
     { status: status.label }
   )
   const countBadge = (
-    <div
-      className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium leading-none text-muted-foreground"
-      aria-label={hiddenCount > 0 ? hiddenLabel : undefined}
-    >
-      {isNarrowed ? `${items.length} / ${laneMembershipCount}` : items.length}
+    <div className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium leading-none text-muted-foreground">
+      {badgeText}
+      {hiddenCount > 0 && <span className="sr-only"> {hiddenLabel}</span>}
     </div>
   )
   const createButton = (
@@ -246,16 +253,23 @@ function WorkspaceKanbanStatusLane({
             {hiddenCount > 0 && (
               <>
                 <span>{hiddenLabel}</span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="xs"
-                  className="h-6"
-                  aria-label={showHiddenHint}
-                  onClick={() => onShowHidden(status.id)}
-                >
-                  {t('auto.components.sidebar.WorkspaceKanbanStatusLane.showHidden', 'Show')}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="xs"
+                      className="h-6"
+                      aria-label={showHiddenLabel}
+                      onClick={() => onShowHidden(status.id)}
+                    >
+                      {t('auto.components.sidebar.WorkspaceKanbanStatusLane.showHidden', 'Show')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6}>
+                    {showHiddenHint}
+                  </TooltipContent>
+                </Tooltip>
               </>
             )}
             {!isFiltered && hiddenCount === 0 && (

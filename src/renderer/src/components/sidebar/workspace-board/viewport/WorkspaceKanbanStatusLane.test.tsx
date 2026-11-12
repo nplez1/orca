@@ -14,7 +14,7 @@ vi.mock('./WorkspaceKanbanLaneCardList', () => ({
 
 const STATUS: WorkspaceStatusDefinition = { id: 'in-progress', label: 'In progress' }
 const EMPTY_REPO_MAP = new Map()
-const SHOW_HIDDEN_LABEL = 'Turn off the filters hiding these workspaces'
+const SHOW_HIDDEN_LABEL = 'Show 3 workspaces hidden by filters'
 
 function renderLane(overrides: {
   items?: readonly Worktree[]
@@ -64,11 +64,10 @@ describe('WorkspaceKanbanStatusLane', () => {
     expect(rendered.queryByText(/hidden by filters/)).toBeNull()
     expect(rendered.queryByRole('button', { name: SHOW_HIDDEN_LABEL })).toBeNull()
   })
-
   it('reports the members the sidebar filters hide instead of reading Empty', () => {
     const rendered = renderLane({ hiddenCount: 3 })
 
-    expect(rendered.getByText('3 hidden by filters')).toBeTruthy()
+    expect(rendered.getAllByText('3 hidden by filters')).toHaveLength(2)
     expect(rendered.queryByText('Empty')).toBeNull()
   })
 
@@ -97,6 +96,18 @@ describe('WorkspaceKanbanStatusLane', () => {
 
     expect(rendered.getByText('1 / 3')).toBeTruthy()
     expect(rendered.getByTestId('cards').textContent).toBe('shown')
-    expect(rendered.queryByText('2 hidden by filters')).toBeNull()
+    expect(rendered.queryByText('Empty')).toBeNull()
+  })
+
+  it('keeps the search badge counting only what the query could match', () => {
+    const rendered = renderLane({
+      items: [makeWorktree({ id: 'matched', repoId: 'repo' })],
+      totalCount: 3,
+      hiddenCount: 7,
+      hasQuery: true
+    })
+
+    expect(rendered.getByText('1 / 3')).toBeTruthy()
+    expect(rendered.getByText('7 hidden by filters')).toBeTruthy()
   })
 })
