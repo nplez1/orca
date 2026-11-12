@@ -40,6 +40,10 @@ describe('settings search multi-word queries', () => {
     expect(matchesSettingsSearch('dark\ttheme', themeEntry)).toBe(true)
   })
 
+  it('matches a query that repeats one word', () => {
+    expect(matchesSettingsSearch('theme theme', themeEntry)).toBe(true)
+  })
+
   it('returns nothing when one word matches nothing', () => {
     expect(scoreSettingsSearch('dark zzz', themeEntry)).toBe(0)
     expect(matchesSettingsSearch('dark theme zzz', getThemeEntries())).toBe(false)
@@ -84,7 +88,7 @@ describe('settings search ranking', () => {
       { title: 'Terminal' },
       { title: 'Terminal font' }
     ])
-    const settingTitleScore = scoreSettingsSearch('font', [{ title: 'Font size' }])
+    const settingTitleScore = scoreSettingsSearch('font', [{ title: 'Other' }, { title: 'Font' }])
     const descriptionScore = scoreSettingsSearch('default', [
       { title: 'Font size', description: 'Default terminal font size' }
     ])

@@ -141,15 +141,15 @@ function scoreFoldedSettingsSearchTerms(
   entry: FoldedSettingsSearchEntry,
   titleTier: SettingsSearchScoreTier
 ): number {
-  let weakest = Number.POSITIVE_INFINITY
+  let weakest: number | undefined
   for (const token of tokens) {
     const score = scoreFoldedSettingsSearchTerm(token, entry, titleTier)
     if (score === SETTINGS_SEARCH_NO_MATCH_SCORE) {
       return SETTINGS_SEARCH_NO_MATCH_SCORE
     }
-    weakest = Math.min(weakest, score)
+    weakest = weakest === undefined ? score : Math.min(weakest, score)
   }
-  return weakest
+  return weakest ?? SETTINGS_SEARCH_NO_MATCH_SCORE
 }
 
 type SettingsSearchMatchMode = 'words' | 'phrase'
@@ -168,7 +168,9 @@ function scoreSettingsSearchEntries(
   }
 
   const tokens = matchMode === 'words' ? tokenizeSettingsSearchQuery(normalizedQuery) : []
-  const splitsWords = tokens.length > 1
+  // Why whitespace rather than the token count: dedupe leaves "theme theme" one token, but it is
+  // still a two-word query, and scoring it as a phrase would match nothing.
+  const splitsWords = matchMode === 'words' && /\s/.test(normalizedQuery)
   const values = Array.isArray(entries) ? entries : [entries]
   return values.reduce((score, entry, index) => {
     // The first entry is the pane title; rank it above setting titles.
@@ -194,7 +196,7 @@ export function scoreSettingsSearch(
 }
 
 /**
- * Whole query only. For callers that read a label — a theme name, a repo name — rather than
+ * Whole query only. For callers that read a label — a theme name, a setting name — rather than
  * ranking rows, where splitting into words matches a different label than the one asked for.
  */
 export function scoreSettingsSearchPhrase(
