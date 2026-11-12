@@ -5,7 +5,7 @@ import type { TerminalThemeSlot } from '../../../../../../shared/terminal-themes
 import {
   matchesSettingsSearch,
   normalizeSettingsSearchQuery,
-  scoreSettingsSearch,
+  scoreSettingsSearchPhrase,
   type SettingsSearchEntry
 } from '../../search/settings-search'
 import { useAppStore } from '../../../../store/index'
@@ -57,7 +57,8 @@ type TerminalAppearanceSectionProps = {
 
 function scoreThemeTargetIntent(searchQuery: string, entries: SettingsSearchEntry[]): number {
   // Infer dark/light target from labels/aliases, not incidental description mentions.
-  return scoreSettingsSearch(
+  // Why whole-query: splitting words let "dark mode theme" pick "Match dark mode" in the light list.
+  return scoreSettingsSearchPhrase(
     searchQuery,
     entries.map(({ title, keywords }) => ({ title, keywords }))
   )

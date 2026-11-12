@@ -6,6 +6,8 @@ export type SettingsSearchEntry = {
   keywords?: string[]
   cmdJKeywords?: string[]
   targetSectionId?: string
+  /** Section header: matched as a whole query only, since it owns no rows. */
+  isSectionHeader?: boolean
 }
 
 export const SETTINGS_SEARCH_QUERY_MAX_BYTES = 2 * 1024
@@ -70,40 +72,92 @@ export function normalizeSettingsSearchQuery(query: string): string {
 }
 
 function scoreSettingsSearchText(
-  normalizedQuery: string,
-  value: string | undefined,
+  normalizedTerm: string,
+  normalizedValue: string,
   tier: SettingsSearchScoreTier
 ): number {
-  if (!value) {
+  if (!normalizedValue) {
     return SETTINGS_SEARCH_NO_MATCH_SCORE
   }
-  const normalizedValue = foldSettingsSearchText(value)
-  if (normalizedValue === normalizedQuery) {
+  if (normalizedValue === normalizedTerm) {
     return tier.exact
   }
-  if (normalizedValue.startsWith(normalizedQuery)) {
+  if (normalizedValue.startsWith(normalizedTerm)) {
     return tier.prefix
   }
-  if (normalizedValue.includes(normalizedQuery)) {
+  if (normalizedValue.includes(normalizedTerm)) {
     return tier.substring
   }
   return SETTINGS_SEARCH_NO_MATCH_SCORE
 }
 
 function scoreSettingsSearchValues(
-  normalizedQuery: string,
-  values: readonly string[] | undefined,
+  normalizedTerm: string,
+  normalizedValues: readonly string[],
   tier: SettingsSearchScoreTier
 ): number {
-  return (values ?? []).reduce(
-    (score, value) => Math.max(score, scoreSettingsSearchText(normalizedQuery, value, tier)),
+  return normalizedValues.reduce(
+    (score, value) => Math.max(score, scoreSettingsSearchText(normalizedTerm, value, tier)),
     SETTINGS_SEARCH_NO_MATCH_SCORE
   )
 }
 
-export function scoreSettingsSearch(
+function tokenizeSettingsSearchQuery(normalizedQuery: string): string[] {
+  // Why dedupe: a repeated word cannot change the result, only the work per entry.
+  return [...new Set(normalizedQuery.split(/\s+/).filter(Boolean))]
+}
+
+type FoldedSettingsSearchEntry = {
+  title: string
+  description: string
+  keywords: readonly string[]
+}
+
+// Fold once per entry; a query re-scores every entry of every visible section on each keystroke.
+function foldSettingsSearchEntry(entry: SettingsSearchEntry): FoldedSettingsSearchEntry {
+  return {
+    title: foldSettingsSearchText(entry.title),
+    description: entry.description ? foldSettingsSearchText(entry.description) : '',
+    keywords: (entry.keywords ?? []).map(foldSettingsSearchText)
+  }
+}
+
+/** Best tier one term reaches across an entry's fields, or no match. */
+function scoreFoldedSettingsSearchTerm(
+  normalizedTerm: string,
+  entry: FoldedSettingsSearchEntry,
+  titleTier: SettingsSearchScoreTier
+): number {
+  return Math.max(
+    scoreSettingsSearchText(normalizedTerm, entry.title, titleTier),
+    scoreSettingsSearchText(normalizedTerm, entry.description, DESCRIPTION_SCORE),
+    scoreSettingsSearchValues(normalizedTerm, entry.keywords, KEYWORD_SCORE)
+  )
+}
+
+// Every word has to land in this entry, so a word that misses ends the entry.
+function scoreFoldedSettingsSearchTerms(
+  tokens: readonly string[],
+  entry: FoldedSettingsSearchEntry,
+  titleTier: SettingsSearchScoreTier
+): number {
+  let weakest: number | undefined
+  for (const token of tokens) {
+    const score = scoreFoldedSettingsSearchTerm(token, entry, titleTier)
+    if (score === SETTINGS_SEARCH_NO_MATCH_SCORE) {
+      return SETTINGS_SEARCH_NO_MATCH_SCORE
+    }
+    weakest = weakest === undefined ? score : Math.min(weakest, score)
+  }
+  return weakest ?? SETTINGS_SEARCH_NO_MATCH_SCORE
+}
+
+type SettingsSearchMatchMode = 'words' | 'phrase'
+
+function scoreSettingsSearchEntries(
   query: string,
-  entries: SettingsSearchEntry | SettingsSearchEntry[]
+  entries: SettingsSearchEntry | SettingsSearchEntry[],
+  matchMode: SettingsSearchMatchMode
 ): number {
   if (isSettingsSearchQueryTooLarge(query)) {
     return SETTINGS_SEARCH_NO_MATCH_SCORE
@@ -113,17 +167,43 @@ export function scoreSettingsSearch(
     return SETTINGS_SEARCH_EMPTY_QUERY_SCORE
   }
 
+  // Why whitespace rather than the token count: dedupe leaves "theme theme" one token, but it is
+  // still a two-word query, and scoring it as a phrase would match nothing.
+  const splitsWords = matchMode === 'words' && /\s/.test(normalizedQuery)
+  const tokens = splitsWords ? tokenizeSettingsSearchQuery(normalizedQuery) : []
   const values = Array.isArray(entries) ? entries : [entries]
   return values.reduce((score, entry, index) => {
     // The first entry is the pane title; rank it above setting titles.
-    const titleScore = index === 0 ? PANE_TITLE_SCORE : ENTRY_TITLE_SCORE
-    return Math.max(
-      score,
-      scoreSettingsSearchText(normalizedQuery, entry.title, titleScore),
-      scoreSettingsSearchText(normalizedQuery, entry.description, DESCRIPTION_SCORE),
-      scoreSettingsSearchValues(normalizedQuery, entry.keywords, KEYWORD_SCORE)
-    )
+    const titleTier = index === 0 ? PANE_TITLE_SCORE : ENTRY_TITLE_SCORE
+    const folded = foldSettingsSearchEntry(entry)
+    // Why keep the whole-query score: a phrase that already matched keeps today's score.
+    const phraseScore = scoreFoldedSettingsSearchTerm(normalizedQuery, folded, titleTier)
+    // Why a section header is never split: it owns no rows, so a cross-word header match
+    // would list a section whose body is empty.
+    const wordScore =
+      splitsWords && !entry.isSectionHeader
+        ? scoreFoldedSettingsSearchTerms(tokens, folded, titleTier)
+        : phraseScore
+    return Math.max(score, phraseScore, wordScore)
   }, SETTINGS_SEARCH_NO_MATCH_SCORE)
+}
+
+export function scoreSettingsSearch(
+  query: string,
+  entries: SettingsSearchEntry | SettingsSearchEntry[]
+): number {
+  return scoreSettingsSearchEntries(query, entries, 'words')
+}
+
+/**
+ * Whole query only. For callers that read a label — a theme name, a setting name — rather than
+ * ranking rows, where splitting into words matches a different label than the one asked for.
+ */
+export function scoreSettingsSearchPhrase(
+  query: string,
+  entries: SettingsSearchEntry | SettingsSearchEntry[]
+): number {
+  return scoreSettingsSearchEntries(query, entries, 'phrase')
 }
 
 export function getSettingsSectionSearchEntries(section: {
@@ -132,7 +212,10 @@ export function getSettingsSectionSearchEntries(section: {
   searchEntries: readonly SettingsSearchEntry[]
 }): SettingsSearchEntry[] {
   // Ranking and filtering need the same pane entry so title-only hits render content.
-  return [{ title: section.title, description: section.description }, ...section.searchEntries]
+  return [
+    { title: section.title, description: section.description, isSectionHeader: true },
+    ...section.searchEntries
+  ]
 }
 
 export function rankSettingsSearchItems<T>(
