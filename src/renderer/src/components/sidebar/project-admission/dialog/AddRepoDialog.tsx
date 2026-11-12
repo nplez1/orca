@@ -65,11 +65,13 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
       : null
   // Every id the chosen machine answers to: the folder Settings shows is stored under whichever of
   // them the user last wrote, and the flows below must read the same one.
-  const { hostOptions: selectableHosts, selectedHostId } = hostSelection
   const selectedMachineHostIds = useMemo((): ExecutionHostId[] | undefined => {
-    const row = selectedHostId ? indexExecutionHostsById(selectableHosts).get(selectedHostId) : null
+    const selectedHostId = hostSelection.selectedHostId
+    const row = selectedHostId
+      ? indexExecutionHostsById(hostSelection.hostOptions).get(selectedHostId)
+      : undefined
     return row ? machineHostIds(row) : undefined
-  }, [selectableHosts, selectedHostId])
+  }, [hostSelection.hostOptions, hostSelection.selectedHostId])
   const {
     nestedScan,
     nestedSelectedPaths,

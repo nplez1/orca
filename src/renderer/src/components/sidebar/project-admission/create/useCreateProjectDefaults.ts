@@ -63,6 +63,11 @@ export function useCreateProjectDefaults({
   const createParentTouchedRef = useRef(false)
   const createParentDefaultGenRef = useRef(0)
   const createGitProbeGenRef = useRef(0)
+  // Why a content key: the dialog rebuilds the id list with the host registry, and an identical list
+  // must not restart a resolve that is still running.
+  const overrideHostIdsRef = useRef(overrideHostIds)
+  overrideHostIdsRef.current = overrideHostIds
+  const overrideHostIdsKey = overrideHostIds?.join('\n') ?? ''
   const activeCreateParentRuntimeEnvironmentId = activeRuntimeEnvironmentId?.trim() || null
   const activeCreateParentTargetKey = activeCreateParentRuntimeEnvironmentId
     ? `runtime:${activeCreateParentRuntimeEnvironmentId}`
@@ -208,7 +213,7 @@ export function useCreateProjectDefaults({
       runtimeEnvironmentId,
       worktreeLayoutMode,
       hostSettingOverrides,
-      overrideHostIds
+      overrideHostIds: overrideHostIdsRef.current
     })
       .then((result) => {
         if (
@@ -243,7 +248,7 @@ export function useCreateProjectDefaults({
     canReplaceCreateParentDefault,
     createParent,
     hostSettingOverrides,
-    overrideHostIds,
+    overrideHostIdsKey,
     setCreateParent,
     step,
     worktreeLayoutMode
