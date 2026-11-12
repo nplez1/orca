@@ -55,16 +55,18 @@ export function TaskPageJiraFilters({
     setNewJiraIssueTypeId,
     sortedAvailableJiraProjects
   } = model
-  const newJiraIssueLabel = jiraProjectsError
-    ? t(
-        'auto.components.TaskPage.jiraProjectsLoadFailedTooltip',
-        "Couldn't load Jira projects — retry"
-      )
-    : jiraProjectsLoading
-      ? t('auto.components.TaskPage.jiraProjectsLoading', 'Loading Jira projects…')
-      : sortedAvailableJiraProjects.length === 0
-        ? t('auto.components.TaskPage.jiraProjectsEmpty', 'No Jira projects available')
-        : t('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')
+  const jiraNewIssueDisabled = sortedAvailableJiraProjects.length === 0 || jiraProjectsLoading
+  const newJiraIssueLabel =
+    jiraProjectsError && sortedAvailableJiraProjects.length === 0
+      ? t(
+          'auto.components.TaskPage.jiraProjectsLoadFailedTooltip',
+          "Couldn't load Jira projects — retry"
+        )
+      : jiraProjectsLoading
+        ? t('auto.components.TaskPage.jiraProjectsLoading', 'Loading Jira projects…')
+        : sortedAvailableJiraProjects.length === 0
+          ? t('auto.components.TaskPage.jiraProjectsEmpty', 'No Jira projects available')
+          : t('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')
   return (
     <div className="rounded-md rounded-b-none border border-border/50 bg-muted/50 px-3 pt-2 pb-0 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -148,37 +150,43 @@ export function TaskPageJiraFilters({
           />
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  // Why: restore dismissed typed text (accidental dismissal recoverable); pickers keep their fresh open-time defaults.
-                  const draft = useAppStore.getState().newJiraIssueDraft
-                  setNewJiraIssueTitle(draft?.title ?? '')
-                  setNewJiraIssueBody(draft?.body ?? '')
-                  const projectFilter = model.jiraProjectFilter
-                  const defaultProject = projectFilter
-                    ? sortedAvailableJiraProjects.find((project) =>
-                        matchesJiraProject(project, projectFilter)
-                      )
-                    : null
-                  const project = defaultProject ?? sortedAvailableJiraProjects[0]
-                  setNewJiraIssueProjectId(project ? getJiraProjectSelectionKey(project) : null)
-                  setNewJiraIssueProjectQuery('')
-                  setNewJiraIssueProjectCommandValue('')
-                  setNewJiraIssueTypeId(null)
-                  setNewJiraIssueOpen(true)
-                }}
-                disabled={sortedAvailableJiraProjects.length === 0 || jiraProjectsLoading}
-                aria-label={newJiraIssueLabel}
-                className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
+              <span
+                className="inline-flex"
+                tabIndex={jiraNewIssueDisabled ? 0 : -1}
+                aria-label={jiraNewIssueDisabled ? newJiraIssueLabel : undefined}
               >
-                {jiraProjectsLoading ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
-              </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    // Why: restore dismissed typed text (accidental dismissal recoverable); pickers keep their fresh open-time defaults.
+                    const draft = useAppStore.getState().newJiraIssueDraft
+                    setNewJiraIssueTitle(draft?.title ?? '')
+                    setNewJiraIssueBody(draft?.body ?? '')
+                    const projectFilter = model.jiraProjectFilter
+                    const defaultProject = projectFilter
+                      ? sortedAvailableJiraProjects.find((project) =>
+                          matchesJiraProject(project, projectFilter)
+                        )
+                      : null
+                    const project = defaultProject ?? sortedAvailableJiraProjects[0]
+                    setNewJiraIssueProjectId(project ? getJiraProjectSelectionKey(project) : null)
+                    setNewJiraIssueProjectQuery('')
+                    setNewJiraIssueProjectCommandValue('')
+                    setNewJiraIssueTypeId(null)
+                    setNewJiraIssueOpen(true)
+                  }}
+                  disabled={jiraNewIssueDisabled}
+                  aria-label={newJiraIssueLabel}
+                  className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
+                >
+                  {jiraProjectsLoading ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
               {newJiraIssueLabel}

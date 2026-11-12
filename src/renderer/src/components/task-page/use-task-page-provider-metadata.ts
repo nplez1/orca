@@ -101,6 +101,8 @@ export function useTaskPageProviderMetadata(model: TaskPageResumeRestorationMode
   )
   useEffect(() => {
     if (!jiraProjectsEnabled) {
+      // Why: re-enabling the source re-reads, so a previous failure must not flash before it lands.
+      setJiraProjectsSnapshot(null)
       return
     }
     let cancelled = false
@@ -162,6 +164,7 @@ export function useTaskPageProviderMetadata(model: TaskPageResumeRestorationMode
     linearTeamRefreshNonce: typeof linearTeamRefreshNonce
     setLinearTeamRefreshNonce: typeof setLinearTeamRefreshNonce
     linearTeamsError: typeof linearTeamsError
+    setLinearTeamsError: typeof setLinearTeamsError
     retryLinearTeams: typeof retryLinearTeams
     availableJiraProjects: typeof availableJiraProjects
     jiraProjectsLoading: typeof jiraProjectsLoading
@@ -173,6 +176,7 @@ export function useTaskPageProviderMetadata(model: TaskPageResumeRestorationMode
   nextModel.linearTeamRefreshNonce = linearTeamRefreshNonce
   nextModel.setLinearTeamRefreshNonce = setLinearTeamRefreshNonce
   nextModel.linearTeamsError = linearTeamsError
+  nextModel.setLinearTeamsError = setLinearTeamsError
   nextModel.retryLinearTeams = retryLinearTeams
   nextModel.availableJiraProjects = availableJiraProjects
   nextModel.jiraProjectsLoading = jiraProjectsLoading

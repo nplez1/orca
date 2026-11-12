@@ -62,14 +62,16 @@ export function TaskPageLinearFilters({
     setNewLinearIssueTeamId,
     setNewLinearIssueProjectId
   } = model
-  const newLinearItemLabel = linearTeamsError
-    ? t(
-        'auto.components.TaskPage.linearTeamsLoadFailedTooltip',
-        "Couldn't load Linear teams — retry"
-      )
-    : linearMode === 'projects' && !selectedLinearProject
-      ? t('auto.components.TaskPage.1361275ec3', 'New Linear project')
-      : t('auto.components.TaskPage.3feb524d42', 'New Linear issue')
+  const linearNewItemDisabled = availableTeams.length === 0
+  const newLinearItemLabel =
+    linearTeamsError && availableTeams.length === 0
+      ? t(
+          'auto.components.TaskPage.linearTeamsLoadFailedTooltip',
+          "Couldn't load Linear teams — retry"
+        )
+      : linearMode === 'projects' && !selectedLinearProject
+        ? t('auto.components.TaskPage.1361275ec3', 'New Linear project')
+        : t('auto.components.TaskPage.3feb524d42', 'New Linear issue')
   return (
     <div
       className="min-w-0 rounded-md rounded-b-none border border-border/50 bg-muted/50 px-3 pt-2 pb-0 shadow-sm"
@@ -130,45 +132,51 @@ export function TaskPageLinearFilters({
         >
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  if (linearMode === 'projects' && !selectedLinearProject) {
-                    // Why: restore dismissed typed text (accidental dismissal recoverable); pickers keep their fresh open-time defaults.
-                    const draft = useAppStore.getState().newLinearProjectDraft
-                    setNewLinearProjectName(draft?.name ?? '')
-                    setNewLinearProjectDescription(draft?.description ?? '')
-                    setNewLinearProjectContent(draft?.content ?? '')
-                    setNewLinearProjectTeamId(availableTeams[0]?.id ?? null)
-                    setNewLinearProjectLeadId(null)
-                    setNewLinearProjectMemberIds([])
-                    setNewLinearProjectLabelIds([])
-                    setNewLinearProjectPriority(0)
-                    setNewLinearProjectStartDate('')
-                    setNewLinearProjectTargetDate('')
-                    setNewLinearProjectOpen(true)
-                    return
-                  }
-                  // Why: restore dismissed typed text (accidental dismissal recoverable); pickers keep their fresh open-time defaults.
-                  const issueDraft = useAppStore.getState().newLinearIssueDraft
-                  setNewLinearIssueTitle(issueDraft?.title ?? '')
-                  setNewLinearIssueBody(issueDraft?.body ?? '')
-                  const projectTeamId =
-                    selectedLinearProject?.teams?.[0]?.id ??
-                    availableTeams.find(
-                      (team) => team.workspaceId === selectedLinearProject?.workspaceId
-                    )?.id
-                  setNewLinearIssueTeamId(projectTeamId ?? availableTeams[0]?.id ?? null)
-                  setNewLinearIssueProjectId(selectedLinearProject?.id ?? null)
-                  setNewLinearIssueOpen(true)
-                }}
-                disabled={availableTeams.length === 0}
-                aria-label={newLinearItemLabel}
-                className="size-8 border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
+              <span
+                className="inline-flex"
+                tabIndex={linearNewItemDisabled ? 0 : -1}
+                aria-label={linearNewItemDisabled ? newLinearItemLabel : undefined}
               >
-                <Plus className="size-4" />
-              </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (linearMode === 'projects' && !selectedLinearProject) {
+                      // Why: restore dismissed typed text (accidental dismissal recoverable); pickers keep their fresh open-time defaults.
+                      const draft = useAppStore.getState().newLinearProjectDraft
+                      setNewLinearProjectName(draft?.name ?? '')
+                      setNewLinearProjectDescription(draft?.description ?? '')
+                      setNewLinearProjectContent(draft?.content ?? '')
+                      setNewLinearProjectTeamId(availableTeams[0]?.id ?? null)
+                      setNewLinearProjectLeadId(null)
+                      setNewLinearProjectMemberIds([])
+                      setNewLinearProjectLabelIds([])
+                      setNewLinearProjectPriority(0)
+                      setNewLinearProjectStartDate('')
+                      setNewLinearProjectTargetDate('')
+                      setNewLinearProjectOpen(true)
+                      return
+                    }
+                    // Why: restore dismissed typed text (accidental dismissal recoverable); pickers keep their fresh open-time defaults.
+                    const issueDraft = useAppStore.getState().newLinearIssueDraft
+                    setNewLinearIssueTitle(issueDraft?.title ?? '')
+                    setNewLinearIssueBody(issueDraft?.body ?? '')
+                    const projectTeamId =
+                      selectedLinearProject?.teams?.[0]?.id ??
+                      availableTeams.find(
+                        (team) => team.workspaceId === selectedLinearProject?.workspaceId
+                      )?.id
+                    setNewLinearIssueTeamId(projectTeamId ?? availableTeams[0]?.id ?? null)
+                    setNewLinearIssueProjectId(selectedLinearProject?.id ?? null)
+                    setNewLinearIssueOpen(true)
+                  }}
+                  disabled={linearNewItemDisabled}
+                  aria-label={newLinearItemLabel}
+                  className="size-8 border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
               {newLinearItemLabel}
