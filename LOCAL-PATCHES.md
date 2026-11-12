@@ -2419,7 +2419,8 @@ fallback — about 400x too light.
   agrees with the baseline metric (median ratio 1.03 above 5 s; below it, the baseline's per-file
   environment allowance dominates and the 442 ms fallback is closer). It refuses an artifact set that
   mixes runs or attempts, holds a file twice, or reports a file discovery did not select, and it refuses
-  to write an overlay that weights nothing — the same three cases upstream's importer rejects. `--check`
+  to write an overlay that weights nothing — the cases upstream's importer rejects, plus a reported file
+  discovery did not select. `--check`
   validates the committed file, asks the planner to load it, and runs in the fork test lane;
   `--simulate` replays a set of artifacts through `balanceFiles` and prints the slowest-to-median shard
   ratio, which is how the acceptance criterion is evidenced without a 12-shard run.

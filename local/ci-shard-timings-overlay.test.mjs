@@ -46,13 +46,17 @@ function overlayFile(t, overlay) {
   return new URL(`file://${join(root, 'overlay.json')}`)
 }
 
-function artifactDirectory(t, { runId = '1', attempt = '1', files = {}, durations = {} }) {
+function artifactDirectory(
+  t,
+  { runId = '1', attempt = '1', selectedShard = 1, shardCount = 1, files = {}, durations = {} }
+) {
   return fixtureRoot(t, {
     'unit-assignment.json': JSON.stringify({
       runId,
       runAttempt: attempt,
       sourceSha: 'a'.repeat(40),
-      shards: [{ files: Object.keys(files) }]
+      selectedShard,
+      shards: Array.from({ length: shardCount }, () => ({ files: Object.keys(files) }))
     }),
     'unit-report.json': JSON.stringify({
       testResults: Object.entries(durations).map(([file, milliseconds]) => ({
@@ -179,7 +183,7 @@ test('a report path is resolved against discovery, and an unselected file is ref
   assert.equal(observed.get('src/a.test.ts'), 3_000)
   assert.equal(observed.get('src/b.test.ts'), 4_000)
   assert.deepEqual(files, ['src/a.test.ts', 'src/b.test.ts'])
-  assert.deepEqual(source, { runId: '1', attempt: '1' })
+  assert.deepEqual(source, { runId: '1', attempt: '1', sha: 'a'.repeat(40) })
   const stray = artifactDirectory(t, {
     files: { 'src/a.test.ts': 1 },
     durations: { 'src/b.test.ts': 4_000 }
@@ -187,29 +191,32 @@ test('a report path is resolved against discovery, and an unselected file is ref
   assert.throws(() => readArtifacts([stray]), /discovery did not select/)
 })
 
-test('two artifact sets are only combined when they are one attempt with no repeated file', (t) => {
+test('an artifact set must be one run, every shard once, and no file twice', (t) => {
   const first = artifactDirectory(t, {
+    shardCount: 2,
+    selectedShard: 1,
     files: { 'src/a.test.ts': 1 },
     durations: { 'src/a.test.ts': 3_000 }
   })
   const second = artifactDirectory(t, {
+    shardCount: 2,
+    selectedShard: 2,
     files: { 'src/b.test.ts': 1 },
     durations: { 'src/b.test.ts': 4_000 }
   })
   assert.equal(readArtifacts([first, second]).observed.size, 2)
+  assert.throws(() => readArtifacts([first]), /covers 1 of 2 shard/)
+  assert.throws(() => readArtifacts([first, first]), /shard 1 a second time/)
   assert.throws(
-    () => readArtifacts([first, artifactDirectory(t, { runId: '2', files: {}, durations: {} })]),
+    () =>
+      readArtifacts([first, artifactDirectory(t, { runId: '2', shardCount: 2, selectedShard: 2 })]),
     /not from run 1 attempt 1/
   )
   assert.throws(
     () =>
       readArtifacts([
         first,
-        artifactDirectory(t, {
-          attempt: '2',
-          files: { 'src/a.test.ts': 1 },
-          durations: { 'src/a.test.ts': 1 }
-        })
+        artifactDirectory(t, { attempt: '2', shardCount: 2, selectedShard: 2 })
       ]),
     /not from run 1 attempt 1/
   )
@@ -218,11 +225,13 @@ test('two artifact sets are only combined when they are one attempt with no repe
       readArtifacts([
         first,
         artifactDirectory(t, {
+          shardCount: 2,
+          selectedShard: 2,
           files: { 'src/a.test.ts': 1 },
           durations: { 'src/a.test.ts': 1 }
         })
       ]),
-    /more than one shard report/
+    /appears twice in the report set/
   )
 })
 

@@ -171,8 +171,8 @@ describe('workspace path catalog core', () => {
     }
   })
 
-  // Why 30k and not 100k: this file was the long pole of its nightly shard (issue #401). The battery
-  // at 300k and above runs under ORCA_RUN_PATH_SEARCH_SCALE below.
+  // Why 30k and not 100k: this file was the long pole of its nightly shard (issue #401). The 300k case
+  // runs under ORCA_RUN_PATH_SEARCH_SCALE below, and 500k/1M need ..._BATTERY as well.
   it('matches the full oracle battery and every scope descriptor at 30k paths', async () => {
     await assertGeneratedCatalogParity(30_000)
   }, 120_000)

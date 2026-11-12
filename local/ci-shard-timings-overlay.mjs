@@ -29,6 +29,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { balanceFiles } from '../config/scripts/ci/sharding/ci-shard-assignment.mjs'
+import { matchAssignedFiles } from './check-unit-shard-verdict.mjs'
 import {
   assertOverlayShape,
   mergeForkTimingOverlay,
@@ -93,14 +94,18 @@ export function parseArgs(argv) {
 /**
  * Per-file durations from a set of shard artifact directories, keyed by repository-relative path.
  *
- * Why every folder must agree on the run and the attempt, and why a file may appear once: a set that
- * mixes two attempts holds each file twice, and summing them would double every weight silently.
- * Upstream's importer refuses the same cases (`ci-unit-timing-import.mjs`).
+ * Why every folder must agree on the run, the attempt and the shard count, why each shard must appear
+ * once, and why a file may appear once: every `unit-assignment.json` carries the *whole* plan, so a set
+ * missing one folder still names every file while holding no timing for the missing shard's — the
+ * entries for those files would silently drop out. Upstream's importer refuses the same cases
+ * (`ci-unit-timing-import.mjs`).
  */
 export function readArtifacts(directories) {
   const discovered = new Set()
   const reports = []
+  const shardIndexes = new Set()
   let source = null
+  let shardCount = null
   for (const directory of directories) {
     const assignmentPath = join(directory, ASSIGNMENT_FILE)
     const reportPath = join(directory, REPORT_FILE)
@@ -110,55 +115,65 @@ export function readArtifacts(directories) {
       }
     }
     const assignment = JSON.parse(readFileSync(assignmentPath, 'utf8'))
-    const attempt = { runId: assignment.runId ?? null, attempt: assignment.runAttempt ?? null }
+    const shards = Array.isArray(assignment.shards) ? assignment.shards : []
+    const selected = Number(assignment.selectedShard)
+    if (!Number.isInteger(selected) || selected < 1 || selected > shards.length) {
+      throw new Error(
+        `${assignmentPath} selects shard ${assignment.selectedShard}, which is not one of its ${shards.length} shard(s)`
+      )
+    }
+    if (shardIndexes.has(selected)) {
+      throw new Error(`${directory} is shard ${selected} a second time`)
+    }
+    shardIndexes.add(selected)
+    shardCount ??= shards.length
+    if (shards.length !== shardCount) {
+      throw new Error(`${directory} plans ${shards.length} shard(s), not ${shardCount}`)
+    }
+    const attempt = {
+      runId: assignment.runId ?? null,
+      attempt: assignment.runAttempt ?? null,
+      sha: assignment.sourceSha ?? null
+    }
     if (source && (source.runId !== attempt.runId || source.attempt !== attempt.attempt)) {
       throw new Error(`${directory} is not from run ${source.runId} attempt ${source.attempt}`)
     }
     source ??= attempt
-    for (const shard of assignment.shards ?? []) {
+    for (const shard of shards) {
       for (const file of shard.files ?? []) {
         discovered.add(file)
       }
     }
     reports.push({ reportPath, report: JSON.parse(readFileSync(reportPath, 'utf8')) })
   }
+  if (shardIndexes.size !== shardCount) {
+    throw new Error(
+      `the artifact set covers ${shardIndexes.size} of ${shardCount} shard(s), so ${shardCount - shardIndexes.size} shard(s) of files would lose their timing`
+    )
+  }
   const observed = new Map()
   for (const { reportPath, report } of reports) {
+    const { matched, unassigned } = matchAssignedFiles(report, discovered)
+    if (unassigned.length > 0) {
+      throw new Error(
+        `${reportPath} reports ${unassigned.length} file(s) discovery did not select, first ${unassigned[0]}`
+      )
+    }
     for (const result of report.testResults ?? []) {
-      const file = relativeToDiscovery(String(result.name ?? ''), discovered, reportPath)
+      const file = matched.get(String(result?.name ?? '').replaceAll('\\', '/'))
       const duration = Number(result.endTime) - Number(result.startTime)
       if (!Number.isFinite(duration) || duration < 0) {
         throw new Error(`${reportPath} holds an unreadable duration for ${file}`)
       }
       if (observed.has(file)) {
-        throw new Error(`${file} appears in more than one shard report`)
+        throw new Error(`${file} appears twice in the report set`)
       }
       observed.set(file, duration)
     }
   }
-  return {
-    observed,
-    files: [...discovered].sort(),
-    source: { runId: source?.runId ?? null, attempt: source?.attempt ?? null }
-  }
+  return { observed, files: [...discovered].sort(), source }
 }
 
-/**
- * The checkout prefix is not fixed, so the discovered file list is the ruler: the longest tail of an
- * absolute report path that is a discovered file is its repository-relative path.
- */
-function relativeToDiscovery(absolute, discovered, reportPath) {
-  const segments = absolute.replace(/\\/g, '/').split('/').filter(Boolean)
-  for (let start = 0; start < segments.length; start += 1) {
-    const candidate = segments.slice(start).join('/')
-    if (discovered.has(candidate)) {
-      return candidate
-    }
-  }
-  throw new Error(`${reportPath} reports ${absolute}, which discovery did not select`)
-}
-
-/** The files a timing entry may cover: the ones the fork's own line adds to the tree upstream ships. */
 export function readForkAddedFiles(root = ROOT) {
   const list = (args) =>
     execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 })
@@ -312,7 +327,7 @@ function runImport(options) {
     source: {
       runId: artifacts.source?.runId ?? null,
       attempt: artifacts.source?.attempt ?? null,
-      sha: artifacts.source?.sha ?? previous.source?.sha ?? null,
+      sha: artifacts.source?.sha ?? null,
       runner: options.runner ?? previous.source?.runner ?? null,
       metric: 'unit-report-file-duration'
     },
