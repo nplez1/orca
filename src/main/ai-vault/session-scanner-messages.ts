@@ -18,7 +18,12 @@ import {
 
 const SESSION_PREVIEW_MESSAGE_LIMIT = 5
 
-type SessionMessageOptions = { seedFirstUserPrompt?: boolean; previewScanLimit?: number }
+type SessionMessageOptions = {
+  seedFirstUserPrompt?: boolean
+  previewScanLimit?: number
+  /** The record says the harness wrote this turn, not the reader. */
+  isMeta?: boolean
+}
 
 export function addSessionContent(
   accumulator: SessionAccumulator,
@@ -62,7 +67,10 @@ export function addDecodedSessionMessage(
     accumulator.firstUserPrompt = extractFullFirstUserPromptText(textParts)
   }
   if (accumulator.messages.active) {
-    for (const transcript of transcriptMessagesFromDecodedMessage(message)) {
+    for (const transcript of transcriptMessagesFromDecodedMessage(
+      message,
+      options?.isMeta === true
+    )) {
       accumulator.messages.push(transcript)
     }
   }

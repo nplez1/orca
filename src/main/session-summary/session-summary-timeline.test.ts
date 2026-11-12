@@ -18,8 +18,8 @@ function result(text: string): TranscriptMessage {
   return { role: 'tool', text, timestamp: null, toolKind: 'result' }
 }
 
-function prose(role: 'user' | 'assistant', text: string): TranscriptMessage {
-  return { role, text, timestamp: null }
+function prose(role: 'user' | 'assistant', text: string, isMeta?: true): TranscriptMessage {
+  return { role, text, timestamp: null, ...(isMeta ? { isMeta } : {}) }
 }
 
 function digest(messages: TranscriptMessage[]): SessionSummarySourceEvent[] {
@@ -86,6 +86,19 @@ describe('planSessionSummaryTimelineMarkers', () => {
     expect(markers).toEqual([])
   })
 
+  // #387: an `isMeta` turn whose text reads as prose — a skill body, a cut-off continuation — has
+  // no tag to recognise, so the record's own flag is the only thing that keeps it out of the rows.
+  it('leaves a meta turn with untagged prose out of the timeline', () => {
+    const events = digest([
+      prose('user', 'Base directory for this skill: /tmp/skills', true),
+      prose('user', 'Your response above was cut off mid-stream. Resume where it stops.', true),
+      prose('user', 'fix the parser')
+    ])
+    expect(planSessionSummaryTimelineMarkers(events, 0)).toEqual([
+      { kind: 'user-input', text: 'fix the parser', sourceIndex: 2 }
+    ])
+  })
+
   // `rg` exits 1 when nothing matched. That is an exit code, not evidence of a problem, and an
   // error row for it is noise the reader cannot act on.
   it('does not call a bare nonzero exit an error', () => {
@@ -105,6 +118,25 @@ describe('planSessionSummaryTimelineMarkers', () => {
 
   it('leaves a blank message out of the timeline', () => {
     expect(planSessionSummaryTimelineMarkers(digest([prose('user', '   \n\t')]), 0)).toEqual([])
+  })
+
+  // #387: a harness turn arrives as a user record, so deriving a row from every user event put
+  // `<command-name>/model</command-name>` in the one place meant to show what the reader asked for.
+  it('leaves harness-injected turns out and keeps a custom tag the reader typed', () => {
+    const events = digest([
+      prose('user', 'fix the parser'),
+      prose(
+        'user',
+        '<local-command-caveat>Caveat: The messages below were generated</local-command-caveat>'
+      ),
+      prose('user', '<command-name>/model</command-name>\n<command-args></command-args>'),
+      prose('user', '<local-command-stdout>Set model to opus</local-command-stdout>'),
+      prose('user', '<my-notes>keep the lexer</my-notes>')
+    ])
+    expect(planSessionSummaryTimelineMarkers(events, 10)).toEqual([
+      { kind: 'user-input', text: 'fix the parser', sourceIndex: 10 },
+      { kind: 'user-input', text: '<my-notes>keep the lexer</my-notes>', sourceIndex: 14 }
+    ])
   })
 
   it('bounds the reader’s message it quotes', () => {

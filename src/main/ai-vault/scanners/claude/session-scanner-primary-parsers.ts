@@ -136,7 +136,10 @@ export function consumeClaudeSessionRecord(
     const isMetaUserTurn =
       record.isMeta === true || (title != null && isKnownHarnessInjectedUserTurnText(title))
     addSessionContent(accumulator, 'user', asRecord(record.message)?.content, record.timestamp, {
-      seedFirstUserPrompt: !isMetaUserTurn
+      seedFirstUserPrompt: !isMetaUserTurn,
+      // Why the raw field and not `isMetaUserTurn`: the text predicate is applied again downstream,
+      // and this flag is the one thing the text cannot say.
+      isMeta: record.isMeta === true
     })
     if (title) {
       if (isMetaUserTurn) {

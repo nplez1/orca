@@ -40,6 +40,8 @@ export type SessionSummarySourceEvent = {
   /** The event's text as the model sees it: full for prose, a one-line digest for a tool event. */
   text: string
   timestamp: string | null
+  /** The record marked this turn as harness-written, whatever its text looks like. */
+  isMeta?: true
   /** A reader bound replaced part of this event's text, and the text says which. */
   textTruncated?: true
   /** Decoded length before that bound, so the digest can name what it stands in for. */
@@ -149,6 +151,7 @@ export function createSessionSummaryEventDigester(): SessionSummaryEventDigester
         role: message.role,
         text: digest.text,
         timestamp: message.timestamp,
+        ...(message.isMeta ? { isMeta: true as const } : {}),
         ...(digest.tool ? { tool: digest.tool } : {}),
         ...(message.textTruncated ? { textTruncated: true as const } : {}),
         ...(message.textOriginalLength === undefined

@@ -15,6 +15,7 @@ import type {
   SessionSummaryTimelineEntry,
   SessionSummaryTimelineKind
 } from '../../shared/session-summary-types'
+import { isKnownHarnessInjectedUserTurnText } from '../../shared/harness-injected-user-turns'
 import type { SessionSummarySourceEvent } from './session-summary-event-digest'
 import {
   describeSessionSummaryToolBurst,
@@ -39,6 +40,26 @@ export type SessionSummaryTimelineFacts = Pick<
 >
 
 /**
+ * The reader spoke this event: a user turn that is not the harness talking through one.
+ *
+ * Two signals, because neither is enough. A record's own `isMeta` catches a harness turn whose text
+ * looks like prose (a skill body), and the text predicate catches the ones that carry no flag at
+ * all — `/model` and `<local-command-stdout>` records in real transcripts have none. The predicate
+ * is the same one the session scanner classifies with, so the timeline and the vault's titles agree
+ * on what the reader typed; only catalogued harness shapes are skipped, so a custom tag stays input.
+ *
+ * Shared because two answers depend on it: the `user-input` rows and the "since your last message"
+ * boundary, and an injected turn that moved the boundary would bury the reader's own prompt.
+ */
+export function isSessionSummaryReaderMessage(event: SessionSummarySourceEvent): boolean {
+  return (
+    event.role === 'user' &&
+    event.isMeta !== true &&
+    !isKnownHarnessInjectedUserTurnText(event.text)
+  )
+}
+
+/**
  * The deterministic half of the timeline, for one fold's applied prefix.
  *
  * `baseIndex` is the transcript index of `events[0]` — the ledger's `foldedThrough` before this
@@ -56,7 +77,7 @@ export function planSessionSummaryTimelineMarkers(
   const markers: SessionSummaryTimelineDeltaEntry[] = []
   for (let index = 0; index < events.length; index += 1) {
     const event = events[index]
-    if (event.role !== 'user') {
+    if (!isSessionSummaryReaderMessage(event)) {
       continue
     }
     const text = excerpt(event.text)
