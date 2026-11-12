@@ -2418,9 +2418,9 @@ fallback — about 400x too light.
   baseline, measured at **2 s or more** — the threshold is where the artifacts' `endTime - startTime`
   agrees with the baseline metric (median ratio 1.03 above 5 s; below it, the baseline's per-file
   environment allowance dominates and the 442 ms fallback is closer). It refuses an artifact set that
-  mixes runs or attempts, holds a file twice, or reports a file discovery did not select, and it refuses
-  to write an overlay that weights nothing — the cases upstream's importer rejects, plus a reported file
-  discovery did not select. `--check`
+  mixes runs or attempts, holds a file twice, reports a file discovery did not select, does not cover
+  every shard exactly once, or would weight nothing — upstream's importer rejects the same cases, plus a
+  reported file discovery did not select. `--check`
   validates the committed file, asks the planner to load it, and runs in the fork test lane;
   `--simulate` replays a set of artifacts through `balanceFiles` and prints the slowest-to-median shard
   ratio, which is how the acceptance criterion is evidenced without a 12-shard run.

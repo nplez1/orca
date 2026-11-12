@@ -174,6 +174,7 @@ export function readArtifacts(directories) {
   return { observed, files: [...discovered].sort(), source }
 }
 
+/** The files a timing entry may cover: the ones the fork's own line adds to the tree upstream ships. */
 export function readForkAddedFiles(root = ROOT) {
   const list = (args) =>
     execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 })
