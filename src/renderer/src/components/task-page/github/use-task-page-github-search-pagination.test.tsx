@@ -139,6 +139,25 @@ describe('useTaskPageGitHubSearchPagination', () => {
     expect(result.current.pages[1]).toEqual([issue(2)])
   })
 
+  it('reports a page the store answered with a per-repo failure, which never throws', async () => {
+    // The store folds a repo's network or IPC failure into failedCount and returns no items, so an
+    // outage reaches this empty-page path rather than the rejection above.
+    const fetchWorkItemsNextPage = vi
+      .fn<FetchNextPage>()
+      .mockResolvedValueOnce({ items: [], failedCount: 1, errorTypes: [] })
+    const { result } = harness(fetchWorkItemsNextPage)
+
+    await act(async () => {
+      await result.current.model.handleLoadNextPage()
+    })
+
+    expect(result.current.paginationError).toEqual({
+      page: 1,
+      message: 'Page 2 could not be loaded from GitHub.'
+    })
+    expect(result.current.paginationLoading).toBe(false)
+  })
+
   it('stays quiet about a failure the list has already moved past', async () => {
     let rejectPage: (error: Error) => void = () => {}
     const fetchWorkItemsNextPage = vi.fn<FetchNextPage>(

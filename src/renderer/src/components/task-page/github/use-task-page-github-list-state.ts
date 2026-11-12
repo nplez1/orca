@@ -1,13 +1,6 @@
 import { useTaskPageGitHubCollectionState } from './use-task-page-github-collection-state'
 import type { TaskPageProviderStateModel } from '../use-task-page-provider-state'
-import {
-  useState,
-  useRef,
-  useEffect,
-  useLayoutEffect,
-  useCallback,
-  useSyncExternalStore
-} from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
 import type { TaskViewPresetId } from '../../../../../shared/ui-chrome-types'
 import {
   PER_REPO_FETCH_LIMIT,
@@ -102,18 +95,8 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
   const [paginationLoading, setPaginationLoading] = useState(false)
   const [loadingTargetPage, setLoadingTargetPage] = useState<number | null>(null)
   // Why: a rejected next-page read owns no row, so the page it failed on and its reason live here for the list to show and retry.
-  // Keyed to the collection the failure belongs to, so a query or repo change retires it without an effect adjusting state.
-  const [paginationErrorState, setPaginationErrorState] = useState<{
-    key: string
-    value: GitHubPageLoadError | null
-  }>({ key: githubResumeContextKey, value: null })
-  const setPaginationError = useCallback(
-    (value: GitHubPageLoadError | null) =>
-      setPaginationErrorState({ key: githubResumeContextKey, value }),
-    [githubResumeContextKey]
-  )
-  const paginationError =
-    paginationErrorState.key === githubResumeContextKey ? paginationErrorState.value : null
+  // The landing run retires it with the rest of the list's failures, so a query, mode or refresh cannot resurrect it.
+  const [paginationError, setPaginationError] = useState<GitHubPageLoadError | null>(null)
   // Keep proven 422 limits separate so late counts replace speculation without resurrecting unreachable pages.
   const [provenPageLimit, setProvenPageLimit] = useState<number | null>(null)
   // Mirror committed counts synchronously so empty-page handling cannot use a stale click-time closure.
@@ -187,6 +170,9 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
     paginationGenerationRef.current += 1
     setPaginationLoading(false)
     setLoadingTargetPage(null)
+    // Why: a failure names a page of the list this generation replaces, so keeping it would resurface a stale banner when the user returns to that query or mode.
+    // oxlint-disable-next-line react-doctor/no-adjust-state-on-prop-change
+    setPaginationError(null)
   }, [
     selectedReposKey,
     appliedTaskSearch,

@@ -319,6 +319,7 @@ export function TaskPageGitHubList({
                 type="button"
                 variant="ghost"
                 size="xs"
+                disabled={loadingTargetPage !== null}
                 onClick={() => void handleLoadNextPage(paginationError.page)}
               >
                 {t('auto.components.TaskPage.0bfbf62f75', 'Retry')}
