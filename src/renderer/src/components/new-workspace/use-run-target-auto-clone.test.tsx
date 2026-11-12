@@ -349,6 +349,33 @@ describe('useRunTargetAutoClone', () => {
     expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: HOST })
   })
 
+  it('starts its own clone when the one it joined was abandoned by a closed composer', async () => {
+    let releaseProbe: (value: string) => void = () => {}
+    mocks.resolveCloneParentForHost.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseProbe = resolve
+        })
+    )
+    const first = renderClone()
+    act(() => first.result.current.start(option))
+    act(() => first.result.current.clear())
+    first.unmount()
+    const onProvisioned = vi.fn()
+    const second = renderClone(onProvisioned)
+    await act(async () => second.result.current.start(option))
+    await act(async () => {
+      releaseProbe('/home/abandoned')
+    })
+
+    // Why: joining a promise the closed composer had abandoned would block Create on a clone
+    // nobody runs, so the composer that still wants the host has to clone it itself.
+    expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
+    expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: HOST })
+    expect(onProvisioned).toHaveBeenCalledWith(JSON.stringify(['setup-new', HOST]), 'cloned')
+    expect(second.result.current.status.kind).toBe('idle')
+  })
+
   it('keeps a destination typed while no clone was pending for the host picked next', async () => {
     const { result } = renderClone()
 

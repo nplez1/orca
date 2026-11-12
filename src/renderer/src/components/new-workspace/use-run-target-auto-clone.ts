@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import { joinHostPath } from '../../../../shared/host-path-join'
@@ -107,6 +107,12 @@ export function useRunTargetAutoClone({
   const destinationKeyRef = useRef<string | null>(null)
   // A closed composer must not be retargeted by a clone it started before it went away.
   const mountedRef = useRef(true)
+  // The latest `run` with the project it belongs to, so an outcome can start the clone a dead
+  // composer left it waiting on — but never one for a project the user has since switched away from.
+  const runRef = useRef<{
+    run: (option: NeedsSetupProjectHostOption, folderName?: string) => void
+    projectId: string
+  } | null>(null)
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -242,7 +248,16 @@ export function useRunTargetAutoClone({
       )
       const applyOutcome = (outcome: ProjectCloneOutcome): void => {
         // Why both: an unmounted composer and one that moved to another host must not be retargeted.
-        if (!mountedRef.current || pendingKeyRef.current !== key || outcome.kind === 'abandoned') {
+        if (!mountedRef.current || pendingKeyRef.current !== key) {
+          return
+        }
+        if (outcome.kind === 'abandoned') {
+          // Only a clone another composer started can be abandoned while this one still wants it —
+          // joining it would block Create on a clone nobody will run, so this one starts its own.
+          const latest = runRef.current
+          if (latest?.projectId === projectId) {
+            latest.run(option, requestedFolderName)
+          }
           return
         }
         if (outcome.kind === 'provisioned') {
@@ -273,6 +288,11 @@ export function useRunTargetAutoClone({
     },
     [cloneOnce, defaultCloneUrl, onProvisioned, overrides.destination, overrides.url, projectId]
   )
+  useLayoutEffect(() => {
+    if (projectId) {
+      runRef.current = { run, projectId }
+    }
+  })
 
   const start = useCallback(
     (option: NeedsSetupProjectHostOption): void => {
