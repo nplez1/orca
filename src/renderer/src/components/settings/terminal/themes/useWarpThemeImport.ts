@@ -33,7 +33,7 @@ export type UseWarpThemeImportReturn = {
 }
 
 export function useWarpThemeImport(
-  updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>,
+  writeSettings: (updates: Partial<GlobalSettings>) => Promise<void>,
   settings: GlobalSettings | null
 ): UseWarpThemeImportReturn {
   const t = useTranslate()
@@ -150,7 +150,7 @@ export function useWarpThemeImport(
 
     setApplyError(null)
     try {
-      await updateSettings({
+      await writeSettings({
         terminalCustomThemes: normalizeTerminalCustomThemes([...byId.values()])
       })
       const count = selectedThemes.length

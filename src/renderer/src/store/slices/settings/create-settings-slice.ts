@@ -1,4 +1,3 @@
-import { normalizeNativeChatAppearanceSettings } from '../../../../../shared/native-chat/native-chat-appearance-settings'
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
@@ -10,28 +9,14 @@ import {
 import { unwrapRuntimeRpcResult } from '@/runtime/rpc/calls/runtime-rpc-result'
 import { assertRuntimeStatusCompatible } from '@/runtime/rpc/compatibility/runtime-protocol-compat'
 import type { RuntimeStatus } from '../../../../../shared/runtime-session-contracts'
-import { normalizeTerminalQuickCommands } from '../../../../../shared/terminal/quick-commands/terminal-quick-commands'
-import { assertTerminalQuickCommandsStorable } from '../../../../../shared/terminal/quick-commands/terminal-quick-command-prompt-limit'
-import { normalizeTerminalCustomThemes } from '../../../../../shared/terminal-themes/terminal-custom-themes'
-import { normalizeTaskProviderSettings } from '../../../../../shared/work-items/task-providers'
-import { normalizeOpenInApplications } from '../../../../../shared/open-in-applications'
 import { createSettingsSearchState, type SettingsSearchState } from './settings-search-state'
 import {
   enablesNewTuiAgents,
   refreshDetectedAgentInventories
 } from '../agent-enablement-redetection'
-import { normalizeDisabledUsageProviders } from '../../../../../shared/usage-provider-enablement'
 import { isRuntimeCatalogListingStale } from '../runtime-status/runtime-status-hydration'
-import { normalizeDisabledTuiAgents } from '../../../../../shared/agent-launch/catalog/tui-agent-selection'
-import { sanitizeAgentLaunchProfileUpdates } from '../../../../../shared/agent-launch/choices/tui-agent-launch-defaults'
 import { bumpProviderRuntimeSessionGeneration } from '@/runtime/hosts/observations/provider-runtime-context'
-import { normalizeUiLanguage } from '../../../../../shared/ui-language'
-import { normalizeDesktopTerminalScrollbackRows } from '../../../../../shared/terminal/replay/terminal-scrollback-policy'
 import { translate } from '@/i18n/i18n'
-import {
-  normalizeMobilePairingCustomAddress,
-  normalizeMobilePairingCustomAddresses
-} from '../../../../../shared/remote-runtime/pairing/mobile-pairing-custom-address'
 import {
   hydrateOwnerWorktreeVisibilityDefaults,
   type WorktreeVisibilityDefaultsByHost
@@ -39,10 +24,14 @@ import {
 import * as ownerHydration from './settings-owner-hydration-publication'
 import { persistVisibilityAwareSettings } from './worktree-visibility-settings-write'
 import { getSettingsFocusedExecutionHostId } from '../../../../../shared/execution-host'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../../../shared/non-secure-context-uuid'
+import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import { handleSettingsWriteFailure, settingsWriteFailureHostName } from './settings-write-failure'
+import { normalizeSettingsUpdates } from './settings-update-normalization'
 
 export type SettingsSlice = SettingsSearchState & {
   settings: GlobalSettings | null
+  /** Increments on every rejected settings write so a draft-based control can drop a value that did not save. */
+  settingsWriteFailureRevision: number
   worktreeVisibilityDefaultsByHost: WorktreeVisibilityDefaultsByHost
   worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId: string | null
   worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId: string | null
@@ -56,116 +45,54 @@ export type SettingsSlice = SettingsSearchState & {
   setActiveRuntimeEnvironmentPreference: (environmentId: string | null) => Promise<boolean>
 }
 
-type LegacyTerminalScrollbackSettingsUpdate = Partial<GlobalSettings> & {
-  terminalScrollbackBytes?: unknown
-}
-
 function normalizeRuntimeEnvironmentId(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
 }
 
-function normalizeSettingsUpdates(
-  updates: Partial<GlobalSettings>,
-  currentSettings: GlobalSettings | null
-): Partial<GlobalSettings> {
-  const { terminalScrollbackBytes: _legacyScrollbackBytes, ...sanitizedUpdates } =
-    updates as LegacyTerminalScrollbackSettingsUpdate
-  void _legacyScrollbackBytes
-  if ('terminalQuickCommands' in updates) {
-    sanitizedUpdates.terminalQuickCommands = normalizeTerminalQuickCommands(
-      updates.terminalQuickCommands
-    )
-    // The web client stores its own list without main's check, so refuse here too, before any write.
-    assertTerminalQuickCommandsStorable(sanitizedUpdates.terminalQuickCommands)
-  }
-  if ('terminalCustomThemes' in updates) {
-    sanitizedUpdates.terminalCustomThemes = normalizeTerminalCustomThemes(
-      updates.terminalCustomThemes
-    )
-  }
-  if ('visibleTaskProviders' in updates || 'defaultTaskSource' in updates) {
-    const taskProviderSettings = normalizeTaskProviderSettings({
-      visibleTaskProviders:
-        'visibleTaskProviders' in updates
-          ? updates.visibleTaskProviders
-          : currentSettings?.visibleTaskProviders,
-      defaultTaskSource:
-        'defaultTaskSource' in updates
-          ? updates.defaultTaskSource
-          : currentSettings?.defaultTaskSource
-    })
-    sanitizedUpdates.defaultTaskSource = taskProviderSettings.defaultTaskSource
-    sanitizedUpdates.visibleTaskProviders = taskProviderSettings.visibleTaskProviders
-  }
-  if ('openInApplications' in updates) {
-    sanitizedUpdates.openInApplications = normalizeOpenInApplications(updates.openInApplications, {
-      createId: createBrowserUuid
-    })
-  }
-  if ('nativeChatAppearance' in updates) {
-    sanitizedUpdates.nativeChatAppearance = normalizeNativeChatAppearanceSettings(
-      updates.nativeChatAppearance
-    )
-  }
-  if ('disabledTuiAgents' in updates) {
-    sanitizedUpdates.disabledTuiAgents = normalizeDisabledTuiAgents(updates.disabledTuiAgents)
-  }
-  if ('disabledUsageProviders' in updates) {
-    sanitizedUpdates.disabledUsageProviders = normalizeDisabledUsageProviders(
-      updates.disabledUsageProviders
-    )
-  }
-  sanitizeAgentLaunchProfileUpdates(sanitizedUpdates, updates)
-  if ('uiLanguage' in updates) {
-    sanitizedUpdates.uiLanguage = normalizeUiLanguage(updates.uiLanguage)
-  }
-  if ('terminalScrollbackRows' in updates) {
-    sanitizedUpdates.terminalScrollbackRows = normalizeDesktopTerminalScrollbackRows(
-      updates.terminalScrollbackRows
-    )
-  }
-  if ('mobilePairingCustomAddress' in updates) {
-    sanitizedUpdates.mobilePairingCustomAddress = normalizeMobilePairingCustomAddress(
-      updates.mobilePairingCustomAddress
-    )
-  }
-  if ('mobilePairingCustomAddresses' in updates) {
-    sanitizedUpdates.mobilePairingCustomAddresses = normalizeMobilePairingCustomAddresses(
-      updates.mobilePairingCustomAddresses
-    )
-  }
-  return sanitizedUpdates
+type SettingsWriteContext = {
+  previousSettings: GlobalSettings | null
+  visibilityOwnerHostId: ExecutionHostId
 }
 
-async function applySettingsUpdates(
+async function persistSettingsWrite(
   set: ownerHydration.SettingsStateSetter,
   get: () => AppState,
   updates: Partial<GlobalSettings>,
   onAcknowledged?: (settings: GlobalSettings) => void
-): Promise<void> {
+): Promise<SettingsWriteContext> {
   const shouldPublish = ownerHydration.createSettingsPublicationFence(
     'activeRuntimeEnvironmentId' in updates || 'worktreeVisibilityDefaults' in updates
   )
-  const visibilityOwnerHostId = getSettingsFocusedExecutionHostId(get().settings)
-  // Why capture: enabling an agent must re-probe its host, and the write is what says so.
-  const previousSettings = get().settings
+  const context: SettingsWriteContext = {
+    visibilityOwnerHostId: getSettingsFocusedExecutionHostId(get().settings),
+    // Why capture: enabling an agent must re-probe its host, and the write is what says so.
+    previousSettings: get().settings
+  }
   await persistSettingsUpdates(
     set,
     updates,
-    previousSettings,
+    context.previousSettings,
     get().worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId,
     get().worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId,
     shouldPublish,
     onAcknowledged
   )
+  return context
+}
+
+async function refreshAfterSettingsWrite(
+  get: () => AppState,
+  updates: Partial<GlobalSettings>,
+  context: SettingsWriteContext
+): Promise<void> {
   // Why before the follow-up: the enable is about the write that just landed, and a follow-up
   // read that rejects must not swallow the re-detection it owes.
-  if (enablesNewTuiAgents(previousSettings, get().settings)) {
+  if (enablesNewTuiAgents(context.previousSettings, get().settings)) {
     refreshDetectedAgentInventories(get())
   }
   if ('worktreeVisibilityDefaults' in updates) {
-    await get().fetchAllWorktrees({ visibilityOwnerHostId })
+    await get().fetchAllWorktrees({ visibilityOwnerHostId: context.visibilityOwnerHostId })
   }
 }
 
@@ -217,6 +144,7 @@ async function verifyRuntimeEnvironmentReachable(environmentId: string | null): 
 
 export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> = (set, get) => ({
   settings: null,
+  settingsWriteFailureRevision: 0,
   worktreeVisibilityDefaultsByHost: {},
   worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId: null,
   worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId: null,
@@ -241,15 +169,31 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
     ownerHydration.awaitOwnerWorktreeVisibilityDefaultsHydration(get),
 
   updateSettings: async (updates) => {
+    // Why before the write: a slow write can outlive a change of the focused host.
+    const hostName = settingsWriteFailureHostName({
+      updates,
+      settings: get().settings,
+      runtimeEnvironments: get().runtimeEnvironments
+    })
+    let context: SettingsWriteContext
     try {
-      await applySettingsUpdates(set, get, updates)
+      context = await persistSettingsWrite(set, get, updates)
     } catch (err) {
-      console.error('Failed to update settings:', err)
+      handleSettingsWriteFailure({ error: err, hostName, set })
+      return
+    }
+    try {
+      await refreshAfterSettingsWrite(get, updates, context)
+    } catch (err) {
+      // Why: the setting saved, so reporting a failed save would be wrong.
+      console.error('Failed to refresh after a settings update:', err)
     }
   },
 
-  updateSettingsOrThrow: (updates, onAcknowledged) =>
-    applySettingsUpdates(set, get, updates, onAcknowledged),
+  updateSettingsOrThrow: async (updates, onAcknowledged) => {
+    const context = await persistSettingsWrite(set, get, updates, onAcknowledged)
+    await refreshAfterSettingsWrite(get, updates, context)
+  },
 
   setActiveRuntimeEnvironmentPreference: async (environmentId) => {
     const nextId = normalizeRuntimeEnvironmentId(environmentId)

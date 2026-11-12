@@ -139,7 +139,7 @@ export function useSettingsStoreModel() {
   const [prevScrollbackRows, setPrevScrollbackRows] = useState(settings?.terminalScrollbackRows)
   // Keep import state above sections so remounts cannot close the modal.
   const terminalConfigImport = useTerminalConfigImport(updateSettings, settings)
-  const warpThemes = useWarpThemeImport(updateSettings, settings)
+  const warpThemes = useWarpThemeImport(updateSettingsOrThrow, settings)
   const [installedFontSuggestions, setInstalledFontSuggestions] = useState<string[]>(
     mergeFontSuggestions([], getFallbackTerminalFonts())
   )

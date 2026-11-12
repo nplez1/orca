@@ -9,6 +9,7 @@ import { SettingsDisabledControlTooltip } from './SettingsDisabledControlTooltip
 import { normalizeColor } from '@/lib/terminal-theme'
 import { cn } from '@/lib/utils'
 import { useTranslate } from '@/i18n/use-translate'
+import { useAppStateValue } from '@/store/retained-views/app-state-view'
 
 type SettingsRowProps = {
   label: React.ReactNode
@@ -311,10 +312,24 @@ export function NumberField({
   const t = useTranslate()
   const [draft, setDraft] = useState(Number.isFinite(value) ? String(value) : '')
   const [prevValue, setPrevValue] = useState(value)
+  const writeFailureRevision = useAppStateValue((state) => state.settingsWriteFailureRevision)
+  const [prevWriteFailureRevision, setPrevWriteFailureRevision] = useState(writeFailureRevision)
+  // The draft this field last handed to a write, so a rejected write can drop just that value.
+  const [attemptedDraft, setAttemptedDraft] = useState<string | null>(null)
 
   if (value !== prevValue) {
     setPrevValue(value)
     setDraft(Number.isFinite(value) ? String(value) : '')
+    setAttemptedDraft(null)
+  }
+
+  if (writeFailureRevision !== prevWriteFailureRevision) {
+    setPrevWriteFailureRevision(writeFailureRevision)
+    // A field the user has typed over since keeps what they typed.
+    if (attemptedDraft !== null && attemptedDraft === draft) {
+      setDraft(Number.isFinite(value) ? String(value) : '')
+    }
+    setAttemptedDraft(null)
   }
 
   const commit = (): void => {
@@ -333,6 +348,7 @@ export function NumberField({
       setDraft('')
       // Re-blurring an already-empty field must not write the setting again.
       if (value !== undefined) {
+        setAttemptedDraft('')
         onClear()
       }
       return
@@ -340,6 +356,7 @@ export function NumberField({
     if (Number.isFinite(next) && (!integer || Number.isSafeInteger(next))) {
       const clamped = max === undefined ? Math.max(min, next) : Math.min(max, Math.max(min, next))
       if (clamped !== value) {
+        setAttemptedDraft(String(clamped))
         onChange(clamped)
       }
       setDraft(String(clamped))

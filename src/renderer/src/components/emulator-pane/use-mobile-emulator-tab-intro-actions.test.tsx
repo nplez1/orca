@@ -42,7 +42,7 @@ async function flushAsyncAction(): Promise<void> {
 }
 
 function configureStoreForHideAction(overrides: {
-  updateSettings: AppState['updateSettings']
+  updateSettingsOrThrow: AppState['updateSettingsOrThrow']
   closeUnifiedTab?: AppState['closeUnifiedTab']
   dismissMobileEmulatorTabIntro?: AppState['dismissMobileEmulatorTabIntro']
 }): {
@@ -74,7 +74,7 @@ function configureStoreForHideAction(overrides: {
         { id: 'terminal-tab', contentType: 'terminal' }
       ]
     } as unknown as AppState['unifiedTabsByWorktree'],
-    updateSettings: overrides.updateSettings
+    updateSettingsOrThrow: overrides.updateSettingsOrThrow
   })
 
   return {
@@ -101,9 +101,9 @@ afterEach(async () => {
 
 describe('useMobileEmulatorTabIntroActions', () => {
   it('does not dismiss or close tabs when the setting write does not stick', async () => {
-    const updateSettings = vi.fn<AppState['updateSettings']>(async () => {})
+    const updateSettingsOrThrow = vi.fn<AppState['updateSettingsOrThrow']>(async () => {})
     const { closeUnifiedTab, dismissMobileEmulatorTabIntro } = configureStoreForHideAction({
-      updateSettings
+      updateSettingsOrThrow
     })
 
     await renderProbe()

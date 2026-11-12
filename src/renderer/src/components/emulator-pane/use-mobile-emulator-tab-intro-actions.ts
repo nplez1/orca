@@ -25,7 +25,7 @@ export function useMobileEmulatorTabIntroActions(): {
   dismissIntro: () => void
 } {
   const dismissMobileEmulatorTabIntro = useAppStore((s) => s.dismissMobileEmulatorTabIntro)
-  const updateSettings = useAppStore((s) => s.updateSettings)
+  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
 
@@ -40,8 +40,9 @@ export function useMobileEmulatorTabIntroActions(): {
   const hideIntro = useCallback((): void => {
     void (async () => {
       try {
-        await updateSettings({ mobileEmulatorEnabled: false })
-        // updateSettings catches write failures; close tabs only after state reflects the persisted setting.
+        // Why the throwing writer: this flow reports its own failure and must not double it.
+        await updateSettingsOrThrow({ mobileEmulatorEnabled: false })
+        // Close tabs only after state reflects the persisted setting.
         if (!isMobileEmulatorHidden()) {
           toast.error(
             translate(
@@ -65,7 +66,7 @@ export function useMobileEmulatorTabIntroActions(): {
         )
       }
     })()
-  }, [dismissIntro, openSettingsPage, openSettingsTarget, updateSettings])
+  }, [dismissIntro, openSettingsPage, openSettingsTarget, updateSettingsOrThrow])
 
   return { keepIntro, hideIntro, dismissIntro }
 }
