@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { buildExecutionHostRegistry } from './execution-host-registry'
-import { pickerExecutionHosts, widenSavedExecutionHostIds } from './managed-orcad-execution-host'
+import {
+  canonicalHostIdOrder,
+  machineHostIds,
+  pickerExecutionHosts,
+  widenSavedExecutionHostIds
+} from './managed-orcad-execution-host'
 import type { SshConnectionState } from '../ssh-types'
 
 const SSH_TARGETS = new Map([['omarchy-target', 'Omarchy']])
@@ -118,5 +123,56 @@ describe('managed Orca server host merging', () => {
     ).toBeNull()
     expect(widenSavedExecutionHostIds(hosts, ['local'])).toBeNull()
     expect(widenSavedExecutionHostIds(hosts, null)).toBeNull()
+  })
+})
+
+describe('machineHostIds', () => {
+  it('names every id a merged pair answers to, server id first', () => {
+    const hosts = registry({ kind: 'managed', environmentId: 'omarchy-server' })
+    const shown = pickerExecutionHosts(hosts).find((host) => host.id === 'runtime:omarchy-server')
+
+    expect(shown && machineHostIds(shown)).toEqual(['runtime:omarchy-server', 'ssh:omarchy-target'])
+  })
+
+  it('puts the server id first even when the picker shows the ssh row', () => {
+    const hosts = registry({ kind: 'relay', environmentId: 'omarchy-server' })
+    const shown = pickerExecutionHosts(hosts).find((host) => host.id === 'ssh:omarchy-target')
+
+    expect(shown && machineHostIds(shown)).toEqual(['runtime:omarchy-server', 'ssh:omarchy-target'])
+  })
+
+  it('leaves an unmerged ssh host as its own single id', () => {
+    const hosts = buildExecutionHostRegistry({
+      repos: [],
+      settings: null,
+      hostSource: 'configured-only',
+      sshTargetLabels: SSH_TARGETS,
+      sshConnectionStates: new Map([
+        [
+          'omarchy-target',
+          {
+            targetId: 'omarchy-target',
+            status: 'connected' as const,
+            error: null,
+            reconnectAttempt: 0
+          }
+        ]
+      ]),
+      runtimeEnvironments: []
+    })
+    const shown = pickerExecutionHosts(hosts).find((host) => host.id === 'ssh:omarchy-target')
+
+    expect(shown && machineHostIds(shown)).toEqual(['ssh:omarchy-target'])
+  })
+})
+
+describe('canonicalHostIdOrder', () => {
+  it('dedupes and puts a server id first without reordering the rest', () => {
+    expect(canonicalHostIdOrder(['ssh:box', 'local', 'runtime:env', 'ssh:box'])).toEqual([
+      'runtime:env',
+      'ssh:box',
+      'local'
+    ])
+    expect(canonicalHostIdOrder(['local'])).toEqual(['local'])
   })
 })

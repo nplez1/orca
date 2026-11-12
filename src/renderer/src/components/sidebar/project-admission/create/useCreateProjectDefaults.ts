@@ -9,6 +9,7 @@ import {
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import type { AddRepoDialogStep } from '../dialog/add-repo-dialog-types'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 
 const LOCAL_GIT_AVAILABILITY_TIMEOUT_MS = 1500
@@ -31,7 +32,8 @@ export function useCreateProjectDefaults({
   createParent,
   setCreateParent,
   worktreeLayoutMode,
-  hostSettingOverrides
+  hostSettingOverrides,
+  overrideHostIds
 }: {
   step: AddRepoDialogStep
   activeRuntimeEnvironmentId: string | null | undefined
@@ -41,6 +43,8 @@ export function useCreateProjectDefaults({
   worktreeLayoutMode?: WorktreeLayoutMode
   /** Per-host folder overrides: a stored root wins over recomputing from the host's home. */
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
+  /** Every id the machine answers to, so a folder stored under a merged alias is found. */
+  overrideHostIds?: readonly ExecutionHostId[]
 }): {
   createDefaultParent: string
   createGitAvailability: GitAvailability
@@ -203,7 +207,8 @@ export function useCreateProjectDefaults({
     void resolveRuntimeCreateParent({
       runtimeEnvironmentId,
       worktreeLayoutMode,
-      hostSettingOverrides
+      hostSettingOverrides,
+      overrideHostIds
     })
       .then((result) => {
         if (
@@ -238,6 +243,7 @@ export function useCreateProjectDefaults({
     canReplaceCreateParentDefault,
     createParent,
     hostSettingOverrides,
+    overrideHostIds,
     setCreateParent,
     step,
     worktreeLayoutMode

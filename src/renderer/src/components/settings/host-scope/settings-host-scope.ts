@@ -6,7 +6,10 @@ import {
   type ExecutionHostId
 } from '../../../../../shared/execution-host'
 import type { MergedExecutionHost } from '../../../../../shared/execution-host/managed-orcad-execution-host'
-import { indexExecutionHostsById } from '../../../../../shared/execution-host/managed-orcad-execution-host'
+import {
+  canonicalHostIdOrder,
+  indexExecutionHostsById
+} from '../../../../../shared/execution-host/managed-orcad-execution-host'
 import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
 
 /** The host rows the Settings picker shows; labels already carry renames. */
@@ -60,9 +63,7 @@ function canonicalHostIds(
   hostId: ExecutionHostId,
   aliasHostIds: readonly ExecutionHostId[]
 ): ExecutionHostId[] {
-  const ids = [hostId, ...aliasHostIds]
-  const serverId = ids.find((id) => parseExecutionHostId(id)?.kind === 'runtime')
-  return serverId ? [serverId, ...ids.filter((id) => id !== serverId)] : ids
+  return canonicalHostIdOrder([hostId, ...aliasHostIds])
 }
 
 function scopeForHostId(args: {

@@ -28,15 +28,36 @@ export const probeRuntimeHostHome: HostHomeProbe = async (environmentId) => {
 export async function resolveCloneParentForHost({
   settings,
   hostIds,
+  overrideHostIds,
   layoutMode,
   probeHostHome = probeRuntimeHostHome
 }: {
   settings: CloneParentSettings | null | undefined
   hostIds: readonly ExecutionHostId[]
+  /** Every id the machine answers to, so a folder stored under a merged alias is found. */
+  overrideHostIds?: readonly ExecutionHostId[]
   layoutMode?: WorktreeLayoutMode
   probeHostHome?: HostHomeProbe
 }): Promise<string> {
-  const { environmentId, probe } = needsHostHomeProbe(settings, hostIds)
+  const { environmentId, probe } = needsHostHomeProbe(settings, hostIds, overrideHostIds)
   const hostHome = probe && environmentId ? await probeHostHome(environmentId) : null
-  return getCloneParentForHost({ settings, hostIds, layoutMode, hostHome })
+  return getCloneParentForHost({ settings, hostIds, overrideHostIds, layoutMode, hostHome })
+}
+
+/** A run-target row's clone destination: the ids it derives decide eligibility, the whole machine the folder. */
+export function resolveRunTargetCloneParent({
+  settings,
+  option,
+  layoutMode
+}: {
+  settings: CloneParentSettings | null | undefined
+  option: { hostId: ExecutionHostId; equivalentHostIds?: readonly ExecutionHostId[] }
+  layoutMode?: WorktreeLayoutMode
+}): Promise<string> {
+  return resolveCloneParentForHost({
+    settings,
+    hostIds: [option.hostId],
+    ...(option.equivalentHostIds ? { overrideHostIds: option.equivalentHostIds } : {}),
+    ...(layoutMode ? { layoutMode } : {})
+  })
 }

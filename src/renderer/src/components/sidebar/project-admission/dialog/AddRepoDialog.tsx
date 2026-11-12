@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: upstream's clone dialog plus the fork's `worktreeLayoutMode`
    (project-folder) wiring on both call sites. */
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { useAppStore } from '@/store/index'
 import { useRemoteRepo } from './AddRepoSteps'
 import { useCreateRepo } from '../create/useCreateRepo'
@@ -10,6 +10,11 @@ import { useAddRepoCloneFlow } from './useAddRepoCloneFlow'
 import { useAddRepoLocalFolderFlow } from './useAddRepoLocalFolderFlow'
 import { useAddRepoServerPathFlow } from './useAddRepoServerPathFlow'
 import { resolveWorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import {
+  indexExecutionHostsById,
+  machineHostIds
+} from '../../../../../../shared/execution-host/managed-orcad-execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { useAddRepoHostSelection } from '../host-selection/use-add-repo-host-selection'
 import { useCompleteGitRepoAdd } from '../completion/use-complete-git-repo-add'
 import { useCreateProjectDefaults } from '../create/useCreateProjectDefaults'
@@ -58,6 +63,13 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
     hostSelection.selectedParsedHost?.kind === 'runtime'
       ? hostSelection.selectedParsedHost.environmentId
       : null
+  // Every id the chosen machine answers to: the folder Settings shows is stored under whichever of
+  // them the user last wrote, and the flows below must read the same one.
+  const { hostOptions: selectableHosts, selectedHostId } = hostSelection
+  const selectedMachineHostIds = useMemo((): ExecutionHostId[] | undefined => {
+    const row = selectedHostId ? indexExecutionHostsById(selectableHosts).get(selectedHostId) : null
+    return row ? machineHostIds(row) : undefined
+  }, [selectableHosts, selectedHostId])
   const {
     nestedScan,
     nestedSelectedPaths,
@@ -143,7 +155,8 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
     createParent,
     setCreateParent,
     hostSettingOverrides: settings?.hostSettingOverrides,
-    worktreeLayoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined
+    worktreeLayoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
+    overrideHostIds: selectedMachineHostIds
   })
 
   const {
@@ -167,6 +180,7 @@ export default React.memo(function AddRepoDialog({ hosted }: AddRepoDialogProps)
     workspaceDir: settings?.workspaceDir,
     hostSettingOverrides: settings?.hostSettingOverrides,
     worktreeLayoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
+    overrideHostIds: selectedMachineHostIds,
     fetchWorktrees,
     onGitRepoReady: completeGitRepoAdd
   })

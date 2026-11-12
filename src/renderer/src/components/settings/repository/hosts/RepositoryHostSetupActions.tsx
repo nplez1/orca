@@ -121,6 +121,7 @@ export function RepositoryHostSetupActions({
   const hostRepoRoot = useCloneParentDefault({
     settings,
     hostIds: setupTargetHostId ? [setupTargetHostId] : [],
+    overrideHostIds: setupTargetHostOption?.equivalentHostIds,
     layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
     enabled: isOpen && canUsePathActions
   })

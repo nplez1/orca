@@ -145,6 +145,44 @@ describe('getCloneParentForHost', () => {
       })
     ).toBe('/home/me/orca/workspaces')
   })
+
+  it('reads a folder stored under the machine’s other id once a server merged with it', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SSH]: { defaultRepoRoot: '/srv/repos' } } },
+        hostIds: [SERVER],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('/srv/repos')
+  })
+
+  it('keeps an SSH row clone-less even when its merged alias holds a folder', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SSH]: { defaultRepoRoot: '/srv/repos' } } },
+        hostIds: [SSH],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('')
+  })
+
+  it('prefers the server id’s folder when the pair holds two values', () => {
+    expect(
+      getCloneParentForHost({
+        settings: {
+          hostSettingOverrides: {
+            [SERVER]: { defaultRepoRoot: '/srv/newer' },
+            [SSH]: { defaultRepoRoot: '/srv/older' }
+          }
+        },
+        hostIds: [SERVER],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('/srv/newer')
+  })
 })
 
 describe('needsHostHomeProbe', () => {
@@ -163,7 +201,18 @@ describe('needsHostHomeProbe', () => {
       ])
     ).toEqual({ environmentId: 'server-a', probe: false })
   })
+
+  it('skips the home probe when the machine’s other id holds a folder', () => {
+    expect(
+      needsHostHomeProbe(
+        { hostSettingOverrides: { [SSH]: { defaultRepoRoot: '/srv/repos' } } },
+        [SERVER],
+        [SERVER, SSH]
+      )
+    ).toEqual({ environmentId: 'server-a', probe: false })
+  })
 })
+
 
 describe('getCloneDestinationAutoFill', () => {
   it('fills an empty destination once', () => {

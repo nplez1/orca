@@ -12,15 +12,18 @@ import {
 export function useCloneParentDefault({
   settings,
   hostIds,
+  overrideHostIds,
   layoutMode,
   enabled
 }: {
   settings: CloneParentSettings | null | undefined
   hostIds: readonly ExecutionHostId[]
+  /** Every id the machine answers to, so a folder stored under a merged alias is found. */
+  overrideHostIds?: readonly ExecutionHostId[]
   layoutMode?: WorktreeLayoutMode
   enabled: boolean
 }): { parent: string; pending: boolean } {
-  const { environmentId, probe } = needsHostHomeProbe(settings, hostIds)
+  const { environmentId, probe } = needsHostHomeProbe(settings, hostIds, overrideHostIds)
   // Only a host with nothing stored needs its home read, and only once per host.
   const shouldProbe = enabled && probe
   const [hostHome, setHostHome] = useState<string | null>(null)
@@ -48,7 +51,7 @@ export function useCloneParentDefault({
     }
   }, [environmentId, shouldProbe])
   return {
-    parent: getCloneParentForHost({ settings, hostIds, layoutMode, hostHome }),
+    parent: getCloneParentForHost({ settings, hostIds, overrideHostIds, layoutMode, hostHome }),
     pending: shouldProbe && hostHome === null && !probeFailed
   }
 }

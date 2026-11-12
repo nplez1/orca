@@ -4,7 +4,10 @@ import { act, render } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCreateProjectDefaults } from './useCreateProjectDefaults'
-import { toRuntimeExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
+} from '../../../../../../shared/execution-host'
 
 const browseRuntimeServerDirectory = vi.hoisted(() => vi.fn())
 
@@ -16,16 +19,19 @@ vi.mock('@/runtime/rpc/calls/runtime-rpc-call', () => ({
 }))
 
 const SERVER = toRuntimeExecutionHostId('server-a')
+const MERGED_SSH = toSshExecutionHostId('builder')
 
 type Seen = { parent: string; status: string }
 
 function Harness({
   hostSettingOverrides,
   worktreeLayoutMode,
+  overrideHostIds,
   seen
 }: {
   hostSettingOverrides: Parameters<typeof useCreateProjectDefaults>[0]['hostSettingOverrides']
   worktreeLayoutMode: 'repo-nested' | 'flat'
+  overrideHostIds?: Parameters<typeof useCreateProjectDefaults>[0]['overrideHostIds']
   seen: Seen
 }): React.JSX.Element {
   const [createParent, setCreateParent] = useState('')
@@ -35,7 +41,8 @@ function Harness({
     createParent,
     setCreateParent,
     worktreeLayoutMode,
-    hostSettingOverrides
+    hostSettingOverrides,
+    overrideHostIds
   })
   seen.parent = createParent
   seen.status = model.createRuntimeParentStatus
@@ -104,5 +111,21 @@ describe('useCreateProjectDefaults on a runtime host', () => {
     })
     expect(seen.parent).toBe('/home/me/orca/workspaces')
     expect(browseRuntimeServerDirectory).toHaveBeenCalledWith('server-a', '~')
+  })
+
+  it('uses a folder stored under the ssh id a server merged with', async () => {
+    const seen: Seen = { parent: '', status: '' }
+    await act(async () => {
+      render(
+        <Harness
+          hostSettingOverrides={{ [MERGED_SSH]: { defaultRepoRoot: '/srv/repos' } }}
+          worktreeLayoutMode="repo-nested"
+          overrideHostIds={[SERVER, MERGED_SSH]}
+          seen={seen}
+        />
+      )
+    })
+    expect(seen.parent).toBe('/srv/repos')
+    expect(browseRuntimeServerDirectory).not.toHaveBeenCalled()
   })
 })

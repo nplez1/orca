@@ -32,6 +32,7 @@ export function useAddRepoCloneFlow({
   workspaceDir,
   hostSettingOverrides,
   worktreeLayoutMode,
+  overrideHostIds,
   fetchWorktrees,
   onGitRepoReady
 }: {
@@ -44,6 +45,8 @@ export function useAddRepoCloneFlow({
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
   /** Placement mode, so the default destination lands the checkout inside its project folder. */
   worktreeLayoutMode?: WorktreeLayoutMode
+  /** Every id the machine answers to, so a folder stored under a merged alias is found. */
+  overrideHostIds?: readonly ExecutionHostId[]
   fetchWorktrees: (
     repoId: string,
     options?: {
@@ -108,6 +111,7 @@ export function useAddRepoCloneFlow({
   const cloneParent = useCloneParentDefault({
     settings: { workspaceDir, hostSettingOverrides },
     hostIds,
+    overrideHostIds,
     layoutMode: worktreeLayoutMode,
     enabled: step === 'clone'
   })

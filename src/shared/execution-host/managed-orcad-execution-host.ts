@@ -1,5 +1,6 @@
 /** SSH and its managed server are one machine in pickers. Keep both ownership ids in the registry; expand each picker selection to both. */
 import {
+  parseExecutionHostId,
   toRuntimeExecutionHostId,
   toSshExecutionHostId,
   type ExecutionHostId
@@ -90,6 +91,20 @@ export function indexExecutionHostsById<T extends MergedExecutionHost>(
     }
   }
   return byId
+}
+
+/** The server id first and each id once, so a merged pair reads and writes the id every consumer derives. */
+export function canonicalHostIdOrder(ids: readonly ExecutionHostId[]): ExecutionHostId[] {
+  const unique = [...new Set(ids)]
+  const serverIds = unique.filter((id) => parseExecutionHostId(id)?.kind === 'runtime')
+  return serverIds.length === 0
+    ? unique
+    : [...serverIds, ...unique.filter((id) => parseExecutionHostId(id)?.kind !== 'runtime')]
+}
+
+/** Every id the row a picker shows answers to, server id first. */
+export function machineHostIds(row: MergedExecutionHost): ExecutionHostId[] {
+  return canonicalHostIdOrder([row.id, ...(row.aliasHostIds ?? [])])
 }
 
 /** Every id the given ids stand for, so a choice of a merged row matches both owners. */

@@ -1,5 +1,9 @@
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
-import { toRuntimeExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  toRuntimeExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
+import { canonicalHostIdOrder } from '../../../../../../shared/execution-host/managed-orcad-execution-host'
 import { resolveCheckoutParent } from '../../../../../../shared/host-repo-root'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
@@ -33,8 +37,13 @@ export function resolveRuntimeCreateParent(args: {
   runtimeEnvironmentId: string
   worktreeLayoutMode?: WorktreeLayoutMode
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
+  /** Every id the machine answers to, so a folder stored under a merged alias is found. */
+  overrideHostIds?: readonly ExecutionHostId[]
 }): Promise<{ parent: string }> {
-  const hostIds = [toRuntimeExecutionHostId(args.runtimeEnvironmentId)]
+  const hostIds = canonicalHostIdOrder([
+    toRuntimeExecutionHostId(args.runtimeEnvironmentId),
+    ...(args.overrideHostIds ?? [])
+  ])
   const layoutMode = args.worktreeLayoutMode ?? 'repo-nested'
   const overrides = { hostSettingOverrides: args.hostSettingOverrides }
   const stored = resolveCheckoutParent({
