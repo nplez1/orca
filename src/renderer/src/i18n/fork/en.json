@@ -893,7 +893,7 @@
           "hiddenByFilters": "{{value0}} hidden by filters",
           "showHidden": "Show",
           "showHiddenHint": "Turn off the filters hiding these workspaces",
-          "showHiddenLabel": "Show {{value0}} workspaces hidden by filters"
+          "showHiddenLabel": "Show workspaces hidden by filters"
         },
         "WorktreeBranchHostSelect": {
           "label": "Select host"

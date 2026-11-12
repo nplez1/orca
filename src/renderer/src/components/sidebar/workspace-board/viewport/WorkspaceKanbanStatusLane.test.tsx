@@ -14,7 +14,7 @@ vi.mock('./WorkspaceKanbanLaneCardList', () => ({
 
 const STATUS: WorkspaceStatusDefinition = { id: 'in-progress', label: 'In progress' }
 const EMPTY_REPO_MAP = new Map()
-const SHOW_HIDDEN_LABEL = 'Show 3 workspaces hidden by filters'
+const SHOW_HIDDEN_LABEL = 'Show workspaces hidden by filters'
 
 function renderLane(overrides: {
   items?: readonly Worktree[]
@@ -67,7 +67,7 @@ describe('WorkspaceKanbanStatusLane', () => {
   it('reports the members the sidebar filters hide instead of reading Empty', () => {
     const rendered = renderLane({ hiddenCount: 3 })
 
-    expect(rendered.getAllByText('3 hidden by filters')).toHaveLength(2)
+    expect(rendered.getByText('3 hidden by filters')).toBeTruthy()
     expect(rendered.queryByText('Empty')).toBeNull()
   })
 

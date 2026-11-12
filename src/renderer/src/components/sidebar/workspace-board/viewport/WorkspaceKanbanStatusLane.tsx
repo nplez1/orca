@@ -106,8 +106,7 @@ function WorkspaceKanbanStatusLane({
       : ''
   const showHiddenLabel = t(
     'auto.components.sidebar.WorkspaceKanbanStatusLane.showHiddenLabel',
-    'Show {{value0}} workspaces hidden by filters',
-    { value0: hiddenCount }
+    'Show workspaces hidden by filters'
   )
   const showHiddenHint = t(
     'auto.components.sidebar.WorkspaceKanbanStatusLane.showHiddenHint',
@@ -131,7 +130,8 @@ function WorkspaceKanbanStatusLane({
   const countBadge = (
     <div className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium leading-none text-muted-foreground">
       {badgeText}
-      {hiddenCount > 0 && <span className="sr-only"> {hiddenLabel}</span>}
+      {/* The empty lane's notice already names the hidden count; only a lane with cards needs it here. */}
+      {hiddenCount > 0 && items.length > 0 && <span className="sr-only"> {hiddenLabel}</span>}
     </div>
   )
   const createButton = (
