@@ -27,9 +27,7 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     openModal,
     updateSettings,
     selectLinearWorkspace,
-    listLinearTeams,
     checkLinearConnection,
-    selectedLinearWorkspaceId,
     jiraSites,
     taskSource,
     linearTaskSourceContext,
@@ -61,7 +59,6 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     setLinearCustomViewProjectsResult,
     setLinearCustomViewContentsError,
     linearContextResumeAttemptedRef,
-    setAvailableTeams,
     setLinearTeamRefreshNonce,
     setLinearTeamSelection
   } = model
@@ -181,16 +178,10 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
   )
   const handleLinearScopeOpen = useCallback((): void => {
     void checkLinearConnection(true)
-    void listLinearTeams(selectedLinearWorkspaceId, {
-      force: true
-    })
-      .then((teams) => {
-        setAvailableTeams(teams)
-      })
-      .catch(() => {
-        console.warn('[TaskPage] Failed to refresh Linear teams')
-      })
-  }, [checkLinearConnection, listLinearTeams, selectedLinearWorkspaceId, setAvailableTeams])
+    // Why: the metadata hook owns the team read and its error, so a late read cannot outlive a
+    // workspace switch and report a failure for a workspace the user has already left.
+    setLinearTeamRefreshNonce((n) => n + 1)
+  }, [checkLinearConnection, setLinearTeamRefreshNonce])
   const handleLinearAccessConnected = useCallback((): void => {
     setLinearTeamRefreshNonce((n) => n + 1)
     setLinearRefreshNonce((n) => n + 1)

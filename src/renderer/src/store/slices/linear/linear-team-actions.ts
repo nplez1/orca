@@ -86,7 +86,7 @@ export function createLinearTeamActions(
         })
         .catch((error) => {
           console.warn('[linear] listLinearTeams failed:', error)
-          if (
+          const authFailure =
             (isIntegrationCredentialDecryptionError(error) || looksLikeAuthError(error)) &&
             canWriteLinearReadResult(
               contextKey,
@@ -95,10 +95,17 @@ export function createLinearTeamActions(
               get().settings,
               scope.explicitSource
             )
+          // Why: a revoked token must still flip connection status when the caller wants the failure.
+          if (
+            authFailure &&
+            !shouldRefreshStatusAfterRead(resolvedWorkspaceId, get().linearStatus)
           ) {
-            if (!shouldRefreshStatusAfterRead(resolvedWorkspaceId, get().linearStatus)) {
-              void get().checkLinearConnection(true)
-            }
+            void get().checkLinearConnection(true)
+          }
+          if (options?.rejectReadError) {
+            throw error
+          }
+          if (authFailure) {
             return []
           }
           return get().linearTeamCache[cacheKey]?.data ?? []
