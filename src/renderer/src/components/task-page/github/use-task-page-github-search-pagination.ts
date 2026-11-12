@@ -12,6 +12,7 @@ import { translate } from '@/i18n/i18n'
 import { overlayPendingOnTaskPagePages } from '@/components/task-page/github/task-page-github-work-item-mutation-pages'
 import { scopeGitHubTaskSearch } from '../../../../../shared/work-items/task-github-search'
 import { useGitHubTaskSearchCommit } from '@/components/use-github-task-search-commit'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { getTaskPageRepoSourceContext } from '../../../lib/work-items/task-repo-source-context'
 export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProjectionModel) {
   const {
@@ -35,6 +36,7 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
     paginationLoading,
     setPaginationLoading,
     setLoadingTargetPage,
+    setPaginationError,
     setCountedTotalPages,
     setProvenPageLimit,
     countedTotalPagesRef,
@@ -58,6 +60,8 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
       const target = targetPage ?? currentPage + 1
       setPaginationLoading(true)
       setLoadingTargetPage(target)
+      // Why: the retry replaces this attempt, so a stale reason must not sit next to a fresh spinner.
+      setPaginationError(null)
       try {
         const result = await fetchWorkItemsNextPage(
           repoArgs,
@@ -147,7 +151,26 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
         setPages(nextPages)
         setCurrentPage(target)
       } catch (err) {
-        console.error('Failed to load next page:', err)
+        // Why: this is the only load path with no row to carry the failure, so it reports itself instead of only logging.
+        if (paginationGenerationRef.current === requestGeneration) {
+          setPaginationError({
+            page: target,
+            message: translate(
+              'auto.components.TaskPage.pageLoadFailedWithReason',
+              'Couldn’t load page {{value0}} — {{value1}}',
+              {
+                value0: String(target + 1),
+                value1: extractIpcErrorMessage(
+                  err,
+                  translate(
+                    'auto.components.TaskPage.pageLoadFailedUnknownReason',
+                    'GitHub did not return this page.'
+                  )
+                )
+              }
+            )
+          })
+        }
       } finally {
         if (paginationGenerationRef.current === requestGeneration) {
           setPaginationLoading(false)
@@ -171,6 +194,7 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
       pagesRef,
       setProvenPageLimit,
       setLoadingTargetPage,
+      setPaginationError,
       countedTotalPagesRef,
       setPages
     ]
