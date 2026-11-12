@@ -41,6 +41,7 @@ import { useNewWorkspaceComposerFileDrop } from './new-workspace/use-new-workspa
 import { useComposerFileDragOver } from './new-workspace/use-composer-file-drag-over'
 import type { ProjectHostSetupProvisioning } from './new-workspace/use-workspace-copy-target'
 import { getRunTargetCloneAvailability } from './new-workspace/run-target-clone-availability'
+import { resolveRunTargetCloneUrl } from './new-workspace/run-target-clone-url'
 import { resolveComposerProjectName } from './new-workspace/composer-project-name'
 import { buildDefaultAgentSettingsUpdate } from '../../../shared/agent-launch/choices/default-agent-settings'
 
@@ -125,6 +126,11 @@ export default function NewWorkspaceComposerCard(
     repoId
   })
   const defaultCloneUrl = resolveProjectCloneUrlPrefill(projects, repos, selectedProjectId)
+  // Why the override: a project with no remote is only clonable through the Advanced URL, so the
+  // rows must be decided by the URL a clone would use, not by the remote alone.
+  const cloneUrl = runTargetClone
+    ? resolveRunTargetCloneUrl(runTargetClone.overrides, defaultCloneUrl)
+    : defaultCloneUrl
   const readyProjectHostSetupOptions = projectHostSetupOptions.filter(
     (option) => option.kind === 'ready'
   )
@@ -140,7 +146,7 @@ export default function NewWorkspaceComposerCard(
       (option) =>
         getRunTargetCloneAvailability(option, {
           projectKind: selectedRepoIsGit ? 'git' : 'folder',
-          cloneUrl: defaultCloneUrl
+          cloneUrl
         }).kind === 'existing-folder-only'
     )
   React.useEffect(() => {
@@ -328,7 +334,7 @@ export default function NewWorkspaceComposerCard(
           handleStartClone={(option) => runTargetClone?.start(option)}
           handleUseExistingFolder={handleUseExistingFolder}
           cloneProjectKind={selectedRepoIsGit ? 'git' : 'folder'}
-          cloneUrl={defaultCloneUrl}
+          cloneUrl={cloneUrl}
           runTargetClone={runTargetClone}
           sshStatusLabel={sshStatusLabel}
           connectButtonLabel={connectButtonLabel}

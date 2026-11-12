@@ -17,6 +17,7 @@ import {
   type ProjectCloneOutcome
 } from './project-clone-in-flight'
 import { toastUnseenRunTargetClone } from './run-target-clone-unseen-toast'
+import { resolveRunTargetCloneUrl } from './run-target-clone-url'
 
 /** The host a clone is for, kept with its row so the picker and the status line name the same host. */
 export type RunTargetCloneTarget = {
@@ -281,7 +282,7 @@ export function useRunTargetAutoClone({
         () =>
           cloneOnce({
             option,
-            url: overrides.url.trim() || defaultCloneUrl.trim(),
+            url: resolveRunTargetCloneUrl(overrides, defaultCloneUrl),
             destinationOverride,
             // Why the key alone and not the mount: a reopened composer may be waiting on this same
             // clone, so only the user moving on — another host pick, or `clear()` on a project
@@ -297,15 +298,7 @@ export function useRunTargetAutoClone({
         }
       )
     },
-    [
-      cloneOnce,
-      defaultCloneUrl,
-      onProvisioned,
-      overrides.destination,
-      overrides.url,
-      projectId,
-      projectName
-    ]
+    [cloneOnce, defaultCloneUrl, onProvisioned, overrides, projectId, projectName]
   )
   useLayoutEffect(() => {
     if (projectId) {

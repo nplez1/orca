@@ -7,6 +7,7 @@ import {
   rewriteGitRemoteTransport,
   type GitRemoteTransport
 } from '../../../../shared/git/remotes/git-remote-url-transport'
+import { resolveRunTargetCloneUrl } from './run-target-clone-url'
 import type { RunTargetAutoClone } from './use-run-target-auto-clone'
 
 const TRANSPORTS: readonly GitRemoteTransport[] = ['ssh', 'https']
@@ -26,7 +27,7 @@ export function ComposerCloneOptionsFields({
 }): React.JSX.Element {
   const t = useTranslate()
   const running = clone.status.kind === 'cloning'
-  const url = clone.overrides.url || clone.defaultUrl
+  const url = resolveRunTargetCloneUrl(clone.overrides, clone.defaultUrl)
   const transport = detectGitRemoteTransport(url)
   const switchTransport = (to: GitRemoteTransport): void => {
     if (to === transport) {
