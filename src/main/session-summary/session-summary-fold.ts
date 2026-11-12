@@ -151,7 +151,7 @@ export async function foldSessionSummaryEvents(args: {
   const baseIndex = ledger.foldedThrough
   // Why planned once and not per chunk: paging and rendering have to agree on where a chunk ends,
   // and a burst is only collapsible if both see the same items.
-  const items = planSessionSummaryRenderItems(events)
+  const items = planSessionSummaryRenderItems(events, baseIndex)
   const ranges = buildSessionSummaryChunks(items)
   const gaps = args.gaps ?? []
   let completedChunks = 0

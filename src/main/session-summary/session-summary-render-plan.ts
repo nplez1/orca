@@ -9,7 +9,8 @@
 // them: no burst is ever cut in half, and the event range a chunk covers is still `[from, to)` —
 // which is what keeps `foldedThrough`, every fact's `sourceIndex` and the chunk cache key stable.
 //
-// Deterministic and local: no model call, and the same events always plan to the same items.
+// Deterministic and local: no model call, and the same events at the same base index always plan
+// to the same items.
 import type { SessionSummarySourceEvent } from './session-summary-event-digest'
 
 /** One rendered line (or, for a burst, one line plus its expanded failures). */
@@ -19,7 +20,12 @@ export type SessionSummaryRenderItem = {
   /** Exclusive end; `from + 1` for a single event. */
   to: number
   role: SessionSummarySourceEvent['role']
-  /** The rendered text, without the `[#from-#to role]` anchor. */
+  /**
+   * The rendered text, without the `[#from-#to role]` anchor.
+   *
+   * `from` and `to` are indexes within the fold, but a burst's failure lines cite transcript
+   * indexes, so they read like the anchor in front of them rather than like `from`.
+   */
   text: string
   /**
    * Several calls collapsed into one line, so the anchor names the whole span.
@@ -170,9 +176,16 @@ function readRunCalls(
   return calls
 }
 
-/** The whole event array as rendered lines: prose one each, tool activity collapsed. */
+/**
+ * The whole event array as rendered lines: prose one each, tool activity collapsed.
+ *
+ * `baseIndex` is the transcript index of `events[0]` — the ledger's `foldedThrough` before this
+ * fold — because the indexes inside a line are the ones the extract is told to cite, and an index
+ * within the fold is not that on any fold after the first.
+ */
 export function planSessionSummaryRenderItems(
-  events: readonly SessionSummarySourceEvent[]
+  events: readonly SessionSummarySourceEvent[],
+  baseIndex: number
 ): SessionSummaryRenderItem[] {
   const runsByStart = new Map<number, SessionSummaryToolRun>()
   for (const run of planSessionSummaryToolRuns(events)) {
@@ -185,13 +198,17 @@ export function planSessionSummaryRenderItems(
       items.push({ from: index, to: index + 1, role: events[index].role, text: events[index].text })
       continue
     }
-    pushRunItems(items, run)
+    pushRunItems(items, run, baseIndex)
     index = run.to - 1
   }
   return items
 }
 
-function pushRunItems(items: SessionSummaryRenderItem[], run: SessionSummaryToolRun): void {
+function pushRunItems(
+  items: SessionSummaryRenderItem[],
+  run: SessionSummaryToolRun,
+  baseIndex: number
+): void {
   // Why the group can be smaller than the run: an item is bounded, so a long run becomes several
   // consecutive bursts rather than one line no chunk budget could split.
   let group: SessionSummaryToolCall[] = []
@@ -207,7 +224,7 @@ function pushRunItems(items: SessionSummaryRenderItem[], run: SessionSummaryTool
       from: first.from,
       to: last.to,
       role: 'tool',
-      text: burst ? renderBurst(group) : last.text,
+      text: burst ? renderBurst(group, baseIndex) : last.text,
       ...(burst ? { burst: true as const } : {})
     })
     group = []
@@ -223,14 +240,17 @@ function pushRunItems(items: SessionSummaryRenderItem[], run: SessionSummaryTool
   flush()
 }
 
-function renderBurst(calls: readonly SessionSummaryToolCall[]): string {
+function renderBurst(calls: readonly SessionSummaryToolCall[], baseIndex: number): string {
   const headline = describeSessionSummaryToolBurst(calls)
   // Why every failure and not only a quoted one: a command that exited 2 without a line the
   // digest recognises is still the command a blocker is about, and dropping it left the extract
   // less than it was shown before bursts existed.
+  //
+  // Why the base: the extract is told to cite these indexes, so a fold-relative one pinned a
+  // blocker to whichever message happened to sit at that offset in the slice.
   const failures = calls
     .filter((call) => call.failed && call.outcome)
-    .map((call) => `  #${call.from} ${call.label} · ${call.outcome}`)
+    .map((call) => `  #${baseIndex + call.from} ${call.label} · ${call.outcome}`)
   return [headline, ...failures].join('\n')
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionSummaryLedgerDelta } from '../../shared/session-summary-types'
+import type { TranscriptMessage } from '../ai-vault/transcripts/session-transcript-consumers'
 import { emptySessionSummaryLedger } from './session-summary-ledger'
+import { createSessionSummaryEventDigester } from './session-summary-event-digest'
 import {
   buildSessionSummaryChunkPrompt,
   buildSessionSummaryChunks,
@@ -24,8 +26,8 @@ function events(count: number): SessionSummarySourceEvent[] {
 }
 
 /** Chunking and rendering both read the render plan; prose renders one item per event. */
-function itemsOf(source: SessionSummarySourceEvent[]) {
-  return planSessionSummaryRenderItems(source)
+function itemsOf(source: SessionSummarySourceEvent[], baseIndex = 0) {
+  return planSessionSummaryRenderItems(source, baseIndex)
 }
 
 function reply(overrides: Record<string, unknown> = {}): string {
@@ -200,6 +202,44 @@ describe('foldSessionSummaryEvents', () => {
     expect(result.ledger.done).toEqual([
       { text: 'cached', sourceIndex: 0 },
       { text: 'fresh', sourceIndex: 129 }
+    ])
+  })
+
+  // Acceptance: a failure line in a later fold names the failing call's transcript index, and a
+  // blocker the extract cites from it hides the error marker for that call. A fold-relative index
+  // named #3 here, which is outside the slice, so the blocker was clamped to the slice's last
+  // message and the same failure showed up twice in the timeline.
+  it('places a blocker cited from a later fold on the call that failed', async () => {
+    const digester = createSessionSummaryEventDigester()
+    const failed = '> vitest run\n\nFAIL src/x.test.ts > adds a flag\nProcess exited with code 1'
+    const messages: TranscriptMessage[] = [
+      { role: 'assistant', text: 'running checks', timestamp: null },
+      { role: 'tool', text: 'Read: /repo/src/a.ts', timestamp: null, toolKind: 'call' },
+      { role: 'tool', text: 'line 0\nline 1', timestamp: null, toolKind: 'result' },
+      { role: 'tool', text: 'Bash: npm test', timestamp: null, toolKind: 'call' },
+      { role: 'tool', text: failed, timestamp: null, toolKind: 'result' },
+      { role: 'tool', text: 'Grep: TODO', timestamp: null, toolKind: 'call' },
+      { role: 'tool', text: '12 matches', timestamp: null, toolKind: 'result' }
+    ]
+    const events = messages.map((message) => digester.digest(message))
+    let chunkPrompt = ''
+    const brain = jsonBrain((prompt) => {
+      chunkPrompt = prompt
+      // The index the prompt's failure line names, cited back the way the extract is told to.
+      return { blockers: [{ text: 'npm test fails', sourceIndex: 43 }] }
+    })
+    const result = await foldSessionSummaryEvents({
+      brain,
+      ledger: { ...emptySessionSummaryLedger(), foldedThrough: 40 },
+      events,
+      signal: new AbortController().signal
+    })
+    expect(chunkPrompt).toContain('[#41-#46 tool]')
+    expect(chunkPrompt).toContain('  #43 Bash npm test · exit 1 · FAIL src/x.test.ts > adds a flag')
+    expect(result.ledger.blockers).toEqual([{ text: 'npm test fails', sourceIndex: 43 }])
+    // One row for one failure: the blocker replaces the marker rather than sitting beside it.
+    expect(result.ledger.timeline.filter((entry) => entry.kind === 'error')).toEqual([
+      { id: 'error-43', kind: 'error', text: 'npm test fails', sourceIndex: 43 }
     ])
   })
 
