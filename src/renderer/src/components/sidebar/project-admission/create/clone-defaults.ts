@@ -1,5 +1,6 @@
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
+import { canonicalHostIdOrder } from '../../../../../../shared/execution-host/managed-orcad-execution-host'
 import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
 import { resolveCheckoutParent } from '../../../../../../shared/host-repo-root'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
@@ -20,6 +21,14 @@ export function getUsableStoredHostRoot(
   return stored && isAbsoluteOrHomeFolderPath(stored, true) ? stored : undefined
 }
 
+/** The ids a folder may be stored under: the derived ones always, then the machine's others, server first. */
+function readHostIds(
+  hostIds: readonly ExecutionHostId[],
+  overrideHostIds: readonly ExecutionHostId[]
+): ExecutionHostId[] {
+  return canonicalHostIdOrder([...hostIds, ...overrideHostIds])
+}
+
 // fork-comment-ok: one rule for the hook and the awaited resolver, so the two cannot drift.
 export function needsHostHomeProbe(
   settings: CloneParentSettings | null | undefined,
@@ -30,9 +39,10 @@ export function needsHostHomeProbe(
     hostIds
       .map((hostId) => parseExecutionHostId(hostId))
       .find((parsed) => parsed?.kind === 'runtime')?.environmentId ?? null
+  const storedHostIds = readHostIds(hostIds, overrideHostIds)
   const hasStoredRoot = Boolean(
-    getUsableStoredHostRoot(settings, overrideHostIds, 'defaultRepoRoot') ??
-    getUsableStoredHostRoot(settings, overrideHostIds, 'defaultWorktreeLocation')
+    getUsableStoredHostRoot(settings, storedHostIds, 'defaultRepoRoot') ??
+    getUsableStoredHostRoot(settings, storedHostIds, 'defaultWorktreeLocation')
   )
   return { environmentId, probe: environmentId !== null && !hasStoredRoot }
 }
@@ -64,12 +74,13 @@ export function getCloneParentForHost({
   }
   // fork-comment-ok: a relative workspace dir is a per-project location, so it names no clone destination.
   const workspaceDir = settings?.workspaceDir ?? ''
+  const storedHostIds = readHostIds(hostIds, overrideHostIds)
   return resolveCheckoutParent({
-    storedRepoRoot: getUsableStoredHostRoot(settings, overrideHostIds, 'defaultRepoRoot'),
+    storedRepoRoot: getUsableStoredHostRoot(settings, storedHostIds, 'defaultRepoRoot'),
     // fork-comment-ok: never this computer's workspaceDir for a remote host — it names another
     // machine's disk, so a remote host falls back to its own probed home instead.
     storedWorktreeRoot:
-      getUsableStoredHostRoot(settings, overrideHostIds, 'defaultWorktreeLocation') ??
+      getUsableStoredHostRoot(settings, storedHostIds, 'defaultWorktreeLocation') ??
       (isLocal && isAbsoluteOrHomeFolderPath(workspaceDir, true) ? workspaceDir : ''),
     layoutMode,
     // Only a runtime host's home is probed, so a local host never reads one here.

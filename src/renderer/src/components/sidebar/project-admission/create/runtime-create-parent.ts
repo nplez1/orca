@@ -40,15 +40,19 @@ export function resolveRuntimeCreateParent(args: {
   /** Every id the machine answers to, so a folder stored under a merged alias is found. */
   overrideHostIds?: readonly ExecutionHostId[]
 }): Promise<{ parent: string }> {
-  const hostIds = canonicalHostIdOrder([
+  const overrideHostIds = canonicalHostIdOrder([
     toRuntimeExecutionHostId(args.runtimeEnvironmentId),
     ...(args.overrideHostIds ?? [])
   ])
   const layoutMode = args.worktreeLayoutMode ?? 'repo-nested'
   const overrides = { hostSettingOverrides: args.hostSettingOverrides }
   const stored = resolveCheckoutParent({
-    storedRepoRoot: getUsableStoredHostRoot(overrides, hostIds, 'defaultRepoRoot'),
-    storedWorktreeRoot: getUsableStoredHostRoot(overrides, hostIds, 'defaultWorktreeLocation'),
+    storedRepoRoot: getUsableStoredHostRoot(overrides, overrideHostIds, 'defaultRepoRoot'),
+    storedWorktreeRoot: getUsableStoredHostRoot(
+      overrides,
+      overrideHostIds,
+      'defaultWorktreeLocation'
+    ),
     layoutMode
   })
   if (stored) {
