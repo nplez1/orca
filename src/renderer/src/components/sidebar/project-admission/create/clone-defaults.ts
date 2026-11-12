@@ -21,7 +21,6 @@ export function getUsableStoredHostRoot(
   return stored && isAbsoluteOrHomeFolderPath(stored, true) ? stored : undefined
 }
 
-/** The ids a folder may be stored under: the derived ones always, then the machine's others, server first. */
 function readHostIds(
   hostIds: readonly ExecutionHostId[],
   overrideHostIds: readonly ExecutionHostId[]
@@ -57,7 +56,6 @@ export function getCloneParentForHost({
 }: {
   settings: CloneParentSettings | null | undefined
   hostIds: readonly ExecutionHostId[]
-  /** Every id the machine answers to, so a folder stored under a merged alias is found. */
   overrideHostIds?: readonly ExecutionHostId[]
   layoutMode?: WorktreeLayoutMode
   /** The machine's home directory, when the caller could probe it. */
@@ -67,8 +65,8 @@ export function getCloneParentForHost({
     .map((hostId) => parseExecutionHostId(hostId))
     .filter((parsed) => parsed !== null)
   const isLocal = parsedIds.some((parsed) => parsed.kind === 'local')
-  // Cloning onto an SSH-only machine is refused, so it never gets a destination; only the derived ids
-  // decide that, while the override read below covers every id the machine answers to.
+  // Cloning onto an SSH-only machine is refused, so it never gets a destination. A merged pair keeps
+  // its server id, which is where the folder is stored.
   if (!isLocal && !parsedIds.some((parsed) => parsed.kind === 'runtime')) {
     return ''
   }

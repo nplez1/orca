@@ -43,7 +43,6 @@ export function useCreateProjectDefaults({
   worktreeLayoutMode?: WorktreeLayoutMode
   /** Per-host folder overrides: a stored root wins over recomputing from the host's home. */
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
-  /** Every id the machine answers to, so a folder stored under a merged alias is found. */
   overrideHostIds?: readonly ExecutionHostId[]
 }): {
   createDefaultParent: string
@@ -63,8 +62,6 @@ export function useCreateProjectDefaults({
   const createParentTouchedRef = useRef(false)
   const createParentDefaultGenRef = useRef(0)
   const createGitProbeGenRef = useRef(0)
-  // Why a content key: the dialog rebuilds the id list with the host registry, and an identical list
-  // must not restart a resolve that is still running.
   const overrideHostIdsRef = useRef(overrideHostIds)
   overrideHostIdsRef.current = overrideHostIds
   const overrideHostIdsKey = overrideHostIds?.join('\n') ?? ''
