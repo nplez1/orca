@@ -42,6 +42,19 @@ export type RunTargetCloneStatus =
 /** Advanced-section values; empty means "use the default this composer derived". */
 export type RunTargetCloneOverrides = { url: string; destination: string }
 
+/**
+ * The URL a clone would use: the Advanced override when it names one, else the project's own remote.
+ *
+ * Availability reads this too, because a project with no remote is only clonable through the
+ * override — deciding a host row from the remote alone contradicts the field the user just filled in.
+ */
+export function resolveRunTargetCloneUrl(
+  overrides: RunTargetCloneOverrides,
+  defaultCloneUrl: string
+): string {
+  return overrides.url.trim() || defaultCloneUrl.trim()
+}
+
 export type RunTargetAutoClone = {
   status: RunTargetCloneStatus
   overrides: RunTargetCloneOverrides
@@ -281,7 +294,7 @@ export function useRunTargetAutoClone({
         () =>
           cloneOnce({
             option,
-            url: overrides.url.trim() || defaultCloneUrl.trim(),
+            url: resolveRunTargetCloneUrl(overrides, defaultCloneUrl),
             destinationOverride,
             // Why the key alone and not the mount: a reopened composer may be waiting on this same
             // clone, so only the user moving on — another host pick, or `clear()` on a project
@@ -301,8 +314,9 @@ export function useRunTargetAutoClone({
       cloneOnce,
       defaultCloneUrl,
       onProvisioned,
-      overrides.destination,
-      overrides.url,
+      // Why the object: the body resolves the URL through resolveRunTargetCloneUrl, which reads the
+      // whole override, so its identity is the dependency.
+      overrides,
       projectId,
       projectName
     ]
