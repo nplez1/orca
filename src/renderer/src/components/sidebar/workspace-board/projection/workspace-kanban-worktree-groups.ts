@@ -20,6 +20,23 @@ function sortManualBoardWorktrees(a: Worktree, b: Worktree): number {
   )
 }
 
+function groupBoardWorktreesByStatus(params: {
+  worktrees: readonly Worktree[]
+  workspaceStatuses: readonly WorkspaceStatusDefinition[]
+  include: (worktree: Worktree) => boolean
+}): Map<WorkspaceStatus, Worktree[]> {
+  const grouped = new Map<WorkspaceStatus, Worktree[]>(
+    params.workspaceStatuses.map((status) => [status.id, []])
+  )
+  for (const worktree of params.worktrees) {
+    if (!params.include(worktree)) {
+      continue
+    }
+    grouped.get(getWorkspaceStatus(worktree, params.workspaceStatuses))!.push(worktree)
+  }
+  return grouped
+}
+
 export function groupWorkspaceKanbanWorktrees(params: {
   worktrees: readonly Worktree[]
   visibleWorktreeIds: ReadonlySet<string>
@@ -27,16 +44,11 @@ export function groupWorkspaceKanbanWorktrees(params: {
   sortBy: SortBy
 }): Map<WorkspaceStatus, Worktree[]> {
   const { worktrees, visibleWorktreeIds, workspaceStatuses, sortBy } = params
-  const grouped = new Map<WorkspaceStatus, Worktree[]>(
-    workspaceStatuses.map((status) => [status.id, []])
-  )
-
-  for (const worktree of worktrees) {
-    if (!visibleWorktreeIds.has(getWorktreeHostIdentity(worktree))) {
-      continue
-    }
-    grouped.get(getWorkspaceStatus(worktree, workspaceStatuses))!.push(worktree)
-  }
+  const grouped = groupBoardWorktreesByStatus({
+    worktrees,
+    workspaceStatuses,
+    include: (worktree) => visibleWorktreeIds.has(getWorktreeHostIdentity(worktree))
+  })
 
   for (const items of grouped.values()) {
     items.sort(
@@ -46,4 +58,21 @@ export function groupWorkspaceKanbanWorktrees(params: {
     )
   }
   return grouped
+}
+
+/**
+ * Lane members the sidebar filters are hiding, so a lane can say "hidden by filters" rather than
+ * "Empty". Archived rows are excluded: no filter can ever show them.
+ */
+export function groupHiddenWorkspaceKanbanWorktrees(params: {
+  worktrees: readonly Worktree[]
+  visibleWorktreeIds: ReadonlySet<string>
+  workspaceStatuses: readonly WorkspaceStatusDefinition[]
+}): Map<WorkspaceStatus, Worktree[]> {
+  return groupBoardWorktreesByStatus({
+    worktrees: params.worktrees,
+    workspaceStatuses: params.workspaceStatuses,
+    include: (worktree) =>
+      !worktree.isArchived && !params.visibleWorktreeIds.has(getWorktreeHostIdentity(worktree))
+  })
 }

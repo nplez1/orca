@@ -28,6 +28,7 @@ type WorkspaceKanbanLaneGridProps = {
   laneScrollerRef: React.RefObject<HTMLDivElement | null>
   statuses: readonly WorkspaceStatusDefinition[]
   laneViews: ReadonlyMap<WorkspaceStatus, WorkspaceKanbanLaneView>
+  hiddenWorktreesByStatus: ReadonlyMap<WorkspaceStatus, readonly Worktree[]>
   laneFullWorktreeIds: ReadonlyMap<WorkspaceStatus, readonly string[]>
   hasQuery: boolean
   repoMap: Map<string, Repo>
@@ -49,6 +50,7 @@ type WorkspaceKanbanLaneGridProps = {
   ) => readonly Worktree[]
   onAssignWorkspaceStatus?: (worktreeIds: readonly string[], status: WorkspaceStatus) => void
   onCreateWorktree: (statusId: string) => void
+  onShowHidden: (statusId: string) => void
   onColumnResizeStart: (event: React.PointerEvent<HTMLElement>) => void
   onColumnResizeKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void
 }
@@ -57,6 +59,7 @@ export default function WorkspaceKanbanLaneGrid({
   laneScrollerRef,
   statuses,
   laneViews,
+  hiddenWorktreesByStatus,
   laneFullWorktreeIds,
   hasQuery,
   repoMap,
@@ -75,6 +78,7 @@ export default function WorkspaceKanbanLaneGrid({
   onContextMenuSelect,
   onAssignWorkspaceStatus,
   onCreateWorktree,
+  onShowHidden,
   onColumnResizeStart,
   onColumnResizeKeyDown
 }: WorkspaceKanbanLaneGridProps): React.JSX.Element {
@@ -201,6 +205,7 @@ export default function WorkspaceKanbanLaneGrid({
               status={status}
               items={laneViews.get(status.id)?.items ?? EMPTY_LANE_ITEMS}
               totalCount={laneViews.get(status.id)?.totalCount ?? 0}
+              hiddenCount={hiddenWorktreesByStatus.get(status.id)?.length ?? 0}
               hasQuery={hasQuery}
               fullWorktreeIds={laneFullWorktreeIds.get(status.id) ?? []}
               repoMap={repoMap}
@@ -220,6 +225,7 @@ export default function WorkspaceKanbanLaneGrid({
               onContextMenuSelect={onContextMenuSelect}
               onAssignWorkspaceStatus={onAssignWorkspaceStatus}
               onCreateWorktree={onCreateWorktree}
+              onShowHidden={onShowHidden}
               onColumnResizeStart={onColumnResizeStart}
               onColumnResizeKeyDown={onColumnResizeKeyDown}
             />

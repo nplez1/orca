@@ -13,6 +13,7 @@ import {
   getPairedDeviceIdsByEnvironment
 } from '../../../../../../shared/workspace-creator-visibility'
 import { getStructuredChatWorktreeIds } from '../../worktree-list/listing/visible-worktree-activity-inputs'
+import { useWorktreeIdsWithEmptySurface } from '../../workspace-actions/sleep/use-worktree-sleep-state'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 
@@ -72,6 +73,9 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
       ? EMPTY_WORKTREE_ID_SET
       : selectLiveAgentWorktreeIds(s, tabsByWorktree, agentStatusNow)
   )
+  // The sidebar keeps an emptied workspace (or the one on screen with nothing to show) through
+  // "Hide sleeping" (#96); matching it keeps the board's hidden count revealable.
+  const sleepingSweepExemptWorktreeIds = useWorktreeIdsWithEmptySurface(!showSleepingWorkspaces)
 
   return useMemo(() => {
     // Why: the board has its own status ordering, but visibility must match
@@ -88,6 +92,7 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
         browserTabsByWorktree,
         worktreeIdsWithLiveAgent,
         worktreeIdsWithStructuredChat,
+        sleepingSweepExemptWorktreeIds,
         hideDefaultBranchWorkspace,
         hideAutomationGeneratedWorkspaces,
         hideCliCreatedWorkspaces,
@@ -125,6 +130,7 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
     runtimeEnvironments,
     runtimeStatusByEnvironmentId,
     showSleepingWorkspaces,
+    sleepingSweepExemptWorktreeIds,
     tabsByWorktree,
     worktreeIdsWithLiveAgent,
     worktreeIdsWithStructuredChat,
