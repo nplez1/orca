@@ -16,6 +16,7 @@ import {
   trackProjectClone,
   type ProjectCloneOutcome
 } from './project-clone-in-flight'
+import { toastUnseenRunTargetClone } from './run-target-clone-unseen-toast'
 
 /** The host a clone is for, kept with its row so the picker and the status line name the same host. */
 export type RunTargetCloneTarget = {
@@ -73,7 +74,7 @@ type CloneRequest = {
  * that cannot clone never reaches here (its row says why), and a failure keeps the error, Retry and
  * "Use existing folder" on the row instead of a toast. The clone itself is shared through a
  * registry, so a second pick — or a composer reopened mid-clone — joins it and still learns how it
- * turned out.
+ * turned out. An outcome no composer could show, because it closed, is toasted instead.
  */
 export function useRunTargetAutoClone({
   projectId,
@@ -197,7 +198,9 @@ export function useRunTargetAutoClone({
             message: translate(
               'auto.components.NewWorkspaceComposerCard.cloneSetupFailed',
               'Cloned, but Orca could not add the project on this host.'
-            )
+            ),
+            // Why: setupProjectExistingFolder toasts its own failure, whatever onFailure says.
+            alreadyToasted: true
           }
         }
         return { kind: 'provisioned', setupId: result.setup.id }
@@ -234,22 +237,12 @@ export function useRunTargetAutoClone({
       const target: RunTargetCloneTarget = { hostId: option.hostId, label: option.label, option }
       setStatus({ kind: 'cloning', target })
 
-      const promise = trackProjectClone(key, () =>
-        cloneOnce({
-          option,
-          url: overrides.url.trim() || defaultCloneUrl.trim(),
-          destinationOverride,
-          // Why the key alone and not the mount: a reopened composer may be waiting on this same
-          // clone, so only the user moving on — another host pick, or `clear()` on a project
-          // switch — may abandon it. A closed composer leaves the ref alone.
-          isSuperseded: () => pendingKeyRef.current !== key,
-          ...(requestedFolderName ? { folderName: requestedFolderName } : {})
-        })
-      )
-      const applyOutcome = (outcome: ProjectCloneOutcome): void => {
+      // Why a boolean: the registry asks every surface that joined, and reports only when none of
+      // them could show the outcome — a closed composer answers false instead of swallowing it.
+      const applyOutcome = (outcome: ProjectCloneOutcome): boolean => {
         // Why both: an unmounted composer and one that moved to another host must not be retargeted.
         if (!mountedRef.current || pendingKeyRef.current !== key) {
-          return
+          return false
         }
         if (outcome.kind === 'abandoned') {
           // Only a clone another composer started can be abandoned while this one still wants it —
@@ -258,7 +251,7 @@ export function useRunTargetAutoClone({
           if (latest?.projectId === projectId) {
             latest.run(option, requestedFolderName)
           }
-          return
+          return true
         }
         if (outcome.kind === 'provisioned') {
           pendingKeyRef.current = null
@@ -267,7 +260,7 @@ export function useRunTargetAutoClone({
             getProjectHostSetupSelectionKey({ id: outcome.setupId, hostId: option.hostId }),
             'cloned'
           )
-          return
+          return true
         }
         setStatus(
           outcome.kind === 'failed'
@@ -281,12 +274,38 @@ export function useRunTargetAutoClone({
                 canUseExistingFolder: outcome.canUseExistingFolder
               }
         )
+        return true
       }
-      void promise.then(applyOutcome, () => {
-        // cloneOnce reports its own failures; this only stops a derived rejection going unhandled.
-      })
+      trackProjectClone(
+        key,
+        () =>
+          cloneOnce({
+            option,
+            url: overrides.url.trim() || defaultCloneUrl.trim(),
+            destinationOverride,
+            // Why the key alone and not the mount: a reopened composer may be waiting on this same
+            // clone, so only the user moving on — another host pick, or `clear()` on a project
+            // switch — may abandon it. A closed composer leaves the ref alone.
+            isSuperseded: () => pendingKeyRef.current !== key,
+            ...(requestedFolderName ? { folderName: requestedFolderName } : {})
+          }),
+        {
+          watch: applyOutcome,
+          // Why the captured target: a project switch must not rename the clone that was dropped.
+          reportUnseen: (outcome) =>
+            toastUnseenRunTargetClone({ projectName, hostLabel: target.label, outcome })
+        }
+      )
     },
-    [cloneOnce, defaultCloneUrl, onProvisioned, overrides.destination, overrides.url, projectId]
+    [
+      cloneOnce,
+      defaultCloneUrl,
+      onProvisioned,
+      overrides.destination,
+      overrides.url,
+      projectId,
+      projectName
+    ]
   )
   useLayoutEffect(() => {
     if (projectId) {
