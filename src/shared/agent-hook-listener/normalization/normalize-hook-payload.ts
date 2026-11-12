@@ -31,6 +31,7 @@ import {
 import { claudeRowHasUnlistedLiveWork } from '../providers/claude-pane-hold-evidence'
 import {
   applyPiScheduledWorkHold,
+  hookPayloadArmsScheduledWork,
   recordPiScheduledWork
 } from '../providers/pi-pane-hold-evidence'
 import { readString } from '../tool-input-preview'
@@ -48,6 +49,7 @@ export function normalizeHookPayload(
     deferCompactOwnershipToClient?: boolean
     previousOpenCodeMainAgent?: AgentMainAgentStatus
     bindingStatusByPaneKey?: ReadonlyMap<string, AgentHookEventPayload>
+    ownsHoldRetraction?: boolean
     admitOpenCodeTui?: (
       identity: Pick<
         AgentHookEventPayload,
@@ -56,6 +58,7 @@ export function normalizeHookPayload(
     ) => boolean | 'preserve-poster'
   } = {}
 ): AgentHookEventPayload | null {
+  state.pendingHoldRetraction = undefined
   const envelope = parseHookEnvelope(state, source, body, expectedEnv)
   if (!envelope) {
     return null
@@ -247,6 +250,8 @@ export function normalizeHookPayload(
   }
 
   const promptText = extractedPrompt.text
+  const heldDescendantRow =
+    (state.lastStatusByPaneKey.get(paneKey)?.payload.subagents?.length ?? 0) > 0
   // Name a Claude PermissionRequest's request once, so the listener and every receiver settle the same one.
   const providerHookPayload =
     source === 'claude'
@@ -261,7 +266,10 @@ export function normalizeHookPayload(
     hookPayload: providerHookPayload,
     envelope: record,
     extractedPrompt,
-    previousOpenCodeMainAgent: options.previousOpenCodeMainAgent
+    previousOpenCodeMainAgent: options.previousOpenCodeMainAgent,
+    ownsHoldRetraction: options.ownsHoldRetraction === true,
+    claimedBeyondDescendants:
+      source === 'pi' && heldDescendantRow && hookPayloadArmsScheduledWork(hookPayloadRecord)
   })
   const providerSessionOnly =
     (source === 'pi' || source === 'prime-agent' || source === 'jcode') &&
@@ -312,6 +320,7 @@ export function normalizeHookPayload(
   if (!piHeldPayload) {
     return null
   }
+  state.pendingHoldRetraction = undefined
   const grokActiveTurn = source === 'grok' ? state.grokActiveTurnByPaneKey.get(paneKey) : undefined
   const claudeBatchSettledRequests =
     source === 'claude' && eventName === 'PostToolBatch'

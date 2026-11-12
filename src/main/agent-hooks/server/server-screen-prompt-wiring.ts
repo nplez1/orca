@@ -1,5 +1,5 @@
 import type { ScreenPromptObservation } from '../../../shared/agent-screen-prompt'
-import { AgentHookServerStatusApplication } from './server-status-application'
+import { AgentHookServerHeldRowRetraction } from './server-held-row-retraction'
 import type { EnrichedAgentHookEventPayload } from './server-types'
 import { ScreenPromptCorroboration } from './server-screen-prompt-corroboration'
 
@@ -44,7 +44,7 @@ export function wireScreenPromptReader(
  * and pi's own dialog events are only as durable as its silence between them.
  * Split out of the status-update chain to keep that file inside its line budget.
  */
-export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerStatusApplication {
+export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerHeldRowRetraction {
   /** Bound by the host that owns panes (main, or the runtime behind `orca serve`); absent in the
    *  relay's parser, which has no screen to read. */
   private screenPromptReader: ScreenPromptReader | null = null

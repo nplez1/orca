@@ -46,6 +46,7 @@ export type HookListenerState = {
   lastToolByPaneKey: Map<string, ToolSnapshot>
   /** Reply text the event being normalized carried; normalizeProviderEvent takes and clears it, so it never outlives that event. */
   eventReplyCandidate: string | undefined
+  pendingHoldRetraction: string | undefined
   /** Read-only compatibility view. All writes pass through the isolated legacy adapter. */
   lastStatusByPaneKey: ReadonlyMap<string, AgentHookEventPayload>
   antigravityCompletedTranscriptByPaneKey: Map<string, string>
@@ -175,6 +176,7 @@ export function createHookListenerState(
     lastPromptByPaneKey: new Map(),
     lastToolByPaneKey: new Map(),
     eventReplyCandidate: undefined,
+    pendingHoldRetraction: undefined,
     lastStatusByPaneKey: adapter.view,
     antigravityCompletedTranscriptByPaneKey: new Map(),
     antigravityChildWorkByPaneKey: new Map(),
@@ -235,6 +237,16 @@ export function canAdmitLegacyAgentStatusEntry(
 
 export function deleteLegacyAgentStatus(state: HookListenerState, paneKey: string): boolean {
   return legacyStatusAdapter(state).delete(paneKey)
+}
+
+export function recordHoldRetraction(state: HookListenerState, paneKey: string): void {
+  state.pendingHoldRetraction = paneKey
+}
+
+export function takeHoldRetraction(state: HookListenerState): string | undefined {
+  const paneKey = state.pendingHoldRetraction
+  state.pendingHoldRetraction = undefined
+  return paneKey
 }
 
 export function clearLegacyAgentStatuses(state: HookListenerState): void {

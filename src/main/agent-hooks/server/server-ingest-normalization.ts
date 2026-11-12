@@ -10,6 +10,7 @@ import {
 } from '../../../shared/agent-hook-listener/presence/agent-hook-owner-presence'
 import type { HookRootEvidenceReader } from '../../../shared/agent-hook-listener/presence/hook-process-root-evidence'
 import { normalizeHookPayload } from '../../../shared/agent-hook-listener/normalization/normalize-hook-payload'
+import { takeHoldRetraction } from '../../../shared/agent-hook-listener/listener-state'
 import {
   isAgentHookSource,
   type AgentHookSource
@@ -150,8 +151,19 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
     body: unknown,
     isReplay = false
   ): NormalizedLocalHook {
+    const normalized = this.normalizeLocalHookPayloadBody(source, body, isReplay)
+    const retractedHold = takeHoldRetraction(this.state)
+    return retractedHold === undefined ? normalized : { ...normalized, retractedHold }
+  }
+
+  private normalizeLocalHookPayloadBody(
+    source: AgentHookSource,
+    body: unknown,
+    isReplay: boolean
+  ): NormalizedLocalHook {
     if (source !== 'claude' || typeof body !== 'object' || body === null) {
       const event = normalizeHookPayload(this.state, source, body, this.env, {
+        ownsHoldRetraction: true,
         admitOpenCodeTui: (identity) => {
           const disposition = this.getAgentStatusDisposition(identity.paneKey, {
             ...identity,
@@ -181,11 +193,17 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
     const rawPaneKey = (body as Record<string, unknown>).paneKey
     const paneKey = typeof rawPaneKey === 'string' ? rawPaneKey.trim() : ''
     if (!paneKey) {
-      return { event: normalizeHookPayload(this.state, source, body, this.env) }
+      return {
+        event: normalizeHookPayload(this.state, source, body, this.env, {
+          ownsHoldRetraction: true
+        })
+      }
     }
     const previousRunningTask = this.state.claudeRunningNonAgentTaskPaneKeys.has(paneKey)
     const previousActiveCron = this.state.claudeActiveSessionCronPaneKeys.has(paneKey)
-    const event = normalizeHookPayload(this.state, source, body, this.env)
+    const event = normalizeHookPayload(this.state, source, body, this.env, {
+      ownsHoldRetraction: true
+    })
     const transcriptPath = event?.providerSession?.transcriptPath
     if (transcriptPath) {
       // A wrapper's CLAUDE_CONFIG_DIR is only visible here; History scans it too (#23505).
@@ -231,10 +249,11 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
       return
     }
     const normalized = this.normalizeLocalHookPayload(record.source, body, true)
-    if (!normalized.event) {
+    const addressedPaneKey = normalized.event?.paneKey ?? normalized.retractedHold
+    if (addressedPaneKey === undefined) {
       return
     }
-    const exit = this.agentExitedAtByPaneKey.get(this.resolvePaneKeyAlias(normalized.event.paneKey))
+    const exit = this.agentExitedAtByPaneKey.get(this.resolvePaneKeyAlias(addressedPaneKey))
     // Whole-second spool timestamps prove pre-exit ownership only with a full second of separation.
     if (exit && record.receivedAt + 1000 <= exit.at) {
       return
@@ -250,6 +269,12 @@ export abstract class AgentHookServerIngestNormalization extends AgentHookServer
       if (!spoolReplayIsNewer(record, watermark)) {
         return
       }
+    }
+    if (!normalized.event) {
+      if (normalized.retractedHold !== undefined) {
+        this.retractHeldStatusEntry(normalized.retractedHold)
+      }
+      return
     }
     const replay = { ...normalized.event, isReplay: true as const }
     const statusDisposition = this.getAgentStatusDisposition(replay.paneKey, {

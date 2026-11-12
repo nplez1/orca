@@ -28,8 +28,9 @@ describe('descendant lifecycle never settles the pane', () => {
 
   const publish = (
     source: AgentHookSource,
-    payload: Record<string, unknown>
-  ): ReturnType<typeof normalizeAndAccept> => normalizeAndAccept(state, source, payload)
+    payload: Record<string, unknown>,
+    options: Parameters<typeof normalizeAndAccept>[3] = {}
+  ): ReturnType<typeof normalizeAndAccept> => normalizeAndAccept(state, source, payload, options)
 
   const publishedState = (
     source: AgentHookSource,
@@ -245,6 +246,87 @@ describe('descendant lifecycle never settles the pane', () => {
       // Why: the roster was only half of it — the cached row held the child and the state too.
       expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(false)
       expect(paneHasStateClaims(state, PANE_KEY)).toBe(false)
+    })
+
+    describe('an ingest that retires the retracted row itself', () => {
+      const owned = { ownsHoldRetraction: true }
+
+      const startHold = (): void => {
+        expect(
+          publish(
+            'pi',
+            { hook_event_name: 'subagent_async_state', subagent_runs: [{ id: 'run-1' }] },
+            owned
+          )?.payload.state
+        ).toBe('working')
+      }
+
+      it('reports the retraction and leaves the row for that ingest to retire', () => {
+        startHold()
+
+        expect(
+          publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] }, owned)
+        ).toBeNull()
+        // Why the row stays: only the ingest that owns the deletion can persist it, notify its
+        // status listeners and tell the renderer, and it needs the row to do any of the three.
+        expect(state.pendingHoldRetraction).toBe(PANE_KEY)
+        expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(true)
+      })
+
+      it('reports nothing when the row it would retire is only retained resume identity', () => {
+        startHold()
+        const held = state.lastStatusByPaneKey.get(PANE_KEY)!
+        seedLegacyAgentStatusForTests(state, { ...held, providerSessionOnly: true })
+
+        publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] }, owned)
+        expect(state.pendingHoldRetraction).toBeUndefined()
+      })
+
+      it('republishes the hold without the drained child when the session has armed work', () => {
+        startHold()
+        // A loop that will re-enter the session claims the pane, so the hold stands — but the child
+        // that just left must not keep riding it.
+        const republished = publish(
+          'pi',
+          {
+            hook_event_name: 'subagent_async_state',
+            subagent_runs: [],
+            scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 60_000 }] }
+          },
+          owned
+        )
+        expect(republished?.payload.state).toBe('working')
+        expect(republished?.payload.subagents).toBeUndefined()
+        expect(state.pendingHoldRetraction).toBeUndefined()
+        expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(true)
+      })
+
+      it('publishes nothing for an empty live set whose armed work has no hold to republish', () => {
+        expect(
+          publish(
+            'pi',
+            {
+              hook_event_name: 'subagent_async_state',
+              subagent_runs: [],
+              scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 60_000 }] }
+            },
+            owned
+          )
+        ).toBeNull()
+        expect(state.pendingHoldRetraction).toBeUndefined()
+        expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(false)
+      })
+
+      it('never carries a retraction over to the next post', () => {
+        startHold()
+        publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] }, owned)
+        expect(state.pendingHoldRetraction).toBe(PANE_KEY)
+
+        // A post that says nothing about this pane's hold must not hand the previous post's
+        // retraction to a caller that reads the slot afterwards.
+        publish('pi', { hook_event_name: 'tool_execution_end' }, owned)
+        expect(state.pendingHoldRetraction).toBeUndefined()
+      })
     })
   })
 
