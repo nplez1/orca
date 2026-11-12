@@ -77,6 +77,7 @@ export function RepositoryHostSetupActions({
   const [setupKind, setSetupKind] = useState<'git' | 'folder'>('git')
   const [cloneUrl, setCloneUrl] = useState('')
   const [cloneDestination, setCloneDestination] = useState('')
+  const [cloneDestinationEdited, setCloneDestinationEdited] = useState(false)
   const [isSettingUp, setIsSettingUp] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
   const [isCreatingPendingSetup, setIsCreatingPendingSetup] = useState(false)
@@ -96,6 +97,7 @@ export function RepositoryHostSetupActions({
     setSetupPath('')
     setCloneUrl('')
     setCloneDestination('')
+    setCloneDestinationEdited(false)
     setIsOpen(true)
   }
   useEffect(() => {
@@ -122,9 +124,22 @@ export function RepositoryHostSetupActions({
     layoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
     enabled: isOpen && canUsePathActions
   })
-  // Derived, so a default that arrives late never overwrites what the user typed. Only the clone
-  // destination gets a default: this step imports a folder that must already exist.
-  const cloneDestinationValue = cloneDestination || hostRepoRoot.parent
+  const cloneParent = hostRepoRoot.parent
+  // Why: the default seeds the field, it is not merged into every render — otherwise clearing it
+  // snaps the text back and the next keystroke appends to the default (issue #374). A default that
+  // arrives late still fills an untouched field, and it follows a host change until the user edits.
+  useEffect(() => {
+    if (step !== 'clone' || cloneDestinationEdited) {
+      return
+    }
+    if (!cloneParent || cloneParent === cloneDestination) {
+      return
+    }
+    setCloneDestination(cloneParent)
+  }, [step, cloneDestinationEdited, cloneDestination, cloneParent])
+  // Only the clone destination gets a default: the existing-folder step imports a folder that must
+  // already exist.
+  const cloneDestinationValue = cloneDestination
   const { cloneFolder, cloneArgs, setCloneFolderName, resetCloneFolder, checkCloneFolderTaken } =
     useCloneFolderOverride(cloneUrl, cloneDestinationValue)
 
@@ -139,7 +154,14 @@ export function RepositoryHostSetupActions({
     setSetupPath('')
     setCloneUrl('')
     setCloneDestination('')
+    setCloneDestinationEdited(false)
     resetCloneFolder()
+  }
+
+  const changeCloneDestination = (value: string): void => {
+    // Why: any edit claims the field, so clearing it stays empty and no default overwrites it.
+    setCloneDestinationEdited(true)
+    setCloneDestination(value)
   }
 
   const handleExistingFolder = async (): Promise<void> => {
@@ -315,7 +337,7 @@ export function RepositoryHostSetupActions({
           isCloning={isCloning}
           onBack={() => setStep('choose')}
           onCloneUrlChange={setCloneUrl}
-          onCloneDestinationChange={setCloneDestination}
+          onCloneDestinationChange={changeCloneDestination}
           cloneFolder={cloneFolder}
           onCloneFolderNameChange={setCloneFolderName}
           onSubmit={handleClone}
