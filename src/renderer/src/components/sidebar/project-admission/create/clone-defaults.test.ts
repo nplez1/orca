@@ -4,7 +4,11 @@ import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId
 } from '../../../../../../shared/execution-host'
-import { getCloneDestinationAutoFill, getCloneParentForHost } from './clone-defaults'
+import {
+  getCloneDestinationAutoFill,
+  getCloneParentForHost,
+  needsHostHomeProbe
+} from './clone-defaults'
 
 const LOCAL = LOCAL_EXECUTION_HOST_ID
 const SERVER = toRuntimeExecutionHostId('server-a')
@@ -89,6 +93,55 @@ describe('getCloneParentForHost', () => {
         layoutMode: 'repo-nested'
       })
     ).toBe('')
+  })
+
+  it('never offers a destination derived from a relative workspace dir', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { workspaceDir: '.orca/worktrees' },
+        hostIds: [LOCAL],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('')
+  })
+
+  it('keeps a home-prefixed root for the host’s own process to expand', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SERVER]: { defaultRepoRoot: '~/src' } } },
+        hostIds: [SERVER],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('~/src')
+  })
+
+  it('ignores a relative root and falls back to the host’s convention', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SERVER]: { defaultRepoRoot: 'src' } } },
+        hostIds: [SERVER],
+        layoutMode: 'repo-nested',
+        hostHome: '/home/me'
+      })
+    ).toBe('/home/me/orca/workspaces')
+  })
+})
+
+describe('needsHostHomeProbe', () => {
+  it('probes a runtime host whose stored root cannot name a folder', () => {
+    expect(
+      needsHostHomeProbe({ hostSettingOverrides: { [SERVER]: { defaultRepoRoot: 'src' } } }, [
+        SERVER
+      ])
+    ).toEqual({ environmentId: 'server-a', probe: true })
+  })
+
+  it('skips the probe when the stored root is usable as stored', () => {
+    expect(
+      needsHostHomeProbe({ hostSettingOverrides: { [SERVER]: { defaultRepoRoot: '~/src' } } }, [
+        SERVER
+      ])
+    ).toEqual({ environmentId: 'server-a', probe: false })
   })
 })
 

@@ -2,11 +2,11 @@ import {
   layoutNestsPrimaryCheckout,
   type WorktreeLayoutMode
 } from '../../../../../../shared/orca-workspace-layout'
-import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
 import { toRuntimeExecutionHostId } from '../../../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
 import { getDefaultCreateProjectParent } from './create-project-defaults'
+import { getUsableStoredHostRoot } from './clone-defaults'
 
 export const RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS = 3000
 
@@ -41,9 +41,9 @@ export function resolveRuntimeCreateParent(args: {
   const layoutMode = args.worktreeLayoutMode ?? 'repo-nested'
   const overrides = { hostSettingOverrides: args.hostSettingOverrides }
   const stored =
-    getHostSettingOverrideForIds(overrides, hostIds, 'defaultRepoRoot') ??
+    getUsableStoredHostRoot(overrides, hostIds, 'defaultRepoRoot') ??
     (layoutNestsPrimaryCheckout(layoutMode)
-      ? (getHostSettingOverrideForIds(overrides, hostIds, 'defaultWorktreeLocation') ?? '')
+      ? (getUsableStoredHostRoot(overrides, hostIds, 'defaultWorktreeLocation') ?? '')
       : '')
   if (stored) {
     return Promise.resolve({ parent: stored })

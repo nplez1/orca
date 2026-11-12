@@ -122,6 +122,25 @@ describe('WorkspaceDirectorySetting', () => {
     })
   })
 
+  it('keeps this computer’s documented relative per-project folder', async () => {
+    const user = userEvent.setup()
+    const { input, updateSettings } = renderRow(settingsWith({}), localScope)
+    await user.clear(input)
+    await user.type(input, '.orca/worktrees{Enter}')
+    expect(updateSettings.mock.calls[0][0]).toEqual({
+      workspaceDir: '.orca/worktrees',
+      hostSettingOverrides: {}
+    })
+  })
+
+  it('refuses a relative folder for another machine, which cannot resolve one', async () => {
+    const user = userEvent.setup()
+    const { input, updateSettings } = renderRow(settingsWith({}), serverScope)
+    await user.type(input, 'orca/wt{Enter}')
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+  })
+
   it('re-reads the value when the scope changes instead of keeping the old draft', async () => {
     const user = userEvent.setup()
     const settings = settingsWith({ [SERVER_HOST_ID]: { defaultWorktreeLocation: '/srv/orca' } })

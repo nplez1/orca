@@ -110,4 +110,71 @@ describe('RepoRootSetting', () => {
     )
     expect(browseRuntimeServerDirectory).toHaveBeenCalledWith(SERVER_ID, '~')
   })
+
+  it('refuses a relative root without saving it', async () => {
+    const user = userEvent.setup()
+    const { input, updateSettings } = renderRow(settingsWith({}), localScope)
+    await waitFor(() => expect(input.value).toBe('/Users/me/orca/workspaces'))
+    await user.clear(input)
+    await user.type(input, 'src{Enter}')
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(input.value).toBe('src')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('refuses a relative root on a remote host too', async () => {
+    const user = userEvent.setup()
+    const { input, updateSettings } = renderRow(settingsWith({}), serverScope)
+    await waitFor(() => expect(input.value).toBe('/home/me/orca/workspaces'))
+    await user.clear(input)
+    await user.type(input, 'orca/checkouts{Enter}')
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('saves a home-prefixed root, which the host expands itself', async () => {
+    const user = userEvent.setup()
+    const { input, updateSettings } = renderRow(settingsWith({}), serverScope)
+    await waitFor(() => expect(input.value).toBe('/home/me/orca/workspaces'))
+    await user.clear(input)
+    await user.type(input, '~/src{Enter}')
+    expect(updateSettings).toHaveBeenCalledWith({
+      hostSettingOverrides: { [SERVER_HOST_ID]: { defaultRepoRoot: '~/src' } }
+    })
+  })
+
+  it('flags a relative root saved before this check existed', () => {
+    const { input } = renderRow(
+      settingsWith({ [SERVER_HOST_ID]: { defaultRepoRoot: 'src' } }),
+      serverScope
+    )
+    expect(input.value).toBe('src')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('shows no error for this computer’s documented relative workspace dir', () => {
+    const { input } = renderRow(
+      { ...settingsWith({}), workspaceDir: '.orca/worktrees' },
+      localScope
+    )
+    expect(input.value).toBe('')
+    expect(input.getAttribute('aria-invalid')).toBeNull()
+  })
+
+  it('restores the saved folder when the override is reset after a refused draft', async () => {
+    const user = userEvent.setup()
+    // The override equals this computer’s convention, so clearing it leaves the shown value unchanged.
+    const { input, updateSettings } = renderRow(
+      settingsWith({ [LOCAL_EXECUTION_HOST_ID]: { defaultRepoRoot: '/Users/me/orca/workspaces' } }),
+      localScope
+    )
+    await user.clear(input)
+    await user.type(input, 'src{Enter}')
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    await user.click(screen.getByRole('button', { name: /reset/i }))
+    expect(updateSettings).toHaveBeenCalledWith({ hostSettingOverrides: {} })
+    expect(input.value).toBe('/Users/me/orca/workspaces')
+    expect(input.getAttribute('aria-invalid')).toBeNull()
+  })
 })

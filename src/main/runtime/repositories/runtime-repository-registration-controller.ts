@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/repo-badge-color'
 import {
@@ -9,6 +10,7 @@ import {
 } from '../../../shared/execution-host'
 import type { Repo } from '../../../shared/repo-types'
 import { gitExecFileAsync } from '../../git/command-runner/git-exec-file'
+import { expandLeadingHomePath } from '../../filesystem/home-path-expansion'
 import { awaitWindowsHostGitEnvironmentReady } from '../../git/command-runner/windows-host-git-environment'
 import { getRepoName } from '../../git/repo'
 import { inspectGitRepoForRegistrationAsync } from '../../git/repo-detection'
@@ -150,7 +152,8 @@ export class RuntimeRepositoryRegistrationController {
   > {
     const store = this.requireStore()
     const trimmedName = name.trim()
-    const trimmedParentPath = parentPath.trim()
+    // fork-comment-ok: `~` is this server's home, and the create path refuses anything relative.
+    const trimmedParentPath = expandLeadingHomePath(parentPath.trim(), homedir())
     const repoKind: 'git' | 'folder' = kind === 'folder' ? 'folder' : 'git'
     if (!trimmedName) {
       return repoCreateFailure('nameEmpty')

@@ -26,6 +26,7 @@ export function WorkspaceDirectorySetting({
       settings={settings}
       updateSettings={updateSettings}
       settingKey="defaultWorktreeLocation"
+      allowRelativePath
       // A remote machine never inherits this computer's path: it names a folder on another disk.
       fallbackValue={scope.hostId === LOCAL_EXECUTION_HOST_ID ? settings.workspaceDir : ''}
       // Why: this computer *is* the client default, so its value is the shared workspaceDir, and

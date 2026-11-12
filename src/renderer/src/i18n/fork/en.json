@@ -830,6 +830,11 @@
           "description": "Where checkouts are cloned on this host.",
           "localCaption": "New clones start here. Clearing this reverts to the Orca default for your workspace layout.",
           "remoteCaption": "Where {{value0}} keeps its checkouts, as that machine spells it."
+        },
+        "general": {
+          "HostFolderSettingRow": {
+            "607a8e146c": "Use a full path, or one that starts with ~/."
+          }
         }
       },
       "sidebar": {

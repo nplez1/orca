@@ -7,6 +7,7 @@ import { mkdir } from 'node:fs/promises'
 import type { Store } from '../../persistence/loading-store/store'
 import type { Repo } from '../../../shared/repo-types'
 import { dirname } from 'node:path'
+import { homedir } from 'node:os'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/constants'
 import { getGitCloneFailureMessage } from '../../../shared/git/remotes/git-clone-failure-message'
@@ -21,7 +22,8 @@ import {
   claimCloneTarget,
   deriveValidatedClonePath,
   getClonePathComparisonKey,
-  getSavedProjectPathKeys
+  getSavedProjectPathKeys,
+  resolveCloneDestination
 } from '../../git/repo-clone-path'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { detectRepoIconAndUpstream } from '../../repository-icons/repo-icon-autodetect'
@@ -130,11 +132,18 @@ export function registerRepoCloneHandlers(mainWindow: BrowserWindow, store: Stor
           getRepoExecutionHostId(r) === LOCAL_EXECUTION_HOST_ID
       )
 
+  // fork-comment-ok: a `~` destination names this machine's home, and every use below needs it expanded.
+  const withResolvedDestination = (args: CloneTargetArgs): CloneTargetArgs => ({
+    ...args,
+    destination: resolveCloneDestination(args.destination, homedir())
+  })
+
   ipcMain.handle('repos:checkCloneTarget', (_event, args: CloneTargetArgs) =>
-    checkCloneTarget(args, findLocalSaved, LOCAL_EXECUTION_HOST_ID)
+    checkCloneTarget(withResolvedDestination(args), findLocalSaved, LOCAL_EXECUTION_HOST_ID)
   )
 
-  ipcMain.handle('repos:clone', async (_event, args: CloneTargetArgs): Promise<Repo> => {
+  ipcMain.handle('repos:clone', async (_event, rawArgs: CloneTargetArgs): Promise<Repo> => {
+    const args = withResolvedDestination(rawArgs)
     // A nested layout puts the checkout under its project folder rather than at the destination.
     const placement = await resolveCloneTargetPlacement({
       url: args.url,

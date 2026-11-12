@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import { isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path'
 import type { Stats } from 'node:fs'
 import { lstat, mkdir, rm } from 'node:fs/promises'
@@ -6,6 +7,7 @@ import {
   normalizeRuntimePathForComparison,
   normalizeRuntimePathSeparators
 } from '../../shared/cross-platform-path'
+import { expandLeadingHomePath } from '../filesystem/home-path-expansion'
 import { resolveCreatePathAlias } from '../workspaces/creation/worktree-create-in-flight'
 
 export type ClaimedCloneTarget = {
@@ -50,6 +52,19 @@ export function deriveCloneOwnerFromUrl(url: string): string | null {
   return owner && owner !== '.' && owner !== '..' && !owner.includes(':') ? owner : null
 }
 
+// fork-comment-ok: a leading `~` is the home of the process that owns the path, so expansion lives here.
+export function resolveCloneDestination(destination: string, home: string): string {
+  const expanded = expandLeadingHomePath(destination.trim(), home)
+  if (
+    !expanded ||
+    !isAbsolute(expanded) ||
+    (process.platform !== 'win32' && isWindowsAbsolutePathLike(expanded))
+  ) {
+    throw new Error('Clone destination must be an absolute path')
+  }
+  return expanded
+}
+
 export function deriveValidatedClonePath(args: {
   url: string
   destination: string
@@ -59,21 +74,15 @@ export function deriveValidatedClonePath(args: {
    *  its project folder instead of directly in the destination. */
   relativeClonePath?: string
 }): string {
-  if (
-    !args.destination ||
-    !isAbsolute(args.destination) ||
-    (process.platform !== 'win32' && isWindowsAbsolutePathLike(args.destination))
-  ) {
-    throw new Error('Clone destination must be an absolute path')
-  }
+  const destination = resolveCloneDestination(args.destination, homedir())
 
   const requestedFolderName = args.folderName?.trim()
   const repoName = requestedFolderName
     ? assertCloneFolderName(requestedFolderName, 'Invalid clone folder name')
     : deriveCloneRepoNameFromUrl(args.url)
 
-  const clonePath = join(args.destination, args.relativeClonePath ?? repoName)
-  const resolvedDestination = resolve(args.destination)
+  const clonePath = join(destination, args.relativeClonePath ?? repoName)
+  const resolvedDestination = resolve(destination)
   const resolvedClonePath = resolve(clonePath)
   const pathFromDestination = relative(resolvedDestination, resolvedClonePath)
   if (

@@ -4,6 +4,7 @@ import {
 } from '../../../../../../shared/orca-workspace-layout'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
+import { isAbsoluteOrHomeFolderPath } from '@/lib/host-folder-path'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import { getDefaultCreateProjectParent } from './create-project-defaults'
 
@@ -48,6 +49,16 @@ export type CloneParentSettings = {
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
 }
 
+// fork-comment-ok: a relative root cannot name a folder on another machine, and that host's platform is unknown here.
+export function getUsableStoredHostRoot(
+  settings: CloneParentSettings | null | undefined,
+  hostIds: readonly ExecutionHostId[],
+  key: 'defaultRepoRoot' | 'defaultWorktreeLocation'
+): string | undefined {
+  const stored = getHostSettingOverrideForIds(settings, hostIds, key)
+  return stored && isAbsoluteOrHomeFolderPath(stored, true) ? stored : undefined
+}
+
 // fork-comment-ok: one rule for the hook and the awaited resolver, so the two cannot drift.
 export function needsHostHomeProbe(
   settings: CloneParentSettings | null | undefined,
@@ -58,8 +69,8 @@ export function needsHostHomeProbe(
       .map((hostId) => parseExecutionHostId(hostId))
       .find((parsed) => parsed?.kind === 'runtime')?.environmentId ?? null
   const hasStoredRoot = Boolean(
-    getHostSettingOverrideForIds(settings, hostIds, 'defaultRepoRoot') ??
-    getHostSettingOverrideForIds(settings, hostIds, 'defaultWorktreeLocation')
+    getUsableStoredHostRoot(settings, hostIds, 'defaultRepoRoot') ??
+    getUsableStoredHostRoot(settings, hostIds, 'defaultWorktreeLocation')
   )
   return { environmentId, probe: environmentId !== null && !hasStoredRoot }
 }
@@ -87,16 +98,20 @@ export function getCloneParentForHost({
     return ''
   }
   // An explicit checkout root already names the folder checkouts go in.
-  const repoRoot = getHostSettingOverrideForIds(settings, hostIds, 'defaultRepoRoot')
+  const repoRoot = getUsableStoredHostRoot(settings, hostIds, 'defaultRepoRoot')
   if (repoRoot) {
     return repoRoot
   }
-  const worktreeRoot = getHostSettingOverrideForIds(settings, hostIds, 'defaultWorktreeLocation')
+  const worktreeRoot = getUsableStoredHostRoot(settings, hostIds, 'defaultWorktreeLocation')
   if (worktreeRoot) {
     return getDefaultCloneParent(worktreeRoot, layoutMode)
   }
   if (isLocal) {
-    return getDefaultCloneParent(settings?.workspaceDir ?? '', layoutMode)
+    // fork-comment-ok: a relative workspace dir is a per-project location, so it names no clone destination.
+    const workspaceDir = settings?.workspaceDir ?? ''
+    return isAbsoluteOrHomeFolderPath(workspaceDir, true)
+      ? getDefaultCloneParent(workspaceDir, layoutMode)
+      : ''
   }
   // Never this computer's workspaceDir: it names a folder on another machine's disk.
   return hostHome
