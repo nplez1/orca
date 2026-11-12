@@ -89,13 +89,13 @@ describe('trackProjectClone', () => {
     consoleError.mockRestore()
   })
 
-  it('releases the key before the watchers run, so a Retry can start a fresh clone', async () => {
+  it('releases the key before the watchers run, so a watcher that clones gets a fresh entry', async () => {
     const clone = deferred()
     const retried = vi.fn()
 
     trackProjectClone(KEY, () => clone.promise, {
       watch: () => {
-        // Why: Retry runs inside a watcher, and must not join the clone that just settled.
+        // Why: a composer that re-clones from inside its watcher must not join the settled entry.
         expect(isProjectCloneInFlight(KEY)).toBe(false)
         void trackProjectClone(KEY, () => Promise.resolve({ kind: 'abandoned' }), {
           watch: retried,

@@ -79,7 +79,8 @@ export function trackProjectClone(
     }
   }
   const settle = (outcome: ProjectCloneOutcome): void => {
-    // Why before the watchers: a Retry inside one starts a fresh clone for this same key.
+    // Why before the watchers: a composer whose joined clone was abandoned starts its own inside its
+    // watcher, and must get a fresh entry rather than join the one that just settled.
     release()
     let shown = false
     for (const watcher of entry.watchers) {
