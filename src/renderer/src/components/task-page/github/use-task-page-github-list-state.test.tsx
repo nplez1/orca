@@ -31,5 +31,7 @@ describe('useTaskPageGitHubListState', () => {
     // Why: keyed-only hiding would let the banner reappear on the way back to the old query.
     act(() => view.setAppliedTaskSearch(Q2))
     expect(view.paginationError).toBeNull()
+    act(() => view.setAppliedTaskSearch(Q1))
+    expect(view.paginationError).toBeNull()
   })
 })
