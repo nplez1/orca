@@ -24,7 +24,8 @@ const hostOption: SetupHostOption = {
   label: 'This computer',
   detail: '',
   isAvailable: true,
-  canUsePathActions: true
+  canUsePathActions: true,
+  equivalentHostIds: [LOCAL_EXECUTION_HOST_ID]
 }
 
 // A host with no stored root resolves to no clone parent, so its destination must not borrow one.
@@ -33,7 +34,8 @@ const remoteHostOption: SetupHostOption = {
   label: 'GPU box',
   detail: '',
   isAvailable: true,
-  canUsePathActions: true
+  canUsePathActions: true,
+  equivalentHostIds: [toRuntimeExecutionHostId('gpu')]
 }
 
 const setup: ProjectHostSetup = {
