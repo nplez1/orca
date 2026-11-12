@@ -38,7 +38,9 @@ export type UseWorkspaceKanbanCardPointerDragParams = {
     dropIndex: number
   }) => void
   onShouldShowDropIndicator: (worktreeKeys: readonly string[], status: WorkspaceStatus) => boolean
+  /** True when the column bars every dragged card, so the lane must show a refused state. */
+  onIsDropRefused: (worktreeKeys: readonly string[], status: WorkspaceStatus) => boolean
   onPinWorktrees: (worktreeIds: readonly string[]) => void
-  onDragTargetChange: (status: WorkspaceStatus | null) => void
+  onDragTargetChange: (status: WorkspaceStatus | null, refused: boolean) => void
   onPinDragTargetChange: (isOver: boolean) => void
 }

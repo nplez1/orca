@@ -158,6 +158,26 @@ export function isWorkspaceStatusAllowedOnHost(
   return !pairedColumns.some((columns) => columns.some((column) => column.id === status))
 }
 
+/**
+ * The live paired hosts whose columns define this id, sorted so a message names a stable host.
+ * Mirrors `isWorkspaceStatusAllowedOnHost`, which reads every paired host's columns, not just host-only ones.
+ */
+export function selectWorkspaceStatusColumnOwnerEnvironmentIds(
+  state: HostStatusColumnInputs,
+  status: WorkspaceStatus
+): string[] {
+  if (state.workspaceStatuses.some((column) => column.id === status)) {
+    return []
+  }
+  return Object.keys(state.hostWorkspaceStatuses ?? {})
+    .sort()
+    .filter((environmentId) =>
+      liveHostStatuses(state, { runtimeOwnerEnvironmentId: environmentId })?.some(
+        (column) => column.id === status
+      )
+    )
+}
+
 /** Drops a status write that would put a card in another paired host's column; other fields still apply. */
 export function withoutForeignHostStatus<T extends { workspaceStatus?: WorkspaceStatus }>(
   state: HostStatusColumnInputs,

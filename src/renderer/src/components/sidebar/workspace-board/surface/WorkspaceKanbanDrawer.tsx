@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { useAllWorktrees } from '@/store/slices/worktrees/listing/use-worktree-catalog'
 import { useRepoMap } from '@/store/repos/use-repository-catalog'
@@ -14,12 +14,13 @@ import { useWorkspaceKanbanOutsideDismiss } from './use-workspace-kanban-outside
 import { useWorkspaceBoardTaskStatusSync } from '../projection/use-workspace-board-task-status-sync'
 import { useWorkspaceKanbanStatusActions } from './use-workspace-kanban-status-actions'
 import { useWorkspaceKanbanWorktreeActions } from './use-workspace-kanban-worktree-actions'
-import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { WorkspaceStatus, Worktree } from '../../../../../../shared/worktree/types'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import WorkspaceKanbanDrawerView from './WorkspaceKanbanDrawerView'
 import { useWorkspaceKanbanBoardProjection } from '../projection/use-workspace-kanban-board-projection'
 import { useWorkspaceKanbanNativeDrag } from '../drag/use-workspace-kanban-native-drag'
+import { isWorkspaceKanbanColumnRefused } from '../drag/workspace-kanban-foreign-column-refusal'
 import { useWorkspaceKanbanRenderLifecycle } from './use-workspace-kanban-render-lifecycle'
 import { useWorkspaceKanbanDrawerLingering } from './use-workspace-kanban-drawer-lingering'
 import { buildWorktreeManualOrderCatalog } from '../../worktree-list/drag/worktree-manual-order-catalog'
@@ -186,14 +187,42 @@ function WorkspaceKanbanDrawerContent({
     setDragOverStatus,
     setPinDragOver
   } = useWorkspaceKanbanNativeDrag(dropWorktreesAtEndOfStatus)
+  const [dragRefused, setDragRefused] = useState(false)
+  const handleDragFinishAll = useCallback(() => {
+    handleDragFinish()
+    setDragRefused(false)
+  }, [handleDragFinish])
+  const handlePointerDragTargetChange = useCallback(
+    (status: WorkspaceStatus | null, refused: boolean) => {
+      setDragOverStatus(status)
+      setDragRefused(refused)
+    },
+    [setDragOverStatus]
+  )
+  // Why: the commit filters these same cards with the same rule, so the lane cannot promise a drop it refuses.
+  const isDropRefused = useCallback(
+    (worktreeKeys: readonly string[], status: WorkspaceStatus) => {
+      const cards: ReadonlyMap<string, Worktree> = worktreeByKey
+      return isWorkspaceKanbanColumnRefused(
+        useAppStore.getState(),
+        worktreeKeys.flatMap((key) => {
+          const card = cards.get(key)
+          return card ? [card] : []
+        }),
+        status
+      )
+    },
+    [worktreeByKey]
+  )
   const { isPointerDragActiveRef, onCardPointerDownCapture } = useWorkspaceKanbanCardPointerDrag({
     open,
     boardRef,
     selectedWorktreeIds,
     selectedWorktrees: renderedSelectedWorktrees,
     onDropWorktreesInStatus: dropPointerDraggedWorktreesInStatus,
+    onIsDropRefused: isDropRefused,
     onPinWorktrees: pinWorktrees,
-    onDragTargetChange: setDragOverStatus,
+    onDragTargetChange: handlePointerDragTargetChange,
     onShouldShowDropIndicator: shouldWriteDropManualOrder,
     onPinDragTargetChange: setPinDragOver
   })
@@ -233,7 +262,7 @@ function WorkspaceKanbanDrawerContent({
     boardRef,
     moveWorktreeToStatus,
     pinWorktree,
-    handleDragFinish,
+    handleDragFinishAll,
     open,
     {
       onMoveWorktreesToStatus: dropWorktreesAtEndOfStatus,
@@ -302,6 +331,7 @@ function WorkspaceKanbanDrawerContent({
         columnWidth,
         isResizingColumn,
         dragOverStatus,
+        dragRefused,
         renderCards,
         selectedWorktreeIds,
         selectedWorktrees: renderedSelectedWorktrees,

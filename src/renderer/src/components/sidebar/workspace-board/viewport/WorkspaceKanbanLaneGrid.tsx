@@ -36,6 +36,8 @@ type WorkspaceKanbanLaneGridProps = {
   columnWidth: number
   isResizingColumn: boolean
   dragOverStatus: WorkspaceStatus | null
+  /** The hovered lane bars every dragged card, so it must read as refused rather than droppable. */
+  dragRefused: boolean
   renderCards: boolean
   selectedWorktreeIds: ReadonlySet<string>
   selectedWorktrees: readonly Worktree[]
@@ -67,6 +69,7 @@ export default function WorkspaceKanbanLaneGrid({
   columnWidth,
   isResizingColumn,
   dragOverStatus,
+  dragRefused,
   renderCards,
   selectedWorktreeIds,
   selectedWorktrees,
@@ -213,6 +216,7 @@ export default function WorkspaceKanbanLaneGrid({
               columnWidth={columnWidth}
               isResizingColumn={isResizingColumn}
               isDragTarget={dragOverStatus === status.id}
+              isDragRefused={dragRefused && dragOverStatus === status.id}
               renderCards={renderCards && renderedLaneIds.has(status.id)}
               selectedWorktreeIds={selectedWorktreeIds}
               selectedWorktrees={selectedWorktrees}

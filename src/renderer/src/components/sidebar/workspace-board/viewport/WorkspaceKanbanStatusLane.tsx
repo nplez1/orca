@@ -34,6 +34,8 @@ type WorkspaceKanbanStatusLaneProps = {
   columnWidth: number
   isResizingColumn: boolean
   isDragTarget: boolean
+  /** The column cannot take the dragged cards, so it dims and drops its accept highlight. */
+  isDragRefused?: boolean
   nativeDragEnabled?: boolean
   renderCards: boolean
   selectedWorktreeIds: ReadonlySet<string>
@@ -66,6 +68,7 @@ function WorkspaceKanbanStatusLane({
   columnWidth,
   isResizingColumn,
   isDragTarget,
+  isDragRefused = false,
   nativeDragEnabled = true,
   renderCards,
   selectedWorktreeIds,
@@ -161,8 +164,12 @@ function WorkspaceKanbanStatusLane({
         'relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-t-2 border-worktree-sidebar-border transition-colors',
         meta.border,
         meta.laneTint,
-        isDragTarget && 'border-worktree-sidebar-ring bg-worktree-sidebar-accent/70',
-        'data-[workspace-board-external-drag-target=true]:border-worktree-sidebar-ring data-[workspace-board-external-drag-target=true]:bg-worktree-sidebar-accent/70'
+        isDragTarget &&
+          !isDragRefused &&
+          'border-worktree-sidebar-ring bg-worktree-sidebar-accent/70',
+        isDragRefused && 'border-destructive/60 opacity-60',
+        'data-[workspace-board-external-drag-target=true]:border-worktree-sidebar-ring data-[workspace-board-external-drag-target=true]:bg-worktree-sidebar-accent/70',
+        'data-[workspace-board-external-drag-refused=true]:border-destructive/60 data-[workspace-board-external-drag-refused=true]:opacity-60'
       )}
       onDragOver={(event) => onDragOver(event, status.id)}
       onDragLeave={onDragLeave}

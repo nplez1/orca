@@ -34,8 +34,10 @@ const BOARD_SELECTOR = '[data-workspace-board-selection-surface]'
 const BOARD_SHEET_SELECTOR = '[data-workspace-board-sheet]'
 const LANE_SCROLL_SELECTOR = '[data-workspace-board-lane-scroll]'
 const EXTERNAL_DRAG_TARGET_ATTR = 'data-workspace-board-external-drag-target'
+const EXTERNAL_DRAG_REFUSED_ATTR = 'data-workspace-board-external-drag-refused'
 
 let externalDragTargetElement: HTMLElement | null = null
+let externalDragTargetRefused = false
 let logicalDropGroupsRegistration: { groups: readonly WorktreeDragGroup[] } | null = null
 
 function getWorkspaceKanbanBoardElement(): HTMLElement | null {
@@ -94,17 +96,24 @@ function getStatusDropTargetElement(
   )
 }
 
-function setExternalDragTargetElement(element: HTMLElement | null): void {
-  if (externalDragTargetElement === element) {
+function setExternalDragTargetElement(element: HTMLElement | null, refused: boolean): void {
+  const refusedNext = element !== null && refused
+  // Why the value too: a lane can turn from accept to refused without the element changing.
+  if (externalDragTargetElement === element && externalDragTargetRefused === refusedNext) {
     return
   }
   externalDragTargetElement?.removeAttribute(EXTERNAL_DRAG_TARGET_ATTR)
+  externalDragTargetElement?.removeAttribute(EXTERNAL_DRAG_REFUSED_ATTR)
   externalDragTargetElement = element
-  externalDragTargetElement?.setAttribute(EXTERNAL_DRAG_TARGET_ATTR, 'true')
+  externalDragTargetRefused = refusedNext
+  externalDragTargetElement?.setAttribute(
+    refusedNext ? EXTERNAL_DRAG_REFUSED_ATTR : EXTERNAL_DRAG_TARGET_ATTR,
+    'true'
+  )
 }
 
 export function clearWorkspaceKanbanSidebarDropTargetVisual(): void {
-  setExternalDragTargetElement(null)
+  setExternalDragTargetElement(null, false)
   removeCardDropIndicator()
 }
 
@@ -175,6 +184,8 @@ export function updateWorkspaceKanbanSidebarDropTargetVisual(args: {
   x: number
   y: number
   shouldShowDropIndicator: (target: WorkspaceKanbanCardDropTarget) => boolean
+  /** True when the lane bars every dragged card, so it reads as refused instead of droppable. */
+  isDropRefused: (target: WorkspaceKanbanCardDropTarget) => boolean
 }): WorkspaceKanbanCardDropTarget {
   const board = getWorkspaceKanbanBoardElement()
   if (!board) {
@@ -183,14 +194,15 @@ export function updateWorkspaceKanbanSidebarDropTargetVisual(args: {
   }
 
   const target = getCardDropTarget(board, args.x, args.y)
+  const refused = target.status !== null && args.isDropRefused(target)
   const targetElement = target.isPinDrop
     ? board.querySelector<HTMLElement>(PIN_DROP_TARGET)
     : target.status
       ? getStatusDropTargetElement(board, target.status)
       : null
-  setExternalDragTargetElement(targetElement)
+  setExternalDragTargetElement(targetElement, refused)
 
-  if (target.status && args.shouldShowDropIndicator(target)) {
+  if (!refused && target.status && args.shouldShowDropIndicator(target)) {
     updateCardDropIndicator(board, target)
   } else {
     removeCardDropIndicator()

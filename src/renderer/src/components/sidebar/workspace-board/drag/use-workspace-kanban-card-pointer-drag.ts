@@ -5,11 +5,11 @@ import {
   getCardDropTarget,
   removeCardDropIndicator,
   resolveWorkspaceKanbanCardDropCommitTarget,
-  updateCardDropIndicator,
-  type WorkspaceKanbanCardTrackedDropTarget
+  updateCardDropIndicator
 } from './workspace-kanban-card-pointer-drag-dom'
 import {
   createDragPreview,
+  setDragDocumentRefusedCursor,
   setDragDocumentStyles,
   setDraggedCardsDragging,
   updateDragPreviewPosition
@@ -21,28 +21,11 @@ import {
 
 const POINTER_DRAG_THRESHOLD = 5
 
-type DragState = {
-  pointerId: number
-  startX: number
-  startY: number
-  currentX: number
-  currentY: number
-  worktreeIds: string[]
-  worktreeIdentities: string[]
-  worktreeKeys: string[]
-  sourceCard: HTMLElement
-  preview: HTMLElement | null
-  previewOffsetX: number
-  previewOffsetY: number
-  started: boolean
-  frameId: number | null
-  latestDropTarget: WorkspaceKanbanCardTrackedDropTarget | null
-}
-
 import {
   resolveWorkspaceKanbanPointerDragSelection,
   type UseWorkspaceKanbanCardPointerDragParams
 } from './workspace-kanban-pointer-drag-selection'
+import type { WorkspaceKanbanCardPointerDragState } from './workspace-kanban-card-pointer-drag-state'
 
 export function useWorkspaceKanbanCardPointerDrag({
   open,
@@ -51,6 +34,7 @@ export function useWorkspaceKanbanCardPointerDrag({
   selectedWorktrees,
   onDropWorktreesInStatus,
   onShouldShowDropIndicator,
+  onIsDropRefused,
   onPinWorktrees,
   onDragTargetChange,
   onPinDragTargetChange
@@ -58,13 +42,14 @@ export function useWorkspaceKanbanCardPointerDrag({
   isPointerDragActiveRef: React.MutableRefObject<boolean>
   onCardPointerDownCapture: (event: React.PointerEvent<HTMLElement>) => void
 } {
-  const dragRef = useRef<DragState | null>(null)
+  const dragRef = useRef<WorkspaceKanbanCardPointerDragState | null>(null)
   const isPointerDragActiveRef = useRef(false)
   const suppressClickUntilRef = useRef(0)
   const selectedWorktreeIdsRef = useRef(selectedWorktreeIds)
   const selectedWorktreesRef = useRef(selectedWorktrees)
   const dropWorktreesInStatusRef = useRef(onDropWorktreesInStatus)
   const shouldShowDropIndicatorRef = useRef(onShouldShowDropIndicator)
+  const isDropRefusedRef = useRef(onIsDropRefused)
   const pinWorktreesRef = useRef(onPinWorktrees)
   const dragTargetChangeRef = useRef(onDragTargetChange)
   const pinDragTargetChangeRef = useRef(onPinDragTargetChange)
@@ -74,12 +59,13 @@ export function useWorkspaceKanbanCardPointerDrag({
   selectedWorktreesRef.current = selectedWorktrees
   dropWorktreesInStatusRef.current = onDropWorktreesInStatus
   shouldShowDropIndicatorRef.current = onShouldShowDropIndicator
+  isDropRefusedRef.current = onIsDropRefused
   pinWorktreesRef.current = onPinWorktrees
   dragTargetChangeRef.current = onDragTargetChange
   pinDragTargetChangeRef.current = onPinDragTargetChange
 
   const clearDragTarget = useCallback(() => {
-    dragTargetChangeRef.current(null)
+    dragTargetChangeRef.current(null, false)
     pinDragTargetChangeRef.current(false)
   }, [])
 
@@ -136,7 +122,7 @@ export function useWorkspaceKanbanCardPointerDrag({
   )
 
   const startPointerDrag = useCallback(
-    (state: DragState) => {
+    (state: WorkspaceKanbanCardPointerDragState) => {
       state.started = true
       isPointerDragActiveRef.current = true
       setDraggedCardsDragging({
@@ -151,11 +137,12 @@ export function useWorkspaceKanbanCardPointerDrag({
   )
 
   const updatePointerDragTarget = useCallback(
-    (state: DragState) => {
+    (state: WorkspaceKanbanCardPointerDragState) => {
       const board = boardRef.current
       if (!board) {
         clearDragTarget()
         removeCardDropIndicator()
+        setDragDocumentRefusedCursor(false)
         return
       }
       const dropTarget = getCardDropTarget(board, state.currentX, state.currentY)
@@ -165,9 +152,15 @@ export function useWorkspaceKanbanCardPointerDrag({
         y: state.currentY
       }
       pinDragTargetChangeRef.current(dropTarget.isPinDrop)
-      dragTargetChangeRef.current(dropTarget.status)
+      // Why: a column on another paired host takes none of these cards, so it must not look droppable.
+      const refused =
+        dropTarget.status !== null &&
+        isDropRefusedRef.current(state.worktreeKeys, dropTarget.status)
+      dragTargetChangeRef.current(dropTarget.status, refused)
+      setDragDocumentRefusedCursor(refused)
       if (
         dropTarget.status &&
+        !refused &&
         shouldShowDropIndicatorRef.current(state.worktreeKeys, dropTarget.status)
       ) {
         updateCardDropIndicator(board, dropTarget)
@@ -192,7 +185,7 @@ export function useWorkspaceKanbanCardPointerDrag({
   }, [updatePointerDragTarget])
 
   const schedulePointerDragFrame = useCallback(
-    (state: DragState) => {
+    (state: WorkspaceKanbanCardPointerDragState) => {
       if (state.frameId !== null) {
         return
       }
