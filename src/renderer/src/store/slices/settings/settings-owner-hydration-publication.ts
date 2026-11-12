@@ -37,6 +37,12 @@ export function createSettingsPublicationFence(invalidateOwnerHydration = false)
   return () => generation === settingsPublicationGeneration
 }
 
+/** Reports whether a newer settings write has started, without cancelling that write's publication. */
+export function observeSettingsPublicationGeneration(): () => boolean {
+  const generation = settingsPublicationGeneration
+  return () => generation === settingsPublicationGeneration
+}
+
 export function createOwnerSettingsHydrationFence(): () => boolean {
   const generation = ++ownerSettingsHydrationGeneration
   return () => generation === ownerSettingsHydrationGeneration

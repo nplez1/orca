@@ -1195,6 +1195,17 @@
               "fixtures": {}
             }
           }
+        },
+        "settings": {
+          "settings": {
+            "write": {
+              "failure": {
+                "df28bd1726": "Could not save the setting",
+                "6f2c05896d": "Could not save the setting on {{host}}",
+                "88c496d7aa": "The change was not saved."
+              }
+            }
+          }
         }
       }
     },

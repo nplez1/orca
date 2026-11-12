@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { createTestStore } from '../../testing/app-store-test-fixture'
+import { getDefaultSettings } from '../../../../../shared/constants'
 import { makeWorktree } from '../worktrees/worktree.test-fixture'
 import type { AppState } from '../../types'
 import type { WorktreeLineage } from '../../../../../shared/worktree/lineage-types'
@@ -634,5 +635,84 @@ describe('fetchSettings runtime catalog probe', () => {
     } finally {
       now.mockRestore()
     }
+  })
+})
+
+describe('createSettingsSlice write failures', () => {
+  it('tells the user which write failed and keeps the stored value', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    settingsSet.mockRejectedValueOnce(
+      new Error("Error invoking remote method 'settings:set': Error: Disk is full")
+    )
+    settingsGet.mockResolvedValue({ terminalFontSize: 12 })
+    const store = createTestStore()
+    store.setState({ settings: { ...getDefaultSettings('/tmp'), terminalFontSize: 12 } })
+
+    try {
+      await store.getState().updateSettings({ terminalFontSize: 16 })
+
+      expect(toast.error).toHaveBeenCalledWith('Could not save the setting', {
+        id: 'settings-write-failed',
+        description: 'Disk is full'
+      })
+      expect(store.getState().settings?.terminalFontSize).toBe(12)
+      expect(store.getState().settingsWriteFailureRevision).toBe(1)
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it('adopts the value main stored when the write rejects after it committed', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    settingsSet.mockRejectedValueOnce(
+      new Error("Error invoking remote method 'settings:set': Error: Language pack failed")
+    )
+    settingsGet.mockResolvedValueOnce({ terminalFontSize: 16 })
+    const store = createTestStore()
+    store.setState({ settings: { ...getDefaultSettings('/tmp'), terminalFontSize: 12 } })
+
+    try {
+      await store.getState().updateSettings({ terminalFontSize: 16 })
+
+      await vi.waitFor(() => expect(store.getState().settings?.terminalFontSize).toBe(16))
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it('names the host when a paired host rejects a host-scoped write', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    runtimeEnvironmentCall.mockRejectedValueOnce(new Error('Host mini is unreachable'))
+    const store = createTestStore()
+    store.setState({
+      settings: { ...getDefaultSettings('/tmp'), activeRuntimeEnvironmentId: 'env-1' },
+      runtimeEnvironments: [{ ...makeRuntimeEnvironment('env-1'), name: 'mini' }],
+      worktreeVisibilityDefaultsSupportedRuntimeEnvironmentId: 'env-1',
+      worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId: 'env-1'
+    })
+
+    try {
+      await store.getState().updateSettings({ worktreeVisibilityDefaults: { external: 'hide' } })
+
+      expect(toast.error).toHaveBeenCalledWith('Could not save the setting on mini', {
+        id: 'settings-write-failed',
+        description: 'Host mini is unreachable'
+      })
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it('leaves the error to a caller that renders its own', async () => {
+    settingsSet.mockRejectedValueOnce(new Error('nope'))
+    settingsGet.mockResolvedValue(undefined)
+    const store = createTestStore()
+    store.setState({ settings: { ...getDefaultSettings('/tmp'), terminalFontSize: 12 } })
+
+    await expect(store.getState().updateSettingsOrThrow({ terminalFontSize: 16 })).rejects.toThrow(
+      'nope'
+    )
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(store.getState().settingsWriteFailureRevision).toBe(0)
   })
 })

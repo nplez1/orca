@@ -36,13 +36,16 @@ export const usePluginTerminalThemes = terminalThemes.useEntries
 export function usePluginTerminalPaletteRefresh(): void {
   const pluginTerminalThemes = usePluginTerminalThemes()
   const settings = useAppStore((s) => s.settings)
-  const updateSettings = useAppStore((s) => s.updateSettings)
+  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
   useEffect(() => {
     const update = settings && refreshedTerminalPluginPalettes(settings, pluginTerminalThemes)
     if (update) {
-      void updateSettings(update)
+      // Why silent: an automatic migration retried on every settings change would toast each time.
+      void updateSettingsOrThrow(update).catch((error: unknown) =>
+        console.error('Failed to refresh plugin terminal palettes:', error)
+      )
     }
-  }, [settings, pluginTerminalThemes, updateSettings])
+  }, [settings, pluginTerminalThemes, updateSettingsOrThrow])
 }
 
 /** Moves a legacy single plugin theme into its mode's slot and drops a startup paint the
@@ -51,7 +54,7 @@ export function usePluginAppThemeSync(): void {
   const pluginThemes = usePluginThemes()
   const loaded = usePluginThemeStore((s) => s.loaded)
   const settings = useAppStore((s) => s.settings)
-  const updateSettings = useAppStore((s) => s.updateSettings)
+  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
   const dark = useSettingsDarkTheme()
   const selected = (dark ? settings?.pluginAppThemeDark : settings?.pluginAppThemeLight) ?? null
   const disabled = !selected || isPluginContentSwitchedOff(settings ?? undefined, selected)
@@ -68,11 +71,14 @@ export function usePluginAppThemeSync(): void {
   useEffect(() => {
     // Why wait for the theme: only it knows which slot it belongs in; `theme` already holds its base.
     if (legacy) {
-      void updateSettings({
+      // Why silent: this migration re-runs from an effect, so a failure must not toast each pass.
+      void updateSettingsOrThrow({
         ...pluginAppThemeSlotUpdate(legacy.base, legacy.id),
         pluginAppTheme: null,
         themeBeforePlugin: null
-      })
+      }).catch((error: unknown) =>
+        console.error('Failed to migrate the legacy plugin theme:', error)
+      )
     }
-  }, [legacy, updateSettings])
+  }, [legacy, updateSettingsOrThrow])
 }

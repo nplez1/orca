@@ -1,6 +1,6 @@
 // @protected-copy: preserve copy used by security settings.
 import type React from 'react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip'
@@ -9,6 +9,7 @@ import { SettingsDisabledControlTooltip } from './SettingsDisabledControlTooltip
 import { normalizeColor } from '@/lib/terminal-theme'
 import { cn } from '@/lib/utils'
 import { useTranslate } from '@/i18n/use-translate'
+import { useAppStateValue } from '@/store/retained-views/app-state-view'
 
 type SettingsRowProps = {
   label: React.ReactNode
@@ -311,10 +312,25 @@ export function NumberField({
   const t = useTranslate()
   const [draft, setDraft] = useState(Number.isFinite(value) ? String(value) : '')
   const [prevValue, setPrevValue] = useState(value)
+  const writeFailureRevision = useAppStateValue((state) => state.settingsWriteFailureRevision)
+  const [prevWriteFailureRevision, setPrevWriteFailureRevision] = useState(writeFailureRevision)
+  // The draft this field last handed to a write, so a rejected write can drop just that value.
+  const attemptedDraftRef = useRef<string | null>(null)
 
   if (value !== prevValue) {
     setPrevValue(value)
     setDraft(Number.isFinite(value) ? String(value) : '')
+    attemptedDraftRef.current = null
+  }
+
+  if (writeFailureRevision !== prevWriteFailureRevision) {
+    setPrevWriteFailureRevision(writeFailureRevision)
+    const attempted = attemptedDraftRef.current
+    attemptedDraftRef.current = null
+    // A field the user has typed over since keeps what they typed.
+    if (attempted !== null && attempted === draft) {
+      setDraft(Number.isFinite(value) ? String(value) : '')
+    }
   }
 
   const commit = (): void => {
@@ -333,6 +349,7 @@ export function NumberField({
       setDraft('')
       // Re-blurring an already-empty field must not write the setting again.
       if (value !== undefined) {
+        attemptedDraftRef.current = ''
         onClear()
       }
       return
@@ -340,6 +357,7 @@ export function NumberField({
     if (Number.isFinite(next) && (!integer || Number.isSafeInteger(next))) {
       const clamped = max === undefined ? Math.max(min, next) : Math.min(max, Math.max(min, next))
       if (clamped !== value) {
+        attemptedDraftRef.current = String(clamped)
         onChange(clamped)
       }
       setDraft(String(clamped))
