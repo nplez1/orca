@@ -107,7 +107,11 @@ export function getCloneParentForHost({
     return getDefaultCloneParent(worktreeRoot, layoutMode)
   }
   if (isLocal) {
-    return getDefaultCloneParent(settings?.workspaceDir ?? '', layoutMode)
+    // fork-comment-ok: a relative workspace dir is a per-project location, so it names no clone destination.
+    const workspaceDir = settings?.workspaceDir ?? ''
+    return isAbsoluteOrHomeFolderPath(workspaceDir, true)
+      ? getDefaultCloneParent(workspaceDir, layoutMode)
+      : ''
   }
   // Never this computer's workspaceDir: it names a folder on another machine's disk.
   return hostHome

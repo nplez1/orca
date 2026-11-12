@@ -95,6 +95,16 @@ describe('getCloneParentForHost', () => {
     ).toBe('')
   })
 
+  it('never offers a destination derived from a relative workspace dir', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { workspaceDir: '.orca/worktrees' },
+        hostIds: [LOCAL],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('')
+  })
+
   it('keeps a home-prefixed root for the host’s own process to expand', () => {
     expect(
       getCloneParentForHost({

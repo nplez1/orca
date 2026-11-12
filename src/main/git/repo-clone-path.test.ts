@@ -7,7 +7,7 @@ const HOME = '/home/me'
 
 describe('resolveCloneDestination', () => {
   it('expands a home-prefixed destination against the home of the machine that owns it', () => {
-    expect(resolveCloneDestination('~/src', HOME)).toBe('/home/me/src')
+    expect(resolveCloneDestination('~/src', HOME)).toBe(join(HOME, 'src'))
   })
 
   it('treats a bare ~ as the whole home folder', () => {

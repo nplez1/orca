@@ -41,7 +41,7 @@ describe('resolveDefaultCreateProjectParent', () => {
         }),
         HOME
       )
-    ).toBe('/home/me/src')
+    ).toBe(join(HOME, 'src'))
   })
 
   it('ignores a relative checkout root, which cannot name a create parent', () => {

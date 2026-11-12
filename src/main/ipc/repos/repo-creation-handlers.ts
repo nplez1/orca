@@ -38,7 +38,6 @@ export async function probeLocalGitAvailability(): Promise<boolean> {
   })
 }
 
-/** Ignore seeded workspaceDir: treating it as user intent nests projects inside the worktree root. */
 function getDefaultCreateProjectParent(store: Store): string {
   return resolveDefaultCreateProjectParent(store.getSettings(), homedir())
 }

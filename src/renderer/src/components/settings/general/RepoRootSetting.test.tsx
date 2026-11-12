@@ -151,4 +151,26 @@ describe('RepoRootSetting', () => {
     expect(input.value).toBe('src')
     expect(input.getAttribute('aria-invalid')).toBe('true')
   })
+
+  it('shows no error for this computer’s documented relative workspace dir', () => {
+    const { input } = renderRow(
+      { ...settingsWith({}), workspaceDir: '.orca/worktrees' },
+      localScope
+    )
+    expect(input.value).toBe('')
+    expect(input.getAttribute('aria-invalid')).toBeNull()
+  })
+
+  it('clears a refused draft when the override is reset', async () => {
+    const user = userEvent.setup()
+    const { input, updateSettings } = renderRow(
+      settingsWith({ [SERVER_HOST_ID]: { defaultRepoRoot: '/srv/checkouts' } }),
+      serverScope
+    )
+    await user.clear(input)
+    await user.type(input, 'src{Enter}')
+    expect(updateSettings).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /reset/i }))
+    expect(updateSettings).toHaveBeenCalledWith({ hostSettingOverrides: {} })
+  })
 })
