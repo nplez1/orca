@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 export const compareIds = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
@@ -47,10 +47,24 @@ export function balanceFiles(files, count, timings, overheadMs = 0) {
   return { algorithm: 'file-lpt-v1', fallbackMs, overheadMs, shards }
 }
 
-export function readTimingBaseline(suite) {
+const FORK_TIMING_OVERLAY = new URL(
+  '../../../../local/ci-shard-timings-overlay.json',
+  import.meta.url
+)
+
+export function readTimingBaseline(suite, overlayUrl = FORK_TIMING_OVERLAY) {
   const bytes = readFileSync(new URL('./ci-shard-timings.json', import.meta.url), 'utf8')
   const baseline = JSON.parse(bytes)
-  return { ...baseline[suite], baselineSha256: createHash('sha256').update(bytes).digest('hex') }
+  const overlayBytes = existsSync(overlayUrl) ? readFileSync(overlayUrl, 'utf8') : ''
+  const overlay = overlayBytes ? JSON.parse(overlayBytes) : {}
+  if (overlayBytes && (overlay?.version !== 1 || !overlay.unit?.timings)) {
+    throw new Error(`Malformed shard timing overlay: ${String(overlayUrl)}`)
+  }
+  return {
+    ...baseline[suite],
+    timings: { ...overlay[suite]?.timings, ...baseline[suite].timings },
+    baselineSha256: createHash('sha256').update(bytes).update(overlayBytes).digest('hex')
+  }
 }
 
 export function writeAssignment(path, assignment) {

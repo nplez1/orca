@@ -170,15 +170,11 @@ describe('workspace path catalog core', () => {
     }
   })
 
-  // Why 5 min: the whole query battery runs against every scope descriptor at 100k paths.
-  it('matches the full oracle battery and every scope descriptor at 100k paths', async () => {
-    await assertGeneratedCatalogParity(100_000)
-  }, 300_000)
-
-  // Why 10 min: the same battery at 300k paths, roughly three times the 100k run.
-  it('matches the full battery and every scope descriptor at 300k paths', async () => {
-    await assertGeneratedCatalogParity(300_000)
-  }, 600_000)
+  // Why 30k and not 100k: this file was the long pole of its nightly shard (issue #401). The battery
+  // at 300k and above runs under ORCA_RUN_PATH_SEARCH_SCALE below.
+  it('matches the full oracle battery and every scope descriptor at 30k paths', async () => {
+    await assertGeneratedCatalogParity(30_000)
+  }, 120_000)
 
   it('aligns ignore-classification and dotfile flags with retained rows', async () => {
     const paths = [...WORKSPACE_PATH_CATALOG_EDGE_PATHS]
@@ -356,6 +352,12 @@ describe('workspace path catalog core', () => {
 })
 
 describe.skipIf(!RUN_PATH_SEARCH_SCALE)('workspace path catalog opt-in scale parity', () => {
+  // Why 10 min: the same battery at 300k paths, where a resident query crosses
+  // WORKSPACE_PATH_CATALOG_QUERY_CHUNK_PATHS.
+  it('matches the full battery and every scope descriptor at 300k paths', async () => {
+    await assertGeneratedCatalogParity(300_000)
+  }, 600_000)
+
   it.each([500_000, 1_000_000])(
     'matches the query battery and scope matrix at %i paths',
     async (size) => {

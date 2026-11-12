@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "note": "Fork-added unit tests heavy enough to move a shard. Merged over ci-shard-timings.json by readTimingBaseline, which lets the baseline win on any collision. Regenerate with `node local/ci-shard-timing-overlay.mjs import <artifact-dir...>`.",
+  "source": {
+    "runId": "43018513608",
+    "sha": "dbb25491d3e0b913eb7a6b95c6eef42843cab35e",
+    "runner": "ubuntu-24.04-arm",
+    "metric": "unit-report-file-duration"
+  },
+  "thresholdMs": 2000,
+  "estimates": {
+    "src/shared/workspace-path-catalog-core.test.ts": "estimate: the recorded run predates this change. 4,099 ms for the 30k case on the fork Mac x 2.97 (the ratio this file showed between CI and local in the recorded run: 178,185 / 59,900 ms). The next measured run replaces it."
+  },
+  "unit": {
+    "timings": {
+      "src/main/agent-hooks/server-screen-prompt-corroboration.test.ts": 7956,
+      "src/main/workspace-path-index/workspace-path-catalog-spill-runs.test.ts": 2337,
+      "src/main/workspace-path-index/workspace-path-index-worker-client.test.ts": 5298,
+      "src/renderer/src/components/sidebar/WorktreeCard.merge-marker.test.tsx": 2276,
+      "src/renderer/src/components/sidebar/WorktreeCard.pr-cache-parity.test.tsx": 2858,
+      "src/shared/workspace-path-catalog-core.test.ts": 13000,
+      "src/shared/workspace-path-catalog-storage-benchmark.test.ts": 3736,
+      "tests/tools/commit-msg-guard.test.mjs": 2475,
+      "tests/tools/fork-invariants.test.mjs": 3144,
+      "tests/tools/orca-vm-create-script.test.mjs": 2111,
+      "tests/tools/orca-vm-extend-script.test.mjs": 4482
+    }
+  }
+}
