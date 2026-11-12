@@ -102,7 +102,7 @@ export function useTaskPageProviderMetadata(model: TaskPageResumeRestorationMode
   useEffect(() => {
     if (!jiraProjectsEnabled) {
       // Why: re-enabling the source re-reads, so a previous failure must not flash before it lands.
-      setJiraProjectsSnapshot(null)
+      setJiraProjectsSnapshot((previous) => previous && { ...previous, failed: false })
       return
     }
     let cancelled = false
@@ -160,11 +160,9 @@ export function useTaskPageProviderMetadata(model: TaskPageResumeRestorationMode
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every added field is assigned below before the model is returned.
   const nextModel = model as typeof model & {
     availableTeams: typeof availableTeams
-    setAvailableTeams: typeof setAvailableTeams
     linearTeamRefreshNonce: typeof linearTeamRefreshNonce
     setLinearTeamRefreshNonce: typeof setLinearTeamRefreshNonce
     linearTeamsError: typeof linearTeamsError
-    setLinearTeamsError: typeof setLinearTeamsError
     retryLinearTeams: typeof retryLinearTeams
     availableJiraProjects: typeof availableJiraProjects
     jiraProjectsLoading: typeof jiraProjectsLoading
@@ -172,11 +170,9 @@ export function useTaskPageProviderMetadata(model: TaskPageResumeRestorationMode
     retryJiraProjects: typeof retryJiraProjects
   }
   nextModel.availableTeams = availableTeams
-  nextModel.setAvailableTeams = setAvailableTeams
   nextModel.linearTeamRefreshNonce = linearTeamRefreshNonce
   nextModel.setLinearTeamRefreshNonce = setLinearTeamRefreshNonce
   nextModel.linearTeamsError = linearTeamsError
-  nextModel.setLinearTeamsError = setLinearTeamsError
   nextModel.retryLinearTeams = retryLinearTeams
   nextModel.availableJiraProjects = availableJiraProjects
   nextModel.jiraProjectsLoading = jiraProjectsLoading
