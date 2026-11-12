@@ -106,6 +106,10 @@
         "cloneNeedsDestination": "Orca could not find a folder to clone into on this host. Use a folder that already exists there.",
         "cloneSetupFailed": "Cloned, but Orca could not add the project on this host.",
         "cloneFailed": "Cloning failed on this host.",
+        "cloneFailedOnHostToast": "Couldn't clone {{project}} onto {{host}}",
+        "cloneSkippedOnHostToast": "Didn't clone {{project}} onto {{host}}",
+        "cloneSkippedFolderTaken": "{{path}} already exists. Pick {{host}} again to clone under another name, or use that folder.",
+        "cloneSkippedFolderTakenByOtherRepo": "{{path}} already exists and holds a different repository. Pick {{host}} again to clone under another name.",
         "cloneProtocolSsh": "SSH",
         "cloneProtocolHttps": "HTTPS"
       },
