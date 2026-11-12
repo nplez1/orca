@@ -3505,14 +3505,15 @@ unnoticed and are enforceable on any branch today. It is deliberately not the un
 **Why the lint verdict and not `pnpm lint`, measured on `main` at 2026-10-29:** `pnpm lint` reported
 "2 of 36 lint step(s) failed" — `oxlint` red for `src/cli/handlers/vm.ts` (336 counted lines against a
 limit of 300), and `lint:ast-grep-gates` wanting a flaky-test baseline pruned. A required check that is
-red on its own base teaches everyone to ignore red — the PR #57 failure shape. `pnpm lint` is also one
-`&&` chain, so it names the first red and says nothing about the other 35. Both problems have the same
-answer, and it is not "wait until the base is green": the base's reds belong in
-`local/lint-known-red.json`, and `local/gate-lint.mjs` runs every step on its own and turns the set of
-failures into a verdict against that file. That is green on a base that carries foreign reds, and red
-on the change that adds one. Both lanes run it — see § `local(ci)`: the lint ratchets run on the PR and
-on the release line (#399) — so the changed-lines half of this lane is no longer the only place a
-lint-family red can be caught before the merge.
+red on its own base teaches everyone to ignore red — the PR #57 failure shape. Attribution is _not_ the
+reason to prefer the gate: since upstream's 2026-10-28 refactor `pnpm lint` is
+`run-lint.mjs`, which runs every step concurrently and names all the failures. The reasons are two,
+and neither is "wait until the base is green": `pnpm lint` has no notion of a known red, so a lane
+re-running it is red on every PR for reds that are not that PR's; and it runs only `LINT_STEPS`, never
+the five `FORK_LINT_STEPS` — `check-upstream-file-comments` among them. `local/gate-lint.mjs` runs the
+same steps plus those and turns the failures into a verdict against `local/lint-known-red.json`. That is
+green on a base that carries foreign reds and red on the change that adds one. Both lanes run it — see
+§ `local(ci)`: the lint ratchets run on the PR and on the release line (#399).
 
 **To make it a required check**, once it has run at least once on a PR (GitHub will not offer a check
 name that has never reported):
@@ -3549,37 +3550,46 @@ only a diff. So the ~45 ratchets the changed-lines gate does not name — `check
   catalogs`, which has no `if: !cancelled()`, the `Typecheck` step after it was **skipped in all
   eight**, so `pnpm tc` had not run on the release line since 11:41Z that morning.
 
-**What changed.** Both lanes now run the gate, and neither runs `pnpm lint`, which stops at the first
-red:
+**What changed.** Both lanes now run the gate, and neither runs `pnpm lint`:
 
 - `fork-main-gates.yml` gains a `Lint ratchet verdict` step, placed after the recorded-sync-base fetch
   because `check-upstream-file-comments` measures against that commit, and marked `!cancelled()` so a
   red family above it cannot hide the other 45 steps — which is exactly how the eight-push window
   above hid `pnpm tc`. `timeout-minutes` goes 40 → 50 for the added step. The step sets
-  `ORCA_CODE_QUALITY_BASE: HEAD`: the gate also runs `check:code-quality:changed`, whose base on the
-  release line is the release line itself, and a shallow checkout need not carry `origin/main`. A
-  gate red for a missing ref rather than for a finding is the failure this lane exists to prevent.
-- `fork-pr-gates.yml` gains a third job, `fork-pr-gates: lint gate`. It checks out at depth 2 (the
-  gate's changed-lines step diffs a merge commit against its first parent), fetches the recorded sync
-  base, and fetches `origin/main` so a `workflow_dispatch` from a branch diffs that branch rather than
-  failing on a missing ref. Its header comment now records why the lane runs the verdict instead of
-  `pnpm lint`.
+  `ORCA_CODE_QUALITY_BASE: HEAD`, because the gate also runs the diff-scoped steps
+  (`check:code-quality:changed` and the flaky-test-pattern ratchet) whose base on the release line is
+  the release line itself, and a shallow checkout need not carry `origin/main`. A gate red for a
+  missing ref rather than for a finding is the failure this lane exists to prevent. The `Typecheck`
+  step gains `if: !cancelled()` in the same commit: it is the step the eight-push window skipped, and
+  leaving it conditional on the family above it would leave that exact hole open.
+- `fork-pr-gates.yml` gains a third job, `fork-pr-gates: lint gate`. It checks out at depth 2, which
+  carries the merge commit's first parent for the gate's diff-scoped steps, and fetches the recorded
+  sync base for `check-upstream-file-comments`. Outside a pull request there is no merge commit, so the
+  job passes `ORCA_CODE_QUALITY_BASE: HEAD` — a dispatch must not red for a `merge-base origin/main
+  HEAD` a shallow checkout of a branch cannot answer. Its header comment now records why the lane runs
+  the verdict instead of `pnpm lint`, and that the allowlist it reads is the PR's own.
 
-**What the base carries, and where it went.** The 16 new reds are recorded in
+**What the base carries, and where it went.** 16 new reds: 15 are recorded in
 `local/lint-known-red.json` per owning PR, each with the exact count it was measured at, so any further
-growth is a new red:
+growth is a new red; the sixteenth, the localization catalog, is fixed in the tree (below).
 
-| class                        | owner                                      | reds           |
-| ---------------------------- | ------------------------------------------ | -------------- |
-| `fork-comment-422`           | #422, the session-summary timeline         | 2 files        |
-| `fork-comment-424`           | #424, settings search across fields        | 1 file         |
-| `fork-comment-416`           | #416, the cards the sidebar filters hide   | 2 files        |
-| `fork-comment-418`           | #418, a paired host's refused column       | 1 file         |
-| `fork-comment-415`           | #415, Jira list paging                     | 3 files        |
-| `fork-comment-414`           | #414, a failed Jira/Linear read            | 1 file         |
-| `fork-comment-411`           | #411, a cleared clone destination          | 1 file         |
-| `fork-comment-422-425-total` | #422/#424/#425 and the sub-threshold files | the 5648 total |
-| `focus-read-foreign-425`     | #425, the settings write failure           | 2 rows         |
+| class                        | owner                                       | reds           |
+| ---------------------------- | ------------------------------------------- | -------------- |
+| `fork-comment-foreign-422`   | #422, the session-summary timeline          | 2 files        |
+| `fork-comment-foreign-424`   | #424, settings search across fields         | 1 file         |
+| `fork-comment-foreign-416`   | #416, the cards the sidebar filters hide    | 2 files        |
+| `fork-comment-foreign-418`   | #418, a paired host's refused column        | 1 file         |
+| `fork-comment-foreign-415`   | #415, Jira list paging                      | 3 files        |
+| `fork-comment-foreign-414`   | #414, a failed Jira/Linear read             | 1 file         |
+| `fork-comment-foreign-411`   | #411, a cleared clone destination           | 1 file         |
+| `fork-comment-foreign-425`   | #425, the settings write failure            | 1 file         |
+| `fork-comment-foreign-total` | #411–#425 and the files under the threshold | the 5648 total |
+| `focus-read-foreign-425`     | #425, the settings write failure            | 2 rows         |
+
+The total entry is the one that will need maintenance, and that is deliberate: it pins `5648`, so any
+PR that adds or removes even one fork comment line in an upstream-owned file is red until it updates
+the pin. That is the rule `LOCAL-PATCHES.md` already states — no fork comments in upstream files — so
+the churn is the mechanism working rather than a cost to design away.
 
 `check-upstream-file-comments` growth was **not** accepted into the ratchet's own baseline. The 2026-11-08
 sync set that precedent: growth the tree carries stays red and is recorded per owning PR, because

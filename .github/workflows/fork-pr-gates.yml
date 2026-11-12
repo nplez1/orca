@@ -14,14 +14,20 @@ name: Fork PR gates
 # purpose: `ci-unit-selection.mjs` turns one changed file into ~3,000 of 13,064 test files, which is a
 # shard planner, not a PR lane. It runs nightly and now also gates a release.
 #
-# Why the lint verdict and not `pnpm lint` in the third job: `pnpm lint` is one `&&` chain, so it stops
-# at the first failing step and says nothing about the rest — and on this fork's own base it is red,
-# because the base carries foreign reds recorded in `local/lint-known-red.json`. A lane that re-ran it
-# would be red on every PR and teach everyone to ignore red. `local/gate-lint.mjs` runs every step on
-# its own and turns the set of failures into a verdict against that file: a red recorded there is
-# reported with its class and owner, one outside it fails this job. That is what makes the lane green
-# by construction on any base while still failing the PR that introduces a ratchet regression — which
-# #361 did not do when it left `main` red on `check:focus-read-ratchet` (issue #399).
+# Why the lint verdict and not `pnpm lint` in the third job: `pnpm lint` runs its steps in parallel
+# and names every one that failed, so attribution is not the reason. The reasons are two: it has no
+# notion of a known red, so a lane that re-ran it would be red on every PR while the base carries
+# foreign reds; and it does not run `FORK_LINT_STEPS` at all — `check-upstream-file-comments` and the
+# four other fork-only checks. `local/gate-lint.mjs` runs the same steps plus those, and turns the
+# failures into a verdict against `local/lint-known-red.json`: a red recorded there is reported with
+# its class and owner, one outside it fails this job. That is what makes the lane green by
+# construction on any base while still failing the change that adds a ratchet regression — which #361
+# did not do when it left `main` red on `check:focus-read-ratchet` (issue #399).
+#
+# What it does not do: the allowlist it reads is the pull request's own, so a PR can record its own red
+# in the same commit and pass. That is the documented process — the entry carries its class, owner and
+# evidence into the diff where review sees it — and it is the same property `local/gate-unit.mjs` has,
+# so the entry, not the lane, is the thing to review.
 #
 # Draft PRs run it too: the cost is a few free minutes, and a draft whose types do not compile is
 # worth knowing about before it is marked ready.
@@ -134,14 +140,15 @@ jobs:
           fi
           git fetch --depth=1 origin "$base"
 
-      # Why: `check:code-quality:changed` resolves its base from `origin/main`, which a shallow
-      # checkout of a branch ref need not carry. A missing ref would red the gate for the wrong
-      # reason, and a gate that is red for the wrong reason is the failure class this lane exists to
-      # avoid.
-      - name: Fetch the base the changed-lines step diffs against
-        run: git fetch --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-
       # The whole lint chain plus the fork's own steps, each run on its own and judged against
       # `local/lint-known-red.json`: a foreign red at the base passes, this PR's own new one fails.
+      # Why `ORCA_CODE_QUALITY_BASE` outside a pull request: the gate also runs the diff-scoped steps
+      # (`check:code-quality:changed` and the flaky-test-pattern ratchet), whose base is the merge
+      # commit's first parent on a PR — which `fetch-depth: 2` carries — and `merge-base origin/main
+      # HEAD` otherwise, which a shallow checkout of a branch cannot answer. A dispatch would then red
+      # this job for a missing ref rather than for a finding, so it passes `HEAD` exactly as
+      # `fork-main-gates.yml` does. Empty on a pull request, so the merge-commit base applies there.
       - name: Lint ratchet verdict
+        env:
+          ORCA_CODE_QUALITY_BASE: ${{ github.event_name != 'pull_request' && 'HEAD' || '' }}
         run: node local/gate-lint.mjs

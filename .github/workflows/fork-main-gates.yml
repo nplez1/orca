@@ -69,7 +69,11 @@ jobs:
           pnpm run verify:localization-extraction
           pnpm run verify:localization-coverage
 
+      # Why `!cancelled()`: this step had none until 2026-11-12, and the red step above it skipped it
+      # for eight consecutive pushes to `main` — so `pnpm tc` did not run on the release line for a
+      # morning and nothing said so.
       - name: Typecheck
+        if: ${{ !cancelled() }}
         run: pnpm tc
 
       # Why last, and why `!cancelled()`: these two used to sit first, so a failed fetch or a broken
@@ -101,11 +105,12 @@ jobs:
       # reported with its class and owner, one outside the list fails this run.
       # Why after the fetch above: `check-upstream-file-comments` measures against the recorded sync
       # base, which a CI checkout does not have — the same reason the max-lines exemption test needs it.
-      # Why `ORCA_CODE_QUALITY_BASE: HEAD`: the gate also runs `check:code-quality:changed`, whose base
-      # on the release line is the release line itself. That step judges a diff, which is a PR's job and
-      # runs in `fork-pr-gates.yml`; here it must not depend on a remote ref a shallow checkout may
-      # lack, and a gate red for a missing ref rather than for a finding is the failure this lane
-      # exists to prevent.
+      # Why `ORCA_CODE_QUALITY_BASE: HEAD`: the gate also runs the diff-scoped steps
+      # (`check:code-quality:changed` and the flaky-test-pattern ratchet), whose base on the release
+      # line is the release line itself. Those steps judge a diff, which is a PR's job and runs in
+      # `fork-pr-gates.yml`; here they must not depend on a remote ref a shallow checkout may lack, and
+      # a gate red for a missing ref rather than for a finding is the failure this lane exists to
+      # prevent.
       - name: Lint ratchet verdict
         if: ${{ !cancelled() }}
         env:

@@ -171,7 +171,7 @@
       "match": "^src/renderer/src/store/slices/settings/create-settings-slice\\.ts: 5 focus read\\(s\\), baseline allows 4\\. Route by the resource's owner\\. Only a creation flow with no source row may use defaultCreationHost\\.$",
       "class": "focus-read-foreign-425",
       "owner": "local(ci) — #425 d96e42dea30, the settings write failure report",
-      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. The write-failure path #425 added reaches the focus through the settings it just wrote; routing it by the resource owner is a change to that path, and it is the fourth read this file carried before the merge.",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The write-failure path #425 added reaches the focus through the settings it just wrote; routing it by the resource owner is a change to that path, and the file carried four reads before the merge, so this is the fifth.",
       "flaky": false
     },
     {
@@ -179,7 +179,7 @@
       "match": "^src/renderer/src/store/slices/settings/settings-write-failure\\.ts: 1 focus read\\(s\\), baseline allows 0\\. Route by the resource's owner\\. Only a creation flow with no source row may use defaultCreationHost\\.$",
       "class": "focus-read-foreign-425",
       "owner": "local(ci) — #425 d96e42dea30, the settings write failure report",
-      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. The file is new in #425 and calls `defaultScopeHost` to name the host a failed write was aimed at; the ratchet wants that routed by the write target instead, which is that PR's change.",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The file is new in #425 and calls `defaultScopeHost` to name the host a failed write was aimed at; the ratchet wants that routed by the write target instead, which is that PR's change.",
       "flaky": false
     }
   ]

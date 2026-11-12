@@ -23,10 +23,11 @@ describe('the cheap PR lane', () => {
     expect(runScripts(GATES)).toContainEqual(expect.stringContaining('node local/gate-lint.mjs'))
   })
 
-  it('runs the lint verdict, not `pnpm lint`, which stops at the first red on its own base', () => {
-    // `pnpm lint` is one `&&` chain and is red on this fork's base; `local/gate-lint.mjs` runs every
-    // step on its own and classifies them against `local/lint-known-red.json`, so a foreign red passes
-    // and a new one fails. A permanently red required check is worse than no check.
+  it('runs the lint verdict, not `pnpm lint`, which cannot pass on a base that carries reds', () => {
+    // `pnpm lint` names every failing step, so attribution is not the reason to prefer the gate: it
+    // has no notion of a known red, and it never runs `FORK_LINT_STEPS`. `local/gate-lint.mjs` runs
+    // both and classifies them against `local/lint-known-red.json`, so a foreign red passes and a new
+    // one fails. A permanently red required check is worse than no check.
     const scripts = runScripts(GATES).join('\n')
 
     expect(scripts).not.toMatch(/^ {2}pnpm lint$|pnpm run lint$/m)
