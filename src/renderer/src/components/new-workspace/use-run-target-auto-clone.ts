@@ -17,6 +17,7 @@ import {
   type ProjectCloneOutcome
 } from './project-clone-in-flight'
 import { toastUnseenRunTargetClone } from './run-target-clone-unseen-toast'
+import { resolveRunTargetCloneUrl } from './run-target-clone-url'
 
 /** The host a clone is for, kept with its row so the picker and the status line name the same host. */
 export type RunTargetCloneTarget = {
@@ -41,19 +42,6 @@ export type RunTargetCloneStatus =
 
 /** Advanced-section values; empty means "use the default this composer derived". */
 export type RunTargetCloneOverrides = { url: string; destination: string }
-
-/**
- * The URL a clone would use: the Advanced override when it names one, else the project's own remote.
- *
- * Availability reads this too, because a project with no remote is only clonable through the
- * override — deciding a host row from the remote alone contradicts the field the user just filled in.
- */
-export function resolveRunTargetCloneUrl(
-  overrides: RunTargetCloneOverrides,
-  defaultCloneUrl: string
-): string {
-  return overrides.url.trim() || defaultCloneUrl.trim()
-}
 
 export type RunTargetAutoClone = {
   status: RunTargetCloneStatus
@@ -310,16 +298,7 @@ export function useRunTargetAutoClone({
         }
       )
     },
-    [
-      cloneOnce,
-      defaultCloneUrl,
-      onProvisioned,
-      // Why the object: the body resolves the URL through resolveRunTargetCloneUrl, which reads the
-      // whole override, so its identity is the dependency.
-      overrides,
-      projectId,
-      projectName
-    ]
+    [cloneOnce, defaultCloneUrl, onProvisioned, overrides, projectId, projectName]
   )
   useLayoutEffect(() => {
     if (projectId) {

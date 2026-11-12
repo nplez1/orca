@@ -7,7 +7,8 @@ import {
   rewriteGitRemoteTransport,
   type GitRemoteTransport
 } from '../../../../shared/git/remotes/git-remote-url-transport'
-import { resolveRunTargetCloneUrl, type RunTargetAutoClone } from './use-run-target-auto-clone'
+import { resolveRunTargetCloneUrl } from './run-target-clone-url'
+import type { RunTargetAutoClone } from './use-run-target-auto-clone'
 
 const TRANSPORTS: readonly GitRemoteTransport[] = ['ssh', 'https']
 

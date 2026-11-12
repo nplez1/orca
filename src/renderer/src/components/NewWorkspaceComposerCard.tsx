@@ -41,7 +41,7 @@ import { useNewWorkspaceComposerFileDrop } from './new-workspace/use-new-workspa
 import { useComposerFileDragOver } from './new-workspace/use-composer-file-drag-over'
 import type { ProjectHostSetupProvisioning } from './new-workspace/use-workspace-copy-target'
 import { getRunTargetCloneAvailability } from './new-workspace/run-target-clone-availability'
-import { resolveRunTargetCloneUrl } from './new-workspace/use-run-target-auto-clone'
+import { resolveRunTargetCloneUrl } from './new-workspace/run-target-clone-url'
 import { resolveComposerProjectName } from './new-workspace/composer-project-name'
 import { buildDefaultAgentSettingsUpdate } from '../../../shared/agent-launch/choices/default-agent-settings'
 
