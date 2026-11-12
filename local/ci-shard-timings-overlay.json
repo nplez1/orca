@@ -1,8 +1,9 @@
 {
   "version": 1,
-  "note": "Fork-added unit tests heavy enough to move a shard. Merged over ci-shard-timings.json by readTimingBaseline, which lets the baseline win on any collision. Regenerate with `node local/ci-shard-timing-overlay.mjs import <artifact-dir...>`.",
+  "note": "Fork-added unit tests heavy enough to move a shard. Merged over ci-shard-timings.json by readTimingBaseline, which lets the baseline win on any collision. Regenerate with `node local/ci-shard-timings-overlay.mjs import <artifact-dir...>`.",
   "source": {
     "runId": "43018513608",
+    "attempt": "1",
     "sha": "dbb25491d3e0b913eb7a6b95c6eef42843cab35e",
     "runner": "ubuntu-24.04-arm",
     "metric": "unit-report-file-duration"
