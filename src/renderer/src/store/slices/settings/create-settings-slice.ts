@@ -25,7 +25,7 @@ import * as ownerHydration from './settings-owner-hydration-publication'
 import { persistVisibilityAwareSettings } from './worktree-visibility-settings-write'
 import { getSettingsFocusedExecutionHostId } from '../../../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import { handleSettingsWriteFailure } from './settings-write-failure'
+import { handleSettingsWriteFailure, settingsWriteFailureHostName } from './settings-write-failure'
 import { normalizeSettingsUpdates } from './settings-update-normalization'
 
 export type SettingsSlice = SettingsSearchState & {
@@ -169,11 +169,17 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
     ownerHydration.awaitOwnerWorktreeVisibilityDefaultsHydration(get),
 
   updateSettings: async (updates) => {
+    // Why before the write: a slow write can outlive a change of the focused host.
+    const hostName = settingsWriteFailureHostName({
+      updates,
+      settings: get().settings,
+      runtimeEnvironments: get().runtimeEnvironments
+    })
     let context: SettingsWriteContext
     try {
       context = await persistSettingsWrite(set, get, updates)
     } catch (err) {
-      handleSettingsWriteFailure({ error: err, updates, set, get })
+      handleSettingsWriteFailure({ error: err, hostName, set })
       return
     }
     try {

@@ -1,6 +1,6 @@
 // @protected-copy: preserve copy used by security settings.
 import type React from 'react'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip'
@@ -315,22 +315,21 @@ export function NumberField({
   const writeFailureRevision = useAppStateValue((state) => state.settingsWriteFailureRevision)
   const [prevWriteFailureRevision, setPrevWriteFailureRevision] = useState(writeFailureRevision)
   // The draft this field last handed to a write, so a rejected write can drop just that value.
-  const attemptedDraftRef = useRef<string | null>(null)
+  const [attemptedDraft, setAttemptedDraft] = useState<string | null>(null)
 
   if (value !== prevValue) {
     setPrevValue(value)
     setDraft(Number.isFinite(value) ? String(value) : '')
-    attemptedDraftRef.current = null
+    setAttemptedDraft(null)
   }
 
   if (writeFailureRevision !== prevWriteFailureRevision) {
     setPrevWriteFailureRevision(writeFailureRevision)
-    const attempted = attemptedDraftRef.current
-    attemptedDraftRef.current = null
     // A field the user has typed over since keeps what they typed.
-    if (attempted !== null && attempted === draft) {
+    if (attemptedDraft !== null && attemptedDraft === draft) {
       setDraft(Number.isFinite(value) ? String(value) : '')
     }
+    setAttemptedDraft(null)
   }
 
   const commit = (): void => {
@@ -349,7 +348,7 @@ export function NumberField({
       setDraft('')
       // Re-blurring an already-empty field must not write the setting again.
       if (value !== undefined) {
-        attemptedDraftRef.current = ''
+        setAttemptedDraft('')
         onClear()
       }
       return
@@ -357,7 +356,7 @@ export function NumberField({
     if (Number.isFinite(next) && (!integer || Number.isSafeInteger(next))) {
       const clamped = max === undefined ? Math.max(min, next) : Math.min(max, Math.max(min, next))
       if (clamped !== value) {
-        attemptedDraftRef.current = String(clamped)
+        setAttemptedDraft(String(clamped))
         onChange(clamped)
       }
       setDraft(String(clamped))

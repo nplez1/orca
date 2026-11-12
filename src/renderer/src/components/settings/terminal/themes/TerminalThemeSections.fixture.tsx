@@ -9,7 +9,8 @@ import { WarpThemeImportModal } from './WarpThemeImportModal'
 function TerminalThemesFixture(): React.JSX.Element {
   const settings = useAppStore((state) => state.settings)
   const updateSettings = useAppStore((state) => state.updateSettings)
-  const warpThemes = useWarpThemeImport(updateSettings, settings)
+  const updateSettingsOrThrow = useAppStore((state) => state.updateSettingsOrThrow)
+  const warpThemes = useWarpThemeImport(updateSettingsOrThrow, settings)
   if (!settings) {
     throw new Error('The theme fixture requires settings.')
   }

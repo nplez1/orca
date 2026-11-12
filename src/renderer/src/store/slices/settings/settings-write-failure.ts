@@ -11,7 +11,7 @@ import { observeSettingsPublicationGeneration } from './settings-owner-hydration
 const SETTINGS_WRITE_FAILURE_TOAST_ID = 'settings-write-failed'
 
 /** The visibility-defaults branch is the only settings write that reaches a paired host. */
-function failedWriteHostName(args: {
+export function settingsWriteFailureHostName(args: {
   updates: Partial<GlobalSettings>
   settings: GlobalSettings | null
   runtimeEnvironments: AppState['runtimeEnvironments']
@@ -29,13 +29,8 @@ function failedWriteHostName(args: {
   )
 }
 
-function notifySettingsWriteFailure(args: {
-  error: unknown
-  updates: Partial<GlobalSettings>
-  settings: GlobalSettings | null
-  runtimeEnvironments: AppState['runtimeEnvironments']
-}): void {
-  const hostName = failedWriteHostName(args)
+function notifySettingsWriteFailure(args: { error: unknown; hostName: string | null }): void {
+  const { hostName } = args
   toast.error(
     hostName
       ? translate(
@@ -76,16 +71,14 @@ function isStoredSettingsKey(settings: GlobalSettings, key: string): key is keyo
   return key in settings
 }
 
-/** Main can hold a newer value than the store when a write rejects after it committed. */
+/**
+ * Main can hold a newer value than the store when a write rejects after it committed, and a newer
+ * write's fence can drop an earlier successful one, so reconcile every key main reports.
+ */
 async function restoreSettingsAfterFailedWrite(args: {
-  updates: Partial<GlobalSettings>
   set: SettingsStateSetter
   shouldPublish: () => boolean
 }): Promise<void> {
-  const keys = Object.keys(args.updates).filter((key) => !RESTORE_SKIPPED_KEYS.has(key))
-  if (keys.length === 0) {
-    return
-  }
   let stored: GlobalSettings | null
   try {
     stored = await window.api.settings.get()
@@ -102,8 +95,8 @@ async function restoreSettingsAfterFailedWrite(args: {
       return {}
     }
     let restored: GlobalSettings | null = null
-    for (const key of keys) {
-      if (!isStoredSettingsKey(stored, key)) {
+    for (const key of Object.keys(stored)) {
+      if (RESTORE_SKIPPED_KEYS.has(key) || !isStoredSettingsKey(current, key)) {
         continue
       }
       const storedValue = stored[key]
@@ -119,20 +112,14 @@ async function restoreSettingsAfterFailedWrite(args: {
 
 export function handleSettingsWriteFailure(args: {
   error: unknown
-  updates: Partial<GlobalSettings>
+  /** Captured before the write, because the host picker can move while a slow write is in flight. */
+  hostName: string | null
   set: SettingsStateSetter
-  get: () => AppState
 }): void {
   console.error('Failed to update settings:', args.error)
   const shouldPublish = observeSettingsPublicationGeneration()
-  const { settings, runtimeEnvironments } = args.get()
-  notifySettingsWriteFailure({
-    error: args.error,
-    updates: args.updates,
-    settings,
-    runtimeEnvironments
-  })
+  notifySettingsWriteFailure({ error: args.error, hostName: args.hostName })
   // Why: a draft-based control cannot see a rejected write through its value prop alone.
   args.set((state) => ({ settingsWriteFailureRevision: state.settingsWriteFailureRevision + 1 }))
-  void restoreSettingsAfterFailedWrite({ updates: args.updates, set: args.set, shouldPublish })
+  void restoreSettingsAfterFailedWrite({ set: args.set, shouldPublish })
 }

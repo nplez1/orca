@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAppStateValue } from '@/store/retained-views/app-state-view'
 
 // Match repository-hook script drafts’ debounce.
 const SETTINGS_TEXT_COMMIT_DEBOUNCE_MS = 700
@@ -19,6 +20,8 @@ export function useDebouncedSettingsTextDraft(args: {
   const draftRef = useRef(draft)
   const commitRef = useRef(commit)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const writeFailureRevision = useAppStateValue((state) => state.settingsWriteFailureRevision)
+  const appliedWriteFailureRevisionRef = useRef(writeFailureRevision)
 
   // Publish after commit because React may replay renders.
   useEffect(() => {
@@ -33,6 +36,20 @@ export function useDebouncedSettingsTextDraft(args: {
     draftRef.current = value
     setDraft(value)
   }, [value])
+
+  // A rejected write leaves `value` untouched, so the draft needs its own revert.
+  // oxlint-disable-next-line react-doctor/no-derived-state-effect -- Why: the revert key is an external write-failure signal, and a pending debounce timer must keep the user's typing.
+  useEffect(() => {
+    if (writeFailureRevision === appliedWriteFailureRevisionRef.current) {
+      return
+    }
+    appliedWriteFailureRevisionRef.current = writeFailureRevision
+    if (timerRef.current !== null) {
+      return
+    }
+    draftRef.current = value
+    setDraft(value)
+  }, [writeFailureRevision, value])
 
   const flush = useCallback(() => {
     if (timerRef.current === null) {
