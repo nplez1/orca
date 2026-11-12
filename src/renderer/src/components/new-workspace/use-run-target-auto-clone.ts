@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import { joinHostPath } from '../../../../shared/host-path-join'
@@ -62,7 +62,7 @@ type CloneRequest = {
   url: string
   destinationOverride: string
   folderName?: string
-  /** True once the user is still here but has moved to another host, so nothing should be cloned. */
+  /** True once the user moved to another host or dropped the request, so nothing should be cloned. */
   isSuperseded: () => boolean
 }
 
@@ -97,8 +97,9 @@ export function useRunTargetAutoClone({
     url: '',
     destination: ''
   })
-  // Only the host the user is currently waiting on may drive the status; a clone they moved away
-  // from still finishes on the host, but must not retarget the composer or overwrite its state.
+  // Only the host the user is currently waiting on may drive the status, and the only thing that
+  // abandons a clone: another host pick, or `clear()`. Unmount leaves it alone, so a clone a closed
+  // composer was still waiting on keeps running — and a reopened composer can still join it.
   const pendingKeyRef = useRef<string | null>(null)
   // The clone a destination override was written for, kept across clears: a path names one machine,
   // so it must not follow the user to another host — but a value typed while nothing is pending
@@ -106,6 +107,12 @@ export function useRunTargetAutoClone({
   const destinationKeyRef = useRef<string | null>(null)
   // A closed composer must not be retargeted by a clone it started before it went away.
   const mountedRef = useRef(true)
+  // The latest `run` with the project it belongs to, so an outcome can start the clone a dead
+  // composer left it waiting on — but never one for a project the user has since switched away from.
+  const runRef = useRef<{
+    run: (option: NeedsSetupProjectHostOption, folderName?: string) => void
+    projectId: string
+  } | null>(null)
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -232,14 +239,25 @@ export function useRunTargetAutoClone({
           option,
           url: overrides.url.trim() || defaultCloneUrl.trim(),
           destinationOverride,
-          // Why unmount does not count: a reopened composer may be waiting on this same clone.
-          isSuperseded: () => mountedRef.current && pendingKeyRef.current !== key,
+          // Why the key alone and not the mount: a reopened composer may be waiting on this same
+          // clone, so only the user moving on — another host pick, or `clear()` on a project
+          // switch — may abandon it. A closed composer leaves the ref alone.
+          isSuperseded: () => pendingKeyRef.current !== key,
           ...(requestedFolderName ? { folderName: requestedFolderName } : {})
         })
       )
       const applyOutcome = (outcome: ProjectCloneOutcome): void => {
         // Why both: an unmounted composer and one that moved to another host must not be retargeted.
-        if (!mountedRef.current || pendingKeyRef.current !== key || outcome.kind === 'abandoned') {
+        if (!mountedRef.current || pendingKeyRef.current !== key) {
+          return
+        }
+        if (outcome.kind === 'abandoned') {
+          // Only a clone another composer started can be abandoned while this one still wants it —
+          // joining it would block Create on a clone nobody will run, so this one starts its own.
+          const latest = runRef.current
+          if (latest?.projectId === projectId) {
+            latest.run(option, requestedFolderName)
+          }
           return
         }
         if (outcome.kind === 'provisioned') {
@@ -270,6 +288,11 @@ export function useRunTargetAutoClone({
     },
     [cloneOnce, defaultCloneUrl, onProvisioned, overrides.destination, overrides.url, projectId]
   )
+  useLayoutEffect(() => {
+    if (projectId) {
+      runRef.current = { run, projectId }
+    }
+  })
 
   const start = useCallback(
     (option: NeedsSetupProjectHostOption): void => {

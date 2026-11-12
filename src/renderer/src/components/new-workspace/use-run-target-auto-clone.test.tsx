@@ -264,6 +264,118 @@ describe('useRunTargetAutoClone', () => {
     expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: 'runtime:env-c' })
   })
 
+  it('starts nothing for a host abandoned before the composer closed', async () => {
+    let releaseProbe: (value: string) => void = () => {}
+    mocks.resolveCloneParentForHost.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseProbe = resolve
+        })
+    )
+    const { result, unmount } = renderClone()
+
+    act(() => result.current.start(option))
+    // A project switch calls `clear()` too, so this covers both ways of moving on.
+    act(() => result.current.clear())
+    unmount()
+    await act(async () => {
+      releaseProbe('/home/abandoned')
+    })
+
+    // Why: closing the composer must not revive a clone the user had already dropped.
+    expect(mocks.setupProjectClone).not.toHaveBeenCalled()
+  })
+
+  it('starts nothing for the host it was moved off before the composer closed', async () => {
+    let releaseProbe: (value: string) => void = () => {}
+    mocks.resolveCloneParentForHost.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseProbe = resolve
+        })
+    )
+    const { result, unmount } = renderClone()
+
+    act(() => result.current.start(option))
+    await act(async () => result.current.start(OTHER_HOST))
+    unmount()
+    await act(async () => {
+      releaseProbe('/home/abandoned')
+    })
+
+    expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
+    expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: 'runtime:env-c' })
+  })
+
+  it('starts nothing for a host abandoned while the clone target was being checked', async () => {
+    let releaseCheck: (value: null) => void = () => {}
+    mocks.checkCloneTargetOn.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseCheck = resolve
+        })
+    )
+    const { result, unmount } = renderClone()
+
+    await act(async () => result.current.start(option))
+    act(() => result.current.clear())
+    unmount()
+    await act(async () => {
+      releaseCheck(null)
+    })
+
+    // Why: the second checkpoint is the last one before the clone is started.
+    expect(mocks.setupProjectClone).not.toHaveBeenCalled()
+  })
+
+  it('keeps running a clone the closed composer was still waiting on', async () => {
+    let releaseProbe: (value: string) => void = () => {}
+    mocks.resolveCloneParentForHost.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseProbe = resolve
+        })
+    )
+    const { result, unmount } = renderClone()
+
+    act(() => result.current.start(option))
+    unmount()
+    await act(async () => {
+      releaseProbe(DESTINATION)
+    })
+
+    // Why: closing the composer is not the user moving away — they may reopen and join this clone.
+    expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
+    expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: HOST })
+  })
+
+  it('starts its own clone when the one it joined was abandoned by a closed composer', async () => {
+    let releaseProbe: (value: string) => void = () => {}
+    mocks.resolveCloneParentForHost.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseProbe = resolve
+        })
+    )
+    const first = renderClone()
+    act(() => first.result.current.start(option))
+    act(() => first.result.current.clear())
+    first.unmount()
+    const onProvisioned = vi.fn()
+    const second = renderClone(onProvisioned)
+    await act(async () => second.result.current.start(option))
+    await act(async () => {
+      releaseProbe('/home/abandoned')
+    })
+
+    // Why: joining a promise the closed composer had abandoned would block Create on a clone
+    // nobody runs, so the composer that still wants the host has to clone it itself.
+    expect(mocks.setupProjectClone).toHaveBeenCalledTimes(1)
+    expect(mocks.setupProjectClone.mock.calls[0][0]).toMatchObject({ hostId: HOST })
+    expect(onProvisioned).toHaveBeenCalledWith(JSON.stringify(['setup-new', HOST]), 'cloned')
+    expect(second.result.current.status.kind).toBe('idle')
+  })
+
   it('keeps a destination typed while no clone was pending for the host picked next', async () => {
     const { result } = renderClone()
 
