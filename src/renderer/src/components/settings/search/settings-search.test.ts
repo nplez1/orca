@@ -90,7 +90,7 @@ describe('settings search ranking', () => {
     ])
     const settingTitleScore = scoreSettingsSearch('font', [{ title: 'Other' }, { title: 'Font' }])
     const descriptionScore = scoreSettingsSearch('default', [
-      { title: 'Font size', description: 'Default terminal font size' }
+      { title: 'Font size', description: 'Default' }
     ])
     const keywordScore = scoreSettingsSearch('typography', [
       { title: 'Font size', keywords: ['typography'] }

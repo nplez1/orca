@@ -167,10 +167,10 @@ function scoreSettingsSearchEntries(
     return SETTINGS_SEARCH_EMPTY_QUERY_SCORE
   }
 
-  const tokens = matchMode === 'words' ? tokenizeSettingsSearchQuery(normalizedQuery) : []
   // Why whitespace rather than the token count: dedupe leaves "theme theme" one token, but it is
   // still a two-word query, and scoring it as a phrase would match nothing.
   const splitsWords = matchMode === 'words' && /\s/.test(normalizedQuery)
+  const tokens = splitsWords ? tokenizeSettingsSearchQuery(normalizedQuery) : []
   const values = Array.isArray(entries) ? entries : [entries]
   return values.reduce((score, entry, index) => {
     // The first entry is the pane title; rank it above setting titles.
