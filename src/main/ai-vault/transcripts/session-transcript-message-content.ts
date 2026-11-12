@@ -52,13 +52,24 @@ function toolResultText(textParts: Iterable<string>): TranscriptText {
 export function transcriptMessagesFromContent(
   role: PreviewRole,
   content: unknown,
-  timestamp: string | null
+  timestamp: string | null,
+  isMeta = false
 ): TranscriptMessage[] {
-  return transcriptMessagesFromDecodedMessage(decodeSessionMessage(role, content, timestamp))
+  return transcriptMessagesFromDecodedMessage(
+    decodeSessionMessage(role, content, timestamp),
+    isMeta
+  )
 }
 
+/**
+ * One message per block, plus the message's own text.
+ *
+ * `isMeta` is the record's own flag, which the decoded text cannot reproduce: it marks a turn the
+ * harness wrote into the user role, and only the parser holding the raw record knows it.
+ */
 export function transcriptMessagesFromDecodedMessage(
-  decoded: DecodedSessionMessage
+  decoded: DecodedSessionMessage,
+  isMeta = false
 ): TranscriptMessage[] {
   const messages: TranscriptMessage[] = []
   const textRole = transcriptMessageRole(decoded.role)
@@ -87,7 +98,7 @@ export function transcriptMessagesFromDecodedMessage(
         )
       : null
     if (message) {
-      messages.unshift(message)
+      messages.unshift(isMeta ? { ...message, isMeta: true as const } : message)
     }
   }
   return messages

@@ -26,6 +26,14 @@ export type TranscriptMessage = {
    * text, and a tool result that happens to start with `name: ` reads as a call.
    */
   toolKind?: 'call' | 'result'
+  /**
+   * The harness wrote this turn, not the reader — a command output, a skill body, a continuation.
+   *
+   * Why carried and not re-derived: a consumer sees the decoded text only, and the record's own
+   * `isMeta` is the one signal the text cannot reproduce — a meta turn whose text has no tag reads
+   * as an ordinary prompt. The session scanner already refuses to seed a title from these turns.
+   */
+  isMeta?: true
   timestamp: string | null
 }
 

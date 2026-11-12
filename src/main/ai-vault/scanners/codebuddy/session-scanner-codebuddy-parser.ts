@@ -123,7 +123,9 @@ export function consumeCodebuddySessionLine(state: CodebuddySessionParseState, l
       role: 'user',
       text,
       timestamp: record.timestamp,
-      seedFirstUserPrompt: !isMetaUserTurn
+      seedFirstUserPrompt: !isMetaUserTurn,
+      // `skipRun` is this provider's `isMeta`: a turn never sent as user input.
+      isMeta: asRecord(record.providerData)?.skipRun === true
     })
     if (text && !isMetaUserTurn) {
       state.firstUserTitle ??= text

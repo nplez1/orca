@@ -31,7 +31,10 @@ import { rewriteSessionSummaryReports } from './session-summary-report'
 import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
 import type { SessionSummarySourceEvent } from './session-summary-event-digest'
 import { planSessionSummaryRenderItems } from './session-summary-render-plan'
-import { planSessionSummaryTimelineMarkers } from './session-summary-timeline'
+import {
+  planSessionSummaryTimelineMarkers,
+  isSessionSummaryReaderMessage
+} from './session-summary-timeline'
 
 import {
   buildSessionSummaryChunks,
@@ -79,6 +82,9 @@ const EMPTY_DELTA: SessionSummaryLedgerDelta = {}
  * This is the "since I last interacted" line, and it is derived here rather than stored by the
  * UI: the transcript is the one artifact every host folds, and it survives a restart, a
  * reconnect and a paired host, which a "the pane was closed at 14:02" cursor does not.
+ *
+ * Why only a real prompt counts: a harness turn arrives as a user record too, and letting one move
+ * this boundary hides the reader's own message behind it.
  */
 function readerMessagesAfter(
   ledger: SessionSummaryLedger,
@@ -88,7 +94,7 @@ function readerMessagesAfter(
   let lastUserMessageIndex = ledger.lastUserMessageIndex
   let userMessageCount = ledger.userMessageCount
   for (let index = 0; index < events.length; index += 1) {
-    if (events[index].role === 'user') {
+    if (isSessionSummaryReaderMessage(events[index])) {
       lastUserMessageIndex = baseIndex + index
       userMessageCount += 1
     }
