@@ -29,6 +29,7 @@ import {
 } from './dragged-worktree-copies'
 import {
   notifyWorkspaceKanbanColumnRefusal,
+  partitionWorkspaceKanbanDropCards,
   resolveWorkspaceKanbanColumnRefusal
 } from '../../workspace-board/drag/workspace-kanban-foreign-column-refusal'
 
@@ -49,19 +50,11 @@ function refusedDropCards(
   rowsFor: ReturnType<typeof dropWriteRows>,
   worktreeIds: readonly string[],
   status: WorkspaceStatus
-): { refused: Worktree[]; total: number } {
+): { refused: Worktree[]; movableCount: number } {
   const state = useAppStore.getState()
-  const refused: Worktree[] = []
-  let total = 0
-  for (const worktreeId of worktreeIds) {
-    for (const row of rowsFor.status(worktreeId)) {
-      total += 1
-      if (!isWorkspaceStatusAllowedOnHost(state, row, status)) {
-        refused.push(row)
-      }
-    }
-  }
-  return { refused, total }
+  const cards = worktreeIds.flatMap((worktreeId) => rowsFor.status(worktreeId))
+  const { refused, movableCount } = partitionWorkspaceKanbanDropCards(state, cards, status)
+  return { refused, movableCount }
 }
 
 // Route every status/rank write through dropWriteRows because IDs repeat across hosts.
@@ -218,9 +211,13 @@ export function useWorktreeStatusMutations(args: {
       const state = useAppStore.getState()
       const rowsFor = dropWriteRows(state, dropArgs.draggedCopies)
       // Why: the store drops a foreign column's write, so report it rather than letting the card snap back.
-      const { refused, total } = refusedDropCards(rowsFor, dropArgs.worktreeIds, dropArgs.status)
+      const { refused, movableCount } = refusedDropCards(
+        rowsFor,
+        dropArgs.worktreeIds,
+        dropArgs.status
+      )
       notifyWorkspaceKanbanColumnRefusal(
-        resolveWorkspaceKanbanColumnRefusal(state, refused, dropArgs.status, total)
+        resolveWorkspaceKanbanColumnRefusal(state, refused, dropArgs.status, movableCount)
       )
       const worktreeIds = idsAcceptingStatus(rowsFor, dropArgs.worktreeIds, dropArgs.status)
       if (worktreeIds.length === 0) {

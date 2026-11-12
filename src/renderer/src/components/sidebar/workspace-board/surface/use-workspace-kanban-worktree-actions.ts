@@ -17,9 +17,9 @@ import type {
 } from '../../../../../../shared/worktree/types'
 import type { WorktreeMetaBatchUpdate } from '../../../../store/slices/worktrees/metadata/worktree-meta-update-options'
 import type { WorktreeManualOrderCatalog } from '../../worktree-list/drag/worktree-manual-order-catalog'
-import { isWorkspaceStatusAllowedOnHost } from '@/store/workspaces/status/host-workspace-status-columns'
 import {
   notifyWorkspaceKanbanColumnRefusal,
+  partitionWorkspaceKanbanDropCards,
   resolveWorkspaceKanbanColumnRefusal
 } from '../drag/workspace-kanban-foreign-column-refusal'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
@@ -112,27 +112,18 @@ export function useWorkspaceKanbanWorktreeActions(args: {
     }) => {
       // Cards that can't take this status (another paired host's column) aren't re-ranked either.
       const state = useAppStore.getState()
-      const rows: Worktree[] = []
-      const refused: Worktree[] = []
-      for (const key of drop.worktreeKeys) {
+      const dragged = drop.worktreeKeys.flatMap((key) => {
         const current = args.worktreeByKey.get(key)
-        if (!current) {
-          continue
-        }
-        if (isWorkspaceStatusAllowedOnHost(state, current, drop.status)) {
-          rows.push(current)
-        } else {
-          refused.push(current)
-        }
-      }
+        return current ? [current] : []
+      })
+      const {
+        accepted: rows,
+        refused,
+        movableCount
+      } = partitionWorkspaceKanbanDropCards(state, dragged, drop.status)
       // Why: the drop did nothing for these cards, so say which host's column refused them.
       notifyWorkspaceKanbanColumnRefusal(
-        resolveWorkspaceKanbanColumnRefusal(
-          state,
-          refused,
-          drop.status,
-          rows.length + refused.length
-        )
+        resolveWorkspaceKanbanColumnRefusal(state, refused, drop.status, movableCount)
       )
       if (rows.length === 0) {
         return

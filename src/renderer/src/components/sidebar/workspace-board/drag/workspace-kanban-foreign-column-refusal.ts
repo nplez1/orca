@@ -11,11 +11,13 @@ import {
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import { selectExecutionHostDisplayLabel } from '@/runtime/hosts/display/execution-host-display-label'
+import { getWorkspaceStatus } from '../../../../../../shared/workspace-statuses'
 import { translate } from '@/i18n/i18n'
-import type { WorkspaceStatus } from '../../../../../../shared/worktree/types'
+import type { WorkspaceStatus, Worktree } from '../../../../../../shared/worktree/types'
 
-/** A dragged card: the rule's owner plus the host id its label resolves from. */
-export type WorkspaceKanbanRefusalCard = StatusColumnOwner & { hostId?: ExecutionHostId }
+/** A dragged card: the rule's owner plus the host and status its label and no-op check read. */
+export type WorkspaceKanbanRefusalCard = StatusColumnOwner &
+  Pick<Worktree, 'workspaceStatus'> & { hostId?: ExecutionHostId }
 
 /** Why a column will not take the dragged cards, in terms the user can act on. */
 export type WorkspaceKanbanColumnRefusal = {
@@ -47,7 +49,10 @@ function columnLabel(state: AppState, status: WorkspaceStatus): string {
   )
 }
 
-/** Null when every card may enter the column; otherwise the reason to show. */
+/**
+ * Null when the column took every card it would move; otherwise the reason to show.
+ * `refusedCards` and `totalCount` come from `partitionWorkspaceKanbanDropCards`.
+ */
 export function resolveWorkspaceKanbanColumnRefusal(
   state: AppState,
   refusedCards: readonly WorkspaceKanbanRefusalCard[],
@@ -71,14 +76,57 @@ export function resolveWorkspaceKanbanColumnRefusal(
   }
 }
 
-/** Whether every dragged card is barred, i.e. the lane must refuse the drag rather than partly take it. */
+/** A card already in the column is a no-op, never a refusal, so it says nothing about hosts. */
+function isCardMovingTo(
+  state: AppState,
+  card: WorkspaceKanbanRefusalCard,
+  status: WorkspaceStatus
+): boolean {
+  return getWorkspaceStatus(card, selectAllKnownWorkspaceStatuses(state)) !== status
+}
+
+/**
+ * Splits the dragged cards the way the commit does: accepted cards, cards this drop would move that
+ * the column bars, and how many would move at all (the count a message quotes).
+ */
+export function partitionWorkspaceKanbanDropCards<C extends WorkspaceKanbanRefusalCard>(
+  state: AppState,
+  cards: readonly C[],
+  status: WorkspaceStatus
+): { accepted: C[]; refused: C[]; movableCount: number } {
+  const accepted: C[] = []
+  const refused: C[] = []
+  let movableCount = 0
+  for (const card of cards) {
+    if (isCardMovingTo(state, card, status)) {
+      movableCount += 1
+    }
+    if (isWorkspaceStatusAllowedOnHost(state, card, status)) {
+      accepted.push(card)
+    } else if (isCardMovingTo(state, card, status)) {
+      refused.push(card)
+    }
+  }
+  return { accepted, refused, movableCount }
+}
+
+/** Whether every card this drop would move is barred, so the lane must refuse rather than partly take it. */
 export function isWorkspaceKanbanColumnRefused(
   state: AppState,
   cards: readonly WorkspaceKanbanRefusalCard[],
   status: WorkspaceStatus
 ): boolean {
-  return (
-    cards.length > 0 && cards.every((card) => !isWorkspaceStatusAllowedOnHost(state, card, status))
+  const { refused, movableCount } = partitionWorkspaceKanbanDropCards(state, cards, status)
+  return refused.length > 0 && refused.length === movableCount
+}
+
+/** False when a local column or no paired host defines this id, so no refusal is possible and no scan is needed. */
+export function canRefuseWorkspaceKanbanColumn(state: AppState, status: WorkspaceStatus): boolean {
+  if (state.workspaceStatuses.some((column) => column.id === status)) {
+    return false
+  }
+  return Object.values(state.hostWorkspaceStatuses ?? {}).some((columns) =>
+    columns.some((column) => column.id === status)
   )
 }
 
@@ -146,5 +194,6 @@ export function notifyWorkspaceKanbanColumnRefusal(
     return
   }
   const { title, description } = formatWorkspaceKanbanColumnRefusal(refusal)
-  toast.warning(title, { description })
+  // Why the id: retrying the same refused drop replaces the warning instead of stacking it.
+  toast.warning(title, { description, id: `workspace-board-foreign-column:${refusal.status}` })
 }

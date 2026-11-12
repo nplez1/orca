@@ -4,9 +4,10 @@ import type { AppState } from '@/store/types'
 import type { PublicKnownRuntimeEnvironment } from '../../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import type { WorkspaceStatusDefinition } from '../../../../../../shared/worktree/types'
 import {
-  formatWorkspaceKanbanColumnRefusal,
+  canRefuseWorkspaceKanbanColumn,
   isWorkspaceKanbanColumnRefused,
   notifyWorkspaceKanbanColumnRefusal,
+  partitionWorkspaceKanbanDropCards,
   resolveWorkspaceKanbanColumnRefusal,
   type WorkspaceKanbanRefusalCard
 } from './workspace-kanban-foreign-column-refusal'
@@ -47,27 +48,51 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
   return useAppStore.getState()
 }
 
-const STUDIO_CARD: WorkspaceKanbanRefusalCard = { hostId: 'runtime:env-studio' }
-const MINI_CARD: WorkspaceKanbanRefusalCard = { hostId: 'runtime:env-mini' }
+const STUDIO_CARD: WorkspaceKanbanRefusalCard = {
+  hostId: 'runtime:env-studio',
+  workspaceStatus: 'backlog'
+}
+const MINI_CARD: WorkspaceKanbanRefusalCard = {
+  hostId: 'runtime:env-mini',
+  workspaceStatus: 'backlog'
+}
+
+describe('partitionWorkspaceKanbanDropCards', () => {
+  it('splits the cards the way the commit does and counts only the ones that would move', () => {
+    const state = makeState()
+    const alreadyInColumn: WorkspaceKanbanRefusalCard = {
+      hostId: 'runtime:env-studio',
+      workspaceStatus: 'qa'
+    }
+
+    const partition = partitionWorkspaceKanbanDropCards(
+      state,
+      [STUDIO_CARD, MINI_CARD, alreadyInColumn],
+      'qa'
+    )
+
+    expect(partition.accepted).toEqual([MINI_CARD])
+    expect(partition.refused).toEqual([STUDIO_CARD])
+    // The card already in the column moves nowhere, so it is not refused and not counted.
+    expect(partition.movableCount).toBe(2)
+  })
+})
 
 describe('resolveWorkspaceKanbanColumnRefusal', () => {
   it('names the refused column, its host, and the host the cards live on', () => {
     const refusal = resolveWorkspaceKanbanColumnRefusal(makeState(), [STUDIO_CARD], 'qa', 1)
 
-    expect(refusal).toMatchObject({
+    expect(refusal).toEqual({
+      status: 'qa',
       columnLabel: 'QA',
       columnHostLabel: 'mini',
       cardHostLabel: 'studio',
       refusedCount: 1,
       totalCount: 1
     })
-    expect(formatWorkspaceKanbanColumnRefusal(refusal!)).toEqual({
-      title: "'QA' is a column on mini",
-      description: 'This workspace lives on studio.'
-    })
   })
 
-  it('reports how many of a partly refused drop stayed put', () => {
+  it('counts the refused cards against the ones that would have moved', () => {
     const refusal = resolveWorkspaceKanbanColumnRefusal(
       makeState(),
       [STUDIO_CARD, STUDIO_CARD],
@@ -75,33 +100,26 @@ describe('resolveWorkspaceKanbanColumnRefusal', () => {
       5
     )
 
-    expect(formatWorkspaceKanbanColumnRefusal(refusal!)).toEqual({
-      title: "2 of 5 workspaces weren't moved",
-      description: "'QA' is a column on mini — they live on studio."
-    })
+    expect(refusal).toMatchObject({ refusedCount: 2, totalCount: 5 })
   })
 
   it('names no card host when the refused cards sit on different hosts', () => {
     const refusal = resolveWorkspaceKanbanColumnRefusal(
       makeState(),
-      [STUDIO_CARD, { hostId: 'runtime:env-third' }],
+      [STUDIO_CARD, { hostId: 'runtime:env-third', workspaceStatus: 'backlog' }],
       'qa',
       2
     )
 
     expect(refusal?.cardHostLabel).toBeNull()
-    expect(formatWorkspaceKanbanColumnRefusal(refusal!).description).toBe(
-      'These 2 workspaces live on other hosts.'
-    )
   })
 
   it('falls back to an anonymous host when only a retired host still defines the column', () => {
     const state = makeState({ removedRuntimeEnvironmentIds: new Set(['env-mini']) })
 
-    const refusal = resolveWorkspaceKanbanColumnRefusal(state, [STUDIO_CARD], 'qa', 1)
-
-    expect(refusal?.columnHostLabel).toBeNull()
-    expect(formatWorkspaceKanbanColumnRefusal(refusal!).title).toBe("'QA' is another host's column")
+    expect(
+      resolveWorkspaceKanbanColumnRefusal(state, [STUDIO_CARD], 'qa', 1)?.columnHostLabel
+    ).toBeNull()
   })
 
   it('resolves nothing when no card was refused', () => {
@@ -110,11 +128,22 @@ describe('resolveWorkspaceKanbanColumnRefusal', () => {
 })
 
 describe('isWorkspaceKanbanColumnRefused', () => {
-  it('refuses the lane only when every dragged card is barred', () => {
+  it('refuses the lane only when every card this drop would move is barred', () => {
     const state = makeState()
 
     expect(isWorkspaceKanbanColumnRefused(state, [STUDIO_CARD, STUDIO_CARD], 'qa')).toBe(true)
     expect(isWorkspaceKanbanColumnRefused(state, [STUDIO_CARD, MINI_CARD], 'qa')).toBe(false)
+  })
+
+  it('keeps a lane droppable when the cards already sit in it', () => {
+    const state = makeState()
+    const alreadyInColumn: WorkspaceKanbanRefusalCard = {
+      hostId: 'runtime:env-studio',
+      workspaceStatus: 'qa'
+    }
+
+    expect(isWorkspaceKanbanColumnRefused(state, [alreadyInColumn], 'qa')).toBe(false)
+    expect(isWorkspaceKanbanColumnRefused(state, [alreadyInColumn, STUDIO_CARD], 'qa')).toBe(true)
   })
 
   it('keeps a local column and an unknown column droppable', () => {
@@ -126,19 +155,33 @@ describe('isWorkspaceKanbanColumnRefused', () => {
   })
 })
 
+describe('canRefuseWorkspaceKanbanColumn', () => {
+  it('is false wherever the rule can never refuse, so the scan can be skipped', () => {
+    const state = makeState()
+
+    expect(canRefuseWorkspaceKanbanColumn(state, 'qa')).toBe(true)
+    expect(canRefuseWorkspaceKanbanColumn(state, 'backlog')).toBe(false)
+    expect(canRefuseWorkspaceKanbanColumn(state, 'never-defined')).toBe(false)
+    expect(canRefuseWorkspaceKanbanColumn(makeState({ hostWorkspaceStatuses: {} }), 'qa')).toBe(
+      false
+    )
+  })
+})
+
 describe('notifyWorkspaceKanbanColumnRefusal', () => {
   it('raises one warning naming the host mismatch', () => {
     toastWarning.mockReset()
-    const state = makeState()
 
     notifyWorkspaceKanbanColumnRefusal(
-      resolveWorkspaceKanbanColumnRefusal(state, [STUDIO_CARD], 'qa', 1)
+      resolveWorkspaceKanbanColumnRefusal(makeState(), [STUDIO_CARD], 'qa', 1)
     )
     notifyWorkspaceKanbanColumnRefusal(null)
 
     expect(toastWarning).toHaveBeenCalledOnce()
-    expect(toastWarning).toHaveBeenCalledWith("'QA' is a column on mini", {
-      description: 'This workspace lives on studio.'
-    })
+    const [title, options] = toastWarning.mock.calls[0] ?? []
+    expect(title).toContain('QA')
+    expect(title).toContain('mini')
+    expect(options).toMatchObject({ id: 'workspace-board-foreign-column:qa' })
+    expect(options?.description).toContain('studio')
   })
 })

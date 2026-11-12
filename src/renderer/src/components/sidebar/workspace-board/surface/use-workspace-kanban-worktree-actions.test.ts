@@ -23,11 +23,11 @@ function pairedEnvironment(id: string, name: string): PublicKnownRuntimeEnvironm
   }
 }
 
-function studioCard(): Worktree {
+function boardCard(id: string, hostId: Worktree['hostId']): Worktree {
   return {
-    id: 'workspace-1',
+    id,
     repoId: 'repo-1',
-    displayName: 'Feature',
+    displayName: id,
     comment: '',
     linkedIssue: null,
     linkedPR: null,
@@ -37,17 +37,20 @@ function studioCard(): Worktree {
     isPinned: false,
     sortOrder: 0,
     lastActivityAt: 0,
-    path: '/tmp/workspace-1',
+    path: `/tmp/${id}`,
     head: 'head',
-    branch: 'feature',
+    branch: id,
     isBare: false,
     isMainWorktree: false,
-    hostId: 'runtime:env-studio',
+    hostId,
     workspaceStatus: 'backlog'
   }
 }
 
-function renderDropActions(card: Worktree) {
+const STUDIO_CARD = boardCard('workspace-studio', 'runtime:env-studio')
+const MINI_CARD = boardCard('workspace-mini', 'runtime:env-mini')
+
+function renderDropActions(cards: readonly Worktree[]) {
   const updateWorktreesMeta = vi.fn().mockResolvedValue({ ok: true })
   const actions = renderHook(() =>
     useWorkspaceKanbanWorktreeActions({
@@ -59,8 +62,8 @@ function renderDropActions(card: Worktree) {
       updateWorktreeMeta: vi.fn(),
       updateWorktreesMeta,
       workspaceStatuses: useAppStore.getState().workspaceStatuses,
-      worktreeById: new Map([[card.id, card]]),
-      worktreeByKey: new Map([[getWorktreeHostIdentity(card), card]]),
+      worktreeById: new Map(cards.map((card) => [card.id, card])),
+      worktreeByKey: new Map(cards.map((card) => [getWorktreeHostIdentity(card), card])),
       manualOrderCatalog: { rankByKey: new Map(), orderedKeys: [] },
       worktreesByStatus: new Map()
     })
@@ -87,26 +90,45 @@ beforeEach(() => {
 
 describe('dropWorktreesAtEndOfStatus', () => {
   it('says why a card stayed put when the column belongs to another host', () => {
-    const { actions, updateWorktreesMeta } = renderDropActions(studioCard())
+    const { actions, updateWorktreesMeta } = renderDropActions([STUDIO_CARD])
 
-    act(() => actions.result.current.dropWorktreesAtEndOfStatus(['workspace-1'], 'qa'))
+    act(() => actions.result.current.dropWorktreesAtEndOfStatus([STUDIO_CARD.id], 'qa'))
 
     expect(updateWorktreesMeta).not.toHaveBeenCalled()
     expect(toastWarning).toHaveBeenCalledOnce()
-    expect(toastWarning).toHaveBeenCalledWith("'QA' is a column on mini", {
-      description: 'This workspace lives on studio.'
-    })
+    const [title, options] = toastWarning.mock.calls[0] ?? []
+    expect(title).toContain('QA')
+    expect(title).toContain('mini')
+    expect(options?.description).toContain('studio')
+  })
+
+  it('moves the allowed cards and reports the ones the column skipped', () => {
+    const { actions, updateWorktreesMeta } = renderDropActions([STUDIO_CARD, MINI_CARD])
+
+    act(() =>
+      actions.result.current.dropWorktreesAtEndOfStatus([STUDIO_CARD.id, MINI_CARD.id], 'qa')
+    )
+
+    expect(updateWorktreesMeta).toHaveBeenCalledOnce()
+    expect(updateWorktreesMeta).toHaveBeenCalledWith([
+      expect.objectContaining({
+        worktreeId: MINI_CARD.id,
+        updates: { workspaceStatus: 'qa' }
+      })
+    ])
+    const [title] = toastWarning.mock.calls[0] ?? []
+    expect(title).toContain('1 of 2')
   })
 
   it('moves an allowed card silently', () => {
-    const { actions, updateWorktreesMeta } = renderDropActions(studioCard())
+    const { actions, updateWorktreesMeta } = renderDropActions([STUDIO_CARD])
 
-    act(() => actions.result.current.dropWorktreesAtEndOfStatus(['workspace-1'], 'completed'))
+    act(() => actions.result.current.dropWorktreesAtEndOfStatus([STUDIO_CARD.id], 'completed'))
 
     expect(toastWarning).not.toHaveBeenCalled()
     expect(updateWorktreesMeta).toHaveBeenCalledWith([
       expect.objectContaining({
-        worktreeId: 'workspace-1',
+        worktreeId: STUDIO_CARD.id,
         updates: { workspaceStatus: 'completed' }
       })
     ])

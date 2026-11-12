@@ -142,6 +142,7 @@ export function useWorkspaceKanbanCardPointerDrag({
       if (!board) {
         clearDragTarget()
         removeCardDropIndicator()
+        setDragDocumentRefusedCursor(false)
         return
       }
       const dropTarget = getCardDropTarget(board, state.currentX, state.currentY)
