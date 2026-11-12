@@ -21,6 +21,20 @@ import { parseJiraStatusError } from '../../../../../shared/jira/jira-status-err
 const CACHE_TTL = 60_000
 const MAX_CACHE_ENTRIES = 500
 
+const pageInflightResets = new Set<() => void>()
+
+/** Page reads keep their own inflight maps; the reader registers its reset here so the
+ *  one teardown path also abandons them. */
+export function registerJiraPageInflightReset(reset: () => void): void {
+  pageInflightResets.add(reset)
+}
+
+function clearJiraPageInflightRequests(): void {
+  for (const reset of pageInflightResets) {
+    reset()
+  }
+}
+
 export type InflightJiraReadRequest<T> = {
   promise: Promise<T>
   contextKey: string
@@ -60,16 +74,16 @@ export function isFreshJiraCacheEntry<T>(entry: CacheEntry<T> | undefined): entr
   return entry !== undefined && Date.now() - entry.fetchedAt < CACHE_TTL
 }
 
-export function evictStaleJiraCacheEntries<T>(
-  cache: Record<string, CacheEntry<T>>,
+export function evictStaleJiraCacheEntries<E extends { fetchedAt: number }>(
+  cache: Record<string, E>,
   maxEntries = MAX_CACHE_ENTRIES
-): Record<string, CacheEntry<T>> {
+): Record<string, E> {
   const keys = Object.keys(cache)
   if (keys.length <= maxEntries) {
     return cache
   }
   const sorted = keys.sort((a, b) => (cache[a]?.fetchedAt ?? 0) - (cache[b]?.fetchedAt ?? 0))
-  const pruned: Record<string, CacheEntry<T>> = {}
+  const pruned: Record<string, E> = {}
   for (const key of sorted.slice(sorted.length - maxEntries)) {
     pruned[key] = cache[key]
   }
@@ -152,6 +166,7 @@ export function clearJiraInflightRequests(): void {
   inflightIssueSummaryRequests.clear()
   inflightSearchRequests.clear()
   inflightListRequests.clear()
+  clearJiraPageInflightRequests()
 }
 
 export function beginJiraMutation(): number {

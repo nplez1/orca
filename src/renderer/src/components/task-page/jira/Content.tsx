@@ -9,6 +9,7 @@ import { TaskPageJiraSortControls } from './task-page-jira-sort-controls'
 import { TaskPageJiraErrorBanner } from '../linear/task-page-linear-jira-list-model'
 import { TaskPageJiraTextFallbackNotice } from './task-page-jira-text-fallback-notice'
 import { TaskPageJiraIssueList } from '@/components/task-page/jira/task-page-jira-issue-list'
+import { TaskPageJiraListPaginationFooter } from './task-page-jira-list-pagination-footer'
 import { TaskPageJiraBoardView } from '@/components/task-page/jira/task-page-jira-board-view'
 import { TaskPageJiraViewControls } from '@/components/task-page/jira/task-page-jira-view-controls'
 import { formatRelativeTime } from '../task-page-source-context'
@@ -43,6 +44,10 @@ export function TaskPageJiraContent({
     selectedJiraIssue,
     openJiraDetailPage,
     jiraIssues,
+    jiraListPage,
+    jiraListLoadingMore,
+    jiraListLoadMoreError,
+    loadMoreJiraListPage,
     jiraLoading,
     jiraError,
     jiraErrorDetailsOpen,
@@ -151,10 +156,22 @@ export function TaskPageJiraContent({
           />
           <div className="flex shrink-0 items-center gap-2 text-2xs text-muted-foreground">
             <span>
-              {t('auto.components.TaskPage.shownCount', '{{count}} shown', {
-                count: displayedJiraIssues.length,
-                defaultValue_one: '{{count}} shown'
-              })}
+              {jiraListPage?.hasMore
+                ? jiraListPage.total !== null
+                  ? t(
+                      'auto.components.TaskPage.jiraListShownOfTotal',
+                      'Showing {{count}} of {{total}}',
+                      { count: displayedJiraIssues.length, total: jiraListPage.total }
+                    )
+                  : t(
+                      'auto.components.TaskPage.jiraListMoreAvailable',
+                      '{{count}} shown · more available',
+                      { count: displayedJiraIssues.length }
+                    )
+                : t('auto.components.TaskPage.shownCount', '{{count}} shown', {
+                    count: displayedJiraIssues.length,
+                    defaultValue_one: '{{count}} shown'
+                  })}
             </span>
             {jiraViewMode === 'list' ? (
               <JiraListColumnsMenu ids={jiraColumnIds} onToggle={toggleJiraColumn} />
@@ -270,6 +287,15 @@ export function TaskPageJiraContent({
               issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
               onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
               sourceContext={jiraTaskSourceContext}
+            />
+          )}
+          {jiraHasWorkspace ? null : (
+            <TaskPageJiraListPaginationFooter
+              page={jiraListPage}
+              shownCount={displayedJiraIssues.length}
+              loadingMore={jiraListLoadingMore}
+              error={jiraListLoadMoreError}
+              onLoadMore={() => void loadMoreJiraListPage()}
             />
           )}
         </div>

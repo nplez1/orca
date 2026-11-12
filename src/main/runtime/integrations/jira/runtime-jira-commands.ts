@@ -14,6 +14,8 @@ import type {
   JiraCreateIssueArgs,
   JiraIssueFilter,
   JiraIssueListFilters,
+  JiraIssueSearchContinuation,
+  JiraIssueSearchPage,
   JiraIssueUpdate,
   JiraSiteSelection,
   JiraSprintAssignment
@@ -35,7 +37,12 @@ import {
 } from '../../../jira/jira-issue-create-metadata'
 import { getBoardOverview, listBoardIssues, listBoards } from '../../../jira/jira-board-queries'
 import { listEditFields } from '../../../jira/jira-issue-edit-metadata'
-import { listIssues, searchIssues } from '../../../jira/jira-issue-search'
+import {
+  listIssues,
+  listIssuesPage,
+  searchIssues,
+  searchIssuesPage
+} from '../../../jira/jira-issue-search'
 import { listProjects } from '../../../jira/jira-project-queries'
 
 export class RuntimeJiraCommands {
@@ -92,6 +99,17 @@ export class RuntimeJiraCommands {
     return searchIssues(jql, Math.min(Math.max(1, limit), 100), siteId, signal, strict)
   }
 
+  jiraSearchIssuesPage(
+    jql: string,
+    limit = 30,
+    siteId?: JiraSiteSelection,
+    signal?: AbortSignal,
+    strict = false,
+    cursor?: Pick<JiraIssueSearchContinuation, 'pageToken' | 'startAt'>
+  ): Promise<JiraIssueSearchPage> {
+    return searchIssuesPage(jql, Math.min(Math.max(1, limit), 100), siteId, signal, strict, cursor)
+  }
+
   jiraListIssues(
     filter?: JiraIssueFilter,
     limit = 30,
@@ -100,6 +118,24 @@ export class RuntimeJiraCommands {
     filters?: JiraIssueListFilters
   ): ReturnType<typeof listIssues> {
     return listIssues(filter, Math.min(Math.max(1, limit), 100), siteId, strict, filters)
+  }
+
+  jiraListIssuesPage(
+    filter?: JiraIssueFilter,
+    limit = 30,
+    siteId?: JiraSiteSelection,
+    strict = false,
+    filters?: JiraIssueListFilters,
+    cursor?: Pick<JiraIssueSearchContinuation, 'pageToken' | 'startAt'>
+  ): Promise<JiraIssueSearchPage> {
+    return listIssuesPage(
+      filter,
+      Math.min(Math.max(1, limit), 100),
+      siteId,
+      strict,
+      filters,
+      cursor
+    )
   }
 
   jiraCreateIssue(args: JiraCreateIssueArgs): ReturnType<typeof createIssue> {

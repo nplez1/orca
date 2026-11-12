@@ -20,6 +20,7 @@ import {
   asRecord,
   asString,
   getPageItems,
+  resolveJiraPageIsLast,
   type JiraPagedResponse,
   type JiraRecord
 } from './jira-record-pages'
@@ -228,15 +229,14 @@ export async function listBoardIssues(
     const responseStartAt = asFiniteNumber(response.startAt) ?? startAt
     const total = asFiniteNumber(response.total)
     const nextPageToken = asString(response.nextPageToken) || null
-    const isLast =
-      issues.length === 0 && nextPageToken === null
-        ? true
-        : (response.isLast ??
-          (nextPageToken !== null
-            ? false
-            : total === null
-              ? issues.length < maxResults
-              : responseStartAt + issues.length >= total))
+    const isLast = resolveJiraPageIsLast({
+      issueCount: issues.length,
+      maxResults,
+      startAt: responseStartAt,
+      total,
+      isLast: response.isLast,
+      nextPageToken
+    })
     return {
       issues,
       startAt: responseStartAt,

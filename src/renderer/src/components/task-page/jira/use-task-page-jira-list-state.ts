@@ -5,7 +5,7 @@ import { useTaskPageJiraFavouriteFilters } from './use-task-page-jira-favourite-
 import type { JiraFavouriteFilter } from '../../../../../shared/jira/jira-favourite-filters'
 import type { JiraSavedFilter } from '../../../../../shared/jira/jira-saved-filters'
 import type { TaskPageLinearViewStateModel } from '../linear/use-task-page-linear-view-state'
-import { useState, useMemo, useEffect, useCallback, type SetStateAction } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, type SetStateAction } from 'react'
 import type {
   JiraIssue,
   JiraProjectStatusOrder,
@@ -13,6 +13,7 @@ import type {
 } from '../../../../../shared/jira/jira-types'
 import type { TaskPageJiraLoadError } from '@/components/task-page/jira/task-page-jira-load-state'
 import type { TaskPageJiraJqlRejection } from '@/components/task-page/jira/task-page-jira-search'
+import type { TaskPageJiraListPage } from '@/components/task-page/jira/task-page-jira-list-pagination'
 import type { JiraPresetId } from '@/components/task-page/task-page-localized-options'
 import type {
   JiraIssueSortColumn,
@@ -69,6 +70,12 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     selectedJiraSiteId
   )
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([])
+  // Why a generation of its own: "load more" runs outside the fetch effect's closure, so
+  // this is the only way a late page can tell it no longer owns the list.
+  const jiraListGenerationRef = useRef(0)
+  const [jiraListPage, setJiraListPage] = useState<TaskPageJiraListPage | null>(null)
+  const [jiraListLoadingMore, setJiraListLoadingMore] = useState(false)
+  const [jiraListLoadMoreError, setJiraListLoadMoreError] = useState<string | null>(null)
   const [jiraLoading, setJiraLoading] = useState(false)
   const [jiraError, setJiraError] = useState<TaskPageJiraLoadError | null>(null)
   const [jiraErrorDetailsOpen, setJiraErrorDetailsOpen] = useState(false)
@@ -226,6 +233,13 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     ...jiraProjectScope,
     jiraIssues,
     setJiraIssues,
+    jiraListPage,
+    setJiraListPage,
+    jiraListGenerationRef,
+    jiraListLoadingMore,
+    setJiraListLoadingMore,
+    jiraListLoadMoreError,
+    setJiraListLoadMoreError,
     jiraLoading,
     setJiraLoading,
     jiraError,

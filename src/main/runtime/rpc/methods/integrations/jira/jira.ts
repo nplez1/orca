@@ -5,6 +5,7 @@ import {
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../../core'
 import { JIRA_ATTACHMENT_IMAGE_METHODS } from './jira-attachment-image'
 import { JIRA_BOARD_METHODS } from '../../jira-board-methods'
+import { JIRA_PAGE_METHODS } from './jira-page-methods'
 import { JiraFavouriteFilterParams } from '../../../../../../shared/rpc-contract/jira-favourite-filter-params'
 import {
   AssignableUsers,
@@ -54,6 +55,7 @@ function generationOwner(context: Pick<RpcContext, 'pairedDeviceId' | 'caller'>)
 
 export const JIRA_METHODS = [
   ...JIRA_ATTACHMENT_IMAGE_METHODS,
+  ...JIRA_PAGE_METHODS,
   defineMethod({
     name: 'jira.generateIssueSummary',
     permission: 'workspace',

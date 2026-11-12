@@ -3,7 +3,7 @@ import { isRuntimeProviderSearchQueryWithinLimit } from '@/runtime/issue-search/
 import { withCurrentSprintClause } from '../../../../../shared/jira/jira-jql-predicate'
 import {
   buildJiraStatusCatalog,
-  getJiraStatusCatalogScopeKey
+  jiraListStatusCatalogScopeKey
 } from './task-page-jira-status-catalog'
 import type { TaskPageLinearCollectionEffectsModel } from '../linear/use-task-page-linear-collection-effects'
 import { useEffect, useMemo, useRef } from 'react'
@@ -16,6 +16,8 @@ import {
 import { createTaskPageJiraLoadFailureState } from '@/components/task-page/jira/task-page-jira-load-state'
 import { searchTaskPageJiraIssues } from '@/components/task-page/jira/task-page-jira-search'
 import { JIRA_ITEM_LIMIT } from '../task-page-source-context'
+import { toTaskPageJiraListPage, type TaskPageJiraListPage } from './task-page-jira-list-pagination'
+import { useTaskPageJiraListLoadMore } from './use-task-page-jira-list-load-more'
 import { useTaskSearchDebouncedApply } from '../use-task-search-debounced-apply'
 import { readLinkedJiraIssues } from './task-page-jira-linked-issues'
 import { useTaskPageJiraSelectionCleanup } from '../../use-task-page-jira-selection-cleanup'
@@ -32,7 +34,8 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     linkedJiraIssueRefsSignature,
     setTaskResumeState,
     searchJiraIssues,
-    listJiraIssues,
+    searchJiraIssuePage,
+    listJiraIssuePage,
     jiraConnected,
     selectedJiraSiteId,
     taskSource,
@@ -41,6 +44,10 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     jiraSearchPersistReadyRef,
     taskResumeApplied,
     setJiraIssues,
+    setJiraListPage,
+    setJiraListLoadingMore,
+    setJiraListLoadMoreError,
+    jiraListGenerationRef,
     setJiraLoading,
     setJiraError,
     setJiraErrorDetailsOpen,
@@ -83,6 +90,15 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
   }, [appliedJiraSearch, setTaskResumeState, taskResumeApplied, jiraSearchPersistReadyRef])
   const favourite = jiraHasWorkspace ? null : jiraFavouriteFilter
   const jiraRemoteSearch = jiraHasWorkspace ? '' : (favourite?.jql ?? appliedJiraSearch)
+  const statusCatalogScopeKey = jiraListStatusCatalogScopeKey({
+    hasWorkspace: jiraHasWorkspace,
+    remoteSearch: jiraRemoteSearch,
+    selectedStatuses: selectedJiraStatuses,
+    sourceScopeKey: jiraTaskSourceScopeKey,
+    selectedSiteId: selectedJiraSiteId,
+    preset: activeJiraPreset,
+    project: jiraProjectFilter
+  })
   const previousJiraRefreshNonceRef = useRef(jiraRefreshNonce)
   useEffect(() => {
     if (!taskResumeApplied) {
@@ -98,6 +114,7 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     previousJiraRefreshNonceRef.current = jiraRefreshNonce
     if (settings?.defaultJiraBoard && jiraBoardViewMode === 'board') {
       setJiraIssues([])
+      setJiraListPage(null)
       setJiraLoading(false)
       setJiraError(null)
       setJiraErrorDetailsOpen(false)
@@ -112,6 +129,10 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     const trimmed = jiraRemoteSearch.trim()
     const savedFilter = jiraSavedFilters.find((filter) => filter.id === jiraActiveSavedFilterId)
     const exactSavedJql = savedFilter?.jql === trimmed
+    // Why a captured page rather than a new return shape: the key-or-text and JQL-retry
+    // helpers are shared with cmd-J and the composer, and each of them answers with the
+    // issues of its last search call, so the last page recorded here is that call's page.
+    let page: TaskPageJiraListPage | null = null
     const searchWithinLimit = async (query: string) => {
       if (
         favourite &&
@@ -130,7 +151,7 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
         queryTooLong = true
         throw new Error('Query exceeds the request limit.')
       }
-      return searchJiraIssues(query, JIRA_ITEM_LIMIT, {
+      const result = await searchJiraIssuePage(query, JIRA_ITEM_LIMIT, {
         sourceContext: jiraTaskSourceContext,
         ...(favourite
           ? { siteId: favourite.siteId }
@@ -139,6 +160,8 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
             : {}),
         force
       })
+      page = toTaskPageJiraListPage(result)
+      return result.issues
     }
     const request = jiraHasWorkspace
       ? readLinkedJiraIssues(linkedJiraIssueRefs, searchJiraIssues, jiraTaskSourceContext, force)
@@ -164,7 +187,7 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
                 jiraProjectFilter
               )
             ).then((issues) => ({ issues, jqlRejection: null, error: null }))
-          : listJiraIssues(activeJiraPreset, JIRA_ITEM_LIMIT, {
+          : listJiraIssuePage(activeJiraPreset, JIRA_ITEM_LIMIT, {
               sourceContext: jiraTaskSourceContext,
               force,
               ...(selectedJiraStatuses.length || jiraCurrentSprint
@@ -175,7 +198,10 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
                     }
                   }
                 : {})
-            }).then((issues) => ({ issues, jqlRejection: null, error: null }))
+            }).then((result) => {
+              page = toTaskPageJiraListPage(result)
+              return { issues: result.issues, jqlRejection: null, error: null }
+            })
     void request
       .then((result) => {
         const { issues, jqlRejection } = result
@@ -183,18 +209,14 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
           return
         }
         setJiraError(result.error)
-        if (!jiraHasWorkspace && !trimmed && selectedJiraStatuses.length === 0) {
+        if (statusCatalogScopeKey) {
           setJiraStatusCatalog({
-            scopeKey: getJiraStatusCatalogScopeKey(
-              jiraTaskSourceScopeKey,
-              selectedJiraSiteId,
-              activeJiraPreset,
-              jiraProjectFilter
-            ),
+            scopeKey: statusCatalogScopeKey,
             items: buildJiraStatusCatalog(issues)
           })
         }
         setJiraIssues(issues)
+        setJiraListPage(page)
         setJiraJqlRejection(jqlRejection)
         setJiraLoading(false)
         const projectScope = getSingleJiraProjectScope(issues)
@@ -224,6 +246,7 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
         }
         const failureState = createTaskPageJiraLoadFailureState(err)
         setJiraIssues(failureState.issues)
+        setJiraListPage(null)
         setJiraError(
           queryTooLong
             ? {
@@ -239,6 +262,10 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
       })
     return () => {
       cancelled = true
+      // Why: a page that lands after this run must not extend a list it no longer owns.
+      jiraListGenerationRef.current += 1
+      setJiraListLoadingMore(false)
+      setJiraListLoadMoreError(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- linkedJiraIssueRefsSignature stands in for the refs array, which re-derives on unrelated workspace churn; store actions and setters are stable.
   }, [
@@ -267,9 +294,12 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     statusOrderOwner,
     statusOrderRuntimeScopeKey
   ])
+  // Why shared with load-more: the status options are the loaded issues, so a page that
+  // widens the rows must widen them too — and only where this list reads them at all.
+  const loadMoreJiraListPage = useTaskPageJiraListLoadMore({ ...model, statusCatalogScopeKey })
   useTaskPageJiraSelectionCleanup(model)
 
   // Linear string IDs need the provider-generic numeric placeholder 0.
-  return model
+  return Object.assign(model, { loadMoreJiraListPage })
 }
 export type TaskPageJiraListEffectsModel = ReturnType<typeof useTaskPageJiraListEffects>

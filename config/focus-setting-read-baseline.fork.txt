@@ -50,10 +50,10 @@
 0 src/renderer/src/runtime/linear/runtime-linear-client.ts # fork has 0 where upstream allows 8; lowered by a fork prune
 0 src/renderer/src/runtime/linear/runtime-linear-issue-client.ts # fork has 0 where upstream allows 6; lowered by a fork prune
 0 src/renderer/src/runtime/linear/runtime-linear-project-client.ts # fork has 0 where upstream allows 12; lowered by a fork prune
-3 src/renderer/src/store/slices/jira/jira-collection-read-actions.ts # fork has 3 where upstream allows 5; lowered by a fork prune
+2 src/renderer/src/store/slices/jira/jira-collection-read-actions.ts # fork has 2 where upstream allows 5; lowered by a fork prune
 20 src/renderer/src/store/slices/jira/jira-connection-actions.ts # fork has 20 where upstream allows 32; lowered by a fork prune
 6 src/renderer/src/store/slices/jira/jira-issue-read-actions.ts # fork has 6 where upstream allows 8; lowered by a fork prune
-2 src/renderer/src/store/slices/jira/jira.ts # fork has 2 where upstream allows 3; lowered by a fork prune
+1 src/renderer/src/store/slices/jira/jira.ts # fork has 1 where upstream allows 3; lowered by a fork prune
 0 src/renderer/src/store/slices/linear/linear-cache.ts
 4 src/renderer/src/store/slices/linear/linear-custom-view-detail-actions.ts # fork has 4 where upstream allows 5; lowered by a fork prune
 2 src/renderer/src/store/slices/linear/linear-custom-view-issue-actions.ts # fork has 4 where upstream allows 5; lowered by a fork prune

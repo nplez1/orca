@@ -186,6 +186,26 @@ export type JiraBoardIssuePageRequest = {
   | { scope: 'sprint'; pageToken?: string; sprintId: string }
 )
 
+/** Where the next list page starts, and the query that produced the current one.
+ *  Carrying the JQL keeps a later page from being rebuilt out of state the first
+ *  page never saw, so a filter change cannot desynchronise the cursor. */
+export type JiraIssueSearchContinuation = {
+  siteId: string
+  jql: string
+  pageToken: string | null
+  startAt: number
+}
+
+/** One page of the Tasks → Jira list. `continuation` is null when no single cursor
+ *  can express the rest — several connected sites, or the Cloud `all` fan-out over
+ *  more than one project chunk — while `hasMore` still reports that more exist. */
+export type JiraIssueSearchPage = {
+  issues: JiraIssue[]
+  hasMore: boolean
+  total: number | null
+  continuation: JiraIssueSearchContinuation | null
+}
+
 export type JiraTransition = {
   id: string
   name: string

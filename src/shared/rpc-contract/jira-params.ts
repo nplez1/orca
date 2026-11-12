@@ -46,15 +46,27 @@ export const SearchIssues = z.object({
   strict: z.boolean().optional()
 })
 
-export const ListIssues = z
-  .object({
-    filter: z.enum(VALID_FILTERS).optional(),
-    limit: OptionalFiniteNumber,
-    siteId: OptionalString,
-    strict: z.boolean().optional(),
-    filters: JiraIssueListFiltersParam.optional()
-  })
-  .optional()
+const ListIssuesFields = {
+  filter: z.enum(VALID_FILTERS).optional(),
+  limit: OptionalFiniteNumber,
+  siteId: OptionalString,
+  strict: z.boolean().optional(),
+  filters: JiraIssueListFiltersParam.optional()
+}
+
+export const ListIssues = z.object(ListIssuesFields).optional()
+
+// Why separate from SearchIssues: an older host strips the cursor fields it does
+// not declare, so a "load more" sent through the array method would silently
+// return page 1 again. The page methods are additive so both hosts keep working.
+const IssuePageCursor = {
+  pageToken: OptionalString,
+  startAt: OptionalFiniteNumber
+}
+
+export const SearchIssuesPage = SearchIssues.extend(IssuePageCursor)
+
+export const ListIssuesPage = z.object({ ...ListIssuesFields, ...IssuePageCursor }).optional()
 
 export const IssueKey = z.object({
   key: requiredString('Issue key is required'),

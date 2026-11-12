@@ -1,7 +1,17 @@
-import type { JiraIssue, JiraSiteSelection } from '../../../../shared/jira/jira-types'
+import type {
+  JiraIssue,
+  JiraIssueSearchPage,
+  JiraSiteSelection
+} from '../../../../shared/jira/jira-types'
 import { createNonSecureContextUuid as createBrowserUuid } from '../../../../shared/non-secure-context-uuid'
 
-type LocalJiraSearchArgs = { jql: string; limit?: number; siteId?: JiraSiteSelection }
+type LocalJiraSearchArgs = {
+  jql: string
+  limit?: number
+  siteId?: JiraSiteSelection
+  pageToken?: string
+  startAt?: number
+}
 
 function createJiraSearchAbortError(): Error {
   const error = new Error('Jira search aborted')
@@ -9,11 +19,10 @@ function createJiraSearchAbortError(): Error {
   return error
 }
 
-/** Cancel superseded local searches in main or abandoned keystrokes hold shared Jira pool slots and stall the next query. */
-export async function searchLocalJiraIssues(
-  args: LocalJiraSearchArgs,
-  signal: AbortSignal
-): Promise<JiraIssue[]> {
+async function runLocalJiraSearch<T>(
+  signal: AbortSignal,
+  read: (requestId: string) => Promise<T>
+): Promise<T> {
   if (signal.aborted) {
     throw createJiraSearchAbortError()
   }
@@ -23,13 +32,32 @@ export async function searchLocalJiraIssues(
   }
   signal.addEventListener('abort', handleAbort, { once: true })
   try {
-    const issues = await window.api.jira.searchIssues({ ...args, requestId })
+    const result = await read(requestId)
     // Why: cancel can race ahead of main-process registration; drop late successes.
     if (signal.aborted) {
       throw createJiraSearchAbortError()
     }
-    return issues
+    return result
   } finally {
     signal.removeEventListener('abort', handleAbort)
   }
+}
+
+/** Cancel superseded local searches in main or abandoned keystrokes hold shared Jira pool slots and stall the next query. */
+export async function searchLocalJiraIssues(
+  args: LocalJiraSearchArgs,
+  signal: AbortSignal
+): Promise<JiraIssue[]> {
+  return runLocalJiraSearch(signal, (requestId) =>
+    window.api.jira.searchIssues({ ...args, requestId })
+  )
+}
+
+export async function searchLocalJiraIssuesPage(
+  args: LocalJiraSearchArgs,
+  signal: AbortSignal
+): Promise<JiraIssueSearchPage> {
+  return runLocalJiraSearch(signal, (requestId) =>
+    window.api.jira.searchIssuesPage({ ...args, requestId })
+  )
 }

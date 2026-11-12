@@ -1,34 +1,49 @@
-import { normalizeJiraStatusSelection } from '../../../../../shared/jira/jira-quick-filters'
 import { jiraListIssuesForTarget, jiraSearchIssues } from '@/runtime/jira/runtime-jira-client'
 import { getJiraRuntimeTarget } from '@/runtime/jira/runtime-jira-target'
 import { isIntegrationCredentialDecryptionError } from '../../../../../shared/integration-credential-errors'
-import type { JiraIssue, JiraSiteSelection } from '../../../../../shared/jira/jira-types'
+import type { JiraSiteSelection } from '../../../../../shared/jira/jira-types'
+import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
 import type { JiraSlice, JiraSliceGet, JiraSliceSet } from './jira-slice-contract'
 import {
+  cachedIssues,
+  collectionKey,
+  issuesEntry,
+  listFilters,
+  readCollection,
+  type JiraCollectionReadGateFactory
+} from './jira-collection-read-core'
+import { createJiraCollectionPageReadActions } from './jira-collection-page-read-actions'
+import {
   canWriteJiraReadResult,
-  createJiraAbortError,
   currentJiraMutationGeneration,
-  evictStaleJiraCacheEntries,
   getJiraReadScope,
   getSelectedJiraSiteId,
   inflightListRequests,
   inflightSearchRequests,
-  isFreshJiraCacheEntry,
   looksLikeJiraAuthError,
   markJiraConnectionLost,
-  scopedJiraCacheKey,
   shouldRefreshJiraStatusAfterRead,
-  type InflightJiraReadRequest,
   type JiraReadScope
 } from './jira-read-coordination'
 
-type JiraCollectionReadActions = Pick<JiraSlice, 'searchJiraIssues' | 'listJiraIssues'>
+type JiraCollectionReadActions = Pick<
+  JiraSlice,
+  | 'searchJiraIssues'
+  | 'listJiraIssues'
+  | 'searchJiraIssuePage'
+  | 'listJiraIssuePage'
+  | 'loadMoreJiraIssues'
+>
 
-function canWriteCollectionResult(
-  scope: JiraReadScope,
-  mutationGeneration: number,
-  get: JiraSliceGet
-): boolean {
+/** One hop each, so this file's routing stays in one place however many reads it grows. */
+function scopeFor(
+  get: JiraSliceGet,
+  sourceContext: TaskSourceContext | null | undefined
+): JiraReadScope {
+  return getJiraReadScope(get().settings, sourceContext)
+}
+
+function canWrite(scope: JiraReadScope, mutationGeneration: number, get: JiraSliceGet): boolean {
   return canWriteJiraReadResult(
     scope.contextKey,
     mutationGeneration,
@@ -37,7 +52,7 @@ function canWriteCollectionResult(
   )
 }
 
-function handleJiraCollectionReadError(
+function recordReadFailure(
   error: unknown,
   scope: JiraReadScope,
   siteId: JiraSiteSelection | null | undefined,
@@ -45,18 +60,17 @@ function handleJiraCollectionReadError(
   set: JiraSliceSet,
   get: JiraSliceGet,
   options: { abortable?: boolean; currentRequest: boolean }
-): JiraIssue[] {
-  const canWrite =
-    options.currentRequest && canWriteCollectionResult(scope, mutationGeneration, get)
-  if (isIntegrationCredentialDecryptionError(error) && canWrite) {
+): void {
+  const writable = options.currentRequest && canWrite(scope, mutationGeneration, get)
+  if (isIntegrationCredentialDecryptionError(error) && writable) {
     if (!shouldRefreshJiraStatusAfterRead(siteId, get().jiraStatus, options)) {
       void get().checkJiraConnection()
     }
-  } else if (looksLikeJiraAuthError(error) && canWrite) {
+  } else if (looksLikeJiraAuthError(error) && writable) {
     markJiraConnectionLost(set, scope)
   }
   if (isIntegrationCredentialDecryptionError(error) || looksLikeJiraAuthError(error)) {
-    return []
+    return
   }
   throw error
 }
@@ -65,171 +79,66 @@ export function createJiraCollectionReadActions(
   set: JiraSliceSet,
   get: JiraSliceGet
 ): JiraCollectionReadActions {
+  const gateFor: JiraCollectionReadGateFactory = (sourceContext) => {
+    const scope = scopeFor(get, sourceContext)
+    const mutationGeneration = currentJiraMutationGeneration()
+    return {
+      scope,
+      canWrite: () => canWrite(scope, mutationGeneration, get),
+      recordFailure: (error, siteId, options) =>
+        recordReadFailure(error, scope, siteId, mutationGeneration, set, get, options)
+    }
+  }
+
   return {
-    searchJiraIssues: async (jql, limit = 30, options) => {
-      const scope = getJiraReadScope(get().settings, options?.sourceContext)
-      const siteId =
-        options && 'siteId' in options ? options.siteId : getSelectedJiraSiteId(get().jiraStatus)
-      const cacheKey = scopedJiraCacheKey(scope, `${siteId ?? 'default'}::${jql}::${limit}`)
-      const cached = get().jiraSearchCache[cacheKey]
-      if (!options?.force && isFreshJiraCacheEntry(cached)) {
-        return cached.data ?? []
-      }
-      const inflight = inflightSearchRequests.get(cacheKey)
-      const abortable = options?.signal !== undefined
-      const requestMutationGeneration = currentJiraMutationGeneration()
-      if (
-        !abortable &&
-        !options?.force &&
-        inflight &&
-        inflight.contextKey === scope.contextKey &&
-        inflight.mutationGeneration === requestMutationGeneration
-      ) {
-        return inflight.promise
-      }
-      let entry: InflightJiraReadRequest<JiraIssue[]>
-      const promise = jiraSearchIssues(scope.settings, jql, limit, siteId, options?.signal)
-        .then((issues) => {
-          if (options?.signal?.aborted) {
-            throw createJiraAbortError('search')
-          }
-          if (
-            (abortable || inflightSearchRequests.get(cacheKey) === entry) &&
-            canWriteCollectionResult(scope, requestMutationGeneration, get)
-          ) {
-            set((state) => ({
-              jiraSearchCache: evictStaleJiraCacheEntries({
-                ...state.jiraSearchCache,
-                [cacheKey]: { data: issues, fetchedAt: Date.now() }
-              })
-            }))
-          }
-          return issues
-        })
-        .catch((error) => {
-          if (options?.signal?.aborted) {
-            throw error
-          }
-          console.warn('[jira] searchJiraIssues failed:', error)
-          return handleJiraCollectionReadError(
-            error,
-            scope,
-            siteId,
-            requestMutationGeneration,
-            set,
-            get,
-            {
-              abortable,
-              currentRequest: abortable || inflightSearchRequests.get(cacheKey) === entry
-            }
-          )
-        })
-        .finally(() => {
-          if (inflightSearchRequests.get(cacheKey) === entry) {
-            inflightSearchRequests.delete(cacheKey)
-          }
-          if (
-            !options?.signal?.aborted &&
-            shouldRefreshJiraStatusAfterRead(siteId, get().jiraStatus, { abortable }) &&
-            canWriteCollectionResult(scope, requestMutationGeneration, get)
-          ) {
-            void get().checkJiraConnection()
-          }
-        })
-      entry = {
-        promise,
-        contextKey: scope.contextKey,
-        mutationGeneration: requestMutationGeneration
-      }
-      if (!abortable) {
-        inflightSearchRequests.set(cacheKey, entry)
-      }
-      return promise
+    ...createJiraCollectionPageReadActions(set, get, gateFor),
+
+    searchJiraIssues: async (jql, limit = 30, options = {}) => {
+      const gate = gateFor(options.sourceContext)
+      const siteId = 'siteId' in options ? options.siteId : getSelectedJiraSiteId(get().jiraStatus)
+      return readCollection(
+        {
+          cacheKey: collectionKey(gate.scope, jql, siteId, limit, undefined),
+          inflight: inflightSearchRequests,
+          gate,
+          siteId,
+          options,
+          read: () => jiraSearchIssues(gate.scope.settings, jql, limit, siteId, options.signal),
+          empty: [],
+          fromCache: cachedIssues,
+          toCacheEntry: issuesEntry
+        },
+        set,
+        get
+      )
     },
 
-    listJiraIssues: async (filter = 'assigned', limit = 30, options) => {
-      const scope = getJiraReadScope(get().settings, options?.sourceContext)
+    listJiraIssues: async (filter = 'assigned', limit = 30, options = {}) => {
+      const gate = gateFor(options.sourceContext)
       const siteId = getSelectedJiraSiteId(get().jiraStatus)
-      const statuses = normalizeJiraStatusSelection(options?.filters?.statuses).sort()
-      const currentSprint = options?.filters?.currentSprint === true
-      const filters =
-        statuses.length || currentSprint
-          ? {
-              ...(statuses.length ? { statuses } : {}),
-              ...(currentSprint ? { currentSprint: true } : {})
-            }
-          : undefined
-      const cacheKey = scopedJiraCacheKey(
-        scope,
-        `${siteId ?? 'default'}::list::${filter}::${limit}${filters ? `::${JSON.stringify(filters)}` : ''}`
+      const filters = listFilters(options.filters)
+      return readCollection(
+        {
+          cacheKey: collectionKey(gate.scope, `list::${filter}`, siteId, limit, filters),
+          inflight: inflightListRequests,
+          gate,
+          siteId,
+          options,
+          read: () =>
+            jiraListIssuesForTarget(
+              getJiraRuntimeTarget(gate.scope.settings),
+              filter,
+              limit,
+              siteId,
+              filters
+            ),
+          empty: [],
+          fromCache: cachedIssues,
+          toCacheEntry: issuesEntry
+        },
+        set,
+        get
       )
-      const cached = get().jiraSearchCache[cacheKey]
-      if (!options?.force && isFreshJiraCacheEntry(cached)) {
-        return cached.data ?? []
-      }
-      const inflight = inflightListRequests.get(cacheKey)
-      const requestMutationGeneration = currentJiraMutationGeneration()
-      if (
-        !options?.force &&
-        inflight &&
-        inflight.contextKey === scope.contextKey &&
-        inflight.mutationGeneration === requestMutationGeneration
-      ) {
-        return inflight.promise
-      }
-      let entry: InflightJiraReadRequest<JiraIssue[]>
-      const request = jiraListIssuesForTarget(
-        getJiraRuntimeTarget(scope.settings),
-        filter,
-        limit,
-        siteId,
-        filters
-      )
-      const promise = request
-        .then((issues) => {
-          if (
-            inflightListRequests.get(cacheKey) === entry &&
-            canWriteCollectionResult(scope, requestMutationGeneration, get)
-          ) {
-            set((state) => ({
-              jiraSearchCache: evictStaleJiraCacheEntries({
-                ...state.jiraSearchCache,
-                [cacheKey]: { data: issues, fetchedAt: Date.now() }
-              })
-            }))
-          }
-          return issues
-        })
-        .catch((error) => {
-          console.warn('[jira] listJiraIssues failed:', error)
-          return handleJiraCollectionReadError(
-            error,
-            scope,
-            siteId,
-            requestMutationGeneration,
-            set,
-            get,
-            { currentRequest: inflightListRequests.get(cacheKey) === entry }
-          )
-        })
-        .finally(() => {
-          if (inflightListRequests.get(cacheKey) === entry) {
-            inflightListRequests.delete(cacheKey)
-          }
-          if (
-            shouldRefreshJiraStatusAfterRead(siteId, get().jiraStatus) &&
-            canWriteCollectionResult(scope, requestMutationGeneration, get)
-          ) {
-            void get().checkJiraConnection()
-          }
-        })
-      entry = {
-        promise,
-        contextKey: scope.contextKey,
-        mutationGeneration: requestMutationGeneration
-      }
-      inflightListRequests.set(cacheKey, entry)
-      return promise
     }
   }
 }

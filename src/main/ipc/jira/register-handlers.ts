@@ -14,8 +14,10 @@ import {
   clampJiraIssueLimit,
   normalizeJiraIssueUpdate,
   normalizeJiraSiteId,
-  normalizeJiraSiteSelection
+  normalizeJiraSiteSelection,
+  VALID_JIRA_ISSUE_FILTERS
 } from './ipc-params'
+import { registerJiraPageHandlers } from './register-page-handlers'
 import { normalizeIssueUpdate } from '../jira-issue-update-payload'
 import { addIssueComment, createIssue, updateIssue } from '../../jira/jira-issue-mutations'
 import { getIssue, getIssueSummary } from '../../jira/jira-issue-read'
@@ -33,11 +35,11 @@ import type {
   JiraSiteSelection
 } from '../../../shared/jira/jira-types'
 
-const VALID_FILTERS = new Set<JiraIssueFilter>(['assigned', 'reported', 'all', 'done'])
 const issueSummaryRequests = new JiraCancellableRequests()
 const searchRequests = new JiraCancellableRequests()
 
 export function registerJiraHandlers(): void {
+  registerJiraPageHandlers({ searchRequests })
   ipcMain.handle('jira:connect', async (_event, args: JiraConnectArgs) => {
     if (
       typeof args?.siteUrl !== 'string' ||
@@ -117,7 +119,7 @@ export function registerJiraHandlers(): void {
         filters?: JiraIssueListFilters
       }
     ) => {
-      const filter = VALID_FILTERS.has(args?.filter as JiraIssueFilter)
+      const filter = VALID_JIRA_ISSUE_FILTERS.has(args?.filter as JiraIssueFilter)
         ? (args!.filter as JiraIssueFilter)
         : undefined
       return listIssues(

@@ -7,6 +7,8 @@ import type {
   JiraIssue,
   JiraIssueFilter,
   JiraIssueListFilters,
+  JiraIssueSearchContinuation,
+  JiraIssueSearchPage,
   JiraSiteSelection,
   JiraViewer
 } from '../../../../../shared/jira/jira-types'
@@ -29,6 +31,12 @@ export type JiraPatchOptions = {
 }
 export type JiraIssueSummaryLookupOptions = { force?: boolean; signal?: AbortSignal }
 
+/** The part of a page that a cached issue array cannot carry on its own. */
+export type JiraIssueSearchPageMeta = Omit<JiraIssueSearchPage, 'issues'>
+/** A page read and an array read share a cache key, so only an entry carrying `page`
+ *  can answer a page read; the metadata is what makes the two shapes distinguishable. */
+export type JiraSearchCacheEntry = CacheEntry<JiraIssue[]> & { page?: JiraIssueSearchPageMeta }
+
 export type JiraSlice = {
   jiraStatus: JiraConnectionStatus
   jiraStatusChecked: boolean
@@ -36,7 +44,7 @@ export type JiraSlice = {
   jiraConnectionRevisions: Record<string, number>
   jiraIssueCache: Record<string, CacheEntry<JiraIssue>>
   jiraIssueSummaryCache: Record<string, CacheEntry<JiraIssue | null>>
-  jiraSearchCache: Record<string, CacheEntry<JiraIssue[]>>
+  jiraSearchCache: Record<string, JiraSearchCacheEntry>
 
   checkJiraConnection: () => Promise<void>
   readJiraStatus: (sourceContext: TaskSourceContext) => Promise<JiraConnectionStatus>
@@ -72,6 +80,22 @@ export type JiraSlice = {
     limit?: number,
     options?: JiraCollectionReadOptions
   ) => Promise<JiraIssue[]>
+  searchJiraIssuePage: (
+    jql: string,
+    limit?: number,
+    options?: JiraSearchOptions
+  ) => Promise<JiraIssueSearchPage>
+  listJiraIssuePage: (
+    filter?: JiraIssueFilter,
+    limit?: number,
+    options?: JiraCollectionReadOptions
+  ) => Promise<JiraIssueSearchPage>
+  /** Reads the page a continuation names. Never cached: it extends a view, not a query. */
+  loadMoreJiraIssues: (
+    continuation: JiraIssueSearchContinuation,
+    limit?: number,
+    options?: JiraSearchOptions
+  ) => Promise<JiraIssueSearchPage>
   patchJiraIssue: (issueKey: string, patch: Partial<JiraIssue>, options?: JiraPatchOptions) => void
 }
 

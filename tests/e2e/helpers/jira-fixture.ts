@@ -59,7 +59,25 @@ export async function openFixtureJiraList(page: Page): Promise<void> {
       checkJiraConnection: async () => {},
       readJiraStatus: async () => status,
       listJiraIssues: async () => [issue],
-      searchJiraIssues: async () => [issue]
+      searchJiraIssues: async () => [issue],
+      listJiraIssuePage: async () => ({
+        issues: [issue],
+        hasMore: false,
+        total: null,
+        continuation: null
+      }),
+      searchJiraIssuePage: async () => ({
+        issues: [issue],
+        hasMore: false,
+        total: null,
+        continuation: null
+      }),
+      loadMoreJiraIssues: async () => ({
+        issues: [],
+        hasMore: false,
+        total: null,
+        continuation: null
+      })
     })
     store.getState().openTaskPage({ taskSource: 'jira' })
   }, ISSUE)

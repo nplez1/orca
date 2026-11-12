@@ -61,7 +61,10 @@ export function createWebJiraApi(): PreloadApi['jira'] {
     // Why: requestId keys desktop-only IPC cancellation; the server has no cancel method.
     searchIssues: ({ requestId: _requestId, ...args }) => jiraCall('searchIssues', args),
     cancelSearchIssues: () => Promise.resolve(),
+    searchIssuesPage: ({ requestId: _pageRequestId, ...args }) =>
+      jiraCall('searchIssuesPage', args),
     listIssues: (args) => jiraCall('listIssues', args),
+    listIssuesPage: (args) => jiraCall('listIssuesPage', args),
     getIssue: (args) => readJiraPayload('getIssueStream', 'getIssue', args),
     lookupIssueSummary: ({ requestId: _requestId, ...args }) =>
       jiraCall('lookupIssueSummary', args),
