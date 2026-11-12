@@ -82,6 +82,21 @@ describe('useCreateProjectDefaults on a runtime host', () => {
     expect(browseRuntimeServerDirectory).not.toHaveBeenCalled()
   })
 
+  it('uses a worktree root the user named under a flat layout, without probing', async () => {
+    const seen: Seen = { parent: '', status: '' }
+    await act(async () => {
+      render(
+        <Harness
+          hostSettingOverrides={{ [SERVER]: { defaultWorktreeLocation: '/srv/wt' } }}
+          worktreeLayoutMode="flat"
+          seen={seen}
+        />
+      )
+    })
+    expect(seen.parent).toBe('/srv/wt')
+    expect(browseRuntimeServerDirectory).not.toHaveBeenCalled()
+  })
+
   it('probes the host home when nothing is stored', async () => {
     const seen: Seen = { parent: '', status: '' }
     await act(async () => {

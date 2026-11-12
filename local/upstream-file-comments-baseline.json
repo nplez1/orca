@@ -3,7 +3,7 @@
   "base": "86ee16da9ea6b1d85a0bd2fda389f09d7eb7992c",
   "perFileThreshold": 5,
   "accepted": "re-take on the #366 base: #366 added 8 fork comment lines above upstream code (mobile-page.css, SkillsPage.tsx, skills-page-column.ts, use-skills-page-keyboard-navigation.ts) without re-taking the ratchet; then main's #408 added 2 in NewWorkspaceComposerCard.tsx, also without re-taking it; this branch's own delta stays at or below main's",
-  "total": 5516,
+  "total": 5515,
   "files": {
     ".github/workflows/e2e.yml": 13,
     ".github/workflows/pr.yml": 7,
@@ -246,7 +246,7 @@
     "src/renderer/src/components/settings/ssh/targets/SshTargetList.tsx": 13,
     "src/renderer/src/components/settings/virtual-machines/runtimes/EphemeralVmRuntimeRow.tsx": 14,
     "src/renderer/src/components/sidebar/host-admission/ssh/ssh-target-duplicate.ts": 5,
-    "src/renderer/src/components/sidebar/project-admission/create/clone-defaults.ts": 7,
+    "src/renderer/src/components/sidebar/project-admission/create/clone-defaults.ts": 6,
     "src/renderer/src/components/sidebar/project-admission/create/create-project-defaults.ts": 7,
     "src/renderer/src/components/sidebar/workspace-actions/sleep/use-worktree-sleep-state.ts": 16,
     "src/renderer/src/components/sidebar/workspace-board/projection/workspace-board-task-status-sync.ts": 5,

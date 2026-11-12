@@ -62,6 +62,13 @@ describe('RepoRootSetting', () => {
     )
   })
 
+  it('shows the flat-layout projects folder this computer’s clones and projects both use', async () => {
+    renderRow({ ...settingsWith({}), worktreeLayoutMode: 'flat' }, localScope)
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLInputElement>('textbox').value).toBe('/Users/me/orca/projects')
+    )
+  })
+
   it('prefers a stored root', async () => {
     const { input } = renderRow(
       settingsWith({ [LOCAL_EXECUTION_HOST_ID]: { defaultRepoRoot: '/data/checkouts' } }),

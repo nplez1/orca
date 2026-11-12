@@ -73,6 +73,6 @@ describe('resolveDefaultCreateProjectParent', () => {
         settings({ worktreeLayoutMode: 'flat', nestWorkspaces: false }),
         HOME
       )
-    ).toBe(join(HOME, 'orca', 'projects'))
+    ).toBe('/home/me/orca/projects')
   })
 })
