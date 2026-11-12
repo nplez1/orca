@@ -213,7 +213,6 @@ describe('needsHostHomeProbe', () => {
   })
 })
 
-
 describe('getCloneDestinationAutoFill', () => {
   it('fills an empty destination once', () => {
     expect(

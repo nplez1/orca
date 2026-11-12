@@ -135,7 +135,7 @@ describe('machineHostIds', () => {
   })
 
   it('puts the server id first even when the picker shows the ssh row', () => {
-    const hosts = registry({ kind: 'relay', environmentId: 'omarchy-server' })
+    const hosts = registry({ kind: 'relay', reason: 'relay_terminals_live' })
     const shown = pickerExecutionHosts(hosts).find((host) => host.id === 'ssh:omarchy-target')
 
     expect(shown && machineHostIds(shown)).toEqual(['runtime:omarchy-server', 'ssh:omarchy-target'])
