@@ -100,7 +100,7 @@ describe('planSessionSummaryRenderItems', () => {
       result('12 matches'),
       prose('assistant', 'fixed it')
     ])
-    const items = planSessionSummaryRenderItems(events)
+    const items = planSessionSummaryRenderItems(events, 0)
     expect(items).toHaveLength(3)
     expect(items[1]).toEqual({
       from: 1,
@@ -123,7 +123,7 @@ describe('planSessionSummaryRenderItems', () => {
       result(OK_BODY),
       prose('assistant', 'read')
     ])
-    const items = planSessionSummaryRenderItems(events)
+    const items = planSessionSummaryRenderItems(events, 0)
     expect(items.map((item) => item.role)).toEqual(['user', 'tool', 'assistant'])
     expect(items[1]).toEqual({
       from: 1,
@@ -147,9 +147,33 @@ describe('planSessionSummaryRenderItems', () => {
       call('Grep', 'TS2322'),
       result('1 match')
     ])
-    const items = planSessionSummaryRenderItems(events)
+    const items = planSessionSummaryRenderItems(events, 0)
     expect(items[1].text).toBe(
       ['3 tool calls · Read 1, Bash 1, Grep 1 · 1 failed', '  #3 Bash pnpm tc · exit 2'].join('\n')
+    )
+  })
+
+  // Acceptance: the failure line names the failing call's *transcript* index, like every other
+  // anchor. A fold-relative one named message #3 of a later fold, which is not the call that failed.
+  it('cites transcript indexes in a burst on a later fold', () => {
+    const events = digest([
+      prose('assistant', 'running checks'),
+      call('Read', '/repo/src/a.ts'),
+      result(OK_BODY),
+      call('Bash', 'npm test'),
+      result(FAILED_TEST),
+      call('Grep', 'TODO'),
+      result('12 matches')
+    ])
+    // 40 messages folded before this one, so `events[0]` is transcript message #40 and the failing
+    // Bash call is #43 — the index the prompt tells the extract to cite.
+    const items = planSessionSummaryRenderItems(events, 40)
+    expect(items[1].from).toBe(1)
+    expect(items[1].text).toBe(
+      [
+        '3 tool calls · Read 1, Bash 1, Grep 1 · 1 failed',
+        '  #43 Bash npm test · exit 1 · FAIL src/x.test.ts > adds a flag'
+      ].join('\n')
     )
   })
 
@@ -158,7 +182,7 @@ describe('planSessionSummaryRenderItems', () => {
     for (const name of ['Read', 'Edit', 'Bash', 'Grep', 'Glob', 'Write']) {
       messages.push(call(name, 'x'), result(OK_BODY))
     }
-    const burst = planSessionSummaryRenderItems(digest(messages)).find(
+    const burst = planSessionSummaryRenderItems(digest(messages), 0).find(
       (item) => item.role === 'tool'
     )
     expect(burst?.text).toBe('6 tool calls · Read 1, Edit 1, Bash 1, Grep 1, +2 more')
@@ -170,7 +194,7 @@ describe('planSessionSummaryRenderItems', () => {
     for (let index = 0; index < 400; index += 1) {
       messages.push(call('Read', `/repo/src/file-${index}.ts`), result(OK_BODY))
     }
-    const items = planSessionSummaryRenderItems(digest(messages))
+    const items = planSessionSummaryRenderItems(digest(messages), 0)
     expect(items.length).toBeGreaterThan(1)
     for (const item of items) {
       expect(item.text.length).toBeLessThan(5_000)
@@ -186,14 +210,18 @@ describe('the chunk prompt anchor', () => {
   it('anchors a single call at its own message and a burst at its span', () => {
     const single = digest([prose('user', 'read it'), call('Read', '/a.ts'), result(OK_BODY)])
     expect(
-      buildSessionSummaryChunkPrompt(planSessionSummaryRenderItems(single), { from: 0, to: 3 }, 0)
+      buildSessionSummaryChunkPrompt(
+        planSessionSummaryRenderItems(single, 0),
+        { from: 0, to: 3 },
+        0
+      )
     ).toContain('[#1 tool] Read /a.ts · 20 lines / ')
     const burst = digest([
       prose('user', 'go'),
       ...Array.from({ length: 3 }, () => [call('Read', '/a.ts'), result(OK_BODY)]).flat()
     ])
     const prompt = buildSessionSummaryChunkPrompt(
-      planSessionSummaryRenderItems(burst),
+      planSessionSummaryRenderItems(burst, 0),
       { from: 0, to: 7 },
       0
     )
@@ -220,7 +248,9 @@ describe('chunking over rendered lines', () => {
   // Acceptance: a tool-heavy session pages by what it renders, not by how many messages it holds.
   // Counting events kept this at five calls because 512 messages is five 120-event chunks.
   it('folds a tool-heavy 512-event transcript in two chunks', () => {
-    const ranges = buildSessionSummaryChunks(planSessionSummaryRenderItems(toolHeavyTranscript()))
+    const ranges = buildSessionSummaryChunks(
+      planSessionSummaryRenderItems(toolHeavyTranscript(), 0)
+    )
     expect(ranges).toHaveLength(2)
     expect(ranges.at(-1)?.to).toBe(512)
   })
@@ -229,8 +259,8 @@ describe('chunking over rendered lines', () => {
   // count that never happened.
   it('never starts a chunk inside a rendered line', () => {
     const events = toolHeavyTranscript()
-    const starts = new Set(planSessionSummaryRenderItems(events).map((item) => item.from))
-    const ranges = buildSessionSummaryChunks(planSessionSummaryRenderItems(events), 500)
+    const starts = new Set(planSessionSummaryRenderItems(events, 0).map((item) => item.from))
+    const ranges = buildSessionSummaryChunks(planSessionSummaryRenderItems(events, 0), 500)
     expect(ranges.length).toBeGreaterThan(2)
     for (const range of ranges) {
       expect(range.from === 0 || starts.has(range.from)).toBe(true)
