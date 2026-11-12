@@ -31,6 +31,11 @@ function digest(messages: TranscriptMessage[]): SessionSummarySourceEvent[] {
 }
 
 const OK_BODY = Array.from({ length: 20 }, (_, index) => `line ${index}`).join('\n')
+
+/** A real plugin MCP name: 46 characters, which the old 40-character gate rejected. */
+const MCP_TOOL = 'mcp__plugin_github_github__create_pull_request'
+/** The failure the issue quotes: no harness exit status, so the outcome is the quoted line. */
+const FAILED_MCP = ['Error: Validation Failed', 'Command failed'].join('\n')
 const FAILED_TEST = [
   '> vitest run',
   '',
@@ -173,6 +178,24 @@ describe('planSessionSummaryRenderItems', () => {
       [
         '3 tool calls · Read 1, Bash 1, Grep 1 · 1 failed',
         '  #43 Bash npm test · exit 1 · FAIL src/x.test.ts > adds a flag'
+      ].join('\n')
+    )
+  })
+
+  // #386: an MCP name runs past 40 characters, so the call was counted as an anonymous `tool` and
+  // its failure line said `tool result`. Both halves of the burst line have to name it.
+  it('names a long MCP tool in a burst and in its failure line', () => {
+    const events = digest([
+      prose('user', 'open the pull request'),
+      call(MCP_TOOL, 'owner/repo'),
+      result(FAILED_MCP),
+      call('Read', '/repo/src/a.ts'),
+      result(OK_BODY)
+    ])
+    expect(planSessionSummaryRenderItems(events, 0)[1].text).toBe(
+      [
+        `2 tool calls · ${MCP_TOOL} 1, Read 1 · 1 failed`,
+        `  #1 ${MCP_TOOL} owner/repo · failed · Error: Validation Failed`
       ].join('\n')
     )
   })

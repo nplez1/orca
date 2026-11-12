@@ -150,7 +150,8 @@ function readRunCalls(
     }
     const paired = facts ? byPair.get(facts.pair) : undefined
     if (paired && facts) {
-      // The result's line: it already names the call and adds the outcome.
+      // The result's line: the digest carries the call's label onto its result, so this keeps the
+      // name even when the call's name did not parse, and adds the outcome.
       paired.text = event.text
       paired.label = facts.label
       paired.failed = facts.failed

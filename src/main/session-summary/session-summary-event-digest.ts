@@ -24,7 +24,8 @@ export type SessionSummaryToolFacts = {
   pair: number
   /** The tool's name, when the call line named one. */
   name: string | null
-  /** `<name> <target>`: how a reader (and the extract) identifies the call. */
+  /** `<name> <target>`: how a reader (and the extract) identifies the call — or the call's own
+   * bounded line when it named no tool. */
   label: string
   /** A result only: the text evidences a failure. */
   failed: boolean
@@ -58,8 +59,14 @@ const TOOL_TARGET_MAX_CHARS = 200
  */
 const TOOL_SCAN_WINDOW_CHARS = 8_000
 
-/** A tool name is a short identifier; anything else is a sentence that happens to contain a colon. */
-const TOOL_NAME_PATTERN = /^[A-Za-z][\w.:-]{0,39}$/
+/**
+ * A tool name is an identifier; anything else is a sentence that happens to contain a colon.
+ *
+ * Why the length bound is generous and not tight: it is the character set that rejects prose, since
+ * a sentence carries spaces. The bound only stops an unbounded `name` reaching every label, and an
+ * MCP name — `mcp__<server>__<tool>` — routinely runs 40-80 characters.
+ */
+const TOOL_NAME_PATTERN = /^[A-Za-z][\w.:-]{0,127}$/
 
 /**
  * A harness-reported exit status, anchored to a whole line.
@@ -99,7 +106,19 @@ export type SessionSummaryEventDigester = {
 }
 
 /** A tool call whose result has not arrived yet. */
-type PendingToolCall = { pair: number; name: string | null; target: string | null }
+type PendingToolCall = {
+  pair: number
+  name: string | null
+  target: string | null
+  /**
+   * `<name> <target>`, or the call's own bounded line when it named no tool.
+   *
+   * Why the call keeps it: a result is that same call with an outcome, so it repeats the label the
+   * call already resolved instead of naming the tool a second time from a parse that can fail.
+   * `null` only for an orphan result, which no call named.
+   */
+  label: string | null
+}
 
 export function createSessionSummaryEventDigester(): SessionSummaryEventDigester {
   // Why a queue and not "the last tool name": agents issue parallel calls, so results arrive
@@ -116,7 +135,7 @@ export function createSessionSummaryEventDigester(): SessionSummaryEventDigester
     if (message.toolKind === 'result') {
       // An orphan result is still one tool call: it gets a pair of its own so nothing downstream
       // has to special-case a missing one.
-      return pending.shift() ?? { pair: (pairs += 1), name: null, target: null }
+      return pending.shift() ?? { pair: (pairs += 1), name: null, target: null, label: null }
     }
     const call = { ...parseToolCall(message.text), pair: (pairs += 1) }
     pending.push(call)
@@ -165,11 +184,7 @@ function digestToolCall(text: string, paired: PendingToolCall | null): DigestEve
   // `note()` always returns the call for a call event; the fallback keeps this total for a caller
   // that hands it a message the queue never saw.
   const call = paired ?? { ...parseToolCall(text), pair: 0 }
-  const label = call.name
-    ? call.target
-      ? `${call.name} ${call.target}`
-      : call.name
-    : boundLine(text)
+  const label = call.label ?? boundLine(text)
   return {
     text: label,
     tool: {
@@ -187,14 +202,14 @@ function digestToolCall(text: string, paired: PendingToolCall | null): DigestEve
 function parseToolCall(text: string): Omit<PendingToolCall, 'pair'> {
   const firstLine = firstLineOf(text)
   const separator = firstLine.indexOf(': ')
-  if (separator === -1) {
-    return { name: TOOL_NAME_PATTERN.test(firstLine) ? firstLine : null, target: null }
-  }
-  const name = firstLine.slice(0, separator)
+  const name = separator === -1 ? firstLine : firstLine.slice(0, separator)
   if (!TOOL_NAME_PATTERN.test(name)) {
-    return { name: null, target: null }
+    // Why the whole line and not nothing: a call whose name did not parse still identifies itself,
+    // and its result repeats this label rather than falling back to `tool result`.
+    return { name: null, target: null, label: boundLine(text) }
   }
-  return { name, target: boundLine(firstLine.slice(separator + 2)) }
+  const target = separator === -1 ? null : boundLine(firstLine.slice(separator + 2))
+  return { name, target, label: target ? `${name} ${target}` : name }
 }
 
 /**
@@ -205,11 +220,9 @@ function parseToolCall(text: string): Omit<PendingToolCall, 'pair'> {
  */
 function digestToolResult(message: TranscriptMessage, paired: PendingToolCall | null): DigestEvent {
   const text = message.text
-  const label = paired?.name
-    ? paired.target
-      ? `${paired.name} ${paired.target}`
-      : paired.name
-    : 'tool result'
+  // Why the call's own label: a result is that call plus an outcome, so the name it repeats is the
+  // one the call already resolved — a long MCP name, or a line the name gate could not parse.
+  const label = paired?.label ?? 'tool result'
   const parts = [label, `${countLines(text)} / ${formatBytes(text.length)}`]
   const outcome = describeOutcome(text)
   parts.push(outcome.text)
