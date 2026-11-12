@@ -2,7 +2,8 @@ import { useCallback } from 'react'
 import { useAppStore } from '@/store'
 import type {
   WorkspaceStatus,
-  WorkspaceStatusDefinition
+  WorkspaceStatusDefinition,
+  Worktree
 } from '../../../../../../shared/worktree/types'
 import '../../workspace-status/presentation/workspace-status'
 import {
@@ -26,6 +27,10 @@ import {
   uniqueDraggedKeys,
   type DraggedWorktreeCopies
 } from './dragged-worktree-copies'
+import {
+  notifyWorkspaceKanbanColumnRefusal,
+  resolveWorkspaceKanbanColumnRefusal
+} from '../../workspace-board/drag/workspace-kanban-foreign-column-refusal'
 
 /** Drops cards that can't take this status (another paired host's column), so they aren't re-ranked either. */
 function idsAcceptingStatus(
@@ -37,6 +42,26 @@ function idsAcceptingStatus(
   return worktreeIds.filter((worktreeId) =>
     rowsFor.status(worktreeId).some((row) => isWorkspaceStatusAllowedOnHost(state, row, status))
   )
+}
+
+/** Cards in these ids that another paired host's column bars, so a refused drop can say why. */
+function refusedDropCards(
+  rowsFor: ReturnType<typeof dropWriteRows>,
+  worktreeIds: readonly string[],
+  status: WorkspaceStatus
+): { refused: Worktree[]; total: number } {
+  const state = useAppStore.getState()
+  const refused: Worktree[] = []
+  let total = 0
+  for (const worktreeId of worktreeIds) {
+    for (const row of rowsFor.status(worktreeId)) {
+      total += 1
+      if (!isWorkspaceStatusAllowedOnHost(state, row, status)) {
+        refused.push(row)
+      }
+    }
+  }
+  return { refused, total }
 }
 
 // Route every status/rank write through dropWriteRows because IDs repeat across hosts.
@@ -190,7 +215,13 @@ export function useWorktreeStatusMutations(args: {
 
   const dropWorktreesOnWorkspaceBoard = useCallback(
     (dropArgs: WorktreeStatusDropAtIndexArgs) => {
-      const rowsFor = dropWriteRows(useAppStore.getState(), dropArgs.draggedCopies)
+      const state = useAppStore.getState()
+      const rowsFor = dropWriteRows(state, dropArgs.draggedCopies)
+      // Why: the store drops a foreign column's write, so report it rather than letting the card snap back.
+      const { refused, total } = refusedDropCards(rowsFor, dropArgs.worktreeIds, dropArgs.status)
+      notifyWorkspaceKanbanColumnRefusal(
+        resolveWorkspaceKanbanColumnRefusal(state, refused, dropArgs.status, total)
+      )
       const worktreeIds = idsAcceptingStatus(rowsFor, dropArgs.worktreeIds, dropArgs.status)
       if (worktreeIds.length === 0) {
         return

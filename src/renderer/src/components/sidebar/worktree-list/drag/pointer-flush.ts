@@ -7,6 +7,9 @@ import {
   updateWorkspaceKanbanSidebarDropTargetVisual
 } from '../../workspace-board/drag/workspace-kanban-sidebar-drop'
 import { updateSidebarDragPreviewPosition } from './worktree-sidebar-pointer-drag-dom'
+import { useAppStore } from '@/store'
+import { dropWriteRows } from './dragged-worktree-copies'
+import { isWorkspaceKanbanColumnRefused } from '../../workspace-board/drag/workspace-kanban-foreign-column-refusal'
 import { getPointerDropStatusTarget, shouldPreferSidebarStatusDropTarget } from './status-target'
 import type {
   ShouldShowWorkspaceBoardDropIndicator,
@@ -115,7 +118,19 @@ export function flushWorktreePointerDragFrame(args: WorktreePointerDragFrameArgs
           target.status,
           drag.draggedCopies
         )
+      ),
+    isDropRefused: (target) => {
+      if (!target.status) {
+        return false
+      }
+      const state = useAppStore.getState()
+      const rowsFor = dropWriteRows(state, drag.draggedCopies)
+      return isWorkspaceKanbanColumnRefused(
+        state,
+        drag.reorderDraggedIds.flatMap((worktreeId) => rowsFor.status(worktreeId)),
+        target.status
       )
+    }
   })
   drag.latestBoardDropTarget = {
     target: boardTarget,

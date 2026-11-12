@@ -70,13 +70,17 @@ vi.mock('./WorkspaceKanbanStatusLane', () => ({
     items,
     hiddenCount,
     renderCards,
-    activeWorktreeIdentity
+    activeWorktreeIdentity,
+    isDragTarget,
+    isDragRefused
   }: {
     status: WorkspaceStatusDefinition
     items: readonly Worktree[]
     hiddenCount: number
     renderCards: boolean
     activeWorktreeIdentity: string | null
+    isDragTarget: boolean
+    isDragRefused?: boolean
   }) => (
     <section
       data-workspace-status={status.id}
@@ -84,6 +88,8 @@ vi.mock('./WorkspaceKanbanStatusLane', () => ({
       data-hidden-count={hiddenCount}
       data-render-cards={renderCards ? 'true' : 'false'}
       data-active-worktree-identity={activeWorktreeIdentity ?? ''}
+      data-drag-target={isDragTarget ? 'true' : 'false'}
+      data-drag-refused={isDragRefused ? 'true' : 'false'}
     >
       <button type="button">{status.label}</button>
     </section>
@@ -99,7 +105,10 @@ const STATUSES = Array.from({ length: 21 }, (_, index) => ({
 }))
 const REPO_MAP = new Map<string, Repo>()
 
-function makeGrid(activeWorktreeIdentity: string | null = null): React.JSX.Element {
+function makeGrid(
+  activeWorktreeIdentity: string | null = null,
+  drag: { status: string | null; refused: boolean } = { status: null, refused: false }
+): React.JSX.Element {
   return (
     <WorkspaceKanbanLaneGrid
       laneScrollerRef={createRef()}
@@ -114,7 +123,8 @@ function makeGrid(activeWorktreeIdentity: string | null = null): React.JSX.Eleme
       activeWorktreeIdentity={activeWorktreeIdentity}
       columnWidth={308}
       isResizingColumn={false}
-      dragOverStatus={null}
+      dragOverStatus={drag.status}
+      dragRefused={drag.refused}
       renderCards={true}
       selectedWorktreeIds={new Set()}
       selectedWorktrees={[]}
@@ -193,5 +203,24 @@ describe('WorkspaceKanbanLaneGrid', () => {
         .querySelector('[data-workspace-status="state-02"]')
         ?.getAttribute('data-hidden-count')
     ).toBe('0')
+  })
+
+  it('marks only the hovered lane as the drag target, and as refused when the drag is barred', () => {
+    const rendered = renderGrid()
+    rendered.rerender(makeGrid(null, { status: 'state-02', refused: true }))
+
+    const lanes = Array.from(
+      rendered.container.querySelectorAll<HTMLElement>('[data-workspace-status]')
+    )
+    const target = lanes.find((lane) => lane.dataset.workspaceStatus === 'state-02')
+    expect(target?.dataset.dragTarget).toBe('true')
+    expect(target?.dataset.dragRefused).toBe('true')
+    expect(
+      lanes
+        .filter((lane) => lane !== target)
+        .every(
+          (lane) => lane.dataset.dragTarget === 'false' && lane.dataset.dragRefused === 'false'
+        )
+    ).toBe(true)
   })
 })

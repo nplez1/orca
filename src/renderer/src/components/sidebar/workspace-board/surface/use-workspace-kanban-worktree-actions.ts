@@ -18,6 +18,10 @@ import type {
 import type { WorktreeMetaBatchUpdate } from '../../../../store/slices/worktrees/metadata/worktree-meta-update-options'
 import type { WorktreeManualOrderCatalog } from '../../worktree-list/drag/worktree-manual-order-catalog'
 import { isWorkspaceStatusAllowedOnHost } from '@/store/workspaces/status/host-workspace-status-columns'
+import {
+  notifyWorkspaceKanbanColumnRefusal,
+  resolveWorkspaceKanbanColumnRefusal
+} from '../drag/workspace-kanban-foreign-column-refusal'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 
 type LaneView = { items: readonly Worktree[] }
@@ -108,12 +112,28 @@ export function useWorkspaceKanbanWorktreeActions(args: {
     }) => {
       // Cards that can't take this status (another paired host's column) aren't re-ranked either.
       const state = useAppStore.getState()
-      const rows = drop.worktreeKeys.flatMap((key) => {
+      const rows: Worktree[] = []
+      const refused: Worktree[] = []
+      for (const key of drop.worktreeKeys) {
         const current = args.worktreeByKey.get(key)
-        return current && isWorkspaceStatusAllowedOnHost(state, current, drop.status)
-          ? [current]
-          : []
-      })
+        if (!current) {
+          continue
+        }
+        if (isWorkspaceStatusAllowedOnHost(state, current, drop.status)) {
+          rows.push(current)
+        } else {
+          refused.push(current)
+        }
+      }
+      // Why: the drop did nothing for these cards, so say which host's column refused them.
+      notifyWorkspaceKanbanColumnRefusal(
+        resolveWorkspaceKanbanColumnRefusal(
+          state,
+          refused,
+          drop.status,
+          rows.length + refused.length
+        )
+      )
       if (rows.length === 0) {
         return
       }

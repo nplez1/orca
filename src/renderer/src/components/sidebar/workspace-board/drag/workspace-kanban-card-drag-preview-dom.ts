@@ -25,6 +25,11 @@ export function setDragDocumentStyles(enabled: boolean): void {
   document.documentElement.toggleAttribute(POINTER_DRAGGING_ATTR, enabled)
 }
 
+/** The lane under the pointer cannot take the drag; keep the grab styles otherwise. */
+export function setDragDocumentRefusedCursor(refused: boolean): void {
+  document.body.style.cursor = refused ? 'not-allowed' : 'grabbing'
+}
+
 export function setDraggedCardsDragging(args: {
   board: HTMLElement | null
   worktreeIdentities: readonly string[]
