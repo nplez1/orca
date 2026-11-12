@@ -183,6 +183,18 @@ describe('getCloneParentForHost', () => {
       })
     ).toBe('/srv/newer')
   })
+
+  it('ignores a relative folder the machine’s other id holds', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SSH]: { defaultRepoRoot: 'src' } } },
+        hostIds: [SERVER],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested',
+        hostHome: '/home/me'
+      })
+    ).toBe('/home/me/orca/workspaces')
+  })
 })
 
 describe('needsHostHomeProbe', () => {
@@ -210,6 +222,16 @@ describe('needsHostHomeProbe', () => {
         [SERVER, SSH]
       )
     ).toEqual({ environmentId: 'server-a', probe: false })
+  })
+
+  it('still probes when the folder the other id holds is relative', () => {
+    expect(
+      needsHostHomeProbe(
+        { hostSettingOverrides: { [SSH]: { defaultRepoRoot: 'src' } } },
+        [SERVER],
+        [SERVER, SSH]
+      )
+    ).toEqual({ environmentId: 'server-a', probe: true })
   })
 })
 
