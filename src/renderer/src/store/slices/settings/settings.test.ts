@@ -705,15 +705,14 @@ describe('createSettingsSlice write failures', () => {
 
   it('does not report a failed save when only the follow-up refresh rejects', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const fetchAllWorktrees = vi.fn().mockRejectedValue(new Error('refresh failed'))
     const store = createTestStore()
-    store.setState({
-      settings: getDefaultSettings('/tmp'),
-      fetchAllWorktrees: vi.fn().mockRejectedValue(new Error('refresh failed'))
-    })
+    store.setState({ settings: getDefaultSettings('/tmp'), fetchAllWorktrees })
 
     try {
       await store.getState().updateSettings({ worktreeVisibilityDefaults: { external: 'hide' } })
 
+      expect(fetchAllWorktrees).toHaveBeenCalled()
       expect(toast.error).not.toHaveBeenCalled()
     } finally {
       consoleError.mockRestore()

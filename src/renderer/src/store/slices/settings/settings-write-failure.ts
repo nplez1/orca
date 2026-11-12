@@ -96,7 +96,7 @@ async function restoreSettingsAfterFailedWrite(args: {
     }
     let restored: GlobalSettings | null = null
     for (const key of Object.keys(stored)) {
-      if (RESTORE_SKIPPED_KEYS.has(key) || !isStoredSettingsKey(current, key)) {
+      if (RESTORE_SKIPPED_KEYS.has(key) || !isStoredSettingsKey(stored, key)) {
         continue
       }
       const storedValue = stored[key]
