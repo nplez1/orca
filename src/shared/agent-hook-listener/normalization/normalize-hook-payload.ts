@@ -31,7 +31,7 @@ import {
 import { claudeRowHasUnlistedLiveWork } from '../providers/claude-pane-hold-evidence'
 import {
   applyPiScheduledWorkHold,
-  paneHasArmedPiScheduledWork,
+  hookPayloadArmsScheduledWork,
   recordPiScheduledWork
 } from '../providers/pi-pane-hold-evidence'
 import { readString } from '../tool-input-preview'
@@ -265,7 +265,8 @@ export function normalizeHookPayload(
     envelope: record,
     extractedPrompt,
     previousOpenCodeMainAgent: options.previousOpenCodeMainAgent,
-    ownsHoldRetraction: options.ownsHoldRetraction === true
+    ownsHoldRetraction: options.ownsHoldRetraction === true,
+    claimedBeyondDescendants: source === 'pi' && hookPayloadArmsScheduledWork(hookPayloadRecord)
   })
   const providerSessionOnly =
     (source === 'pi' || source === 'prime-agent' || source === 'jcode') &&
@@ -303,9 +304,6 @@ export function normalizeHookPayload(
   // session's placeholder — passes through this line with the inventory this post carries.
   if (source === 'pi') {
     recordPiScheduledWork(state, paneKey, hookPayloadRecord)
-  }
-  if (state.pendingHoldRetraction === paneKey && paneHasArmedPiScheduledWork(state, paneKey)) {
-    state.pendingHoldRetraction = undefined
   }
   const piHeldPayload =
     source === 'pi' ? applyPiScheduledWorkHold(state, paneKey, transportPayload) : transportPayload

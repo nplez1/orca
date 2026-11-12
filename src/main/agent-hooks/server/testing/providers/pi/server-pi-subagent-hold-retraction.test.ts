@@ -105,7 +105,7 @@ it('retracts once, however many empty live sets arrive', async () => {
   expect(listeners.changes()).toBe(changesAfterFirstDrain)
 })
 
-it('keeps a held row whose session still has scheduled work armed', async () => {
+it('republishes a held row without the drained child when the session has armed work', async () => {
   const listeners = watchListeners()
   await piHook('subagent_async_state', { subagent_runs: [CHILD] })
 
@@ -115,7 +115,8 @@ it('keeps a held row whose session still has scheduled work armed', async () => 
   })
 
   // Why: the loop will re-enter this session, so the pane is still claimed and clearing it would
-  // strand a row the extension is about to republish.
+  // strand a row the extension is about to republish — but the child that left must not stay listed.
   expect(listeners.cleared).toEqual([])
   expect(visibleRows()[0]?.state).toBe('working')
+  expect(visibleRows()[0]?.subagents).toBeUndefined()
 })

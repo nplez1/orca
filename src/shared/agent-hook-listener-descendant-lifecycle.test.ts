@@ -276,21 +276,17 @@ describe('descendant lifecycle never settles the pane', () => {
       it('reports nothing when the row it would retire is only retained resume identity', () => {
         startHold()
         const held = state.lastStatusByPaneKey.get(PANE_KEY)!
-        seedLegacyAgentStatusForTests(state, {
-          ...held,
-          providerSessionOnly: true,
-          payload: { ...held.payload, subagents: undefined }
-        })
+        seedLegacyAgentStatusForTests(state, { ...held, providerSessionOnly: true })
 
         publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] }, owned)
         expect(state.pendingHoldRetraction).toBeUndefined()
       })
 
-      it('keeps the row when the session still has armed work, which claims the pane', () => {
+      it('republishes the hold without the drained child when the session has armed work', () => {
         startHold()
-        // A loop that will re-enter the session: clearing this pane would strand a row its own
-        // extension is about to republish.
-        publish(
+        // A loop that will re-enter the session claims the pane, so the hold stands — but the child
+        // that just left must not keep riding it.
+        const republished = publish(
           'pi',
           {
             hook_event_name: 'subagent_async_state',
@@ -299,6 +295,8 @@ describe('descendant lifecycle never settles the pane', () => {
           },
           owned
         )
+        expect(republished?.payload.state).toBe('working')
+        expect(republished?.payload.subagents).toBeUndefined()
         expect(state.pendingHoldRetraction).toBeUndefined()
         expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(true)
       })

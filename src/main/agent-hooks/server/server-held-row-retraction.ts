@@ -3,21 +3,17 @@ import { AGENT_STATUS_2A_CURRENT_PRODUCER_MODE } from '../../../shared/agent-sta
 import type { EnrichedAgentHookEventPayload } from './server-types'
 import { AgentHookServerStatusApplication } from './server-status-application'
 
-/**
- * Retires a row the listener withdrew while normalizing a post.
+/** Retires a row the listener withdrew while normalizing a post.
  *
- * Its own link in the chain, and a fork-owned file, for one reason: the descendant lane retracts a
- * held row when nothing claims the pane any more (#397), and the retraction happens where no row can
- * be published — so the deletion has to be performed and announced here, through the same path
- * `dropStatusEntry` uses, rather than by the bare `deleteLegacyAgentStatus` the listener could reach.
- */
+ * Its own link in the chain, and a fork-owned file, because the descendant lane retracts a held row
+ * where no row can be published (#397) — so the deletion is performed and announced here, through
+ * the path `dropStatusEntry` uses, rather than by the bare delete the listener could reach. */
 export abstract class AgentHookServerHeldRowRetraction extends AgentHookServerStatusApplication {
   /** Retire the held row a retracted pane still has stored.
    *
    *  Only a row carrying descendants is the descendant lane's own; anything else is another lane's
-   *  row, or the identity-only record a previous retraction already left behind. The retained
-   *  identity-only row keeps the pane's resume target without claiming live work. */
-  retractHeldStatusEntry(paneKey: string): void {
+   *  row, or the identity-only record a previous retirement left behind. */
+  protected retractHeldStatusEntry(paneKey: string): void {
     const resolvedPaneKey = this.resolvePaneKeyAlias(paneKey)
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Main admits enriched legacy rows; the shared view declares their base event type.
     const held = this.state.lastStatusByPaneKey.get(resolvedPaneKey) as

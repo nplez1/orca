@@ -45,7 +45,7 @@ export function applyDescendantEventToPane(
   source: AgentHookSource,
   paneKey: string,
   facts: DescendantEventFacts,
-  options: { ownsHoldRetraction?: boolean } = {}
+  options: { ownsHoldRetraction?: boolean; claimedBeyondDescendants?: boolean } = {}
 ): ParsedAgentStatusPayload | null {
   const now = Date.now()
   if (facts.kind === 'live-set') {
@@ -100,7 +100,10 @@ export function applyDescendantEventToPane(
   const nothingClaimsThePane =
     leadState === undefined &&
     !state.descendantRosterByPaneKey.has(paneKey) &&
-    children.length === 0
+    children.length === 0 &&
+    // Why: a loop or a wakeup the session still has armed claims the pane, so the post republishes
+    // the hold with the drained child gone rather than retracting a pane that will run again.
+    options.claimedBeyondDescendants !== true
   if (facts.kind === 'child' && facts.ended === true && leadState === undefined) {
     if (nothingClaimsThePane) {
       retractDescendantHoldRow(state, paneKey, options)
