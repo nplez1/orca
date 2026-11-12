@@ -62,7 +62,7 @@ type CloneRequest = {
   url: string
   destinationOverride: string
   folderName?: string
-  /** True once the user is still here but has moved to another host, so nothing should be cloned. */
+  /** True once the user moved to another host or dropped the request, so nothing should be cloned. */
   isSuperseded: () => boolean
 }
 
@@ -97,8 +97,9 @@ export function useRunTargetAutoClone({
     url: '',
     destination: ''
   })
-  // Only the host the user is currently waiting on may drive the status; a clone they moved away
-  // from still finishes on the host, but must not retarget the composer or overwrite its state.
+  // Only the host the user is currently waiting on may drive the status, and the only thing that
+  // abandons a clone: another host pick, or `clear()`. Unmount leaves it alone, so a clone a closed
+  // composer was still waiting on keeps running — and a reopened composer can still join it.
   const pendingKeyRef = useRef<string | null>(null)
   // The clone a destination override was written for, kept across clears: a path names one machine,
   // so it must not follow the user to another host — but a value typed while nothing is pending
@@ -232,8 +233,10 @@ export function useRunTargetAutoClone({
           option,
           url: overrides.url.trim() || defaultCloneUrl.trim(),
           destinationOverride,
-          // Why unmount does not count: a reopened composer may be waiting on this same clone.
-          isSuperseded: () => mountedRef.current && pendingKeyRef.current !== key,
+          // Why the key alone and not the mount: a reopened composer may be waiting on this same
+          // clone, so only the user moving on — another host pick, or `clear()` on a project
+          // switch — may abandon it. A closed composer leaves the ref alone.
+          isSuperseded: () => pendingKeyRef.current !== key,
           ...(requestedFolderName ? { folderName: requestedFolderName } : {})
         })
       )
