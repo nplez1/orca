@@ -250,6 +250,8 @@ export function normalizeHookPayload(
   }
 
   const promptText = extractedPrompt.text
+  const heldDescendantRow =
+    (state.lastStatusByPaneKey.get(paneKey)?.payload.subagents?.length ?? 0) > 0
   // Name a Claude PermissionRequest's request once, so the listener and every receiver settle the same one.
   const providerHookPayload =
     source === 'claude'
@@ -266,7 +268,8 @@ export function normalizeHookPayload(
     extractedPrompt,
     previousOpenCodeMainAgent: options.previousOpenCodeMainAgent,
     ownsHoldRetraction: options.ownsHoldRetraction === true,
-    claimedBeyondDescendants: source === 'pi' && hookPayloadArmsScheduledWork(hookPayloadRecord)
+    claimedBeyondDescendants:
+      source === 'pi' && heldDescendantRow && hookPayloadArmsScheduledWork(hookPayloadRecord)
   })
   const providerSessionOnly =
     (source === 'pi' || source === 'prime-agent' || source === 'jcode') &&

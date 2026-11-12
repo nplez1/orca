@@ -301,6 +301,22 @@ describe('descendant lifecycle never settles the pane', () => {
         expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(true)
       })
 
+      it('publishes nothing for an empty live set whose armed work has no hold to republish', () => {
+        expect(
+          publish(
+            'pi',
+            {
+              hook_event_name: 'subagent_async_state',
+              subagent_runs: [],
+              scheduled_work: { jobs: [{ id: 'loop-1', kind: 'live', next_in_ms: 60_000 }] }
+            },
+            owned
+          )
+        ).toBeNull()
+        expect(state.pendingHoldRetraction).toBeUndefined()
+        expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(false)
+      })
+
       it('never carries a retraction over to the next post', () => {
         startHold()
         publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] }, owned)

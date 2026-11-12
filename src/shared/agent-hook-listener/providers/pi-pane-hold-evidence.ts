@@ -64,8 +64,9 @@ export function recordPiScheduledWork(
  *  session or a cold job the scheduler will fire.
  *
  *  Why the descendant lane asks: it retracts a held row when nothing claims the pane, and an armed
- *  loop or wakeup IS a claim — so the post republishes the hold with the drained child gone instead
- *  of retracting it, or the pane reads cleared while its own extension is about to post again. */
+ *  loop or wakeup IS a claim — so over a stored hold the post republishes that row with the drained
+ *  child gone instead of retracting it, or the pane reads cleared while its own extension is about to
+ *  post again. A pane with no hold publishes nothing, exactly as it did before. */
 export function hookPayloadArmsScheduledWork(hookPayload: Record<string, unknown>): boolean {
   const jobs = readPiScheduledWork(hookPayload)
   return jobs !== null && jobs.length > 0
