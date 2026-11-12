@@ -1,48 +1,9 @@
-import {
-  layoutNestsPrimaryCheckout,
-  type WorktreeLayoutMode
-} from '../../../../../../shared/orca-workspace-layout'
+import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import { getHostSettingOverrideForIds } from '../../../../../../shared/host-setting-overrides'
-import { isAbsoluteOrHomeFolderPath } from '@/lib/host-folder-path'
+import { resolveCheckoutParent } from '../../../../../../shared/host-repo-root'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
-import { getDefaultCreateProjectParent } from './create-project-defaults'
-
-export function getDefaultCloneParent(
-  workspaceDir: string,
-  layoutMode: WorktreeLayoutMode = 'repo-nested'
-): string {
-  if (!workspaceDir) {
-    return ''
-  }
-
-  // fork-comment-ok: the destination IS the workspace dir under a nested layout, not its parent.
-  if (layoutNestsPrimaryCheckout(layoutMode)) {
-    return workspaceDir
-  }
-
-  const trimmed = workspaceDir.replace(/[\\/]+$/, '')
-  if (!trimmed) {
-    return workspaceDir
-  }
-
-  const separatorIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
-  const lastSegment = separatorIndex === -1 ? trimmed : trimmed.slice(separatorIndex + 1)
-
-  if (lastSegment !== 'workspaces') {
-    return workspaceDir
-  }
-
-  // Place clones beside Orca’s default workspaces tree.
-  const parent = separatorIndex === -1 ? '' : trimmed.slice(0, separatorIndex)
-  if (parent === '' && trimmed.startsWith('/')) {
-    return '/'
-  }
-  if (/^[A-Za-z]:$/.test(parent)) {
-    return `${parent}${trimmed[separatorIndex]}`
-  }
-  return parent
-}
+import { isAbsoluteOrHomeFolderPath } from '@/lib/host-folder-path'
 
 export type CloneParentSettings = {
   workspaceDir?: string | null
@@ -75,7 +36,7 @@ export function needsHostHomeProbe(
   return { environmentId, probe: environmentId !== null && !hasStoredRoot }
 }
 
-/** Where a clone lands for a host: its checkout root, else its worktree root under the layout rule. */
+/** Where a clone lands for a host: the same rule create-project uses, so the two cannot diverge. */
 export function getCloneParentForHost({
   settings,
   hostIds,
@@ -97,26 +58,19 @@ export function getCloneParentForHost({
   if (!isLocal && !parsedIds.some((parsed) => parsed.kind === 'runtime')) {
     return ''
   }
-  // An explicit checkout root already names the folder checkouts go in.
-  const repoRoot = getUsableStoredHostRoot(settings, hostIds, 'defaultRepoRoot')
-  if (repoRoot) {
-    return repoRoot
-  }
-  const worktreeRoot = getUsableStoredHostRoot(settings, hostIds, 'defaultWorktreeLocation')
-  if (worktreeRoot) {
-    return getDefaultCloneParent(worktreeRoot, layoutMode)
-  }
-  if (isLocal) {
-    // fork-comment-ok: a relative workspace dir is a per-project location, so it names no clone destination.
-    const workspaceDir = settings?.workspaceDir ?? ''
-    return isAbsoluteOrHomeFolderPath(workspaceDir, true)
-      ? getDefaultCloneParent(workspaceDir, layoutMode)
-      : ''
-  }
-  // Never this computer's workspaceDir: it names a folder on another machine's disk.
-  return hostHome
-    ? getDefaultCloneParent(getDefaultCreateProjectParent(hostHome, layoutMode), layoutMode)
-    : ''
+  // fork-comment-ok: a relative workspace dir is a per-project location, so it names no clone destination.
+  const workspaceDir = settings?.workspaceDir ?? ''
+  return resolveCheckoutParent({
+    storedRepoRoot: getUsableStoredHostRoot(settings, hostIds, 'defaultRepoRoot'),
+    // fork-comment-ok: never this computer's workspaceDir for a remote host — it names another
+    // machine's disk, so a remote host falls back to its own probed home instead.
+    storedWorktreeRoot:
+      getUsableStoredHostRoot(settings, hostIds, 'defaultWorktreeLocation') ??
+      (isLocal && isAbsoluteOrHomeFolderPath(workspaceDir, true) ? workspaceDir : ''),
+    layoutMode,
+    // Only a runtime host's home is probed, so a local host never reads one here.
+    hostHome: isLocal ? null : hostHome
+  })
 }
 
 export function getCloneDestinationAutoFill({

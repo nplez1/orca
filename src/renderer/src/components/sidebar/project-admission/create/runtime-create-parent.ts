@@ -1,11 +1,8 @@
-import {
-  layoutNestsPrimaryCheckout,
-  type WorktreeLayoutMode
-} from '../../../../../../shared/orca-workspace-layout'
+import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
 import { toRuntimeExecutionHostId } from '../../../../../../shared/execution-host'
+import { resolveCheckoutParent } from '../../../../../../shared/host-repo-root'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import { browseRuntimeServerDirectory } from '@/runtime/files/reads/runtime-server-directory-browser'
-import { getDefaultCreateProjectParent } from './create-project-defaults'
 import { getUsableStoredHostRoot } from './clone-defaults'
 
 export const RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS = 3000
@@ -31,7 +28,7 @@ export function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<
   })
 }
 
-/** A stored root wins; otherwise the host's own home names the container for the layout in use. */
+/** A stored root wins; otherwise the host's own home names the folder the layout puts checkouts in. */
 export function resolveRuntimeCreateParent(args: {
   runtimeEnvironmentId: string
   worktreeLayoutMode?: WorktreeLayoutMode
@@ -40,11 +37,11 @@ export function resolveRuntimeCreateParent(args: {
   const hostIds = [toRuntimeExecutionHostId(args.runtimeEnvironmentId)]
   const layoutMode = args.worktreeLayoutMode ?? 'repo-nested'
   const overrides = { hostSettingOverrides: args.hostSettingOverrides }
-  const stored =
-    getUsableStoredHostRoot(overrides, hostIds, 'defaultRepoRoot') ??
-    (layoutNestsPrimaryCheckout(layoutMode)
-      ? (getUsableStoredHostRoot(overrides, hostIds, 'defaultWorktreeLocation') ?? '')
-      : '')
+  const stored = resolveCheckoutParent({
+    storedRepoRoot: getUsableStoredHostRoot(overrides, hostIds, 'defaultRepoRoot'),
+    storedWorktreeRoot: getUsableStoredHostRoot(overrides, hostIds, 'defaultWorktreeLocation'),
+    layoutMode
+  })
   if (stored) {
     return Promise.resolve({ parent: stored })
   }
@@ -52,6 +49,6 @@ export function resolveRuntimeCreateParent(args: {
     browseRuntimeServerDirectory(args.runtimeEnvironmentId, '~'),
     RUNTIME_GIT_AVAILABILITY_TIMEOUT_MS
   ).then((result) => ({
-    parent: getDefaultCreateProjectParent(result.resolvedPath, args.worktreeLayoutMode)
+    parent: resolveCheckoutParent({ layoutMode, hostHome: result.resolvedPath })
   }))
 }

@@ -25,14 +25,24 @@ describe('getCloneParentForHost', () => {
     ).toBe('/Users/me/orca/workspaces')
   })
 
-  it('places a flat-layout clone beside the workspaces tree', () => {
+  it('places a flat-layout clone in the projects tree beside the workspaces one', () => {
     expect(
       getCloneParentForHost({
         settings: { workspaceDir: '/Users/me/orca/workspaces' },
         hostIds: [LOCAL],
         layoutMode: 'flat'
       })
-    ).toBe('/Users/me/orca')
+    ).toBe('/Users/me/orca/projects')
+  })
+
+  it('keeps a worktree root the user named under a flat layout', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SERVER]: { defaultWorktreeLocation: '/srv/wt' } } },
+        hostIds: [SERVER],
+        layoutMode: 'flat'
+      })
+    ).toBe('/srv/wt')
   })
 
   it('prefers the host’s stored checkout root', () => {

@@ -51,7 +51,8 @@ export function RepoRootSetting({
       cancelled = true
     }
   }, [environmentId, isLocal, scope.available])
-  // The same rule the clone flow applies to this machine, so the field cannot promise another folder.
+  // The same rule the clone and create-project flows apply to this machine, so the field cannot
+  // promise another folder.
   const fallbackValue = useMemo(
     () =>
       getCloneParentForHost({
