@@ -83,6 +83,9 @@ describe('resolveCheckoutParent', () => {
       })
     ).toBe('C:\\Users\\me\\Orca\\projects')
     expect(
+      resolveCheckoutParent({ storedWorktreeRoot: '~\\Orca\\Workspaces', layoutMode: 'flat' })
+    ).toBe('~\\Orca\\projects')
+    expect(
       resolveCheckoutParent({ storedWorktreeRoot: '/data/Orca/Workspaces', layoutMode: 'flat' })
     ).toBe('/data/Orca/Workspaces')
   })

@@ -1,13 +1,6 @@
 import { isCaseInsensitiveRuntimeRoot } from './cross-platform-path'
 import { joinHostPath, trimHostPathSeparators } from './host-path-join'
-import { LOCAL_EXECUTION_HOST_ID } from './execution-host'
-import type { GlobalSettings } from './global-settings-types'
-import { getEffectiveHostSetting } from './host-setting-overrides'
-import {
-  layoutNestsPrimaryCheckout,
-  resolveWorktreeLayoutMode,
-  type WorktreeLayoutMode
-} from './orca-workspace-layout'
+import { layoutNestsPrimaryCheckout, type WorktreeLayoutMode } from './orca-workspace-layout'
 /** Where a host keeps checkouts when nothing is stored. Under a nested layout that is the worktree
  *  root itself, which is why the two settings coincide there and diverge under `flat`. */
 export function getDefaultRepoRootConvention(
@@ -27,8 +20,9 @@ export function getDefaultRepoRootConvention(
 /** Under `flat` a checkout lands in the worktree root the user named — except for Orca's own
  *  `<x>/orca/workspaces` tree, whose checkouts belong in its sibling `orca/projects`. */
 function flatCheckoutParent(worktreeRoot: string): string {
-  // Windows roots fold case, so a hand-typed `…\Orca\Workspaces` is still Orca's own tree.
-  const foldCase = isCaseInsensitiveRuntimeRoot(worktreeRoot)
+  // Windows roots fold case, so a hand-typed `…\Orca\Workspaces` is still Orca's own tree. A
+  // backslash is the only Windows evidence a `~`-rooted value carries, since its platform is unknown.
+  const foldCase = isCaseInsensitiveRuntimeRoot(worktreeRoot) || worktreeRoot.includes('\\')
   const isSegment = (segment: string, expected: string): boolean =>
     foldCase ? segment.toLowerCase() === expected : segment === expected
   const trimmed = trimHostPathSeparators(worktreeRoot)
@@ -66,35 +60,4 @@ export function resolveCheckoutParent({
     return layoutNestsPrimaryCheckout(layoutMode) ? worktreeRoot : flatCheckoutParent(worktreeRoot)
   }
   return getDefaultRepoRootConvention(hostHome ?? '', layoutMode)
-}
-
-type LocalCheckoutSettings = {
-  workspaceDir?: string | null
-  hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
-  worktreeLayoutMode?: WorktreeLayoutMode
-  nestWorkspaces?: boolean
-}
-
-/** This computer's checkout folder: its stored roots, else the convention for its own home. The
- *  seeded workspaceDir counts as the worktree root, not as a stored checkout folder. */
-export function getLocalCheckoutParent(
-  settings: LocalCheckoutSettings | null | undefined,
-  hostHome?: string | null
-): string {
-  return resolveCheckoutParent({
-    storedRepoRoot: getEffectiveHostSetting(
-      settings,
-      LOCAL_EXECUTION_HOST_ID,
-      'defaultRepoRoot',
-      ''
-    ),
-    storedWorktreeRoot: getEffectiveHostSetting(
-      settings,
-      LOCAL_EXECUTION_HOST_ID,
-      'defaultWorktreeLocation',
-      settings?.workspaceDir ?? ''
-    ),
-    layoutMode: resolveWorktreeLayoutMode(settings ?? {}),
-    hostHome
-  })
 }

@@ -5,8 +5,8 @@ import {
   toRuntimeExecutionHostId
 } from '../../../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
-import { getLocalCheckoutParent } from '../../../../../../shared/host-repo-root'
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
+import { resolveDefaultCreateProjectParent } from '../../../../../../main/ipc/repos/default-create-project-parent'
 import { getCloneParentForHost } from './clone-defaults'
 import { resolveRuntimeCreateParent } from './runtime-create-parent'
 
@@ -70,7 +70,7 @@ describe('the checkout folder is one rule for clone, the Settings row and create
       layoutMode: 'flat'
     })
     expect(row).toBe('/Users/me/orca/projects')
-    expect(getLocalCheckoutParent(settings, LOCAL_HOME)).toBe(row)
+    expect(resolveDefaultCreateProjectParent(settings, LOCAL_HOME)).toBe(row)
   })
 
   it('agrees on this computer under a nested layout', () => {
@@ -81,7 +81,7 @@ describe('the checkout folder is one rule for clone, the Settings row and create
       layoutMode: 'repo-nested'
     })
     expect(row).toBe('/Users/me/orca/workspaces')
-    expect(getLocalCheckoutParent(settings, LOCAL_HOME)).toBe(row)
+    expect(resolveDefaultCreateProjectParent(settings, LOCAL_HOME)).toBe(row)
   })
 
   it('agrees on this computer with a worktree root the user named', () => {
@@ -95,7 +95,7 @@ describe('the checkout folder is one rule for clone, the Settings row and create
         layoutMode
       })
       expect(row).toBe('/data/wt')
-      expect(getLocalCheckoutParent(settings, LOCAL_HOME)).toBe(row)
+      expect(resolveDefaultCreateProjectParent(settings, LOCAL_HOME)).toBe(row)
     }
   })
 
@@ -110,7 +110,7 @@ describe('the checkout folder is one rule for clone, the Settings row and create
         layoutMode
       })
       expect(row).toBe('/data/checkouts')
-      expect(getLocalCheckoutParent(settings, LOCAL_HOME)).toBe(row)
+      expect(resolveDefaultCreateProjectParent(settings, LOCAL_HOME)).toBe(row)
     }
   })
 
@@ -177,5 +177,15 @@ describe('the checkout folder is one rule for clone, the Settings row and create
       ).parent
     ).toBe('/srv/wt')
     expect(browseRuntimeServerDirectory).not.toHaveBeenCalled()
+  })
+
+  it('keeps a relative workspace dir out of the clone default, as main refuses it too', () => {
+    // #410's contract: a relative workspace dir is a per-project location, so clone has no
+    // destination while create-project still falls back to the layout convention.
+    const settings = { ...settingsWith('flat'), workspaceDir: '.orca/worktrees' }
+    expect(
+      getCloneParentForHost({ settings, hostIds: [LOCAL_EXECUTION_HOST_ID], layoutMode: 'flat' })
+    ).toBe('')
+    expect(resolveDefaultCreateProjectParent(settings, LOCAL_HOME)).toBe('/Users/me/orca/projects')
   })
 })
