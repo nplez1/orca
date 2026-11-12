@@ -9,6 +9,14 @@ name: Fork base gates
 #
 # This runs those rules on the release line itself, where the debt is created, so it is
 # caught the day it lands instead of the day someone else trips over it.
+#
+# Why the lint verdict step as well as the named families: the four families below are a
+# third of what `pnpm lint` runs. The ratchets it does not name here were never run on the
+# release line at all, so #361 merged green and left `main` red on
+# `check:focus-read-ratchet` for the next branch to allowlist (issue #399).
+# `local/gate-lint.mjs` runs the whole set and classifies it against
+# `local/lint-known-red.json`, which is what makes it green on a base that carries foreign
+# reds while still failing the push that adds one.
 on:
   schedule:
     - cron: '23 4 * * *'
@@ -30,7 +38,10 @@ jobs:
     # 2026-10-26 nightly's 17.5 h wait: that job never started, and a timeout only counts once a runner
     # picks the job up. `cancel-in-progress: false` stays — a merge must not replace a running gate with
     # a `cancelled` conclusion, which is what hid that run's red shards.
-    timeout-minutes: 40
+    # Why 50 rather than 40: the lint verdict below was added on 2026-11-12, and it runs ~50 steps the
+    # named ones above do not (measured 83 s on an 18-core host, so a few minutes on a runner). At 40 a
+    # slow-but-finishing `pnpm tc` would time the job out before the ratchet set ever ran.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
@@ -81,3 +92,22 @@ jobs:
       - name: Fork-local tooling tests
         if: ${{ !cancelled() }}
         run: node local/run-fork-tests.mjs
+
+      # Why: the named steps above are four families of the lint chain. The other ~45 — the focus-read,
+      # path-literal, ast-grep, workspace-read and tab-map ratchets among them — ran only in a hand-run
+      # release gate, so a regression sat on `main` until an unrelated branch found and allowlisted it
+      # (#361, #399). The gate runs every step of the chain plus the fork's own, each on its own, and
+      # turns the set of failures into a verdict against `local/lint-known-red.json`: a foreign red is
+      # reported with its class and owner, one outside the list fails this run.
+      # Why after the fetch above: `check-upstream-file-comments` measures against the recorded sync
+      # base, which a CI checkout does not have — the same reason the max-lines exemption test needs it.
+      # Why `ORCA_CODE_QUALITY_BASE: HEAD`: the gate also runs `check:code-quality:changed`, whose base
+      # on the release line is the release line itself. That step judges a diff, which is a PR's job and
+      # runs in `fork-pr-gates.yml`; here it must not depend on a remote ref a shallow checkout may
+      # lack, and a gate red for a missing ref rather than for a finding is the failure this lane
+      # exists to prevent.
+      - name: Lint ratchet verdict
+        if: ${{ !cancelled() }}
+        env:
+          ORCA_CODE_QUALITY_BASE: HEAD
+        run: node local/gate-lint.mjs

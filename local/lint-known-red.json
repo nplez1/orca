@@ -33,9 +33,10 @@
     "it is pushed — see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-08 sync's lint gate. It goes stale on",
     "the first run after `git push origin main`; prune it then.",
     "The `check-upstream-file-comments` entries that sync left were pruned on 2026-11-11, when a branch re-took that baseline; see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-11 fork-comment re-take.",
-    "2026-11-11: three `check:focus-read-ratchet` entries, red at the merge base from #361's per-host settings scope; see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-11 fork-comment re-take."
+    "2026-11-11: three `check:focus-read-ratchet` entries, red at the merge base from #361's per-host settings scope; see LOCAL-PATCHES.md § `local(lint)`: the 2026-11-11 fork-comment re-take.",
+    "2026-11-12: the 16 reds `node local/gate-lint.mjs` reported at 9438d16e892, recorded per owning PR in the commit that puts the gate on the PR and release lines (#399). Why they are recorded and not accepted into the ratchet baseline: see LOCAL-PATCHES.md § local(ci): the lint ratchets run on the PR and on the release line."
   ],
-  "recordedAt": "2026-11-11",
+  "recordedAt": "2026-11-12",
   "entries": [
     {
       "step": "check:focus-read-ratchet",
@@ -59,6 +60,126 @@
       "class": "focus-read-prunable-361",
       "owner": "local(gates) — #361 f079fb32908, the per-host settings scope",
       "evidence": "Foreign red: `pnpm check:focus-read-ratchet` fails identically at the merge base. Measured in /Volumes/Storage/Code/orca/main at dbb25491d3e: the same three lines (use-settings-host-scope.ts 2 vs 0, Settings.tsx 1 vs 2, WorkspaceDirectorySetting.tsx 0 vs 1). They arrived with #361 (f079fb32908), the per-host settings scope, which this branch does not touch. The two 'baseline still allows' rows are prunable slack, and the use-settings-host-scope read is a real new focus read in that PR's own file; fixing either is that PR's change, not this issue's.",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/main/ai-vault/transcripts/session-transcript-consumers\\.ts: 21 fork comment line\\(s\\), baseline 15$",
+      "class": "fork-comment-foreign-422",
+      "owner": "local(ci) — #422 1b8a19b3498, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 21 fork comment line(s) against a frozen maximum of 15; the lines arrived with #422 (1b8a19b3498).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/main/ai-vault/transcripts/session-transcript-message-content\\.ts: 7 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-422",
+      "owner": "local(ci) — #422 1b8a19b3498, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 7 fork comment line(s) against a frozen maximum of 0; the lines arrived with #422 (1b8a19b3498).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/settings/repository/hosts/RepositoryHostSetupActions\\.tsx: 10 fork comment line\\(s\\), baseline 8$",
+      "class": "fork-comment-foreign-411",
+      "owner": "local(ci) — #411 0a30555a2af, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 10 fork comment line(s) against a frozen maximum of 8; the lines arrived with #411 (0a30555a2af).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/settings/search/settings-search\\.ts: 13 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-424",
+      "owner": "local(ci) — #424 2a4438fecc2, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 13 fork comment line(s) against a frozen maximum of 0; the lines arrived with #424 (2a4438fecc2).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/sidebar/workspace-board/surface/use-visible-workspace-kanban-worktree-ids\\.ts: 6 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-416",
+      "owner": "local(ci) — #416 feab103d945, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 6 fork comment line(s) against a frozen maximum of 0; the lines arrived with #416 (feab103d945).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/sidebar/workspace-board/viewport/WorkspaceKanbanStatusLane\\.tsx: 5 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-418",
+      "owner": "local(ci) — #418 456f2fa416e, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 5 fork comment line(s) against a frozen maximum of 0; the lines arrived with #418 (456f2fa416e).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/sidebar/worktree-list/listing/use-filters\\.ts: 6 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-416",
+      "owner": "local(ci) — #416 feab103d945, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 6 fork comment line(s) against a frozen maximum of 0; the lines arrived with #416 (feab103d945).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/task-page/jira/use-task-page-jira-list-effects\\.ts: 6 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-415",
+      "owner": "local(ci) — #415 16f4de1bc6e, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 6 fork comment line(s) against a frozen maximum of 0; the lines arrived with #415 (16f4de1bc6e).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/components/task-page/use-task-page-provider-metadata\\.ts: 7 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-414",
+      "owner": "local(ci) — #414 87e92a3a7f8, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 7 fork comment line(s) against a frozen maximum of 0; the lines arrived with #414 (87e92a3a7f8).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/renderer/src/store/slices/settings/create-settings-slice\\.ts: 6 fork comment line\\(s\\), baseline 0$",
+      "class": "fork-comment-foreign-425",
+      "owner": "local(ci) — #425 d96e42dea30, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 6 fork comment line(s) against a frozen maximum of 0; the lines arrived with #425 (d96e42dea30).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/shared/jira/jira-types\\.ts: 64 fork comment line\\(s\\), baseline 58$",
+      "class": "fork-comment-foreign-415",
+      "owner": "local(ci) — #415 16f4de1bc6e, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 64 fork comment line(s) against a frozen maximum of 58; the lines arrived with #415 (16f4de1bc6e).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^src/shared/rpc-contract/jira-params\\.ts: 17 fork comment line\\(s\\), baseline 14$",
+      "class": "fork-comment-foreign-415",
+      "owner": "local(ci) — #415 16f4de1bc6e, merged without a comment re-baseline",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. This file carries 17 fork comment line(s) against a frozen maximum of 14; the lines arrived with #415 (16f4de1bc6e).",
+      "flaky": false
+    },
+    {
+      "step": "check-upstream-file-comments",
+      "match": "^5648 fork comment lines in total, baseline 5515$",
+      "class": "fork-comment-foreign-total",
+      "owner": "local(ci) — #411, #414, #415, #416, #418, #422, #424, #425 and the files under the per-file threshold",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. The total is 133 lines over the frozen 5515, and 73 of those are the per-file rows above; the rest sits in files under PER_FILE_THRESHOLD (5), where the total is the only place growth shows.",
+      "flaky": false
+    },
+    {
+      "step": "check:focus-read-ratchet",
+      "match": "^src/renderer/src/store/slices/settings/create-settings-slice\\.ts: 5 focus read\\(s\\), baseline allows 4\\. Route by the resource's owner\\. Only a creation flow with no source row may use defaultCreationHost\\.$",
+      "class": "focus-read-foreign-425",
+      "owner": "local(ci) — #425 d96e42dea30, the settings write failure report",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. The write-failure path #425 added reaches the focus through the settings it just wrote; routing it by the resource owner is a change to that path, and it is the fourth read this file carried before the merge.",
+      "flaky": false
+    },
+    {
+      "step": "check:focus-read-ratchet",
+      "match": "^src/renderer/src/store/slices/settings/settings-write-failure\\.ts: 1 focus read\\(s\\), baseline allows 0\\. Route by the resource's owner\\. Only a creation flow with no source row may use defaultCreationHost\\.$",
+      "class": "focus-read-foreign-425",
+      "owner": "local(ci) — #425 d96e42dea30, the settings write failure report",
+      "evidence": "Foreign red at 9438d16e892 (2026-11-12): `node local/gate-lint.mjs` reports it at the release-line tip with no branch changes, so it arrived through a merge of someone else's work rather than from this lane's change. The ratchet baseline is the fork's frozen pre-growth set; moving this prose into LOCAL-PATCHES.md or a fork-owned module is that PR's change, not this lane's. The match pins the exact count, so any further growth is a new red. The file is new in #425 and calls `defaultScopeHost` to name the host a failed write was aimed at; the ratchet wants that routed by the write target instead, which is that PR's change.",
       "flaky": false
     }
   ]
