@@ -125,23 +125,17 @@ export function RepositoryHostSetupActions({
     enabled: isOpen && canUsePathActions
   })
   const cloneParent = hostRepoRoot.parent
-  // Why: the default seeds the field, it is not merged into every render — otherwise clearing it
-  // snaps the text back and the next keystroke appends to the default (issue #374). A default that
-  // arrives late still fills an untouched field, and it follows a host change until the user edits.
+  // Why: mirror the default into the field instead of merging it per render, or clearing snaps back
+  // and the next keystroke appends to it (#374). Untouched mirrors it empty too, so a host switch
+  // never leaves another machine's path behind.
   useEffect(() => {
-    if (step !== 'clone' || cloneDestinationEdited) {
-      return
-    }
-    if (!cloneParent || cloneParent === cloneDestination) {
+    if (step !== 'clone' || cloneDestinationEdited || cloneParent === cloneDestination) {
       return
     }
     setCloneDestination(cloneParent)
   }, [step, cloneDestinationEdited, cloneDestination, cloneParent])
-  // Only the clone destination gets a default: the existing-folder step imports a folder that must
-  // already exist.
-  const cloneDestinationValue = cloneDestination
   const { cloneFolder, cloneArgs, setCloneFolderName, resetCloneFolder, checkCloneFolderTaken } =
-    useCloneFolderOverride(cloneUrl, cloneDestinationValue)
+    useCloneFolderOverride(cloneUrl, cloneDestination)
 
   if (setupHostOptions.length === 0) {
     return null
@@ -187,12 +181,7 @@ export function RepositoryHostSetupActions({
   }
 
   const handleClone = async (): Promise<void> => {
-    if (
-      !setupTargetHostId ||
-      !canUsePathActions ||
-      !cloneUrl.trim() ||
-      !cloneDestinationValue.trim()
-    ) {
+    if (!setupTargetHostId || !canUsePathActions || !cloneUrl.trim() || !cloneDestination.trim()) {
       return
     }
     setIsCloning(true)
@@ -332,7 +321,7 @@ export function RepositoryHostSetupActions({
       {step === 'clone' ? (
         <HostSetupCloneStep
           cloneUrl={cloneUrl}
-          cloneDestination={cloneDestinationValue}
+          cloneDestination={cloneDestination}
           disabled={!canUsePathActions}
           isCloning={isCloning}
           onBack={() => setStep('choose')}

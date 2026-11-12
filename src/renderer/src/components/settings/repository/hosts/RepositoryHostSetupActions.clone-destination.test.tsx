@@ -4,7 +4,10 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { getDefaultSettings } from '../../../../../../shared/constants'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  toRuntimeExecutionHostId
+} from '../../../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import type { ProjectHostSetup } from '../../../../../../shared/project-types'
 import { useAppStore } from '../../../../store/index'
@@ -19,6 +22,15 @@ let root: Root
 const hostOption: SetupHostOption = {
   id: LOCAL_EXECUTION_HOST_ID,
   label: 'This computer',
+  detail: '',
+  isAvailable: true,
+  canUsePathActions: true
+}
+
+// A host with no stored root resolves to no clone parent, so its destination must not borrow one.
+const remoteHostOption: SetupHostOption = {
+  id: toRuntimeExecutionHostId('gpu'),
+  label: 'GPU box',
   detail: '',
   isAvailable: true,
   canUsePathActions: true
@@ -48,13 +60,13 @@ function applySettings(settings: GlobalSettings): void {
   })
 }
 
-function render(): void {
+function render(hostOptions: SetupHostOption[] = [hostOption]): void {
   act(() => {
     root.render(
       React.createElement(RepositoryHostSetupActions, {
         repoDisplayName: 'Orca',
         selectedProjectHostSetup: setup,
-        setupHostOptions: [hostOption],
+        setupHostOptions: hostOptions,
         setupProjectExistingFolder: async () => null,
         setupProjectClone: async () => null,
         createProjectHostSetup: async () => null,
@@ -90,6 +102,29 @@ function clickButton(button: HTMLButtonElement | undefined, label: string): void
 function openCloneStep(): void {
   clickButton(findButton('Add to another host'), 'Add to another host')
   clickButton(findActionButton('Clone from URL'), 'Clone from URL')
+}
+
+// The picker is a radix popover: it opens on pointerdown and its rows select on click.
+function selectHost(label: string): void {
+  const trigger = container.querySelector('[role="combobox"]')
+  if (!(trigger instanceof HTMLElement)) {
+    throw new Error('no host picker')
+  }
+  act(() => {
+    trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+    trigger.click()
+  })
+  const item = Array.from(document.querySelectorAll('[cmdk-item]')).find(
+    (candidate): candidate is HTMLElement =>
+      candidate instanceof HTMLElement && (candidate.textContent?.includes(label) ?? false)
+  )
+  if (!item) {
+    throw new Error(`no host row labelled ${label}`)
+  }
+  act(() => {
+    item.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
+    item.click()
+  })
 }
 
 function getInput(placeholder: string): HTMLInputElement {
@@ -193,6 +228,20 @@ describe('RepositoryHostSetupActions clone destination', () => {
     applySettings(settingsWith('/srv/clones'))
 
     expect(getDestination().value).toBe('/srv/clones')
+  })
+
+  it('empties an untouched field when the host it switches to has no default', () => {
+    render([hostOption, remoteHostOption])
+    openCloneStep()
+    expect(getDestination().value).toBe(DEFAULT_PARENT)
+    // A URL here, so the disabled Clone below can only be the empty destination.
+    changeInput('Repository URL', 'https://github.com/stablyai/orca.git')
+    expect(findButton('Clone')?.disabled).toBe(false)
+
+    selectHost('GPU box')
+
+    expect(getDestination().value).toBe('')
+    expect(findButton('Clone')?.disabled).toBe(true)
   })
 
   it('never overwrites typed text with a default that arrives late', () => {
