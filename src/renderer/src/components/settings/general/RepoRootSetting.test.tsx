@@ -161,16 +161,20 @@ describe('RepoRootSetting', () => {
     expect(input.getAttribute('aria-invalid')).toBeNull()
   })
 
-  it('clears a refused draft when the override is reset', async () => {
+  it('restores the saved folder when the override is reset after a refused draft', async () => {
     const user = userEvent.setup()
+    // The override equals this computer’s convention, so clearing it leaves the shown value unchanged.
     const { input, updateSettings } = renderRow(
-      settingsWith({ [SERVER_HOST_ID]: { defaultRepoRoot: '/srv/checkouts' } }),
-      serverScope
+      settingsWith({ [LOCAL_EXECUTION_HOST_ID]: { defaultRepoRoot: '/Users/me/orca/workspaces' } }),
+      localScope
     )
     await user.clear(input)
     await user.type(input, 'src{Enter}')
     expect(updateSettings).not.toHaveBeenCalled()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
     await user.click(screen.getByRole('button', { name: /reset/i }))
     expect(updateSettings).toHaveBeenCalledWith({ hostSettingOverrides: {} })
+    expect(input.value).toBe('/Users/me/orca/workspaces')
+    expect(input.getAttribute('aria-invalid')).toBeNull()
   })
 })

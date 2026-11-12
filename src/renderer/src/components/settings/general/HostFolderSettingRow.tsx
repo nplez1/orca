@@ -153,9 +153,13 @@ export function HostFolderSettingRow({
   }
 
   const resetOverride = (): void => {
-    // The cleared value re-seeds the row, so a refused draft must not outlive it.
+    // A cleared override can equal the fallback, leaving `value` unchanged and the effect unrun, so
+    // the draft goes back to the saved value here rather than waiting to be re-seeded.
     editedRef.current = false
-    setPathRefused(false)
+    setDraftValue(value)
+    draftValueRef.current = value
+    lastCommittedRef.current = value
+    setPathRefused(isUnusableFolderPath(value, requiresAbsolutePath, isWindowsHost))
     updateSettings({
       hostSettingOverrides: clearHostSettingOverrideForIds(
         settings,
