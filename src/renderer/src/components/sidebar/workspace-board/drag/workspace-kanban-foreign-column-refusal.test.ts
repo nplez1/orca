@@ -128,7 +128,7 @@ describe('resolveWorkspaceKanbanColumnRefusal', () => {
 })
 
 describe('isWorkspaceKanbanColumnRefused', () => {
-  it('refuses the lane only when every card this drop would move is barred', () => {
+  it('refuses the lane when the column takes none of the dragged cards', () => {
     const state = makeState()
 
     expect(isWorkspaceKanbanColumnRefused(state, [STUDIO_CARD, STUDIO_CARD], 'qa')).toBe(true)
@@ -142,7 +142,7 @@ describe('isWorkspaceKanbanColumnRefused', () => {
       workspaceStatus: 'qa'
     }
 
-    // The mini copy drops nothing, so the lane still has work to do for the barred studio card.
+    // The mini copy is already there, so the lane must stay droppable for the barred studio card.
     expect(isWorkspaceKanbanColumnRefused(state, [alreadyInColumn, STUDIO_CARD], 'qa')).toBe(false)
   })
 
