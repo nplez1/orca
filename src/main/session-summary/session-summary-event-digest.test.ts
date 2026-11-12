@@ -18,6 +18,9 @@ function body(lines: number): string {
   return Array.from({ length: lines }, (_, index) => `  line ${index} of the file`).join('\n')
 }
 
+/** A real plugin MCP name: 46 characters, which the old 40-character gate rejected. */
+const MCP_TOOL = 'mcp__plugin_github_github__create_pull_request'
+
 describe('createSessionSummaryEventDigester', () => {
   it('keeps user and assistant text in full', () => {
     const digester = createSessionSummaryEventDigester()
@@ -126,6 +129,45 @@ describe('createSessionSummaryEventDigester', () => {
   it('falls back to a plain label when no call is pending', () => {
     const digester = createSessionSummaryEventDigester()
     expect(digester.digest(result('orphan output')).text).toContain('tool result')
+  })
+
+  // #386: an MCP name runs past 40 characters, and a name the gate rejected left the pending call
+  // anonymous, so its failure read `tool result` and nothing named the tool that failed.
+  it('names a long MCP tool on its own result', () => {
+    const digester = createSessionSummaryEventDigester()
+    const callEvent = digester.digest(call(`${MCP_TOOL}: owner/repo`))
+    const resultEvent = digester.digest(
+      result(['Error: Validation Failed', 'Command failed'].join('\n'))
+    )
+
+    expect(callEvent.tool?.name).toBe(MCP_TOOL)
+    expect(resultEvent.tool?.name).toBe(MCP_TOOL)
+    expect(resultEvent.tool?.label).toBe(`${MCP_TOOL} owner/repo`)
+    expect(resultEvent.text).toBe(
+      `${MCP_TOOL} owner/repo · 2 lines / 39 B · failed · Error: Validation Failed`
+    )
+  })
+
+  // The name gate exists to reject a sentence that happens to contain a colon, and the fallback has
+  // to be the call's own line: labelling it `tool result` is what lost the identity in the first
+  // place. A harness that omits the name emits the call's input as its text.
+  it('repeats the call’s own line when its name does not parse', () => {
+    const digester = createSessionSummaryEventDigester()
+    digester.digest(call('{"path": "/repo/x.ts"}'))
+    const event = digester.digest(result('one line'))
+    expect(event.tool?.name).toBeNull()
+    expect(event.text).toBe('{"path": "/repo/x.ts"} · 1 line / 8 B · ok')
+  })
+
+  // A fold resumes at a cursor, so the call sits before it and only its result is digested. The
+  // label has to survive the skip, which is why the digest owns it rather than the render merge.
+  it('names a skipped long-named call on the result after the cursor', () => {
+    const digester = createSessionSummaryEventDigester()
+    digester.skip(call(`${MCP_TOOL}: owner/repo`))
+    const event = digester.digest(result(['Error: Validation Failed', 'Command failed'].join('\n')))
+    expect(event.text).toBe(
+      `${MCP_TOOL} owner/repo · 2 lines / 39 B · failed · Error: Validation Failed`
+    )
   })
 
   // A fold resumes at a cursor: the messages before it are counted, not retained, but a result

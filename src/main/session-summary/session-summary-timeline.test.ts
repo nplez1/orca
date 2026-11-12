@@ -28,6 +28,11 @@ function digest(messages: TranscriptMessage[]): SessionSummarySourceEvent[] {
 }
 
 const OK_BODY = Array.from({ length: 20 }, (_, index) => `line ${index}`).join('\n')
+
+/** A real plugin MCP name: 46 characters, which the old 40-character gate rejected. */
+const MCP_TOOL = 'mcp__plugin_github_github__create_pull_request'
+/** The failure the issue quotes: no harness exit status, so the outcome is the quoted line. */
+const FAILED_MCP = ['Error: Validation Failed', 'Command failed'].join('\n')
 const FAILED_TEST = ['FAIL src/x.test.ts > adds a flag', 'Process exited with code 1'].join('\n')
 
 /** A run of `count` reads, one of which fails when `failedAt` names it. */
@@ -51,6 +56,24 @@ describe('planSessionSummaryTimelineMarkers', () => {
         kind: 'error',
         text: 'Read /repo/src/f2.ts · exit 1 · FAIL src/x.test.ts > adds a flag',
         sourceIndex: 105
+      }
+    ])
+  })
+
+  // #386 acceptance: digest -> render plan -> timeline. A failing MCP call is the interesting one,
+  // and `tool result · failed · …` named neither the tool nor what it was called on.
+  it('names a long MCP tool on its error marker', () => {
+    const events = digest([
+      prose('user', 'open the pull request'),
+      call(MCP_TOOL, 'owner/repo'),
+      result(FAILED_MCP)
+    ])
+    expect(planSessionSummaryTimelineMarkers(events, 0)).toEqual([
+      { kind: 'user-input', text: 'open the pull request', sourceIndex: 0 },
+      {
+        kind: 'error',
+        text: `${MCP_TOOL} owner/repo · failed · Error: Validation Failed`,
+        sourceIndex: 1
       }
     ])
   })
