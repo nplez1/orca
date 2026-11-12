@@ -86,6 +86,9 @@ export function createLinearTeamActions(
         })
         .catch((error) => {
           console.warn('[linear] listLinearTeams failed:', error)
+          if (options?.rejectReadError) {
+            throw error
+          }
           if (
             (isIntegrationCredentialDecryptionError(error) || looksLikeAuthError(error)) &&
             canWriteLinearReadResult(

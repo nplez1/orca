@@ -166,7 +166,13 @@
         "jiraTaskSettings": "Jira task settings",
         "jiraTransitionFieldsDescription": "Jira requires these fields before it will apply the {{value0}} transition.",
         "jiraTransitionFieldsTitle": "Update fields to move {{value0}}",
-        "jiraUnassignedFilter": "Unassigned"
+        "jiraUnassignedFilter": "Unassigned",
+        "jiraProjectsLoadFailedTooltip": "Couldn't load Jira projects — retry",
+        "jiraProjectsLoading": "Loading Jira projects…",
+        "jiraProjectsEmpty": "No Jira projects available",
+        "jiraProjectsLoadFailed": "Couldn't load Jira projects.",
+        "linearTeamsLoadFailedTooltip": "Couldn't load Linear teams — retry",
+        "linearTeamsLoadFailed": "Couldn't load Linear teams."
       },
       "activity": {
         "ActivityPrototypePage": {

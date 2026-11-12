@@ -28,6 +28,8 @@ export function TaskPageLinearFilters({
     linearAttributeFilterWorkspaceId,
     linearAttributeFilter,
     setLinearRefreshNonce,
+    linearTeamsError,
+    retryLinearTeams,
     linearProjectSearchInput,
     setLinearProjectSearchInput,
     setAppliedLinearProjectSearch,
@@ -60,6 +62,14 @@ export function TaskPageLinearFilters({
     setNewLinearIssueTeamId,
     setNewLinearIssueProjectId
   } = model
+  const newLinearItemLabel = linearTeamsError
+    ? t(
+        'auto.components.TaskPage.linearTeamsLoadFailedTooltip',
+        "Couldn't load Linear teams — retry"
+      )
+    : linearMode === 'projects' && !selectedLinearProject
+      ? t('auto.components.TaskPage.1361275ec3', 'New Linear project')
+      : t('auto.components.TaskPage.3feb524d42', 'New Linear issue')
   return (
     <div
       className="min-w-0 rounded-md rounded-b-none border border-border/50 bg-muted/50 px-3 pt-2 pb-0 shadow-sm"
@@ -154,20 +164,14 @@ export function TaskPageLinearFilters({
                   setNewLinearIssueOpen(true)
                 }}
                 disabled={availableTeams.length === 0}
-                aria-label={
-                  linearMode === 'projects' && !selectedLinearProject
-                    ? t('auto.components.TaskPage.1361275ec3', 'New Linear project')
-                    : t('auto.components.TaskPage.3feb524d42', 'New Linear issue')
-                }
+                aria-label={newLinearItemLabel}
                 className="size-8 border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
               >
                 <Plus className="size-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {linearMode === 'projects' && !selectedLinearProject
-                ? t('auto.components.TaskPage.1361275ec3', 'New Linear project')
-                : t('auto.components.TaskPage.3feb524d42', 'New Linear issue')}
+              {newLinearItemLabel}
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -175,7 +179,10 @@ export function TaskPageLinearFilters({
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setLinearRefreshNonce((n) => n + 1)}
+                onClick={() => {
+                  setLinearRefreshNonce((n) => n + 1)
+                  retryLinearTeams()
+                }}
                 disabled={
                   linearMode === 'issues' || linearMode === 'in-orca'
                     ? linearLoading
@@ -205,6 +212,20 @@ export function TaskPageLinearFilters({
           </Tooltip>
         </div>
       </div>
+
+      {linearTeamsError ? (
+        <div
+          role="alert"
+          className="mt-2 flex flex-wrap items-center gap-2 text-xs text-destructive"
+        >
+          <span>
+            {t('auto.components.TaskPage.linearTeamsLoadFailed', "Couldn't load Linear teams.")}
+          </span>
+          <Button type="button" variant="ghost" size="xs" onClick={retryLinearTeams}>
+            {t('auto.components.TaskPage.0bfbf62f75', 'Retry')}
+          </Button>
+        </div>
+      ) : null}
 
       {linearMode === 'issues' || linearMode === 'in-orca' ? (
         <div className="mt-3 flex min-w-0 items-center gap-2">

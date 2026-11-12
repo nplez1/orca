@@ -44,6 +44,8 @@ export function TaskPageJiraFilters({
     setActiveJiraPreset,
     setJiraRefreshNonce,
     jiraProjectsLoading,
+    jiraProjectsError,
+    retryJiraProjects,
     setNewJiraIssueOpen,
     setNewJiraIssueTitle,
     setNewJiraIssueBody,
@@ -53,6 +55,16 @@ export function TaskPageJiraFilters({
     setNewJiraIssueTypeId,
     sortedAvailableJiraProjects
   } = model
+  const newJiraIssueLabel = jiraProjectsError
+    ? t(
+        'auto.components.TaskPage.jiraProjectsLoadFailedTooltip',
+        "Couldn't load Jira projects — retry"
+      )
+    : jiraProjectsLoading
+      ? t('auto.components.TaskPage.jiraProjectsLoading', 'Loading Jira projects…')
+      : sortedAvailableJiraProjects.length === 0
+        ? t('auto.components.TaskPage.jiraProjectsEmpty', 'No Jira projects available')
+        : t('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')
   return (
     <div className="rounded-md rounded-b-none border border-border/50 bg-muted/50 px-3 pt-2 pb-0 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -158,7 +170,7 @@ export function TaskPageJiraFilters({
                   setNewJiraIssueOpen(true)
                 }}
                 disabled={sortedAvailableJiraProjects.length === 0 || jiraProjectsLoading}
-                aria-label={t('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')}
+                aria-label={newJiraIssueLabel}
                 className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
               >
                 {jiraProjectsLoading ? (
@@ -169,7 +181,7 @@ export function TaskPageJiraFilters({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {t('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')}
+              {newJiraIssueLabel}
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -177,7 +189,10 @@ export function TaskPageJiraFilters({
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setJiraRefreshNonce((n) => n + 1)}
+                onClick={() => {
+                  setJiraRefreshNonce((n) => n + 1)
+                  retryJiraProjects()
+                }}
                 disabled={jiraLoading}
                 aria-label={t('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
                 className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
@@ -199,6 +214,19 @@ export function TaskPageJiraFilters({
         <p role="alert" className="mt-2 text-xs text-destructive">
           {jiraSavedFiltersError}
         </p>
+      ) : null}
+      {jiraProjectsError ? (
+        <div
+          role="alert"
+          className="mt-2 flex flex-wrap items-center gap-2 text-xs text-destructive"
+        >
+          <span>
+            {t('auto.components.TaskPage.jiraProjectsLoadFailed', "Couldn't load Jira projects.")}
+          </span>
+          <Button type="button" variant="ghost" size="xs" onClick={retryJiraProjects}>
+            {t('auto.components.TaskPage.0bfbf62f75', 'Retry')}
+          </Button>
+        </div>
       ) : null}
       <TaskPageJiraStatusFilters model={model} />
       <div className="mt-3 flex items-center gap-3">
