@@ -124,16 +124,18 @@ it('pushes the release line through the enablement sweep, not as a bare git push
   expect(blocks).not.toContain('upstream/main:main')
 })
 
-it('says why the PR lane does not run repo-wide lint yet, with the measured failures', () => {
+it('says why the PR lane runs the lint verdict instead of `pnpm lint`', () => {
   const live = section(
     read('LOCAL-PATCHES.md'),
     '### `local(ci)`: which workflows are live on this fork'
   ).join('\n')
 
-  // A required check that is red on its own base is worse than none; the ledger has to say so.
+  // A required check that is red on its own base is worse than none; the ledger has to say why the
+  // lane runs the classified gate rather than the raw `&&` chain.
   const flat = live.replace(/\s+/g, ' ')
 
-  expect(flat).toContain('2 of 36 lint step(s) failed')
-  expect(flat).toContain('changed lines')
+  expect(flat).toContain('local/gate-lint.mjs')
+  expect(flat).toContain('local/lint-known-red.json')
   expect(flat).toContain('fork-pr-gates: changed lines')
+  expect(flat).toContain('fork-pr-gates: lint gate')
 })

@@ -20,6 +20,14 @@
             }
           }
         }
+      },
+      "sidebar": {
+        "WorkspaceKanbanDrawer": {
+          "foreignColumnRefusedDescription_one": "This workspace lives on {{host}}.",
+          "foreignColumnRefusedDescription_other": "These {{count}} workspaces live on {{host}}.",
+          "foreignColumnRefusedOtherHosts_one": "This workspace lives on another host.",
+          "foreignColumnRefusedOtherHosts_other": "These {{count}} workspaces live on other hosts."
+        }
       }
     }
   },

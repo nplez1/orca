@@ -6,19 +6,28 @@ name: Fork PR gates
 # returns 0 ms for the nightly (7 jobs) and for a full three-platform release. See `LOCAL-PATCHES.md`
 # § local(ci), which also records the decision this file implements.
 #
-# Why these two gates and not `pr.yml`: upstream's file is the whole fleet — package, e2e, relay,
+# Why these three gates and not `pr.yml`: upstream's file is the whole fleet — package, e2e, relay,
 # cross-version-wire, mobile web, Windows probes — it arrives with every sync, and it spends 40+
-# minutes per PR re-treading a branch that just ran the same suites locally. Typecheck and the
-# changed-lines quality gate are the two classes that reached this fork's release line unnoticed and
-# are green to enforce on any branch today. The unit suite is not here on purpose:
-# `ci-unit-selection.mjs` turns one changed file into ~3,000 of 13,064 test files, which is a shard
-# planner, not a PR lane. It runs nightly and now also gates a release.
+# minutes per PR re-treading a branch that just ran the same suites locally. Typecheck, the
+# changed-lines quality gate and the repo-wide lint verdict are the classes that reached this fork's
+# release line unnoticed and are green to enforce on any branch today. The unit suite is not here on
+# purpose: `ci-unit-selection.mjs` turns one changed file into ~3,000 of 13,064 test files, which is a
+# shard planner, not a PR lane. It runs nightly and now also gates a release.
 #
-# Why not `pnpm lint` here yet: measured on `main` at 2026-10-29, `pnpm lint` reports "2 of 36
-# lint step(s) failed" — `oxlint` on its own is red for `src/cli/handlers/vm.ts` (336 counted lines,
-# limit 300), and `lint:ast-grep-gates` wants a flaky-test baseline pruned. A repo-wide lane that is
-# red on its own base teaches everyone to ignore it, so this lane judges the PR's changed lines
-# instead, and repo-wide lint becomes the third gate here once the release line is green.
+# Why the lint verdict and not `pnpm lint` in the third job: `pnpm lint` runs its steps in parallel
+# and names every one that failed, so attribution is not the reason. The reasons are two: it has no
+# notion of a known red, so a lane that re-ran it would be red on every PR while the base carries
+# foreign reds; and it does not run `FORK_LINT_STEPS` at all — `check-upstream-file-comments` and the
+# four other fork-only checks. `local/gate-lint.mjs` runs the same steps plus those, and turns the
+# failures into a verdict against `local/lint-known-red.json`: a red recorded there is reported with
+# its class and owner, one outside it fails this job. That is what makes the lane green by
+# construction on any base while still failing the change that adds a ratchet regression — which #361
+# did not do when it left `main` red on `check:focus-read-ratchet` (issue #399).
+#
+# What it does not do: the allowlist it reads is the pull request's own, so a PR can record its own red
+# in the same commit and pass. That is the documented process — the entry carries its class, owner and
+# evidence into the diff where review sees it — and it is the same property `local/gate-unit.mjs` has,
+# so the entry, not the lane, is the thing to review.
 #
 # Draft PRs run it too: the cost is a few free minutes, and a draft whose types do not compile is
 # worth knowing about before it is marked ready.
@@ -101,3 +110,45 @@ jobs:
       - name: Fork-local tooling tests
         if: ${{ !cancelled() }}
         run: node local/run-fork-tests.mjs
+
+  lint:
+    name: 'fork-pr-gates: lint gate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Why depth 2: `check:code-quality:changed`, one of the steps inside the gate, diffs the pull
+      # request's merge commit against its first parent, and a single-commit clone carries neither.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      # Why `native-runtime: node`: the same preparation `fork-main-gates.yml` gives the gate on the
+      # release line, so a green here means what a green there means.
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      # Why: `check-upstream-file-comments` measures the fork's comments against the sync base the
+      # baseline records, and a CI checkout has no such commit — the same fetch both other jobs need.
+      - name: Fetch the recorded upstream sync base
+        run: |
+          base=$(node -p 'require("./local/upstream-file-comments-baseline.json").base ?? ""')
+          if [ -z "$base" ]; then
+            echo "no sync base is recorded in local/upstream-file-comments-baseline.json" >&2
+            exit 1
+          fi
+          git fetch --depth=1 origin "$base"
+
+      # The whole lint chain plus the fork's own steps, each run on its own and judged against
+      # `local/lint-known-red.json`: a foreign red at the base passes, this PR's own new one fails.
+      # Why `ORCA_CODE_QUALITY_BASE` outside a pull request: the gate also runs the diff-scoped steps
+      # (`check:code-quality:changed` and the flaky-test-pattern ratchet), whose base is the merge
+      # commit's first parent on a PR — which `fetch-depth: 2` carries — and `merge-base origin/main
+      # HEAD` otherwise, which a shallow checkout of a branch cannot answer. A dispatch would then red
+      # this job for a missing ref rather than for a finding, so it passes `HEAD` exactly as
+      # `fork-main-gates.yml` does. Empty on a pull request, so the merge-commit base applies there.
+      - name: Lint ratchet verdict
+        env:
+          ORCA_CODE_QUALITY_BASE: ${{ github.event_name != 'pull_request' && 'HEAD' || '' }}
+        run: node local/gate-lint.mjs
