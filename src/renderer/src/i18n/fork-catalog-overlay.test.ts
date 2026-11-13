@@ -38,10 +38,11 @@ describe('lazy locale catalog with the fork overlay', () => {
     await i18n.changeLanguage('en')
   })
 
-  // Shared-worker files share this singleton's module cache, so a language left active here is the
-  // next file's language: it failed checks-panel-empty-state.test.ts on the 2026-11-12 nightly.
+  // Shared-worker files inherit this singleton: leave the language and its catalogs as found.
   afterEach(async () => {
     await i18n.changeLanguage('en')
+    i18n.removeResourceBundle('es', 'translation')
+    i18n.removeResourceBundle('zh', 'translation')
   })
 
   it('serves a fork-added Spanish string', async () => {

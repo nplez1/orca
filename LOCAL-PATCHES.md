@@ -3011,9 +3011,12 @@ undoes mocks, timers, globals, env and cwd between shared files; a language held
 is none of those, so the next file inherits it.
 
 **The fork's half.** `fork-catalog-overlay.test.ts` reset the language in `beforeEach` but never at the
-end, so it handed `es` to whatever ran next. It restores `en` in `afterEach` now. Measured both ways on
-this box with `VITEST_MAX_WORKERS=1` (the env var, not `--maxWorkers`: the cap is applied after the
-CLI value): with the restore removed, the following file reads `es`; with it, `en`.
+end, so it handed `es` to whatever ran next. Its `afterEach` now restores `en` and drops the `es` and
+`zh` bundles it loaded: `loadRendererUiLanguage` skips the fetch when `hasResourceBundle` is already
+true, so a bundle left behind — including the one its own hung-overlay test reloads _without_ the fork's
+strings — would be served to the next file. Measured both ways on this box with `VITEST_MAX_WORKERS=1`
+(the env var, not `--maxWorkers`: the cap is applied after the CLI value): with the restore removed, the
+following file reads `es`; with it, `en`.
 
 **Upstream's half.** The checks-panel test called `getChecksPanelReviewState` without its optional `t`,
 so it asserted whatever the worker's locale produced. It passes `englishFallback` now — the
