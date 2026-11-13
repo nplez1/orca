@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { getChecksPanelReviewState } from './checks-panel-empty-state'
 import type { ChecksPanelReviewStateInput } from '../checks-panel-review-state-model'
 
+const englishFallback = (
+  _key: string,
+  fallback: string,
+  options?: Record<string, unknown>
+): string =>
+  fallback.replace(/\{\{(\w+)\}\}/g, (match, name: string) =>
+    options && name in options ? String(options[name]) : match
+  )
+
 function input(overrides: Partial<ChecksPanelReviewStateInput> = {}): ChecksPanelReviewStateInput {
   return {
     operationLabel: null,
@@ -25,7 +34,8 @@ function input(overrides: Partial<ChecksPanelReviewStateInput> = {}): ChecksPane
 describe('getChecksPanelReviewState — precedence', () => {
   it('positive_unresolved blocks create and offers Open Review', () => {
     const state = getChecksPanelReviewState(
-      input({ reviewLookup: 'positive_unresolved', openReviewUrl: 'https://x/pull/1' })
+      input({ reviewLookup: 'positive_unresolved', openReviewUrl: 'https://x/pull/1' }),
+      englishFallback
     )
     expect(state.title).toBe('Pull request details unavailable')
     expect(state.composerMode).toBe('hidden')
@@ -42,7 +52,8 @@ describe('getChecksPanelReviewState — precedence', () => {
         openReviewUrl: 'https://x/pull/7',
         eligibilityBlockedReason: 'no_upstream',
         hasUpstream: false
-      })
+      }),
+      englishFallback
     )
     expect(state.title).toBe('No upstream configured')
     expect(state.workflowAction).toBe('publish_branch')
@@ -53,7 +64,8 @@ describe('getChecksPanelReviewState — precedence', () => {
 
   it('hard refresh error hides the composer', () => {
     const state = getChecksPanelReviewState(
-      input({ refresh: { status: 'error', errorType: 'auth' } })
+      input({ refresh: { status: 'error', errorType: 'auth' } }),
+      englishFallback
     )
     expect(state.title).toBe('GitHub authentication failed')
     expect(state.composerMode).toBe('hidden')
@@ -64,7 +76,8 @@ describe('getChecksPanelReviewState — precedence', () => {
 describe('getChecksPanelReviewState — composer preserve', () => {
   it('transient error preserves a confirmed composer', () => {
     const state = getChecksPanelReviewState(
-      input({ confirmedReadiness: true, refresh: { status: 'error', errorType: 'network' } })
+      input({ confirmedReadiness: true, refresh: { status: 'error', errorType: 'network' } }),
+      englishFallback
     )
     expect(state.composerMode).toBe('confirmed_open')
     expect(state.title).toBe('Could not reach GitHub')
@@ -72,7 +85,8 @@ describe('getChecksPanelReviewState — composer preserve', () => {
 
   it('transient error without confirmed readiness never opens a composer', () => {
     const state = getChecksPanelReviewState(
-      input({ confirmedReadiness: false, refresh: { status: 'error', errorType: 'network' } })
+      input({ confirmedReadiness: false, refresh: { status: 'error', errorType: 'network' } }),
+      englishFallback
     )
     expect(state.composerMode).toBe('hidden')
   })
@@ -84,7 +98,8 @@ describe('getChecksPanelReviewState — composer preserve', () => {
         reviewLookup: 'positive_unresolved',
         confirmedReadiness: true,
         confirmedNeedsPush: true
-      })
+      }),
+      englishFallback
     )
     expect(state.composerMode).toBe('hidden')
     expect(state.workflowAction).toBeNull()
@@ -97,7 +112,8 @@ describe('getChecksPanelReviewState — composer preserve', () => {
         reviewLookup: 'not_found',
         confirmedReadiness: true,
         confirmedNeedsPush: true
-      })
+      }),
+      englishFallback
     )
     expect(state.composerMode).toBe('needs_push_open')
     expect(state.workflowAction).toBe('push_and_create')

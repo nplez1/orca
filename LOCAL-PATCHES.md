@@ -2994,6 +2994,40 @@ a sync hazard — upstream growing that file by more than three lines breaks the
   test: the merge is identity when no fork provider is configured, and a fork reading or saved key
   still reaches the roster, the meter count and the empty state.
 
+### `local(test)`: the shared worker's i18n language is restored, and one copy assertion stopped reading it
+
+Anchors: the `afterEach` in `src/renderer/src/i18n/fork-catalog-overlay.test.ts` (fork-owned); the
+`englishFallback` const and its seven call sites in
+`src/renderer/src/components/right-sidebar/checks-panel/presentation/checks-panel-empty-state.test.ts`
+(upstream-owned, no fork comment above it). No production module changed.
+
+**The red.** The 2026-11-12 nightly (run `43226305290`, shard 11/12) failed that checks-panel test with
+four assertions receiving Spanish copy — `'Autenticación de GitHub fallida'` where it wanted
+`'GitHub authentication failed'`. The component was not wrong. The file runs in the `bun-shared`
+project, whose files share one worker's module cache (`isolate: false`), and the fork's
+`fork-catalog-overlay.test.ts` — same shard, same project, finishing 8 s earlier in that job's log —
+leaves the `i18n` singleton on `es`. `config/scripts/test-runtime/environment/vitest-shared-worker-file-reset.mjs`
+undoes mocks, timers, globals, env and cwd between shared files; a language held in a module singleton
+is none of those, so the next file inherits it.
+
+**The fork's half.** `fork-catalog-overlay.test.ts` reset the language in `beforeEach` but never at the
+end, so it handed `es` to whatever ran next. Its `afterEach` now restores `en` and drops the `es` and
+`zh` bundles it loaded: `loadRendererUiLanguage` skips the fetch when `hasResourceBundle` is already
+true, so a bundle left behind — including the one its own hung-overlay test reloads _without_ the fork's
+strings — would be served to the next file. The language restore is what the measurement below
+covers; the bundle removal has no victim yet and is there for the same reason.
+
+Measured both ways on this box with `VITEST_MAX_WORKERS=1` (the env var, not `--maxWorkers`: the cap is
+applied after the CLI value): with the language restore removed, the following file reads `es`; with
+it, `en`.
+
+**Upstream's half.** The checks-panel test called `getChecksPanelReviewState` without its optional `t`,
+so it asserted whatever the worker's locale produced. It passes `englishFallback` now — the
+`(_key, fallback, options) => interpolated fallback` stub already used in
+`FolderWorkspaceWorktreesPanel.test.tsx` and `IssuePaneIssueSwitcher.test.tsx` — so its assertions are
+the module's English source strings. That keeps the fix from depending on every other shared file's
+tidiness, and it is the half that has to change upstream for the class to be closed there.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream

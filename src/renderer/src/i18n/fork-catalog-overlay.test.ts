@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mergeLocaleOverlay } from './fork-catalog-overlay'
 import { i18n, setRendererPluginLanguagePacks, setRendererUiLanguage } from './i18n'
 import { UI_LANGUAGE_CHINESE, UI_LANGUAGE_SPANISH } from '../../../shared/ui-language'
@@ -36,6 +36,13 @@ describe('lazy locale catalog with the fork overlay', () => {
   beforeEach(async () => {
     setRendererPluginLanguagePacks([])
     await i18n.changeLanguage('en')
+  })
+
+  // Shared-worker files inherit this singleton: hand it back on English with no loaded catalogs.
+  afterEach(async () => {
+    await i18n.changeLanguage('en')
+    i18n.removeResourceBundle('es', 'translation')
+    i18n.removeResourceBundle('zh', 'translation')
   })
 
   it('serves a fork-added Spanish string', async () => {
