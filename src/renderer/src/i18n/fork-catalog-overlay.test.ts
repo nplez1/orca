@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mergeLocaleOverlay } from './fork-catalog-overlay'
 import { i18n, setRendererPluginLanguagePacks, setRendererUiLanguage } from './i18n'
 import { UI_LANGUAGE_CHINESE, UI_LANGUAGE_SPANISH } from '../../../shared/ui-language'
@@ -35,6 +35,12 @@ describe('mergeLocaleOverlay', () => {
 describe('lazy locale catalog with the fork overlay', () => {
   beforeEach(async () => {
     setRendererPluginLanguagePacks([])
+    await i18n.changeLanguage('en')
+  })
+
+  // Shared-worker files share this singleton's module cache, so a language left active here is the
+  // next file's language: it failed checks-panel-empty-state.test.ts on the 2026-11-12 nightly.
+  afterEach(async () => {
     await i18n.changeLanguage('en')
   })
 
