@@ -2385,6 +2385,65 @@ Three fixes with one cause: a signal that was **absent** was read as a signal th
   the branch's own. `origin/HEAD` now comes first, as it already does in the sibling
   `check-changed-code-quality.mjs`.
 
+### `local(ci)`: the fork's own heavy tests get shard weights (#401)
+
+`src/shared/workspace-path-catalog-core.test.ts` ran the full parity battery at 100k **and** 300k paths
+in the default unit suite. In nightly run 43018513608 it took **178.2 s**, the slowest file in the suite
+by 5x (the next heaviest is 34.3 s), and its shard's job took **494 s** against a 311 s median. The
+planner could not see it: `ci-shard-timings.json` is imported from **upstream** runs, whose tree has no
+fork files, so no fork-added file can ever appear in it, and the file was scheduled at the 442 ms
+fallback — about 400x too light.
+
+- **The 300k case moved under `ORCA_RUN_PATH_SEARCH_SCALE`**, the flag three other scale files already
+  share. The default run keeps a **30k** case, which takes this file from 59.9 s to 4.4 s locally (178 s
+  to 14.9 s in CI, both measured). Not a new flag (a synonym), and not `performance-contracts.yml`: that lane
+  counts operations, runs three OSes one file at a time, and its `paths:` filter has to stay in sync with
+  its contract allowlist. The 500k and 1M cases moved behind `ORCA_RUN_PATH_SEARCH_SCALE_BATTERY`, the
+  second flag `workspace-path-search-scale.test.ts` already uses, because they want a 2 GB catalog budget
+  and about four minutes.
+- **`fork-main-tests.yml` gained a `scale` job** that runs that file with the flag beside the shards, so
+  scale parity is automatic again rather than manual only — and, being a separate job, it cannot move
+  the shards' balance.
+- **`local/ci-shard-timings-overlay.json` is merged over the baseline** by `mergeForkTimingOverlay` in
+  `local/ci-shard-timings-overlay-merge.mjs`, which `readTimingBaseline`
+  (`config/scripts/ci/sharding/ci-shard-assignment.mjs`) calls in two lines. Every caller already goes
+  through it: the CI shard sequencer, the runtime sequencer, the PR selection plan and the E2E plan. A
+  missing overlay falls back to the baseline alone, a malformed one **throws** rather than scheduling
+  with no weights, and **the baseline wins any collision** — a collision means the file reached upstream
+  and the entry is stale. The overlay's bytes join the `baselineSha256` in `unit-assignment.json`, so a
+  run's provenance names both files. Why the merge is a fork module rather than lines inside
+  `readTimingBaseline`: § Rules above, and it leaves the upstream hunk at one import and one call.
+- **`local/ci-shard-timings-overlay.mjs` is the only way to change it.** `import <artifact-dir...>`
+  rewrites the entries from a nightly's `unit-report.json` artifacts: fork-added files, absent from the
+  baseline, measured at **2 s or more** — the threshold is where the artifacts' `endTime - startTime`
+  agrees with the baseline metric (median ratio 1.03 above 5 s; below it, the baseline's per-file
+  environment allowance dominates and the 442 ms fallback is closer). It refuses an artifact set that
+  mixes runs or attempts, holds a file twice, reports a file discovery did not select, does not cover
+  every shard exactly once, or would weight nothing — upstream's importer rejects the same cases, plus a
+  reported file discovery did not select. `--check`
+  validates the committed file, asks the planner to load it, and runs in the fork test lane;
+  `--simulate` replays a set of artifacts through `balanceFiles` and prints the slowest-to-median shard
+  ratio, which is how the acceptance criterion is evidenced without a 12-shard run.
+- **`local/ci-shard-timings-overlay.test.mjs`** covers the merge, the baseline-wins rule, the malformed
+  and missing cases, the entry selection, the artifact-set refusals, and the committed file against the
+  committed baseline.
+
+**Measured, from the same lane before and after — one run each way.** `fork-main-tests.yml` dispatched on
+the branch (run 43332008251) gives test-step durations of **237–288 s, median 269.5 s, 1.07x** against
+run 43018513608's **232–453 s, median 268 s, 1.69x** — the issue's 1.3x criterion, met.
+
+Most of that gain is the 300k move, not the overlay: replaying the same artifacts with the baseline alone
+still gives 1.21x, and 1.10x with the overlay. The overlay's own job is that it keeps the placement
+correct as fork-owned files accumulate, which is what the missing entry cost before. The overlay the run
+wrote is its own measurements, with no estimate in it.
+
+That run's shard 5 job took 716 s against 288–334 s for the other eleven, which is **not** shard
+balance: 420 s of its 716 s was the `Checkout` step, against 18–22 s elsewhere, and its test step was
+268 s.
+
+Refresh: `node local/ci-shard-timings-overlay.mjs import <dir-with-the-12-artifacts> --runner
+ubuntu-24.04-arm`, then `--check`.
+
 ### `local(ci)`: the nightly could queue forever and say nothing
 
 `fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then hit two

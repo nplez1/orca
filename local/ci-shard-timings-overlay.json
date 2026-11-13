@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "note": "Fork-added unit tests heavy enough to move a shard. Merged over ci-shard-timings.json by readTimingBaseline, which lets the baseline win on any collision. Regenerate with `node local/ci-shard-timings-overlay.mjs import <artifact-dir...>`.",
+  "source": {
+    "runId": "43332008251",
+    "attempt": "1",
+    "sha": "b6d3c6bb8a335a76630b015a0e43ec0b1ed3d356",
+    "runner": "ubuntu-24.04-arm",
+    "metric": "unit-report-file-duration"
+  },
+  "thresholdMs": 2000,
+  "unit": {
+    "timings": {
+      "src/main/agent-hooks/server-screen-prompt-corroboration.test.ts": 7916,
+      "src/main/workspace-path-index/workspace-path-catalog-spill-runs.test.ts": 2303,
+      "src/main/workspace-path-index/workspace-path-index-worker-client.test.ts": 4487,
+      "src/renderer/src/components/sidebar/WorktreeCard.merge-marker.test.tsx": 3894,
+      "src/renderer/src/components/sidebar/WorktreeCard.pr-cache-parity.test.tsx": 5467,
+      "src/renderer/src/components/task-page/jira/Content.listPagination.test.tsx": 4619,
+      "src/shared/workspace-path-catalog-core.test.ts": 14899,
+      "src/shared/workspace-path-catalog-storage-benchmark.test.ts": 4207,
+      "tests/tools/fork-invariants.test.mjs": 3170,
+      "tests/tools/orca-vm-create-script.test.mjs": 2115,
+      "tests/tools/orca-vm-extend-script.test.mjs": 4464
+    }
+  }
+}

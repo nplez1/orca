@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { mergeForkTimingOverlay } from '../../../../local/ci-shard-timings-overlay-merge.mjs'
 
 export const compareIds = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -49,8 +49,7 @@ export function balanceFiles(files, count, timings, overheadMs = 0) {
 
 export function readTimingBaseline(suite) {
   const bytes = readFileSync(new URL('./ci-shard-timings.json', import.meta.url), 'utf8')
-  const baseline = JSON.parse(bytes)
-  return { ...baseline[suite], baselineSha256: createHash('sha256').update(bytes).digest('hex') }
+  return mergeForkTimingOverlay(suite, bytes)
 }
 
 export function writeAssignment(path, assignment) {

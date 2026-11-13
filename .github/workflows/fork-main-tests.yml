@@ -62,3 +62,44 @@ jobs:
       # the two `relay-region` unit files, which shard discovery excludes and only that job ran.
       # `browser_contract` is not dropped — this caller never enabled it (its default is `false`).
       run_relay_integration: false
+
+  # Why a job of its own rather than a shard: `ORCA_RUN_PATH_SEARCH_SCALE=1` turns on the 300k-path
+  # parity case, which the shards deliberately skip — at 100k and 300k it was the slowest file in the
+  # whole suite (178 s, nightly 43018513608) and doubled its shard's wall clock (#401). Here it costs a
+  # few minutes beside the shards, where scale is the point, and cannot move their balance.
+  #
+  # Why not `performance-contracts.yml`: that lane counts operations rather than wall clock, runs three
+  # operating systems, and is upstream's file. Why not `ORCA_RUN_PATH_SEARCH_SCALE_BATTERY`: that gates
+  # the 500k and 1M cases, which want a 2 GB catalog budget and stay a deliberate run.
+  scale:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+          node-version: '24'
+
+      # Why the same Bun probe the shards use: `run-vitest.mjs` refuses to start without the pinned
+      # version, and a job that silently never ran is the failure class this lane exists to catch.
+      - name: Find installed Bun
+        id: installed-bun
+        shell: bash
+        run: |
+          bun="$GITHUB_WORKSPACE/node_modules/.bin/bun"
+          if [ -x "$bun" ] && [ "$("$bun" --version)" = "$(cat config/.bun-version)" ]; then
+            echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
+            echo 'found=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        if: steps.installed-bun.outputs.found != 'true'
+        with:
+          bun-version-file: config/.bun-version
+          no-cache: true
+
+      - name: Path-catalog scale parity
+        run: ORCA_RUN_PATH_SEARCH_SCALE=1 pnpm test src/shared/workspace-path-catalog-core.test.ts

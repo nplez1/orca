@@ -31,6 +31,7 @@ import { WORKSPACE_PATH_SEARCH_QUERY_BATTERY } from './__fixtures__/workspace-pa
 const TEST_MEMORY_BUDGET = 512 * 1024 * 1024
 const TEST_IGNORED_PATHS = new Set(['ignored/reports/target-ignored.ts'])
 const RUN_PATH_SEARCH_SCALE = process.env.ORCA_RUN_PATH_SEARCH_SCALE === '1'
+const RUN_PATH_SEARCH_SCALE_BATTERY = process.env.ORCA_RUN_PATH_SEARCH_SCALE_BATTERY === '1'
 
 describe('workspace path catalog core', () => {
   it('keeps original and folded offset domains independent for Unicode paths', () => {
@@ -170,15 +171,11 @@ describe('workspace path catalog core', () => {
     }
   })
 
-  // Why 5 min: the whole query battery runs against every scope descriptor at 100k paths.
-  it('matches the full oracle battery and every scope descriptor at 100k paths', async () => {
-    await assertGeneratedCatalogParity(100_000)
-  }, 300_000)
-
-  // Why 10 min: the same battery at 300k paths, roughly three times the 100k run.
-  it('matches the full battery and every scope descriptor at 300k paths', async () => {
-    await assertGeneratedCatalogParity(300_000)
-  }, 600_000)
+  // Why 30k and not 100k: this file was the long pole of its nightly shard (issue #401). The 300k case
+  // runs under ORCA_RUN_PATH_SEARCH_SCALE below, and 500k/1M need ..._BATTERY as well.
+  it('matches the full oracle battery and every scope descriptor at 30k paths', async () => {
+    await assertGeneratedCatalogParity(30_000)
+  }, 120_000)
 
   it('aligns ignore-classification and dotfile flags with retained rows', async () => {
     const paths = [...WORKSPACE_PATH_CATALOG_EDGE_PATHS]
@@ -356,14 +353,26 @@ describe('workspace path catalog core', () => {
 })
 
 describe.skipIf(!RUN_PATH_SEARCH_SCALE)('workspace path catalog opt-in scale parity', () => {
-  it.each([500_000, 1_000_000])(
-    'matches the query battery and scope matrix at %i paths',
-    async (size) => {
-      await assertGeneratedCatalogParity(size, 2 * 1024 * 1024 * 1024)
-    },
-    1_500_000
-  )
+  // Why 10 min: the same battery at 300k paths, roughly three times the 30k case above.
+  it('matches the full battery and every scope descriptor at 300k paths', async () => {
+    await assertGeneratedCatalogParity(300_000)
+  }, 600_000)
 })
+
+// Why the second flag: these two sizes take about four minutes locally and want a 2 GB catalog budget,
+// so they stay a deliberate run the way `workspace-path-search-scale.test.ts` keeps its 1M battery.
+describe.skipIf(!RUN_PATH_SEARCH_SCALE || !RUN_PATH_SEARCH_SCALE_BATTERY)(
+  'workspace path catalog full-size parity',
+  () => {
+    it.each([500_000, 1_000_000])(
+      'matches the query battery and scope matrix at %i paths',
+      async (size) => {
+        await assertGeneratedCatalogParity(size, 2 * 1024 * 1024 * 1024)
+      },
+      1_500_000
+    )
+  }
+)
 
 async function assertGeneratedCatalogParity(
   size: number,
