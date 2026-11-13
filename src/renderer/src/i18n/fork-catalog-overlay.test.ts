@@ -38,7 +38,7 @@ describe('lazy locale catalog with the fork overlay', () => {
     await i18n.changeLanguage('en')
   })
 
-  // Shared-worker files inherit this singleton: leave the language and its catalogs as found.
+  // Shared-worker files inherit this singleton: hand it back on English with no loaded catalogs.
   afterEach(async () => {
     await i18n.changeLanguage('en')
     i18n.removeResourceBundle('es', 'translation')
