@@ -2428,11 +2428,15 @@ fallback — about 400x too light.
   and missing cases, the entry selection, the artifact-set refusals, and the committed file against the
   committed baseline.
 
-**Projected, not measured:** `--simulate` over that run's twelve artifacts gives **1.95x before, 1.09x
-after** (the issue quotes 1.87x on an upper median). It is a replay with this file at its estimated
-13 s, so the issue's 1.3x criterion is met once a nightly runs on this change, not by the projection.
-One estimate is recorded in the overlay for this file, since the artifacts predate the change; the next
-measured run replaces it.
+**Measured, from the same lane before and after.** `fork-main-tests.yml` dispatched on the branch
+(run 43332008251) gives test-step durations of **237–288 s, median 269.5 s, 1.07x** against run
+43018513608's **232–453 s, median 268 s, 1.69x** — the issue's 1.3x criterion, met. The overlay it wrote
+is that run's own measurements, with no estimate in it. `--simulate` over the same artifacts agrees:
+1.21x on the baseline alone, 1.10x with the overlay.
+
+That run's shard 5 job took 716 s against 288–334 s for the other eleven, which is **not** shard
+balance: 420 s of its 716 s was the `Checkout` step, against 19–21 s elsewhere, and its test step was
+268 s.
 
 Refresh: `node local/ci-shard-timings-overlay.mjs import <dir-with-the-12-artifacts> --runner
 ubuntu-24.04-arm`, then `--check`.
