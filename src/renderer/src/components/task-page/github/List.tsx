@@ -49,6 +49,7 @@ export function TaskPageGitHubList({
     showPRManagementColumns,
     githubTaskGridClass,
     totalPages,
+    paginationError,
     handleLoadNextPage
   } = model
   return (
@@ -306,6 +307,25 @@ export function TaskPageGitHubList({
       !showGitHubTaskSkeletons &&
       totalPages > 1 ? (
         <div className="flex-none border-t border-border/50 bg-background">
+          {paginationError ? (
+            // fork-comment-ok: a rejected next-page read changes nothing on screen, so without this the click reads as "no more results".
+            <div
+              role="alert"
+              aria-atomic="true"
+              className="flex flex-wrap items-center justify-center gap-2 border-b border-border/50 px-4 py-2 text-xs text-destructive"
+            >
+              <span>{paginationError.message}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={loadingTargetPage !== null}
+                onClick={() => void handleLoadNextPage(paginationError.page)}
+              >
+                {t('auto.components.TaskPage.0bfbf62f75', 'Retry')}
+              </Button>
+            </div>
+          ) : null}
           <PaginationBar
             currentPage={currentPage}
             totalPages={totalPages}

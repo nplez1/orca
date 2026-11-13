@@ -12,6 +12,7 @@ import { translate } from '@/i18n/i18n'
 import { overlayPendingOnTaskPagePages } from '@/components/task-page/github/task-page-github-work-item-mutation-pages'
 import { scopeGitHubTaskSearch } from '../../../../../shared/work-items/task-github-search'
 import { useGitHubTaskSearchCommit } from '@/components/use-github-task-search-commit'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { getTaskPageRepoSourceContext } from '../../../lib/work-items/task-repo-source-context'
 export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProjectionModel) {
   const {
@@ -35,6 +36,7 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
     paginationLoading,
     setPaginationLoading,
     setLoadingTargetPage,
+    setPaginationError,
     setCountedTotalPages,
     setProvenPageLimit,
     countedTotalPagesRef,
@@ -82,6 +84,8 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
             countedTotalPages: null
           })
           if (reason === 'window-unreachable') {
+            // fork-comment-ok: a proven window limit answers the click, so the page stops being offered instead of failing again.
+            setPaginationError(null)
             toast.error(
               translate(
                 'auto.components.TaskPage.loadPageUnreachable',
@@ -96,19 +100,19 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
             )
             setProvenPageLimit((previous) => applyWindowPageLimit(previous, target))
           } else if (reason === 'load-failed') {
-            toast.error(
-              translate(
+            // fork-comment-ok: the store folds a per-repo network or IPC failure into failedCount, so this — not the catch below — is what a real outage reaches.
+            setPaginationError({
+              page: target,
+              message: translate(
                 'auto.components.TaskPage.loadPageFailed',
                 'Page {{value0}} could not be loaded from GitHub.',
                 {
                   value0: String(target + 1)
                 }
-              ),
-              {
-                id: 'work-items-page-load-failed'
-              }
-            )
+              )
+            })
           } else {
+            setPaginationError(null)
             // Real counts block speculative clamps; use the committed-count ref to explain clean empty clicks without a false failure.
             const committedCount = countedTotalPagesRef.current
             if (committedCount !== null && committedCount > 0) {
@@ -146,8 +150,28 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
         currentPageRef.current = target
         setPages(nextPages)
         setCurrentPage(target)
+        setPaginationError(null)
       } catch (err) {
-        console.error('Failed to load next page:', err)
+        // fork-comment-ok: this is the only load path with no row to carry the failure, so it reports itself instead of only logging.
+        if (paginationGenerationRef.current === requestGeneration) {
+          setPaginationError({
+            page: target,
+            message: translate(
+              'auto.components.TaskPage.pageLoadFailedWithReason',
+              'Couldn’t load page {{value0}} — {{value1}}',
+              {
+                value0: String(target + 1),
+                value1: extractIpcErrorMessage(
+                  err,
+                  translate(
+                    'auto.components.TaskPage.pageLoadFailedUnknownReason',
+                    'GitHub did not return this page.'
+                  )
+                )
+              }
+            )
+          })
+        }
       } finally {
         if (paginationGenerationRef.current === requestGeneration) {
           setPaginationLoading(false)
@@ -171,6 +195,7 @@ export function useTaskPageGitHubSearchPagination(model: TaskPageGitHubListProje
       pagesRef,
       setProvenPageLimit,
       setLoadingTargetPage,
+      setPaginationError,
       countedTotalPagesRef,
       setPages
     ]

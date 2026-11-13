@@ -94,6 +94,8 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
   const githubListRestoreWriteRef = useRef<GitHubListRestoreWrite | null>(null)
   const [paginationLoading, setPaginationLoading] = useState(false)
   const [loadingTargetPage, setLoadingTargetPage] = useState<number | null>(null)
+  // fork-comment-ok: no row can carry a rejected next-page read, so the page and its reason need a slot here.
+  const [paginationError, setPaginationError] = useState<GitHubPageLoadError | null>(null)
   // Keep proven 422 limits separate so late counts replace speculation without resurrecting unreachable pages.
   const [provenPageLimit, setProvenPageLimit] = useState<number | null>(null)
   // Mirror committed counts synchronously so empty-page handling cannot use a stale click-time closure.
@@ -167,6 +169,9 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
     paginationGenerationRef.current += 1
     setPaginationLoading(false)
     setLoadingTargetPage(null)
+    // fork-comment-ok: the ordering is the fix — a stale page's failure must not outlive the generation that owns it.
+    // oxlint-disable-next-line react-doctor/no-adjust-state-on-prop-change
+    setPaginationError(null)
   }, [
     selectedReposKey,
     appliedTaskSearch,
@@ -230,6 +235,8 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
     setPaginationLoading,
     loadingTargetPage,
     setLoadingTargetPage,
+    paginationError,
+    setPaginationError,
     countedTotalPages,
     setCountedTotalPages,
     provenPageLimit,
@@ -242,3 +249,5 @@ export function useTaskPageGitHubListState(model: TaskPageProviderStateModel) {
   })
 }
 export type TaskPageGitHubListStateModel = ReturnType<typeof useTaskPageGitHubListState>
+
+export type GitHubPageLoadError = { message: string; page: number }

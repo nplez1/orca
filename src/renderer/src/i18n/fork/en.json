@@ -178,7 +178,9 @@
         "jiraProjectsEmpty": "No Jira projects available",
         "jiraProjectsLoadFailed": "Couldn't load Jira projects.",
         "linearTeamsLoadFailedTooltip": "Couldn't load Linear teams — retry",
-        "linearTeamsLoadFailed": "Couldn't load Linear teams."
+        "linearTeamsLoadFailed": "Couldn't load Linear teams.",
+        "pageLoadFailedUnknownReason": "GitHub did not return this page.",
+        "pageLoadFailedWithReason": "Couldn’t load page {{value0}} — {{value1}}"
       },
       "activity": {
         "ActivityPrototypePage": {
