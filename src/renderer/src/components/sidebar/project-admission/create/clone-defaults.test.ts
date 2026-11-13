@@ -145,6 +145,56 @@ describe('getCloneParentForHost', () => {
       })
     ).toBe('/home/me/orca/workspaces')
   })
+
+  it('reads a folder stored under the machine’s other id once a server merged with it', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SSH]: { defaultRepoRoot: '/srv/repos' } } },
+        hostIds: [SERVER],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('/srv/repos')
+  })
+
+  it('keeps an SSH row clone-less even when its merged alias holds a folder', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SSH]: { defaultRepoRoot: '/srv/repos' } } },
+        hostIds: [SSH],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('')
+  })
+
+  it('prefers the server id’s folder when the pair holds two values', () => {
+    expect(
+      getCloneParentForHost({
+        settings: {
+          hostSettingOverrides: {
+            [SERVER]: { defaultRepoRoot: '/srv/newer' },
+            [SSH]: { defaultRepoRoot: '/srv/older' }
+          }
+        },
+        hostIds: [SERVER],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested'
+      })
+    ).toBe('/srv/newer')
+  })
+
+  it('ignores a relative folder the machine’s other id holds', () => {
+    expect(
+      getCloneParentForHost({
+        settings: { hostSettingOverrides: { [SSH]: { defaultRepoRoot: 'src' } } },
+        hostIds: [SERVER],
+        overrideHostIds: [SERVER, SSH],
+        layoutMode: 'repo-nested',
+        hostHome: '/home/me'
+      })
+    ).toBe('/home/me/orca/workspaces')
+  })
 })
 
 describe('needsHostHomeProbe', () => {
@@ -162,6 +212,26 @@ describe('needsHostHomeProbe', () => {
         SERVER
       ])
     ).toEqual({ environmentId: 'server-a', probe: false })
+  })
+
+  it('skips the home probe when the machine’s other id holds a folder', () => {
+    expect(
+      needsHostHomeProbe(
+        { hostSettingOverrides: { [SSH]: { defaultRepoRoot: '/srv/repos' } } },
+        [SERVER],
+        [SERVER, SSH]
+      )
+    ).toEqual({ environmentId: 'server-a', probe: false })
+  })
+
+  it('still probes when the folder the other id holds is relative', () => {
+    expect(
+      needsHostHomeProbe(
+        { hostSettingOverrides: { [SSH]: { defaultRepoRoot: 'src' } } },
+        [SERVER],
+        [SERVER, SSH]
+      )
+    ).toEqual({ environmentId: 'server-a', probe: true })
   })
 })
 

@@ -10,7 +10,10 @@ import type {
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 import { getHostSetupUnavailableDetail } from '@/lib/project-host-setup-availability'
-import { pickerExecutionHosts } from '../../../../../../shared/execution-host/managed-orcad-execution-host'
+import {
+  machineHostIds,
+  pickerExecutionHosts
+} from '../../../../../../shared/execution-host/managed-orcad-execution-host'
 
 export type SetupHostOption = {
   id: ExecutionHostId
@@ -18,6 +21,8 @@ export type SetupHostOption = {
   detail: string
   isAvailable: boolean
   canUsePathActions: boolean
+  /** Every id this machine answers to, so a folder stored under a merged alias is found. */
+  equivalentHostIds: readonly ExecutionHostId[]
 }
 
 export function getSetupStateLabel(
@@ -72,7 +77,8 @@ export function buildSetupHostOptions(
                 'Connect this host before importing or cloning the project'
               )),
         isAvailable: unavailableDetail === null,
-        canUsePathActions
+        canUsePathActions,
+        equivalentHostIds: machineHostIds(host)
       }
     })
 }

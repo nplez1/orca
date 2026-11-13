@@ -135,14 +135,16 @@ describe('project menu Add to…', () => {
         label: 'Build Box',
         detail: 'build-box.local',
         isAvailable: true,
-        canUsePathActions: true
+        canUsePathActions: true,
+        equivalentHostIds: ['ssh:build-box']
       },
       {
         id: 'runtime:win',
         label: 'Windows',
         detail: 'win-box.tailnet',
         isAvailable: true,
-        canUsePathActions: true
+        canUsePathActions: true,
+        equivalentHostIds: ['runtime:win']
       }
     ])
 
@@ -173,7 +175,8 @@ describe('project menu Add to…', () => {
         label: 'Old Box',
         detail: 'Update Orca on this host to set up projects',
         isAvailable: false,
-        canUsePathActions: false
+        canUsePathActions: false,
+        equivalentHostIds: ['runtime:stale']
       }
     ])
 

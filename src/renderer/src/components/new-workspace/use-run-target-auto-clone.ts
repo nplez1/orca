@@ -9,7 +9,7 @@ import { getProjectCloneCheckTarget } from '@/store/projects/project-host-routin
 import { readIpcErrorMessage } from '@/lib/ipc-error'
 import { translate } from '@/i18n/i18n'
 import { checkCloneTargetOn } from '@/components/sidebar/project-admission/clone-folder/use-clone-folder-override'
-import { resolveCloneParentForHost } from '@/components/sidebar/project-admission/create/resolve-clone-parent-for-host'
+import { resolveRunTargetCloneParent } from '@/components/sidebar/project-admission/create/resolve-clone-parent-for-host'
 import type { ProjectHostSetupProvisioning } from './use-workspace-copy-target'
 import {
   getProjectCloneKey,
@@ -150,12 +150,7 @@ export function useRunTargetAutoClone({
         return { kind: 'abandoned' }
       }
       const destination =
-        destinationOverride ||
-        (await resolveCloneParentForHost({
-          settings,
-          hostIds: [option.hostId],
-          ...(layoutMode ? { layoutMode } : {})
-        }))
+        destinationOverride || (await resolveRunTargetCloneParent({ settings, option, layoutMode }))
       // Why here as well as at the outcome: the host lookup is the long wait, and a user who has
       // moved on must not end up with a checkout on a host they abandoned.
       if (isSuperseded()) {

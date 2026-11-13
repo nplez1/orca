@@ -8,7 +8,7 @@ import { useRunTargetAutoClone } from './use-run-target-auto-clone'
 
 const mocks = vi.hoisted(() => ({
   setupProjectClone: vi.fn(),
-  resolveCloneParentForHost: vi.fn(),
+  resolveRunTargetCloneParent: vi.fn(),
   checkCloneTargetOn: vi.fn(),
   toastError: vi.fn(),
   toastWarning: vi.fn()
@@ -28,7 +28,7 @@ vi.mock('@/components/sidebar/project-admission/clone-folder/use-clone-folder-ov
 }))
 
 vi.mock('@/components/sidebar/project-admission/create/resolve-clone-parent-for-host', () => ({
-  resolveCloneParentForHost: mocks.resolveCloneParentForHost
+  resolveRunTargetCloneParent: mocks.resolveRunTargetCloneParent
 }))
 
 vi.mock('sonner', () => ({
@@ -48,7 +48,8 @@ const option: NeedsSetupProjectHostOption = {
   detail: 'Project location not set',
   isAvailable: true,
   attention: false,
-  canSetLocation: true
+  canSetLocation: true,
+  equivalentHostIds: [HOST, 'ssh:builder']
 }
 
 const OTHER_HOST: NeedsSetupProjectHostOption = {
@@ -85,11 +86,11 @@ function renderClone(onProvisioned = vi.fn()) {
 beforeEach(() => {
   resetProjectCloneInFlightForTests()
   mocks.setupProjectClone.mockReset()
-  mocks.resolveCloneParentForHost.mockReset()
+  mocks.resolveRunTargetCloneParent.mockReset()
   mocks.checkCloneTargetOn.mockReset()
   mocks.toastError.mockReset()
   mocks.toastWarning.mockReset()
-  mocks.resolveCloneParentForHost.mockResolvedValue(DESTINATION)
+  mocks.resolveRunTargetCloneParent.mockResolvedValue(DESTINATION)
   mocks.checkCloneTargetOn.mockResolvedValue(null)
   mocks.setupProjectClone.mockResolvedValue({ setup: { id: 'setup-new' } })
 })
@@ -105,8 +106,10 @@ describe('useRunTargetAutoClone', () => {
 
     await act(async () => result.current.start(option))
 
-    expect(mocks.resolveCloneParentForHost).toHaveBeenCalledWith(
-      expect.objectContaining({ hostIds: [HOST] })
+    expect(mocks.resolveRunTargetCloneParent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        option: expect.objectContaining({ hostId: HOST, equivalentHostIds: [HOST, 'ssh:builder'] })
+      })
     )
     expect(mocks.setupProjectClone).toHaveBeenCalledWith(
       {
@@ -131,7 +134,7 @@ describe('useRunTargetAutoClone', () => {
     })
     await act(async () => result.current.start(option))
 
-    expect(mocks.resolveCloneParentForHost).not.toHaveBeenCalled()
+    expect(mocks.resolveRunTargetCloneParent).not.toHaveBeenCalled()
     expect(mocks.setupProjectClone).toHaveBeenCalledWith(
       expect.objectContaining({ url: 'https://github.com/acme/app.git', destination: '/srv/x' }),
       { onFailure: 'throw' }
@@ -260,7 +263,7 @@ describe('useRunTargetAutoClone', () => {
 
   it('starts nothing for a host the user abandoned while its folder was still being resolved', async () => {
     let releaseProbe: (value: string) => void = () => {}
-    mocks.resolveCloneParentForHost.mockImplementationOnce(
+    mocks.resolveRunTargetCloneParent.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           releaseProbe = resolve
@@ -284,7 +287,7 @@ describe('useRunTargetAutoClone', () => {
 
   it('starts nothing for a host abandoned before the composer closed', async () => {
     let releaseProbe: (value: string) => void = () => {}
-    mocks.resolveCloneParentForHost.mockImplementationOnce(
+    mocks.resolveRunTargetCloneParent.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           releaseProbe = resolve
@@ -306,7 +309,7 @@ describe('useRunTargetAutoClone', () => {
 
   it('starts nothing for the host it was moved off before the composer closed', async () => {
     let releaseProbe: (value: string) => void = () => {}
-    mocks.resolveCloneParentForHost.mockImplementationOnce(
+    mocks.resolveRunTargetCloneParent.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           releaseProbe = resolve
@@ -348,7 +351,7 @@ describe('useRunTargetAutoClone', () => {
 
   it('keeps running a clone the closed composer was still waiting on', async () => {
     let releaseProbe: (value: string) => void = () => {}
-    mocks.resolveCloneParentForHost.mockImplementationOnce(
+    mocks.resolveRunTargetCloneParent.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           releaseProbe = resolve
@@ -369,7 +372,7 @@ describe('useRunTargetAutoClone', () => {
 
   it('starts its own clone when the one it joined was abandoned by a closed composer', async () => {
     let releaseProbe: (value: string) => void = () => {}
-    mocks.resolveCloneParentForHost.mockImplementationOnce(
+    mocks.resolveRunTargetCloneParent.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           releaseProbe = resolve
@@ -598,7 +601,7 @@ describe('useRunTargetAutoClone', () => {
 
   it('reports a taken folder found after close without calling it a failed clone', async () => {
     let releaseDestination: (value: string) => void = () => {}
-    mocks.resolveCloneParentForHost.mockImplementationOnce(
+    mocks.resolveRunTargetCloneParent.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           releaseDestination = resolve

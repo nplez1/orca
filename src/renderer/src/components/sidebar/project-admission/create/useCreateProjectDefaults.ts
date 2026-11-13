@@ -9,6 +9,7 @@ import {
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import type { AddRepoDialogStep } from '../dialog/add-repo-dialog-types'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 
 const LOCAL_GIT_AVAILABILITY_TIMEOUT_MS = 1500
@@ -31,7 +32,8 @@ export function useCreateProjectDefaults({
   createParent,
   setCreateParent,
   worktreeLayoutMode,
-  hostSettingOverrides
+  hostSettingOverrides,
+  overrideHostIds
 }: {
   step: AddRepoDialogStep
   activeRuntimeEnvironmentId: string | null | undefined
@@ -41,6 +43,7 @@ export function useCreateProjectDefaults({
   worktreeLayoutMode?: WorktreeLayoutMode
   /** Per-host folder overrides: a stored root wins over recomputing from the host's home. */
   hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
+  overrideHostIds?: readonly ExecutionHostId[]
 }): {
   createDefaultParent: string
   createGitAvailability: GitAvailability
@@ -59,6 +62,9 @@ export function useCreateProjectDefaults({
   const createParentTouchedRef = useRef(false)
   const createParentDefaultGenRef = useRef(0)
   const createGitProbeGenRef = useRef(0)
+  const overrideHostIdsRef = useRef(overrideHostIds)
+  overrideHostIdsRef.current = overrideHostIds
+  const overrideHostIdsKey = overrideHostIds?.join('\n') ?? ''
   const activeCreateParentRuntimeEnvironmentId = activeRuntimeEnvironmentId?.trim() || null
   const activeCreateParentTargetKey = activeCreateParentRuntimeEnvironmentId
     ? `runtime:${activeCreateParentRuntimeEnvironmentId}`
@@ -203,7 +209,8 @@ export function useCreateProjectDefaults({
     void resolveRuntimeCreateParent({
       runtimeEnvironmentId,
       worktreeLayoutMode,
-      hostSettingOverrides
+      hostSettingOverrides,
+      overrideHostIds: overrideHostIdsRef.current
     })
       .then((result) => {
         if (
@@ -238,6 +245,7 @@ export function useCreateProjectDefaults({
     canReplaceCreateParentDefault,
     createParent,
     hostSettingOverrides,
+    overrideHostIdsKey,
     setCreateParent,
     step,
     worktreeLayoutMode

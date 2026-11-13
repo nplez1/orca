@@ -7,7 +7,10 @@ import {
 } from '../../../shared/execution-host'
 import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host/execution-host-registry-entry'
 import { isEphemeralVmRuntimeEnvironment } from '../../../shared/remote-runtime/host-catalog/runtime-environments'
-import { isMergedAwayExecutionHost } from '../../../shared/execution-host/managed-orcad-execution-host'
+import {
+  isMergedAwayExecutionHost,
+  machineHostIds
+} from '../../../shared/execution-host/managed-orcad-execution-host'
 import type { ProjectHostSetup } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
 
@@ -52,6 +55,8 @@ export type ProjectHostSetupOption =
       attention: boolean
       // Available pathless hosts can set up in place; connecting/in-progress/unsupported hosts need another step.
       canSetLocation: boolean
+      /** Every id this machine answers to, so a folder stored under a merged alias is found. */
+      equivalentHostIds?: readonly ExecutionHostId[]
       connectAction?: { kind: 'ssh'; targetId: string } | { kind: 'runtime'; environmentId: string }
     }
 
@@ -205,6 +210,7 @@ function buildNeedsSetupOptions({
         isAvailable,
         attention: host.health === 'error',
         canSetLocation: canSetProjectLocation(projectId, isAvailable, pendingSetup, host.id),
+        equivalentHostIds: machineHostIds(host),
         ...(connectAction ? { connectAction } : {})
       }
     })
