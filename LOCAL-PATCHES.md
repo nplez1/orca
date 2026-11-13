@@ -2396,7 +2396,7 @@ fallback — about 400x too light.
 
 - **The 300k case moved under `ORCA_RUN_PATH_SEARCH_SCALE`**, the flag three other scale files already
   share. The default run keeps a **30k** case, which takes this file from 59.9 s to 4.4 s locally (178 s
-  to an estimated 13 s in CI). Not a new flag (a synonym), and not `performance-contracts.yml`: that lane
+  to 14.9 s in CI, both measured). Not a new flag (a synonym), and not `performance-contracts.yml`: that lane
   counts operations, runs three OSes one file at a time, and its `paths:` filter has to stay in sync with
   its contract allowlist. The 500k and 1M cases moved behind `ORCA_RUN_PATH_SEARCH_SCALE_BATTERY`, the
   second flag `workspace-path-search-scale.test.ts` already uses, because they want a 2 GB catalog budget
@@ -2428,14 +2428,17 @@ fallback — about 400x too light.
   and missing cases, the entry selection, the artifact-set refusals, and the committed file against the
   committed baseline.
 
-**Measured, from the same lane before and after.** `fork-main-tests.yml` dispatched on the branch
-(run 43332008251) gives test-step durations of **237–288 s, median 269.5 s, 1.07x** against run
-43018513608's **232–453 s, median 268 s, 1.69x** — the issue's 1.3x criterion, met. The overlay it wrote
-is that run's own measurements, with no estimate in it. `--simulate` over the same artifacts agrees:
-1.21x on the baseline alone, 1.10x with the overlay.
+**Measured, from the same lane before and after — one run each way.** `fork-main-tests.yml` dispatched on
+the branch (run 43332008251) gives test-step durations of **237–288 s, median 269.5 s, 1.07x** against
+run 43018513608's **232–453 s, median 268 s, 1.69x** — the issue's 1.3x criterion, met.
+
+Most of that gain is the 300k move, not the overlay: replaying the same artifacts with the baseline alone
+still gives 1.21x, and 1.10x with the overlay. The overlay's own job is that it keeps the placement
+correct as fork-owned files accumulate, which is what the missing entry cost before. The overlay the run
+wrote is its own measurements, with no estimate in it.
 
 That run's shard 5 job took 716 s against 288–334 s for the other eleven, which is **not** shard
-balance: 420 s of its 716 s was the `Checkout` step, against 19–21 s elsewhere, and its test step was
+balance: 420 s of its 716 s was the `Checkout` step, against 18–22 s elsewhere, and its test step was
 268 s.
 
 Refresh: `node local/ci-shard-timings-overlay.mjs import <dir-with-the-12-artifacts> --runner
