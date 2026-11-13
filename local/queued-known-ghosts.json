@@ -8,6 +8,15 @@
       "reason": "queued with zero jobs since 2026-10-07; `gh run cancel` answers \"Cannot cancel a workflow run that is completed\", force-cancel answers 409 \"not queued yet\", and DELETE returns 403. Only a delete in the Actions UI clears it.",
       "evidence": "https://github.com/nplez1/orca/actions/runs/37640199177",
       "recorded": "2026-11-01"
+    },
+    {
+      "runId": 43095501923,
+      "name": "Fork base gates",
+      "status": "queued",
+      "createdAt": "2026-11-11T20:21:01Z",
+      "reason": "queued with zero jobs since the 2026-11-11T20:21:01Z push of f3086f3283c to main; `gh run cancel` answers \"Cannot cancel a workflow run that is completed\", force-cancel answers 409 \"Cannot cancel a workflow run that has not been queued yet.\", and DELETE answers 403 \"Could not delete the workflow run\". Only a delete in the Actions UI clears it. Later pushes to main started their own gates runs normally (43341236109 and the three before it succeeded), so the workflow is not wedged: this is one superseded record left behind by `concurrency.cancel-in-progress: false`.",
+      "evidence": "https://github.com/nplez1/orca/actions/runs/43095501923",
+      "recorded": "2026-11-13"
     }
   ]
 }
