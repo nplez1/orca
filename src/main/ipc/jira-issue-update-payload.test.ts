@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { normalizeIssueUpdate } from './jira-issue-update-payload'
 
 /** Every field the boundary accepts, in one payload. The RPC contract's suite
- *  (src/shared/rpc-contract/jira-params.test.ts) carries the same fixture, because
- *  both boundaries must keep accepting it. */
+ *  (src/shared/rpc-contract/jira-params.test.ts) covers a subset of these fields; the
+ *  two boundaries are deliberately not the same schema, so this is not a parity fixture. */
 const FULL_UPDATE = {
   title: 'Fix the thing',
   labels: ['bug', 'jira'],
@@ -29,7 +29,8 @@ const ACCEPTED: [string, unknown][] = [
   // keys are read (see updateIssue in jira-issue-mutations.ts).
   ['an unknown top-level key', { title: 'T', fieldValues: { summary: 'x' } }],
   // An array has no named update keys to apply, so it narrows to an update that does
-  // nothing. Kept as a case because it is the same branch as the object check.
+  // nothing, and the handler's upstream narrower refuses arrays anyway. Pinned as a
+  // characterization case because it is the same branch as the object check.
   ['a top-level array', []]
 ]
 
@@ -50,6 +51,9 @@ const REJECTED: [string, unknown][] = [
   ['a whitespace sprint id', { sprintId: '  ' }],
   ['a numeric sprint id', { sprintId: 42 }],
   ['a system field in the custom-field map', { customFields: { reporter: 'acc-1' } }],
+  // Both, because a map with no custom field at all also satisfies "some key is a
+  // custom field", so it would not pin that the check is `every`.
+  ['a system field beside a custom field', { customFields: { customfield_1: 'x', reporter: 'a' } }],
   ['a custom-field map that is an array', { customFields: [] }],
   ['a custom-field map that is a string', { customFields: 'customfield_1' }],
   ['transition fields that are an array', { transitionFields: [] }],

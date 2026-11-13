@@ -40,9 +40,11 @@ describe('jira:updateIssue', () => {
 
   // Why: the handler merges two narrowers — upstream's rebuild, which keeps only the
   // fields it names, and the fork's, which passes the payload through after checking
-  // it. The upstream rebuild spreads last, so it wins for a key both carry; an
-  // undeclared label operation is the one case where the two disagree about the
-  // value, and reversing the spread would send it to Jira.
+  // it. The upstream rebuild spreads last, so it wins for a key both carry. An
+  // undeclared label operation is the one place the two disagree about the value, so
+  // it is what makes the order observable: reversed, `replace` survives. It stays
+  // inert either way (updateIssue reads only add/remove); if the fork narrower ever
+  // rebuilds labelOperations too, both orders agree and this test stops pinning it.
   it('prefers the upstream rebuild for a key both narrowers carry', async () => {
     await updateIssueHandler()(null, {
       key: 'A-1',
