@@ -118,11 +118,11 @@ skip it. If one of them is red there, the fix is the one above — fix it, or cl
 `local/nightly-linux-known-red.json` (suite) or `local/lint-known-red.json` (lint) with evidence — not
 a retry.
 
-The release lane is a backstop, not a wider net: it runs the same TypeScript projects, the same lint
-steps and the same allowlist (`local/lint-known-red.json`) on `ubuntu-latest`, so a green there restates
-a green here rather than adding coverage. What it adds (#298) is that a dispatch cannot outrun those
-verdicts. Nothing checks `Fork base gates` was green for the commit being published —
-`local/dispatch-release.mjs` reads the review, the tree, the ref and the Actions fleet — so before this
+For `typecheck` and `lint` the release lane is a backstop, not a wider net: it runs the same TypeScript
+projects, the same lint steps and the same allowlist (`local/lint-known-red.json`) on `ubuntu-latest`, so
+a green there restates a green here rather than adding coverage. What it adds (#298) is that a dispatch
+cannot outrun those verdicts. Nothing checks `Fork base gates` was green for the commit being published
+— `local/dispatch-release.mjs` reads the review, the tree, the ref and the Actions fleet — so before this
 change the compiler's verdict at publish time was whatever the dispatcher happened to have run by hand.
 A typecheck red has no allowlist: the fix is a clean `pnpm tc`, the same as this step's.
 
