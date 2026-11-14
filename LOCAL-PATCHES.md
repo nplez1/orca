@@ -3056,10 +3056,10 @@ tidiness, and it is the half that has to change upstream for the class to be clo
 
 Anchors: `config/scripts/test-runtime/environment/vitest-shared-worker-locale-reset.mjs` and its test
 (fork-owned, new); one added entry in the shared project's `setupFiles` in `config/vitest.config.ts`
-(upstream-owned, `fork-comment-ok`); `src/shared/i18n-instance-registry.ts` (fork-added); a
-`registerOrcaI18nInstance` call in `src/shared/orca-i18n-instance.ts` and one `__reset…ForTests` export
-each in `src/shared/ui-locale.ts` and `src/renderer/src/i18n/language-readiness.ts` (all three
-upstream-owned, marked).
+(upstream-owned, `fork-comment-ok`); `src/shared/i18n-instance-registry.ts` (fork-added); one
+`registerOrcaI18nInstance` call in `src/shared/orca-i18n-instance.ts` (upstream-owned, code only, no
+fork comment) and one `__reset…ForTests` export each in `src/shared/ui-locale.ts` and
+`src/renderer/src/i18n/language-readiness.ts` (upstream-owned, `fork-comment-ok`).
 
 **The gap this closes.** A `bun-shared` worker's files share one module cache (`isolate: false`), and
 `vitest-shared-worker-file-reset.mjs` undoes mocks, timers, globals, process state and the modules a
@@ -3075,8 +3075,19 @@ locale catalog (about 15 MB of base64 per shared worker) through the `locale-cat
 plugin, `src/main/i18n/main-i18n.ts` reaches `electron`, and importing **i18next itself** leaves a
 pending timer that the file reset answers with `resetAllModules` — measured, a shared worker's second
 file then re-imports the whole graph. `src/shared/i18n-instance-registry.ts` is a type-only import of
-`i18next` plus an array, so a setup file can read it for nothing. `createOrcaI18n` registers into it;
-production builds two instances at module load, so it is two entries there.
+`i18next` plus an array of `WeakRef`s, so a setup file can read it for nothing. `createOrcaI18n`
+registers into it; production builds two instances at module load, so it is two entries there. Weak
+because a file that makes the i18n module evaluate again — a mock, or a leaked global — registers
+another instance, and this module was loaded by the setup file, so nothing else clears it.
+
+**What it waits for, and what it cannot.** The reset awaits `vi.dynamicImportSettled()` first: a
+catalog a file started loading in the background would otherwise arrive after the language was put back
+and land on the restored one. A _fetched_ catalog (the renderer's route, `fetch` of a base64 data URL)
+has no such hook, so a file that leaves a catalog fetch in flight can still settle it late. And
+`changeLanguage` restores the language, not everything a file may have changed: a rewrite of the `en`
+bundle itself, plugin language packs the file registered, and main's `languageGeneration` counter all
+survive it. None of those is reachable from a shared test file today; they are listed so the next
+reader does not read this as "locale is fully reset".
 
 **Preventive, not a fix for a live red.** No shared file writes a detection or the store today: the
 only writer is `publishLanguageDetection`, whose tests are `@vitest-environment happy-dom` and so are
@@ -3103,6 +3114,10 @@ Three things that fixture has to keep doing, all learned the hard way:
   than a re-evaluated one. A mark on the readiness store is not stable across the fixture's files, and
   the fixture never creates a real i18next instance: it stands one in, because the real one leaves the
   timer described above and then a module reset, not the hook, would be what cleared the language.
+- **Read the fixture's two halves for what they are.** Its language assertion is the strong one: remove
+  the switch and it reds. Its detection assertion compares the detection to the browser fallback, which
+  on a host whose own locale is Spanish would match even without the reset — the unit test above pins
+  `de-DE` precisely so that half does not depend on the host.
 
 ## Syncing with upstream
 

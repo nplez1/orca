@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runProcess, runProcessSync } from '@orca/process-host'
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import {
   getRendererLanguageDetection,
   setRendererLanguageDetection
@@ -13,15 +13,16 @@ import { resolvePinnedBunExecutable } from '../../tool-invocation/pinned-bun-exe
 const root = resolve(fileURLToPath(new URL('../../../..', import.meta.url)))
 const SPANISH = { detectedTag: 'es-ES', status: 'supported', locale: 'es', source: 'browser' }
 
-it('puts the detection back on what a fresh worker starts with', () => {
+afterEach(() => vi.unstubAllGlobals())
+
+it('puts the detection back on what a fresh worker starts with', async () => {
   vi.stubGlobal('navigator', { language: 'de-DE', languages: ['de-DE'] })
   setRendererLanguageDetection(SPANISH)
   expect(getRendererLanguageDetection().locale).toBe('es')
 
-  restoreSharedWorkerLocale()
+  await restoreSharedWorkerLocale()
 
   expect(getRendererLanguageDetection().locale).toBe('de')
-  vi.unstubAllGlobals()
 })
 
 it('drops the cached detection, so the next file detects for itself', async () => {
@@ -37,7 +38,6 @@ it('drops the cached detection, so the next file detects for itself', async () =
   expect(useLanguageReadiness.getState().detection).toBeNull()
   expect((await initializeLanguageDetection()).locale).toBe('ja')
   await restoreSharedWorkerLocale()
-  vi.unstubAllGlobals()
 })
 
 it('puts the i18n instance a file switched back on English', async () => {
@@ -103,7 +103,7 @@ it('restores the locale a previous shared file left behind', async () => {
          writeFileSync(new URL('./planted.json', import.meta.url), JSON.stringify({ pid: process.pid }))
        })`
     )
-    // Two files, so the hooks are shown to run for every file rather than only the last one.
+    // Two later files, so a hook that attached to only one of them could not carry both.
     for (const name of ['02-assert.spec.mjs', '03-assert.spec.mjs']) {
       writeFileSync(
         join(directory, name),
