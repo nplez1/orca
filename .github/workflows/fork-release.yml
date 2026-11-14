@@ -10,12 +10,22 @@ name: Fork release
 # is why it needs no GitHub App token: the workflow's own GITHUB_TOKEN can create
 # releases in its own repository.
 #
-# Tests and lint are not run as a PR gate for this branch, but nothing publishes without the unit
-# suite: `unit-tests` below runs it on the dispatched commit, and the `macos` job waits for it. Before
-# 2026-10-29 the header here said the opposite — a dispatch from the Actions UI published to every
-# auto-updating install with no test evidence at all, because the local release gate's verdict lives in
-# `.git/orca-gate/` on one machine, which CI cannot see. To release without waiting for a full run
-# there is no flag: fix the red, or classify it in `local/nightly-linux-known-red.json` with evidence.
+# Nothing publishes without evidence: `unit-tests` below runs the unit suite on the dispatched commit,
+# `typecheck` and `lint` run the compiler's and the lint gate's verdicts on it, and every artifact leg
+# waits for all three. Before 2026-10-29 the header here said the opposite — a dispatch from the Actions
+# UI published to every auto-updating install with no test evidence at all, because the local release
+# gate's verdict lives in `.git/orca-gate/` on one machine, which CI cannot see. To release without
+# waiting for a full run there is no flag: fix the red, or classify it in
+# `local/nightly-linux-known-red.json` with evidence.
+#
+# Why `typecheck` and `lint` are jobs here at all (#298): until 2026-11-14 the compiler's verdict at
+# publish time was whatever the dispatcher happened to run by hand. The 2026-11-08 sync is the case —
+# `PROVIDER_DISPLAY_NAMES` and `USAGE_PROVIDER_IDS` were short after a rate-limit union merged, and
+# `pnpm tc` was the only thing that noticed, so this workflow would have built and published from that
+# tree. `fork-main-gates.yml` and `fork-pr-gates.yml` do run both verdicts, but nothing at dispatch time
+# reads them: `local/dispatch-release.mjs` checks the review, the tree, the ref and the Actions fleet,
+# not whether `Fork base gates` came back green for the commit being published — and that lane was red
+# for eight consecutive pushes on 2026-11-12, with its `Typecheck` step skipped in all eight.
 #
 # What is also gated is the dispatch itself: the `release-ref` job refuses any ref but
 # `refs/heads/main`, and any tag that already points at another commit.
@@ -112,8 +122,83 @@ jobs:
       shards: ${{ needs.unit-plan.outputs.shards }}
       run_relay_integration: false
 
+  # Why a job and not a step in the artifact legs: the verdict has to arrive once, before the first
+  # artifact exists, and the legs are serialized behind each other — a step in `macos` would spend the
+  # same minutes after the unit suite instead of alongside it. Same runner and same preparation as the
+  # other two typecheck lanes, so a green here means what a green there means.
+  typecheck:
+    needs: release-ref
+    runs-on: ubuntu-latest
+    # Why 40: `fork-main-gates.yml` caps a hung `pnpm tc` at 40 minutes rather than the default 360,
+    # and that budget was chosen for this command on this runner.
+    timeout-minutes: 40
+    # Why read-only: this job installs dependencies, which runs third-party composite actions and
+    # package lifecycle scripts. It needs nothing from the release token — the same reasoning as
+    # `unit-plan`.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # Why `native-runtime: node`: the preparation `fork-main-gates.yml` gives `pnpm tc` on this
+      # runner, so a green here cannot be a green about a different install.
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Typecheck
+        run: pnpm tc
+
+  # Why the verdict and not `pnpm lint`: `pnpm lint` stops at the first failing step and has no notion
+  # of a known red, so on a base carrying foreign reds it is red on every run — and this lane has to be
+  # green on a clean release line rather than forgiven on a dirty one. `local/gate-lint.mjs` runs every
+  # step of the chain plus `FORK_LINT_STEPS` and fails only on a red outside `local/lint-known-red.json`.
+  # The allowlist is committed to the dispatched tree, so the verdict is that tree's own; the escape
+  # hatch for a foreign red is the file, with evidence, exactly as it is for the suite above.
+  lint:
+    needs: release-ref
+    runs-on: ubuntu-latest
+    # Why 40: `fork-main-gates.yml` allows 50 for this verdict and `pnpm tc` together. Here the
+    # typecheck is a job of its own, so the verdict gets the larger share of that budget.
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      # Why: `check-upstream-file-comments` measures against the recorded sync base, and a CI checkout
+      # has no such commit — the same fetch both other lanes make before the verdict.
+      - name: Fetch the recorded upstream sync base
+        run: |
+          base=$(node -p 'require("./local/upstream-file-comments-baseline.json").base ?? ""')
+          if [ -z "$base" ]; then
+            echo "no sync base is recorded in local/upstream-file-comments-baseline.json" >&2
+            exit 1
+          fi
+          git fetch --depth=1 origin "$base"
+
+      # Why `ORCA_CODE_QUALITY_BASE: HEAD`: the gate also runs the diff-scoped steps
+      # (`check:code-quality:changed` and the flaky-test-pattern ratchet), and a single-commit checkout
+      # has no base to diff against. A red for a missing ref rather than for a finding is the failure
+      # this lane exists to prevent.
+      - name: Lint ratchet verdict
+        env:
+          ORCA_CODE_QUALITY_BASE: HEAD
+        run: node local/gate-lint.mjs
+
   macos:
-    needs: [release-ref, unit-tests]
+    # Why the two verdicts are named on every leg and not just on `macos`: the serialization below is
+    # an upload-race workaround (`windows` and `linux` inherit them transitively through it), so hanging
+    # a gate off the chain would silently drop it the day the chain is relaxed.
+    needs: [release-ref, unit-tests, typecheck, lint]
     runs-on: macos-15
     steps:
       # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
@@ -320,7 +405,7 @@ jobs:
   # Why serialized behind macos: every job publishes into the same release, and electron-builder
   # decides whether to create or append at upload time. Running them at once races that decision.
   windows:
-    needs: macos
+    needs: [macos, typecheck, lint]
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -424,7 +509,7 @@ jobs:
   # live before the last platform's manifest exists offers downloads no installed build can
   # update from.
   linux:
-    needs: windows
+    needs: [windows, typecheck, lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0

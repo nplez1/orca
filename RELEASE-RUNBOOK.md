@@ -111,9 +111,19 @@ something to do silently.
 
 Since 2026-10-29 the dispatch carries the same coverage itself: `fork-release.yml` runs the unit suite
 on the dispatched commit (`unit-plan` → `unit-tests`, the same reusable workflow, shard plan and fork
-shard verdict as the nightly) and every artifact leg waits for it. So a dispatch can no longer publish
-with no test evidence, and there is no flag to skip it. If a shard is red there, the fix is the one
-above — fix it, or classify it in `local/nightly-linux-known-red.json` with evidence — not a retry.
+shard verdict as the nightly), `typecheck` runs `pnpm tc` on it, `lint` runs
+`node local/gate-lint.mjs` against the tree's own `local/lint-known-red.json`, and every artifact leg
+waits for all three. So a dispatch can no longer publish with no test evidence, and there is no flag to
+skip it. If one of them is red there, the fix is the one above — fix it, or classify it in
+`local/nightly-linux-known-red.json` (suite) or `local/lint-known-red.json` (lint) with evidence — not
+a retry.
+
+The local legs of this step are still the wider net: `pnpm tc` here typechecks the darwin-bound code a
+Linux runner cannot, and the local lint gate reads the same allowlist the release lane does. What the
+release lane adds (#298) is that a dispatch cannot outrun them. Nothing checks `Fork base gates` was
+green for the commit being published — `local/dispatch-release.mjs` reads the review, the tree, the ref
+and the Actions fleet — so before this change the compiler's verdict at publish time was whatever the
+dispatcher happened to have run by hand.
 
 ## Step 1.6 — the review gate, before the dispatch
 

@@ -63,7 +63,12 @@ describe('the release dispatch is gated on test evidence', () => {
     )
 
     expect(text).not.toContain('Tests and lint are deliberately not run here')
-    expect(text).toContain('nothing publishes without the unit')
+    // Every verdict that gates a publish is named in the claim, not just the suite it started with.
+    const header = text.slice(0, text.indexOf('\njobs:'))
+    expect(header).toContain('Nothing publishes without evidence')
+    for (const gate of ['unit-tests', 'typecheck', 'lint']) {
+      expect(header, gate).toContain(gate)
+    }
   })
 
   it('nothing in the file can skip or soften the gate', () => {
@@ -89,6 +94,62 @@ describe('the release dispatch is gated on test evidence', () => {
 
     expect(guard).toContain('fork-release-ref-guard.sh')
     expect(needsOf(RELEASE, 'unit-tests')).toContain('release-ref')
+  })
+})
+
+describe('the release dispatch is gated on the compiler and the lint verdict', () => {
+  const scripts = (name) => runScripts({ jobs: { job: RELEASE.jobs[name] } })
+
+  it('typechecks the commit it is about to publish, with the command the other lanes run', () => {
+    const mainGate = readWorkflow('.github/workflows/fork-main-gates.yml').jobs.gates.steps.find(
+      (step) => step.name === 'Typecheck'
+    )
+
+    // Why against the other two lanes rather than a literal: `tc:node` here would be a green about a
+    // third of the tree, and the point of the job is that green means what green means elsewhere.
+    const prGate = readWorkflow('.github/workflows/fork-pr-gates.yml').jobs.typecheck
+
+    expect(mainGate?.run).toBe('pnpm tc')
+    expect(runScripts({ jobs: { job: prGate } })).toEqual(['pnpm tc'])
+    expect(scripts('typecheck')).toEqual(['pnpm tc'])
+  })
+
+  it('runs the fork lint verdict, which is the one form green on a base carrying foreign reds', () => {
+    expect(scripts('lint')).toContain('node local/gate-lint.mjs')
+  })
+
+  it('fetches the recorded sync base before the verdict, or the comment ratchet cannot run', () => {
+    const steps = RELEASE.jobs.lint.steps
+    const fetched = steps.findIndex((step) =>
+      (step.run ?? '').includes('upstream-file-comments-baseline.json')
+    )
+    const verdict = steps.findIndex((step) => (step.run ?? '').includes('node local/gate-lint.mjs'))
+
+    expect(fetched).toBeGreaterThan(-1)
+    expect(fetched).toBeLessThan(verdict)
+  })
+
+  it('tells the verdict where its diff base is, so a shallow checkout cannot red it', () => {
+    const verdict = RELEASE.jobs.lint.steps.find((step) =>
+      (step.run ?? '').includes('node local/gate-lint.mjs')
+    )
+
+    expect(verdict?.env?.ORCA_CODE_QUALITY_BASE).toBe('HEAD')
+  })
+
+  it('every artifact leg waits for both verdicts, not only the first one in the chain', () => {
+    // `windows` and `linux` would inherit them through `macos`; naming both anyway is what keeps the
+    // gate when the upload-race serialization is relaxed.
+    for (const job of PUBLISHING) {
+      expect(needsOf(RELEASE, job), job).toContain('typecheck')
+      expect(needsOf(RELEASE, job), job).toContain('lint')
+    }
+  })
+
+  it('gives neither verdict job the release token', () => {
+    for (const job of ['typecheck', 'lint']) {
+      expect(RELEASE.jobs[job].permissions, job).toEqual({ contents: 'read' })
+    }
   })
 })
 
