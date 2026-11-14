@@ -14,12 +14,15 @@ export type WorkspacePathIndexQueryRequest = {
   cancellation: WorkspacePathIndexQueryCancellation
 }
 
+/** A query the worker failed, without its cancellation handle. */
+export type WorkspacePathIndexFailedQuery = Omit<WorkspacePathIndexQueryRequest, 'cancellation'>
+
 /** Owns latest-per-consumer query scheduling and worker-loss fencing. */
 export class WorkspacePathIndexSearch {
   private readonly queryEntryByConsumer = new Map<string, { entryKey: string; sequence: number }>()
   private readonly failedConsumers = new Set<string>()
   private readonly scheduler: WorkspacePathIndexQueryScheduler<
-    Omit<WorkspacePathIndexQueryRequest, 'cancellation'>,
+    WorkspacePathIndexFailedQuery,
     WorkspacePathSearchResponse
   >
 
@@ -27,15 +30,15 @@ export class WorkspacePathIndexSearch {
     query: (request: WorkspacePathIndexQueryRequest) => Promise<WorkspacePathSearchResponse>
     cancelQuery?: (consumerKey: string) => void
     maxPendingConsumers: number
-    onWorkerFailure: (consumerKey: string) => void
+    onWorkerFailure: (consumerKey: string, failed: WorkspacePathIndexFailedQuery) => void
   }) {
     this.scheduler = new WorkspacePathIndexQueryScheduler(
       (request, cancellation) => args.query({ ...request, cancellation }),
       (consumerKey) => args.cancelQuery?.(consumerKey),
       args.maxPendingConsumers,
-      (consumerKey) => {
+      (consumerKey, failed) => {
         this.failedConsumers.add(consumerKey)
-        args.onWorkerFailure(consumerKey)
+        args.onWorkerFailure(consumerKey, failed)
       }
     )
   }

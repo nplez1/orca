@@ -17,6 +17,7 @@ export class LazyWorkerThreadHost<TResponse> {
       onExit: (code: number) => void
       /** No active or queued requests; checked again at idle expiry. */
       isIdle: () => boolean
+      keepAlive?: () => boolean
       /** Called only for the first spawn failure. */
       onUnavailable: (error: unknown) => void
       /** Native calls can delay termination; wait for exit before spawning another worker (#24572). */
@@ -97,9 +98,14 @@ export class LazyWorkerThreadHost<TResponse> {
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null
       // Recheck idle state so requests arriving during the delay survive.
-      if (this.options.isIdle()) {
-        this.destroy()
+      if (!this.options.isIdle()) {
+        return
       }
+      if (this.options.keepAlive?.()) {
+        this.scheduleIdleTeardown()
+        return
+      }
+      this.destroy()
     }, this.options.idleTeardownMs)
     this.idleTimer.unref?.()
   }

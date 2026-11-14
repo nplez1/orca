@@ -85,6 +85,142 @@ describe('WorkspacePathIndexService recovery and admission', () => {
     service.dispose()
   })
 
+  // Why (issue #301): every root queries the same worker, but a failed query reset all of them, so
+  // one root's lost generation made every other workspace fall back to a main-thread rescan.
+  it('resets only the root whose query failed and leaves another root serving its generation', async () => {
+    const otherOwner: WorkspacePathSearchOwnerIdentity = {
+      executionHost: { provider: 'local', incarnationId: 'recovery-host' },
+      authorizedCanonicalRoot: '/workspace/recovery-other'
+    }
+    const builds: string[] = []
+    const build = vi.fn(
+      async (request: { owner: WorkspacePathSearchOwnerIdentity; generationId: string }) => {
+        builds.push(request.owner.authorizedCanonicalRoot)
+        return { generationId: request.generationId, retainedBytes: 48 }
+      }
+    )
+    let failQueryFor: string | null = null
+    const service = new WorkspacePathIndexService({
+      authorize: async (owner) => owner.authorizedCanonicalRoot,
+      build,
+      retryBackoffMilliseconds: 0,
+      query: async ({ identity: requestIdentity }) => {
+        if (failQueryFor === requestIdentity.owner.authorizedCanonicalRoot) {
+          failQueryFor = null
+          throw new Error('Workspace path catalog generation is unavailable')
+        }
+        return createCompleteWorkspacePathSearchResponse({
+          requestIdentity,
+          paths: ['src/target.ts'],
+          totalCount: 1,
+          generationId: requestIdentity.generationId ?? 'missing-generation'
+        })
+      }
+    })
+    const search = (
+      owner: WorkspacePathSearchOwnerIdentity,
+      consumerId: string,
+      sequence: number
+    ) =>
+      service.search({
+        identity: identity(owner, consumerId, sequence),
+        listingPolicyVersion: 'listing-v1',
+        foldVersion: 'fold-v1',
+        buildReservationBytes: 256,
+        correlationId: '123e4567-e89b-42d3-a456-426614174301'
+      })
+
+    await search(OWNER, 'failing-root', 1)
+    await settleBuild()
+    await expect(search(OWNER, 'failing-root', 2)).resolves.toMatchObject({ ready: true })
+    await search(otherOwner, 'healthy-root', 1)
+    await settleBuild()
+    await expect(search(otherOwner, 'healthy-root', 2)).resolves.toMatchObject({ ready: true })
+
+    failQueryFor = OWNER.authorizedCanonicalRoot
+    await expect(search(OWNER, 'failing-root', 3)).resolves.toMatchObject({
+      ready: false,
+      reason: 'failed'
+    })
+
+    await expect(search(otherOwner, 'healthy-root', 3)).resolves.toMatchObject({ ready: true })
+    expect(builds).toEqual([OWNER.authorizedCanonicalRoot, otherOwner.authorizedCanonicalRoot])
+
+    await expect(search(OWNER, 'failing-root', 4)).resolves.toMatchObject({
+      ready: false,
+      reason: 'building'
+    })
+    await settleBuild()
+    await expect(search(OWNER, 'failing-root', 5)).resolves.toMatchObject({ ready: true })
+    expect(builds).toEqual([
+      OWNER.authorizedCanonicalRoot,
+      otherOwner.authorizedCanonicalRoot,
+      OWNER.authorizedCanonicalRoot
+    ])
+    service.dispose()
+  })
+
+  // Why (issue #301): a query that loses a race with a newer generation must not drop that generation.
+  it('keeps a generation published while the failed query was still in flight', async () => {
+    const builds: string[] = []
+    let failStaleQuery = false
+    let publishNewerGeneration = async (): Promise<void> => {}
+    const service = new WorkspacePathIndexService({
+      authorize: async (owner) => owner.authorizedCanonicalRoot,
+      build: async (request) => {
+        builds.push(request.owner.authorizedCanonicalRoot)
+        return { generationId: request.generationId, retainedBytes: 48 }
+      },
+      retryBackoffMilliseconds: 0,
+      applyDelta: async (request) => ({
+        generationId: `${request.expectedGenerationId}:delta`,
+        retainedBytes: 64,
+        deltaPathCount: 1,
+        deltaBytes: 8,
+        compacted: false
+      }),
+      query: async ({ identity: requestIdentity }) => {
+        if (failStaleQuery) {
+          failStaleQuery = false
+          await publishNewerGeneration()
+          throw new Error('Workspace path catalog generation is unavailable')
+        }
+        return createCompleteWorkspacePathSearchResponse({
+          requestIdentity,
+          paths: ['src/target.ts'],
+          totalCount: 1,
+          generationId: requestIdentity.generationId ?? 'missing-generation'
+        })
+      }
+    })
+    publishNewerGeneration = async () => {
+      await service.applyDelta(
+        OWNER,
+        [{ type: 'add', path: 'src/new.ts', pathSet: 'included' }],
+        '123e4567-e89b-42d3-a456-426614174302'
+      )
+    }
+    const search = (sequence: number) =>
+      service.search({
+        identity: identity(OWNER, 'raced-root', sequence),
+        listingPolicyVersion: 'listing-v1',
+        foldVersion: 'fold-v1',
+        buildReservationBytes: 256,
+        correlationId: '123e4567-e89b-42d3-a456-426614174303'
+      })
+
+    await search(1)
+    await settleBuild()
+    await expect(search(2)).resolves.toMatchObject({ ready: true })
+
+    failStaleQuery = true
+    await expect(search(3)).resolves.toMatchObject({ ready: false, reason: 'failed' })
+
+    await expect(search(4)).resolves.toMatchObject({ ready: true })
+    expect(builds).toEqual([OWNER.authorizedCanonicalRoot])
+    service.dispose()
+  })
+
   it('backs off after a worker build failure and retries the same requested scope', async () => {
     // Only Date is faked: the retry backoff compares Date.now(), while settleBuild needs real timers.
     vi.useFakeTimers({ toFake: ['Date'] })
