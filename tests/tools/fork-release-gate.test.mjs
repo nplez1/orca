@@ -66,7 +66,8 @@ describe('the release dispatch is gated on test evidence', () => {
     // Every verdict that gates a publish is named in the claim, not just the suite it started with.
     const header = text.slice(0, text.indexOf('\njobs:'))
     expect(header).toContain('Nothing publishes without evidence')
-    for (const gate of ['unit-tests', 'typecheck', 'lint']) {
+    // Backticked, so the word appearing in prose does not satisfy the pin.
+    for (const gate of ['`unit-tests`', '`typecheck`', '`lint`']) {
       expect(header, gate).toContain(gate)
     }
   })
@@ -149,6 +150,27 @@ describe('the release dispatch is gated on the compiler and the lint verdict', (
   it('gives neither verdict job the release token', () => {
     for (const job of ['typecheck', 'lint']) {
       expect(RELEASE.jobs[job].permissions, job).toEqual({ contents: 'read' })
+    }
+  })
+
+  it('prepares both verdict jobs the way the other lanes prepare theirs', () => {
+    for (const job of ['typecheck', 'lint']) {
+      const install = RELEASE.jobs[job].steps.find(
+        (step) => step.uses === './.github/actions/install-node-dependencies'
+      )
+
+      expect(install?.with?.['native-runtime'], job).toBe('node')
+    }
+  })
+
+  it('judges the dispatched commit, never a ref of its own', () => {
+    // A `ref:` would let a verdict pass on one revision while a different one is published.
+    for (const [name, job] of Object.entries(RELEASE.jobs)) {
+      for (const step of job.steps ?? []) {
+        if (String(step.uses ?? '').startsWith('actions/checkout@')) {
+          expect(step.with?.ref, name).toBeUndefined()
+        }
+      }
     }
   })
 })

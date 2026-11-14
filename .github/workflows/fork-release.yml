@@ -16,7 +16,8 @@ name: Fork release
 # UI published to every auto-updating install with no test evidence at all, because the local release
 # gate's verdict lives in `.git/orca-gate/` on one machine, which CI cannot see. To release without
 # waiting for a full run there is no flag: fix the red, or classify it in
-# `local/nightly-linux-known-red.json` with evidence.
+# `local/nightly-linux-known-red.json` (the suite) or `local/lint-known-red.json` (lint) with evidence —
+# and a typecheck red has no allowlist, so the only fix is a clean `pnpm tc`.
 #
 # Why `typecheck` and `lint` are jobs here at all (#298): until 2026-11-14 the compiler's verdict at
 # publish time was whatever the dispatcher happened to run by hand. The 2026-11-08 sync is the case —
