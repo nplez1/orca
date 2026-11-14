@@ -3052,6 +3052,44 @@ so it asserted whatever the worker's locale produced. It passes `englishFallback
 the module's English source strings. That keeps the fix from depending on every other shared file's
 tidiness, and it is the half that has to change upstream for the class to be closed there.
 
+### `local(test)`: the shared worker resets the language detection between files
+
+Anchors: `config/scripts/test-runtime/environment/vitest-shared-worker-locale-reset.mjs` and its test
+(fork-owned, new); one added entry in the shared project's `setupFiles` in `config/vitest.config.ts`
+and one `__reset…ForTests` export each in `src/shared/ui-locale.ts` and
+`src/renderer/src/i18n/language-readiness.ts` (all three upstream-owned, marked `fork-comment-ok`).
+
+**The gap this closes.** Issue #421's class: a `bun-shared` worker's files share one module cache
+(`isolate: false`), and `vitest-shared-worker-file-reset.mjs` undoes mocks, timers, globals, process
+state and the modules a file _newly_ evaluated — not a value a module already held. `rendererDetection`
+in `src/shared/ui-locale.ts` and the cached `detectionPromise` plus store in
+`src/renderer/src/i18n/language-readiness.ts` are exactly that, so a file that detected a locale handed
+it to whatever ran next. #430 fixed the one leaker and the one victim; this makes the next one harmless.
+
+**Why not the i18next singleton too.** It is the other value of the same class, and it is what the
+2026-11-12 nightly actually tripped on. Resetting it centrally needs the instance, and neither route is
+free: importing `src/renderer/src/i18n/i18n.ts` from the reset inlines all ten locale catalogs (about
+15 MB of base64 per shared worker) through the `locale-catalog-test-assets` plugin, and reading it out
+of `__vitest_mocker__.evaluatedModules` does not work — in a worker that graph holds the spec file and
+the mocker's own modules, not the runner's module graph (measured: `size=1`, and `getModulesByFile`
+for any `src/` module returns `undefined`). The three node-env tests that switch it restore `en`
+themselves.
+
+**Evidence, both directions.** `config/scripts/test-runtime/environment/vitest-shared-worker-locale-reset.test.mjs`
+plants a Spanish detection and store in one shared file and asserts the next one starts clean. Removing
+both reset calls reds all three of its tests, removing either one reds the two that cover it — measured
+on 2026-11-14 with `VITEST_MAX_WORKERS=1`.
+
+Two things that fixture has to keep doing, both learned the hard way:
+
+- **Live under `.tmp/`, never under `node_modules/`.** A spec file inside `node_modules` is loaded as a
+  dependency in its own module instance, so the setup file's reset reaches a different copy of the store
+  and the assertion passes without proving anything. Same for a fixture outside the vite root.
+- **Set `VITEST_MAX_WORKERS=1` in the child env.** This box exports 16, and Vitest applies it after the
+  config's `maxWorkers`; two workers would give each file its own module cache.
+- **The reset runs in `afterEach` as well as `afterAll`** — per test, so a file's own tests cannot
+  inherit each other's detection, and after the file, for anything its hooks left behind.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream

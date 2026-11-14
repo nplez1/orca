@@ -160,7 +160,13 @@ const sharedProjects =
             isolate: false,
             setupFiles: [
               ...runtimeProject.test.setupFiles,
-              resolve('config/scripts/test-runtime/environment/vitest-shared-worker-file-reset.mjs')
+              resolve(
+                'config/scripts/test-runtime/environment/vitest-shared-worker-file-reset.mjs'
+              ),
+              // fork-comment-ok: the locale singletons it restores and why are in that file (#421).
+              resolve(
+                'config/scripts/test-runtime/environment/vitest-shared-worker-locale-reset.mjs'
+              )
             ]
           }
         }

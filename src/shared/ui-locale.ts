@@ -103,6 +103,11 @@ export function setRendererLanguageDetection(detection: UiLanguageDetection): vo
   rendererDetection = detection
 }
 
+/** A shared worker's next file starts with no detection, as a fresh worker does. */
+export function __resetRendererLanguageDetectionForTests(): void {
+  rendererDetection = null
+}
+
 export function getBrowserLanguageDetection(
   source: UiLanguageDetection['source'] = 'browser'
 ): UiLanguageDetection {
