@@ -3286,6 +3286,29 @@ leg appends into one release and electron-builder decides create-vs-append at up
 means every platform's update manifest exists, and each leg asserts its own (`latest-mac.yml`,
 `latest.yml`, `latest-linux.yml`).
 
+**The lane runs the compiler's and the lint gate's verdicts (2026-11-14, #298).** Two jobs sit beside
+`unit-plan`/`unit-tests` and every artifact leg names both in `needs`: `typecheck` (`pnpm tc` on the
+dispatched commit) and `lint` (`node local/gate-lint.mjs`, after the recorded sync base is fetched, with
+`ORCA_CODE_QUALITY_BASE: HEAD` for its diff-scoped steps). The trigger was the 2026-11-08 sync, where
+`PROVIDER_DISPLAY_NAMES` and `USAGE_PROVIDER_IDS` were short after a rate-limit provider union merged
+and `pnpm tc` was the only thing that noticed — a dispatch between two nightlies would have built and
+published from that tree.
+
+What made it a hole is narrower than "no lane runs it", which the issue's text implies and which is
+stale: `#399` put `pnpm tc` and the lint verdict on both the PR lane and the release line on 2026-11-12.
+The hole is that **nothing at dispatch time reads those verdicts.** `local/dispatch-release.mjs` checks
+the review manifest, a clean tree, `HEAD == origin/main` and the Actions fleet — not whether `Fork base
+gates` came back green for the commit about to be published. That lane was red for eight consecutive
+pushes on 2026-11-12, with its `Typecheck` step skipped in all eight, so "main's gates ran" is not
+evidence a dispatch may lean on.
+
+Why the whole lint verdict and not a named subset: the lane already blocks on the unit suite, whose
+allowlisted reds are more environment-bound than the lint gate's, so the escape hatch
+(`local/lint-known-red.json`, committed to the dispatched tree) is the same mechanism in the same
+shape. The known cost is that a red the base carries — the moving fork-comment total pin, most often —
+now blocks a publish until it is fixed or recorded, which is what `#399` decided reds require anyway.
+Both jobs take `contents: read`, which is what `unit-plan` does.
+
 The Linux leg (`2026-10-21`) is x86_64 only and packages AppImage + deb + rpm. Its packaging needs
 are the ones upstream's `release-cut.yml` linux matrix entry established: `python3-gi`,
 `gir1.2-atspi-2.0`, `at-spi2-core`, `xclip`, `xdotool` and `rpm` from apt (`build:release` verifies

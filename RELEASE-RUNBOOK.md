@@ -111,9 +111,20 @@ something to do silently.
 
 Since 2026-10-29 the dispatch carries the same coverage itself: `fork-release.yml` runs the unit suite
 on the dispatched commit (`unit-plan` → `unit-tests`, the same reusable workflow, shard plan and fork
-shard verdict as the nightly) and every artifact leg waits for it. So a dispatch can no longer publish
-with no test evidence, and there is no flag to skip it. If a shard is red there, the fix is the one
-above — fix it, or classify it in `local/nightly-linux-known-red.json` with evidence — not a retry.
+shard verdict as the nightly), `typecheck` runs `pnpm tc` on it, `lint` runs
+`node local/gate-lint.mjs` against the tree's own `local/lint-known-red.json`, and every artifact leg
+waits for all three. So a dispatch can no longer publish with no test evidence, and there is no flag to
+skip it. If one of them is red there, the fix is the one above — fix it, or classify it in
+`local/nightly-linux-known-red.json` (suite) or `local/lint-known-red.json` (lint) with evidence — not
+a retry.
+
+For `typecheck` and `lint` the release lane is a backstop, not a wider net: it runs the same TypeScript
+projects, the same lint steps and the same allowlist (`local/lint-known-red.json`) on `ubuntu-latest`, so
+a green there restates a green here rather than adding coverage. What it adds (#298) is that a dispatch
+cannot outrun those verdicts. Nothing checks `Fork base gates` was green for the commit being published
+— `local/dispatch-release.mjs` reads the review, the tree, the ref and the Actions fleet — so before this
+change the compiler's verdict at publish time was whatever the dispatcher happened to have run by hand.
+A typecheck red has no allowlist: the fix is a clean `pnpm tc`, the same as this step's.
 
 ## Step 1.6 — the review gate, before the dispatch
 
