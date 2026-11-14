@@ -41,6 +41,8 @@ export class WorkspacePathIndexWorkerClient {
     log?: (message: string) => void
     onInstrumentation?: (event: WorkspacePathSearchInstrumentationEvent) => void
     spillDirectory?: string
+    /** True holds the worker past an idle expiry, so its published catalogs survive. */
+    keepAlive?: () => boolean
   }) {
     this.onInstrumentation = options.onInstrumentation
     this.spillDirectory = options.spillDirectory
@@ -48,7 +50,8 @@ export class WorkspacePathIndexWorkerClient {
     this.requests = createWorkspacePathIndexWorkerRequestQueue({
       workerFactory: options.workerFactory,
       log,
-      maxConsecutiveDeaths: WORKSPACE_PATH_INDEX_WORKER_MAX_CONSECUTIVE_DEATHS
+      maxConsecutiveDeaths: WORKSPACE_PATH_INDEX_WORKER_MAX_CONSECUTIVE_DEATHS,
+      keepAlive: options.keepAlive
     })
   }
 

@@ -24,7 +24,7 @@ export class WorkspacePathIndexQueryScheduler<TRequest, TResult> {
     ) => Promise<TResult>,
     private readonly sendCancellation: (consumerKey: string) => void,
     private readonly maxPendingConsumers = 64,
-    private readonly onFailure?: (consumerKey: string) => void
+    private readonly onFailure?: (consumerKey: string, request: TRequest) => void
   ) {}
 
   get pendingConsumerCount(): number {
@@ -104,7 +104,7 @@ export class WorkspacePathIndexQueryScheduler<TRequest, TResult> {
       .then((result) => query.resolve(query.cancelled ? null : result))
       .catch(() => {
         if (!query.cancelled && !this.disposed) {
-          this.onFailure?.(consumerKey)
+          this.onFailure?.(consumerKey, query.request)
         }
         query.resolve(null)
       })

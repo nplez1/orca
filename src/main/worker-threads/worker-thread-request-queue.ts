@@ -14,6 +14,7 @@ export type WorkerThreadRequestQueueOptions<TRequest> = {
   queueCap?: { maxQueuedCalls: number; describeFull: (request: TRequest) => string }
   /** Progress messages restart the active call deadline without settling it. */
   isProgress?: (message: { id: number }) => boolean
+  keepAlive?: () => boolean
   transferList?: (request: TRequest) => readonly TransferListItem[]
   /** The client's own error subclass, so callers can tell "no worker" from a fault. */
   createUnavailableError: (message: string) => Error
@@ -62,6 +63,7 @@ export class WorkerThreadRequestQueue<
       onError: (error) => this.onWorkerFault(error),
       onExit: (code) => this.onWorkerExit(code),
       isIdle: () => !this.active && this.queue.length === 0 && this.concurrentCalls.size === 0,
+      keepAlive: options.keepAlive,
       onUnavailable: options.onUnavailable,
       awaitRetirement: options.awaitRetirement
     })

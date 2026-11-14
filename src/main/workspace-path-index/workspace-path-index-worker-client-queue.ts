@@ -17,10 +17,12 @@ export function createWorkspacePathIndexWorkerRequestQueue(args: {
   workerFactory: WorkerThreadFactory
   log: (message: string) => void
   maxConsecutiveDeaths: number
+  keepAlive?: () => boolean
 }): WorkspacePathIndexWorkerRequestQueue {
   return new WorkerThreadRequestQueue({
     factory: args.workerFactory,
     idleTeardownMs: 5 * 60_000,
+    keepAlive: args.keepAlive,
     maxConsecutiveDeaths: args.maxConsecutiveDeaths,
     queueCap: {
       maxQueuedCalls: 128,

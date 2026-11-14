@@ -9,6 +9,7 @@ import {
 } from './workspace-path-index-lease'
 import { WorkspacePathIndexRetention } from './workspace-path-index-retention'
 import { WorkspacePathIndexSearch } from './workspace-path-index-search'
+import type { WorkspacePathIndexFailedQuery } from './workspace-path-index-search'
 import type { WorkspacePathIndexServiceOptions } from './workspace-path-index-service-options'
 
 /** Shared state, admission wiring, and maintenance instrumentation for the path-index service. */
@@ -88,14 +89,18 @@ export abstract class WorkspacePathIndexServiceState {
       query: options.query,
       cancelQuery: options.cancelQuery,
       maxPendingConsumers: options.maxPendingConsumers ?? 64,
-      onWorkerFailure: (consumerKey) => this.onWorkerFailure(consumerKey)
+      onWorkerFailure: (consumerKey, entryKey) => this.onWorkerFailure(consumerKey, entryKey)
     })
   }
 
   protected abstract scheduleValidation(entry: WorkspacePathIndexEntry): void
   protected abstract scheduleReconciliationRetry(entry: WorkspacePathIndexEntry): void
   protected abstract drainPendingMutations(entry: WorkspacePathIndexEntry): Promise<void>
-  protected abstract onWorkerFailure(consumerKey: string): void
+  /** Only the failing root loses its generation; a global reset made every workspace rescan (#301). */
+  protected abstract onWorkerFailure(
+    consumerKey: string,
+    failed: WorkspacePathIndexFailedQuery
+  ): void
 
   protected validationIntervalFor(owner: WorkspacePathSearchOwnerIdentity): number {
     return Math.max(

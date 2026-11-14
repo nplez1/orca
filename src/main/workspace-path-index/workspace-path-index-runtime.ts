@@ -69,7 +69,10 @@ export function createLocalWorkspacePathIndexService(
     worker ??= new WorkspacePathIndexWorkerClient({
       workerFactory: createDefaultWorkspacePathIndexWorker,
       onInstrumentation,
-      spillDirectory
+      spillDirectory,
+      // Why (issue #301): the worker is the only holder of a published catalog, so an idle teardown
+      // underneath a live index drops it and every later search rescans from the main thread.
+      keepAlive: () => localService?.hasResidentGeneration() ?? false
     })
     return worker
   }

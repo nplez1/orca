@@ -63,6 +63,18 @@ conflict adjacency, and because each is a trap a well-meaning future edit can fa
   workspace, so ripgrep would then drop the workspace's _own_ root ignore files — which also leaves the
   index classifying a directory created later by the enclosing checkout's rules until the next full
   build, the behaviour this fork had before the fix.
+- **The path-index worker is held by a `keepAlive` predicate instead of being torn down under a live
+  index** (`src/main/worker-threads/worker-thread-request-queue.ts`,
+  `src/main/worker-threads/lazy-worker-thread-host.ts`, wired from
+  `src/main/workspace-path-index/workspace-path-index-runtime.ts`; #301). The worker is the only
+  holder of every published catalog, so an idle teardown underneath the index drops it, and the next
+  search rebuilds from the main thread. An idle expiry that finds the queue idle but the predicate
+  true re-arms its timer rather than destroying the worker, because a hold can also clear with
+  nothing dispatched — a failure reset, or a build that ends with no generation — and holding until a
+  request arrives would leak the thread in exactly those cases. The predicate reads
+  `hasResidentGeneration()`, not `hasIndex()`: the latter is also true for entries that are failed or
+  still building and own no catalog. `keepAlive` is optional, so the other five queue users keep
+  upstream's teardown.
 
 ## Patches
 

@@ -12,6 +12,7 @@ import type {
 import { withWorkspacePathSearchFreshness } from './workspace-path-index-freshness'
 import { workspacePathIndexSameOwner } from './workspace-path-index-lease'
 import { WorkspacePathIndexServiceState } from './workspace-path-index-service-state'
+import type { WorkspacePathIndexFailedQuery } from './workspace-path-index-search'
 import type { WorkspacePathIndexSearchResult } from './workspace-path-index-service-options'
 
 /** Lease acquisition and search entry points for the path-index service. */
@@ -166,6 +167,13 @@ export abstract class WorkspacePathIndexServiceSearch extends WorkspacePathIndex
     )
   }
 
+  /** True while the worker holds a published catalog; an idle teardown would drop it (#301). */
+  hasResidentGeneration(): boolean {
+    return [...this.entries.values()].some(
+      (entry) => !entry.disposed && entry.generationId !== null
+    )
+  }
+
   cancelLocalConsumer(consumerId: string): void {
     this.searcher.cancelLocalConsumer(consumerId)
   }
@@ -175,24 +183,30 @@ export abstract class WorkspacePathIndexServiceSearch extends WorkspacePathIndex
     this.options.deleteCheckpoint?.(owner)
   }
 
-  protected onWorkerFailure(_consumerKey: string): void {
-    const retryAfter = Date.now() + this.retryBackoffMilliseconds
-    for (const entry of this.entries.values()) {
-      this.searcher.cancelEntry(entry.key)
-      this.clearValidationTimers(entry)
-      entry.continuityEpoch += 1
-      entry.freshness = 'failed'
-      entry.needsRebuild = true
-      entry.activeReconciliations = 0
-      entry.buildGeneration += 1
-      entry.buildController?.abort()
-      entry.generationId = null
-      entry.publishedScope = null
-      entry.retainedBytes = 0
-      entry.servingLastKnown = false
-      entry.retryAfterAt = retryAfter
-      entry.lastFailureReason = 'failed'
-      this.admission.releaseRoot(entry.key)
+  protected onWorkerFailure(_consumerKey: string, failed: WorkspacePathIndexFailedQuery): void {
+    const entry = this.entries.get(failed.key)
+    if (!entry || entry.disposed) {
+      return
     }
+    // Why: a query that lost a race with a newer generation must not drop the generation that replaced it.
+    if (failed.identity.generationId !== entry.generationId) {
+      return
+    }
+    const retryAfter = Date.now() + this.retryBackoffMilliseconds
+    this.searcher.cancelEntry(entry.key)
+    this.clearValidationTimers(entry)
+    entry.continuityEpoch += 1
+    entry.freshness = 'failed'
+    entry.needsRebuild = true
+    entry.activeReconciliations = 0
+    entry.buildGeneration += 1
+    entry.buildController?.abort()
+    entry.generationId = null
+    entry.publishedScope = null
+    entry.retainedBytes = 0
+    entry.servingLastKnown = false
+    entry.retryAfterAt = retryAfter
+    entry.lastFailureReason = 'failed'
+    this.admission.releaseRoot(entry.key)
   }
 }

@@ -63,10 +63,15 @@ const MAX_CONSECUTIVE_DEATHS = 3
 
 function makeQueue(
   workers: FakeWorker[],
-  options: { awaitRetirement?: boolean; makeWorker?: () => FakeWorker } = {}
+  options: {
+    awaitRetirement?: boolean
+    makeWorker?: () => FakeWorker
+    keepAlive?: () => boolean
+  } = {}
 ): WorkerThreadRequestQueue<Request, Response> {
   return new WorkerThreadRequestQueue<Request, Response>({
     awaitRetirement: options.awaitRetirement,
+    keepAlive: options.keepAlive,
     factory: () => {
       const worker = options.makeWorker?.() ?? new FakeWorker()
       workers.push(worker)
@@ -207,6 +212,26 @@ describe('WorkerThreadRequestQueue', () => {
     }
     workers[0]?.emit('message', { id: buildRequest.id, label: buildRequest.label })
     await expect(build).resolves.toMatchObject({ label: 'build' })
+    queue.dispose()
+  })
+
+  it('holds a keepAlive worker past the idle window and tears it down once the hold clears', async () => {
+    vi.useFakeTimers()
+    const workers: FakeWorker[] = []
+    let keepAlive = true
+    const queue = makeQueue(workers, { keepAlive: () => keepAlive })
+
+    const call = send(queue, 'search')
+    workers[0].respond()
+    await expect(call).resolves.toMatchObject({ label: 'search' })
+
+    await vi.advanceTimersByTimeAsync(IDLE_TEARDOWN_MS)
+    expect(workers[0].terminated).toBe(false)
+
+    keepAlive = false
+    await vi.advanceTimersByTimeAsync(IDLE_TEARDOWN_MS)
+    expect(workers[0].terminated).toBe(true)
+    expect(workers).toHaveLength(1)
     queue.dispose()
   })
 
