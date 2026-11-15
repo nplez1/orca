@@ -10,6 +10,7 @@ import { isPseudoLocalizationLocale, pseudoLocalizeString } from './pseudo-local
 import { DEFAULT_UI_LOCALE } from './ui-locale'
 import type { PluginLanguagePackRegistration } from './plugins/artifacts/plugin-language-pack-artifact'
 import { replacePluginLanguagePackResources } from './plugins/plugin-language-pack-i18n-resources'
+import { registerOrcaI18nInstance } from './i18n-instance-registry'
 
 export type OrcaI18n = {
   i18n: I18nInstance
@@ -32,6 +33,7 @@ export function createOrcaI18n(options: {
   initOptions?: InitOptions
 }): OrcaI18n {
   const i18n = i18next.createInstance()
+  registerOrcaI18nInstance(i18n)
   let pluginLanguagePacks: readonly PluginLanguagePackRegistration[] = []
 
   const backend: BackendModule = {

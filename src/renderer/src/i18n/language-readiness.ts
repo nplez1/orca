@@ -66,3 +66,10 @@ export function initializeLanguageDetection(): Promise<UiLanguageDetection> {
   })()
   return detectionPromise
 }
+
+// fork-comment-ok: the shared-worker locale reset calls this between files; see that file for why.
+/** Drops the cached detection and the readiness state, so the next file detects for itself. */
+export function __resetLanguageReadinessForTests(): void {
+  detectionPromise = undefined
+  useLanguageReadiness.setState(useLanguageReadiness.getInitialState(), true)
+}

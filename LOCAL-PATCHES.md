@@ -3052,6 +3052,73 @@ so it asserted whatever the worker's locale produced. It passes `englishFallback
 the module's English source strings. That keeps the fix from depending on every other shared file's
 tidiness, and it is the half that has to change upstream for the class to be closed there.
 
+### `local(test)`: the shared worker resets the locale singletons between files
+
+Anchors: `config/scripts/test-runtime/environment/vitest-shared-worker-locale-reset.mjs` and its test
+(fork-owned, new); one added entry in the shared project's `setupFiles` in `config/vitest.config.ts`
+(upstream-owned, `fork-comment-ok`); `src/shared/i18n-instance-registry.ts` (fork-added); one
+`registerOrcaI18nInstance` call in `src/shared/orca-i18n-instance.ts` (upstream-owned, code only, no
+fork comment) and one `__reset…ForTests` export each in `src/shared/ui-locale.ts` and
+`src/renderer/src/i18n/language-readiness.ts` (upstream-owned, `fork-comment-ok`).
+
+**The gap this closes.** A `bun-shared` worker's files share one module cache (`isolate: false`), and
+`vitest-shared-worker-file-reset.mjs` undoes mocks, timers, globals, process state and the modules a
+file _newly_ evaluated — not a value a module already held. Four of those are locale state:
+`rendererDetection` in `src/shared/ui-locale.ts`, the `detectionPromise` and readiness store in
+`src/renderer/src/i18n/language-readiness.ts`, and the i18next singleton's language. The reset puts all
+four back on what a fresh worker holds: detection unset, cached detection and store dropped, and every
+registered instance on `en`.
+
+**The i18next half reads its instances from a registry, not from an import.** Importing either i18n
+module from a setup file is wrong in both directions: `src/renderer/src/i18n/i18n.ts` inlines every
+locale catalog (about 15 MB of base64 per shared worker) through the `locale-catalog-test-assets`
+plugin, `src/main/i18n/main-i18n.ts` reaches `electron`, and importing **i18next itself** leaves a
+pending timer that the file reset answers with `resetAllModules` — measured, a shared worker's second
+file then re-imports the whole graph. `src/shared/i18n-instance-registry.ts` is a type-only import of
+`i18next` plus an array of `WeakRef`s, so a setup file can read it for nothing. `createOrcaI18n`
+registers into it; production builds two instances at module load, so it is two entries there. Weak
+because a file that makes the i18n module evaluate again — a mock, or a leaked global — registers
+another instance, and this module was loaded by the setup file, so nothing else clears it.
+
+**What it waits for, and what it cannot.** The reset awaits `vi.dynamicImportSettled()` first: a
+catalog a file started loading in the background would otherwise arrive after the language was put back
+and land on the restored one. A _fetched_ catalog (the renderer's route, `fetch` of a base64 data URL)
+has no such hook, so a file that leaves a catalog fetch in flight can still settle it late. And
+`changeLanguage` restores the language, not everything a file may have changed: a rewrite of the `en`
+bundle itself, plugin language packs the file registered, and main's `languageGeneration` counter all
+survive it. None of those is reachable from a shared test file today; they are listed so the next
+reader does not read this as "locale is fully reset".
+
+**Preventive, not a fix for a live red.** No shared file writes a detection or the store today: the
+only writer is `publishLanguageDetection`, whose tests are `@vitest-environment happy-dom` and so are
+kept out of the shared project by `ISOLATION_REQUIRING_API`. The language red of 2026-11-12 was
+`fork-catalog-overlay.test.ts` and was fixed at the source in #430; three node-env shared files now
+restore `en` themselves. This change is what makes the fourth one harmless instead of a repeat.
+
+**Evidence, both directions.** `vitest-shared-worker-locale-reset.test.mjs` has three unit tests (the
+detection, the cached detection plus store, and a real `i18n.ts` instance switched to `es`) and one
+spawned `isolate: false` fixture: a file plants a Spanish detection and a Spanish i18n instance, and the
+next two files assert they start clean. Removing the detection reset reds two of the four, removing the
+readiness reset reds one, removing the language switch reds two, and removing the `afterAll` that
+registers the hook reds the fixture — measured on 2026-11-14.
+
+Three things that fixture has to keep doing, all learned the hard way:
+
+- **Live under `.tmp/`, never under `node_modules/`.** A spec file inside `node_modules` is loaded as a
+  dependency in its own module instance, so a setup file's reset reaches a different copy of the state
+  and the assertions pass without proving anything. The same is true of a fixture outside the vite root.
+- **Set `VITEST_MAX_WORKERS=1` in the child env.** This box exports 16, and Vitest applies it after the
+  config's `maxWorkers`; two workers would give each file its own module cache.
+- **Witness with the registry instance, not with a property on the store.** The instance carries the
+  planting file's mark, which is what proves the assertion is reading that file's module instance rather
+  than a re-evaluated one. A mark on the readiness store is not stable across the fixture's files, and
+  the fixture never creates a real i18next instance: it stands one in, because the real one leaves the
+  timer described above and then a module reset, not the hook, would be what cleared the language.
+- **Read the fixture's two halves for what they are.** Its language assertion is the strong one: remove
+  the switch and it reds. Its detection assertion compares the detection to the browser fallback, which
+  on a host whose own locale is Spanish would match even without the reset — the unit test above pins
+  `de-DE` precisely so that half does not depend on the host.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream
