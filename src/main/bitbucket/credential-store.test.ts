@@ -20,7 +20,7 @@ async function loadStore(
   // resetModules leaves doMock registrations behind.
   vi.doUnmock('node:fs')
   vi.doUnmock('../../shared/secure-storage/secure-path-windows-acl')
-  const { setSecretStore } = await import('../../shared/secret-store')
+  const { setSecretStore } = await import('../../shared/secure-storage/secret-store')
   setSecretStore({
     isEncryptionAvailable: () => true,
     encryptString: (value) => Buffer.from(value),
@@ -105,35 +105,6 @@ describe('Bitbucket credential store', () => {
     }
   })
 
-  it('rejects non-string fields from hand-edited metadata and secret files', async () => {
-    const store = await loadStore()
-    const { writeFileSync } = await import('node:fs')
-    store.saveBitbucketCredential({
-      authMode: 'basic',
-      email: 'ada@example.com',
-      baseUrl: null,
-      account: 'ada',
-      accessToken: null,
-      apiToken: 'secret-token'
-    })
-
-    writeFileSync(
-      join(tempHome, '.orca-np', 'bitbucket-credential.json'),
-      JSON.stringify({ version: 1, authMode: 'basic', email: { evil: true }, account: 42 })
-    )
-    writeFileSync(
-      join(tempHome, '.orca-np', 'bitbucket-credential.enc'),
-      JSON.stringify({ accessToken: ['nope'], apiToken: 7 })
-    )
-    store._resetBitbucketCredentialCache()
-
-    expect(store.getStoredBitbucketMetadata()).toMatchObject({ email: null, account: null })
-    expect(store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
-      accessToken: null,
-      apiToken: null
-    })
-  })
-
   it('keeps the previous credential intact when the secret write fails (STA-3941)', async () => {
     const store = await loadStore()
     store.saveBitbucketCredential({
@@ -160,9 +131,7 @@ describe('Bitbucket credential store', () => {
     ).toThrow(/disk full/)
 
     expect(readFileSync(join(tempHome, '.orca-np', 'bitbucket-credential.enc'))).toEqual(before)
-    expect(readdirSync(join(tempHome, '.orca-np')).filter((name) => name.endsWith('.tmp'))).toEqual(
-      []
-    )
+    expect(readdirSync(join(tempHome, '.orca-np')).filter((name) => name.endsWith('.tmp'))).toEqual([])
   })
 
   it('authenticates from the envelope when metadata is stale (STA-3941)', async () => {

@@ -17,7 +17,7 @@ import {
   writeEncryptedCredential
 } from '../credentials/integration-credential-file'
 import { readCredentialFileProtection } from '../credentials/credential-file-protection'
-import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
+import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 
 /**
  * The user's configured Jenkins servers, on disk as non-secret profiles

@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import type { PRCheckDetail } from '../../shared/github/check-types'
+import type { PRCheckDetail } from '../../shared/github/checks/check-types'
 import type { JenkinsSaveServerArgs } from '../../shared/jenkins-servers'
 import { asRecord } from '../../shared/jenkins-payload'
 import { getJenkinsBuildDetails } from '../jenkins/jenkins-build-details'

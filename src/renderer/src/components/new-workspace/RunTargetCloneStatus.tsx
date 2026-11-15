@@ -2,7 +2,7 @@ import React from 'react'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
+import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
 import type { RunTargetAutoClone } from './use-run-target-auto-clone'
 
 /**

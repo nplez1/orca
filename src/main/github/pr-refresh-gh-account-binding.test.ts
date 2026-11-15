@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GitHubPRRefreshCandidate } from '../../shared/github/pull-request-refresh-types'
-import { hostedReviewOptionArgs, refreshKey } from './pr-refresh-candidate-policy'
+import type { GitHubPRRefreshCandidate } from '../../shared/github/pull-requests/refresh/pull-request-refresh-types'
+import { hostedReviewOptionArgs, refreshKey } from './pull-requests/refresh/pr-refresh-candidate-policy'
 
 const { coordinatorMocks, moduleMocks } = await vi.hoisted(async () => {
-  const moduleMocks = await import('./pr-refresh-coordinator-test-mocks')
+  const moduleMocks = await import('./pull-requests/refresh/pr-refresh-coordinator-test-mocks')
   return { coordinatorMocks: moduleMocks.createPRRefreshCoordinatorMocks(), moduleMocks }
 })
 
-vi.mock('./pr-refresh-renderer-port', () => moduleMocks.rendererPortModuleMock(coordinatorMocks))
+vi.mock('./pull-requests/refresh/pr-refresh-renderer-port', () => moduleMocks.rendererPortModuleMock(coordinatorMocks))
 vi.mock('./client', () => moduleMocks.clientModuleMock(coordinatorMocks))
-vi.mock('./github-api-repository', () =>
+vi.mock('./repositories/github-api-repository', () =>
   moduleMocks.githubApiRepositoryModuleMock(coordinatorMocks)
 )
-vi.mock('./rate-limit', () => moduleMocks.rateLimitModuleMock(coordinatorMocks))
+vi.mock('./api/rate-limit', () => moduleMocks.rateLimitModuleMock(coordinatorMocks))
 
-import { makeCandidate, makePR } from './pr-refresh-coordinator-test-harness'
+import { makeCandidate, makePR } from './pull-requests/refresh/pr-refresh-coordinator-test-harness'
 
 const { getPRForBranchOutcomeMock } = coordinatorMocks
 const bound = { host: 'github.com', user: 'Alice' }
@@ -40,7 +40,7 @@ describe('background PR refresh account binding', () => {
 
   it('refreshes a bound repo as its pinned account', async () => {
     const candidate = makeCandidate({ localGitOptions: { ghAccount: bound } })
-    const { enqueuePRRefresh } = await import('./pr-refresh-coordinator')
+    const { enqueuePRRefresh } = await import('./pull-requests/refresh/pr-refresh-coordinator')
 
     enqueuePRRefresh(candidate, 'active', 80, 1)
     await vi.advanceTimersByTimeAsync(0)
@@ -56,7 +56,7 @@ describe('background PR refresh account binding', () => {
     const candidate = makeCandidate({
       localGitOptions: { wslDistro: 'Ubuntu', ghAccount: bound }
     })
-    const { enqueuePRRefresh } = await import('./pr-refresh-coordinator')
+    const { enqueuePRRefresh } = await import('./pull-requests/refresh/pr-refresh-coordinator')
 
     enqueuePRRefresh(candidate, 'active', 80, 1)
     await vi.advanceTimersByTimeAsync(0)
@@ -69,7 +69,7 @@ describe('background PR refresh account binding', () => {
   })
 
   it('leaves an unbound repo on the ambient login', async () => {
-    const { enqueuePRRefresh } = await import('./pr-refresh-coordinator')
+    const { enqueuePRRefresh } = await import('./pull-requests/refresh/pr-refresh-coordinator')
 
     enqueuePRRefresh(makeCandidate(), 'active', 80, 1)
     await vi.advanceTimersByTimeAsync(0)
@@ -81,7 +81,7 @@ describe('background PR refresh account binding', () => {
 
   it('re-polls a visible worktree as the new account after a rebind', async () => {
     const rebound = { host: 'github.com', user: 'Bob' }
-    const { reportVisiblePRRefreshCandidates } = await import('./pr-refresh-coordinator')
+    const { reportVisiblePRRefreshCandidates } = await import('./pull-requests/refresh/pr-refresh-coordinator')
 
     reportVisiblePRRefreshCandidates(
       [makeCandidate({ localGitOptions: { ghAccount: bound }, isSelected: true })],

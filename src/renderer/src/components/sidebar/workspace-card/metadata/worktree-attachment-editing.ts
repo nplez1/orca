@@ -1,11 +1,11 @@
 import type { HostedReviewProvider } from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type { WorkspaceAttachmentMutation } from '../../../../../../shared/workspace-attachments/workspace-attachment-mutation'
 import { translate } from '@/i18n/i18n'
-import type { Repo } from '../../../../../../shared/repo-types'
 import {
   gitRemoteIdentityKeys,
   normalizeGitRemoteUrl
 } from '../../../../../../shared/git/remotes/git-remote-identity'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { WorkspaceAttachment, Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
 import {
@@ -16,7 +16,7 @@ import {
   getWorkspaceAttachmentKey,
   getWorkspaceAttachmentUrlScope
 } from '../../../../../../shared/workspace-attachments/workspace-attachment-normalization'
-import { parseGitHubIssueOrPRLink } from '../../../../../../shared/github/links'
+import { parseGitHubIssueOrPRLink } from '../../../../../../shared/github/repositories/links'
 import { parseGitLabIssueOrMRLink } from '../../../../../../shared/new-workspace/gitlab-links'
 import { parseLinearIssueInput } from '../../../../../../shared/linear/links'
 import { parseJiraIssueUrl } from '../../../../../../shared/jira/jira-issue-url'

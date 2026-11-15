@@ -15,7 +15,7 @@ import type { RuntimeFileOperationArgs } from './files/runtime-file-client-types
 import type { RuntimeClientTarget } from './runtime-rpc-client'
 import { callRuntimeRpc, RuntimeRpcCallError } from './runtime-rpc-client'
 import { readRuntimeWorkspacePathSearchCapability } from './runtime-workspace-path-search-capability'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/identifiers/non-secure-context-uuid'
 import { toRuntimeWorktreeSelector } from './rpc/targets/runtime-worktree-selector'
 import { searchLegacyQuickOpenInventory } from './files/search/runtime-legacy-quick-open-inventory'
 

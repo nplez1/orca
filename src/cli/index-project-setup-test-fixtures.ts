@@ -1,5 +1,5 @@
-import { PROJECT_HOST_SETUP_HOST_TARGET_RUNTIME_CAPABILITY } from '../shared/worktree-runtime-capabilities'
-import { okFixture } from './test-fixtures'
+import { PROJECT_HOST_SETUP_HOST_TARGET_RUNTIME_CAPABILITY } from '../shared/remote-runtime/protocol/worktree-runtime-capabilities'
+import { okFixture } from './runtime/fixtures/runtime-rpc-fixtures'
 
 export const ORCA_PROJECT = {
   id: 'github:stablyai/orca',

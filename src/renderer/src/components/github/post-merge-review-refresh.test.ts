@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store/types'
-import type { Repo } from '../../../../shared/repo-types'
-import { prCacheKey } from '../../store/github/cache/cache-identity'
+import type { Repo } from '../../../../shared/repository/repo-types'
+import { getGitHubPRCacheKey } from '../../../../shared/github/cache/github-cache-key'
 import { getHostedReviewCacheKey } from '../../store/slices/hosted-review/hosted-review-cache-identity'
 import {
   createTestStore,
@@ -157,7 +157,7 @@ describe('post-merge review refresh', () => {
   }
 
   function keyFor(branch: string): string {
-    return prCacheKey(repo.path, repo.id, branch, null, null, null, true)
+    return getGitHubPRCacheKey(repo.path, repo.id, branch, null, null, null, true)
   }
 
   type FetchOptions = NonNullable<Parameters<AppState['fetchPRForBranch']>[2]>

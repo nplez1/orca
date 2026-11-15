@@ -6,7 +6,7 @@ import { defineMethod, defineStreamingMethod, type RpcContext } from '../../../c
 import { JIRA_ATTACHMENT_IMAGE_METHODS } from './jira-attachment-image'
 import { JIRA_BOARD_METHODS } from '../../jira-board-methods'
 import { JIRA_PAGE_METHODS } from './jira-page-methods'
-import { JiraFavouriteFilterParams } from '../../../../../../shared/rpc-contract/jira-favourite-filter-params'
+import { JiraFavouriteFilterParams } from '../../../../../../shared/rpc-contract/jira/jira-favourite-filter-params'
 import {
   AssignableUsers,
   CancelGenerateIssueSummary,
@@ -24,7 +24,7 @@ import {
   SelectSite,
   SiteSelection,
   UserSearch
-} from '../../../../../../shared/rpc-contract/jira-params'
+} from '../../../../../../shared/rpc-contract/jira/jira-params'
 
 /** Emits a Jira result over RPC, normalizing it to the shape clients decode. */
 function emitJiraPayload(value: unknown, emit: (result: unknown) => void): void {

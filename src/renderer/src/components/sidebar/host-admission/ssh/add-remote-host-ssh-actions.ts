@@ -16,7 +16,7 @@ import {
   type SshTarget,
   type SshTargetAddResult,
   type SshTargetCreateInput
-} from '../../../../../../shared/ssh-types'
+} from '../../../../../../shared/remote-runtime/ssh/ssh-types'
 
 import { findDuplicateSshTargetAlias } from './ssh-target-duplicate'
 

@@ -6,7 +6,7 @@
  * past its line budget and hid the shape of the recovery next to 200 lines of teardown.
  */
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import type { WorktreeOperationGenerationGuard } from '@/lib/workspace/ownership/worktree-operation-generation'
 import {

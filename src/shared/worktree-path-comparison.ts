@@ -9,7 +9,7 @@
  */
 import { posix, win32 } from 'node:path'
 import { isWindowsAbsolutePathLike } from './cross-platform-path'
-import { foldWslUncPathCaseInsensitiveParts } from './wsl-paths'
+import { foldWslUncPathCaseInsensitiveParts } from './file-access/wsl-paths'
 
 /** Path syntax determines case folding: preserve POSIX and WSL ext4 tails even on Windows to avoid merging checkouts. */
 export function canonicalWorktreePath(pathValue: string, platform = process.platform): string {

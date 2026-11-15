@@ -1,4 +1,4 @@
-import type { RuntimeTerminalWaitBlockedReason } from './runtime-terminal-contracts'
+import type { RuntimeTerminalWaitBlockedReason } from './terminal/runtime/runtime-terminal-contracts'
 
 /** A dialog the pane's screen is holding, as the blocked-text layer read it. */
 export type ScreenPromptObservation = {

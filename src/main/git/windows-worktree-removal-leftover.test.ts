@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LeftoverCheckoutFolderError } from '../../shared/worktree/removal'
+import { LeftoverCheckoutFolderError } from '../../shared/worktree/removal/removal'
 
 const removeHostCheckout = vi.hoisted(() => vi.fn())
 const listWorktreesStrict = vi.hoisted(() => vi.fn())

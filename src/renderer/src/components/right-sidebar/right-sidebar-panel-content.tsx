@@ -1,19 +1,24 @@
-import { useAppStore } from '@/store'
+import { useAppStore } from '@/store/index'
 import { Suspense } from 'react'
-import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
+import { lazyWithRetry as lazy } from '@/app-shell/startup/lazy-with-retry'
 import { restoreAgentTabFocusAfterPanelBackgroundClick } from '@/lib/agent-tab-focus-policy'
 import type { ActiveRightSidebarTab } from '../../../../shared/ui-chrome-types'
-import { isPluginPanelTabKey } from '../../../../shared/plugins/manifest/plugin-manifest'
+import '../../../../shared/plugins/manifest/plugin-manifest'
+import { isPluginPanelTabKey } from '../../../../shared/plugins/frames/plugin-tab-key'
 
 const FileExplorer = lazy(() => import('./file-explorer/panel/FileExplorer'))
-const FolderWorkspaceSourceControl = lazy(() => import('./FolderWorkspaceSourceControlPanel'))
+const FolderWorkspaceSourceControl = lazy(
+  () => import('./folder-workspaces/FolderWorkspaceSourceControlPanel')
+)
 const SourceControl = lazy(() => import('./source-control/panel/SourceControl'))
 const ChecksPanel = lazy(() => import('./checks-panel/ChecksPanel'))
-const PortsPanel = lazy(() => import('./PortsPanel'))
+const PortsPanel = lazy(() => import('./ports/PortsPanel'))
 const AiVaultSidebarPanel = lazy(() => import('./ai-vault/panel/AiVaultSidebarPanel'))
 const IssuePane = lazy(() => import('./IssuePane'))
 const SessionSummaryPane = lazy(() => import('./SessionSummaryPane'))
-const FolderWorkspaceWorktreesPanel = lazy(() => import('./FolderWorkspaceWorktreesPanel'))
+const FolderWorkspaceWorktreesPanel = lazy(
+  () => import('./folder-workspaces/FolderWorkspaceWorktreesPanel')
+)
 const FolderWorkspacePrChecksPanel = lazy(
   () => import('./hosted-review/folder-checks/FolderWorkspacePrChecksPanel')
 )
@@ -63,9 +68,6 @@ export function RightSidebarPanelContent({
             onFocusSearchHandled={onVaultSearchFocusHandled}
           />
         )}
-        {/* Why: the tab only offers itself when the active workspace has a
-            linked issue, but the persisted route can still name it across a
-            workspace switch — the pane itself renders the no-link state. */}
         {effectiveTab === 'issue' && <IssuePane />}
         {/* Why isVisible: the panel stays mounted while the sidebar is collapsed, and
             the summary fold must not run for a pane nobody is reading. */}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PRComment } from './github/comment-types'
+import type { PRComment } from './github/comments/comment-types'
 import {
   filterPRCommentListEntries,
   getPRReviewVerdicts,

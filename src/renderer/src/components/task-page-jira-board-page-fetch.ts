@@ -4,7 +4,7 @@ import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'
 import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-client'
 import { jiraListBoardIssues } from '../runtime/jira/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import type { TaskPageJiraBoardCachedPage } from './task-page-jira-board-cache'
 
 export const JIRA_BOARD_ISSUE_PAGE_SIZE = 100

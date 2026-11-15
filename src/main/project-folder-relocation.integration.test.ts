@@ -11,7 +11,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { gitExecFileAsync } from './git/runner'
+import { gitExecFileAsync } from './git/command-runner/git-exec-file'
 import { runProcessSync } from '@orca/process-host'
 import { getRepoMainWorktreeId } from '../shared/worktree/id'
 import {

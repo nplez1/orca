@@ -27,8 +27,8 @@ import {
   needsWorkspacePathIndexReconciliation,
   reconcileLocalWorkspacePathIndexEvents
 } from './filesystem-watcher-path-index-reconciliation'
-import { mapWithConcurrency } from '../../../../shared/map-with-concurrency'
-import { PrioritySemaphore } from '../../../../shared/priority-semaphore'
+import { mapWithConcurrency } from '../../../../shared/concurrency/map-with-concurrency'
+import { PrioritySemaphore } from '../../../../shared/concurrency/priority-semaphore'
 import {
   notifyLocalWatcherEvents,
   notifyLocalWatcherInterrupted

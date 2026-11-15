@@ -8,7 +8,7 @@ import {
 } from '@/runtime/rpc/compatibility/runtime-compatibility-cache'
 import { unwrapRuntimeRpcResult } from '@/runtime/rpc/calls/runtime-rpc-result'
 import { assertRuntimeStatusCompatible } from '@/runtime/rpc/compatibility/runtime-protocol-compat'
-import type { RuntimeStatus } from '../../../../../shared/runtime-session-contracts'
+import type { RuntimeStatus } from '../../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import { createSettingsSearchState, type SettingsSearchState } from './settings-search-state'
 import {
   enablesNewTuiAgents,

@@ -1,4 +1,4 @@
-import type { PRCheckDetail } from './github/check-types'
+import type { PRCheckDetail } from './github/checks/check-types'
 import type { JenkinsBuildDetailsFailureReason } from './jenkins-check-details'
 import { parseJenkinsBuildLocation } from './jenkins-urls'
 import { parseActionsRunId } from './actions-run-url'

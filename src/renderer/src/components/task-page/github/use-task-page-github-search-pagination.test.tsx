@@ -2,10 +2,10 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { useRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
-import type { Repo } from '../../../../../shared/repo-types'
-import type { GitHubPageLoadError } from './use-task-page-github-list-state'
-import { useTaskPageGitHubSearchPagination } from './use-task-page-github-search-pagination'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
+import type { Repo } from '../../../../../shared/repository/repo-types'
+import type { GitHubPageLoadError } from './listing/use-task-page-github-list-state'
+import { useTaskPageGitHubSearchPagination } from './listing/use-task-page-github-search-pagination'
 
 const repo: Repo = {
   id: 'repo-1',

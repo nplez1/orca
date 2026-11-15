@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 2-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import type { ChildProcess } from 'node:child_process'
-import { createAiVaultScanCancelledError } from '../ai-vault-scan-cancellation'
+import { createAiVaultScanCancelledError } from '../scan-lifecycle/ai-vault-scan-cancellation'
 import {
   AI_VAULT_SERVICE_IDLE_TIMEOUT_MS,
   AI_VAULT_SERVICE_MAX_CALLS,

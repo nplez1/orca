@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { DisableableUsageProviderId } from '../../../../shared/usage-provider-enablement'
-import { ZCODE_PLAN_SITE_CONSOLE_URLS } from '../../../../shared/zcode-plan-sites'
-import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import { ZCODE_PLAN_SITE_CONSOLE_URLS } from '../../../../shared/agent-accounts/usage-credentials/zcode-plan-sites'
+import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { translate } from '@/i18n/i18n'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { AgentIcon } from '@/components/agent/icons/AgentIcon'
@@ -11,7 +11,7 @@ import {
   MiniMaxIcon,
   OpenAIIcon,
   OpenCodeGoIcon
-} from '../status-bar/icons'
+} from '../status-bar/accounts/provider-icons'
 import {
   CopilotIcon,
   DeepInfraIcon,

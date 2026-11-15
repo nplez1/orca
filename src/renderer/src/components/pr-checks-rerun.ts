@@ -1,5 +1,5 @@
 import { translate } from '@/i18n/i18n'
-import type { GitHubRerunPRChecksResult, PRCheckDetail } from '../../../shared/github/check-types'
+import type { GitHubRerunPRChecksResult, PRCheckDetail } from '../../../shared/github/checks/check-types'
 import { selectRerunTargets } from '../../../shared/jenkins-rebuild'
 import { rerunJenkinsCheck } from '@/runtime/jenkins-rebuild-client'
 import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-copy'

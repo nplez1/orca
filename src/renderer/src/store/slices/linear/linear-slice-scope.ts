@@ -91,6 +91,11 @@ export function scopedLinearCacheKeyForSource(source: TaskSourceContext, key: st
   return scopedLinearCacheKey({ cachePrefix: getTaskSourceCacheScope(source) }, key)
 }
 
+/** A task source names its own owner, so its scope is always explicit. */
+export function getLinearTaskSourceScope(source: TaskSourceContext): LinearReadScope {
+  return getLinearSourceScope(source)
+}
+
 export function canPublishLinearScopeCache(
   scope: LinearReadScope,
   settings: AppState['settings']

@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { ProjectViewErrorState } from './ProjectViewStates'
+import { ProjectViewErrorState } from './view/ProjectViewStates'
 
 afterEach(cleanup)
 

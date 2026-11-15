@@ -1,0 +1,321 @@
+import { describe, expect, it } from 'vitest'
+import type { GlobalSettings } from '../../global-settings-types'
+import type { Repo } from '../../repository/repo-types'
+import type { WorktreeMeta } from '../meta-types'
+import type { Worktree } from '../types'
+
+import {
+  applyMetadataFallbackVisibility,
+  buildKnownOrcaWorkspaceLayouts,
+  toDetectedWorktree,
+  classifyWorktreeOwnership
+} from './ownership'
+import { EXTERNAL_WORKTREE_VISIBILITY_ROLLOUT_AT } from './external-worktree-visibility'
+
+const LARGE_WORKSPACE_HISTORY_COUNT = 150_000
+
+function makeRepo(overrides: Partial<Repo> = {}): Repo {
+  return {
+    id: 'repo-1',
+    path: '/repos/app',
+    displayName: 'app',
+    badgeColor: '#000',
+    addedAt: EXTERNAL_WORKTREE_VISIBILITY_ROLLOUT_AT + 1,
+    kind: 'git',
+    ...overrides
+  }
+}
+
+function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
+  return {
+    id: `repo-1::${overrides.path ?? '/repos/app'}`,
+    repoId: 'repo-1',
+    path: '/repos/app',
+    head: 'abc',
+    branch: 'refs/heads/main',
+    isBare: false,
+    isMainWorktree: true,
+    displayName: 'main',
+    comment: '',
+    linkedIssue: null,
+    linkedPR: null,
+    linkedLinearIssue: null,
+    linkedGitLabMR: null,
+    linkedGitLabIssue: null,
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    lastActivityAt: 0,
+    workspaceStatus: 'todo',
+    ...overrides
+  }
+}
+
+function makeMeta(overrides: Partial<WorktreeMeta> = {}): WorktreeMeta {
+  return {
+    displayName: '',
+    comment: '',
+    linkedIssue: null,
+    linkedPR: null,
+    linkedLinearIssue: null,
+    linkedGitLabMR: null,
+    linkedGitLabIssue: null,
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    lastActivityAt: 0,
+    workspaceStatus: 'todo',
+    ...overrides
+  }
+}
+
+function makeSettings(overrides: Partial<GlobalSettings> = {}): GlobalSettings {
+  return {
+    workspaceDir: '/orca/workspaces',
+    nestWorkspaces: true,
+    workspaceDirHistory: [],
+    refreshLocalBaseRefOnWorktreeCreate: false,
+    localBaseRefSuggestionDismissed: false,
+    branchPrefix: 'none',
+    branchPrefixCustom: '',
+    theme: 'system',
+    appFontFamily: 'Geist',
+    editorAutoSave: false,
+    editorAutoSaveDelayMs: 1000,
+    editorMinimapEnabled: false,
+    markdownReviewToolsEnabled: true,
+    terminalFontSize: 14,
+    terminalFontFamily: 'monospace',
+    terminalFontWeight: 400,
+    terminalLineHeight: 1.2,
+    ...overrides
+  } as GlobalSettings
+}
+
+describe('worktree ownership classification', () => {
+  it('does not treat generic discovery metadata on nested workspace paths as Orca-managed', () => {
+    const repo = makeRepo({ externalWorktreeVisibility: 'hide' })
+    const settings = makeSettings()
+    const detected = toDetectedWorktree({
+      repo,
+      settings,
+      worktree: makeWorktree({
+        path: '/orca/workspaces/app/manual-git-worktree',
+        isMainWorktree: false
+      }),
+      meta: makeMeta({ displayName: 'manual-git-worktree' }),
+      knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+    })
+
+    expect(detected.ownership).toBe('external')
+    expect(detected.visible).toBe(false)
+  })
+
+  it('builds known layouts from large workspace history lists', () => {
+    const repo = makeRepo()
+    const workspaceDirHistory = Array.from(
+      { length: LARGE_WORKSPACE_HISTORY_COUNT },
+      (_, index) => ({
+        path: `/history/workspaces-${index}`,
+        nestWorkspaces: index % 2 === 0
+      })
+    )
+    const settings = makeSettings({
+      workspaceDir: '/new/workspaces',
+      workspaceDirHistory
+    })
+
+    const layouts = buildKnownOrcaWorkspaceLayouts(settings, repo)
+
+    expect(layouts).toHaveLength(LARGE_WORKSPACE_HISTORY_COUNT + 1)
+    expect(layouts[0]).toEqual({
+      path: '/new/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
+    })
+    expect(layouts[1]).toEqual({ path: '/history/workspaces-0', nestWorkspaces: true })
+    expect(layouts.at(-1)).toEqual({
+      path: `/history/workspaces-${LARGE_WORKSPACE_HISTORY_COUNT - 1}`,
+      nestWorkspaces: false
+    })
+  })
+
+  it('keeps selected linked checkouts visible without trusting Git main-worktree', () => {
+    const repo = makeRepo({ path: '/repos/app-linked', externalWorktreeVisibility: 'hide' })
+    const settings = makeSettings()
+    const selected = toDetectedWorktree({
+      repo,
+      settings,
+      worktree: makeWorktree({
+        path: '/repos/app-linked',
+        isMainWorktree: false
+      }),
+      knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+    })
+    const gitMain = toDetectedWorktree({
+      repo,
+      settings,
+      worktree: makeWorktree({
+        path: '/repos/app-main',
+        isMainWorktree: true
+      }),
+      knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+    })
+
+    expect(selected.visible).toBe(true)
+    expect(gitMain.visible).toBe(false)
+    expect(gitMain.ownership).toBe('external')
+  })
+})
+
+describe('agent scratch worktrees', () => {
+  const scratchPath = '/repos/app/.claude/worktrees/agent-a04ccaaa55ddadb91'
+
+  it('applies built-in source preferences independently after legacy migration', () => {
+    const repo = makeRepo({
+      agentWorktreeVisibility: 'show',
+      worktreeVisibilitySourcePreferences: {
+        builtIn: { claude: 'hide', gsd: 'show' }
+      }
+    })
+    const settings = makeSettings()
+
+    expect(
+      toDetectedWorktree({
+        repo,
+        settings,
+        worktree: makeWorktree({ path: scratchPath, isMainWorktree: false }),
+        knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+      }).visible
+    ).toBe(false)
+    expect(
+      toDetectedWorktree({
+        repo,
+        settings,
+        worktree: makeWorktree({
+          path: '/repos/app/.gsd-workspaces/phase-1',
+          isMainWorktree: false
+        }),
+        knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+      }).visible
+    ).toBe(true)
+  })
+
+  it('lets a custom source override ordinary external visibility', () => {
+    const customPath = '/srv/team-worktrees/feature'
+    const repo = makeRepo({
+      externalWorktreeVisibility: 'show',
+      customWorktreeVisibilitySources: [{ id: 'team', rootPath: '/srv/team-worktrees' }],
+      worktreeVisibilitySourcePreferences: { custom: { team: 'hide' } }
+    })
+    const settings = makeSettings()
+    const detected = toDetectedWorktree({
+      repo,
+      settings,
+      worktree: makeWorktree({ path: customPath, isMainWorktree: false }),
+      knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+    })
+
+    expect(detected.visibilitySource).toEqual({ kind: 'custom', id: 'team' })
+    expect(detected.visible).toBe(false)
+    expect(applyMetadataFallbackVisibility(detected).visible).toBe(false)
+  })
+
+  it('keeps agent scratch hidden in the metadata fallback while revealing the rest', () => {
+    const repo = makeRepo()
+    const settings = makeSettings()
+    const layouts = buildKnownOrcaWorkspaceLayouts(settings, repo)
+    const scratch = toDetectedWorktree({
+      repo,
+      settings,
+      worktree: makeWorktree({ path: scratchPath, isMainWorktree: false }),
+      knownOrcaLayouts: layouts
+    })
+    const external = toDetectedWorktree({
+      repo,
+      settings,
+      worktree: makeWorktree({ path: '/scratch/manual', isMainWorktree: false }),
+      knownOrcaLayouts: layouts
+    })
+
+    expect(applyMetadataFallbackVisibility(scratch)).toMatchObject({
+      visible: false,
+      ownership: 'agent-scratch'
+    })
+    expect(applyMetadataFallbackVisibility(external)).toMatchObject({
+      visible: true,
+      ownership: 'unknown-legacy'
+    })
+  })
+
+  it('preserves an explicit scratch import in the metadata fallback', () => {
+    const repo = makeRepo({
+      externalWorktreeVisibility: 'hide',
+      importedExternalWorktreePaths: [scratchPath]
+    })
+    const settings = makeSettings()
+    const scratch = toDetectedWorktree({
+      repo,
+      settings,
+      worktree: makeWorktree({ path: scratchPath, isMainWorktree: false }),
+      knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+    })
+
+    expect(scratch).toMatchObject({ ownership: 'agent-scratch', visible: true })
+    expect(applyMetadataFallbackVisibility(scratch)).toBe(scratch)
+  })
+})
+
+describe('project-folder layouts', () => {
+  it('records the mode alongside the root, and classifies the container as external', () => {
+    const settings = makeSettings({ worktreeLayoutMode: 'project-folder' })
+    const repo = makeRepo()
+
+    expect(buildKnownOrcaWorkspaceLayouts(settings, repo)[0]).toEqual({
+      path: '/orca/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'project-folder'
+    })
+    // Why external rather than unknown-legacy: the container is not a flat root, so a worktree
+    // placed in it by hand stays subject to the external-visibility policy. Orca's own
+    // worktrees carry creation metadata and classify as orca-managed before this is consulted.
+    expect(
+      classifyWorktreeOwnership({
+        repo,
+        worktree: makeWorktree({ path: '/orca/workspaces/app/feature', isMainWorktree: false }),
+        settings,
+        knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+      })
+    ).toBe('external')
+  })
+
+  it('keeps a workspace created under an older mode classifiable from history', () => {
+    // Why the mode and not just the boolean: the same root under two modes describes two
+    // different placements, and collapsing them would drop one from classification.
+    const settings = makeSettings({
+      worktreeLayoutMode: 'project-folder',
+      workspaceDirHistory: [
+        { path: '/orca/workspaces', nestWorkspaces: true, worktreeLayoutMode: 'repo-nested' }
+      ]
+    })
+    const repo = makeRepo()
+
+    const layouts = buildKnownOrcaWorkspaceLayouts(settings, repo)
+    expect(layouts).toHaveLength(2)
+    expect(layouts.map((layout) => layout.worktreeLayoutMode)).toEqual([
+      'project-folder',
+      'repo-nested'
+    ])
+    // A worktree the nested mode would have placed under the repo name stays external.
+    expect(
+      classifyWorktreeOwnership({
+        repo,
+        worktree: makeWorktree({ path: '/orca/workspaces/app/feature', isMainWorktree: false }),
+        settings,
+        knownOrcaLayouts: layouts
+      })
+    ).not.toBe('unknown-legacy')
+  })
+})

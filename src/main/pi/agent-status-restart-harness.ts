@@ -1,7 +1,7 @@
 /** Shared setup for the restart-watch suites: an endpoint served from the on-disk file, as a real
  *  pane's env points it there, plus the "restart" that rewrites it. */
-import { createAgentStatusExtensionHarness } from './agent-status-extension-test-harness'
-import type { PiAgentKind } from '../../shared/pi-agent-kind'
+import { createAgentStatusExtensionHarness } from './managed-extensions/agent-status/agent-status-extension-test-harness'
+import type { PiAgentKind } from '../../shared/agent-launch/catalog/pi-agent-kind'
 
 // Why: Orca mints a new hook token (and usually a new port) on every start, so a restarted Orca is
 // an endpoint change to the agent already running in the pane it restored that agent's row from.

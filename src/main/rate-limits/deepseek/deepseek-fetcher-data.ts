@@ -1,4 +1,4 @@
-import type { ProviderRateLimits, UsageRateLimitMetadata } from '../../../shared/rate-limit-types'
+import type { ProviderRateLimits, UsageRateLimitMetadata } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { ProviderCredits, ProviderCreditsItem } from '../../../shared/provider-credits'
 import {
   moneyFromDecimalString,

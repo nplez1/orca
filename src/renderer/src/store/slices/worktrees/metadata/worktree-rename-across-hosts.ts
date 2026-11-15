@@ -4,12 +4,12 @@ import {
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
-import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
 import {
   buildHostLabelById,
   getHostContextLabel
-} from '../../../../../../shared/worktree/host-context-labels'
+} from '../../../../../../shared/worktree/row-display/host-context-labels'
 import {
   findIndexedDetectedWorktrees,
   findIndexedWorktreeOwner

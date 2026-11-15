@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PRCheckDetail } from '../../../shared/github/check-types'
+import type { PRCheckDetail } from '../../../shared/github/checks/check-types'
 import { rerunChecksAcrossProviders } from './pr-checks-rerun'
 
 const rerunJenkinsCheck = vi.fn()

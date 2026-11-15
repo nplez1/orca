@@ -8,7 +8,7 @@
  * any host is asked: there is nothing to move, so there is no folder to name.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
 
 vi.mock('../ipc/filesystem/access/filesystem-auth.ts', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))

@@ -1,4 +1,4 @@
-import type { ProviderRateLimits, RateLimitState } from '../rate-limit-types'
+import type { ProviderRateLimits, RateLimitState } from '../agent-usage/rate-limits/rate-limit-types'
 
 /** The `RateLimitState` slot holding one provider's snapshot. */
 export type ProviderSlotKey = {

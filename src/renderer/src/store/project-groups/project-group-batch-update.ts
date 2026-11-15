@@ -1,14 +1,17 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
 import type { RepoSlice } from '../repos/repo-state'
-import type { ProjectGroup, ProjectGroupMutation } from '../../../../shared/project-group-types'
-import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import type {
+  ProjectGroup,
+  ProjectGroupMutation
+} from '../../../../shared/project/groups/project-group-types'
+import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import {
   catalogOwnsHost,
-  getProjectGroupHostId,
   resolveProjectGroupOwnerHostId,
   runtimeTargetForProjectGroupOwner
 } from './project-group-owner-routing'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { getRuntimeTargetHostId } from '../../runtime/rpc/targets/runtime-client-target'
 import { adoptFromEndpoint } from '../host-catalog/endpoint-catalog-adoption'
 import { persistProjectGroupUpdates } from './project-group-update-persistence'
@@ -77,7 +80,7 @@ export function createProjectGroupBatchUpdateAction(
       set((s) => ({
         projectGroups: s.projectGroups.map((group) => {
           const owners = updatedById.get(group.id)
-          const hostId = getProjectGroupHostId(group)
+          const hostId = getRepoExecutionHostId(group)
           return (
             owners?.get(hostId) ??
             (catalogOwnsHost('local', hostId) ? owners?.get('local') : undefined) ??

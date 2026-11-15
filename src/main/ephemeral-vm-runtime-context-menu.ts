@@ -2,8 +2,8 @@ import type { Store } from './persistence/loading-store/store'
 import {
   isEphemeralVmHostActionable,
   type EphemeralVmRuntimeRecord
-} from '../shared/ephemeral-vm-runtimes'
-import { getEphemeralVmRecipeResultConnection } from '../shared/ephemeral-vm-recipes'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import { getEphemeralVmRecipeResultConnection } from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { listEnvironments } from '../shared/remote-runtime/host-store/runtime-environment-store'
 import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
 import {
@@ -53,7 +53,7 @@ export async function runEphemeralVmRuntimeContextMenuItem(
     throw new Error('A context menu item needs the workspace path to run against.')
   }
 
-  const hostName = resolveEphemeralVmRuntimeHostName(args.userDataPath, runtime)
+  const hostName = await resolveEphemeralVmRuntimeHostName(args.userDataPath, runtime)
 
   const run = await runEphemeralVmRecipeContextMenuItem({
     repoPath: resolved.repoPath,
@@ -92,10 +92,10 @@ export async function runEphemeralVmRuntimeContextMenuItem(
  * string, so a node-hosting service publishes its node id there. An Orca-server host instead has the
  * name Orca registered its environment under, which is the only name that host has.
  */
-export function resolveEphemeralVmRuntimeHostName(
+export async function resolveEphemeralVmRuntimeHostName(
   userDataPath: string,
   runtime: EphemeralVmRuntimeRecord
-): string {
+): Promise<string> {
   const recipeResult = runtime.recipeResult
   if (!recipeResult) {
     return ''
@@ -108,10 +108,8 @@ export function resolveEphemeralVmRuntimeHostName(
     return ''
   }
   try {
-    return (
-      listEnvironments(userDataPath).find((entry) => entry.id === runtime.runtimeEnvironmentId)
-        ?.name ?? ''
-    )
+    const environments = await listEnvironments(userDataPath)
+    return environments.find((entry) => entry.id === runtime.runtimeEnvironmentId)?.name ?? ''
   } catch {
     // Why not fatal: an unreadable environment store costs the callback a label, and the item the
     // user clicked may not need one. Refusing to run it would be the larger surprise.

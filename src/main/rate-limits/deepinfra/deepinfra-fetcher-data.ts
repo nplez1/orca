@@ -1,4 +1,4 @@
-import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { ProviderCredits, ProviderCreditsItem } from '../../../shared/provider-credits'
 import { moneyFromUnitsAndNanos, type MoneyAmount } from '../../../shared/money-amount'
 

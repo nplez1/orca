@@ -32,7 +32,7 @@ async function loadModules() {
   vi.doMock('../network/proxy-settings', () => ({
     ensureElectronProxyFromEnvironment: async () => undefined
   }))
-  const { setSecretStore } = await import('../../shared/secret-store')
+  const { setSecretStore } = await import('../../shared/secure-storage/secret-store')
   setSecretStore({
     isEncryptionAvailable: () => true,
     encryptString: (value) => Buffer.from(value),

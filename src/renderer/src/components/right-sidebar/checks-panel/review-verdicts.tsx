@@ -7,9 +7,9 @@ import {
   CircleX,
   MessageSquare
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { GitHubUserAvatar } from '@/components/github/github-user-avatar'
-import type { GitHubReviewState } from '../../../../../shared/github/comment-types'
+import type { GitHubReviewState } from '../../../../../shared/github/comments/comment-types'
 import type { PRReviewVerdict } from '../../../../../shared/pr-review-verdicts'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'

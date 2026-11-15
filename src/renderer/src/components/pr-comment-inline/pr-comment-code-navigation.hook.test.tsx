@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAppStore } from '@/store'
 import type { GitBranchCompareSummary } from '../../../../shared/git/diff/git-diff-compare-types'
-import type { PRComment } from '../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../shared/github/comments/comment-types'
 import { getPRCommentInlineId } from './pr-comment-inline-threads'
 import { usePRCommentCodeNavigation } from './pr-comment-code-navigation'
 import {

@@ -23,7 +23,7 @@ import { resumableStateFactoryFor } from '../ai-vault/parse-cache/session-scanne
 import { describeSkippedTranscriptRecords } from './session-summary-skipped-record-text'
 import type { SkippedTranscriptRecord } from '../ai-vault/transcripts/session-transcript-record-budget'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
-import { COPILOT_SESSIONS_DIR } from '../ai-vault/session-scanner-agent-sources'
+import { COPILOT_SESSIONS_DIR } from '../ai-vault/discovery/session-scanner-agent-sources'
 import type { SessionFileCandidate, FileWithMtime } from '../ai-vault/session-scanner-types'
 import { REMOTE_TRANSCRIPT_MAX_BYTES } from './session-summary-remote-transcript'
 import {

@@ -8,7 +8,7 @@ import {
   ensurePathWithinWorkspaceMock,
   getPRForBranchMock
 } from '../orca-runtime-test-mocks/setup.spec'
-import { getBranchConflictKindStrict, getBranchConflictKind } from '../../git/repo-branch-conflict'
+import { getBranchConflictKindStrict, getBranchConflictKind } from '../../git/refs/resolution/repo-branch-conflict'
 import { listWorktrees } from '../../git/worktrees/catalog/worktree-scan-cache'
 import { TEST_REPO_PATH, store } from './orca-runtime-test-fixtures.spec'
 import { getLocalWorktreeScanGeneration } from '../../workspaces/catalog/local-worktree-scan-generation'

@@ -4,7 +4,7 @@ import { useRef } from 'react'
 import { cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { editor as monacoEditor } from 'monaco-editor'
-import { SELF_LOCAL_AUTHORITY } from '../../../../shared/host-authority'
+import { SELF_LOCAL_AUTHORITY } from '../../../../shared/execution-host/host-authority'
 
 vi.mock('monaco-editor', () => import('monaco-editor/esm/vs/editor/editor.api.js'))
 

@@ -1,0 +1,46 @@
+import type { RepoIconPickResult } from '../../../shared/repository/appearance/repo-icon-pick-failure-copy'
+import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { ShellPathExistence } from '../../../shared/file-access/path-existence-batch'
+import type {
+  ShellOpenExternalEditorRequest,
+  ShellOpenExternalEditorResult,
+  ShellOpenFileResult,
+  ShellOpenLocalPathResult
+} from '../../../shared/shell/opening/shell-open-types'
+import type { RuntimeFileOpenPosition } from '../../../shared/file-access/runtime-editor-file-open'
+
+export type ShellApi = {
+  /** Every OS open names the path's owner; main refuses anything not owned by this computer. */
+  openPath: (path: string, ownerHostId: ExecutionHostId) => Promise<void>
+  openInFileManager: (
+    path: string,
+    ownerHostId: ExecutionHostId
+  ) => Promise<ShellOpenLocalPathResult>
+  openInExternalEditor: (
+    request: ShellOpenExternalEditorRequest
+  ) => Promise<ShellOpenExternalEditorResult>
+  /** Opens a URL at the destination the user's link-routing preference names (Orca's browser by
+   *  default), falling back to the system browser when the window cannot route it. */
+  openUrl: (url: string) => Promise<void>
+  /** Always hands the URL to the OS browser — the explicit "open externally" actions. */
+  openUrlInSystemBrowser: (url: string) => Promise<void>
+  /** Main → renderer: a link reached the window with no in-app handler. */
+  onContextualLinkRequested: (callback: (url: string) => void) => () => void
+  /** Announces that this window routes link opens, so main relays instead of opening the OS browser. */
+  markContextualLinkRouterReady: () => void
+  openFilePath: (
+    path: string,
+    ownerHostId: ExecutionHostId,
+    location?: RuntimeFileOpenPosition
+  ) => Promise<boolean>
+  openFileUri: (uri: string, ownerHostId: ExecutionHostId) => Promise<ShellOpenFileResult>
+  pathsExist?: (paths: string[]) => Promise<ShellPathExistence[]>
+  /** `wakeWslDistro`: a click, a user act that may start a stopped WSL distro. */
+  pathExists: (path: string, options?: { wakeWslDistro?: boolean }) => Promise<boolean>
+  pickAttachment: () => Promise<string | null>
+  pickAttachments: () => Promise<string[]>
+  pickImage: () => Promise<string | null>
+  pickRepoIconImage: () => Promise<RepoIconPickResult>
+  pickAudio: () => Promise<string | null>
+  pickDirectory: (args: { defaultPath?: string }) => Promise<string | null>
+}

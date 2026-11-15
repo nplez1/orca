@@ -6,7 +6,7 @@ import type {
   JiraSiteSelection,
   JiraSprintAssignment
 } from '../../../shared/jira/jira-types'
-import { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
+import { hasRuntimeRpcErrorCode } from '../../../shared/remote-runtime/rpc/runtime-rpc-error-code'
 import { callRuntimeRpc } from './runtime-rpc-client'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './jira/runtime-jira-target'
 

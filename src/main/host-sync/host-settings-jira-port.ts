@@ -1,6 +1,6 @@
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
 import type { JiraSite } from '../../shared/jira/jira-types'
-import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
+import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 import {
   assertSiteFileWritable,
   deleteToken,

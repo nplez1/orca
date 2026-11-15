@@ -5,7 +5,8 @@
 // top of it. The pane must claim the gesture before xterm encodes the report.
 import { renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ManagedPane, PaneManager } from '@/lib/pane-manager/pane-manager'
+import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
 import { useTerminalContextMenuTrigger } from './context-menu/use-terminal-context-menu-trigger'
 
 type TestTerminal = {

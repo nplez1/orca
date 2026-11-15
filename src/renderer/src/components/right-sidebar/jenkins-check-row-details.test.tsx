@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
+import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/checks/check-types'
 import { JenkinsCheckDetailsError } from '@/lib/check-details-error-action'
 import { ChecksList } from './checks-panel/presentation/checks-list'
 import { clearCheckDetailsCache } from '@/components/github/check-details-cache'
@@ -31,9 +31,6 @@ vi.mock('@/store', () => ({
     })
 }))
 
-vi.mock('../../../../cli/selectors.ts', () => ({
-  useActiveWorktree: () => null
-}))
 
 /**
  * The Jenkins case this pane exists for: the check's own state says only "failed", and the pane has

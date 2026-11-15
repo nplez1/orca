@@ -19,7 +19,7 @@ import { readWebWorkspacePathSearchCapability } from './web-workspace-path-searc
 import type { RuntimeFileListResult } from '../../../../shared/file-listing/runtime-file-list'
 import { callRuntimeResult } from './web-runtime-calls'
 import { toRuntimeWorktreeSelector } from '../../runtime/rpc/targets/runtime-worktree-selector'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../../shared/identifiers/non-secure-context-uuid'
 
 export async function searchWebWorkspaceNameFilter(args: {
   worktree: { id: string; path: string }

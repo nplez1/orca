@@ -20,7 +20,7 @@ import {
 } from '../../shared/ripgrep/ripgrep-process-availability'
 import { spawnBundledRipgrep } from '../ripgrep/bundled-ripgrep-spawn'
 import { QuickOpenSubprocessPathAccumulator } from '../../shared/quick-open/quick-open-subprocess-path-accumulator'
-import { toWindowsWslPath } from '../../shared/wsl-paths'
+import { toWindowsWslPath } from '../../shared/file-access/wsl-paths'
 
 /**
  * One bounded ripgrep `--files` walk, streaming each surviving path into `onPath`.

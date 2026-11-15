@@ -10,7 +10,7 @@ import {
   canonicalHostIdOrder,
   indexExecutionHostsById
 } from '../../../../../shared/execution-host/managed-orcad-execution-host'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 
 /** The host rows the Settings picker shows; labels already carry renames. */
 export type SettingsHostScopeHost = MergedExecutionHost & { label: string }

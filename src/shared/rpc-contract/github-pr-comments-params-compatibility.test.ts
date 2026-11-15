@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PullRequest } from './github-pull-request-params'
+import { PullRequest } from './github/github-pull-request-params'
 
 /**
  * `github.prComments` is the only call that opts into review-verdict entries, and the flag has to

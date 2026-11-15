@@ -1,10 +1,10 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
 import { isImeCompositionKeyDown } from '@/lib/text-input/ime/ime-composition-keyboard-event'
-import { replaceCompletedWorkspaceEmojiShortcode } from '@/lib/workspace-emoji-shortcodes'
+import { replaceCompletedWorkspaceEmojiShortcode } from '@/lib/workspace/display/workspace-emoji-shortcodes'
 import { useTranslate } from '@/i18n/use-translate'
-import { SelectionIcon } from './smart-workspace-source-row-content'
-import type { SmartWorkspaceNameSelection } from './smart-workspace-name-field-model'
+import { SelectionIcon } from './source-search/smart-workspace-source-row-content'
+import type { SmartWorkspaceNameSelection } from './name-field/smart-workspace-name-field-model'
 
 /** The name field for a composer opened from a task.
  *

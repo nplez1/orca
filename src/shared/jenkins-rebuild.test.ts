@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PRCheckDetail } from './github/check-types'
+import type { PRCheckDetail } from './github/checks/check-types'
 import { isGitHubRerunCandidate, isJenkinsCheck, selectRerunTargets } from './jenkins-rebuild'
 
 function check(overrides: Partial<PRCheckDetail>): PRCheckDetail {

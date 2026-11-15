@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ProviderRateLimits, RateLimitState } from '../../../../shared/rate-limit-types'
-import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-factory'
+import type { ProviderRateLimits, RateLimitState } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
+import { createEmptyRateLimitState } from '../../../../shared/agent-usage/rate-limits/rate-limit-state-factory'
 import {
   withForkStatusBarUsage,
   type ForkStatusBarUsage,

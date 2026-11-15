@@ -1,4 +1,4 @@
-import type { PRCheckJob, PRCheckStep } from './github/check-types'
+import type { PRCheckJob, PRCheckStep } from './github/checks/check-types'
 
 /** Step states that mean the step did not pass, shared so surfaces agree on what a failure is. */
 export function isFailedStepState(state: string | null | undefined): boolean {

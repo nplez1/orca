@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { FloatingTerminalTitlebarGrabHandle } from './FloatingTerminalTitlebarGrabHandle'
-import { isFloatingTerminalDragTarget } from './floating-terminal-panel-drag-target'
+import { isFloatingTerminalDragTarget } from './geometry/floating-terminal-panel-drag-target'
 
 afterEach(cleanup)
 

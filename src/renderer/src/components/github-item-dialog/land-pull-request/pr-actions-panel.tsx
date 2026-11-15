@@ -4,8 +4,8 @@ import { CircleDot, GitPullRequest, GitPullRequestClosed, LoaderCircle } from 'l
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
-import { cn } from '@/lib/utils'
-import { useAppStore } from '@/store'
+import { cn } from '@/lib/class-names'
+import { useAppStore } from '@/store/index'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import {
   getGitHubRepoRoutingTarget,
@@ -14,9 +14,9 @@ import {
 import { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
 import { startPostMergeReviewRefresh } from '@/components/github/post-merge-review-refresh'
 import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
-import { resolveGitHubPRMergeMethods } from '../../../../../shared/github/pull-request-merge-methods'
-import type { GitHubPRMergeMethod } from '../../../../../shared/github/pull-request-types'
-import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
+import { resolveGitHubPRMergeMethods } from '../../../../../shared/github/pull-requests/merge/pull-request-merge-methods'
+import type { GitHubPRMergeMethod } from '../../../../../shared/github/pull-requests/pull-request-types'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
 import { useTranslate } from '@/i18n/use-translate'
 import {
@@ -24,7 +24,7 @@ import {
   getPullRequestMergeMethodLabel,
   getPullRequestStateConfirmationTitle
 } from '@/components/github/pull-request-confirmation-copy'
-import { assertTaskPageGitHubDialogStateAuthority } from '@/components/task-page/github/task-page-github-dialog-state-authority'
+import { assertTaskPageGitHubDialogStateAuthority } from '@/components/task-page/github/mutations/task-page-github-dialog-state-authority'
 import { resolvePullRequestRepo } from '@/components/github/github-work-item-identity'
 import { notifyWorkItemDetailsMutation } from '@/components/github/github-work-item-comment-mutations'
 import { runPullRequestStateUpdate } from '@/components/github/github-work-item-edit-mutations'

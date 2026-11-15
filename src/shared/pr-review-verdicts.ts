@@ -1,4 +1,4 @@
-import type { GitHubReviewState, PRComment } from './github/comment-types'
+import type { GitHubReviewState, PRComment } from './github/comments/comment-types'
 import { isBotPRComment } from './source-control/review-comments/pr-comment-audience'
 
 /**

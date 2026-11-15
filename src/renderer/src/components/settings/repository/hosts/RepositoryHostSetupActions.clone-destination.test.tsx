@@ -9,7 +9,7 @@ import {
   toRuntimeExecutionHostId
 } from '../../../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
-import type { ProjectHostSetup } from '../../../../../../shared/project-types'
+import type { ProjectHostSetup } from '../../../../../../shared/project/project-types'
 import { useAppStore } from '../../../../store/index'
 import { RepositoryHostSetupActions } from './RepositoryHostSetupActions'
 import type { SetupHostOption } from './repository-host-setup-options'

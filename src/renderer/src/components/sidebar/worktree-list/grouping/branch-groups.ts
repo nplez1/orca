@@ -1,21 +1,21 @@
-import type { Repo } from '../../../../../../shared/repo-types'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import {
   LOCAL_EXECUTION_HOST_ID,
   getWorktreeExecutionHostId,
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
-import { isDetachedHeadWorkspace } from '../../../../../../shared/worktree/workspace-kinds'
+import { isDetachedHeadWorkspace } from '../../../../../../shared/worktree/visibility/workspace-kinds'
 import { branchName } from '../../../../lib/source-control/branches/branch-name'
 import {
   composeWorktreeHostIdentity,
   getWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
-import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/group-keys'
+import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/sections/group-keys'
 import {
   getProjectGroupingForRepo,
   type ProjectGroupingIndex
-} from '../../../../../../shared/project-section-grouping'
+} from '../../../../../../shared/sidebar-list/sections/project-section-grouping'
 import type {
   BranchGroupMember,
   Row,

@@ -4,7 +4,7 @@ import {
 } from '../../../../../../shared/source-control/checks/provider-check-summary'
 import { createElement } from 'react'
 import { GitMerge } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { getReviewStateIcon } from '@/components/github/review-state-presentation'
 import {
   getHostedReviewMergeReadiness,

@@ -8,8 +8,8 @@ import {
   removeEphemeralVmRuntime,
   updateEphemeralVmRuntimeStatus,
   upsertEphemeralVmRuntime
-} from '../shared/ephemeral-vm-runtime-store'
-import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
+import type { EphemeralVmRuntimeRecord } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { EphemeralVmRuntimeReclaimed } from '../shared/ephemeral-vm-runtime-reclaim'
 import { toRuntimeExecutionHostId, toSshExecutionHostId } from '../shared/execution-host'
 
@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./ssh/targets/ssh-target-registry', () => ({
   getSshConnectionManager: mocks.getSshConnectionManager
 }))
-vi.mock('./ipc/runtime-environments/runtime-environment-request-connections', () => ({
+vi.mock('./ipc/runtime-environments/connections/runtime-environment-request-connections', () => ({
   getRuntimeEnvironmentStatusSnapshots: mocks.getRuntimeEnvironmentStatusSnapshots
 }))
 vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({

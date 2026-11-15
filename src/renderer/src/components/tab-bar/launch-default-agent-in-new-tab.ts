@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
-import { newAgentLaunchRequestId } from '../../lib/agent-session/launch/routing/agent-launch-request-id'
+import { createNonSecureContextUuid } from '../../../../shared/identifiers/non-secure-context-uuid'
 import { launchAgentInNewTab } from '../../lib/agent-session/launch/new-tab/launch-agent-in-new-tab'
 import { shouldQueueTerminalFocusAfterMenuClose } from '../../lib/agent-session/launch/new-tab/launch-agent-in-new-tab-host-agents'
 import { captureNativeChatComposerFocusIntent } from '../native-chat/composer/focus/native-chat-composer-focus-intent'
@@ -29,7 +29,7 @@ export function launchDefaultAgentInNewTab(
   context: DefaultAgentLaunchContext
 ): void {
   const result = launchAgentInNewTab({
-    requestId: newAgentLaunchRequestId(),
+    requestId: createNonSecureContextUuid(),
     focusIntent: captureNativeChatComposerFocusIntent(),
     agent,
     worktreeId: context.worktreeId,

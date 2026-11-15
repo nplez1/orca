@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
-import type { ProviderRateLimits } from '../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../shared/agent-usage/rate-limits/rate-limit-types'
 import {
   USAGE_PROVIDER_IDS,
   type DisableableUsageProviderId

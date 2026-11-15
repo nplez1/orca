@@ -35,7 +35,7 @@ vi.mock('./claude-cli-usage-probe', () => ({ readClaudeUsageFromCli: vi.fn() }))
 vi.mock('../../claude-accounts/claude-oauth-token-refresh', () => ({
   refreshClaudeOAuthCredentials: vi.fn()
 }))
-vi.mock('../../claude-accounts/claude-profile-installed-router', () => ({
+vi.mock('../../claude-accounts/profiles/routing/claude-profile-installed-router', () => ({
   getClaudeProfileRouter: () => undefined,
   getClaudeWslProfileRouter: () => undefined
 }))

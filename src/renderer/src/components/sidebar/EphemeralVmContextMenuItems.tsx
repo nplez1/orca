@@ -8,8 +8,8 @@ import {
   useEphemeralVmRuntimes
 } from '@/hooks/useEphemeralVmRuntimes'
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
-import type { EphemeralVmContextMenuItem } from '../../../../shared/ephemeral-vm-runtimes'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
+import type { EphemeralVmContextMenuItem } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 
 /** Just the parts of the workspace context menu this list reads, so a test needs no store. */
 export type EphemeralVmContextMenuItemsModel = {

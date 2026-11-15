@@ -12,8 +12,8 @@ import {
   getRichMarkdownSpellcheckAttribute,
   useRichMarkdownSpellcheckAttribute
 } from './editor/rich-markdown/instance/rich-markdown-spellcheck'
-import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
-import { cn } from '@/lib/utils'
+import { isScreenSubmitShortcut } from '@/lib/keyboard/screen-submit-shortcut'
+import { cn } from '@/lib/class-names'
 import { useAppStore } from '@/store'
 import { useTranslate } from '@/i18n/use-translate'
 import './comment-composer.css'

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   listEphemeralVmRuntimes,
   upsertEphemeralVmRuntime
-} from '../../shared/ephemeral-vm-runtime-store'
+} from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { resumeEphemeralVmRuntime } from './runtime-service'
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import { cleanupTempDirs, makeDir, nodeCommand } from './runtime-service.test-harness'

@@ -4,7 +4,7 @@ import {
   removeEphemeralVmProvisioningAttempt,
   type EphemeralVmProvisioningAttempt
 } from '../shared/ephemeral-vm-provisioning-attempts'
-import { listEphemeralVmRuntimes } from '../shared/ephemeral-vm-runtime-store'
+import { listEphemeralVmRuntimes } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { recordSwallowedFailure } from './observability/swallowed-failure'
 import { isEphemeralVmProvisioningInFlight } from './ephemeral-vm/runtime-provisioning'
 

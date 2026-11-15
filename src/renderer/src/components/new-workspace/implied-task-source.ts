@@ -1,4 +1,4 @@
-import type { SmartWorkspaceNameSelection } from './smart-workspace-name-field-model'
+import type { SmartWorkspaceNameSelection } from './name-field/smart-workspace-name-field-model'
 
 /** The source a task-launched composer opened with, identified by its issue URL.
  *

@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 9-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import { RelaySessionGenerations } from './server-relay-sessions'
 import { retainHookRootContext } from '../../../shared/agent-hook-listener/pane-provider-session'
 import { deriveCliWriterTopology } from './cli-writer-observation'
 import { previewHookPresence } from '../../../shared/agent-hook-listener/presence/agent-hook-presence-transition'
@@ -7,16 +6,16 @@ import {
   needsHookRootEvidence,
   readHookProcessVerdict
 } from '../../../shared/agent-hook-listener/presence/agent-hook-owner-presence'
-import { markCodexLeadTurnInterrupted } from '../../../shared/agent-hook-listener/providers/codex-state'
-import { reconcileCodexStatusEvent } from '../../../shared/agent-hook-listener/providers/codex-session-start'
+import { markCodexLeadTurnInterrupted } from '../../../shared/agent-hook-listener/providers/codex/codex-state'
+import { reconcileCodexStatusEvent } from '../../../shared/agent-hook-listener/providers/codex/codex-session-start'
 import {
   resolveAgentStatusIdentity,
   shouldSuppressInheritedTerminalStatus
 } from '../../../shared/agent-status/identity/agent-status-identity'
 import type { EnrichedAgentHookEventPayload, IncomingAgentHookEvent } from './server-types'
 import type { AgentStatusObservationOrigin } from '../../../shared/agent-status/contracts/agent-status-observation'
-import { ClaudeOwedNotificationExpiryTimers } from '../../../shared/agent-hook-listener/providers/claude-owed-notification-expiry-timers'
-import { setClaudeMainAgentTurnState } from '../../../shared/agent-hook-listener/providers/claude-roster-state'
+
+import { setClaudeMainAgentTurnState } from '../../../shared/agent-hook-listener/providers/claude/lifecycle/claude-roster-state'
 import {
   attachClaudePermissionToolUseId,
   pairedClaudeNonAgentWork,
@@ -30,27 +29,6 @@ import { claimsPaneAfterExit } from './agent-exit-evidence'
 import { writePiClaudeChildParentMarker } from './pi-claude-child-parent-marker'
 
 export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenPromptWiring {
-  protected readonly claudeOwedNotificationExpiry = new ClaudeOwedNotificationExpiryTimers(
-    this.state
-  )
-  protected readonly relaySessions = new RelaySessionGenerations()
-
-  // Every row mutation passes here, including cancellation and pane moves.
-  protected override commitStatusRowMutation(
-    before: EnrichedAgentHookEventPayload | null | undefined,
-    after: EnrichedAgentHookEventPayload | null | undefined,
-    emit = true
-  ): boolean {
-    if (after) {
-      this.claudeOwedNotificationExpiry.arm(after.paneKey, (row) => {
-        if (this.server) {
-          this.applyRestatedStatus(row)
-        }
-      })
-    }
-    return super.commitStatusRowMutation(before, after, emit)
-  }
-
   protected applyNormalizedStatus(
     incoming: IncomingAgentHookEvent,
     onAccepted?: () => void,
@@ -126,6 +104,24 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenP
     // and the event already carries the child's own transcript, so the link is recorded as soon as
     // the event is admissible — no later fold can drop it.
     writePiClaudeChildParentMarker(childParent, payload.paneKey, previous, Date.now())
+    if (
+      previous?.paneSleep &&
+      !rootContext.acquired &&
+      !newRun &&
+      this.sameTerminalOwner(previous, payload) &&
+      previous.payload.agentType === payload.payload.agentType
+    ) {
+      return previous
+    }
+    if (
+      previous &&
+      payload.payload.sessionBoundary === true &&
+      !rootContext.acquired &&
+      this.sameTerminalOwner(previous, payload) &&
+      this.preservesStoppingDone(previous.paneKey)
+    ) {
+      return previous
+    }
     const terminalHandle =
       payload.terminalHandle ??
       (previous?.terminalHandle && this.sameTerminalOwner(previous, payload)

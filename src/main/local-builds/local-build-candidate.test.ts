@@ -10,7 +10,7 @@ import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
 import {
   LOCAL_BUILD_COMPATIBILITY_FILENAME,
   type LocalBuildCompatibility
-} from '../../shared/local-build-compatibility'
+} from '../../shared/remote-runtime/orcad-distribution/local-build-compatibility'
 import { loadLocalBuildCandidate } from './local-build-candidate'
 import { startLocalBuildFeed } from './local-build-feed-server'
 

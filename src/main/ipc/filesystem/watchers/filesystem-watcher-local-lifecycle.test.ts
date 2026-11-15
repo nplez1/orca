@@ -47,7 +47,7 @@ import {
   reserveWatcherChild,
   resetWatcherChildRegistryForTest,
   WatcherChildCapacityError
-} from '../watcher-process/parcel-watcher-child-registry'
+} from '../watcher-process/child-lifecycle/parcel-watcher-child-registry'
 import { acquireWatcherRemovalGate } from '../../../workspaces/removal/watcher-removal-gate'
 
 type HandlerMap = Record<string, (_event: unknown, args: unknown) => unknown>

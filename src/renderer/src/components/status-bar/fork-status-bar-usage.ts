@@ -1,4 +1,4 @@
-import type { ProviderRateLimits, RateLimitState } from '../../../../shared/rate-limit-types'
+import type { ProviderRateLimits, RateLimitState } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
 import {
   FORK_USAGE_PROVIDER_IDS,
@@ -9,8 +9,8 @@ import {
   getVisibleUsageProvider,
   isUsageEmptyState,
   type UsageProviderSettings
-} from './status-bar-provider-visibility'
-import { isOwnerNotSetUpPlaceholder } from './owner-usage-rate-limits'
+} from './composition/status-bar-provider-visibility'
+import { isOwnerNotSetUpPlaceholder } from './usage/owner-usage-rate-limits'
 
 /** The controller values a fork provider can change. */
 export type ForkStatusBarUsage = {

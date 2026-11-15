@@ -1,5 +1,6 @@
 import { OrcaRuntimeWithPtyController } from './terminal/lifecycle/orca-runtime-pty-controller'
-import type { RuntimeDegradation, RuntimeStatus } from '../../shared/runtime-types'
+import type { RuntimeStatus } from '../../shared/remote-runtime/session-graph/runtime-session-contracts'
+import type { RuntimeDegradation } from '../../shared/remote-runtime/protocol/runtime-capability-degradation'
 import {
   runtimeBrowserCommandsFactoryIsHeadless,
   runtimeBrowserCommandsFactorySupportsGoogleCookieClear,
@@ -7,18 +8,20 @@ import {
   runtimeBrowserUnavailableCause
 } from './browser/installation/runtime-browser-commands-factory'
 import { isBrowserIdentityModeStoreInitialized } from '../browser/identity/mode/browser-identity-mode-store'
-import { servesLocalWslMigrationSource } from '../orcad/orcad-migration-wsl-destination'
-import { ORCAD_MIGRATION_LOCAL_WSL_SOURCE_RUNTIME_CAPABILITY } from '../../shared/orcad-runtime-capabilities'
-import { advertisedOrcadMigrationDestinationCapabilities } from '../orcad/orcad-migration-destination-capabilities'
-import { USAGE_CREDENTIALS_RUNTIME_CAPABILITY } from '../../shared/account-runtime-capabilities'
+import { servesLocalWslMigrationSource } from '../orcad/migration/orcad-migration-wsl-destination'
+import { ORCAD_MIGRATION_LOCAL_WSL_SOURCE_RUNTIME_CAPABILITY } from '../../shared/remote-runtime/protocol/orcad-runtime-capabilities'
+import { advertisedOrcadMigrationDestinationCapabilities } from '../orcad/migration/orcad-migration-destination-capabilities'
+import { USAGE_CREDENTIALS_RUNTIME_CAPABILITY } from '../../shared/remote-runtime/protocol/account-runtime-capabilities'
+import {
+  MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
+  RUNTIME_CAPABILITIES,
+  RUNTIME_PROTOCOL_VERSION
+} from '../../shared/remote-runtime/protocol/protocol-version'
 import {
   MANAGED_SERVER_RUNTIME_CAPABILITY,
-  MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
-  REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,
-  RUNTIME_CAPABILITIES,
-  RUNTIME_PROTOCOL_VERSION,
-  SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY
-} from '../../shared/protocol-version'
+  REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY
+} from '../../shared/remote-runtime/protocol/host-runtime-capabilities'
+import { SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY } from '../../shared/remote-runtime/protocol/session-tabs-runtime-capabilities'
 import {
   BROWSER_CERTIFICATE_TRUST_RUNTIME_CAPABILITY,
   BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
@@ -34,7 +37,7 @@ import {
 import {
   BROWSER_UNAVAILABLE_ERROR_CODE,
   browserUnavailableMessage
-} from '../../shared/runtime-types'
+} from '../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import {
   RUNTIME_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
   WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
@@ -47,14 +50,14 @@ import type { RuntimeNotifier } from './client/events/runtime-notifier-contract'
 import type {
   AutomationsChangedPayload,
   RuntimeClientEvent
-} from '../../shared/runtime-client-events'
+} from '../../shared/remote-runtime/session-graph/runtime-client-events'
 import { parsePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import { wakeFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade-wake'
 import { hostModeRuntimeCapabilities } from './runtime-host-mode-capabilities'
 import { runWorktreeChangeInvalidators } from '../ipc/worktrees/listing/worktree-change-invalidators'
 import { MACHINE_NAME_PUBLISH_WAIT_MS } from './hosts/platform-probe/runtime-machine-name'
 import { getManagedServerActions } from './hosts/management/managed-server-actions-registry'
-import type { WorktreeSortOrderUpdate } from '../../shared/worktree/sort-order-update'
+import type { WorktreeSortOrderUpdate } from '../../shared/worktree/metadata/sort-order-update'
 import { supportsDurableTerminalPromptDelivery } from './terminal/input/durable-terminal-prompt-delivery-support'
 
 type RuntimeStatusHost = {

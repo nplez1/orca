@@ -1,4 +1,4 @@
-import type { ProviderRateLimits, UsageRateLimitMetadata } from '../../../shared/rate-limit-types'
+import type { ProviderRateLimits, UsageRateLimitMetadata } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { ClaudeRateLimitFetchOptions } from '../providers/claude/claude-usage-fetch-options'
 import { makeClaudeUsageResult } from '../providers/claude/claude-usage-result'
 import { readClaudeUsageFromCli, type ClaudeUsageProbeDeps } from './claude-cli-usage-probe'

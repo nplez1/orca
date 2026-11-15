@@ -8,13 +8,16 @@ import {
   windowMaterialPreference,
   type WindowMaterial,
   type WindowMaterialHost
-} from '../../../../../shared/window-material'
+} from '../../../../../shared/app-lifecycle/windows/window-material'
 import { Button } from '../../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
 import { SettingsRow } from '../form-controls/SettingsFormControls'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { readPrefersReducedTransparency } from '@/hooks/use-reduce-visual-effects'
-import { activeWindowMaterial, rendererWindowMaterialHost } from '@/lib/window-material-runtime'
+import {
+  activeWindowMaterial,
+  rendererWindowMaterialHost
+} from '@/app-shell/appearance/window-material-runtime'
 import { translate } from '@/i18n/i18n'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 

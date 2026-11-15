@@ -4,7 +4,7 @@ import {
   type GitHubPRAutoMergeActionIntent,
   type GitHubPRMergeStateInput as SharedGitHubPRMergeStateInput,
   type GitHubPRMergeStateKind
-} from '../../../shared/github/pull-request-merge-state'
+} from '../../../shared/github/pull-requests/merge/pull-request-merge-state'
 import {
   gitHubPRAdminBypassTooltip,
   shouldOfferGitHubPRAdminBypass

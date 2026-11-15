@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { getWorkspaceAttachmentSourceContext } from '../sidebar/workspace-card/review/workspace-attachment-source-result'

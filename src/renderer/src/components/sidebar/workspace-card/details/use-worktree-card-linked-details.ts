@@ -1,6 +1,6 @@
 import { useTranslate } from '@/i18n/use-translate'
 import { getWorkspaceAttachments } from '../../../../../../shared/workspace-attachments/workspace-attachments'
-import type { IssueInfo } from '../../../../../../shared/github/pull-request-types'
+import type { IssueInfo } from '../../../../../../shared/github/pull-requests/pull-request-types'
 import type { LinearIssue } from '../../../../../../shared/linear/issue-types'
 import { getWorktreeCardJiraIssueDisplay } from '../review/worktree-card-jira-issue-display'
 import type { WorktreeCardIssueDisplay } from '../metadata/worktree-card-meta-types'
@@ -104,6 +104,7 @@ export function useWorktreeCardLinkedDetails({
   const jiraIssueDisplay = getWorktreeCardJiraIssueDisplay(worktree)
   const cardTitleDisplay = getWorktreeCardTitleDisplay({
     storedDisplayName: worktree.displayName,
+    displayNameMode: worktree.displayNameMode,
     branchName: branch,
     // Fetched titles only: display fallbacks hold localized loading/unavailable placeholders.
     linearIssueTitle: linearIssue?.title,

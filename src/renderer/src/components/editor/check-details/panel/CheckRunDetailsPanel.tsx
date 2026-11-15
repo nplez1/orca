@@ -6,10 +6,10 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { useAppStore } from '@/store'
-import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
-import type { PRCheckDetail, PRCheckRunDetails } from '../../../../../../shared/github/check-types'
+import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/components/settings/navigation/settings-navigation-types'
 import { rendersEveryStep } from '../../../../../../shared/check-step-visibility'
 import type { CheckDetailsErrorAction } from '@/lib/check-details-error-action'
+import type * as GitHubChecks from '../../../../../../shared/github/checks/check-types'
 import { SourceControlFixSplitButton } from '@/components/right-sidebar/source-control/panel/source-control-fix-split-button'
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import { useIntlLocale, useTranslate, type Translate } from '@/i18n/use-translate'
@@ -20,7 +20,7 @@ import { CheckFailureSummary } from '../../CheckFailureSummary'
 import { CheckRunJobs } from './CheckRunJobs'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import { JenkinsRebuildButton } from '@/components/jenkins-rebuild-button'
-import { CheckRunCopyButton } from './CheckRunCopyButton'
+import { CopyTextButton } from '@/components/clipboard/CopyTextButton'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useCheckDetailsReadingPosition } from '../reading/use-check-details-reading-position'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
@@ -46,8 +46,8 @@ function formatCheckTimestamp(
 
 type CheckStatusLike = {
   gitlabAllowedFailure?: boolean
-  status: PRCheckDetail['status'] | (string & {}) | null | undefined
-  conclusion: PRCheckDetail['conclusion'] | (string & {}) | null | undefined
+  status: GitHubChecks.PRCheckDetail['status'] | (string & {}) | null | undefined
+  conclusion: GitHubChecks.PRCheckDetail['conclusion'] | (string & {}) | null | undefined
 }
 
 function getCheckStatusLabel(check: CheckStatusLike, t: Translate = translate): string {
@@ -104,8 +104,8 @@ export function CheckRunDetailsPanel({
   viewStateScopeId,
   contextKey
 }: {
-  check: PRCheckDetail
-  details: PRCheckRunDetails | null
+  check: GitHubChecks.PRCheckDetail
+  details: GitHubChecks.PRCheckRunDetails | null
   loading: boolean
   error: string | null
   /** Settings affordance for the error, when the failure is one the user can fix. */
@@ -389,7 +389,7 @@ export function CheckRunDetailsPanel({
                     <div className="text-sm font-medium">
                       {t('auto.components.editor.CheckRunDetailsPanel.d098e5529a', 'Output')}
                     </div>
-                    <CheckRunCopyButton
+                    <CopyTextButton
                       text={outputClipboardText}
                       label={t(
                         'auto.components.editor.CheckRunDetailsPanel.copyOutput',

@@ -15,7 +15,7 @@ import {
   type JiraTransitionSubmitOutcome
 } from '@/components/jira-transition-fields-form'
 import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import type { RuntimeJiraSettings } from '../../runtime/jira/runtime-jira-client'
 import {

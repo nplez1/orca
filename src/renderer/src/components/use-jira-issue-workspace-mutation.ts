@@ -7,7 +7,7 @@ import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import type { JiraIssue, JiraMutationResult } from '../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { JiraWriteTimeoutError } from '@/runtime/jira-write-deadline'
 import { enqueueJiraIssueMutation, JiraMutationFailure } from './jira-issue-mutation-queue'
 import {

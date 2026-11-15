@@ -1,5 +1,5 @@
 import { defineMethod } from '../../../core'
-import { ListIssuesPage, SearchIssuesPage } from '../../../../../../shared/rpc-contract/jira-params'
+import { ListIssuesPage, SearchIssuesPage } from '../../../../../../shared/rpc-contract/jira/jira-params'
 
 /** A page read resumes from either generation's cursor; nothing usable means page 1. */
 function pageCursor(params?: {

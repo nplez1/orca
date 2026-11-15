@@ -1,5 +1,5 @@
 import type { HostedReviewInfo } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
-import type { PRInfo } from '../../../../shared/github/pull-request-types'
+import type { PRInfo } from '../../../../shared/github/pull-requests/pull-request-types'
 
 /** The PR shape the Checks pane reads out of a review it was not handed by the PR cache.
  *

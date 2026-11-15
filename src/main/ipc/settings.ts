@@ -21,7 +21,7 @@ import { applyBrowserSessionProxies } from '../browser/sessions/proxy/browser-se
 import { applyProxyToElectronUpdaterSession } from '../updater/lifecycle/electron-updater-proxy-session'
 import { browserSessionRegistry } from '../browser/sessions/profiles/browser-session-registry'
 import { sanitizeNetworkSettings } from './network-settings-sanitization'
-import { normalizeAppIconId } from '../../shared/app-icon'
+import { normalizeAppIconId } from '../../shared/app-lifecycle/identity/app-icon'
 import { normalizeUiLanguage } from '../../shared/ui-language'
 import { applyAppIcon } from '../window/desktop-integration/app-icon'
 import { registerCustomAppIconHandlers } from './custom-app-icon'
@@ -32,7 +32,7 @@ import { prepareLocalWorktreeRootsForRepos } from '../workspaces/creation/worktr
 import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from './worktrees/creation/worktree-base-directory-watcher'
 import { applyPRBotAuthorOverride } from '../../shared/source-control/review-comments/pr-bot-author-overrides'
 import { resolveEnvironment } from '../../shared/remote-runtime/host-store/runtime-environment-store'
-import { readSettingsWithRuntimeEnvironmentPreference } from './runtime-environments/runtime-environment-preference'
+import { readSettingsWithRuntimeEnvironmentPreference } from './runtime-environments/catalog/runtime-environment-preference'
 import { haveSameDisabledTuiAgents } from '../../shared/agent-launch/catalog/tui-agent-selection'
 import {
   normalizeMobilePairingCustomAddress,
@@ -41,10 +41,10 @@ import {
 import {
   computerAwakeSettingsForMode,
   normalizeComputerAwakeMode
-} from '../../shared/computer-awake-mode'
+} from '../../shared/app-lifecycle/computer-awake-mode'
 import { resolveAiVaultSearchSettings } from '../../shared/ai-vault/search/ai-vault-search-settings'
 import { applySessionSearchSettingsChange } from '../ai-vault-search/session-search-enablement'
-import { getRuntimeEnvironmentRegistryRoot } from './runtime-environments/runtime-environment-registry-root'
+import { getRuntimeEnvironmentRegistryRoot } from './runtime-environments/catalog/runtime-environment-registry-root'
 
 const registryRoot = getRuntimeEnvironmentRegistryRoot
 
@@ -83,8 +83,9 @@ export function registerSettingsHandlers(
     }
   })
 
-  ipcMain.handle('settings:get', () =>
-    readSettingsWithRuntimeEnvironmentPreference(store, registryRoot())
+  ipcMain.handle(
+    'settings:get',
+    async () => await readSettingsWithRuntimeEnvironmentPreference(store, registryRoot())
   )
 
   ipcMain.handle(
@@ -101,8 +102,8 @@ export function registerSettingsHandlers(
   )
 
   // PTYs can bind before hydration; transport authority selection needs persisted settings synchronously.
-  ipcMain.on('settings:get-sync', (event) => {
-    event.returnValue = readSettingsWithRuntimeEnvironmentPreference(store, registryRoot())
+  ipcMain.on('settings:get-sync', async (event) => {
+    event.returnValue = await readSettingsWithRuntimeEnvironmentPreference(store, registryRoot())
   })
 
   ipcMain.handle('settings:set', async (event, args: Partial<GlobalSettings>) => {
@@ -263,14 +264,14 @@ export function registerSettingsHandlers(
 
   ipcMain.handle(
     'settings:set-active-runtime-environment-preference',
-    (event, args: { environmentId?: unknown }): GlobalSettings => {
+    async (event, args: { environmentId?: unknown }): Promise<GlobalSettings> => {
       const requestedEnvironmentId = args?.environmentId
       if (requestedEnvironmentId !== null && typeof requestedEnvironmentId !== 'string') {
         throw new Error('Invalid default host for new projects')
       }
       const requestedId = requestedEnvironmentId?.trim() || null
       const environmentId =
-        requestedId === null ? null : resolveEnvironment(registryRoot(), requestedId).id
+        requestedId === null ? null : (await resolveEnvironment(registryRoot(), requestedId)).id
       return store.updateSettings(
         { activeRuntimeEnvironmentId: environmentId },
         { notifyListeners: true, originWebContentsId: event.sender.id }

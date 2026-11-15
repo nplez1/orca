@@ -8,7 +8,7 @@ import {
   useAppStateViewActive,
   useAppStateValue
 } from '@/store/retained-views/app-state-view'
-import { nativeChatPreferenceFor } from '../../../../shared/structured-native-chat-launch-route'
+import { nativeChatPreferenceFor } from '../../../../shared/agent-launch/choices/structured-native-chat-launch-route'
 import type { AgentMenuRowsTarget, NewTabAgentMenuModel } from './new-tab-agent-menu-model'
 export type { AgentMenuRowsTarget, NewTabAgentMenuModel } from './new-tab-agent-menu-model'
 import { useMemo } from 'react'
@@ -37,8 +37,8 @@ import {
 } from '@/runtime/hosts/capabilities/local-runtime-capabilities'
 import { useDetectedAgents, type AgentDetectionTarget } from '@/hooks/useDetectedAgents'
 import { readDetectedAgentsForTarget } from '@/lib/agent-session/launch/inventory/agent-detection-target-inventory'
-import { useChatProgramFacts } from '@/lib/host-chat-program-acquisition'
-import { readChatProgram } from '@/lib/host-chat-program'
+import { useChatProgramFacts } from '@/lib/agent-session/launch/inventory/host-chat-program-acquisition'
+import { readChatProgram } from '@/lib/agent-session/launch/inventory/host-chat-program'
 import { resolveAgentMenuSelection } from '@/lib/agent-session/launch/routing/agent-menu-selection'
 import { useHostAgentMenuSettings } from '@/runtime/agent-launch-settings/use-host-agent-launch-preferences'
 import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'

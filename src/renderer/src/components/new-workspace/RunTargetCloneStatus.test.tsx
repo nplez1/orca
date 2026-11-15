@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
+import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
 import { RunTargetCloneStatus } from './RunTargetCloneStatus'
 import type {
   RunTargetAutoClone,

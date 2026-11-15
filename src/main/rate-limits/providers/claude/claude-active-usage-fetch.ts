@@ -2,7 +2,7 @@ import type {
   ProviderRateLimits,
   UsageRateLimitFailureKind,
   UsageRateLimitMetadata
-} from '../../../../shared/rate-limit-types'
+} from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import {
   refreshClaudeOAuthCredentials,
   type ClaudeOAuthRefreshOutcome
@@ -17,7 +17,7 @@ import { classifyClaudeOAuthUsageError } from './claude-usage-error-classificati
 import { OAuthUsageError } from './claude-oauth-usage-error'
 import type { ClaudeRateLimitFetchOptions } from './claude-usage-fetch-options'
 import { abortedClaudeRateLimitResult, makeClaudeUsageResult } from './claude-usage-result'
-import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../../../shared/claude-profile-routing'
+import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../../../shared/agent-accounts/claude/claude-profile-routing'
 import {
   claudeUsageEndpointGatedResult,
   openEndpointRetryAtMs,

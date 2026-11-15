@@ -3,11 +3,11 @@ import {
   normalizeRuntimePathForComparison,
   normalizeRuntimePathSeparators
 } from '../../cross-platform-path'
-import { isClipboardTextByteLengthOverLimit } from '../../clipboard-text'
 import {
   hasAiVaultSearchQueryOperators,
   splitAiVaultSearchQuery
 } from '../search/ai-vault-search-query-operators'
+import { isClipboardTextByteLengthOverLimit } from '../../clipboard/clipboard-text'
 import {
   aiVaultSessionInScope,
   createAiVaultScopeCwdMatcher

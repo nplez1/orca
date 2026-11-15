@@ -1,4 +1,4 @@
-import type { ProviderRateLimits, RateLimitState } from '../rate-limit-types'
+import type { ProviderRateLimits, RateLimitState } from '../agent-usage/rate-limits/rate-limit-types'
 import {
   USAGE_PROVIDER_MANIFEST,
   USAGE_PROVIDER_MANIFEST_IDS,

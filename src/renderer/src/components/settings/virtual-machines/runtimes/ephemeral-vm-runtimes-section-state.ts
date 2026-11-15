@@ -1,6 +1,6 @@
-import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { parseEphemeralVmLifetimeDuration } from '../../../../../../shared/ephemeral-vm-lifetime'
-import { EPHEMERAL_VM_CLEANUP_STOPPED_ERROR } from '../../../../../../shared/ephemeral-vm-recipe-destroy-result'
+import { EPHEMERAL_VM_CLEANUP_STOPPED_ERROR } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-destroy-result'
 import {
   isEphemeralVmHostActionable,
   resolveEphemeralVmRuntimeLease

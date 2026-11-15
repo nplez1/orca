@@ -4,7 +4,7 @@
 // no Electron app, so this module reaches user data and status rows only through the
 // app-environment shim and the hook server. See docs/reference/session-summary.md.
 import { join } from 'node:path'
-import { getAppEnvironment } from '../../shared/app-environment'
+import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
 import { isTuiAgent } from '../../shared/agent-launch/catalog/tui-agent-config'
 import { isCustomAgentId } from '../../shared/source-control/ai/generation/commit-message-agent-spec'

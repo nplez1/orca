@@ -3,14 +3,14 @@ import { LoaderCircle, Pencil, Plus, Server, Trash2 } from 'lucide-react'
 import type { JenkinsServerSummary } from '../../../../shared/jenkins-servers'
 import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import { readIpcErrorMessage } from '@/lib/ipc-error'
+import { readIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { runAsyncTask, runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import {
   IntegrationCardDetails,
   IntegrationCardShell
 } from '../integrations/presentation/integration-card-shell'
-import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
-import { cn } from '@/lib/utils'
+import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/components/settings/navigation/settings-navigation-types'
+import { cn } from '@/lib/class-names'
 import { useIntegrationSubordinateRowClass } from '../integrations/presentation/integration-card-presentation'
 import { JenkinsServerDialog } from './jenkins-server-dialog'
 import { translate } from '@/i18n/i18n'

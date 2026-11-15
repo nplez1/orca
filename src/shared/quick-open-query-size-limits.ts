@@ -1,4 +1,4 @@
-import { isClipboardTextByteLengthOverLimit } from './clipboard-text'
+import { isClipboardTextByteLengthOverLimit } from './clipboard/clipboard-text'
 
 /** Query admission limits for path search, shared by the host scan, the relay and the renderer. */
 

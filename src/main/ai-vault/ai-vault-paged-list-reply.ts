@@ -8,7 +8,7 @@ import {
   retainedAiVaultListDigests,
   aiVaultListSyncDelta
 } from './ai-vault-list-sync-store'
-import { aiVaultListSnapshot, type AiVaultListSnapshot } from './session-list-fingerprint'
+import { aiVaultListSnapshot, type AiVaultListSnapshot } from './listing/session-list-fingerprint'
 import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
 import { pageAiVaultListResult } from './session-list-page-bounds'
 

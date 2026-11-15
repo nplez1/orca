@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import {
-  isSshTargetHidden,
-  type SshConnectionState,
-  type SshTarget
-} from '../../../../../../shared/ssh-types'
+import type {
+  SshConnectionState,
+  SshTarget
+} from '../../../../../../shared/remote-runtime/ssh/ssh-types'
+import { isSshTargetHidden } from '../../../../../../shared/ssh-target-visibility'
 import { translate } from '@/i18n/i18n'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { Button } from '../../../ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../../ui/collapsible'
 import { Checkbox } from '../../../ui/checkbox'

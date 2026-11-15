@@ -1,5 +1,5 @@
-import { normalizeSshConfigAlias } from '../../../../../../shared/ssh-config-alias'
-import type { SshTarget } from '../../../../../../shared/ssh-types'
+import { normalizeSshConfigAlias } from '../../../../../../shared/remote-runtime/ssh/ssh-config-alias'
+import type { SshTarget } from '../../../../../../shared/remote-runtime/ssh/ssh-types'
 
 /** Alias-owning fields, plus visibility when the caller has the full row. */
 type SshTargetAliasCandidate = Pick<SshTarget, 'configHost' | 'label' | 'host'> &

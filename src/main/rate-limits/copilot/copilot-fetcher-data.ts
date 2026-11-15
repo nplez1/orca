@@ -1,5 +1,5 @@
 import type { ProviderAllowance } from '../../../shared/provider-allowance'
-import type { ProviderRateLimits, RateLimitWindow } from '../../../shared/rate-limit-types'
+import type { ProviderRateLimits, RateLimitWindow } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 
 /**
  * Shapes for GitHub's billing API. Copilot reports a monthly AI-credit budget rather

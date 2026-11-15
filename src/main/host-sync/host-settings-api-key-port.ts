@@ -1,5 +1,5 @@
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
-import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
+import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
 
 /** What a provider key store has to expose for {@link createHostSettingsApiKeyPort} to adapt it. */

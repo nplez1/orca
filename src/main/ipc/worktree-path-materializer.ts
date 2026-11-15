@@ -1,6 +1,6 @@
 import { lstat, realpath, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
+import { mapSettledWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
 import {
   WorktreeLinkedPathTargetExistsError,
   type DarwinFilesystemCache

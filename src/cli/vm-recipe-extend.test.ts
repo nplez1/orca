@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { parseEphemeralVmRecipeResult } from '../shared/ephemeral-vm-recipes'
+import { parseEphemeralVmRecipeResult } from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
 import {
   DEFAULT_EXTEND_TIMEOUT_MS,

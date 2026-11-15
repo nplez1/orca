@@ -1,9 +1,17 @@
-import { consumeLinearIssueRead } from '@/store/slices/linear/linear-issue-publication'
-import { useEffect } from 'react'
+import '@/store/slices/linear/linear-issue-read'
+import { consumeLinearIssueRead } from '@/store/slices/linear/linear-issue-read-lifecycle'
+import { useEffect, useMemo } from 'react'
 import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  getGitHubIssueUrlRepository,
+  getWorktreeGitHubIssueUrl
+} from '../../../../../../shared/worktree/github-issue-repository'
 
-import { isMacAppDataPath } from '@/lib/passive-macos-app-data-access'
-import { installWindowVisibilityInterval, isWindowVisible } from '@/lib/window-visibility-interval'
+import { isMacAppDataPath } from '@/app-shell/platform/passive-macos-app-data-access'
+import {
+  installWindowVisibilityInterval,
+  isWindowVisible
+} from '@/lib/window-activity/window-visibility-interval'
 import { isWebClient, type WorktreeCardProps } from './worktree-card-model'
 import type { useWorktreeCardFoundation } from './use-worktree-card-foundation'
 import type { useWorktreeCardReviewDetails } from '../details/use-worktree-card-review-details'
@@ -59,6 +67,13 @@ export function useWorktreeCardLifecycleEffects({
     showIssue: boolean
     showLinearIssue: boolean
   }): void {
+  const { linkedIssue } = worktree
+  // Keyed on the URL string so worktree refreshes don't restart the issue poll.
+  const issueUrl = getWorktreeGitHubIssueUrl(worktree)
+  const issueRepository = useMemo(
+    () => (linkedIssue ? getGitHubIssueUrlRepository(issueUrl, linkedIssue) : undefined),
+    [issueUrl, linkedIssue]
+  )
   const hostedReviewExactKey = !branch || branch === 'HEAD' ? hostedReviewCacheKey : undefined
   useEffect(() => {
     if (
@@ -112,16 +127,9 @@ export function useWorktreeCardLifecycleEffects({
   ])
 
   // Poll issues only while visible; hidden metadata does not justify GitHub calls.
+  // Why web clients and folders too: this card is the only owner of its issue's freshness; nothing sweeps the catalog.
   useEffect(() => {
-    // Why: per-card decoration lookups from the browser flood the RPC path at paired-web startup; the host is authoritative.
-    if (
-      isWebClient() ||
-      !issueRepo ||
-      isFolder ||
-      !worktree.linkedIssue ||
-      !issueCacheKey ||
-      !showIssue
-    ) {
+    if (!repo || !worktree.linkedIssue || !issueCacheKey || !showIssue) {
       return
     }
 
@@ -129,32 +137,38 @@ export function useWorktreeCardLifecycleEffects({
 
     // Why: fallback poll behind activity triggers; stopped while hidden to avoid waking idle workspaces.
     return installWindowVisibilityInterval({
-      run: () => void fetchIssue(issueRepo.path, issueNumber, { repoId: issueRepo.id }),
+      run: () =>
+        void fetchIssue((issueRepo ?? repo).path, issueNumber, {
+          repoId: (issueRepo ?? repo).id,
+          ownerRepo: issueRepository
+        }),
       intervalMs: 5 * 60_000
     })
-  }, [issueRepo, isFolder, worktree.linkedIssue, fetchIssue, issueCacheKey, showIssue])
+  }, [repo, issueRepo, worktree.linkedIssue, issueRepository, fetchIssue, issueCacheKey, showIssue])
 
   useEffect(() => {
     if (
       !newCardStyle ||
       !hoverDetailsOpen ||
       showIssue ||
-      isWebClient() ||
-      !issueRepo ||
-      isFolder ||
+      !repo ||
       !worktree.linkedIssue ||
       !issueCacheKey
     ) {
       return
     }
-    void fetchIssue(issueRepo.path, worktree.linkedIssue, { repoId: issueRepo.id })
+    void fetchIssue((issueRepo ?? repo).path, worktree.linkedIssue, {
+      repoId: (issueRepo ?? repo).id,
+      ownerRepo: issueRepository
+    })
   }, [
     newCardStyle,
     hoverDetailsOpen,
     showIssue,
+    repo,
     issueRepo,
-    isFolder,
     worktree.linkedIssue,
+    issueRepository,
     fetchIssue,
     issueCacheKey
   ])
@@ -164,26 +178,15 @@ export function useWorktreeCardLifecycleEffects({
       return
     }
     const controller = new AbortController()
-    const linearIssueId = worktree.linkedLinearIssue
-    const refreshLinearIssueIfVisible = (): void => {
-      if (!isWindowVisible()) {
-        return
-      }
-      void consumeLinearIssueRead(
-        fetchLinearIssue(linearIssueId, linearWorkspaceId, { sourceContext: linearSourceContext }),
-        () => !controller.signal.aborted,
-        undefined,
-        controller.signal
-      ).catch(() => {})
-    }
-    refreshLinearIssueIfVisible()
-    window.addEventListener('focus', refreshLinearIssueIfVisible)
-    document.addEventListener('visibilitychange', refreshLinearIssueIfVisible)
-    return () => {
-      controller.abort()
-      window.removeEventListener('focus', refreshLinearIssueIfVisible)
-      document.removeEventListener('visibilitychange', refreshLinearIssueIfVisible)
-    }
+    void consumeLinearIssueRead(
+      fetchLinearIssue(worktree.linkedLinearIssue, linearWorkspaceId, {
+        sourceContext: linearSourceContext
+      }),
+      () => !controller.signal.aborted,
+      undefined,
+      controller.signal
+    ).catch(() => {})
+    return () => controller.abort()
   }, [
     worktree.linkedLinearIssue,
     fetchLinearIssue,

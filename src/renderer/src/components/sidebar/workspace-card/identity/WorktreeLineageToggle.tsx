@@ -3,8 +3,11 @@ import { ChevronDown, Workflow } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslate } from '@/i18n/use-translate'
-import { getWorktreeStatusLabel, type WorktreeStatus } from '@/lib/worktree-status'
-import { cn } from '@/lib/utils'
+import {
+  getWorktreeStatusLabel,
+  type WorktreeStatus
+} from '@/lib/workspace/activity/worktree-status'
+import { cn } from '@/lib/class-names'
 import StatusIndicator from '../surface/StatusIndicator'
 import { useWorktreeActivityStatuses } from '../activity/use-worktree-activity-statuses'
 

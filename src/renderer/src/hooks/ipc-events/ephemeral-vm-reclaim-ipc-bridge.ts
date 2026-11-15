@@ -1,5 +1,5 @@
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
-import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   getWorktreeOperationOwnerHostIds,
   type WorktreeOperationRouteState

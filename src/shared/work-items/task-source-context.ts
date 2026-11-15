@@ -15,7 +15,7 @@ import {
 } from './task-provider-identity'
 import { isTaskProvider, type TaskProvider } from './task-providers'
 import type { GlobalSettings } from '../global-settings-types'
-import type { Repo } from '../repo-types'
+import type { Repo } from '../repository/repo-types'
 
 /** The scope key the account-backed task sources (Jira, Linear) use when no repo
  *  project names one: those sources are scoped by account, not by project, so

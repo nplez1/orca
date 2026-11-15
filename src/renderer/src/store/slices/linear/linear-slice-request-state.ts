@@ -1,8 +1,9 @@
+import './linear-issue-read'
 import {
   abandonLinearIssueReads,
   invalidateLinearIssueReads,
   type LinearIssueRequest
-} from './linear-issue-publication'
+} from './linear-issue-read-lifecycle'
 import { ownedSourceTarget } from '@/lib/provider-source-target'
 import { taskSourceCacheScopeHostId } from '../../../../../shared/work-items/task-source-context'
 import type { LinearSlice } from './linear-slice-contract'

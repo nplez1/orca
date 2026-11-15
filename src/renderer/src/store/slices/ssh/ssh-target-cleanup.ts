@@ -1,5 +1,5 @@
 import type { AppState } from '../../types'
-import { parseAppSshPtyId } from '../../../../../shared/ssh-pty-id'
+import { parseAppSshPtyId } from '../../../../../shared/remote-runtime/ssh/ssh-pty-id'
 import { resolveDirectSshTargetWorktreeIds } from '../../../lib/workspace/ownership/direct-ssh-target-scope'
 import { unbindTerminalTabPtys } from '../tabs/worktree-terminal-tab-respawn'
 import { recordDraft } from '../../keyed-record-transitions'
@@ -7,7 +7,7 @@ import {
   selectDetectedWorktreesByRepo,
   selectWorktreesByRepo
 } from '../../workspaces/catalog/workspace-record-fields'
-import type { SshTargetSummary } from '../../../../../shared/ssh-types'
+import type { SshTargetSummary } from '../../../../../shared/remote-runtime/ssh/ssh-types'
 
 /**
  * Target IDs the user hid, so host pickers can drop them while label and connection

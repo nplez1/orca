@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react'
 import { ChevronDown, LoaderCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 
 /** One compact property row for the narrow Issue pane: label left, value right.
  *

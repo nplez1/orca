@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createAgentStatusExtensionHarness,
   type AgentStatusExtensionHarness
-} from './agent-status-extension-test-harness'
+} from './managed-extensions/agent-status/agent-status-extension-test-harness'
 
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 10; i++) {

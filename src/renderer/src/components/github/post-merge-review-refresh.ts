@@ -1,10 +1,10 @@
 import type { AppState } from '@/store/types'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { HostedReviewState } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
-import { prCacheKey } from '../../store/github/cache/cache-identity'
+import { getGitHubPRCacheKey } from '../../../../shared/github/cache/github-cache-key'
 import { findWorktreeById } from '../../store/github/refresh/worktree-refresh'
 import { settingsForGitHubRepoOwner } from '../../store/github/work-items/work-item-routing'
 import { getHostedReviewCacheKey } from '../../store/slices/hosted-review/hosted-review-cache-identity'
@@ -190,7 +190,7 @@ export function resolvePostMergeReviewTarget(
   const settings = settingsForGitHubRepoOwner(state.settings, repo)
   const withRepoOwner = repo !== undefined
   const cacheKeyFor = (branch: string): string =>
-    prCacheKey(
+    getGitHubPRCacheKey(
       target.repoPath,
       repoId,
       branch,

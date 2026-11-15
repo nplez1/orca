@@ -5,6 +5,11 @@
  * guard here (LOCAL-PATCHES.md § `local(lint)`).
  */
 export const HOST_SYNC_DISPOSITION_ROWS_B = {
+  // Why replicated: a review-refresh cadence is a preference the host can honour.
+  prAutoRefresh: 'replicated',
+  // Why replicated: cleanup rules and the card's detail row are presentation preferences.
+  workspaceCleanupPolicy: 'replicated',
+  worktreeCardDetailsRow: 'replicated',
   floatingTerminalEnabled: 'replicated',
   browserClientHostedRemoteEnabled: 'replicated',
   browserProfileScope: 'replicated',

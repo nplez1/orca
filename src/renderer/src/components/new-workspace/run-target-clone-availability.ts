@@ -1,5 +1,5 @@
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
-import type { RepoKind } from '../../../../shared/repo-types'
+import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
+import type { RepoKind } from '../../../../shared/repository/repo-types'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 

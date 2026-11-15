@@ -3,7 +3,7 @@
 import { renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useAppStore } from '@/store'
-import type { PRComment } from '../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../shared/github/comments/comment-types'
 import type { PRCommentInlineThread } from './pr-comment-inline-threads'
 import { buildPRCommentInlineFromComments } from './worktree-pr-comment-inline'
 import { usePRCommentInlineSurface } from './usePRCommentInlineSurface'

@@ -1,9 +1,9 @@
-import type { PRInfo } from '../../../../../shared/github/pull-request-types'
-import type { ChecksPanelReview } from './checks-panel-review'
+import type { PRInfo } from '../../../../../shared/github/pull-requests/pull-request-types'
+import type { ChecksPanelReview } from './review-state/checks-panel-review'
 import type { WorkspaceReviewSelection } from '../use-workspace-review-selection'
 import { isChecksPaneReviewProvider, pickShownReview } from '../workspace-review-selection'
 import { gitHubPRInfoFromHostedReview } from '../hosted-review-to-pr-info'
-import { isGitLabChecksPanelReview } from './gitlab-review-client'
+import { isGitLabChecksPanelReview } from './review-data/gitlab-review-client'
 
 export type ChecksPanelShownReview = {
   /** The review the pane renders: the pick when there is one it can render, else the workspace's. */

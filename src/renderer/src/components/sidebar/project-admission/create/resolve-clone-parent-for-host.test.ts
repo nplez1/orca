@@ -4,7 +4,7 @@ import {
   toSshExecutionHostId
 } from '../../../../../../shared/execution-host'
 import { buildExecutionHostRegistry } from '../../../../../../shared/execution-host/execution-host-registry'
-import { buildProjectHostSetupOptions } from '@/lib/project-host-setup-options'
+import { buildProjectHostSetupOptions } from '@/lib/workspace/creation/project-host-setup-options'
 import {
   resolveCloneParentForHost,
   resolveRunTargetCloneParent

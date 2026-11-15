@@ -1,0 +1,49 @@
+import { revealTerminalPane } from '@/lib/workspace/activation/reveal-terminal-pane'
+import { activateAndRevealWorkspace } from '@/lib/workspace/activation/worktree-activation'
+import { activateStructuredAgentSessionTab } from '@/lib/agent-session/structured-agent-session-tab-activation'
+import {
+  structuredAgentSessionOwnerForTab,
+  structuredAgentSessionTargetForTab
+} from '@/runtime/native-chat/session-ownership/structured-agent-session-owner'
+import { useAppStore } from '@/store/index'
+import type { DashboardRevealAgentArgs } from '../../../../../shared/dashboard-snapshot'
+
+/**
+ * Click-to-focus from the Agent Dashboard (workspace jump or terminal preview).
+ *
+ * Why the workspace dispatcher rather than a bare `setActiveWorktree`: only the shared
+ * sequence switches the view back to terminal, resumes sleeping agent sessions, and seeds a
+ * terminal surface. A parked SSH workspace has no resident tab until those run, so the bare
+ * call revealed a workspace with nothing in it (#16731).
+ */
+export function revealDashboardAgent(args: DashboardRevealAgentArgs): boolean {
+  const state = useAppStore.getState()
+  const tab = state.unifiedTabsByWorktree[args.worktreeId]?.find(
+    (candidate) =>
+      candidate.id === args.tabId &&
+      candidate.worktreeId === args.worktreeId &&
+      candidate.contentType === 'agent-session'
+  )
+  if (tab) {
+    const owner = structuredAgentSessionOwnerForTab(state, tab)
+    const target = structuredAgentSessionTargetForTab(state, tab)
+    if (!target) {
+      return false
+    }
+    if (
+      activateAndRevealWorkspace(
+        args.worktreeId,
+        owner ? { executionHostId: owner } : undefined
+      ) === false
+    ) {
+      return false
+    }
+    return activateStructuredAgentSessionTab({ worktreeId: args.worktreeId, tabId: tab.id, target })
+  }
+  return revealTerminalPane({
+    worktreeId: args.worktreeId,
+    tabId: args.tabId,
+    leafId: args.leafId,
+    executionHostId: args.executionHostId ?? null
+  })
+}

@@ -6,7 +6,7 @@ import { normalizeCheckRunDetailsLogTails } from '@/lib/source-control/checks/ch
 import {
   GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE,
   isGitHubCheckDetailsTimeout
-} from '../../../../../shared/github/check-details-deadline'
+} from '../../../../../shared/github/checks/check-details-deadline'
 import {
   beginGitHubChecksTabDetails,
   settleGitHubChecksTabDetails,
@@ -19,7 +19,7 @@ import {
   rememberCheckDetails
 } from '@/components/github/check-details-cache'
 import { getGitHubRuntimeRepoId } from '@/lib/work-items/github/github-source-runtime-context'
-import type { PRCheckDetail } from '../../../../../shared/github/check-types'
+import type { PRCheckDetail } from '../../../../../shared/github/checks/check-types'
 import { translate } from '@/i18n/i18n'
 import type { ChecksTabActionContext } from './checks-tab-actions'
 

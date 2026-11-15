@@ -1,11 +1,11 @@
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
-import { getSecretStore } from '../../shared/secret-store'
+import { getSecretStore } from '../../shared/secure-storage/secret-store'
 import { writeCredentialFileAtomic } from '../credentials/integration-credential-file'
 import { readCredentialFileProtection } from '../credentials/credential-file-protection'
 import {
   classifyUnenvelopedCredential,
   type SecretAtRestProtection
-} from '../../shared/secret-at-rest-protection'
+} from '../../shared/secure-storage/secret-at-rest-protection'
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'

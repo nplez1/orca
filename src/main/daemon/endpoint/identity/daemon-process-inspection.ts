@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { parseUtcLstart, psUtcEnvironment } from '../../../../shared/ps-lstart-time'
-import { readPsStdoutInProcess } from '../../../../shared/libproc-process-table'
+import { readPsStdoutInProcess } from '../../../../shared/process-observation/darwin/libproc-process-table'
 import { parseLinuxBootTimeSeconds, parseLinuxProcStartTicks } from './daemon-process-start-time'
 import type {
   LinuxStatEvidence,

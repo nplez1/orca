@@ -15,7 +15,7 @@ import { RepoRootSetting } from './RepoRootSetting'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
 import { useTranslate } from '@/i18n/use-translate'
 import { GlobalWorktreeVisibilitySourcesSetting } from './GlobalWorktreeVisibilitySourcesSetting'
-import { GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
+import { GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID } from '@/components/settings/navigation/settings-navigation-types'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 
 type GeneralWorkspaceSettingsSectionProps = {

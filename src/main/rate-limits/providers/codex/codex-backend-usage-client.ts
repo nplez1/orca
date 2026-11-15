@@ -1,5 +1,8 @@
 import type { ProviderAllowance } from '../../../../shared/provider-allowance'
-import type { ProviderRateLimits, RateLimitWindow } from '../../../../shared/rate-limit-types'
+import type {
+  ProviderRateLimits,
+  RateLimitWindow
+} from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import { cancelUnreadResponseBody } from '../../../lib/unread-response-body'
 import { abortSignalWithTimeout } from '../../../lib/abort-signal-with-timeout'
 import {
@@ -29,8 +32,8 @@ type BackendUsageResponse = {
     primary_window?: BackendRateLimitWindow | null
     secondary_window?: BackendRateLimitWindow | null
   } | null
-  rate_limit_reset_credits?: Parameters<typeof mapBackendRateLimitResetCredits>[0]
   spend_control?: BackendSpendControl | null
+  rate_limit_reset_credits?: Parameters<typeof mapBackendRateLimitResetCredits>[0]
 }
 
 /**
@@ -202,15 +205,22 @@ export async function fetchCodexRateLimitsViaBackend(
   }
 }
 
-export async function supplementCodexSessionWindow(
+export async function supplementCodexUsageWindows(
   limits: ProviderRateLimits,
   request: CodexBackendRequest,
   options?: CodexRateLimitFetchOptions
 ): Promise<ProviderRateLimits> {
   // Why: run whenever the RPC produced no session window. That keeps the original
   // weekly-only plan case and adds the windowless enterprise case, whose allowance and
-  // planType exist only in the backend payload.
-  if (options?.signal?.aborted || limits.session) {
+  // planType exist only in the backend payload. Upstream's extra guards ride here too: a
+  // non-ok RPC result is not authoritative, and an app-server that already reported a
+  // monthly meter (spend-capped seat, #8664) has nothing left to supplement.
+  if (
+    options?.signal?.aborted ||
+    limits.status !== 'ok' ||
+    limits.session ||
+    limits.monthly
+  ) {
     return limits
   }
   try {
@@ -225,14 +235,17 @@ export async function supplementCodexSessionWindow(
     // its plan. Returning `limits` unchanged when there is nothing to add preserves the
     // previous no-op behaviour.
     if (!backend.session) {
+      // Why the weekly guard: a plan with a local weekly window is a normal subscription
+      // plan, so a backend monthly meter must not replace its bars.
+      const monthly = limits.weekly ? null : backend.monthly
       const adoptsPlan = backend.planType !== undefined && backend.planType !== limits.planType
       const adoptsCredits = rateLimitResetCredits !== limits.rateLimitResetCredits
-      if (!backend.monthly && !backend.allowance && !adoptsPlan && !adoptsCredits) {
+      if (!monthly && !backend.allowance && !adoptsPlan && !adoptsCredits) {
         return limits
       }
       return {
         ...limits,
-        ...(backend.monthly ? { monthly: backend.monthly } : {}),
+        ...(monthly ? { monthly } : {}),
         ...(backend.allowance ? { allowance: backend.allowance } : {}),
         planType: backend.planType ?? limits.planType,
         ...(rateLimitResetCredits !== undefined ? { rateLimitResetCredits } : {}),

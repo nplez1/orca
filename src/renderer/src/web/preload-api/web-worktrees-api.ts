@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 19-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import { pickApprovedSetupHashes } from '../../../../shared/worktree/approved-setup-hashes'
+import { pickApprovedSetupHashes } from '../../../../shared/worktree/creation/approved-setup-hashes'
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../shared/sidebar-inputs-switch'
 import type { Worktree, WorkspaceAttachment } from '../../../../shared/worktree/types'
 import type { WorkspaceAttachmentMutation } from '../../../../shared/workspace-attachments/workspace-attachment-mutation'
@@ -8,12 +8,12 @@ import {
   WORKTREE_LINKED_ITEMS_RUNTIME_CAPABILITY,
   WORKTREE_LINKED_ITEMS_DELTA_RUNTIME_CAPABILITY
 } from '../../../../shared/workspace-attachments/workspace-attachment-capabilities'
-import { WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY } from '../../../../shared/worktree-runtime-capabilities'
+import { WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY } from '../../../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
 import type { PreloadApi } from '../../../../preload/api-types'
 import type { ForceDeleteWorktreeBranchResult } from '../../../../shared/worktree/create-types'
 import type { WorkspaceLineage, WorktreeLineage } from '../../../../shared/worktree/lineage-types'
-import { readRetiredNameRegistryForRepo } from '../../../../shared/worktree/retired-name-cache'
-import { EMPTY_RETIRED_NAME_REGISTRY } from '../../../../shared/worktree/retired-name-registry'
+import { readRetiredNameRegistryForRepo } from '../../../../shared/worktree/naming/retired-name-cache'
+import { EMPTY_RETIRED_NAME_REGISTRY } from '../../../../shared/worktree/naming/retired-name-registry'
 import { toRuntimeWorktreeSelector } from '../../runtime/rpc/targets/runtime-worktree-selector'
 import {
   getRemoteRuntimeStatus,
@@ -32,7 +32,7 @@ import { noopUnsubscribe } from './web-storage'
 import { runApprovedSetupOnWebHost } from './web-approved-setup'
 import { emitWebWorkspaceSleep } from './web-workspace-sleep-notices'
 import { translate } from '@/i18n/i18n'
-import type { WorkspaceSleepOutcome } from '../../../../shared/workspace-sleep'
+import type { WorkspaceSleepOutcome } from '../../../../shared/workspace/lifecycle/workspace-sleep'
 
 // Past the host's two-minute chat stop, so a slow stop answers rather than timing out.
 const WEB_WORKSPACE_SLEEP_TIMEOUT_MS = 150_000
@@ -274,6 +274,7 @@ export function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees
     onChanged: () => noopUnsubscribe,
     onGitStatusMetadataChanged: () => noopUnsubscribe,
     onHeadIdentitiesChanged: () => noopUnsubscribe,
+    onMetadataSet: () => noopUnsubscribe,
     onBaseStatus: () => noopUnsubscribe,
     onRemoteBranchConflict: () => noopUnsubscribe
   }

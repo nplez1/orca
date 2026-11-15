@@ -1,4 +1,4 @@
-import type { PRMergeableState, PRReviewDecision, PRState } from './pull-request-types'
+import type { PRMergeableState, PRReviewDecision, PRState } from './pull-requests/pull-request-types'
 
 /** The pull-request facts an admin-bypass decision reads. */
 export type GitHubPRAdminBypassInput = {

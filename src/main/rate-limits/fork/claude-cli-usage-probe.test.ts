@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildClaudeChildProcessEnv } from '../../claude/claude-child-process-environment'
+import { buildClaudeChildProcessEnv } from '../../claude/child-process/claude-child-process-environment'
 import {
   probeClaudeUsage,
   readClaudeUsageFromCli,

@@ -1,17 +1,17 @@
+import { toEphemeralVmRuntimeRecipeSnapshot } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
 import {
   getEphemeralVmRecipeResultConnection,
   type EphemeralVmRecipeResult
-} from '../../shared/ephemeral-vm-recipes'
+} from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import {
   toEphemeralVmRuntimeContextMenuFields,
   toEphemeralVmRuntimeExtendFields,
-  toEphemeralVmRuntimeRecipeSnapshot,
   type EphemeralVmRuntimeRecord
-} from '../../shared/ephemeral-vm-runtimes'
+} from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   upsertEphemeralVmRuntime,
   upsertEphemeralVmRuntimeRollbackRecovery
-} from '../../shared/ephemeral-vm-runtime-store'
+} from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import type { ProvisionEphemeralVmRuntimeArgs } from './runtime-provisioning'
 import {
   toCleanupLastErrorFields,
@@ -19,8 +19,8 @@ import {
   ephemeralVmFailureFromError,
   pickEphemeralVmFailureCode,
   type EphemeralVmFailure
-} from '../../shared/ephemeral-vm-failure-copy'
-import type { EphemeralVmRecipeContext } from '../../shared/ephemeral-vm-recipe-runner'
+} from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
+import type { EphemeralVmRecipeContext } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner'
 import { ShellRecipeDriver } from '../environment-providers/shell-recipe-driver'
 
 type FailedStart = {

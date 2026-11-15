@@ -1,7 +1,7 @@
 import { isAbsolute } from 'node:path'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
-import { getEffectiveHostSetting } from '../../../shared/host-setting-overrides'
+import { getEffectiveHostSetting } from '../../../shared/execution-host/host-setting-overrides'
 import { resolveCheckoutParent } from '../../../shared/host-repo-root'
 import { resolveWorktreeLayoutMode } from '../../../shared/orca-workspace-layout'
 import { expandLeadingHomePath } from '../../filesystem/home-path-expansion'

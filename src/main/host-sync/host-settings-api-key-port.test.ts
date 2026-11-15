@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
-import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
+import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 import { createHostSettingsApiKeyPort } from './host-settings-api-key-port'
 import type { HostSettingsApiKeyStore } from './host-settings-api-key-port'
 import { createHostSettingsCredentialRegistry } from './host-settings-credential-port'

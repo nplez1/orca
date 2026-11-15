@@ -28,7 +28,7 @@ import { extractSessionSummaryJson } from './session-summary-json'
 
 export { extractSessionSummaryJson }
 import { rewriteSessionSummaryReports } from './session-summary-report'
-import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
+import { mapSettledWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
 import type { SessionSummarySourceEvent } from './session-summary-event-digest'
 import { planSessionSummaryRenderItems } from './session-summary-render-plan'
 import {

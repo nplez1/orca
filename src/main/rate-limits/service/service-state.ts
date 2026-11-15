@@ -1,11 +1,11 @@
-import type { LocalAccountRuntimeTarget } from '../../../shared/local-account-runtime'
+import type { LocalAccountRuntimeTarget } from '../../../shared/agent-accounts/local-account-runtime'
 import type { BrowserWindow } from 'electron'
 import type {
   AntigravityAccountUsage,
   InactiveAccountUsage,
   ProviderRateLimits,
   RateLimitState
-} from '../../../shared/rate-limit-types'
+} from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import { USAGE_PROVIDER_IDS } from '../../../shared/usage-provider-enablement'
 import { usageProviderPendingReadout } from '../../../shared/usage-providers/usage-provider-readouts'
@@ -20,6 +20,7 @@ import {
   type OpenCodeGoRateLimitConfig,
   type MiniMaxRateLimitConfig,
   type AntigravityUsageEnabledResolver,
+  type ClaudeOAuthUsageEnabledResolver,
   type MuseUsageEnabledResolver,
   type ZcodePlanRateLimitConfig,
   type DeepSeekRateLimitConfig,
@@ -30,8 +31,8 @@ import {
   USAGE_PROVIDER_STATE_KEYS,
   DEFAULT_POLL_MS
 } from './service-types'
-import type { NormalizedCodexAccountSelectionTarget } from '../../../shared/codex-selection-lane'
-import type { NormalizedClaudeAccountSelectionTarget } from '../../claude-accounts/runtime-selection'
+import type { NormalizedCodexAccountSelectionTarget } from '../../../shared/agent-accounts/codex/codex-selection-lane'
+import type { NormalizedClaudeAccountSelectionTarget } from '../../claude-accounts/selection/runtime-selection'
 import type { InactiveClaudeAccount } from '../providers/claude/claude-managed-account-usage'
 import type { NetworkProxySettings } from '../../../shared/network-proxy'
 import { readGrokAuthSession } from '../providers/grok/grok-auth'
@@ -126,10 +127,20 @@ export abstract class RateLimitServiceState {
   protected fetchIdleResolvers: (() => void)[] = []
   protected codexFetchGeneration = 0
   protected claudeFetchGeneration = 0
+  protected claudeUsageAbortController = new AbortController()
+  protected liveClaudeUsage: ProviderRateLimits | null = null
   // Why: cached display receipts cannot establish when the selected account was last checked.
   protected lastClaudeCheckCompletedAt: number | null = null
   // Capture account attribution once per cycle instead of rerunning auth preparation on every post.
-  protected lastClaudeAuthSnapshot: { configDir: string | null; provenance: string } | null = null
+  protected lastClaudeAuthSnapshot: {
+    configDir: string | null
+    home: string | undefined
+    provenance: string
+  } | null = null
+  /** Where the applied host-runtime Claude/Codex readings were taken. */
+  protected usageReadingAccounts: Partial<
+    Record<'claude' | 'codex', { home: string; provenance: string }>
+  > = {}
   protected opencodeFetchGeneration = 0
   protected minimaxFetchGeneration = 0
   protected zcodeFetchGeneration = 0
@@ -167,6 +178,7 @@ export abstract class RateLimitServiceState {
   protected deepInfraConfigResolver: (() => DeepInfraRateLimitConfig) | null = null
   protected copilotConfigResolver: (() => CopilotRateLimitConfig) | null = null
   protected geminiCliOAuthEnabledResolver: GeminiCliOAuthEnabledResolver | null = null
+  protected claudeOAuthUsageEnabledResolver: ClaudeOAuthUsageEnabledResolver | null = null
   protected antigravityUsageEnabledResolver: AntigravityUsageEnabledResolver | null = null
   protected antigravityFetchTarget: LocalAccountRuntimeTarget = { runtime: 'host', wslDistro: null }
   protected antigravityAccountUsageRecorder: AntigravityAccountUsageRecorder | null = null
@@ -289,6 +301,22 @@ export abstract class RateLimitServiceState {
       }
     }
     return result
+  }
+
+  protected rememberUsageReadingAccount(
+    provider: 'claude' | 'codex',
+    target: { runtime: 'host' | 'wsl' },
+    home: string | null | undefined,
+    provenance: string | null
+  ): void {
+    const previous = this.usageReadingAccounts[provider]
+    // The same object while unchanged: its identity is how readers see the reading's source move.
+    this.usageReadingAccounts[provider] =
+      target.runtime !== 'host' || !home || provenance === null
+        ? undefined
+        : previous?.home === home && previous.provenance === provenance
+          ? previous
+          : { home, provenance }
   }
 
   protected updateState(next: InternalRateLimitState): void {

@@ -1,10 +1,11 @@
-import { wslGatedReadFile } from '../native-chat/wsl-transcript-fs-access'
+import { wslGatedReadFile } from '../native-chat/transcript-filesystem/wsl-transcript-fs-access'
 import type { AiVaultSessionSubagentInfo } from '../../shared/ai-vault/contracts/ai-vault-types'
 import {
   PI_CLAUDE_PARENT_MARKER_TYPE,
   piClaudeParentMarkerPath
 } from '../../shared/pi-claude-parent-marker'
-import { extractString, parseJsonObject } from './session-scanner-values'
+import { extractString } from '../../shared/text/trimmed-string'
+import { parseJsonObject } from './parsing/session-json-object'
 
 /**
  * A `claude --print` child spawned by a pi session writes its conversation as an ordinary root

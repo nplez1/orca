@@ -4,7 +4,7 @@ import { act, cloneElement, isValidElement, type ReactElement, type ReactNode } 
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SetupHostOption } from '@/components/settings/repository/hosts/repository-host-setup-options'
-import type { Repo } from '../../../../../../shared/repo-types'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import {
   RepoHeaderProjectActionsMenu,
   type RepoHeaderProjectActions

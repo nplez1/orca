@@ -1,12 +1,12 @@
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import {
   getRepoExecutionHostId,
   getRepoSshConnectionId,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import { splitWorktreeId } from '../../../../shared/worktree/id'
-import type { GitPushTarget } from '../../../../shared/worktree/types'
-import type { GhAccountBinding } from '../../../../shared/github/account-binding'
+import type { GitPushTarget, GitWorktreeInfo } from '../../../../shared/worktree/types'
+import type { GhAccountBinding } from '../../../../shared/github/accounts/account-binding'
 
 export type RuntimeWorktreeRemovalTarget = {
   id: string
@@ -29,6 +29,8 @@ export type RemoveManagedWorktreeOptions = {
   hostId?: string
   /** Reply with the finished delete's result; otherwise a background delete replies on acceptance. */
   waitForBackgroundRemoval?: boolean
+  /** Archive marks the row after every refusal, before Git deletes the checkout; purge then keeps it. */
+  archive?: { markArchived: (worktree: GitWorktreeInfo) => Promise<void> }
 }
 
 export function getRuntimeWorktreeRemovalOptionsKey(
@@ -40,6 +42,7 @@ export function getRuntimeWorktreeRemovalOptionsKey(
     | 'allowFailedArchiveHook'
     | 'deleteBranch'
     | 'deleteRemoteBranch'
+    | 'archive'
   >
 ): string {
   // Forced retries must not coalesce onto an attempt refusing unverified PTY stop.
@@ -54,7 +57,9 @@ export function getRuntimeWorktreeRemovalOptionsKey(
         ? 'delete-branch'
         : 'keep-branch'
   const remoteBranchKey = options.deleteRemoteBranch ? 'delete-remote-branch' : 'keep-remote-branch'
-  return `${options.force ? 'force' : 'normal'}:${hooksKey}:${ptyKey}:${archiveKey}:${branchKey}:${remoteBranchKey}`
+  const removalKey = `${options.force ? 'force' : 'normal'}:${hooksKey}:${ptyKey}:${archiveKey}:${branchKey}:${remoteBranchKey}`
+  // An archive keeps the metadata a plain delete purges; they must never share one reply.
+  return options.archive ? `archive:${removalKey}` : removalKey
 }
 
 // Null host is host-unaware; unstamped legacy rows are adoptable, but either explicit host spelling must match exactly.

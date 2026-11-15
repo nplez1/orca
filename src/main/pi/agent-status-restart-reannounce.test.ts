@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { createAgentStatusExtensionHarness } from './agent-status-extension-test-harness'
+import { createAgentStatusExtensionHarness } from './managed-extensions/agent-status/agent-status-extension-test-harness'
 import {
   complete,
   postedSubagentRunIds,
@@ -8,7 +8,7 @@ import {
   startAsync,
   startChild,
   startWorkflow
-} from './agent-status-subagent-event-fixtures'
+} from './managed-extensions/agent-status/agent-status-subagent-event-fixtures'
 import { harnessWithEndpoint, restartOrca, WATCH_MS, working } from './agent-status-restart-harness'
 
 beforeEach(() => vi.useFakeTimers())

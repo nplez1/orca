@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { JiraIssueListFiltersParam } from '../../../shared/rpc-contract/jira-quick-filter-params'
+import { JiraIssueListFiltersParam } from '../../../shared/rpc-contract/jira/jira-quick-filter-params'
 import type {
   JiraIssueFilter,
   JiraIssueListFilters,

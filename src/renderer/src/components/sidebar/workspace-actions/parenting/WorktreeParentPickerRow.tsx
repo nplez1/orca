@@ -1,13 +1,16 @@
 import React from 'react'
 import { GitBranch, Server } from 'lucide-react'
 import { RepoBadgeMark } from '@/components/repo/RepoBadgeLabel'
-import { getWorktreeStatusLabel, type WorktreeStatus } from '@/lib/worktree-status'
+import {
+  getWorktreeStatusLabel,
+  type WorktreeStatus
+} from '@/lib/workspace/activity/worktree-status'
 import { useTranslate } from '@/i18n/use-translate'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import '../../workspace-card/activity/worktree-card-empty-inputs'
 import { branchDisplayName } from '../../workspace-card/identity/worktree-branch-display'
 import StatusIndicator from '../../workspace-card/surface/StatusIndicator'
-import type { Repo } from '../../../../../../shared/repo-types'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { ParentMachineBadge } from './ParentMachineBadge'

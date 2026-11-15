@@ -1,13 +1,13 @@
 import type SyncDatabase from '../sqlite/sync-database'
-import type { SessionSearchRoute } from './session-search-engine-types'
-import type { SessionRow } from './session-search-hit-ranking'
+import type { SessionSearchRoute } from './query/session-search-engine-types'
+import type { SessionRow } from './query/session-search-hit-ranking'
 import {
   andExpression,
   orExpression,
   phraseExpression,
   type SessionSearchQueryPlan
-} from './session-search-query-planner'
-import type { RetrievalScope } from './session-search-retrieval'
+} from './query/session-search-query-planner'
+import type { RetrievalScope } from './query/session-search-retrieval'
 
 // Ids per `loadSessions` statement, with room to spare for the filter's own
 // bound values beside them. Matches the content path's batch size deliberately:

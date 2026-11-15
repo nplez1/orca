@@ -6,7 +6,7 @@ import {
   findRegisteredTerminalTab,
   focusRuntimeTerminalSurface
 } from '../runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-registry'
-import { hasVisibleOverlay } from '@/lib/visible-overlay'
+import { hasVisibleOverlay } from '@/lib/overlay-interaction/visible-overlay'
 import { useAppStore } from '@/store'
 import { isEventTargetInsideCurrentTarget } from '../components/sidebar/workspace-card/controller/worktree-card-dom-events'
 

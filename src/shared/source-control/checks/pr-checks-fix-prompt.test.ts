@@ -10,7 +10,7 @@ import type {
   PRCheckJob,
   PRCheckRunDetails,
   PRCheckStep
-} from '../../github/check-types'
+} from '../../github/checks/check-types'
 
 const failingCheck: PRCheckDetail = {
   name: 'unit',

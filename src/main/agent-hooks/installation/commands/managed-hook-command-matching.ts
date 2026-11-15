@@ -30,7 +30,7 @@ export type ManagedCommandMatcherOptions = {
 export function createManagedCommandMatcher(
   scriptFileName: string,
   options: ManagedCommandMatcherOptions = {}
-): (command: string | undefined) => boolean {
+): (command: unknown) => boolean {
   const scriptStem = scriptFileName.replace(/\.(?:cmd|ps1|sh)$/, '')
   const ownNeedles = managedCommandNeedles(HOME_DIRECTORY_NAME, scriptFileName, scriptStem)
   const ownNativeHook = nativeHookNeedle(HOME_DIRECTORY_NAME, scriptFileName)
@@ -45,7 +45,8 @@ export function createManagedCommandMatcher(
   // app changes it.
   const explicitLegacySweep = options.sweepLegacyHomeDirectory
   return (command) => {
-    if (!command) {
+    // hooks.json is user-editable, so a command may not be a string.
+    if (typeof command !== 'string' || !command) {
       return false
     }
     const lines = hookCommandLines(command)

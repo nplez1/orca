@@ -1,6 +1,6 @@
 import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/utils'
-import type { PRCheckBuild } from '../../../shared/github/check-types'
+import { cn } from '@/lib/class-names'
+import type { PRCheckBuild } from '../../../shared/github/checks/check-types'
 
 /** Compact build duration: `4m 12s`, `1h 3m`, `12s`. */
 export function formatBuildDuration(ms: number): string {

@@ -10,15 +10,15 @@ import React, { type ReactNode } from 'react'
 import { act, cleanup, render, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Repo } from '../../../../../../shared/repo-types'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import { DEFAULT_WORKTREE_CARD_PROPERTIES } from '../../../../../../shared/worktree/card-properties'
+import { DEFAULT_WORKTREE_CARD_PROPERTIES } from '../../../../../../shared/worktree/row-display/card-properties'
 import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/row-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import WorktreeCard from '../surface/WorktreeCard'
 import type { EphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
 import { resolveEphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
-import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 
 type Mocks = {
   state: Record<string, unknown>

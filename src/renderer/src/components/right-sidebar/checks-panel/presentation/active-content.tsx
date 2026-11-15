@@ -35,7 +35,7 @@ import { useWorktreePRCommentInline } from '../../../pr-comment-inline/worktree-
 import { usePRCommentCodeNavigation } from '../../../pr-comment-inline/pr-comment-code-navigation'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import type { PRComment } from '../../../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../../../shared/github/comments/comment-types'
 import { ChecksPanelReviewHeader } from './review-header'
 
 export function ChecksPanelActiveContent({

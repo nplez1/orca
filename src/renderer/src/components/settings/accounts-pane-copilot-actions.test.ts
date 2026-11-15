@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
+import type { FeatureInteractionId } from '../../../../shared/feature-education/interactions/feature-interaction-catalog'
 import type { CopilotCredentialSource } from './accounts/accounts-pane-types'
 import { createCopilotCredentialActions } from './accounts-pane-copilot-actions'
 

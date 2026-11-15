@@ -1,13 +1,13 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
-import { getAppEnvironment } from '../../shared/app-environment'
+import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { agentHookServer } from '../agent-hooks/server/agent-hook-server'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import {
   isSessionSummaryCloseRequest,
   isSessionSummaryOpenRequest
 } from '../../shared/session-summary-types'
-import { callRuntimeEnvironment } from './runtime-environments/runtime-environment-transport-routing'
+import { callRuntimeEnvironment } from './runtime-environments/requests/runtime-environment-transport-routing'
 import { getSshConnectionManager } from '../ssh/targets/ssh-target-registry'
 import { createAgentCliSessionFoldBrain } from '../session-summary/session-summary-agent-cli-fold-brain'
 import { createSessionSummaryEventReader } from '../session-summary/session-summary-event-reader'

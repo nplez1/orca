@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { FolderOpen, FolderSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
+import { floatingWorkspaceUnavailableReason } from '@/components/floating-terminal/workspace/floating-workspace-availability'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import type { FloatingTerminalTriggerLocation } from '../../../../../shared/ui-chrome-types'
 import { Button } from '../../ui/button'
@@ -13,9 +14,10 @@ import { getFloatingWorkspaceSearchEntries } from './floating-workspace-search'
 import { matchesSettingsSearch } from '../search/settings-search'
 import { useAppStore } from '../../../store/index'
 import { useTranslate } from '@/i18n/use-translate'
-import { isWebClientLocation } from '@/lib/web-client-location'
-import { getRendererAppPlatform } from '@/lib/renderer-app-platform'
+import { getRendererAppPlatform } from '@/app-shell/platform/renderer-app-platform'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
+import { SettingsGroup } from '../section-layout/SettingsGroup'
 
 type FloatingWorkspacePaneProps = {
   settings: Pick<
@@ -43,6 +45,8 @@ export function FloatingWorkspacePane({
   const t = useTranslate()
   const searchQuery = useAppStore((state) => state.settingsSearchQuery)
   const includeBrowser = !isWebClientLocation()
+  // Pass the component's translator so a language change re-renders the reason.
+  const unavailableReason = floatingWorkspaceUnavailableReason(t)
   const [resolvedFloatingWorkspacePath, setResolvedFloatingWorkspacePath] = useState('')
 
   useEffect(() => {
@@ -100,7 +104,7 @@ export function FloatingWorkspacePane({
   }
 
   return (
-    <section className="space-y-4">
+    <SettingsGroup>
       <SearchableSetting
         title={t('auto.components.settings.FloatingWorkspacePane.2374e81dd8', 'Floating workspace')}
         description={t(
@@ -118,17 +122,21 @@ export function FloatingWorkspacePane({
           'quick panel',
           'launch directory'
         ]}
-        className="divide-y divide-border/40"
+        className="divide-y divide-border"
       >
         <SettingsSwitchRow
           label={t(
             'auto.components.settings.FloatingWorkspacePane.172d1d75c3',
             'Enable floating workspace'
           )}
-          description={t(
-            'auto.components.settings.FloatingWorkspacePane.41eb95f7f0',
-            'Shows the floating workspace button and panel.'
-          )}
+          description={
+            unavailableReason ??
+            t(
+              'auto.components.settings.FloatingWorkspacePane.41eb95f7f0',
+              'Shows the floating workspace button and panel.'
+            )
+          }
+          disabled={unavailableReason !== null}
           checked={settings.floatingTerminalEnabled}
           onChange={() => {
             if (!settings.floatingTerminalEnabled) {
@@ -214,6 +222,6 @@ export function FloatingWorkspacePane({
           }
         />
       </SearchableSetting>
-    </section>
+    </SettingsGroup>
   )
 }

@@ -8,7 +8,7 @@ import {
   runtimeEnvironmentCall
 } from '../github/github-slice-test-harness'
 import type { AppState } from '../types'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 
 const branch = 'feature/remote-recovery'
 const repoId = 'repo-runtime'

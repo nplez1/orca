@@ -2,15 +2,14 @@ import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
 import type { GitHubSlice } from '../github-slice-contract'
 import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
+import { getWorktreeGitHubIssueRepository } from '../../../../../shared/worktree/github-issue-repository'
 import { buildPRRefreshCandidate, findWorktreeReviewOwner } from './worktree-refresh'
-import { getGitHubRepoLookupIndex } from '../repositories/github-repo-lookup-index'
 import { issueCacheKey } from '../cache/cache-identity'
-import { CACHE_TTL, evictStaleEntries } from '../cache/cache-policy'
+import { evictStaleEntries } from '../cache/cache-policy'
 import { pruneExpiredPRRefreshStates } from './pr-refresh-state'
-import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 import { pruneExpiredPRRefreshStartedEntries } from '../pull-requests/pr-result-cache'
 import { settingsForGitHubRepoOwner } from '../work-items/work-item-routing'
-import { selectWorktreesByRepo } from '../../workspaces/catalog/workspace-record-fields'
+import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 
 export const createRefreshSweepActions = (
   set: Parameters<StateCreator<AppState>>[0],
@@ -42,47 +41,7 @@ export const createRefreshSweepActions = (
     })
 
     // Why: don't prune prRequestGenerations here — deleting a live generation makes its response look stale.
-
-    const state = get()
-    if (!(state.worktreeCardProperties ?? []).includes('issue')) {
-      return
-    }
-
-    const now = Date.now()
-    const repoLookup = getGitHubRepoLookupIndex(state.repos)
-
-    for (const worktrees of Object.values(selectWorktreesByRepo(state))) {
-      for (const wt of worktrees) {
-        const repo = repoLookup.findById(wt.repoId)
-        if (!repo) {
-          continue
-        }
-
-        if (wt.linkedIssue) {
-          // Why the link's repo: a workspace created from a task on another host lives in that
-          // project's repo while the issue stays where the task was listed, so the workspace
-          // row would key a fetch the card never reads. Same helper as the card and the pane.
-          const issueRepo = findLinkedIssueRepo(state.repos, wt, wt.linkedIssue)
-          if (!issueRepo) {
-            continue
-          }
-          const ownerSettings = settingsForGitHubRepoOwner(state.settings, issueRepo)
-          const issueKey = issueCacheKey(
-            issueRepo.path,
-            issueRepo.id,
-            wt.linkedIssue,
-            ownerSettings,
-            issueRepo.connectionId,
-            issueRepo.executionHostId,
-            true
-          )
-          const issueEntry = state.issueCache[issueKey]
-          if (!issueEntry || now - issueEntry.fetchedAt >= CACHE_TTL) {
-            void get().fetchIssue(issueRepo.path, wt.linkedIssue, { repoId: issueRepo.id })
-          }
-        }
-      }
-    }
+    // Each surface that shows a linked issue refreshes it on reveal; no catalog-wide issue reads here.
   },
 
   refreshGitHubForWorktree: (worktreeId, executionHostId) => {
@@ -99,13 +58,14 @@ export const createRefreshSweepActions = (
     const ownerHostId = getRepoExecutionHostId(candidate)
 
     const branch = candidate.branch
-    const prKey = candidate.cacheKey
     // Why the link's repo: the issue lives where the task was listed, which is not always
     // this workspace's repo — keying off the workspace invalidates an entry the card never
     // reads and refetches through the wrong repo.
     const issueRepo = worktree.linkedIssue
       ? findLinkedIssueRepo(state.repos, worktree, worktree.linkedIssue)
       : null
+    const ownerRepo = getWorktreeGitHubIssueRepository(worktree)
+    const prKey = candidate.cacheKey
     const issueKey =
       issueRepo && worktree.linkedIssue
         ? issueCacheKey(
@@ -115,7 +75,8 @@ export const createRefreshSweepActions = (
             settingsForGitHubRepoOwner(state.settings, issueRepo),
             issueRepo.connectionId,
             issueRepo.executionHostId,
-            true
+            true,
+            ownerRepo
           )
         : ''
 
@@ -141,7 +102,10 @@ export const createRefreshSweepActions = (
       worktree.linkedIssue &&
       issueRepo
     ) {
-      void get().fetchIssue(issueRepo.path, worktree.linkedIssue, { repoId: issueRepo.id })
+      void get().fetchIssue(issueRepo.path, worktree.linkedIssue, {
+        repoId: issueRepo.id,
+        ownerRepo
+      })
     }
   }
 })

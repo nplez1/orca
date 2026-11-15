@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import type { SettingsNavigationTarget } from '@/lib/settings-navigation-types'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import { settingsNavigationHostId } from './settings-host-scope'
+import type { SettingsNavigationTarget } from '@/components/settings/navigation/settings-navigation-types'
 
 /** A chat-scoped account view lasts only for this Settings visit. */
 export function useSettingsHostNavigation(target: SettingsNavigationTarget | null) {

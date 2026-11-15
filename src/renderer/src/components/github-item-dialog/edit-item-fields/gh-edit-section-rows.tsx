@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CircleDashed, CircleDot } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { getStateLabel } from '@/components/github/work-item-state-presentation'
 import { useTranslate } from '@/i18n/use-translate'
 import {

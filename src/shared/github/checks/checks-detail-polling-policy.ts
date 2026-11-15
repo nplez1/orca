@@ -1,0 +1,151 @@
+import type { PRCheckDetail } from './check-types'
+import type { CheckStatus } from '../pull-requests/pull-request-types'
+import type { HostedReviewState } from '../../source-control/hosted-review/hosted-review-contracts'
+import {
+  FOCUSED_CHECKS_REFRESH_INTERVAL_MS,
+  getPRAutoRefreshCadence,
+  reviewRefreshIntervalMs,
+  scaleReviewRefreshInterval,
+  type PRAutoRefreshCadence
+} from '../../review-refresh-policy'
+import { summarizeProviderChecks } from '../../source-control/checks/provider-check-summary'
+
+/** Ceiling for the focused loop while a run's rows repeat read after read. */
+const STUCK_RUN_BACKOFF_MAX_MS = 30_000
+
+export function detailedChecksStatus(checks: readonly PRCheckDetail[]): CheckStatus | undefined {
+  if (checks.length === 0) {
+    return undefined
+  }
+  if (
+    checks.some(
+      (check) =>
+        check.status !== 'completed' ||
+        check.conclusion === 'pending' ||
+        check.conclusion === 'action_required' ||
+        check.conclusion === null
+    )
+  ) {
+    return 'pending'
+  }
+  if (
+    checks.some((check) => ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? ''))
+  ) {
+    return 'failure'
+  }
+  return checks.some((check) => check.conclusion === 'success') ? 'success' : 'neutral'
+}
+
+/**
+ * Whether the review's rollup reports something the panel's rows cannot be showing.
+ *
+ * Only one direction counts: a rollup that says pending or failure while the rows say otherwise is
+ * news the panel has to go read. Rows can hold more than the rollup does (checks it dropped or has
+ * not seen yet), and a refetch cannot improve on those.
+ */
+export function rollupReportsUnseenRun(
+  displayed: CheckStatus | null,
+  rollup: CheckStatus | null
+): boolean {
+  return (
+    displayed !== null && (rollup === 'pending' || rollup === 'failure') && displayed !== rollup
+  )
+}
+
+// Unchanged checks back off to 2 min; a change restores the 1 min cadence. Failures back off from 1 to 15 min.
+export function nextChecksPollBackoffMs(
+  previousMs: number,
+  result: 'changed' | 'unchanged' | 'failed'
+): number {
+  if (result === 'failed') {
+    return Math.min(Math.max(60_000, previousMs * 2), 900_000)
+  }
+  return result === 'unchanged' ? Math.min(previousMs * 2, 120_000) : 60_000
+}
+
+export class ChecksDetailPollingPolicy {
+  private status: CheckStatus | undefined
+  private liveRun: boolean | undefined
+  private hasDetails = false
+  private failing = false
+  private unchangedReads = 0
+  private signature = ''
+
+  /** Whether the last read failed — a force may not shorten that backoff. */
+  get failed(): boolean {
+    return this.failing
+  }
+
+  reset(): void {
+    this.status = undefined
+    this.liveRun = undefined
+    this.hasDetails = false
+    this.failing = false
+    this.unchangedReads = 0
+    this.signature = ''
+  }
+
+  accept(checks: readonly PRCheckDetail[], pipelineCheck: PRCheckDetail | null = null): string {
+    // A GitLab parent pipeline's own status decides cadence; a partial job page cannot settle it.
+    const settledChecks = pipelineCheck ? [pipelineCheck] : checks
+    this.status = detailedChecksStatus(settledChecks)
+    // Why: "unfinished" for the focused loop is the shared classifier's pending count, not the
+    // status above — an approval-pending suite is `pending` there and must not keep a 10s loop.
+    this.liveRun =
+      settledChecks.length > 0 ? summarizeProviderChecks(settledChecks).pending > 0 : undefined
+    this.hasDetails = true
+    this.failing = false
+    const signature = JSON.stringify(
+      [...(pipelineCheck ? [pipelineCheck] : []), ...checks].map(
+        (check) => `${check.name}:${check.status}:${check.conclusion}`
+      )
+    )
+    this.unchangedReads = signature === this.signature ? this.unchangedReads + 1 : 0
+    this.signature = signature
+    return signature
+  }
+
+  fail(): void {
+    this.failing = true
+  }
+
+  /** `cadence`: the setting of the host that reads these checks; null means no timed read, which
+   *  under "off" includes the retry after a failure. */
+  delayMs(
+    state: HostedReviewState | undefined,
+    aggregateStatus: CheckStatus | undefined,
+    backoffMs: number,
+    cadence: PRAutoRefreshCadence = getPRAutoRefreshCadence()
+  ): number | null {
+    if (this.failing) {
+      return scaleReviewRefreshInterval(
+        Math.max(state === 'closed' ? 900_000 : 60_000, backoffMs),
+        cadence
+      )
+    }
+    const liveRun = this.liveRun ?? aggregateStatus === 'pending'
+    if (liveRun && state !== 'merged' && state !== 'closed') {
+      // Why: a row carries only status and conclusion, so a job that outlives ~30s reads identically
+      // however healthy it is (as does an offline runner). Easing off on unchanged rows keeps a long
+      // run from polling uncached every 10s, and the first row that moves restores the 10s loop.
+      return Math.min(
+        FOCUSED_CHECKS_REFRESH_INTERVAL_MS * 2 ** Math.min(this.unchangedReads, 2),
+        STUCK_RUN_BACKOFF_MAX_MS
+      )
+    }
+    const status = this.hasDetails && this.status !== undefined ? this.status : aggregateStatus
+    const interval = reviewRefreshIntervalMs(
+      {
+        state,
+        checksStatus: status,
+        hasReview: true,
+        selected: true
+      },
+      cadence
+    )
+    if (interval === null) {
+      return null
+    }
+    return state === 'closed' ? interval : Math.max(interval, backoffMs)
+  }
+}

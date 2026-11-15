@@ -3,12 +3,12 @@ import type { JiraIssue, JiraSite } from '../shared/jira/jira-types'
 import { isWorkspaceLinkedItemSourceContextMatch } from '../shared/workspace-attachments/workspace-linked-item-source-context'
 import type { TaskProvider } from '../shared/work-items/task-providers'
 import type { WorkspaceLinkedItem } from '../shared/worktree/types'
-import { RuntimeClientError } from './runtime-client'
-import type { JiraLinkRpcClient } from './handlers/worktree-jira-issue-link'
+import { RuntimeClientError } from './runtime/connection/types'
+import type { JiraLinkRpcClient } from './workspaces/worktree-jira-issue-link'
 import {
   getJiraIssueLinkFlagUpdates,
   resolveJiraIssueLinkUpdates
-} from './handlers/worktree-jira-issue-link'
+} from './workspaces/worktree-jira-issue-link'
 
 const ACME: JiraSite = {
   id: 'site-1',

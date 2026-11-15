@@ -1,8 +1,8 @@
 import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { AlertTriangle, ExternalLink, FolderPlus, GitBranchPlus, X } from 'lucide-react'
-import { useAppStore } from '../store'
-import { isGitRepoKind } from '../../../shared/repo-kind'
-import type { Repo } from '../../../shared/repo-types'
+import { useAppStore } from '../store/index'
+import { isGitRepoKind } from '../../../shared/repository/repo-kind'
+import type { Repo } from '../../../shared/repository/repo-types'
 import {
   dismissPreflightIssue,
   githubProjectKeys,

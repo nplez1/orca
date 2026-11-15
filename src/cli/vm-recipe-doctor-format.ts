@@ -1,5 +1,5 @@
-import { redactEphemeralVmRecipeDiagnosticText } from '../shared/ephemeral-vm-recipe-diagnostics'
-import type { EphemeralVmRecipeDoctorResult } from '../shared/ephemeral-vm-recipes'
+import { redactEphemeralVmRecipeDiagnosticText } from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import type { EphemeralVmRecipeDoctorResult } from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 
 /** Rendering and transcript capping for `orca vm recipe doctor`'s output. */
 

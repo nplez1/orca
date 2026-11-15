@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PRCheckDetail } from './github/check-types'
+import type { PRCheckDetail } from './github/checks/check-types'
 import { jenkinsBuildToCheckRunDetails } from './jenkins-check-details'
 import type { JenkinsBuildLocation } from './jenkins-urls'
 

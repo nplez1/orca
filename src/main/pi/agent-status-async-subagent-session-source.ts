@@ -1,4 +1,4 @@
-import type { PiAgentKind } from '../../shared/pi-agent-kind'
+import type { PiAgentKind } from '../../shared/agent-launch/catalog/pi-agent-kind'
 
 /** Where the fork's pi child lane keeps its live set, which session that set belongs to, and which
  *  registration is allowed to say so.

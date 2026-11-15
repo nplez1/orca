@@ -12,7 +12,7 @@ import {
 import { materializeWorktreePathThroughStaging } from './worktree-materialization-staging'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 import type { WorktreeCopyBudget } from './worktree-include-copy-budget'
-import type { WorktreeSharedDirectoriesMode } from '../../shared/repo-types'
+import type { WorktreeSharedDirectoriesMode } from '../../shared/repository/repo-types'
 
 export type WorktreeLinkedPathOptions = {
   platform?: NodeJS.Platform

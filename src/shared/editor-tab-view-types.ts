@@ -12,8 +12,8 @@ import type {
   GitStatusEntry
 } from './git/status/git-status-types'
 import type { GitLabProjectRef } from './gitlab-types'
-import type { PRCheckDetail, PRCheckRunDetails } from './github/check-types'
-import type { GitHubRepositoryIdentity } from './github/pull-request-types'
+import type { PRCheckDetail, PRCheckRunDetails } from './github/checks/check-types'
+import type { GitHubRepositoryIdentity } from './github/repositories/repository-identity'
 
 /**
  * A check-details failure the user can fix elsewhere, carried alongside the message.

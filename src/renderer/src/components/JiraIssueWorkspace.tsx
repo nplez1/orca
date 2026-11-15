@@ -11,7 +11,7 @@ import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
 } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
-import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
+import { getWorktreeAttachmentLabel } from '@/lib/workspace/display/worktree-attachment-label'
 import { useTranslate } from '@/i18n/use-translate'
 import { JiraIssueMetadataBar, JiraIssueWorkspaceHeader } from './jira-issue-workspace-chrome'
 import { getJiraSelfUser } from './jira-self-user'

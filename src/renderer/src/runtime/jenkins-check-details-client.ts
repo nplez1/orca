@@ -1,5 +1,5 @@
 import { translate } from '@/i18n/i18n'
-import type { PRCheckRunDetails, PRCheckDetail } from '../../../shared/github/check-types'
+import type { PRCheckRunDetails, PRCheckDetail } from '../../../shared/github/checks/check-types'
 import type {
   JenkinsBuildDetailsFailureReason,
   JenkinsBuildDetailsResult

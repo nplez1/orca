@@ -6,7 +6,7 @@ import {
   ORCA_REPOSITORY_DISPLAY_URL,
   ORCA_REPOSITORY_URL
 } from './orca-repository'
-import { MAIN_RELEASE_REPO } from './release-channel'
+import { MAIN_RELEASE_REPO } from './updater/release-channel'
 
 describe('ORCA repository identity', () => {
   // Why: the links this backs and the update feed are one identity. A separate

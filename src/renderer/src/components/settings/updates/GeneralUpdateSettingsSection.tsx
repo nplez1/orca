@@ -8,15 +8,18 @@ import { Button } from '../../ui/button'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import { updaterMessageText } from '@/lib/updater-message-copy'
-import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
+import { updaterMessageText } from '@/app-shell/updates/updater-message-copy'
+import {
+  getUpdateCheckClickOptions,
+  getUpdateCheckHint
+} from '@/app-shell/updates/update-check-click-options'
 import { GeneralRemoteServerUpdates } from './GeneralRemoteServerUpdates'
 import { ReleaseChannelSection } from './ReleaseChannelSection'
 import { UpdateDelaySetting } from './UpdateDelaySetting'
 import { formatUpdateDelayDate } from './update-delay-copy'
 import { useNow } from '@/hooks/use-now'
-import { isDelayedUpdatePending } from '../../../../../shared/update-delay'
-import { getReleaseNotesUrlForVersion } from '../../../../../shared/release-channel'
+import { isDelayedUpdatePending } from '../../../../../shared/updater/update-delay'
+import { getReleaseNotesUrlForVersion } from '../../../../../shared/updater/release-channel'
 import { openAppHttpLinkFromAnchor } from '@/lib/browser/navigation/app-http-link-open'
 
 export function GeneralUpdateSettingsSection({

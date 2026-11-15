@@ -2,7 +2,7 @@ import { debounceRuntimeFileRequest } from '@/runtime/files/runtime-file-request
 import { useEffect, useRef } from 'react'
 import { quickOpenRecentCandidateSet } from '../../../shared/quick-open/quick-open-recent-candidates'
 import { cancelRuntimeFileList, listRuntimeFiles } from '@/runtime/runtime-file-client'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/identifiers/non-secure-context-uuid'
 import { translate } from '@/i18n/i18n'
 import type { RuntimeFileOperationArgs } from '@/runtime/files/runtime-file-client-types'
 

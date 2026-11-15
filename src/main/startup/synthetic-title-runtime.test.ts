@@ -26,7 +26,7 @@ vi.mock('../agent-hooks/server/agent-hook-server', () => ({
   }
 }))
 
-import { driveSyntheticTitleFromHookStatus } from './synthetic-title-runtime'
+import { driveSyntheticTitleFromHookStatus } from './main-window/synthetic-title-runtime'
 import { mainProcessState } from './main-process-state'
 
 function status(

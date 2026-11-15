@@ -1,6 +1,6 @@
 import { createOsc133CommandFinishedScanner } from '../../shared/terminal/output/terminal-osc133-command-finished'
 import { OrcaRuntimeWithStartTuiIdleVisibleReadProbe } from './terminal/wait/terminal-wait-visible-probe'
-import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
+import type { RuntimeClientEvent } from '../../shared/remote-runtime/session-graph/runtime-client-events'
 
 /**
  * Hard ceiling for the "setting up" announcement.

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 21-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import { WorktreeCreateCollisionError } from '../../../../shared/new-workspace/worktree-create-collision'
 import type { CreateWorktreeArgs } from '../../../../shared/worktree/create-types'
@@ -14,7 +14,7 @@ import { resolveWorktreeCreateDisplayNameRequest } from '../../../ipc/worktree-d
 import {
   getBranchConflictKind,
   getBranchConflictKindStrict
-} from '../../../git/repo-branch-conflict'
+} from '../../../git/refs/resolution/repo-branch-conflict'
 import {
   exactNameBranchConflict,
   exactNameTakenError
@@ -26,7 +26,7 @@ import {
   WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS
 } from '../../../workspaces/creation/worktree-create-candidates'
 import { isGeneratedWorktreeCreateName } from '../../../../shared/new-workspace/worktree-create-retry-policy'
-import { createRetiredNameLookup } from '../../../../shared/worktree/retired-name-registry'
+import { createRetiredNameLookup } from '../../../../shared/worktree/naming/retired-name-registry'
 import { getRetiredNameRegistryForRepo } from '../../../workspaces/removal/retirement/worktree-name-retirement'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
 import {
@@ -41,7 +41,8 @@ import {
   resolveCreateBranchName
 } from './runtime-worktree-create-git'
 import { runtimePathExists } from '../catalog/runtime-worktree-filesystem'
-import { findPendingWorktreeRemovalConflict } from '../../../workspaces/removal/worktree-removal-table'
+import { assertNoPendingWorktreeRemovalConflict } from '../../../workspaces/removal/worktree-removal-table'
+import { isWorktreePathReserved } from '../../../workspaces/creation/reserved-worktree-path'
 import type { WorktreeCreatePathClaim } from '../../../workspaces/creation/worktree-create-in-flight'
 import type { RuntimeStore } from '../../construction/runtime-store-contract'
 import type { HostedReviewExecutionOptions } from '../../../source-control/hosted-review-git-options'
@@ -99,7 +100,6 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
   let branchName = ''
   let checkoutExistingBranch = false
   let selectedExistingLocalBranchName: string | null = null
-  let selectedReuseBranchName: string | null = null
   let branchConflictKind: 'local' | 'remote' | null = null
   let worktreePath = ''
   let worktreePathResolved = false
@@ -119,7 +119,28 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
         )
       : null
   const isRetiredName = retiredNameRegistry ? createRetiredNameLookup(retiredNameRegistry) : null
-  selectedReuseBranchName = await resolveLegacyRemoteBranch({ ...args, sanitizedName })
+  if (args.request.nameWasGenerated !== true || args.request.branchNameOverride) {
+    assertNoPendingWorktreeRemovalConflict(args.repo.path, {
+      worktreePath:
+        args.request.nameWasGenerated === true
+          ? undefined
+          : ensurePathWithinWorkspace(
+              computeWorktreePath(sanitizedName, args.repo.path, args.worktreePathSettings),
+              args.workspaceRoot
+            ),
+      branch:
+        args.request.branchNameOverride ||
+        (await resolveCreateBranchName(
+          args.repo.path,
+          undefined,
+          sanitizedName,
+          args.settings,
+          args.username,
+          args.localWorktreeGitOptions
+        ))
+    })
+  }
+  let selectedReuseBranchName = await resolveLegacyRemoteBranch({ ...args, sanitizedName })
   if (selectedReuseBranchName) {
     branchName = selectedReuseBranchName
   }
@@ -134,9 +155,9 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
       computeWorktreePath(effectiveSanitizedName, args.repo.path, args.worktreePathSettings),
       args.workspaceRoot
     )
-    // Orca owns the path until background removal settles.
+    // Orca owns the path until background removal settles, and while it is archived.
     return (
-      !findPendingWorktreeRemovalConflict(args.repo.path, { worktreePath }) &&
+      !isWorktreePathReserved(args.store, args.repo, worktreePath) &&
       !(await runtimePathExists(worktreePath)) &&
       args.pathClaim.claim(worktreePath)
     )

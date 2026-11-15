@@ -1,13 +1,13 @@
 import type { TaskPageProviderMetadataModel } from '../use-task-page-provider-metadata'
 import { useEffect } from 'react'
 import { translate } from '@/i18n/i18n'
-import { readIpcErrorDetail } from '@/lib/ipc-error'
+import { readIpcErrorDetail } from '@/runtime/errors/ipc-error'
 import {
   gitLabApiFor,
   type GitLabCapabilityChecks
 } from '@/runtime/repository-gitlab/gitlab-owner-api'
-import { mapSettledWithConcurrency } from '../../../../../shared/map-with-concurrency'
-import type { Repo } from '../../../../../shared/repo-types'
+import { mapSettledWithConcurrency } from '../../../../../shared/concurrency/map-with-concurrency'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
 import type { GitLabDialogRepoSelector } from '../../gitlab-item-dialog/gitlab-item-dialog-types'
 import type { GitLabWorkItem, GitLabTodo } from '../../../../../shared/gitlab-types'

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
+import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/checks/check-types'
 import { PR_CHECKS_CACHE_TTL_MS } from '../../store/github/cache/cache-identity'
 import {
   checkDetailsBuildIdentity,

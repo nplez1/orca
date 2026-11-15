@@ -1,4 +1,4 @@
-import './session-search-worker.test-fixture'
+import './worker/session-search-worker.test-fixture'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it } from 'vitest'
@@ -12,7 +12,7 @@ import {
   openSessionSearchIndexerHarness,
   writeClaudeTranscript,
   type SessionSearchIndexerHarness
-} from './session-search-indexer-test-fixture'
+} from './indexing/session-search-indexer-test-fixture'
 
 /**
  * The list must be answerable without touching a transcript.

@@ -3,7 +3,7 @@ import type {
   GitBranchChangeEntry,
   GitBranchCompareSummary
 } from '../../../../shared/git/diff/git-diff-compare-types'
-import type { PRComment } from '../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../shared/github/comments/comment-types'
 import {
   resolvePRCommentCodeSurface,
   resolvePRCommentCodeTarget

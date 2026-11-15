@@ -1,4 +1,4 @@
-import { withTimeout } from '../../../shared/promise-timeout-fallback'
+import { withTimeout } from '../../../shared/concurrency/promise-timeout-fallback'
 import forkDeCatalogUrl from './fork/de.json?url'
 import forkEsCatalogUrl from './fork/es.json?url'
 import forkFrCatalogUrl from './fork/fr.json?url'

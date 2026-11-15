@@ -1,4 +1,4 @@
-import type { GitAdmissionTier } from './git-exec-options'
+import type { GitAdmissionTier } from '../../../shared/rpc-contract/source-control/git-admission-tier-params'
 
 /** Result of a streamed git command; `stoppedEarly` is true when onStdout asked to stop before the child exited. */
 export type GitStreamResult = { stoppedEarly: boolean }
@@ -13,6 +13,8 @@ export type GitStreamOptions = {
   signal?: AbortSignal
   /** Byte backstop; defaults to DEFAULT_GIT_MAX_BUFFER. */
   maxBuffer?: number
+  /** Independent stderr cap for parsers that stream an arbitrarily large population. */
+  maxStderrBuffer?: number
   /** Explicit wall-clock deadline; read commands default to the production backstop. */
   timeoutMs?: number
   /** Overrides only the default read deadline in tests. */

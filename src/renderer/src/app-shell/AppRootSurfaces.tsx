@@ -4,7 +4,7 @@ import { OnboardingLanguageLoading } from '../components/onboarding/OnboardingLa
 import { useLanguageReadiness } from '../i18n/language-readiness'
 import { memo, Suspense } from 'react'
 import { createPortal } from 'react-dom'
-import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
+import { lazyWithRetry as lazy } from '@/app-shell/startup/lazy-with-retry'
 import { useTranslate } from '@/i18n/use-translate'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
 import NewWorkspaceComposerModal from '../components/NewWorkspaceComposerModal'
@@ -20,8 +20,8 @@ import { ZoomOverlay } from '../components/ZoomOverlay'
 import { WslMoveDialogHost } from '../components/wsl-move/WslMoveDialog'
 import { MacosUpdateRequirementHost } from '../components/macos-update-requirement/MacosUpdateRequirementHost'
 import { shouldRenderPetOverlay } from '../components/pet/pet-overlay-visibility'
-import { useAppStore } from '../store'
-import type { UpdateStatus } from '../../../shared/update-status-types'
+import { useAppStore } from '../store/index'
+import type { UpdateStatus } from '../../../shared/updater/update-status-types'
 import { useLazyModalMounts } from './use-lazy-modal-mounts'
 import { AppNotificationCards } from './AppNotificationCards'
 import { usePreloadWorktreeJumpPalette, WorktreeJumpPalette } from './worktree-jump-palette-preload'
@@ -52,7 +52,7 @@ const NonGitFolderDialog = lazy(
 const AddProjectFromFolderDialog = lazy(
   () => import('../components/sidebar/project-admission/dialog/AddProjectFromFolderDialog')
 )
-const DiagramViewerModal = lazy(() => import('../components/editor/DiagramViewerModal'))
+const DiagramViewerModal = lazy(() => import('../components/editor/diagrams/DiagramViewerModal'))
 const ProjectAddedDialog = lazy(
   () => import('../components/sidebar/project-admission/completion/ProjectAddedDialog')
 )

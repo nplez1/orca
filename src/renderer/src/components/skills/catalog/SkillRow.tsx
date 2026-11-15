@@ -11,12 +11,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { translate } from '@/i18n/i18n'
 import { useIntlLocale, useTranslate, type Translate } from '@/i18n/use-translate'
 import { formatClipboardFilePath } from '@/lib/clipboard/clipboard-file-path'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import type { DiscoveredSkill, SkillProvider } from '../../../../../shared/skills'
+import type { DiscoveredSkill, SkillProvider } from '../../../../../shared/skills/discovery/skills'
 import { sourceKindLabel } from '../presentation/skill-display-labels'
 import {
   SkillRowContextActions,

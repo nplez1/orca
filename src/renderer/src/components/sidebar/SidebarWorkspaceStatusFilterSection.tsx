@@ -6,7 +6,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger
 } from '@/components/ui/dropdown-menu'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { getWorkspaceStatusVisualMeta } from './workspace-status/presentation/workspace-status'
 import { useTranslate } from '@/i18n/use-translate'
 

@@ -1,4 +1,4 @@
-import { gitExecFileAsync } from './runner'
+import { gitExecFileAsync } from './command-runner/git-exec-file'
 
 /**
  * Branch name `git init` is about to create in `cwd`, read from the same config git itself will

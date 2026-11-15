@@ -1,12 +1,13 @@
 import { getHostedReviewCacheKey } from '../../slices/hosted-review/hosted-review-cache-identity'
 import type { AppState } from '../../types'
-import type { PRCheckDetail } from '../../../../../shared/github/check-types'
-import type { GitHubOwnerRepo, PRInfo } from '../../../../../shared/github/pull-request-types'
+import type { PRCheckDetail } from '../../../../../shared/github/checks/check-types'
+import type { PRInfo } from '../../../../../shared/github/pull-requests/pull-request-types'
+import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../../shared/github/repositories/repository-identity'
 import {
   getGitHubPRCacheKey,
   type RuntimeFocusSettings
-} from '../../../../../shared/github/github-cache-key'
-import { githubRepoIdentityKey } from '../../../../../shared/github/repository-identity-key'
+} from '../../../../../shared/github/cache/github-cache-key'
+import { githubRepoIdentityKey } from '../../../../../shared/github/repositories/repository-identity-key'
 import { derivePRCheckStatus } from '../../../../../shared/source-control/checks/pr-check-status'
 
 export function normalizeBranchName(branch: string): string {

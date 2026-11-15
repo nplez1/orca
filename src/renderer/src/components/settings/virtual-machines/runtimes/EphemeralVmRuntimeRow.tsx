@@ -9,15 +9,15 @@ import {
   Unplug,
   X
 } from 'lucide-react'
-import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
-import { getEphemeralVmRecipeResultProjectRoot } from '../../../../../../shared/ephemeral-vm-recipes'
 import { formatEphemeralVmCountdown } from '../../../../../../shared/ephemeral-vm-lifetime'
 import { useSecondTickNow } from '@/components/sidebar/workspace-card/activity/prompt-cache-countdown-clock'
 import { resolveEphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import { getEphemeralVmRecipeResultProjectRoot } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { useTranslate } from '@/i18n/use-translate'
 import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
-import { ephemeralVmCleanupErrorText } from '@/lib/ephemeral-vm-error-copy'
-import { cn } from '@/lib/utils'
+import { ephemeralVmCleanupErrorText } from '@/runtime/ephemeral-vm/ephemeral-vm-error-copy'
+import { cn } from '@/lib/class-names'
 import { Button } from '../../../ui/button'
 import {
   DropdownMenu,

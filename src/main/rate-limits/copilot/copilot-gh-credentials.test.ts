@@ -8,7 +8,7 @@ const { ghExecFileAsyncMock } = vi.hoisted(() => ({
 
 // Why: credential discovery shells out to `gh`; mocking that module keeps the suite off
 // the real CLI while leaving the real `gh auth status` parser in play.
-vi.mock('../../git/command-runner/gh-exec-file', () => ({
+vi.mock('../../git/command-runner/hosted-cli/gh-exec-file', () => ({
   ghExecFileAsync: ghExecFileAsyncMock
 }))
 

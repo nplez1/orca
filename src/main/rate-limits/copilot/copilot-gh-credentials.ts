@@ -1,6 +1,6 @@
-import { ghExecFileAsync } from '../../git/command-runner/gh-exec-file'
-import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-fallback'
-import { parseAuthStatus } from '../../github/auth-diagnose'
+import { ghExecFileAsync } from '../../git/command-runner/hosted-cli/gh-exec-file'
+import { isHostCommandMissing } from '../../git/command-runner/hosted-cli/github-cli-host-fallback'
+import { parseAuthStatus } from '../../github/accounts/auth-diagnose'
 
 /**
  * Verifies that the GitHub CLI sign-in can read the user's Copilot entitlement.

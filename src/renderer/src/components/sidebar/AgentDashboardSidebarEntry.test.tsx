@@ -14,7 +14,7 @@ vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) => selector(mocks.state)
 }))
 
-vi.mock('@/components/dashboard/useAgentBucketCounts', () => ({
+vi.mock('@/components/dashboard/bucket-counts/useAgentBucketCounts', () => ({
   useAgentBucketCounts: () => ({ attention: 0, working: 0, done: 0, idle: 0 })
 }))
 

@@ -11,7 +11,7 @@ vi.mock('../diagnostics/ui-hang-log-sink', () => ({
   recordMainUiHangSample: recordMainUiHangSampleMock
 }))
 
-import { invalidateMainWindowOnFocus } from './main-window-visual-lifecycle'
+import { invalidateMainWindowOnFocus } from './main-window/main-window-visual-lifecycle'
 
 describe('invalidateMainWindowOnFocus', () => {
   beforeEach(() => {

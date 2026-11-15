@@ -105,7 +105,7 @@ Orca NP 是 [stablyai/orca](https://github.com/stablyai/orca) 加上一系列 fo
 
 ## 特性
 
-下方的特性列表属于上游 Orca；其中的“Docs”链接指向 onorca.dev 上的上游文档，并不涵盖上文的 fork 专属特性。
+下方的特性列表属于上游 Orca；其中的“Docs”链接指向 orca.dev 上的上游文档，并不涵盖上文的 fork 专属特性。
 
 <table>
 <tr>
@@ -115,11 +115,11 @@ Orca NP 是 [stablyai/orca](https://github.com/stablyai/orca) 加上一系列 fo
 
 用手机监控并指挥你的智能体 — 智能体完成时收到通知，随时随地发送后续指令。
 
-[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://www.onorca.dev/download/android) · [文档 →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://orca.dev/download/android) · [文档 →](https://orca.dev/docs/mobile)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca 桌面端与移动 companion 应用" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca 桌面端与移动 companion 应用" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -129,11 +129,11 @@ Orca NP 是 [stablyai/orca](https://github.com/stablyai/orca) 加上一系列 fo
 
 把一个提示同时分发给五个智能体，每个都在自己隔离的 git worktree 中运行 — 比较结果，合并最佳方案。
 
-[文档 →](https://www.onorca.dev/docs/model/worktrees)
+[文档 →](https://orca.dev/docs/model/worktrees)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/model/worktrees"><picture><source srcset="../site/public/docs/tab-split.gif" type="image/gif"><img src="../site/public/docs/posters/tab-split.jpg" alt="并行 worktree 编排" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/model/worktrees"><picture><source srcset="../site/public/docs/tab-split.gif" type="image/gif"><img src="../site/public/docs/posters/tab-split.jpg" alt="并行 worktree 编排" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -143,11 +143,11 @@ Orca NP 是 [stablyai/orca](https://github.com/stablyai/orca) 加上一系列 fo
 
 Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然保留的滚动历史。
 
-[文档 →](https://www.onorca.dev/docs/terminal)
+[文档 →](https://orca.dev/docs/terminal)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/terminal"><picture><source srcset="../../resources/onboarding/feature-wall/tile-02.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-02.poster.jpg" alt="终端分屏" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/terminal"><picture><source srcset="../../resources/onboarding/feature-wall/tile-02.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-02.poster.jpg" alt="终端分屏" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -157,11 +157,11 @@ Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然�
 
 在真实的 Chromium 窗口中点击任意 UI 元素，把它的 HTML、CSS 和裁剪好的截图直接发送到智能体的提示中。
 
-[文档 →](https://www.onorca.dev/docs/browser/design-mode)
+[文档 →](https://orca.dev/docs/browser/design-mode)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/browser/design-mode"><picture><source srcset="../site/public/docs/orca-design-mode.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-05.poster.jpg" alt="内置浏览器与设计模式" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/browser/design-mode"><picture><source srcset="../site/public/docs/orca-design-mode.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-05.poster.jpg" alt="内置浏览器与设计模式" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -171,11 +171,11 @@ Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然�
 
 在应用内浏览 PR、issue 和项目看板 — 从任意任务打开 worktree，无需切换上下文即可完成评审。
 
-[文档 →](https://www.onorca.dev/docs/review/linear)
+[文档 →](https://orca.dev/docs/review/linear)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../../resources/onboarding/feature-wall/tile-03.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-03.poster.jpg" alt="Orca 中的 GitHub 与 Linear 任务工作流" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/review/linear"><picture><source srcset="../../resources/onboarding/feature-wall/tile-03.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-03.poster.jpg" alt="Orca 中的 GitHub 与 Linear 任务工作流" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -185,11 +185,11 @@ Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然�
 
 在高性能远程机器上运行智能体，完整支持文件编辑、git 和终端 — 自动重连与端口转发一应俱全。
 
-[文档 →](https://www.onorca.dev/docs/ssh)
+[文档 →](https://orca.dev/docs/ssh)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/ssh"><picture><source srcset="../../resources/onboarding/feature-wall/tile-06.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-06.poster.jpg" alt="通过 SSH 使用远程 worktree" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/ssh"><picture><source srcset="../../resources/onboarding/feature-wall/tile-06.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-06.poster.jpg" alt="通过 SSH 使用远程 worktree" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -199,11 +199,11 @@ Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然�
 
 在任意 diff 行上添加评论并发回给智能体 — 评审、编辑、提交，全程无需离开 Orca。
 
-[文档 →](https://www.onorca.dev/docs/review/annotate-ai-diff)
+[文档 →](https://orca.dev/docs/review/annotate-ai-diff)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/annotate-ai-diff"><picture><source srcset="../site/public/docs/annotate-ai-diff.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-08.poster.jpg" alt="标注 AI 生成的 diff" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/review/annotate-ai-diff"><picture><source srcset="../site/public/docs/annotate-ai-diff.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-08.poster.jpg" alt="标注 AI 生成的 diff" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -213,11 +213,11 @@ Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然�
 
 VS Code 的编辑器，处处自动保存 — 把文件或图片直接拖入智能体提示。
 
-[文档 →](https://www.onorca.dev/docs/editing/file-explorer)
+[文档 →](https://orca.dev/docs/editing/file-explorer)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/editing/file-explorer"><picture><source srcset="../../resources/onboarding/feature-wall/tile-07.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-07.poster.jpg" alt="将文件和图片拖入智能体提示" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/editing/file-explorer"><picture><source srcset="../../resources/onboarding/feature-wall/tile-07.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-07.poster.jpg" alt="将文件和图片拖入智能体提示" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -227,22 +227,22 @@ VS Code 的编辑器，处处自动保存 — 把文件或图片直接拖入智�
 
 智能体也能驱动 Orca — 用 `orca worktree create`、`snapshot`、`click` 和 `fill` 把每个工作流脚本化。
 
-[文档 →](https://www.onorca.dev/docs/cli/overview)
+[文档 →](https://orca.dev/docs/cli/overview)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../../resources/onboarding/feature-wall/tile-09.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-09.poster.jpg" alt="从 CLI 脚本化 Orca" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/cli/overview"><picture><source srcset="../../resources/onboarding/feature-wall/tile-09.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-09.poster.jpg" alt="从 CLI 脚本化 Orca" width="100%" /></picture></a>
 </td>
 </tr>
 </table>
 
 **开箱即用的还有：**
 
-- **[快速打开](https://www.onorca.dev/docs/model/quick-open)** — 在 worktree、文件、智能体、命令和仓库上下文之间搜索，不打断你的心流。
-- **[账号切换与用量追踪](https://www.onorca.dev/docs/agents/usage-tracking)** — 查看 Claude 和 Codex 的用量与限额重置时间，并且无需重新登录即可热切换账号。
-- **[丰富仓库预览](https://www.onorca.dev/docs/editing/markdown)** — 在工作区中预览 Markdown、图片、PDF 和仓库文档。
-- **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 当工作流需要真实交互时，让智能体操作桌面应用和可见 UI。
-- **[通知与未读状态](https://www.onorca.dev/docs/notifications)** — 第一时间知道智能体何时完成或需要关注，并可将会话标记为未读，稍后再回来处理。
+- **[快速打开](https://orca.dev/docs/model/quick-open)** — 在 worktree、文件、智能体、命令和仓库上下文之间搜索，不打断你的心流。
+- **[账号切换与用量追踪](https://orca.dev/docs/agents/usage-tracking)** — 查看 Claude 和 Codex 的用量与限额重置时间，并且无需重新登录即可热切换账号。
+- **[丰富仓库预览](https://orca.dev/docs/editing/markdown)** — 在工作区中预览 Markdown、图片、PDF 和仓库文档。
+- **[Computer Use](https://orca.dev/docs/cli/computer-use)** — 当工作流需要真实交互时，让智能体操作桌面应用和可见 UI。
+- **[通知与未读状态](https://orca.dev/docs/notifications)** — 第一时间知道智能体何时完成或需要关注，并可将会话标记为未读，稍后再回来处理。
 - **还有很多很多** —— 我们每天发布，所以这个列表总是落后。本 fork 真正的特性列表是 [Orca NP 的发布](https://github.com/nplez1/orca/releases)，其继承的部分则见[上游的发布](https://github.com/stablyai/orca/releases)。
 
 ---
@@ -302,7 +302,7 @@ Orca NP 可与官方 Orca 并存安装，并通过本仓库的发布自动更新
 将 Orca 移动应用与 Orca NP 配对，即可用手机监控和操控你的智能体。这些应用由上游 Orca 发布，可与 Orca NP 配合使用。
 
 - **iOS:** [从 App Store 下载](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [下载 APK](https://www.onorca.dev/download/android)
+- **Android:** [下载 APK](https://orca.dev/download/android)
 
 ---
 
@@ -310,7 +310,7 @@ Orca NP 可与官方 Orca 并存安装，并通过本仓库的发布自动更新
 
 - **Orca NP 的 Issue 与想法：** 与本 fork 相关的问题请[提交 Issue](https://github.com/nplez1/orca/issues)。
 - **上游社区：** 本 fork 继承的部分由上游 Orca 的渠道覆盖 —— [Discord](https://discord.gg/fzjDKHxv8Q)、[X 上的 @orca_build](https://x.com/orca_build)，以及在官方 Orca 中同样可复现的 bug 请提交到[上游 Issue](https://github.com/stablyai/orca/issues)。
-- **文档：** [onorca.dev/docs](https://www.onorca.dev/docs) 是上游 Orca 的文档。
+- **文档：** [orca.dev/docs](https://orca.dev/docs) 是上游 Orca 的文档。
 - **支持我们：** 给本仓库点个 [Star](https://github.com/nplez1/orca) 以关注这个 fork，或给[上游](https://github.com/stablyai/orca)点 Star。
 
 ---

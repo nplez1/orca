@@ -1,7 +1,7 @@
 import type { WorkspacePathSearchCorrelationId } from './workspace-path-search-instrumentation'
-import { measureUtf8ByteLength } from './utf8-byte-limits'
-import { MAX_MESSAGE_SIZE } from './relay-frame-decoder'
-import { REMOTE_RPC_MAX_CONTENT_BYTES } from './remote-rpc-content-budget'
+import { measureUtf8ByteLength } from './text/utf8-byte-limits'
+import { MAX_MESSAGE_SIZE } from './remote-runtime/relay/relay-frame-decoder'
+import { REMOTE_RPC_MAX_CONTENT_BYTES } from './remote-runtime/rpc/remote-rpc-content-budget'
 import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from './remote-runtime/remote-runtime-memory-limits'
 import {
   QUICK_OPEN_QUERY_MAX_BYTES,

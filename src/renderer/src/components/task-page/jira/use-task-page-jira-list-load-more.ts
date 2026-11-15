@@ -1,18 +1,18 @@
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
 import type { JiraSlice } from '@/store/slices/jira/jira-slice-contract'
 import type { JiraProjectReference } from '../../../../../shared/jira/jira-project-reference'
-import type { JiraStatusCatalogItem } from './task-page-jira-status-catalog'
+import type { JiraStatusCatalogItem } from './filters/task-page-jira-status-catalog'
 import { JIRA_ITEM_LIMIT } from '../task-page-source-context'
 import {
   appendJiraIssuePage,
   toTaskPageJiraListPage,
   type TaskPageJiraListPage
 } from './task-page-jira-list-pagination'
-import { buildJiraStatusCatalog } from './task-page-jira-status-catalog'
+import { buildJiraStatusCatalog } from './filters/task-page-jira-status-catalog'
 
 /** Only what the read touches: naming the whole effects model here would make the
  *  effect that calls this hook and this hook's argument type depend on each other. */

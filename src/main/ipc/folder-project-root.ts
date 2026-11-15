@@ -1,8 +1,8 @@
 // A folder workspace is a root Orca owns, but not a checkout that owns ignore rules of its own.
 
 import { resolve } from 'node:path'
-import { getRepoKind } from '../../shared/repo-kind'
-import type { RepoKind } from '../../shared/repo-types'
+import { getRepoKind } from '../../shared/repository/repo-kind'
+import type { RepoKind } from '../../shared/repository/repo-types'
 
 /**
  * Only the fields this decision reads, so a caller — and a test — need not own a whole store. Every

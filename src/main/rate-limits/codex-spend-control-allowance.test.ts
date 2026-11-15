@@ -4,10 +4,10 @@ const { readFileMock } = vi.hoisted(() => ({ readFileMock: vi.fn() }))
 
 vi.mock('node:fs/promises', () => ({ readFile: readFileMock }))
 
-import type { ProviderRateLimits } from '../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../shared/agent-usage/rate-limits/rate-limit-types'
 import {
   fetchCodexRateLimitsViaBackend,
-  supplementCodexSessionWindow
+  supplementCodexUsageWindows
 } from './providers/codex/codex-backend-usage-client'
 
 // Why: invented stand-in for the account's reset instant; the backend reports Unix
@@ -206,7 +206,7 @@ describe('Codex spend-control allowance for windowless plans', () => {
 
   it('adds monthly, allowance and planType to a windowless snapshot', async () => {
     const limits = windowlessLimits()
-    const merged = await supplementCodexSessionWindow(limits, backendRequest(spendControlPayload()))
+    const merged = await supplementCodexUsageWindows(limits, backendRequest(spendControlPayload()))
 
     expect(merged).not.toBe(limits)
     expect(merged.session).toBeNull()
@@ -232,7 +232,7 @@ describe('Codex spend-control allowance for windowless plans', () => {
       session: { usedPercent: 12, windowMinutes: 300, resetsAt: null, resetDescription: null }
     })
     const request = backendRequest(spendControlPayload())
-    const merged = await supplementCodexSessionWindow(limits, request)
+    const merged = await supplementCodexUsageWindows(limits, request)
 
     expect(merged).toBe(limits)
     expect(request).not.toHaveBeenCalled()
@@ -241,7 +241,7 @@ describe('Codex spend-control allowance for windowless plans', () => {
   it('returns the snapshot untouched when the signal is already aborted', async () => {
     const limits = windowlessLimits()
     const request = backendRequest(spendControlPayload())
-    const merged = await supplementCodexSessionWindow(limits, request, {
+    const merged = await supplementCodexUsageWindows(limits, request, {
       signal: AbortSignal.abort()
     })
 
@@ -252,7 +252,7 @@ describe('Codex spend-control allowance for windowless plans', () => {
   it('leaves updatedAt alone when the backend response is not ok', async () => {
     const limits = windowlessLimits({ updatedAt: 4_242 })
     const request = vi.fn(async (): Promise<Response> => new Response('', { status: 503 }))
-    const merged = await supplementCodexSessionWindow(limits, request)
+    const merged = await supplementCodexUsageWindows(limits, request)
 
     expect(merged).toBe(limits)
     expect(merged.updatedAt).toBe(4_242)
@@ -265,7 +265,7 @@ describe('Codex spend-control allowance for windowless plans', () => {
     const request = vi.fn(async (): Promise<Response> => {
       throw new Error('backend unreachable')
     })
-    const merged = await supplementCodexSessionWindow(limits, request)
+    const merged = await supplementCodexUsageWindows(limits, request)
 
     expect(merged).toBe(limits)
     expect(merged.updatedAt).toBe(4_242)
@@ -273,7 +273,7 @@ describe('Codex spend-control allowance for windowless plans', () => {
 
   it('leaves updatedAt alone when the payload carries no plan type', async () => {
     const limits = windowlessLimits({ updatedAt: 4_242 })
-    const merged = await supplementCodexSessionWindow(limits, backendRequest({ rate_limit: null }))
+    const merged = await supplementCodexUsageWindows(limits, backendRequest({ rate_limit: null }))
 
     expect(merged).toBe(limits)
     expect(merged.updatedAt).toBe(4_242)
@@ -281,7 +281,7 @@ describe('Codex spend-control allowance for windowless plans', () => {
 
   it('adopts the backend plan type alone as contributed data', async () => {
     const limits = windowlessLimits({ updatedAt: 4_242 })
-    const merged = await supplementCodexSessionWindow(
+    const merged = await supplementCodexUsageWindows(
       limits,
       backendRequest({ plan_type: 'business', rate_limit: null })
     )

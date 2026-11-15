@@ -11,7 +11,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { runProcessSync } from '@orca/process-host'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
 
 vi.mock('../ipc/filesystem/access/filesystem-auth.ts', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))

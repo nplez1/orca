@@ -1,4 +1,4 @@
-import type { PiAgentKind } from '../../shared/pi-agent-kind'
+import type { PiAgentKind } from '../../shared/agent-launch/catalog/pi-agent-kind'
 
 /** The one line a pi handler uses to hand the child lane the session its own event context named —
  *  the only thing that decides which session a child reported on that handler's bus belongs to. */

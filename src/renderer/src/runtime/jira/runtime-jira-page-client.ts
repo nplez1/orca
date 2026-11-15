@@ -6,8 +6,8 @@ import type {
   JiraIssueSearchPage,
   JiraSiteSelection
 } from '../../../../shared/jira/jira-types'
-import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
-import { hasRuntimeRpcErrorCode } from '../../../../shared/runtime-rpc-error-code'
+import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import { hasRuntimeRpcErrorCode } from '../../../../shared/remote-runtime/rpc/runtime-rpc-error-code'
 import { JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY } from '../../../../shared/jira/jira-detail-capabilities'
 import {
   JIRA_STATUS_FILTER_RUNTIME_CAPABILITY,

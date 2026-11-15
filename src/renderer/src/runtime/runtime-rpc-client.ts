@@ -1,14 +1,14 @@
-import { waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
-import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
-import type { RuntimeStatus } from '../../../shared/runtime-types'
-import type { RuntimeCapability } from '../../../shared/protocol-version'
-import { withBrowserPaneUiRuntimeRpcSource } from '../../../shared/runtime-rpc-feature-interaction-source'
+import { waitForPromiseWithSignal } from '../../../shared/concurrency/abort-signal-reason'
+import type { RuntimeRpcResponse } from '../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
+import type { RuntimeStatus } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
+import type { RuntimeCapability } from '../../../shared/remote-runtime/protocol/protocol-version'
+import { withBrowserPaneUiRuntimeRpcSource } from '../../../shared/remote-runtime/rpc/runtime-rpc-feature-interaction-source'
 import { assertRuntimeStatusCompatible } from './rpc/compatibility/runtime-protocol-compat'
 import { createRuntimeRpcAbortError } from './rpc/calls/abortable-runtime-environment-call'
 import { callRuntimeEnvironmentWithRevision } from './rpc/calls/runtime-rpc-environment-call'
 import { unwrapRuntimeRpcResult } from './rpc/calls/runtime-rpc-result'
 import { captureRuntimeEnvironmentRequestRevision } from './rpc/environment-revisions/runtime-environment-revision'
-import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import {
   RUNTIME_CAPABILITY_STATUS_TTL_MS,
   compatibilityEntry,
@@ -27,9 +27,9 @@ export {
   peekRuntimeEnvironmentCapability,
   subscribeRuntimeWorkspacePathSearchCapabilityInvalidation
 } from './rpc/compatibility/runtime-compatibility-cache'
-export { type RuntimeClientTarget } from '../../../shared/runtime-client-target'
+export { type RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'
 export { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './rpc/calls/runtime-rpc-result'
-export { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
+export { hasRuntimeRpcErrorCode } from '../../../shared/remote-runtime/rpc/runtime-rpc-error-code'
 
 export async function callRuntimeRpc<TResult>(
   target: RuntimeClientTarget,

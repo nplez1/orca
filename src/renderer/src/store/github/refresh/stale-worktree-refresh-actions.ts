@@ -2,7 +2,8 @@ import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
 import type { GitHubSlice } from '../github-slice-contract'
 import type { Worktree } from '../../../../../shared/worktree/types'
-import { rightSidebarShowsPullRequestData } from '@/lib/right-sidebar-visibility'
+import { getWorktreeGitHubIssueRepository } from '../../../../../shared/worktree/github-issue-repository'
+import { rightSidebarShowsPullRequestData } from '@/components/right-sidebar/visibility/right-sidebar-visibility'
 import { getGitHubRepoLookupIndex } from '../repositories/github-repo-lookup-index'
 import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 import { issueCacheKey } from '../cache/cache-identity'
@@ -50,6 +51,7 @@ export const createStaleWorktreeRefreshActions = (
     if ((state.worktreeCardProperties ?? []).includes('issue') && worktree.linkedIssue) {
       // Why the link's repo rather than the workspace row: see `linked-issue-repo.ts`.
       const issueRepo = findLinkedIssueRepo(state.repos, worktree, worktree.linkedIssue)
+      const ownerRepo = getWorktreeGitHubIssueRepository(worktree)
       if (issueRepo) {
         const ownerSettings = settingsForGitHubRepoOwner(state.settings, issueRepo)
         const issueKey = issueCacheKey(
@@ -59,11 +61,15 @@ export const createStaleWorktreeRefreshActions = (
           ownerSettings,
           issueRepo.connectionId,
           issueRepo.executionHostId,
-          true
+          true,
+          ownerRepo
         )
         const issueEntry = state.issueCache[issueKey]
         if (!issueEntry || now - issueEntry.fetchedAt >= CACHE_TTL) {
-          void get().fetchIssue(issueRepo.path, worktree.linkedIssue, { repoId: issueRepo.id })
+          void get().fetchIssue(issueRepo.path, worktree.linkedIssue, {
+            repoId: issueRepo.id,
+            ownerRepo
+          })
         }
       }
     }

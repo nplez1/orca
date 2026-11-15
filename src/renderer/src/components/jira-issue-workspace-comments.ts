@@ -4,12 +4,12 @@ import {
   getCommentBodySubmitState,
   hasBoundedCommentBodyText
 } from '@/lib/source-control/review/comments/comment-body-submit-state'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/identifiers/non-secure-context-uuid'
 import { jiraAddIssueComment, jiraIssueComments } from '../runtime/jira/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import type { JiraComment } from '../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { runAsyncTaskWithFailure } from '../lib/async-task-with-cleanup'
 
 export type JiraIssueCommentsState = {

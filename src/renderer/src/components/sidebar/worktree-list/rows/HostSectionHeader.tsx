@@ -1,22 +1,23 @@
 import React, { useMemo } from 'react'
 import { AlertTriangle, ChevronDown, Loader2, Server, ServerOff } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
 import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId,
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import { formatEphemeralVmRemaining } from '../../../../../../shared/ephemeral-vm-lifetime'
-import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   isReleasedEphemeralVmRuntime,
   resolveEphemeralVmRuntimeLease,
   useEphemeralVmRuntimes
 } from '@/hooks/useEphemeralVmRuntimes'
 import { useSecondTickNow } from '../../workspace-card/activity/prompt-cache-countdown-clock'
+import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
-import type { HostHeaderRow } from '../../../../../../shared/sidebar-list/host-section-rows'
+import { translateHostDisplayLabel } from '../../execution-host-label'
+import type { HostHeaderRow } from '../../../../../../shared/sidebar-list/hosts/host-section-rows'
 import { HostSectionHeaderMenu } from './HostSectionHeaderMenu'
 import { stopRepoHeaderMenuEvent } from './header-event-guards'
 import { getHostHeaderDetail } from './host-header-detail'
@@ -243,7 +244,7 @@ export function HostSectionHeader({
               isDisconnected || isSuspended ? 'text-muted-foreground' : 'text-foreground'
             )}
           >
-            {row.label}
+            {translateHostDisplayLabel(row)}
           </span>
           <EphemeralHostLeaseMarker hostId={row.hostId} />
           {detail ? (

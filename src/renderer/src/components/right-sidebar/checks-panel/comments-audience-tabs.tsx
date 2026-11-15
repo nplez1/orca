@@ -1,5 +1,5 @@
 import React from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { getPrCommentAudienceFilters } from '@/lib/source-control/review/comments/pr-comment-audience-labels'
 import type { PRCommentAudienceFilter } from '../../../../../shared/source-control/review-comments/pr-comment-audience'
 import type { PRCommentPresentationClasses } from './comments/pr-comment-presentation'

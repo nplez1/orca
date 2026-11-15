@@ -3,7 +3,7 @@ import {
   clearOpenCodeGoApiKey,
   hasOpenCodeGoApiKey,
   saveOpenCodeGoApiKey
-} from '../opencode/opencode-go-api-key-store'
+} from '../opencode/accounts/opencode-go-api-key-store'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import type { RateLimitService } from '../rate-limits/service/rate-limit-service'
 import { refreshAfterCredentialChange } from './credential-change-rate-limit-refresh'

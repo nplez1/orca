@@ -4,10 +4,10 @@ import path from 'node:path'
 import { z } from 'zod'
 import type { ClaudeOAuthCredentialTarget } from '../../../claude-accounts/claude-oauth-credential-store'
 import { isDefinitiveAbsence } from '../../../../shared/definitive-filesystem-absence'
-import { readActiveClaudeKeychainCredentialsStrict } from '../../../claude-accounts/keychain'
+import { readActiveClaudeKeychainCredentialsStrict } from '../../../claude-accounts/runtime-auth/keychain'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
-import { readUserClaudeConfigDir } from '../../../claude-accounts/claude-profile-paths'
-import { getClaudeProfileRouter } from '../../../claude-accounts/claude-profile-installed-router'
+import { readUserClaudeConfigDir } from '../../../claude-accounts/profiles/claude-profile-paths'
+import { getClaudeProfileRouter } from '../../../claude-accounts/profiles/routing/claude-profile-installed-router'
 
 export type ClaudeOAuthCredentialSource =
   | 'scoped-keychain'
@@ -180,6 +180,10 @@ export async function readClaudeOAuthCredentials(
         path: credentialsPath
       }
     )
+    // A file with no token must not hide a refreshable or unreadable Keychain login.
+    return file.token || !(keychain.hasRefreshableCredentials || keychain.unavailable)
+      ? file
+      : keychain
   } catch (error) {
     fileMissing = isDefinitiveAbsence(error)
     fileUnreadable = !fileMissing

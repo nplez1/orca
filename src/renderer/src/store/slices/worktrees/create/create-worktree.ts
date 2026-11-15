@@ -23,18 +23,16 @@ import {
 } from '../../../../../../shared/new-workspace/worktree-create-retry-policy'
 import { assertRuntimeEnvironmentCapability } from '../../../../runtime/rpc/compatibility/runtime-capability-proof'
 import { runtimeTargetSupportsCapability } from '../../../../runtime/rpc/compatibility/runtime-target-capability'
-import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
-import {
-  WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
-  WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY
-} from '../../../../../../shared/protocol-version'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { runtimeTargetForRepoOwner } from '@/lib/workspace/ownership/repo-runtime-owner'
 import {
+  WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
+  WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY,
   WORKTREE_OPEN_EXISTING_BRANCH_RUNTIME_CAPABILITY,
   WORKTREE_OPEN_EXISTING_BRANCH_V2_RUNTIME_CAPABILITY,
   WORKTREE_OPEN_EXISTING_BRANCH_V2_REQUEST_RUNTIME_CAPABILITY,
   WORKTREE_PUSH_TARGET_BASE_RUNTIME_CAPABILITY
-} from '../../../../../../shared/worktree-runtime-capabilities'
+} from '../../../../../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/workspace-creation/base-ref-update/local-base-ref-suggestion-toast'
 import { requestWorktreeBaseFallbackNotice } from '@/components/worktree-base-fallback-notice'
 import { showLocalBaseRefRefreshToast } from './local-base-ref-refresh-toast'
@@ -47,7 +45,7 @@ import {
   type WorktreeCreateAttempt,
   type WorktreeCreateRequest
 } from './worktree-create-payload'
-import { holdCreatedSidebarWorkspace } from '@/lib/sidebar-pending-layer'
+import { holdCreatedSidebarWorkspace } from '@/components/sidebar/sidebar-feed/sidebar-pending-layer'
 import {
   resolveCreateCrossStoreParent,
   withoutRefusedInferredParent

@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { defaultScopeHost } from '@/runtime/hosts/selection/default-creation-host'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import type { AppState } from '../../types'

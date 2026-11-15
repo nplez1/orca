@@ -1,11 +1,11 @@
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
-import { getEphemeralVmLifetimeLossError } from '../../shared/ephemeral-vm-recipes'
+import { getEphemeralVmLifetimeLossError } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
-} from '../../shared/ephemeral-vm-runtime-store'
-import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
-import type { EphemeralVmRecipeContext } from '../../shared/ephemeral-vm-recipe-runner'
+} from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
+import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import type { EphemeralVmRecipeContext } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner'
 import { ShellRecipeDriver } from '../environment-providers/shell-recipe-driver'
 import {
   beginEphemeralVmProvisioning,
@@ -28,7 +28,7 @@ import {
   ephemeralVmFailure,
   pickEphemeralVmFailureCode,
   type EphemeralVmFailure
-} from '../../shared/ephemeral-vm-failure-copy'
+} from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 
 export type CleanupEphemeralVmRuntimeArgs = {
   userDataPath: string

@@ -3,7 +3,10 @@ import * as os from 'node:os'
 import { join } from 'node:path'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
+import {
+  _resetSecretStoreForTests,
+  setSecretStore
+} from '../../shared/secure-storage/secret-store'
 import type * as SecureFile from '../../shared/secure-storage/secure-file'
 import type * as ZcodePlanApiKeyStore from './zcode-plan-api-key-store'
 

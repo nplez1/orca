@@ -3,7 +3,7 @@ import type {
   JiraIssueSearchPage,
   JiraSiteSelection
 } from '../../../../shared/jira/jira-types'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../../shared/identifiers/non-secure-context-uuid'
 
 type LocalJiraSearchArgs = {
   jql: string

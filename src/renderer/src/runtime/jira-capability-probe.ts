@@ -1,6 +1,6 @@
 import type { JiraIssueUpdate } from '../../../shared/jira/jira-types'
-import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
-import type { RuntimeCapability } from '../../../shared/protocol-version'
+import type { RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import type { RuntimeCapability } from '../../../shared/remote-runtime/protocol/protocol-version'
 import {
   JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
   JIRA_TRANSITION_FIELDS_UPDATE_REQUIRED_MESSAGE

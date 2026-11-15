@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs'
-import { getSecretStore } from '../../shared/secret-store'
+import { getSecretStore } from '../../shared/secure-storage/secret-store'
 import { adoptLegacyHomeStore } from '../home-directory-migration'
 import { hardenExistingSecureFile, writeSecureFile } from '../../shared/secure-storage/secure-file'
-import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
+import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 
 const ZCODE_PLAN_API_KEY_FILE = 'zcode-plan-api-key.enc'
 export const API_KEY_ENVELOPE_PREFIX = 'orca-zcode-plan-api-key:v1:'

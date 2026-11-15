@@ -4,9 +4,9 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { JiraIssue, JiraIssueSearchPage } from '../../../../shared/jira/jira-types'
 import type { JiraSavedFilterState } from '../../../../shared/jira/jira-saved-filters'
 import type { TaskPageLinearViewStateModel } from '../task-page/linear/use-task-page-linear-view-state'
-import type { TaskPageLinearCollectionEffectsModel } from '../task-page/linear/use-task-page-linear-collection-effects'
+import type { TaskPageLinearCollectionEffectsModel } from '../task-page/linear/projects/use-task-page-linear-collection-effects'
 import { useTaskPageJiraListState } from '../task-page/jira/use-task-page-jira-list-state'
-import { useTaskPageJiraListEffects } from '../task-page/jira/use-task-page-jira-list-effects'
+import { useTaskPageJiraListEffects } from '../task-page/jira/listing/use-task-page-jira-list-effects'
 
 const favouriteTransport: {
   catalogue: Mock

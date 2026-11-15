@@ -1,5 +1,5 @@
-import { cn } from '../../../lib/utils'
 import { APP_DISPLAY_NAME } from '../../../../../shared/app-display-name'
+import { cn } from '../../../lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
 
 type AgentIndicator = 'waiting' | 'done' | 'working' | 'idle'

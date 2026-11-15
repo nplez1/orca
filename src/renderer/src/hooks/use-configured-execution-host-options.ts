@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { buildExecutionHostRegistry } from '../../../shared/execution-host/execution-host-registry'
 import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host/execution-host-registry-entry'
-import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
+import { getHostDisplayLabelOverrides } from '../../../shared/execution-host/host-setting-overrides'
 import { useAppStore } from '@/store'
 
 /**

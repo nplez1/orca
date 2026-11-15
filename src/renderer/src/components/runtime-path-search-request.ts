@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/identifiers/non-secure-context-uuid'
 import type { PathSearchMode } from '../../../shared/quick-open/quick-open-path-search'
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import {

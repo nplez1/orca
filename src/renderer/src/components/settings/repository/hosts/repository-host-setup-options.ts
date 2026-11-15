@@ -6,9 +6,10 @@ import type { ExecutionHostRegistryEntry } from '../../../../../../shared/execut
 import type {
   ProjectHostSetup,
   ProjectHostSetupState
-} from '../../../../../../shared/project-types'
+} from '../../../../../../shared/project/project-types'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
+import { translateHostDisplayLabel } from '../../../sidebar/execution-host-label'
 import { getHostSetupUnavailableDetail } from '@/lib/project-host-setup-availability'
 import {
   machineHostIds,
@@ -67,7 +68,7 @@ export function buildSetupHostOptions(
       const canUsePathActions = host.health === 'local' || host.health === 'available'
       return {
         id: host.id,
-        label: host.label || getExecutionHostLabel(host.id),
+        label: host.label ? translateHostDisplayLabel(host) : getExecutionHostLabel(host.id),
         detail:
           unavailableDetail ??
           (canUsePathActions

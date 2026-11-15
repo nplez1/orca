@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState
-} from '../../../../../shared/managed-account-types'
-import type { CodexConfigSyncStatus } from '../../../../../shared/codex-config-sync-types'
+} from '../../../../../shared/agent-accounts/managed-account-types'
+import type { CodexConfigSyncStatus } from '../../../../../shared/agent-accounts/codex/codex-config-sync-types'
 import { toast } from 'sonner'
 import { useAppStore } from '../../../store/index'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
-import { isWebClientLocation } from '@/lib/web-client-location'
+import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
 import {
   emptyClaudeAccountsState,
   emptyCodexAccountsState,
@@ -33,7 +33,7 @@ import {
   type ProviderAccountsSectionContext
 } from '../provider-accounts-sections'
 import { ProviderAccountsSection } from '../ProviderAccountsSection'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import type {
   AccountsPaneProps,

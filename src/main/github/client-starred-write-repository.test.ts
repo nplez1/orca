@@ -1,24 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type * as GithubApiRepositoryModule from './github-api-repository'
-import type * as GitHubEnterpriseRepositoryModule from './github-enterprise-repository'
+import type * as GithubApiRepositoryModule from './repositories/github-api-repository'
+import type * as GitHubEnterpriseRepositoryModule from './repositories/github-enterprise-repository'
 
 const { clientMocks, moduleMocks } = await vi.hoisted(async () => {
-  const moduleMocks = await import('./client-test-mocks')
+  const moduleMocks = await import('./client/client-test-mocks')
   return { clientMocks: moduleMocks.createGitHubClientMocks(), moduleMocks }
 })
 
-vi.mock('./gh-utils', () => moduleMocks.ghUtilsModuleMock(clientMocks))
-vi.mock('../git/runner', () => moduleMocks.gitRunnerModuleMock(clientMocks))
-vi.mock('./local-git-config-signature', () =>
+vi.mock('./repositories/local-git-config-signature', () =>
   moduleMocks.localGitConfigSignatureModuleMock(clientMocks)
 )
-vi.mock('./github-enterprise-repository', async (importOriginal) =>
+vi.mock('./repositories/github-enterprise-repository', async (importOriginal) =>
   moduleMocks.githubEnterpriseRepositoryModuleMock(
     await importOriginal<typeof GitHubEnterpriseRepositoryModule>()
   )
 )
-vi.mock('./rate-limit', () => moduleMocks.rateLimitModuleMock(clientMocks))
-vi.mock('./github-api-repository', async (importOriginal) =>
+vi.mock('./api/rate-limit', () => moduleMocks.rateLimitModuleMock(clientMocks))
+vi.mock('./repositories/github-api-repository', async (importOriginal) =>
   moduleMocks.githubApiRepositoryModuleMock(
     clientMocks,
     await importOriginal<typeof GithubApiRepositoryModule>()
@@ -26,7 +24,7 @@ vi.mock('./github-api-repository', async (importOriginal) =>
 )
 
 import { __resetOrcaStarCheckForTests, checkOrcaStarred, starOrca } from './client/fetch/orca-star'
-import { resetOriginRepositoryCache } from './client-test-harness'
+import { resetOriginRepositoryCache } from './client/client-test-harness'
 import { ORCA_REPOSITORY } from '../../shared/orca-repository'
 
 const { execFileAsyncMock, ghExecFileAsyncMock, acquireMock, releaseMock } = clientMocks

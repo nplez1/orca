@@ -1,5 +1,5 @@
 import type { GlobalSettings } from '../../shared/global-settings-types'
-import { SETTINGS_CHANGED_WHITELIST } from '../../shared/telemetry-events'
+import { SETTINGS_CHANGED_WHITELIST } from '../../shared/telemetry/schemas/telemetry-property-schemas'
 import { track } from '../telemetry/client'
 
 export function trackAgentDashboardToggle(

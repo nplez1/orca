@@ -4,7 +4,7 @@
 // homedir-derived path when no AppEnvironment is installed (unit tests).
 
 import { APP_DATA_DIRECTORY_NAME } from '../../shared/app-directory-names'
-import { getAppEnvironment, hasAppEnvironment } from '../../shared/app-environment'
+import { getAppEnvironment, hasAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { homedir, platform } from 'node:os'
 import { join } from 'node:path'
 

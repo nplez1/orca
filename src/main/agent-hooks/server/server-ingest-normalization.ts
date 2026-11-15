@@ -21,7 +21,7 @@ import {
 } from '../../../shared/agent-hook-listener/opencode-session-registry'
 import type { EnrichedAgentHookEventPayload, NormalizedLocalHook } from './server-types'
 import { AgentHookServerTmuxStatus } from './server-tmux-status'
-import { getClaudeObservedConfigDirs } from '../../claude-accounts/claude-profile-installed-router'
+import { getClaudeObservedConfigDirs } from '../../claude-accounts/profiles/routing/claude-profile-installed-router'
 
 /** The row's arrival stamp, when this process still holds a row for the pane. */
 export function statusRowReceivedAt(row: unknown): number | undefined {

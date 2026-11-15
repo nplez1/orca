@@ -13,7 +13,7 @@ async function loadModules() {
     const actual = await vi.importActual<typeof Os>('node:os')
     return { ...actual, homedir: () => tempHome }
   })
-  const { setSecretStore } = await import('../../shared/secret-store')
+  const { setSecretStore } = await import('../../shared/secure-storage/secret-store')
   setSecretStore({
     isEncryptionAvailable: () => true,
     encryptString: (value) => Buffer.from(value),

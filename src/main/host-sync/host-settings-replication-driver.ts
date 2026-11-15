@@ -1,4 +1,4 @@
-import { getAppEnvironment } from '../../shared/app-environment'
+import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import {
   HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY,
   type HostSettingsReplicationApplyResult
@@ -51,7 +51,7 @@ export function getHostSettingsReplicationSync(): HostSettingsReplicationSync {
       supportsReplication: async (environmentId) => {
         try {
           const response = await sendRemoteRuntimeRequestOnSocket(
-            pairedRuntimeConnectionFromOffer(resolvePairing(environmentId)),
+            pairedRuntimeConnectionFromOffer(await resolvePairing(environmentId)),
             'status.get',
             undefined,
             CAPABILITY_PROBE_TIMEOUT_MS

@@ -1,4 +1,4 @@
-import { readableWslDistroHoldText } from '../../shared/wsl-distro-stopped-hold'
+import { readableWslDistroHoldText } from '../../shared/remote-runtime/wsl-hosts/wsl-distro-stopped-hold'
 import { canCheckoutExistingLocalBranch } from '../runtime/workspaces/creation/runtime-worktree-create-git'
 /* eslint-disable max-lines */
 
@@ -8,9 +8,9 @@ import type { BrowserWindow } from 'electron'
 import { stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence/loading-store/store'
-import type { GitAdmissionTier } from '../../shared/rpc-contract/git-admission-tier-params'
-import type { LocalGitExecOptions } from '../github/github-repository-identity'
-import type { Repo } from '../../shared/repo-types'
+import type { GitAdmissionTier } from '../../shared/rpc-contract/source-control/git-admission-tier-params'
+import type { Repo } from '../../shared/repository/repo-types'
+import type { LocalGitExecOptions } from '../github/repositories/github-repository-identity'
 import type {
   CreateWorktreeArgs,
   CreateWorktreeProgressEvent,
@@ -29,7 +29,7 @@ import type {
   Worktree,
   WorktreeHeadIdentity
 } from '../../shared/worktree/types'
-import { getPRForBranch } from '../github/client'
+import { getPRForBranch } from '../github/client/lookup/get-pr-for-branch'
 import { addWorktree } from '../git/worktrees/creation/worktree-add'
 import { addSparseWorktree } from '../git/worktrees/creation/worktree-sparse-add'
 import type {
@@ -42,24 +42,24 @@ import {
 } from '../workspaces/creation/preparation/worktree-create-preparation'
 import {
   getBranchConflictKind,
-  getBranchConflictKindStrict,
-  resolveDefaultBaseRefWithLocalGit
-} from '../git/repo'
+  getBranchConflictKindStrict
+} from '../git/refs/resolution/repo-branch-conflict'
+import { resolveDefaultBaseRefWithLocalGit } from '../git/refs/resolution/repo-default-base-ref'
 import { WorktreeCreateCollisionError } from '../../shared/new-workspace/worktree-create-collision'
-import { resolveLocalGitUsername } from '../git/git-username'
+import { resolveLocalGitUsername } from '../git/repositories/git-username'
 import { hasLocalWorktreeBaseRef } from '../git/worktrees/creation/worktree-base-ref-probe'
 import { resolveWorktreeCreateBase } from '../workspaces/creation/worktree-create-base'
 import { materializeCopiedPushTargetBase } from '../worktree-create-push-target-base'
 import { getHostedReviewForBranch } from '../source-control/hosted-review'
 import type { ForgeProviderId } from '../source-control/forge-provider'
-import { validateGitPushTarget } from '../git/push-target-validation'
-import { gitExecFileAsync } from '../git/runner'
+import { validateGitPushTarget } from '../git/remotes/push-target-validation'
+import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type {
   RemoteFetchResult,
   RemoteTrackingBase
 } from '../runtime/repositories/runtime-remote-fetch-controller'
-import { getProjectHostSetupWorktreeMeta } from '../../shared/project-host-setup-lookup'
+import { getProjectHostSetupWorktreeMeta } from '../../shared/project/host-setup/project-host-setup-lookup'
 import { getEffectiveHooks, loadHooks } from '../workspace-hooks/hooks'
 import {
   createSetupRunnerScript,
@@ -104,9 +104,12 @@ import {
   type ExecutionHostId
 } from '../../shared/execution-host'
 import type { BranchPrefixSettings } from '../../shared/git/branches/branch-prefix'
-import { parseWorkspaceKey, worktreeWorkspaceKey } from '../../shared/workspace-scope'
+import {
+  parseWorkspaceKey,
+  worktreeWorkspaceKey
+} from '../../shared/workspace/identity/workspace-scope'
 import { sharesWorktreeLineageBoundary } from '../../shared/resolved-worktree-lineage'
-import { CrossStoreParentRefSchema } from '../../shared/rpc-contract/cross-store-parent-params'
+import { CrossStoreParentRefSchema } from '../../shared/rpc-contract/workspaces/cross-store-parent-params'
 import { assertParentInAnotherStore } from '../runtime/workspaces/lineage/cross-store-parent-store-check'
 import {
   crossStoreManualLineage,
@@ -176,7 +179,8 @@ import {
   getRetiredNameRegistryForRepo,
   retireGeneratedWorktreeName
 } from '../workspaces/removal/retirement/worktree-name-retirement'
-import { createRetiredNameLookup } from '../../shared/worktree/retired-name-registry'
+import { createRetiredNameLookup } from '../../shared/worktree/naming/retired-name-registry'
+import { assertNoPendingWorktreeRemovalConflict } from '../workspaces/removal/worktree-removal-table'
 import { findPendingWorktreeRemovalConflict } from '../workspaces/removal/worktree-removal-table'
 import {
   exactNameBranchConflict,
@@ -187,7 +191,7 @@ import {
   openWorktreeCreatePathClaim,
   type WorktreeCreatePathClaim
 } from '../workspaces/creation/worktree-create-in-flight'
-import { isWslMoveWorktreeBlocked } from '../persistence/moving-wsl-projects/wsl-move-background-backoff'
+import { isWslMoveWorktreeBlocked } from '../persistence/moving-wsl-projects/orchestration/wsl-move-background-backoff'
 import {
   hostWorktreeTarget,
   type HostWorktreeTarget
@@ -1315,6 +1319,27 @@ async function performLocalWorktreeCreate(
   const shouldRetireGeneratedName =
     args.nameWasGenerated === true && isGeneratedWorktreeCreateName(sanitizedName)
   const exactName = args.branchIntent === 'create-exact'
+  if (args.nameWasGenerated !== true || args.branchNameOverride) {
+    assertNoPendingWorktreeRemovalConflict(repo.path, {
+      worktreePath:
+        args.nameWasGenerated === true
+          ? undefined
+          : ensurePathWithinWorkspace(
+              computeWorktreePath(sanitizedName, repo.path, worktreePathSettings, workspaceRoot),
+              workspaceRoot
+            ),
+      branch:
+        args.branchNameOverride ||
+        (await resolveCreateBranchName(
+          repo.path,
+          undefined,
+          sanitizedName,
+          settings,
+          username,
+          localWorktreeGitOptions
+        ))
+    })
+  }
   if (
     args.branchIntent === 'open-existing' &&
     args.branchNameOverride &&
@@ -1385,7 +1410,7 @@ async function performLocalWorktreeCreate(
       computeWorktreePath(effectiveSanitizedName, repo.path, worktreePathSettings, workspaceRoot),
       workspaceRoot
     )
-    // Pending removals still own paths Git may already have deleted; skip them until teardown settles.
+    // Pending removals and archived workspaces still own paths Git may already have deleted.
     return (
       !(await worktreePathTaken(worktreePath)) &&
       !findPendingWorktreeRemovalConflict(repo.path, { worktreePath }) &&

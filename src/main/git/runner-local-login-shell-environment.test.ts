@@ -12,8 +12,9 @@ vi.mock('node:child_process', () => ({
   spawn: spawnMock
 }))
 
-import { gitExecFileAsync, gitSpawn } from './runner'
-import { _resetGitAdmissionForTests } from './command-runner/git-subprocess-admission'
+import { gitExecFileAsync } from './command-runner/git-exec-file'
+import { gitSpawn } from './command-runner/git-spawn'
+import { _resetGitAdmissionForTests } from './command-runner/admission/git-subprocess-admission'
 import { _configureLocalLoginShellGitEnvironmentForTests } from './command-runner/local-login-shell-git-environment'
 
 function createMockChildProcess(pid: number) {

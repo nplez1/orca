@@ -4,7 +4,7 @@ import {
   layoutNestsPrimaryCheckout,
   resolveWorktreeLayoutMode
 } from '../../../shared/orca-workspace-layout'
-import { deriveCloneRepoNameFromUrl } from '../../git/repo-clone-path'
+import { deriveCloneRepoNameFromUrl } from '../../git/repositories/cloning/repo-clone-path'
 import { getRemoteDefaultBranchName } from '../../git/remote-default-branch'
 import { sanitizeWorktreeName } from '../worktree-logic'
 

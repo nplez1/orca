@@ -5,7 +5,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { refreshEphemeralVmRuntimes } from '@/hooks/useEphemeralVmRuntimes'
-import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { EphemeralVmContextMenuItems } from './EphemeralVmContextMenuItems'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true

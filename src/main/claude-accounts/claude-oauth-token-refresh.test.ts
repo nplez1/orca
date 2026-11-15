@@ -45,7 +45,7 @@ vi.mock('../filesystem/atomic-file-publication', async (importOriginal) => {
   }
 })
 
-import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secure-storage/secret-store'
 import { readClaudeOAuthCredential } from './claude-oauth-credential-store'
 import {
   flushPendingClaudeOAuthRotations,

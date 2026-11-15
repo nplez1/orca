@@ -1,5 +1,5 @@
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 
 /** Jira's own reason for a refused board action, or the board's own wording when the
  *  failure carries none. Shared by the board and the two hooks that move issues on it,

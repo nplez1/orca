@@ -1,4 +1,4 @@
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { translate } from '@/i18n/i18n'
 
 /** Each Jira issue side read has its own fallback, because the picker it feeds shows

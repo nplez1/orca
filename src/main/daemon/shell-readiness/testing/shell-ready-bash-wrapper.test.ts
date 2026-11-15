@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEV_COMMAND_NAME } from '../../../cli/cli-install-constants'
+import { DEV_COMMAND_NAME } from '../../../cli/installation/cli-install-constants'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import type * as DaemonBashRcfileModule from '../daemon-bash-shell-ready-rcfile'
 import { getBashShellReadyRcfileContent } from '../../../providers/local-pty/local-pty-shell-ready-bash-rcfile'
 import { getDaemonBashShellReadyRcfileContent } from '../daemon-bash-shell-ready-rcfile'
-import { prependOrcaCliDirToChildPath } from '../../../cli/orca-cli-child-path'
+import { prependOrcaCliDirToChildPath } from '../../../cli/launchers/orca-cli-child-path'
 import {
   expectBashOsc133Lifecycle,
   runInteractiveBashRcfile

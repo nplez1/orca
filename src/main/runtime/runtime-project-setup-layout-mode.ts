@@ -1,5 +1,5 @@
 import type { RuntimeStore } from './construction/runtime-store-contract'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import {
   layoutModeNestsWorkspaces,
   resolveWorktreeLayoutMode,

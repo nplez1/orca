@@ -2,7 +2,7 @@ import React from 'react'
 import { XCircle } from 'lucide-react'
 import { useTranslate } from '@/i18n/use-translate'
 import { isFailedStepState } from '../../../../shared/check-step-visibility'
-import type { PRCheckRunDetails, PRCheckStep } from '../../../../shared/github/check-types'
+import type { PRCheckRunDetails, PRCheckStep } from '../../../../shared/github/checks/check-types'
 
 type FailureEntry = { key: string; label: string; message: string | null }
 

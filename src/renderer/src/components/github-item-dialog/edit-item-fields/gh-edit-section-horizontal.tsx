@@ -8,10 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import type { GitHubAssignableUser } from '../../../../../shared/github/pull-request-types'
-import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
-import type { TaskPageGitHubCloseAction } from '@/components/task-page/github/task-page-github-status-actions'
 import { GHEditSectionPills } from './gh-edit-section-pills'
+import type { GitHubAssignableUser } from '../../../../../shared/github/pull-requests/pull-request-types'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
+import type { TaskPageGitHubCloseAction } from '@/components/task-page/github/issue-status/task-page-github-status-actions'
 import { useTranslate } from '@/i18n/use-translate'
 
 export function GHEditSectionHorizontal({

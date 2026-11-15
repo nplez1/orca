@@ -3,8 +3,8 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
 import { formatBuildDuration } from '@/components/check-build-metadata'
 import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/utils'
-import type { PRCheckJob, PRCheckStep } from '../../../../shared/github/check-types'
+import { cn } from '@/lib/class-names'
+import type { PRCheckJob, PRCheckStep } from '../../../../shared/github/checks/check-types'
 import { resolveStepOutcome } from '../../../../shared/source-control/checks/pr-check-step-status'
 
 /** Elapsed time for a settled step, or null while it is still running. */

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from './local-build-compatibility-contract'
+import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from './remote-runtime/orcad-distribution/local-build-compatibility-contract'
 import {
   ORCAD_BROWSER_PARK_LABEL,
   SERVE_LAUNCHD_LABEL_PREFIX,
   isServeSupervisorLabel,
   parseServeSupervisorRegistration
-} from './serve-bundle-coordination'
+} from './remote-runtime/serve-supervisor/serve-bundle-coordination'
 
 describe('serve supervisor labels', () => {
   // Why: a fixed upstream prefix made `serve service install` replace and delete the official

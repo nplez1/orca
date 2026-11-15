@@ -2,7 +2,7 @@
 import { act, useEffect, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ActivityBarItem } from './activity-bar-buttons'
+import type { ActivityBarItem } from './activity-bar/activity-bar-buttons'
 
 const sidebarState = {
   rightSidebarTab: 'checks',
@@ -53,7 +53,7 @@ vi.mock('@/runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-regist
   })
 }))
 
-const { useRightSidebarTabRouting } = await import('./use-right-sidebar-tab-routing')
+const { useRightSidebarTabRouting } = await import('./activity-bar/use-right-sidebar-tab-routing')
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
 const ITEM_ICON = (): null => null

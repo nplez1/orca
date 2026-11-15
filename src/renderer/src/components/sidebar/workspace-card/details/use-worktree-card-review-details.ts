@@ -3,17 +3,17 @@ import { getDetachedWorkspaceReviewRequest } from '../review/workspace-detached-
 import { getLinearReadScope, scopedLinearCacheKey } from '@/store/slices/linear/linear-slice-scope'
 import { getWorkspaceAttachmentSourceContext } from '../review/workspace-attachment-source-result'
 import { getWorkspaceReferenceLinearWorkspaceId } from '../review/workspace-reference-details'
-import { getWorktreeGitIdentityDisplay } from '../../../../../../shared/worktree/git-identity-display'
+import { getWorktreeGitIdentityDisplay } from '../../../../../../shared/worktree/row-display/git-identity-display'
 import { useAppStore } from '@/store'
 import { findLinkedIssueRepo, linkedIssueRepoIsOffDevice } from '@/lib/linked-issue-repo'
-import { selectWorkspaceReviewState } from '../../../right-sidebar/checks-panel/checks-panel-review'
+import { selectWorkspaceReviewState } from '../../../right-sidebar/checks-panel/review-state/checks-panel-review'
 import { isStaleMergedGitHubReviewForHead } from '../../../../store/slices/hosted-review/hosted-review-cache-state'
-import { getGitHubPRCacheKey } from '../../../../../../shared/github/github-cache-key'
+import { getGitHubPRCacheKey } from '../../../../../../shared/github/cache/github-cache-key'
 import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache/cache-identity'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review/hosted-review-cache-identity'
-import { isFolderRepo } from '../../../../../../shared/repo-kind'
+import { isFolderRepo } from '../../../../../../shared/repository/repo-kind'
 import { areTaskSourceContextsEqual } from '../../../../../../shared/work-items/task-source-context'
-import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
+import { parseWorkspaceKey } from '../../../../../../shared/workspace/identity/workspace-scope'
 import {
   getWorktreeCardPrDisplay,
   isCachedMergedBranchPRCurrentForWorktree

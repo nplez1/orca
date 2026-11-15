@@ -1,10 +1,10 @@
-import { isAntigravityReferenceSession } from '../../../../../../shared/antigravity-session-origin'
+import { isAntigravityReferenceSession } from '../../../../../../shared/agent-session/lifecycle/provider-handles/antigravity-session-origin'
 import type { AiVaultSubagentResumeActions } from './AiVaultSessionSubagents'
 import { useCallback } from 'react'
 import type React from 'react'
 import { ChevronRight } from 'lucide-react'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import {
   AI_VAULT_SESSION_DRAG_END_EVENT,
   AI_VAULT_SESSION_DRAG_START_EVENT,
@@ -33,6 +33,8 @@ import type { AgentDotState } from '@/components/AgentStateDot'
 import type { AiVaultSearchHit } from '../../../../../../shared/ai-vault/search/ai-vault-search-types'
 import { AiVaultSearchEvidence } from '../search/AiVaultSearchEvidence'
 import { useAiVaultSessionDisplayTitle } from './use-ai-vault-session-display-title'
+import { ForkMarkedName } from '@/components/native-chat/fork/ForkMarkedName'
+import type { AiVaultOriginalPaneTarget } from '../session-actions/ai-vault-original-pane'
 
 // One step per nesting level. Pi emits a single level today; the cap keeps a
 // pathological chain from walking rows off the pane instead of clipping.
@@ -86,7 +88,8 @@ export function VaultSessionRow({
   onRequestDelete,
   searchHit,
   sourceHostLabel,
-  onPick
+  onPick,
+  originalPaneTarget
 }: {
   session: AiVaultSession
   liveState: AgentDotState | null
@@ -98,6 +101,7 @@ export function VaultSessionRow({
   resumeDisabled: boolean
   resumeHidden?: boolean
   onToggleDetails: () => void
+  originalPaneTarget?: AiVaultOriginalPaneTarget | null
   /** 0 for a top-level row; 1+ for a sub-agent nested under its parent. */
   subagentDepth?: number
   /** Sub-agent rows the list holds for this session; 0 hides the disclosure. */
@@ -135,7 +139,7 @@ export function VaultSessionRow({
     ? t('aiVault.continueInCli', 'Continue in CLI')
     : defaultResumeLabel
   const updatedAt = session.updatedAt ?? session.modifiedAt
-  const title = useAiVaultSessionDisplayTitle(session)
+  const { title, forked } = useAiVaultSessionDisplayTitle(session, originalPaneTarget)
   const detailsId = getSessionDetailsId(session.id)
   const latestTurn = latestSessionConversationTurn(session)
   const deleteHost = useAiVaultSessionDeleteHost(session)
@@ -225,7 +229,7 @@ export function VaultSessionRow({
             window.dispatchEvent(new Event(AI_VAULT_SESSION_DRAG_END_EVENT))
           }}
         >
-          {title}
+          {forked ? <ForkMarkedName name={title} /> : title}
         </div>
         <SessionRowTrailingActions
           session={session}

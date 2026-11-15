@@ -4,7 +4,8 @@ import {
 } from './ephemeral-vm-lifetime'
 import { asRecord, asTrimmedString } from './orca-yaml-fields'
 import { MAX_ORCA_YAML_COLLECTION_ENTRIES } from './orca-yaml-file-limit'
-import { parseEphemeralVmRecipeTimeoutSeconds } from './ephemeral-vm-recipe-timeouts'
+import { parseEphemeralVmRecipeTimeoutSeconds } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
+import { parseRecipePassEnv } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-env'
 import type {
   OrcaVmRecipe,
   OrcaVmRecipeContextMenuItem,
@@ -185,6 +186,18 @@ export function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
           message: `Recipe "${id}" ${timeouts.message} Steps keep no time limit.`
         })
       }
+      const parsedPassEnv =
+        record.passEnv === undefined ? undefined : parseRecipePassEnv(record.passEnv)
+      if (parsedPassEnv === null) {
+        // Why: a typo must not widen the environment back to everything, and dropping the recipe
+        // would let a same-id plugin recipe or a stored snapshot run with the full environment.
+        diagnostics.push({
+          index,
+          field: 'passEnv',
+          message: `Recipe "${id}" passEnv must be a list of environment variable names (a trailing * matches a prefix). Scripts only receive basic variables until it is fixed.`
+        })
+      }
+      const passEnv = parsedPassEnv === null ? [] : parsedPassEnv
       const extend = asTrimmedString(record.extend)
       const extendDurations =
         record.extendDurations === undefined
@@ -232,7 +245,8 @@ export function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
           : {}),
         ...(extend ? { extend } : {}),
         ...(extendDurations.length > 0 ? { extendDurations } : {}),
-        ...(contextMenuItems.items.length > 0 ? { contextMenuItems: contextMenuItems.items } : {})
+        ...(contextMenuItems.items.length > 0 ? { contextMenuItems: contextMenuItems.items } : {}),
+        ...(passEnv ? { passEnv } : {})
       }
     })
     .filter((entry): entry is OrcaVmRecipe => entry !== null)

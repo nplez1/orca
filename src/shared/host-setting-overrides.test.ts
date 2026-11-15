@@ -4,7 +4,7 @@ import {
   getEffectiveHostSetting,
   getHostSettingOverrideForIds,
   setHostSettingOverrideForIds
-} from './host-setting-overrides'
+} from './execution-host/host-setting-overrides'
 import { LOCAL_EXECUTION_HOST_ID, toRuntimeExecutionHostId } from './execution-host'
 
 const LOCAL = LOCAL_EXECUTION_HOST_ID

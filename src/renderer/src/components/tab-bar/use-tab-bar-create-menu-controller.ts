@@ -5,7 +5,7 @@ import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent
 import { launchDefaultAgentInNewTab } from './launch-default-agent-in-new-tab'
 import { useNewTabMenuFocusHandoff } from './new-tab-menu-focus-handoff'
 import type { AgentPickerEntry } from '../../../../shared/agent-launch/picker/agent-launch-picker'
-import type { WindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
+import type { WindowsTerminalCapabilities } from '@/runtime/hosts/capabilities/windows-terminal-capabilities'
 import { useTabAgentMenuLaunch } from './QuickLaunchButton'
 import { requestNativeChatComposerFocus } from '@/components/native-chat/composer/focus/native-chat-composer-focus-intent'
 import { useNewTabAgentMenuRows } from './use-new-tab-agent-menu-rows'

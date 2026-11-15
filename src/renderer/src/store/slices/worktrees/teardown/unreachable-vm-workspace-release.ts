@@ -23,9 +23,9 @@ import { isEphemeralVmRuntimeEnvironment } from '../../../../../../shared/remote
 import {
   ARCHIVE_HOOK_FAILED_REMOVAL_PREFIX,
   ARCHIVE_HOOK_OVERRIDE_HINT
-} from '../../../../../../shared/worktree/archive-hook-removal-gate'
-import type { EphemeralVmCleanupSummary } from '@/lib/ephemeral-vm-runtime-cleanup'
-import { listEphemeralVmRuntimesForWorkspace } from '@/lib/ephemeral-vm-runtime-cleanup'
+} from '../../../../../../shared/worktree/removal/archive-hook-removal-gate'
+import type { EphemeralVmCleanupSummary } from '@/runtime/ephemeral-vm/ephemeral-vm-runtime-cleanup'
+import { listEphemeralVmRuntimesForWorkspace } from '@/runtime/ephemeral-vm/ephemeral-vm-runtime-cleanup'
 import type { WorktreeSliceGet } from '../listing/worktree-slice-types'
 
 export type UnreachableVmRemovalFallback =

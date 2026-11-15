@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react'
 
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { activateWorktreeFromSidebar } from '@/lib/workspace/activation/sidebar-worktree-activation'
-import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
+import type { HostSectionRow } from '../../../../../../shared/sidebar-list/hosts/host-section-rows'
 import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/row-types'
 
 type BranchGroupHostTarget = { member: BranchGroupMember; rowKey: string }

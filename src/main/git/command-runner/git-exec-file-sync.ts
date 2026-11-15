@@ -1,7 +1,8 @@
-import { execFileSync, type SpawnOptions } from 'node:child_process'
+import type { SpawnOptions } from 'node:child_process'
+import { execNativeFileSync } from '@orca/process-host/native-process-spawn'
 import { recordSubprocessSpawn } from '../../diagnostics/main-thread-churn-probe'
-import { resolveCommand } from './wsl-command-resolution'
-import { untranslatedGitOutputEnv } from './git-process-env'
+import { untranslatedGitOutputEnv } from './git-environment/git-process-env'
+import { resolveCommand } from './host-routing/wsl-command-resolution'
 import { localLoginShellGitEnvironmentSnapshot } from './local-login-shell-git-environment'
 
 // Why: sync git blocks the main thread; a dead network drive can hang git for minutes without a
@@ -33,9 +34,11 @@ export function gitExecFileSync(
     // Host Git only: a WSL path would make this a synchronous wsl.exe that can boot the distro.
     throw new Error('Synchronous Git cannot run in a WSL folder. Use asynchronous Git for it.')
   }
-  const spawnStartedAt = performance.now()
-  try {
-    return execFileSync(resolved.binary, resolved.args, {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: A BufferEncoding is always supplied, so execFileSync returns text.
+  return execNativeFileSync(
+    resolved.binary,
+    resolved.args,
+    {
       cwd: resolved.cwd,
       encoding: options.encoding ?? 'utf-8',
       // Why best-effort: this path is sync, so it can only use a probe that already settled.
@@ -43,9 +46,7 @@ export function gitExecFileSync(
       stdio: options.stdio ?? ['pipe', 'pipe', 'pipe'],
       timeout: options.timeout ?? GIT_EXEC_SYNC_TIMEOUT_MS,
       windowsHide: true
-    }) as string
-  } finally {
-    // Sync exec blocks the main thread for its whole duration — the cost issue #7576 flags.
-    recordSubprocessSpawn(resolved.binary, resolved.args, performance.now() - spawnStartedAt)
-  }
+    },
+    recordSubprocessSpawn
+  ) as string
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Info, RefreshCw, StickyNote } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
 import { resolveSessionSummaryHeaderState } from '@/components/activity/session-summary-presentation'

@@ -1,10 +1,10 @@
-import { useAppStore } from '@/store'
+import { useAppStore } from '@/store/index'
 import {
   getClaudeSubagentNavigationTitle,
   getClaudeSubagentNavigationDescription
 } from './behavior/claude-subagent-navigation-copy'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
-import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host'
+import { translateLocalExecutionHostLabel } from '../../sidebar/execution-host-label'
 import { AgentAwakeSetting } from './behavior/AgentAwakeSetting'
 import { AgentCacheTimerSection } from './behavior/AgentCacheTimerSection'
 import { SessionSummaryAiSetting } from '../SessionSummaryAiSetting'
@@ -21,7 +21,7 @@ import {
   getAgentStatusHooksTitle
 } from './behavior/agent-status-hooks-copy'
 import { SettingsSwitchRow } from '../form-controls/SettingsFormControls'
-import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
+import { isPairedWebClientWindow } from '@/app-shell/chrome/desktop-window-chrome'
 import { AgentLaunchSettingsSection } from './launch/AgentLaunchSettingsSection'
 import {
   AgentPermissionsSetting,
@@ -39,7 +39,7 @@ type AgentSettingProps = {
 }
 
 type AgentsPaneProps = AgentSettingProps & {
-  /** Host whose agent launch settings the pane shows; this computer's groups always show. */
+  /** Host whose agent launch settings and detected agents the pane shows. */
   hostScope: SettingsHostScope
   wslSupportedPlatform?: boolean
   wslAvailable?: boolean
@@ -78,12 +78,14 @@ export function AgentsPane({
       ) : (
         <SettingsHostScopeMachineOnlyNotice hostLabel={hostScope.label} />
       )}
-      <SettingsGroup title={getLocalExecutionHostLabel()}>
+      <SettingsGroup title={translateLocalExecutionHostLabel()}>
         <AgentRuntimeSetting
           settings={settings}
           updateSettings={updateSettings}
           refresh={() =>
-            useAppStore.getState().refreshDetectedAgents(undefined, { wakeWslDistro: true })
+            useAppStore
+              .getState()
+              .refreshDetectedAgents(undefined, { wakeWslDistro: true, userInitiated: true })
           }
           wslSupportedPlatform={wslSupportedPlatform}
           wslAvailable={wslAvailable}

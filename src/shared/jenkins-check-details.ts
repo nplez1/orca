@@ -3,7 +3,7 @@ import type {
   PRCheckJob,
   PRCheckRunDetails,
   PRCheckStep
-} from './github/check-types'
+} from './github/checks/check-types'
 import type { JenkinsBuildLocation } from './jenkins-urls'
 import { readJenkinsBuildMetadata } from './jenkins-build-metadata'
 import {

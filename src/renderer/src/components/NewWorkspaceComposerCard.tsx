@@ -2,17 +2,17 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
-import { getScreenSubmitModifierLabel } from '@/lib/screen-submit-shortcut'
-import { resolveProjectCloneUrlPrefill } from '@/lib/project-clone-url-prefill'
+import { getScreenSubmitModifierLabel } from '@/lib/keyboard/screen-submit-shortcut'
+import { resolveProjectCloneUrlPrefill } from '@/lib/workspace/creation/project-clone-url-prefill'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import {
   AddRemoteHostDialog,
   type AddRemoteHostMode
 } from '@/components/sidebar/host-admission/ssh/AddRemoteHostDialog'
-import { lazyWithRetry } from '@/lib/lazy-with-retry'
-import type * as SetProjectLocationDialogModule from '@/components/new-workspace/SetProjectLocationDialog'
+import { lazyWithRetry } from '@/app-shell/startup/lazy-with-retry'
+import type * as SetProjectLocationDialogModule from '@/components/new-workspace/project-location/SetProjectLocationDialog'
 import { unwrapRuntimeRpcResult } from '@/runtime/rpc/calls/runtime-rpc-result'
 import { withUiConnectTimeout } from '@/ssh/ssh-connect-ui-timeout'
 import { isSshConnectInFlight, trackSshConnect } from '@/ssh/ssh-connect-in-flight'
@@ -22,23 +22,23 @@ import {
   DEFAULT_DISABLED_TUI_AGENTS,
   filterEnabledTuiAgents
 } from '../../../shared/agent-launch/catalog/tui-agent-selection'
-import type { RuntimeStatus } from '../../../shared/runtime-session-contracts'
+import type { RuntimeStatus } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import type { TuiAgent } from '../../../shared/agent-launch/catalog/tui-agent'
-import { NewWorkspaceComposerAdvancedSection } from './new-workspace/NewWorkspaceComposerAdvancedSection'
-import { NewWorkspaceComposerAgentSection } from './new-workspace/NewWorkspaceComposerAgentSection'
-import { NewWorkspaceComposerFooter } from './new-workspace/NewWorkspaceComposerFooter'
-import { NewWorkspaceComposerNameSection } from './new-workspace/NewWorkspaceComposerNameSection'
-import { NewWorkspaceComposerProjectSection } from './new-workspace/NewWorkspaceComposerProjectSection'
+import { NewWorkspaceComposerAdvancedSection } from './new-workspace/composer/NewWorkspaceComposerAdvancedSection'
+import { NewWorkspaceComposerAgentSection } from './new-workspace/composer/NewWorkspaceComposerAgentSection'
+import { NewWorkspaceComposerFooter } from './new-workspace/composer/NewWorkspaceComposerFooter'
+import { NewWorkspaceComposerNameSection } from './new-workspace/composer/NewWorkspaceComposerNameSection'
+import { NewWorkspaceComposerProjectSection } from './new-workspace/composer/NewWorkspaceComposerProjectSection'
 import {
   EMPTY_EPHEMERAL_VM_RECIPES,
   EMPTY_PROJECT_HOST_SETUP_OPTIONS,
   EMPTY_PROJECT_OPTIONS,
   type NeedsProjectHostOption,
   type NewWorkspaceComposerCardProps
-} from './new-workspace/new-workspace-composer-card-props'
-import { getSshStatusLabel } from './new-workspace/new-workspace-composer-ssh-status'
-import { useNewWorkspaceComposerFileDrop } from './new-workspace/use-new-workspace-composer-file-drop'
-import { useComposerFileDragOver } from './new-workspace/use-composer-file-drag-over'
+} from './new-workspace/composer/new-workspace-composer-card-props'
+import { getSshStatusLabel } from './new-workspace/composer/new-workspace-composer-ssh-status'
+import { useNewWorkspaceComposerFileDrop } from './new-workspace/composer/use-new-workspace-composer-file-drop'
+import { useComposerFileDragOver } from './new-workspace/composer/use-composer-file-drag-over'
 import type { ProjectHostSetupProvisioning } from './new-workspace/use-workspace-copy-target'
 import { getRunTargetCloneAvailability } from './new-workspace/run-target-clone-availability'
 import { resolveRunTargetCloneUrl } from './new-workspace/run-target-clone-url'
@@ -47,7 +47,7 @@ import { buildDefaultAgentSettingsUpdate } from '../../../shared/agent-launch/ch
 
 // Lazy-load the project-location browser outside boot; warming shares this module entry with the click.
 const loadSetProjectLocationDialog = (): Promise<typeof SetProjectLocationDialogModule> =>
-  import('@/components/new-workspace/SetProjectLocationDialog')
+  import('@/components/new-workspace/project-location/SetProjectLocationDialog')
 
 const SetProjectLocationDialog = lazyWithRetry(
   () =>

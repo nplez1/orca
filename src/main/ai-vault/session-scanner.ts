@@ -4,34 +4,37 @@ import type {
 } from '../../shared/ai-vault/contracts/ai-vault-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { withSpan } from '../observability/tracer'
+import { dedupeScannedSessions } from './parsing/session-root-dedup'
 import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
-import { unionScopedSessions } from './session-list-results'
-import { dedupeScannedSessions } from './session-root-dedup'
+import { unionScopedSessions } from './listing/session-list-results'
 import {
   createAntigravityWorkspaceResolver,
   readLocalAntigravityHistory
 } from './scanners/antigravity/session-scanner-antigravity-history'
-import { sessionCandidatesFromDiscoveries } from './session-scanner-candidates'
-import { parseSessionCandidates } from './session-scanner-candidate-parse'
+import { sessionCandidatesFromDiscoveries } from './discovery/session-scanner-candidates'
+import { parseSessionCandidates } from './parsing/session-scanner-candidate-parse'
 import { createSessionParseStats } from './parse-cache/session-scanner-parse-cache'
-import { recordSessionScanIssue } from './session-scan-issues'
-import { aiVaultScanWorkload, noteAiVaultScanReading } from './ai-vault-scan-progress'
-import { yieldScanInventory } from './session-scanner-scope-inventory'
-import { prepareScopeScan, scanInScopeSessions } from './session-scanner-scope-walk'
-import { discoverAiVaultSessionSources } from './session-scanner-source-discovery'
+import { recordSessionScanIssue } from './parsing/session-scan-issues'
+import {
+  aiVaultScanWorkload,
+  noteAiVaultScanReading
+} from './scan-lifecycle/ai-vault-scan-progress'
+import { yieldScanInventory } from './scope/session-scanner-scope-inventory'
+import { prepareScopeScan, scanInScopeSessions } from './scope/session-scanner-scope-walk'
+import { discoverAiVaultSessionSources } from './discovery/session-scanner-source-discovery'
 import { withAntigravityArtifactPaths } from './scanners/antigravity/antigravity-session-artifacts'
 import {
   cursorChatMetaRefusals,
   withCursorChatMetaScan
 } from './scanners/cursor/session-scanner-cursor-chat-meta'
 import type { AiVaultScanOptions } from './session-scanner-types'
-import { clampPositiveInteger } from './session-scanner-values'
-import { scopeOnlyScan } from './session-scope-cwd'
+
+import { scopeOnlyScan } from './scope/session-scope-cwd'
 import {
   aiVaultSessionInScope,
   createAiVaultScopeCwdMatcher
 } from '../../shared/ai-vault/scanning/ai-vault-scope-cwd-match'
-import { throwIfAiVaultScanCancelled } from './ai-vault-scan-cancellation'
+import { throwIfAiVaultScanCancelled } from './scan-lifecycle/ai-vault-scan-cancellation'
 import { DEFAULT_AI_VAULT_SCAN_LIMIT } from '../../shared/ai-vault/scanning/ai-vault-session-depth'
 import { withDevinSessionsDbScan } from './scanners/devin/session-scanner-devin-db'
 import { withOpenCodeSqliteScanScope } from './scanners/opencode/sqlite/session-scanner-opencode-sqlite-scan-scope'
@@ -150,4 +153,8 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
       })
     )
   )
+}
+
+function clampPositiveInteger(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback
 }

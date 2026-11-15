@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secure-storage/secret-store'
 import { canSealReplicatedCredential } from './host-settings-credential-port'
 import { HOST_SETTINGS_CREDENTIAL_PORTS } from './host-settings-credential-ports'
 

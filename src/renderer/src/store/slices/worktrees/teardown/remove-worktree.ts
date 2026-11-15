@@ -1,33 +1,32 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 1-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
-import type { WorktreeSlice } from '../worktree-slice-contract'
-import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
-import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import { parseExecutionHostId } from '../../../../../../shared/execution-host'
-import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
+import { ensureHooksConfirmed } from '@/runtime/repo-hooks/ensure-hooks-confirmed'
 import { runtimeTargetForOwnerEnvironment } from '../../../../runtime/rpc/targets/runtime-client-target'
 import { forgetHugeRepoWarningDismissalsForWorktrees } from '@/lib/source-control/warnings/source-control-huge-repo-warning-dismissals'
-import { forgetWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
-import { readIpcErrorDetail } from '@/lib/ipc-error'
-import { isArchiveHookRemovalError } from '../../../../../../shared/worktree/archive-hook-removal-gate'
+import { forgetWorktreeSleepIntent } from '@/lib/workspace/sleep/worktree-sleep-intent'
+import { readIpcErrorDetail } from '@/runtime/errors/ipc-error'
+import { isArchiveHookRemovalError } from '../../../../../../shared/worktree/removal/archive-hook-removal-gate'
 import {
   beginHostQualifiedRemoval,
   completeSameIdHostScopedRemoval,
   findWorktreeOnConfirmedHost,
-  prepareHostScopedRemovalCompletion,
   refuseUnprovableRemoteHostRouting
 } from './host-qualified-worktree-removal'
-import { resolveSameIdSurvivingHostId } from './host-qualified-worktree-row-removal'
+import {
+  resolveSameIdSurvivingHostId,
+  prepareHostScopedRemovalCompletion
+} from './host-qualified-worktree-row-removal'
 import {
   classifyWorktreeForceDeleteReason,
   getLockedWorktreeRemovalReason,
   isLockedWorktreeRemovalError
-} from '../../../../../../shared/worktree/removal'
-import { preservedBranchCleanupKey } from '../../../../../../shared/git/branches/preserved-branch-cleanup'
+} from '../../../../../../shared/worktree/removal/removal'
+import '../../../../../../shared/git/branches/preserved-branch-cleanup'
 import { getWorktreeDeleteStateKey } from './worktree-delete-state'
-import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
 import { pruneHostedReviewLinkMutationGenerations } from '../metadata/hosted-review-link-mutation'
 import { rememberAuthoritativelyRemovedWorktrees } from '../listing/authoritative-worktree-removal-memory'
+import { rememberPreservedBranchCleanup } from './preserved-branch-cleanup-target'
 import { recordRemovedWorktreeSnapshotPrune } from './removed-worktree-snapshot-prune'
 import { retireRemovedWorktreeCommitDrafts } from '@/lib/source-control/drafts/source-control-commit-draft-session'
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
@@ -41,9 +40,12 @@ import {
 import { resolveWorktreeRemovalPreference } from './worktree-removal-preference'
 import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
 import { resolveLocalForgetRemovalFallback } from './local-forget-removal-fallback'
-import type { EphemeralVmCleanupSummary } from '@/lib/ephemeral-vm-runtime-cleanup'
+import type { EphemeralVmCleanupSummary } from '@/runtime/ephemeral-vm/ephemeral-vm-runtime-cleanup'
 import { showUnreachableVmRemovalNotice } from './unreachable-vm-workspace-release'
 import { refreshEphemeralVmRuntimesAfterMutation } from '@/hooks/useEphemeralVmRuntimes'
+import type { WorktreeSlice } from '../worktree-slice-contract'
+import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
+import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 
 export function createRemoveWorktree(
   set: WorktreeSliceSet,
@@ -246,23 +248,13 @@ export function createRemoveWorktree(
         reportMachine(runtimeCleanup)
       }
       const preservedBranch = removalResult?.preservedBranch
-      const cleanup = preservedBranch
-        ? {
-            worktreeId,
-            branchName: preservedBranch.branchName,
-            expectedHead: preservedBranch.head,
-            ...(hostId ? { hostId } : {}),
-            ...(removalRoute?.runtimeEnvironmentId
-              ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
-              : {})
-          }
-        : null
-      if (preservedBranch) {
-        preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup!), {
-          cleanup: cleanup!,
-          target
-        })
-      }
+      const cleanup = rememberPreservedBranchCleanup(
+        worktreeId,
+        preservedBranch,
+        hostId,
+        removalRoute,
+        target
+      )
       const branchCleanupOptions = {
         ...(hostId ? { hostId } : {}),
         ...(removalRoute?.runtimeEnvironmentId

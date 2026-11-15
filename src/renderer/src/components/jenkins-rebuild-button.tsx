@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import { rerunJenkinsCheck, hasJenkinsApi } from '@/runtime/jenkins-rebuild-client'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
-import type { PRCheckDetail } from '../../../shared/github/check-types'
+import type { PRCheckDetail } from '../../../shared/github/checks/check-types'
 
 /** How long a started rerun keeps its own button quiet, until Jenkins reports the new build. */
 const RERUN_SETTLE_MS = 15_000

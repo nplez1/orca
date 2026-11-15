@@ -1,11 +1,11 @@
-import { withClaudeAgentViewPlugin } from '../../../shared/claude-agent-view-launch'
+import { withClaudeAgentViewPlugin } from '../../../shared/agent-hook-listener/providers/claude/view/claude-agent-view-launch'
 import { resolveStartupShell } from '../../../shared/agent-launch/startup/tui-agent-startup-shell'
-import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
-import { getAppEnvironment } from '../../../shared/app-environment'
+import { resolveLocalWindowsAgentStartupShell } from '../../../shared/shell/launch/windows-terminal-shell'
+import { getAppEnvironment } from '../../../shared/app-lifecycle/app-environment'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { isTuiAgent } from '../../../shared/agent-launch/catalog/tui-agent-config'
-import { withCodexTerminalServerIsolationEnv } from '../../../shared/codex-terminal-server-isolation'
-import { getLegacyOpenCodeEnvKeysToDelete } from '../../opencode/legacy-shared-config-dir'
+import { withCodexTerminalServerIsolationEnv } from '../../../shared/agent-launch/startup/codex-terminal-server-isolation'
+import { getLegacyOpenCodeEnvKeysToDelete } from '../../opencode/status-hooks/legacy-shared-config-dir'
 import { prepareOpenCodePtyLaunch } from '../../opencode/opencode-pty-launch'
 import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../../pty/shell-startup/legacy-terminal-shim-dir'
 import { PI_PROCESS_OWNER_ENV_KEYS } from '../../pty/shell-startup/pi-process-owner-env'
@@ -14,8 +14,8 @@ import {
   applyAgentWorkspaceTrustToSpawn,
   withAgentWorkspaceTrustLaunchArgs
 } from '../../agent-launch/trust/agent-workspace-trust-spawn'
-import type { PtySpawnOptions } from '../../providers/pty-provider-contract'
-import type { CodexAccountSelectionTarget } from '../../codex-accounts/runtime-selection'
+import type { PtySpawnOptions } from '../../providers/pty/provider-contract'
+import type { CodexAccountSelectionTarget } from '../../../shared/agent-accounts/codex/codex-selection-lane'
 import { getStartupTerminalIngressIntent } from '../terminal-startup-color-query-replies'
 import { CODEX_HOME_ENV_KEYS } from './host-env/codex-home'
 import {
@@ -28,9 +28,9 @@ import { promoteAgentTeamsShimPath, deleteRequestedEnvKeys } from './host-env/pa
 import { resolveConfiguredTerminalShellArgs } from './configured-terminal-shell-args'
 import { ptySizes } from './delivery/visibility-state'
 import {
-  canonicalClaudeSessionStampEnvKey,
-  stripInheritedClaudeSessionEnv
-} from '../../../shared/agent-launch/startup/claude-parent-session-env'
+  canonicalAgentSessionStampEnvKey,
+  stripInheritedAgentSessionEnv
+} from '../../../shared/agent-launch/startup/parent-agent-session-env'
 import { shouldSeedPreAttachPtySize } from './delivery/attached-pty-size'
 
 type TrustInput = Parameters<typeof applyAgentWorkspaceTrustToSpawn>[0]
@@ -52,12 +52,12 @@ export function assemblePtySpawnEnvDeletions(input: {
   const isolated = withCodexTerminalServerIsolationEnv(input.env, input.settings)
   const env = isolated ? { ...isolated } : undefined
   if (env) {
-    stripInheritedClaudeSessionEnv(env, { launchEnv: isolated })
+    stripInheritedAgentSessionEnv(env, { launchEnv: isolated })
   }
   let envToDelete =
     mergePtyEnvDeletions(
       input.callerEnvToDelete?.map((key) =>
-        canonicalClaudeSessionStampEnvKey(key, process.platform)
+        canonicalAgentSessionStampEnvKey(key, process.platform)
       ) ?? [],
       // Persistent daemons and older SSH hosts must not resurrect a parent Pi's ownership.
       PI_PROCESS_OWNER_ENV_KEYS,
@@ -92,11 +92,12 @@ export type PtySpawnLaunchOptionsInput = {
     startupCommandDelivery?: PtySpawnOptions['startupCommandDelivery']
     worktreeId?: string
     trustWorktreeId?: string
+    /** The user chose "let agents ask" for this launch; it wins even if saving the answer failed. */
+    skipAgentWorkspaceTrust?: boolean
     tabId?: unknown
     connectionId?: string | null
     shellOverride?: string
     telemetry?: { agent_kind?: unknown }
-    skipAgentWorkspaceTrust?: unknown
   }
   env: Record<string, string> | undefined
   /** Mutated: OpenCode prep may add the keys its launch must drop. */
@@ -227,7 +228,21 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   if (startupIngress) {
     spawnOptions.startupIngress = startupIngress
   }
-  const trustWrite = applyAgentWorkspaceTrustToSpawn({ ...trustInput, spawnOptions })
+  const trustWrite = applyAgentWorkspaceTrustToSpawn({
+    launchAgent: args.launchAgent,
+    worktreeId: args.worktreeId,
+    trustWorktreeId: args.trustWorktreeId,
+    cwd: input.cwd,
+    store: input.store,
+    isFreshLaunch: !input.preAdoptedStablePane && launchCommand !== undefined,
+    settings: input.getSettings?.(),
+    env,
+    claudeAuth: input.claudeAuth,
+    wslDistro: input.expectedWslDistro,
+    connectionId: connectionId ?? null,
+    codexHome: input.selectedCodexHomePath,
+    spawnOptions
+  })
   if (trustWrite) {
     await trustWrite
   }

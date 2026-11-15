@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callMock = vi.fn()
 
-vi.mock('./runtime-client', () => {
+vi.mock('./runtime/client', () => {
   class RuntimeClient {
     call = callMock
     getCliStatus = vi.fn()
@@ -31,7 +31,7 @@ vi.mock('./runtime-client', () => {
 })
 
 import { main } from './index'
-import { okFixture, queueFixtures } from './test-fixtures'
+import { okFixture, queueFixtures } from './runtime/fixtures/runtime-rpc-fixtures'
 
 async function run(args: string[]): Promise<string> {
   const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})

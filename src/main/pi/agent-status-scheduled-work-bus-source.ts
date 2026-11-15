@@ -1,4 +1,4 @@
-import type { PiAgentKind } from '../../shared/pi-agent-kind'
+import type { PiAgentKind } from '../../shared/agent-launch/catalog/pi-agent-kind'
 
 /** The bus half of the scheduled-work lane: which `pi.events` this pane's inventory is asked on.
  *

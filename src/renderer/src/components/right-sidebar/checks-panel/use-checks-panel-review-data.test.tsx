@@ -9,10 +9,10 @@ import {
   mountProbe,
   unmountProbes
 } from '../source-control/panel/source-control-hook-test-harness'
-import { useChecksPanelReviewData } from './use-checks-panel-review-data'
-import type { PRComment } from '../../../../../shared/github/comment-types'
-import type { PRInfo } from '../../../../../shared/github/pull-request-types'
-import type { Repo } from '../../../../../shared/repo-types'
+import { useChecksPanelReviewData } from './review-data/use-checks-panel-review-data'
+import type { PRComment } from '../../../../../shared/github/comments/comment-types'
+import type { PRInfo } from '../../../../../shared/github/pull-requests/pull-request-types'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 
 const repo: Repo = {
   id: 'repo-1',

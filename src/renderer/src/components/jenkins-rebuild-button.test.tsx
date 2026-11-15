@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { PRCheckDetail } from '../../../shared/github/check-types'
+import type { PRCheckDetail } from '../../../shared/github/checks/check-types'
 import { JenkinsRebuildButton } from './jenkins-rebuild-button'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true

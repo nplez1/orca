@@ -5,7 +5,7 @@ import { useClipboardTextCopyFeedback } from '@/hooks/clipboard/use-clipboard-te
 import { useTranslate } from '@/i18n/use-translate'
 import { openContextualHttpLink } from '@/lib/contextual-http-link'
 import { isEditableTarget } from '@/lib/text-input/focus/editable-target'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { useAppStore } from '@/store'
 
 type LinkContextMenuRequest = {

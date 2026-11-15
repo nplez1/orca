@@ -1,5 +1,5 @@
-import type { Repo } from '../../../shared/repo-types'
-import { mapWithConcurrency } from '../../../shared/map-with-concurrency'
+import type { Repo } from '../../../shared/repository/repo-types'
+import { mapWithConcurrency } from '../../../shared/concurrency/map-with-concurrency'
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import { WORKTREE_REFRESH_CONCURRENCY } from '../store/slices/worktrees/listing/worktree-slice-constants'
 import type { AppState } from '../store/types'

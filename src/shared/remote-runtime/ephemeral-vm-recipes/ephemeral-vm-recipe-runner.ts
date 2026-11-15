@@ -1,0 +1,288 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 6-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
+import type { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { statSync } from 'node:fs'
+import type { OrcaVmRecipe } from '../../orca-yaml-hook-types'
+import { parseEphemeralVmRecipeResult, type EphemeralVmRecipeResult } from './ephemeral-vm-recipes'
+import { getEphemeralVmRecipeCheckoutModeFailure } from './ephemeral-vm-recipe-checkout-mode'
+import { pickEphemeralVmFailureCode, type EphemeralVmFailure } from './ephemeral-vm-failure-copy'
+import { getEphemeralVmRecipeTimeoutSeconds } from './ephemeral-vm-recipe-timeouts'
+import { getRecipeStepFailure, runRecipeStep } from './ephemeral-vm-recipe-step'
+import { getEphemeralVmRecipeDestroyFailure } from './ephemeral-vm-recipe-destroy-result'
+import {
+  buildEphemeralVmRecipeCleanupPayload,
+  buildEphemeralVmRecipeLifecyclePayload
+} from './ephemeral-vm-recipe-lifecycle-payload'
+
+export type EphemeralVmRecipeContext = {
+  instanceId?: string
+  recipeId: string
+  projectId?: string
+  workspaceId?: string
+  workspaceName?: string
+  repoPath: string
+  repoUrl?: string
+  branch?: string
+  ref?: string
+  expectedRefHead?: string
+  orcaVersion?: string
+}
+
+export type EphemeralVmRecipeStartArgs = {
+  recipe: OrcaVmRecipe
+  repoPath: string
+  context?: Partial<Omit<EphemeralVmRecipeContext, 'recipeId' | 'repoPath'>>
+  env?: NodeJS.ProcessEnv
+  maxCaptureBytes?: number
+  signal?: AbortSignal
+  /** Called once the create process has actually started. */
+  onSpawn?: () => void
+  onStdout?: (chunk: string) => void
+  onStderr?: (chunk: string) => void
+  spawnCommand?: typeof spawn
+}
+
+export type EphemeralVmRecipeStartSuccess = {
+  ok: true
+  context: EphemeralVmRecipeContext
+  result: EphemeralVmRecipeResult
+  stdout: string
+  stderr: string
+}
+
+export type EphemeralVmRecipeStartFailure = {
+  ok: false
+  context: EphemeralVmRecipeContext
+  stdout: string
+  stderr: string
+  exitCode: number | null
+  signal: NodeJS.Signals | null
+  /** Set when the caller's signal stopped the create (a cancel) before it answered. */
+  aborted?: true
+  recipeResult?: EphemeralVmRecipeResult
+} & EphemeralVmFailure
+
+export type EphemeralVmRecipeStartResult =
+  | EphemeralVmRecipeStartSuccess
+  | EphemeralVmRecipeStartFailure
+
+export type EphemeralVmRecipeCleanupArgs = {
+  recipe: OrcaVmRecipe
+  repoPath: string
+  context: EphemeralVmRecipeContext
+  recipeResult?: EphemeralVmRecipeResult
+  env?: NodeJS.ProcessEnv
+  maxCaptureBytes?: number
+  signal?: AbortSignal
+  onStdout?: (chunk: string) => void
+  onStderr?: (chunk: string) => void
+  spawnCommand?: typeof spawn
+}
+
+export type EphemeralVmRecipeLifecycleArgs = EphemeralVmRecipeCleanupArgs
+
+export type EphemeralVmRecipeCleanupResult = {
+  ok: boolean
+  skipped: boolean
+  stdout: string
+  stderr: string
+  exitCode: number | null
+  signal: NodeJS.Signals | null
+} & Partial<EphemeralVmFailure>
+
+export type EphemeralVmRecipeResumeResult =
+  | (EphemeralVmRecipeStartSuccess & { skipped: false })
+  | (EphemeralVmRecipeStartFailure & { skipped: false })
+  | {
+      ok: true
+      skipped: true
+      context: EphemeralVmRecipeContext
+      stdout: string
+      stderr: string
+    }
+
+export async function runEphemeralVmRecipeStart(
+  args: EphemeralVmRecipeStartArgs
+): Promise<EphemeralVmRecipeStartResult> {
+  validateRepoPath(args.repoPath)
+  const context = buildRecipeContext(args.recipe, args.repoPath, args.context)
+  const processResult = await runRecipeStep(args, 'create', args.recipe.create, context)
+
+  const stepFailure = getRecipeStepFailure(args.recipe, 'create', processResult)
+  if (stepFailure) {
+    return { ok: false, context, ...stepFailure, ...processResult }
+  }
+
+  const parsed = parseEphemeralVmRecipeResult(processResult.stdout)
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      context,
+      error: parsed.error,
+      ...pickEphemeralVmFailureCode(parsed),
+      ...processResult
+    }
+  }
+  const checkoutModeFailure = getEphemeralVmRecipeCheckoutModeFailure(args.recipe, parsed.result)
+  if (checkoutModeFailure) {
+    return {
+      ok: false,
+      context,
+      ...checkoutModeFailure,
+      recipeResult: parsed.result,
+      ...processResult
+    }
+  }
+
+  return {
+    ok: true,
+    context,
+    result: parsed.result,
+    stdout: processResult.stdout,
+    stderr: processResult.stderr
+  }
+}
+
+export async function runEphemeralVmRecipeCleanup(
+  args: EphemeralVmRecipeCleanupArgs
+): Promise<EphemeralVmRecipeCleanupResult> {
+  validateRepoPath(args.repoPath)
+  if (args.recipe.destroyDisabled || !args.recipe.destroy) {
+    return { ok: true, skipped: true, stdout: '', stderr: '', exitCode: null, signal: null }
+  }
+
+  const payload = buildEphemeralVmRecipeCleanupPayload(args)
+  const processResult = await runRecipeStep(
+    args,
+    'destroy',
+    args.recipe.destroy,
+    args.context,
+    `${JSON.stringify(payload)}\n`
+  )
+
+  const failure = getEphemeralVmRecipeDestroyFailure(
+    processResult,
+    getEphemeralVmRecipeTimeoutSeconds(args.recipe, 'destroy') ?? 0
+  )
+  if (failure) {
+    return failure
+  }
+
+  return { ok: true, skipped: false, ...processResult }
+}
+
+export async function runEphemeralVmRecipeSuspend(
+  args: EphemeralVmRecipeLifecycleArgs
+): Promise<EphemeralVmRecipeCleanupResult> {
+  validateRepoPath(args.repoPath)
+  if (!args.recipe.suspend) {
+    return { ok: true, skipped: true, stdout: '', stderr: '', exitCode: null, signal: null }
+  }
+
+  const payload = buildEphemeralVmRecipeLifecyclePayload({ ...args, mode: 'suspend' })
+  const processResult = await runRecipeStep(
+    args,
+    'suspend',
+    args.recipe.suspend,
+    args.context,
+    `${JSON.stringify(payload)}\n`
+  )
+
+  const stepFailure = getRecipeStepFailure(args.recipe, 'suspend', processResult)
+  if (stepFailure) {
+    return { ok: false, skipped: false, ...stepFailure, ...processResult }
+  }
+
+  return { ok: true, skipped: false, ...processResult }
+}
+
+export async function runEphemeralVmRecipeResume(
+  args: EphemeralVmRecipeLifecycleArgs
+): Promise<EphemeralVmRecipeResumeResult> {
+  validateRepoPath(args.repoPath)
+  if (!args.recipe.resume) {
+    return {
+      ok: true,
+      skipped: true,
+      context: args.context,
+      stdout: '',
+      stderr: ''
+    }
+  }
+
+  const payload = buildEphemeralVmRecipeLifecyclePayload({ ...args, mode: 'resume' })
+  const processResult = await runRecipeStep(
+    args,
+    'resume',
+    args.recipe.resume,
+    args.context,
+    `${JSON.stringify(payload)}\n`
+  )
+
+  const stepFailure = getRecipeStepFailure(args.recipe, 'resume', processResult)
+  if (stepFailure) {
+    return { ok: false, skipped: false, context: args.context, ...stepFailure, ...processResult }
+  }
+
+  const parsed = parseEphemeralVmRecipeResult(processResult.stdout)
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      skipped: false,
+      context: args.context,
+      error: parsed.error,
+      ...pickEphemeralVmFailureCode(parsed),
+      ...processResult
+    }
+  }
+  const checkoutModeFailure = getEphemeralVmRecipeCheckoutModeFailure(args.recipe, parsed.result)
+  if (checkoutModeFailure) {
+    return {
+      ok: false,
+      skipped: false,
+      context: args.context,
+      ...checkoutModeFailure,
+      recipeResult: parsed.result,
+      ...processResult
+    }
+  }
+
+  return {
+    ok: true,
+    skipped: false,
+    context: args.context,
+    result: parsed.result,
+    stdout: processResult.stdout,
+    stderr: processResult.stderr
+  }
+}
+
+function buildRecipeContext(
+  recipe: OrcaVmRecipe,
+  repoPath: string,
+  context: EphemeralVmRecipeStartArgs['context'] = {}
+): EphemeralVmRecipeContext {
+  return {
+    ...context,
+    instanceId: context.instanceId ?? newEphemeralVmInstanceId(),
+    recipeId: recipe.id,
+    repoPath
+  }
+}
+
+/**
+ * The id one create is keyed by, published to the hook as `ORCA_VM_INSTANCE_ID`.
+ *
+ * Exported because the caller has to know it *before* the create runs: a detached hook outlives an app
+ * that is killed mid-create, so the only record of that machine is whichever id was written first.
+ */
+export function newEphemeralVmInstanceId(): string {
+  return `orca-${randomUUID()}`
+}
+
+export function validateRepoPath(repoPath: string): void {
+  const stat = statSync(repoPath)
+  if (!stat.isDirectory()) {
+    throw new Error(`Recipe repo path is not a directory: ${repoPath}`)
+  }
+}

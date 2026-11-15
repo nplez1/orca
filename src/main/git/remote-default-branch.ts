@@ -1,5 +1,5 @@
-import { promptGuardGitEnv } from './command-runner/git-process-env'
-import { gitExecFileAsync } from './runner'
+import { promptGuardGitEnv } from './command-runner/git-environment/git-process-env'
+import { gitExecFileAsync } from './command-runner/git-exec-file'
 import { parseRemoteHeadBranch } from '../../shared/git/remotes/git-fork-sync'
 
 /** Bounded like the clone itself: a remote that cannot answer HEAD must not stall the create flow. */

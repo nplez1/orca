@@ -5,13 +5,13 @@ import {
   LeftoverCheckoutFolderError,
   leftoverCheckoutFolderOf,
   unregisteredFolderRefusal
-} from '../../shared/worktree/removal'
+} from '../../shared/worktree/removal/removal'
 import { join, win32 } from 'node:path'
 import { lstat, readdir, rm, rmdir, unlink } from './asar-transparent-fs'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
-import { isWslUncPath } from '../../shared/wsl-paths'
-import { stripWin32LongPathPrefix } from '../../shared/windows-path-access'
-import { removeTree } from '../../shared/windows-transient-lock-removal'
+import { isWslUncPath } from '../../shared/file-access/wsl-paths'
+import { stripWin32LongPathPrefix } from '../../shared/file-access/windows-path-access'
+import { removeTree } from '../../shared/file-write/windows-transient-lock-removal'
 
 // A child that only Windows transient-lock retries can clear; anything else aborts the delete at once.
 const TOLERATED_CHILD_FAILURES = ['EBUSY', 'EPERM', 'ENOTEMPTY']

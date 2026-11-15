@@ -1,4 +1,4 @@
-import type { PRCheckDetail } from '../../shared/github/check-types'
+import type { PRCheckDetail } from '../../shared/github/checks/check-types'
 import {
   jenkinsBuildToCheckRunDetails,
   type JenkinsBuildDetailsFailureReason,

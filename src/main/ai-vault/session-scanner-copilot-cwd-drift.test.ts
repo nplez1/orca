@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { filterAiVaultSessions } from '../../shared/ai-vault/session-display/ai-vault-session-filters'
 import { AI_VAULT_AGENTS } from '../../shared/ai-vault/contracts/ai-vault-types'
 import { scanAiVaultSessions } from './session-scanner'
-import { isolatedScanRoots, jsonLines } from './session-scanner-test-fixtures'
+import { isolatedScanRoots, jsonLines } from './scanner-fixtures/session-scanner-test-fixtures'
 
 const SESSION_ID = 'a1b2c3d4-1111-4222-8333-444455556666'
 

@@ -9,7 +9,7 @@ import {
 import {
   getEphemeralVmRuntimeStorePath,
   listEphemeralVmRuntimes
-} from '../shared/ephemeral-vm-runtime-store'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { parseOrcaYaml } from '../shared/orca-yaml'
 import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
 import { provisionEphemeralVmRuntime } from './ephemeral-vm/runtime-service'

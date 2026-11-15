@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { shouldPreserveEditableFocus } from '@/lib/text-input/focus/editable-focus-preservation'
 import { restoreAgentTabFocusAfterGesture } from '@/lib/agent-tab-focus-policy'
 import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-keyboard-event'
-import { overlayLeftDom, visibleOverlayElements } from '@/lib/visible-overlay'
+import { overlayLeftDom, visibleOverlayElements } from '@/lib/overlay-interaction/visible-overlay'
 
 /**
  * Why: a gesture is a claim only on the overlays that were on screen when it happened, so

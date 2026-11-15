@@ -22,6 +22,133 @@ Rules for using it:
 
 ---
 
+## 2026-11-15 sync (upstream `1ce376b27e`, 1180 commits)
+
+### The `git/runner.ts` barrel is upstream's to delete
+
+**Paths:** `src/main/git/runner.ts`, `src/main/git/**`
+
+**Resolution:** take-theirs (delete the barrel) — re-point the fork's importers at the concrete modules
+
+**Decision:** upstream deleted the `git/runner.ts` re-export barrel and pointed every caller at
+`command-runner/git-exec-file`, `command-runner/git-exec-file-sync`, `command-runner/git-spawn`,
+`command-runner/host-routing/windows-host-git-environment` and
+`command-runner/host-routing/wsl-command-resolution`. The fork's four surviving importers
+(`startup/main-process-ready-foundation.ts`, `runtime/runtime-repository-relocation-controller.ts`,
+`project-folder-relocation.integration.test.ts`, the github client tests) import from those modules
+directly. `command-runner/local-login-shell-git-environment.ts` is fork-only and stays.
+
+**Do not:** restore the barrel to keep a fork import stable. It was a convenience re-export, not a
+fork capability, and restoring it re-conflicts on the file upstream keeps editing.
+
+---
+
+### `session-scanner-values.ts` split into `parsing/`; the fork's hardening moved with it
+
+**Paths:** `src/main/ai-vault/parsing/**`, `src/main/ai-vault/session-scanner-values.ts`
+
+**Resolution:** take-theirs (the split) — re-apply the fork's delta inside the new modules
+
+**Decision:** upstream deleted `session-scanner-values.ts` and split it: `asRecord`/`extractModel`/
+`extractGitBranch`/`arrayValue`/`firstString` → `parsing/session-record-fields.ts`,
+`timestampMs` → `parsing/session-record-time.ts`, `parseJsonObject` → `parsing/session-json-object.ts`,
+`extractString` → `shared/text/trimmed-string.ts`, `readJsonObjectIfExists` →
+`discovery/session-json-file.ts`, and `sessionIdFromFileName` is now upstream's own declaration in
+`parsing/session-scanner-accumulator.ts`. The fork's two hardening deltas were re-applied at the new
+homes: the `MAX_DATE_MS` / `FUTURE_TIMESTAMP_SKEW_MS` bounds in `timestampMs` (a nanosecond epoch
+throws `RangeError` and loses the whole session; a microsecond one lands in the year 55840) and the
+leading-byte-order-mark strip in `parseJsonObject` (U+FEFF trims but does not parse, which loses a
+session's header and its workspace).
+
+**Do not:** re-create `session-scanner-values.ts` as a barrel. The 20+ importers were re-pointed by
+upstream; a restored barrel re-conflicts it and hides the next move.
+
+---
+
+### AI Vault listing fingerprint: the fork's snapshot API lives in `listing/session-list-fingerprint.ts`
+
+**Paths:** `src/main/ai-vault/session-list-fingerprint*`, `src/main/ai-vault/listing/session-list-fingerprint.ts`
+
+**Resolution:** manual — upstream's path, the fork's `AiVaultListSnapshot` API
+
+**Decision:** upstream moved the module to `listing/` and kept its own `conditionalAiVaultListResult`
+fingerprint formula. The fork's version wins on the formula, because the fork's delta-sync feature
+(`ai-vault-list-sync.ts`, `ai-vault-paged-list-reply.ts`) needs the per-row `digests` map that
+`aiVaultListSnapshot()` returns — upstream's hash cannot drive a delta. The file now carries the
+fork's `rowDigest`/`listingMetadata`/`aiVaultListSnapshot` plus its `conditionalAiVaultListResult`.
+
+**Do not:** reintroduce a second fingerprint constant or re-point the two fork importers
+(`ai-vault-paged-list-reply.ts`, `ai-vault-list-sync-store.ts`) back at the flat path.
+
+---
+
+### `repo relocate` is the fork's CLI command, re-homed onto upstream's `cli/projects/` split
+
+**Paths:** `src/cli/projects/repo.ts`, `src/cli/projects/repo-format.ts`, `src/cli/workspace-format.ts`, `src/cli/handlers/repo.ts`
+
+**Resolution:** manual — re-home the fork's delta; upstream retires the old paths
+
+**Decision:** upstream moved `cli/handlers/repo.ts` → `cli/projects/repo.ts` and
+`cli/workspace-format.ts` → `cli/workspaces/workspace-format.ts`, and `formatRepoList` now lives in
+`cli/projects/repo-format.ts`. The fork's `repo relocate` command (`repo.relocate` RPC,
+`RuntimeRepoRelocationResult`) is registered in `projects/repo.ts`, and its "not in its project
+folder — run `orca repo relocate`" hint is re-applied in `projects/repo-format.ts`.
+
+**Do not:** re-create `cli/handlers/` or `cli/workspace-format.ts` to hold them again.
+
+---
+
+### `orca.yaml` recipe parsing: upstream's new keys go into the fork's split module
+
+**Paths:** `src/shared/orca-yaml.ts`, `src/shared/orca-yaml-vm-recipes.ts`
+
+**Resolution:** keep-ours (the fork's split) — port upstream's new parsing into `orca-yaml-vm-recipes.ts`
+
+**Decision:** the fork split`orca.yaml` into `orca-yaml-fields.ts` + `orca-yaml-vm-recipes.ts` to stay
+under the `max-lines` budget. Upstream kept growing the parser in place and added `passEnv`
+(`parseRecipePassEnv`, with a trailing `*` as a prefix match, and a diagnostic that refuses a typo
+rather than widening the environment). `passEnv` was ported into the fork's module along with the
+`remote-runtime/ephemeral-vm-recipes/` import paths.
+
+**Do not:** move `normalizeVmRecipes` back into `orca-yaml.ts`, and do not let a new upstream recipe
+key land only in the deleted inline copy — it parses nowhere and no test fails (that is exactly how
+the `timeoutSeconds` key was lost in the 2026-11-10 sync).
+
+---
+
+### Dashboard open mode: the fork ships one mode, and the module exists only because upstream's importers need it
+
+**Paths:** `src/renderer/src/components/dashboard/settings/agent-dashboard-open-mode*`
+
+**Resolution:** manual — a fork-owned resolver, not upstream's drawer-mode logic
+
+**Decision:** upstream added this module in the range (a web client cannot open a second window, so it
+collapses `experimentalAgentDashboardMode`), and four of its files import it: the sidebar entry, the
+settings menu, the experimental-setting row and the `agent-dashboard-command` hook. This fork ships
+the dashboard as a content-area view only (see § "Dashboard delivery"), so the module resolves one
+mode — `'in-window'` — and `canOpenAgentDashboardPopout()` is `false`. The fork's
+`experimentalAgentDashboardMode` setting does not exist and must not be added to carry it.
+
+**Do not:** adopt upstream's `GlobalSettings.experimentalAgentDashboardMode` and the `AgentDashboardMode`
+union to make that file byte-identical; that is the drawer feature the fork rejected in 2026-10-26.
+
+---
+
+### Usage stores: upstream's backend supervisor for Claude/Codex, the fork's own stores for its providers
+
+**Paths:** `src/main/startup/main-process-observers.ts`
+
+**Resolution:** manual — upstream's `BackendSupervisor` + the fork's `OpenCodeUsageStore`/`MuseUsageStore`
+
+**Decision:** upstream replaced the per-provider usage stores with
+`state.backend.automationClient('claudeUsage' | 'codexUsage')` (a `UsageWorktreeHistory`-backed
+supervisor). Its client factory only knows those two providers, so `state.openCodeUsage` and
+`state.museUsage` stay as the fork's own stores, alongside the fork's
+`primeMacTailscaleDnsDiagnostic()` warm-up. Adding a fork provider to `automationClient` is the change
+to make if a third provider ever needs the supervisor's worktree attribution.
+
+---
+
 ## `import/no-cycle` keeps the fork's depth bound (2026-11-10 sync)
 
 **Paths:** `config/oxlint-code-quality-native-plugins.json`

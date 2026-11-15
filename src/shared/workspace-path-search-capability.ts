@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { REMOTE_RPC_MAX_CONTENT_BYTES } from './remote-rpc-content-budget'
-import { MAX_MESSAGE_SIZE } from './relay-frame-decoder'
+import { REMOTE_RPC_MAX_CONTENT_BYTES } from './remote-runtime/rpc/remote-rpc-content-budget'
+import { MAX_MESSAGE_SIZE } from './remote-runtime/relay/relay-frame-decoder'
 import {
   WORKSPACE_PATH_SEARCH_LOCAL_EXPLORER_MAX_PAGE_PATHS,
   WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY,

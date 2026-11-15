@@ -6,17 +6,17 @@ import {
   getHostSettingOverrideForIds,
   setHostSettingOverrideForIds,
   type HostSettingOverrideKey
-} from '../../../../../shared/host-setting-overrides'
+} from '../../../../../shared/execution-host/host-setting-overrides'
 import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from '../../../../../shared/execution-host'
-import { normalizeWorkspaceDirInput } from '../../../../../shared/worktree/workspace-dir-input'
+import { normalizeWorkspaceDirInput } from '../../../../../shared/worktree/paths/workspace-dir-input'
 import { isAbsoluteOrHomeFolderPath } from '@/lib/host-folder-path'
-import { isWindowsUserAgent } from '@/lib/user-agent-platform'
+import { isWindowsUserAgent } from '@/app-shell/platform/user-agent-platform'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { Dialog, DialogContent } from '../../ui/dialog'
 import { CreateProjectParentBrowser } from '../../sidebar/project-admission/create/CreateProjectLocationField'
-import { pickLocalProjectLocationFolder } from '../../new-workspace/pick-local-project-folder'
+import { pickLocalProjectLocationFolder } from '../../new-workspace/project-location/pick-local-project-folder'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { isImeCompositionKeyDown } from '@/lib/text-input/ime/ime-composition-keyboard-event'
 import { SettingsHostScopeUnavailableNotice } from '../host-scope/SettingsHostScopePicker'

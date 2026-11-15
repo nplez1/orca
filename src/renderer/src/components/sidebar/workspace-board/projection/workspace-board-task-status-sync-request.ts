@@ -1,4 +1,4 @@
-import { getWorkspaceStatus } from '../../../../../../shared/workspace-statuses'
+import { getWorkspaceStatus } from '../../../../../../shared/workspace/status/workspace-statuses'
 import type {
   WorkspaceStatus,
   WorkspaceStatusDefinition,

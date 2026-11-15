@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store/index'
 import { selectSidebarLineageParentIdentities } from '@/store/slices/worktrees/metadata/cross-store-lineage-parents'
@@ -6,36 +6,34 @@ import {
   getLocalExecutionHostLabel,
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
-import { getHostDisplayLabelOverrides } from '../../../../../../shared/host-setting-overrides'
+import { getHostDisplayLabelOverrides } from '../../../../../../shared/execution-host/host-setting-overrides'
 import { planSidebarRows } from '../../../../../../shared/sidebar-list/sidebar-row-plan'
-import { createHostScopedRepoOf } from '../../../../../../shared/sidebar-list/sidebar-feed-index'
+import { createHostScopedRepoOf } from '../../../../../../shared/sidebar-list/feed/sidebar-feed-index'
 import { createSidebarPRGroupReader } from '../grouping/pr-group-key'
 import { useEffectiveCollapsedGroups } from './use-collapsed-groups'
 import { useMergedSidebarRows } from './use-merged-sidebar-rows'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import type { Row } from '../../../../../../shared/sidebar-list/row-types'
 import type { SectionRowsArgs } from './sidebar-list-model'
-import { getLogicalRepoOrderRankById } from '../../../../../../shared/project-section-order'
-import { readHiddenVmCheckouts, subscribeHiddenVmCheckouts } from '@/lib/vm-create-hidden-checkouts'
-import { getEmptyProjectPlaceholderRepoIds } from '../../../../../../shared/sidebar-list/empty-project-placeholder-repos'
+import { getLogicalRepoOrderRankById } from '../../../../../../shared/sidebar-list/sections/project-section-order'
+import { useEmptyProjectPlaceholderRepoIds } from './use-empty-project-placeholders'
 import {
   deferHostSectionCollapse,
   scopeHostSectionCollapse
-} from '../../../../../../shared/sidebar-list/host-section-collapse'
-import { addHostSectionRows } from '../../../../../../shared/sidebar-list/host-section-rows'
+} from '../../../../../../shared/sidebar-list/hosts/host-section-collapse'
+import { addHostSectionRows } from '../../../../../../shared/sidebar-list/hosts/host-section-rows'
 import { collectRenderedSidebarRowKeys } from './rendered-row-keys'
 import {
   mergeDraggedHostSectionOrder,
   orderHostSectionOptions
-} from '../../../../../../shared/sidebar-list/host-section-order'
+} from '../../../../../../shared/sidebar-list/hosts/host-section-order'
 import type { ExecutionHostRegistryEntry } from '../../../../../../shared/execution-host/execution-host-registry-entry'
 import { createSidebarHostLabelsSelector } from '../controls/sidebar-host-options'
 import { createSidebarHostOptionsSelector } from './create-sidebar-host-options-selector'
 import { selectPendingWorktreeCreationKeys } from './pending-worktree-creation-keys'
-import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 
 export function useSidebarSectionRows(args: SectionRowsArgs) {
   const { repos, worktrees, repoMap, defaultHostId } = args
-  const worktreesByRepo = useAppStore((s) => selectWorktreesByRepo(s))
   const lineageParentIdentities = useAppStore(selectSidebarLineageParentIdentities)
   const workspaceHostOrder = useAppStore((s) => s.workspaceHostOrder)
   const setWorkspaceHostOrder = useAppStore((s) => s.setWorkspaceHostOrder)
@@ -46,26 +44,14 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     [repos]
   )
   const allRepoIds = useMemo(() => repos.map((r) => r.id), [repos])
-  const hiddenVmCheckouts = useSyncExternalStore(subscribeHiddenVmCheckouts, readHiddenVmCheckouts)
-  const placeholderRepoIds = useMemo(
-    () =>
-      getEmptyProjectPlaceholderRepoIds({
-        groupBy: args.groupBy,
-        repos: args.visibleReposForRows,
-        worktreesByRepo,
-        visibleWorktrees: worktrees,
-        filterRepoIds: args.filterRepoIds,
-        pendingVmRepoIds: hiddenVmCheckouts.repoIds
-      }),
-    [
-      args.filterRepoIds,
-      args.groupBy,
-      args.visibleReposForRows,
-      worktrees,
-      worktreesByRepo,
-      hiddenVmCheckouts
-    ]
-  )
+  const placeholderRepoIds = useEmptyProjectPlaceholderRepoIds({
+    groupBy: args.groupBy,
+    repos,
+    visibleRepos: args.visibleReposForRows,
+    visibleWorktrees: worktrees,
+    filterRepoIds: args.filterRepoIds,
+    defaultHostId
+  })
 
   // Why: subscribe on a flat key array (useShallow) so progress ticks don't rebuild the whole row model.
   const pendingCreationKeys = useAppStore(
@@ -88,13 +74,11 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
   )
   const selectHostOptions = useMemo(() => createSidebarHostOptionsSelector(), [])
   const selectHostLabels = useMemo(() => createSidebarHostLabelsSelector(), [])
+  useUiLanguageRevision()
   const hostOptions = useAppStore((state) =>
     selectHostOptions(state, repos, args.settings, hostLabelOverrides)
   )
-  const hostLabelById = useMemo(
-    () => selectHostLabels(hostOptions),
-    [hostOptions, selectHostLabels]
-  )
+  const hostLabelById = selectHostLabels(hostOptions)
 
   const hostScopedGroups =
     args.workspaceHostScope !== 'all' || args.visibleWorkspaceHostIds !== null

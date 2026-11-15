@@ -29,8 +29,8 @@ import {
   DEV_APP_DATA_DIRECTORY_NAME
 } from '../../shared/app-directory-names'
 import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
-import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/local-build-compatibility-contract'
-import { CLI_COMMAND_NAME } from '../cli/cli-install-constants'
+import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/remote-runtime/orcad-distribution/local-build-compatibility-contract'
+import { CLI_COMMAND_NAME } from '../cli/installation/cli-install-constants'
 
 /** `Orca NP.app` — the bundle an installer places in `/Applications` or `~/Applications`. */
 export const MAC_APP_BUNDLE_NAME = `${APP_DISPLAY_NAME}.app`

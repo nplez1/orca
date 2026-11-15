@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
-import type { SkillInstallProviderId } from '../../../../../shared/skill-install-providers'
+import type { SkillInstallProviderId } from '../../../../../shared/skills/installation/skill-install-providers'
 import {
   groupSkillInstallProviders,
   toggledSkillProviderSelection

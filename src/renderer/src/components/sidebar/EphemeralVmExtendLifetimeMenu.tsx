@@ -14,12 +14,12 @@ import {
   refreshEphemeralVmRuntimes,
   useEphemeralVmRuntimes
 } from '@/hooks/useEphemeralVmRuntimes'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { runAsyncTaskWithFailure } from '@/lib/async-task-with-cleanup'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import { readEphemeralVmLifetime } from '../../../../shared/ephemeral-vm-lifetime'
-import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { formatEphemeralVmDeadline } from './ephemeral-vm-lease-presentation'
 
 function describeExtendSuccess(runtime: EphemeralVmRuntimeRecord): string {

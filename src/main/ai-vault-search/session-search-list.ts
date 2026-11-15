@@ -2,7 +2,7 @@ import type { AiVaultAgent, AiVaultSession } from '../../shared/ai-vault/contrac
 import type { ExecutionHostId } from '../../shared/execution-host'
 import type SyncDatabase from '../sqlite/sync-database'
 import { parseVaultQuery } from '../../shared/ai-vault/session-display/ai-vault-session-filters'
-import { sessionRowFilter } from './session-search-row-filter'
+import { sessionRowFilter } from './query/session-search-row-filter'
 import { SESSION_LIST_FROM } from './session-search-list-schema'
 
 /**

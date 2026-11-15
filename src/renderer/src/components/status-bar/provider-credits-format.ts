@@ -5,7 +5,7 @@ import type {
   ProviderCreditsItemKey,
   ProviderCreditsPeriod
 } from '../../../../shared/provider-credits'
-import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 
 // Why: tests replace the i18n module with a translate-only stub, so the locale
 // read is best-effort — a missing accessor falls back to the runtime locale.

@@ -6,8 +6,8 @@ import {
   consumeOpenCodeMessages,
   parseOpenCodeSessionFile
 } from './session-scanner-opencode-parser'
-import { createAccumulator } from '../../session-scanner-accumulator'
-import { withFullFirstUserPromptCapture } from '../../session-scanner-first-user-prompt-capture'
+import { createAccumulator } from '../../parsing/session-scanner-accumulator'
+import { withFullFirstUserPromptCapture } from '../../prompts/session-scanner-first-user-prompt-capture'
 import type { TranscriptMessage } from '../../transcripts/session-transcript-consumers'
 
 let tempDirs: string[] = []

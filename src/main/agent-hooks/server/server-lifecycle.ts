@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto'
 import {
   CLAUDE_STATUSLINE_PATHNAME,
   parseClaudeStatusLineBody
-} from '../../../shared/claude-statusline-rate-limits'
+} from '../../../shared/agent-usage/rate-limits/claude-statusline-rate-limits'
 import { mergeAgentHookRequestHeaders } from '../../../shared/agent-hook-listener/hook-envelope'
 import { hookTokenMatches } from '../../../shared/agent-hook-listener/hook-token'
 import { readRequestBody } from '../../../shared/agent-hook-listener/request-body'
@@ -22,8 +22,7 @@ import { clearAllListenerCaches } from '../../../shared/agent-hook-listener/list
 import { trackEmptyPaneKeyHook } from './server-transport-rules'
 import { AgentHookServerStatusHookLifecycle } from './server-status-hook-lifecycle'
 import { OPENCODE_STARTUP_PROMPT_CLAIM_PATH } from '../../../shared/agent-launch/startup/opencode-startup-prompt'
-import { CLAUDE_AGENT_VIEW_PATH } from '../../../shared/claude-agent-view'
-import { respondAfterAgentToolPluginHooks } from '../tool-events/agent-tool-plugin-hooks'
+import { CLAUDE_AGENT_VIEW_PATH } from '../../../shared/agent-hook-listener/providers/claude/view/claude-agent-view'
 
 import type { HookServerStartOptions } from './server-types'
 
@@ -200,8 +199,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
             this.scheduleTranscriptPoll(source, aliasedBody, enriched)
           }
         }
-        // Plugins see only calls status accepted, so a fenced or reused pane's old agent is skipped.
-        await respondAfterAgentToolPluginHooks(res, source, aliasedBody, req.headers, toolCallOwner)
+        await this.respondToHook(req, res, source, aliasedBody, toolCallOwner)
       } catch (error) {
         if (pathname === OPENCODE_STARTUP_PROMPT_CLAIM_PATH) {
           if (isHookRequestTruncatedError(error) && !destroyedBySlowlorisCap) {
@@ -266,6 +264,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.startup.stop()
     this.stopStatusSpoolDrainLoop()
     this.claudeAgentViews.clear()
+    this.claudePermissionHooks.drain()
     // Terminal status may still have a pending write while hook ingress is disabled.
     if (this.statusHooksEnabled || this.statusPersistTimer) {
       this.flushStatusPersistSync()
@@ -295,10 +294,10 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.endpointFilePathCache = null
     this.endpointFileWritten = false
     this.statusCacheHydrationReady = Promise.resolve()
-    this.lastStatusFilePath = null
+    this.setStatusFilePath(null)
     this.closeStatusSnapshotWriter()
-    this.runtimeObservedStatusPaneKeys.clear()
-    this.paneKeyByTerminalHandle.clear()
+    this.agentIdentities.close()
+    this.clearRuntimeStatusQueries()
     this.hydratedAuthorityCommitments = Object.freeze([])
     this.hydratedLaunchTokenHashByPaneKey.clear()
     this.persistedAuthorityCommitmentsByPaneKey.clear()

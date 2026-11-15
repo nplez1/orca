@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
-import { buildJiraCreateSubmission } from '@/components/task-page/jira/task-page-jira-create-fields'
+import { buildJiraCreateSubmission } from '@/components/task-page/jira/creation/task-page-jira-create-fields'
 import { useTranslate } from '@/i18n/use-translate'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import type { RuntimeJiraSettings } from '../runtime/jira/runtime-jira-client'

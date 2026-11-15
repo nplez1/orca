@@ -4,15 +4,15 @@ import {
   NodeFileReadTooLargeError,
   readNodeFileWithinLimit
 } from '../../shared/file-content/node-bounded-file-reader'
-import { throwIfSignalAborted, waitForPromiseWithSignal } from '../../shared/abort-signal-reason'
-import { isWslUncPath } from '../../shared/wsl-paths'
-import { runWslTranscriptFsTask, type WslTranscriptFsTaskPriority } from './wsl-transcript-fs-gate'
-import { runWslTranscriptFsProcess } from './wsl-transcript-fs-process-dispatch'
-import type { WslTranscriptFsReusableProcessCall } from './wsl-transcript-fs-process-protocol'
-import { wslTranscriptFsLaneKey } from './wsl-transcript-fs-route'
-import { admitWslTranscriptPath } from './wsl-transcript-running-admission'
-import { statSshTranscript } from './ssh-transcript-fs-access'
-import { parseSshTranscriptPath } from './ssh-transcript-path'
+import { throwIfSignalAborted, waitForPromiseWithSignal } from '../../shared/concurrency/abort-signal-reason'
+import { isWslUncPath } from '../../shared/file-access/wsl-paths'
+import { runWslTranscriptFsTask, type WslTranscriptFsTaskPriority } from './transcript-filesystem/wsl-transcript-fs-gate'
+import { runWslTranscriptFsProcess } from './transcript-filesystem/process/wsl-transcript-fs-process-dispatch'
+import type { WslTranscriptFsReusableProcessCall } from './transcript-filesystem/process/wsl-transcript-fs-process-protocol'
+import { wslTranscriptFsLaneKey } from './transcript-filesystem/wsl-transcript-fs-route'
+import { admitWslTranscriptPath } from './transcript-filesystem/wsl-transcript-running-admission'
+import { statSshTranscript } from './transcript-filesystem/ssh-transcript-fs-access'
+import { parseSshTranscriptPath } from './transcript-filesystem/ssh-transcript-path'
 
 export type TranscriptFileStats = Pick<Stats, 'size' | 'mtimeMs' | 'ctimeMs' | 'dev' | 'ino'>
 

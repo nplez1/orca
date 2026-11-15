@@ -1,6 +1,6 @@
 import type { RemoteRuntimeSharedConnectionDiagnostics } from '../../../shared/remote-runtime/control/remote-runtime-shared-control-types'
 import { getHostSettingsReplicationSync } from '../../host-sync/host-settings-replication-driver'
-import { publishRuntimeEnvironmentDiagnostics } from './runtime-environment-diagnostics-broadcast'
+import { publishRuntimeEnvironmentDiagnostics } from './status/runtime-environment-diagnostics-broadcast'
 
 /**
  * Everything the main does when a paired host's connection diagnostics change.

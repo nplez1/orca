@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AskParams, CheckParams } from './orchestration-params'
+import { AskParams, CheckParams } from './orchestration/orchestration-params'
 
 /** The fork installs its CLI as `orca-np`, and the packaged Windows launcher can name the dev
  *  build too. A host that validates either field against a shorter list refuses the whole

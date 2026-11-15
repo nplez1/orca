@@ -8,7 +8,7 @@ import type {
   ProjectHostSetup,
   ProjectHostSetupCreateResult,
   ProjectHostSetupResult
-} from '../../../../../../shared/project-types'
+} from '../../../../../../shared/project/project-types'
 import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store/index'
 import { resolveWorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'

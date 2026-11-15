@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { AgentHibernationGate } from '../components/AgentHibernationGate'
 import { AiVaultTabTitleSyncGate } from '../components/AiVaultTabTitleSyncGate'
-import RetainedAgentsSyncGate from '../components/dashboard/RetainedAgentsSyncGate'
 import { WorkspacePortScanner } from '../components/ports/WorkspacePortScanner'
 import { SavedHostScopeWidenGate } from '../components/sidebar/worktree-list/listing/SavedHostScopeWidenGate'
 import { MacosTccPromptNoticeHost } from '../hooks/MacosTccPromptNoticeHost'
@@ -36,7 +35,6 @@ export function AppBackgroundServices(): React.JSX.Element {
       <MacosTccPromptNoticeHost />
       <RemoteHostBrowserControlNoticeHost />
       {/* Keep agent-status retention subscriptions out of the App render tree. */}
-      <RetainedAgentsSyncGate />
       <AiVaultTabTitleSyncGate />
       <SavedHostScopeWidenGate />
       <AgentHibernationGate />

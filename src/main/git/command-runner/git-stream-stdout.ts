@@ -2,16 +2,17 @@ import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import { withGitSpan } from '../../observability/instrumentation'
 import { recordSubprocessSpawn } from '../../diagnostics/main-thread-churn-probe'
-import { createAbortError } from './abort-error'
-import { killSpawnedCommandTree } from './spawned-command-tree-kill'
+import { createAbortError } from './process-capture/abort-error'
+import { killSpawnedCommandTree } from './process-capture/spawned-command-tree-kill'
+import { pendingWslDriveCheckoutGitRouting } from './host-routing/wsl-drive-checkout-git-routing'
+import type { ResolvedCommand } from './host-routing/wsl-command-resolution'
+import { DEFAULT_GIT_MAX_BUFFER, type GitExecOptions } from './git-exec-options'
+
 import {
   deadlineOverrunMetadata,
   recordDeadlineOverrunOnSpan,
   terminateAtStalledDeadline
 } from './stalled-deadline-kill'
-import { pendingWslDriveCheckoutGitRouting } from '../wsl-drive-checkout-git-routing'
-import type { ResolvedCommand } from './wsl-command-resolution'
-import { DEFAULT_GIT_MAX_BUFFER, type GitExecOptions } from './git-exec-options'
 import {
   pendingWslDirectGitReadEnvironment,
   directWslGitExitCode,
@@ -19,21 +20,21 @@ import {
   invalidateMissingDirectWslGit,
   resolveGitCommand,
   resolveGitCommandWithoutProbe
-} from './git-command-resolution'
-import { prepareWindowsHostGitEnvironment } from './windows-host-git-environment'
+} from './host-routing/git-command-resolution'
+import { prepareWindowsHostGitEnvironment } from './host-routing/windows-host-git-environment'
+import { nonInteractiveGitEnv, untranslatedGitOutputEnv } from './git-environment/git-process-env'
 import { prepareLocalLoginShellGitEnvironment } from './local-login-shell-git-environment'
-import { nonInteractiveGitEnv, untranslatedGitOutputEnv } from './git-process-env'
 import { gitSpawn } from './git-spawn'
-import { acquireGitAdmission } from './git-subprocess-admission'
+import { acquireGitAdmission } from './admission/git-subprocess-admission'
 import type { GitStreamOptions, GitStreamResult } from './git-stream-options'
 import {
   GitCommandTimeoutError,
   gitCommandTimeoutMs
 } from '../../../shared/git/commands/git-command-timeout'
-import { routeLocalGitOptions, runAdmittedWslGit } from './local-git-runtime-route'
-import { gitRunsIn } from './git-runs-in'
+import { routeLocalGitOptions, runAdmittedWslGit } from './host-routing/local-git-runtime-route'
+import { gitRunsIn } from './host-routing/git-runs-in'
 
-export type { GitStreamOptions, GitStreamResult } from './git-stream-options'
+export type { GitStreamOptions, GitStreamResult }
 
 /** Stream bounded stdout so large repositories cannot overflow V8 and parsers can stop early. */
 export async function gitStreamStdout(
@@ -52,7 +53,8 @@ function streamInSpan(
   maxBuffer: number,
   timeoutMs: number | undefined
 ): Promise<GitStreamResult> {
-  return withGitSpan({ args, cwd: options.cwd }, async (span) => {
+  const meta = { args, cwd: options.cwd, admissionTier: options.admissionTier }
+  return withGitSpan(meta, async (span) => {
     const checkoutRoutingReady = pendingWslDriveCheckoutGitRouting(args, options)
     if (checkoutRoutingReady) {
       await checkoutRoutingReady
@@ -197,7 +199,7 @@ function streamInSpan(
         }
         function onStderrData(chunk: Buffer): void {
           stderrBytes += chunk.byteLength
-          if (stderrBytes > maxBuffer) {
+          if (stderrBytes > (options.maxStderrBuffer ?? maxBuffer)) {
             void killSpawnedCommandTree(child)
             finish(new Error('git stderr exceeded maxBuffer.'))
             return

@@ -8,8 +8,8 @@ import {
   toEphemeralVmRuntimeRecipeSnapshot,
   type EphemeralVmProvisionedRuntimeRecord,
   type EphemeralVmRuntimeRecord
-} from './ephemeral-vm-runtimes'
-import { projectRuntimeForRollback } from './ephemeral-vm-runtime-rollback-projection'
+} from './remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import { projectRuntimeForRollback } from './remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-rollback-projection'
 
 const ITEMS = [
   { id: 'launch-vnc', label: 'Launch VNC', command: './local/orca-vm/launch-vnc.sh' },

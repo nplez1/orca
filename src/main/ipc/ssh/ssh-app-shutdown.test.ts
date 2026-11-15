@@ -12,7 +12,6 @@ vi.mock('./ssh-host-server-connect', () => mocks.hostServerConnect)
 vi.mock('../../ssh/connection/ssh-connection-manager', () => mocks.sshConnectionManager)
 vi.mock('../../ssh/protocol/ssh-channel-multiplexer', () => mocks.sshChannelMultiplexer)
 vi.mock('../../ssh/port-forwarding/ssh-port-forward', () => mocks.sshPortForward)
-vi.mock('../ssh/ssh-port-scanner', () => mocks.sshPortScanner)
 const { shutdownTunnelsMock } = vi.hoisted(() => ({ shutdownTunnelsMock: vi.fn() }))
 vi.mock('../../managed-server/lifecycle/orcad-managed-tunnel', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -20,7 +19,7 @@ vi.mock('../../managed-server/lifecycle/orcad-managed-tunnel', async (importOrig
 }))
 
 import { beginSshShutdown } from './ssh-shutdown-drain'
-import type { SshTarget } from '../../../shared/ssh-types'
+import type { SshTarget } from '../../../shared/remote-runtime/ssh/ssh-types'
 import { quitTeardownStartGate } from '../../startup/quit/quit-teardown-start-gate'
 import { createSshIpcHarness } from './ssh-ipc-test-harness'
 

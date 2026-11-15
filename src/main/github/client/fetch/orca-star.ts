@@ -1,6 +1,7 @@
-import { ghExecFileAsync, acquire, release } from '../../gh-utils'
 import { ORCA_REPOSITORY } from '../../../../shared/orca-repository'
-import { runAsDefaultWslCliUserAct } from '../../../git/command-runner/default-wsl-cli-fallback'
+import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
+import { acquire, release } from '../../execution/github-operation-slots'
+import { runAsDefaultWslCliUserAct } from '../../../git/command-runner/hosted-cli/default-wsl-cli-fallback'
 
 // Bound optional star prompts more tightly than user work; failures can fall back to the browser.
 const STAR_GH_TIMEOUT_MS = 15_000

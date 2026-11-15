@@ -1,11 +1,11 @@
 import { parseExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host/execution-host-registry-entry'
-import { isHostLocalProjectId } from '../../../shared/project-host-setup-projection'
+import { isHostLocalProjectId } from '../../../shared/project/host-setup/project-host-setup-projection'
 import {
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY
-} from '../../../shared/protocol-version'
-import type { ProjectHostSetup } from '../../../shared/project-types'
+} from '../../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
+import type { ProjectHostSetup } from '../../../shared/project/project-types'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 

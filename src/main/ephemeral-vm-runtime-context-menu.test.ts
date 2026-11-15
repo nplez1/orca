@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   listEphemeralVmRuntimes,
   upsertEphemeralVmRuntime
-} from '../shared/ephemeral-vm-runtime-store'
-import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
+import type { EphemeralVmRuntimeRecord } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { OrcaVmRecipe, OrcaVmRecipeContextMenuItem } from '../shared/orca-yaml-hook-types'
 import type { Store } from './persistence/loading-store/store'
 
@@ -159,7 +159,7 @@ function run(fixture: Fixture, itemId = 'launch-vnc', workspacePath = WORKSPACE_
 
 beforeEach(() => {
   vi.resetAllMocks()
-  mocks.listEnvironments.mockReturnValue([])
+  mocks.listEnvironments.mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -356,14 +356,16 @@ describe('runEphemeralVmRuntimeContextMenuItem', () => {
 })
 
 describe('resolveEphemeralVmRuntimeHostName', () => {
-  it('uses the recipe-published SSH label, which is where a node id lives', () => {
-    expect(resolveEphemeralVmRuntimeHostName('/unused', baseRuntime())).toBe('node-9f2c')
+  it('uses the recipe-published SSH label, which is where a node id lives', async () => {
+    await expect(resolveEphemeralVmRuntimeHostName('/unused', baseRuntime())).resolves.toBe(
+      'node-9f2c'
+    )
   })
 
-  it('uses the registered environment name for an Orca-server host', () => {
-    mocks.listEnvironments.mockReturnValue([{ id: 'env-1', name: 'Team machine (repo)' }])
+  it('uses the registered environment name for an Orca-server host', async () => {
+    mocks.listEnvironments.mockResolvedValue([{ id: 'env-1', name: 'Team machine (repo)' }])
 
-    expect(
+    await expect(
       resolveEphemeralVmRuntimeHostName(
         '/unused',
         baseRuntime({
@@ -376,11 +378,11 @@ describe('resolveEphemeralVmRuntimeHostName', () => {
           }
         })
       )
-    ).toBe('Team machine (repo)')
+    ).resolves.toBe('Team machine (repo)')
   })
 
-  it('is empty when an Orca-server host has no environment to name it', () => {
-    expect(
+  it('is empty when an Orca-server host has no environment to name it', async () => {
+    await expect(
       resolveEphemeralVmRuntimeHostName(
         '/unused',
         baseRuntime({
@@ -392,15 +394,13 @@ describe('resolveEphemeralVmRuntimeHostName', () => {
           }
         })
       )
-    ).toBe('')
+    ).resolves.toBe('')
   })
 
-  it('is empty rather than throwing when the environment store cannot be read', () => {
-    mocks.listEnvironments.mockImplementation(() => {
-      throw new Error('unreadable store')
-    })
+  it('is empty rather than throwing when the environment store cannot be read', async () => {
+    mocks.listEnvironments.mockRejectedValue(new Error('unreadable store'))
 
-    expect(
+    await expect(
       resolveEphemeralVmRuntimeHostName(
         '/unused',
         baseRuntime({
@@ -413,6 +413,6 @@ describe('resolveEphemeralVmRuntimeHostName', () => {
           }
         })
       )
-    ).toBe('')
+    ).resolves.toBe('')
   })
 })

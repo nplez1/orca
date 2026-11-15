@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
 import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
 import type { TerminalTab } from '../../../../shared/workspace-layout/terminal-tab-types'
-import type { RetainedAgentEntry } from '@/store/slices/agent-status/agent-status-contract'
+import { AcceptedAgentStatuses } from '@/store/slices/agent-status/accepted-agent-statuses'
+import type { AgentPaneConversationIdentity } from '@/store/slices/agent-status/agent-pane-conversation'
 import {
   resolveSessionSummarySessionRef,
   selectSessionSummaryPaneKey,
@@ -47,14 +48,22 @@ function makeAgentStatusEntry(
   }
 }
 
-function makeRetainedEntry(paneKey: string, worktreeId = WORKTREE_ID): RetainedAgentEntry {
+function makeConversationIdentity(
+  paneKey: string,
+  overrides: Partial<AgentPaneConversationIdentity> = {}
+): AgentPaneConversationIdentity {
   return {
-    entry: makeAgentStatusEntry(paneKey),
-    worktreeId,
-    tab: makeTab(TAB_ID, worktreeId),
-    agentType: 'claude',
-    startedAt: 5_000
+    paneKey,
+    worktreeId: WORKTREE_ID,
+    executionHostId: 'local',
+    connectionId: null,
+    agent: 'claude',
+    ...overrides
   }
+}
+
+function agentStatuses(rows: Record<string, AgentStatusEntry> = {}): AcceptedAgentStatuses {
+  return new AcceptedAgentStatuses(new Map(Object.entries(rows)))
 }
 
 function makeState(
@@ -76,8 +85,8 @@ function makeState(
         expandedLeafId: null
       }
     },
-    agentStatusByPaneKey: {},
-    retainedAgentsByPaneKey: {},
+    agentStatusByPaneKey: agentStatuses(),
+    agentConversationsByPaneKey: {},
     migrationUnsupportedByPtyId: {},
     ...overrides
   }
@@ -90,10 +99,10 @@ describe('selectSessionSummaryPaneKey', () => {
 
   it('follows the focused agent pane over a newer one in the same workspace', () => {
     const state = makeState({
-      agentStatusByPaneKey: {
+      agentStatusByPaneKey: agentStatuses({
         [PANE_KEY]: makeAgentStatusEntry(PANE_KEY, 1_000),
         [OTHER_PANE_KEY]: makeAgentStatusEntry(OTHER_PANE_KEY, 9_000)
-      }
+      })
     })
 
     expect(selectSessionSummaryPaneKey(state, WORKTREE_ID)).toBe(PANE_KEY)
@@ -103,7 +112,7 @@ describe('selectSessionSummaryPaneKey', () => {
   // hibernated pane the user focused is still summarizable.
   it('follows a focused hibernated pane', () => {
     const state = makeState({
-      retainedAgentsByPaneKey: { [PANE_KEY]: makeRetainedEntry(PANE_KEY) }
+      agentConversationsByPaneKey: { [PANE_KEY]: makeConversationIdentity(PANE_KEY) }
     })
 
     expect(selectSessionSummaryPaneKey(state, WORKTREE_ID)).toBe(PANE_KEY)
@@ -133,7 +142,7 @@ describe('selectSessionSummaryPaneKey', () => {
           expandedLeafId: null
         }
       },
-      agentStatusByPaneKey: { [PANE_KEY]: makeAgentStatusEntry(PANE_KEY, 9_000) }
+      agentStatusByPaneKey: agentStatuses({ [PANE_KEY]: makeAgentStatusEntry(PANE_KEY, 9_000) })
     })
 
     expect(selectSessionSummaryPaneKey(state, OTHER_WORKTREE_ID)).toBeNull()
@@ -194,16 +203,10 @@ describe('resolveSessionSummarySessionRef', () => {
   it('falls back to a retained entry for a finished pane', () => {
     expect(
       resolveSessionSummarySessionRef({
-        retained: {
-          entry: makeAgentStatusEntry(PANE_KEY, 1_000, {
-            agentType: 'pi',
-            providerSession: piSession
-          }),
-          worktreeId: WORKTREE_ID,
-          tab: makeTab(TAB_ID),
-          agentType: 'pi',
-          startedAt: 1
-        }
+        retained: makeConversationIdentity(PANE_KEY, {
+          agent: 'pi',
+          providerSession: piSession
+        })
       })
     ).toEqual({ agentType: 'pi', providerSession: piSession })
   })

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   appImageNamespaceKey,
   resolveAppImageGenerationOfExecutable
-} from './appimage-cache-identity'
+} from './desktop-distribution/appimage/appimage-cache-identity'
 
 const cacheRoot = '/home/me/.cache/orca/appimage'
 const namespaceKey = appImageNamespaceKey('/home/me/Applications/Orca NP.AppImage')

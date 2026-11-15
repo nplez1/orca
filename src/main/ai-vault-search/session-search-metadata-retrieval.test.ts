@@ -4,8 +4,8 @@ import {
   addSyntheticSession,
   openSessionSearchHarness,
   type SessionSearchHarness
-} from './session-search-engine-test-fixture'
-import { SessionSearchCursorError } from './session-search-page-cursor'
+} from './query/session-search-engine-test-fixture'
+import { SessionSearchCursorError } from './query/session-search-page-cursor'
 
 let harness: SessionSearchHarness | null = null
 

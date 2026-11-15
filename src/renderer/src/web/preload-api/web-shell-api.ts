@@ -1,5 +1,5 @@
 import type { PreloadApi } from '../../../../preload/api-types'
-import { holdBrowserAttachmentFiles } from '@/lib/browser-attachment-files'
+import { holdBrowserAttachmentFiles } from '@/lib/files/drop/browser-attachment-files'
 import { resolveRuntimeFilePath } from './web-runtime-worktree-catalog'
 
 /** The web build has no in-app browser, so every destination is the browser tab. */

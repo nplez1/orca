@@ -3,7 +3,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SetStateAction } from 'react'
-import type { PRComment } from '../../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../../shared/github/comments/comment-types'
 import { clearPendingPRCommentAiAck } from './comments/pr-comments-ai-launch-ack'
 import type { PendingPRCommentAiAck } from './comments/pr-comments-ai-launch-ack'
 import { PR_COMMENT_AI_FIXING_REPLY } from './comments/pr-comment-fixing-reply-body'
@@ -21,7 +21,7 @@ vi.mock('sonner', () => ({
 // Why: the pre-#166 GitLab ack resolved MR discussions through this client, not through the
 // GitHub resolver dep — so the spy below cannot catch a GitLab regression on its own.
 const gitlab = vi.hoisted(() => ({ resolveGitLabDiscussion: vi.fn(async () => ({ ok: true })) }))
-vi.mock('./gitlab-review-client', () => ({
+vi.mock('./review-data/gitlab-review-client', () => ({
   resolveGitLabMRDiscussionForChecks: gitlab.resolveGitLabDiscussion
 }))
 

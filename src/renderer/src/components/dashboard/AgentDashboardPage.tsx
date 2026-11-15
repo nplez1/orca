@@ -1,11 +1,11 @@
 import { useCallback } from 'react'
 import { useAppStore } from '@/store'
-import { AgentKanbanBoard } from '../dashboard-popout/AgentKanbanBoard'
-import type { AgentRevealArgs } from '../dashboard-popout/AgentTerminalDialog'
-import { AgentDashboardSettingsMenu } from './AgentDashboardSettingsMenu'
-import { revealDashboardAgent } from './reveal-dashboard-agent'
+import { AgentKanbanBoard } from './board/AgentKanbanBoard'
+import type { DashboardRevealAgentArgs as AgentRevealArgs } from '../../../../shared/dashboard-snapshot'
+import { AgentDashboardSettingsMenu } from './settings/AgentDashboardSettingsMenu'
+import { revealDashboardAgent } from './navigation/reveal-dashboard-agent'
 import { useAgentDashboardPageEscape } from './use-agent-dashboard-page-escape'
-import { useLiveDashboardSnapshot } from './useLiveDashboardSnapshot'
+import { useLiveDashboardSnapshot } from './snapshot/useLiveDashboardSnapshot'
 
 /**
  * The Agent Dashboard as a first-class top-level view, rendered in the content

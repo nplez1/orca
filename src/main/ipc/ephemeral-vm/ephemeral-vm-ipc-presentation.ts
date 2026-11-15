@@ -1,7 +1,7 @@
-import type { EphemeralVmRecipeResultWarning } from '../../../shared/ephemeral-vm-recipe-diagnostics'
-import type { EphemeralVmProvisionedRuntimeRecord } from '../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRecipeResultWarning } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
+import type { EphemeralVmProvisionedRuntimeRecord } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/remote-runtime/host-catalog/runtime-environments'
-import type { EphemeralVmFailure } from '../../../shared/ephemeral-vm-failure-copy'
+import type { EphemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 
 export type EphemeralVmProvisionIpcResult =
   | {

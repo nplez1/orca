@@ -1,6 +1,6 @@
-import { getSecretStore } from '../../shared/secret-store'
+import { getSecretStore } from '../../shared/secure-storage/secret-store'
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
-import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
+import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 
 /**
  * One credential family as the host holding it sees it.

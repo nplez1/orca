@@ -8,7 +8,7 @@ import {
   getSingleJiraProjectScope,
   getTaskPageJiraStatusOrderRuntimeScopeKey,
   loadTaskPageJiraProjectStatusOrder
-} from '@/components/task-page/jira/task-page-jira-status-order'
+} from '@/components/task-page/jira/listing/task-page-jira-status-order'
 import { getTaskPageJiraBoardTransitionTargets } from '@/components/task-page-jira-board-model'
 import {
   resolveIssuePaneIssues,
@@ -28,7 +28,7 @@ import type {
   Worktree
 } from '../../../../../../shared/worktree/types'
 import type { TaskSourceContext } from '../../../../../../shared/work-items/task-source-context'
-import type { Repo } from '../../../../../../shared/repo-types'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 
 /** The Jira failures a board move can report; the board owns the copy for each. */
 export type JiraStatusSyncMessage =

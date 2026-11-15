@@ -1,7 +1,7 @@
 import type { GitHubImageIntake } from '@/components/github/use-github-image-uploads'
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import {
   filterPRCommentsByAudience,
   getPRCommentAudienceCounts,
@@ -31,7 +31,7 @@ import { getPRCommentPresentationClasses } from './pr-comment-presentation'
 import type {
   GitHubReactionContent,
   PRComment
-} from '../../../../../../shared/github/comment-types'
+} from '../../../../../../shared/github/comments/comment-types'
 import {
   RightPanelCommentComposer,
   type RightPanelCommentSubmitResult

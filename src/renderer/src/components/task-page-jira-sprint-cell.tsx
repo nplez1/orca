@@ -2,7 +2,7 @@ import React from 'react'
 import { LoaderCircle } from 'lucide-react'
 
 import { JiraSprintPicker, sprintTriggerLabel } from '@/components/jira-sprint-picker'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import type { JiraIssue, JiraSprint } from '../../../shared/jira/jira-types'
 
 /** Board sprints a backlog row can be moved into. */

@@ -8,7 +8,7 @@ import { readCursorAuthSession } from '../providers/cursor/cursor-auth'
 import { fetchZcodeRateLimits } from '../providers/zcode/zcode-usage-fetcher'
 import { fetchAntigravityRateLimits } from '../providers/antigravity/antigravity-usage-fetcher'
 import { antigravityUsageDisabledSnapshot } from '../providers/antigravity/antigravity-usage-snapshot'
-import { ZCODE_PLAN_SITE_BASE_URLS } from '../../../shared/zcode-plan-sites'
+import { ZCODE_PLAN_SITE_BASE_URLS } from '../../../shared/agent-accounts/usage-credentials/zcode-plan-sites'
 import { fetchMiniMaxRateLimits } from '../providers/minimax/minimax-fetcher'
 import { createHash } from 'node:crypto'
 import { fetchOpenCodeGoUsage } from '../providers/opencode-go/opencode-go-usage-source-selection'
@@ -197,6 +197,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     // Live display does not waive automated Retry-After gates.
     const claudeFetchGated =
       disabled.has('claude') ||
+      !this.isClaudeOAuthUsageEnabled() ||
+      claudeGeneration !== this.claudeFetchGeneration ||
       (!options?.force && this.shouldSkipAutomatedFetch('claude', previousState.claude))
 
     const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
@@ -211,7 +213,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
                 ? null
                 : (previousState.claude?.usageMetadata?.retryAtMs ?? null),
               networkProxySettings: this.networkProxySettingsResolver?.(),
-              signal
+              signal: this.claudeUsageFetchSignal(signal)
             }),
         codexFetchGated
           ? Promise.resolve(previousState.codex as ProviderRateLimits)
@@ -286,6 +288,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       codexFetchGated,
       codexStateBeforeFetch,
       codexProvenance,
+      codexHomePath,
       codexGeneration,
       opencodeConfigChanged,
       opencodeGeneration,

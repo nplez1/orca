@@ -6,6 +6,48 @@ three most recent inline so that section stays readable. Same text and same orde
 Entries dated before the 2026-11-09 rename have been rewritten to say `main`; where one reads oddly
 for the topology it was written in (a `main` that mirrored upstream), its date is the explanation.
 
+- **2026-11-01 — merge of upstream `0fa5dae2f9` (459 commits) into the release line, from
+  `01eac17153`** (merge base `a903985082`, rollback tag `archive/pre-sync-01eac17153`, merge commit
+  `7fea08330aa`, then `62107128f7a`, `87421079c3b`). **202 conflicted paths** —
+  `both-rewrote 101, modify/delete 56, union 37, duplicate-tail 6, duplicate-members 2`. Decisions
+  are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer
+  will want first:
+
+  - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **24 paths** outright (26
+    import-only unions, 3 fork-unchanged, 2 upstream-unchanged). **48 modify/delete** were settled by
+    the manifest: the 5 dashboard-popout / snapshotted-thread deletions the fork already asserts, and
+    **43 upstream test files** the fork accepts as deletions. The remaining **130 paths** were
+    resolved in 8 disjoint area batches bound to the ledger.
+  - **Upstream retired ~1031 test files this sync** (`test: remove low-value … suites`, ~20 commits
+    from `#36336` to `#37106`). 43 of them were files the fork had extended with its own cases. Per
+    the ledger's "Test inventories retired upstream" decision the fork takes the deletion rather than
+    re-adding the file, so **fork test coverage was lost in the files that carried it** — the review
+    picker (`use-checks-panel-manual-refresh`, `source-control-header-toolbar-identity`), the
+    keychain payload encoding (`generic-password`), Orca NP dev identity
+    (`dev-instance-identity`), Jira grouping and `repo-clone-path`. Named follow-up: re-home those
+    cases into fork-owned test files; nothing in the tree references them today, so this is coverage
+    debt, not a red.
+  - **Two `@ts-nocheck` wiring gaps no typecheck could catch.** `orca-runtime-owned-controllers.ts`
+    (fork-owned, merged clean) had lost `acquireFileWatcherRemoval` from the
+    `RuntimeProjectGroupController` deps and the notifier from `RuntimeAccountController`, so
+    worktree removal would have thrown and Claude-selection notifications would have stopped
+    silently. Both are restored to upstream's own shape.
+  - **Upstream added 17 settings and retired 4**, which the fork's host-sync disposition table is a
+    complete `Record` over — so the table was both short and stale. The 3 retired rows
+    (`experimentalNativeChat`, `orchestrationChatErrorEscalationEnabled`,
+    `orchestrationHeartbeatIntervalMinutes`) were type errors, not fork capability.
+  - **The fork's session-summary feature imported modules upstream had moved** (`agent-session-resume`,
+    `native-chat-agent-support`, `persistence`, `agent-session-provider-handle`). These are
+    rename-replay breaks: no conflict marker, and `tc` names them one file at a time.
+  - **`max-lines` went over budget in 10 upstream-owned files** once the merge's fork delta landed
+    in them; each gets one directive and one baseline row, per § `local(lint)`. The fork-owned
+    `host-sync-settings-disposition.ts` is the single fork exemption: splitting its audit table
+    reported 284 symbol relocations, so the table stays whole.
+  - **The fork-comment ratchet fell** 6051 → 5992 with 4 re-keyed entries (upstream relocated
+    `checks-detail-polling-policy.ts` to `src/shared/github/` and three `task-page-jira-*` files
+    into `task-page/jira/`) and +4 genuine lines across three files, all recorded in the baseline's
+    `accepted` field.
+
 - **2026-10-30 — merge of upstream `a903985082` (906 commits) into the release line, from
   `16f49e00cf`** (merge base `f173998203`, rollback tag `archive/pre-sync-16f49e00cf`, merge commit
   `985687d2004`, then `a7a778bc197`, `69d7a35c4a`). **184 conflicted paths, 340 hunks** —

@@ -77,8 +77,8 @@ const SUPPRESSED_CHANGED_LINES_DIAGNOSTICS = new Map([
   [
     'react-doctor(no-adjust-state-on-prop-change)',
     new Set([
-      'src/renderer/src/components/task-page/github/use-task-page-github-issue-draft.ts',
-      'src/renderer/src/components/task-page/jira/use-task-page-jira-creation-state.ts',
+      'src/renderer/src/components/task-page/github/issue-creation/use-task-page-github-issue-draft.ts',
+      'src/renderer/src/components/task-page/jira/creation/use-task-page-jira-creation-state.ts',
       // Restored byte-identical to upstream/main under the no-delete policy, so this finding is
       // upstream's code and fixing it here would be divergence the next sync has to re-resolve.
       'src/renderer/src/components/use-jira-issue-workspace-data.ts',

@@ -6,16 +6,13 @@ import {
   getWorkspaceAttachments,
   normalizeWorkspaceAttachmentUpdate
 } from '../../../../../../shared/workspace-attachments/workspace-attachments'
-import { normalizeGitHubPRSuppressionUpdate } from '../../../../../../shared/worktree/github-pr-suppression'
-
-import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
+import { normalizeGitHubPRSuppressionUpdate } from '../../../../../../shared/worktree/hosted-review/github-pr-suppression'
 import { translate } from '@/i18n/i18n'
 import { isPositiveHostedReviewNumber } from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
-import { displayNameUpdatePinsLabel } from '../../../../../../shared/worktree/display-name-provenance'
-import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
+import { displayNameUpdatePinsLabel } from '../../../../../../shared/worktree/metadata/display-name-provenance'
+import { parseWorkspaceKey } from '../../../../../../shared/workspace/identity/workspace-scope'
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../../../shared/sidebar-inputs-switch'
 import { findKnownWorktreeById } from '../listing/detected-worktree-meta'
-import type { WorktreeSlice } from '../worktree-slice-contract'
 import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
 import {
   bumpHostedReviewLinkMutationGeneration,
@@ -31,14 +28,16 @@ import { planWorktreeRename, settleWorktreeRename } from './worktree-rename-acro
 import { updateFolderWorkspaceMeta } from './folder-workspace-meta-update'
 import { refreshHostedReviewAfterMetaUpdate } from './refresh-hosted-review-after-meta-update'
 import { buildWorktreeMetaStateUpdate } from './worktree-meta-state-update'
-import { withPendingSidebarRowWrites } from '@/lib/sidebar-pending-layer'
+import { withPendingSidebarRowWrites } from '@/components/sidebar/sidebar-feed/sidebar-pending-layer'
 import { isRuntimeSelectorNotFoundError } from '../listing/runtime-worktree-rpc-errors'
 import { runtimeTargetForWorktreeOwner } from '../listing/worktree-owner-target'
 import { runtimeTargetForWorkspaceOwner } from '@/lib/workspace/ownership/resolve-owner'
-
 import { hasUniqueIndexedRepositoryHost } from '@/lib/workspace/ownership/repository-owner-index'
-import { resolveReviewRepository } from '@/lib/review-owner'
+import { resolveReviewRepository } from '@/lib/source-control/review/review-owner'
 import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
+import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
+import type { WorktreeSlice } from '../worktree-slice-contract'
+
 export function createUpdateWorktreeMeta(
   set: WorktreeSliceSet,
   get: WorktreeSliceGet
@@ -102,7 +101,8 @@ export function createUpdateWorktreeMeta(
       return { ok: true }
     }
     normalizedUpdates = normalizeGitHubPRSuppressionUpdate(
-      normalizeWorkspaceAttachmentUpdate(worktreeForUpdate, mutationUpdates)
+      normalizeWorkspaceAttachmentUpdate(worktreeForUpdate, mutationUpdates),
+      worktreeForUpdate?.linkedPR
     )
     const currentResolvedPushTarget =
       normalizedUpdates.linkedPR === linkedPrForPushTarget ? resolvedPushTarget : undefined

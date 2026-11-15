@@ -8,10 +8,10 @@ import { mkdir, rename, stat } from 'node:fs/promises'
 import { getRepoExecutionHostId, getRepoRoutingConnectionId } from '../../shared/execution-host'
 import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 import type { GlobalSettings } from '../../shared/global-settings-types'
-import type { Repo } from '../../shared/repo-types'
-import type { RuntimeWorktreePsSummary } from '../../shared/runtime-worktree-contracts'
+import type { Repo } from '../../shared/repository/repo-types'
+import type { RuntimeWorktreePsSummary } from '../../shared/worktree/catalog/runtime-worktree-contracts'
 import type { RuntimeRepoRelocationResult } from '../../shared/repo-relocation-contracts'
-import { gitExecFileAsync } from '../git/runner'
+import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import { invalidateAuthorizedRootsCache } from '../ipc/worktrees/removal/registered-worktree-roots-cache'
 import {
   isCheckoutOutsideProjectFolder,

@@ -1,7 +1,7 @@
 import { constants as fsConstants, realpathSync } from 'node:fs'
 import { access, copyFile, readdir, realpath, rename, rmdir, stat, unlink } from 'node:fs/promises'
 import path from 'node:path'
-import { getAppEnvironment } from '../../shared/app-environment'
+import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { FloatingTerminalCwdRequest } from '../../shared/ui-chrome-types'
 import { ensureFloatingWorkspaceLaunchDirectory } from '../floating-workspace-launch-directory'

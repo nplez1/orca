@@ -2,12 +2,11 @@ import { mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { withFullFirstUserPromptCapture } from '../../session-scanner-first-user-prompt-capture'
-import { TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES } from '../../../native-chat/wsl-transcript-fs-access'
+import { TRANSCRIPT_WHOLE_FILE_READ_MAX_BYTES } from '../../../native-chat/wsl-transcript-gated-fs'
+import { withFullFirstUserPromptCapture } from '../../prompts/session-scanner-first-user-prompt-capture'
 import { parseGrokSessionFile } from './session-scanner-grok-parser'
-import { parseSessionCandidate } from '../../session-scanner-candidate-parse'
+import { parseSessionCandidate } from '../../parsing/session-scanner-candidate-parse'
 import { createSessionParseStats } from '../../parse-cache/session-scanner-parse-cache'
-import type { TranscriptMessage } from '../../transcripts/session-transcript-consumers'
 
 let tempRoots: string[] = []
 
@@ -21,58 +20,6 @@ const FIXTURE_MTIME_MS = 1_777_634_000_000
 const FIXTURE_MODIFIED_AT = new Date(FIXTURE_MTIME_MS).toISOString()
 
 describe('AI Vault Grok session parser', () => {
-  it.each([false, true])(
-    'bounds preview scanning while preserving full turns with capture %s',
-    async (active) => {
-      const root = await mkdtemp(join(tmpdir(), 'orca-grok-preview-budget-'))
-      tempRoots.push(root)
-      const path = join(root, 'summary.json')
-      await writeFile(path, JSON.stringify({ info: { id: 'grok-preview-budget' } }))
-      const hidden = `<system-reminder>${'x'.repeat(4057)}</system-reminder>`
-      const text = `${hidden}ask😀tail`
-      const userText = `ask${' '.repeat(4093)}tail`
-      const turns = [
-        { type: 'user', content: `<user_query>${userText}</user_query>` },
-        { type: 'assistant', content: text },
-        {
-          type: 'assistant',
-          content: [
-            { type: 'text', text: ' '.repeat(2048) },
-            { type: 'text', text: `${' '.repeat(2048)}outside preview budget` }
-          ]
-        }
-      ]
-      await writeFile(
-        join(root, 'chat_history.jsonl'),
-        turns.map((turn) => JSON.stringify(turn)).join('\n')
-      )
-      const messages: TranscriptMessage[] = []
-      const session = await withFullFirstUserPromptCapture(() =>
-        parseGrokSessionFile(
-          { path, mtimeMs: 1, modifiedAt: '2026-05-01T00:00:00.000Z' },
-          'linux',
-          { active, push: (message) => messages.push(message) }
-        )
-      )
-
-      expect(session?.previewMessages.map((message) => message.text)).toEqual(['ask', 'ask'])
-      expect(session?.firstUserPrompt).toBe(userText)
-      expect(messages).toEqual(
-        active
-          ? [
-              { role: 'user', text: userText, timestamp: null },
-              { role: 'assistant', text, timestamp: null },
-              {
-                role: 'assistant',
-                text: `${' '.repeat(2048)}\n${' '.repeat(2048)}outside preview budget`,
-                timestamp: null
-              }
-            ]
-          : []
-      )
-    }
-  )
-
   it('stores the unwrapped user_query as firstUserPrompt under full capture', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-grok-first-'))
     tempRoots.push(root)

@@ -1,3 +1,4 @@
+import { acceptedAgentStatuses } from '@/store/slices/agent-status/accepted-agent-statuses'
 import { bindPtyConnectionTestMocks } from '../test-fixtures/pty-connection-mocks.spec'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makePaneKey } from '../../../../../../shared/workspace-layout/stable-pane-id'
@@ -66,7 +67,7 @@ export function registerPtyConnectionHiddenSleepingResumeTests(): void {
         }
       },
       settings: { ...mockStoreState.settings, agentCmdOverrides: {} },
-      agentStatusByPaneKey: {},
+      agentStatusByPaneKey: acceptedAgentStatuses(Object.entries({})),
       sleepingAgentSessionsByPaneKey: {
         [PANE_KEY]: {
           paneKey: PANE_KEY,
@@ -160,7 +161,8 @@ export function registerPtyConnectionHiddenSleepingResumeTests(): void {
 
     it('does not count a later in-session sleep of the woken pane as held', async () => {
       seedSleepingPane(null)
-      const { isPaneSpawnDeferred } = await import('@/lib/pane-spawn-deferral-registry')
+      const { isPaneSpawnDeferred } =
+        await import('@/components/terminal-pane/session-restore/spawn-deferral/pane-spawn-deferral-registry')
       const isVisibleRef = { current: false }
       const transport = createResumingTransport()
       transportFactoryQueue.push(transport)
@@ -230,7 +232,8 @@ export function registerPtyConnectionHiddenSleepingResumeTests(): void {
     it('keeps holding while a woken reattach falls back to a fresh resume', async () => {
       seedSleepingPane(DEAD_SESSION_ID)
       setHostLiveness(false)
-      const { isPaneSpawnDeferred } = await import('@/lib/pane-spawn-deferral-registry')
+      const { isPaneSpawnDeferred } =
+        await import('@/components/terminal-pane/session-restore/spawn-deferral/pane-spawn-deferral-registry')
       const { transport, binding, isVisibleRef } = connectHiddenPane(
         DEAD_SESSION_ID,
         await vi.importMock<PtyConnectionAgentTitleMocks>(

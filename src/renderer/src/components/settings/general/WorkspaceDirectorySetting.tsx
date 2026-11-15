@@ -1,7 +1,7 @@
 import { GENERAL_SETTING_ANCHORS } from './general-setting-anchors'
 import type React from 'react'
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
-import { clearHostSettingOverrideForIds } from '../../../../../shared/host-setting-overrides'
+import { clearHostSettingOverrideForIds } from '../../../../../shared/execution-host/host-setting-overrides'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
 import { HostFolderSettingRow } from './HostFolderSettingRow'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'

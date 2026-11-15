@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import SyncDatabase from '../sqlite/sync-database'
-import { cwdKey } from './session-search-file-records'
+import { cwdKey } from './storage/session-search-file-records'
 import {
   listIndexedSessions,
   type IndexedSessionList,
@@ -10,7 +10,7 @@ import {
 import {
   openSessionSearchIndexFile,
   type SessionSearchIndexFile
-} from './session-search-index-test-fixture'
+} from './storage/session-search-index-test-fixture'
 
 /**
  * The plan doc's latency gate: a panel load has to stay one indexed read, and

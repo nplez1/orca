@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/identifiers/non-secure-context-uuid'
 import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open/quick-open-listing-limits'
 import { cancelRuntimeFileList, listRuntimeFiles } from '@/runtime/runtime-file-client'
 import { runtimeTargetForOwnerEnvironment } from '../runtime/rpc/targets/runtime-client-target'

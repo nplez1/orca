@@ -8,7 +8,7 @@ import {
   activateAndRevealWorktree
 } from './workspace/activation/worktree-activation'
 import { folderWorkspaceToWorktree } from '../../../shared/folder-workspaces/folder-workspace-worktree'
-import { parseWorkspaceKey } from '../../../shared/workspace-scope'
+import { parseWorkspaceKey } from '../../../shared/workspace/identity/workspace-scope'
 import { findJiraIssueWorkspaceAttachmentForIssue } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'

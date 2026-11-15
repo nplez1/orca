@@ -17,6 +17,20 @@ const NATIVE_BUILD_PACKAGES = {
   '@vscode/windows-process-tree': { abi: 'napi' }
 }
 
+function nativeRuntimeModules(platform = process.platform) {
+  return [
+    'node-pty',
+    ...(platform === 'win32'
+      ? [
+          '@orca/windows-notifications',
+          '@orca/windows-registry',
+          '@orca/windows-security',
+          '@vscode/windows-process-tree'
+        ]
+      : [])
+  ]
+}
+
 // Key N-API by platform/arch; other addons need NODE_MODULE_VERSION, differing between Node/Electron majors.
 function nativeBuildEntryName(
   moduleName,
@@ -111,6 +125,7 @@ function isSourceBuildDir(nativeDir) {
 module.exports = {
   NATIVE_BUILD_PACKAGES,
   NODE_PTY_LOADER_BUILD_ENTRY_MARKER,
+  nativeRuntimeModules,
   TRANSIENT_NATIVE_BUILD_ENTRY_FILTER,
   isNativeBuildEntryName,
   isSharedNativePackage,

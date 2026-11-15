@@ -5,9 +5,9 @@ import {
   getEphemeralVmRecipeResultPairingCode,
   parseEphemeralVmRecipeResult,
   type EphemeralVmRecipeResult
-} from '../shared/ephemeral-vm-recipes'
+} from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { writeSecureFile } from '../shared/secure-storage/secure-file'
-import { redactEphemeralVmRecipeDiagnosticText } from '../shared/ephemeral-vm-recipe-diagnostics'
+import { redactEphemeralVmRecipeDiagnosticText } from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
 import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lifetime'
 import { runEphemeralVmRecipeExtend } from '../shared/ephemeral-vm-recipe-extend-runner'
 import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'

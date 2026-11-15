@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Worktree } from '../../../../shared/worktree/types'
-import type { Repo } from '../../../../shared/repo-types'
-import type { PRComment } from '../../../../shared/github/comment-types'
-import type { PRInfo } from '../../../../shared/github/pull-request-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
+import type { PRComment } from '../../../../shared/github/comments/comment-types'
+import type { PRInfo } from '../../../../shared/github/pull-requests/pull-request-types'
 import { createGlobalSettingsFixture } from '../../../../shared/global-settings-test-fixture'
 import {
   getGitHubPRCacheKey,
   getGitHubRepoCacheKey
-} from '../../../../shared/github/github-cache-key'
+} from '../../../../shared/github/cache/github-cache-key'
 import { prCommentsCacheSuffix } from '../../store/github/cache/cache-identity'
 import type { AppState } from '@/store/types'
 import {

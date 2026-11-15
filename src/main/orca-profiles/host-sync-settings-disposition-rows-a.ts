@@ -91,8 +91,17 @@ export const HOST_SYNC_DISPOSITION_ROWS_A = {
   codexSharedServerWarning: 'replicated',
   dismissedSkillFreshnessNudges: 'replicatedOnlyIfEmpty',
   agentsSidebarIntroShown: 'replicatedOnlyIfEmpty',
+  // Why hostLocal: Orca's OAuth polling for Claude usage is a machine-level billing call, and a
+  // headless host's own answer decides it (docs/agents/usage-tracking.mdx).
+  claudeOAuthUsageEnabled: 'hostLocal',
+  // Why replicated: the browser extension runtime and the memory saver are per-window behaviour the
+  // host applies, so the main's preference is the one that travels.
+  browserExtensionsEnabled: 'replicated',
+  browserMemorySaverHours: 'replicated',
 
   // ---- replicated: a deliberate preference or connection -----------------------------
+  // Why replicated: the coordinator-approval switch is a workflow preference the host can honour.
+  orchestrationCoordinatorApprovalsEnabled: 'replicated',
   nativeChatAppearance: 'replicated',
   nativeChatAutoName: 'replicated',
   worktreeVisibilityDefaults: 'replicated',

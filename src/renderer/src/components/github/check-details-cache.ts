@@ -1,4 +1,4 @@
-import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
+import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/checks/check-types'
 import type { CacheEntry } from '../../store/github/cache/cache-model'
 import { isFresh, evictStaleEntries } from '../../store/github/cache/cache-policy'
 import { PR_CHECKS_CACHE_TTL_MS } from '../../store/github/cache/cache-identity'

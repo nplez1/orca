@@ -3,7 +3,7 @@
 import { act, cleanup, render, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as DiffCommentZoneCardModule from '../diff-comments/diff-comment-zone-card'
-import type { PRComment } from '../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../shared/github/comments/comment-types'
 import type { PRCommentInlineThread } from './pr-comment-inline-threads'
 
 vi.mock('monaco-editor', () => import('monaco-editor/esm/vs/editor/editor.api.js'))

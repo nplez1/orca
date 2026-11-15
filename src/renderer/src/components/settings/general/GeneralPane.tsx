@@ -30,7 +30,7 @@ import { GeneralSearchResults } from './GeneralSearchResults'
 import { getGeneralSubPageTitle, type GeneralSubPage } from './general-sub-pages'
 import { useOpenInMenuDraft } from './OpenInMenuSetting'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host'
 
 /** Whether two Settings targets name the same machine. */

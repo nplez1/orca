@@ -12,14 +12,14 @@ import type {
   CommitMessagePlanInput
 } from '../../shared/source-control/ai/generation/commit-message-plan'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
-import { spawnSourceControlAgent } from '../text-generation/source-control-agent-launch'
-import { killSourceControlAgentProcess } from '../text-generation/source-control-local-process'
+import { spawnSourceControlAgent } from '../text-generation/execution/source-control-agent-launch'
+import { killSourceControlAgentProcess } from '../text-generation/execution/source-control-agent-termination'
 import type { SpawnSourceControlAgent } from '../text-generation/source-control-text-generation-types'
 import { prepareSessionSummaryFoldCwd } from './session-summary-scratch'
 import {
   MAX_SOURCE_CONTROL_AGENT_OUTPUT_BYTES,
   SOURCE_CONTROL_GENERATION_TIMEOUT_MS
-} from '../text-generation/source-control-generation-limits'
+} from '../text-generation/execution/source-control-generation-limits'
 import type { SessionFoldBrain } from './session-summary-fold'
 
 export type AgentCliFoldBrainDeps = {

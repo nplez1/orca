@@ -1,8 +1,8 @@
-import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
-import { extractExecError, parseRetryAfterMs } from '../../git/exec-error'
-import { isGhPrimaryRateLimitStderr } from '../../git/gh-rate-limit-breaker'
-import { ghExecFileAsync } from '../../git/command-runner/gh-exec-file'
-import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-fallback'
+import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
+import { extractExecError, parseRetryAfterMs } from '../../git/command-runner/process-capture/exec-error'
+import { isGhPrimaryRateLimitStderr } from '../../git/command-runner/hosted-cli/gh-rate-limit-breaker'
+import { ghExecFileAsync } from '../../git/command-runner/hosted-cli/gh-exec-file'
+import { isHostCommandMissing } from '../../git/command-runner/hosted-cli/github-cli-host-fallback'
 import { capUsageRetryAfterMs } from '../providers/usage-retry-after'
 import {
   buildCopilotEntitlementSnapshot,

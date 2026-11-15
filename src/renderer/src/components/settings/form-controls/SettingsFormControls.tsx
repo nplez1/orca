@@ -1,13 +1,13 @@
 // @protected-copy: preserve copy used by security settings.
-import type React from 'react'
 import { useState } from 'react'
+import type React from 'react'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip'
 import { Switch } from '../../ui/switch'
 import { SettingsDisabledControlTooltip } from './SettingsDisabledControlTooltip'
-import { normalizeColor } from '@/lib/terminal-theme'
-import { cn } from '@/lib/utils'
+import { normalizeColor } from '@/lib/terminal/appearance/terminal-theme'
+import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
 import { useAppStateValue } from '@/store/retained-views/app-state-view'
 
@@ -18,6 +18,7 @@ type SettingsRowProps = {
   className?: string
   labelId?: string
   alignTop?: boolean
+  id?: string
 }
 
 export function SettingsRow({
@@ -26,10 +27,12 @@ export function SettingsRow({
   control,
   className,
   labelId,
-  alignTop
+  alignTop,
+  id
 }: SettingsRowProps): React.JSX.Element {
   return (
     <div
+      id={id}
       data-settings-row=""
       className={cn(
         'flex gap-4',
@@ -102,9 +105,10 @@ type SettingsSegmentedControlProps<T extends string | number> = {
   ariaLabel?: string
   ariaLabelledBy?: string
   ariaDescribedBy?: string
-  size?: 'sm' | 'md'
+  size?: 'icon' | 'sm' | 'md'
   equalWidth?: boolean
   wrap?: boolean
+  overlayTooltip?: boolean
 }
 
 export function SettingsSegmentedControl<T extends string | number>({
@@ -116,7 +120,8 @@ export function SettingsSegmentedControl<T extends string | number>({
   ariaDescribedBy,
   size = 'md',
   equalWidth = false,
-  wrap = false
+  wrap = false,
+  overlayTooltip = false
 }: SettingsSegmentedControlProps<T>): React.JSX.Element {
   return (
     <div
@@ -126,6 +131,7 @@ export function SettingsSegmentedControl<T extends string | number>({
       aria-describedby={ariaDescribedBy}
       className={cn(
         'inline-flex items-center rounded-md border border-border bg-background/50 p-0.5',
+        size === 'icon' && 'gap-0.5',
         equalWidth && 'w-full',
         wrap && 'flex-wrap'
       )}
@@ -148,7 +154,11 @@ export function SettingsSegmentedControl<T extends string | number>({
             }}
             className={cn(
               'rounded-sm text-center outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
-              size === 'sm' ? 'px-2.5 py-0.5 text-xs' : 'px-3 py-1 text-sm',
+              size === 'icon'
+                ? 'grid h-[26px] w-7 place-items-center'
+                : size === 'sm'
+                  ? 'px-2.5 py-0.5 text-xs'
+                  : 'px-3 py-1 text-sm',
               equalWidth && 'flex-1',
               active
                 ? 'bg-accent font-medium text-accent-foreground'
@@ -166,7 +176,13 @@ export function SettingsSegmentedControl<T extends string | number>({
         return (
           <Tooltip key={String(opt.value)}>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
-            <TooltipContent>{opt.tooltip}</TooltipContent>
+            <TooltipContent
+              side="top"
+              sideOffset={4}
+              style={overlayTooltip ? { zIndex: 110 } : undefined}
+            >
+              {opt.tooltip}
+            </TooltipContent>
           </Tooltip>
         )
       })}
@@ -238,7 +254,7 @@ type ColorFieldProps = {
 
 type NumberFieldProps = {
   label: string
-  description: string
+  description?: string
   /** undefined renders the field empty — pair it with `placeholder` and `onClear` for an unset state. */
   value: number | undefined
   defaultValue?: number
@@ -370,15 +386,17 @@ export function NumberField({
       className={className}
       label={label}
       description={
-        <>
-          {description}
-          {defaultValue !== undefined ? (
-            <span className="ml-1 text-muted-foreground/70">
-              {t('auto.components.settings.SettingsFormControls.b661b034ec', '· Default:')}{' '}
-              {defaultValue}
-            </span>
-          ) : null}
-        </>
+        description || defaultValue !== undefined ? (
+          <>
+            {description}
+            {defaultValue !== undefined ? (
+              <span className="ml-1 text-muted-foreground/70">
+                {t('auto.components.settings.SettingsFormControls.b661b034ec', '· Default:')}{' '}
+                {defaultValue}
+              </span>
+            ) : null}
+          </>
+        ) : undefined
       }
       control={
         <div className="flex items-center gap-2">

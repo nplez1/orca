@@ -1,9 +1,9 @@
-import type { LocalGitExecOptions } from '../../../git/repo-default-base-ref'
+import type { LocalGitExecOptions } from '../../../git/refs/resolution/repo-default-base-ref'
 import { randomUUID } from 'node:crypto'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
-import { getProjectHostSetupWorktreeMeta } from '../../../../shared/project-host-setup-lookup'
+import { getProjectHostSetupWorktreeMeta } from '../../../../shared/project/host-setup/project-host-setup-lookup'
 import type { GitWorktreeInfo, GitPushTarget, Worktree } from '../../../../shared/worktree/types'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import type { CreateWorktreeArgs } from '../../../../shared/worktree/create-types'
 import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import { resolveWorktreeIncludePaths } from '../../../git/worktrees/content-paths/worktree-include-file'
@@ -149,10 +149,25 @@ export async function materializeRuntimeLocalWorktree<T>(args: {
     hostId: meta.hostId ?? getRepoExecutionHostId(repo)
   }
   const metadataResult = args.onMetadataPersisted(worktree)
+  const { materializationWarning } = await materializeWorktreeContentPaths(
+    repo,
+    created.path,
+    localWorktreeGitOptions,
+    timing
+  )
+  return { worktree, metadataResult, ...(materializationWarning ? { materializationWarning } : {}) }
+}
 
+/** Repo-configured files a fresh checkout lacks: symlinks, shared directories and .worktreeinclude copies. */
+export async function materializeWorktreeContentPaths(
+  repo: Repo,
+  worktreePath: string,
+  localWorktreeGitOptions: LocalGitExecOptions,
+  timing: Pick<WorktreeCreateTimingRecorder, 'time'>
+): Promise<{ materializationWarning?: string }> {
   if ((repo.symlinkPaths ?? []).length > 0) {
     await timing.time('create_symlinks', () =>
-      createWorktreeLinkedPaths(repo.path, created.path, repo.symlinkPaths ?? [])
+      createWorktreeLinkedPaths(repo.path, worktreePath, repo.symlinkPaths ?? [])
     )
   }
   // These discoveries are read-only; overlap them, but keep the shared-path
@@ -168,7 +183,7 @@ export async function materializeRuntimeLocalWorktree<T>(args: {
   const materializationWarnings: string[] = []
   if (sharedDirectories.length > 0) {
     const failedSharedDirectories = await timing.time('create_shared_directories', () =>
-      createWorktreeSharedPaths(repo.path, created.path, sharedDirectories, {
+      createWorktreeSharedPaths(repo.path, worktreePath, sharedDirectories, {
         sharedDirectoriesMode: repo.sharedDirectoriesMode
       })
     )
@@ -180,14 +195,10 @@ export async function materializeRuntimeLocalWorktree<T>(args: {
   }
   if (worktreeIncludePaths.length === 0) {
     const materializationWarning = materializationWarnings.join(' ')
-    return {
-      worktree,
-      metadataResult,
-      ...(materializationWarning ? { materializationWarning } : {})
-    }
+    return materializationWarning ? { materializationWarning } : {}
   }
   const skippedIncludePaths = await timing.time('copy_worktreeinclude', () =>
-    createWorktreeCopiedPaths(repo.path, created.path, worktreeIncludePaths)
+    createWorktreeCopiedPaths(repo.path, worktreePath, worktreeIncludePaths)
   )
   const includeCopyWarning = formatWorktreeIncludeCopyWarning(skippedIncludePaths)
   if (includeCopyWarning) {
@@ -195,9 +206,5 @@ export async function materializeRuntimeLocalWorktree<T>(args: {
     materializationWarnings.push(includeCopyWarning)
   }
   const materializationWarning = materializationWarnings.join(' ')
-  return {
-    worktree,
-    metadataResult,
-    ...(materializationWarning ? { materializationWarning } : {})
-  }
+  return materializationWarning ? { materializationWarning } : {}
 }

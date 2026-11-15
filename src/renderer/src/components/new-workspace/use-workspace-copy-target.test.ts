@@ -3,7 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Worktree } from '../../../../shared/worktree/types'
-import type { ReadyProjectHostSetupOption } from '@/lib/project-host-setup-options'
+import type { ReadyProjectHostSetupOption } from '@/lib/workspace/creation/project-host-setup-options'
 
 const storeMocks = vi.hoisted(() => {
   const worktreesByRepo: Record<string, Worktree[]> = {}

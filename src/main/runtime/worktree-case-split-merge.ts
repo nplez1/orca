@@ -1,7 +1,7 @@
 import { basename } from 'node:path'
 import { getDefaultPersistedState } from '../../shared/constants'
 import { getWorkspaceAttachmentKey } from '../../shared/workspace-attachments/workspace-attachment-normalization'
-import { worktreeWorkspaceKey } from '../../shared/workspace-scope'
+import { worktreeWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
 import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'
 import type { WorktreeMeta } from '../../shared/worktree/meta-types'
 import { migrateWorktreeIdentity } from '../persistence/tracking-repos/worktree-identity-migration'

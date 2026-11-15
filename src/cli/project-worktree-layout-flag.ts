@@ -1,6 +1,6 @@
 import { WORKTREE_LAYOUT_MODES, type WorktreeLayoutMode } from '../shared/orca-workspace-layout'
-import { getOptionalStringFlag } from './flags'
-import { RuntimeClientError } from './runtime-client'
+import { getOptionalStringFlag } from './arguments/flags'
+import { RuntimeClientError } from './runtime/connection/types'
 
 function isWorktreeLayoutMode(value: string): value is WorktreeLayoutMode {
   return WORKTREE_LAYOUT_MODES.some((mode) => mode === value)

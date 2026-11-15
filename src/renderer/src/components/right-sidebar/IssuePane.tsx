@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useRepoById } from '../../store/repos/use-repository-catalog'
 import { useActiveWorktree } from '../../store/workspaces/selection/use-selected-worktree'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { useStableTaskSource } from '@/hooks/useStableTaskSource'

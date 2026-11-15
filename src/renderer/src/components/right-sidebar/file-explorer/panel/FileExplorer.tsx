@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/index'
 import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/workspace/ownership/worktree-runtime-owner'
-import { getWorkspaceFileRevealOwner } from '@/lib/reveal-in-file-manager'
-import { getRouteForLocalPathOpenOwner } from '@/lib/local-path-open-guard'
+import { getWorkspaceFileRevealOwner } from '@/lib/files/os-open/reveal-in-file-manager'
+import { getRouteForLocalPathOpenOwner } from '@/lib/files/os-open/local-path-open-guard'
 import { useActiveWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 import { useRepoById } from '@/store/repos/use-repository-catalog'
 import {
@@ -16,7 +16,7 @@ import { FileExplorerScopeNotice } from './FileExplorerScopeNotice'
 import { useFileExplorerRootNavigation } from '../navigation/use-file-explorer-root-navigation'
 import { useFileExplorerScopeTransition } from '../navigation/use-file-explorer-scope-transition'
 import { basename } from '@/lib/path'
-import { isGitRepoKind } from '../../../../../../shared/repo-kind'
+import { isGitRepoKind } from '../../../../../../shared/repository/repo-kind'
 import { getVisibleFileExplorerWorktreePath } from '../navigation/file-explorer-reset'
 import { FileExplorerBackgroundMenu } from './FileExplorerBackgroundMenu'
 import { FileExplorerFilesTreePane } from '../tree/FileExplorerFilesTreePane'
@@ -42,7 +42,7 @@ import { useFileExplorerBackgroundMenu } from './use-file-explorer-background-me
 import { useFileExplorerNameFilter } from './use-file-explorer-name-filter'
 import { useFileExplorerTreePaneState } from '../tree/use-file-explorer-tree-pane-state'
 import { useWslHostUnavailableReason } from '../../../../runtime/hosts/wsl/wsl-host-availability'
-import { useStoppedWslHost } from '../../../wsl-host-stopped/use-stopped-wsl-host'
+import { useWslHostReadOutage } from '../../../wsl-host-stopped/use-stopped-wsl-host'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 
 /** Coordinates scoped navigation while retaining the actual worktree root for file operations and runtime routing. */
@@ -56,7 +56,7 @@ function FileExplorerFiles(): React.JSX.Element {
     runtimeEnvironmentIdOrLocalUnlessTwin(s, activeWorktreeId)
   )
   const wslHostUnavailable = useWslHostUnavailableReason(activeWorktreeId)
-  const stoppedWslHost = useStoppedWslHost(activeWorktreeId)
+  const stoppedWslHost = useWslHostReadOutage(activeWorktreeId)
   const activeWorktree = useActiveWorktree()
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
   // Why: a folder workspace has no repo row, so only the catalog owner names its SSH host.

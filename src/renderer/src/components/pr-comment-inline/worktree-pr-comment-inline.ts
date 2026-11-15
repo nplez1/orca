@@ -1,16 +1,16 @@
 import { useMemo } from 'react'
 import type { AppState } from '@/store/types'
-import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
-import type { PRComment } from '../../../../shared/github/comment-types'
+import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../shared/github/repositories/repository-identity'
+import type { PRComment } from '../../../../shared/github/comments/comment-types'
 import { useAppStore } from '@/store'
 import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 import type { Worktree } from '../../../../shared/worktree/types'
 import {
   getGitHubPRCacheKey,
   getGitHubRepoCacheKey
-} from '../../../../shared/github/github-cache-key'
+} from '../../../../shared/github/cache/github-cache-key'
 import { prCommentsCacheSuffix } from '../../store/github/cache/cache-identity'
-import { isGitHubPRSuppressed } from '../../../../shared/worktree/github-pr-suppression'
+import { isGitHubPRSuppressed } from '../../../../shared/worktree/hosted-review/github-pr-suppression'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
 import { isStaleMergedGitHubReviewForHead } from '../../store/slices/hosted-review/hosted-review-cache-state'
 import { getPRCommentInlineScope } from './pr-comment-inline-comments'

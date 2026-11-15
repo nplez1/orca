@@ -8,7 +8,7 @@ import {
   resetSessionParseCacheForTests
 } from './parse-cache/session-parse-cache-store'
 import { scanAiVaultSessions } from './session-scanner'
-import { isolatedScanRoots, writeJsonlFile } from './session-scanner-test-fixtures'
+import { isolatedScanRoots, writeJsonlFile } from './scanner-fixtures/session-scanner-test-fixtures'
 
 let tempRoots: string[] = []
 

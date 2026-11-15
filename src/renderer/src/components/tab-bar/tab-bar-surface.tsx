@@ -26,7 +26,7 @@ import { renderTabBarItems } from './tab-bar-item-surface'
 import { TabBarStaticCreateMenu } from './tab-bar-static-create-menu'
 import { TabBarNewTabButton } from './TabBarNewTabButton'
 import ClientHostedBrowserTabRows from './ClientHostedBrowserTabRows'
-import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
+import type { ClientHostedBrowserRow } from '../../../../shared/browser/client-hosting/client-hosted-browser-rows'
 import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
 import { advanceAgentSessionsTourPastNewTab } from '@/components/contextual-tours/agent-sessions-tour-new-tab'
 
@@ -123,6 +123,7 @@ export function renderTabBarSurface(
     activeClientHostedBrowserRowId
   })
 
+  const hasTabs = orderedItems.length + clientHostedBrowserRows.length > 0
   return (
     <div ref={surfaceRef} className="flex items-stretch h-full overflow-hidden flex-1 min-w-0">
       {tabStripOverflowState.hasOverflow ? (
@@ -155,7 +156,10 @@ export function renderTabBarSurface(
         {/* Why: no-drag lets tab interactions work inside the titlebar's drag region (outer container stays window-draggable). */}
         <div
           data-single-tab={singleTab ? '' : undefined}
-          className="group/tab-strip relative flex min-h-0 w-max min-w-0 max-w-full shrink"
+          // Why: tabs are the only drag source, so a narrow pane clips the "+" before the last tab sliver.
+          className={`group/tab-strip relative flex min-h-0 w-max max-w-full shrink ${
+            hasTabs ? 'min-w-10' : 'min-w-0'
+          }`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <div

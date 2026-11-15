@@ -3,7 +3,7 @@ import type {
   AiVaultScanIssue,
   AiVaultSession
 } from '../../shared/ai-vault/contracts/ai-vault-types'
-import type { AiVaultListSnapshot } from './session-list-fingerprint'
+import type { AiVaultListSnapshot } from './listing/session-list-fingerprint'
 import { AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES } from './session-list-page-bounds'
 
 /**

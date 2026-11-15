@@ -1,16 +1,16 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
-import { useAppStore } from '@/store'
+import { useAppStore } from '@/store/index'
 import {
   selectWorkspaceByHostTarget,
   type WorkspaceRecordState
 } from '@/store/workspaces/selection/workspace-host-target'
 import { hostWorktreeTarget } from '../../../../../../shared/worktree/host-qualified-identity'
-import { getRuntimeTargetForWorktreeOwner } from '@/lib/file-owner-runtime-target'
+import { getRuntimeTargetForWorktreeOwner } from '@/lib/files/access/file-owner-runtime-target'
 import { runtimeTargetForWorkspaceOwner } from '@/lib/workspace/ownership/resolve-owner'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import { warnAmbiguousOwnerOnce } from '@/lib/ambiguous-owner-warning'
 import { getIndexedRepoMap } from '@/store/repos/repository-catalog-index'
+import { warnAmbiguousOwnerOnce } from '@/lib/workspace/ownership/ambiguous-owner-warning'
 import type { WorktreeOperationRouteState } from '@/lib/workspace/ownership/worktree-operation-route'
 import type { RuntimeLinearSettings } from '@/runtime/linear/runtime-linear-client'
 import { translate } from '@/i18n/i18n'

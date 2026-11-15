@@ -1,5 +1,5 @@
 import { Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'

@@ -1,4 +1,5 @@
-import { isWslHookRelayConnectionId } from '../../../../shared/wsl-hook-relay-contract'
+import type * as AgentStatusBridge from './agent-status-bridge-types'
+import { isWslHookRelayConnectionId } from '../../../../shared/agent-hook-listener/transport/wsl-hook-relay-contract'
 import { AgentHookAttributionDiagnostics } from '../../../../shared/agent-hook-listener/state/agent-hook-attribution-diagnostics'
 import { pickHostTurnEnd } from '../../../../shared/agent-status/contracts/agent-status-types'
 import type { AgentStatusIpcPayload } from '../../../../shared/agent-status/contracts/agent-status-ipc-payload'
@@ -6,7 +7,7 @@ import { isDecorativeAgentTitleFrameChange } from '../../../../shared/agent-stat
 import { parsePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
 import { normalizeProgramStatusFacet } from '../../../../shared/program-status/facet'
 import { resolveAgentStatusTerminalTitle } from '@/lib/agent-status/evidence/agent-status-terminal-title'
-import { track } from '@/lib/telemetry'
+import { track } from '@/diagnostics/telemetry/telemetry'
 import { resolveAgentPaneAuthorityKey } from '@/store/slices/agent-status/agent-pane-authority'
 import type { AgentStatusUpdate } from '@/store/slices/agent-status/agent-status-contract'
 import { observeAgentHookCompletionForNotification } from '../agent-hook-completion-notifications'
@@ -25,11 +26,6 @@ import {
   resolvePaneKeyFromRoutingIndex,
   resolveWorktreeConnectionFromRoutingIndex
 } from './agent-status-pane-routing-index'
-import type {
-  AgentStatusApplyOptions,
-  AgentStatusApplyResult,
-  PendingAgentStatusEvent
-} from './agent-status-bridge-types'
 import {
   normalizeAgentStatusEvent,
   normalizeAgentStatusMetadata,
@@ -42,21 +38,22 @@ import {
   foldProgramStatusIntoPendingRows
 } from './agent-status-partial-updates'
 
-export function createAgentStatusEventApplicator(args: {
-  pendingAgentStatusEvents: PendingAgentStatusEvent[]
-  transientClearWatermarkByConnectionId: Map<string, number>
-  enqueuePendingAgentStatus: (data: AgentStatusIpcPayload, options?: { replay?: boolean }) => void
-}): (data: AgentStatusIpcPayload, options?: AgentStatusApplyOptions) => AgentStatusApplyResult {
+export function createAgentStatusEventApplicator(
+  args: AgentStatusBridge.AgentStatusEventApplicatorArgs
+): (
+  data: AgentStatusIpcPayload,
+  options?: AgentStatusBridge.AgentStatusApplyOptions
+) => AgentStatusBridge.AgentStatusApplyResult {
   const {
     pendingAgentStatusEvents,
     transientClearWatermarkByConnectionId,
     enqueuePendingAgentStatus
   } = args
   const attributionDiagnostics = new AgentHookAttributionDiagnostics()
-  const applyAgentStatus = (
+  return (
     data: AgentStatusIpcPayload,
-    options?: AgentStatusApplyOptions
-  ): AgentStatusApplyResult => {
+    options?: AgentStatusBridge.AgentStatusApplyOptions
+  ): AgentStatusBridge.AgentStatusApplyResult => {
     const store = options?.batch?.transaction.getState() ?? useAppStore.getState()
     if (!isAgentStatusRoutingReady(store)) {
       return 'dropped'
@@ -73,7 +70,6 @@ export function createAgentStatusEventApplicator(args: {
       return 'dropped'
     }
     const programStatus = normalizeProgramStatusFacet(data.programStatus) ?? null
-    // Reuse first-match pane ownership without rescanning every worktree per event.
     const routingIndex = options?.batch?.routingIndex ?? createAgentStatusPaneRoutingIndex(store)
     let {
       exists,
@@ -156,7 +152,11 @@ export function createAgentStatusEventApplicator(args: {
       typeof data.connectionId === 'string'
         ? transientClearWatermarkByConnectionId.get(data.connectionId)
         : undefined
-    if (transientClearWatermark !== undefined && data.receivedAt <= transientClearWatermark) {
+    if (
+      !data.paneSleep &&
+      transientClearWatermark !== undefined &&
+      data.receivedAt <= transientClearWatermark
+    ) {
       return 'dropped'
     }
     const canAcceptPendingRemoteOwnership =
@@ -172,7 +172,7 @@ export function createAgentStatusEventApplicator(args: {
     ) {
       return 'dropped'
     }
-    const existingStatus = store.agentStatusByPaneKey[paneKey]
+    const existingStatus = store.agentStatusByPaneKey.get(paneKey)
     if (indexedPaneExists) {
       attributionDiagnostics.resolved({
         paneKey,
@@ -206,7 +206,11 @@ export function createAgentStatusEventApplicator(args: {
       : resolvedPayload
     const statusPayloadWithEnvelope = withAgentStatusEnvelopeFields(statusPayload, data)
     // Why null: main stitches the pane's current facet onto every publish, so absence means cleared.
-    const statusPayloadWithProgramStatus = { ...statusPayloadWithEnvelope, programStatus }
+    const statusPayloadWithProgramStatus = {
+      ...statusPayloadWithEnvelope,
+      programStatus,
+      ...(data.paneSleep ? { paneSleep: data.paneSleep } : {})
+    }
     if (
       existingStatus &&
       isInheritedFromActivePane(existingStatus, data, statusPayload.agentType, {
@@ -224,6 +228,7 @@ export function createAgentStatusEventApplicator(args: {
       terminalTitle,
       timing: {
         updatedAt: data.receivedAt,
+        isReplay: data.isReplay,
         ...(data.evidenceObservedAt !== undefined
           ? { evidenceObservedAt: data.evidenceObservedAt }
           : {}),
@@ -291,6 +296,4 @@ export function createAgentStatusEventApplicator(args: {
     }
     return 'applied'
   }
-
-  return applyAgentStatus
 }

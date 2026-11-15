@@ -1,4 +1,4 @@
-import type { SshTarget } from './ssh-types'
+import type { SshTarget } from './remote-runtime/ssh/ssh-types'
 
 // Split out of ssh-types.ts: upstream keeps that file on the max-lines budget, so the fork's
 // visibility helpers live here and ssh-types.ts re-exports them.

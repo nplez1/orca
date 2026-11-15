@@ -2,12 +2,12 @@ import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import type {
   EphemeralVmRecipeStartFailure,
   EphemeralVmRecipeStartSuccess
-} from '../../shared/ephemeral-vm-recipe-runner'
+} from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner'
 import {
   removeEphemeralVmProvisioningAttempt,
   upsertEphemeralVmProvisioningAttempt
 } from '../../shared/ephemeral-vm-provisioning-attempts'
-import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { recordSwallowedFailure } from '../observability/swallowed-failure'
 
 /**

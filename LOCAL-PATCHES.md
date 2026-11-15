@@ -3194,6 +3194,54 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-11-15 — merge of upstream `1ce376b27e` (1,180 commits) into the release line, from
+  `a992b134ff`** (merge base `86ee16da9ea`). **694 conflicted paths, 824 hunks** —
+  `both-rewrote 325, modify/delete 182, union 166, rename-replay 10, duplicate-tail 5, add/add 4,
+  duplicate-members 2`. This is the largest delta since 2026-11-08. Resolved in four tiers: **10
+  fork deletions** asserted by the ledger (the dashboard pop-out cluster and
+  `AiCommitPrSettingsFields`, which the fork had re-homed into `settings/ai-generation-fields.tsx`),
+  **163 upstream test retirements** taken as deletions, **189 paths proved outright** by
+  `conflicts.mjs --apply-proven` (import-only three-way unions), and the remaining ~330 resolved in
+  seven disjoint area batches. What a reviewer will want first:
+
+  - **The cost was module moves, not markers.** Upstream moved ~6,900 paths — owner-scoped
+    directories again, plus `ai-vault/parsing/`, `ai-vault-search/{indexing,storage,worker,discovery}/`,
+    `cli/{projects,workspaces,runtime,hosts}/`, `git/command-runner/{host-routing,admission,process-capture}/`
+    and `shared/{agent-usage/rate-limits,remote-runtime}/`. Each one re-points imports, and `pnpm tc`
+    is the only thing that sees it: the first `tc:node` after the markers were gone still held 60+
+    errors, and a `resolveDir: process.cwd()` site would fail only at runtime.
+  - **Five fork deltas were re-homed rather than merged**: `repo relocate` into
+    `cli/projects/repo.ts` (plus its hint in `projects/repo-format.ts`), the AI Vault
+    list-fingerprint snapshot API into `ai-vault/listing/session-list-fingerprint.ts`, the scan
+    time/BOM hardening into `ai-vault/parsing/{session-record-time,session-json-object}.ts`, the
+    ephemeral-VM test fixture into `task-page/linear/issue-refresh/`, and the `orca.yaml` recipe
+    `passEnv` key into the fork's `orca-yaml-vm-recipes.ts`.
+  - **`git/runner.ts` is gone.** Upstream deleted the re-export barrel; the fork's four surviving
+    importers now name `command-runner/git-exec-file`, `-sync`, `git-spawn` and the `host-routing/*`
+    modules directly. `command-runner/local-login-shell-git-environment.ts` is fork-only and stays.
+  - **The dashboard open-mode module is fork-owned again.** Upstream added
+    `agent-dashboard-open-mode.ts` and four of its files import it; this fork ships one mode, so the
+    module resolves `'in-window'` unconditionally and `canOpenAgentDashboardPopout()` is `false`.
+  - **The four usage stores moved behind the backend daemon.** `createUsageService(host)` in
+    `backend/usage-service.ts` owns claude/codex/opencode/muse now; `mainProcessState` has no
+    `openCodeUsage`/`museUsage`, and `claudeUsage`/`codexUsage` come from
+    `BackendSupervisor.automationClient(...)`.
+  - **`AiVaultSearchSettings` keeps the fork's `contentEnabled` tier.** Upstream's `enabled` never
+    parsed here; every upstream handler and test that set it was adapted to the fork's two-tier
+    consent model.
+  - **`host-sync-settings-disposition` gained seven rows** for settings upstream added:
+    `claudeOAuthUsageEnabled` (`hostLocal` — a machine-level billing call) and
+    `browserExtensionsEnabled` / `browserMemorySaverHours` / `prAutoRefresh` /
+    `workspaceCleanupPolicy` / `worktreeCardDetailsRow` / `orchestrationCoordinatorApprovalsEnabled`
+    (`replicated`).
+  - **Two conflicts were settled by deleting concatenated code, not by a human choice.**
+    `worktree-background-removal.ts` and `detected-worktree-scan-cache.ts` each held both sides'
+    implementations after the three-way merge; both now carry upstream's model only, with the
+    fork's `deleteRemoteBranch` threading intact.
+  - **Coverage:** three fork tests were restored from the pre-sync tip because the merge deleted a
+    fixture they use (`lucide-icon-stub-fixture.ts`, `use-task-page-source-display.test-fixture.tsx`,
+    `__mocks__/task-page-jira-favourite-fixture.ts`).
+
 - **2026-11-10 — merge of upstream `86ee16da9ea` (426 commits) into the release line, from
   `24dceda182f`** (merge base `51c77320bc`, merge commit `266cd398f34`). **281 conflicted paths** —
   `both-rewrote 155, union 64, modify/delete 27, rename-replay 23, duplicate-tail 9, no-markers 2,
@@ -3301,48 +3349,6 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     applied to all 39,553 staged files — the whole upstream delta — and were killed. Its oxlint tool
     set was run over the 524 files this merge authored instead (clean), and `local/gate-lint.mjs` is
     the gate of record. The reason is in the merge commit body.
-
-- **2026-11-01 — merge of upstream `0fa5dae2f9` (459 commits) into the release line, from
-  `01eac17153`** (merge base `a903985082`, rollback tag `archive/pre-sync-01eac17153`, merge commit
-  `7fea08330aa`, then `62107128f7a`, `87421079c3b`). **202 conflicted paths** —
-  `both-rewrote 101, modify/delete 56, union 37, duplicate-tail 6, duplicate-members 2`. Decisions
-  are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md); the ones a reviewer
-  will want first:
-
-  - **Resolved in three tiers.** `conflicts.mjs --apply-proven` proved **24 paths** outright (26
-    import-only unions, 3 fork-unchanged, 2 upstream-unchanged). **48 modify/delete** were settled by
-    the manifest: the 5 dashboard-popout / snapshotted-thread deletions the fork already asserts, and
-    **43 upstream test files** the fork accepts as deletions. The remaining **130 paths** were
-    resolved in 8 disjoint area batches bound to the ledger.
-  - **Upstream retired ~1031 test files this sync** (`test: remove low-value … suites`, ~20 commits
-    from `#36336` to `#37106`). 43 of them were files the fork had extended with its own cases. Per
-    the ledger's "Test inventories retired upstream" decision the fork takes the deletion rather than
-    re-adding the file, so **fork test coverage was lost in the files that carried it** — the review
-    picker (`use-checks-panel-manual-refresh`, `source-control-header-toolbar-identity`), the
-    keychain payload encoding (`generic-password`), Orca NP dev identity
-    (`dev-instance-identity`), Jira grouping and `repo-clone-path`. Named follow-up: re-home those
-    cases into fork-owned test files; nothing in the tree references them today, so this is coverage
-    debt, not a red.
-  - **Two `@ts-nocheck` wiring gaps no typecheck could catch.** `orca-runtime-owned-controllers.ts`
-    (fork-owned, merged clean) had lost `acquireFileWatcherRemoval` from the
-    `RuntimeProjectGroupController` deps and the notifier from `RuntimeAccountController`, so
-    worktree removal would have thrown and Claude-selection notifications would have stopped
-    silently. Both are restored to upstream's own shape.
-  - **Upstream added 17 settings and retired 4**, which the fork's host-sync disposition table is a
-    complete `Record` over — so the table was both short and stale. The 3 retired rows
-    (`experimentalNativeChat`, `orchestrationChatErrorEscalationEnabled`,
-    `orchestrationHeartbeatIntervalMinutes`) were type errors, not fork capability.
-  - **The fork's session-summary feature imported modules upstream had moved** (`agent-session-resume`,
-    `native-chat-agent-support`, `persistence`, `agent-session-provider-handle`). These are
-    rename-replay breaks: no conflict marker, and `tc` names them one file at a time.
-  - **`max-lines` went over budget in 10 upstream-owned files** once the merge's fork delta landed
-    in them; each gets one directive and one baseline row, per § `local(lint)`. The fork-owned
-    `host-sync-settings-disposition.ts` is the single fork exemption: splitting its audit table
-    reported 284 symbol relocations, so the table stays whole.
-  - **The fork-comment ratchet fell** 6051 → 5992 with 4 re-keyed entries (upstream relocated
-    `checks-detail-polling-policy.ts` to `src/shared/github/` and three `task-page-jira-*` files
-    into `task-page/jira/`) and +4 genuine lines across three files, all recorded in the baseline's
-    `accepted` field.
 
 ### `local(ci)`: release workflow
 

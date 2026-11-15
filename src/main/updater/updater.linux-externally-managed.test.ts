@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as UpdaterModule from './updater-service'
 import { loadUpdaterModule, warmUpdaterModule } from './testing/updater-test-module-loader'
 import { createUpdaterMainWindow } from './testing/updater-test-main-window'
-import type { LinuxRootPackageType, UpdateStatus } from '../../shared/update-status-types'
+import type { LinuxRootPackageType, UpdateStatus } from '../../shared/updater/update-status-types'
 
 const {
   autoUpdaterMock,

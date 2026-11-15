@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ gitExec: vi.fn(), ghExec: vi.fn() }))
 
-vi.mock('./runner', () => ({
+vi.mock('./command-runner/git-exec-file', () => ({
   gitExecFileAsync: mocks.gitExec,
   ghExecFileAsync: mocks.ghExec,
   extractExecError: () => ({ stdout: '', stderr: '' })
 }))
-vi.mock('./repo', () => ({
+vi.mock('./repositories/git-username', () => ({
   resolveDefaultBaseRefViaExec: async () => 'refs/remotes/origin/main'
 }))
 
@@ -15,7 +15,7 @@ import {
   resetGhLoginCacheForTests,
   resolveLocalGitUsername,
   resolveLocalGitUsernameDetailed
-} from './git-username'
+} from './repositories/git-username'
 
 /** A GitHub-remote checkout whose git config holds nothing that names a login. */
 function gitConfig(

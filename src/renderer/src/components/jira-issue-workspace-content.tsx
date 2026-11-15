@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { ArrowRight, FolderOpen, LoaderCircle, RefreshCw } from 'lucide-react'
 import { JiraIssueMarkdown } from './jira-issue-markdown'
-import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { CommentComposer } from '@/components/comment-composer'
 import { Button } from '@/components/ui/button'

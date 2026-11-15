@@ -5,7 +5,7 @@ import {
   localLoginShellGitEnvironmentSnapshot,
   prepareLocalLoginShellGitEnvironment
 } from './local-login-shell-git-environment'
-import type { ResolvedCommand } from './wsl-command-resolution'
+import type { ResolvedCommand } from './host-routing/wsl-command-resolution'
 
 const SHELL_SENTINEL = 'ORCA_TEST_SHELL_STARTUP_ENV'
 const LAUNCH_SENTINEL = 'ORCA_TEST_LAUNCH_ENV'

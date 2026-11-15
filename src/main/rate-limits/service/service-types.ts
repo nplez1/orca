@@ -1,16 +1,16 @@
-import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
-import type { ZcodePlanSite } from '../../../shared/zcode-plan-sites'
+import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
+import type { ZcodePlanSite } from '../../../shared/agent-accounts/usage-credentials/zcode-plan-sites'
 import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth/runtime-auth-types'
 import type {
   ClaudeAccountSelectionTarget,
   NormalizedClaudeAccountSelectionTarget
-} from '../../claude-accounts/runtime-selection'
+} from '../../claude-accounts/selection/runtime-selection'
 import type { KimiHomeResolution } from '../../kimi/kimi-runtime-home'
 import type {
   CodexAccountSelectionTarget,
   NormalizedCodexAccountSelectionTarget
-} from '../../../shared/codex-selection-lane'
-import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service-types'
+} from '../../../shared/agent-accounts/codex/codex-selection-lane'
+import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home/runtime-home-service-types'
 import type { SettledProviderResult } from './service-sibling-provider-result'
 import type { ForkProviderCyclePrepared } from '../fork/fork-provider-cycle'
 
@@ -20,21 +20,21 @@ export type {
   ProviderRateLimits,
   InactiveAccountUsage,
   RateLimitRuntimeTarget
-} from '../../../shared/rate-limit-types'
-export type { ClaudeStatusLineRateLimits } from '../../../shared/claude-statusline-rate-limits'
+} from '../../../shared/agent-usage/rate-limits/rate-limit-types'
+export type { ClaudeStatusLineRateLimits } from '../../../shared/agent-usage/rate-limits/claude-statusline-rate-limits'
 export type { NetworkProxySettings } from '../../../shared/network-proxy'
 export type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth/runtime-auth-types'
 export type {
   ClaudeAccountSelectionTarget,
   NormalizedClaudeAccountSelectionTarget
-} from '../../claude-accounts/runtime-selection'
-export { normalizeClaudeAccountSelectionTarget } from '../../claude-accounts/runtime-selection'
+} from '../../claude-accounts/selection/runtime-selection'
+export { normalizeClaudeAccountSelectionTarget } from '../../claude-accounts/selection/runtime-selection'
 export type {
   CodexAccountSelectionTarget,
   NormalizedCodexAccountSelectionTarget
-} from '../../../shared/codex-selection-lane'
-export { normalizeCodexAccountSelectionTarget } from '../../../shared/codex-selection-lane'
-export type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service-types'
+} from '../../../shared/agent-accounts/codex/codex-selection-lane'
+export { normalizeCodexAccountSelectionTarget } from '../../../shared/agent-accounts/codex/codex-selection-lane'
+export type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home/runtime-home-service-types'
 
 export type InactiveCodexHome = { kind: 'ready'; managedHomePath: string } | { kind: 'skip' }
 
@@ -134,6 +134,7 @@ export type AntigravityUsageEnabledResolver = () => boolean
 
 export { USAGE_PROVIDER_STATE_KEYS } from '../../../shared/usage-providers/usage-provider-readouts'
 
+export type ClaudeOAuthUsageEnabledResolver = () => boolean
 export type MuseUsageEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {
@@ -182,6 +183,7 @@ export type FetchAllCyclePrepared = {
   codexFetchGated: boolean
   codexStateBeforeFetch: ProviderRateLimits | null
   codexProvenance: string | null
+  codexHomePath: string | null
   codexGeneration: number
   opencodeConfigChanged: boolean
   opencodeGeneration: number

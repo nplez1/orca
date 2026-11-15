@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraSite, JiraSiteSelection } from '../../shared/jira/jira-types'
 import type { JenkinsServerProfile } from '../../shared/jenkins-servers'
-import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
+import type { SecretAtRestProtection } from '../../shared/secure-storage/secret-at-rest-protection'
 import type { JiraSiteFile } from '../jira/site-credential-store'
 import type * as JiraStoreModule from '../jira/site-credential-store'
 import type * as JenkinsStoreModule from '../jenkins/jenkins-server-store'

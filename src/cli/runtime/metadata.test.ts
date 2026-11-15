@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { APP_DATA_DIRECTORY_NAME } from '../../shared/app-directory-names'
-import { getDefaultUserDataPath, getPlatformUserDataPath } from './metadata'
+import { getDefaultUserDataPath, getPlatformUserDataPath } from './profile/metadata'
 
 afterEach(() => {
   vi.unstubAllEnvs()

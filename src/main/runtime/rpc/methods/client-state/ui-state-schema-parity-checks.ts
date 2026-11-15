@@ -10,6 +10,7 @@ type MainOwnedUIState =
   | 'jiraQuickFilterState'
   | '_explorerDisplayRootMigrated'
   | 'trayMinimizeNoticeShown'
+  | 'windowFullScreen'
   | '_expandedWorktreeCardPropertiesDefaulted'
   | '_jiraIssueWorktreeCardPropertyDefaulted'
   | '_hostWorktreeCardPropertyDefaulted'

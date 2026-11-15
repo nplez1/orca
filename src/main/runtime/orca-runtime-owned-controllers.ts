@@ -35,9 +35,11 @@ export function installOrcaRuntimeOwnedControllers(
   runtime.projectHostSetups = new RuntimeProjectHostSetupController({
     getStore: () => runtime.store,
     listRepos: () => runtime.listRepos(),
-    addRepo: (path, kind, hostId) => runtime.addRepo(path, kind, hostId),
+    addRepo: (path, kind, hostId) => runtime.repositoryRegistrations.add(path, kind, hostId),
     cloneRepo: (args) =>
-      runtime.cloneRepo(args.url, args.destination, args.hostId, args.folderName),
+      runtime.repositoryClones.clone(args.url, args.destination, args.hostId, args.folderName),
+    resolveRepositoryMetadata: (repo) => runtime.repositoryForkBackfill.resolve(repo),
+    enqueueRepositoryMetadata: (repos) => void runtime.repositoryForkBackfill.enqueue(repos),
     invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
     invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
     notifyReposChanged: () => runtime.notifyReposChanged(),
@@ -48,6 +50,7 @@ export function installOrcaRuntimeOwnedControllers(
   })
 
   runtime.projectGroups = new RuntimeProjectGroupController({
+    finishFolderCreation: (...args) => runtime.finishGroupFolderCreation(...args),
     getStore: () => runtime.store,
     resolveRepo: (...args) => runtime.managedWorktreeQueries.resolveRepoForConnection(...args),
     notifyReposChanged: () => runtime.notifyReposChanged(),

@@ -3,7 +3,7 @@ import type {
   CommitMessageModel
 } from './source-control/ai/generation/commit-message-agent-spec'
 import { OPENAI_THINKING_LEVELS } from './source-control/ai/generation/commit-message-model-parsers'
-import { labelFromModelId } from './model-id-label'
+import { labelFromModelId } from './agent-session/options/model-catalog/model-id-label'
 
 // Why: the Copilot CLI has no `models` subcommand, but `help config` documents the
 // `model` setting's accepted ids — the CLI's own catalog, so the list keeps up with

@@ -12,7 +12,7 @@ import { APP_DISPLAY_NAME } from '../../../shared/app-display-name'
 import type { WebPairingOffer } from './web-pairing'
 import { readWebDeviceKeySupport } from './web-device-key-support'
 import { MIGRATED_DEVICE_TOKEN_PREFIX } from './web-runtime-credential-source'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid as createBrowserUuid } from '../../../shared/identifiers/non-secure-context-uuid'
 import { translate } from '@/i18n/i18n'
 
 export type StoredWebRuntimeEnvironment = Omit<PublicKnownRuntimeEnvironment, 'endpoints'> & {

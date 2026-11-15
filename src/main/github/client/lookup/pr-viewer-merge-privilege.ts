@@ -1,7 +1,8 @@
-import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
-import { ghExecFileAsync } from '../../gh-utils'
-import { githubHostExecOptions, type GitHubApiRepository } from '../../github-api-repository'
-import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from '../../rate-limit'
+import { githubRepoIdentityKey } from '../../../../shared/github/repositories/repository-identity-key'
+import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
+import type { GitHubRepositoryIdentity as GitHubApiRepository } from '../../../../shared/github/repositories/repository-identity'
+import { githubHostExecOptions } from '../../repositories/github-repository-host'
+import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from '../../api/rate-limit'
 import type { GhExecOptions } from '../github-exec-scope'
 import type { PullRequestLookupData } from './pull-request-lookup-data'
 

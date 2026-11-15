@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
+import type { FeatureInteractionId } from '../../../../shared/feature-education/interactions/feature-interaction-catalog'
 import type {
   CopilotCredentialSectionModel,
   CopilotCredentialSource,

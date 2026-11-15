@@ -7,7 +7,7 @@ import { jiraSearchUsers } from '@/runtime/jira/runtime-jira-user-fields-client'
 import type { RuntimeJiraSettings } from '@/runtime/jira/runtime-jira-target'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import type { JiraUser } from '../../../shared/jira/jira-types'
 

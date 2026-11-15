@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   EphemeralVmProvisionedRuntimeRecord,
   EphemeralVmRuntimeRecord
-} from '../../../../shared/ephemeral-vm-runtimes'
+} from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { EphemeralVmRuntimeRow } from './virtual-machines/runtimes/EphemeralVmRuntimeRow'
 
 const roots: Root[] = []

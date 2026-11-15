@@ -2,7 +2,7 @@ import { useAppStore } from '@/store/index'
 import type { LinearIssue } from '../../../../../shared/linear/issue-types'
 import type { RuntimeLinearSettings } from '@/runtime/linear/runtime-linear-client'
 import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
-import '@/store/slices/linear/linear-issue-publication'
+import '@/store/slices/linear/linear-issue-read'
 import {
   runLinearIssueWrite,
   knownLinearOrganization

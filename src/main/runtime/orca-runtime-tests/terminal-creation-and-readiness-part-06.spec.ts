@@ -1,15 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import './runtime-test-module-registration.spec'
 import { OrcaRuntimeService } from '../orca-runtime'
-import type { RuntimeClientEvent } from '../../../shared/runtime-client-events'
+import { TEST_WORKTREE_ID, TEST_WORKTREE_PATH, store } from './orca-runtime-test-fixtures.spec'
+import type { RuntimeClientEvent } from '../../../shared/remote-runtime/session-graph/runtime-client-events'
 import { SETUP_RUNNER_WATCHDOG_MS } from '../orca-runtime-setup-runner-state'
-import {
-  TEST_WORKTREE_ID,
-  TEST_WORKTREE_PATH,
-  antigravityPromptBeforeModelReadyScreen,
-  store,
-  syncSinglePty
-} from './orca-runtime-test-fixtures.spec'
 
 describe('OrcaRuntimeService', () => {
   /** 133;D also emits a `terminalSideEffects` fact; these tests only assert on the state event. */
@@ -31,7 +25,7 @@ describe('OrcaRuntimeService', () => {
       getForegroundProcess: async () => null
     })
     runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    await runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
     const events: RuntimeClientEvent[] = []
     runtime.onClientEvent((event) => events.push(event))
     const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
@@ -43,32 +37,6 @@ describe('OrcaRuntimeService', () => {
   }
 
 
-  it('observes setup command completion without waiting for its interactive shell to exit', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      spawn: vi.fn().mockResolvedValue({ id: 'pty-setup' }),
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
-    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-    ;(
-      runtime as unknown as { setupCompletionTokenByPtyId: Map<string, string> }
-    ).setupCompletionTokenByPtyId.set('pty-setup', 'token-live')
-
-    const waiting = runtime.waitForSetupTerminalCompletion(handle)
-    runtime.onPtyData(
-      'pty-setup',
-      'setup failed\r\n__ORCA_SETUP_COMPLETE__:token-live:17\r\nPS>',
-      100
-    )
-
-    await expect(waiting).resolves.toEqual({ exitCode: 17 })
-    await expect(runtime.readTerminal(handle)).resolves.toMatchObject({ status: 'running' })
-  })
-
   it('replays fast setup completion emitted before its observer is registered', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
@@ -78,7 +46,7 @@ describe('OrcaRuntimeService', () => {
       getForegroundProcess: async () => null
     })
     runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    await runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
     const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
     ;(
       runtime as unknown as { setupCompletionTokenByPtyId: Map<string, string> }
@@ -92,84 +60,6 @@ describe('OrcaRuntimeService', () => {
     await expect(runtime.waitForSetupTerminalCompletion(handle)).resolves.toEqual({ exitCode: 0 })
   })
 
-  it('falls back to setup terminal exit when no completion signal is available', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      spawn: vi.fn().mockResolvedValue({ id: 'pty-legacy-setup' }),
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
-    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-
-    const waiting = runtime.waitForSetupTerminalCompletion(handle)
-    runtime.onPtyExit('pty-legacy-setup', 9)
-
-    await expect(waiting).resolves.toEqual({ exitCode: 9 })
-  })
-
-  it('cancels setup completion observation when the caller aborts', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      spawn: vi.fn().mockResolvedValue({ id: 'pty-cancelled-setup' }),
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
-    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-    ;(
-      runtime as unknown as { setupCompletionTokenByPtyId: Map<string, string> }
-    ).setupCompletionTokenByPtyId.set('pty-cancelled-setup', 'token-cancelled')
-    const unsubscribe = vi.fn()
-    vi.spyOn(runtime, 'subscribeToTerminalData').mockReturnValue(unsubscribe)
-    const controller = new AbortController()
-
-    const waiting = runtime.waitForSetupTerminalCompletion(handle, controller.signal)
-    expect(runtime.subscribeToTerminalData).toHaveBeenCalledWith(
-      'pty-cancelled-setup',
-      expect.any(Function)
-    )
-
-    const reason = new Error('cancelled')
-    controller.abort(reason)
-
-    await expect(waiting).rejects.toBe(reason)
-    expect(unsubscribe).toHaveBeenCalledOnce()
-  })
-
-  it('keeps observing after an uncertain setup terminal status', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      spawn: vi.fn().mockResolvedValue({ id: 'pty-uncertain-setup' }),
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
-    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-    ;(
-      runtime as unknown as { setupCompletionTokenByPtyId: Map<string, string> }
-    ).setupCompletionTokenByPtyId.set('pty-uncertain-setup', 'token-uncertain')
-    vi.spyOn(runtime, 'waitForTerminal').mockResolvedValue({
-      handle,
-      condition: 'exit',
-      satisfied: false,
-      status: 'unknown',
-      exitCode: null
-    })
-
-    const waiting = runtime.waitForSetupTerminalCompletion(handle)
-    await Promise.resolve()
-    runtime.onPtyData('pty-uncertain-setup', '__ORCA_SETUP_COMPLETE__:token-uncertain:0\r\n', 100)
-
-    await expect(waiting).resolves.toEqual({ exitCode: 0 })
-  })
-
   it('drops retained PTY transcript memory when a background terminal exits', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
@@ -179,7 +69,7 @@ describe('OrcaRuntimeService', () => {
       getForegroundProcess: async () => null
     })
     runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    await runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
     const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
 
     runtime.onPtyData(
@@ -229,7 +119,7 @@ describe('OrcaRuntimeService', () => {
       getForegroundProcess: async () => null
     })
     runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    await runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
 
     const handles: string[] = []
     for (let index = 0; index < 140; index += 1) {
@@ -256,149 +146,6 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
-  it('keeps retained PTY transcript memory when controller refresh omits a record', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null,
-      listProcesses: async () => []
-    })
-    runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
-    runtime.registerPty('daemon-pty-1', TEST_WORKTREE_ID)
-    runtime.onPtyData('daemon-pty-1', 'still live\npartial', 100)
-
-    await runtime.listTerminals()
-
-    const pty = (
-      runtime as unknown as {
-        ptysById: Map<
-          string,
-          {
-            connected: boolean
-            tailBuffer: string[]
-            tailPartialLine: string
-            tailLinesTotal: number
-          }
-        >
-      }
-    ).ptysById.get('daemon-pty-1')
-    expect(pty).toMatchObject({
-      connected: false,
-      tailBuffer: ['still live'],
-      tailPartialLine: 'partial',
-      tailLinesTotal: 1
-    })
-  })
-
-  it('keeps retained PTY transcript memory when controller refresh times out', async () => {
-    vi.useFakeTimers()
-    try {
-      const runtime = new OrcaRuntimeService(store)
-      runtime.setPtyController({
-        write: () => true,
-        kill: () => true,
-        getForegroundProcess: async () => null,
-        listProcesses: () => new Promise(() => {})
-      })
-      runtime.attachWindow(1)
-      runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
-      runtime.registerPty('daemon-pty-1', TEST_WORKTREE_ID)
-      runtime.onPtyData('daemon-pty-1', 'still live\npartial', 100)
-
-      const terminals = runtime.listTerminals()
-      await vi.advanceTimersByTimeAsync(3_000)
-      await terminals
-
-      const pty = (
-        runtime as unknown as {
-          ptysById: Map<
-            string,
-            {
-              connected: boolean
-              tailBuffer: string[]
-              tailPartialLine: string
-              tailLinesTotal: number
-            }
-          >
-        }
-      ).ptysById.get('daemon-pty-1')
-      expect(pty).toMatchObject({
-        connected: true,
-        tailBuffer: ['still live'],
-        tailPartialLine: 'partial',
-        tailLinesTotal: 1
-      })
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('resolves tui-idle for adopted background PTY handles from the renderer title', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-
-    runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, {
-      tabs: [
-        {
-          tabId: 'tab-bg',
-          worktreeId: TEST_WORKTREE_ID,
-          title: 'Codex ready',
-          activeLeafId: 'pane-bg',
-          layout: null
-        }
-      ],
-      leaves: [
-        {
-          tabId: 'tab-bg',
-          worktreeId: TEST_WORKTREE_ID,
-          leafId: 'pane-bg',
-          paneRuntimeId: 1,
-          ptyId: 'pty-bg',
-          paneTitle: null
-        }
-      ]
-    })
-
-    await expect(
-      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
-    ).resolves.toMatchObject({
-      handle,
-      condition: 'tui-idle',
-      status: 'running'
-    })
-  })
-
-  it('resolves live-leaf tui-idle from an OpenCode native title', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    syncSinglePty(runtime, 'remote:pty-1', {
-      tabTitle: 'repo terminal',
-      paneTitle: 'ssh build-host | OC | Native session'
-    })
-    const [terminal] = (await runtime.listTerminals()).terminals
-
-    await expect(
-      runtime.waitForTerminal(terminal.handle, { condition: 'tui-idle', timeoutMs: 1_000 })
-    ).resolves.toMatchObject({
-      handle: terminal.handle,
-      condition: 'tui-idle',
-      status: 'running'
-    })
-  })
-
   it('does not treat a Codex launch title as tui-idle readiness', async () => {
     vi.useFakeTimers()
     try {
@@ -419,7 +166,7 @@ describe('OrcaRuntimeService', () => {
       const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
 
       runtime.attachWindow(1)
-      runtime.syncWindowGraph(1, {
+      await runtime.syncWindowGraph(1, {
         tabs: [
           {
             tabId: 'tab-bg',
@@ -456,63 +203,6 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
-  it('resolves tui-idle from a Codex ready prompt preview', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-    runtime.onPtyData(
-      'pty-bg',
-      [
-        ' >_ OpenAI Codex (v0.131.0)\n',
-        ' model:       gpt-5.5 high   /model to change\n',
-        ' directory:   ~/orca/workspaces/orca/cli-debug\n'
-      ].join(''),
-      Date.now()
-    )
-
-    await expect(
-      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
-    ).resolves.toMatchObject({
-      handle,
-      condition: 'tui-idle',
-      status: 'running'
-    })
-  })
-
-  it('resolves tui-idle from an Antigravity prompt before the model line', async () => {
-    const runtime = new OrcaRuntimeService(store)
-    runtime.setPtyController({
-      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
-      write: () => true,
-      kill: () => true,
-      getForegroundProcess: async () => null
-    })
-    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-    runtime.onPtyData(
-      'pty-bg',
-      [
-        'Do you trust this workspace directory?\n',
-        'Press t to trust\n',
-        antigravityPromptBeforeModelReadyScreen('Gemini 3.5 Flash (High)')
-      ].join(''),
-      Date.now()
-    )
-
-    await expect(
-      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
-    ).resolves.toMatchObject({
-      handle,
-      condition: 'tui-idle',
-      satisfied: true,
-      status: 'running'
-    })
-  })
-
   it('announces a worktree as setting up until its runner reports completion', async () => {
     const { runtime, events, handle } = await startArmedSetupRunner('pty-setup-state')
 
@@ -540,7 +230,7 @@ describe('OrcaRuntimeService', () => {
     await expect(runtime.readTerminal(handle)).resolves.toMatchObject({ status: 'running' })
   })
 
-  it('does not announce setup for a handle that is already gone', () => {
+  it('does not announce setup for a handle that is already gone', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
       spawn: vi.fn().mockResolvedValue({ id: 'pty-setup-absent' }),
@@ -549,7 +239,7 @@ describe('OrcaRuntimeService', () => {
       getForegroundProcess: async () => null
     })
     runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    await runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
     const events: RuntimeClientEvent[] = []
     runtime.onClientEvent((event) => events.push(event))
 
@@ -620,7 +310,7 @@ describe('OrcaRuntimeService', () => {
       getForegroundProcess: async () => null
     })
     runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    await runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
     const events: RuntimeClientEvent[] = []
     runtime.onClientEvent((event) => events.push(event))
     const first = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {

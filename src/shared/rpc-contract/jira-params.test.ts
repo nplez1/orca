@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CreateIssue, IssueUpdate } from './jira-params'
+import { CreateIssue, IssueUpdate } from './jira/jira-params'
 
 describe('Jira RPC params', () => {
   // Why guarded here: a zod object strips keys it does not name, and the

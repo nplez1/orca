@@ -1,26 +1,23 @@
 /* eslint-disable max-lines -- Why: upstream's AI Vault IPC plus the fork's host-leg scan, leg-sync
    request shaping and session-depth filtering, which ride upstream's handler bodies. */
+import { scanLocalAiVaultSessionsAsIssue } from './ai-vault-local-scan'
 import {
   captureRuntimeAiVaultProjectionDependency,
   type AiVaultProjectionDependency
 } from './ai-vault-projection-dependency'
 import { app, ipcMain } from 'electron'
-import {
-  configureAiVaultSessionSources,
-  listAiVaultSessions as listCachedLocalAiVaultSessions,
-  AiVaultLocalScanError,
-  resetAiVaultSessionListCacheForTests,
-  type AiVaultSessionSources
-} from '../../ai-vault/cached-session-list'
+import { configureAiVaultSessionSources } from '../../ai-vault/discovery/ai-vault-scan-roots'
+import { resetAiVaultSessionListCacheForTests } from '../../ai-vault/listing/cached-session-list'
+import type { AiVaultSessionSources } from '../../ai-vault/discovery/ai-vault-scan-roots'
 import { deleteAiVaultSession, registerAiVaultDeleteHandler } from './ai-vault-delete'
 import { listAiVaultSubagentSessions } from './ai-vault-subagent-list'
 import {
   aiVaultScanIssueResult,
   cancelledAiVaultListResult,
   mergeAiVaultListResults
-} from '../../ai-vault/session-list-results'
+} from '../../ai-vault/listing/session-list-results'
 import type { AiVaultDeleteSessionArgs } from '../../../shared/ai-vault/contracts/ai-vault-session-deletion'
-import { classifyAiVaultScanError } from '../../../shared/ai-vault/scanning/ai-vault-scan-error-message'
+
 import {
   AI_VAULT_SCOPE_PATHS_MAX_COUNT,
   isAiVaultScanCancelledError,
@@ -30,7 +27,7 @@ import {
   type AiVaultSubagentListArgs,
   type AiVaultSubagentListResult
 } from '../../../shared/ai-vault/contracts/ai-vault-types'
-import { handleAiVaultGetFirstUserPrompt } from '../../ai-vault/session-first-user-prompt-handler'
+import { handleAiVaultGetFirstUserPrompt } from '../../ai-vault/prompts/session-first-user-prompt-handler'
 import { registerAiVaultResumeHandler, type AiVaultResumeHandlerOptions } from './ai-vault-resume'
 import {
   LOCAL_EXECUTION_HOST_ID,
@@ -45,7 +42,7 @@ import {
   scanRuntimeAiVaultSessions,
   type RuntimeAiVaultHostInfo,
   type RuntimeAiVaultScanner
-} from '../../ai-vault/ai-vault-runtime-scan'
+} from '../../ai-vault/runtime-hosts/ai-vault-runtime-scan'
 import {
   createAiVaultListScanCoordinator,
   invalidateAiVaultHostLegCache,
@@ -70,17 +67,16 @@ import {
 import {
   OPENS_EVERY_STRUCTURED_CHAT,
   projectStructuredAiVaultSessions
-} from '../../ai-vault/structured-session-ownership'
-import {
-  allHostsRuntimeScanDrainMs,
-  allHostsRuntimeScanTimeoutMs
-} from './ai-vault-all-host-timeouts'
+} from '../../ai-vault/structured-sessions/structured-session-ownership'
+import { allHostsRuntimeScanDrainMs, allHostsRuntimeScanTimeoutMs } from './ai-vault-all-host-timeouts'
 import { registerAiVaultScanProgressBroadcast } from './ai-vault-scan-progress-broadcast'
 
 type AiVaultHandlerOptions = AiVaultSessionSources &
   AiVaultResumeHandlerOptions & {
     getUserDataPath?: () => string
-    getActiveRuntimeAiVaultHostInfos?: () => readonly RuntimeAiVaultHostInfo[]
+    getActiveRuntimeAiVaultHostInfos?: () =>
+      | readonly RuntimeAiVaultHostInfo[]
+      | Promise<readonly RuntimeAiVaultHostInfo[]>
     scanRuntimeAiVaultSessions?: RuntimeAiVaultScanner
     resolveRuntimeAiVaultSessionTitles?: RuntimeAiVaultSessionTitleResolver
   }
@@ -109,10 +105,10 @@ async function listAiVaultSessions(
   const executionHostScope = requestedExecutionHostScope(args?.executionHostScope)
   const hostScope: AiVaultScanHostScope =
     executionHostScope === 'all'
-      ? { scope: executionHostScope, runtimeHosts: getActiveRuntimeAiVaultHostInfosResult() }
+      ? { scope: executionHostScope, runtimeHosts: await getActiveRuntimeAiVaultHostInfosResult() }
       : { scope: executionHostScope }
   const parsedHost = parseRoutableExecutionHostId(executionHostScope)
-  const dependency = captureRuntimeAiVaultProjectionDependency(
+  const dependency = await captureRuntimeAiVaultProjectionDependency(
     hostScope.scope === 'all'
       ? hostScope.runtimeHosts.hostInfos.map((host) => host.environmentId)
       : parsedHost?.kind === 'runtime'
@@ -247,34 +243,13 @@ async function scanAiVaultSessionsByHostScope(
   })
 }
 
-export function getActiveRuntimeAiVaultHostInfosResult(): AiVaultHostDiscoveryResult<RuntimeAiVaultHostInfo> {
+export async function getActiveRuntimeAiVaultHostInfosResult(): Promise<
+  AiVaultHostDiscoveryResult<RuntimeAiVaultHostInfo>
+> {
   return discoverAiVaultHosts(() => handlerOptions.getActiveRuntimeAiVaultHostInfos?.() ?? [], {
     path: 'runtime environments',
     fallbackMessage: 'Runtime hosts are unavailable.'
   })
-}
-
-// Like remote failures, local scanner/cache/WSL failures must degrade to issues without discarding healthy hosts.
-async function scanLocalAiVaultSessionsAsIssue(
-  args: AiVaultListArgs | undefined,
-  signal: AbortSignal | undefined
-): Promise<AiVaultListResult> {
-  try {
-    return await listCachedLocalAiVaultSessions(args, { signal })
-  } catch (error) {
-    if (isAiVaultScanCancelledError(error)) {
-      throw error
-    }
-    // Keep raw supervision details in logs; show an actionable host issue.
-    const raw = error instanceof Error ? error.message : 'Local session scan failed.'
-    console.error('[ai-vault] local session scan failed:', raw)
-    const result = aiVaultScanIssueResult({
-      executionHostId: LOCAL_EXECUTION_HOST_ID,
-      path: 'this computer',
-      ...classifyAiVaultScanError(raw)
-    })
-    return error instanceof AiVaultLocalScanError ? { ...result, scanId: error.scanId } : result
-  }
 }
 
 export function registerAiVaultHandlers(options: AiVaultHandlerOptions = {}): void {

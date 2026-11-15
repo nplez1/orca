@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import type * as Os from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PRCheckDetail } from '../../shared/github/check-types'
+import type { PRCheckDetail } from '../../shared/github/checks/check-types'
 import type { JenkinsSaveServerResult } from '../../shared/jenkins-servers'
 
 const BUILD_URL = 'https://ci.example.com/job/team/job/repo/12/'
@@ -43,7 +43,7 @@ async function loadModules() {
   vi.doMock('node:dns/promises', () => ({
     lookup: async () => [{ address: '93.184.216.34', family: 4 }]
   }))
-  const { setSecretStore } = await import('../../shared/secret-store')
+  const { setSecretStore } = await import('../../shared/secure-storage/secret-store')
   setSecretStore({
     isEncryptionAvailable: () => true,
     encryptString: (value) => Buffer.from(value),

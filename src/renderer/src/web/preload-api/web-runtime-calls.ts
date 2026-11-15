@@ -6,9 +6,9 @@ import type { PreloadApi } from '../../../../preload/api-types'
 import type { WebRuntimeSubscribeOptions } from '../web-runtime-subscription-contract'
 import { parseExecutionHostId, toRuntimeExecutionHostId } from '../../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
-import type { Repo } from '../../../../shared/repo-types'
-import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
-import type { RuntimeStatus } from '../../../../shared/runtime-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
+import type { RuntimeRpcResponse } from '../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
+import type { RuntimeStatus } from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import type { Worktree } from '../../../../shared/worktree/types'
 import {
   getClientForEnvironment,
@@ -56,7 +56,8 @@ export async function callRuntimeEnvelope<TResult = unknown>(
       return getClientForEnvironment(environment).call(method, params, { timeoutMs, signal })
     },
     0,
-    signal
+    signal,
+    params
   )
   if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
     return manuallyDisconnectedResponse(environment)
@@ -146,19 +147,26 @@ export async function callEnvironmentEnvelope<TResult = unknown>(
   if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
     return manuallyDisconnectedResponse(environment)
   }
-  const response = await runtimeCallQueuePool.enqueue(environment.id, method, () => {
-    assertPairing()
-    if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
-      return Promise.resolve(manuallyDisconnectedResponse(environment))
-    }
-    return callPinnedToRuntime(
-      getClientForEnvironment(environment),
-      method,
-      params,
-      timeoutMs,
-      expectedEnvironmentRuntimeId
-    )
-  })
+  const response = await runtimeCallQueuePool.enqueue(
+    environment.id,
+    method,
+    () => {
+      assertPairing()
+      if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
+        return Promise.resolve(manuallyDisconnectedResponse(environment))
+      }
+      return callPinnedToRuntime(
+        getClientForEnvironment(environment),
+        method,
+        params,
+        timeoutMs,
+        expectedEnvironmentRuntimeId
+      )
+    },
+    0,
+    undefined,
+    params
+  )
   if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
     return manuallyDisconnectedResponse(environment)
   }

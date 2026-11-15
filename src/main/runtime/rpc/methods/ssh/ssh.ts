@@ -17,20 +17,20 @@ import {
 import type {
   SshTarget as SshTargetRecord,
   SshTargetSummary
-} from '../../../../../shared/ssh-types'
-import { isRemoteCliControlAllowed } from '../../../../../shared/ssh-remote-cli-control'
+} from '../../../../../shared/remote-runtime/ssh/ssh-types'
+import { isRemoteCliControlAllowed } from '../../../../../shared/remote-runtime/ssh/ssh-remote-cli-control'
 import type {
   SshEditableTarget,
   SshEditableTargetField,
   SshEditableTargetInput
-} from '../../../../../shared/ssh-target-management'
+} from '../../../../../shared/remote-runtime/ssh/ssh-target-management'
 import {
   SshBrowseDir,
   SshConnect,
   SshTarget,
   SshTargetAdd,
   SshTargetUpdate
-} from '../../../../../shared/rpc-contract/ssh-params'
+} from '../../../../../shared/rpc-contract/ssh/ssh-params'
 
 // Why: `generation` stays optional on the wire — an old server simply omits it and its rows key on target id alone.
 // Same for `hidden`: never drop the row, because a paired client resolves labels and live

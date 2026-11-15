@@ -7,7 +7,7 @@ import { Button } from '../../../ui/button'
 import { Label } from '../../../ui/label'
 import { CodexLoginLinkNotice } from './CodexLoginLinkNotice'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
-import { getAccountsCodexSearchEntries } from '../accounts-search'
+import { ACCOUNTS_SECTION_IDS, getAccountsCodexSearchEntries } from '../accounts-search'
 import { getCodexSystemDefaultSubtitle } from '../scope/accounts-pane-runtime'
 import type { AccountsPaneSectionModel } from '../accounts-pane-types'
 import { renderCodexAccountRow } from './accounts-pane-codex-account-row'
@@ -46,7 +46,7 @@ export function renderCodexAccountsSection(
     wslCapabilitiesLoading
   } = model
   return (
-    <div key="codex-accounts" id="accounts-codex" className="scroll-mt-6">
+    <div key="codex-accounts" id={ACCOUNTS_SECTION_IDS.codex} className="scroll-mt-6">
       <SettingsGroup>
         <SearchableSetting
           title={t('auto.components.settings.AccountsPane.bd16d363ed', 'Codex accounts')}

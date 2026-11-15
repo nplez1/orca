@@ -104,7 +104,9 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceAn
     } = args
     this.updateState({
       ...previousState,
-      claude: this.withFetchingStatus(previousState.claude, 'claude'),
+      // Upstream's OAuth gate rides here: a switched-off Claude slot shows the disabled reading,
+      // never a fetching chip that cannot settle.
+      claude: this.claudeStateAtCycleStart(previousState.claude),
       // Why: a gated Codex cycle makes no attempt; a "fetching" chip would never settle.
       codex: codexFetchGated
         ? codexStateBeforeFetch

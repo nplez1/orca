@@ -4,13 +4,13 @@ import type {
   SessionSearchHit,
   SessionSearchScope,
   SessionSearchSourcePresence
-} from './session-search-engine-types'
-import type { RankedSession, SessionRow } from './session-search-hit-ranking'
+} from './query/session-search-engine-types'
+import type { RankedSession, SessionRow } from './query/session-search-hit-ranking'
 import type { SessionSearchMetadataRetrieval } from './session-search-metadata-retrieval'
-import type { RetrievalScope, Retrieved } from './session-search-retrieval'
-import type { planSessionSearchQuery } from './session-search-query-planner'
-import { EMPTY_SNIPPET, sessionSearchSnippet } from './session-search-snippet'
-import { sessionSourcePresence } from './session-search-source-presence'
+import type { RetrievalScope, Retrieved } from './query/session-search-retrieval'
+import type { planSessionSearchQuery } from './query/session-search-query-planner'
+import { EMPTY_SNIPPET, sessionSearchSnippet } from './query/session-search-snippet'
+import { sessionSourcePresence } from './query/session-search-source-presence'
 
 export type SnippetPlan = Pick<Retrieved, 'plan' | 'route' | 'repairedTerms'>
 

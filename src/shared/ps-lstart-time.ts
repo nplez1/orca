@@ -1,4 +1,4 @@
-import { psLocaleEnvironment } from './ps-locale-environment'
+import { psLocaleEnvironment } from './process-observation/tables/ps-locale-environment'
 
 /** `lstart` is local wall clock, and the hour a DST fall-back repeats parses an hour early: read it in
  * UTC so a start time is one instant. `runPsInProcess` formats its own rows for the same zone. */

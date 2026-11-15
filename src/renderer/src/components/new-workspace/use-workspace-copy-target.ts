@@ -5,7 +5,7 @@ import { branchName } from '@/lib/source-control/branches/branch-name'
 import {
   getProjectHostSetupSelectionKey,
   type ProjectHostSetupOption
-} from '@/lib/project-host-setup-options'
+} from '@/lib/workspace/creation/project-host-setup-options'
 import { useAppStore } from '@/store'
 import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 import { isLockedSourceHostTarget } from './locked-target-host'

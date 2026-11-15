@@ -4,8 +4,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import NewWorkspaceComposerCard from './NewWorkspaceComposerCard'
-import type { NewWorkspaceComposerCardProps } from './new-workspace/new-workspace-composer-card-props'
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
+import type { NewWorkspaceComposerCardProps } from './new-workspace/composer/new-workspace-composer-card-props'
+import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
 import type { RunTargetAutoClone } from './new-workspace/use-run-target-auto-clone'
 
 // Why: the card mounts inside the app's TooltipProvider; this case renders it alone.

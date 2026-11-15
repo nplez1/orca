@@ -1,14 +1,16 @@
 import { useSyncExternalStore } from 'react'
-import type { AgentSessionHandleProvider } from '../../../../../shared/agent-session/lifecycle/agent-session-provider-handle'
+import type { AgentSessionHandleProvider } from '../../../../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle'
 import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
 import { structuredLaunchesHoldingIdentity } from './structured-agent-session-launch-holders'
 import {
   structuredLaunchIdentity,
-  subscribeStructuredAgentLaunchStatus,
-  structuredLaunchStates,
-  structuredAgentSessionLaunchHasRetainedInput,
   type StructuredAgentLaunchStatus
 } from './structured-agent-session-launch-registry'
+import {
+  structuredLaunchStates,
+  subscribeStructuredAgentLaunchStatus
+} from './structured-agent-session-launch-state-store'
+import { structuredAgentSessionLaunchHasRetainedInput } from './structured-agent-session-launch-input'
 
 /** Whether a chat for this pair is being created here: its own first create, or an adoption. */
 export function getStructuredAgentLaunchStatus(

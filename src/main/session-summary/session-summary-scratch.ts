@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Stats } from 'node:fs'
 import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
-import { removeTree, removeTreeSync } from '../../shared/windows-transient-lock-removal'
+import { removeTree, removeTreeSync } from '../../shared/file-write/windows-transient-lock-removal'
 
 export const SESSION_SUMMARY_FOLD_CWD_DIR_NAME = 'session-summary-fold-cwd'
 

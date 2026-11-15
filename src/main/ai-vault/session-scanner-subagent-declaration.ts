@@ -1,6 +1,8 @@
 import type { AiVaultSessionSubagentInfo } from '../../shared/ai-vault/contracts/ai-vault-types'
 import type { SessionAccumulator } from './session-scanner-types'
-import { asRecord, extractString, sessionIdFromFileName } from './session-scanner-values'
+import { asRecord } from './parsing/session-record-fields'
+import { extractString } from '../../shared/text/trimmed-string'
+import { sessionIdFromFileName } from './parsing/session-scanner-accumulator'
 
 /**
  * How a Pi-family transcript declares that it is a sub-agent rather than a

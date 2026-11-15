@@ -1,11 +1,11 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { REVIEW_REFRESH_COOLDOWN_MS } from '../../../../../../shared/review-refresh-policy'
 import { derivePRCheckStatus } from '../../../../../../shared/source-control/checks/pr-check-status'
-import { installWindowVisibilityTimeoutPoller } from '@/lib/window-visibility-timeout-poller'
+import { installWindowVisibilityTimeoutPoller } from '@/lib/window-activity/window-visibility-timeout-poller'
 import {
   rollupReportsUnseenRun,
   type ChecksDetailPollingPolicy
-} from '../../../../../../shared/github/checks-detail-polling-policy'
+} from '../../../../../../shared/github/checks/checks-detail-polling-policy'
 import type { ChecksPanelPollingInput, ChecksPanelPollingState } from './use-checks-panel-polling'
 
 export function useChecksDetailTimer({

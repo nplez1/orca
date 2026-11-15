@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import type * as ReactModule from 'react'
-import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 
 vi.mock('@/components/agent/icons/AgentIcon', async () => {
   const ReactActual = await vi.importActual<typeof ReactModule>('react')
@@ -23,7 +23,7 @@ vi.mock('@/i18n/i18n', () => ({
   }
 }))
 
-import { ProviderPanel } from './tooltip'
+import { ProviderPanel } from './usage/provider-usage-panel'
 
 function provider(overrides: Partial<ProviderRateLimits> = {}): ProviderRateLimits {
   return {

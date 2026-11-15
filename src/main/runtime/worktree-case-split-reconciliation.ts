@@ -4,7 +4,7 @@ import {
   LOCAL_EXECUTION_HOST_ID,
   type ExecutionHostId
 } from '../../shared/execution-host'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'
 import { composeWorktreeId, splitWorktreeId } from '../../shared/worktree/id'
 import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'

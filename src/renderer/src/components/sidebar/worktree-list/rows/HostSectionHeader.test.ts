@@ -3,7 +3,7 @@ import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId
 } from '../../../../../../shared/execution-host'
-import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { resolveEphemeralHostLease } from './HostSectionHeader'
 
 // Why: the header's menu reaches the whole app store, and this suite only exercises the lease label.

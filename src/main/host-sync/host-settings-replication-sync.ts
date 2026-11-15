@@ -1,5 +1,5 @@
 import type { PairingOffer } from '../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
-import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
+import type { RuntimeRpcResponse } from '../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import { HOST_SETTINGS_APPLY_METHOD } from '../../shared/host-settings-replication'
 import type { HostSettingsReplicationApplyResult } from '../../shared/host-settings-replication'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
@@ -66,7 +66,7 @@ export type HostSettingsReplicationSync = {
 export function createHostSettingsReplicationSync(input: {
   ports: readonly HostSettingsCredentialPort[]
   /** Resolves the paired host's offer, or throws when the environment is gone. */
-  resolvePairing: (environmentId: string) => PairingOffer
+  resolvePairing: (environmentId: string) => Promise<PairingOffer>
   /** Overridable so a test never opens a socket. */
   sendRequest: SendApplyRequest
   ledger?: HostSettingsCredentialLedger
@@ -84,7 +84,7 @@ export function createHostSettingsReplicationSync(input: {
     send: async (environmentId, payload) => {
       let pairing: PairingOffer
       try {
-        pairing = input.resolvePairing(environmentId)
+        pairing = await input.resolvePairing(environmentId)
       } catch (error) {
         return { kind: 'unreachable', detail: describe(error) }
       }

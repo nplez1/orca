@@ -20,7 +20,7 @@ const spies = vi.hoisted(() => ({
   sheet: vi.fn()
 }))
 
-vi.mock('./task-page-jira-issue-list', () => ({
+vi.mock('./listing/task-page-jira-issue-list', () => ({
   TaskPageJiraIssueList: (props: {
     onOpenOrStartWorkspace: unknown
     issueWorkspaceAttachmentIndex: unknown
@@ -57,7 +57,7 @@ vi.mock('@/components/jira-list-columns-menu', () => ({ JiraListColumnsMenu: () 
 vi.mock('./task-page-jira-view-controls', () => ({
   TaskPageJiraViewControls: () => null
 }))
-vi.mock('./task-page-jira-sort-controls', () => ({
+vi.mock('./listing/task-page-jira-sort-controls', () => ({
   TaskPageJiraSortControls: () => null
 }))
 

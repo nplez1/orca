@@ -24,7 +24,7 @@
  * store field.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RuntimeMobileSessionTabsResult } from '../../../shared/runtime-types'
+import type { RuntimeMobileSessionTabsResult } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import type { AgentStatusEntry } from '../../../shared/agent-status/contracts/agent-status-types'
 import {
   AGENT_STATUS_STALE_AFTER_MS,

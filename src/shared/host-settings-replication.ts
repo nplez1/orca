@@ -1,4 +1,4 @@
-import type { SecretAtRestProtection } from './secret-at-rest-protection'
+import type { SecretAtRestProtection } from './secure-storage/secret-at-rest-protection'
 
 /**
  * The wire contract for host settings replication.

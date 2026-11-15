@@ -1,22 +1,22 @@
-import './session-search-worker.test-fixture'
+import './worker/session-search-worker.test-fixture'
 import { existsSync } from 'node:fs'
 import { unlink, utimes } from 'node:fs/promises'
-import * as fileRemoval from '../../shared/windows-transient-lock-removal'
+import * as fileRemoval from '../../shared/file-write/windows-transient-lock-removal'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { resetSessionParseCacheForTests } from '../ai-vault/parse-cache/session-parse-cache-store'
 import { resetTranscriptConsumersForTests } from '../ai-vault/transcripts/session-transcript-consumers'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import SyncDatabase from '../sqlite/sync-database'
-import * as searchSchema from './session-search-schema'
-import { SessionSearchReaders } from './session-search-readers'
+import * as searchSchema from './storage/session-search-schema'
+import { SessionSearchReaders } from './worker/session-search-readers'
 import { SessionSearchInstance } from './session-search-instance'
-import { SessionSearchIndexer } from './session-search-indexer'
+import { SessionSearchIndexer } from './indexing/session-search-indexer'
 import {
   openSessionSearchIndexerHarness,
   writeClaudeTranscript,
   type SessionSearchIndexerHarness
-} from './session-search-indexer-test-fixture'
+} from './indexing/session-search-indexer-test-fixture'
 
 const RECENT_SESSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 const ANCIENT_SESSION_ID = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'

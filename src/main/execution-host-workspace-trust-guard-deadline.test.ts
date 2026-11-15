@@ -13,7 +13,7 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
   realpath: mocks.realpath
 }))
 
-vi.mock('./claude/claude-folder-trust-file', () => ({
+vi.mock('./claude/configuration/claude-folder-trust-file', () => ({
   grantClaudeWorkspaceTrust: mocks.grant
 }))
 

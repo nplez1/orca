@@ -6,12 +6,12 @@ import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
 } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
-import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
+import { getWorktreeAttachmentLabel } from '@/lib/workspace/display/worktree-attachment-label'
 import { JiraAttachedWorkspaceChip } from './JiraAttachedWorkspaceChip'
-import { getJiraStatusTone } from './task-page-jira-status-tone'
+import { getJiraStatusTone } from './listing/task-page-jira-status-tone'
 import { TaskPageJiraPriorityBadge } from '../../task-page-jira-priority-badge'
 import { getJiraPrioritySurfaceTone } from '../../task-page-jira-priority-tone'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import { JiraIssueRowContextMenu } from '../../JiraIssueRowContextMenu'

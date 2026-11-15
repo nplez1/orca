@@ -4,7 +4,7 @@ import {
   BoardIssuePage,
   BoardListQuery,
   IssueSprintAssignment
-} from '../../../../shared/rpc-contract/jira-params'
+} from '../../../../shared/rpc-contract/jira/jira-params'
 
 export const JIRA_BOARD_METHODS = [
   defineMethod({

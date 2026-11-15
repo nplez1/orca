@@ -1,6 +1,8 @@
-import * as monaco from 'monaco-editor'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { useEffect, useRef, type RefObject } from 'react'
+// Why: a value import of 'monaco-editor' here would evaluate Monaco ahead of its NLS pack
+// (see monaco-nls-import-order.test.ts); the enum module carries no localized labels.
+import { EditorOption } from 'monaco-editor/esm/vs/editor/common/standalone/standaloneEnums.js'
 import { getDiffCommentPopoverTop } from './diff-comment-popover-position'
 import type { DiffCommentLineRange } from './diff-comment-line-range'
 import { toDiffCommentLineTarget } from './diff-comment-line-range'
@@ -141,7 +143,7 @@ export function installDiffCommentAddButtonOverlay({
   editorDomNode.appendChild(plus)
 
   const getLineHeight = (): number => {
-    const h = editor.getOption(monaco.editor.EditorOption.lineHeight)
+    const h = editor.getOption(EditorOption.lineHeight)
     return typeof h === 'number' && h > 0 ? h : 19
   }
 

@@ -1,4 +1,4 @@
-import { MAIN_RELEASE_REPO } from './release-channel'
+import { MAIN_RELEASE_REPO } from './updater/release-channel'
 
 /**
  * The GitHub repository this build comes from — what a star request, a bug

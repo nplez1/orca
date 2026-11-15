@@ -8,7 +8,7 @@ import { getFocusedAgentPaneKeyForWorktree } from '../sidebar/workspace-card/act
 import { getExecutionHostIdForWorktree } from '../../lib/workspace/ownership/worktree-runtime-owner'
 import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
 import type { SleepingAgentSessionRecord } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
-import type { RetainedAgentEntry } from '@/store/slices/agent-status/agent-status-contract'
+import type { AgentPaneConversationIdentity } from '@/store/slices/agent-status/agent-pane-conversation'
 
 /** Exactly what resolving the pane's subject reads, so tests can build a partial state. */
 export type SessionSummarySubjectState = Pick<
@@ -20,7 +20,7 @@ export type SessionSummarySubjectState = Pick<
   | 'tabsByWorktree'
   | 'terminalLayoutsByTabId'
   | 'agentStatusByPaneKey'
-  | 'retainedAgentsByPaneKey'
+  | 'agentConversationsByPaneKey'
   | 'migrationUnsupportedByPtyId'
 >
 
@@ -79,7 +79,7 @@ export function hasSessionSummaryBridge(): boolean {
 export type SessionSummarySessionSources = {
   live?: AgentStatusEntry | undefined
   sleeping?: SleepingAgentSessionRecord | undefined
-  retained?: RetainedAgentEntry | undefined
+  retained?: AgentPaneConversationIdentity | undefined
 }
 
 /**
@@ -87,7 +87,7 @@ export type SessionSummarySessionSources = {
  *
  * Why not the live row alone: an idle Pi session is identity-only — the renderer drops its
  * status row and parks the identity in `sleepingAgentSessionsByPaneKey` while the session sits
- * waiting for a prompt, and a finished pane keeps it in `retainedAgentsByPaneKey`. A pane in
+ * waiting for a prompt, and a finished pane keeps it in `agentConversationsByPaneKey`. A pane in
  * either state still has an agent on screen, so the summary pane must still brief it; reading
  * the live row alone made exactly the quiet sessions the ones that reported "no readable
  * transcript".
@@ -132,10 +132,8 @@ function resolveParkedSessionRef(
   const retained = sources.retained
   return retained
     ? {
-        agentType: retained.agentType,
-        ...(retained.entry.providerSession
-          ? { providerSession: retained.entry.providerSession }
-          : {})
+        agentType: retained.agent,
+        ...(retained.providerSession ? { providerSession: retained.providerSession } : {})
       }
     : null
 }
@@ -155,7 +153,7 @@ export function useSessionSummarySessionRef(
     paneKey ? state.sleepingAgentSessionsByPaneKey[paneKey] : undefined
   )
   const retained = useAppStore((state) =>
-    paneKey ? state.retainedAgentsByPaneKey[paneKey] : undefined
+    paneKey ? state.agentConversationsByPaneKey[paneKey] : undefined
   )
   return useMemo(
     () => resolveSessionSummarySessionRef({ live, sleeping, retained }),

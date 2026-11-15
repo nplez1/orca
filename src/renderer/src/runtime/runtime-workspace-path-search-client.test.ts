@@ -16,7 +16,7 @@ import type { WorkspacePathSearchResponse } from '../../../shared/workspace-path
 import {
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
   RUNTIME_PROTOCOL_VERSION
-} from '../../../shared/protocol-version'
+} from '../../../shared/remote-runtime/protocol/protocol-version'
 import { replaceRuntimeEnvironmentRevisions } from './rpc/environment-revisions/runtime-environment-revision'
 
 installRuntimeFileClientEnvironment()

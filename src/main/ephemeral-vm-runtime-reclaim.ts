@@ -8,17 +8,17 @@ import type { ExecutionHostId } from '../shared/execution-host'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
-} from '../shared/ephemeral-vm-runtime-store'
-import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
+import type { EphemeralVmRuntimeRecord } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { isRuntimeHostContactRevoked } from '../shared/remote-runtime/host-status/runtime-host-status'
 import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm/runtime-environment-release'
-import { clearRuntimeEnvironmentCapabilityEvidence } from './ipc/runtime-environments/runtime-environment-capability-evidence'
-import { clearRuntimeEnvironmentManualDisconnect } from './ipc/runtime-environments/runtime-environment-manual-disconnect'
+import { clearRuntimeEnvironmentCapabilityEvidence } from './ipc/runtime-environments/connections/runtime-environment-capability-evidence'
+import { clearRuntimeEnvironmentManualDisconnect } from './ipc/runtime-environments/connectivity/runtime-environment-manual-disconnect'
 import { tryWithEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
 import { recordSwallowedFailure } from './observability/swallowed-failure'
 import { removeRuntimeOwnedSshTarget } from './ephemeral-vm/runtime-ssh'
 import { removeEphemeralVmRuntimeSshTarget } from './ephemeral-vm/runtime-ssh-cleanup'
-import { getRuntimeEnvironmentStatusSnapshots } from './ipc/runtime-environments/runtime-environment-request-connections'
+import { getRuntimeEnvironmentStatusSnapshots } from './ipc/runtime-environments/connections/runtime-environment-request-connections'
 import { getSshConnectionManager } from './ssh/targets/ssh-target-registry'
 
 /** Cadence of the reclaim sweep: a provider deadline is coarse, so a minute is prompt enough. */

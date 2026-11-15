@@ -1,4 +1,4 @@
-import { scheduleAfterInputQuiet } from '@/lib/input-quiet-scheduler'
+import { scheduleAfterInputQuiet } from '@/lib/window-activity/input-quiet-scheduler'
 import {
   ACTIVE_WORKTREE_TERMINAL_PREP_DELAY_MS,
   ACTIVE_WORKTREE_TERMINAL_PREP_IDLE_TIMEOUT_MS,

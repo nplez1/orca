@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
+import {
+  _resetSecretStoreForTests,
+  setSecretStore
+} from '../../shared/secure-storage/secret-store'
 import type * as ZcodePlanApiKeyStore from './zcode-plan-api-key-store'
 
 const secretStoreMock = vi.hoisted(() => ({

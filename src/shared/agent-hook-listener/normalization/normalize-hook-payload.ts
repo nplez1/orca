@@ -10,7 +10,7 @@ import {
   canAcceptClaudeCompactCompletion,
   isClaudeCompactCompletionConsumed,
   markClaudeCompactCompletionConsumed
-} from '../providers/claude-compact-completion'
+} from '../providers/claude/lifecycle/claude-compact-completion'
 import { isProcessExitSessionEnd, parseHookEnvelope } from '../hook-envelope'
 import { readFirstString } from '../interactive-tool'
 import type { AgentHookEventPayload } from '../listener-event'
@@ -21,23 +21,24 @@ import { gatePaneStateOnDescendants } from '../descendant-pane-state'
 import { admitNestedAgentPost } from '../pi-claude-child-events'
 import { normalizeProviderEvent } from '../provider-dispatch'
 import { hasExplicitUserPrompt } from '../provider-event-routing'
-import { hasExplicitAmpPrompt } from '../providers/amp-events'
+import { hasExplicitAmpPrompt } from '../providers/amp/amp-events'
 import {
   isOpenCodeSharedServerPost,
   resolveOpenCodeSharedServerEnvelope,
   suppressOpenCodeSharedServerPost,
   trackOpenCodePaneLaunchToken
 } from '../opencode-session-registry'
-import { claudeRowHasUnlistedLiveWork } from '../providers/claude-pane-hold-evidence'
 import {
   applyPiScheduledWorkHold,
   hookPayloadArmsScheduledWork,
   recordPiScheduledWork
 } from '../providers/pi-pane-hold-evidence'
+import { claudeRowHasUnlistedLiveWork } from '../providers/claude/lifecycle/claude-pane-hold-evidence'
 import { readString } from '../tool-input-preview'
 import { readClaudeBatchSettledRequests } from '../claude-settled-permission-requests'
 import { withClaudeToolRequestId } from '../claude-tool-request-identity'
 import { hasSeparateHookSessionAdmission, readPaneSessionContext } from '../pane-provider-session'
+import { routeJcodeHelperHook } from '../providers/jcode/jcode-helper-permission-wait'
 /** Canonical transport-agnostic normalization entry shared by main and relay listeners. */
 
 export function normalizeHookPayload(
@@ -77,6 +78,11 @@ export function normalizeHookPayload(
   }
   const sessions = readPaneSessionContext(state, source, envelope, eventName)
   const { providerSession, statusAdmissionSession } = sessions
+  // Before prompt and tool caches: a helper's turn must not reset the root turn's caches either.
+  const helper = routeJcodeHelperHook(state, source, envelope, options.bindingStatusByPaneKey)
+  if (helper !== undefined) {
+    return helper
+  }
   if (source === 'opencode' && record.opencodeTui === 1 && !providerSession) {
     return null
   }

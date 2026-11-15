@@ -13,8 +13,8 @@ import {
   type AgentTrustSpawnFields
 } from './agent-workspace-trust'
 import { AGENT_TRUST_KEYED_BY_START_FOLDER } from './execution-host-workspace-trust'
-import type { Repo } from '../../../shared/repo-types'
-import { parseWorkspaceKey } from '../../../shared/workspace-scope'
+import type { Repo } from '../../../shared/repository/repo-types'
+import { parseWorkspaceKey } from '../../../shared/workspace/identity/workspace-scope'
 import { splitWorktreeId } from '../../../shared/worktree/id'
 import {
   shouldPreTrustAgentWorkspace,
@@ -126,8 +126,6 @@ export function agentWorkspaceTrustDecisionForWorkspace(
 export function applyAgentWorkspaceTrustToSpawn(
   args: {
     launchAgent: unknown
-    /** The user chose "let agents ask" for this launch; it wins even if saving that answer failed. */
-    skipForThisLaunch?: boolean
     /** Placement workspace id; its root may differ from the agent’s starting folder. */
     worktreeId: string | undefined
     /** Section root to pre-trust for this launch; never part of the terminal identity. */

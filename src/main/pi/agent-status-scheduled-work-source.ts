@@ -1,4 +1,4 @@
-import type { PiAgentKind } from '../../shared/pi-agent-kind'
+import type { PiAgentKind } from '../../shared/agent-launch/catalog/pi-agent-kind'
 
 /** Scheduled work is the Pi lane's monitoring input: a loop, a pending wakeup or a cold job will re-enter
  *  this session after its turn ends, so the pane must not read `done` while one is armed.

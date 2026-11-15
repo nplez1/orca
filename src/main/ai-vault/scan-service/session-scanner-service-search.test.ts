@@ -1,4 +1,4 @@
-import '../../ai-vault-search/session-search-worker.test-fixture'
+import '../../ai-vault-search/worker/session-search-worker.test-fixture'
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
@@ -8,12 +8,12 @@ import type {
   AiVaultSearchResponse,
   AiVaultSearchStatus
 } from '../../../shared/ai-vault/search/ai-vault-search-types'
-import { SessionSearchIndexer } from '../../ai-vault-search/session-search-indexer'
+import { SessionSearchIndexer } from '../../ai-vault-search/indexing/session-search-indexer'
 import {
   openSessionSearchIndexerHarness,
   writeClaudeTranscript,
   type SessionSearchIndexerHarness
-} from '../../ai-vault-search/session-search-indexer-test-fixture'
+} from '../../ai-vault-search/indexing/session-search-indexer-test-fixture'
 import { SessionSearchInstance } from '../../ai-vault-search/session-search-instance'
 import { SessionScannerServiceSearch } from './session-scanner-service-search'
 import {

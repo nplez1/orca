@@ -1,14 +1,14 @@
 import { admitLegacyAgentStatus } from '../../../shared/agent-hook-listener/listener-state'
 import { AGENT_STATUS_2A_CURRENT_PRODUCER_MODE } from '../../../shared/agent-status/transport/agent-status-legacy-adapter'
 import type { EnrichedAgentHookEventPayload } from './server-types'
-import { AgentHookServerStatusApplication } from './server-status-application'
+import { AgentHookServerStatusRowMutation } from './server-status-row-mutation'
 
 /** Retires a row the listener withdrew while normalizing a post.
  *
  * Its own link in the chain, and a fork-owned file, because the descendant lane retracts a held row
  * where no row can be published (#397) — so the deletion is performed and announced here, through
  * the path `dropStatusEntry` uses, rather than by the bare delete the listener could reach. */
-export abstract class AgentHookServerHeldRowRetraction extends AgentHookServerStatusApplication {
+export abstract class AgentHookServerHeldRowRetraction extends AgentHookServerStatusRowMutation {
   /** Retire the held row a retracted pane still has stored.
    *
    *  Only a row carrying descendants is the descendant lane's own; anything else is another lane's

@@ -1,4 +1,4 @@
-import type { NewWorkspaceProjectOption } from '@/lib/new-workspace-project-options'
+import type { NewWorkspaceProjectOption } from '@/lib/workspace/creation/new-workspace-project-options'
 
 /**
  * The name a project is shown by in the composer, shared by the surfaces that name it.

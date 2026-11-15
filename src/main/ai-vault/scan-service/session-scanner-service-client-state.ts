@@ -1,8 +1,8 @@
 import { recordRelayedSpan } from '../../observability/tracer'
-import type { SessionSearchScanRoots } from '../../ai-vault-search/session-search-scan-roots'
+import type { SessionSearchScanRoots } from '../../ai-vault-search/discovery/session-search-scan-roots'
 import type { ChildProcess } from 'node:child_process'
-import { sessionSearchSqliteAvailable } from '../../ai-vault-search/session-search-sqlite-support'
-import { createAiVaultScanCancelledError } from '../ai-vault-scan-cancellation'
+import { isSqliteAvailable } from '../../sqlite/sync-database'
+import { createAiVaultScanCancelledError } from '../scan-lifecycle/ai-vault-scan-cancellation'
 import type { AiVaultServiceScanListener } from './session-scanner-service-request-deadline'
 import {
   AI_VAULT_SERVICE_PROTOCOL_VERSION,
@@ -329,7 +329,7 @@ export class AiVaultServiceSessionSearchHold {
     // service is installed; `contentEnabled` only decides what it stores, never
     // whether it exists. Reading consent here is what used to keep a child from
     // being spawned at all.
-    this.enabled = sessionSearchSqliteAvailable()
+    this.enabled = isSqliteAvailable()
     child?.send({ type: 'sessionSearch', init })
     return this.enabled
   }

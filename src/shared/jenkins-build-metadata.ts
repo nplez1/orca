@@ -1,4 +1,4 @@
-import type { PRCheckBuild, PRCheckBuildCommit, PRCheckBuildParameter } from './github/check-types'
+import type { PRCheckBuild, PRCheckBuildCommit, PRCheckBuildParameter } from './github/checks/check-types'
 import { asRecord, readArray, readFiniteNumber, readString } from './jenkins-payload'
 
 /**

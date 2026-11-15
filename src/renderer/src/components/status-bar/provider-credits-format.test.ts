@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MoneyAmount } from '../../../../shared/money-amount'
-import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { ProviderCredits } from '../../../../shared/provider-credits'
 
 const mocks = vi.hoisted(() => {

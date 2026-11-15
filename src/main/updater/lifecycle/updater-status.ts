@@ -1,7 +1,7 @@
 import { loadElectronAutoUpdater, type ElectronAutoUpdater } from '../electron-updater-loader'
 import { UpdaterWindowBinding } from '../updater-window-binding'
 import { statusesEqual } from '../releases/updater-fallback'
-import type { UpdateCheckOptions, UpdateStatus } from '../../../shared/update-status-types'
+import type { UpdateCheckOptions, UpdateStatus } from '../../../shared/updater/update-status-types'
 
 export abstract class UpdaterStatus extends UpdaterWindowBinding {
   protected getAutoUpdater(): ElectronAutoUpdater {

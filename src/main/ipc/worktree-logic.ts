@@ -6,9 +6,9 @@ import {
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
 } from '../../shared/orca-workspace-layout'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import { isWindowsAbsolutePathLike, resolveRuntimePath } from '../../shared/cross-platform-path'
-import { isWslUncPath, resolveWslRepoWorktreeBasePath } from '../../shared/wsl-paths'
+import { isWslUncPath, resolveWslRepoWorktreeBasePath } from '../../shared/file-access/wsl-paths'
 import {
   adoptExistingDirectoryName,
   getRuntimePathOps,

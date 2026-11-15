@@ -6,7 +6,7 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import type { EphemeralVmRuntimeReclaimed } from '../../../../shared/ephemeral-vm-runtime-reclaim'
-import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { makeWorktree } from '../../store/slices/worktrees/worktree.test-fixture'
 import { createTestStore } from '../../store/slices/worktrees/worktrees-slice-test-harness'
 import type { WorktreeSlice } from '../../store/slices/worktrees/worktree-slice-contract'

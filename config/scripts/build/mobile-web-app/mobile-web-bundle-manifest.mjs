@@ -70,7 +70,11 @@ export function hashedAsset(bytes, extension) {
   }
 }
 
-function readIntegerConstant(source, name, file = 'src/shared/runtime-protocol-versions.ts') {
+function readIntegerConstant(
+  source,
+  name,
+  file = 'src/shared/runtime-protocol-versions.ts'
+) {
   const match = new RegExp(`export const ${name} = (\\d+)`).exec(source)
   if (!match) {
     throw new Error(`[mobile-web-bundle-manifest] ${name} not found in ${file}`)

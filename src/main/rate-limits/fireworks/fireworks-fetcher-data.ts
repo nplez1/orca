@@ -5,7 +5,7 @@ import {
   type MoneyAmount
 } from '../../../shared/money-amount'
 import type { ProviderCredits } from '../../../shared/provider-credits'
-import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 
 // Why: pure data-shape helpers for the Fireworks billing API. Kept out of
 // fireworks-fetcher.ts so the transport file stays under the line cap and these

@@ -5,6 +5,7 @@ import {
   parseExecutionHostId,
   type ExecutionHostId
 } from '../../../../../shared/execution-host'
+import { translateLocalExecutionHostLabel } from '../../sidebar/execution-host-label'
 import {
   SettingsSearchableSelect,
   type SettingsSearchableSelectGroup,
@@ -54,7 +55,13 @@ export function SettingsHostScopePicker({
   const t = useTranslate()
   const rows: SettingsHostScopeHost[] = hosts.some((host) => host.id === LOCAL_EXECUTION_HOST_ID)
     ? [...hosts]
-    : [{ id: LOCAL_EXECUTION_HOST_ID, label: getLocalExecutionHostLabel() }, ...hosts]
+    : [
+        {
+          id: LOCAL_EXECUTION_HOST_ID,
+          label: translateLocalExecutionHostLabel(getLocalExecutionHostLabel())
+        },
+        ...hosts
+      ]
   const optionFor = (host: SettingsHostScopeHost): SettingsSearchableSelectOption => ({
     value: host.id,
     label: host.label,

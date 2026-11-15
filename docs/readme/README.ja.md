@@ -105,7 +105,7 @@ Orca NP は [stablyai/orca](https://github.com/stablyai/orca) に、フォーク
 
 ## 機能
 
-以下の機能一覧はアップストリームの Orca のものです。「Docs」リンクは onorca.dev にあるアップストリームのドキュメントへ移動し、上記のフォーク独自機能は扱っていません。
+以下の機能一覧はアップストリームの Orca のものです。「Docs」リンクは orca.dev にあるアップストリームのドキュメントへ移動し、上記のフォーク独自機能は扱っていません。
 
 <table>
 <tr>
@@ -115,11 +115,11 @@ Orca NP は [stablyai/orca](https://github.com/stablyai/orca) に、フォーク
 
 スマートフォンからエージェントを監視・操作 — エージェントの完了を通知で受け取り、どこからでもフォローアップを送信できます。
 
-[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://www.onorca.dev/download/android) · [ドキュメント →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://orca.dev/download/android) · [ドキュメント →](https://orca.dev/docs/mobile)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca デスクトップとモバイル companion アプリ" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca デスクトップとモバイル companion アプリ" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -129,11 +129,11 @@ Orca NP は [stablyai/orca](https://github.com/stablyai/orca) に、フォーク
 
 1 つのプロンプトを 5 つのエージェントに展開し、それぞれを独立した git ワークツリーで実行 — 結果を比較して、最良のものをマージできます。
 
-[ドキュメント →](https://www.onorca.dev/docs/model/worktrees)
+[ドキュメント →](https://orca.dev/docs/model/worktrees)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/model/worktrees"><picture><source srcset="../site/public/docs/tab-split.gif" type="image/gif"><img src="../site/public/docs/posters/tab-split.jpg" alt="並列ワークツリーのオーケストレーション" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/model/worktrees"><picture><source srcset="../site/public/docs/tab-split.gif" type="image/gif"><img src="../site/public/docs/posters/tab-split.jpg" alt="並列ワークツリーのオーケストレーション" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -143,11 +143,11 @@ Orca NP は [stablyai/orca](https://github.com/stablyai/orca) に、フォーク
 
 WebGL レンダリング、無制限の分割、再起動後も残るスクロールバックを備えた Ghostty クラスのターミナル。
 
-[ドキュメント →](https://www.onorca.dev/docs/terminal)
+[ドキュメント →](https://orca.dev/docs/terminal)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/terminal"><picture><source srcset="../../resources/onboarding/feature-wall/tile-02.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-02.poster.jpg" alt="ターミナル分割" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/terminal"><picture><source srcset="../../resources/onboarding/feature-wall/tile-02.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-02.poster.jpg" alt="ターミナル分割" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -157,11 +157,11 @@ WebGL レンダリング、無制限の分割、再起動後も残るスクロ�
 
 実際の Chromium ウィンドウで任意の UI 要素をクリックすると、その HTML、CSS、切り抜いたスクリーンショットがそのままエージェントのプロンプトに送られます。
 
-[ドキュメント →](https://www.onorca.dev/docs/browser/design-mode)
+[ドキュメント →](https://orca.dev/docs/browser/design-mode)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/browser/design-mode"><picture><source srcset="../site/public/docs/orca-design-mode.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-05.poster.jpg" alt="組み込みブラウザとデザインモード" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/browser/design-mode"><picture><source srcset="../site/public/docs/orca-design-mode.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-05.poster.jpg" alt="組み込みブラウザとデザインモード" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -171,11 +171,11 @@ WebGL レンダリング、無制限の分割、再起動後も残るスクロ�
 
 PR、Issue、プロジェクトボードをアプリ内で閲覧 — 任意のタスクからワークツリーを開き、コンテキストスイッチなしでレビューできます。
 
-[ドキュメント →](https://www.onorca.dev/docs/review/linear)
+[ドキュメント →](https://orca.dev/docs/review/linear)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../../resources/onboarding/feature-wall/tile-03.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-03.poster.jpg" alt="Orca の GitHub と Linear タスクワークフロー" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/review/linear"><picture><source srcset="../../resources/onboarding/feature-wall/tile-03.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-03.poster.jpg" alt="Orca の GitHub と Linear タスクワークフロー" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -185,11 +185,11 @@ PR、Issue、プロジェクトボードをアプリ内で閲覧 — 任意の�
 
 強力なリモートマシン上でエージェントを実行 — ファイル編集、git、ターミナルをフルに使え、自動再接続とポートフォワーディングも付属します。
 
-[ドキュメント →](https://www.onorca.dev/docs/ssh)
+[ドキュメント →](https://orca.dev/docs/ssh)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/ssh"><picture><source srcset="../../resources/onboarding/feature-wall/tile-06.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-06.poster.jpg" alt="SSH 経由のリモートワークツリー" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/ssh"><picture><source srcset="../../resources/onboarding/feature-wall/tile-06.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-06.poster.jpg" alt="SSH 経由のリモートワークツリー" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -199,11 +199,11 @@ PR、Issue、プロジェクトボードをアプリ内で閲覧 — 任意の�
 
 任意の Diff 行にコメントを付けてエージェントへ送り返せます — Orca から離れずにレビュー、編集、コミットまで完結します。
 
-[ドキュメント →](https://www.onorca.dev/docs/review/annotate-ai-diff)
+[ドキュメント →](https://orca.dev/docs/review/annotate-ai-diff)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/annotate-ai-diff"><picture><source srcset="../site/public/docs/annotate-ai-diff.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-08.poster.jpg" alt="AI が生成した Diff への注釈" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/review/annotate-ai-diff"><picture><source srcset="../site/public/docs/annotate-ai-diff.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-08.poster.jpg" alt="AI が生成した Diff への注釈" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -213,11 +213,11 @@ PR、Issue、プロジェクトボードをアプリ内で閲覧 — 任意の�
 
 オートセーブが全面的に効く VS Code のエディタ — ファイルや画像をそのままエージェントのプロンプトへドラッグできます。
 
-[ドキュメント →](https://www.onorca.dev/docs/editing/file-explorer)
+[ドキュメント →](https://orca.dev/docs/editing/file-explorer)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/editing/file-explorer"><picture><source srcset="../../resources/onboarding/feature-wall/tile-07.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-07.poster.jpg" alt="ファイルや画像をエージェントのプロンプトへドラッグ" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/editing/file-explorer"><picture><source srcset="../../resources/onboarding/feature-wall/tile-07.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-07.poster.jpg" alt="ファイルや画像をエージェントのプロンプトへドラッグ" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -227,22 +227,22 @@ PR、Issue、プロジェクトボードをアプリ内で閲覧 — 任意の�
 
 エージェント自身も Orca を操作できます — `orca worktree create`、`snapshot`、`click`、`fill` であらゆるワークフローをスクリプト化できます。
 
-[ドキュメント →](https://www.onorca.dev/docs/cli/overview)
+[ドキュメント →](https://orca.dev/docs/cli/overview)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../../resources/onboarding/feature-wall/tile-09.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-09.poster.jpg" alt="CLI から Orca をスクリプト操作" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/cli/overview"><picture><source srcset="../../resources/onboarding/feature-wall/tile-09.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-09.poster.jpg" alt="CLI から Orca をスクリプト操作" width="100%" /></picture></a>
 </td>
 </tr>
 </table>
 
 **さらに同梱:**
 
-- **[クイックオープン](https://www.onorca.dev/docs/model/quick-open)** — フローを離れずに、ワークツリー、ファイル、エージェント、コマンド、リポジトリコンテキストを横断検索できます。
-- **[アカウント切り替えと使用量トラッキング](https://www.onorca.dev/docs/agents/usage-tracking)** — Claude と Codex の使用量やレート制限のリセットを確認し、再ログインなしでアカウントを切り替えられます。
-- **[リッチなリポジトリプレビュー](https://www.onorca.dev/docs/editing/markdown)** — Markdown、画像、PDF、リポジトリ文書をワークスペース内でプレビューできます。
-- **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 実際の操作が必要なワークフローでは、エージェントにデスクトップアプリや画面上の UI を操作させられます。
-- **[通知と未読ステータス](https://www.onorca.dev/docs/notifications)** — エージェントの完了や要対応をすぐに把握し、スレッドを未読に戻して後で確認できます。
+- **[クイックオープン](https://orca.dev/docs/model/quick-open)** — フローを離れずに、ワークツリー、ファイル、エージェント、コマンド、リポジトリコンテキストを横断検索できます。
+- **[アカウント切り替えと使用量トラッキング](https://orca.dev/docs/agents/usage-tracking)** — Claude と Codex の使用量やレート制限のリセットを確認し、再ログインなしでアカウントを切り替えられます。
+- **[リッチなリポジトリプレビュー](https://orca.dev/docs/editing/markdown)** — Markdown、画像、PDF、リポジトリ文書をワークスペース内でプレビューできます。
+- **[Computer Use](https://orca.dev/docs/cli/computer-use)** — 実際の操作が必要なワークフローでは、エージェントにデスクトップアプリや画面上の UI を操作させられます。
+- **[通知と未読ステータス](https://orca.dev/docs/notifications)** — エージェントの完了や要対応をすぐに把握し、スレッドを未読に戻して後で確認できます。
 - **その他、まだまだたくさん** — 毎日リリースしているので、このリストは常に追いついていません。このフォークの本当の機能一覧は [Orca NP のリリース](https://github.com/nplez1/orca/releases)、継承している部分は[アップストリームのリリース](https://github.com/stablyai/orca/releases)です。
 
 ---
@@ -302,7 +302,7 @@ Orca NP は公式の Orca と並べてインストールでき、このリポジ
 Orca のモバイルアプリを Orca NP とペアリングして、スマートフォンからエージェントを監視・操作できます。アプリはアップストリームの Orca が公開しており、Orca NP でも動作します。
 
 - **iOS:** [App Store からダウンロード](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [APK をダウンロード](https://www.onorca.dev/download/android)
+- **Android:** [APK をダウンロード](https://orca.dev/download/android)
 
 ---
 
@@ -310,7 +310,7 @@ Orca のモバイルアプリを Orca NP とペアリングして、スマート
 
 - **Orca NP の Issue とアイデア:** このフォーク固有の件は [Issue を作成](https://github.com/nplez1/orca/issues)してください。
 - **アップストリームのコミュニティ:** このフォークが継承する部分は、アップストリーム Orca のチャンネルが対象です — [Discord](https://discord.gg/fzjDKHxv8Q)、[X の @orca_build](https://x.com/orca_build)、公式 Orca でも再現するバグは[アップストリームの Issue](https://github.com/stablyai/orca/issues) へ。
-- **ドキュメント:** [onorca.dev/docs](https://www.onorca.dev/docs) はアップストリームの Orca のドキュメントです。
+- **ドキュメント:** [orca.dev/docs](https://orca.dev/docs) はアップストリームの Orca のドキュメントです。
 - **応援する:** このフォークを追うにはこのリポジトリに[スター](https://github.com/nplez1/orca)を、または[アップストリーム](https://github.com/stablyai/orca)に付けてください。
 
 ---

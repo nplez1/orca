@@ -1,6 +1,6 @@
 import type { getReleaseDownloadUrl } from './releases/updater-release-readiness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UpdateStatus } from '../../shared/update-status-types'
+import type { UpdateStatus } from '../../shared/updater/update-status-types'
 import type * as UpdaterModule from './updater-service'
 import { createUpdaterMainWindow } from './testing/updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './testing/updater-test-module-loader'

@@ -1,6 +1,6 @@
 import { workspaceAccountHostId } from '@/lib/workspace-account-host-id'
 import { getWorkspaceReferenceIdentity } from '../../../../../../shared/workspace-attachments/workspace-reference-identity'
-import type { Repo } from '../../../../../../shared/repo-types'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import type { WorkspaceAttachment, Worktree } from '../../../../../../shared/worktree/types'
 import {
   buildTaskSourceContextFromRepo,

@@ -8,7 +8,7 @@ import { seedLegacyAgentStatusForTests } from '../../shared/agent-hook-listener/
 import {
   createAgentStatusExtensionHarness,
   type HookContext
-} from './agent-status-extension-test-harness'
+} from './managed-extensions/agent-status/agent-status-extension-test-harness'
 
 const HOOK_ENV = { ORCA_PANE_KEY: PANE_KEY, ORCA_AGENT_HOOK_ENV: 'production' }
 const LIVE_LIST = 'loop:rpc:schedules:list'

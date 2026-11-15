@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import {
   FORK_USAGE_PROVIDER_IDS,
   isForkUsageProvider,

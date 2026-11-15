@@ -3,7 +3,7 @@ import type {
   DeepInfraCredentialsApi,
   DeepSeekCredentialsApi,
   FireworksCredentialsApi
-} from './agent-account-api'
+} from './agent-accounts/agent-account-api'
 import { copilotCredentialsApi } from './copilot-credentials-bridge'
 import { deepinfraCredentialsApi } from './deepinfra-credentials-bridge'
 import { deepseekCredentialsApi } from './deepseek-credentials-bridge'

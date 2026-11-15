@@ -1,4 +1,4 @@
-import './session-search-worker.test-fixture'
+import './worker/session-search-worker.test-fixture'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { resetSessionParseCacheForTests } from '../ai-vault/parse-cache/session-parse-cache-store'
@@ -8,14 +8,14 @@ import {
   openSessionSearchIndexerHarness,
   writeClaudeTranscript,
   type SessionSearchIndexerHarness
-} from './session-search-indexer-test-fixture'
+} from './indexing/session-search-indexer-test-fixture'
 import { searchSessionService, sessionSearchServiceStatus } from './session-search-service-registry'
 import { resetSessionSearchPolicyForTests } from './session-search-policy'
 import { resetSessionSearchServiceInitForTests } from './session-search-service-init'
 import { installInProcessSessionSearchService } from './session-search-in-process-service'
 
 const localAiVaultScanRoots = vi.hoisted(() => vi.fn())
-vi.mock('../ai-vault/cached-session-list', async (importOriginal) => ({
+vi.mock('../ai-vault/discovery/ai-vault-scan-roots', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   localAiVaultScanRoots
 }))
@@ -74,7 +74,7 @@ it('registers an in-process service for a host with no scanner child', async () 
 })
 
 it('orcad indexes metadata without content consent and discovers a late root', async () => {
-  const { installOrcadSessionSearchService } = await import('../orcad/orcad-session-search')
+  const { installOrcadSessionSearchService } = await import('../orcad/host-runtime/orcad-session-search')
   // Content consent is not what starts the index any more: the history list's own
   // rows are indexed regardless, which is why a host reaches for its roots here.
   installed = await installOrcadSessionSearchService({

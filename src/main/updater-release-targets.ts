@@ -1,4 +1,4 @@
-import { getPlatformUpdateManifestName } from '../shared/release-channel'
+import { getPlatformUpdateManifestName } from '../shared/updater/release-channel'
 
 export const RELEASES_REPO = 'nplez1/orca'
 const RELEASES_DOWNLOAD_BASE = `https://github.com/${RELEASES_REPO}/releases/download`

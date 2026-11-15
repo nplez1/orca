@@ -1,4 +1,4 @@
-import type { EphemeralVmRuntimeRecord } from './ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from './remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { ExecutionHostId } from './execution-host'
 import { readEphemeralVmLifetime, type EphemeralVmLifetime } from './ephemeral-vm-lifetime'
 

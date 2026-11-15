@@ -29,9 +29,9 @@ import {
   type SessionScopeCwdStamp
 } from './session-parse-cache-store'
 import type * as ParseCacheModule from './session-scanner-parse-cache'
-import { isolatedScanRoots } from '../session-scanner-test-fixtures'
+import { isolatedScanRoots } from '../scanner-fixtures/session-scanner-test-fixtures'
 import { parseClaudeSessionFile } from '../scanners/claude/session-scanner-primary-parsers'
-import { parseSessionCandidate } from '../session-scanner-candidate-parse'
+import { parseSessionCandidate } from '../parsing/session-scanner-candidate-parse'
 import { MAX_SESSION_TRANSCRIPT_RECORD_BYTES } from '../transcripts/session-transcript-record-budget'
 import type { FileWithMtime, SessionFileCandidate } from '../session-scanner-types'
 

@@ -3,7 +3,7 @@ import {
   isEphemeralVmHostActionable,
   isReleasedEphemeralVmRuntime,
   type EphemeralVmRuntimeRecord
-} from '../../../shared/ephemeral-vm-runtimes'
+} from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   getEphemeralVmRemainingMs,
   isEphemeralVmLifetimeExpired,

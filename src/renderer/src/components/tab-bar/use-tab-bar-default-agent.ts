@@ -2,7 +2,7 @@ import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTar
 import { useDetectedAgents } from '@/hooks/useDetectedAgents'
 import { useStructuredAgentLaunchStatus } from '@/lib/agent-session/launch/structured-agent-session-launch-status'
 import { useAppStore } from '@/store'
-import { isAgentSessionHandleProvider } from '../../../../shared/agent-session/lifecycle/agent-session-provider-handle'
+import { isAgentSessionHandleProvider } from '../../../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle'
 import {
   DEFAULT_DISABLED_TUI_AGENTS,
   filterEnabledTuiAgents

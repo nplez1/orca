@@ -1,13 +1,13 @@
 import type { OrcaVmRecipeContextMenuItem } from './orca-yaml-hook-types'
-import { getEphemeralVmRecipeResultSchemaVersion } from './ephemeral-vm-recipe-checkout-mode'
-import { redactEphemeralVmRecipeDiagnosticText } from './ephemeral-vm-recipe-diagnostics'
-import { runRecipeCommand } from './ephemeral-vm-recipe-process'
-import { buildEphemeralVmRecipeContextMenuPayload } from './ephemeral-vm-recipe-lifecycle-payload'
+import { getEphemeralVmRecipeResultSchemaVersion } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-checkout-mode'
+import { redactEphemeralVmRecipeDiagnosticText } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import { runRecipeCommand } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-process'
+import { buildEphemeralVmRecipeContextMenuPayload } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-lifecycle-payload'
 import {
   validateRepoPath,
   type EphemeralVmRecipeContext,
   type EphemeralVmRecipeLifecycleArgs
-} from './ephemeral-vm-recipe-runner'
+} from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner'
 
 /**
  * The `context-menu` action: one declared item, run with the workspace's identity.

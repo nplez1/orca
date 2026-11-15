@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
-import { isUsageEmptyState } from './status-bar-provider-visibility'
+import type { ProviderRateLimits } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
+import { isUsageEmptyState } from './composition/status-bar-provider-visibility'
 
 /**
  * Why this file exists: `isUsageEmptyState` decides whether the status bar offers

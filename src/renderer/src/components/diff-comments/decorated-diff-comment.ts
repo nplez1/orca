@@ -1,4 +1,4 @@
-import type { PRComment } from '../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../shared/github/comments/comment-types'
 import type { DiffComment } from '../../../../shared/diff-comment-types'
 
 /**

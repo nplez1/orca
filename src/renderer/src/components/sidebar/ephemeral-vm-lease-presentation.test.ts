@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveEphemeralVmRuntimeLease } from '@/hooks/useEphemeralVmRuntimes'
-import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeRecord } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   EPHEMERAL_VM_LEASE_WARNING_MS,
   resolveEphemeralVmLeaseIndicator,

@@ -4,13 +4,13 @@ import { toast } from 'sonner'
 import {
   consumeShutdownCheckpointFailureReason,
   publishShutdownCheckpointFailureReason
-} from '../../../shared/renderer-shutdown-events'
+} from '../../../shared/app-lifecycle/shutdown/renderer-shutdown-events'
 
 import {
   dispatchWindowCloseRequest,
   isWindowCloseCheckpointInProgress,
+  prepareWindowCloseCheckpoint,
   registerWindowCloseGuard,
-  runWithWindowCloseCheckpointScope,
   setWindowCloseRequestHandler
 } from './window-close-request-coordinator'
 
@@ -20,6 +20,7 @@ describe('window-close-request-coordinator', () => {
   const confirmWindowClose = vi.fn()
   const cancelQuit = vi.fn()
   const cancelWindowClose = vi.fn()
+  const awaitBeforeUnloadCheckpoint = vi.fn(() => Promise.resolve())
   const unregisterFns: (() => void)[] = []
 
   const addGuard = (guard: () => boolean | Promise<boolean>): void => {
@@ -30,10 +31,14 @@ describe('window-close-request-coordinator', () => {
     confirmWindowClose.mockClear()
     cancelQuit.mockClear()
     cancelWindowClose.mockClear()
+    awaitBeforeUnloadCheckpoint.mockReset().mockResolvedValue(undefined)
     vi.mocked(toast.error).mockClear()
     // Without a rich close handler, dispatch uses only this preload fallback surface.
     const windowTarget = Object.assign(new EventTarget(), {
-      api: { ui: { confirmWindowClose, cancelWindowClose, cancelQuit } }
+      api: {
+        ui: { confirmWindowClose, cancelWindowClose, cancelQuit },
+        app: { awaitBeforeUnloadCheckpoint }
+      }
     })
     ;(globalThis as unknown as { window: typeof windowTarget }).window = windowTarget
   })
@@ -173,12 +178,30 @@ describe('window-close-request-coordinator', () => {
     expect(confirmWindowClose).toHaveBeenCalledTimes(1)
   })
 
-  it('clears the window-close checkpoint flag when the wrapped dispatch throws', () => {
-    expect(() =>
-      runWithWindowCloseCheckpointScope(() => {
+  it('counts one failed write once when a second close overlaps it', async () => {
+    awaitBeforeUnloadCheckpoint.mockRejectedValueOnce(new Error('disk full'))
+
+    const results = await Promise.all([
+      prepareWindowCloseCheckpoint(),
+      prepareWindowCloseCheckpoint()
+    ])
+
+    expect(results).toEqual([false, null])
+    expect(awaitBeforeUnloadCheckpoint).toHaveBeenCalledTimes(1)
+    // A later attempt stages its own write, which clears the failure.
+    await expect(prepareWindowCloseCheckpoint()).resolves.toBe(true)
+  })
+
+  it('clears the window-close checkpoint flag when the staged listener throws', async () => {
+    window.addEventListener(
+      'beforeunload',
+      () => {
         throw new Error('listener exploded')
-      })
-    ).toThrow('listener exploded')
+      },
+      { once: true }
+    )
+
+    await expect(prepareWindowCloseCheckpoint()).rejects.toThrow('listener exploded')
     expect(isWindowCloseCheckpointInProgress()).toBe(false)
   })
 })

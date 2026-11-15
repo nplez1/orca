@@ -1,8 +1,8 @@
 import { ExternalLink, ShieldCheck } from 'lucide-react'
 import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/utils'
-import type { FeatureInteractionId } from '../../../../../../shared/feature-interaction-catalog'
-import type { ProviderRateLimits } from '../../../../../../shared/rate-limit-types'
+import { cn } from '@/lib/class-names'
+import type { FeatureInteractionId } from '../../../../../../shared/feature-education/interactions/feature-interaction-catalog'
+import type { ProviderRateLimits } from '../../../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import { Label } from '../../../ui/label'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
 import { DebouncedSettingsTextInput } from '../../form-controls/DebouncedSettingsTextInput'
@@ -16,6 +16,7 @@ import {
 } from './usage-credential-host'
 import type { UsageHostSettingsModel, UsageHostSettings } from './use-usage-host-settings'
 import { SettingsGroup } from '../../section-layout/SettingsGroup'
+import { ACCOUNTS_SECTION_IDS } from '../accounts-search'
 
 // fork-comment-ok: fork-only behaviour; the why must sit above the code a sync rewrites.
 /** MiniMax runs two consoles; the saved endpoint picks which one a key is created in. */
@@ -53,7 +54,7 @@ export function MiniMaxAccountsSection({
     void usageSettings.update({ minimaxEndpoint: value })
   }
   return (
-    <div id="accounts-minimax" className="scroll-mt-6">
+    <div id={ACCOUNTS_SECTION_IDS.minimax} className="scroll-mt-6">
       <SettingsGroup
         action={
           <a

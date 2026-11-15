@@ -1,7 +1,7 @@
 import {
   sourceControlModelLabel,
   sourceControlThinkingLabel
-} from '../feature-wall/source-control-model-label'
+} from '../feature-wall/commit-pr-settings/source-control-model-label'
 import { useMemo, type JSX } from 'react'
 import { Terminal } from 'lucide-react'
 import { CUSTOM_PROMPT_PLACEHOLDER } from '../../../../shared/source-control/ai/generation/commit-message-prompt'
@@ -17,7 +17,7 @@ import type {
   AgentPickerEntry
 } from '../../../../shared/agent-launch/picker/agent-launch-picker'
 import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import {
   aiGenerationAgentLabel,
   type AiGenerationSettingsConfig
@@ -31,7 +31,7 @@ import { AgentLaunchPicker } from '../agent/AgentLaunchPicker'
 import {
   aiCommitPrPickerDraft,
   commitMessagePickerModel
-} from '../feature-wall/ai-commit-pr-picker'
+} from '../feature-wall/commit-pr-settings/ai-commit-pr-picker'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 
 type AiGenerationFieldsBaseProps = {

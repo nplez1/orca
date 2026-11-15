@@ -518,6 +518,7 @@ describe('WorkerThreadRequestQueue', () => {
       await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
       expect(await first).toMatchObject({ message: `timed out after ${TIMEOUT_MS}ms` })
 
+      await expect(queue.retired()).resolves.toBeUndefined()
       const next = send(queue, 'next')
       expect(workers).toHaveLength(2)
       workers[1].respond()

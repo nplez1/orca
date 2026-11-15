@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   normalizeCopilotEventName,
   resolveCopilotEventName
-} from '../../shared/agent-hook-listener/providers/copilot-tool-fields'
+} from '../../shared/agent-hook-listener/providers/copilot/copilot-tool-fields'
 import { _internals } from './server/agent-hook-server'
 import { buildBody } from './server/testing/server.test-fixtures'
 

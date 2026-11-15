@@ -8,7 +8,7 @@ import {
 } from '../providers/claude/claude-oauth-credentials'
 
 const keychain = vi.hoisted(() => vi.fn())
-vi.mock('../../claude-accounts/keychain', () => ({
+vi.mock('../../claude-accounts/runtime-auth/keychain', () => ({
   readActiveClaudeKeychainCredentialsStrict: keychain
 }))
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as fs from './asar-transparent-fs'
 import { removeHostCheckout } from './host-tree-removal'
-import { leftoverCheckoutFolderOf } from '../../shared/worktree/removal'
+import { leftoverCheckoutFolderOf } from '../../shared/worktree/removal/removal'
 
 vi.mock('./asar-transparent-fs', () => ({
   readdir: vi.fn(),

@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 
-import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
+import { TaskPageJiraIssueList } from './listing/task-page-jira-issue-list'
 
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { Worktree } from '../../../../../shared/worktree/types'

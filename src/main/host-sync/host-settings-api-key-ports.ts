@@ -25,7 +25,7 @@ import {
   hasOpenCodeGoApiKey,
   readOpenCodeGoApiKey,
   saveOpenCodeGoApiKey
-} from '../opencode/opencode-go-api-key-store'
+} from '../opencode/accounts/opencode-go-api-key-store'
 import {
   clearZcodePlanApiKey,
   getZcodePlanApiKeyProtection,

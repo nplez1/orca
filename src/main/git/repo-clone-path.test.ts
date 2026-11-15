@@ -1,7 +1,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { deriveValidatedClonePath, resolveCloneDestination } from './repo-clone-path'
+import { deriveValidatedClonePath, resolveCloneDestination } from './repositories/cloning/repo-clone-path'
 
 const HOME = '/home/me'
 

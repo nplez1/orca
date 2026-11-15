@@ -1,20 +1,20 @@
 /* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 75-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
-import type { ComposerModalData } from './new-workspace/composer-modal-data'
+import type { ComposerModalData } from './new-workspace/composer/composer-modal-data'
 import { toast } from 'sonner'
 import {
   formatWorkspaceCreateError,
   getWorkspaceCreateErrorToastMessage
-} from '@/lib/workspace-create-error-format'
+} from '@/lib/workspace/creation/workspace-create-error-format'
 import type {
   AgentPickerDraft,
   AgentPickerEntry
 } from '../../../shared/agent-launch/picker/agent-launch-picker'
-import { DirectWorkItemSetupDialog } from './new-workspace/DirectWorkItemSetupDialog'
-import { agentChoicePending } from '@/lib/host-chat-program'
+import { DirectWorkItemSetupDialog } from './new-workspace/setup/DirectWorkItemSetupDialog'
+import { agentChoicePending } from '@/lib/agent-session/launch/inventory/host-chat-program'
 import type { AgentLaunchSurface } from '@/lib/agent-session/launch/routing/agent-session-launch-plan'
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store/index'
-import { lazyWithRetry } from '@/lib/lazy-with-retry'
+import { lazyWithRetry } from '@/app-shell/startup/lazy-with-retry'
 import {
   Dialog,
   DialogContent,
@@ -33,10 +33,10 @@ import {
   quickWorkspacePickerInputs,
   pickQuickWorkspaceAgent,
   resolveQuickWorkspaceAgentSelection
-} from '@/lib/quick-workspace-agent-selection'
-import { useAgentsOfferedForLaunch } from '@/lib/host-chat-program-acquisition'
-import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
-import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
+} from '@/lib/workspace/creation/quick-workspace-agent-selection'
+import { useAgentsOfferedForLaunch } from '@/lib/agent-session/launch/inventory/host-chat-program-acquisition'
+import { shouldAllowComposerEnterSubmitTarget } from '@/lib/workspace/creation/new-workspace-enter-guard'
+import { isScreenSubmitShortcut } from '@/lib/keyboard/screen-submit-shortcut'
 import type { TuiAgent } from '../../../shared/agent-launch/catalog/tui-agent'
 import {
   useWorkspaceCopyTarget,
@@ -44,13 +44,13 @@ import {
 } from '@/components/new-workspace/use-workspace-copy-target'
 import { useRunTargetAutoClone } from '@/components/new-workspace/use-run-target-auto-clone'
 import { resolveComposerProjectName } from '@/components/new-workspace/composer-project-name'
-import { resolveProjectCloneUrlPrefill } from '@/lib/project-clone-url-prefill'
+import { resolveProjectCloneUrlPrefill } from '@/lib/workspace/creation/project-clone-url-prefill'
 import { resolveWorktreeLayoutMode } from '../../../shared/orca-workspace-layout'
 import { branchName } from '@/lib/source-control/branches/branch-name'
 import { activateAndRevealWorktree } from '@/lib/workspace/activation/worktree-activation'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
-import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
+import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace/creation/workspace-composer-initial-focus'
 import '@/components/sidebar/workspace-creation/folder/folder-workspace-source-repos'
 import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/workspace-creation/folder/folder-workspace-source-selection'
 import { useAgentMenuObservation } from '@/components/tab-bar/use-new-tab-agent-menu-rows'

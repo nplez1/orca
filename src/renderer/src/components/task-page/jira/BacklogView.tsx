@@ -4,12 +4,12 @@ import type { Worktree } from '../../../../../shared/worktree/types'
 import type { useTaskPageJiraBoard } from '../../use-task-page-jira-board'
 import type { JiraIssueWorkspaceAttachmentIndex } from '@/lib/work-items/jira/jira-issue-workspace-attachment'
 import type { TaskPageJiraSprintOptions } from '@/components/task-page-jira-sprint-cell'
-import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
+import { TaskPageJiraIssueList } from './listing/task-page-jira-issue-list'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import { LoaderCircle } from 'lucide-react'
 import { formatRelativeTime } from '../task-page-source-context'
-import { getJiraStatusTone } from './task-page-jira-status-tone'
+import { getJiraStatusTone } from './listing/task-page-jira-status-tone'
 
 type TaskPageJiraBoardState = ReturnType<typeof useTaskPageJiraBoard>
 

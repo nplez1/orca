@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { JiraIssueAssigneeControl } from '@/components/jira-issue-assignee-control'
 import { JiraSprintPicker, backlogLabel, sprintTriggerLabel } from '@/components/jira-sprint-picker'
 import { JiraIssueStoryPointsControl } from '@/components/jira-issue-story-points-control'
-import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
 import { JiraIssueTransitionControl } from './jira-issue-transition-control'
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'

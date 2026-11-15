@@ -1,11 +1,11 @@
 import type { Worktree } from '../../../../shared/worktree/types'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import {
   isAutomationGeneratedWorkspace,
   isCliCreatedWorkspace,
   isDefaultBranchWorkspace,
   isDetachedHeadWorkspace
-} from '../../../../shared/worktree/workspace-kinds'
+} from '../../../../shared/worktree/visibility/workspace-kinds'
 
 type WorkspaceKindFilterOptions = {
   hideDefaultBranchWorkspace: boolean

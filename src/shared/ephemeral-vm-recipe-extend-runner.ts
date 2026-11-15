@@ -1,15 +1,15 @@
-import { parseEphemeralVmRecipeResult, type EphemeralVmRecipeResult } from './ephemeral-vm-recipes'
+import { parseEphemeralVmRecipeResult, type EphemeralVmRecipeResult } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import {
   getEphemeralVmRecipeCheckoutModeFailure,
   getEphemeralVmRecipeResultSchemaVersion
-} from './ephemeral-vm-recipe-checkout-mode'
-import { runRecipeCommand } from './ephemeral-vm-recipe-process'
-import { buildEphemeralVmRecipeExtendPayload } from './ephemeral-vm-recipe-lifecycle-payload'
+} from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-checkout-mode'
+import { runRecipeCommand } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-process'
+import { buildEphemeralVmRecipeExtendPayload } from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-lifecycle-payload'
 import {
   validateRepoPath,
   type EphemeralVmRecipeContext,
   type EphemeralVmRecipeLifecycleArgs
-} from './ephemeral-vm-recipe-runner'
+} from './remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner'
 
 /**
  * The `extend` lifecycle action, split from the runner because it is the one action whose result

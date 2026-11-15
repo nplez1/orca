@@ -141,8 +141,8 @@ function primaryRemoteSortKey(entry: GitRemoteEntry): number {
   return 2
 }
 
-export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | null {
-  const entries = parseGitRemoteVerboseOutput(stdout)
+function networkRemotesInPrimaryOrder(stdout: string) {
+  return parseGitRemoteVerboseOutput(stdout)
     .map((entry) => ({
       ...entry,
       canonicalKey: normalizeGitRemoteUrl(entry.url)
@@ -152,7 +152,11 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
       const priority = primaryRemoteSortKey(left) - primaryRemoteSortKey(right)
       return priority === 0 ? left.name.localeCompare(right.name, 'en') : priority
     })
-  const selected = entries[0]
+}
+
+export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | null {
+  const remotes = networkRemotesInPrimaryOrder(stdout)
+  const selected = remotes[0]
   return selected
     ? {
         canonicalKey: selected.canonicalKey,
@@ -160,7 +164,13 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
         remoteUrl: selected.url,
         // fork-comment-ok: fork-only identity field; the why must sit above the code a sync rewrites.
         // Publish every remote so a fork's own repository stays linkable from this repo.
-        remoteKeys: [...new Set(entries.map((entry) => entry.canonicalKey))]
+        remoteKeys: [...new Set(remotes.map((entry) => entry.canonicalKey))]
       }
     : null
+}
+
+/** The remote that plays origin's role when origin is missing or a local path, picked as project identity picks it. */
+export function deriveOriginStandInRemoteName(stdout: string): string | null {
+  const selected = networkRemotesInPrimaryOrder(stdout).find((entry) => entry.name !== 'upstream')
+  return selected && selected.name !== 'origin' ? selected.name : null
 }

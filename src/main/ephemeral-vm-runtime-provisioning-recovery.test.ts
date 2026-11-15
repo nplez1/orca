@@ -12,8 +12,8 @@ import {
 import {
   getEphemeralVmRuntimeStorePath,
   upsertEphemeralVmRuntime
-} from '../shared/ephemeral-vm-runtime-store'
-import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
+import type { EphemeralVmRuntimeRecord } from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { holdEphemeralVmProvisioningInFlightForTest } from './ephemeral-vm/runtime-provisioning'
 import {
   MAX_INTERRUPTED_EPHEMERAL_VM_PROVISIONING_ATTEMPTS,

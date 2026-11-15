@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
+import type { GitHubWorkItem } from '../../../../shared/github/work-items/work-item-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { GithubLinkedIssuePane } from './GithubLinkedIssuePane'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'

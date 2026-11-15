@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyRateLimitState } from '../rate-limit-state-factory'
-import type { ProviderRateLimits } from '../rate-limit-types'
-import { StatusBarItem } from '../rpc-contract/client-ui-params'
-import { DEFAULT_STATUS_BAR_ITEMS } from '../status-bar-defaults'
+import { createEmptyRateLimitState } from '../agent-usage/rate-limits/rate-limit-state-factory'
+import type { ProviderRateLimits } from '../agent-usage/rate-limits/rate-limit-types'
+import { StatusBarItem } from '../rpc-contract/client-ui/client-ui-params'
+import { DEFAULT_STATUS_BAR_ITEMS } from '../status-bar/status-bar-defaults'
 import type { StatusBarItem as StatusBarItemUnion } from '../ui-chrome-types'
 import { USAGE_PROVIDER_IDS } from '../usage-provider-enablement'
 import {

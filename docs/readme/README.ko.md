@@ -105,7 +105,7 @@ Orca NP는 [stablyai/orca](https://github.com/stablyai/orca)에 포크 전용 �
 
 ## 기능
 
-아래 기능 목록은 업스트림 Orca의 것입니다. "Docs" 링크는 onorca.dev의 업스트림 문서로 이동하며, 위의 포크 전용 기능은 다루지 않습니다.
+아래 기능 목록은 업스트림 Orca의 것입니다. "Docs" 링크는 orca.dev의 업스트림 문서로 이동하며, 위의 포크 전용 기능은 다루지 않습니다.
 
 <table>
 <tr>
@@ -115,11 +115,11 @@ Orca NP는 [stablyai/orca](https://github.com/stablyai/orca)에 포크 전용 �
 
 휴대폰에서 에이전트를 모니터링하고 조종하세요 — 에이전트가 완료되면 알림을 받고 어디서든 후속 지시를 보낼 수 있습니다.
 
-[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://www.onorca.dev/download/android) · [문서 →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://orca.dev/download/android) · [문서 →](https://orca.dev/docs/mobile)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca 데스크톱과 모바일 companion 앱" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/mobile"><picture><source srcset="../assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="../assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca 데스크톱과 모바일 companion 앱" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -129,11 +129,11 @@ Orca NP는 [stablyai/orca](https://github.com/stablyai/orca)에 포크 전용 �
 
 하나의 프롬프트를 다섯 에이전트에 동시에 보내세요. 각 에이전트는 격리된 자체 git worktree에서 실행됩니다 — 결과를 비교하고 가장 좋은 것을 머지하세요.
 
-[문서 →](https://www.onorca.dev/docs/model/worktrees)
+[문서 →](https://orca.dev/docs/model/worktrees)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/model/worktrees"><picture><source srcset="../site/public/docs/tab-split.gif" type="image/gif"><img src="../site/public/docs/posters/tab-split.jpg" alt="병렬 worktree 오케스트레이션" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/model/worktrees"><picture><source srcset="../site/public/docs/tab-split.gif" type="image/gif"><img src="../site/public/docs/posters/tab-split.jpg" alt="병렬 worktree 오케스트레이션" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -143,11 +143,11 @@ Orca NP는 [stablyai/orca](https://github.com/stablyai/orca)에 포크 전용 �
 
 WebGL 렌더링, 무한 분할, 재시작 후에도 유지되는 스크롤백을 갖춘 Ghostty급 터미널.
 
-[문서 →](https://www.onorca.dev/docs/terminal)
+[문서 →](https://orca.dev/docs/terminal)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/terminal"><picture><source srcset="../../resources/onboarding/feature-wall/tile-02.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-02.poster.jpg" alt="터미널 분할" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/terminal"><picture><source srcset="../../resources/onboarding/feature-wall/tile-02.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-02.poster.jpg" alt="터미널 분할" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -157,11 +157,11 @@ WebGL 렌더링, 무한 분할, 재시작 후에도 유지되는 스크롤백을
 
 실제 Chromium 창에서 UI 요소를 클릭하면 해당 HTML, CSS, 잘라낸 스크린샷이 에이전트 프롬프트로 바로 전송됩니다.
 
-[문서 →](https://www.onorca.dev/docs/browser/design-mode)
+[문서 →](https://orca.dev/docs/browser/design-mode)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/browser/design-mode"><picture><source srcset="../site/public/docs/orca-design-mode.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-05.poster.jpg" alt="내장 브라우저와 디자인 모드" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/browser/design-mode"><picture><source srcset="../site/public/docs/orca-design-mode.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-05.poster.jpg" alt="내장 브라우저와 디자인 모드" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -171,11 +171,11 @@ WebGL 렌더링, 무한 분할, 재시작 후에도 유지되는 스크롤백을
 
 PR, issue, 프로젝트 보드를 앱 안에서 탐색하세요 — 어떤 작업에서든 worktree를 열고 컨텍스트 전환 없이 리뷰할 수 있습니다.
 
-[문서 →](https://www.onorca.dev/docs/review/linear)
+[문서 →](https://orca.dev/docs/review/linear)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="../../resources/onboarding/feature-wall/tile-03.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-03.poster.jpg" alt="Orca의 GitHub 및 Linear 작업 워크플로" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/review/linear"><picture><source srcset="../../resources/onboarding/feature-wall/tile-03.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-03.poster.jpg" alt="Orca의 GitHub 및 Linear 작업 워크플로" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -185,11 +185,11 @@ PR, issue, 프로젝트 보드를 앱 안에서 탐색하세요 — 어떤 작�
 
 강력한 원격 머신에서 에이전트를 실행하세요. 파일 편집, git, 터미널을 모두 지원하며 자동 재연결과 포트 포워딩도 포함됩니다.
 
-[문서 →](https://www.onorca.dev/docs/ssh)
+[문서 →](https://orca.dev/docs/ssh)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/ssh"><picture><source srcset="../../resources/onboarding/feature-wall/tile-06.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-06.poster.jpg" alt="SSH를 통한 원격 worktree" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/ssh"><picture><source srcset="../../resources/onboarding/feature-wall/tile-06.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-06.poster.jpg" alt="SSH를 통한 원격 worktree" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -199,11 +199,11 @@ PR, issue, 프로젝트 보드를 앱 안에서 탐색하세요 — 어떤 작�
 
 diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내세요 — Orca를 떠나지 않고 리뷰하고 수정하고 커밋할 수 있습니다.
 
-[문서 →](https://www.onorca.dev/docs/review/annotate-ai-diff)
+[문서 →](https://orca.dev/docs/review/annotate-ai-diff)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/review/annotate-ai-diff"><picture><source srcset="../site/public/docs/annotate-ai-diff.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-08.poster.jpg" alt="AI가 생성한 diff에 주석 달기" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/review/annotate-ai-diff"><picture><source srcset="../site/public/docs/annotate-ai-diff.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-08.poster.jpg" alt="AI가 생성한 diff에 주석 달기" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -213,11 +213,11 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 
 어디서나 자동 저장되는 VS Code 에디터 — 파일이나 이미지를 에이전트 프롬프트로 바로 드래그하세요.
 
-[문서 →](https://www.onorca.dev/docs/editing/file-explorer)
+[문서 →](https://orca.dev/docs/editing/file-explorer)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/editing/file-explorer"><picture><source srcset="../../resources/onboarding/feature-wall/tile-07.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-07.poster.jpg" alt="파일과 이미지를 에이전트 프롬프트로 드래그" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/editing/file-explorer"><picture><source srcset="../../resources/onboarding/feature-wall/tile-07.gif" type="image/gif"><img src="../../resources/onboarding/feature-wall/tile-07.poster.jpg" alt="파일과 이미지를 에이전트 프롬프트로 드래그" width="100%" /></picture></a>
 </td>
 </tr>
 <tr>
@@ -227,22 +227,22 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 
 에이전트도 Orca를 조작할 수 있습니다 — `orca worktree create`, `snapshot`, `click`, `fill`로 모든 워크플로를 스크립팅하세요.
 
-[문서 →](https://www.onorca.dev/docs/cli/overview)
+[문서 →](https://orca.dev/docs/cli/overview)
 
 </td>
 <td width="50%">
-  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="../../resources/onboarding/feature-wall/tile-09.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-09.poster.jpg" alt="CLI에서 Orca 스크립팅" width="100%" /></picture></a>
+  <a href="https://orca.dev/docs/cli/overview"><picture><source srcset="../../resources/onboarding/feature-wall/tile-09.webp" type="image/webp"><img src="../../resources/onboarding/feature-wall/tile-09.poster.jpg" alt="CLI에서 Orca 스크립팅" width="100%" /></picture></a>
 </td>
 </tr>
 </table>
 
 **그 밖에 기본으로 제공되는 기능:**
 
-- **[빠른 열기](https://www.onorca.dev/docs/model/quick-open)** — 작업 흐름을 벗어나지 않고 worktree, 파일, 에이전트, 커맨드, 리포지토리 컨텍스트를 검색하세요.
-- **[계정 전환 및 사용량 추적](https://www.onorca.dev/docs/agents/usage-tracking)** — Claude와 Codex의 사용량과 rate limit 초기화 시점을 확인하고, 다시 로그인하지 않고 계정을 바로 전환하세요.
-- **[풍부한 리포지토리 미리보기](https://www.onorca.dev/docs/editing/markdown)** — Markdown, 이미지, PDF, 리포지토리 문서를 워크스페이스에서 미리 볼 수 있습니다.
-- **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 워크플로에 실제 상호작용이 필요할 때 에이전트가 데스크톱 앱과 화면에 보이는 UI를 직접 조작하게 하세요.
-- **[알림과 읽지 않음 상태](https://www.onorca.dev/docs/notifications)** — 에이전트가 완료되거나 주의가 필요할 때 알림을 받고, 스레드를 읽지 않음으로 표시해 나중에 다시 확인하세요.
+- **[빠른 열기](https://orca.dev/docs/model/quick-open)** — 작업 흐름을 벗어나지 않고 worktree, 파일, 에이전트, 커맨드, 리포지토리 컨텍스트를 검색하세요.
+- **[계정 전환 및 사용량 추적](https://orca.dev/docs/agents/usage-tracking)** — Claude와 Codex의 사용량과 rate limit 초기화 시점을 확인하고, 다시 로그인하지 않고 계정을 바로 전환하세요.
+- **[풍부한 리포지토리 미리보기](https://orca.dev/docs/editing/markdown)** — Markdown, 이미지, PDF, 리포지토리 문서를 워크스페이스에서 미리 볼 수 있습니다.
+- **[Computer Use](https://orca.dev/docs/cli/computer-use)** — 워크플로에 실제 상호작용이 필요할 때 에이전트가 데스크톱 앱과 화면에 보이는 UI를 직접 조작하게 하세요.
+- **[알림과 읽지 않음 상태](https://orca.dev/docs/notifications)** — 에이전트가 완료되거나 주의가 필요할 때 알림을 받고, 스레드를 읽지 않음으로 표시해 나중에 다시 확인하세요.
 - **그 외에도 정말 많습니다** — 매일 릴리스하므로 이 목록은 늘 뒤처져 있습니다. 이 포크의 실제 기능 목록은 [Orca NP 릴리스](https://github.com/nplez1/orca/releases)이고, 물려받은 부분은 [업스트림 릴리스](https://github.com/stablyai/orca/releases)입니다.
 
 ---
@@ -304,7 +304,7 @@ Orca NP는 공식 Orca와 나란히 설치되며 이 저장소의 릴리스로 �
 Orca 모바일 앱을 Orca NP와 페어링해 휴대폰에서 에이전트를 모니터링하고 조종하세요. 앱은 업스트림 Orca가 배포하며 Orca NP와 함께 동작합니다.
 
 - **iOS:** [App Store에서 다운로드](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [APK 다운로드](https://www.onorca.dev/download/android) · [설치 가이드](https://www.onorca.dev/docs/android-apk)
+- **Android:** [APK 다운로드](https://orca.dev/download/android) · [설치 가이드](https://orca.dev/docs/android-apk)
 
 ---
 
@@ -312,7 +312,7 @@ Orca 모바일 앱을 Orca NP와 페어링해 휴대폰에서 에이전트를 �
 
 - **Orca NP 이슈 및 아이디어:** 이 포크에만 해당하는 내용은 [이슈를 열어](https://github.com/nplez1/orca/issues) 주세요.
 - **업스트림 커뮤니티:** 이 포크가 물려받은 부분은 업스트림 Orca의 채널에서 다룹니다 — [Discord](https://discord.gg/fzjDKHxv8Q), [X의 @orca_build](https://x.com/orca_build), 공식 Orca에서도 재현되는 버그는 [업스트림 이슈](https://github.com/stablyai/orca/issues)로 보내 주세요.
-- **문서:** [onorca.dev/docs](https://www.onorca.dev/docs)는 업스트림 Orca의 문서입니다.
+- **문서:** [orca.dev/docs](https://orca.dev/docs)는 업스트림 Orca의 문서입니다.
 - **응원하기:** 이 포크를 따라가려면 이 저장소에 [스타](https://github.com/nplez1/orca)를, 또는 [업스트림](https://github.com/stablyai/orca)에 눌러 주세요.
 
 ---

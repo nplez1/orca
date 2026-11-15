@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { complete, posts, startAsync } from './agent-status-subagent-event-fixtures'
+import { complete, posts, startAsync } from './managed-extensions/agent-status/agent-status-subagent-event-fixtures'
 import {
   curlArgv,
   curlUrl,

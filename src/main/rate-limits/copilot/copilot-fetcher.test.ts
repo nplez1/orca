@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UsageRateLimitFailureKind } from '../../../shared/rate-limit-types'
+import type { UsageRateLimitFailureKind } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 
 type GhResult = { stdout: string; stderr: string }
 type GhCallOptions = { env?: NodeJS.ProcessEnv; signal?: AbortSignal }
@@ -10,7 +10,7 @@ const { ghExecFileAsyncMock } = vi.hoisted(() => ({
 
 // Why: `gh` is the whole transport for these two endpoints, so mocking that one
 // surface keeps the suite off the real GitHub billing API and off the real CLI.
-vi.mock('../../git/command-runner/gh-exec-file', () => ({
+vi.mock('../../git/command-runner/hosted-cli/gh-exec-file', () => ({
   ghExecFileAsync: ghExecFileAsyncMock
 }))
 

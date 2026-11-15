@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AiVaultListSessionsParams } from './ai-vault-params'
+import { AiVaultListSessionsParams } from './ai-vault/ai-vault-params'
 
 // The list request gained an optional `query` while desktop parents, the web
 // client and mobile ship on their own cadence: an old client sends no query at

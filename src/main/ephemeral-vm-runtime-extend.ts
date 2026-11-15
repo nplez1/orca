@@ -2,18 +2,18 @@ import type { Store } from './persistence/loading-store/store'
 import {
   isEphemeralVmHostActionable,
   type EphemeralVmRuntimeRecord
-} from '../shared/ephemeral-vm-runtimes'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   getEphemeralVmRecipeResultConnection,
   getEphemeralVmLifetimeLossError,
   getEphemeralVmRecipeResultPairingCode,
   type EphemeralVmRecipeResult
-} from '../shared/ephemeral-vm-recipes'
+} from '../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lifetime'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
-} from '../shared/ephemeral-vm-runtime-store'
+} from '../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { updateEnvironmentFromPairingCode } from '../shared/remote-runtime/host-store/runtime-environment-store'
 import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
 import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environments/runtime-environments'

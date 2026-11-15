@@ -3,7 +3,7 @@ import type { Page } from '@stablyai/playwright-test'
 import { expect } from '@stablyai/playwright-test'
 import { focusActiveTerminalInput, waitForTerminalOutput } from './terminal'
 import { openNewTabMenu } from './terminal-tab-menu'
-import type { BuiltInWindowsTerminalShell } from '../../../src/shared/windows-terminal-shell'
+import type { BuiltInWindowsTerminalShell } from '../../../src/shared/shell/launch/windows-terminal-shell'
 
 export const GOLDEN_STUB_READY_MARKER = 'GOLDEN_STUB_AGENT_READY'
 export const GOLDEN_STUB_EXIT_MARKER = 'GOLDEN_STUB_AGENT_EXITED'

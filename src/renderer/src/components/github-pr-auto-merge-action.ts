@@ -1,7 +1,7 @@
 import {
   canShowGitHubPRAutoMergeControl,
   type GitHubPRAutoMergeAvailabilityInput
-} from '../../../shared/github/pull-request-auto-merge-availability'
+} from '../../../shared/github/pull-requests/merge/pull-request-auto-merge-availability'
 import { translate } from '@/i18n/i18n'
 
 export type GitHubPRAutoMergeAction = {

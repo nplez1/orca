@@ -1,7 +1,7 @@
-import { waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
+import { waitForPromiseWithSignal } from '../../../shared/concurrency/abort-signal-reason'
 import { recordSwallowedFailure } from '../../observability/swallowed-failure'
-import { resolveLoginShellEnvironment } from '../../startup/login-shell-environment'
-import type { ResolvedCommand } from './wsl-command-resolution'
+import { resolveLoginShellEnvironment } from '../../startup/shell-environment/login-shell-environment'
+import type { ResolvedCommand } from './host-routing/wsl-command-resolution'
 
 /**
  * Environment for git children on the local host.

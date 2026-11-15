@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY } from '../../../../shared/worktree-runtime-capabilities'
+import { WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY } from '../../../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
 import { createWorktreesApi } from './web-worktrees-api'
 
 const mocks = vi.hoisted(() => ({ status: vi.fn(), call: vi.fn(), assertEnvironment: vi.fn() }))

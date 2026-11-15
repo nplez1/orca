@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
+import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
 import {
   getRunTargetCloneAvailability,
   resolveRunTargetRowAction

@@ -16,7 +16,7 @@ import {
   soleAutomationCreateHost
 } from './automation-create-destination'
 import { groupReposByAutomationAuthority } from '../hosts/automation-authority-identity'
-import type { Repo } from '../../../../../shared/repo-types'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 
 function mirror(
   targets: AutomationCatalogSshMirrorInput['targets']

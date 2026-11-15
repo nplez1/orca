@@ -1,6 +1,6 @@
 import { getMainHttpClient } from '../../network/http-client'
 import { abortSignalWithTimeout } from '../../lib/abort-signal-with-timeout'
-import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
 import { classifyThrownUsageRequestError } from '../providers/usage-request-failure-kind'
 import {
   DEEPINFRA_API_BASE_URL,

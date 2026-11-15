@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { PRCheckJob, PRCheckRunDetails } from '../../../../shared/github/check-types'
+import type { PRCheckJob, PRCheckRunDetails } from '../../../../shared/github/checks/check-types'
 import { CheckFailureSummary } from './CheckFailureSummary'
 import { CheckStageTree } from './CheckStageTree'
 import { CheckRunDetailsPanel } from './check-details/panel/CheckRunDetailsPanel'

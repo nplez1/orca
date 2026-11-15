@@ -1,13 +1,16 @@
 import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { getAgentStatusEpochNow } from '@/lib/agent-status/evidence/agent-status-epoch-clock'
-import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
+import {
+  getWorktreeIdsWithLiveAgent,
+  isInactiveWorkspace
+} from '@/lib/workspace/activity/worktree-activity-state'
 import {
   isActiveEmptyWorkspace,
   isWorkspaceEmptiedOnPurpose
 } from '@/lib/workspace-emptied-on-purpose'
-import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../../../../shared/workspace-layout/closed-terminal-tab-tombstones'
-import type { ClosedTerminalTabTombstonesByTabId } from '../../../../../../shared/workspace-layout/closed-terminal-tab-tombstones'
+import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
+import type { ClosedTerminalTabTombstonesByTabId } from '../../../../../../shared/workspace-layout/terminal-surfaces/closed-terminal-tab-tombstones'
 import { getWorktreeIdsWithStructuredChat } from '../../worktree-list/listing/visible-worktree-activity-inputs'
 import type { AgentStatusEntry } from '../../../../../../shared/agent-status/contracts/agent-status-types'
 import type { Tab } from '../../../../../../shared/tab-types'
@@ -21,7 +24,7 @@ type TabLike = { id: string }
 // Partial store mocks may omit slices; shared predicates treat absence as empty.
 type SleepStateInput = {
   activeWorktreeId?: string | null
-  agentStatusByPaneKey?: Record<string, AgentStatusEntry> | null
+  agentStatusByPaneKey?: ReadonlyMap<string, AgentStatusEntry> | null
   agentStatusEpoch?: number
   tabsByWorktree?: Record<string, readonly TabLike[]> | null
   ptyIdsByTabId?: Record<string, string[]> | null
@@ -42,7 +45,7 @@ type LiveAgentGeneration = {
 let liveAgentGeneration: LiveAgentGeneration | null = null
 
 // Cache the whole-store live-agent scan across cards by relevant snapshots and freshness epoch.
-function selectWorktreeIdsWithLiveAgent(state: SleepStateInput): ReadonlySet<string> {
+export function selectWorktreeIdsWithLiveAgent(state: SleepStateInput): ReadonlySet<string> {
   const agentStatusNow = getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
   if (
     liveAgentGeneration &&
@@ -66,7 +69,7 @@ function selectWorktreeIdsWithLiveAgent(state: SleepStateInput): ReadonlySet<str
   return worktreeIds
 }
 
-/** Use the hide-sleeping predicate; retained done status alone cannot establish whether a workspace is asleep. */
+/** Use the hide-sleeping predicate; done status alone cannot establish whether a workspace is asleep. */
 export function selectIsSleepingWorktree(state: SleepStateInput, worktreeId: string): boolean {
   // Why first: a workspace the user emptied on purpose, or the one on screen with nothing left to
   // render, has no surfaces by design — that absence is the empty-tabs state, not sleep (#96).

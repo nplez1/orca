@@ -3,9 +3,9 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
-import RunTargetRowList from './RunTargetRowList'
-import type { RunTargetRowModel } from './run-target-options'
+import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
+import RunTargetRowList from './run-target/RunTargetRowList'
+import type { RunTargetRowModel } from './run-target/run-target-options'
 import type { RunTargetCloneStatus } from './use-run-target-auto-clone'
 
 const CLONE_URL = 'git@github.com:acme/app.git'

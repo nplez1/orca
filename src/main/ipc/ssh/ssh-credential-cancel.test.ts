@@ -12,10 +12,9 @@ vi.mock('./ssh-host-server-connect', () => mocks.hostServerConnect)
 vi.mock('../../ssh/connection/ssh-connection-manager', () => mocks.sshConnectionManager)
 vi.mock('../../ssh/protocol/ssh-channel-multiplexer', () => mocks.sshChannelMultiplexer)
 vi.mock('../../ssh/port-forwarding/ssh-port-forward', () => mocks.sshPortForward)
-vi.mock('../ssh/ssh-port-scanner', () => mocks.sshPortScanner)
 
 import type { SshCredentialKind } from '../../ssh/connection/ssh-connection-callbacks'
-import type { SshTarget } from '../../../shared/ssh-types'
+import type { SshTarget } from '../../../shared/remote-runtime/ssh/ssh-types'
 import { isSshCredentialDeclined } from '../../ssh/authentication/ssh-credential-decline'
 import { createSshIpcHarness } from './ssh-ipc-test-harness'
 import { createSshConnectionCallbacks } from './ssh-connection-state-callbacks'

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { toast } from 'sonner'
 import type { WorktreeLayoutMode } from '../../../../../../shared/orca-workspace-layout'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
-import type { AddRepoExistingWorkspaceSource } from '../../../../../../shared/telemetry-events'
-import type { Repo } from '../../../../../../shared/repo-types'
+import type { AddRepoExistingWorkspaceSource } from '../../../../../../shared/telemetry/schemas/telemetry-property-schemas'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
 import { getCloneDestinationAutoFill } from '../create/clone-defaults'
 import { useCloneParentDefault } from '../create/use-clone-parent-default'
 import {
@@ -13,7 +13,7 @@ import {
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
 import { translate } from '@/i18n/i18n'
-import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import { upsertAddedRepoWithProjectHostSetup } from '../completion/add-repo-store-upsert'
 import {
   resolveAddRepoRuntimeTarget,

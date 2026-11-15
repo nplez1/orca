@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import { getRuntimeRepoTarget } from './repositories/repository-routing'
 
 function makeRepo(id: string, path: string, executionHostId?: Repo['executionHostId']): Repo {

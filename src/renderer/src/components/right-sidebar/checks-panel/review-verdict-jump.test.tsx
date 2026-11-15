@@ -6,7 +6,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { PRComment } from '../../../../../shared/github/comment-types'
+import type { PRComment } from '../../../../../shared/github/comments/comment-types'
 import { getPRCommentPresentationClasses } from './comments/pr-comment-presentation'
 
 vi.mock('@/lib/element-scroll-reveal', () => ({

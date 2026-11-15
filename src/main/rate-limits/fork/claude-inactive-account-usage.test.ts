@@ -12,7 +12,7 @@ vi.mock('../providers/claude/claude-oauth-credentials', () => ({
   resolveClaudeOAuthCredentialReadOptions: () => undefined
 }))
 vi.mock('./claude-cli-usage-probe', () => ({ readClaudeUsageFromCli: vi.fn() }))
-vi.mock('../../claude-accounts/claude-profile-installed-router', () => ({
+vi.mock('../../claude-accounts/profiles/routing/claude-profile-installed-router', () => ({
   getClaudeProfileRouter: () => ({
     accountUsagePreparation: (id: string) => ({
       configDir: `/Users/x/Library/orca/claude-profiles/${id}/home`,

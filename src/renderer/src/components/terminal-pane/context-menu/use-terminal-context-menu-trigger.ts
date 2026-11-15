@@ -3,12 +3,12 @@ import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import type { TerminalPasteSource } from '../input/paste/terminal-paste-model'
 import { copyTerminalSelection } from '../clipboard/terminal-selection-copy'
-import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 import { suppressTerminalRightClickPtyMouseReport } from '../terminal-right-click-pty-mouse-suppression'
 import {
   claimTerminalRightClickPasteMouseDown,
   isTerminalRightClickPasteGesture
 } from '../input/paste/terminal-right-click-paste-gesture'
+import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/overlay-interaction/close-all-context-menus'
 
 type UseTerminalContextMenuTriggerDeps = {
   managerRef: React.RefObject<PaneManager | null>

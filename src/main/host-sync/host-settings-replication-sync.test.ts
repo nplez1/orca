@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PairingOffer } from '../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
-import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
+import type { RuntimeRpcResponse } from '../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import { HOST_SETTINGS_APPLY_METHOD } from '../../shared/host-settings-replication'
 import type { HostSettingsReplicationApplyResult } from '../../shared/host-settings-replication'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
@@ -98,7 +98,7 @@ function createSync(
   const sent: { method: string; payload: { baseRevision: number | null; revision: number } }[] = []
   const sync = createHostSettingsReplicationSync({
     ports: [port(overrides.held ?? true)],
-    resolvePairing: () => PAIRING,
+    resolvePairing: async () => PAIRING,
     scheduleDebounce: immediateDebounce,
     ...(overrides.supportsReplication === undefined
       ? {}

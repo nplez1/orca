@@ -2,7 +2,7 @@
 
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NeedsSetupProjectHostOption } from '@/lib/project-host-setup-options'
+import type { NeedsSetupProjectHostOption } from '@/lib/workspace/creation/project-host-setup-options'
 import { resetProjectCloneInFlightForTests } from './project-clone-in-flight'
 import { useRunTargetAutoClone } from './use-run-target-auto-clone'
 

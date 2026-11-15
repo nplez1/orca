@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PRCheckJob, PRCheckStep } from './github/check-types'
+import type { PRCheckJob, PRCheckStep } from './github/checks/check-types'
 import {
   isFailedStepState,
   isRunningStepState,
