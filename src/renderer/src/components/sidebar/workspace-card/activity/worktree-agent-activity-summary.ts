@@ -55,7 +55,7 @@ const EMPTY_FORK_ACTIVITY_FIELDS: ForkActivityFields = {
 /** Rebuilt only when this worktree's rows, tab map, epoch or upstream summary identity changes. */
 type CachedActivitySummary = {
   rows: readonly DashboardAgentRow[]
-  tabsByWorktree: AgentActivityTabsByWorktree
+  activityTabs: AgentActivityTabsByWorktree
   agentStatusEpoch: number
   summary: WorktreeAgentActivitySummary
   result: WorktreeAgentActivitySummary
@@ -70,12 +70,12 @@ export function selectWorktreeAgentActivitySummary(
   const projection = state.agentStatusByPaneKey.projection
   const rows = projection.list(worktreeId)
   const summary = projection.summary(worktreeId)
-  const tabsByWorktree = state.tabsByWorktree
+  const activityTabs = state.tabsByWorktree
   const cached = activitySummaries.get(worktreeId)
   if (
     cached &&
     cached.rows === rows &&
-    cached.tabsByWorktree === tabsByWorktree &&
+    cached.activityTabs === activityTabs &&
     cached.agentStatusEpoch === state.agentStatusEpoch &&
     cached.summary === summary
   ) {
@@ -83,11 +83,11 @@ export function selectWorktreeAgentActivitySummary(
   }
   const result: WorktreeAgentActivitySummary = {
     ...summary,
-    ...forkActivityFields(rows, tabsByWorktree)
+    ...forkActivityFields(rows, activityTabs)
   }
   activitySummaries.set(worktreeId, {
     rows,
-    tabsByWorktree,
+    activityTabs,
     agentStatusEpoch: state.agentStatusEpoch,
     summary,
     result
@@ -101,11 +101,11 @@ export function selectWorktreeAgentActivitySummary(
  */
 function forkActivityFields(
   rows: readonly DashboardAgentRow[],
-  tabsByWorktree: AgentActivityTabsByWorktree
+  activityTabs: AgentActivityTabsByWorktree
 ): ForkActivityFields {
   const now = Date.now()
   const ownWorkingEntries: AgentStatusEntry[] = []
-  let terminalPaneIdsByTabId = EMPTY_PANE_IDS_BY_TAB_ID
+  let paneIdsByTabId = EMPTY_PANE_IDS_BY_TAB_ID
   for (const row of rows) {
     // Synthetic subagent keys are not pane keys, and their entries always carry orchestration.
     if (row.rowSource === 'subagent' || row.entry.restoredUnconfirmed) {
@@ -119,7 +119,7 @@ function forkActivityFields(
       // Why: the finish outlives the row's freshness. A mirrored pane's cached title — a paired
       // host's last report — has no age of its own, so without this the host's last working frame
       // kept the card spinning long after the host reported the agent done.
-      terminalPaneIdsByTabId = withPaneId(terminalPaneIdsByTabId, identity.tabId, identity.paneId)
+      paneIdsByTabId = withPaneId(paneIdsByTabId, identity.tabId, identity.paneId)
       continue
     }
     // Why: an orchestration worker reports before its tab exists by design, so its missing tab says
@@ -131,17 +131,17 @@ function forkActivityFields(
   const permissionYieldingAgentTypes = ownWorkingEntries.length
     ? unplacedWorkingAgentTypes({
         entries: ownWorkingEntries,
-        hasTab: knownTabPredicate(tabsByWorktree),
+        hasTab: knownTabPredicate(activityTabs),
         now
       })
     : EMPTY_PERMISSION_YIELDING_AGENT_TYPES
   if (
-    terminalPaneIdsByTabId === EMPTY_PANE_IDS_BY_TAB_ID &&
+    paneIdsByTabId === EMPTY_PANE_IDS_BY_TAB_ID &&
     permissionYieldingAgentTypes.size === 0
   ) {
     return EMPTY_FORK_ACTIVITY_FIELDS
   }
-  return { terminalPaneIdsByTabId, permissionYieldingAgentTypes }
+  return { terminalPaneIdsByTabId: paneIdsByTabId, permissionYieldingAgentTypes }
 }
 
 function knownTabPredicate(

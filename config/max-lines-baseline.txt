@@ -17,7 +17,6 @@ inline src/main/daemon/executable-host/windows/daemon-host-relocation.ts
 inline src/main/git/command-runner/process-capture/exec-file-capture.ts
 inline src/main/ipc/filesystem/filesystem-list-files.ts
 inline src/main/ipc/filesystem/watchers/filesystem-watcher-wsl.ts
-inline src/main/ipc/pty/spawn-options-assembly.ts
 inline src/main/ipc/repos/repo-clone-lifecycle.ts
 inline src/main/ipc/shell.ts
 inline src/main/ipc/worktree-remote.ts
@@ -62,3 +61,4 @@ inline src/shared/default-global-settings.ts
 inline src/shared/remote-runtime/ssh/ssh-types.ts
 inline src/shared/rpc-contract/client-ui/client-ui-params.ts
 inline src/shared/wsl-move/wsl-move-storage-dispositions.ts
+inline src/renderer/src/components/settings/agents/launch/AgentLaunchSettingsCatalog.tsx

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's workspace-trust waiver rides upstream's spawn assembly, and splitting costs a permanent sync hunk. */
 import { withClaudeAgentViewPlugin } from '../../../shared/agent-hook-listener/providers/claude/view/claude-agent-view-launch'
 import { resolveStartupShell } from '../../../shared/agent-launch/startup/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/shell/launch/windows-terminal-shell'

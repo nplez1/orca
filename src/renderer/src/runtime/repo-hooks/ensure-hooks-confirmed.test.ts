@@ -36,11 +36,13 @@ type PendingPrompt = {
 function createTestState(): { state: AppState; pending: PendingPrompt[] } {
   const pending: PendingPrompt[] = []
   const trust: PersistedTrustedOrcaHooks = {}
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test store carries only the slices this hook reads.
   const state = {
     trustedOrcaHooks: trust,
     repos: [{ id: 'repo-1', displayName: 'Repo One' }],
     projectGroups: [],
     openModal: (modal: string, data: Record<string, unknown>) => {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub modal records this exact callback signature.
       pending.push({ modal, data, resolve: data.onResolve as (d: 'run' | 'skip') => void })
     },
     closeModal: () => undefined

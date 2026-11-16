@@ -64,8 +64,13 @@ describe('useWorktreeCardReviewDetails issue cache key', () => {
       })
     )
 
+    // The item carried a repository, so the key is the owner/repo-scoped one every writer uses.
     expect(result.current.issueCacheKey).toBe(
-      getIssueCacheKey(issueRepo.path, issueRepo.id, 97, initialState.settings, null, null, true)
+      getIssueCacheKey(issueRepo.path, issueRepo.id, 97, initialState.settings, null, null, true, {
+        host: 'github.com',
+        owner: 'acme',
+        repo: 'orca'
+      })
     )
     expect(result.current.issueCacheKey).not.toBe(
       getIssueCacheKey(
