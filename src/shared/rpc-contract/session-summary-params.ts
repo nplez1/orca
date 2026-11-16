@@ -25,6 +25,14 @@ export const SessionSummaryOpenOnHostParams = SessionSummaryPaneParams.extend({
   foldParams: SessionSummaryFoldParamsOnWire,
   /** Which session the viewer has on screen, when the host's own row cannot say. */
   session: SessionSummarySessionOnWire,
+  /**
+   * The host the viewer believes owns the session.
+   *
+   * Why forwarded: a browser client can read a workspace owned by a *third* host, and the host
+   * it is paired with holds no status row for that pane — so without this the fold would run
+   * where the session is not.
+   */
+  executionHostId: z.string().min(1).max(512).nullish(),
   /** The reader's freshness window; the host owns the brief cache this decides about. */
   revalidateWithinMs: z.number().int().nonnegative().nullish(),
   /** This client already holds the pane's lease there — a refresh, not a new viewer. */

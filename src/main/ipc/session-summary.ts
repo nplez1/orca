@@ -14,7 +14,7 @@ import { createSessionSummaryEventReader } from '../session-summary/session-summ
 import {
   createSessionSummaryHostFoldClient,
   type SessionSummaryHostFoldClient
-} from '../session-summary/session-summary-host-fold-client'
+} from '../../shared/session-summary-host-fold-client'
 import { registerHostSessionSummaryService } from '../session-summary/session-summary-host-service'
 import { createSshTranscriptFetcher } from '../session-summary/session-summary-remote-transcript'
 import { sweepStaleSessionSummaryScratchDirsOnce } from '../session-summary/session-summary-scratch'

@@ -107,4 +107,20 @@ describe('session summary host RPC', () => {
       foldParams: { agentId: 'claude', model: 'sonnet' }
     })
   })
+
+  // Why a wire test: a field the schema does not declare is stripped, and the host then folds
+  // where its own rows say — the wrong machine for a workspace another host owns.
+  it('forwards the workspace host the viewer named', async () => {
+    mocks.open.mockResolvedValue(snapshot({}))
+
+    await dispatcher().dispatch(
+      openRequest({ paneKey: 'tab-1:leaf-1', foldParams, executionHostId: 'runtime:env-2' })
+    )
+
+    expect(mocks.open).toHaveBeenCalledWith({
+      paneKey: 'tab-1:leaf-1',
+      foldParams: { agentId: 'claude', model: 'sonnet' },
+      executionHostId: 'runtime:env-2'
+    })
+  })
 })

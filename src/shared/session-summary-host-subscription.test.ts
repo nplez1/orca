@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
+import type { SessionSummarySnapshot } from './session-summary-types'
 import { SessionSummaryHostFoldSubscription } from './session-summary-host-subscription'
 
 function snapshot(running: boolean, overrides: Partial<SessionSummarySnapshot> = {}) {

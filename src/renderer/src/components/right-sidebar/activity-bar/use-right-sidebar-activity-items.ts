@@ -98,8 +98,8 @@ export function useRightSidebarActivityItems({
         title: t('auto.components.right.sidebar.index.aiVaultSessionHistory', 'Agents'),
         shortcut: ''
       },
-      // Why conditional: a paired web client composes no session-summary bridge, so
-      // offering the tab there would leave the pane permanently on its loading state.
+      // Why conditional: a window with no summary bridge (a component fixture, not the web
+      // client, which composes one) would leave the pane permanently on its loading state.
       ...(hasSessionSummaryBridge()
         ? [
             {

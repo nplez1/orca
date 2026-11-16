@@ -7,7 +7,7 @@
 import {
   SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS,
   SESSION_SUMMARY_TIMELINE_KINDS
-} from '../../shared/session-summary-types'
+} from './session-summary-types'
 import type {
   SessionSummaryFact,
   SessionSummaryFoldGap,
@@ -17,7 +17,7 @@ import type {
   SessionSummaryReportSection,
   SessionSummaryTimelineDeltaEntry,
   SessionSummaryTimelineEntry
-} from '../../shared/session-summary-types'
+} from './session-summary-types'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null

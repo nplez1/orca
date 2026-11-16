@@ -13,6 +13,7 @@ import type {
   SessionSummarySnapshot,
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
+import { SESSION_SUMMARY_IDLE_FOLD } from '../../shared/session-summary-types'
 import { emptySessionSummaryLedger, hasProducedLedger } from './session-summary-ledger'
 import type { SessionSummaryTranscriptHost } from './session-summary-transcript-host'
 
@@ -30,7 +31,7 @@ export type SessionSummaryStatusEntry = {
   prompt?: string
 }
 
-export const IDLE_FOLD = { running: false, completedChunks: 0, totalChunks: 0 } as const
+export const IDLE_FOLD = SESSION_SUMMARY_IDLE_FOLD
 
 /** Cheap deterministic facts: no LLM, no transcript read. */
 export function buildSessionSummaryFacts(

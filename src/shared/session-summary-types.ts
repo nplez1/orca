@@ -288,6 +288,40 @@ export const SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS = 200
  */
 export const SESSION_SUMMARY_HOST_OUTDATED_MESSAGE = 'host-outdated'
 
+/** No fold is running. Shared so a client that answers before its host does starts idle. */
+export const SESSION_SUMMARY_IDLE_FOLD: SessionSummaryFoldProgress = {
+  running: false,
+  completedChunks: 0,
+  totalChunks: 0
+}
+
+/**
+ * A failed snapshot for a pane, keeping the brief already on screen when there is one.
+ *
+ * Why one builder: a failure reaches the pane from three sides — the folding service, a client's
+ * own request, and the hook — and a pane that reported the same failure three different ways
+ * would show "up to date" over a skeleton on two of them.
+ */
+export function failedSessionSummarySnapshot(
+  paneKey: string,
+  error: string,
+  previous: SessionSummarySnapshot | null = null
+): SessionSummarySnapshot {
+  return {
+    ...(previous ?? {
+      paneKey,
+      status: 'failed',
+      facts: null,
+      ledger: null,
+      seenThrough: 0,
+      fold: SESSION_SUMMARY_IDLE_FOLD
+    }),
+    paneKey,
+    status: 'failed',
+    error
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }

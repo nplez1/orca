@@ -184,4 +184,35 @@ describe('useSessionSummary', () => {
     const { result } = renderHook(() => useSessionSummary(PANE_KEY, true, 'runtime:env-1'))
     await waitFor(() => expect(result.current.snapshot?.paneKey).toBe(PANE_KEY))
   })
+
+  // A window with no summary bridge answers `undefined` (the web client's fallback proxy does
+  // exactly this), and reading `paneKey` off that threw inside the voided promise.
+  it('survives a bridge that answers with no snapshot', async () => {
+    const open = vi.fn(async () => undefined)
+    vi.stubGlobal('api', {
+      sessionSummary: { open, close: vi.fn(), onUpdate: () => () => {} }
+    })
+
+    const { result } = renderHook(() => useSessionSummary(PANE_KEY, true))
+
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1))
+    expect(result.current.snapshot).toBeNull()
+  })
+
+  it('reports a rejected open instead of leaving an unhandled rejection', async () => {
+    vi.stubGlobal('api', {
+      sessionSummary: {
+        open: vi.fn(async () => {
+          throw new Error('The requesting window did not name a usable summarization agent.')
+        }),
+        close: vi.fn(),
+        onUpdate: () => () => {}
+      }
+    })
+
+    const { result } = renderHook(() => useSessionSummary(PANE_KEY, true))
+
+    await waitFor(() => expect(result.current.snapshot?.status).toBe('failed'))
+    expect(result.current.snapshot?.error).toContain('usable summarization agent')
+  })
 })

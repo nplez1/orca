@@ -70,7 +70,7 @@ export function useSessionSummaryHostSupported(): boolean {
 }
 
 /** Whether this window can fold at all: the desktop bridge owns it, and a paired web
- *  client composes no `sessionSummary` implementation. */
+ *  client composes its own `sessionSummary` over the runtime connection. */
 export function hasSessionSummaryBridge(): boolean {
   return typeof window.api?.sessionSummary?.open === 'function'
 }

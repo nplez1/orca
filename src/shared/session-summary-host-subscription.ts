@@ -11,11 +11,8 @@
 // idle window, "still running? / what is the ledger now?" is all the pane needs, and a
 // reconnecting client resumes against the same host state with nothing to tear down.
 import type { SessionSummaryHostFoldClient } from './session-summary-host-fold-client'
-import type {
-  SessionSummarySessionRef,
-  SessionSummarySnapshot
-} from '../../shared/session-summary-types'
-import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control/ai/source-control-ai-operation-resolution'
+import type { SessionSummarySessionRef, SessionSummarySnapshot } from './session-summary-types'
+import type { ResolvedSourceControlAiGenerationParams } from './source-control/ai/source-control-ai-operation-resolution'
 
 const DEFAULT_POLL_INTERVAL_MS = 600
 const MAX_POLL_RETRIES = 1
@@ -68,6 +65,8 @@ export class SessionSummaryHostFoldSubscription {
     environmentId: string
     foldParams: ResolvedSourceControlAiGenerationParams | null
     session?: SessionSummarySessionRef
+    /** The host the viewer believes owns the session, for a pane this host cannot place. */
+    executionHostId?: string
     revalidateWithinMs?: number
     sameViewer?: boolean
   }): void {
@@ -158,6 +157,7 @@ export class SessionSummaryHostFoldSubscription {
       environmentId: string
       foldParams: ResolvedSourceControlAiGenerationParams | null
       session?: SessionSummarySessionRef
+      executionHostId?: string
       revalidateWithinMs?: number
       sameViewer?: boolean
     },
@@ -171,6 +171,7 @@ export class SessionSummaryHostFoldSubscription {
         paneKey: args.paneKey,
         foldParams: args.foldParams,
         ...(args.session ? { session: args.session } : {}),
+        ...(args.executionHostId ? { executionHostId: args.executionHostId } : {}),
         ...(args.revalidateWithinMs ? { revalidateWithinMs: args.revalidateWithinMs } : {}),
         ...(args.sameViewer ? { sameViewer: true } : {})
       })
