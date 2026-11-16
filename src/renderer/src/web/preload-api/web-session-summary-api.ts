@@ -8,7 +8,10 @@ import type { SessionSummaryApi } from '../../../../preload/api/session-summary-
 import { createSessionSummaryHostFoldClient } from '../../../../shared/session-summary-host-fold-client'
 import { SessionSummaryHostFoldSubscription } from '../../../../shared/session-summary-host-subscription'
 import { SessionSummaryPaneLeases } from '../../../../shared/session-summary-pane-leases'
-import { resolveSessionSummaryAiParams } from '../../../../shared/session-summary-ai'
+import {
+  resolveSessionSummaryAiParams,
+  type SessionSummaryAiSettingsInput
+} from '../../../../shared/session-summary-ai'
 import {
   failedSessionSummarySnapshot,
   SESSION_SUMMARY_IDLE_FOLD,
@@ -19,8 +22,8 @@ import {
 import { unwrapRuntimeRpcResult } from '../../runtime/rpc/calls/runtime-rpc-result'
 import { parseExecutionHostId } from '../../../../shared/execution-host'
 import { callEnvironmentEnvelope } from './web-runtime-calls'
-import { getStoredSettings } from './web-preferences-store'
 import { requireActiveEnvironmentOrNull } from './web-runtime-session'
+import { SETTINGS_STORAGE_KEY, readJson } from './web-storage'
 
 export const WEB_SESSION_SUMMARY_NO_HOST_MESSAGE = 'Pair this web client with an Orca server first.'
 
@@ -83,11 +86,14 @@ export function createWebSessionSummaryApi(): SessionSummaryApi {
       }
       // Why the fold configuration is read here and not on the host: the fold spawns an agent,
       // and a host substituting its own choice would run one the reader never picked. This
-      // client's settings are what its Settings → Agents pane edits.
+      // client's settings are what its Settings → Agents pane edits. Read as the slice the
+      // resolver takes, so this never loads (or migrates) the host-routing settings.
       hostFolds.open({
         paneKey: request.paneKey,
         environmentId,
-        foldParams: resolveSessionSummaryAiParams(getStoredSettings()),
+        foldParams: resolveSessionSummaryAiParams(
+          readJson<SessionSummaryAiSettingsInput>(SETTINGS_STORAGE_KEY, {})
+        ),
         ...(request.session ? { session: request.session } : {}),
         ...(request.executionHostId
           ? {

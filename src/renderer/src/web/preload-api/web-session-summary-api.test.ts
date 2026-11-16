@@ -6,15 +6,16 @@ const PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
 
 const mocks = vi.hoisted(() => ({
   call: vi.fn(),
-  settings: vi.fn(),
+  foldSettings: vi.fn(),
   environment: vi.fn()
 }))
 
 vi.mock('./web-runtime-calls', () => ({
   callEnvironmentEnvelope: (...args: unknown[]) => mocks.call(...args)
 }))
-vi.mock('./web-preferences-store', () => ({
-  getStoredSettings: () => mocks.settings()
+vi.mock('./web-storage', () => ({
+  SETTINGS_STORAGE_KEY: 'orca.web.settings.v1',
+  readJson: () => mocks.foldSettings()
 }))
 vi.mock('./web-runtime-session', () => ({
   requireActiveEnvironmentOrNull: () => mocks.environment()
@@ -46,8 +47,8 @@ function callsTo(method: string): unknown[][] {
 beforeEach(() => {
   mocks.call.mockReset()
   mocks.call.mockResolvedValue(ok(snapshot()))
-  mocks.settings.mockReset()
-  mocks.settings.mockReturnValue({ defaultTuiAgent: 'claude' })
+  mocks.foldSettings.mockReset()
+  mocks.foldSettings.mockReturnValue({ defaultTuiAgent: 'claude' })
   mocks.environment.mockReset()
   mocks.environment.mockReturnValue({ id: 'env-1' })
 })
