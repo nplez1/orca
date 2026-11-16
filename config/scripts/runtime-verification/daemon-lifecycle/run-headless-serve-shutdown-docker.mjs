@@ -14,13 +14,13 @@ const launcherExecOverlay = args.includes('--launcher-exec-overlay')
 const allEntrypoints = args.includes('--all-entrypoints')
 
 /** The name this build installs into a PATH directory (~/.local/bin on Linux).
- *  Why read it: the name is an identity — see cli-install-constants.ts — so the in-container
+ *  Why read it: the name is an identity — see cli/installation/cli-install-constants.ts — so the in-container
  *  check must assert the name this build registers rather than upstream's `orca-ide`. */
 function readInstalledCliCommandName() {
-  const source = readFileSync(resolve('src/main/cli/cli-install-constants.ts'), 'utf8')
+  const source = readFileSync(resolve('src/main/cli/installation/cli-install-constants.ts'), 'utf8')
   const match = source.match(/CLI_COMMAND_NAME\s*=\s*'([^']+)'/)
   if (!match) {
-    fail('Could not read CLI_COMMAND_NAME from src/main/cli/cli-install-constants.ts')
+    fail('Could not read CLI_COMMAND_NAME from src/main/cli/installation/cli-install-constants.ts')
   }
   return match[1]
 }

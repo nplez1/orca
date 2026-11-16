@@ -1061,7 +1061,7 @@ const ORCA_COMPUTER_USE_MARKDOWN = [
   "",
   "# Orca Computer Use",
   "",
-  "Use this skill to drive an app window through `orca-np computer`, in the background where the platform allows, so the user can keep working. Prefer a programmatic path (shell, filesystem, git, HTTP, existing CLIs) whenever it can complete the task; use this skill only when an app window needs GUI control those cannot reach. Do not use it for Orca's embedded browser (`orca-cli`).",
+  "Use this skill to drive an app window through `ORCA computer`, in the background where the platform allows, so the user can keep working. Prefer a programmatic path (shell, filesystem, git, HTTP, existing CLIs) whenever it can complete the task; use this skill only when an app window needs GUI control those cannot reach. Do not use it for Orca's embedded browser (`orca-cli`).",
   "",
   "## Preconditions",
   "",

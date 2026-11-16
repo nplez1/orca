@@ -142,6 +142,8 @@ it('converges after a real late write response revokes a later settings event re
     await import('../../src/shared/review-refresh-policy')
   const { PRAutoRefreshSetting } =
     await import('../../src/renderer/src/components/settings/source-control/PRAutoRefreshSetting')
+  const { toRuntimeExecutionHostId } = await import('../../src/shared/execution-host')
+  const remoteHostId = toRuntimeExecutionHostId('env-a')
   const subscription = await subscribeRuntimeClientEvents('env-a', () => {})
   await act(async () =>
     root.render(
@@ -149,7 +151,13 @@ it('converges after a real late write response revokes a later settings event re
         TooltipProvider,
         null,
         createElement(PRAutoRefreshSetting, {
-          hostScope: { target: { kind: 'environment', environmentId: 'env-a' }, available: true },
+          hostScope: {
+            hostId: remoteHostId,
+            label: 'Boston build server',
+            equivalentHostIds: [remoteHostId],
+            target: { kind: 'environment', environmentId: 'env-a' },
+            available: true
+          },
           // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a remote host never reads the local settings.
           settings: {} as never,
           updateSettings: () => {}

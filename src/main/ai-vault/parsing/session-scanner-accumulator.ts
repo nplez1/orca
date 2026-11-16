@@ -153,7 +153,13 @@ export function finalizeSession(
       platform,
       codexHome: options.codexHome
     }),
-    subagent: scannedSubagentInfo(accumulator, sessionId)
+    subagent: scannedSubagentInfo(
+      accumulator,
+      sessionId,
+      accumulator.lineageParentSessionPath
+        ? sessionIdFromFileName(accumulator.lineageParentSessionPath)
+        : null
+    )
   }
 }
 

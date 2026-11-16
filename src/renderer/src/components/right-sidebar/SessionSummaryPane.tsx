@@ -28,7 +28,9 @@ function SessionSummarySubjectBody({
   // about the session outranks the folding side's row — which may be absent (a paired host
   // that only runs the PTY) or relayed without the agent's transcript path.
   const session = useSessionSummarySessionRef(paneKey)
-  const agentUpdatedAt = useAppStore((state) => state.agentStatusByPaneKey[paneKey]?.updatedAt ?? 0)
+  const agentUpdatedAt = useAppStore(
+    (state) => state.agentStatusByPaneKey.get(paneKey)?.updatedAt ?? 0
+  )
   const { snapshot, refresh, refreshing } = useSessionSummary(
     paneKey,
     isOpen,

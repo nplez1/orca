@@ -12,6 +12,6 @@ const _packageSatisfiesPageMermaid: (engine: Mermaid) => PageMermaid = (engine) 
 
 // Defer one pre-bundled artifact: package import emits 103 already-downloaded scripts against 256-asset cap, saving no transfer. No diagram means no engine evaluation.
 export async function loadPageMermaid(): Promise<PageMermaid> {
-  const engine = await import('../pr-sidebar/mermaid-page-engine.generated')
+  const engine = await import('./mermaid-page-engine.generated')
   return engine.default
 }

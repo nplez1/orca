@@ -2,7 +2,6 @@ import type { AiVaultSessionSubagentInfo } from '../../shared/ai-vault/contracts
 import type { SessionAccumulator } from './session-scanner-types'
 import { asRecord } from './parsing/session-record-fields'
 import { extractString } from '../../shared/text/trimmed-string'
-import { sessionIdFromFileName } from './parsing/session-scanner-accumulator'
 
 /**
  * How a Pi-family transcript declares that it is a sub-agent rather than a
@@ -109,14 +108,13 @@ export function consumeSubagentDeclarationRecord(
 /** A scanned row's parent link, or null when the transcript is a root session. */
 export function scannedSubagentInfo(
   accumulator: SessionAccumulator,
-  sessionId: string
+  sessionId: string,
+  parentSessionId: string | null
 ): AiVaultSessionSubagentInfo | null {
-  const parentSessionPath = accumulator.lineageParentSessionPath
   const agentType = accumulator.declaredSubagentAgentType
-  if (!parentSessionPath || !agentType) {
+  if (!parentSessionId || !agentType) {
     return null
   }
-  const parentSessionId = sessionIdFromFileName(parentSessionPath)
   // Self-reference is dropped rather than trusted: a transcript naming itself
   // as its own parent would otherwise hide the session behind a row that can
   // never be expanded.

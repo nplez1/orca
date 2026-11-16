@@ -557,6 +557,11 @@ import {
 } from './projects/repo-params'
 import { ReferenceFind, ReferenceList } from './references/reference-params'
 import { BrowserTarget, ExpectUrlBrowserTarget } from './rpc-param-primitives'
+import {
+  SessionSummaryCloseOnHostParams,
+  SessionSummaryOpenOnHostParams,
+  SessionSummarySnapshotOnHostParams
+} from './session-summary-params'
 import { SessionTabsUnsubscribeAllParams } from './session-tabs/session-tabs-params'
 import {
   ActivateTab,
@@ -572,11 +577,6 @@ import {
   WorktreeTabSelector
 } from './session-tabs/session-tabs-schemas-params'
 import { SessionReadTerminalScrollbackParams } from './session-tabs/session-terminal-scrollback-params'
-import {
-  SessionSummaryCloseOnHostParams,
-  SessionSummaryOpenOnHostParams,
-  SessionSummarySnapshotOnHostParams
-} from './session-summary-params'
 import {
   SkillsCancelInstallParams,
   SkillsDiscoverParams,

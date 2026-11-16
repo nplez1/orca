@@ -6,7 +6,9 @@
       },
       "TaskPage": {
         "jiraOpenAttachedWorkspace": "Ouvrir l'espace de travail attaché à {{value0}}",
-        "jiraShowWorkspace": "Afficher l'espace de travail"
+        "jiraShowWorkspace": "Afficher l'espace de travail",
+        "4826fd1ad8": null,
+        "1a06219d5c": null
       },
       "settings": {
         "AccountsPane": {
@@ -52,6 +54,12 @@
             "40c10c4deb": null,
             "c29089716e": null
           }
+        },
+        "WorkspaceDirectorySetting": {
+          "1a2b3c4d5e": null,
+          "2b3c4d5e6f": null,
+          "3c4d5e6f7a": null,
+          "4d5e6f7a8b": null
         }
       },
       "GitHubItemDialog": {
@@ -97,6 +105,10 @@
           "HomeSlide": {
             "5d94e8ddcc": null
           }
+        },
+        "MobilePageToolbar": {
+          "ad2284a9e2": null,
+          "9883b58693": null
         }
       },
       "crash": {
@@ -115,6 +127,28 @@
         },
         "WorkspaceKanbanSettingsMenu": {
           "4c2eaa78cc": null
+        }
+      },
+      "NewWorkspaceComposerCard": {
+        "setLocation": null,
+        "setLocationOnHost": null,
+        "setLocationTooltip": null
+      },
+      "skills": {
+        "SkillsPage": {
+          "closeSkills": null,
+          "closeTooltip": null
+        }
+      },
+      "new": {
+        "workspace": {
+          "SetProjectLocationDialog": {
+            "title": null,
+            "browseFolder": null,
+            "browseFolderHelp": null,
+            "cloneFromUrl": null,
+            "cloneFromUrlHelp": null
+          }
         }
       }
     },
