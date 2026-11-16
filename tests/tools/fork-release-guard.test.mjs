@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -20,7 +20,13 @@ afterEach(() => {
  * workflow: the two things that went wrong here were both logic — a ref nobody compared, and a
  * `targetCommitish` resolved as a branch name, which always equals this run's commit.
  */
-function scenario({ target, tagCommit = null, tag = 'v1.2.3-np.7', existingTags = [] }) {
+function scenario({
+  target,
+  tagCommit = null,
+  tag = 'v1.2.3-np.7',
+  existingTags = [],
+  draft = false
+}) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-release-guard-'))
   dirs.push(dir)
   const bin = join(dir, 'bin')
@@ -37,7 +43,8 @@ function scenario({ target, tagCommit = null, tag = 'v1.2.3-np.7', existingTags 
       '  echo "release not found" >&2',
       '  exit 1',
       'fi',
-      'echo "$FAKE_RELEASE_TARGET"',
+      // The guard asks for `targetCommitish` and `isDraft` in one call, space-separated.
+      'echo "$FAKE_RELEASE_TARGET $FAKE_RELEASE_DRAFT"',
       ''
     ].join('\n')
   )
@@ -75,6 +82,7 @@ function scenario({ target, tagCommit = null, tag = 'v1.2.3-np.7', existingTags 
           ...process.env,
           PATH: `${bin}:${process.env.PATH}`,
           FAKE_RELEASE_TARGET: releaseTarget,
+          FAKE_RELEASE_DRAFT: String(draft),
           FAKE_GH_ERROR: target === 'error' ? '1' : '0',
           RUNNER_TEMP: dir
         }
@@ -221,8 +229,49 @@ describe('the release dispatch guard', () => {
     expect(result.stdout).toContain('already exists')
   })
 
-  it('is what the workflow runs, before any platform builds', async () => {
-    const { readFileSync } = await import('node:fs')
+  // `gh run rerun --failed` keeps a `release-ref` that passed hours ago, and the undraft runs this
+  // guard again for exactly that reason — so a draft has to be held to the newest published tag.
+  it('refuses to carry a draft below a release published since it was created', () => {
+    const { run, sha, tag } = scenario({
+      target: 'sha',
+      draft: true,
+      existingTags: ['v1.2.3-np.9']
+    })
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('not above the newest published release v1.2.3-np.9')
+  })
+
+  it('accepts its own draft when nothing newer has been published', () => {
+    const { run, sha, tag } = scenario({
+      target: 'sha',
+      draft: true,
+      existingTags: ['v1.2.3-np.6']
+    })
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('is a draft at')
+  })
+
+  it('does not compare a draft against its own tag, should one have been pushed by hand', () => {
+    const { run, sha, tag } = scenario({ target: 'sha', draft: true, tagCommit: 'here' })
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('first release of this line')
+  })
+
+  it('still refuses a draft at another commit before it looks at any version', () => {
+    const { run, sha, tag } = scenario({ target: 'branch', draft: true, tagCommit: 'other' })
+    const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('would replace its assets')
+  })
+
+  it('is what the workflow runs, before any platform builds', () => {
     const workflow = readFileSync(WORKFLOW, 'utf8')
     const preflight = workflow.slice(workflow.indexOf('  release-ref:'))
     expect(preflight).toContain('bash .github/scripts/fork-release-ref-guard.sh')
@@ -236,9 +285,23 @@ describe('the release dispatch guard', () => {
     // A guard any leg can start ahead of is not a guard: the legs build and upload the artifacts.
     // `needs` is read by containment, because `macos` also waits for the unit suite.
     const needs = (name) => /needs: (\[[^\]]*\]|[^\n]*)/.exec(jobBlock(name))?.[1] ?? ''
-    expect(needs('macos')).toContain('release-ref')
-    expect(needs('windows')).toContain('macos')
-    expect(needs('linux')).toContain('windows')
+    for (const leg of ['release-draft', 'macos', 'windows', 'linux', 'publish']) {
+      expect(needs(leg), leg).toContain('release-ref')
+    }
     expect(workflow.indexOf('release-ref:')).toBeLessThan(workflow.indexOf('macos:'))
+  })
+
+  it('runs again in the job that undrafts, ahead of the undraft', () => {
+    // Why: a `--failed` re-run skips a `release-ref` that passed, so this is the copy of the guard
+    // that sees the tags as they are when the release goes public.
+    const workflow = readFileSync(WORKFLOW, 'utf8')
+    const start = workflow.indexOf('\n  publish:\n')
+    expect(start).toBeGreaterThan(-1)
+    const publish = workflow.slice(start)
+    const guard = publish.indexOf('bash .github/scripts/fork-release-ref-guard.sh')
+
+    expect(guard).toBeGreaterThan(-1)
+    expect(guard).toBeLessThan(publish.indexOf('--draft=false'))
+    expect(publish.slice(guard, guard + 200)).toContain('"$GITHUB_REF"')
   })
 })

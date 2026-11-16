@@ -29,7 +29,15 @@ name: Fork release
 # for eight consecutive pushes on 2026-11-12, with its `Typecheck` step skipped in all eight.
 #
 # What is also gated is the dispatch itself: the `release-ref` job refuses any ref but
-# `refs/heads/main`, and any tag that already points at another commit.
+# `refs/heads/main`, and any tag that already points at another commit. `publish` runs the same guard
+# again immediately before the undraft, which is what makes `gh run rerun --failed` a safe retry — it
+# keeps a `release-ref` that passed, and the tags that guard read can have moved since.
+#
+# The shape of the run: the gates, then `release-draft` creates the draft with its body, then the
+# `macos`, `windows` and `linux` legs build and upload into that draft in parallel, then `publish`
+# checks every manifest and the body and makes it public. Until 2026-11-16 the legs ran one after
+# another — 44 minutes of a 50-minute run in v1.4.214-np.56 — because the draft was created inside
+# `macos`, and a leg that started first would have created the release itself.
 #
 # Why every `uses:` is pinned to a commit SHA with its tag in a trailing comment: these jobs hold
 # `contents: write` and, on macOS, the Apple certificate and notarisation secrets. The repository
@@ -45,6 +53,14 @@ on:
         required: false
         default: ''
         type: string
+      # Why: a change to this workflow has to be provable without publishing to every install. The
+      # whole run happens — gates, draft, all three legs, every check in `publish` — and only the
+      # undraft is skipped, so the draft can be inspected and deleted. Nothing else reads it.
+      keep_draft:
+        description: 'Validation run: build and upload everything, run every publish check, leave the release a draft'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -124,8 +140,8 @@ jobs:
       run_relay_integration: false
 
   # Why a job and not a step in the artifact legs: the verdict has to arrive once, before the first
-  # artifact exists, and the legs are serialized behind each other — a step in `macos` would spend the
-  # same minutes after the unit suite instead of alongside it. Same runner and same preparation as the
+  # artifact exists, and a step in each leg would spend the same minutes three times, after the unit
+  # suite instead of alongside it. Same runner and same preparation as the
   # other two typecheck lanes, so a green here means what a green there means.
   typecheck:
     needs: release-ref
@@ -195,12 +211,25 @@ jobs:
           ORCA_CODE_QUALITY_BASE: HEAD
         run: node local/gate-lint.mjs
 
-  macos:
-    # Why the two verdicts are named on every leg and not just on `macos`: the serialization below is
-    # an upload-race workaround (`windows` and `linux` inherit them transitively through it), so hanging
-    # a gate off the chain would silently drop it the day the chain is relaxed.
+  # Why a job of its own, ahead of every leg: the legs upload in parallel into one release, and
+  # electron-builder's GitHub publisher creates that release itself when its listing finds none for
+  # the tag (electron-publish `GitHubPublisher.getOrCreateRelease`, `publish: always`). Two legs that
+  # both miss it each create one — a duplicate draft, or 422 "Published releases must have a valid
+  # tag" for the loser, which is what killed run 35071546550's successor. Created here, before any
+  # leg starts, the draft is what every leg's publisher finds, and finding a draft is always "append":
+  # there is no create decision left to race.
+  #
+  # Why a draft: until every manifest is up, the release has assets a user can download but no update
+  # manifest an installed build can follow. A draft is hidden from the releases list, so a run that
+  # dies in that window leaves nothing visible. `publish` makes it public.
+  #
+  # Why after all three verdicts and not beside them: a red verdict leaves no draft behind.
+  release-draft:
     needs: [release-ref, unit-tests, typecheck, lint]
-    runs-on: macos-15
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
       # and the default clone carries one commit and no tags. Deepening to the tag would not be
@@ -208,6 +237,97 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: package.json
+
+      # Why the same formula as every leg's stamp: the legs bake it into their manifests and this job
+      # names the tag they upload into, so the two must agree without passing state to the legs.
+      - name: Resolve the release version
+        id: version
+        shell: bash
+        env:
+          SUFFIX: ${{ inputs.version_suffix }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
+          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "Releasing $version"
+
+      # Why generated: the notes must say what changed, and a hand-maintained list goes stale. The
+      # script derives the summary from git and never exits non-zero, so the guard below — not the
+      # generator — decides whether this release has a summary (see "Release notes" in
+      # RELEASE-RUNBOOK.md).
+      - name: Generate the release notes
+        shell: bash
+        env:
+          # Why a comparison rather than the secret: the notes only say whether this run signs, and
+          # the expression hands this job a boolean instead of the certificate. It is the same test
+          # `macos` applies when it resolves its signing mode.
+          SIGNING: ${{ secrets.MAC_CERTS != '' }}
+        run: |
+          set -euo pipefail
+          node .github/scripts/fork-release-notes.mjs \
+            --version "$RELEASE_VERSION" \
+            --sha "$GITHUB_SHA" \
+            --repo "$PUBLISH_OWNER/orca" \
+            --signing "$SIGNING" \
+            --out /tmp/notes.md || true
+          # Why this fails instead of substituting a minimal body: the runbook promises no release
+          # goes public without its change summary, and a minimal body published anyway is exactly
+          # the install-instructions-only release the generator was introduced to remove. Nothing
+          # is created at this point, so failing here leaves no draft, no tag and no assets behind.
+          node .github/scripts/fork-release-notes-guard.mjs /tmp/notes.md --label "the generated notes"
+
+      # Why refuse a published release: the config's `releaseType: draft` makes electron-builder skip
+      # the upload, with a warning and exit 0, when the release it finds is not a draft. Each leg's
+      # manifest check then passes on the old manifest, so a re-dispatch into a published tag is a
+      # green run that replaced nothing — or, should a leg's clear step ever delete its own assets
+      # first, one that strips that platform from the live update feed.
+      - name: Create the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+
+          errors="$RUNNER_TEMP/release-view.err"
+          # Why the error file: "no release yet" and "gh could not tell me" are different answers,
+          # and creating on the second is how a second release under one tag would come about.
+          if draft="$(gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json isDraft --jq .isDraft 2>"$errors")"; then
+            if [ "$draft" != "true" ]; then
+              echo "::error::$tag is already published. electron-builder never appends to a published release under releaseType: draft, so the legs would upload nothing into it. Dispatch a new version instead."
+              exit 1
+            fi
+            # Why this is not a second check: the release-ref job already refused a tag that points at
+            # any other commit, so reaching here means this draft is this SHA's.
+            echo "$tag is already a draft at $GITHUB_SHA; the legs upload into it"
+          elif ! grep -qiE 'not found|HTTP 404' "$errors"; then
+            echo "::error::cannot read release $tag: $(head -3 "$errors" | tr '\n' ' ')"
+            exit 1
+          else
+            gh release create "$tag" \
+              --repo "$PUBLISH_OWNER/orca" \
+              --target "$GITHUB_SHA" \
+              --draft \
+              --notes-file /tmp/notes.md
+            echo "created draft $tag"
+          fi
+
+  macos:
+    # Why the three verdicts are named on every leg and not left to `release-draft`: a gate that hangs
+    # off another job's `needs` is silently dropped the day that job's own `needs` change.
+    needs: [release-ref, release-draft, unit-tests, typecheck, lint]
+    runs-on: macos-15
+    steps:
+      # Why the default one-commit clone: the notes, which need history, are `release-draft`'s; the
+      # build reads only `git rev-parse HEAD`. A full clone cost this leg 2-3 minutes.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
@@ -293,58 +413,6 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Why generated: the notes must say what changed, and a hand-maintained list goes stale. The
-      # script derives the summary from git and never exits non-zero, so the guard below — not the
-      # generator — decides whether this release has a summary (see "Release notes" in
-      # RELEASE-RUNBOOK.md).
-      - name: Generate the release notes
-        shell: bash
-        env:
-          SIGNING: ${{ steps.signing.outputs.signed }}
-        run: |
-          set -euo pipefail
-          node .github/scripts/fork-release-notes.mjs \
-            --version "$RELEASE_VERSION" \
-            --sha "$GITHUB_SHA" \
-            --repo "$PUBLISH_OWNER/orca" \
-            --signing "$SIGNING" \
-            --out /tmp/notes.md || true
-          # Why this fails instead of substituting a minimal body: the runbook promises no release
-          # goes public without its change summary, and a minimal body published anyway is exactly
-          # the install-instructions-only release the generator was introduced to remove. Nothing
-          # is created at this point, so failing here leaves no draft, no tag and no assets behind.
-          node .github/scripts/fork-release-notes-guard.mjs /tmp/notes.md --label "the generated notes"
-
-      # Why create the release up front, as a draft: electron-builder's publisher would otherwise
-      # have two artifact legs race to create it, and the loser aborts the whole job with
-      # 422 "Published releases must have a valid tag" even though the winner succeeded — which is
-      # exactly what killed runs 35071546550's successor.
-      #
-      # Why a draft: until the manifest check below passes, the release has assets a user can
-      # download but no `latest-mac.yml`, so no installed build can update from it. A draft is
-      # hidden from the releases list, so a run that dies in that window leaves nothing visible.
-      # It goes live at the end of the linux job, once every platform's manifest is up and the body
-      # has been re-checked for its change summary.
-      - name: Create draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          tag="v$RELEASE_VERSION"
-
-          if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" >/dev/null 2>&1; then
-            # Why this is not a second check: the release-ref job already refused a tag that points at
-            # any other commit, so reaching here means this tag is this SHA's.
-            echo "$tag already exists at $GITHUB_SHA; uploading into it"
-          else
-            gh release create "$tag" \
-              --repo "$PUBLISH_OWNER/orca" \
-              --target "$GITHUB_SHA" \
-              --draft \
-              --notes-file /tmp/notes.md
-            echo "created draft $tag"
-          fi
-
       # Why before packaging: electron-builder appends to the release and fails on a name that
       # already exists, so a retry after a partial publish (a notarization timeout, a lost
       # connection) has to clear this leg's own assets first — and only this leg's.
@@ -403,10 +471,10 @@ jobs:
           echo "::error::latest-mac.yml never appeared; an installed build will not see this release."
           exit 1
 
-  # Why serialized behind macos: every job publishes into the same release, and electron-builder
-  # decides whether to create or append at upload time. Running them at once races that decision.
+  # Why in parallel with `macos` and `linux`: each leg appends into the draft `release-draft`
+  # created, and uploads only names no other leg publishes, so the legs share nothing but the release.
   windows:
-    needs: [macos, typecheck, lint]
+    needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -486,7 +554,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Why the explicit tag: the release is a draft until this job finishes, and
+          # Why the explicit tag: the release is a draft until `publish` finishes, and
           # `gh release list` hides drafts.
           tag="v$RELEASE_VERSION"
           for attempt in 1 2 3 4 5; do
@@ -501,16 +569,10 @@ jobs:
           echo "::error::latest.yml never appeared; an installed build will not see this release."
           exit 1
 
-      # Why not here any more: the release is undrafted by the last job, and Linux's manifest has
-      # to exist before it does. See the linux job below.
-
-  # Why serialized behind windows, and why last: every job appends into one release, and
-  # electron-builder decides whether to create or append at upload time — concurrent legs race that
-  # decision. The undraft has to be the final step of the final leg, because a release that goes
-  # live before the last platform's manifest exists offers downloads no installed build can
-  # update from.
+  # Why in parallel with the other legs: see `windows`. The undraft is not here either — it is
+  # `publish`, which waits for all three.
   linux:
-    needs: [windows, typecheck, lint]
+    needs: [release-ref, release-draft, unit-tests, typecheck, lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -577,8 +639,6 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Why ensure-native-runtime first: electron-builder's beforeBuild rebuilds node-pty for the
-      # Electron ABI, and the Linux leg has to start from the runtime variant the app actually
       # Why before packaging: electron-builder appends to the release and fails on a name that
       # already exists, so a retry after a partial publish (a notarization timeout, a lost
       # connection) has to clear this leg's own assets first — and only this leg's.
@@ -589,12 +649,14 @@ jobs:
           tag: v${{ env.RELEASE_VERSION }}
           patterns: '^(latest-linux\\.yml|orca-linux[^/]*\\.AppImage|orca-np[_-][^/]*\\.(deb|rpm))$'
 
+      # Why ensure-native-runtime first: electron-builder's beforeBuild rebuilds node-pty for the
+      # Electron ABI, and the Linux leg has to start from the runtime variant the app actually
       # loads — upstream's release leg does the same on every Linux matrix entry.
       #
       # Why the publish overrides: the checked-in config names stablyai/orca. Overriding here rather
       # than patching the config keeps that a runtime concern instead of a fork patch, so upstream
       # edits to the publish block still apply cleanly. `--publish always` plus the config's own
-      # `releaseType: draft` appends into the draft the macos job created.
+      # `releaseType: draft` appends into the draft `release-draft` created.
       - name: Package and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -611,7 +673,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Why the explicit tag: the release is a draft until this job finishes, and
+          # Why the explicit tag: the release is a draft until `publish` finishes, and
           # `gh release list` hides drafts.
           tag="v$RELEASE_VERSION"
           for attempt in 1 2 3 4 5; do
@@ -626,22 +688,87 @@ jobs:
           echo "::error::latest-linux.yml never appeared; an installed AppImage will not see this release."
           exit 1
 
-      # Why here and not in an earlier job: every platform uploads into one release, and a release
-      # that goes live before the last platform's manifest exists offers downloads that no installed
-      # build can update from. Flipping it last makes "published" mean "complete".
-      #
-      # Why the body is checked again here: this is the step that makes the release public, and the
-      # body can change between generation and now — a re-dispatch appends into an existing release,
-      # and the runbook tells whoever reads the draft to edit a wrong body before it goes live. A
-      # failure leaves the release a draft, which no installed build can see.
-      - name: Publish the release
+  # Why a job of its own, after all three legs: a release that goes live before every platform's
+  # manifest exists offers downloads that no installed build can update from, so "published" has to
+  # mean "complete". It used to be the last step of the last serialized leg; with the legs parallel,
+  # only a job that needs all three can know they are all done.
+  #
+  # Why the verdicts are named here too: the same reason as on the legs.
+  publish:
+    needs: [release-ref, release-draft, unit-tests, typecheck, lint, macos, windows, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_VERSION: ${{ needs.release-draft.outputs.version }}
+    steps:
+      # Why full history: the guard below reads the published tags, and resolves a branch-named
+      # target through the tag's own commit — the same checkout `release-ref` makes.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: package.json
+
+      # Why again: `gh run rerun --failed` re-runs a failed leg and this job, and keeps the
+      # `release-ref` that passed — possibly hours ago. The ref, the commit and the version are this
+      # run's and cannot change; the published tags can, and a draft made public below the newest one
+      # points `releases/latest` at an older build. So the check that reads them runs where it matters.
+      - name: Re-check the release ref and version against the tags as they are now
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fork-release-ref-guard.sh \
+            "$GITHUB_REF" "v$RELEASE_VERSION" "$GITHUB_SHA" "$PUBLISH_OWNER/orca"
+
+      # Why every manifest again, and exactly one release: each leg confirmed its own manifest, but
+      # a `--failed` re-run keeps legs that passed in an earlier attempt, and a second release under
+      # this tag is what a create race between legs would leave. Both are cheap to rule out here.
+      - name: Confirm one release carries every platform's manifest
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           tag="v$RELEASE_VERSION"
+          count="$(gh api --paginate "repos/$PUBLISH_OWNER/orca/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$tag\") | .id" | wc -l | tr -d ' ')"
+          if [ "$count" != "1" ]; then
+            echo "::error::$count releases carry $tag; expected exactly one. Delete the extra draft before publishing."
+            exit 1
+          fi
+          assets="$(gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets --jq '.assets[].name')"
+          missing=0
+          for manifest in latest-mac.yml latest.yml latest-linux.yml; do
+            if ! printf '%s\n' "$assets" | grep -qxF "$manifest"; then
+              echo "::error::$manifest is missing from $tag; an installed build on that platform will not see this release."
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ]
+          echo "$tag carries latest-mac.yml, latest.yml and latest-linux.yml"
+
+      # Why the body is checked again here: this is the step that makes the release public, and the
+      # body can change between generation and now — a re-run keeps the draft it created, and the
+      # runbook tells whoever reads the draft to edit a wrong body before it goes live. A failure
+      # leaves the release a draft, which no installed build can see.
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP_DRAFT: ${{ inputs.keep_draft }}
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
           gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json body --jq .body \
             | node .github/scripts/fork-release-notes-guard.mjs - --site draft --label "the draft body of $tag"
+          if [ "$KEEP_DRAFT" = "true" ]; then
+            echo "::notice title=Validation run::keep_draft is set, so $tag stays a draft. Every check passed; delete it with: gh release delete $tag --repo $PUBLISH_OWNER/orca --yes"
+            exit 0
+          fi
           gh release edit "$tag" --repo "$PUBLISH_OWNER/orca" --draft=false
           echo "published $tag"

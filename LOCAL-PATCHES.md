@@ -3365,11 +3365,18 @@ signed, notarized path by itself once it does. The release body comes from
 `.github/fork-release-notes.md`, rendered per release with the version, commit, date, and a signing
 paragraph that follows the signing mode.
 
-The three jobs are **serialized** (`linux: needs: windows`, `windows: needs: macos`) because every
-leg appends into one release and electron-builder decides create-vs-append at upload time. The
-`macos` job creates the draft, and the undraft is the last step of the last leg — so "published"
-means every platform's update manifest exists, and each leg asserts its own (`latest-mac.yml`,
-`latest.yml`, `latest-linux.yml`).
+The three legs run **in parallel** (since 2026-11-16) behind a `release-draft` job that generates the
+notes and creates the draft, and ahead of a `publish` job that needs all three. electron-builder's
+GitHub publisher creates the release only when its listing finds none for the tag
+(electron-publish 26.15.3 `GitHubPublisher.getOrCreateRelease`); a draft it finds is always appended
+to, so with the draft created before any leg starts there is no create-vs-append decision left to race.
+Until then the legs were serialized (`linux: needs: windows`, `windows: needs: macos`) because the
+draft was created inside `macos` — 44 minutes of legs in v1.4.214-np.56 (run 43826476774), against
+~26 for the longest leg alone. Each leg asserts its own manifest (`latest-mac.yml`, `latest.yml`,
+`latest-linux.yml`); `publish` re-asserts all three, that exactly one release carries the tag, the
+body, and `fork-release-ref-guard.sh` — which now holds a draft (not only a new tag) above the newest
+published `-np.` tag, so a `gh run rerun --failed` that keeps an hours-old `release-ref` cannot
+undraft below a release published since.
 
 **The lane runs the compiler's and the lint gate's verdicts (2026-11-14, #298).** Two jobs sit beside
 `unit-plan`/`unit-tests` and every artifact leg names both in `needs`: `typecheck` (`pnpm tc` on the
