@@ -1,0 +1,92 @@
+{
+  "revision": "e6a60bee22d7d4e03b3e59240baf4462fde88e5d",
+  "base": "a992b134ff",
+  "upstream": "1ce376b27e",
+  "mergeCommit": "7da96c11bd4",
+  "reviewer": {
+    "provider": "claude",
+    "alias": "opus",
+    "name": "Opus 5.5",
+    "thinking": "high"
+  },
+  "artifact": {
+    "kind": "remerge-diff",
+    "path": ".git/orca-review/remerge-diff.patch",
+    "bytes": 10125206
+  },
+  "note": "Six slices over the remerge diff (what the 694-path conflict resolution itself wrote), then one delta pass over the 13 SHOULD-FIX fixes. Round 1: 0 BLOCKER, 13 SHOULD-FIX, 7 MINOR, 7 NIT. Delta (e216b75df8c..154b524fc9): 0 BLOCKER, 0 SHOULD-FIX, 1 MINOR, 1 NIT; 13/13 round-1 findings resolved. The delta's MINOR (the activity-summary cache map never evicts) and NIT (pane-key parse without the tab) are structural notes about the fork's own cache, recorded in local/sync/convergence-ledger.md. Two later CI-driven deltas, both re-checked by Opus: 154b524fc9..ee697b1077e (three cwd-rooted esbuild bundles in Linux-only fixtures, which the local gate skips) and ee697b1077e..20375f443b7 (the same defect in two pi smoke scripts, caught by that delta). Second delta: 0 BLOCKER, 1 SHOULD-FIX (fixed in 20375f443b7), 0 MINOR, 1 NIT. One further commit, bbc0a2d354c, only adds a local/nightly-linux-known-red.json entry (the offscreen frame-rate suite cannot paint on a headless ubuntu runner) — no application code. 8e920dc5233 adds the sibling offscreen-free suite to the same Linux red set — again no application code. e6a60bee22d ports upstream's new Orca-app accessibility rule into OrcaBundleIdentity; the CI macOS leg failed with \"cannot find TrustedOrcaApplication in scope\", which no local gate compiles (swift is only built on the macOS release leg).",
+  "slices": [
+    {
+      "id": "A",
+      "lines": "1-14301",
+      "scope": "config/, docs, package.json, resources/, src/cli, src/main/{agent-hooks,agent-launch,ai-vault*,antigravity,backend,bitgo*,browser}, mobile/",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 1,
+      "minors": 0,
+      "nits": 1,
+      "unresolved": 0,
+      "resolved": "Fixed in 154b524fc9; the delta pass re-checked every finding on these files. Findings: SHOULD-FIX src/main/daemon/launch/testing/daemon-launcher-driver-fixture.ts; NIT src/cli/orchestration/recovery/runtime-compatibility.ts"
+    },
+    {
+      "id": "B",
+      "lines": "14302-28602",
+      "scope": "src/main/{claude*,cli,codex,computer,credentials,cursor,daemon,emulator,ephemeral-vm*}, src/packages, src/preload, src/shared/{agent-hook-listener,agent-usage,ai-vault}, src/wsl-guest",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 2,
+      "minors": 1,
+      "nits": 1,
+      "unresolved": 0,
+      "resolved": "Fixed in 154b524fc9; the delta pass re-checked every finding on these files. Findings: SHOULD-FIX src/main/ipc/pty/spawn-options-assembly.ts; SHOULD-FIX src/main/daemon/launch/testing/daemon-launcher-driver-fixture.ts; MINOR src/main/ai-vault/session-list-result-validation.test.ts (+ scan-service/session-scanner-service-request-deadline.test.ts, scanners/copilot/session-scanner-copilot-parser.test.ts, session-scanner-values.test.ts, session-scanner-timeline.test.ts); NIT src/main/git/git-username-gh-account.test.ts"
+    },
+    {
+      "id": "C",
+      "lines": "28603-42903",
+      "scope": "src/main/{git,github,gitlab,host-sync,ipc}, src/cli/{hosts,projects,runtime,workspaces}, src/renderer/src/{app-shell,hooks,i18n}",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 3,
+      "minors": 0,
+      "nits": 0,
+      "unresolved": 0,
+      "resolved": "Fixed in 154b524fc9; the delta pass re-checked every finding on these files. Findings: SHOULD-FIX src/main/ipc/worktree-remote.ts; SHOULD-FIX src/main/ephemeral-vm-runtime-extend.ts; SHOULD-FIX src/main/daemon/launch/testing/daemon-launcher-driver-fixture.ts"
+    },
+    {
+      "id": "D",
+      "lines": "42904-57204",
+      "scope": "src/renderer/src/components (A-M), src/renderer/src/{lib,store}",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 2,
+      "minors": 1,
+      "nits": 1,
+      "unresolved": 0,
+      "resolved": "Fixed in 154b524fc9; the delta pass re-checked every finding on these files. Findings: SHOULD-FIX src/renderer/src/components/NewWorkspaceComposerCard.tsx (also src/renderer/src/components/NewWorkspaceComposerModal.tsx); SHOULD-FIX src/main/workspaces/removal/worktree-background-removal.ts (now src/main/workspaces/removal/worktree-removal-settlement.ts); MINOR src/main/workspace-hooks/hook-orca-cli-env.ts; NIT src/main/window/createMainWindow.test.ts, src/main/window/privileged-window-navigation.test.ts, and the fork-modified suites under dashboard-popout/, dashboard/, editor/, quick-open-*"
+    },
+    {
+      "id": "E",
+      "lines": "57205-71505",
+      "scope": "src/renderer/src/components (N-Z), src/renderer/src/runtime, src/shared/{remote-runtime,rpc-contract,secure-storage,worktree}",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 3,
+      "minors": 3,
+      "nits": 2,
+      "unresolved": 0,
+      "resolved": "Fixed in 154b524fc9; the delta pass re-checked every finding on these files. Findings: SHOULD-FIX src/renderer/src/components/sidebar/workspace-card/details/use-worktree-card-review-details.ts; SHOULD-FIX src/renderer/src/components/sidebar/workspace-card/activity/worktree-agent-activity-summary.ts; SHOULD-FIX src/renderer/src/components/settings/agents/launch/AgentLaunchSettingsCatalog.tsx; MINOR src/renderer/src/components/settings/page/settings-setup-workflow-section-renderers.tsx; MINOR src/renderer/src/components/tab-bar/tab-bar-surface.tsx; MINOR src/renderer/src/components/settings/ssh/targets/SshTargetList.test.tsx; NIT src/renderer/src/components/settings/workspace-cleanup/WorkspaceCleanupSettingsPane.test.tsx; NIT src/renderer/src/components/status-bar/usage/UsageRosterPanel.tsx"
+    },
+    {
+      "id": "F",
+      "lines": "71506-85801",
+      "scope": "src/shared remaining, src/main/{persistence,pi,plugins,providers,pty,rate-limits,runtime*,session-summary,skills,speech,startup,text-generation,updater,usage,window,workspaces}, tests/",
+      "verdict": "reported",
+      "blockers": 0,
+      "shouldFix": 2,
+      "minors": 2,
+      "nits": 2,
+      "unresolved": 0,
+      "resolved": "Fixed in 154b524fc9; the delta pass re-checked every finding on these files. Findings: SHOULD-FIX src/shared/release-channel.test.ts; SHOULD-FIX src/renderer/src/lib/ensure-hooks-confirmed.test.ts, src/shared/ephemeral-vm-runtime-store-rollback.test.ts; MINOR (aggregate) worktree-activation-emptied-workspace-reseed.test.ts, worktree-status.test.ts, settings.test.ts, worktrees-remote-runtime-create.test.ts, jira-transition-fields.test.ts, web-preload-api-agent-providers.test.ts, claude-helper-kill.test.ts, worktrees-multiple-attachments.test.ts, repos-project-host-capability.test.ts, editor-check-details-tabs.test.ts; MINOR src/shared/remote-runtime/serve-supervisor/serve-bundle-coordination.ts; NIT src/renderer/src/lib/worktree-activation-sidebar-reveal.ts; NIT src/renderer/src/runtime/jira/runtime-jira-detail-client.ts"
+    }
+  ]
+}
