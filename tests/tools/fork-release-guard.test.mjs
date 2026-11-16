@@ -114,7 +114,7 @@ describe('the release dispatch guard', () => {
     const { run, sha, tag } = scenario({ target: 'sha' })
     const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('already exists')
+    expect(result.stdout).toContain('is already published at')
   })
 
   it('refuses a tag that points at another commit, whatever the release records', () => {
@@ -226,7 +226,7 @@ describe('the release dispatch guard', () => {
     const result = run(['refs/heads/main', tag, sha, 'nplez1/orca'])
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('already exists')
+    expect(result.stdout).toContain('is already published at')
   })
 
   // `gh run rerun --failed` keeps a `release-ref` that passed hours ago, and the undraft runs this

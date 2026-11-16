@@ -48,8 +48,8 @@ release carries the tag, every leg appended to the draft `release-draft` created
 manifests are on it. The `local/dispatch-release.mjs` gate does not pass `keep_draft`; a validation
 run publishes nothing, so dispatching it directly is not a bypass.
 
-A published release should appear with `latest-mac.yml`, the `.zip`, the `.dmg`, `latest.yml`, and
-`orca-windows-setup.exe`, and a body that opens with a generated change summary (see
+A published release should appear with `latest-mac.yml`, the `.zip`, the `.dmg`, `latest.yml`,
+`orca-windows-setup.exe`, `latest-linux.yml`, the `.AppImage`, the `.deb` and the `.rpm`, and a body that opens with a generated change summary (see
 [Release notes](#release-notes--read-the-draft-before-it-goes-live) below). Keep that release; it is
 also your rollback artifact.
 
@@ -410,8 +410,20 @@ A re-dispatch into an **already-published** tag is refused by `release-draft`: u
 `releaseType: draft` electron-builder skips the upload to a release that is not a draft (warning,
 exit 0), so the legs would replace nothing. Dispatch a new version instead.
 
+**When `publish`'s guard refuses because a newer `-np.` tag was published since this run's draft**,
+the draft can never go public: the newer tag stays newer, so `--failed` (or any re-run) refuses again,
+forever. Delete the draft and dispatch a new version:
+
+```bash
+gh release delete v<version> --repo nplez1/orca --yes   # a draft has no tag to clean up
+node local/dispatch-release.mjs
+```
+
 Delete the draft and start over (`gh release delete v<version> --yes`) only when the _draft body_ is
-wrong — a re-run keeps the body it created.
+wrong — a re-run keeps the body it created. **After deleting a draft, the next run must be a full
+`gh run rerun <id>` or a fresh dispatch, never `--failed` or a single re-run job:** only
+`release-draft` creates the draft, and `--failed` keeps the `release-draft` that passed. Every leg
+then refuses at "Require this run's draft release" — which is the guard working, not a new failure.
 
 ## The Linux leg, first run (2026-10-21, `v1.4.214-np.38`)
 

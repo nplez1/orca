@@ -49,9 +49,10 @@ errors="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/fork-release-guard.XXXXXX")"
 if ! found="$(gh release view "$tag" --repo "$repo" --json targetCommitish,isDraft \
   --jq '"\(.targetCommitish) \(.isDraft)"' 2>"$errors")"; then
   if grep -qiE 'not found|HTTP 404' "$errors"; then
-    # Why the monotonicity check here and on a draft below, but not on a published tag: a
-    # re-dispatch of a published tag cannot be stepped above itself, and refusing it would block the
-    # retry it exists for.
+    # Why the monotonicity check here and on a draft below, but not on a published tag: a published
+    # tag cannot be above itself. That exemption no longer lets anything upload — `release-draft` and
+    # every leg refuse a published release — so in practice it only lets `publish` be re-run after
+    # its own undraft.
     if ! node "$script_dir/fork-release-version-guard.mjs" "$tag" "$newest_tag"; then
       exit 1
     fi
@@ -88,7 +89,7 @@ fi
 # Why a draft is not exempt from the newest-tag check: a draft is this run's own release, not yet
 # published, so it can still be stepped below a release published since it was created — and making
 # it public then points `releases/latest` at the older build. Only an already-published tag is exempt,
-# because it cannot be above itself. A draft carries no git tag, so this tag is excluded only in case
+# because it cannot be above itself (see the not-found branch above for what that still allows). A draft carries no git tag, so this tag is excluded only in case
 # one was pushed by hand. Anything but a literal `false` is read as a draft: failing closed here costs
 # a retry, and failing open publishes below the line.
 if [ "$is_draft" != "false" ]; then
@@ -102,5 +103,7 @@ if [ "$is_draft" != "false" ]; then
   echo "$tag is a draft at $sha; uploading into it"
   exit 0
 fi
-echo "$tag already exists at $sha; uploading into it"
+# Why "nothing uploads": the ref and commit check out, but the release is already published, and
+# `release-draft` and every leg's `fork-release-require-draft.sh` refuse to upload into one.
+echo "$tag is already published at $sha; nothing uploads into it"
 exit 0

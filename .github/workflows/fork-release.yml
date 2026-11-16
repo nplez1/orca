@@ -779,6 +779,12 @@ jobs:
           tag="v$RELEASE_VERSION"
           gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json body --jq .body \
             | node .github/scripts/fork-release-notes-guard.mjs - --site draft --label "the draft body of $tag"
+          # Why: "Re-run job" on this job after its own undraft reaches here with a published release,
+          # and neither the validation notice nor the edit applies to it.
+          if [ "$(gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json isDraft --jq .isDraft)" != "true" ]; then
+            echo "$tag is already published; nothing to do"
+            exit 0
+          fi
           if [ "$KEEP_DRAFT" = "true" ]; then
             echo "::notice title=Validation run::keep_draft is set, so $tag stays a draft. Every check passed; delete it with: gh release delete $tag --repo $PUBLISH_OWNER/orca --yes"
             exit 0
