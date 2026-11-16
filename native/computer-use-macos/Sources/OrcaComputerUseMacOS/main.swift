@@ -89,7 +89,9 @@ struct AppDescriptor {
         // Chromium/Electron apps often need this private AX mode, but applying it
         // broadly can corrupt native Cocoa app trees into app-root-only nodes. Not every
         // Electron app either: it turns on screen-reader mode, which VS Code and its forks react to.
-        if let bundleId, TrustedOrcaApplication.isTrusted(bundleId: bundleId) {
+        // Why: any Orca-owned app is Electron-hosted, so it takes the private AX mode; the
+        // fork's identity helper is the one that knows this build's bundle ids.
+        if let bundleId, OrcaBundleIdentity.isTrustedPeer(bundleId: bundleId) {
             return true
         }
         // Why: Gecko ships its engine as Contents/MacOS/XUL, which covers Firefox, its forks, Thunderbird and Zotero.
