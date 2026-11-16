@@ -96,17 +96,21 @@ literals re-applied), import-only (three-way union). A proven file must also pas
   keeps — stage 0, or both sides' stages; a modify/delete is undecided. A TS importer probes like the
   compiler (never a `.d.ts` for a value import); a JS importer and a URL need the exact path;
 - it imports or re-exports nothing an index stage removed, and uses no name base imported that it
-  neither imports nor declares (a text scan: a false hit only refuses);
-- a binding a side re-pointed at another module keeps the other side's edits: if the other side
-  changed its declaration in the old module, the new module must be where git's renames say the old
-  one moved.
+  neither imports nor declares at module scope (a text scan: an inner parameter of the same name does
+  not count, and a shadowed use is a false hit, which only refuses);
+- a binding a side re-pointed at another module keeps the other side's edits
+  (`lib/conflict-provider-gate.mjs`). It passes when the new module is the old one moved and the
+  index holds the merge's own three-way result of that move, or when the other side changed nothing,
+  byte for byte, in the old module and everything it imports. Anything it cannot trace refuses: an
+  `@orca/` import in the closure, a path base cannot resolve, a merge with more than one merge base.
 
 `--apply-proven <decision.json>` refuses a decision proposed for another operation (merge head, HEAD,
 rebase step), re-proves each file from disk and writes only files where every hunk is proven and
-nothing changed since the proposal. A rerun re-checks what an earlier run wrote against the live index
-and reports it as `already`; a path that is no longer unmerged — staged, by hand or after review — has
-no stages left to check, so it is `REFUSED` and the run exits 1 having written nothing. It stages
-nothing and prints, never runs, the `git rm` a settled deletion needs. `--rename-forecast
+nothing changed since the proposal. A rerun runs what an earlier run wrote back through the whole-file
+gate against the live index and reports it as `already` (the hunks are not re-proved: their markers
+are gone). A path that is no longer unmerged — staged, by hand or after review — has no stages left,
+so it is reported as `staged`, is neither written nor re-checked, and does not fail the run: a partial
+`git add` followed by a rerun exits 0 and still writes every other proven file. It stages nothing and prints, never runs, the `git rm` a settled deletion needs. `--rename-forecast
 <old-base> <new-base>` runs before the merge and lists fork-added references (imports, `vi.mock`, path
 strings) that upstream's renames and deletions will leave pointing at nothing.
 
@@ -116,17 +120,22 @@ from the merge: 54 stale module paths, 29 import unions that kept a binding one 
 orphaned imports from git's clean merge, and `WorktreeCardStatusSlot.tsx`, which took upstream's
 `import type { WorktreeStatus }` from the shared rollup module while the fork had added `'setup'` to
 the renderer's own `WorktreeStatus` — `tsc` reports four errors with it in place of the merge's line.
-Now 100 are written, all byte-identical to `7da96c11bd4`; 594 are left manual and none is refused. The
-re-pointed-binding check also refuses `session-scanner-primary-parsers.ts`, correct only because the
-merge re-homed the fork's `parseJsonObject` change into upstream's new module by hand.
+Now 84 are written, all byte-identical to `7da96c11bd4`; 610 are left manual and none is refused.
+Comparing the whole old module and its import closure, instead of the binding's declaration, cost 16
+written files that turned out right. The check refuses 18 files in all — `WorktreeCardStatusSlot.tsx`
+and `session-scanner-primary-parsers.ts`, correct in the merge only because the fork's
+`parseJsonObject` change was re-homed by hand, among them: in 12 the other side had edited something in
+the old module's closure, in 6 the closure could not be traced (an `@orca/` package, or a path base
+cannot resolve). That is the price of not tracing re-exports, aliases and dependencies by hand.
+`--propose` took 34 s, of which `git diff -M -l0` is 5.3 s on upstream's 7,872 renames (0.05 s on the
+fork's one); the default rename limit stopped pairing at 6,940.
 
 **What the gate does not check**, so a written file can still be wrong in these ways: bare package
 specifiers (a removed dependency), `import.meta.glob` patterns, JSDoc `import()` types, `declare
 module` names, paths inside JSON or other string literals (`path.join(__dirname, '../x')`), template
-specifiers with substitutions, whether a resolved module still exports the imported name, a
-re-pointed binding whose old module only re-exports it from a third file, and scope: the unbound-name
-scan is not a binder, so a shadowing declaration anywhere hides a use. Typecheck is still the gate
-after the merge.
+specifiers with substitutions, whether a resolved module still exports the imported name, and a
+binding imported from a module no side re-pointed whose declaration the other side changed (a
+cross-file semantic conflict git merges cleanly). Typecheck is still the gate after the merge.
 
 The two mistakes it is designed to prevent, both made for real:
 
