@@ -99,10 +99,11 @@ orca-queue node local/gate-lint.mjs
   on an unchanged revision returns the same answer immediately. Do not re-run to chase green.
 - Paste its summary line into the release notes. That line is the claim this step makes checkable.
 
-Check the nightly before cutting, not after:
+Check the nightly before cutting, not after (`--branch main`: a candidate dispatch is a run of the same
+workflow, and would otherwise be what `-L1` shows):
 
 ```bash
-gh run list --workflow fork-main-tests.yml -L1 --repo nplez1/orca
+gh run list --workflow fork-main-tests.yml --branch main -L1 --repo nplez1/orca
 ```
 
 A red there is a failure the Mac's allowlist cannot see, because the Linux runner has its own red set.
@@ -110,6 +111,10 @@ Triage it first. If that nightly is green on the exact commit being released, re
 notes — it covers the Linux runtime better than the local gate does, though the local gate is still
 the only one that exercises the darwin-bound classes, so substituting it is a judgement call and not
 something to do silently.
+
+**Precondition: the early Linux lane is green on the revision being released**
+(UPSTREAM-SYNC-RUNBOOK.md Step 3.5, `node local/sync/linux-lane.mjs`) — the same suite this dispatch
+runs, on the same runner, without a dispatch loop per red.
 
 Since 2026-10-29 the dispatch carries the same coverage itself: `fork-release.yml` runs the unit suite
 on the dispatched commit (`unit-plan` → `unit-tests`, the same reusable workflow, shard plan and fork

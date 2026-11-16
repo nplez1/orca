@@ -13,6 +13,7 @@ The process they belong to is [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUN
 | `post-sync.mjs`         | the tree is resolved and you are about to push | the catalog check rewrites the derived catalog (that rewriting _is_ the check)           |
 | `identity-sweep.mjs`    | any time the tree is not conflicted            | only with `--fix`                                                                        |
 | `fork-symbols.mjs`      | after the merge, beside post-sync              | no                                                                                       |
+| `linux-lane.mjs`        | post-sync and `pnpm tc` pass; again at the end | pushes a `sync-candidate/<sha12>` ref and dispatches `fork-main-tests.yml` on it         |
 | `convergence-ledger.md` | every time a convergence question comes up     | edit it when you settle one                                                              |
 
 **Neither sync script is read-only.** `pre-sync.mjs` and `post-sync.mjs` both run
@@ -36,6 +37,9 @@ node local/sync/conflicts.mjs            # per file: stages, balance, class, led
 
 # 3. prove it
 node local/sync/post-sync.mjs
+
+# 3.5 the release's Linux unit lane, on a candidate ref, while the local gates run
+node local/sync/linux-lane.mjs           # --dry-run first; --cleanup after the release
 
 # 4. publish
 node local/sync/publish-sync.mjs         # push origin main, then sweep the Actions fleet
@@ -132,6 +136,14 @@ report-only until the `~/.orca` migration is designed — and `identity-sweep-ba
 which report-only findings already exist, per rule and per file, so post-sync's row fails on a new one
 instead of passing on `fixable === 0`. `--baseline-init [--accept <reason>]` and `--baseline-prune`
 move it, and the total may only shrink.
+
+**`linux-lane.mjs`** — runs the release workflow's Linux unit lane early. It pushes HEAD to
+`sync-candidate/<sha12>` (a new ref per revision, never a force-push) and dispatches
+`fork-main-tests.yml` on it, which runs that ref's own copy of the workflow, shard plan and Linux
+known-red list. Before pushing it reads every workflow file in the candidate's tree and refuses if a
+`push` or `create` trigger would fire for that ref, or if the lane can reach a runner label this fork
+does not provision. `--cleanup` deletes the candidate refs `origin/main` already contains and names the
+rest. UPSTREAM-SYNC-RUNBOOK.md Step 3.5 is why it exists.
 
 **`curate.mjs`** — **retired 2026-10-27.** It planned a curated, linear patch series for the _rebase_
 era: a contiguous partition of the release line where each patch's tree is a real historical tree. It

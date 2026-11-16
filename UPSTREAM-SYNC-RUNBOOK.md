@@ -77,6 +77,7 @@ node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no wor
 node local/sync/post-sync.mjs [--json] [--skip-typecheck] [--waive <id>:<reason>]
 node local/sync/fork-symbols.mjs [--json]               # also a post-sync row; run it alone to see why
 node local/sync/identity-sweep.mjs [--json|--fix]
+node local/sync/linux-lane.mjs [--dry-run] [--cleanup]   # Step 3.5: the Linux unit lane, early
 ```
 
 `local/sync/convergence-ledger.md` is not a script: it is the durable record of _which side wins_
@@ -340,6 +341,59 @@ Then the gates that no script can judge:
 - `pnpm test <every test file in a touched area>`.
 - `pnpm run check:code-quality:changed` (against `upstream/main` for a sync-sized change). Findings
   in fork-only files are expected debt; a finding in a file this sync touched is not.
+
+## Step 3.5 — the early Linux lane
+
+As soon as `post-sync.mjs` and `pnpm tc` pass, and the merge and its repairs are committed, run the
+release workflow's Linux unit lane on the candidate — long before the release gates:
+
+```bash
+node local/sync/linux-lane.mjs --dry-run   # the plan and the safety verdict; pushes nothing
+node local/sync/linux-lane.mjs             # push HEAD to sync-candidate/<sha12>, dispatch fork-main-tests.yml
+```
+
+**Why.** Five of the six 2026-11-16 release dispatches failed, four of them in `fork-release.yml`'s Linux
+unit lane on Linux-only or Electron tests the Mac gate quarantines or skips; each one cost a fix, a
+review-manifest commit, a push and a dispatch, 8–60 minutes a loop. `fork-main-tests.yml` runs the same
+reusable `unit-tests.yml`, shard plan and fork shard verdict on `ubuntu-24.04-arm` in about 12 minutes,
+at no cost.
+
+**Why it is safe**, checked 2026-11-16:
+
+- A dispatch runs **the ref's own copy** of the workflow — and so the merged `unit-tests.yml` and
+  `local/nightly-linux-known-red.json`. Run 43332008251 on `nplez1/issue-401` ran the `scale` job 44
+  minutes before #401 added it to `main`.
+- **No `push` trigger matches `sync-candidate/*`.** The tree's `on.push` filters are `branches: [main]`
+  (seven files), `branches: [Jinwoo-H/windows-update-survival]` (two) and tags only (two), and no file
+  has `create`. A file new to the repository arrives enabled and a sync can add one, so the script
+  re-reads every workflow in the candidate's tree and refuses a `push` or `create` trigger that would
+  fire for the ref (a `paths` filter counts as matching), and any unprovisioned runner label the lane
+  can reach.
+- The concurrency group is `fork-main-unit-tests-${{ github.ref }}`, so a candidate neither cancels nor
+  shares the nightly's slot. One ref per revision means candidates never cancel each other; a
+  re-dispatch of the same revision supersedes its earlier run.
+- The health checks do not read it as the nightly: `check-nightly-liveness.mjs` lists `--branch main`
+  only, `ci-health-report.mjs` sweeps only on `refs/heads/main`, and `check-actions-enablement.mjs`
+  judges per-workflow repository state, which no ref changes. A bare
+  `gh run list --workflow fork-main-tests.yml -L1` _does_ show a candidate run — add `--branch main`
+  when you mean the nightly.
+
+**Triage in parallel.** Start `gh run watch <id> --repo nplez1/orca --compact --exit-status` as one
+background command and let its exit notify you; meanwhile carry on with Step 3's review and the local
+release gates. A red shard is fixed or classified exactly as a release-lane red is (RELEASE-RUNBOOK.md
+Step 1.5): `gh run download <id> --repo nplez1/orca`, then
+`node local/check-nightly-linux-parity.mjs --failures <dir>`, and hand the reds to a fixer with
+[`repair-tests.md`](./local/sync/templates/repair-tests.md). Commit the fixes and re-run the script on
+the new HEAD.
+
+**Run it again on the final revision**, before `node local/dispatch-release.mjs`: the revision whose
+code you dispatch. A later commit that touches only `local/sync/release-review/*.json` or `*.md` — what
+the review gate already treats as review-neutral — does not change what it tests.
+
+**Clean up after the release ships:** `node local/sync/linux-lane.mjs --cleanup` (`--dry-run` lists)
+deletes the candidate refs `origin/main` already contains and keeps, by name, any whose commit it does
+not, since that ref may be the only remote copy. No workflow in the tree has a `delete` trigger, and the
+runs' history survives the ref.
 
 ## Step 4 — push
 
