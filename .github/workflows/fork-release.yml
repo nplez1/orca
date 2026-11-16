@@ -65,6 +65,14 @@ on:
 permissions:
   contents: write
 
+# Why one release run at a time: two dispatches running together can each create a draft, or the
+# lower version can finish last and its undraft make it `releases/latest`. Why not cancel: a release
+# run cancelled mid-upload leaves a half-filled draft. GitHub keeps one run pending behind the
+# running one, and a newer dispatch replaces an older pending one — which is the run to keep anyway.
+concurrency:
+  group: fork-release
+  cancel-in-progress: false
+
 # Why the same version for every job: the mac, windows and linux artifacts of one release must
 # agree, and the updater compares the version baked into each manifest. github.run_number is
 # identical across jobs in a run, so deriving from it keeps them in step without passing state around.

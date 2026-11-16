@@ -101,6 +101,10 @@ describe('the release dispatch is gated on test evidence', () => {
     }
   })
 
+  it('never runs two releases at once, and never cancels one mid-upload', () => {
+    expect(RELEASE.concurrency).toEqual({ group: 'fork-release', 'cancel-in-progress': false })
+  })
+
   it('creates the release in exactly one job, and never in a leg', () => {
     const creating = Object.entries(RELEASE.jobs)
       .filter(([, job]) =>
