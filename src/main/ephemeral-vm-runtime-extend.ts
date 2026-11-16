@@ -232,7 +232,7 @@ async function reattachEphemeralVmRuntime(args: {
       'Extend changed the host connection but returned no Orca Server pairing code to reattach it with.'
     )
   }
-  updateEnvironmentFromPairingCode(args.userDataPath, environmentId, { pairingCode })
+  await updateEnvironmentFromPairingCode(args.userDataPath, environmentId, { pairingCode })
   invalidateRuntimeEnvironmentTransport(environmentId)
   return updateEphemeralVmRuntimeStatus(args.userDataPath, args.runtime.id, {
     connectionMode: 'orca-server'

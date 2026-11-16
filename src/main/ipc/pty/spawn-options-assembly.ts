@@ -229,21 +229,7 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   if (startupIngress) {
     spawnOptions.startupIngress = startupIngress
   }
-  const trustWrite = applyAgentWorkspaceTrustToSpawn({
-    launchAgent: args.launchAgent,
-    worktreeId: args.worktreeId,
-    trustWorktreeId: args.trustWorktreeId,
-    cwd: input.cwd,
-    store: input.store,
-    isFreshLaunch: !input.preAdoptedStablePane && launchCommand !== undefined,
-    settings: input.getSettings?.(),
-    env,
-    claudeAuth: input.claudeAuth,
-    wslDistro: input.expectedWslDistro,
-    connectionId: connectionId ?? null,
-    codexHome: input.selectedCodexHomePath,
-    spawnOptions
-  })
+  const trustWrite = applyAgentWorkspaceTrustToSpawn({ ...trustInput, spawnOptions })
   if (trustWrite) {
     await trustWrite
   }

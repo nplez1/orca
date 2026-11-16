@@ -180,10 +180,8 @@ import {
   retireGeneratedWorktreeName
 } from '../workspaces/removal/retirement/worktree-name-retirement'
 import { createRetiredNameLookup } from '../../shared/worktree/naming/retired-name-registry'
-import {
-  assertNoPendingWorktreeRemovalConflict,
-  findPendingWorktreeRemovalConflict
-} from '../workspaces/removal/worktree-removal-table'
+import { assertNoPendingWorktreeRemovalConflict } from '../workspaces/removal/worktree-removal-table'
+import { isWorktreePathReserved } from '../workspaces/creation/reserved-worktree-path'
 import {
   exactNameBranchConflict,
   exactNameLateCollision,
@@ -1415,7 +1413,7 @@ async function performLocalWorktreeCreate(
     // Pending removals and archived workspaces still own paths Git may already have deleted.
     return (
       !(await worktreePathTaken(worktreePath)) &&
-      !findPendingWorktreeRemovalConflict(repo.path, { worktreePath }) &&
+      !isWorktreePathReserved(store, repo, worktreePath) &&
       pathClaim.claim(worktreePath)
     )
   }

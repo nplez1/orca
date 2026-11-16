@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: upstream-owned and at its budget; the fork's 18-code-line delta rides inside it, and splitting costs a permanent sync hunk. */
 import { useAppStateValue } from '@/store/retained-views/app-state-view'
 import { AgentLaunchChoiceEditor } from '@/components/agent/launch-settings/AgentLaunchChoiceEditor'
 import { agentChatPermissionModes } from '../../../../../../shared/agent-launch/permissions/agent-chat-permission-support'
@@ -65,6 +66,8 @@ import {
   useHostStructuredAgentsVersion
 } from '@/runtime/native-chat/agent-catalogs/chat-provider-agents'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host'
+import { useAppStore } from '@/store'
+import { refreshDetectedAgentInventories } from '@/store/slices/agent-enablement-redetection'
 import { useTranslate } from '@/i18n/use-translate'
 
 export type AgentPermissionsRenderer = (props: AgentPermissionsSettingProps) => React.ReactNode
@@ -287,7 +290,27 @@ export function AgentLaunchSettingsCatalog({
           )
         : undefined,
     onSetDefault: (isDefault) => save({ type: 'default', agent: isDefault ? agent.id : null }),
-    onSetEnabled: (enabled) => save({ type: 'availability', agent: agent.id, enabled }),
+    onSetEnabled: (enabled) => {
+      // Why: an agent is normally enabled because it is already installed, and this host's
+      // list is a cache — re-read it once the write lands so the menu and the default pills
+      // offer the agent.
+      void mutate({ type: 'availability', agent: agent.id, enabled })
+        .catch(() => {})
+        .then(() => {
+          if (!enabled) {
+            return
+          }
+          if (detectionTarget.kind === 'runtime') {
+            // Why: a host page's enable is an RPC write, so no settings-write fan-out sees it, and
+            // each of that host's workspaces keeps a list of its own beside the default one.
+            refreshDetectedAgentInventories(useAppStore.getState(), {
+              runtimeEnvironmentId: detectionTarget.environmentId
+            })
+            return
+          }
+          void refresh()
+        })
+    },
     onSaveOverride: async (value) => {
       const changed = value !== (settings.agentCmdOverrides[agent.id] ?? '')
       await mutate({ type: 'command', agent: agent.id, value })

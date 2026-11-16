@@ -2,6 +2,7 @@ import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/e
 import type { RemoveWorktreeResult } from '../../../shared/worktree/create-types'
 import type { WorktreeRemovalRecord } from './worktree-removal-records'
 import { pendingWorktreeRemovals } from './worktree-removal-table'
+import { withRemovalAcceptanceFields } from '../../worktree-removal-acceptance-fields'
 
 export type RemovalSettlement = {
   accepted: Promise<void>
@@ -78,5 +79,11 @@ export async function finishAcceptedWorktreeRemoval<T extends RemoveWorktreeResu
 ): Promise<Omit<T, 'removing'>> {
   const { removing, ...acceptance } = accepted
   const pending = removing ? waitForPendingWorktreeRemoval(worktreeId, hostId) : undefined
-  return pending ? { ...acceptance, ...(await pending) } : acceptance
+  if (!pending) {
+    return acceptance
+  }
+  // Why the helper: both sides can carry a warning (archive hook skipped, folder left behind), and
+  // upstream's spread would overwrite the acceptance warning with the finished removal's.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the pending removal is the same T the acceptance was created from.
+  return withRemovalAcceptanceFields(await pending, acceptance) as Omit<T, 'removing'>
 }
