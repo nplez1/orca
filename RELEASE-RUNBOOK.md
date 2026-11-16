@@ -7,7 +7,9 @@ Companions: [BRANCHES.md](./BRANCHES.md) for branch state, [LOCAL-PATCHES.md](./
 for the fork-only patches the builds depend on, and
 [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for the sync that usually precedes a
 release. Bring upstream in first — a release built from a stale base cannot see the fixes upstream
-has since landed.
+has since landed. An agent running the sync and the release end to end starts from
+[local/sync/templates/release-brief.md](./local/sync/templates/release-brief.md), which walks both
+runbooks step by step.
 
 ## What is already done
 

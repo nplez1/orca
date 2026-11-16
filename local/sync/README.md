@@ -1,7 +1,7 @@
 # `local/sync/` — the tooling behind an upstream sync
 
-Five small `node` scripts and one markdown ledger. Nothing here resolves a conflict for you; they
-exist so a sync starts informed, a conflict stop is cheap to classify, and the checks that caught
+Small `node` scripts, one markdown ledger, and the prompt templates a sync's subagents run from.
+Nothing here resolves a conflict for you; they exist so a sync starts informed, a conflict stop is cheap to classify, and the checks that caught
 real breakage are one command instead of a list you read off a runbook at the end.
 
 The process they belong to is [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUNBOOK.md).
@@ -40,6 +40,27 @@ node local/sync/post-sync.mjs
 # 4. publish
 node local/sync/publish-sync.mjs         # push origin main, then sweep the Actions fleet
 ```
+
+## The templates
+
+A sync and release is run by one agent that fans work out to subagents. The prompts it hands them are
+checked in under [`templates/`](./templates/), parameterised with `{{PLACEHOLDERS}}` that each file's
+header comment lists. Fill them, and check nothing still reads `{{`, before sending.
+
+| Template                    | Who gets it                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| `release-brief.md`          | the release agent itself — **start a sync and release with this brief**        |
+| `conflict-protocol.md`      | written once per sync to `.git/orca-sync/PROTOCOL.md`; every resolver reads it |
+| `resolve-batch.md`          | one resolver per batch of at most 20 conflicted paths                          |
+| `repair-typecheck.md`       | one fixer per TypeScript project after the merge                               |
+| `repair-tests.md`           | unit-gate or Linux-lane reds, grouped by area                                  |
+| `repair-lint.md`            | lint-gate steps, disjoint sets per fixer                                       |
+| `repair-review-findings.md` | the findings of RELEASE-RUNBOOK.md Step 1.6, grouped by area                   |
+
+The brief names runbook steps rather than copying their commands, so a runbook change reaches it
+without an edit. Its "Orchestration" section holds the rules the 2026-11-15 run paid for: batch size,
+file-by-file staging, no repo-wide commands in a resolver, waiting on the harness instead of `sleep`,
+and one runner per heavy gate.
 
 ## What each one is for
 

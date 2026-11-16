@@ -1,7 +1,10 @@
 # Upstream sync runbook
 
 How to bring `main` up to upstream `main` and publish a release from it. The short
-instruction is **"sync upstream"**; everything below is what that means.
+instruction is **"sync upstream"**; everything below is what that means. To run a sync and release
+end to end, **start the agent with
+[local/sync/templates/release-brief.md](./local/sync/templates/release-brief.md)**, which walks these
+steps and RELEASE-RUNBOOK.md's in order.
 
 Companions: [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) for the patch series that must survive,
 [BRANCHES.md](./BRANCHES.md) for what each branch is, [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md)
@@ -174,6 +177,17 @@ Stages survive until you `git add`, so this works at any point in either operati
 When upstream has built the same thing, ask the fork's owner which way to converge, then **write the
 answer into the ledger** in the same commit. Decisions already taken are in
 [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md).
+
+### Fanning out to resolvers
+
+A sync-sized conflict set is resolved by subagents, from checked-in prompts: write
+[`conflict-protocol.md`](./local/sync/templates/conflict-protocol.md) once to
+`.git/orca-sync/PROTOCOL.md`, then hand each batch a
+[`resolve-batch.md`](./local/sync/templates/resolve-batch.md). **A batch is at most 20 paths from one
+area, resolved and `git add`-ed file by file**, and a resolver never runs a repo-wide command — the
+2026-11-15 batch of 51 staged nothing in 26 minutes while re-splits of 22 and 19 finished in under
+ten. The `repair-*.md` templates beside them hand Step 3's and the release gates' reds to fixers.
+[release-brief.md](./local/sync/templates/release-brief.md) § Orchestration has the rest of the rules.
 
 ### Traps, all of them hit for real
 
