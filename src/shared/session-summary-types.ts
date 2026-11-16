@@ -289,11 +289,11 @@ export const SESSION_SUMMARY_REPORT_HEADLINE_MAX_CHARS = 200
 export const SESSION_SUMMARY_HOST_OUTDATED_MESSAGE = 'host-outdated'
 
 /** No fold is running. Shared so a client that answers before its host does starts idle. */
-export const SESSION_SUMMARY_IDLE_FOLD: SessionSummaryFoldProgress = {
+export const SESSION_SUMMARY_IDLE_FOLD: Readonly<SessionSummaryFoldProgress> = Object.freeze({
   running: false,
   completedChunks: 0,
   totalChunks: 0
-}
+})
 
 /**
  * A failed snapshot for a pane, keeping the brief already on screen when there is one.
@@ -318,6 +318,9 @@ export function failedSessionSummarySnapshot(
     }),
     paneKey,
     status: 'failed',
+    // Why cleared: the header reads `fold.running` before it reads the failure, so a failed
+    // snapshot that kept a running fold reported "Updating…" with the refresh button disabled.
+    fold: { ...(previous?.fold ?? SESSION_SUMMARY_IDLE_FOLD), running: false },
     error
   }
 }

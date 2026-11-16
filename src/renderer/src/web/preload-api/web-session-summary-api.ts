@@ -17,6 +17,7 @@ import {
   type SessionSummarySnapshot
 } from '../../../../shared/session-summary-types'
 import { unwrapRuntimeRpcResult } from '../../runtime/rpc/calls/runtime-rpc-result'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
 import { callEnvironmentEnvelope } from './web-runtime-calls'
 import { getStoredSettings } from './web-preferences-store'
 import { requireActiveEnvironmentOrNull } from './web-runtime-session'
@@ -69,28 +70,40 @@ export function createWebSessionSummaryApi(): SessionSummaryApi {
         // Not 'unavailable': its copy names a missing transcript, and there is no host to ask.
         return failedSessionSummarySnapshot(request.paneKey, WEB_SESSION_SUMMARY_NO_HOST_MESSAGE)
       }
-      openedOn.set(request.paneKey, environment.id)
-      if (!request.sameViewer) {
+      // Why the recorded pairing and not the current one: a close must reach the host that took
+      // the lease, and a re-pair mid-fold would otherwise move this pane's fold to a host that
+      // owes it nothing.
+      const environmentId = openedOn.get(request.paneKey) ?? environment.id
+      // Why also when this client holds none: a pane opened before the client was paired has no
+      // lease yet, and its first refresh would otherwise be dropped as unread.
+      if (!request.sameViewer || leases.count(request.paneKey) === 0) {
         leases.touch(request.paneKey)
+        openedOn.set(request.paneKey, environmentId)
       }
       // Why the fold configuration is read here and not on the host: the fold spawns an agent,
       // and a host substituting its own choice would run one the reader never picked. This
       // client's settings are what its Settings → Agents pane edits.
       hostFolds.open({
         paneKey: request.paneKey,
-        environmentId: environment.id,
+        environmentId,
         foldParams: resolveSessionSummaryAiParams(getStoredSettings()),
         ...(request.session ? { session: request.session } : {}),
-        // Why forwarded: this client can read a workspace owned by a third host, and the host it
-        // is paired with holds no status row for that pane.
-        ...(request.executionHostId ? { executionHostId: request.executionHostId } : {}),
+        ...(request.executionHostId
+          ? { executionHostId: hostForRequest(request.executionHostId, environmentId) }
+          : {}),
         ...(request.revalidateWithinMs ? { revalidateWithinMs: request.revalidateWithinMs } : {}),
         ...(request.sameViewer ? { sameViewer: true } : {})
       })
       // Why answer before the host does: the fold outlives a relay idle window, and a caller
       // waiting on it would show "up to date" over a skeleton until it landed. The host's own
       // answers arrive through `onUpdate`, which the pane subscribes to before it opens.
-      return shown.get(request.paneKey) ?? foldingSnapshot(request.paneKey)
+      const shownHere = shown.get(request.paneKey)
+      if (!shownHere) {
+        return foldingSnapshot(request.paneKey)
+      }
+      // Why the fold is marked running: between the click and the host's first answer the header
+      // has to say so, or a refresh reports "up to date" over a brief it has not checked yet.
+      return { ...shownHere, fold: { ...shownHere.fold, running: true } }
     },
     close: (request: SessionSummaryCloseRequest): void => {
       const environmentId = openedOn.get(request.paneKey)
@@ -127,4 +140,20 @@ function foldingSnapshot(paneKey: string): SessionSummarySnapshot {
     seenThrough: 0,
     fold: { ...SESSION_SUMMARY_IDLE_FOLD, running: true }
   }
+}
+
+/**
+ * The workspace host to send on, or nothing when it names this client's own pairing.
+ *
+ * A browser client stamps every row its server sends with `runtime:<its pairing id>`, so the
+ * common case arrives naming the server itself — which that server does not know as an
+ * environment of its own, and would try to fold on. A workspace owned by a third host is named
+ * with the id the server gave it, which is exactly what the server needs to route there.
+ */
+function hostForRequest(requested: string, pairedEnvironmentId: string): string | undefined {
+  const host = parseExecutionHostId(requested)
+  if (host?.kind === 'runtime' && host.environmentId === pairedEnvironmentId) {
+    return undefined
+  }
+  return requested
 }

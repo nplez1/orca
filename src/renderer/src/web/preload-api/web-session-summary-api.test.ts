@@ -69,12 +69,23 @@ describe('web session summary api', () => {
       [
         'env-1',
         'sessionSummary.openOnHost',
-        // The workspace's own host travels: this client can read a workspace the host it is
+        // A workspace owned by another host travels: this client can read one the host it is
         // paired with holds no status row for.
         expect.objectContaining({ paneKey: PANE_KEY, executionHostId: 'runtime:env-2' })
       ]
     ])
     expect(answered.paneKey).toBe(PANE_KEY)
+  })
+
+  // Why: a browser client stamps every row its server sends with `runtime:<its pairing id>`, so
+  // the common case names the paired server itself. Sent on, the server would look for an
+  // environment of its own by that name and fold nowhere.
+  it('does not name the pairing itself as a workspace host', async () => {
+    const api = createWebSessionSummaryApi()
+
+    await api.open({ paneKey: PANE_KEY, executionHostId: 'runtime:env-1' })
+
+    expect(callsTo('sessionSummary.openOnHost')[0]?.[2]).not.toHaveProperty('executionHostId')
   })
 
   // Why: the fold spawns an agent, and a host substituting its own Settings → Agents choice
@@ -114,6 +125,40 @@ describe('web session summary api', () => {
         ['env-1', 'sessionSummary.closeOnHost', { paneKey: PANE_KEY, seenTimelineCount: 0 }]
       ])
     )
+  })
+
+  // Why: a refresh is the same reader asking again, so a second lease here would outlive the
+  // one close an unmount sends and the host's fold would never stop.
+  it('does not take a second lease for a refresh', async () => {
+    const api = createWebSessionSummaryApi()
+    await api.open({ paneKey: PANE_KEY })
+    await api.open({ paneKey: PANE_KEY, sameViewer: true })
+
+    api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
+
+    await vi.waitFor(() => expect(callsTo('sessionSummary.closeOnHost')).toHaveLength(1))
+  })
+
+  // Why: a poll that lands after the last close belongs to a pane nobody is reading, and keeping
+  // it would brief the next session in that pane with the previous one's summary.
+  it('stops delivering once the last viewer has closed the pane', async () => {
+    let answer: (value: unknown) => void = () => {}
+    mocks.call.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = (value: unknown) => resolve(ok(value))
+        })
+    )
+    const api = createWebSessionSummaryApi()
+    const seen: SessionSummarySnapshot[] = []
+    api.onUpdate((next) => seen.push(next))
+    await api.open({ paneKey: PANE_KEY })
+    api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
+
+    answer(snapshot())
+
+    await vi.waitFor(() => expect(mocks.call).toHaveBeenCalled())
+    expect(seen).toEqual([])
   })
 
   it('reports an unpaired client instead of asking a host that is not there', async () => {
