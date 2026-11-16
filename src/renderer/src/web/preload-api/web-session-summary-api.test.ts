@@ -129,14 +129,56 @@ describe('web session summary api', () => {
 
   // Why: a refresh is the same reader asking again, so a second lease here would outlive the
   // one close an unmount sends and the host's fold would never stop.
-  it('does not take a second lease for a refresh', async () => {
+  it('refreshes the pane on the lease it already holds', async () => {
     const api = createWebSessionSummaryApi()
     await api.open({ paneKey: PANE_KEY })
     await api.open({ paneKey: PANE_KEY, sameViewer: true })
 
+    expect(callsTo('sessionSummary.openOnHost')[1]?.[2]).toMatchObject({ sameViewer: true })
+
     api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
 
     await vi.waitFor(() => expect(callsTo('sessionSummary.closeOnHost')).toHaveLength(1))
+  })
+
+  // Why: a pane opened before the client was paired holds no lease, so its first refresh has to
+  // take one — and must not claim to be a refresh, which would tell the host to skip its own.
+  it('takes the lease a refresh of an unpaired open was never given', async () => {
+    mocks.environment.mockReturnValue(null)
+    const api = createWebSessionSummaryApi()
+    await api.open({ paneKey: PANE_KEY })
+
+    mocks.environment.mockReturnValue({ id: 'env-1' })
+    await api.open({ paneKey: PANE_KEY, sameViewer: true })
+
+    const refresh = callsTo('sessionSummary.openOnHost')[0]?.[2]
+    expect(refresh?.sameViewer).not.toBe(true)
+
+    api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
+
+    await vi.waitFor(() => expect(callsTo('sessionSummary.closeOnHost')).toHaveLength(1))
+  })
+
+  // Why: a re-pair mid-lease must not move this pane's fold to the new host — the lease it is
+  // reading through lives on the old one, and only a close there ends it.
+  it('keeps folding on the host that holds the lease after a re-pair', async () => {
+    const api = createWebSessionSummaryApi()
+    await api.open({ paneKey: PANE_KEY })
+    mocks.environment.mockReturnValue({ id: 'env-2' })
+
+    await api.open({ paneKey: PANE_KEY, sameViewer: true })
+
+    expect(callsTo('sessionSummary.openOnHost')[1]?.[0]).toBe('env-1')
+  })
+
+  it('reports a refresh as folding until the host answers', async () => {
+    const api = createWebSessionSummaryApi()
+    await api.open({ paneKey: PANE_KEY })
+    await vi.waitFor(() => expect(mocks.call).toHaveBeenCalled())
+
+    const answered = await api.open({ paneKey: PANE_KEY, sameViewer: true })
+
+    expect(answered.fold.running).toBe(true)
   })
 
   // Why: a poll that lands after the last close belongs to a pane nobody is reading, and keeping
@@ -153,12 +195,17 @@ describe('web session summary api', () => {
     const seen: SessionSummarySnapshot[] = []
     api.onUpdate((next) => seen.push(next))
     await api.open({ paneKey: PANE_KEY })
-    api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
 
+    // The same answer delivered while the pane is read, so the negative case below is not vacuous.
     answer(snapshot())
+    await vi.waitFor(() => expect(seen).toHaveLength(1))
 
-    await vi.waitFor(() => expect(mocks.call).toHaveBeenCalled())
-    expect(seen).toEqual([])
+    await api.open({ paneKey: PANE_KEY, sameViewer: true })
+    api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
+    answer(snapshot())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(seen).toHaveLength(1)
   })
 
   it('reports an unpaired client instead of asking a host that is not there', async () => {

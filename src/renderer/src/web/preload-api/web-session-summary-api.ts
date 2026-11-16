@@ -76,7 +76,8 @@ export function createWebSessionSummaryApi(): SessionSummaryApi {
       const environmentId = openedOn.get(request.paneKey) ?? environment.id
       // Why also when this client holds none: a pane opened before the client was paired has no
       // lease yet, and its first refresh would otherwise be dropped as unread.
-      if (!request.sameViewer || leases.count(request.paneKey) === 0) {
+      const takesLease = !request.sameViewer || leases.count(request.paneKey) === 0
+      if (takesLease) {
         leases.touch(request.paneKey)
         openedOn.set(request.paneKey, environmentId)
       }
@@ -89,10 +90,17 @@ export function createWebSessionSummaryApi(): SessionSummaryApi {
         foldParams: resolveSessionSummaryAiParams(getStoredSettings()),
         ...(request.session ? { session: request.session } : {}),
         ...(request.executionHostId
-          ? { executionHostId: hostForRequest(request.executionHostId, environmentId) }
+          ? {
+              executionHostId: hostForRequest(request.executionHostId, [
+                environmentId,
+                environment.id
+              ])
+            }
           : {}),
         ...(request.revalidateWithinMs ? { revalidateWithinMs: request.revalidateWithinMs } : {}),
-        ...(request.sameViewer ? { sameViewer: true } : {})
+        // Why only when no lease is taken: `sameViewer` tells the host to skip its own lease, so
+        // forwarding it while this client takes one would owe the host a close it never earned.
+        ...(takesLease ? {} : { sameViewer: true })
       })
       // Why answer before the host does: the fold outlives a relay idle window, and a caller
       // waiting on it would show "up to date" over a skeleton until it landed. The host's own
@@ -143,16 +151,19 @@ function foldingSnapshot(paneKey: string): SessionSummarySnapshot {
 }
 
 /**
- * The workspace host to send on, or nothing when it names this client's own pairing.
+ * The workspace host to send on, or nothing when it names a pairing this client holds.
  *
  * A browser client stamps every row its server sends with `runtime:<its pairing id>`, so the
  * common case arrives naming the server itself — which that server does not know as an
  * environment of its own, and would try to fold on. A workspace owned by a third host is named
  * with the id the server gave it, which is exactly what the server needs to route there.
+ *
+ * Both pairings are checked: after a re-pair the rows carry the new id while this pane's lease,
+ * and therefore the host it is opened on, are still the old one.
  */
-function hostForRequest(requested: string, pairedEnvironmentId: string): string | undefined {
+function hostForRequest(requested: string, pairingIds: readonly string[]): string | undefined {
   const host = parseExecutionHostId(requested)
-  if (host?.kind === 'runtime' && host.environmentId === pairedEnvironmentId) {
+  if (host?.kind === 'runtime' && pairingIds.includes(host.environmentId)) {
     return undefined
   }
   return requested
