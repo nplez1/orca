@@ -32,10 +32,10 @@ async function load(contents) {
   return import(`data:text/javascript;base64,${encoded}`)
 }
 const [baselineModule, currentModule] = await Promise.all([
-  load(`import { sessionSortTime } from './parsing/session-scanner-accumulator';
+  load(`import { sessionSortTime } from '../../../../src/main/ai-vault/parsing/session-scanner-accumulator';
 export ${baselineFunction.getText(baselineSource)}`),
-  load(`export { canStopParsingSessions } from './parsing/session-scan-cutoff';
-export { ScannedSessionCollection } from './parsing/session-root-dedup';`)
+  load(`export { canStopParsingSessions } from '../../../../src/main/ai-vault/parsing/session-scan-cutoff';
+export { ScannedSessionCollection } from '../../../../src/main/ai-vault/parsing/session-root-dedup';`)
 ])
 const baseline = baselineModule.canStopParsingSessions
 const current = currentModule.canStopParsingSessions

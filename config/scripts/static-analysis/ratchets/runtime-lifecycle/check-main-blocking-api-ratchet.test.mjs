@@ -26,7 +26,7 @@ afterEach(() => {
 describe('main blocking API ratchets', () => {
   it('guards typed SQL receivers without charging Map.get or async backup', () => {
     expect(
-      counts(`import type Database from '../sqlite/sync-database'
+      counts(`import type Database from '../../../../../src/main/sqlite/sync-database'
       class Owner {
         db: Database.Database | null
         query() { this.db.prepare('select').get(); this.db.backup('copy') }

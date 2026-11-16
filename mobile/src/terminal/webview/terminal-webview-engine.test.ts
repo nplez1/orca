@@ -2,7 +2,7 @@
 import { Script } from 'node:vm'
 import { parse } from 'acorn'
 import { describe, expect, it, vi } from 'vitest'
-import { XTERM_ENGINE_JS } from '../document/terminal-webview-engine.generated'
+import { XTERM_ENGINE_JS } from '../terminal-webview-engine.generated'
 describe('terminal WebView bundled engine', () => {
   it('parses the bundled engine at the Chrome 74 syntax floor', () => {
     expect(() => parse(XTERM_ENGINE_JS, { ecmaVersion: 2019 })).not.toThrow()

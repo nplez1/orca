@@ -196,7 +196,7 @@ const RELEASE_PROCESS_HOST = {
     }
   }),
   'src/packages/process-host/src/run-process.ts': [
-    "import { describeSpec } from './process-spec'",
+    "import { describeSpec } from '../../../src/packages/process-host/src/process-spec'",
     "export const runProcess = () => 'release runProcess'",
     'export const releaseOnlyExport = describeSpec',
     ''

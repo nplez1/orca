@@ -1,6 +1,6 @@
 import { runInThisContext } from 'node:vm'
 import { afterEach, beforeEach, vi, type Mock } from 'vitest'
-import { TERMINAL_DOCUMENT_SCRIPT } from '../document/terminal-webview-document-script.generated'
+import { TERMINAL_DOCUMENT_SCRIPT } from '../terminal-webview-document-script.generated'
 import { XTERM_HTML } from '../document/native-terminal-html'
 
 function bodyMarkup(): string {

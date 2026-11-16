@@ -21,9 +21,9 @@ try {
   await build({
     stdin: {
       contents: `
-        export { readPersistedProfileState } from './tests/e2e/helpers/persisted-profile-state'
-        export { partitionsFromProfileRoot } from './tests/e2e/helpers/workspace-layout-oracle-views'
-        export { checkWorkspaceLayoutRules } from './src/shared/workspace-layout/invariants/workspace-layout-rules'
+        export { readPersistedProfileState } from '../../../../tests/e2e/helpers/persisted-profile-state'
+        export { partitionsFromProfileRoot } from '../../../../tests/e2e/helpers/workspace-layout-oracle-views'
+        export { checkWorkspaceLayoutRules } from '../../../../src/shared/workspace-layout/invariants/workspace-layout-rules'
       `,
       resolveDir: root,
       loader: 'ts'

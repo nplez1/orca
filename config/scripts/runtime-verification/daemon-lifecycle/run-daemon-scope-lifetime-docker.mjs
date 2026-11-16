@@ -72,7 +72,7 @@ async function bundle(mode) {
       : {
           stdin: {
             contents:
-              "export { buildDurableDaemonScopeCommand } from './src/main/daemon/process-scopes/daemon-cgroup-scope'",
+              "export { buildDurableDaemonScopeCommand } from '../../../../src/main/daemon/process-scopes/daemon-cgroup-scope'",
             resolveDir: repo,
             loader: 'ts'
           }

@@ -16,7 +16,7 @@ describe('countFocusSettingReads', () => {
         [
           'src/renderer/src/a.ts',
           [
-            "import { getSettingsFocusedExecutionHostId } from '../../shared/execution-host'",
+            "import { getSettingsFocusedExecutionHostId } from '../../../../../src/shared/execution-host'",
             'export function getAutomationListTarget(settings) {',
             '  const id = settings?.activeRuntimeEnvironmentId?.trim()',
             "  return id ? { kind: 'environment', environmentId: id } : { kind: 'local' }",
@@ -86,38 +86,38 @@ describe('countFocusSettingReads', () => {
         ],
         [
           'src/renderer/src/wrap.ts',
-          "import * as rr from './routing'\nexport function hostOf(s) {\n  return rr.focusedHostId(s)\n}\n"
+          "import * as rr from '../../../../../src/main/runtime/rpc/methods/orchestration/routing'\nexport function hostOf(s) {\n  return rr.focusedHostId(s)\n}\n"
         ],
         [
           'src/renderer/src/use.ts',
-          "const { focusedHostId } = await import('./routing')\nconst a = focusedHostId(s)\n"
+          "const { focusedHostId } = await import('../../../../../src/main/runtime/rpc/methods/orchestration/routing')\nconst a = focusedHostId(s)\n"
         ]
       ])
     )
     expect(readers.has('hostOf')).toBe(true)
     expect(
       countFocusSettingReads(
-        "import * as rr from './routing'\nconst a = rr.focusedHostId(s)\nt('auto.rr.focusedHostId.x')",
+        "import * as rr from '../../../../../src/main/runtime/rpc/methods/orchestration/routing'\nconst a = rr.focusedHostId(s)\nt('auto.rr.focusedHostId.x')",
         readers.namesFor('src/renderer/src/other.ts'),
         readers.memberNames
       )
     ).toBe(1)
     expect(
       countFocusSettingReads(
-        "const { focusedHostId } = await import('./routing')\nconst a = focusedHostId(s)\n",
+        "const { focusedHostId } = await import('../../../../../src/main/runtime/rpc/methods/orchestration/routing')\nconst a = focusedHostId(s)\n",
         readers.namesFor('src/renderer/src/use.ts'),
         readers.memberNames
       )
     ).toBe(1)
     for (const [rel, text] of [
-      ['src/renderer/src/r1.ts', "const { focusedHostId: g } = await import('./routing')\ng(s)"],
+      ['src/renderer/src/r1.ts', "const { focusedHostId: g } = await import('../../../../../src/main/runtime/rpc/methods/orchestration/routing')\ng(s)"],
       [
         'src/renderer/src/r2.ts',
-        "const { focusedHostId } = (await import('./routing'))\nfocusedHostId(s)"
+        "const { focusedHostId } = (await import('../../../../../src/main/runtime/rpc/methods/orchestration/routing'))\nfocusedHostId(s)"
       ],
       [
         'src/renderer/src/r3.ts',
-        "void import('./routing').then(({ focusedHostId }) => focusedHostId(s))"
+        "void import('../../../../../src/main/runtime/rpc/methods/orchestration/routing').then(({ focusedHostId }) => focusedHostId(s))"
       ]
     ]) {
       const withFile = discoverFocusReaders(

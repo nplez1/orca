@@ -17,7 +17,7 @@ async function load(useBaseline) {
   const result = await build({
     stdin: {
       contents: `export { isDotfileRelativePath } from './${entry}';
-export { createNameFilteredFileExplorerProjection } from './src/renderer/src/components/right-sidebar/file-explorer/tree/file-explorer-name-filter-projection.ts';`,
+export { createNameFilteredFileExplorerProjection } from '../../../../src/renderer/src/components/right-sidebar/file-explorer/tree/file-explorer-name-filter-projection';`,
       resolveDir: process.cwd(),
       loader: 'ts'
     },

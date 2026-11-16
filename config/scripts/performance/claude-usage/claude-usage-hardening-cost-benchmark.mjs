@@ -81,9 +81,9 @@ async function loadValidation(frozenSources) {
   const fingerprints = {}
   const bundled = await build({
     stdin: {
-      contents: `export { validatePersistedClaudeUsageProjections } from './src/main/claude-usage/persisted-projection-validation';
-        export { buildClaudeUsageProjectionIntegrity } from './src/main/claude-usage/transcript-projection-integrity';
-        export { hasClaudeUsageResumeProjection } from './src/main/claude-usage/transcript-resume-projection';`,
+      contents: `export { validatePersistedClaudeUsageProjections } from '../../../../src/main/claude-usage/persisted-projection-validation';
+        export { buildClaudeUsageProjectionIntegrity } from '../../../../src/main/claude-usage/transcript-projection-integrity';
+        export { hasClaudeUsageResumeProjection } from '../../../../src/main/claude-usage/transcript-resume-projection';`,
       loader: 'ts',
       resolveDir: ROOT
     },

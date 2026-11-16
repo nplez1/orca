@@ -28,8 +28,8 @@ const entry = `
 import { createRoot } from 'react-dom/client'
 import { View } from 'react-native'
 import { SafeAreaFrameContext, SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context'
-import { RpcClientProvider } from './src/transport/connection/client-context.web'
-import { useTopChromeSpace } from './src/layout/use-top-chrome-space'
+import { RpcClientProvider } from '../../../../mobile/src/transport/connection/client-context.web'
+import { useTopChromeSpace } from '../../../../mobile/src/layout/use-top-chrome-space'
 
 const session = { pageGeometry: {
     occlusions: [{ x: 535, y: 0, width: 134, height: 82 }], sideRail: false

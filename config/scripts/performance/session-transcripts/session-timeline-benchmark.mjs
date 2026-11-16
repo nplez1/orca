@@ -66,9 +66,9 @@ async function load(source, sourcePath = target) {
     stdin: {
       contents: `
         export {createAccumulator, cloneSessionAccumulator, updateTimeline, finalizeSession}
-          from './session-scanner-accumulator';
+          from '../../../../src/main/ai-vault/parsing/session-scanner-accumulator';
         export {createClaudeSessionParseState, consumeClaudeSessionLine}
-          from '../scanners/claude/session-scanner-primary-parsers';`,
+          from '../../../../src/main/ai-vault/scanners/claude/session-scanner-primary-parsers';`,
       loader: 'ts',
       resolveDir: dirname(target)
     },

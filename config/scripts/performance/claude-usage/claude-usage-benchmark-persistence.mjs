@@ -64,7 +64,7 @@ function persistenceEntry(mode, modulePaths) {
   ]
   if (mode === 'published') {
     exports.push(`export { validatePersistedClaudeUsageProjections }
-      from './src/main/claude-usage/persisted-projection-validation';`)
+      from '../../../../src/main/claude-usage/persisted-projection-validation';`)
   } else if (mode === 'main') {
     exports.push(`export { readUsageSourceCache as readSourceCache,
       writeUsageSourceCache as writeSourceCache, splitUsageCacheFile as splitCacheFile }
@@ -73,11 +73,11 @@ function persistenceEntry(mode, modulePaths) {
     exports.push(`export { readClaudeUsageSourceCache as readSourceCache,
       writeClaudeUsageSourceCache as writeSourceCache, persistClaudeUsageSourceCache as persistSourceCache,
       splitClaudeUsageCacheFile as splitCacheFile }
-      from './src/main/claude-usage/persisted-source-cache';
+      from '../../../../src/main/claude-usage/persisted-source-cache';
       export { parseClaudeUsageReport as parseReport, serializeClaudeUsageReport as serializeReport }
-      from './src/main/claude-usage/persisted-usage-report';
+      from '../../../../src/main/claude-usage/persisted-usage-report';
       export { encodeClaudeUsagePersistedState }
-      from './src/main/claude-usage/persisted-token-columns';`)
+      from '../../../../src/main/claude-usage/persisted-token-columns';`)
   }
   return exports.join('\n')
 }

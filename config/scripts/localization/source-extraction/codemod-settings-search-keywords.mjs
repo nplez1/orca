@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 const SETTINGS_DIR = path.join('src', 'renderer', 'src', 'components', 'settings')
-const IMPORT_LINE = "import { translateSearchKeyword } from './settings-search-keywords'"
+const IMPORT_LINE = "import { translateSearchKeyword } from '../../../../src/renderer/src/components/settings/search/settings-search-keywords'"
 
 function transformKeywordsBlock(block) {
   return block.replace(

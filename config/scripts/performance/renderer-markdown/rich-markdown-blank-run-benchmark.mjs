@@ -26,7 +26,7 @@ try {
     const outfile = join(temp, `${arm}.cjs`)
     await build({
       stdin: {
-        contents: `export { encodeRawMarkdownHtmlForRichEditor as encode } from './src/renderer/src/components/editor/rich-markdown/raw-source/raw-markdown-html'; export { createRichMarkdownEditorCodec as codec } from './src/renderer/src/components/editor/rich-markdown/document/rich-markdown-source-transport';`,
+        contents: `export { encodeRawMarkdownHtmlForRichEditor as encode } from '../../../../src/renderer/src/components/editor/rich-markdown/raw-source/raw-markdown-html'; export { createRichMarkdownEditorCodec as codec } from '../../../../src/renderer/src/components/editor/rich-markdown/document/rich-markdown-source-transport';`,
         resolveDir: root
       },
       bundle: true,

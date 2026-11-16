@@ -15,7 +15,7 @@ async function load(useBaseline) {
   const result = await build({
     stdin: {
       contents: `export * from './${entry}';
-export { extractAssistantTextFromLine } from './src/shared/agent-hook-listener/transcript-entry-text.ts';`,
+export { extractAssistantTextFromLine } from '../../../../src/shared/agent-hook-listener/transcript-entry-text';`,
       resolveDir: process.cwd(),
       loader: 'ts'
     },

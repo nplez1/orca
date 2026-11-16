@@ -10,7 +10,7 @@ import { scopeStyleToHost } from '../../style-scoping/document-style-scoping'
 import {
   TERMINAL_SYMBOLS_FONT_CSS,
   XTERM_ENGINE_CSS
-} from './terminal-webview-engine-css.generated'
+} from '../terminal-webview-engine-css.generated'
 import terminalNerdFontUrl from '../../../assets/fonts/SymbolsNerdFontMono-Regular.woff2'
 import { terminalNerdFontCss } from '../fonts/terminal-font-face-css.mjs'
 import { createTerminalDocument } from './create-terminal-document'

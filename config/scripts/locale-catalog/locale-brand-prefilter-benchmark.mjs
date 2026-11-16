@@ -39,7 +39,7 @@ const modules = await Promise.all(
               resolveDir: path.dirname(policyPath)
             }))
             builder.onLoad({ filter: /verify-localization-catalog\.mjs$/ }, () => ({
-              contents: `${readFileSync(verifierPath, 'utf8')}\nimport { collectStringLeaves, repairCacheMap, repairCatalog, includesPreservedLatinTerm } from '../../locale-catalog/locale-translation-policy.mjs';\nimport { BRAND_MISTRANSLATIONS } from '../../locale-catalog/locale-brand-mistranslations.mjs';\nexport { collectStringLeaves, repairCacheMap, repairCatalog, repairTranslatedValue, includesPreservedLatinTerm, BRAND_MISTRANSLATIONS };`,
+              contents: `${readFileSync(verifierPath, 'utf8')}\nimport { collectStringLeaves, repairCacheMap, repairCatalog, includesPreservedLatinTerm } from './locale-translation-policy.js';\nimport { BRAND_MISTRANSLATIONS } from './locale-brand-mistranslations.js';\nexport { collectStringLeaves, repairCacheMap, repairCatalog, repairTranslatedValue, includesPreservedLatinTerm, BRAND_MISTRANSLATIONS };`,
               resolveDir: path.dirname(verifierPath)
             }))
           }

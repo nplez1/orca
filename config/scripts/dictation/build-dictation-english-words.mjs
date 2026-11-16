@@ -105,7 +105,7 @@ try {
   writeFileSync(
     OUT,
     `/*! @license\n${notice.map((line) => ` * ${line}`.trimEnd()).join('\n')}\n */\n` +
-      `import type { WordFilter } from './dictation-word-filter'\n\n` +
+      `import type { WordFilter } from '../../../src/shared/speech/dictation/dictation-word-filter'\n\n` +
       `export const COMMON_ENGLISH_WORDS: WordFilter = {\n  bits: ${bits},\n  hashes: ${hashes},\n` +
       `  base64:\n    '${Buffer.from(bytes).toString('base64')}'\n}\n`
   )

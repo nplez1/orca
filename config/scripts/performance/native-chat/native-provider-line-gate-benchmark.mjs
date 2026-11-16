@@ -20,7 +20,7 @@ async function load(source) {
         name: 'native-client-receive-fixture',
         setup(builder) {
           builder.onLoad({ filter: /macos-native-provider-client\.ts$/ }, () => ({
-            contents: `${source}\nexport { NativeProviderLineBuffer, consumeNativeProviderLines } from './macos-native-provider-transport';`,
+            contents: `${source}\nexport { NativeProviderLineBuffer, consumeNativeProviderLines } from '../../../../src/main/computer/macos-native/macos-native-provider-transport';`,
             loader: 'ts',
             resolveDir: path.dirname(entry)
           }))
