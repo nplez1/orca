@@ -37,7 +37,7 @@ const PAGE_ENTRY = `
 import { createElement, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { MermaidDiagram } from './src/components/mermaid/MermaidDiagram'
+import { MermaidDiagram } from './MermaidDiagram'
 
 // The app root provides insets; the expanded viewer reads them.
 const METRICS = {

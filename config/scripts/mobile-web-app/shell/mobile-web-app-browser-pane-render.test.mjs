@@ -45,8 +45,8 @@ const NO_VIEWPORT_META_PAGE_SCALE = SOURCE.deviceWidth / 980
 
 // Scratch pane-only route uses fixed-depth relative imports for reproducibility; substitute desktop screencastSupported answer, leaving capability probe to C7.
 const ROUTE_SOURCE = `
-import { useHostClient } from './src/transport/connection/host-client-hooks'
-import { MobileBrowserPane } from './src/browser/MobileBrowserPane'
+import { useHostClient } from '../../../../mobile/src/transport/connection/host-client-hooks'
+import { MobileBrowserPane } from '../../../../mobile/src/browser/MobileBrowserPane'
 
 const TAB = {
   type: 'browser',
