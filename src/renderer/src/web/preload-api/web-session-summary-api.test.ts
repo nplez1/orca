@@ -160,36 +160,45 @@ describe('web session summary api', () => {
   })
 
   // Why: a re-pair mid-lease must not move this pane's fold to the new host — the lease it is
-  // reading through lives on the old one, and only a close there ends it.
-  it('keeps folding on the host that holds the lease after a re-pair', async () => {
+  // reading through lives on the old one, and only a close there ends it. The rows this client
+  // reads are re-stamped with the new pairing, so that id must not travel either.
+  it('keeps folding on the host that holds the lease, and never names the new pairing', async () => {
     const api = createWebSessionSummaryApi()
     await api.open({ paneKey: PANE_KEY })
     mocks.environment.mockReturnValue({ id: 'env-2' })
 
-    await api.open({ paneKey: PANE_KEY, sameViewer: true })
+    await api.open({ paneKey: PANE_KEY, sameViewer: true, executionHostId: 'runtime:env-2' })
 
     expect(callsTo('sessionSummary.openOnHost')[1]?.[0]).toBe('env-1')
+    expect(callsTo('sessionSummary.openOnHost')[1]?.[2]).not.toHaveProperty('executionHostId')
   })
 
   it('reports a refresh as folding until the host answers', async () => {
     const api = createWebSessionSummaryApi()
+    const seen: SessionSummarySnapshot[] = []
+    api.onUpdate((next) => seen.push(next))
     await api.open({ paneKey: PANE_KEY })
-    await vi.waitFor(() => expect(mocks.call).toHaveBeenCalled())
+    // Why: a snapshot has to be on screen, or the refresh answers a synthetic one that is
+    // folding anyway and the assertion would hold however the shown brief is reported.
+    await vi.waitFor(() => expect(seen).toHaveLength(1))
 
     const answered = await api.open({ paneKey: PANE_KEY, sameViewer: true })
 
     expect(answered.fold.running).toBe(true)
   })
 
-  // Why: a poll that lands after the last close belongs to a pane nobody is reading, and keeping
-  // it would brief the next session in that pane with the previous one's summary.
+  // Why: an answer that lands after the last close belongs to a pane nobody is reading, and
+  // keeping it would brief the next session in that pane with the previous one's summary.
   it('stops delivering once the last viewer has closed the pane', async () => {
-    let answer: (value: unknown) => void = () => {}
-    mocks.call.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          answer = (value: unknown) => resolve(ok(value))
-        })
+    // Why per method: a close resolves at once, so one shared resolver would answer the close
+    // instead of the fold and the pane's open would never settle.
+    const answers: ((value: unknown) => void)[] = []
+    mocks.call.mockImplementation((_environmentId: unknown, method: unknown) =>
+      method === 'sessionSummary.closeOnHost'
+        ? Promise.resolve(ok(null))
+        : new Promise((resolve) => {
+            answers.push((value: unknown) => resolve(ok(value)))
+          })
     )
     const api = createWebSessionSummaryApi()
     const seen: SessionSummarySnapshot[] = []
@@ -197,12 +206,12 @@ describe('web session summary api', () => {
     await api.open({ paneKey: PANE_KEY })
 
     // The same answer delivered while the pane is read, so the negative case below is not vacuous.
-    answer(snapshot())
+    answers.shift()?.(snapshot())
     await vi.waitFor(() => expect(seen).toHaveLength(1))
 
     await api.open({ paneKey: PANE_KEY, sameViewer: true })
     api.close({ paneKey: PANE_KEY, seenTimelineCount: 0 })
-    answer(snapshot())
+    answers.shift()?.(snapshot())
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(seen).toHaveLength(1)
