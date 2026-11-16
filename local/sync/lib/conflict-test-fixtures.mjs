@@ -1,6 +1,7 @@
 // Conflict fixtures shared by the conflict-prove, file-gate and apply-proven tests. Not a test file.
 import { parseConflictHunks } from './conflict-classify.mjs'
 import { proveFile, reconstruct } from './conflict-prove.mjs'
+import { providerHistory } from './conflict-provider-gate.mjs'
 
 export const hunk = ({ ours, base, theirs }) => [
   '<<<<<<< ours',
@@ -25,3 +26,13 @@ export const proveWithIndex = (
   moduleExists = everyModule,
   stages = stagesOf(merged)
 ) => proveFile({ path, merged, moduleExists, stages })
+
+/** `history` over in-memory sides: `{ base: { path: text }, ours, theirs }`, renames base path -> side path. */
+export const historyOf = (sides, renames = {}) =>
+  providerHistory({
+    files: Object.fromEntries(
+      Object.entries(sides).map(([side, blobs]) => [side, new Set(Object.keys(blobs))])
+    ),
+    read: (side, path) => sides[side][path] ?? null,
+    renames: { ours: new Map(renames.ours ?? []), theirs: new Map(renames.theirs ?? []) }
+  })

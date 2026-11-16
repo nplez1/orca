@@ -4,9 +4,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { modulePaths, resolvesInIndex } from './conflict-file-gate.mjs'
-import { indexModuleOracle } from './conflict-index.mjs'
+import { indexModuleOracle, treeModuleOracle } from './conflict-index.mjs'
 import { proveFile } from './conflict-prove.mjs'
-import { everyModule, file, hunk, proveWithIndex } from './conflict-test-fixtures.mjs'
+import {
+  everyModule,
+  file,
+  historyOf,
+  hunk,
+  proveWithIndex,
+  stagesOf
+} from './conflict-test-fixtures.mjs'
 import { parseSource } from './ts-source.mjs'
 
 test('a proven file is not written while a module path in it resolves to nothing the merge keeps', () => {
@@ -33,9 +40,12 @@ test('a proven file is not written while a module path in it resolves to nothing
   assert.equal(stale.fullyProven, false)
   assert.equal(stale.resolvedText, undefined)
   assert.deepEqual(stale.unresolvedModules, ['../../shared/app-directory-names'])
-  const rebased = proveWithIndex(path, merged('../../../shared/app-directory-names'), (at) =>
-    index.has(at)
-  )
+  // `E` was re-pointed at a module the fork never touched: the history says so.
+  const env = { 'src/cli/shared/env.ts': 'export const E = 1\n' }
+  const rebased = proveWithIndex(path, merged('../../../shared/app-directory-names'), {
+    exists: (at) => index.has(at),
+    history: historyOf({ base: env, ours: env, theirs: { 'src/shared/remote/env.ts': '' } })
+  })
   assert.equal(rebased.fullyProven, true)
   // No index to check against is a refusal, not a pass.
   assert.equal(
@@ -69,35 +79,221 @@ test('a proven file is not written while it imports a binding one side removed o
   assert.match(result.reason, /imports what one side removed: m$/)
 })
 
-test('module paths are read from every import form and resolved like the compiler would', () => {
+test('module paths are read from every import form, with how each one resolves', () => {
   const { sf } = parseSource(
     'src/renderer/src/a.test.ts',
     [
       "import { a } from './a.js'",
+      "import type { T } from './t'",
       "export { b } from '../b'",
+      "export * from './star'",
       "import pkg from 'react'",
+      "import eq = require('./eq')",
       "vi.mock('@/store/c', () => ({}))",
+      "vitest.mock('@renderer/store/v')",
       "const d = await import('./d')",
+      "const r = require('./r')",
+      "const where = require.resolve('./w')",
+      "const icon = new URL('./icon.svg', import.meta.url)",
+      "import raw from './shader.glsl?raw'",
+      "import { run } from '@orca/process-host'",
       "type E = typeof import('./e')"
     ].join('\n')
   )
-  assert.deepEqual(modulePaths(sf), ['./a.js', '../b', '@/store/c', './d', './e'])
+  assert.deepEqual(
+    modulePaths(sf).map(({ specifier, kind }) => `${kind} ${specifier}`),
+    [
+      'value ./a.js',
+      'type ./t',
+      'value ../b',
+      'value ./star',
+      'value ./eq',
+      'value @/store/c',
+      'value @renderer/store/v',
+      'value ./d',
+      'value ./r',
+      'value ./w',
+      'url ./icon.svg',
+      'value ./shader.glsl?raw',
+      'value @orca/process-host',
+      'type ./e'
+    ]
+  )
+})
+
+test('a TS importer probes like the compiler; a JS importer and a URL need the exact path', () => {
   const index = new Set([
     'src/renderer/src/a.ts',
     'src/renderer/b/index.tsx',
-    'src/renderer/src/store/c.ts'
+    'src/renderer/src/store/c.ts',
+    'src/renderer/src/types.d.ts',
+    'src/renderer/src/shader.glsl',
+    'local/x.mts',
+    'local/y.mjs',
+    'mobile/src/theme.ts',
+    'docs/site/src/page.tsx'
   ])
   const exists = (at) => index.has(at)
-  assert.equal(resolvesInIndex('src/renderer/src/a.test.ts', './a.js', exists), true)
-  assert.equal(resolvesInIndex('src/renderer/src/a.test.ts', '../b', exists), true)
-  assert.equal(resolvesInIndex('src/main/x.ts', '@/store/c', exists), true)
-  assert.equal(resolvesInIndex('src/renderer/src/a.test.ts', './d', exists), false)
+  const from = 'src/renderer/src/a.test.ts'
+  assert.equal(resolvesInIndex(from, './a.js', exists), true)
+  assert.equal(resolvesInIndex(from, '../b', exists), true)
+  assert.equal(resolvesInIndex(from, './shader.glsl?raw', exists), true)
+  assert.equal(resolvesInIndex(from, './d', exists), false)
   assert.equal(resolvesInIndex('src/a.ts', '../../outside', exists), false)
+  // A value import has no runtime in a `.d.ts`; a type import may name one.
+  assert.equal(resolvesInIndex(from, './types', exists, 'value'), false)
+  assert.equal(resolvesInIndex(from, './types', exists, 'type'), true)
+  // Node resolves a .mjs importer's `./x.mjs` exactly: x.mts is not it, though a .ts importer's would be.
+  assert.equal(resolvesInIndex('local/z.mjs', './x.mjs', exists), false)
+  assert.equal(resolvesInIndex('local/z.mts', './x.mjs', exists), true)
+  assert.equal(resolvesInIndex('local/z.mjs', './y.mjs', exists), true)
+  assert.equal(resolvesInIndex('local/z.mjs', './y', exists), false)
+  assert.equal(resolvesInIndex(from, './a', exists, 'url'), false)
+})
+
+test('an alias resolves from the project the importer is in, and refuses where none maps it', () => {
+  const index = new Set([
+    'src/renderer/src/store/c.ts',
+    'mobile/src/theme.ts',
+    'docs/site/src/page.tsx'
+  ])
+  const exists = (at) => index.has(at)
+  assert.equal(resolvesInIndex('src/renderer/src/x.ts', '@/store/c', exists), true)
+  assert.equal(resolvesInIndex('tests/e2e/x.ts', '@renderer/store/c', exists), true)
+  assert.equal(resolvesInIndex('mobile/src/app.ts', '@/theme', exists), true)
+  assert.equal(resolvesInIndex('mobile/src/app.ts', '@/store/c', exists), false)
+  assert.equal(resolvesInIndex('docs/site/app/x.tsx', '@/page', exists), true)
+  // The main-process project maps no `@/`.
+  assert.equal(resolvesInIndex('src/main/x.ts', '@/store/c', exists), false)
+})
+
+test('a workspace package resolves through its source export, and nothing else', () => {
+  const index = {
+    exists: (at) => at === 'src/packages/process-host/src/run-process.ts',
+    workspaceSource: (specifier) =>
+      specifier === '@orca/process-host'
+        ? 'src/packages/process-host/src/run-process.ts'
+        : specifier === '@orca/process-host/gone'
+          ? 'src/packages/process-host/src/gone.ts'
+          : null
+  }
+  assert.equal(resolvesInIndex('src/main/x.ts', '@orca/process-host', index), true)
+  assert.equal(resolvesInIndex('src/main/x.ts', '@orca/process-host/gone', index), false)
+  assert.equal(resolvesInIndex('src/main/x.ts', '@orca/unknown', index), false)
+  assert.equal(resolvesInIndex('src/main/x.ts', '@orca/process-host', index.exists), false)
+})
+
+test('a proven file is not written while it uses a binding one side stopped importing', () => {
+  // The fork deleted `x`'s import; upstream re-pointed `y` and added a use of `x` that merged cleanly.
+  const merged = file(
+    hunk({
+      ours: ["import { y } from './y'"],
+      base: ["import { x } from './x'", "import { y } from './y'"],
+      theirs: ["import { x } from './x'", "import { y } from './moved/y'"]
+    }),
+    'export const z = x + y'
+  )
+  const stages = {
+    base: file("import { x } from './x'", "import { y } from './y'", 'export const z = y'),
+    ours: file("import { y } from './y'", 'export const z = y'),
+    theirs: file(
+      "import { x } from './x'",
+      "import { y } from './moved/y'",
+      'export const z = x + y'
+    )
+  }
+  const result = proveWithIndex('src/a.ts', merged, everyModule, stages)
+  assert.equal(result.provenHunks, 1)
+  assert.equal(result.fullyProven, false)
+  assert.match(result.reason, /uses what it no longer imports: x$/)
+  // A member or a local declaration of the same name is not a use of the import.
+  const y = { 'src/y.ts': 'export const y = 1\n' }
+  const local = proveWithIndex(
+    'src/a.ts',
+    merged.replace('export const z = x + y', 'const x = 1\nexport const z = { x: y.x, w: x }'),
+    { exists: everyModule, history: historyOf({ base: y, ours: y, theirs: {} }) },
+    stages
+  )
+  assert.equal(local.fullyProven, true)
+})
+
+test('a binding re-pointed at another module is refused when the other side changed it in the old one', () => {
+  // The 2026-11-15 WorktreeCardStatusSlot.tsx shape: upstream took `WorktreeStatus` from a rollup module,
+  // while the fork added 'setup' to the renderer's own `WorktreeStatus`, which upstream merely moved.
+  const path = 'src/renderer/src/card.tsx'
+  const merged = file(
+    hunk({
+      ours: ["import { label, type Status } from './status'"],
+      base: ["import { label, type Status } from './status'"],
+      theirs: [
+        "import { label } from './activity/status'",
+        "import type { Status } from './rollup'"
+      ]
+    })
+  )
+  const stages = stagesOf(merged)
+  const before = "export type Status = 'a' | 'b'\nexport const label = 1\n"
+  const forked = "export type Status = 'a' | 'b' | 'setup'\nexport const label = 1\n"
+  const history = (oursStatus) =>
+    historyOf(
+      {
+        base: { 'src/renderer/src/status.ts': before },
+        ours: { 'src/renderer/src/status.ts': oursStatus },
+        theirs: {
+          'src/renderer/src/activity/status.ts': before,
+          'src/renderer/src/rollup.ts': "export type Status = 'a' | 'b'\n"
+        }
+      },
+      { theirs: [['src/renderer/src/status.ts', 'src/renderer/src/activity/status.ts']] }
+    )
+  const swapped = proveWithIndex(
+    path,
+    merged,
+    { exists: everyModule, history: history(forked) },
+    stages
+  )
+  assert.equal(swapped.provenHunks, 1)
+  assert.match(swapped.reason, /never reached: Status \(now from src\/renderer\/src\/rollup\.ts/)
+  // `label` followed its module's move, so the fork's edits travel with it; and with no fork edit to
+  // `Status`, upstream's choice of provider stands.
+  const untouched = proveWithIndex(
+    path,
+    merged,
+    { exists: everyModule, history: history(before) },
+    stages
+  )
+  assert.equal(untouched.fullyProven, true)
+  // No history to trace the old module through refuses the re-pointed names rather than passing them.
+  assert.equal(proveWithIndex(path, merged, everyModule, stages).fullyProven, false)
+})
+
+test('a proven file is not written while it re-exports what one side removed', () => {
+  // Upstream moved the re-export to the top and re-pointed it; the fork deleted it. Both merge cleanly.
+  const merged = file(
+    "export { m } from './new/m'",
+    hunk({
+      ours: ["import { k } from './k'", "import { f } from './f'"],
+      base: ["import { k } from './k'"],
+      theirs: ["import { k } from './k'", "import { u } from './u'"]
+    })
+  )
+  const stages = {
+    base: file("import { k } from './k'", "export { m } from './m'"),
+    ours: file("import { k } from './k'", "import { f } from './f'"),
+    theirs: file(
+      "export { m } from './new/m'",
+      "import { k } from './k'",
+      "import { u } from './u'"
+    )
+  }
+  const result = proveWithIndex('src/a.ts', merged, everyModule, stages)
+  assert.equal(result.provenHunks, 1)
+  assert.match(result.reason, /still imports what one side removed: export m$/)
 })
 
 test('the index keeps a stage-0 path or a both-sides conflict, never a modify/delete', () => {
   const record = (mode, stage, path) => `${mode} ${'a'.repeat(40)} ${stage}\t${path}`
-  const exists = indexModuleOracle(
+  const { exists } = indexModuleOracle(
     [
       record('100644', 0, 'src/clean.ts'),
       ...[1, 2, 3].map((stage) => record('100644', stage, 'src/both.ts')),
@@ -111,4 +307,17 @@ test('the index keeps a stage-0 path or a both-sides conflict, never a modify/de
     ),
     [true, true, false, false]
   )
+})
+
+test('a --merge-tree run keeps the result tree less every conflict that is not both-modified', () => {
+  const { exists } = treeModuleOracle(['src/a.ts', 'src/ud.ts', 'src/uu.ts', ''].join('\u0000'), [
+    { path: 'src/ud.ts', status: 'UD' },
+    { path: 'src/uu.ts', status: 'UU' }
+  ])
+  assert.deepEqual(['src/a.ts', 'src/ud.ts', 'src/uu.ts', 'src/b.ts'].map(exists), [
+    true,
+    false,
+    true,
+    false
+  ])
 })

@@ -9,13 +9,14 @@
 //   import-only         every side is import declarations only                    -> three-way union
 // A token or comment crossing a hunk edge on any side refuses the hunk: its meaning lives outside it.
 // Everything else is unproven, and a file is written only when every hunk in it is proven AND the
-// resolved file passes a whole-file gate: every relative or `@/` module path names a file the merged
-// index keeps, and no import survives that an index stage removed.
+// resolved file passes the whole-file gate in `conflict-file-gate.mjs`: module paths that resolve in
+// the merged index, no import a stage removed, no use left unbound, no re-pointed binding that loses
+// the other side's edit.
 //
-// That gate exists because no tier above can see the tree or git's clean merge. An upstream
-// reorganisation moves the modules a fork-added import points at, and moves the conflicted file itself,
-// so a specifier that was right on its own side resolves to nothing in the merge. In the 2026-11-15
-// sync 87 of 189 "proven" files were stale paths or orphaned imports; all 87 differ from the merge.
+// That gate exists because no tier above can see the tree, git's clean merge, or another file. In the
+// 2026-11-15 sync 88 of 189 "proven" files differed from the merge that shipped: stale paths after
+// upstream's reorganisation, orphaned imports, and one binding re-pointed at a module the fork's edit
+// never reached. The gate refuses all 88; the 100 files it still writes are byte-identical.
 //
 // Comments are not always noise. A directive comment (`@vitest-environment`, `@ts-expect-error`,
 // `eslint-disable`, `/// <reference>`, a JSDoc type in a JS file) *is* code: dropping one changes a test

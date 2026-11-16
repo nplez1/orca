@@ -3,7 +3,13 @@
 // The decision file is `--propose --json` output, so it records what was proven, but it is never the
 // authority: each file is re-proven from the bytes on disk, and anything that does not reproduce —
 // edited since the proposal, hand-edited decision, partial proof — is refused rather than written.
+import { parseConflictHunks } from './conflict-classify.mjs'
+import { resolvedFileGate } from './conflict-file-gate.mjs'
 import { proveFile, sha256 } from './conflict-prove.mjs'
+
+// What identifies the conflict a decision was proposed for. `subject` is prose and may be re-worded.
+const STATE_KEYS = ['kind', 'head', 'headOid', 'step', 'total', 'branch', 'onto']
+const stateKey = (state) => JSON.stringify(STATE_KEYS.map((key) => state?.[key] ?? null))
 
 const quote = (file) => (/^[\w./@+-]+$/.test(file) ? file : `'${file.replace(/'/g, "'\\''")}'`)
 
@@ -11,10 +17,12 @@ const quote = (file) => (/^[\w./@+-]+$/.test(file) ? file : `'${file.replace(/'/
  * @param {{ readText: (path: string) => string | null, unmerged: Set<string>, isSymlink: (path: string) => boolean, moduleExists?: (path: string) => boolean, readStages?: (path: string) => { base: string | null, ours: string | null, theirs: string | null } }} worktree
  *   `unmerged` is `git diff --name-only --diff-filter=U`: a decision may only write a path git still calls conflicted.
  *   `moduleExists` and `readStages` are the index facts `proveFile` checks a resolved file against.
+ *   `state` is the live operation (`conflicts.mjs` `readState` plus `headOid`): a decision from another
+ *   merge, or an earlier rebase step, describes other files and is refused whole.
  */
 export function planApplyProven(
   decision,
-  { readText, unmerged, isSymlink, moduleExists = null, readStages = null }
+  { readText, unmerged, isSymlink, moduleExists = null, readStages = null, state = null }
 ) {
   if (decision?.mode !== 'live' || !Array.isArray(decision.files)) {
     throw new Error(
@@ -24,6 +32,11 @@ export function planApplyProven(
   if (!(unmerged instanceof Set)) {
     throw new Error(
       'the unmerged path set is required, so a decision cannot name an arbitrary path'
+    )
+  }
+  if (stateKey(decision.state) !== stateKey(state) || !state?.headOid) {
+    throw new Error(
+      `the decision was proposed for ${stateKey(decision.state)}, the worktree is at ${stateKey(state)}: re-run --propose`
     )
   }
   const plan = { writes: [], already: [], removals: [], unproven: [], refused: [] }
@@ -61,11 +74,17 @@ export function planApplyProven(
       continue
     }
     const current = readText(file.path)
-    // A second run over the same decision finds the files the first one wrote, staged or not. They hold
-    // this decision's own resolution, not an edit: on 2026-11-15 the rerun reported all 189 files the
-    // first run had written as "changed since --propose" and exited 1. Nothing is written for them.
+    // A second run over the same decision finds the files the first one wrote: on 2026-11-15 the rerun
+    // called all 189 "changed since --propose" and exited 1. The recorded hash only nominates a file
+    // (the decision is never the authority: an older tool's decision vouches for its own bad writes), so
+    // each one is re-checked against the live index before it is reported as done.
     if (current !== null && proof.resolvedSha && sha256(current) === proof.resolvedSha) {
-      plan.already.push({ path: file.path, staged: !unmerged.has(file.path) })
+      const recheck = recheckAlready(file.path, current, { unmerged, moduleExists, readStages })
+      if (recheck === null) {
+        plan.already.push({ path: file.path })
+      } else {
+        plan.refused.push({ path: file.path, reason: recheck })
+      }
       continue
     }
     if (!unmerged.has(file.path)) {
@@ -104,6 +123,20 @@ export function planApplyProven(
   return plan
 }
 
+/** Why a file holding the recorded resolution is not done after all, or null when it passes. */
+function recheckAlready(path, current, { unmerged, moduleExists, readStages }) {
+  if (!unmerged.has(path)) {
+    return 'no longer unmerged: its index stages are gone, so it cannot be re-checked; nothing written'
+  }
+  if (parseConflictHunks(current).length > 0) {
+    return 'matches the recorded resolution but still has conflict markers; re-run --propose'
+  }
+  const gate = resolvedFileGate(path, current, readStages ? readStages(path) : null, moduleExists)
+  return gate === null
+    ? null
+    : `matches the recorded resolution, which the live index now refuses: ${gate.reason}`
+}
+
 /**
  * `--propose`: attach each file's proof, without its resolved text, and return the summary note.
  * `merged` and `stages` are maps by path; `moduleExists` is the merged-index oracle.
@@ -133,8 +166,7 @@ export function renderApplyPlan(plan, written) {
     rows.push(`  wrote   ${write.path} — ${write.tiers.join(', ')}`)
   }
   for (const item of already) {
-    const state = item.staged ? ' (staged)' : ''
-    rows.push(`  already ${item.path} — holds the resolution this decision recorded${state}`)
+    rows.push(`  already ${item.path} — holds the resolution this decision recorded, re-checked`)
   }
   for (const item of plan.refused) {
     rows.push(`  REFUSED ${item.path} — ${item.reason}`)
@@ -152,7 +184,7 @@ export function renderApplyPlan(plan, written) {
       rows.push(`  ${item.command}    # ${item.provenance}`)
     }
   }
-  const unstaged = [...written, ...already.filter((item) => !item.staged).map((item) => item.path)]
+  const unstaged = [...written, ...already.map((item) => item.path)]
   if (unstaged.length > 0) {
     rows.push(`nothing is staged; review, then: git add -- ${unstaged.map(quote).join(' ')}`)
   }

@@ -15,7 +15,6 @@
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import process from 'node:process'
 import {
   classifyFile,
@@ -26,11 +25,17 @@ import {
 import { deletionFor, pendingDeletionPaths } from './lib/expected-deletions.mjs'
 import { readDeletionManifestFromGit } from './lib/deletion-manifest-git.mjs'
 import { attachProofs, planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
-import { indexModuleOracle, treeModuleOracle } from './lib/conflict-index.mjs'
+import {
+  gitProviderHistory,
+  indexModuleOracle,
+  treeModuleOracle,
+  workspaceSourceLookup
+} from './lib/conflict-index.mjs'
 import { proposeAll } from './lib/conflict-propose.mjs'
 import { renameForecast } from './lib/fork-surface-git.mjs'
 import { renderForecast } from './lib/rename-forecast.mjs'
 import { classCounts, renderSummary, renderText } from './lib/conflict-report.mjs'
+import { liveSides, readState } from './lib/conflict-state.mjs'
 
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
 const DELETIONS_URL = new URL('./expected-deletions.json', import.meta.url)
@@ -71,11 +76,11 @@ them; it never commits, and it refuses to act on a \`--merge-tree\` run because 
 --propose also attaches a per-hunk proof, read from each side's syntax tree (comments and whitespace
 dropped): upstream-unchanged (take ours), fork-unchanged (take theirs), identity-only (take theirs with
 the fork's identity literals re-applied; re-run identity-sweep.mjs), import-only (three-way union with
-no duplicate module or binding), and the resolved file's relative and \`@/\` module paths must name files
-the index keeps, with no import an index stage removed. --apply-proven reads \`--propose --json\`
-output, re-proves each file from the bytes on disk, and writes only files where EVERY hunk is proven
-and nothing changed since; a rerun reports what an earlier run wrote as \`already\`. It stages
-nothing, and prints the \`git rm\` a ledger/manifest deletion needs instead of running it.
+no duplicate module or binding); the resolved file must also pass the whole-file gate (local/sync/
+README.md). --apply-proven reads \`--propose --json\` output for the live operation, re-proves each
+file from the bytes on disk, and writes only files where EVERY hunk is proven and nothing changed
+since; a rerun re-checks what an earlier run wrote (\`already\`) and refuses a path no longer
+unmerged. It stages nothing, and prints the \`git rm\` a ledger/manifest deletion needs instead.
 
 --rename-forecast runs before the merge: upstream's renames and deletions in <old-base>..<new-base>,
 matched against the lines the fork added since <old-base> (default tip HEAD) — import specifiers,
@@ -145,7 +150,16 @@ const indexStages = (path) => ({
   theirs: blobAt(':3', path)
 })
 
-const indexOracle = () => indexModuleOracle(gitText(['ls-files', '-s', '-z']) ?? '')
+const workspaceSource = () => workspaceSourceLookup(gitText(['rev-parse', '--show-toplevel']))
+const rev = (ref) => gitText(['rev-parse', '--verify', '-q', ref], { allowFailure: true })
+const historyFor = (sides) =>
+  sides && Object.values(sides).every(Boolean) ? gitProviderHistory(gitText, sides) : null
+const indexOracle = () =>
+  indexModuleOracle(
+    gitText(['ls-files', '-s', '-z']) ?? '',
+    workspaceSource(),
+    historyFor(liveSides(rev, gitText))
+  )
 
 const unmergedPaths = () =>
   (gitText(['diff', '--name-only', '--diff-filter=U', '-z']) ?? '').split('\u0000').filter(Boolean)
@@ -168,37 +182,11 @@ function unmergedStatuses() {
   return statuses
 }
 
-function readState(gitDir) {
-  const info = (name) => {
-    try {
-      return readFileSync(join(gitDir, name), 'utf8').trim()
-    } catch {
-      return ''
-    }
-  }
-  const rebase = ['rebase-merge', 'rebase-apply'].find((dir) => existsSync(join(gitDir, dir)))
-  if (rebase) {
-    const [step, total] = rebase === 'rebase-merge' ? ['msgnum', 'end'] : ['next', 'last']
-    return {
-      kind: 'rebase',
-      step: Number(info(`${rebase}/${step}`) || 0),
-      total: Number(info(`${rebase}/${total}`) || 0),
-      branch: info(`${rebase}/head-name`).replace('refs/heads/', ''),
-      onto: info(`${rebase}/onto`).slice(0, 10)
-    }
-  }
-  for (const [file, kind] of [
-    ['MERGE_HEAD', 'merge'],
-    ['CHERRY_PICK_HEAD', 'cherry-pick'],
-    ['REVERT_HEAD', 'revert']
-  ]) {
-    if (existsSync(join(gitDir, file))) {
-      const head = info(file).split('\n')[0].trim().slice(0, 10)
-      return { kind, head, subject: info('MERGE_MSG').split('\n')[0] }
-    }
-  }
-  return { kind: 'none' }
-}
+// HEAD's oid too: a rebase step and a later merge onto the same upstream share everything else.
+const liveState = () => ({
+  ...readState(gitText(['rev-parse', '--git-dir'])),
+  headOid: gitText(['rev-parse', 'HEAD'])
+})
 
 // ------------------------------------------------------------------ adapters
 
@@ -212,7 +200,7 @@ function readLive() {
       merged: remember(path, worktreeText(path))
     })
   )
-  return { mode: 'live', state: readState(gitText(['rev-parse', '--git-dir'])), files, notes: [] }
+  return { mode: 'live', state: liveState(), files, notes: [] }
 }
 
 function readMergeTree(base, other) {
@@ -392,6 +380,7 @@ function runApplyProven(decisionPath) {
     unmerged: new Set(unmergedPaths()),
     moduleExists: indexOracle(),
     readStages: indexStages,
+    state: liveState(),
     isSymlink: (path) => {
       try {
         return lstatSync(path).isSymbolicLink()
@@ -630,7 +619,13 @@ function main() {
         result.mode === 'merge-tree'
           ? treeModuleOracle(
               gitText(['ls-tree', '-r', '-z', '--name-only', result.state.tree]) ?? '',
-              result.files
+              result.files,
+              workspaceSource(),
+              historyFor({
+                base: result.state.mergeBase,
+                ours: result.state.base,
+                theirs: result.state.other
+              })
             )
           : indexOracle()
       result.notes.push(
