@@ -188,7 +188,7 @@ describe.skipIf(process.platform === 'win32')('Antigravity POSIX hook executable
       const command = installedCommand(home, event)
       const marker = join(home, 'script-ran')
       writeFileSync(
-        join(home, '.orca', 'agent-hooks', 'antigravity-hook.sh'),
+        join(home, HOME_DIRECTORY_NAME, 'agent-hooks', 'antigravity-hook.sh'),
         `#!/bin/sh\n: > ${quotePosixShell(marker)}\n`
       )
       const { ORCA_PANE_KEY: _paneKey, ...outsideEnv } = process.env

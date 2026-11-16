@@ -40,7 +40,8 @@ it('names the Linux dev launcher orca-dev in help', () => {
   Object.defineProperty(process, 'platform', { value: 'linux' })
   vi.stubEnv('ELECTRON_RUN_AS_NODE', '1')
   vi.stubEnv('ORCA_CLI_COMMAND', '')
-  vi.stubEnv('ORCA_USER_DATA_PATH', '/home/me/.config/orca-dev')
+  // This fork's dev launcher owns an orca-np-dev data dir; that is what marks a dev invocation.
+  vi.stubEnv('ORCA_USER_DATA_PATH', '/home/me/.config/orca-np-dev')
   expect(renderHelp([])).toContain('Usage: orca-dev <command> [options]')
 })
 

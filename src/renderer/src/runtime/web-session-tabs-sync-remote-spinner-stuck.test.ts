@@ -184,7 +184,7 @@ describe('remote paired pane: does a client "working" row clear past the stale b
   it('host publishes done: the client row reaches a terminal state and stops painting the yellow dot', () => {
     const store = seedPairedClientStore()
     replayClientOscWorking(store, T0)
-    expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+    expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('working')
     expect(sidebarHasLiveWorking(store, T0)).toBe(true)
 
     // Host republishes `done` on a cadence well past the client row's freshness.
@@ -198,7 +198,7 @@ describe('remote paired pane: does a client "working" row clear past the stale b
     }
 
     const after = T0 + 2 * AGENT_STATUS_STALE_AFTER_MS + 1
-    const entry = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
+    const entry = store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)
     const fresh = entry
       ? isExplicitAgentStatusFresh(entry, after, AGENT_STATUS_STALE_AFTER_MS)
       : false
@@ -237,13 +237,13 @@ describe('remote paired pane: does a client "working" row clear past the stale b
     }
 
     const after = T0 + 2 * AGENT_STATUS_STALE_AFTER_MS + 1
-    const entry = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
+    const entry = store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)
     // The host's done retires the row even though its stamp is older than the client write.
     expect(entry?.state, 'host done retires the stale client row').toBe('done')
     expect(sidebarHasLiveWorking(store, after), 'yellow working dot clears').toBe(false)
   })
 
-  it('host publishes nothing: the client row decays and the yellow dot clears', () => {
+  it('host publishes nothing: the client row decays and the yellow dot clears', async () => {
     const store = seedPairedClientStore()
     replayClientOscWorking(store, T0)
     expect(sidebarHasLiveWorking(store, T0)).toBe(true)
@@ -259,11 +259,15 @@ describe('remote paired pane: does a client "working" row clear past the stale b
     }
 
     const after = T0 + 2 * AGENT_STATUS_STALE_AFTER_MS + 1
-    const entry = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
+    const entry = store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)
     expect(entry, 'a client-owned row is retained, not deleted').toBeDefined()
     const fresh = isExplicitAgentStatusFresh(entry!, after, AGENT_STATUS_STALE_AFTER_MS)
     // Correct decay keeps the row but it reads stale, so consumers render idle.
     expect(fresh, 'retained working row must read stale').toBe(false)
+    // Why the tick: the sidebar reads a cached projection, so the row only leaves the live set
+    // when the store's freshness scheduler expires it — the app's own decay path.
+    vi.setSystemTime(after)
+    await vi.advanceTimersByTimeAsync(AGENT_STATUS_STALE_AFTER_MS)
     expect(sidebarHasLiveWorking(store, after), 'yellow working dot must clear').toBe(false)
   })
 })
@@ -305,7 +309,7 @@ describe('remote paired pane: structuredHostOwned decay bypass (M1) and unattrib
       }),
       T0
     )
-    const entry0 = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
+    const entry0 = store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)
     expect(entry0?.state).toBe('working')
     // The mirror stamps its own worktree, as it already stamped its own connection.
     expect(entry0?.worktreeId).toBe(WT)
@@ -317,7 +321,7 @@ describe('remote paired pane: structuredHostOwned decay bypass (M1) and unattrib
       after
     )
 
-    const entry = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
+    const entry = store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)
     expect(entry, 'mirrored row must be swept').toBeUndefined()
     // Without structuredHostOwned the leaked row still decays, so M2 alone does not pin the dot.
     expect(sidebarHasLiveWorking(store, after), 'yellow dot must clear').toBe(false)

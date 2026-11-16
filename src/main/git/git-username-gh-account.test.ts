@@ -4,10 +4,13 @@ const mocks = vi.hoisted(() => ({ gitExec: vi.fn(), ghExec: vi.fn() }))
 
 vi.mock('./command-runner/git-exec-file', () => ({
   gitExecFileAsync: mocks.gitExec,
-  ghExecFileAsync: mocks.ghExec,
   extractExecError: () => ({ stdout: '', stderr: '' })
 }))
-vi.mock('./repositories/git-username', () => ({
+vi.mock('./command-runner/hosted-cli/gh-exec-file', () => ({
+  ghExecFileAsync: mocks.ghExec,
+  ghExecFileWithScopeAsync: mocks.ghExec
+}))
+vi.mock('../../../shared/git/refs/git-default-base-ref', () => ({
   resolveDefaultBaseRefViaExec: async () => 'refs/remotes/origin/main'
 }))
 

@@ -172,7 +172,7 @@ it.each([
     try {
       const mainPath = join(root, 'main.cjs')
       await build({
-        stdin: { contents: MAIN, resolveDir: process.cwd(), loader: 'ts' },
+        stdin: { contents: MAIN, resolveDir: import.meta.dirname, loader: 'ts' },
         outfile: mainPath,
         bundle: true,
         platform: 'node',

@@ -121,7 +121,13 @@ export function getPiSubagentRosterSetupSourceLines(kind: PiAgentKind): string[]
     "    piEventBus.on('task:subagent:lifecycle', (event: unknown) => lifecycleState.onEvent?.(event))",
     // LOCAL(nplez1): the `subagent:async-*` aliases belong to the fork's descendant bus, which binds them
     // once for pi only (agent-status-async-subagent-source.ts); binding them here too fired every child
-    // lifecycle event twice. `task:subagent:lifecycle` is OMP-only and stays.
+    // lifecycle event twice. That lane reports child runs as its own roster, so the shared roster only
+    // needs these channels where nothing else sees them: native chat, whose adapter reads the status
+    // line below and whose hook posts go nowhere (upstream #42448).
+    '    if (process.env.ORCA_STRUCTURED_SESSION && !isOmpRuntime()) {',
+    "      piEventBus.on('subagent:async-started', (event: unknown) => lifecycleState.onEvent?.(event, 'started'))",
+    "      piEventBus.on('subagent:async-complete', (event: unknown) => lifecycleState.onEvent?.(event, 'completed'))",
+    '    }',
     '  }',
     '  if (ownsPaneRoster && piEventBus?.on && !subagentRunnerExitBound && !piEventBus.__orcaPiRunnerExitsHeard && !busRoster?.runnerExitListener) {',
     '    subagentRunnerExitBound = true',

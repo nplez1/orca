@@ -1,4 +1,3 @@
-import { toEphemeralVmRuntimeRecipeSnapshot } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
 import {
   getEphemeralVmRecipeResultConnection,
   type EphemeralVmRecipeResult
@@ -6,6 +5,7 @@ import {
 import {
   toEphemeralVmRuntimeContextMenuFields,
   toEphemeralVmRuntimeExtendFields,
+  toEphemeralVmRuntimeRecipeSnapshot,
   type EphemeralVmRuntimeRecord
 } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {

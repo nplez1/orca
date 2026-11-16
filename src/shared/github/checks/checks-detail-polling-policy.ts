@@ -2,16 +2,11 @@ import type { PRCheckDetail } from './check-types'
 import type { CheckStatus } from '../pull-requests/pull-request-types'
 import type { HostedReviewState } from '../../source-control/hosted-review/hosted-review-contracts'
 import {
-  FOCUSED_CHECKS_REFRESH_INTERVAL_MS,
   getPRAutoRefreshCadence,
   reviewRefreshIntervalMs,
   scaleReviewRefreshInterval,
   type PRAutoRefreshCadence
 } from '../../review-refresh-policy'
-import { summarizeProviderChecks } from '../../source-control/checks/provider-check-summary'
-
-/** Ceiling for the focused loop while a run's rows repeat read after read. */
-const STUCK_RUN_BACKOFF_MAX_MS = 30_000
 
 export function detailedChecksStatus(checks: readonly PRCheckDetail[]): CheckStatus | undefined {
   if (checks.length === 0) {
@@ -65,11 +60,8 @@ export function nextChecksPollBackoffMs(
 
 export class ChecksDetailPollingPolicy {
   private status: CheckStatus | undefined
-  private liveRun: boolean | undefined
   private hasDetails = false
   private failing = false
-  private unchangedReads = 0
-  private signature = ''
 
   /** Whether the last read failed — a force may not shorten that backoff. */
   get failed(): boolean {
@@ -78,31 +70,20 @@ export class ChecksDetailPollingPolicy {
 
   reset(): void {
     this.status = undefined
-    this.liveRun = undefined
     this.hasDetails = false
     this.failing = false
-    this.unchangedReads = 0
-    this.signature = ''
   }
 
   accept(checks: readonly PRCheckDetail[], pipelineCheck: PRCheckDetail | null = null): string {
     // A GitLab parent pipeline's own status decides cadence; a partial job page cannot settle it.
-    const settledChecks = pipelineCheck ? [pipelineCheck] : checks
-    this.status = detailedChecksStatus(settledChecks)
-    // Why: "unfinished" for the focused loop is the shared classifier's pending count, not the
-    // status above — an approval-pending suite is `pending` there and must not keep a 10s loop.
-    this.liveRun =
-      settledChecks.length > 0 ? summarizeProviderChecks(settledChecks).pending > 0 : undefined
+    this.status = detailedChecksStatus(pipelineCheck ? [pipelineCheck] : checks)
     this.hasDetails = true
     this.failing = false
-    const signature = JSON.stringify(
+    return JSON.stringify(
       [...(pipelineCheck ? [pipelineCheck] : []), ...checks].map(
         (check) => `${check.name}:${check.status}:${check.conclusion}`
       )
     )
-    this.unchangedReads = signature === this.signature ? this.unchangedReads + 1 : 0
-    this.signature = signature
-    return signature
   }
 
   fail(): void {
@@ -121,16 +102,6 @@ export class ChecksDetailPollingPolicy {
       return scaleReviewRefreshInterval(
         Math.max(state === 'closed' ? 900_000 : 60_000, backoffMs),
         cadence
-      )
-    }
-    const liveRun = this.liveRun ?? aggregateStatus === 'pending'
-    if (liveRun && state !== 'merged' && state !== 'closed') {
-      // Why: a row carries only status and conclusion, so a job that outlives ~30s reads identically
-      // however healthy it is (as does an offline runner). Easing off on unchanged rows keeps a long
-      // run from polling uncached every 10s, and the first row that moves restores the 10s loop.
-      return Math.min(
-        FOCUSED_CHECKS_REFRESH_INTERVAL_MS * 2 ** Math.min(this.unchangedReads, 2),
-        STUCK_RUN_BACKOFF_MAX_MS
       )
     }
     const status = this.hasDetails && this.status !== undefined ? this.status : aggregateStatus

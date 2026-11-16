@@ -233,13 +233,16 @@ describe('scoped Jira Cloud tokens over HTTP', () => {
   )
 
   it('never probes the Cloud gateway for self-hosted credentials or a server outage', async () => {
+    // Why a non-Atlassian host: an atlassian.net site is always resolved as Cloud (upstream
+    // #42728), so only a real self-hosted host exercises the server path.
+    const SERVER_SITE = 'https://jira.example.com'
     fixture = await startJiraAuthFixture((_request, response) => {
       jiraFixtureJson(response, 401, {})
     })
     const jira = await loadClient()
-    await jira.connect({ ...CREDENTIAL, authType: 'server' })
+    await jira.connect({ ...CREDENTIAL, siteUrl: SERVER_SITE, authType: 'server' })
     expect(fixture.requests).toHaveLength(1)
-    expect(fixture.requests[0]?.url).toBe(`${SITE}/rest/api/2/myself`)
+    expect(fixture.requests[0]?.url).toBe(`${SERVER_SITE}/rest/api/2/myself`)
     await fixture.close()
     fixture = await startJiraAuthFixture((_request, response) => {
       jiraFixtureJson(response, 503, {})

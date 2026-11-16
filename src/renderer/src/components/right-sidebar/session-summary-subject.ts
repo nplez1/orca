@@ -148,7 +148,9 @@ function resolveParkedSessionRef(
 export function useSessionSummarySessionRef(
   paneKey: string | null
 ): SessionSummarySessionRef | null {
-  const live = useAppStore((state) => (paneKey ? state.agentStatusByPaneKey[paneKey] : undefined))
+  const live = useAppStore((state) =>
+    paneKey ? state.agentStatusByPaneKey.get(paneKey) : undefined
+  )
   const sleeping = useAppStore((state) =>
     paneKey ? state.sleepingAgentSessionsByPaneKey[paneKey] : undefined
   )

@@ -1,3 +1,4 @@
+import type * as StoreModule from '@/store'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,33 +12,27 @@ let worktreeCardProperties: WorktreeCardProperty[] = ['status', 'pr']
 let hostedReviewCache: Record<string, unknown> = {}
 let settings: Partial<GlobalSettings> | null = null
 
-vi.mock('@/store', () => {
-  // Why built per call: these read the mutable `let`s above, which each test resets.
+vi.mock('@/store', async () => {
+  const { useAppStore: realStore } = await vi.importActual<typeof StoreModule>('@/store')
+  // Why the real initial state: the card reads whatever the store carries, and a hand-kept
+  // subset goes stale silently. Only the fields each test mutates are overridden here.
   const buildState = () => ({
-    deleteStateByWorktreeId: {},
+    ...realStore.getInitialState(),
     fetchHostedReviewForBranch: vi.fn(),
     fetchIssue: vi.fn(),
     fetchLinearIssue: vi.fn(),
-    gitConflictOperationByWorktree: {},
     hostedReviewCache,
-    issueCache: {},
-    linearIssueCache: {},
     openModal: vi.fn(),
-    prCache: {},
-    projectGroups: [],
-    remoteBranchConflictByWorktreeId: {},
     settings,
-    sshConnectionStates: new Map(),
-    sshTargetLabels: new Map(),
     updateWorktreeMeta: vi.fn(),
-    workspacePortScan: null,
     worktreeCardProperties
   })
   return {
-    // Why getState: upstream's use-workspace-reference-details reads the store imperatively
-    // while it resolves hovered reference rows, not through a subscription.
+    // Why the full store surface: the card's agent rows read the view through `useStore`.
     useAppStore: Object.assign((selector: (state: unknown) => unknown) => selector(buildState()), {
-      getState: () => buildState()
+      getInitialState: buildState,
+      getState: buildState,
+      subscribe: () => () => {}
     })
   }
 })

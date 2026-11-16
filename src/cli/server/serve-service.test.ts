@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { installServeService, uninstallServeService, type ServeServiceDeps } from './serve-service'
 import { resolveServiceCommand } from '../runtime/app-launch/serve-app-launcher'
 import { serveSupervisorBrakePath } from '../runtime/serve/supervision/serve-supervisor-brake'
+import { SERVE_LAUNCHD_LABEL_PREFIX } from '../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
 
 describe('orca serve service', () => {
   let home: string
@@ -16,10 +17,11 @@ describe('orca serve service', () => {
     home = await mkdtemp(join(tmpdir(), 'orca-serve-service-'))
     bin = join(home, 'bin')
     await mkdir(bin)
+    // Why orca-np: this fork installs its app CLI under that name on every platform.
+    await writeFile(join(bin, 'orca-np'), '#!/bin/sh\n')
+    await chmod(join(bin, 'orca-np'), 0o755)
     await writeFile(join(bin, 'orca'), '#!/bin/sh\n')
     await chmod(join(bin, 'orca'), 0o755)
-    await writeFile(join(bin, 'orca-ide'), '#!/bin/sh\n')
-    await chmod(join(bin, 'orca-ide'), 0o755)
     calls = []
   })
 
@@ -48,9 +50,10 @@ describe('orca serve service', () => {
     await writeFile(serveSupervisorBrakePath(join(home, 'profile')), '{}')
     const result = await installServeService({ command: null, dryRun: false }, deps('darwin'))
     const unitPath = String(result.unitPath)
-    expect(await readFile(unitPath, 'utf8')).toContain(`<string>${join(bin, 'orca')}</string>`)
+    expect(await readFile(unitPath, 'utf8')).toContain(`<string>${join(bin, 'orca-np')}</string>`)
     expect(calls).toEqual([
-      expect.stringMatching(/^launchctl bootout gui\/501\/com\.stablyai\.orca\.serve\./),
+      // Why the constant: the label carries this build's appId, not upstream's.
+      expect.stringMatching(new RegExp(`^launchctl bootout gui/501/${SERVE_LAUNCHD_LABEL_PREFIX}\\.`)),
       `launchctl bootstrap gui/501 ${unitPath}`
     ])
     expect(existsSync(serveSupervisorBrakePath(join(home, 'profile')))).toBe(false)
@@ -71,15 +74,21 @@ describe('orca serve service', () => {
   it('skips a profile launcher and refuses a bare Linux orca', async () => {
     const scoped = join(home, 'profile', 'cli', 'bin')
     await mkdir(scoped, { recursive: true })
-    await writeFile(join(scoped, 'orca'), '#!/bin/sh\n')
-    await chmod(join(scoped, 'orca'), 0o755)
+    await writeFile(join(scoped, 'orca-np'), '#!/bin/sh\n')
+    await chmod(join(scoped, 'orca-np'), 0o755)
     expect(
       resolveServiceCommand(null, {
         platform: 'darwin',
         env: { PATH: `${scoped}:${bin}`, ORCA_USER_DATA_PATH: join(home, 'profile') }
       })
-    ).toBe(join(bin, 'orca'))
-    // Linux takes only orca-ide, never a bare `orca` (often the screen reader).
+    ).toBe(join(bin, 'orca-np'))
+    // Linux resolves the same orca-np launcher, never a bare `orca` (often the screen reader).
+    expect(
+      resolveServiceCommand(null, {
+        platform: 'linux',
+        env: { PATH: bin, ORCA_USER_DATA_PATH: join(home, 'profile') }
+      })
+    ).toBe(join(bin, 'orca-np'))
     const onlyOrca = join(home, 'only-orca')
     await mkdir(onlyOrca)
     await writeFile(join(onlyOrca, 'orca'), '#!/bin/sh\n')

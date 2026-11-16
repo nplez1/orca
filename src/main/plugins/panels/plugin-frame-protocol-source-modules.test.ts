@@ -26,7 +26,7 @@ async function fixture(options: { installed: boolean }): Promise<ValidDiscovered
   await mkdir(join(rootDir, 'src'), { recursive: true })
   await writeFile(
     join(rootDir, 'src', 'panel.tsx'),
-    "import { Text } from 'orca'\nimport { label } from '../../../renderer/src/components/ui/label'\nexport default () => <Text>{label}</Text>\n"
+    "import { Text } from 'orca'\nimport { label } from './label'\nexport default () => <Text>{label}</Text>\n"
   )
   await writeFile(join(rootDir, 'src', 'label.ts'), "export const label: string = 'hi'\n")
   await writeFile(join(rootDir, 'src', 'page.ts'), "document.body.append('page')\n")
@@ -82,7 +82,7 @@ describe('orca-plugin-frame source modules', () => {
     expect(response.headers.get('Content-Type')).toBe('text/javascript; charset=utf-8')
     const code = await response.text()
     expect(code).toContain('from "orca/jsx-runtime"')
-    expect(code).toContain("from '../../../renderer/src/components/ui/label'")
+    expect(code).toContain("from './label.ts'")
     expect(code).toContain('sourceMappingURL=data:application/json')
   })
 

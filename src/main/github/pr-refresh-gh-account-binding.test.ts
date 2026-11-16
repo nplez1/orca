@@ -8,10 +8,13 @@ const { coordinatorMocks, moduleMocks } = await vi.hoisted(async () => {
 })
 
 vi.mock('./pull-requests/refresh/pr-refresh-renderer-port', () => moduleMocks.rendererPortModuleMock(coordinatorMocks))
-vi.mock('./client', () => moduleMocks.clientModuleMock(coordinatorMocks))
+vi.mock('./client/lookup/pr-for-branch-outcome', () => moduleMocks.clientModuleMock(coordinatorMocks))
 vi.mock('./repositories/github-api-repository', () =>
   moduleMocks.githubApiRepositoryModuleMock(coordinatorMocks)
 )
+vi.mock('./repositories/github-api-repository-remote-probe', () => ({
+  getOriginGitHubApiRepository: coordinatorMocks.getOriginGitHubApiRepositoryMock
+}))
 vi.mock('./api/rate-limit', () => moduleMocks.rateLimitModuleMock(coordinatorMocks))
 
 import { makeCandidate, makePR } from './pull-requests/refresh/pr-refresh-coordinator-test-harness'

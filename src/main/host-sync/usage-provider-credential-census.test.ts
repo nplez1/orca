@@ -77,19 +77,19 @@ const NON_USAGE_CREDENTIAL_STORES: readonly { storeModule: string; reason: strin
     reason: 'Jenkins integration tokens; replicated through the `jenkins` port, one per server.'
   },
   {
-    storeModule: 'linear/linear-token-store',
+    storeModule: 'linear/accounts/linear-token-store',
     reason: 'Linear integration token; carries a workspace list beside the secret, so no port yet.'
   },
   {
-    storeModule: 'orcad/orcad-secret-store',
+    storeModule: 'orcad/credentials/orcad-secret-store',
     reason: 'The orcad credential vault; its entries are claimed by their own integration.'
   },
   {
-    storeModule: 'persistence/moving-wsl-projects/wsl-move-browser-cookie-store',
+    storeModule: 'persistence/moving-wsl-projects/desktop-state/wsl-move-browser-cookie-store',
     reason: 'Browser session cookies moved with a WSL project, not a provider credential.'
   },
   {
-    storeModule: 'plugins/plugin-secrets-store',
+    storeModule: 'plugins/storage/plugin-secrets-store',
     reason: "A plugin's own secrets, which the plugin manifest declares."
   },
   {

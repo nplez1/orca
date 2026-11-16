@@ -20,7 +20,7 @@ vi.mock('node:os', async (importOriginal) => ({
 }))
 
 vi.mock('../../repository-icons/repo-icon-autodetect', () => ({
-  detectRepoIconAndUpstream: vi.fn().mockResolvedValue({})
+  detectRepoLocalMetadata: vi.fn().mockResolvedValue({})
 }))
 
 vi.mock('../../workspaces/creation/worktree-root-preparation', () => ({

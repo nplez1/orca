@@ -27,9 +27,12 @@ describe('generateBranchNameFromContext', () => {
 
     expect(result).toEqual({ success: true, slug: 'fix-login-flow', agentLabel: 'GitHub Copilot' })
     expect(calls).toHaveLength(2)
-    expect(calls[0]).toEqual(expect.arrayContaining(['--model', 'gpt-5.4', '--effort', 'low']))
+    // Upstream #37990 moved Copilot's thinking level to the CLI-level --reasoning-effort flag.
+    expect(calls[0]).toEqual(
+      expect.arrayContaining(['--model', 'gpt-5.4', '--reasoning-effort', 'low'])
+    )
     expect(calls[1]).toEqual(
-      calls[0].filter((arg) => !['--model', 'gpt-5.4', '--effort', 'low'].includes(arg))
+      calls[0].filter((arg) => !['--model', 'gpt-5.4', '--reasoning-effort', 'low'].includes(arg))
     )
   })
 })

@@ -42,6 +42,11 @@ export function hostedReviewOptionArgs(
     ...(candidate.localGitOptions?.wslDistro
       ? { wslDistro: candidate.localGitOptions.wslDistro }
       : {}),
+    // Why: dropping the repo's pinned account here made background branch→PR lookups
+    // run as the ambient login, so a bound user's PRs and Checks read as absent.
+    ...(candidate.localGitOptions?.ghAccount
+      ? { ghAccount: candidate.localGitOptions.ghAccount }
+      : {}),
     admissionTier: admissionTierForRefreshReason(reason)
   }
   if (shouldAcceptMergedFallbackPR(candidate)) {
@@ -88,15 +93,24 @@ export function candidateReadRequest(
   ]
 }
 
+/** Why: the queue keeps the candidate it last ran, so a repo re-pinned to another account would
+ *  otherwise keep polling as the previous one — `wslDistro` was already keyed, the account was
+ *  not. Ambient keys stay byte-identical so nothing else about the queue moves. */
+function ghAccountScope(candidate: PRBranchReadRequest): string {
+  const account = candidate.localGitOptions?.ghAccount
+  return account ? `::${account.host.trim().toLowerCase()}/${account.user}` : ''
+}
+
 export function refreshKey(candidate: PRBranchReadRequest): string {
   const connectionScope = candidate.connectionId ?? 'local'
   const runtimeScope = candidate.connectionId
     ? 'remote'
     : `runtime:${candidate.localGitOptions?.wslDistro ? `wsl:${candidate.localGitOptions.wslDistro}` : 'host'}`
+  const accountScope = ghAccountScope(candidate)
   if (typeof candidate.linkedPRNumber === 'number') {
-    return `${connectionScope}::${runtimeScope}::${candidate.repoPath}::pr::${candidate.linkedPRNumber}`
+    return `${connectionScope}::${runtimeScope}${accountScope}::${candidate.repoPath}::pr::${candidate.linkedPRNumber}`
   }
-  return `${connectionScope}::${runtimeScope}::${candidate.repoPath}::branch::${candidate.branch}`
+  return `${connectionScope}::${runtimeScope}${accountScope}::${candidate.repoPath}::branch::${candidate.branch}`
 }
 
 export function validateCandidate(

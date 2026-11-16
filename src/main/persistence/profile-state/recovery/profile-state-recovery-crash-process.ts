@@ -33,7 +33,8 @@ export function buildRecoveryCrashProcess(directory: string): {
         export { invalidateHttp1CompatibilityMarker, writeHttp1CompatibilityMarker } from '../../../startup/network-compatibility/http1-compatibility-marker'
       `,
       loader: 'ts',
-      resolveDir: process.cwd()
+      // The specifiers above are relative to this file, not to the caller's cwd.
+      resolveDir: import.meta.dirname
     },
     outfile: bundle,
     bundle: true,

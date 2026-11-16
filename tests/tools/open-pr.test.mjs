@@ -399,7 +399,7 @@ it('needs the full suite only when a changed path is global', () => {
     ['src/packages/process-host/src/index.ts'],
     // Why this one: a unit setup file imports it, so it loads in every test worker while its path
     // says `src/main` — a path rule alone read it as targeted (#316).
-    ['src/main/runtime/rpc/orcad-feature-readiness.ts'],
+    ['src/main/runtime/rpc/startup/orcad-readiness.ts'],
     ['package.json'],
     ['pnpm-lock.yaml'],
     ['config/vitest.config.ts'],

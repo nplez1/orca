@@ -1,5 +1,5 @@
-import { createReadStream, type Dirent, type Stats } from 'node:fs'
-import { access, lstat, open, readdir, readFile, stat, type FileHandle } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { open, type FileHandle } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
 import * as abort from '../../../shared/concurrency/abort-signal-reason'
@@ -9,19 +9,27 @@ import {
   closeWslTranscriptFsProcess,
   isWslTranscriptFsProcessHandle,
   openWslTranscriptFsProcess,
-  readWslTranscriptFsProcess,
-  runWslTranscriptFsProcess
+  readWslTranscriptFsProcess
 } from './process/wsl-transcript-fs-process-dispatch'
 import type { WslTranscriptFsProcessHandle } from './process/wsl-transcript-fs-process-slot'
-import type { WslTranscriptFsReusableProcessCall } from './process/wsl-transcript-fs-process-protocol'
 import { wslTranscriptFsLaneKey } from './wsl-transcript-fs-route'
 import { admitWslTranscriptPath } from './wsl-transcript-running-admission'
 import {
   readSshTranscript,
-  statSshTranscript,
   type SshTranscriptHandle
 } from './ssh-transcript-fs-access'
 import { parseSshTranscriptPath } from './ssh-transcript-path'
+
+// The gated primitives stay in the bounded module, so every whole-file read carries its ceiling.
+export {
+  transcriptFileStat,
+  wslGatedAccess,
+  wslGatedLstat,
+  wslGatedReadFile,
+  wslGatedReaddir,
+  wslGatedStat,
+  type TranscriptFileStats
+} from '../wsl-transcript-gated-fs'
 
 /** Never nest a gated call inside another — that deadlocks the scan slot. */
 
@@ -29,96 +37,9 @@ import { parseSshTranscriptPath } from './ssh-transcript-path'
 export const WSL_TRANSCRIPT_READ_CHUNK_BYTES = 1024 * 1024
 
 export type TranscriptFileHandle = FileHandle | WslTranscriptFsProcessHandle | SshTranscriptHandle
-export type TranscriptFileStats = Pick<Stats, 'size' | 'mtimeMs' | 'ctimeMs' | 'dev' | 'ino'>
 
 function isSshTranscriptHandle(handle: TranscriptFileHandle): handle is SshTranscriptHandle {
   return 'sshTranscript' in handle
-}
-
-// One request defines both route/dedup identity and child operation, preventing mismatches.
-function runReusableFsOperation<T>(
-  request: WslTranscriptFsReusableProcessCall,
-  priority: WslTranscriptFsTaskPriority,
-  signal: AbortSignal | undefined,
-  localTask: () => Promise<T>
-): Promise<T> {
-  abort.throwIfSignalAborted(signal)
-  const pending = isWslUncPath(request.path)
-    ? admitWslTranscriptPath(request.path).then(() =>
-        runWslTranscriptFsTask(
-          { operation: request.operation, path: request.path, priority, signal },
-          async (taskSignal) => {
-            // Queued work runs later: ask again right before the touch.
-            await abort.waitForPromiseWithSignal(admitWslTranscriptPath(request.path), taskSignal)
-            return runWslTranscriptFsProcess<T>(
-              request,
-              taskSignal,
-              wslTranscriptFsLaneKey(request.path, priority)
-            )
-          }
-        )
-      )
-    : localTask()
-  return abort.waitForPromiseWithSignal(pending, signal)
-}
-
-export function wslGatedAccess(
-  path: string,
-  priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
-): Promise<boolean> {
-  return runReusableFsOperation({ operation: 'access', path }, priority, signal, async () => {
-    await access(path)
-    return true
-  })
-}
-
-export function wslGatedStat(
-  path: string,
-  priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
-): Promise<Stats> {
-  return runReusableFsOperation({ operation: 'stat', path }, priority, signal, () => stat(path))
-}
-
-export function transcriptFileStat(
-  path: string,
-  priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
-): Promise<TranscriptFileStats> {
-  const ssh = parseSshTranscriptPath(path)
-  return ssh
-    ? abort.waitForPromiseWithSignal(statSshTranscript(ssh), signal)
-    : wslGatedStat(path, priority, signal)
-}
-
-export function wslGatedLstat(
-  path: string,
-  priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
-): Promise<Stats> {
-  return runReusableFsOperation({ operation: 'lstat', path }, priority, signal, () => lstat(path))
-}
-
-export function wslGatedReaddir(
-  path: string,
-  priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
-): Promise<Dirent[]> {
-  return runReusableFsOperation({ operation: 'readdir', path }, priority, signal, () =>
-    readdir(path, { withFileTypes: true })
-  )
-}
-
-export function wslGatedReadFile(
-  path: string,
-  encoding: BufferEncoding,
-  priority: WslTranscriptFsTaskPriority,
-  signal?: AbortSignal
-): Promise<string> {
-  return runReusableFsOperation({ operation: 'readfile', path, encoding }, priority, signal, () =>
-    readFile(path, encoding)
-  )
 }
 
 // Do not coalesce opens: joiners would share one handle and both close it.

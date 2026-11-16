@@ -11,6 +11,9 @@ const NODE_RUNTIME_INCLUDE = [
   'src/main/ssh/legacy-relay/endpoints/ssh-relay-endpoint-incumbent-shell.integration.test.ts',
   'src/main/ssh/remote-exec/ssh-remote-commands.test.ts',
   'src/packages/process-host/src/run-process.test.ts',
+  // LOCAL(nplez1): asserts Node's own child_process contracts (a bare spawnSync ELOOP, and PATH search
+  // skipping a candidate whose interpreter is missing), and Bun reports neither the same way.
+  'src/packages/process-host/src/native-process-spawn.test.ts',
   'tests/e2e/cursor-quota-transport.unit.test.ts',
   'tests/e2e/helpers/electron-process-shutdown.unit.test.ts',
   // The parse cache persists through node:sqlite.

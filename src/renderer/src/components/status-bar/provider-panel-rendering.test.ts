@@ -254,7 +254,8 @@ describe('ProviderPanel extra-usage rendering', () => {
 
     expect(markup).toContain('Zen balance')
     expect(markup).toContain(message)
-    expect(markup).toContain('Session')
+    // Why the window length, not "Session": the panel names a known window by its size.
+    expect(markup).toContain('5h')
     expect(markup).not.toContain('$0.00')
     expect(markup).not.toMatch(/\$[\d,.]+ available/)
   })
@@ -334,7 +335,7 @@ describe('ProviderPanel reset rendering', () => {
     const markup = renderToStaticMarkup(createElement(ProviderPanel, { p }))
 
     expect(markup).toContain('Fable')
-    expect(markup).toContain('Resets in 6d 17h')
+    expect(markup).toContain('resets in 6d 17h')
   })
 
   it('renders MiniMax session as usedPercent so the value matches the bar', () => {
@@ -353,9 +354,9 @@ describe('ProviderPanel reset rendering', () => {
 
     const markup = renderToStaticMarkup(createElement(ProviderPanel, { p }))
 
-    // Why: bars show consumption (% used), matching harness meters (#7551).
+    // Why: bars show consumption, and the value is the bare percentage the bar fills.
     expect(markup).toContain('35%')
-    expect(markup).toContain('% used')
+    expect(markup).toContain('width:35%')
     expect(markup).not.toContain('% left')
   })
 
@@ -376,7 +377,7 @@ describe('ProviderPanel reset rendering', () => {
     const markup = renderToStaticMarkup(createElement(ProviderPanel, { p }))
 
     expect(markup).toContain('100%')
-    expect(markup).toContain('% used')
+    expect(markup).toContain('width:100%')
   })
 
   it('clamps over-100 usedPercent to 100% used in the panel', () => {
@@ -400,7 +401,7 @@ describe('ProviderPanel reset rendering', () => {
     expect(markup).not.toContain('140%')
   })
 
-  it.each(PROVIDER_IDS)('applies remaining copy and meter fill to %s', (providerId) => {
+  it.each(PROVIDER_IDS)('applies the remaining meter fill and value to %s', (providerId) => {
     const p = provider({
       provider: providerId,
       status: 'ok',
@@ -416,8 +417,9 @@ describe('ProviderPanel reset rendering', () => {
       createElement(ProviderPanel, { p, usagePercentageDisplay: 'remaining' })
     )
 
-    expect(markup).toContain('75% left')
+    expect(markup).toContain('>75%<')
     expect(markup).toContain('width:75%')
+    expect(markup).not.toContain('>25%<')
     expect(markup).not.toContain('width:25%')
   })
 })

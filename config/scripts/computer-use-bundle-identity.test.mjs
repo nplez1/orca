@@ -44,7 +44,7 @@ describe('computer-use bundle identity', () => {
     for (const path of [
       'config/scripts/native-build/macos/build-computer-macos.mjs',
       'config/scripts/computer-use-bundle-identity.mjs',
-      'src/main/computer/macos-computer-use-permissions.ts'
+      'src/main/computer/macos-permissions/macos-computer-use-permissions.ts'
     ]) {
       expect(source(path)).not.toContain('com.stablyai.orca')
     }

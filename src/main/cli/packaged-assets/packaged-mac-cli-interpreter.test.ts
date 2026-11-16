@@ -64,7 +64,8 @@ it.skipIf(process.platform === 'win32').each([
       shim.replace('/System/Library/CoreServices/SystemVersion.plist', systemVersion)
     )
     for (const [path, name] of [
-      [join(contents, 'MacOS', 'Orca'), 'electron'],
+      // Why Orca NP: this fork's macOS bundle is Orca NP, and the launcher execs that name.
+      [join(contents, 'MacOS', 'Orca NP'), 'electron'],
       [helper.executable, 'node']
     ]) {
       await writeFile(
@@ -87,7 +88,7 @@ it.skipIf(process.platform === 'win32').each([
       ...args,
       'NODE_OPTIONS:unset',
       'ORCA_NODE_OPTIONS:--max-old-space-size=2048',
-      `ELECTRON:${runtime === 'node' ? join(contents, 'MacOS', 'Orca') : 'unset'}`,
+      `ELECTRON:${runtime === 'node' ? join(contents, 'MacOS', 'Orca NP') : 'unset'}`,
       ''
     ])
   }

@@ -9,7 +9,8 @@ import { useAppStore } from '../store'
 import { UpdateCard } from './UpdateCard'
 import { NotificationCardStack } from './NotificationCardStack'
 
-const openUrl = vi.fn()
+// Why a promise: the card chains .catch on the shell call, so a bare spy throws on click.
+const openUrl = vi.fn(() => Promise.resolve())
 const download = vi.fn()
 const check = vi.fn()
 const quitAndInstall = vi.fn()
@@ -76,7 +77,8 @@ beforeEach(() => {
     value: {
       app: { relaunch },
       settings: { set: setSettings },
-      shell: { openUrl },
+      // One mock for both: these cases assert the OS-browser handoff of an installer link.
+      shell: { openUrl, openUrlInSystemBrowser: openUrl },
       ui: { set: vi.fn().mockResolvedValue(undefined), writeClipboardText },
       updater: {
         check,
@@ -95,6 +97,24 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   useAppStore.setState(useAppStore.getInitialState(), true)
+})
+
+describe('UpdateCard Windows signature failures', () => {
+  it('does not offer the rejected version as a manual publisher-check bypass', () => {
+    const message =
+      'New version 1.4.200 is not signed by the application owner: publisherNames: Orca'
+    renderAfterAvailableStatus()
+
+    act(() => useAppStore.getState().setUpdateStatus({ state: 'error', message }))
+
+    expect(screen.getByText("Update Wasn't Installed")).toBeTruthy()
+    expect(screen.getByText(/Don't install this download/)).toBeTruthy()
+    expect(screen.queryByText(message)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check official releases' }))
+    expect(openUrl).toHaveBeenCalledWith('https://github.com/nplez1/orca/releases')
+    expect(openUrl).not.toHaveBeenCalledWith(expect.stringContaining('/tag/'))
+  })
 })
 
 async function flushActions(): Promise<void> {
@@ -152,7 +172,7 @@ describe('UpdateCard Linux package-install recovery', () => {
     expect(screen.queryByText('Manual Install Required')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Retry Download' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Download Manually' }))
-    expect(openUrl).toHaveBeenCalledWith('https://github.com/stablyai/orca/releases/tag/v1.4.200')
+    expect(openUrl).toHaveBeenCalledWith('https://github.com/nplez1/orca/releases/tag/v1.4.200')
   })
 
   it('relaunches once when Enable & Restart is double-clicked', async () => {

@@ -322,7 +322,9 @@ it.each(['recovered parent', 'unavailable'] as const)(
         expect(repos[0].gitRemoteIdentity).toEqual({
           canonicalKey: 'gh-personal/me/repo-a',
           remoteName: 'origin',
-          remoteUrl: 'git@gh-personal:me/repo-a.git'
+          remoteUrl: 'git@gh-personal:me/repo-a.git',
+          // The fork's own key set: the sync's identity probe now publishes every remote.
+          remoteKeys: ['gh-personal/me/repo-a']
         })
         expect(repos[0].repoIcon).toEqual({
           type: 'image',

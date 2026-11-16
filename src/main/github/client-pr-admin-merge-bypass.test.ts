@@ -15,7 +15,7 @@ vi.mock('../git/command-runner/git-exec-file', async (importOriginal) => ({
 }))
 vi.mock('../git/command-runner/hosted-cli/gh-exec-file', async (importOriginal) => ({
   ...(await importOriginal<typeof GhExecFileModule>()),
-  ghExecFileAsync: clientMocks.ghExecFileAsyncMock
+  ...moduleMocks.githubHostedCliModuleMock(clientMocks)
 }))
 vi.mock('./repositories/local-git-config-signature', () =>
   moduleMocks.localGitConfigSignatureModuleMock(clientMocks)

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { useAppStore } from '../../store'
 import { AccountsPane } from './accounts/AccountsPane'
+import { TooltipProvider } from '../ui/tooltip'
 import { LOCAL_SETTINGS_HOST_SCOPE } from './host-scope/settings-host-scope'
 
 const mocks = vi.hoisted(() => ({
@@ -89,12 +90,17 @@ function copilotSection(): ReturnType<typeof within> {
 
 function renderPane(): void {
   render(
-    React.createElement(AccountsPane, {
-      settings: getDefaultSettings('/tmp'),
-      updateSettings: vi.fn(),
-      updateSettingsOrThrow: vi.fn(),
-      hostScope: LOCAL_SETTINGS_HOST_SCOPE
-    })
+    // Why the provider: the pane's own sections render tooltips, and the app supplies it at the root.
+    React.createElement(
+      TooltipProvider,
+      null,
+      React.createElement(AccountsPane, {
+        settings: getDefaultSettings('/tmp'),
+        updateSettings: vi.fn(),
+        updateSettingsOrThrow: vi.fn(),
+        hostScope: LOCAL_SETTINGS_HOST_SCOPE
+      })
+    )
   )
 }
 

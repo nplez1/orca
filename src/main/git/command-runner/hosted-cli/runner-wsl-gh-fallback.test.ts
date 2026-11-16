@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { basename } from 'node:path'
 import type * as BackgroundDistroGate from '../../../wsl/discovery/wsl-background-distro-gate'
 import {
   fakeSpawnDispatch,
@@ -42,6 +43,11 @@ const TRANSIENT_502 = 'HTTP 502 Bad Gateway'
 
 function spawnEnoent(command: string): { spawnError: Error } {
   return { spawnError: Object.assign(new Error(`spawn ${command} ENOENT`), { code: 'ENOENT' }) }
+}
+
+/** Why: the host CLI is spawned from its resolved path, so only the program's name is stable. */
+function programName(program: string): string {
+  return basename(program)
 }
 
 describe('ghExecFileAsync WSL fallback', () => {
@@ -131,23 +137,30 @@ describe('ghExecFileAsync WSL fallback', () => {
     getDefaultWslDistroMock.mockReturnValue('Ubuntu')
     spawnMock.mockImplementation(
       fakeSpawnDispatch((program) =>
-        program === 'gh' ? spawnEnoent('gh') : { stderr: PRIMARY_RATE_LIMIT_STDERR, code: 1 }
+        programName(program) === 'gh'
+          ? spawnEnoent('gh')
+          : { stderr: PRIMARY_RATE_LIMIT_STDERR, code: 1 }
       )
     )
 
+    const wslSpawns = (): string[] =>
+      spawnMock.mock.calls.map(([binary]) => programName(binary)).filter((name) => name === 'wsl.exe')
+
     await expect(ghExecFileAsync(['api', 'repos/acme/widgets/pulls'])).rejects.toThrow('rate limit')
+    expect(wslSpawns()).toHaveLength(1)
+
+    spawnMock.mockClear()
     await expect(ghExecFileAsync(['api', 'repos/acme/widgets/pulls'])).rejects.toMatchObject({
       ghRateLimitBlocked: true
     })
-
-    expect(spawnMock).toHaveBeenCalledTimes(3)
-    expect(spawnMock.mock.calls.map(([binary]) => binary)).toEqual(['gh', 'wsl.exe', 'gh'])
+    // Why: the blocked WSL scope is consulted first, so the native-to-WSL fallback is not repeated.
+    expect(wslSpawns()).toHaveLength(0)
   })
 
   it('checks a blocked native scope before repeating a WSL-to-native fallback', async () => {
     spawnMock.mockImplementation(
       fakeSpawnDispatch((program) =>
-        program === 'wsl.exe'
+        programName(program) === 'wsl.exe'
           ? { stderr: WSL_GH_MISSING, code: 1 }
           : { stderr: PRIMARY_RATE_LIMIT_STDERR, code: 1 }
       )
@@ -164,7 +177,11 @@ describe('ghExecFileAsync WSL fallback', () => {
     ).rejects.toMatchObject({ ghRateLimitBlocked: true })
 
     expect(spawnMock).toHaveBeenCalledTimes(3)
-    expect(spawnMock.mock.calls.map(([binary]) => binary)).toEqual(['wsl.exe', 'gh', 'wsl.exe'])
+    expect(spawnMock.mock.calls.map(([binary]) => programName(binary))).toEqual([
+      'wsl.exe',
+      'gh',
+      'wsl.exe'
+    ])
   })
 
   it('does not retry non-idempotent glab transient failures', async () => {

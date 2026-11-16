@@ -14,7 +14,8 @@ beforeAll(async () => {
   await build({
     stdin: {
       contents: `\n        import { startOfLastNonBlankLines } from './terminal-wait-tail-window';\n        import { detectTerminalWaitBlockedReason, isKnownReadyPromptPreview } from './terminal-wait-detection';\n        const tails = ['', '\\n', '\\n\\n', '\\ntext', '\\ntext\\n', '\\n \\t\\ntext\\n\\n'];\n        process.stdout.write(JSON.stringify({\n          offsets: tails.map(value => startOfLastNonBlankLines(value, 12)),\n          blank: detectTerminalWaitBlockedReason('\\n\\n'),\n          ordinary: detectTerminalWaitBlockedReason('\\nordinary output'),\n          blocked: detectTerminalWaitBlockedReason('\\nDo you trust this workspace directory?\\n1. Yes\\n2. No'),\n          ready: isKnownReadyPromptPreview('\\nOpenAI Codex\\nmodel: test\\ndirectory: /workspace')\n        }));\n      `,
-      resolveDir: process.cwd()
+      // Why: the entry imports its siblings by relative path, so it resolves from this file's dir.
+      resolveDir: import.meta.dirname
     },
     outfile: childPath,
     bundle: true,

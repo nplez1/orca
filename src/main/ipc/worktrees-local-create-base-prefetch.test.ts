@@ -81,7 +81,7 @@ vi.mock('../git/command-runner/git-exec-file-sync', async (importOriginal) => ({
 
 vi.mock('../git/refs/resolution/repo-default-base-ref', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getBaseRefDefault: (await import('./worktrees-test-module-mocks')).getBaseRefDefaultMock,
+  getDefaultBaseRefAsync: (await import('./worktrees-test-module-mocks')).getBaseRefDefaultMock,
   resolveDefaultBaseRefWithLocalGit: (await import('./worktrees-test-module-mocks'))
     .resolveDefaultBaseRefWithLocalGitMock
 }))

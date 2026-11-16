@@ -1,4 +1,3 @@
-import { toEphemeralVmRuntimeRecipeSnapshot } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
 import { randomUUID } from 'node:crypto'
 import { assertEphemeralVmRuntimeCheckoutModeCanPersist } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store'
 import { getEphemeralVmRecipeResultConnection } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
@@ -12,6 +11,7 @@ import { removeEphemeralVmProvisioningAttempt } from '../../shared/ephemeral-vm-
 import {
   toEphemeralVmRuntimeContextMenuFields,
   toEphemeralVmRuntimeExtendFields,
+  toEphemeralVmRuntimeRecipeSnapshot,
   type EphemeralVmRuntimeRecord
 } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {

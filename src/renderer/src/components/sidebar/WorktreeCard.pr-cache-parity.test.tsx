@@ -1,3 +1,4 @@
+import type * as StoreModule from '@/store'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,29 +20,25 @@ let hostedReviewCache: Record<string, unknown> = {}
 let prCache: Record<string, unknown> = {}
 let settings: Partial<GlobalSettings> | null = null
 
-vi.mock('@/store', () => {
+vi.mock('@/store', async () => {
+  const { useAppStore: realStore } = await vi.importActual<typeof StoreModule>('@/store')
+  // Why the real initial state: the card reads whatever the store carries, and a hand-kept
+  // subset goes stale silently. Only the fields each test mutates are overridden here.
   const getState = () => ({
-    deleteStateByWorktreeId: {},
+    ...realStore.getInitialState(),
     fetchHostedReviewForBranch,
     fetchIssue,
     fetchLinearIssue,
-    gitConflictOperationByWorktree: {},
     hostedReviewCache,
-    issueCache: {},
-    linearIssueCache: {},
     openModal,
     prCache,
-    projectGroups: [],
-    remoteBranchConflictByWorktreeId: {},
     settings,
-    sshConnectionStates: new Map(),
-    sshTargetLabels: new Map(),
     updateWorktreeMeta,
-    workspacePortScan: null,
     worktreeCardProperties
   })
   return {
     useAppStore: Object.assign((selector: (state: unknown) => unknown) => selector(getState()), {
+      getInitialState: getState,
       getState,
       subscribe: () => () => {}
     })

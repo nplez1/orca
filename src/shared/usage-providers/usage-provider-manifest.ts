@@ -139,7 +139,7 @@ export const USAGE_PROVIDER_MANIFEST = {
       {
         kind: 'replicated',
         portKind: 'api-key:opencode-go',
-        storeModule: 'opencode/opencode-go-api-key-store',
+        storeModule: 'opencode/accounts/opencode-go-api-key-store',
         flag: 'opencodeGoApiKeyConfigured'
       },
       {

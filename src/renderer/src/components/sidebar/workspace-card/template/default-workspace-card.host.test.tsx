@@ -5,6 +5,7 @@
  * affordance that exists only in `surface/worktree-card-header.tsx` never reaches the user: the
  * card silently loses it. These assertions read the surface that actually renders.
  */
+import type * as StoreModule from '@/store'
 import React, { type ReactNode } from 'react'
 
 import { act, cleanup, render, within } from '@testing-library/react'
@@ -33,11 +34,14 @@ const mocks = vi.hoisted((): Mocks => ({
   lease: null
 }))
 
-vi.mock('@/store', () => {
-  const getState = () => mocks.state
+vi.mock('@/store', async () => {
+  const { useAppStore: realStore } = await vi.importActual<typeof StoreModule>('@/store')
+  const getState = () => ({ ...realStore.getInitialState(), ...mocks.state })
   return {
     useAppStore: Object.assign((selector: (state: unknown) => unknown) => selector(getState()), {
-      getState
+      getInitialState: getState,
+      getState,
+      subscribe: () => () => {}
     })
   }
 })
@@ -180,8 +184,6 @@ function stateFor(settings: Record<string, unknown> = {}): Record<string, unknow
     runtimeStatusByEnvironmentId: new Map(),
     sshTargetLabels: new Map(),
     tabsByWorktree: {},
-    agentStatusByPaneKey: {},
-    retainedAgentsByPaneKey: {},
     workspacePortScan: null,
     worktreeCardProperties: [...DEFAULT_WORKTREE_CARD_PROPERTIES]
   }

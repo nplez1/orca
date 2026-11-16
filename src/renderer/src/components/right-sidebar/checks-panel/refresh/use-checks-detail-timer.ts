@@ -1,7 +1,13 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { REVIEW_REFRESH_COOLDOWN_MS } from '../../../../../../shared/review-refresh-policy'
+import {
+  REVIEW_REFRESH_COOLDOWN_MS,
+  subscribePRAutoRefreshCadence,
+  type PRAutoRefreshCadence
+} from '../../../../../../shared/review-refresh-policy'
 import { derivePRCheckStatus } from '../../../../../../shared/source-control/checks/pr-check-status'
 import { installWindowVisibilityTimeoutPoller } from '@/lib/window-activity/window-visibility-timeout-poller'
+import { getPRRefreshOwnerRuntimeEnvironmentId } from '@/store/github/repositories/repository-routing'
+import { hostPRAutoRefreshCadence } from '@/store/github/refresh/remote-host-pr-auto-refresh-cadence'
 import {
   rollupReportsUnseenRun,
   type ChecksDetailPollingPolicy
@@ -28,6 +34,7 @@ export function useChecksDetailTimer({
     checks,
     pr,
     prNumber,
+    prCacheKey,
     isPanelVisible,
     setChecks,
     setComments,
@@ -42,8 +49,7 @@ export function useChecksDetailTimer({
   const lastReviewRef = useRef<{ key: string; headSha: string | null } | null>(null)
   const lastAttemptAtRef = useRef(-Infinity)
   const nextAttemptAtRef = useRef(-Infinity)
-  const hasAttemptedRef = useRef(false)
-  const inFlightRef = useRef<{ identity: string; token: symbol } | null>(null)
+  const inFlightRef = useRef<{ identity: string; token: symbol; background: boolean } | null>(null)
   const reviewKey = [
     repo?.id ?? repo?.path ?? '',
     isGitLabReview ? 'gitlab' : 'github',
@@ -59,7 +65,6 @@ export function useChecksDetailTimer({
       lastIdentityRef.current = requestIdentity
       lastAttemptAtRef.current = -Infinity
       nextAttemptAtRef.current = -Infinity
-      hasAttemptedRef.current = false
       // Why: the provider read is cached per review, not per head, so a push's first read can come
       // back with the run that preceded it. Force it and a new head never inherits the old rows.
       forceNextFetchRef.current =
@@ -75,89 +80,148 @@ export function useChecksDetailTimer({
       wakeNextReadRef.current = true
       return
     }
+    const ownerCadence = (): PRAutoRefreshCadence => {
+      const current = modelRef.current
+      // The host that reads these checks owns the cadence: a paired host's setting, else this app's.
+      return hostPRAutoRefreshCadence(
+        getPRRefreshOwnerRuntimeEnvironmentId({
+          cacheKey: current.prCacheKey ?? '',
+          executionHostId: current.repo?.executionHostId ?? null
+        })
+      )
+    }
     // The one rule the scheduler and the attempt guard both read. Returning it from one place is what
     // keeps a skipped attempt from being re-armed at 0ms forever.
-    const nextAttemptDelayMs = (): number | null => {
-      if (inFlightRef.current?.identity === requestIdentity) {
-        // Why: an attempt is already running; answering the cadence here re-arms the poller against
-        // a request it cannot start (Infinity clamps to 0ms). The finally block reschedules.
-        return null
-      }
+    const policyDelay = (cadence: PRAutoRefreshCadence = ownerCadence()): number | null => {
       const current = modelRef.current
-      const policyDelay = policyRef.current.delayMs(
+      return policyRef.current.delayMs(
         current.activeGitLabReview?.state ?? current.pr?.state,
         current.activeGitLabReview?.status ?? current.pr?.checksStatus,
-        current.pollIntervalRef.current
+        current.pollIntervalRef.current,
+        cadence
       )
-      // Why: a failing panel is not forced past its backoff, or a broken endpoint gets retried every
-      // cooldown; `reset()` on a pending flip clears the flag so the next attempt is a real one.
-      const forcePending = forceNextFetchRef.current && !policyRef.current.failed
-      // Why: nothing has been read for this identity yet, so the first attempt is due regardless of
-      // what the rollup claims — a settled rollup can still hide an unfinished run in the rows.
-      if (policyDelay === null && hasAttemptedRef.current && !forcePending) {
-        return null
-      }
-      // Why: Infinity means the last read settled the review. If the policy asks for more reads again,
-      // count from the last attempt (a target anchored in the past never slides); recomputing from
-      // `now` would push the attempt out on every call, and Infinity itself is clamped to 0ms.
-      const scheduled =
-        nextAttemptAtRef.current === Infinity
-          ? policyDelay === null
-            ? Infinity
-            : lastAttemptAtRef.current + policyDelay
-          : nextAttemptAtRef.current
-      const dueAt = forcePending
-        ? Math.min(scheduled, lastAttemptAtRef.current + REVIEW_REFRESH_COOLDOWN_MS)
-        : scheduled
-      return Math.max(0, dueAt - Date.now())
     }
+    // Under a stretched or stopped cadence the window coming back still reads checks older than
+    // Default's delay, never sooner: the cadence slows the timer, not the user's return.
+    const returnReadDue = (now: number): boolean => {
+      const defaultDelay = ownerCadence() === 'default' ? null : policyDelay('default')
+      return defaultDelay !== null && now - lastAttemptAtRef.current >= defaultDelay
+    }
+    const stoppedByCadence = (): boolean =>
+      ownerCadence() === 'off' && policyDelay('default') !== null
+    // Why: a failing panel is not forced past its backoff, or a broken endpoint gets retried every
+    // cooldown; `reset()` on a pending flip clears the flag so the next attempt is a real one.
+    const forceWanted = (): boolean => forceNextFetchRef.current && !policyRef.current.failed
     const cleanup = installWindowVisibilityTimeoutPoller({
-      run: async () => {
+      run: async ({ trigger }) => {
         if (inFlightRef.current?.identity === requestIdentity) {
           return
         }
-        const waitMs = nextAttemptDelayMs()
-        if (waitMs === null || waitMs > 0) {
+        const now = Date.now()
+        const nextAttemptAt = nextAttemptAtRef.current
+        const forcePending = forceWanted()
+        if (
+          (!(
+            wakeNextReadRef.current ||
+            forcePending ||
+            (trigger === 'visibility' && returnReadDue(now))
+          ) &&
+            (Number.isFinite(nextAttemptAt)
+              ? now < nextAttemptAt
+              : nextAttemptAt === Infinity &&
+                !forcePending &&
+                (stoppedByCadence() ||
+                  now - lastAttemptAtRef.current < REVIEW_REFRESH_COOLDOWN_MS))) ||
+          now - lastAttemptAtRef.current < REVIEW_REFRESH_COOLDOWN_MS
+        ) {
           return
         }
         const token = Symbol()
         const shown = wakeNextReadRef.current
+        const force =
+          forcePending ||
+          trigger === 'visibility' ||
+          (shown && Number.isFinite(lastAttemptAtRef.current))
         wakeNextReadRef.current = false
-        const force = forceNextFetchRef.current
-        inFlightRef.current = { identity: requestIdentity, token }
-        hasAttemptedRef.current = true
-        lastAttemptAtRef.current = Date.now()
+        lastAttemptAtRef.current = now
         nextAttemptAtRef.current = Infinity
         forceNextFetchRef.current = false
-        // Why: a scheduled poll must not flash the panel's loading state — it is a refresh of rows
-        // that are already on screen, not a load.
-        const background = prevChecksRef.current !== ''
+        // Only the timer's own tick is a background read the host may pace; the window coming
+        // back, the panel opening and a changed aggregate state must read fresh.
+        const background = trigger === 'timer' && !shown && !force
+        inFlightRef.current = { identity: requestIdentity, token, background }
         try {
           // Why two flags on the GitLab path: `background` is the host's WSL refusal (upstream E9 —
-          // a wake is a foreground read), while `suppressLoading` is the fork's "rows already shown".
+          // a wake is a foreground read), while `suppressLoading` is the fork's "rows already shown":
+          // it is only ever set true, and the callee's own default covers the rest.
           await (isGitLabReview
-            ? fetchGitLabDetails({ background: !shown, suppressLoading: background })
-            : fetchChecks({ force, background, ...(shown ? { wakeWslDistro: true } : {}) }))
+            ? fetchGitLabDetails({
+                background: !shown,
+                ...(prevChecksRef.current !== '' ? { suppressLoading: true } : {})
+              })
+            : fetchChecks({
+                force,
+                ...(shown ? { wakeWslDistro: true } : {}),
+                ...(background ? { background: true } : {})
+              }))
         } finally {
           if (inFlightRef.current?.token === token) {
             inFlightRef.current = null
             if (lastIdentityRef.current === requestIdentity) {
-              const delay = policyRef.current.delayMs(
-                modelRef.current.activeGitLabReview?.state ?? modelRef.current.pr?.state,
-                modelRef.current.activeGitLabReview?.status ?? modelRef.current.pr?.checksStatus,
-                modelRef.current.pollIntervalRef.current
-              )
+              if (!background && modelRef.current.isPanelVisible) {
+                wakeNextReadRef.current = false
+              }
+              const delay = policyDelay()
               nextAttemptAtRef.current = delay === null ? Infinity : Date.now() + delay
               refreshRef.current?.()
             }
           }
         }
       },
-      getDelayMs: nextAttemptDelayMs
+      getDelayMs: () => {
+        const delay = policyDelay()
+        if (inFlightRef.current?.identity === requestIdentity) {
+          return delay
+        }
+        if (wakeNextReadRef.current || forceWanted()) {
+          return Math.max(0, lastAttemptAtRef.current + REVIEW_REFRESH_COOLDOWN_MS - Date.now())
+        }
+        if (delay === null) {
+          return null
+        }
+        return Number.isFinite(nextAttemptAtRef.current)
+          ? Math.max(0, nextAttemptAtRef.current - Date.now())
+          : delay
+      },
+      // Returning to the window is a promised foreground read in every mode: when only the owning
+      // host's cadence (not settled checks) stopped the timer, focus still reads once.
+      refreshOnFocusWhileStopped: stoppedByCadence,
+      replayVisibilityWhileInFlight: () => {
+        const current = inFlightRef.current
+        const qualified =
+          current?.identity === requestIdentity && current.background && returnReadDue(Date.now())
+        if (qualified) {
+          forceNextFetchRef.current = true
+        }
+        return qualified
+      }
     })
     refreshRef.current = cleanup.refresh
+    // A cadence change (this app's or the owning host's) re-plans a mounted panel at once: a timer
+    // stopped under "off" starts again, and one armed for Default is disarmed.
+    const unsubscribeCadence = subscribePRAutoRefreshCadence(() => {
+      if (inFlightRef.current?.identity === requestIdentity) {
+        return
+      }
+      const delay = policyDelay()
+      if (Number.isFinite(lastAttemptAtRef.current)) {
+        nextAttemptAtRef.current = delay === null ? Infinity : lastAttemptAtRef.current + delay
+      }
+      cleanup.replan()
+    })
     return () => {
       refreshRef.current = null
+      unsubscribeCadence()
       cleanup()
     }
   }, [
@@ -171,6 +235,7 @@ export function useChecksDetailTimer({
     isPanelVisible,
     isGitLabReview,
     prNumber,
+    prCacheKey,
     pollIntervalRef,
     prevChecksRef,
     setChecks,
@@ -186,6 +251,9 @@ export function useChecksDetailTimer({
       forceNextFetchRef.current = true
       if (aggregatePending) {
         policyRef.current.reset()
+      }
+      if (nextAttemptAtRef.current === Infinity) {
+        nextAttemptAtRef.current = lastAttemptAtRef.current + REVIEW_REFRESH_COOLDOWN_MS
       }
       refreshRef.current?.()
     }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as GhExecFileModule from '../git/command-runner/hosted-cli/gh-exec-file'
 import type * as GithubApiRepositoryModule from './repositories/github-api-repository'
 import type * as GitHubEnterpriseRepositoryModule from './repositories/github-enterprise-repository'
 
@@ -7,6 +8,16 @@ const { clientMocks, moduleMocks } = await vi.hoisted(async () => {
   return { clientMocks: moduleMocks.createGitHubClientMocks(), moduleMocks }
 })
 
+vi.mock('../git/command-runner/hosted-cli/gh-exec-file', async (importOriginal) => ({
+  ...(await importOriginal<typeof GhExecFileModule>()),
+  ...moduleMocks.githubHostedCliModuleMock(clientMocks)
+}))
+vi.mock('./execution/github-legacy-command', () =>
+  moduleMocks.githubLegacyCommandModuleMock(clientMocks)
+)
+vi.mock('./execution/github-operation-slots', () =>
+  moduleMocks.githubOperationSlotsModuleMock(clientMocks)
+)
 vi.mock('./repositories/local-git-config-signature', () =>
   moduleMocks.localGitConfigSignatureModuleMock(clientMocks)
 )

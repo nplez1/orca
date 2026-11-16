@@ -244,7 +244,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
         askedAt
       )
 
-      const entry = store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]
+      const entry = store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)
       expect(entry?.state).toBe('waiting')
       expect(entry?.prompt).toBe('Does a pending ask show as Needs You?')
     })
@@ -265,7 +265,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
         }),
         T0 + 1_000
       )
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('waiting')
 
       // Answered: the host resumes the turn. No client byte write in between.
       applyHostSnapshot(
@@ -278,7 +278,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
         }),
         T0 + 2_000
       )
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('working')
 
       // And the turn then finishes.
       applyHostSnapshot(
@@ -291,7 +291,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
         }),
         T0 + 3_000
       )
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('done')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('done')
     })
 
     // Why: the two clocks are not comparable, so a client running ahead must not be able to keep
@@ -311,7 +311,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
         T0 + 60_500
       )
 
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('waiting')
     })
 
     // Why: pi re-posts `ui_prompt_active` on every tool event while the dialog is open, so both
@@ -338,7 +338,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
             undefined,
             { tabId: MIRROR_TAB_ID, worktreeId: WT }
           )
-        expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+        expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('working')
 
         const hostNow = T0 + 1_000 + cycle * 1_000
         applyHostSnapshot(
@@ -351,7 +351,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
           }),
           hostNow
         )
-        rounds.push(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state ?? null)
+        rounds.push(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state ?? null)
       }
       expect(rounds).toEqual(Array.from({ length: CYCLES }, () => 'waiting'))
     })
@@ -373,7 +373,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
 
       // The first sighting of the host's wait pierces.
       applyHostSnapshot(store, hostWait(2, T0 + 1_000), T0 + 1_000)
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('waiting')
 
       // The client's bytes write again, as they do on every OSC frame.
       vi.setSystemTime(clientNow + 1_000)
@@ -387,15 +387,15 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
           undefined,
           { tabId: MIRROR_TAB_ID, worktreeId: WT }
         )
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('working')
 
       // Same row, newer snapshot: the host is repeating itself, so the client keeps its own state.
       applyHostSnapshot(store, hostWait(3, T0 + 1_000), T0 + 20_000)
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('working')
 
       // A genuinely new observation of the dialog still wins.
       applyHostSnapshot(store, hostWait(4, T0 + 30_000), T0 + 30_000)
-      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
+      expect(store.getState().agentStatusByPaneKey.get(MIRROR_PANE_KEY)?.state).toBe('waiting')
     })
   })
 })
