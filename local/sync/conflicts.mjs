@@ -25,8 +25,8 @@ import {
 } from './lib/conflict-classify.mjs'
 import { deletionFor, pendingDeletionPaths } from './lib/expected-deletions.mjs'
 import { readDeletionManifestFromGit } from './lib/deletion-manifest-git.mjs'
-import { planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
-import { proveFile } from './lib/conflict-prove.mjs'
+import { attachProofs, planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
+import { indexModuleOracle, treeModuleOracle } from './lib/conflict-index.mjs'
 import { proposeAll } from './lib/conflict-propose.mjs'
 import { renameForecast } from './lib/fork-surface-git.mjs'
 import { renderForecast } from './lib/rename-forecast.mjs'
@@ -42,6 +42,8 @@ const MESSAGE = /^(Auto-merging|CONFLICT|Warning:|fatal:|error:|Failed to merge)
 const OID = /^[0-9a-f]{40}([0-9a-f]{24})?$/
 // Merged text per path, kept out of the classified file so --json does not carry every file twice.
 const MERGED = new Map()
+// The three stages per path, for the prover's whole-file import check; out of --json for the same reason.
+const STAGES = new Map()
 
 const HELP = `conflict triage for an upstream sync stop — advisory only
 
@@ -69,9 +71,11 @@ them; it never commits, and it refuses to act on a \`--merge-tree\` run because 
 --propose also attaches a per-hunk proof, read from each side's syntax tree (comments and whitespace
 dropped): upstream-unchanged (take ours), fork-unchanged (take theirs), identity-only (take theirs with
 the fork's identity literals re-applied; re-run identity-sweep.mjs), import-only (three-way union with
-no duplicate module or binding). --apply-proven reads \`--propose --json\` output, re-proves each file
-from the bytes on disk, and writes only files where EVERY hunk is proven and nothing changed since.
-It stages nothing, and prints the \`git rm\` a ledger/manifest deletion needs instead of running it.
+no duplicate module or binding), and the resolved file's relative and \`@/\` module paths must name files
+the index keeps, with no import an index stage removed. --apply-proven reads \`--propose --json\`
+output, re-proves each file from the bytes on disk, and writes only files where EVERY hunk is proven
+and nothing changed since; a rerun reports what an earlier run wrote as \`already\`. It stages
+nothing, and prints the \`git rm\` a ledger/manifest deletion needs instead of running it.
 
 --rename-forecast runs before the merge: upstream's renames and deletions in <old-base>..<new-base>,
 matched against the lines the fork added since <old-base> (default tip HEAD) — import specifiers,
@@ -129,6 +133,19 @@ function remember(path, merged) {
   MERGED.set(path, merged)
   return merged
 }
+
+function sides(path, stages) {
+  STAGES.set(path, stages)
+  return stages
+}
+
+const indexStages = (path) => ({
+  base: blobAt(':1', path),
+  ours: blobAt(':2', path),
+  theirs: blobAt(':3', path)
+})
+
+const indexOracle = () => indexModuleOracle(gitText(['ls-files', '-s', '-z']) ?? '')
 
 const unmergedPaths = () =>
   (gitText(['diff', '--name-only', '--diff-filter=U', '-z']) ?? '').split('\u0000').filter(Boolean)
@@ -191,9 +208,7 @@ function readLive() {
     classifyFile({
       path,
       status: statuses.get(path) ?? null,
-      base: blobAt(':1', path),
-      ours: blobAt(':2', path),
-      theirs: blobAt(':3', path),
+      ...sides(path, indexStages(path)),
       merged: remember(path, worktreeText(path))
     })
   )
@@ -245,9 +260,7 @@ function readMergeTree(base, other) {
     return classifyFile({
       path,
       status: deleted ?? (baseContent === null ? 'AA' : null),
-      base: baseContent,
-      ours,
-      theirs,
+      ...sides(path, { base: baseContent, ours, theirs }),
       merged: remember(path, blobAt(tree, path))
     })
   })
@@ -377,6 +390,8 @@ function runApplyProven(decisionPath) {
   const plan = planApplyProven(JSON.parse(readFileSync(decisionPath, 'utf8')), {
     readText: worktreeText,
     unmerged: new Set(unmergedPaths()),
+    moduleExists: indexOracle(),
+    readStages: indexStages,
     isSymlink: (path) => {
       try {
         return lstatSync(path).isSymbolicLink()
@@ -611,19 +626,15 @@ function main() {
           file.proposal = proposal
         }
       }
-      for (const file of result.files) {
-        const { resolvedText: _text, ...proof } = proveFile({
-          path: file.path,
-          status: file.status,
-          merged: MERGED.get(file.path) ?? null
-        })
-        file.proof = proof
-      }
-      const proven = result.files.filter((file) => file.proof.fullyProven).length
-      const hunks = result.files.reduce((sum, file) => sum + file.proof.hunkCount, 0)
-      const provenHunks = result.files.reduce((sum, file) => sum + file.proof.provenHunks, 0)
+      const moduleExists =
+        result.mode === 'merge-tree'
+          ? treeModuleOracle(
+              gitText(['ls-tree', '-r', '-z', '--name-only', result.state.tree]) ?? '',
+              result.files
+            )
+          : indexOracle()
       result.notes.push(
-        `proof: ${provenHunks} of ${hunks} hunk(s) proven; ${proven} of ${result.files.length} path(s) fully proven (--apply-proven writes only those)`
+        attachProofs(result.files, { merged: MERGED, stages: STAGES, moduleExists })
       )
       const settled = result.files.filter((file) => file.proposal)
       result.notes.push(
@@ -677,4 +688,5 @@ function main() {
   }
 }
 
-process.exit(main())
+// Not process.exit(): it drops a piped stdout's unflushed tail, and --apply-proven | tail lost its summary.
+process.exitCode = main()

@@ -8,7 +8,14 @@
 //                       the same literals re-applied token-for-token; re-run the identity sweep
 //   import-only         every side is import declarations only                    -> three-way union
 // A token or comment crossing a hunk edge on any side refuses the hunk: its meaning lives outside it.
-// Everything else is unproven, and a file is written only when every hunk in it is proven.
+// Everything else is unproven, and a file is written only when every hunk in it is proven AND the
+// resolved file passes a whole-file gate: every relative or `@/` module path names a file the merged
+// index keeps, and no import survives that an index stage removed.
+//
+// That gate exists because no tier above can see the tree or git's clean merge. An upstream
+// reorganisation moves the modules a fork-added import points at, and moves the conflicted file itself,
+// so a specifier that was right on its own side resolves to nothing in the merge. In the 2026-11-15
+// sync 87 of 189 "proven" files were stale paths or orphaned imports; all 87 differ from the merge.
 //
 // Comments are not always noise. A directive comment (`@vitest-environment`, `@ts-expect-error`,
 // `eslint-disable`, `/// <reference>`, a JSDoc type in a JS file) *is* code: dropping one changes a test
@@ -16,6 +23,7 @@
 // hunk whose directives differ on one side is unproven however little code it changes.
 import { createHash } from 'node:crypto'
 import { parseConflictHunks } from './conflict-classify.mjs'
+import { importFacts, resolvedFileGate } from './conflict-file-gate.mjs'
 import { isJsDoc, parseSource, scriptKindFor, ts } from './ts-source.mjs'
 
 export const PROOF_TIERS = ['upstream-unchanged', 'fork-unchanged', 'identity-only', 'import-only']
@@ -300,22 +308,6 @@ function reapplyIdentity(theirs, base, map) {
   return out.split('\n')
 }
 
-function importFacts(node) {
-  const clause = node.importClause
-  const names = []
-  if (clause?.name) {
-    names.push(clause.name.text)
-  }
-  const bindings = clause?.namedBindings
-  if (bindings && ts.isNamespaceImport(bindings)) {
-    names.push(bindings.name.text)
-  } else if (bindings) {
-    names.push(...bindings.elements.map((element) => element.name.text))
-  }
-  const typeOnly = Boolean(clause?.isTypeOnly)
-  return { module: `${typeOnly ? 'type ' : ''}${node.moduleSpecifier.text}`, names }
-}
-
 /** The side's import declarations outside its hunk region; other hunks count on either side. */
 const importsOutside = (side) =>
   side.sf.statements
@@ -359,6 +351,22 @@ function importUnion(sides) {
     ]) {
       // One side dropped the import and the other changed it: a modify/delete, not a union.
       if (!gone.has(module) && kept.has(module) && kept.get(module) !== key) {
+        return null
+      }
+    }
+  }
+  // The same check by binding: a reorganisation changes the specifier, so "one side dropped `x`, the
+  // other re-pointed `x` at the module's new home" has no module in common and passed the check above,
+  // and the union kept an import the side that dropped it no longer uses.
+  const nameKeys = (name) =>
+    new Map(keyed[name].flatMap((item) => item.facts.names.map((bound) => [bound, item.key])))
+  const [baseNames, oursNames, theirsNames] = ['base', 'ours', 'theirs'].map(nameKeys)
+  for (const [bound, key] of baseNames) {
+    for (const [gone, kept] of [
+      [oursNames, theirsNames],
+      [theirsNames, oursNames]
+    ]) {
+      if (!gone.has(bound) && kept.has(bound) && kept.get(bound) !== key) {
         return null
       }
     }
@@ -470,13 +478,32 @@ export function proveHunk(hunk, trees, index) {
   return unproven('no proof tier holds: both sides changed code here')
 }
 
+// Said in full because `--apply-proven` prints it: a bare "0/0 hunk(s) proven" read as a tool failure.
+function notBothModified(status) {
+  if (status === 'UD' || status === 'DU') {
+    return `status ${status} is a modify/delete: there are no hunks to prove, so keeping or deleting it is a ledger, expected-deletions.json or reviewer decision`
+  }
+  return `status ${status} is not a both-modified file: there are no three-way hunks to prove`
+}
+
 /**
- * Proofs for one conflicted file. `resolvedText` is set only when every hunk is proven; callers that
- * serialise the result drop it, and `--apply-proven` recomputes it rather than trusting a file.
+ * Proofs for one conflicted file. `resolvedText` is set only when every hunk is proven and every module
+ * path in it resolves; callers that serialise the result drop it, and `--apply-proven` recomputes it
+ * rather than trusting a file.
  *
- * @param {{ path: string, status?: string | null, merged?: string | null }} args
+ * `moduleExists(repoPath)` answers whether the merge will keep a file at that path. `conflicts.mjs`
+ * reads it from the index: stage 0, or both sides' stages present — a modify/delete is undecided.
+ * `stages` is the file's own `:1:`/`:2:`/`:3:` text. Without either, a script file is never written.
+ *
+ * @param {{ path: string, status?: string | null, merged?: string | null, moduleExists?: (path: string) => boolean, stages?: { base: string | null, ours: string | null, theirs: string | null } | null }} args
  */
-export function proveFile({ path, status = null, merged = null }) {
+export function proveFile({
+  path,
+  status = null,
+  merged = null,
+  moduleExists = null,
+  stages = null
+}) {
   const base = { path, mergedSha: merged === null ? null : sha256(merged), fullyProven: false }
   if (merged === null || (status !== null && status !== 'UU')) {
     return {
@@ -485,7 +512,7 @@ export function proveFile({ path, status = null, merged = null }) {
       provenHunks: 0,
       identitySweep: false,
       hunks: [],
-      reason: status ? `status ${status} is not a both-modified file` : 'no merged content'
+      reason: status ? notBothModified(status) : 'no merged content'
     }
   }
   const hunks = parseConflictHunks(merged)
@@ -522,6 +549,14 @@ export function proveFile({ path, status = null, merged = null }) {
       hunks.map((hunk, index) => ({ ...hunk, resolved: proofs[index].resolution })),
       'resolved'
     ).text
+    // The whole file, not only the hunks: git's clean merge of a moved file keeps the old relative paths.
+    const gate = resolvedFileGate(path, resolvedText, stages, moduleExists)
+    if (gate !== null) {
+      result.fullyProven = false
+      result.reason = gate.reason
+      result.unresolvedModules = gate.missing
+      return result
+    }
     result.resolvedText = resolvedText
     result.resolvedSha = sha256(resolvedText)
   }

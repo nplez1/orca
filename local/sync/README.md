@@ -88,9 +88,13 @@ delimiter balance cannot prove a union is correct.
 `--propose` also attaches a per-hunk proof read from each side's syntax tree (via `typescript-api`,
 the 6.x JS API; the `typescript` dependency is the native TS 7 compiler and has none):
 upstream-unchanged (take ours), fork-unchanged (take theirs), identity-only (theirs with the fork's
-literals re-applied), import-only (three-way union). `--apply-proven <decision.json>` re-proves each
-file from disk and writes only files where every hunk is proven and nothing changed since the proposal;
-it stages nothing and prints, never runs, the `git rm` a settled deletion needs. `--rename-forecast
+literals re-applied), import-only (three-way union). A proven file must also pass a whole-file gate:
+every relative or `@/` module path in it resolves to a path the index keeps, and it imports nothing an
+index stage removed — no tier can see a moved module, and on 2026-11-15 87 of 189 "proven" files
+failed one of those. `--apply-proven <decision.json>` re-proves each file from disk and writes only
+files where every hunk is proven and nothing changed since the proposal; a rerun reports what an
+earlier run wrote as `already`. It stages nothing and prints, never runs, the `git rm` a settled
+deletion needs. `--rename-forecast
 <old-base> <new-base>` runs before the merge and lists fork-added references (imports, `vi.mock`, path
 strings) that upstream's renames and deletions will leave pointing at nothing.
 
