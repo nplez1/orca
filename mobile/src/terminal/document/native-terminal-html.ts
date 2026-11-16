@@ -1,4 +1,4 @@
-import { TERMINAL_DOCUMENT_SCRIPT } from '../terminal-webview-document-script.generated'
+import { TERMINAL_DOCUMENT_SCRIPT } from './terminal-webview-document-script.generated'
 import { TERMINAL_HTML_DOCUMENT_CLOSE } from '../terminal-webview-html/document-close'
 import { TERMINAL_HTML_DOCUMENT_SHELL } from '../terminal-webview-html/document-shell'
 
