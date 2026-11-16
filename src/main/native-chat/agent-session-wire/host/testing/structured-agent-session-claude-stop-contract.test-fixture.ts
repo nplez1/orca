@@ -141,7 +141,13 @@ beforeEach(async () => {
     providerHandle: { kind: 'claude', sessionId: PROVIDER_SESSION_ID, leafUuid: null }
   })
   expect(await host.attach(CALLER, params)).toMatchObject({ ok: true })
-  await vi.waitFor(() => expect(host.readStatusSummary(SESSION)?.hostExecutionPhase).toBe('ready'))
+  // Two durable journal writes gate `ready`, so the 1 s default reddened shard 12/12 (#439).
+  await vi.waitFor(
+    () => expect(host.readStatusSummary(SESSION)?.hostExecutionPhase).toBe('ready'),
+    {
+      timeout: 10_000
+    }
+  )
   await Promise.all(lifecycle)
 })
 
