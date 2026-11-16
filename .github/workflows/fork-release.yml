@@ -423,6 +423,16 @@ jobs:
           tag: v${{ env.RELEASE_VERSION }}
           patterns: '^(orca-macos-(x64|arm64)\\.dmg(\\.blockmap)?|Orca[.-]NP-[^/]*-mac\\.zip(\\.blockmap)?|latest-mac\\.yml)$'
 
+      # Why: a leg can run without `release-draft` running again ("Re-run job", or `--failed` after
+      # the draft was deleted), and electron-builder then either creates a release of its own or,
+      # for a published one, skips the upload with exit 0 while the old manifest makes this leg's
+      # check pass. See the script for the electron-publish behaviour behind both.
+      - name: Require this run's draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/fork-release-require-draft.sh "$PUBLISH_OWNER/orca" "v$RELEASE_VERSION"
+
       # Why --config.publish.owner: the checked-in config names stablyai/orca. Overriding here
       # rather than patching the config keeps that a runtime concern instead of a fork patch,
       # so upstream edits to the publish block still apply cleanly.
@@ -536,6 +546,16 @@ jobs:
           tag: v${{ env.RELEASE_VERSION }}
           patterns: '^(orca-windows-setup\\.exe(\\.blockmap)?|latest\\.yml)$'
 
+      # Why: a leg can run without `release-draft` running again ("Re-run job", or `--failed` after
+      # the draft was deleted), and electron-builder then either creates a release of its own or,
+      # for a published one, skips the upload with exit 0 while the old manifest makes this leg's
+      # check pass. See the script for the electron-publish behaviour behind both.
+      - name: Require this run's draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/fork-release-require-draft.sh "$PUBLISH_OWNER/orca" "v$RELEASE_VERSION"
+
       # Why no signing env: this fork ships Windows unsigned (see LOCAL-PATCHES.md), and the
       # NP config drops publisherName so electron-updater does not reject its own next build.
       # SmartScreen warns once per installer; that is the accepted cost.
@@ -648,6 +668,16 @@ jobs:
           repo: ${{ env.PUBLISH_OWNER }}/orca
           tag: v${{ env.RELEASE_VERSION }}
           patterns: '^(latest-linux\\.yml|orca-linux[^/]*\\.AppImage|orca-np[_-][^/]*\\.(deb|rpm))$'
+
+      # Why: a leg can run without `release-draft` running again ("Re-run job", or `--failed` after
+      # the draft was deleted), and electron-builder then either creates a release of its own or,
+      # for a published one, skips the upload with exit 0 while the old manifest makes this leg's
+      # check pass. See the script for the electron-publish behaviour behind both.
+      - name: Require this run's draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/fork-release-require-draft.sh "$PUBLISH_OWNER/orca" "v$RELEASE_VERSION"
 
       # Why ensure-native-runtime first: electron-builder's beforeBuild rebuilds node-pty for the
       # Electron ABI, and the Linux leg has to start from the runtime variant the app actually
