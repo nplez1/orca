@@ -22,6 +22,26 @@ Rules for using it:
 
 ---
 
+## Review follow-ups from the 2026-11-15 sync
+
+The release review (Opus 5.5, high) read the remerge diff in six slices and returned 0 BLOCKER and
+13 SHOULD-FIX on the resolution itself, all fixed in `154b524fc9` and re-checked by a delta pass.
+Three carry a decision worth keeping rather than a fix:
+
+- **`tabsByWorktree` is a layout-field name, and the renderer layout-writer ratchet counts object
+  keys.** The fork's activity-summary cache row cannot name its tab map after the AppState field, or
+  it reads as a layout write. It is `activityTabs` there.
+- **A visible PR row's failure settles under the key that carries the fork's account scope.** The
+  merge restored `ghAccountScope` in `refreshKey`, and `reconcileCompletion` had to follow it; when
+  the two disagree the row never backs off and an `upstream-error` comes back with no
+  `nextAutoRetryAt`.
+- **`forkActivityFields`' pane-key parse takes no tab argument**, so a structured agent-session pane
+  key `parsePaneKey` cannot parse is skipped, and the module-level `activitySummaries` map is keyed
+  by worktree id with no eviction. Both are the fork's own cache structure, not merge fallout; they
+  are recorded here rather than fixed in a sync.
+
+---
+
 ## 2026-11-15 sync (upstream `1ce376b27e`, 1180 commits)
 
 ### The `git/runner.ts` barrel is upstream's to delete
