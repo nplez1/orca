@@ -294,8 +294,8 @@ jobs:
       # Why refuse a published release: the config's `releaseType: draft` makes electron-builder skip
       # the upload, with a warning and exit 0, when the release it finds is not a draft. Each leg's
       # manifest check then passes on the old manifest, so a re-dispatch into a published tag is a
-      # green run that replaced nothing — or, should a leg's clear step ever delete its own assets
-      # first, one that strips that platform from the live update feed.
+      # green run that replaced nothing. Each leg re-checks this itself before it uploads, because a
+      # leg can be re-run without this job.
       - name: Create the draft release
         shell: bash
         env:
@@ -421,20 +421,17 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Why before packaging: electron-builder appends to the release and fails on a name that
-      # already exists, so a retry after a partial publish (a notarization timeout, a lost
-      # connection) has to clear this leg's own assets first — and only this leg's.
-      - name: Clear macOS assets from an earlier attempt
-        uses: ./.github/actions/clear-release-assets
-        with:
-          repo: ${{ env.PUBLISH_OWNER }}/orca
-          tag: v${{ env.RELEASE_VERSION }}
-          patterns: '^(orca-macos-(x64|arm64)\\.dmg(\\.blockmap)?|Orca[.-]NP-[^/]*-mac\\.zip(\\.blockmap)?|latest-mac\\.yml)$'
-
       # Why: a leg can run without `release-draft` running again ("Re-run job", or `--failed` after
       # the draft was deleted), and electron-builder then either creates a release of its own or,
       # for a published one, skips the upload with exit 0 while the old manifest makes this leg's
       # check pass. See the script for the electron-publish behaviour behind both.
+      #
+      # Why no step clears this leg's assets from an earlier attempt: electron-publish does it per
+      # name — an upload that fails 422 `already_exists` deletes that asset and uploads again
+      # (electron-publish 26.15.3 `gitHubPublisher.js:153-154` → `overwriteArtifact`, `:114-125`).
+      # It matches by exact name, which is why every asset name here is already GitHub-safe (see
+      # `mac.artifactName` in config/electron-builder.np.config.cjs): on np.38 a blockmap GitHub had
+      # renamed was never found, and the retry died on it.
       - name: Require this run's draft release
         shell: bash
         env:
@@ -544,20 +541,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Why before packaging: electron-builder appends to the release and fails on a name that
-      # already exists, so a retry after a partial publish (a notarization timeout, a lost
-      # connection) has to clear this leg's own assets first — and only this leg's.
-      - name: Clear Windows assets from an earlier attempt
-        uses: ./.github/actions/clear-release-assets
-        with:
-          repo: ${{ env.PUBLISH_OWNER }}/orca
-          tag: v${{ env.RELEASE_VERSION }}
-          patterns: '^(orca-windows-setup\\.exe(\\.blockmap)?|latest\\.yml)$'
-
       # Why: a leg can run without `release-draft` running again ("Re-run job", or `--failed` after
       # the draft was deleted), and electron-builder then either creates a release of its own or,
       # for a published one, skips the upload with exit 0 while the old manifest makes this leg's
       # check pass. See the script for the electron-publish behaviour behind both.
+      # Why no step clears this leg's assets from an earlier attempt: see the same step in `macos`.
       - name: Require this run's draft release
         shell: bash
         env:
@@ -667,20 +655,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Why before packaging: electron-builder appends to the release and fails on a name that
-      # already exists, so a retry after a partial publish (a notarization timeout, a lost
-      # connection) has to clear this leg's own assets first — and only this leg's.
-      - name: Clear Linux assets from an earlier attempt
-        uses: ./.github/actions/clear-release-assets
-        with:
-          repo: ${{ env.PUBLISH_OWNER }}/orca
-          tag: v${{ env.RELEASE_VERSION }}
-          patterns: '^(latest-linux\\.yml|orca-linux[^/]*\\.AppImage|orca-np[_-][^/]*\\.(deb|rpm))$'
-
       # Why: a leg can run without `release-draft` running again ("Re-run job", or `--failed` after
       # the draft was deleted), and electron-builder then either creates a release of its own or,
       # for a published one, skips the upload with exit 0 while the old manifest makes this leg's
       # check pass. See the script for the electron-publish behaviour behind both.
+      # Why no step clears this leg's assets from an earlier attempt: see the same step in `macos`.
       - name: Require this run's draft release
         shell: bash
         env:

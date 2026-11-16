@@ -98,4 +98,15 @@ describe('a leg uploads only into its own draft', () => {
       expect(upload - check, leg).toBe(1)
     }
   })
+
+  it('has no step that deletes release assets ahead of an upload', () => {
+    // The clear step this check replaced never matched (`\\.` is a literal backslash to `grep -E`),
+    // and a working one would delete a published release's manifests before the skipped upload.
+    for (const job of Object.values(RELEASE.jobs)) {
+      for (const step of job.steps ?? []) {
+        expect(String(step.uses ?? '')).not.toContain('clear-release-assets')
+        expect(step.run ?? '').not.toContain('delete-asset')
+      }
+    }
+  })
 })

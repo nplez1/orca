@@ -375,11 +375,20 @@ v1.4.214-np.56 that is ~26 minutes of legs instead of 44.
 
 **A re-upload of an existing name is handled by electron-builder itself**: on
 `422 ReleaseAsset already_exists` it deletes the asset and uploads again (electron-publish 26.15.3,
-`doUploadFile` → `overwriteArtifact`). Each leg also runs `.github/actions/clear-release-assets`
-before "Package and publish", but its patterns are written with doubled backslashes (`latest\\.yml`),
-which `grep -E` reads as a literal backslash followed by any character — so it cannot match a real
-asset name (np.56's retry logged `cleared 0 asset(s)`). Retries work because of the overwrite, not
-the clear step.
+`gitHubPublisher.js:153-154` → `overwriteArtifact`, `:114-125`). It finds the asset by exact name, so
+it only works for names GitHub does not rewrite — on np.38 the mac blockmap was uploaded as
+`Orca NP-…` and stored as `Orca.NP-…`, the overwrite never found it, and the retry died on
+`already_exists`. `mac.artifactName` in `config/electron-builder.np.config.cjs` keeps every name
+GitHub-safe since.
+
+Until 2026-11-16 each leg also ran a `.github/actions/clear-release-assets` step before packaging. It
+never cleared anything: its patterns were written `latest\\.yml`, which `grep -E` reads as a literal
+backslash, so np.56's retry logged `cleared 0 asset(s)`. It was deleted rather than repaired, because a
+working one would delete a published release's live manifests before electron-builder skipped the
+upload to it. Before a leg uploads, it now checks that its release is still a draft
+(`.github/scripts/fork-release-require-draft.sh`), so a leg re-run on its own (`Re-run job`, or
+`--failed` after the draft was deleted) refuses instead of creating a second release or passing on the
+assets already there.
 
 **`--failed` is a legitimate retry now:**
 

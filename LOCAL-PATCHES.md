@@ -3438,8 +3438,13 @@ Two follow-ups this release exposed, neither fixed here:
   than a rename inside a release.
 - **A retried release uploads cleanly now.** electron-builder appends to the release and fails on an
   existing asset name, so the two failed attempts on `np.38` (Apple stapling timeout, then
-  `already_exists`) could not be retried as they stood; each leg now clears its own assets first via
+  `already_exists`) could not be retried as they stood; each leg then cleared its own assets first via
   `.github/actions/clear-release-assets`, matched by name so one leg never deletes another's.
+  **Corrected 2026-11-16:** that step never matched anything — its patterns were written `\\.`, a literal
+  backslash to `grep -E` (np.56's retry: `cleared 0 asset(s)`) — and was deleted. What makes a retry
+  upload cleanly is electron-publish's own overwrite of an `already_exists` name
+  (`gitHubPublisher.js:153-154`), which np.38 defeated only because GitHub had renamed the
+  `Orca NP-…` blockmap; `mac.artifactName` has kept every name GitHub-safe since.
 
 Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instead of leaving them
 empty: an unset secret still _defines_ them as empty strings, electron-builder reads a defined
